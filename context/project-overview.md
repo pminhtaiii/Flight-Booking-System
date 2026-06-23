@@ -359,23 +359,6 @@ flowchart TD
 
 ---
 
-## Open Questions
-
-- **Tech stack**: Language, framework, database choice.
-- **Authentication strategy**: OAuth, JWT, social login providers.
-- **Search UX**: Filters (stops, airlines, price range), sorting, pagination.
-- **Multi-currency / multi-language** support.
-- **Rate limiting & caching** strategy for Amadeus API (2,000 calls/month is tight).
-- **Hotel booking flow**: Full booking via Amadeus, or surface suggestions with external links?
-- **Dining**: Booking integration (e.g., OpenTable) or bookmark-only?
-- **Multi-city trips**: Support for complex itineraries with multiple flight legs?
-- **Trip sharing**: Can a user share their itinerary with travel companions?
-- **Loyalty programs**: Integration with airline/hotel loyalty point tracking?
-- **Offline access**: Downloadable trip itinerary for offline use during travel?
-- **Push notifications**: Real-time flight delay/gate change alerts?
-
----
-
 ## Success Criteria
 
 - User can search for flights, view results, and complete a booking end-to-end.
