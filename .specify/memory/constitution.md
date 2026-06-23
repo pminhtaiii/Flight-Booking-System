@@ -1,24 +1,26 @@
 <!--
   ╔══════════════════════════════════════════════════════════════╗
   ║  SYNC IMPACT REPORT                                        ║
-  ║  Version change: 0.0.0 → 1.0.0 (MAJOR — initial adoption) ║
+  ║  Version change: 1.0.0 → 2.0.0 (MAJOR — principle removal)║
   ║                                                             ║
-  ║  Added principles:                                         ║
-  ║    I.   Flight-First Architecture                          ║
-  ║    II.  Deterministic Transaction Boundary                 ║
-  ║    III. API Budget Discipline                              ║
-  ║    IV.  Brainstorm-First Development                       ║
-  ║    V.   Test-First Development                             ║
-  ║    VI.  Incremental Delivery                               ║
+  ║  Modified principles:                                      ║
+  ║    I.   Flight-First Architecture (unchanged)              ║
+  ║    II.  Deterministic Transaction Boundary (unchanged)     ║
+  ║    III. API Budget Discipline (unchanged)                  ║
+  ║    IV.  Observability & Operational Visibility (NEW)       ║
+  ║    V.   Incremental Delivery (was VI, renumbered)          ║
   ║                                                             ║
   ║  Added sections:                                           ║
-  ║    - Security Requirements                                 ║
-  ║    - Governance                                            ║
+  ║    - Principle IV: Observability & Operational Visibility  ║
   ║                                                             ║
-  ║  Removed sections: (none — fresh constitution)             ║
+  ║  Removed sections:                                         ║
+  ║    - Principle IV: Brainstorm-First Development             ║
+  ║      → Relocated to .agents/AGENTS.md as procedural rule   ║
+  ║    - Principle V: Test-First Development                    ║
+  ║      → Relocated to .agents/AGENTS.md as procedural rule   ║
   ║                                                             ║
   ║  Templates requiring updates:                              ║
-  ║    ✅ plan-template.md — Constitution Check aligns          ║
+  ║    ✅ plan-template.md — Constitution Check still generic   ║
   ║    ✅ spec-template.md — scope/requirements compatible      ║
   ║    ✅ tasks-template.md — phase structure compatible        ║
   ║                                                             ║
@@ -81,49 +83,42 @@ hard constraint imposes the following non-negotiable rules:
 **Rationale**: Exceeding the free tier silently breaks the product for all
 users. Budget discipline is an architectural constraint, not an optimization.
 
-### IV. Brainstorm-First Development
+### IV. Observability & Operational Visibility
 
-Before any feature implementation begins, the agent MUST complete a
-structured brainstorming phase. No code is written until this phase
-produces an approved design artifact. The brainstorming phase consists of:
+All production services MUST expose sufficient telemetry to diagnose
+failures, measure performance, and audit behavior without requiring code
+changes or redeployment. The following are non-negotiable:
 
-1. **Context Exploration** — scan the project state, read relevant specs,
-   and understand the current codebase landscape.
-2. **Clarification** — surface ambiguities and ask the user targeted
-   questions to refine intent and requirements.
-3. **Approach Prototyping** — propose at least two distinct design
-   approaches with explicit trade-offs (complexity, performance, risk).
-4. **Design Presentation** — break down the chosen approach into
-   reviewable chunks and obtain explicit user approval.
+- **Structured Logging**: All services MUST emit structured logs (JSON) with
+  consistent fields: `timestamp`, `level`, `service`, `trace_id`,
+  `correlation_id`, and `message`. Logs MUST NOT contain PII or payment
+  card data (enforced by the Security Requirements section).
+- **Health Checks**: Every deployable service MUST expose a `/health`
+  endpoint (or equivalent) that reports readiness and liveness status.
+  Health checks MUST include downstream dependency status (database,
+  Amadeus API, payment provider).
+- **Metrics**: Key operational metrics MUST be collected and exposed:
+  - Request rate, error rate, and latency (p50, p95, p99) per endpoint.
+  - API budget consumption (ties to Principle III thresholds).
+  - Active booking transactions in progress.
+  - Cache hit/miss ratios for search results.
+- **Distributed Tracing**: All cross-service and cross-boundary calls MUST
+  propagate a `trace_id` to enable end-to-end request tracing. This
+  includes calls to the Amadeus API and payment processor.
+- **Alerting**: Alerts MUST be defined for:
+  - Error rate exceeding baseline by 2× over a 5-minute window.
+  - Latency p95 exceeding SLO for any critical endpoint.
+  - Health check failures on any service or dependency.
+  - API budget thresholds (as defined in Principle III).
+- **Dashboard**: A single operational dashboard MUST aggregate the above
+  metrics for at-a-glance system health assessment.
 
-The output of brainstorming MUST be captured in a structured specification
-or design document before planning or implementation proceeds.
+**Rationale**: A booking system handles real money and real itineraries.
+Silent failures or undetected performance degradation directly translate
+to lost revenue and broken trust. Observability is not a nice-to-have —
+it is a prerequisite for operating a transactional system responsibly.
 
-**Rationale**: Inspired by the Superpowers methodology — undisciplined AI
-coding is slow. Investing in upfront design exploration prevents costly
-rework and ensures the agent builds what the user actually needs.
-
-### V. Test-First Development
-
-TDD is mandatory for all production code. The Red-Green-Refactor cycle
-MUST be strictly enforced:
-
-1. **Red** — write a failing test that captures the requirement.
-2. **Green** — write the minimum code to make the test pass.
-3. **Refactor** — clean up while keeping tests green.
-
-Each user story MUST be independently testable. Integration tests are
-required for:
-
-- New service contract boundaries.
-- Inter-service communication paths.
-- Shared data schemas and external API integrations.
-
-**Rationale**: In a booking system handling financial transactions, untested
-code is unshippable code. TDD catches regressions early and provides a
-living specification of system behavior.
-
-### VI. Incremental Delivery
+### V. Incremental Delivery
 
 Every milestone and user story MUST deliver a working, deployable
 increment. The following rules apply:
@@ -182,4 +177,4 @@ decisions.
   artifacts for day-to-day development guidance aligned with these
   principles.
 
-**Version**: 1.0.0 | **Ratified**: 2026-06-23 | **Last Amended**: 2026-06-23
+**Version**: 2.0.0 | **Ratified**: 2026-06-23 | **Last Amended**: 2026-06-23
