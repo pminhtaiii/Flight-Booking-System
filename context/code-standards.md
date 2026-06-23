@@ -9,13 +9,12 @@ Implementation rules and conventions for the entire project. The AI agent must f
 The AI agent on this project operates as a senior engineer. This means:
 
 - **Think before implementing** — understand what is being built and why before writing a single line
-- **Read context files first** — never assume, always verify against architecture.md and project-overview.md
 - **Scope is sacred** — only build what the current feature requires. Never go beyond scope even if it seems helpful
 - **Every feature must be testable** — if it cannot be verified immediately after implementation, it is incomplete
 - **Clean over clever** — simple readable code that a junior developer can understand is always preferred over clever abstractions
 - **One thing at a time** — complete one feature fully before touching the next
 - **Failures are expected** — wrap agent operations in try/catch, log failures, never let one failure crash everything
-- **Constitution compliance** — every implementation decision must align with the principles in constitution.md
+- **Constitution compliance** — align implementation decisions with `.specify/memory/constitution.md`
 
 ---
 
@@ -214,8 +213,10 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
 
 ## Redis Conventions
 
+Caching and rate limiting conventions:
+
 - Use `ioredis` client — wrapped in an injectable `CacheService`
-- Search result caching: TTL of 15–30 minutes — constitutional requirement (API Budget Discipline)
+- Search result caching: TTL of 15–30 minutes
 - API budget counter: atomic `INCR` with monthly key — alerts at 50%, 75%, 90% thresholds
 - Rate limiting: per-user and global limits enforced before any Amadeus API call
 - Cache keys follow the pattern: `{domain}:{action}:{hash}` — e.g., `flights:search:{sha256}`
@@ -225,9 +226,10 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
 
 ## Amadeus API Conventions
 
+Conventions for external Amadeus API integration:
+
 - All Amadeus calls go through a single `AmadeusService` — never call the SDK directly from controllers
-- Every call MUST check the Redis budget counter first — if exhausted, return a graceful error
-- Every response MUST be cached in Redis — duplicate searches within TTL must hit cache
+- Budget counter check and response caching are enforced here (see Redis Conventions above for implementation)
 - Use the official `amadeus` npm SDK with typed wrappers
 - Store the raw API response in the database alongside parsed data
 - Log every API call with: endpoint, parameters (no PII), response status, latency
@@ -236,9 +238,10 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
 
 ## Stripe Payment Conventions
 
+Conventions for Stripe payment processing:
+
 - Use Payment Intents API + Stripe Elements on the frontend
-- Raw card data NEVER touches our server — Stripe Elements handles all card input
-- Backend only sees tokenized Payment Intent IDs
+- Backend only sees tokenized Payment Intent IDs — Stripe Elements handles all card input on the client
 - Webhook handling: always verify webhook signature before processing
 - Payment flow: create intent → frontend confirms → webhook updates booking status
 - All payment state changes written to `audit_logs` table
@@ -280,8 +283,7 @@ export class FlightMatchAgent {
 - Every agent function has a try/catch — never let one failure crash the run
 - Errors are always logged with trace ID before returning
 - Agent functions NEVER import from frontend code
-- Agent functions NEVER access Prisma directly — all data access goes through the agent-gateway
-- Agent-gateway strips PII before returning data to agents
+- Agent functions NEVER access Prisma directly — all data access goes through the agent-gateway (see `context/architecture.md` Invariants)
 - LangSmith records full traces for every agent run (tool calls, inputs, outputs, latency)
 - Use `ChatOpenAI` with custom `baseURL` pointing to Mimo's OpenAI-compatible endpoint
 
@@ -313,7 +315,7 @@ export class FlightMatchAgent {
 
 ## Structured Logging
 
-All services emit structured JSON logs with consistent fields — constitutional requirement (Observability):
+Conventions for structured logging:
 
 ```typescript
 {
@@ -327,7 +329,7 @@ All services emit structured JSON logs with consistent fields — constitutional
 }
 ```
 
-- Logs MUST NOT contain PII or payment card data — use `user_id` references only
+- Logs must use `user_id` references only — never PII or payment card data (constitutional requirement)
 - Every cross-service call propagates `trace_id` for distributed tracing
 - Use NestJS `Logger` service — never use raw `console.log` in backend code
 
@@ -335,7 +337,7 @@ All services emit structured JSON logs with consistent fields — constitutional
 
 ## Audit Logging
 
-All transactional state changes MUST be recorded in the `audit_logs` table:
+All transactional state changes must be recorded in the `audit_logs` table:
 
 - Booking created, confirmed, cancelled
 - Payment intent created, succeeded, failed, refunded
@@ -343,7 +345,6 @@ All transactional state changes MUST be recorded in the `audit_logs` table:
 - Amadeus API calls (endpoint, status, budget counter value)
 
 Audit log entries must include: `timestamp`, `user_id`, `action`, `resource_type`, `resource_id`, `metadata`.
-Audit logs MUST NOT contain PII or payment card data.
 
 ---
 
@@ -438,13 +439,13 @@ import { PrismaService } from '../../../prisma/prisma.service';
 - Integration tests for controller endpoints — use NestJS testing module with test database
 - E2E tests for critical flows: search → book → pay → confirm
 - Never test implementation details — test behavior and outcomes
-- All tests must pass before merge — constitutional requirement (Incremental Delivery)
+- All tests must pass before merge
 
 ---
 
 ## Health Checks
 
-Every deployable service exposes a `/health` endpoint — constitutional requirement (Observability):
+Every deployable service must expose a `/health` endpoint:
 
 - Reports readiness and liveness status
 - Includes downstream dependency status: PostgreSQL, Redis, Amadeus API, Stripe

@@ -224,9 +224,6 @@ After a flight is booked, the system uses the destination airport's coordinates 
 
 ## Architecture: AI Agents vs. Deterministic Services
 
-### Boundary Rule
-
-> **AI agents must NEVER be in the critical booking/payment path.** All transactional operations are handled by deterministic, auditable backend services.
 
 ### AI Agent Roles (Advisory — Never Transactional)
 
@@ -253,12 +250,6 @@ After a flight is booked, the system uses the destination airport's coordinates 
 | **Hotel Booking Service** | Amadeus Hotel Booking API |
 | **Auth Service** | User authentication, session management, OAuth |
 | **Notification Service** | Email, SMS delivery |
-
-### Rationale
-
-- LLMs are non-deterministic — unsuitable for financial transactions.
-- Booking transactions must be **auditable and reproducible**.
-- PCI-DSS and payment regulations require strict, traceable flows.
 
 ---
 

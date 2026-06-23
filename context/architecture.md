@@ -153,17 +153,10 @@ Response returned to user (advisory only — no booking action taken)
 
 ## Invariants
 
-Rules that must never be violated:
+The following are **architecture-specific** invariants that enforce the system design:
 
-- **AI agents NEVER participate in booking or payment flows.** All transactional operations are handled by deterministic backend services only.
 - **AI agents NEVER access PostgreSQL directly.** All agent data access goes through the agent-gateway, which strips PII and enforces scoped access.
-- **Raw payment card data NEVER touches our servers.** Stripe Elements handles all card input on the frontend; the backend only sees tokenized Payment Intent IDs.
-- **Every Amadeus API call MUST check the Redis budget counter first.** If the monthly budget is exhausted, return a graceful error — never silently exceed the 2,000 call limit.
-- **Every Amadeus API response MUST be cached in Redis.** Duplicate searches within the TTL window must hit cache, not Amadeus.
-- **All booking, payment, and auth events MUST be written to audit_logs.** No transactional state change goes unrecorded.
-- **Audit logs and structured logs MUST NOT contain PII or payment card data.** Use user_id references only.
 - **JWT tokens MUST be validated on every protected endpoint.** No endpoint in the deterministic path is accessible without authentication.
 - **Prisma migrations MUST be version-controlled and reviewed.** No ad-hoc schema changes in production.
-- **All user-facing inputs MUST be validated and sanitized.** SQL injection, XSS, and CSRF protections are mandatory.
 - **Frontend components contain no business logic or direct API calls to external services.** All external communication goes through the NestJS backend.
 - **Shared TypeScript types are the single source of truth.** Frontend and backend must use the same type definitions — never redefine them locally.

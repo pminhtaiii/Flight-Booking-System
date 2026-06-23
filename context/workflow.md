@@ -32,10 +32,8 @@ flowchart LR
 
 The agent must:
 
-1. Read all files in `context/` — project-overview.md, architecture.md, code-standards.md, this workflow file, and progress-checker.md.
-2. Read the constitution at `.specify/memory/constitution.md`.
-3. Understand the feature's final aim and how it fits into the existing system.
-4. Produce a `spec.md` with functional requirements, acceptance criteria, user stories, and edge cases.
+1. Understand the feature's final aim and how it fits into the existing system.
+2. Produce a `spec.md` with functional requirements, acceptance criteria, user stories, and edge cases.
 
 The spec is the agent's written understanding of the feature. The user reviews and may overwrite or correct it before proceeding.
 
@@ -50,8 +48,7 @@ The spec is the agent's written understanding of the feature. The user reviews a
 The agent must:
 
 1. Read the approved spec.
-2. Produce a `plan.md` with technical decisions, file-by-file breakdown, and implementation approach.
-3. Reference the architecture in `context/architecture.md` and code standards in `context/code-standards.md` to ensure alignment.
+2. Produce a `plan.md` with technical decisions, file-by-file breakdown, and implementation approach, ensuring alignment with project architecture and code standards.
 
 **Gate**: Plan produced, but not yet approved — it goes through convergence review first.
 
@@ -201,16 +198,7 @@ If any test fails, the task remains `[ ]` and the agent continues working on it.
 
 ---
 
-## Workflow Enforcement
-
-### How This Workflow Is Enforced
-
-1. **`context/workflow.md` (this file)** — defines the full pipeline and rules. Every agent reads this as part of the context folder.
-2. **`context/code-standards.md`** — contains the TDD strict rules as part of the project's coding standards.
-3. **`AGENTS.md`** — instructs agents to read all files in `context/` before starting any work.
-4. **Speckit hooks** — `before_implement` hook triggers a check that the agent has read this workflow and will apply TDD to every task.
-
-### Checkpoint Summary
+## Checkpoint Summary
 
 | Step | Gate | Who Approves |
 |---|---|---|
