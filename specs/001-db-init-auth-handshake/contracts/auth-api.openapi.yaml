@@ -1,0 +1,224 @@
+openapi: 3.1.0
+info:
+  title: Flight Booking Auth API
+  version: 0.1.0
+  description: Contract for database initialization and frontend/backend authentication handshake.
+servers:
+  - url: http://localhost:3001
+paths:
+  /auth/register:
+    post:
+      summary: Register a new user and return a session token.
+      operationId: registerUser
+      tags: [Auth]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RegisterRequest"
+      responses:
+        "201":
+          description: Registration succeeded.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthSession"
+        "400":
+          description: Invalid email or password policy failure.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: Registration rejected with safe duplicate-account messaging.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "429":
+          description: Temporarily locked out.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LockoutResponse"
+  /auth/login:
+    post:
+      summary: Authenticate a user and return a session token.
+      operationId: loginUser
+      tags: [Auth]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginRequest"
+      responses:
+        "200":
+          description: Login succeeded.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthSession"
+        "401":
+          description: Invalid credentials.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "429":
+          description: Temporarily locked out.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LockoutResponse"
+  /auth/logout:
+    post:
+      summary: Record logout and allow the client to clear its session.
+      operationId: logoutUser
+      tags: [Auth]
+      security:
+        - bearerAuth: []
+      responses:
+        "204":
+          description: Logout recorded.
+        "401":
+          description: Missing or invalid token.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /auth/me:
+    get:
+      summary: Return the authenticated user identity.
+      operationId: getCurrentUser
+      tags: [Auth]
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Authenticated user identity.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserIdentity"
+        "401":
+          description: Missing or invalid token.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /health:
+    get:
+      summary: API and dependency health.
+      operationId: getHealth
+      tags: [Health]
+      responses:
+        "200":
+          description: Service is healthy.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthResponse"
+        "503":
+          description: Service is degraded or down.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthResponse"
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  schemas:
+    RegisterRequest:
+      type: object
+      additionalProperties: false
+      required: [email, password]
+      properties:
+        email:
+          type: string
+          format: email
+          maxLength: 254
+        password:
+          type: string
+          minLength: 8
+          maxLength: 128
+          description: Must include uppercase, lowercase, digit, and special character.
+    LoginRequest:
+      type: object
+      additionalProperties: false
+      required: [email, password]
+      properties:
+        email:
+          type: string
+          format: email
+          maxLength: 254
+        password:
+          type: string
+          minLength: 1
+          maxLength: 128
+    AuthSession:
+      type: object
+      additionalProperties: false
+      required: [token, expiresAt, user]
+      properties:
+        token:
+          type: string
+          description: JWT valid for 24 hours.
+        expiresAt:
+          type: string
+          format: date-time
+        user:
+          $ref: "#/components/schemas/UserIdentity"
+    UserIdentity:
+      type: object
+      additionalProperties: false
+      required: [id, email]
+      properties:
+        id:
+          type: string
+        email:
+          type: string
+          format: email
+    ErrorResponse:
+      type: object
+      additionalProperties: false
+      required: [code, message]
+      properties:
+        code:
+          type: string
+          examples: [invalid_credentials]
+        message:
+          type: string
+    LockoutResponse:
+      type: object
+      additionalProperties: false
+      required: [code, message, retryAfterSeconds]
+      properties:
+        code:
+          type: string
+          const: auth_locked
+        message:
+          type: string
+        retryAfterSeconds:
+          type: integer
+          minimum: 1
+    HealthResponse:
+      type: object
+      additionalProperties: false
+      required: [status, dependencies]
+      properties:
+        status:
+          type: string
+          enum: [ok, degraded, down]
+        dependencies:
+          type: object
+          additionalProperties: false
+          required: [database]
+          properties:
+            database:
+              type: string
+              enum: [ok, down]

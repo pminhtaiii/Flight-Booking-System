@@ -38,6 +38,6 @@ Read in this exact order before any implementation:
 - **Context Folder Access**: Read all files in the `context/` folder *except* for `ui_rules.md` and `workflow.md` by default. Only read `workflow.md` when implementing code or dealing with things that need to be tested via unit or integration tests.
 
 <!-- SPECKIT START -->
-For additional context about technologies to be used, project structure,
-shell commands, and other important information, read the current plan
+Current implementation plan:
+specs/001-db-init-auth-handshake/plan.md
 <!-- SPECKIT END -->
