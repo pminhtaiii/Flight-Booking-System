@@ -24,7 +24,7 @@ Booking flights involves juggling multiple airline sites, comparing prices, and 
 
 ```
 /                        → Homepage
-/login                   → Auth page (OAuth providers)
+/login                   → Auth page (email/password)
 /dashboard               → Trip overview, recent activity, analytics
 /search                  → Flight search controls + results list
 /search/[flightId]       → Individual flight details + AI insights
@@ -60,7 +60,7 @@ Full width layout on all pages. No sidebar.
 
 ### 2. Onboarding
 
-- User signs up via OAuth (Google, GitHub, or other configured providers).
+- User signs up with email and password (social login deferred to a future milestone).
 - On login → redirect to `/dashboard`.
 - Dashboard shows an incomplete profile banner if traveler preferences are not set.
 
@@ -248,7 +248,7 @@ After a flight is booked, the system uses the destination airport's coordinates 
 | **Ticketing Service** | Ticket issuance, confirmation, PDF generation |
 | **Refund Service** | Cancellation processing, refund execution |
 | **Hotel Booking Service** | Amadeus Hotel Booking API |
-| **Auth Service** | User authentication, session management, OAuth |
+| **Auth Service** | User authentication, session management, JWT |
 | **Notification Service** | Email, SMS delivery |
 
 ---
