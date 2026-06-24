@@ -22,9 +22,7 @@ Read in this exact order before any implementation:
 4. context/code-standards.md
 5. context/library-docs.md
 6. context/progress-tracker.md
-
-Conditional reading:
-- Read context/workflow.md only when implementing code or dealing with tasks that need to be verified by unit or integration tests.
+7. context/workflow.md
 
 ## Rules That Never Change
 
