@@ -36,3 +36,8 @@ Read in this exact order before any implementation:
 - **Stop on Persistent Failure**: If the same problem persists after one corrective prompt — stop immediately, explain the situation, and ask the user for guidance.
 - **Third-Party Libraries**: Before using any third-party library, load its installed skill first, then read `context/library-docs.md` for project-specific rules.
 - **Context Folder Access**: Read all files in the `context/` folder *except* for `ui_rules.md` and `workflow.md` by default. Only read `workflow.md` when implementing code or dealing with things that need to be tested via unit or integration tests.
+
+<!-- SPECKIT START -->
+For additional context about technologies to be used, project structure,
+shell commands, and other important information, read the current plan
+<!-- SPECKIT END -->
