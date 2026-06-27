@@ -26,7 +26,8 @@ Read in this exact order before any implementation:
 
 ## Rules That Never Change
 
-- Always use caveman
+- Always use subagents while doing the implementation or code reviews to avoid context rot.
+- Always use caveman to save tokens.
 - Never use hardcoded hex values or raw Tailwind color classes.
 - Update progress-tracker.md after every feature.
 - Before any third party library — load its installed skill first, then read context/library-docs.md for project-specific rules.
