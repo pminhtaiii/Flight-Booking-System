@@ -1,0 +1,10 @@
+{
+  "extends": ["../../.eslintrc.json"],
+  "env": {
+    "jest": true
+  },
+  "rules": {
+    "@typescript-eslint/interface-name-prefix": "off",
+    "@typescript-eslint/explicit-module-boundary-types": "off"
+  }
+}

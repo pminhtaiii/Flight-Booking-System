@@ -1,0 +1,25 @@
+{
+  "name": "flight-booking-system-root",
+  "version": "1.0.0",
+  "private": true,
+  "engines": {
+    "node": ">=20.0.0",
+    "pnpm": ">=9.0.0"
+  },
+  "scripts": {
+    "build:shared": "pnpm --filter @shared/types build",
+    "build": "pnpm build:shared && pnpm --filter @api/backend build && pnpm --filter @web/frontend build",
+    "dev": "pnpm --parallel dev",
+    "test": "pnpm --recursive test",
+    "lint": "eslint \"{apps,packages}/**/*.{ts,tsx}\" --max-warnings 0",
+    "format": "prettier --write \"**/*.{ts,tsx,json,md,yaml,yml}\""
+  },
+  "devDependencies": {
+    "typescript": "^5.4.5",
+    "prettier": "^3.2.5",
+    "eslint": "^8.57.0",
+    "eslint-config-prettier": "^9.1.0",
+    "@typescript-eslint/eslint-plugin": "^7.11.0",
+    "@typescript-eslint/parser": "^7.11.0"
+  }
+}

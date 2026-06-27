@@ -1,2 +1,9 @@
 .agents/
 .specify/
+node_modules/
+dist/
+.next/
+*.log
+.env
+.env.*
+!*.example
