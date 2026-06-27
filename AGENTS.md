@@ -18,11 +18,10 @@ Read in this exact order before any implementation:
 
 1. context/project-overview.md
 2. context/architecture.md
-3. context/ui-rules.md
-4. context/code-standards.md
-5. context/library-docs.md
-6. context/progress-tracker.md
-7. context/workflow.md
+3. context/code-standards.md
+4. context/library-docs.md
+5. context/progress-tracker.md
+6. context/workflow.md
 
 ## Rules That Never Change
 
