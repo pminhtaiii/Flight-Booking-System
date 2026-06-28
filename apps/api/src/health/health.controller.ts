@@ -17,6 +17,7 @@ export class HealthController {
           await tx.$queryRaw`SELECT 1`;
         },
         {
+          maxWait: 150,
           timeout: 150,
         },
       );
