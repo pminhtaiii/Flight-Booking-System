@@ -6,23 +6,52 @@ Update this file after every completed feature. Any AI agent reading this should
 
 ## Current Status
 
-**Phase:** Milestone M6: Polish, E2E Verification & Stress Testing
+**Feature:** Polish, E2E Verification & Stress Testing
 **Last completed:** Full monorepo verification, E2E tests pass, concurrency testing, and lint cleanup.
 **Next:** Prepare for the next pipeline feature implementation.
 
 ---
 
-## Progress
+## Progress by Feature
 
-- [x] Database Schema initialization (User and AuditLog tables with cascade delete SetNull and index on userId)
-- [x] PrismaService implementation with connection error catching and shutdown hooks
-- [x] GET /health endpoint implementation with 100ms timeout on raw query
-- [x] Verification of build and 100% passing health check E2E tests
-- [x] User Registration API & UI with PII-safe audit logging
-- [x] User Login API & UI with Redis rate-limited escalating lockout
-- [x] NextAuth credential provider configuration and JWT session handshake
-- [x] 100% clean global ESLint runs and type checking across all workspaces
-- [x] Concurrency stress testing (100 parallel requests) verifying lockout safety
+### [x] Feature: Monorepo Scaffold & Shared Infrastructure
+- [x] Configure workspace `package.json` and workspaces
+- [x] Set up strict compiler, linting, and formatting rules
+- [x] Define shared domain models, types, and constants
+
+### [x] Feature: Database & Health Endpoint
+- [x] Define User and AuditLog schemas in Prisma
+- [x] Implement PrismaService database wrapper
+- [x] Add `GET /health` verification endpoint with E2E tests
+
+### [x] Feature: User Registration
+- [x] Define registration validation contracts
+- [x] Build PII-safe logger and AuditLog writer
+- [x] Implement AuthService registration with password hashing
+- [x] Expose `POST /auth/register` and build Registration UI
+
+### [x] Feature: User Login & Rate-Limited Lockout
+- [x] Define login validation contracts
+- [x] Set up Redis cache service wrapper
+- [x] Implement escalating brute-force lockout logic
+- [x] Expose `POST /auth/login` and build Login UI
+
+### [x] Feature: JWT Session Handshake
+- [x] Configure Passport JWT Strategy and Guards
+- [x] Implement `GET /auth/me` identity endpoint
+- [x] Configure NextAuth credentials provider session
+- [x] Create apiClient helper and protect `/dashboard` route
+
+### [x] Feature: User Logout
+- [x] Expose `POST /auth/logout` audit endpoint
+- [x] Implement frontend logout flow and NextAuth clear-session
+
+### [x] Feature: E2E Polish & Verification
+- [x] Clean ESLint and type checking globally
+- [x] Run concurrency stress tests (100 parallel requests)
+- [x] Walkthrough verification and documentation
+
+---
 
 ## Decisions Made During Build
 
