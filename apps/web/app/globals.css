@@ -1,0 +1,123 @@
+@import "tailwindcss";
+
+@theme {
+  /* Font Family Link to Next Font variable */
+  --font-sans: var(--font-sans), ui-sans-serif, system-ui, sans-serif;
+
+  /* Brand Colors */
+  --color-accent: #7C5CFC;
+  --color-primary: #7C5CFC;
+  --color-primary-foreground: #FFFFFF;
+  --color-secondary: #FFFFFF;
+  --color-secondary-border: #E7EAF3;
+  --color-secondary-foreground: #101828;
+  --color-danger: #FFFFFF;
+  --color-danger-border: #DC2626;
+  --color-danger-foreground: #DC2626;
+  --color-muted: #99A1AF;
+  
+  /* Text and Card Colors */
+  --color-background: #F9FAFB;
+  --color-text-primary: #101828;
+  --color-text-secondary: #4A5565;
+  --color-text-muted: #99A1AF;
+  --color-card: #FFFFFF;
+  --color-card-border: #E7EAF3;
+  --color-card-foreground: #101828;
+
+  /* Status Colors */
+  --color-bg-confirmed: #ECFDF5;
+  --color-text-confirmed: #009966;
+  --color-bg-pending: #FFFBEB;
+  --color-text-pending: #B45309;
+  --color-bg-cancelled: #FEF2F2;
+  --color-text-cancelled: #DC2626;
+
+  /* Match Score Colors */
+  --color-bg-match-strong: #ECFDF5;
+  --color-text-match-strong: #009966;
+  --color-bg-match-fair: #EFF6FF;
+  --color-text-match-fair: #2563EB;
+  --color-bg-match-weak: #FFF7ED;
+  --color-text-match-weak: #EA580C;
+}
+
+/* Custom UI Utilities following UI Rules */
+@utility card {
+  background-color: var(--color-card);
+  border: 1px solid var(--color-card-border);
+  border-radius: 16px;
+  padding: 24px;
+  box-shadow: 0px 1px 3px rgba(0, 0, 0, 0.1), 0px 1px 2px -1px rgba(0, 0, 0, 0.1);
+}
+
+@utility btn-primary {
+  background-color: var(--color-accent);
+  color: var(--color-primary-foreground);
+  border-radius: 8px;
+  padding: 8px 16px;
+  font-size: 14px;
+  font-weight: 500;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: opacity 0.2s;
+  &:hover {
+    opacity: 0.9;
+  }
+}
+
+@utility btn-secondary {
+  background-color: var(--color-secondary);
+  border: 1px solid var(--color-secondary-border);
+  color: var(--color-secondary-foreground);
+  border-radius: 8px;
+  padding: 8px 16px;
+  font-size: 14px;
+  font-weight: 500;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background-color 0.2s;
+  &:hover {
+    background-color: var(--color-background);
+  }
+}
+
+@utility btn-danger {
+  background-color: var(--color-danger);
+  border: 1px solid var(--color-danger-border);
+  color: var(--color-danger-foreground);
+  border-radius: 8px;
+  padding: 8px 16px;
+  font-size: 14px;
+  font-weight: 500;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background-color 0.2s;
+  &:hover {
+    background-color: var(--color-bg-cancelled);
+  }
+}
+
+@utility form-input {
+  background-color: var(--color-card);
+  border: 1px solid var(--color-secondary-border);
+  border-radius: 8px;
+  padding: 8px 12px;
+  font-size: 14px;
+  color: var(--color-text-primary);
+  outline: none;
+  transition: border-color 0.2s, box-shadow 0.2s;
+  &::placeholder {
+    color: var(--color-text-muted);
+  }
+  &:focus {
+    border-color: var(--color-accent);
+    box-shadow: 0 0 0 1px var(--color-accent);
+  }
+}
