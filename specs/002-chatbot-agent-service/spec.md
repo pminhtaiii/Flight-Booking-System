@@ -140,10 +140,10 @@ A user can start new conversations, switch between existing conversations, and v
 
 - **SC-001**: First token within 3 seconds, measured from when the message exits the guardrail layer.
 - **SC-002**: 100% of requests without a valid authentication token are rejected before any processing occurs.
-- **SC-004**: Legitimate user messages pass through the guardrail layer with less than 500 milliseconds of added latency in 95% of cases.
-- **SC-005**: Users can retrieve and continue conversations from previous sessions with full history preserved.
-- **SC-006**: The service health check endpoint responds within 1 second and accurately reflects dependency status.
-- **SC-007**: No user can access another user's conversation data, verified through access control testing.
+- **SC-003**: Legitimate user messages pass through the guardrail layer with less than 500 milliseconds of added latency in 95% of cases.
+- **SC-004**: Users can retrieve and continue conversations from previous sessions with full history preserved.
+- **SC-005**: The service health check endpoint responds within 1 second and accurately reflects dependency status.
+- **SC-006**: No user can access another user's conversation data, verified through access control testing.
 
 ## Assumptions
 
