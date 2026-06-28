@@ -14,21 +14,20 @@ This version has breaking changes — APIs, conventions, and file structure may 
 
 ## Read Before Anything Else
 
-Read in this exact order before any implementation:
-
-1. context/project-overview.md
-2. context/architecture.md
-3. context/code-standards.md
-4. context/library-docs.md
-5. context/progress-tracker.md
-6. context/workflow.md
+Read only the context files relevant to the specific task:
+- For general understanding or new features: read `context/project-overview.md`.
+- For system layout, routing, database, and backend/frontend setup: read `context/architecture.md`.
+- For linting, file structure, naming conventions, and code guidelines: read `context/code-standards.md`.
+- For third-party library rules and configurations: read `context/library-docs.md`.
+- For current progress status: read `context/progress-checker.md`.
+- For testing and build/verification workflows (only read when implementing or testing): read `context/workflow.md`.
 
 ## Rules That Never Change
 
 - Always use subagents while doing the implementation or code reviews to avoid context rot.
 - Always use caveman to save tokens.
 - Never use hardcoded hex values or raw Tailwind color classes.
-- Update progress-tracker.md after every feature.
+- Update all relevant files in the `context/` folder (such as `context/architecture.md` and `context/progress-checker.md`) after completing any feature to ensure project documentation remains in sync with the codebase.
 - Before any third party library — load its installed skill first, then read context/library-docs.md for project-specific rules.
 
 ## Agent Operating Rules
@@ -37,8 +36,29 @@ Read in this exact order before any implementation:
 
 - **Stop on Persistent Failure**: If the same problem persists after one corrective prompt — stop immediately, explain the situation, and ask the user for guidance.
 - **Third-Party Libraries**: Before using any third-party library, load its installed skill first, then read `context/library-docs.md` for project-specific rules.
-- **Context Folder Access**: Read all files in the `context/` folder _except_ for `ui_rules.md` and `workflow.md` by default. Only read `workflow.md` when implementing code or dealing with things that need to be tested via unit or integration tests.
+- **Context Folder Access**: Avoid reading all files in the `context/` folder by default. Instead, selectively read only the files relevant to the current task to prevent context bloating:
+  - If the task is about architecture, data flow, or NestJS/Next.js setup: read `context/architecture.md`.
+  - If the task is about coding conventions, directories, or rules: read `context/code-standards.md`.
+  - If the task requires using a third-party library: read `context/library-docs.md`.
+  - If the task involves updating status/progress: read `context/progress-checker.md`.
+  - If the task is a new feature or high-level request: read `context/project-overview.md`.
+  - If the task is implementation, testing, or requires the TDD/E2E workflow: read `context/workflow.md`.
 - **Sub-Agent Delegation**: Use specialized sub-agents whenever possible, especially when performing code implementation or code reviews, to optimize task distribution and avoid context bloating.
+
+### E2E Testing Instructions
+When the task involves writing, running, or verifying E2E tests:
+1. **Locating E2E Tests**:
+   - Backend NestJS API E2E tests reside in `apps/api/test/` (e.g., `*.e2e-spec.ts`).
+   - Frontend Next.js Playwright UI tests reside in `apps/web/tests/` (e.g., `*.spec.ts`).
+2. **Configuration**:
+   - Backend E2E uses Jest, configured in `apps/api/test/jest-e2e.json`.
+   - Frontend E2E uses Playwright, configured in `apps/web/tests/playwright.config.ts`.
+3. **Running E2E Tests**:
+   - Backend API E2E tests: run `npm run test:e2e --workspace=apps/api`
+   - Frontend Playwright E2E tests: run `npx playwright test --config=apps/web/tests/playwright.config.ts`
+4. **Mocking & Test Strategy**:
+   - Follow the opaque-box verification strategies defined in [TEST_INFRA.md](file:///c:/Booking%20Systems/TEST_INFRA.md).
+   - Use time acceleration (`POST /auth/test/reset-lockout` when `NODE_ENV === 'test'`) and database assertions.
 
 <!-- SPECKIT START -->
 

@@ -25,11 +25,36 @@
 ```
 /
 ├── AGENTS.md                          → Agent rules and procedural guidance
+├── PROJECT.md                         → Project high-level definition
+├── TEST_INFRA.md                      → E2E testing infrastructure docs
+├── TEST_READY.md                      → E2E test coverage and runbook
+├── pnpm-workspace.yaml                → pnpm workspace config
+├── package.json                       → Monorepo dependencies and workspaces
+├── tsconfig.json                      → Base TypeScript compiler options
 ├── .gitignore
 ├── skills-lock.json
 │
+├── apps/
+│   ├── api/                           → NestJS backend API service
+│   │   ├── prisma/                    → Prisma database schemas & migrations
+│   │   ├── src/                       → NestJS source code (auth, health, audit, etc.)
+│   │   └── test/                      → API E2E spec tests
+│   └── web/                           → Next.js frontend UI service
+│       ├── app/                       → Next.js App Router pages and API routes
+│       ├── components/                → React UI components
+│       └── tests/                     → Playwright UI browser tests
+│
+├── packages/
+│   └── shared/                        → Shared library for types and constants
+│       └── src/                       → Shared TypeScript validation contracts
+│
 ├── context/
-│   └── architecture.md                → This file
+│   ├── architecture.md                → This file
+│   ├── code-standards.md              → General coding rules and conventions
+│   ├── library-docs.md                → Usage guide for third-party libraries
+│   ├── progress-checker.md            → Detailed progress status tracker
+│   ├── project-overview.md            → High-level system requirements and flow
+│   └── workflow.md                    → The step-by-step development process
 │
 ├── research/
 │   ├── decision-boundaries.md         → Architecture decisions from grilling
@@ -50,8 +75,6 @@
     ├── init-options.json
     └── integration.json
 ```
-
-> **Note**: No application source code has been implemented yet.
 
 ---
 
