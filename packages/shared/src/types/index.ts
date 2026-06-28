@@ -19,6 +19,6 @@ export type Booking = {
   id: string;
   userId: string;
   flightId: string;
-  status: 'CONFIRMED' | 'PENDING' | 'CANCELLED';
+  status: 'confirmed' | 'pending' | 'cancelled';
   createdAt: Date;
 };

@@ -8,7 +8,7 @@
   },
   "scripts": {
     "build:shared": "pnpm --filter @shared/types build",
-    "build": "pnpm build:shared && pnpm --filter @api/backend build && pnpm --filter @web/frontend build",
+    "build": "pnpm -r build",
     "dev": "pnpm --parallel dev",
     "test": "pnpm --recursive test",
     "lint": "eslint \"{apps,packages}/**/*.{ts,tsx}\" --max-warnings 0",

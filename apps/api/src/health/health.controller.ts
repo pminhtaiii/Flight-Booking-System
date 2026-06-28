@@ -10,19 +10,16 @@ export class HealthController {
 
   @Get()
   async check(@Res() res: Response): Promise<Response> {
-    let timeoutId: NodeJS.Timeout | undefined;
-
-    const timeout = new Promise<never>((_, reject) => {
-      timeoutId = setTimeout(() => reject(new Error('Database query timed out')), 100);
-    });
-
     try {
-      // Execute the SELECT 1 query and race it with the 100ms timeout
-      await Promise.race([this.prisma.$queryRaw`SELECT 1`, timeout]);
-
-      if (timeoutId) {
-        clearTimeout(timeoutId);
-      }
+      await this.prisma.$transaction(
+        async (tx) => {
+          await tx.$executeRawUnsafe('SET LOCAL statement_timeout = 100');
+          await tx.$queryRaw`SELECT 1`;
+        },
+        {
+          timeout: 150,
+        },
+      );
 
       return res.status(HttpStatus.OK).json({
         status: 'ok',
@@ -32,9 +29,6 @@ export class HealthController {
       });
     } catch (error) {
       this.logger.error('Error occurred during health check:', error);
-      if (timeoutId) {
-        clearTimeout(timeoutId);
-      }
       return res.status(HttpStatus.SERVICE_UNAVAILABLE).json({
         status: 'down',
         dependencies: {

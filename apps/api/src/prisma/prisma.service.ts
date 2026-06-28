@@ -16,6 +16,7 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
       await this.$queryRaw`SELECT 1`;
     } catch (error) {
       this.logger.error('Failed to connect to the database on module initialization', error);
+      throw error;
     }
   }
 

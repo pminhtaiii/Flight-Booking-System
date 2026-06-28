@@ -3,10 +3,10 @@ import { z } from 'zod';
 export const registerSchema = z.object({
   email: z
     .string()
-    .email({ message: 'Invalid email address' })
-    .max(254, { message: 'Email must be at most 254 characters' })
     .trim()
-    .toLowerCase(),
+    .toLowerCase()
+    .email({ message: 'Invalid email address' })
+    .max(254, { message: 'Email must be at most 254 characters' }),
   password: z
     .string()
     .min(8, { message: 'Password must be at least 8 characters' })
