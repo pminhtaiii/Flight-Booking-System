@@ -148,6 +148,10 @@ export class CacheService implements OnModuleInit, OnModuleDestroy {
     const item = this.inMemoryStore.get(key);
     if (!item) return -2;
     if (item.expiry === Infinity) return -1;
+    if (Date.now() > item.expiry) {
+      this.inMemoryStore.delete(key);
+      return -2;
+    }
     const remaining = Math.max(0, Math.ceil((item.expiry - Date.now()) / 1000));
     return remaining > 0 ? remaining : -2;
   }
@@ -170,12 +174,12 @@ export class CacheService implements OnModuleInit, OnModuleDestroy {
     const regex = new RegExp('^' + escapedPattern + '$');
     const now = Date.now();
     for (const [key, item] of this.inMemoryStore.entries()) {
+      if (now > item.expiry) {
+        this.inMemoryStore.delete(key);
+        continue;
+      }
       if (regex.test(key)) {
-        if (now > item.expiry) {
-          this.inMemoryStore.delete(key);
-        } else {
-          matched.push(key);
-        }
+        matched.push(key);
       }
     }
     return matched;
