@@ -30,7 +30,7 @@ Initialize the Flight Booking System application foundation with a PostgreSQL-ba
 
 ## Constitution Check
 
-*GATE: Must pass before Phase 0 research. Re-check after Phase 1 design.*
+_GATE: Must pass before Phase 0 research. Re-check after Phase 1 design._
 
 - **Flight-First Architecture**: PASS. The feature enables future flight workflows without adding hotel, dining, or itinerary scope.
 - **Deterministic Transaction Boundary**: PASS. Auth and database setup are deterministic services. AI is explicitly out of scope.
@@ -183,10 +183,10 @@ Test coverage must include:
 
 ## Complexity Tracking
 
-| Violation | Why Needed | Simpler Alternative Rejected Because |
-|-----------|------------|-------------------------------------|
-| Monorepo with separate API, web, and shared package | The architecture mandates separate NestJS backend, Next.js frontend, and shared TypeScript types. | A single app would violate the frontend/backend boundary and make future flight, booking, and payment services harder to isolate. |
-| Redis in first feature | Required for auth rate limiting and escalating lockout without coupling abuse-control state to stateless JWT sessions. | In-memory counters would fail across restarts and multiple instances; database counters would add transactional load and cleanup complexity to the auth hot path. |
+| Violation                                           | Why Needed                                                                                                             | Simpler Alternative Rejected Because                                                                                                                              |
+| --------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Monorepo with separate API, web, and shared package | The architecture mandates separate NestJS backend, Next.js frontend, and shared TypeScript types.                      | A single app would violate the frontend/backend boundary and make future flight, booking, and payment services harder to isolate.                                 |
+| Redis in first feature                              | Required for auth rate limiting and escalating lockout without coupling abuse-control state to stateless JWT sessions. | In-memory counters would fail across restarts and multiple instances; database counters would add transactional load and cleanup complexity to the auth hot path. |
 
 ## Phase 0 Research Outcomes
 

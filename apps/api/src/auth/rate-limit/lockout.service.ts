@@ -22,7 +22,9 @@ export class LockoutService {
     return { locked: false, retryAfterSeconds: 0 };
   }
 
-  async recordFailedAttempt(ip: string): Promise<{ locked: boolean; retryAfterSeconds: number; attempts: number }> {
+  async recordFailedAttempt(
+    ip: string,
+  ): Promise<{ locked: boolean; retryAfterSeconds: number; attempts: number }> {
     const ipHash = this.hashIp(ip);
     const failedKey = `auth:failed:${ipHash}`;
     const lockoutKey = `auth:lockout:${ipHash}`;

@@ -5,22 +5,18 @@ import { AuditService } from '@/audit/audit.service';
 import { LockoutService } from './rate-limit/lockout.service';
 import { JwtService } from '@nestjs/jwt';
 import { CacheService } from '@/cache/cache.service';
-import { ConflictException, UnauthorizedException, BadRequestException } from '@nestjs/common';
+import { ConflictException, BadRequestException } from '@nestjs/common';
 
 describe('AuthService', () => {
   let service: AuthService;
-  let prisma: PrismaService;
-  let audit: AuditService;
-  let lockout: LockoutService;
-  let jwt: JwtService;
 
-  const mockPrismaService: any = {
+  const mockPrismaService = {
     user: {
       findUnique: jest.fn(),
       create: jest.fn(),
       update: jest.fn(),
     },
-    $transaction: jest.fn(async (cb: (tx: any) => Promise<any>): Promise<any> => {
+    $transaction: jest.fn(async (cb: (tx: unknown) => Promise<unknown>): Promise<unknown> => {
       return cb(mockPrismaService);
     }),
   };
@@ -57,10 +53,6 @@ describe('AuthService', () => {
     }).compile();
 
     service = module.get<AuthService>(AuthService);
-    prisma = module.get<PrismaService>(PrismaService);
-    audit = module.get<AuditService>(AuditService);
-    lockout = module.get<LockoutService>(LockoutService);
-    jwt = module.get<JwtService>(JwtService);
 
     jest.clearAllMocks();
   });
@@ -88,24 +80,21 @@ describe('AuthService', () => {
     });
 
     it('should throw ConflictException if email is already taken', async () => {
-      mockPrismaService.user.findUnique.mockResolvedValue({ id: 'existing-123', email: 'test@example.com' });
+      mockPrismaService.user.findUnique.mockResolvedValue({
+        id: 'existing-123',
+        email: 'test@example.com',
+      });
 
       await expect(service.register(validDto)).rejects.toThrow(ConflictException);
     });
 
     it('should throw BadRequestException if password does not meet complexity requirements', async () => {
-      const weakPasswords = [
-        'pwd123!',
-        'password123!',
-        'PASSWORD123!',
-        'Password!',
-        'Password123',
-      ];
+      const weakPasswords = ['pwd123!', 'password123!', 'PASSWORD123!', 'Password!', 'Password123'];
 
       for (const password of weakPasswords) {
-        await expect(
-          service.register({ email: 'test@example.com', password })
-        ).rejects.toThrow(BadRequestException);
+        await expect(service.register({ email: 'test@example.com', password })).rejects.toThrow(
+          BadRequestException,
+        );
       }
     });
   });

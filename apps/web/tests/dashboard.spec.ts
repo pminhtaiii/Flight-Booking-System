@@ -1,3 +1,4 @@
+/* eslint-disable no-console */
 import { test, expect } from '@playwright/test';
 
 test.describe('Dashboard and Session Flows', () => {
@@ -6,16 +7,18 @@ test.describe('Dashboard and Session Flows', () => {
 
   test.beforeEach(async ({ request, context }) => {
     const res = await request.post('http://localhost:3001/api/auth/test/reset-lockout', {
-      data: { clearAll: true }
+      data: { clearAll: true },
     });
     expect(res.status()).toBe(200);
     await context.clearCookies();
   });
 
-  test('should redirect unauthenticated user visiting dashboard to login page', async ({ page }) => {
+  test('should redirect unauthenticated user visiting dashboard to login page', async ({
+    page,
+  }) => {
     // Navigate to dashboard unauthenticated
     await page.goto('/dashboard');
-    
+
     // Verify redirection to /login
     await expect(page).toHaveURL(/\/login/);
   });
@@ -33,18 +36,34 @@ test.describe('Dashboard and Session Flows', () => {
     await expect(page.locator('text=' + email)).toBeVisible();
   });
 
-  test('should handle token expiration by clearing session and redirecting to login with message', async ({ page }) => {
+  test('should handle token expiration by clearing session and redirecting to login with message', async ({
+    page,
+  }) => {
+    page.on('console', (msg) => console.log('PAGE LOG:', msg.text()));
+    page.on('pageerror', (err) => console.log('PAGE ERROR:', err.message));
+
     // Log in
     await page.goto('/register');
     await page.fill('input[name="email"]', 'expiry@example.com');
     await page.fill('input[name="password"]', password);
     await page.click('button[type="submit"]');
-    await expect(page).toHaveURL(/\/dashboard/);
+
+    try {
+      await expect(page).toHaveURL(/\/dashboard/, { timeout: 5000 });
+    } catch (e) {
+      const errorMsg = await page
+        .locator('.error-message')
+        .textContent()
+        .catch(() => 'no error message');
+      console.log('REGISTRATION ERROR ON PAGE:', errorMsg);
+      await page.screenshot({ path: 'registration_failure.png' });
+      throw e;
+    }
 
     // Simulate token expiry by injecting an expired session cookie
     const cookies = await page.context().cookies();
-    const sessionCookie = cookies.find(c => c.name.includes('session'));
-    
+    const sessionCookie = cookies.find((c) => c.name.includes('session'));
+
     if (sessionCookie) {
       // Overwrite the session cookie with a dummy expired one or remove it to force 401
       await page.context().addCookies([
@@ -54,7 +73,7 @@ test.describe('Dashboard and Session Flows', () => {
           domain: sessionCookie.domain,
           path: sessionCookie.path,
           expires: Math.floor(Date.now() / 1000) - 3600, // expired 1 hour ago
-        }
+        },
       ]);
     }
 

@@ -2,21 +2,21 @@
 
 ## Stack
 
-| Layer              | Tool                          | Purpose                                                    |
-| ------------------ | ----------------------------- | ---------------------------------------------------------- |
-| Language           | TypeScript (strict)           | End-to-end — shared types across frontend and backend      |
-| Backend Framework  | NestJS                        | Deterministic backend services (booking, payments, auth)   |
-| Frontend Framework | Next.js (App Router)          | SSR, SEO, Server Components for the user-facing UI         |
-| Database           | PostgreSQL                    | Primary transactional store (users, bookings, payments)    |
-| ORM                | Prisma                        | Type-safe queries, declarative schema, versioned migrations|
-| Cache / Rate Limit | Redis                         | Search result caching, rate limiting, API budget tracking   |
-| Authentication     | NextAuth.js (Auth.js) + JWT   | Email/password for v1. Social login deferred               |
-| Payment            | Stripe (Payment Intents)      | PCI-DSS compliant payment processing                       |
-| Flight Data        | Amadeus Self-Service API      | Flight search, pricing, PNR creation, ticketing            |
-| AI Model           | Mimo (OpenAI-compatible URL)  | Advisory agents — search assistance, recommendations       |
-| AI Framework       | LangChain.js                  | Agent chains, tool calling, conversation memory            |
-| AI Observability   | LangSmith                     | Agent run tracing, tool call auditing                      |
-| Code Review        | CodeRabbit                    | Automated PR review for security and code quality          |
+| Layer              | Tool                         | Purpose                                                     |
+| ------------------ | ---------------------------- | ----------------------------------------------------------- |
+| Language           | TypeScript (strict)          | End-to-end — shared types across frontend and backend       |
+| Backend Framework  | NestJS                       | Deterministic backend services (booking, payments, auth)    |
+| Frontend Framework | Next.js (App Router)         | SSR, SEO, Server Components for the user-facing UI          |
+| Database           | PostgreSQL                   | Primary transactional store (users, bookings, payments)     |
+| ORM                | Prisma                       | Type-safe queries, declarative schema, versioned migrations |
+| Cache / Rate Limit | Redis                        | Search result caching, rate limiting, API budget tracking   |
+| Authentication     | NextAuth.js (Auth.js) + JWT  | Email/password for v1. Social login deferred                |
+| Payment            | Stripe (Payment Intents)     | PCI-DSS compliant payment processing                        |
+| Flight Data        | Amadeus Self-Service API     | Flight search, pricing, PNR creation, ticketing             |
+| AI Model           | Mimo (OpenAI-compatible URL) | Advisory agents — search assistance, recommendations        |
+| AI Framework       | LangChain.js                 | Agent chains, tool calling, conversation memory             |
+| AI Observability   | LangSmith                    | Agent run tracing, tool call auditing                       |
+| Code Review        | CodeRabbit                   | Automated PR review for security and code quality           |
 
 ---
 

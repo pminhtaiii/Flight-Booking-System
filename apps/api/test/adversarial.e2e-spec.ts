@@ -8,6 +8,32 @@ import { AuditService } from '@/audit/audit.service';
 import { LockoutService } from '@/auth/rate-limit/lockout.service';
 import { HttpExceptionFilter } from '@/common/filters/http-exception.filter';
 
+interface CacheServiceWithInternal {
+  redisClient: unknown;
+}
+
+interface SanitizedUserMetadata {
+  usersList: {
+    email?: string;
+    emailHash?: string;
+    credentials: {
+      password?: string;
+      token?: string;
+    };
+  }[];
+}
+
+interface SanitizedVariantsMetadata {
+  emailAddress?: string;
+  userEmail?: string;
+  emailAddressHash?: string;
+  userEmailHash?: string;
+}
+
+interface CircularMetadata {
+  self: unknown;
+}
+
 describe('Adversarial and Edge Case Tests (E2E)', () => {
   jest.setTimeout(30000);
   let app: INestApplication;
@@ -22,7 +48,7 @@ describe('Adversarial and Edge Case Tests (E2E)', () => {
     }).compile();
 
     app = moduleFixture.createNestApplication();
-    
+
     // Enable trust proxy so that X-Forwarded-For from loopback is respected in req.ip
     app.getHttpAdapter().getInstance().set('trust proxy', 'loopback');
 
@@ -50,11 +76,9 @@ describe('Adversarial and Edge Case Tests (E2E)', () => {
     // Reset database state before each test
     await prisma.auditLog.deleteMany({});
     await prisma.user.deleteMany({});
-    
+
     // Clear lockouts
-    await request(app.getHttpServer())
-      .post('/auth/test/reset-lockout')
-      .send({ clearAll: true });
+    await request(app.getHttpServer()).post('/auth/test/reset-lockout').send({ clearAll: true });
   });
 
   describe('JWT Strategy Status and Existence Verification', () => {
@@ -206,14 +230,14 @@ describe('Adversarial and Edge Case Tests (E2E)', () => {
   });
 
   describe('CacheService Fallback Mechanism (Redis Offline simulation)', () => {
-    let originalRedisClient: any;
+    let originalRedisClient: unknown;
 
     beforeEach(() => {
-      originalRedisClient = (cacheService as any).redisClient;
+      originalRedisClient = (cacheService as unknown as CacheServiceWithInternal).redisClient;
     });
 
     afterEach(() => {
-      (cacheService as any).redisClient = originalRedisClient;
+      (cacheService as unknown as CacheServiceWithInternal).redisClient = originalRedisClient;
     });
 
     it('should fall back to in-memory store and allow LockoutService to function when Redis throws errors', async () => {
@@ -228,7 +252,7 @@ describe('Adversarial and Edge Case Tests (E2E)', () => {
         expire: jest.fn().mockRejectedValue(new Error('Redis connection lost')),
       };
 
-      (cacheService as any).redisClient = failingRedis;
+      (cacheService as unknown as CacheServiceWithInternal).redisClient = failingRedis;
 
       // 2. Verify that CacheService functions via fallback in-memory store
       await cacheService.set('test-fallback-key', 'fallback-value', 10);
@@ -237,7 +261,7 @@ describe('Adversarial and Edge Case Tests (E2E)', () => {
 
       // 3. Test that LockoutService works properly using fallback
       const ip = '9.9.9.9';
-      
+
       // Initially not locked out
       let check = await lockoutService.isLockedOut(ip);
       expect(check.locked).toBe(false);
@@ -266,13 +290,13 @@ describe('Adversarial and Edge Case Tests (E2E)', () => {
 
     it('should not return expired keys when listing keys in the fallback cache', async () => {
       // Simulate offline Redis to force fallback to in-memory store
-      (cacheService as any).redisClient = null;
+      (cacheService as unknown as CacheServiceWithInternal).redisClient = null;
 
       await cacheService.set('auth:expired:1', 'val1', 1);
       await cacheService.set('auth:expired:2', 'val2', 100);
 
       // Wait 1.5 seconds for key 1 to expire
-      await new Promise(resolve => setTimeout(resolve, 1500));
+      await new Promise((resolve) => setTimeout(resolve, 1500));
 
       const keys = await cacheService.keys('auth:expired:*');
       expect(keys).toContain('auth:expired:2');
@@ -281,7 +305,7 @@ describe('Adversarial and Edge Case Tests (E2E)', () => {
 
     it('should not reset/extend the TTL on subsequent increments in the fallback cache', async () => {
       // Simulate offline Redis to force fallback to in-memory store
-      (cacheService as any).redisClient = null;
+      (cacheService as unknown as CacheServiceWithInternal).redisClient = null;
 
       const key = 'auth:incr-ttl-test';
       // First increment set TTL to 10 seconds
@@ -290,12 +314,12 @@ describe('Adversarial and Edge Case Tests (E2E)', () => {
       expect(ttl1).toBeGreaterThan(0);
 
       // Wait 2 seconds
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      await new Promise((resolve) => setTimeout(resolve, 2000));
 
       // Subsequent increment
       await cacheService.incr(key, 10);
       const ttl2 = await cacheService.getTtl(key);
-      
+
       // The remaining TTL should be less than 9 seconds (not reset back to 10)
       expect(ttl2).toBeLessThan(9);
     });
@@ -329,7 +353,7 @@ describe('Adversarial and Edge Case Tests (E2E)', () => {
       });
 
       expect(log).toBeDefined();
-      const metadata = log?.metadata as any;
+      const metadata = log?.metadata as unknown as SanitizedUserMetadata;
       expect(metadata).toBeDefined();
 
       const nestedUser = metadata.usersList[0];
@@ -358,7 +382,7 @@ describe('Adversarial and Edge Case Tests (E2E)', () => {
         where: { action: 'test_variants' },
       });
       expect(log).toBeDefined();
-      const metadata = log?.metadata as any;
+      const metadata = log?.metadata as unknown as SanitizedVariantsMetadata;
       expect(metadata.emailAddress).toBeUndefined();
       expect(metadata.userEmail).toBeUndefined();
       expect(metadata.emailAddressHash).toBeDefined();
@@ -366,7 +390,7 @@ describe('Adversarial and Edge Case Tests (E2E)', () => {
     });
 
     it('should throw circular reference error on stringify when metadata is circular, or fail safely if handled', async () => {
-      const circularMetadata: any = { name: 'circular' };
+      const circularMetadata: Record<string, unknown> = { name: 'circular' };
       circularMetadata.self = circularMetadata;
 
       let threw = false;
@@ -387,7 +411,7 @@ describe('Adversarial and Edge Case Tests (E2E)', () => {
         where: { action: 'circular_test' },
       });
       expect(log).toBeDefined();
-      expect((log?.metadata as any).self).toBe('[Circular]');
+      expect((log?.metadata as unknown as CircularMetadata).self).toBe('[Circular]');
     });
   });
 

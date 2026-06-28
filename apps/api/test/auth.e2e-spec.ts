@@ -11,7 +11,6 @@ describe('Authentication (E2E)', () => {
   let app: INestApplication;
   let prisma: PrismaService;
   let jwtService: JwtService;
-  const jwtSecret = process.env.JWT_SECRET || 'test_secret';
 
   beforeAll(async () => {
     const moduleFixture: TestingModule = await Test.createTestingModule({
@@ -92,10 +91,7 @@ describe('Authentication (E2E)', () => {
     });
 
     it('should reject registration if email is already taken with a safe 409 Conflict', async () => {
-      await request(app.getHttpServer())
-        .post('/auth/register')
-        .send(validRegistration)
-        .expect(201);
+      await request(app.getHttpServer()).post('/auth/register').send(validRegistration).expect(201);
 
       // Duplicate registration
       const res = await request(app.getHttpServer())
@@ -143,12 +139,10 @@ describe('Authentication (E2E)', () => {
   describe('POST /auth/login', () => {
     beforeEach(async () => {
       // Setup a registered user
-      await request(app.getHttpServer())
-        .post('/auth/register')
-        .send({
-          email: 'Registered@Example.com',
-          password: 'Password123!',
-        });
+      await request(app.getHttpServer()).post('/auth/register').send({
+        email: 'Registered@Example.com',
+        password: 'Password123!',
+      });
     });
 
     it('should authenticate user, update lastLogin, write login audit log and return JWT', async () => {
@@ -213,12 +207,10 @@ describe('Authentication (E2E)', () => {
     let userId: string;
 
     beforeEach(async () => {
-      const res = await request(app.getHttpServer())
-        .post('/auth/register')
-        .send({
-          email: 'session@example.com',
-          password: 'Password123!',
-        });
+      const res = await request(app.getHttpServer()).post('/auth/register').send({
+        email: 'session@example.com',
+        password: 'Password123!',
+      });
       token = res.body.token;
       userId = res.body.user.id;
     });
@@ -236,9 +228,7 @@ describe('Authentication (E2E)', () => {
     });
 
     it('should reject request when token is missing', async () => {
-      await request(app.getHttpServer())
-        .get('/auth/me')
-        .expect(401);
+      await request(app.getHttpServer()).get('/auth/me').expect(401);
     });
 
     it('should reject request when token signature is tampered', async () => {
@@ -268,12 +258,10 @@ describe('Authentication (E2E)', () => {
     let userId: string;
 
     beforeEach(async () => {
-      const res = await request(app.getHttpServer())
-        .post('/auth/register')
-        .send({
-          email: 'logout@example.com',
-          password: 'Password123!',
-        });
+      const res = await request(app.getHttpServer()).post('/auth/register').send({
+        email: 'logout@example.com',
+        password: 'Password123!',
+      });
       token = res.body.token;
       userId = res.body.user.id;
     });

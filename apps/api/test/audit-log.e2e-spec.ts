@@ -51,7 +51,7 @@ describe('Audit Log (E2E)', () => {
       .set('X-Forwarded-For', ip)
       .send({ email, password })
       .expect(201);
-    
+
     const userId = regRes.body.user.id;
     const regLogs = await prisma.auditLog.findMany({ where: { userId, action: 'registration' } });
     expect(regLogs.length).toBe(1);
@@ -91,17 +91,14 @@ describe('Audit Log (E2E)', () => {
     const email = 'sensitive@example.com';
     const password = 'Password123!';
 
-    await request(app.getHttpServer())
-      .post('/auth/register')
-      .send({ email, password })
-      .expect(201);
+    await request(app.getHttpServer()).post('/auth/register').send({ email, password }).expect(201);
 
     const logs = await prisma.auditLog.findMany({});
     expect(logs.length).toBeGreaterThan(0);
 
     for (const log of logs) {
       const metadata = log.metadata ? JSON.parse(JSON.stringify(log.metadata)) : {};
-      
+
       // Email check
       expect(metadata.email).toBeUndefined();
       expect(JSON.stringify(metadata)).not.toContain(email);

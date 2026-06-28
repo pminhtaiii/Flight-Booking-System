@@ -19,9 +19,7 @@ export class HttpExceptionFilter implements ExceptionFilter {
 
     // 1. Determine HTTP status code
     const status =
-      exception instanceof HttpException
-        ? exception.getStatus()
-        : HttpStatus.INTERNAL_SERVER_ERROR;
+      exception instanceof HttpException ? exception.getStatus() : HttpStatus.INTERNAL_SERVER_ERROR;
 
     // 2. Format user-facing message & detail safely
     let message: string | string[] = 'Internal server error';
@@ -34,7 +32,10 @@ export class HttpExceptionFilter implements ExceptionFilter {
         const responseBody = resContent as Record<string, unknown>;
         message = (responseBody.message as string | string[]) || exception.message;
         errorDetail = responseBody.error || null;
-        const { message: _, error: __, statusCode: ___, ...rest } = responseBody;
+        const rest = { ...responseBody };
+        delete rest.message;
+        delete rest.error;
+        delete rest.statusCode;
         extraFields = rest;
       } else {
         message = exception.message;
@@ -46,7 +47,6 @@ export class HttpExceptionFilter implements ExceptionFilter {
         errorDetail = exception.stack;
       }
     }
-
 
     // 3. Extract tracing propagation headers with truncation to mitigate log injection
     const getSanitizedHeader = (val: string | string[] | undefined): string | null => {

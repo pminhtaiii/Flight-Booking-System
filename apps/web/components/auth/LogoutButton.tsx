@@ -1,6 +1,6 @@
-"use client";
+'use client';
 
-import { signOut, useSession } from "next-auth/react";
+import { signOut, useSession } from 'next-auth/react';
 
 export function LogoutButton() {
   const { data: session } = useSession();
@@ -9,26 +9,23 @@ export function LogoutButton() {
     const token = (session as { accessToken?: string })?.accessToken;
     if (token) {
       try {
-        const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
+        const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
         await fetch(`${apiUrl}/api/auth/logout`, {
-          method: "POST",
+          method: 'POST',
           headers: {
             Authorization: `Bearer ${token}`,
           },
         });
       } catch (err) {
         // eslint-disable-next-line no-console
-        console.error("Backend logout failed:", err);
+        console.error('Backend logout failed:', err);
       }
     }
-    await signOut({ callbackUrl: "/login" });
+    await signOut({ callbackUrl: '/login' });
   };
 
   return (
-    <button
-      onClick={handleLogout}
-      className="btn-secondary"
-    >
+    <button onClick={handleLogout} className="btn-secondary">
       Sign Out
     </button>
   );

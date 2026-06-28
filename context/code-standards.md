@@ -149,14 +149,14 @@ export class FlightsService {
 Every React component follows this exact order:
 
 ```typescript
-"use client"; // only if needed
+'use client'; // only if needed
 
 // 1. External imports
-import { useState } from "react";
-import { Button } from "@/components/ui/button";
+import { useState } from 'react';
+import { Button } from '@/components/ui/button';
 
 // 2. Internal imports
-import { FlightCard } from "@/components/flights/FlightCard";
+import { FlightCard } from '@/components/flights/FlightCard';
 
 // 3. Type definitions
 type Props = {
@@ -354,27 +354,27 @@ All environment variables defined in `.env.local` for development. Never hardcod
 
 ### NestJS Backend
 
-| Variable                    | Used In                    |
-| --------------------------- | -------------------------- |
-| `DATABASE_URL`              | prisma/schema.prisma       |
-| `REDIS_URL`                 | cache.service.ts           |
-| `AMADEUS_API_KEY`           | amadeus.service.ts         |
-| `AMADEUS_API_SECRET`        | amadeus.service.ts         |
-| `STRIPE_SECRET_KEY`         | payments.service.ts        |
-| `STRIPE_WEBHOOK_SECRET`     | payments.controller.ts     |
-| `MIMO_API_URL`              | agents/ (LangChain config) |
-| `MIMO_API_KEY`              | agents/ (LangChain config) |
-| `LANGSMITH_API_KEY`         | agents/ (tracing config)   |
-| `JWT_SECRET`                | auth.module.ts             |
+| Variable                | Used In                    |
+| ----------------------- | -------------------------- |
+| `DATABASE_URL`          | prisma/schema.prisma       |
+| `REDIS_URL`             | cache.service.ts           |
+| `AMADEUS_API_KEY`       | amadeus.service.ts         |
+| `AMADEUS_API_SECRET`    | amadeus.service.ts         |
+| `STRIPE_SECRET_KEY`     | payments.service.ts        |
+| `STRIPE_WEBHOOK_SECRET` | payments.controller.ts     |
+| `MIMO_API_URL`          | agents/ (LangChain config) |
+| `MIMO_API_KEY`          | agents/ (LangChain config) |
+| `LANGSMITH_API_KEY`     | agents/ (tracing config)   |
+| `JWT_SECRET`            | auth.module.ts             |
 
 ### Next.js Frontend
 
-| Variable                       | Used In                    |
-| ------------------------------ | -------------------------- |
-| `NEXT_PUBLIC_API_URL`          | lib/apiClient.ts           |
-| `NEXTAUTH_SECRET`              | NextAuth.js config         |
-| `NEXTAUTH_URL`                 | NextAuth.js config         |
-| `NEXT_PUBLIC_STRIPE_PUBLIC_KEY`| Stripe Elements            |
+| Variable                        | Used In            |
+| ------------------------------- | ------------------ |
+| `NEXT_PUBLIC_API_URL`           | lib/apiClient.ts   |
+| `NEXTAUTH_SECRET`               | NextAuth.js config |
+| `NEXTAUTH_URL`                  | NextAuth.js config |
+| `NEXT_PUBLIC_STRIPE_PUBLIC_KEY` | Stripe Elements    |
 
 `NEXT_PUBLIC_` prefix means the variable is exposed to the browser. Never add `NEXT_PUBLIC_` to secret keys.
 
@@ -401,11 +401,11 @@ Always use the `@/` alias — never use relative imports that go up more than on
 
 ```typescript
 // Correct
-import { Button } from "@/components/ui/button";
-import { MATCH_THRESHOLD } from "@shared/constants";
+import { Button } from '@/components/ui/button';
+import { MATCH_THRESHOLD } from '@shared/constants';
 
 // Never
-import { Button } from "../../../components/ui/button";
+import { Button } from '../../../components/ui/button';
 ```
 
 ### NestJS Backend

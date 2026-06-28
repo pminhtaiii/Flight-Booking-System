@@ -17,7 +17,7 @@
 - Q: What is the rate limit trigger threshold before lockout begins? → A: 5 failed attempts per 15-minute window per IP.
 - Q: How long should a session token remain valid before requiring re-authentication? → A: 24 hours (standard for a travel platform where users browse over a day).
 
-## User Scenarios & Testing *(mandatory)*
+## User Scenarios & Testing _(mandatory)_
 
 ### User Story 1 - New User Registration (Priority: P1)
 
@@ -107,7 +107,7 @@ The system's database is initialized with the schema required to store user acco
 - What happens when the frontend sends a request during a brief network interruption? The frontend handles the failure gracefully and allows the user to retry.
 - What happens when a user exceeds the failed login rate limit? After 5 failed attempts within a 15-minute window from the same IP, the system applies an escalating lockout — first lockout is 1 minute, doubling with each subsequent violation (1 min → 2 min → 4 min → 8 min), and resets after a successful login. The user sees a clear message indicating they are temporarily locked out and how long to wait.
 
-## Requirements *(mandatory)*
+## Requirements _(mandatory)_
 
 ### Functional Requirements
 
@@ -132,7 +132,7 @@ The system's database is initialized with the schema required to store user acco
 - **User**: Represents a registered account holder. Key attributes: unique identifier, email address, hashed password, account creation timestamp, last login timestamp, account status (active/inactive).
 - **Audit Log Entry**: Represents a recorded authentication event. Key attributes: timestamp, user reference (by identifier, not PII), action type (registration, login, logout, failed login), and contextual metadata.
 
-## Success Criteria *(mandatory)*
+## Success Criteria _(mandatory)_
 
 ### Measurable Outcomes
 

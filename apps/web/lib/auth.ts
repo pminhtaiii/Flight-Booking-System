@@ -1,25 +1,25 @@
-import { NextAuthOptions } from "next-auth";
-import CredentialsProvider from "next-auth/providers/credentials";
+import { NextAuthOptions } from 'next-auth';
+import CredentialsProvider from 'next-auth/providers/credentials';
 
 export const authOptions: NextAuthOptions = {
   providers: [
     CredentialsProvider({
-      name: "Credentials",
+      name: 'Credentials',
       credentials: {
-        email: { label: "Email", type: "email" },
-        password: { label: "Password", type: "password" },
+        email: { label: 'Email', type: 'email' },
+        password: { label: 'Password', type: 'password' },
       },
       async authorize(credentials) {
         if (!credentials?.email || !credentials?.password) {
           return null;
         }
 
-        const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
+        const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
         try {
           const res = await fetch(`${apiUrl}/api/auth/login`, {
-            method: "POST",
+            method: 'POST',
             headers: {
-              "Content-Type": "application/json",
+              'Content-Type': 'application/json',
             },
             body: JSON.stringify({
               email: credentials.email,
@@ -29,16 +29,16 @@ export const authOptions: NextAuthOptions = {
 
           if (!res.ok) {
             const data = await res.json().catch(() => ({}));
-            if (res.status === 429 || data.code === "auth_locked") {
+            if (res.status === 429 || data.code === 'auth_locked') {
               throw new Error(
                 JSON.stringify({
-                  code: "auth_locked",
-                  message: data.message || "Too many failed attempts. Please wait.",
+                  code: 'auth_locked',
+                  message: data.message || 'Too many failed attempts. Please wait.',
                   retryAfterSeconds: data.retryAfterSeconds || 60,
-                })
+                }),
               );
             }
-            throw new Error(data.message || "Invalid email or password");
+            throw new Error(data.message || 'Invalid email or password');
           }
 
           const data = await res.json();
@@ -51,7 +51,7 @@ export const authOptions: NextAuthOptions = {
           }
           return null;
         } catch (error: unknown) {
-          throw new Error((error as { message?: string })?.message || "Authentication failed");
+          throw new Error((error as { message?: string })?.message || 'Authentication failed');
         }
       },
     }),
@@ -75,10 +75,10 @@ export const authOptions: NextAuthOptions = {
     },
   },
   pages: {
-    signIn: "/login",
+    signIn: '/login',
   },
   session: {
-    strategy: "jwt",
+    strategy: 'jwt',
   },
-  secret: process.env.NEXTAUTH_SECRET || "nextauth_test_secret_12345",
+  secret: process.env.NEXTAUTH_SECRET || 'nextauth_test_secret_12345',
 };

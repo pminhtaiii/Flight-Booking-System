@@ -9,8 +9,8 @@ Concise rules for building Flight Booking System UI. These rules cover the most 
 Always import Inter via `next/font/google` in the root layout.
 
 ```typescript
-import { Inter } from "next/font/google";
-const inter = Inter({ subsets: ["latin"], variable: "--font-sans" });
+import { Inter } from 'next/font/google';
+const inter = Inter({ subsets: ['latin'], variable: '--font-sans' });
 ```
 
 The `--font-sans` variable is already declared in `@theme` in globals.css. Apply the font variable class to the `<html>` tag in root layout. Never use system fonts as the primary font.

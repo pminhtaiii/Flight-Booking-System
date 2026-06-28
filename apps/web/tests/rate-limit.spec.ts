@@ -7,7 +7,7 @@ test.describe('Rate Limiting and Lockout UI', () => {
   test.beforeEach(async ({ page, request }) => {
     // Reset database and lockout state
     const res = await request.post('http://localhost:3001/api/auth/test/reset-lockout', {
-      data: { clearAll: true }
+      data: { clearAll: true },
     });
     expect(res.status()).toBe(200);
     await page.context().clearCookies();
@@ -18,13 +18,16 @@ test.describe('Rate Limiting and Lockout UI', () => {
     await page.fill('input[name="password"]', password);
     await page.click('button[type="submit"]');
     await expect(page).toHaveURL(/\/dashboard/);
-    
+
     // Log out to return to login screen
     await page.click('text=/sign out|log out|logout/i');
     await expect(page).toHaveURL(/\/login/);
   });
 
-  test('should display lockout message, disable submit button, and allow login after reset', async ({ page, request }) => {
+  test('should display lockout message, disable submit button, and allow login after reset', async ({
+    page,
+    request,
+  }) => {
     await page.goto('/login');
     await page.fill('input[name="email"]', email);
 
@@ -32,7 +35,7 @@ test.describe('Rate Limiting and Lockout UI', () => {
     for (let i = 0; i < 5; i++) {
       await page.fill('input[name="password"]', 'WrongPassword!');
       await page.click('button[type="submit"]');
-      
+
       // Wait for UI to render invalid credentials error
       await expect(page.locator('text=Invalid email or password')).toBeVisible();
     }
@@ -51,7 +54,7 @@ test.describe('Rate Limiting and Lockout UI', () => {
 
     // 4. Call test-only reset endpoint to clear lockout
     const res2 = await request.post('http://localhost:3001/api/auth/test/reset-lockout', {
-      data: { clearAll: true }
+      data: { clearAllLockoutsOnly: true },
     });
     expect(res2.status()).toBe(200);
 
