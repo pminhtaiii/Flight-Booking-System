@@ -87,7 +87,7 @@ Full width layout on all pages. No sidebar.
   - Factors: preferred airlines, class, layover tolerance, departure time preference, price sensitivity.
   - Returns: **match score (0–100)**, match reason, matched preferences, trade-offs.
 - Results appear in a list below, sorted by match score by default.
-- After search completes: *"Found 12 flights — 5 strong matches for your preferences."*
+- After search completes: _"Found 12 flights — 5 strong matches for your preferences."_
 
 > **The AI scoring is advisory only.** It never touches the booking/payment path. All Amadeus API calls for search and pricing are deterministic backend services.
 
@@ -121,7 +121,7 @@ Full width layout on all pages. No sidebar.
   - Matched preferences — green tags (e.g., "Preferred airline", "Non-stop").
   - Trade-offs — amber tags (e.g., "Red-eye departure", "1 stop").
   - Match reasoning paragraph from the AI agent.
-- **Price Trend Analysis** section *(AI-powered, future)*:
+- **Price Trend Analysis** section _(AI-powered, future)_:
   - Current price vs. historical average for this route.
   - AI recommendation: "Book now" / "Prices may drop" / "Likely to increase".
   - Trend chart (last 30 days).
@@ -212,44 +212,43 @@ After a flight is booked, the system uses the destination airport's coordinates 
 
 ## Data Sources & APIs
 
-| Concern | Provider | Notes |
-|---|---|---|
-| Flight search, pricing, booking | **Amadeus Self-Service API** | Free tier (2,000 calls/month). Supports search, pricing, PNR creation, and ticketing. Non-negotiable for v1. |
-| Airport geolocation | **Static dataset** (e.g., OurAirports CSV) | IATA code → lat/lng mapping. Airports don't move — store in a DB table. |
-| Hotels *(future)* | **Amadeus Hotel Search API** | Same provider, keeps booking pipeline unified. |
-| Restaurants *(future)* | **Google Places API** | Rich restaurant data with ratings, photos, radius-based search. Free tier ($200/month credit). |
-| Flight tracking *(optional)* | **AviationStack** | Supplementary real-time flight status data. Not used for booking. |
+| Concern                         | Provider                                   | Notes                                                                                                        |
+| ------------------------------- | ------------------------------------------ | ------------------------------------------------------------------------------------------------------------ |
+| Flight search, pricing, booking | **Amadeus Self-Service API**               | Free tier (2,000 calls/month). Supports search, pricing, PNR creation, and ticketing. Non-negotiable for v1. |
+| Airport geolocation             | **Static dataset** (e.g., OurAirports CSV) | IATA code → lat/lng mapping. Airports don't move — store in a DB table.                                      |
+| Hotels _(future)_               | **Amadeus Hotel Search API**               | Same provider, keeps booking pipeline unified.                                                               |
+| Restaurants _(future)_          | **Google Places API**                      | Rich restaurant data with ratings, photos, radius-based search. Free tier ($200/month credit).               |
+| Flight tracking _(optional)_    | **AviationStack**                          | Supplementary real-time flight status data. Not used for booking.                                            |
 
 ---
 
 ## Architecture: AI Agents vs. Deterministic Services
 
-
 ### AI Agent Roles (Advisory — Never Transactional)
 
-| Agent | Trigger | Output |
-|---|---|---|
-| **Flight Match Agent** | After flight search results return | Match score, reasoning, preference alignment per flight |
-| **Price Trend Agent** | On flight details page | Historical price analysis, buy/wait recommendation |
-| **Hotel Match Agent** | After flight is booked | Scored hotel suggestions near destination |
-| **Dining Curator Agent** | After flight is booked | Curated restaurant shortlist with reasoning |
-| **Itinerary Planner Agent** | When trip has flight + hotel + dining | Optimized day-by-day trip plan |
-| **Support Chatbot Agent** | User opens chat widget | Conversational support, hands off to backend for actions |
-| **Fraud Detection Agent** | On every payment attempt (background) | Risk score flag — deterministic service decides to proceed or block |
+| Agent                       | Trigger                               | Output                                                              |
+| --------------------------- | ------------------------------------- | ------------------------------------------------------------------- |
+| **Flight Match Agent**      | After flight search results return    | Match score, reasoning, preference alignment per flight             |
+| **Price Trend Agent**       | On flight details page                | Historical price analysis, buy/wait recommendation                  |
+| **Hotel Match Agent**       | After flight is booked                | Scored hotel suggestions near destination                           |
+| **Dining Curator Agent**    | After flight is booked                | Curated restaurant shortlist with reasoning                         |
+| **Itinerary Planner Agent** | When trip has flight + hotel + dining | Optimized day-by-day trip plan                                      |
+| **Support Chatbot Agent**   | User opens chat widget                | Conversational support, hands off to backend for actions            |
+| **Fraud Detection Agent**   | On every payment attempt (background) | Risk score flag — deterministic service decides to proceed or block |
 
 ### Deterministic Services (Transactional — Auditable)
 
-| Service | Responsibility |
-|---|---|
-| **Flight Search Service** | Amadeus Flight Offers Search API |
+| Service                    | Responsibility                                     |
+| -------------------------- | -------------------------------------------------- |
+| **Flight Search Service**  | Amadeus Flight Offers Search API                   |
 | **Flight Pricing Service** | Amadeus Flight Price API (live price confirmation) |
-| **Booking Service** | Amadeus Flight Create Orders API (PNR creation) |
-| **Payment Service** | Payment processing, PCI-DSS compliant |
-| **Ticketing Service** | Ticket issuance, confirmation, PDF generation |
-| **Refund Service** | Cancellation processing, refund execution |
-| **Hotel Booking Service** | Amadeus Hotel Booking API |
-| **Auth Service** | User authentication, session management, JWT |
-| **Notification Service** | Email, SMS delivery |
+| **Booking Service**        | Amadeus Flight Create Orders API (PNR creation)    |
+| **Payment Service**        | Payment processing, PCI-DSS compliant              |
+| **Ticketing Service**      | Ticket issuance, confirmation, PDF generation      |
+| **Refund Service**         | Cancellation processing, refund execution          |
+| **Hotel Booking Service**  | Amadeus Hotel Booking API                          |
+| **Auth Service**           | User authentication, session management, JWT       |
+| **Notification Service**   | Email, SMS delivery                                |
 
 ---
 

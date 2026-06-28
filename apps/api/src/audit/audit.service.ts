@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '@/prisma/prisma.service';
 import * as crypto from 'crypto';
+import { Prisma } from '@prisma/client';
 
 @Injectable()
 export class AuditService {
@@ -10,7 +11,7 @@ export class AuditService {
     return crypto.createHash('sha256').update(val).digest('hex');
   }
 
-  private safeSanitize(val: any, visited = new Set<any>()): any {
+  private safeSanitize(val: unknown, visited = new Set<unknown>()): unknown {
     if (val === null || typeof val !== 'object') {
       return val;
     }
@@ -20,16 +21,17 @@ export class AuditService {
     visited.add(val);
 
     if (Array.isArray(val)) {
-      const copy = val.map(item => this.safeSanitize(item, visited));
+      const copy = val.map((item) => this.safeSanitize(item, visited));
       visited.delete(val);
       return copy;
     }
 
-    const copy: Record<string, any> = {};
-    for (const key in val) {
-      if (Object.prototype.hasOwnProperty.call(val, key)) {
+    const obj = val as Record<string, unknown>;
+    const copy: Record<string, unknown> = {};
+    for (const key in obj) {
+      if (Object.prototype.hasOwnProperty.call(obj, key)) {
         const lowerKey = key.toLowerCase();
-        const value = val[key];
+        const value = obj[key];
 
         if (lowerKey.includes('email')) {
           if (typeof value === 'string') {
@@ -52,26 +54,29 @@ export class AuditService {
     return copy;
   }
 
-  sanitizeMetadata(metadata: any): any {
+  sanitizeMetadata(metadata: unknown): Prisma.JsonObject {
     if (!metadata) return {};
-    return this.safeSanitize(metadata);
+    const sanitized = this.safeSanitize(metadata);
+    return typeof sanitized === 'object' && sanitized !== null
+      ? (sanitized as Prisma.JsonObject)
+      : {};
   }
 
   async createLog(
-    prismaClient: any,
+    prismaClient: Prisma.TransactionClient | PrismaService | null,
     data: {
       userId?: string | null;
       action: string;
       resourceType: string;
       resourceId?: string | null;
-      metadata?: any;
+      metadata?: unknown;
       traceId?: string | null;
       correlationId?: string | null;
       ipAddress?: string | null;
-    }
+    },
   ) {
     const client = prismaClient || this.prisma;
-    
+
     // 1. Sanitize metadata
     const sanitizedMetadata = this.sanitizeMetadata(data.metadata || {});
 

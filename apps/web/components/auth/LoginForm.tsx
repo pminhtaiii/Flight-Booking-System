@@ -1,14 +1,14 @@
-"use client";
+'use client';
 
-import { useState, useEffect } from "react";
-import { signIn } from "next-auth/react";
-import { useRouter } from "next/navigation";
+import { useState, useEffect } from 'react';
+import { signIn } from 'next-auth/react';
+import { useRouter } from 'next/navigation';
 
 export function LoginForm() {
   const router = useRouter();
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [error, setError] = useState("");
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [lockoutTime, setLockoutTime] = useState(0);
 
@@ -22,11 +22,11 @@ export function LoginForm() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError("");
+    setError('');
     setLoading(true);
 
     try {
-      const res = await signIn("credentials", {
+      const res = await signIn('credentials', {
         redirect: false,
         email,
         password,
@@ -35,21 +35,21 @@ export function LoginForm() {
       if (res?.error) {
         try {
           const parsed = JSON.parse(res.error);
-          if (parsed.code === "auth_locked") {
-            setError(parsed.message || "Too many login attempts. Please wait.");
+          if (parsed.code === 'auth_locked') {
+            setError(parsed.message || 'Too many login attempts. Please wait.');
             setLockoutTime(parsed.retryAfterSeconds || 60);
             return;
           }
         } catch {
           // Keep standard fallback
         }
-        setError("Invalid email or password");
+        setError('Invalid email or password');
       } else {
-        router.push("/dashboard");
+        router.push('/dashboard');
         router.refresh();
       }
     } catch {
-      setError("An unexpected error occurred");
+      setError('An unexpected error occurred');
     } finally {
       setLoading(false);
     }
@@ -90,16 +90,8 @@ export function LoginForm() {
           disabled={isLocked}
         />
       </div>
-      <button
-        type="submit"
-        className="btn-primary w-full mt-2"
-        disabled={loading || isLocked}
-      >
-        {isLocked
-          ? `Please wait (${lockoutTime}s)`
-          : loading
-          ? "Signing in..."
-          : "Sign In"}
+      <button type="submit" className="btn-primary w-full mt-2" disabled={loading || isLocked}>
+        {isLocked ? `Please wait (${lockoutTime}s)` : loading ? 'Signing in...' : 'Sign In'}
       </button>
     </form>
   );

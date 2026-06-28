@@ -112,12 +112,12 @@ For each task:
 
 For every feature, the agent must write:
 
-| Test Type | Scope | Always Required |
-|---|---|---|
-| **Unit tests** | Individual services, functions, utilities | ✅ Always |
-| **Integration tests** | Controller endpoints, service-to-service interactions | ✅ Always |
-| **Guard/boundary tests** | Constitutional invariants (AI never in booking path, budget checks before API calls, no PII in logs) | ✅ Always |
-| **E2E tests** | Full system flows across multiple modules | ⚠️ Conditional |
+| Test Type                | Scope                                                                                                | Always Required |
+| ------------------------ | ---------------------------------------------------------------------------------------------------- | --------------- |
+| **Unit tests**           | Individual services, functions, utilities                                                            | ✅ Always       |
+| **Integration tests**    | Controller endpoints, service-to-service interactions                                                | ✅ Always       |
+| **Guard/boundary tests** | Constitutional invariants (AI never in booking path, budget checks before API calls, no PII in logs) | ✅ Always       |
+| **E2E tests**            | Full system flows across multiple modules                                                            | ⚠️ Conditional  |
 
 ### E2E Test Triggers
 
@@ -200,11 +200,11 @@ If any test fails, the task remains `[ ]` and the agent continues working on it.
 
 ## Checkpoint Summary
 
-| Step | Gate | Who Approves |
-|---|---|---|
-| speckit-specify | Spec reviewed and approved | User |
-| speckit-plan | Plan produced (goes to convergence) | Automatic |
-| plan-review-convergence | No unresolved HIGH/CRITICAL issues | User approves converged plan |
-| speckit-tasks | Tasks generated | User may review |
-| speckit-implement (TDD) | All tests pass for every task | Automatic (tests) |
-| speckit-converge | "✅ Converged" reported | Automatic (convergence) |
+| Step                    | Gate                                | Who Approves                 |
+| ----------------------- | ----------------------------------- | ---------------------------- |
+| speckit-specify         | Spec reviewed and approved          | User                         |
+| speckit-plan            | Plan produced (goes to convergence) | Automatic                    |
+| plan-review-convergence | No unresolved HIGH/CRITICAL issues  | User approves converged plan |
+| speckit-tasks           | Tasks generated                     | User may review              |
+| speckit-implement (TDD) | All tests pass for every task       | Automatic (tests)            |
+| speckit-converge        | "✅ Converged" reported             | Automatic (convergence)      |

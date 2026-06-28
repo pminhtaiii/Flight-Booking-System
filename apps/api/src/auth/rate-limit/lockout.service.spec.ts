@@ -4,7 +4,6 @@ import { CacheService } from '@/cache/cache.service';
 
 describe('LockoutService', () => {
   let service: LockoutService;
-  let cache: CacheService;
 
   const mockCacheService = {
     get: jest.fn(),
@@ -17,14 +16,10 @@ describe('LockoutService', () => {
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
-      providers: [
-        LockoutService,
-        { provide: CacheService, useValue: mockCacheService },
-      ],
+      providers: [LockoutService, { provide: CacheService, useValue: mockCacheService }],
     }).compile();
 
     service = module.get<LockoutService>(LockoutService);
-    cache = module.get<CacheService>(CacheService);
 
     jest.clearAllMocks();
   });
@@ -56,8 +51,16 @@ describe('LockoutService', () => {
 
       const res = await service.recordFailedAttempt('1.2.3.4');
       expect(res).toEqual({ locked: true, retryAfterSeconds: 60, attempts: 5 });
-      expect(mockCacheService.set).toHaveBeenCalledWith(expect.stringContaining('lockout-level'), '1', expect.any(Number));
-      expect(mockCacheService.set).toHaveBeenCalledWith(expect.stringContaining('lockout'), 'true', 60);
+      expect(mockCacheService.set).toHaveBeenCalledWith(
+        expect.stringContaining('lockout-level'),
+        '1',
+        expect.any(Number),
+      );
+      expect(mockCacheService.set).toHaveBeenCalledWith(
+        expect.stringContaining('lockout'),
+        'true',
+        60,
+      );
     });
 
     it('should escalate lock duration to 120s at level 2', async () => {
@@ -66,8 +69,16 @@ describe('LockoutService', () => {
 
       const res = await service.recordFailedAttempt('1.2.3.4');
       expect(res).toEqual({ locked: true, retryAfterSeconds: 120, attempts: 6 });
-      expect(mockCacheService.set).toHaveBeenCalledWith(expect.stringContaining('lockout-level'), '2', expect.any(Number));
-      expect(mockCacheService.set).toHaveBeenCalledWith(expect.stringContaining('lockout'), 'true', 120);
+      expect(mockCacheService.set).toHaveBeenCalledWith(
+        expect.stringContaining('lockout-level'),
+        '2',
+        expect.any(Number),
+      );
+      expect(mockCacheService.set).toHaveBeenCalledWith(
+        expect.stringContaining('lockout'),
+        'true',
+        120,
+      );
     });
   });
 });

@@ -17,15 +17,18 @@ export class CacheService implements OnModuleInit, OnModuleDestroy {
       });
 
       this.redisClient.on('error', (err) => {
-        this.logger.warn(`Redis connection error: ${err.message}. Falling back to in-memory cache.`);
+        this.logger.warn(
+          `Redis connection error: ${err.message}. Falling back to in-memory cache.`,
+        );
         this.redisClient = null;
       });
 
       this.redisClient.on('connect', () => {
         this.logger.log('Successfully connected to Redis.');
       });
-    } catch (err: any) {
-      this.logger.warn(`Failed to initialize Redis client: ${err.message}. Using in-memory cache.`);
+    } catch (err: unknown) {
+      const errMsg = err instanceof Error ? err.message : String(err);
+      this.logger.warn(`Failed to initialize Redis client: ${errMsg}. Using in-memory cache.`);
       this.redisClient = null;
     }
   }
@@ -40,8 +43,11 @@ export class CacheService implements OnModuleInit, OnModuleDestroy {
     if (this.redisClient) {
       try {
         return await this.redisClient.get(key);
-      } catch (err: any) {
-        this.logger.warn(`Redis GET failed for key ${key}: ${err.message}. Using in-memory fallback.`);
+      } catch (err: unknown) {
+        const errMsg = err instanceof Error ? err.message : String(err);
+        this.logger.warn(
+          `Redis GET failed for key ${key}: ${errMsg}. Using in-memory fallback.`,
+        );
       }
     }
 
@@ -63,8 +69,11 @@ export class CacheService implements OnModuleInit, OnModuleDestroy {
           await this.redisClient.set(key, value);
         }
         return;
-      } catch (err: any) {
-        this.logger.warn(`Redis SET failed for key ${key}: ${err.message}. Using in-memory fallback.`);
+      } catch (err: unknown) {
+        const errMsg = err instanceof Error ? err.message : String(err);
+        this.logger.warn(
+          `Redis SET failed for key ${key}: ${errMsg}. Using in-memory fallback.`,
+        );
       }
     }
 
@@ -80,22 +89,25 @@ export class CacheService implements OnModuleInit, OnModuleDestroy {
           await this.redisClient.expire(key, ttlSeconds);
         }
         return val;
-      } catch (err: any) {
-        this.logger.warn(`Redis INCR failed for key ${key}: ${err.message}. Using in-memory fallback.`);
+      } catch (err: unknown) {
+        const errMsg = err instanceof Error ? err.message : String(err);
+        this.logger.warn(
+          `Redis INCR failed for key ${key}: ${errMsg}. Using in-memory fallback.`,
+        );
       }
     }
 
     const now = Date.now();
     const item = this.inMemoryStore.get(key);
-    
+
     let current = 0;
     let expiry = ttlSeconds ? now + ttlSeconds * 1000 : Infinity;
-    
+
     if (item && now <= item.expiry) {
       current = parseInt(item.value, 10) || 0;
       expiry = item.expiry;
     }
-    
+
     const nextVal = current + 1;
     this.inMemoryStore.set(key, { value: String(nextVal), expiry });
     return nextVal;
@@ -106,8 +118,11 @@ export class CacheService implements OnModuleInit, OnModuleDestroy {
       try {
         await this.redisClient.del(key);
         return;
-      } catch (err: any) {
-        this.logger.warn(`Redis DEL failed for key ${key}: ${err.message}. Using in-memory fallback.`);
+      } catch (err: unknown) {
+        const errMsg = err instanceof Error ? err.message : String(err);
+        this.logger.warn(
+          `Redis DEL failed for key ${key}: ${errMsg}. Using in-memory fallback.`,
+        );
       }
     }
 
@@ -118,8 +133,11 @@ export class CacheService implements OnModuleInit, OnModuleDestroy {
     if (this.redisClient) {
       try {
         return await this.redisClient.ttl(key);
-      } catch (err: any) {
-        this.logger.warn(`Redis TTL failed for key ${key}: ${err.message}. Using in-memory fallback.`);
+      } catch (err: unknown) {
+        const errMsg = err instanceof Error ? err.message : String(err);
+        this.logger.warn(
+          `Redis TTL failed for key ${key}: ${errMsg}. Using in-memory fallback.`,
+        );
       }
     }
 
@@ -134,8 +152,9 @@ export class CacheService implements OnModuleInit, OnModuleDestroy {
     if (this.redisClient) {
       try {
         return await this.redisClient.keys(pattern);
-      } catch (err: any) {
-        this.logger.warn(`Redis KEYS failed: ${err.message}. Using in-memory fallback.`);
+      } catch (err: unknown) {
+        const errMsg = err instanceof Error ? err.message : String(err);
+        this.logger.warn(`Redis KEYS failed: ${errMsg}. Using in-memory fallback.`);
       }
     }
 

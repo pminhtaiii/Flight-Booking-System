@@ -1,5 +1,5 @@
-import Link from "next/link";
-import { LogoutButton } from "@/components/auth/LogoutButton";
+import Link from 'next/link';
+import { LogoutButton } from '@/components/auth/LogoutButton';
 
 export function Header() {
   return (
@@ -10,13 +10,22 @@ export function Header() {
           <Link href="/dashboard" className="text-sm font-medium text-accent">
             Dashboard
           </Link>
-          <Link href="/search" className="text-sm font-medium text-text-secondary hover:text-accent">
+          <Link
+            href="/search"
+            className="text-sm font-medium text-text-secondary hover:text-accent"
+          >
             Search Flights
           </Link>
-          <Link href="/bookings" className="text-sm font-medium text-text-secondary hover:text-accent">
+          <Link
+            href="/bookings"
+            className="text-sm font-medium text-text-secondary hover:text-accent"
+          >
             My Bookings
           </Link>
-          <Link href="/profile" className="text-sm font-medium text-text-secondary hover:text-accent">
+          <Link
+            href="/profile"
+            className="text-sm font-medium text-text-secondary hover:text-accent"
+          >
             Profile
           </Link>
         </nav>

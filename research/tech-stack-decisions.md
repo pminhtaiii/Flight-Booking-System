@@ -82,14 +82,14 @@
 
 ## Cost Summary
 
-| Component | Cost for v1 |
-|---|---|
-| NestJS, Next.js, TypeScript, PostgreSQL, Redis, Prisma, NextAuth.js, LangChain.js, Docker | **$0** (all open source) |
-| Amadeus API | **$0** (free tier: 2,000 calls/month) |
-| LangSmith | **$0** (free tier: 5,000 traces/month) |
-| Mimo | **Usage-based** (per-token pricing) |
-| Stripe | **2.9% + $0.30 per transaction** (no upfront cost) |
-| CodeRabbit | **$0** (open-source repos) / ~$12/seat/month (private repos) |
+| Component                                                                                 | Cost for v1                                                  |
+| ----------------------------------------------------------------------------------------- | ------------------------------------------------------------ |
+| NestJS, Next.js, TypeScript, PostgreSQL, Redis, Prisma, NextAuth.js, LangChain.js, Docker | **$0** (all open source)                                     |
+| Amadeus API                                                                               | **$0** (free tier: 2,000 calls/month)                        |
+| LangSmith                                                                                 | **$0** (free tier: 5,000 traces/month)                       |
+| Mimo                                                                                      | **Usage-based** (per-token pricing)                          |
+| Stripe                                                                                    | **2.9% + $0.30 per transaction** (no upfront cost)           |
+| CodeRabbit                                                                                | **$0** (open-source repos) / ~$12/seat/month (private repos) |
 
 **Bottom line**: The entire core stack can be built and tested at effectively $0. Variable costs scale only with real user activity.
 

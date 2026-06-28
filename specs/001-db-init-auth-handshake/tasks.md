@@ -74,6 +74,7 @@
 **Independent Test**: Call POST /auth/register with new email/password, verify record creation, hashed password in database, and registration audit event written.
 
 ### Tests for User Story 1
+
 > **NOTE: Write these tests FIRST, ensure they FAIL before implementation**
 
 - [x] T015 [P] [US1] Write unit tests for password strength validation and duplicate email check in apps/api/src/auth/auth.service.spec.ts

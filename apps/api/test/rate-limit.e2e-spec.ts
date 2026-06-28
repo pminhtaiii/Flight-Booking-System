@@ -38,7 +38,7 @@ describe('Rate Limit and Lockout (E2E)', () => {
     // Clear databases and reset lockouts
     await prisma.auditLog.deleteMany({});
     await prisma.user.deleteMany({});
-    
+
     // Clear lockouts for all IPs by calling the test reset endpoint
     await request(app.getHttpServer())
       .post('/auth/test/reset-lockout')
@@ -46,12 +46,10 @@ describe('Rate Limit and Lockout (E2E)', () => {
       .expect(200);
 
     // Setup a user to log in
-    await request(app.getHttpServer())
-      .post('/auth/register')
-      .send({
-        email: 'lockout@example.com',
-        password: 'Password123!',
-      });
+    await request(app.getHttpServer()).post('/auth/register').send({
+      email: 'lockout@example.com',
+      password: 'Password123!',
+    });
   });
 
   it('should block login after 5 failed attempts with 429 and auth_locked payload', async () => {

@@ -6,9 +6,9 @@ Update this file after every completed feature. Any AI agent reading this should
 
 ## Current Status
 
-**Phase:** Milestone M2: Database Schema & Health Endpoint
-**Last completed:** Database initialization and health endpoint E2E verification
-**Next:** Authentication and basic authentication handshake (frontend and backend)
+**Phase:** Milestone M6: Polish, E2E Verification & Stress Testing
+**Last completed:** Full monorepo verification, E2E tests pass, concurrency testing, and lint cleanup.
+**Next:** Prepare for the next pipeline feature implementation.
 
 ---
 
@@ -18,6 +18,11 @@ Update this file after every completed feature. Any AI agent reading this should
 - [x] PrismaService implementation with connection error catching and shutdown hooks
 - [x] GET /health endpoint implementation with 100ms timeout on raw query
 - [x] Verification of build and 100% passing health check E2E tests
+- [x] User Registration API & UI with PII-safe audit logging
+- [x] User Login API & UI with Redis rate-limited escalating lockout
+- [x] NextAuth credential provider configuration and JWT session handshake
+- [x] 100% clean global ESLint runs and type checking across all workspaces
+- [x] Concurrency stress testing (100 parallel requests) verifying lockout safety
 
 ## Decisions Made During Build
 

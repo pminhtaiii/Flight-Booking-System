@@ -116,13 +116,17 @@ export default defineConfig({
 To ensure the tests are resilient to internal code structure changes, we use three key opaque-box verification strategies:
 
 ### 4.1 Lockout Simulation via IP Headers
+
 Since the test runner runs from a single machine, we simulate distinct clients by passing customized `X-Forwarded-For` headers in HTTP requests. This lets us verify rate limiting partitioning without altering actual network interfaces.
 
 ### 4.2 Lockout Reset / Time Acceleration
+
 Exposing a secure HTTP endpoint `POST /auth/test/reset-lockout` (active ONLY when `NODE_ENV === 'test'`) allows tests to instantly flush rate-limiting keys for specific IPs. This prevents tests from sleeping during escalating lockout level checks (60s -> 120s -> 240s -> 480s).
 
 ### 4.3 Database-Asserted Audit Log Checks
+
 We use a **Database-Asserted E2E Pattern**. The test runner executes regular auth requests over HTTP but reads directly from the `AuditLog` table using Prisma Client in the assertion phase to verify:
+
 - Log record exists with proper action status.
 - Metadata is strictly PII-free (no plaintext passwords, emails, etc.).
 - Failed login audit log entries record a hashed version of the client IP instead of the raw IP address.
@@ -133,11 +137,13 @@ We use a **Database-Asserted E2E Pattern**. The test runner executes regular aut
 ## 5. Execution Runbook
 
 ### 5.1 Run Backend E2E Tests
+
 ```bash
 npm run test:e2e --workspace=apps/api
 ```
 
 ### 5.2 Run Frontend UI E2E Tests
+
 ```bash
 npx playwright test --config=apps/web/tests/playwright.config.ts
 ```

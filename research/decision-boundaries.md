@@ -14,19 +14,19 @@
 
 1. User searches for a flight (origin → destination, dates, passengers).
 2. User browses results, selects a flight, and proceeds to booking.
-3. *(Future)* After selecting a flight, the system suggests hotels and restaurants near the destination airport using the airport's known coordinates.
+3. _(Future)_ After selecting a flight, the system suggests hotels and restaurants near the destination airport using the airport's known coordinates.
 
 The flight is the **anchor of the entire experience**. Hotels and restaurants are supplementary and deferred to later milestones.
 
 ## 3. Data Sources & APIs
 
-| Concern | Provider | Notes |
-|---|---|---|
-| Flight search, pricing, booking | **Amadeus Self-Service API** | Free tier (2,000 calls/month). Supports search, pricing, PNR creation, and ticketing. Non-negotiable for v1. |
-| Airport geolocation | **Static dataset** (e.g., OurAirports CSV) | IATA code → lat/lng mapping. Airports don't move — store in a DB table. |
-| Hotels *(future)* | **Amadeus Hotel Search API** | Same provider, keeps booking pipeline unified. |
-| Restaurants *(future)* | **Google Places API** | Rich restaurant data with ratings, photos, radius-based search. Free tier ($200/month credit). |
-| Flight tracking *(optional)* | **AviationStack** | Supplementary real-time flight status data. Not used for booking. |
+| Concern                         | Provider                                   | Notes                                                                                                        |
+| ------------------------------- | ------------------------------------------ | ------------------------------------------------------------------------------------------------------------ |
+| Flight search, pricing, booking | **Amadeus Self-Service API**               | Free tier (2,000 calls/month). Supports search, pricing, PNR creation, and ticketing. Non-negotiable for v1. |
+| Airport geolocation             | **Static dataset** (e.g., OurAirports CSV) | IATA code → lat/lng mapping. Airports don't move — store in a DB table.                                      |
+| Hotels _(future)_               | **Amadeus Hotel Search API**               | Same provider, keeps booking pipeline unified.                                                               |
+| Restaurants _(future)_          | **Google Places API**                      | Rich restaurant data with ratings, photos, radius-based search. Free tier ($200/month credit).               |
+| Flight tracking _(optional)_    | **AviationStack**                          | Supplementary real-time flight status data. Not used for booking.                                            |
 
 ## 4. AI Agents vs. Deterministic Services (Hybrid Architecture)
 
@@ -38,7 +38,7 @@ The flight is the **anchor of the entire experience**. Hotels and restaurants ar
 
 - Smart flight search assistance and result interpretation.
 - Handling edge cases and surfacing relevant information to the user.
-- *(Future)* Itinerary recommendations, customer support chatbot, price trend analysis, fraud pattern detection.
+- _(Future)_ Itinerary recommendations, customer support chatbot, price trend analysis, fraud pattern detection.
 
 ### Deterministic Backend Services — Transactional Role
 

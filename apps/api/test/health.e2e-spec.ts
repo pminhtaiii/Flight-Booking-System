@@ -3,6 +3,7 @@ import { INestApplication } from '@nestjs/common';
 import request from 'supertest';
 import { AppModule } from '@/app.module';
 import { PrismaService } from '@/prisma/prisma.service';
+import { Prisma } from '@prisma/client';
 
 describe('Health Check (E2E)', () => {
   jest.setTimeout(30000);
@@ -25,7 +26,9 @@ describe('Health Check (E2E)', () => {
     prismaService = moduleFixture.get<PrismaService>(PrismaService);
 
     // Warm up the application using a mock implementation of $queryRaw so it doesn't try to query the real db
-    const warmupSpy = jest.spyOn(prismaService, '$queryRaw').mockImplementation(() => Promise.resolve([1]) as any);
+    const warmupSpy = jest
+      .spyOn(prismaService, '$queryRaw')
+      .mockImplementation(() => Promise.resolve([1]) as unknown as Prisma.PrismaPromise<unknown>);
     await request(app.getHttpServer()).get('/health');
     warmupSpy.mockRestore();
   });
@@ -36,7 +39,9 @@ describe('Health Check (E2E)', () => {
 
   beforeEach(() => {
     // Simulate database up state since no real database is running in this environment
-    dbMockSpy = jest.spyOn(prismaService, '$queryRaw').mockImplementation(() => Promise.resolve([1]) as any);
+    dbMockSpy = jest
+      .spyOn(prismaService, '$queryRaw')
+      .mockImplementation(() => Promise.resolve([1]) as unknown as Prisma.PrismaPromise<unknown>);
   });
 
   afterEach(() => {
@@ -65,9 +70,7 @@ describe('Health Check (E2E)', () => {
   });
 
   it('GET /health - should not require authentication headers', async () => {
-    await request(app.getHttpServer())
-      .get('/health')
-      .expect(200);
+    await request(app.getHttpServer()).get('/health').expect(200);
   });
 
   it('GET /health - should report down/degraded and return status 503 when database is unreachable', async () => {
@@ -92,9 +95,7 @@ describe('Health Check (E2E)', () => {
     // First, verify a failure occurs when query fails
     dbMockSpy.mockRejectedValueOnce(new Error('Connection lost'));
 
-    await request(app.getHttpServer())
-      .get('/health')
-      .expect(503);
+    await request(app.getHttpServer()).get('/health').expect(503);
 
     // Now, call again and assert recovery (mockRejectedValueOnce only affects the first call,
     // so the second call automatically recovers using mockImplementation)
@@ -113,13 +114,13 @@ describe('Health Check (E2E)', () => {
 
   it('GET /health - should return status 503 within 150ms if database query times out (> 100ms delay)', async () => {
     // Measure a base normal request duration right before the timeout request to get current environmental overhead
-    dbMockSpy.mockImplementationOnce(() => Promise.resolve([1]) as any);
+    dbMockSpy.mockImplementationOnce(() => Promise.resolve([1]) as unknown as Prisma.PrismaPromise<unknown>);
     const baseStart = Date.now();
     await request(app.getHttpServer()).get('/health').expect(200);
     const baseDuration = Date.now() - baseStart;
 
     // Simulate database timeout by delaying query execution indefinitely
-    dbMockSpy.mockImplementation(() => new Promise(() => {}) as any);
+    dbMockSpy.mockImplementation(() => new Promise<unknown>(() => {}) as unknown as Prisma.PrismaPromise<unknown>);
 
     const startTime = Date.now();
     const response = await request(app.getHttpServer())

@@ -1,10 +1,16 @@
-import { Injectable, ConflictException, UnauthorizedException, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  ConflictException,
+  UnauthorizedException,
+  BadRequestException,
+} from '@nestjs/common';
 import { PrismaService } from '@/prisma/prisma.service';
 import { AuditService } from '@/audit/audit.service';
 import { LockoutService } from './rate-limit/lockout.service';
 import { JwtService } from '@nestjs/jwt';
 import { CacheService } from '@/cache/cache.service';
 import * as bcrypt from 'bcrypt';
+import { Prisma } from '@prisma/client';
 
 @Injectable()
 export class AuthService {
@@ -45,7 +51,7 @@ export class AuthService {
     const hashedPassword = await bcrypt.hash(password, 10);
 
     try {
-      const result = await this.prisma.$transaction(async (tx) => {
+      const result = await this.prisma.$transaction(async (tx: Prisma.TransactionClient) => {
         const user = await tx.user.create({
           data: {
             email,
@@ -80,8 +86,11 @@ export class AuthService {
           email: result.email,
         },
       };
-    } catch (error: any) {
-      if (error.code === 'P2002') {
+    } catch (error: unknown) {
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === 'P2002'
+      ) {
         throw new ConflictException('An account with this email address already exists');
       }
       throw error;
@@ -205,6 +214,8 @@ export class AuthService {
     const logs = await this.prisma.auditLog.deleteMany({});
     const users = await this.prisma.user.deleteMany({});
     // eslint-disable-next-line no-console
-    console.log(`[resetDatabaseForTesting] Deleted ${users.count} users and ${logs.count} audit logs.`);
+    console.log(
+      `[resetDatabaseForTesting] Deleted ${users.count} users and ${logs.count} audit logs.`,
+    );
   }
 }

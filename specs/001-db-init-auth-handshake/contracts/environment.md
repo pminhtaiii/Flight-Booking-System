@@ -2,22 +2,22 @@
 
 ## API Environment
 
-| Variable | Required | Purpose |
-|----------|----------|---------|
-| `DATABASE_URL` | Yes | PostgreSQL connection string for Prisma. |
-| `REDIS_URL` | Yes | Redis connection string for rate limiting and lockout. |
-| `JWT_SECRET` | Yes | Signs backend JWT session tokens. |
-| `NEXTAUTH_SECRET` | Yes | Shared secret for frontend auth/session validation where needed. |
-| `FRONTEND_ORIGIN` | Yes | Allowed CORS origin for the Next.js app. |
-| `NODE_ENV` | Yes | Runtime environment. |
+| Variable          | Required | Purpose                                                          |
+| ----------------- | -------- | ---------------------------------------------------------------- |
+| `DATABASE_URL`    | Yes      | PostgreSQL connection string for Prisma.                         |
+| `REDIS_URL`       | Yes      | Redis connection string for rate limiting and lockout.           |
+| `JWT_SECRET`      | Yes      | Signs backend JWT session tokens.                                |
+| `NEXTAUTH_SECRET` | Yes      | Shared secret for frontend auth/session validation where needed. |
+| `FRONTEND_ORIGIN` | Yes      | Allowed CORS origin for the Next.js app.                         |
+| `NODE_ENV`        | Yes      | Runtime environment.                                             |
 
 ## Web Environment
 
-| Variable | Required | Purpose |
-|----------|----------|---------|
-| `NEXT_PUBLIC_API_URL` | Yes | Public URL for the NestJS API. |
-| `NEXTAUTH_SECRET` | Yes | NextAuth/Auth.js session secret. |
-| `NEXTAUTH_URL` | Yes | Canonical frontend URL. |
+| Variable              | Required | Purpose                          |
+| --------------------- | -------- | -------------------------------- |
+| `NEXT_PUBLIC_API_URL` | Yes      | Public URL for the NestJS API.   |
+| `NEXTAUTH_SECRET`     | Yes      | NextAuth/Auth.js session secret. |
+| `NEXTAUTH_URL`        | Yes      | Canonical frontend URL.          |
 
 ## Secret Rules
 
@@ -28,9 +28,9 @@
 
 ## Local Default Ports
 
-| Service | Port |
-|---------|------|
+| Service     | Port |
+| ----------- | ---- |
 | Next.js web | 3000 |
-| NestJS API | 3001 |
-| PostgreSQL | 5432 |
-| Redis | 6379 |
+| NestJS API  | 3001 |
+| PostgreSQL  | 5432 |
+| Redis       | 6379 |

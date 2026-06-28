@@ -8,7 +8,7 @@ test.describe('User Authentication Flows', () => {
   test.beforeEach(async ({ request, context }) => {
     // Reset databases and lockouts before each test via API test-only reset
     const res = await request.post('http://localhost:3001/api/auth/test/reset-lockout', {
-      data: { clearAll: true }
+      data: { clearAll: true },
     });
     expect(res.status()).toBe(200);
     await context.clearCookies();
@@ -23,10 +23,10 @@ test.describe('User Authentication Flows', () => {
 
       // Verify redirection to /dashboard
       await expect(page).toHaveURL(/\/dashboard/);
-      
+
       // Verify session cookie populated and user email rendered
       const cookies = await page.context().cookies();
-      const sessionCookie = cookies.find(c => c.name.includes('session'));
+      const sessionCookie = cookies.find((c) => c.name.includes('session'));
       expect(sessionCookie).toBeDefined();
 
       await expect(page.locator('text=' + testEmail.toLowerCase())).toBeVisible();
@@ -83,7 +83,9 @@ test.describe('User Authentication Flows', () => {
       await expect(page).toHaveURL(/\/login/);
     });
 
-    test('should successfully log in returning user and redirect to dashboard', async ({ page }) => {
+    test('should successfully log in returning user and redirect to dashboard', async ({
+      page,
+    }) => {
       await page.goto('/login');
       await page.fill('input[name="email"]', 'registered@example.com');
       await page.fill('input[name="password"]', password);
@@ -103,7 +105,9 @@ test.describe('User Authentication Flows', () => {
       await expect(errorAlert).toBeVisible();
     });
 
-    test('should automatically redirect authenticated user visiting login or register to dashboard', async ({ page }) => {
+    test('should automatically redirect authenticated user visiting login or register to dashboard', async ({
+      page,
+    }) => {
       // Log in
       await page.goto('/login');
       await page.fill('input[name="email"]', 'registered@example.com');
@@ -122,7 +126,9 @@ test.describe('User Authentication Flows', () => {
   });
 
   test.describe('Logout & History Checks', () => {
-    test('should log out user, clear cookies, and prevent browser back button navigation to protected page', async ({ page }) => {
+    test('should log out user, clear cookies, and prevent browser back button navigation to protected page', async ({
+      page,
+    }) => {
       // Register & log in
       await page.goto('/register');
       await page.fill('input[name="email"]', 'logout-flow@example.com');
@@ -136,7 +142,7 @@ test.describe('User Authentication Flows', () => {
 
       // Verify cookies are cleared
       const cookies = await page.context().cookies();
-      const sessionCookie = cookies.find(c => c.name.includes('session'));
+      const sessionCookie = cookies.find((c) => c.name.includes('session'));
       expect(sessionCookie).toBeUndefined();
 
       // Click browser back button

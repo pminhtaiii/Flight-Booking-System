@@ -10,7 +10,7 @@ async function bootstrap() {
     const app = await NestFactory.create(AppModule);
 
     const expressApp = app.getHttpAdapter().getInstance();
-    expressApp.set('trust proxy', 'loopback, link-local, 127.0.0.1, ::1');
+    expressApp.set('trust proxy', 'loopback, linklocal, 127.0.0.1, ::1');
 
     // 1. CORS Configuration
     const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';

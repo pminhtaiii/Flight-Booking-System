@@ -54,11 +54,14 @@ const booking = await this.prisma.booking.create({
 await this.prisma.$transaction([
   this.prisma.booking.update({ where: { id: bookingId }, data: { status: 'CONFIRMED' } }),
   this.prisma.payment.create({ data: { bookingId, stripeIntentId, amount, status: 'SUCCEEDED' } }),
-  this.prisma.auditLog.create({ data: { userId, action: 'BOOKING_CONFIRMED', resourceId: bookingId } }),
+  this.prisma.auditLog.create({
+    data: { userId, action: 'BOOKING_CONFIRMED', resourceId: bookingId },
+  }),
 ]);
 ```
 
 **Rules:**
+
 - Schema at `prisma/schema.prisma` — all changes through Prisma migrations, never manual SQL
 - Always use `PrismaService` — never import `PrismaClient` directly
 - Always scope queries to `userId` on user-owned data
@@ -142,6 +145,7 @@ async createOrder(flightOffer: FlightOffer, travelers: Traveler[]): Promise<Orde
 ```
 
 **Rules:**
+
 - All Amadeus calls go through `AmadeusService` — never call the SDK from controllers directly
 - Always check Redis cache before calling search API (TTL 15–30 min)
 - Always check API budget counter before calling (monthly limit: 2,000 calls)
@@ -198,6 +202,7 @@ async handleWebhook(@Req() req: RawBodyRequest<Request>, @Headers('stripe-signat
 ```
 
 **Rules:**
+
 - Use Payment Intents API — card data NEVER touches our server (Stripe Elements handles it)
 - Always verify webhook signature before processing
 - Frontend uses `@stripe/react-stripe-js` with `NEXT_PUBLIC_STRIPE_PUBLIC_KEY`
@@ -269,6 +274,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
 ```
 
 **Rules:**
+
 - v1: email/password only — social login deferred
 - JWT strategy — stateless, validated independently by Next.js and NestJS
 - NextAuth route is the only `app/api/` route in the Next.js app
@@ -325,6 +331,7 @@ export class CacheService {
 ```
 
 **Rules:**
+
 - Use `ioredis` — wrapped in injectable `CacheService`
 - Search result cache: TTL 15–30 minutes
 - API budget counter: atomic `INCR` with monthly key — alerts at 50%, 75%, 90%
@@ -395,6 +402,7 @@ const userPrefsTool = tool(
 ```
 
 **Rules:**
+
 - Use `ChatOpenAI` with custom `baseURL` pointing to Mimo's OpenAI-compatible endpoint
 - AI agents are NestJS injectable services — follow the same module pattern
 - Every agent function returns `{ success: boolean, error?: string }`
@@ -405,6 +413,7 @@ const userPrefsTool = tool(
 - LangSmith records full traces for every agent run
 
 **Temperature settings:**
+
 - `0.3` — flight matching, scoring, extraction (deterministic results)
 - `0.7` — conversational responses, trip suggestions (natural variation)
 
@@ -425,6 +434,7 @@ export const langsmithClient = new Client({
 ```
 
 **Rules:**
+
 - Every agent run is traced — tool calls, inputs, outputs, latency
 - Trace ID propagated through all agent functions for correlation
 - Traces used for debugging agent behavior, not for production monitoring dashboards
@@ -507,6 +517,7 @@ export class FlightsService {
 ```
 
 **Rules:**
+
 - One module per domain: flights, bookings, payments, auth, agents, notifications
 - Module → Controller → Service → Repository pattern
 - Controllers handle HTTP concerns only — validation, request parsing, response shaping
@@ -553,14 +564,17 @@ export class SearchFlightsDto {
 // src/main.ts
 import { ValidationPipe } from '@nestjs/common';
 
-app.useGlobalPipes(new ValidationPipe({
-  whitelist: true,
-  forbidNonWhitelisted: true,
-  transform: true,
-}));
+app.useGlobalPipes(
+  new ValidationPipe({
+    whitelist: true,
+    forbidNonWhitelisted: true,
+    transform: true,
+  }),
+);
 ```
 
 **Rules:**
+
 - Every controller input uses a DTO class with `class-validator` decorators — never validate manually
 - `whitelist: true` strips unknown properties — defence against mass assignment
 - `forbidNonWhitelisted: true` rejects requests with unexpected fields
@@ -604,6 +618,7 @@ export function FlightSearchForm({ flights }: Props) {
 ```
 
 **Rules:**
+
 - App Router only — no Pages Router
 - All components are Server Components by default
 - Only add `"use client"` when the component requires: useState, useEffect, browser APIs, event listeners, or client-only libraries

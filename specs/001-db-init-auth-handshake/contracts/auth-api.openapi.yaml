@@ -16,32 +16,32 @@ paths:
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/RegisterRequest"
+              $ref: '#/components/schemas/RegisterRequest'
       responses:
-        "201":
+        '201':
           description: Registration succeeded.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/AuthSession"
-        "400":
+                $ref: '#/components/schemas/AuthSession'
+        '400':
           description: Invalid email or password policy failure.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "409":
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
           description: Registration rejected with safe duplicate-account messaging.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "429":
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
           description: Temporarily locked out.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/LockoutResponse"
+                $ref: '#/components/schemas/LockoutResponse'
   /auth/login:
     post:
       summary: Authenticate a user and return a session token.
@@ -52,26 +52,26 @@ paths:
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/LoginRequest"
+              $ref: '#/components/schemas/LoginRequest'
       responses:
-        "200":
+        '200':
           description: Login succeeded.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/AuthSession"
-        "401":
+                $ref: '#/components/schemas/AuthSession'
+        '401':
           description: Invalid credentials.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "429":
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
           description: Temporarily locked out.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/LockoutResponse"
+                $ref: '#/components/schemas/LockoutResponse'
   /auth/logout:
     post:
       summary: Record logout and allow the client to clear its session.
@@ -80,14 +80,14 @@ paths:
       security:
         - bearerAuth: []
       responses:
-        "204":
+        '204':
           description: Logout recorded.
-        "401":
+        '401':
           description: Missing or invalid token.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                $ref: '#/components/schemas/ErrorResponse'
   /auth/me:
     get:
       summary: Return the authenticated user identity.
@@ -96,36 +96,36 @@ paths:
       security:
         - bearerAuth: []
       responses:
-        "200":
+        '200':
           description: Authenticated user identity.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/UserIdentity"
-        "401":
+                $ref: '#/components/schemas/UserIdentity'
+        '401':
           description: Missing or invalid token.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                $ref: '#/components/schemas/ErrorResponse'
   /health:
     get:
       summary: API and dependency health.
       operationId: getHealth
       tags: [Health]
       responses:
-        "200":
+        '200':
           description: Service is healthy.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/HealthResponse"
-        "503":
+                $ref: '#/components/schemas/HealthResponse'
+        '503':
           description: Service is degraded or down.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/HealthResponse"
+                $ref: '#/components/schemas/HealthResponse'
 components:
   securitySchemes:
     bearerAuth:
@@ -172,7 +172,7 @@ components:
           type: string
           format: date-time
         user:
-          $ref: "#/components/schemas/UserIdentity"
+          $ref: '#/components/schemas/UserIdentity'
     UserIdentity:
       type: object
       additionalProperties: false
