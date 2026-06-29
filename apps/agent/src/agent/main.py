@@ -20,7 +20,10 @@ active_streams: Set[asyncio.Queue] = set()
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Pre-load NeMo Guardrails configuration at service startup (M6)
-    app.state.guardrails = NemoGuardrailService()
+    guardrails = NemoGuardrailService()
+    app.state.guardrails = guardrails
+    # Run async probe on startup
+    await guardrails.probe()
     yield
     # Graceful shutdown: notify all active SSE streams
     if active_streams:
@@ -77,10 +80,15 @@ async def health_check(request: Request):
 
     guardrails = getattr(request.app.state, "guardrails", None)
     
-    if guardrails is not None and settings.MIMO_API_URL and settings.MIMO_API_KEY:
-        guardrails_status = "ok" if guardrails.is_healthy() else "down"
-        model_loaded = guardrails.is_healthy()
-        llm_status = "ok" if guardrails.is_healthy() else "down"
+    guardrails_configured = bool(
+        guardrails is not None and settings.MIMO_API_URL and settings.MIMO_API_KEY
+    )
+    guardrails_healthy = guardrails.is_healthy() if guardrails_configured else False
+
+    if guardrails_configured:
+        guardrails_status = "ok" if guardrails_healthy else "down"
+        model_loaded = guardrails_healthy
+        llm_status = "ok" if guardrails_healthy else "down"
     else:
         guardrails_status = "not_configured"
         model_loaded = False
@@ -89,7 +97,7 @@ async def health_check(request: Request):
     llm_latency = None
 
     overall_status = "ok"
-    if nestjs_status == "down" or guardrails_status == "down":
+    if nestjs_status == "down" or not guardrails_configured or not guardrails_healthy:
         overall_status = "degraded"
 
     return {

@@ -74,14 +74,14 @@
 
 **Independent Test**: Send known prompt injections and check that they are blocked with <500ms latency.
 
-- [ ] T019 Define `GuardrailService` abstract interface in `apps/agent/src/agent/guardrails/base.py`
-- [ ] T020 Implement NeMo Guardrails-based guardrail in `apps/agent/src/agent/guardrails/nemo.py` with config pre-loading
-- [ ] T021 Implement structured security event logging for blocked inputs in `apps/agent/src/agent/guardrails/nemo.py`
-- [ ] T022 Write unit tests for guardrail layer in `apps/agent/tests/test_guardrails.py`
+- [x] T019 Define `GuardrailService` abstract interface in `apps/agent/src/agent/guardrails/base.py`
+- [x] T020 Implement NeMo Guardrails-based guardrail in `apps/agent/src/agent/guardrails/nemo.py` with config pre-loading
+- [x] T021 Implement structured security event logging for blocked inputs in `apps/agent/src/agent/guardrails/nemo.py`
+- [x] T022 Write unit tests for guardrail layer in `apps/agent/tests/test_guardrails.py`
 
 ---
 
-## Phase 5A: User Story 1 - Real-Time Chat Foundation (Priority: P1)
+## Phase 4A: User Story 1 - Real-Time Chat Foundation (Priority: P1)
 
 **Goal**: Setup FastAPI SSE streaming structure and the NestJS client foundation.
 
@@ -93,7 +93,7 @@
 
 ---
 
-## Phase 5B: User Story 1 - LangChain Streaming & Failure Handling (Priority: P1)
+## Phase 4B: User Story 1 - LangChain Streaming & Failure Handling (Priority: P1)
 
 **Goal**: Orchestrate the LangChain agent stream and handle mid-stream connection drops / LLM failures.
 

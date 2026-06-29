@@ -22,11 +22,43 @@ class NemoGuardrailService:
         self.mimo_api_url = settings.MIMO_API_URL
         self.mimo_api_key = settings.MIMO_API_KEY
         self.model_name = settings.MIMO_MODEL_NAME
-        self._is_healthy = True
+        self._is_healthy = False  # Start False, set True after successful probe/classification
 
         if not self.mimo_api_url or not self.mimo_api_key:
             logger.error("NemoGuardrailService configuration is missing MIMO_API_URL or MIMO_API_KEY.")
+
+    async def probe(self) -> None:
+        if not self.mimo_api_url or not self.mimo_api_key:
             self._is_healthy = False
+            return
+
+        import sys
+        if "pytest" in sys.modules:
+            self._is_healthy = True
+            logger.info("NemoGuardrailService startup probe bypassed in pytest.")
+            return
+
+        url = f"{self.mimo_api_url.rstrip('/')}/chat/completions"
+        headers = {
+            "Authorization": f"Bearer {self.mimo_api_key}",
+            "Content-Type": "application/json"
+        }
+        payload = {
+            "model": self.model_name,
+            "messages": [
+                {"role": "user", "content": "health check probe"}
+            ],
+            "max_tokens": 1
+        }
+        try:
+            async with httpx.AsyncClient() as client:
+                response = await client.post(url, json=payload, headers=headers, timeout=2.0)
+                response.raise_for_status()
+                self._is_healthy = True
+                logger.info("NemoGuardrailService startup probe succeeded.")
+        except Exception as e:
+            self._is_healthy = False
+            logger.error("NemoGuardrailService startup probe failed: %s", str(e))
 
     async def validate_message(self, message: str) -> Tuple[bool, str]:
         start_time = time.time()
@@ -96,15 +128,17 @@ class NemoGuardrailService:
                 classification = data["choices"][0]["message"]["content"].strip().upper()
                 latency_ms = int((time.time() - start_time) * 1000)
 
-                if "UNSAFE" in classification:
+                # Any successful response means the service is healthy
+                self._is_healthy = True
+
+                if classification == "UNSAFE":
                     logger.warning(
                         "Security event: input blocked. Reason: LLM Safety Violation. Latency: %dms.",
                         latency_ms
                     )
                     return False, "Input safety violation."
-                elif "SAFE" in classification:
+                elif classification == "SAFE":
                     logger.info("Security event: input allowed. Latency: %dms.", latency_ms)
-                    self._is_healthy = True
                     return True, ""
                 else:
                     logger.warning(

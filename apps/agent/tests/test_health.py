@@ -1,17 +1,28 @@
 import pytest
 import httpx
 from fastapi.testclient import TestClient
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, patch, MagicMock
 from agent.main import app
 
 client = TestClient(app)
 
 def test_health_success():
     # Mock nestjsApi and llm check responses
-    with patch("httpx.AsyncClient.get", new_callable=AsyncMock) as mock_get:
+    with patch("httpx.AsyncClient.get", new_callable=AsyncMock) as mock_get, \
+         patch("agent.main.settings") as mock_settings:
+        
+        mock_settings.MIMO_API_URL = "http://mockmimo"
+        mock_settings.MIMO_API_KEY = "mockkey"
+        mock_settings.NESTJS_API_URL = "http://localhost:3001"
+        
         # Mocking NestJS API health check to be ok
         mock_response = httpx.Response(200, json={"status": "ok"}, request=httpx.Request("GET", "http://localhost:3001/api/health"))
         mock_get.return_value = mock_response
+
+        # Mock healthy guardrail service in app state
+        mock_guardrail = MagicMock()
+        mock_guardrail.is_healthy.return_value = True
+        app.state.guardrails = mock_guardrail
 
         response = client.get("/health")
         assert response.status_code == 200
@@ -26,9 +37,20 @@ def test_health_success():
         assert data["version"] == "0.1.0"
 
 def test_health_nestjs_down():
-    with patch("httpx.AsyncClient.get", new_callable=AsyncMock) as mock_get:
+    with patch("httpx.AsyncClient.get", new_callable=AsyncMock) as mock_get, \
+         patch("agent.main.settings") as mock_settings:
+        
+        mock_settings.MIMO_API_URL = "http://mockmimo"
+        mock_settings.MIMO_API_KEY = "mockkey"
+        mock_settings.NESTJS_API_URL = "http://localhost:3001"
+        
         # Simulate NestJS API connection error
         mock_get.side_effect = httpx.RequestError("Connection failed")
+        
+        # Mock healthy guardrail service in app state
+        mock_guardrail = MagicMock()
+        mock_guardrail.is_healthy.return_value = True
+        app.state.guardrails = mock_guardrail
         
         response = client.get("/health")
         assert response.status_code == 200
