@@ -1,10 +1,11 @@
 import time
 import httpx
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from agent.config import get_settings
 from agent.middleware.auth import JWTAuthMiddleware
 from agent.middleware.rate_limit import RateLimitMiddleware
 from fastapi.middleware.cors import CORSMiddleware
+from agent.guardrails.nemo import NemoGuardrailService
 
 from contextlib import asynccontextmanager
 
@@ -18,6 +19,8 @@ active_streams: Set[asyncio.Queue] = set()
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    # Pre-load NeMo Guardrails configuration at service startup (M6)
+    app.state.guardrails = NemoGuardrailService()
     yield
     # Graceful shutdown: notify all active SSE streams
     if active_streams:
@@ -58,7 +61,7 @@ app.add_middleware(
 )
 
 @app.get("/health")
-async def health_check():
+async def health_check(request: Request):
     nestjs_status = "ok"
     nestjs_latency = 0
     start_time = time.time()
@@ -72,14 +75,21 @@ async def health_check():
     
     nestjs_latency = int((time.time() - start_time) * 1000)
 
-    # Placeholders for Phase 2 scaffold
-    llm_status = "not_configured"
+    guardrails = getattr(request.app.state, "guardrails", None)
+    
+    if guardrails is not None and settings.MIMO_API_URL and settings.MIMO_API_KEY:
+        guardrails_status = "ok" if guardrails.is_healthy() else "down"
+        model_loaded = guardrails.is_healthy()
+        llm_status = "ok" if guardrails.is_healthy() else "down"
+    else:
+        guardrails_status = "not_configured"
+        model_loaded = False
+        llm_status = "not_configured"
+
     llm_latency = None
-    guardrails_status = "not_configured"
-    model_loaded = False
 
     overall_status = "ok"
-    if nestjs_status == "down":
+    if nestjs_status == "down" or guardrails_status == "down":
         overall_status = "degraded"
 
     return {
