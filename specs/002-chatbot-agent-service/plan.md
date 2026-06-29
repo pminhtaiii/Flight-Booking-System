@@ -8,7 +8,7 @@
 
 ## Summary
 
-Build a standalone Python/FastAPI agent service (`apps/agent/`) that receives user questions via SSE streaming, validates authentication, applies LlamaFirewall input guardrails, orchestrates a LangChain-powered conversational agent, manages conversation memory (sliding window + summary), and persists all chat data through the existing NestJS API. The NestJS API is extended with a ChatModule providing REST endpoints for session/message CRUD and memory retrieval.
+Build a standalone Python/FastAPI agent service (`apps/agent/`) that receives user questions via SSE streaming, validates authentication, applies NeMo Guardrails input guardrails, orchestrates a LangChain-powered conversational agent, manages conversation memory (sliding window + summary), and persists all chat data through the existing NestJS API. The NestJS API is extended with a ChatModule providing REST endpoints for session/message CRUD and memory retrieval.
 
 ---
 
@@ -17,7 +17,7 @@ Build a standalone Python/FastAPI agent service (`apps/agent/`) that receives us
 **Language/Version**: Python 3.11+ (agent service), TypeScript strict (NestJS chat module, shared types)
 
 **Primary Dependencies**:
-- Agent: FastAPI, sse-starlette, PyJWT, LangChain, langchain-openai, LangGraph, LlamaFirewall, httpx, python-dotenv
+- Agent: FastAPI, sse-starlette, PyJWT, LangChain, langchain-openai, LangGraph, nemoguardrails, httpx, python-dotenv
 - NestJS: Prisma (schema extension), class-validator, existing auth guards
 
 **Storage**: PostgreSQL (existing instance) — new `ChatSession` and `ChatMessage` models via Prisma migration
@@ -101,7 +101,7 @@ apps/
 │   │       │   └── auth.py           # JWT validation middleware
 │   │       ├── guardrails/
 │   │       │   ├── base.py           # GuardrailService protocol
-│   │       │   └── firewall.py       # LlamaFirewall implementation
+│   │       │   └── nemo.py           # NeMo Guardrails implementation
 │   │       ├── agents/
 │   │       │   └── chat_agent.py     # LangChain conversational agent
 │   │       ├── memory/
@@ -189,8 +189,8 @@ This feature is organized into **6 phases**, each independently testable and dep
 
 **Scope**:
 - Define `GuardrailService` protocol (abstract interface)
-- Implement LlamaFirewall-based guardrail (`firewall.py`)
-- Pre-load LlamaFirewall BERT model at service startup via FastAPI lifespan events to avoid cold-start latency (M6)
+- Implement NeMo Guardrails-based guardrail (`nemo.py`)
+- Pre-load NeMo Guardrails configuration at service startup via FastAPI lifespan events to avoid cold-start latency (M6)
 - Implement fail-closed behavior (FR-012): when guardrails unavailable, block all messages
 - Implement max message length validation (FR-015)
 - Implement structured security event logging (FR-009): blocked inputs, guardrail triggers

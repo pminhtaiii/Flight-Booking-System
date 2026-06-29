@@ -153,26 +153,25 @@ notifications.service sends confirmation email
 Audit log entry written to PostgreSQL
 ```
 
-### AI Agent Advisory Flow (Non-Transactional)
+### AI Chatbot Agent Flow (SSE Streaming)
 
 ```
-User asks AI assistant for help (e.g., "suggest flights for a beach vacation")
+User sends message in chat interface
         ↓
-Next.js → POST /api/agents/search-assist
+Next.js UI → POST apps/agent:3002/chat/stream (SSE streaming)
         ↓
-NestJS agents controller initializes LangChain agent chain
+FastAPI JWTAuthMiddleware validates JWT token (shared JWT_SECRET)
         ↓
-LangChain agent (Mimo model via OpenAI-compatible URL)
-        │
-        ├── Tool call: user-prefs.tool → agent-gateway → Prisma (PII stripped)
-        ├── Tool call: flight-lookup.tool → agent-gateway → cached results
-        │
-        ↓
-Agent synthesizes recommendation (natural language)
-        ↓
-LangSmith records full trace (tools called, inputs, outputs, latency)
-        ↓
-Response returned to user (advisory only — no booking action taken)
+FastAPI NemoGuardrailService runs safety checks (length, regex heuristics, Mimo safety classification)
+        ├── Safety check FAILS/BLOCKED → Log security event, return error event and close stream
+        └── Safety check PASSES ↓
+            Agent checks conversation memory (loads history/summary from NestJS Chat API)
+                ↓
+            Orchestrates LangChain conversational agent with Mimo model
+                ↓
+            Tokens streamed back to frontend via SSE in real time
+                ↓
+            Upon completion, full conversation Turn persisted via NestJS Chat API
 ```
 
 ---

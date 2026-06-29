@@ -6,9 +6,9 @@ Update this file after every completed feature. Any AI agent reading this should
 
 ## Current Status
 
-**Feature:** Chatbot Agent Service (Phase 2)
-**Last completed:** Python Service Scaffold & JWT Auth middleware, rate limiter, graceful shutdown handler, health endpoint, and NestJS API client.
-**Next:** Phase 3: Input Guardrails.
+**Feature:** Chatbot Agent Service (Phase 3)
+**Last completed:** NeMo-style Input Guardrails (character length limits, regex prompt injection heuristic blocks, and Mimo LLM safety classifier API) with fail-closed safety and health check status.
+**Next:** Phase 4A: SSE Streaming & API Client Foundation.
 
 ---
 
@@ -19,7 +19,7 @@ Update this file after every completed feature. Any AI agent reading this should
 - [x] Implement NestJS ChatModule endpoints (CRUD, batch, memory)
 - [x] Implement structured audit logs for chat operations
 - [x] Implement FastAPI Python Agent Service Scaffold & JWT Auth middleware
-- [ ] Implement LlamaFirewall input guardrails
+- [x] Implement NeMo Guardrails input guardrails
 - [ ] Implement SSE streaming and LangChain agent completion
 - [ ] Implement sliding window & summary memory manager
 - [ ] Implement per-conversation concurrency queue
