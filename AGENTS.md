@@ -63,6 +63,6 @@ When the task involves writing, running, or verifying E2E tests:
 <!-- SPECKIT START -->
 
 Current implementation plan:
-specs/001-db-init-auth-handshake/plan.md
+specs/002-chatbot-agent-service/plan.md
 
 <!-- SPECKIT END -->
