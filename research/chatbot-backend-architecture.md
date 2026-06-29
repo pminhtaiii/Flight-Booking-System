@@ -56,7 +56,7 @@ All other APIs:        Next.js  →  NestJS API
 - Even if the agent is prompt-injected, NestJS rejects cross-user access.
 
 ### Layer 3: Input Guardrails (Inference-Time)
-- **LlamaFirewall** (Meta's open-source framework) runs as an input guardrail before the user message hits the LLM.
+- **NeMo Guardrails** (NVIDIA's open-source framework) runs as an input guardrail before the user message hits the LLM.
 - Detects prompt injection, jailbreak attempts, and other malicious inputs.
 
 ### JWT Validation in Python
@@ -124,7 +124,7 @@ flowchart TD
     end
 
     subgraph Agent ["apps/agent (Python/LangChain)"]
-        FW["LlamaFirewall"]
+        FW["NeMo Guardrails"]
         JWT["JWT Middleware (PyJWT)"]
         Router["Agent Router"]
         Agents["Specialist Agents"]

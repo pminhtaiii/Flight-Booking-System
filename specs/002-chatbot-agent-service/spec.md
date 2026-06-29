@@ -151,7 +151,7 @@ A user can start new conversations, switch between existing conversations, and v
 - The existing PostgreSQL database managed by Prisma can accommodate new models for chat data without requiring a separate database.
 - The authentication system (JWT-based) from the `001-db-init-auth-handshake` spec is implemented and tokens can be validated independently by the agent service using a shared secret.
 - The LLM provider exposes an API compatible with standard chat-completion interfaces (e.g., OpenAI-compatible endpoint).
-- The guardrail library (LlamaFirewall) is available as a dependency and can run as an in-process component within the agent service.
+- The guardrail library (NeMo Guardrails) is available as a dependency and can run as an in-process component within the agent service.
 - Conversation memory summarization is triggered when the token count of older messages exceeds a defined budget threshold, checked after the agent finishes streaming a response. If the budget is exceeded, summarization runs asynchronously before the next message is processed. Summarization MUST NOT run during active streaming or response generation to avoid interfering with the user's experience.
 - The multi-agent topology (router vs. single agent vs. supervisor graph) is out of scope for this spec — this spec covers the foundational service infrastructure, not the internal agent orchestration strategy.
 - The specific LLM model/provider selection is out of scope — the service will use an abstraction layer that supports swapping providers.

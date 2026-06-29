@@ -19,7 +19,7 @@ Update this file after every completed feature. Any AI agent reading this should
 - [x] Implement NestJS ChatModule endpoints (CRUD, batch, memory)
 - [x] Implement structured audit logs for chat operations
 - [x] Implement FastAPI Python Agent Service Scaffold & JWT Auth middleware
-- [ ] Implement LlamaFirewall input guardrails
+- [ ] Implement NeMo Guardrails input guardrails
 - [ ] Implement SSE streaming and LangChain agent completion
 - [ ] Implement sliding window & summary memory manager
 - [ ] Implement per-conversation concurrency queue

@@ -48,14 +48,14 @@
 
 ## Decision 4: Input Guardrails Library
 
-**Choice**: Abstract guardrail interface with LlamaFirewall as primary implementation
+**Choice**: Abstract guardrail interface with NeMo Guardrails as primary implementation
 
-**Rationale**: The spec requires guardrails (FR-004, FR-012). LlamaFirewall (Meta) is the intended library. However, availability may vary, so the guardrail layer is built behind a protocol/interface (`GuardrailService`) allowing the implementation to be swapped (LlamaFirewall → NeMo Guardrails → custom regex) without changing the rest of the service.
+**Rationale**: The spec requires guardrails (FR-004, FR-012). NeMo Guardrails (NVIDIA) is the intended library — mature, available on PyPI, and well-documented. The guardrail layer is built behind a protocol/interface (`GuardrailService`) allowing the implementation to be swapped (NeMo Guardrails → LlamaFirewall → custom regex) without changing the rest of the service.
 
 **Fail-closed behavior**: When the guardrail service is unavailable, all messages are blocked (FR-012).
 
 **Alternatives considered**:
-- NeMo Guardrails (NVIDIA) — more mature, available on PyPI, viable fallback
+- LlamaFirewall (Meta) — open-source, viable fallback
 - Rebuff — lightweight but less comprehensive
 - Custom regex — baseline pattern matching, lowest capability
 

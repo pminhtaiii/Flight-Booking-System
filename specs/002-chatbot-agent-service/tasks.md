@@ -70,13 +70,13 @@
 
 ## Phase 4: User Story 3 - Malicious Input Protection (Priority: P1)
 
-**Goal**: Apply LlamaFirewall input guardrails to block prompt injection and fail closed.
+**Goal**: Apply NeMo Guardrails input guardrails to block prompt injection and fail closed.
 
 **Independent Test**: Send known prompt injections and check that they are blocked with <500ms latency.
 
 - [ ] T019 Define `GuardrailService` abstract interface in `apps/agent/src/agent/guardrails/base.py`
-- [ ] T020 Implement LlamaFirewall-based guardrail in `apps/agent/src/agent/guardrails/firewall.py` with BERT model pre-loading
-- [ ] T021 Implement structured security event logging for blocked inputs in `apps/agent/src/agent/guardrails/firewall.py`
+- [ ] T020 Implement NeMo Guardrails-based guardrail in `apps/agent/src/agent/guardrails/nemo.py` with config pre-loading
+- [ ] T021 Implement structured security event logging for blocked inputs in `apps/agent/src/agent/guardrails/nemo.py`
 - [ ] T022 Write unit tests for guardrail layer in `apps/agent/tests/test_guardrails.py`
 
 ---
