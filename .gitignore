@@ -7,3 +7,12 @@ dist/
 .env
 .env.*
 !*.example
+
+# Python
+.venv/
+__pycache__/
+.pytest_cache/
+*.pyc
+*.pyo
+*.pyd
+.ipynb_checkpoints/

@@ -20,9 +20,9 @@
 
 **Purpose**: Python agent service workspace setup and environment preparation
 
-- [ ] T001 Initialize Python agent service directory structure in `apps/agent/`
-- [ ] T002 Configure Python dependencies in `apps/agent/pyproject.toml`
-- [ ] T003 [P] Create minimal `apps/agent/package.json` for pnpm workspace compatibility
+- [x] T001 Initialize Python agent service directory structure in `apps/agent/`
+- [x] T002 Configure Python dependencies in `apps/agent/pyproject.toml`
+- [x] T003 [P] Create minimal `apps/agent/package.json` for pnpm workspace compatibility
 
 ---
 
@@ -62,9 +62,9 @@
 
 **Independent Test**: Send requests to Python service with valid, expired, and missing tokens and verify status codes.
 
-- [ ] T016 Setup FastAPI application scaffold and configuration loading in `apps/agent/src/agent/main.py` and `config.py`
-- [ ] T017 Implement JWT auth middleware in `apps/agent/src/agent/middleware/auth.py`
-- [ ] T018 Write unit tests for auth middleware in `apps/agent/tests/test_auth.py`
+- [x] T016 Setup FastAPI application scaffold and configuration loading in `apps/agent/src/agent/main.py` and `config.py`
+- [x] T017 Implement JWT auth middleware in `apps/agent/src/agent/middleware/auth.py`
+- [x] T018 Write unit tests for auth middleware in `apps/agent/tests/test_auth.py`
 
 ---
 
@@ -87,7 +87,7 @@
 
 **Independent Test**: Verify mock token streaming over `/chat/stream` via SSE and check that the NestJS API client creates sessions correctly.
 
-- [ ] T023 Implement NestJS API client using httpx in `apps/agent/src/agent/tools/nestjs_client.py`
+- [x] T023 Implement NestJS API client using httpx in `apps/agent/src/agent/tools/nestjs_client.py`
 - [ ] T025a Implement base SSE event streaming endpoint and session auto-creation in `apps/agent/src/agent/streaming/sse.py`
 - [ ] T026a Write unit/integration tests for the streaming foundation and API client in `apps/agent/tests/test_streaming_foundation.py`
 

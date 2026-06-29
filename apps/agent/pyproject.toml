@@ -1,0 +1,30 @@
+[project]
+name = "agent"
+version = "0.1.0"
+description = "AI Chatbot Agent Service"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "fastapi>=0.100.0",
+    "uvicorn>=0.22.0",
+    "pydantic>=2.0.0",
+    "pydantic-settings>=2.0.0",
+    "pyjwt>=2.8.0",
+    "sse-starlette>=1.6.0",
+    "tiktoken>=0.5.0",
+    "httpx>=0.24.0",
+    "python-dotenv>=1.0.0",
+    "cryptography>=41.0.0",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=7.0.0",
+    "pytest-asyncio>=0.21.0",
+    "pytest-mock>=3.10.0",
+]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+pythonpath = ["src"]

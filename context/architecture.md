@@ -39,6 +39,9 @@
 │   │   ├── prisma/                    → Prisma database schemas & migrations
 │   │   ├── src/                       → NestJS source code (auth, health, audit, etc.)
 │   │   └── test/                      → API E2E spec tests
+│   ├── agent/                         → Python/FastAPI agent service (NEW)
+│   │   ├── src/                       → FastAPI source code (middlewares, endpoints, config)
+│   │   └── tests/                     → pytest unit and integration tests
 │   └── web/                           → Next.js frontend UI service
 │       ├── app/                       → Next.js App Router pages and API routes
 │       ├── components/                → React UI components
