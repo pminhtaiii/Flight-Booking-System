@@ -48,20 +48,6 @@ export class AuthController {
     @Headers() headers: Record<string, string>,
   ) {
     const { ipAddress, traceId, correlationId } = this.getRequestDetails(req, headers);
-
-    // Check registration rate-limiting lockout
-    const lockout = await this.lockoutService.isLockedOut(ipAddress);
-    if (lockout.locked) {
-      throw new HttpException(
-        {
-          code: 'auth_locked',
-          message: `Too many failed attempts. Please try again after ${lockout.retryAfterSeconds} seconds.`,
-          retryAfterSeconds: lockout.retryAfterSeconds,
-        },
-        HttpStatus.TOO_MANY_REQUESTS,
-      );
-    }
-
     return this.authService.register(dto, ipAddress, traceId, correlationId);
   }
 
@@ -130,6 +116,9 @@ export class AuthController {
     @Req() req: Request,
     @Headers() headers: Record<string, string>,
   ) {
+    if (process.env.NODE_ENV !== 'test') {
+      throw new HttpException('Not Found', HttpStatus.NOT_FOUND);
+    }
     const { ipAddress } = this.getRequestDetails(req, headers);
     if (body.clearAll) {
       await this.lockoutService.clearAllLockouts();

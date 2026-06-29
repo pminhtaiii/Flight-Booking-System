@@ -6,6 +6,10 @@ import { AuthController } from './auth.controller';
 import { LockoutService } from './rate-limit/lockout.service';
 import { JwtStrategy } from './strategies/jwt.strategy';
 
+if (!process.env.JWT_SECRET && process.env.NODE_ENV !== 'test') {
+  throw new Error('JWT_SECRET environment variable is missing.');
+}
+
 @Module({
   imports: [
     PassportModule,

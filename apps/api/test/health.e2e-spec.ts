@@ -15,6 +15,18 @@ describe('Health Check (E2E)', () => {
     // Mock Prisma's $connect and $disconnect to avoid slow TCP timeouts during E2E test setup
     jest.spyOn(PrismaService.prototype, '$connect').mockImplementation(async () => {});
     jest.spyOn(PrismaService.prototype, '$disconnect').mockImplementation(async () => {});
+    jest.spyOn(PrismaService.prototype, '$transaction').mockImplementation((callback) => {
+      const tx = {
+        $executeRawUnsafe: jest.fn().mockResolvedValue(1),
+        $queryRaw: (query: unknown) => {
+          if (prismaService) {
+            return prismaService.$queryRaw(query as TemplateStringsArray);
+          }
+          return Promise.resolve([1]);
+        },
+      };
+      return (callback as (tx: unknown) => Promise<unknown>)(tx);
+    });
 
     const moduleFixture: TestingModule = await Test.createTestingModule({
       imports: [AppModule],
