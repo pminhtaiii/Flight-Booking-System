@@ -12,7 +12,10 @@ class JWTAuthMiddleware(BaseHTTPMiddleware):
 
     async def dispatch(self, request: Request, call_next) -> Response:
         path = request.url.path
-        if any(path.startswith(p) for p in self.exclude_paths):
+        if any(
+            path == normalized or path.startswith(f"{normalized}/")
+            for normalized in ((p.rstrip("/") or "/") for p in self.exclude_paths)
+        ):
             return await call_next(request)
 
         auth_header = request.headers.get("Authorization")

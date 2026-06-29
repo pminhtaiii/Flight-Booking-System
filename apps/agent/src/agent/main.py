@@ -28,8 +28,9 @@ async def lifespan(app: FastAPI):
         for q in list(active_streams):
             try:
                 q.put_nowait(shutdown_event)
-            except Exception:
+            except asyncio.QueueFull:
                 pass
+        active_streams.clear()
         # Allow a short duration for the queues to flush
         await asyncio.sleep(0.5)
 
@@ -72,13 +73,13 @@ async def health_check():
     nestjs_latency = int((time.time() - start_time) * 1000)
 
     # Placeholders for Phase 2 scaffold
-    llm_status = "ok"
-    llm_latency = 100
-    guardrails_status = "ok"
-    model_loaded = True
+    llm_status = "not_configured"
+    llm_latency = None
+    guardrails_status = "not_configured"
+    model_loaded = False
 
     overall_status = "ok"
-    if nestjs_status == "down" or llm_status == "down" or guardrails_status == "down":
+    if nestjs_status == "down":
         overall_status = "degraded"
 
     return {

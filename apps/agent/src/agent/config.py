@@ -3,7 +3,7 @@ from pydantic import Field
 from typing import Optional
 
 class Settings(BaseSettings):
-    JWT_SECRET: str
+    JWT_SECRET: str = Field(..., min_length=1)
     FRONTEND_URL: str = "http://localhost:3000"
     NESTJS_API_URL: str
     MIMO_API_URL: Optional[str] = None

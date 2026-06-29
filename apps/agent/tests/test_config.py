@@ -10,7 +10,7 @@ def test_config_missing_required():
     
     try:
         with pytest.raises(ValidationError):
-            Settings()
+            Settings(_env_file=None)
     finally:
         if old_jwt:
             os.environ["JWT_SECRET"] = old_jwt
@@ -26,7 +26,7 @@ def test_config_defaults(monkeypatch):
     monkeypatch.delenv("MIMO_MODEL_NAME", raising=False)
     monkeypatch.delenv("AGENT_PORT", raising=False)
     
-    settings = Settings()
+    settings = Settings(_env_file=None)
     assert settings.JWT_SECRET == "testsecret"
     assert settings.NESTJS_API_URL == "http://localhost:3001"
     assert settings.FRONTEND_URL == "http://localhost:3000"
@@ -48,7 +48,7 @@ def test_config_custom_values(monkeypatch):
     monkeypatch.setenv("MEMORY_TOKEN_BUDGET", "2000")
     monkeypatch.setenv("QUEUE_MAX_DEPTH", "5")
     
-    settings = Settings()
+    settings = Settings(_env_file=None)
     assert settings.JWT_SECRET == "customsecret"
     assert settings.NESTJS_API_URL == "http://custom-api:3001"
     assert settings.FRONTEND_URL == "http://custom-front:3000"

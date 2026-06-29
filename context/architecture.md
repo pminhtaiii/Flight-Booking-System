@@ -4,7 +4,7 @@
 
 | Layer              | Tool                         | Purpose                                                     |
 | ------------------ | ---------------------------- | ----------------------------------------------------------- |
-| Language           | TypeScript (strict)          | End-to-end — shared types across frontend and backend       |
+| Language           | TypeScript & Python 3.11+    | TS for web/API, Python for agent service                    |
 | Backend Framework  | NestJS                       | Deterministic backend services (booking, payments, auth)    |
 | Frontend Framework | Next.js (App Router)         | SSR, SEO, Server Components for the user-facing UI          |
 | Database           | PostgreSQL                   | Primary transactional store (users, bookings, payments)     |
@@ -14,7 +14,7 @@
 | Payment            | Stripe (Payment Intents)     | PCI-DSS compliant payment processing                        |
 | Flight Data        | Amadeus Self-Service API     | Flight search, pricing, PNR creation, ticketing             |
 | AI Model           | Mimo (OpenAI-compatible URL) | Advisory agents — search assistance, recommendations        |
-| AI Framework       | LangChain.js                 | Agent chains, tool calling, conversation memory             |
+| AI Framework       | LangChain (JS/Python)        | Agent chains, tool calling, conversation memory             |
 | AI Observability   | LangSmith                    | Agent run tracing, tool call auditing                       |
 | Code Review        | CodeRabbit                   | Automated PR review for security and code quality           |
 

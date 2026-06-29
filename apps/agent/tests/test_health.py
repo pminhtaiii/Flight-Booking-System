@@ -17,7 +17,7 @@ def test_health_success():
         assert response.status_code == 200
         
         data = response.json()
-        assert data["status"] in ["ok", "degraded", "down"]
+        assert data["status"] == "ok"
         assert "dependencies" in data
         assert "llm" in data["dependencies"]
         assert "nestjsApi" in data["dependencies"]
