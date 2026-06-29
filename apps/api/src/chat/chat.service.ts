@@ -49,23 +49,37 @@ export class ChatService {
       userId,
     };
 
+    let cursorDate: Date | undefined;
+    let cursorId: string | undefined;
     if (query.cursor) {
-      where.lastActiveAt = {
-        lt: new Date(query.cursor),
-      };
+      const parts = query.cursor.split('_');
+      cursorDate = new Date(parts[0]);
+      cursorId = parts[1];
+
+      where.OR = cursorId
+        ? [
+            { lastActiveAt: { lt: cursorDate } },
+            { lastActiveAt: cursorDate, id: { lt: cursorId } },
+          ]
+        : [{ lastActiveAt: { lt: cursorDate } }];
     }
 
     const sessions = await this.prisma.chatSession.findMany({
       where,
       take: query.limit + 1,
-      orderBy: {
-        lastActiveAt: 'desc',
-      },
+      orderBy: [
+        { lastActiveAt: 'desc' },
+        { id: 'desc' },
+      ],
       include: {
         messages: {
-          orderBy: {
-            createdAt: 'desc',
+          where: {
+            type: 'STANDARD',
           },
+          orderBy: [
+            { createdAt: 'desc' },
+            { id: 'desc' },
+          ],
           take: 1,
         },
       },
@@ -75,7 +89,8 @@ export class ChatService {
     const hasMore = sessions.length > query.limit;
     if (hasMore) {
       sessions.pop();
-      nextCursor = sessions[sessions.length - 1].lastActiveAt.toISOString();
+      const lastSession = sessions[sessions.length - 1];
+      nextCursor = `${lastSession.lastActiveAt.toISOString()}_${lastSession.id}`;
     }
 
     const formattedSessions = sessions.map((session) => ({
@@ -363,14 +378,15 @@ export class ChatService {
     const now = new Date();
     const createdMessages = await this.prisma.$transaction(async (tx) => {
       const msgs = [];
-      for (const msgDto of dto.messages) {
+      for (const [index, msgDto] of dto.messages.entries()) {
+        const createdAt = new Date(now.getTime() + index);
         const msg = await tx.chatMessage.create({
           data: {
             sessionId,
             sender: msgDto.sender,
             type: msgDto.type || 'STANDARD',
             content: msgDto.content,
-            createdAt: now,
+            createdAt,
           },
         });
         msgs.push(msg);
@@ -431,9 +447,10 @@ export class ChatService {
         sessionId,
         type: 'SUMMARY',
       },
-      orderBy: {
-        createdAt: 'desc',
-      },
+      orderBy: [
+        { createdAt: 'desc' },
+        { id: 'desc' },
+      ],
     });
 
     const recentStandardMessages = await this.prisma.chatMessage.findMany({
@@ -442,9 +459,10 @@ export class ChatService {
         type: 'STANDARD',
       },
       take: query.recentCount,
-      orderBy: {
-        createdAt: 'desc',
-      },
+      orderBy: [
+        { createdAt: 'desc' },
+        { id: 'desc' },
+      ],
     });
 
     const recentMessages = recentStandardMessages.reverse().map((m) => ({
