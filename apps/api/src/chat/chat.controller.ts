@@ -74,10 +74,19 @@ export class ChatController {
   @Patch('sessions/:sessionId')
   async updateSession(
     @Req() req: AuthenticatedRequest,
+    @Headers() headers: Record<string, string>,
     @Param('sessionId') sessionId: string,
     @Body() dto: UpdateSessionDto,
   ) {
-    return this.chatService.updateSession(req.user.id, sessionId, dto.title);
+    const { ipAddress, traceId, correlationId } = this.getRequestDetails(req, headers);
+    return this.chatService.updateSession(
+      req.user.id,
+      sessionId,
+      dto.title,
+      ipAddress,
+      traceId,
+      correlationId,
+    );
   }
 
   @Delete('sessions/:sessionId')

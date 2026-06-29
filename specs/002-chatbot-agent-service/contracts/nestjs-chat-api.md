@@ -246,6 +246,7 @@ Get conversation memory for LLM context assembly. Returns the most recent summar
 
 Every write endpoint MUST log a structured record to the `audit_logs` table via `AuditService`:
 - `POST /chat/sessions` → action: `chat_session_create`, resourceType: `ChatSession`
+- `PATCH /chat/sessions/:sessionId` → action: `chat_session_update`, resourceType: `ChatSession`
 - `DELETE /chat/sessions/:sessionId` → action: `chat_session_delete`, resourceType: `ChatSession`
 - `POST /chat/sessions/:sessionId/messages` → action: `chat_message_create`, resourceType: `ChatMessage`
 - `POST /chat/sessions/:sessionId/messages/batch` → action: `chat_message_batch_create`, resourceType: `ChatMessage`

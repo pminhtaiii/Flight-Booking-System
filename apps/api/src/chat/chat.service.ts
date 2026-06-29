@@ -131,7 +131,14 @@ export class ChatService {
     };
   }
 
-  async updateSession(userId: string, sessionId: string, title?: string) {
+  async updateSession(
+    userId: string,
+    sessionId: string,
+    title?: string,
+    ipAddress?: string,
+    traceId?: string,
+    correlationId?: string,
+  ) {
     const session = await this.prisma.chatSession.findFirst({
       where: {
         id: sessionId,
@@ -143,11 +150,25 @@ export class ChatService {
       throw new NotFoundException('Session not found');
     }
 
-    return this.prisma.chatSession.update({
-      where: {
-        id: sessionId,
-      },
-      data: title === undefined ? {} : { title },
+    return this.prisma.$transaction(async (tx) => {
+      const updatedSession = await tx.chatSession.update({
+        where: {
+          id: sessionId,
+        },
+        data: title === undefined ? {} : { title },
+      });
+
+      await this.auditService.createLog(tx, {
+        userId,
+        action: 'chat_session_update',
+        resourceType: 'ChatSession',
+        resourceId: sessionId,
+        ipAddress,
+        traceId,
+        correlationId,
+      });
+
+      return updatedSession;
     });
   }
 

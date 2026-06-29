@@ -223,6 +223,18 @@ describe('Chat API (E2E)', () => {
         where: { id: session.id },
       });
       expect(dbSession!.title).toBe('New Title');
+
+      // Verify audit log entry
+      const auditLog = await prisma.auditLog.findFirst({
+        where: {
+          userId: userA.id,
+          action: 'chat_session_update',
+          resourceType: 'ChatSession',
+          resourceId: session.id,
+        },
+      });
+      expect(auditLog).toBeDefined();
+      expect(auditLog).not.toBeNull();
     });
   });
 
