@@ -46,16 +46,30 @@ class NemoGuardrailService:
         payload = {
             "model": self.model_name,
             "messages": [
+                {
+                    "role": "system",
+                    "content": (
+                        "Your task is to classify the user input as SAFE or UNSAFE.\n"
+                        "You must respond with exactly one word: SAFE or UNSAFE.\n"
+                        "Do not include any explanation or extra text.\n"
+                    )
+                },
                 {"role": "user", "content": "health check probe"}
             ],
-            "max_tokens": 1
+            "max_tokens": 5
         }
         try:
             async with httpx.AsyncClient() as client:
                 response = await client.post(url, json=payload, headers=headers, timeout=2.0)
                 response.raise_for_status()
-                self._is_healthy = True
-                logger.info("NemoGuardrailService startup probe succeeded.")
+                data = response.json()
+                classification = data["choices"][0]["message"]["content"].strip().upper()
+                if classification in ("SAFE", "UNSAFE"):
+                    self._is_healthy = True
+                    logger.info("NemoGuardrailService startup probe succeeded. Verdict: %s", classification)
+                else:
+                    self._is_healthy = False
+                    logger.error("NemoGuardrailService startup probe failed: Unexpected classification '%s'", classification)
         except Exception as e:
             self._is_healthy = False
             logger.error("NemoGuardrailService startup probe failed: %s", str(e))
@@ -128,19 +142,19 @@ class NemoGuardrailService:
                 classification = data["choices"][0]["message"]["content"].strip().upper()
                 latency_ms = int((time.time() - start_time) * 1000)
 
-                # Any successful response means the service is healthy
-                self._is_healthy = True
-
                 if classification == "UNSAFE":
+                    self._is_healthy = True
                     logger.warning(
                         "Security event: input blocked. Reason: LLM Safety Violation. Latency: %dms.",
                         latency_ms
                     )
                     return False, "Input safety violation."
                 elif classification == "SAFE":
+                    self._is_healthy = True
                     logger.info("Security event: input allowed. Latency: %dms.", latency_ms)
                     return True, ""
                 else:
+                    self._is_healthy = False
                     logger.warning(
                         "Security event: input blocked. Reason: Unexpected LLM classification '%s'. Latency: %dms.",
                         classification,

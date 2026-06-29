@@ -86,7 +86,7 @@ async def test_guardrail_llm_fail_closed(guardrail_service):
         assert "Safety check unavailable" in reason
         assert not guardrail_service.is_healthy()
 
-def test_health_endpoint_with_guardrails():
+def test_health_endpoint_with_guardrails(monkeypatch):
     # Setup test client and verify health check behaves appropriately based on app state
     client = TestClient(app)
     
@@ -103,7 +103,7 @@ def test_health_endpoint_with_guardrails():
         # Mock healthy guardrail service in app state
         mock_guardrail = MagicMock()
         mock_guardrail.is_healthy.return_value = True
-        app.state.guardrails = mock_guardrail
+        monkeypatch.setattr(app.state, "guardrails", mock_guardrail, raising=False)
 
         response = client.get("/health")
         assert response.status_code == 200

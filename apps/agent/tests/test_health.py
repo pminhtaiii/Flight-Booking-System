@@ -6,7 +6,7 @@ from agent.main import app
 
 client = TestClient(app)
 
-def test_health_success():
+def test_health_success(monkeypatch):
     # Mock nestjsApi and llm check responses
     with patch("httpx.AsyncClient.get", new_callable=AsyncMock) as mock_get, \
          patch("agent.main.settings") as mock_settings:
@@ -22,7 +22,7 @@ def test_health_success():
         # Mock healthy guardrail service in app state
         mock_guardrail = MagicMock()
         mock_guardrail.is_healthy.return_value = True
-        app.state.guardrails = mock_guardrail
+        monkeypatch.setattr(app.state, "guardrails", mock_guardrail, raising=False)
 
         response = client.get("/health")
         assert response.status_code == 200
@@ -36,7 +36,7 @@ def test_health_success():
         assert data["dependencies"]["nestjsApi"]["status"] == "ok"
         assert data["version"] == "0.1.0"
 
-def test_health_nestjs_down():
+def test_health_nestjs_down(monkeypatch):
     with patch("httpx.AsyncClient.get", new_callable=AsyncMock) as mock_get, \
          patch("agent.main.settings") as mock_settings:
         
@@ -50,7 +50,7 @@ def test_health_nestjs_down():
         # Mock healthy guardrail service in app state
         mock_guardrail = MagicMock()
         mock_guardrail.is_healthy.return_value = True
-        app.state.guardrails = mock_guardrail
+        monkeypatch.setattr(app.state, "guardrails", mock_guardrail, raising=False)
         
         response = client.get("/health")
         assert response.status_code == 200
