@@ -18,7 +18,8 @@
 
 3. **Environment variables** (`apps/agent/.env`):
    ```bash
-   JWT_SECRET=<same as NEXTAUTH_SECRET>
+   JWT_SECRET=<same JWT_SECRET used by NestJS to sign standard HS256 JWTs>
+   FRONTEND_URL=http://localhost:3000
    NESTJS_API_URL=http://localhost:3001
    MIMO_API_URL=<OpenAI-compatible endpoint>
    MIMO_API_KEY=<Mimo API key>
@@ -27,7 +28,7 @@
    LANGCHAIN_PROJECT=flight-booking-agent
    ```
 
-4. **Valid JWT token**: Obtain by logging in through the existing auth flow.
+4. **Valid JWT token**: Obtain by logging in through the existing auth flow (from NestJS `/api/auth/login`).
 
 ---
 
@@ -65,7 +66,7 @@ curl http://localhost:3002/health
   "dependencies": {
     "llm": { "status": "ok" },
     "nestjsApi": { "status": "ok" },
-    "guardrails": { "status": "ok" }
+    "guardrails": { "status": "ok", "modelLoaded": true }
   }
 }
 ```
@@ -76,7 +77,7 @@ curl http://localhost:3002/health
 # No token
 curl -X POST http://localhost:3002/chat/stream \
   -H "Content-Type: application/json" \
-  -d '{"sessionId": "test", "message": "hello"}'
+  -d '{"sessionId": null, "message": "hello"}'
 ```
 
 **Expected**: `401 Unauthorized`
@@ -86,14 +87,40 @@ curl -X POST http://localhost:3002/chat/stream \
 curl -X POST http://localhost:3002/chat/stream \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer invalid_token_here" \
-  -d '{"sessionId": "test", "message": "hello"}'
+  -d '{"sessionId": null, "message": "hello"}'
 ```
 
 **Expected**: `401 Unauthorized`
 
-### Scenario 3: SSE Streaming Response (FR-001, SC-001)
+### Scenario 3: Create Chat Session
+
+Create a session directly in NestJS to obtain a `<session_id>`:
 
 ```bash
+curl -X POST http://localhost:3001/api/chat/sessions \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer <valid_jwt>" \
+  -d '{"title": "Beach Vacation Planning"}'
+```
+
+**Expected**:
+```json
+{
+  "id": "uuid-of-new-session",
+  "userId": "uuid-of-user",
+  "title": "Beach Vacation Planning",
+  "createdAt": "ISO-8601",
+  "updatedAt": "ISO-8601",
+  "lastActiveAt": "ISO-8601"
+}
+```
+
+### Scenario 4: SSE Streaming Response (FR-001, SC-001)
+
+Use the session ID returned in Scenario 3:
+
+```bash
+# Note: -N disables curl's internal output buffering so we see tokens streamed in real time
 curl -N -X POST http://localhost:3002/chat/stream \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer <valid_jwt>" \
@@ -119,9 +146,10 @@ data: {"messageId": "uuid", "sessionId": "uuid"}
 
 First token MUST appear within 3 seconds (SC-001).
 
-### Scenario 4: Guardrail Blocking (FR-004, FR-012)
+### Scenario 5: Guardrail Blocking (FR-004, FR-012)
 
 ```bash
+# Note: -N ensures the block response is streamed as an SSE error event
 curl -N -X POST http://localhost:3002/chat/stream \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer <valid_jwt>" \
@@ -131,10 +159,10 @@ curl -N -X POST http://localhost:3002/chat/stream \
 **Expected**: SSE error event:
 ```
 event: error
-data: {"code": "GUARDRAIL_BLOCKED", "message": "Your message could not be processed."}
+data: {"code": "GUARDRAIL_BLOCKED", "message": "Your message could not be processed.", "partialMessageId": null}
 ```
 
-### Scenario 5: Message Too Long (FR-015)
+### Scenario 6: Message Too Long (FR-015)
 
 ```bash
 # Send a message exceeding max length
@@ -146,9 +174,9 @@ curl -X POST http://localhost:3002/chat/stream \
 
 **Expected**: `400 Bad Request` with error indicating character limit.
 
-### Scenario 6: Chat Data Persistence (FR-005)
+### Scenario 7: Chat Data Persistence (FR-005)
 
-After Scenario 3 completes, verify messages were persisted:
+After Scenario 4 completes, verify messages were persisted in NestJS:
 
 ```bash
 curl http://localhost:3001/api/chat/sessions/<session_id>/messages \
@@ -157,7 +185,7 @@ curl http://localhost:3001/api/chat/sessions/<session_id>/messages \
 
 **Expected**: Both user message and agent response appear in the messages list.
 
-### Scenario 7: Conversation Memory (FR-006, SC-004)
+### Scenario 8: Conversation Memory (FR-006, SC-004)
 
 After 20+ messages in a conversation, verify memory endpoint:
 
@@ -168,9 +196,9 @@ curl "http://localhost:3001/api/chat/sessions/<session_id>/memory?recentCount=20
 
 **Expected**: Response contains `summary` (if summarization has run) and `recentMessages` array.
 
-### Scenario 8: Cross-User Isolation (FR-003, SC-006)
+### Scenario 9: Cross-User Isolation (FR-003, SC-006)
 
-Using User A's token, attempt to access User B's session:
+Using User A's token, attempt to access User B's session messages:
 
 ```bash
 curl http://localhost:3001/api/chat/sessions/<user_b_session_id>/messages \

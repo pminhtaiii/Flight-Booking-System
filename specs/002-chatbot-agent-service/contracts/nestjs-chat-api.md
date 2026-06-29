@@ -171,6 +171,45 @@ Get messages for a session, paginated in chronological order.
 
 ---
 
+## POST /chat/sessions/:sessionId/messages/batch
+
+Persist a batch of messages (e.g. user message + agent response pair, or partial messages during mid-stream drop) atomically in a single transaction. Also updates `session.lastActiveAt` and writes to the audit log.
+
+**Request**:
+```json
+{
+  "messages": [
+    {
+      "sender": "USER | AGENT",
+      "type": "STANDARD | SUMMARY",
+      "content": "string"
+    }
+  ]
+}
+```
+
+**Response** (201):
+```json
+{
+  "messages": [
+    {
+      "id": "uuid",
+      "sessionId": "uuid",
+      "sender": "USER | AGENT",
+      "type": "STANDARD | SUMMARY",
+      "content": "string",
+      "createdAt": "ISO-8601"
+    }
+  ]
+}
+```
+
+**Errors**:
+- `404` — Session not found or does not belong to user
+- `400` — Validation error / message length exceeded
+
+---
+
 ## GET /chat/sessions/:sessionId/memory
 
 Get conversation memory for LLM context assembly. Returns the most recent summary (if any) plus the last N standard messages.
@@ -200,3 +239,13 @@ Get conversation memory for LLM context assembly. Returns the most recent summar
 - `summary` is the content of the most recent SUMMARY-type message
 - `recentMessages` are STANDARD-type messages only, ordered oldest → newest
 - This is the primary endpoint the Python agent calls before each LLM invocation
+
+---
+
+## Audit Logging Requirements
+
+Every write endpoint MUST log a structured record to the `audit_logs` table via `AuditService`:
+- `POST /chat/sessions` → action: `chat_session_create`, resourceType: `ChatSession`
+- `DELETE /chat/sessions/:sessionId` → action: `chat_session_delete`, resourceType: `ChatSession`
+- `POST /chat/sessions/:sessionId/messages` → action: `chat_message_create`, resourceType: `ChatMessage`
+- `POST /chat/sessions/:sessionId/messages/batch` → action: `chat_message_batch_create`, resourceType: `ChatMessage`

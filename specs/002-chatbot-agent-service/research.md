@@ -36,13 +36,13 @@
 
 ## Decision 3: JWT Validation in Python
 
-**Choice**: `PyJWT` library with HS256 algorithm, shared `JWT_SECRET`
+**Choice**: `PyJWT` library with HS256 algorithm, shared `JWT_SECRET` (matching NestJS `JWT_SECRET`)
 
-**Rationale**: NextAuth.js signs tokens with `NEXTAUTH_SECRET` using HS256. The Python agent shares the same secret via environment variable and validates tokens in FastAPI middleware. The token payload contains `sub` (user ID) and `email`. The raw token is preserved in request state for forwarding to NestJS API calls.
+**Rationale**: The NestJS API service issues its own standard HS256-signed JWTs (via `@nestjs/jwt`) during login/registration, rather than relying on JWE-encrypted NextAuth session tokens directly. The Python agent shares the same `JWT_SECRET` environment variable with NestJS and validates these NestJS-signed JWTs in FastAPI middleware. The token payload contains `id` (user ID) and `email`. The raw token is preserved in request state for forwarding to NestJS API calls.
 
 **Alternatives considered**:
-- Service-to-service API keys — adds complexity, JWT is already available
-- NestJS token exchange endpoint — unnecessary round-trip
+- decrypting NextAuth JWE tokens — extremely complex in Python and duplicates NestJS decryption logic
+- Service-to-service API keys — adds complexity, user context validation is required anyway
 
 ---
 

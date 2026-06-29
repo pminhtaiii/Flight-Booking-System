@@ -6,13 +6,24 @@ Update this file after every completed feature. Any AI agent reading this should
 
 ## Current Status
 
-**Feature:** Polish, E2E Verification & Stress Testing
-**Last completed:** Full monorepo verification, E2E tests pass, concurrency testing, and lint cleanup.
-**Next:** Prepare for the next pipeline feature implementation.
+**Feature:** Chatbot Agent Service (Phase 1)
+**Last completed:** Database schema extensions, NestJS ChatModule API endpoints, and comprehensive E2E integration test suite.
+**Next:** Phase 2: Python Service Scaffold & JWT Auth.
 
 ---
 
 ## Progress by Feature
+
+### [/] Feature: Chatbot Agent Service
+- [x] Define ChatSession and ChatMessage database schema
+- [x] Implement NestJS ChatModule endpoints (CRUD, batch, memory)
+- [x] Implement structured audit logs for chat operations
+- [ ] Implement FastAPI Python Agent Service Scaffold & JWT Auth middleware
+- [ ] Implement LlamaFirewall input guardrails
+- [ ] Implement SSE streaming and LangChain agent completion
+- [ ] Implement sliding window & summary memory manager
+- [ ] Implement per-conversation concurrency queue
+
 
 ### [x] Feature: Monorepo Scaffold & Shared Infrastructure
 - [x] Configure workspace `package.json` and workspaces

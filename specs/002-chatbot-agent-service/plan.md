@@ -141,7 +141,7 @@ This feature is organized into **6 phases**, each independently testable and dep
 
 ### Phase 1: Prisma Schema + NestJS ChatModule (Data Layer)
 
-**Covers**: FR-005, FR-007, FR-003, SC-006
+**Covers**: FR-005, FR-007, FR-003, SC-006, H6, H7
 
 **Scope**:
 - Add `ChatSession` and `ChatMessage` Prisma models (see [data-model.md](specs/002-chatbot-agent-service/data-model.md))
@@ -149,7 +149,9 @@ This feature is organized into **6 phases**, each independently testable and dep
 - Add `chatSessions` relation to existing `User` model
 - Run Prisma migration
 - Build `ChatModule` with controller, service, and DTOs
-- Implement all REST endpoints (see [nestjs-chat-api.md](specs/002-chatbot-agent-service/contracts/nestjs-chat-api.md))
+- Implement REST endpoints (see [nestjs-chat-api.md](specs/002-chatbot-agent-service/contracts/nestjs-chat-api.md))
+- Implement batch message persistence endpoint `POST /api/chat/sessions/:sessionId/messages/batch` to save user message + agent response atomically in a transaction (H7)
+- Implement structured audit logging in NestJS `ChatService` using the existing `AuditService` for session creation/deletion and message creation (H6)
 - All endpoints protected by `JwtAuthGuard`, scoped to authenticated user
 - E2E tests for chat CRUD operations
 
@@ -159,18 +161,22 @@ This feature is organized into **6 phases**, each independently testable and dep
 
 ### Phase 2: Python Service Scaffold + JWT Auth (Service Foundation)
 
-**Covers**: FR-002, FR-011, FR-008, SC-002, SC-005
+**Covers**: FR-002, FR-011, FR-008, SC-002, SC-005, C1, C2, H5, M1, M2
 
 **Scope**:
 - Create `apps/agent/` directory structure
-- Set up `pyproject.toml` with all dependencies
+- Set up `pyproject.toml` with dependencies including `fastapi`, `sse-starlette`, `pyjwt`, `pydantic-settings`, `tiktoken`
 - Create minimal `package.json` for pnpm workspace
 - Implement FastAPI app entry point (`main.py`)
-- Implement JWT auth middleware using PyJWT (shared `JWT_SECRET`)
+- Implement `config.py` using Pydantic `BaseSettings` for env validation (H5)
+- Configure FastAPI CORS middleware to allow requests from the frontend origin `FRONTEND_URL` (C2)
+- Implement JWT auth middleware using PyJWT with NestJS-signed HS256 tokens and shared `JWT_SECRET` (C1)
+- Implement rate limiting middleware (e.g. per-user limit) (M1)
+- Implement graceful shutdown hook to send error events to active SSE streams on shutdown (M2)
 - Implement `/health` endpoint with dependency checks (LLM, NestJS API, guardrails)
 - Implement NestJS API client (`nestjs_client.py`) using httpx
 - Configure LangSmith tracing via environment variables
-- Unit tests for auth middleware and health endpoint
+- Unit tests for auth middleware, config validation, and health endpoint
 - Update root `.gitignore` for Python artifacts
 
 **Output**: Running FastAPI service that validates JWT tokens and reports health status. NestJS API client can make authenticated requests.
@@ -179,55 +185,69 @@ This feature is organized into **6 phases**, each independently testable and dep
 
 ### Phase 3: Input Guardrails (Security Layer)
 
-**Covers**: FR-004, FR-012, FR-009, FR-015, SC-003
+**Covers**: FR-004, FR-012, FR-009, FR-015, SC-003, M6
 
 **Scope**:
 - Define `GuardrailService` protocol (abstract interface)
 - Implement LlamaFirewall-based guardrail (`firewall.py`)
+- Pre-load LlamaFirewall BERT model at service startup via FastAPI lifespan events to avoid cold-start latency (M6)
 - Implement fail-closed behavior (FR-012): when guardrails unavailable, block all messages
 - Implement max message length validation (FR-015)
 - Implement structured security event logging (FR-009): blocked inputs, guardrail triggers
 - No PII or raw malicious payloads in logs
-- Add guardrail latency to health check
+- Add guardrail latency and model loading status to health check
 - Unit tests for guardrail pass/block/unavailable scenarios
 
 **Output**: Guardrail layer that blocks malicious inputs and fails closed on unavailability. Independently testable.
 
 ---
 
-### Phase 4: SSE Streaming + LangChain Agent (Core Chat)
+### Phase 4A: SSE Streaming & API Client Foundation
 
-**Covers**: FR-001, FR-010, SC-001
+**Covers**: FR-001, H1
 
 **Scope**:
 - Implement SSE streaming endpoint (`POST /chat/stream`)
+- Implement SSE event protocol: `token`, `done`, `error` events with mock streaming response
+- Implement NestJS API client (`nestjs_client.py`) using httpx for authenticated API requests
+- Support optional `sessionId` in request body. If omitted, automatically create a new session via NestJS REST API and return the `sessionId` in the done event (H1)
+- Unit/integration tests for the streaming and API client foundation
+
+**Output**: Running FastAPI streaming endpoint that can stream tokens and auto-create sessions via NestJS API.
+
+---
+
+### Phase 4B: LangChain Agent & Mid-Stream Drop Persistence
+
+**Covers**: FR-001, FR-010, SC-001, H3
+
+**Scope**:
 - Set up LangChain `ChatOpenAI` with Mimo endpoint (streaming=True)
 - Create conversational agent with system prompt
-- Implement SSE event protocol: `token`, `done`, `error` events
 - Handle LLM provider failures gracefully (FR-010): user-friendly error event
-- Handle mid-stream connection drops: persist partial response
-- Persist user message and agent response to NestJS API (FR-005)
-- Wire together: JWT auth → guardrails → agent → SSE stream → persistence
-- Integration tests for full streaming flow
+- Handle mid-stream connection drops / LLM failures: persist user input and partial agent response generated so far to NestJS via batch endpoint, and include `partialMessageId` in the `error` event payload (H3)
+- Wire together: JWT auth → guardrails → agent → SSE stream → persistence (batch save user/agent pair on success)
+- Integration tests for full streaming flow with agent completion and drop handling
 
-**Output**: End-to-end chat: authenticated user sends message, receives streaming response, messages persisted.
+**Output**: End-to-end chat: authenticated user sends message, receives streaming response from LLM agent, and messages are persisted on completion or drop.
 
 ---
 
 ### Phase 5: Conversation Memory Management
 
-**Covers**: FR-006, FR-014, SC-004
+**Covers**: FR-006, FR-014, SC-004, M3, M5
 
 **Scope**:
 - Implement memory manager (`memory/manager.py`)
 - Load conversation memory from NestJS `/memory` endpoint: summary + recent N messages
 - Assemble LLM context: system prompt → summary → recent messages → new input
-- Implement post-response token budget check
+- Implement post-response token budget check using `tiktoken` library for precise token counting (M3)
 - Implement async summarization trigger (between responses, not during streaming)
 - Store summary as `ChatMessage` with `type: SUMMARY` via NestJS API
 - Implement summarization failure fallback: truncation to recent N messages (FR-014)
 - Retry summarization on next applicable turn
 - Unit tests for memory assembly, budget checking, summarization trigger
+- Ensure types/schemas align with NestJS API contracts as single source of truth (M5)
 
 **Output**: Conversations maintain context across many messages. Summarization runs transparently between turns.
 
@@ -263,7 +283,8 @@ No constitution violations — no complexity justification needed.
 
 | Variable | Purpose |
 |----------|---------|
-| `JWT_SECRET` | Same as `NEXTAUTH_SECRET` — JWT validation |
+| `JWT_SECRET` | Shared JWT secret used by NestJS to sign standard HS256 tokens (not NEXTAUTH_SECRET) |
+| `FRONTEND_URL` | Next.js frontend origin (default: `http://localhost:3000`) for CORS (C2) |
 | `NESTJS_API_URL` | NestJS API base URL (e.g., `http://localhost:3001`) |
 | `MIMO_API_URL` | Mimo OpenAI-compatible endpoint |
 | `MIMO_API_KEY` | Mimo API key |

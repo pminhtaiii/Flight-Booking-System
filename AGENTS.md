@@ -60,9 +60,18 @@ When the task involves writing, running, or verifying E2E tests:
    - Follow the opaque-box verification strategies defined in [TEST_INFRA.md](file:///c:/Booking%20Systems/TEST_INFRA.md).
    - Use time acceleration (`POST /auth/test/reset-lockout` when `NODE_ENV === 'test'`) and database assertions.
 
+### GitHub MCP & CodeRabbit Integration
+When a task involves creating a pull request or requesting CodeRabbit reviews:
+1. **PR Creation**: Use the `github-mcp-server` to create Pull Requests directly. The target repository details are `owner: "pminhtaiii"`, `repo: "Flight-Booking-System"`. The base branch is typically `development`. Do not ask the user to manually create the PR.
+2. **Triggering CodeRabbit**: CodeRabbit skips automatic reviews on non-default target branches (like `development`). You must trigger the review manually:
+   - Use the `add_issue_comment` tool from `github-mcp-server` to post `@coderabbitai review` on the pull request (pass the PR number as `issue_number`).
+3. **Harvesting Feedback**:
+   - Use `pull_request_read` with method `get_comments` to check when CodeRabbit completes its run.
+   - Use `pull_request_read` with method `get_review_comments` to fetch CodeRabbit's inline review threads.
+   - Address all findings, push changes, and post `@coderabbitai review` again to confirm convergence. Do not consider a planning or implementation phase complete until all CodeRabbit comments are resolved.
+
 <!-- SPECKIT START -->
-
-Current implementation plan:
-specs/002-chatbot-agent-service/plan.md
-
+For additional context about technologies to be used, project structure,
+shell commands, and other important information, read the current plan
+at specs/002-chatbot-agent-service/plan.md
 <!-- SPECKIT END -->
