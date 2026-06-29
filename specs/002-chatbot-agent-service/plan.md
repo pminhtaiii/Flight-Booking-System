@@ -172,7 +172,7 @@ This feature is organized into **6 phases**, each independently testable and dep
 - Configure FastAPI CORS middleware to allow requests from the frontend origin `FRONTEND_URL` (C2)
 - Implement JWT auth middleware using PyJWT with NestJS-signed HS256 tokens and shared `JWT_SECRET` (C1)
 - Implement rate limiting middleware (e.g. per-user limit) (M1)
-- Implement graceful shutdown hook to send error events to active SSE streams on shutdown (M2)
+- Implement generic graceful shutdown hook (M2)
 - Implement `/health` endpoint with dependency checks (LLM, NestJS API, guardrails)
 - Implement NestJS API client (`nestjs_client.py`) using httpx
 - Configure LangSmith tracing via environment variables
@@ -204,13 +204,14 @@ This feature is organized into **6 phases**, each independently testable and dep
 
 ### Phase 4A: SSE Streaming & API Client Foundation
 
-**Covers**: FR-001, H1
+**Covers**: FR-001, H1, M2
 
 **Scope**:
 - Implement SSE streaming endpoint (`POST /chat/stream`)
 - Implement SSE event protocol: `token`, `done`, `error` events with mock streaming response
 - Implement NestJS API client (`nestjs_client.py`) using httpx for authenticated API requests
 - Support optional `sessionId` in request body. If omitted, automatically create a new session via NestJS REST API and return the `sessionId` in the done event (H1)
+- Implement graceful shutdown handling to send error events to active SSE streams on shutdown (M2)
 - Unit/integration tests for the streaming and API client foundation
 
 **Output**: Running FastAPI streaming endpoint that can stream tokens and auto-create sessions via NestJS API.
