@@ -13,14 +13,15 @@ enum UserStatus {
 }
 
 model User {
-  id          String      @id @default(uuid())
-  email       String      @unique
+  id          String        @id @default(uuid())
+  email       String        @unique
   password    String
-  status      UserStatus  @default(ACTIVE)
-  createdAt   DateTime    @default(now())
-  updatedAt   DateTime    @updatedAt
+  status      UserStatus    @default(ACTIVE)
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
   lastLogin   DateTime?
   auditLogs   AuditLog[]
+  chatSessions ChatSession[]
 
   @@map("users")
 }
@@ -40,3 +41,44 @@ model AuditLog {
   @@index([userId])
   @@map("audit_logs")
 }
+
+enum MessageSender {
+  USER
+  AGENT
+}
+
+enum MessageType {
+  STANDARD
+  SUMMARY
+}
+
+model ChatSession {
+  id            String        @id @default(uuid())
+  userId        String
+  title         String?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+  lastActiveAt  DateTime      @default(now())
+  messages      ChatMessage[]
+  user          User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([userId, lastActiveAt])
+  @@map("chat_sessions")
+}
+
+model ChatMessage {
+  id          String        @id @default(uuid())
+  sessionId   String
+  sender      MessageSender
+  type        MessageType   @default(STANDARD)
+  content     String
+  createdAt   DateTime      @default(now())
+  session     ChatSession   @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@index([sessionId])
+  @@index([sessionId, createdAt])
+  @@index([sessionId, type])
+  @@map("chat_messages")
+}
+
