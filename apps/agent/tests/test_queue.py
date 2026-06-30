@@ -163,4 +163,6 @@ async def test_endpoint_concurrency_limit(monkeypatch):
         assert "Too many concurrent requests" in r3_response.json()["detail"]
         
         # Let other requests finish
-        await asyncio.gather(r1_task, r2_task)
+        r1_response, r2_response = await asyncio.gather(r1_task, r2_task)
+        assert r1_response.status_code == 200
+        assert r2_response.status_code == 200

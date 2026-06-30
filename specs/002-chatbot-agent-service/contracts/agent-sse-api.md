@@ -76,6 +76,7 @@ data: {"code": "GUARDRAIL_BLOCKED", "message": "Your message could not be proces
 | `MESSAGE_TOO_LONG`      | 400         | Input exceeds maximum length                            |
 | `QUEUE_FULL`            | 429         | Concurrent message limit exceeded for this conversation |
 | `LLM_ERROR`             | 200 (SSE)   | LLM provider error, user-friendly message returned      |
+| `PERSISTENCE_ERROR`     | 200 (SSE)   | Response completed, but saving the final messages failed |
 | `INTERNAL_ERROR`        | 500         | Unexpected server error                                 |
 
 **Notes**:
