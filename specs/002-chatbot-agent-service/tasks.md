@@ -88,8 +88,8 @@
 **Independent Test**: Verify mock token streaming over `/chat/stream` via SSE and check that the NestJS API client creates sessions correctly.
 
 - [x] T023 Implement NestJS API client using httpx in `apps/agent/src/agent/tools/nestjs_client.py`
-- [ ] T025a Implement base SSE event streaming endpoint and session auto-creation in `apps/agent/src/agent/streaming/sse.py`
-- [ ] T026a Write unit/integration tests for the streaming foundation and API client in `apps/agent/tests/test_streaming_foundation.py`
+- [x] T025a Implement base SSE event streaming endpoint and session auto-creation in `apps/agent/src/agent/streaming/sse.py`
+- [x] T026a Write unit/integration tests for the streaming foundation and API client in `apps/agent/tests/test_streaming_foundation.py`
 
 ---
 
@@ -99,9 +99,9 @@
 
 **Independent Test**: Connect to `/chat/stream` and verify end-to-end token delivery from the agent, database persistence on success, and partial persistence on mid-stream drop.
 
-- [ ] T024 Setup LangChain ChatOpenAI and chat agent prompt template in `apps/agent/src/agent/agents/chat_agent.py`
-- [ ] T025b Wire agent streaming into the SSE endpoint and implement the connection drop handler / batch persistence in `apps/agent/src/agent/streaming/sse.py`
-- [ ] T026b Write integration tests for full agent streaming and drop persistence in `apps/agent/tests/test_streaming_agent.py`
+- [x] T024 Setup LangChain ChatOpenAI and chat agent prompt template in `apps/agent/src/agent/agents/chat_agent.py`
+- [x] T025b Wire agent streaming into the SSE endpoint and implement the connection drop handler / batch persistence in `apps/agent/src/agent/streaming/sse.py`
+- [x] T026b Write integration tests for full agent streaming and drop persistence in `apps/agent/tests/test_streaming_agent.py`
 
 ---
 

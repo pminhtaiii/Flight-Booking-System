@@ -76,6 +76,7 @@ async def chat_stream(
     # Background producer task
     async def producer():
         partial_response = ""
+        persisted = False
         try:
             # Format messages for LangChain agent
             messages = format_messages(
@@ -101,6 +102,7 @@ async def chat_stream(
                 {"sender": "AGENT", "type": "STANDARD", "content": partial_response}
             ]
             batch_res = await client.create_message_batch(session_id, messages_payload)
+            persisted = True
             
             # Extract agent message id
             agent_message_id = None
@@ -115,14 +117,45 @@ async def chat_stream(
                     "sessionId": session_id
                 })
             })
+        except asyncio.CancelledError:
+            # Handle mid-stream connection drop or cancellation
+            logger.warning(f"Connection dropped mid-stream for session {session_id}.")
+            if not persisted:
+                async def persist_partial():
+                    try:
+                        messages_payload = [
+                            {"sender": "USER", "type": "STANDARD", "content": body.message},
+                            {"sender": "AGENT", "type": "STANDARD", "content": partial_response}
+                        ]
+                        await client.create_message_batch(session_id, messages_payload)
+                    except Exception as e:
+                        logger.error(f"Failed to persist partial response on connection drop: {e!s}")
+                asyncio.create_task(persist_partial())
+            raise
         except Exception as e:
-            logger.error(f"Error during streaming: {e!s}")
+            # Handle LLM provider or other runtime failures
+            logger.error(f"LLM error during streaming: {e!s}")
+            partial_message_id = None
+            if not persisted:
+                try:
+                    messages_payload = [
+                        {"sender": "USER", "type": "STANDARD", "content": body.message},
+                        {"sender": "AGENT", "type": "STANDARD", "content": partial_response}
+                    ]
+                    batch_res = await client.create_message_batch(session_id, messages_payload)
+                    persisted = True
+                    for msg in batch_res.get("messages", []):
+                        if msg.get("sender") == "AGENT":
+                            partial_message_id = msg.get("id")
+                except Exception as persist_err:
+                    logger.error(f"Failed to persist partial response on LLM error: {persist_err!s}")
+            
             await q.put({
                 "event": "error",
                 "data": json.dumps({
                     "code": "LLM_ERROR",
                     "message": "The AI model encountered an error. Please try again.",
-                    "partialMessageId": None
+                    "partialMessageId": partial_message_id
                 })
             })
         finally:
