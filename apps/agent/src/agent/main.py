@@ -1,18 +1,17 @@
 import time
 import httpx
+import asyncio
+from typing import Set
 from fastapi import FastAPI, Request
 from agent.config import get_settings
 from agent.middleware.auth import JWTAuthMiddleware
 from agent.middleware.rate_limit import RateLimitMiddleware
 from fastapi.middleware.cors import CORSMiddleware
 from agent.guardrails.nemo import NemoGuardrailService
-
+from agent.streaming.sse import router as sse_router
 from contextlib import asynccontextmanager
 
 settings = get_settings()
-
-import asyncio
-from typing import Set
 
 # Global set to track active SSE connection queues for graceful shutdown (M2)
 active_streams: Set[asyncio.Queue] = set()
@@ -41,6 +40,7 @@ async def lifespan(app: FastAPI):
         await asyncio.sleep(0.5)
 
 app = FastAPI(title="AI Chatbot Agent Service", version="0.1.0", lifespan=lifespan)
+app.include_router(sse_router)
 
 
 app.add_middleware(
