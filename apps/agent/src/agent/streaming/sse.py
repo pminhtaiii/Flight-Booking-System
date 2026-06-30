@@ -18,6 +18,10 @@ async def chat_stream(
     body: ChatStreamRequest,
     authorization: str = Header(None)
 ):
+    """
+    Handle POST /chat/stream requests, performing validation, checking guardrails,
+    fetching memory context, and returning an SSE stream with LangChain output.
+    """
     settings = get_settings()
 
     # 1. Authorization validation first (security check)
@@ -149,7 +153,7 @@ async def chat_stream(
             except asyncio.CancelledError:
                 # Handle mid-stream connection drop or cancellation
                 logger.warning(f"Connection dropped mid-stream for session {session_id}.")
-                if not persisted:
+                if not persisted and partial_response:
                     try:
                         messages_payload = [
                             {"sender": "USER", "type": "STANDARD", "content": body.message},
@@ -164,7 +168,7 @@ async def chat_stream(
                 # Handle LLM provider or other runtime failures
                 logger.error(f"LLM error during streaming: {e!s}")
                 partial_message_id = None
-                if not persisted:
+                if not persisted and partial_response:
                     try:
                         messages_payload = [
                             {"sender": "USER", "type": "STANDARD", "content": body.message},

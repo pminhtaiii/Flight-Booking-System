@@ -8,6 +8,10 @@ from langchain_core.messages import SystemMessage
 logger = logging.getLogger("agent.memory")
 
 class MemoryManager:
+    """
+    Manager responsible for counting tokens, tracking budget, and triggering 
+    asynchronous summarization of sliding chat memory context.
+    """
     def __init__(self, window_size: int = 20, token_budget: int = 4000):
         self.window_size = window_size
         self.token_budget = token_budget
@@ -18,11 +22,17 @@ class MemoryManager:
             self.encoding = None
 
     def count_tokens(self, text: str) -> int:
+        """
+        Count tokens in text using tiktoken base encoding, falling back to approximation.
+        """
         if not self.encoding:
             return len(text) // 4
         return len(self.encoding.encode(text))
 
     def get_older_messages_tokens(self, older_messages: List[Dict[str, Any]], summary: Optional[str]) -> int:
+        """
+        Calculate total tokens of messages that slid out of window plus the existing summary.
+        """
         tokens = 0
         if summary:
             tokens += self.count_tokens(summary)
@@ -74,6 +84,9 @@ class MemoryManager:
         existing_summary: Optional[str],
         client: NestJSClient
     ) -> None:
+        """
+        Invoke LLM to generate an updated summary incorporating new slide-out messages and persist it.
+        """
         # Format the older messages for the summarization prompt
         formatted_messages = []
         for msg in older_messages:

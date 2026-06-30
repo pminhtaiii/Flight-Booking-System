@@ -5,6 +5,10 @@ from fastapi import HTTPException
 logger = logging.getLogger("agent.queue")
 
 class MessageQueueManager:
+    """
+    Manages per-session locks and request depths to queue concurrent requests 
+    and reject requests exceeding the maximum allowed depth.
+    """
     def __init__(self, max_depth: int = 3):
         self.max_depth = max_depth
         self.locks: dict[str, asyncio.Lock] = {}

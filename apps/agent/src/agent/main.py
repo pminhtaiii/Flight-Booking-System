@@ -18,6 +18,10 @@ active_streams: Set[asyncio.Queue] = set()
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    """
+    Lifespan context manager that initializes NeMo Guardrails configuration,
+    message queue manager on startup, and flushes active SSE connections on shutdown.
+    """
     # Pre-load NeMo Guardrails configuration at service startup (M6)
     guardrails = NemoGuardrailService()
     app.state.guardrails = guardrails
@@ -68,6 +72,9 @@ app.add_middleware(
 
 @app.get("/health")
 async def health_check(request: Request):
+    """
+    Perform a health check verification by checking NestJS and NeMo Guardrails status.
+    """
     nestjs_status = "ok"
     nestjs_latency = 0
     start_time = time.time()
