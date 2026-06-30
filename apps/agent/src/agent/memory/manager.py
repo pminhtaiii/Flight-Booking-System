@@ -36,10 +36,11 @@ class MemoryManager:
         plus the existing summary exceeds the token budget. If so, trigger async summarization.
         """
         try:
-            # 1. Resolve total message count
-            if total_count is None:
-                memory_data = await client.get_memory(session_id, recent_count=self.window_size)
-                total_count = memory_data.get("totalMessageCount", 0)
+            # 1. Resolve total message count from the server, even when the caller
+            #    provides a hint, so concurrent writes do not truncate history.
+            memory_data = await client.get_memory(session_id, recent_count=self.window_size)
+            server_total = memory_data.get("totalMessageCount", 0)
+            total_count = max(total_count or 0, server_total)
             
             # If total messages are within the window, no older messages exist to summarize
             if total_count <= self.window_size:

@@ -102,8 +102,20 @@ async def chat_stream(
                 {"sender": "USER", "type": "STANDARD", "content": body.message},
                 {"sender": "AGENT", "type": "STANDARD", "content": partial_response}
             ]
-            batch_res = await client.create_message_batch(session_id, messages_payload)
-            persisted = True
+            try:
+                batch_res = await client.create_message_batch(session_id, messages_payload)
+                persisted = True
+            except Exception as persist_err:
+                logger.error(f"Failed to persist completed response: {persist_err!s}")
+                await q.put({
+                    "event": "error",
+                    "data": json.dumps({
+                        "code": "PERSISTENCE_ERROR",
+                        "message": "The response was generated but could not be saved.",
+                        "partialMessageId": None
+                    })
+                })
+                return
             
             # Extract agent message id
             agent_message_id = None
@@ -131,16 +143,15 @@ async def chat_stream(
             # Handle mid-stream connection drop or cancellation
             logger.warning(f"Connection dropped mid-stream for session {session_id}.")
             if not persisted:
-                async def persist_partial():
-                    try:
-                        messages_payload = [
-                            {"sender": "USER", "type": "STANDARD", "content": body.message},
-                            {"sender": "AGENT", "type": "STANDARD", "content": partial_response}
-                        ]
-                        await client.create_message_batch(session_id, messages_payload)
-                    except Exception as e:
-                        logger.error(f"Failed to persist partial response on connection drop: {e!s}")
-                asyncio.create_task(persist_partial())
+                try:
+                    messages_payload = [
+                        {"sender": "USER", "type": "STANDARD", "content": body.message},
+                        {"sender": "AGENT", "type": "STANDARD", "content": partial_response}
+                    ]
+                    await asyncio.shield(client.create_message_batch(session_id, messages_payload))
+                    persisted = True
+                except Exception as e:
+                    logger.error(f"Failed to persist partial response on connection drop: {e!s}")
             raise
         except Exception as e:
             # Handle LLM provider or other runtime failures

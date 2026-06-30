@@ -6,6 +6,7 @@ import httpx
 from unittest.mock import AsyncMock, patch, MagicMock
 from langchain_core.messages import AIMessageChunk
 from agent.main import app, active_streams
+from agent.config import get_settings
 
 JWT_SECRET = "testsecret_must_be_at_least_32_bytes_long_for_security_reasons"
 
@@ -117,7 +118,11 @@ async def test_stream_success_path(monkeypatch):
                 assert done_events[0]["data"]["messageId"] == "agent-msg-456"
                 
                 # Verify NestJS calls
-                mock_get_memory.assert_called_once_with("session-123", recent_count=20)
+                settings = get_settings()
+                assert mock_get_memory.call_count == 2
+                for call_args in mock_get_memory.call_args_list:
+                    assert call_args[0][0] == "session-123"
+                    assert call_args[1]["recent_count"] == settings.MEMORY_WINDOW_SIZE
                 mock_create_batch.assert_called_once_with("session-123", [
                     {"sender": "USER", "type": "STANDARD", "content": "how are you?"},
                     {"sender": "AGENT", "type": "STANDARD", "content": "Hello there human!"}
@@ -189,7 +194,8 @@ async def test_stream_llm_error_path(monkeypatch):
                 assert error_events[0]["data"]["partialMessageId"] == "agent-partial-msg-456"
                 
                 # Verify NestJS calls
-                mock_get_memory.assert_called_once_with("session-456", recent_count=20)
+                settings = get_settings()
+                mock_get_memory.assert_called_once_with("session-456", recent_count=settings.MEMORY_WINDOW_SIZE)
                 mock_create_batch.assert_called_once_with("session-456", [
                     {"sender": "USER", "type": "STANDARD", "content": "fail for me"},
                     {"sender": "AGENT", "type": "STANDARD", "content": "Partial answer..."}
@@ -211,12 +217,17 @@ async def test_stream_connection_drop_path(monkeypatch):
         "summary": None
     })
     
-    mock_create_batch = AsyncMock(return_value={
-        "messages": [
-            {"id": "dropped-user-id", "sender": "USER"},
-            {"id": "dropped-agent-id", "sender": "AGENT"}
-        ]
-    })
+    call_event = asyncio.Event()
+    async def mock_create_batch_side_effect(*args, **kwargs):
+        call_event.set()
+        return {
+            "messages": [
+                {"id": "dropped-user-id", "sender": "USER"},
+                {"id": "dropped-agent-id", "sender": "AGENT"}
+            ]
+        }
+    
+    mock_create_batch = AsyncMock(side_effect=mock_create_batch_side_effect)
     
     monkeypatch.setattr(
         "agent.tools.nestjs_client.NestJSClient.get_memory",
@@ -256,8 +267,8 @@ async def test_stream_connection_drop_path(monkeypatch):
                         break
             
             # Now the connection is dropped.
-            # We wait a brief moment for the background task to run and write to the database
-            await asyncio.sleep(0.1)
+            # We wait for the background persistence task to execute and call the database
+            await asyncio.wait_for(call_event.wait(), timeout=2.0)
             
             # Assert that create_message_batch was called
             assert mock_create_batch.call_count == 1
