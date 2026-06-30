@@ -41,21 +41,21 @@ Send a message and receive a streaming response via SSE.
 
 **Token event** — incremental response token:
 
-```
+```text
 event: token
 data: {"content": "Hello"}
 ```
 
 **Done event** — response complete:
 
-```
+```text
 event: done
 data: {"messageId": "uuid", "sessionId": "uuid"}
 ```
 
 **Error event** — error occurred:
 
-```
+```text
 event: error
 data: {"code": "GUARDRAIL_BLOCKED", "message": "Your message could not be processed.", "partialMessageId": "uuid | null"}
 ```

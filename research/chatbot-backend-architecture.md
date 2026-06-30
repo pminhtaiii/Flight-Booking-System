@@ -33,7 +33,7 @@
 
 **Traffic flow**:
 
-```
+```text
 Chat (SSE streaming):  Next.js  →  Python Agent (direct)
 Data (REST):           Python Agent  →  NestJS API
 All other APIs:        Next.js  →  NestJS API
