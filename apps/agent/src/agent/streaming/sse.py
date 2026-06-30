@@ -7,6 +7,7 @@ from agent.config import get_settings
 from agent.models.requests import ChatStreamRequest
 from agent.tools.nestjs_client import NestJSClient
 from agent.agents.chat_agent import get_chat_model, format_messages
+from agent.memory.manager import MemoryManager
 
 logger = logging.getLogger("agent.streaming")
 router = APIRouter()
@@ -117,6 +118,15 @@ async def chat_stream(
                     "sessionId": session_id
                 })
             })
+
+            # Asynchronously trigger token budget check and summarization in the background
+            memory_mgr = MemoryManager(
+                window_size=settings.MEMORY_WINDOW_SIZE,
+                token_budget=settings.MEMORY_TOKEN_BUDGET
+            )
+            # The session message count has increased by 2 (user message + agent response)
+            original_total = memory_data.get("totalMessageCount", 0)
+            asyncio.create_task(memory_mgr.check_and_summarize(session_id, client, total_count=original_total + 2))
         except asyncio.CancelledError:
             # Handle mid-stream connection drop or cancellation
             logger.warning(f"Connection dropped mid-stream for session {session_id}.")

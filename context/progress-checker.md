@@ -6,9 +6,9 @@ Update this file after every completed feature. Any AI agent reading this should
 
 ## Current Status
 
-**Feature:** Chatbot Agent Service (Phase 4B)
-**Last completed:** Phase 4B: LangChain Agent & Mid-Stream Drop Persistence (orchestrating LangChain streaming, handling LLM failures and mid-stream drops, persisting partial/full responses via NestJS batch message endpoint).
-**Next:** Phase 6: Conversation History & Memory (sliding window + summary memory manager).
+**Feature:** Chatbot Agent Service (Phase 6)
+**Last completed:** Phase 6: Conversation History & Memory (sliding window + summary memory manager, post-response token budget check using tiktoken, and async summarization updates persisted to NestJS API).
+**Next:** Phase 7: Conversation Management & Concurrent Message Queue (per-conversation serialization).
 
 ---
 
@@ -22,7 +22,7 @@ Update this file after every completed feature. Any AI agent reading this should
 - [x] Implement NeMo Guardrails input guardrails
 - [x] Implement SSE streaming foundation (Phase 4A)
 - [x] Implement LangChain agent completion & persistence (Phase 4B)
-- [ ] Implement sliding window & summary memory manager
+- [x] Implement sliding window & summary memory manager
 - [ ] Implement per-conversation concurrency queue
 
 
