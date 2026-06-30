@@ -11,6 +11,7 @@
 **Rationale**: Confirmed from grilling session. FastAPI provides async-first HTTP with native SSE streaming via `sse-starlette`. First-class Pydantic validation, dependency injection, and middleware support. The async model aligns with LLM streaming requirements.
 
 **Alternatives considered**:
+
 - Flask — no native async, SSE support is hacky
 - Django — too heavy for a single-purpose agent service
 - Starlette (raw) — FastAPI adds routing, validation, DI on top
@@ -24,11 +25,13 @@
 **Rationale**: Purpose-built for FastAPI/Starlette. Provides a clean async generator interface that maps directly to LangChain's `.astream()` method. Supports custom event types (`token`, `done`, `error`) for structured client consumption.
 
 **Event protocol**:
+
 - `event: token` — incremental response token
 - `event: done` — response complete
 - `event: error` — error occurred (user-friendly message only)
 
 **Alternatives considered**:
+
 - Raw Starlette `StreamingResponse` — no SSE event framing
 - WebSocket — more complex, SSE is sufficient for server→client streaming
 
@@ -41,6 +44,7 @@
 **Rationale**: The NestJS API service issues its own standard HS256-signed JWTs (via `@nestjs/jwt`) during login/registration, rather than relying on JWE-encrypted NextAuth session tokens directly. The Python agent shares the same `JWT_SECRET` environment variable with NestJS and validates these NestJS-signed JWTs in FastAPI middleware. The token payload contains `id` (user ID) and `email`. The raw token is preserved in request state for forwarding to NestJS API calls.
 
 **Alternatives considered**:
+
 - decrypting NextAuth JWE tokens — extremely complex in Python and duplicates NestJS decryption logic
 - Service-to-service API keys — adds complexity, user context validation is required anyway
 
@@ -55,6 +59,7 @@
 **Fail-closed behavior**: When the guardrail service is unavailable, all messages are blocked (FR-012).
 
 **Alternatives considered**:
+
 - LlamaFirewall (Meta) — open-source, viable fallback
 - Rebuff — lightweight but less comprehensive
 - Custom regex — baseline pattern matching, lowest capability
@@ -88,6 +93,7 @@
 **Rationale**: LangChain's Python SDK auto-detects `LANGCHAIN_TRACING_V2=true` and sends traces to LangSmith. No code changes needed. Traces include LLM calls, tool calls, chain execution, token usage, and latency.
 
 **Environment variables**:
+
 - `LANGCHAIN_TRACING_V2=true`
 - `LANGCHAIN_API_KEY` — LangSmith API key
 - `LANGCHAIN_PROJECT=flight-booking-agent`

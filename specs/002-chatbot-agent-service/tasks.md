@@ -33,22 +33,26 @@
 **⚠️ CRITICAL**: All Python agent user stories depend on this persistence layer being fully operational.
 
 ### Database Setup
+
 - [x] T004 Add `ChatSession` and `ChatMessage` models, enums `MessageSender` and `MessageType`, and relation `chatSessions` in `apps/api/prisma/schema.prisma`
 - [x] T005 Run Prisma migration and regenerate client in `apps/api/` using `npx prisma migrate dev`
 - [x] T006 [P] Add ChatSession and ChatMessage TypeScript types to `packages/shared/src/types/index.ts`
 
 ### NestJS ChatModule Scaffolding
+
 - [x] T007 [P] Create ChatSession and ChatMessage DTOs in `apps/api/src/chat/dto/` (create-session, update-session, list-sessions-query, create-message)
 - [x] T008 [P] Create `ChatModule` file structure: service, controller, and module in `apps/api/src/chat/`
 - [x] T009 Import `ChatModule` into `apps/api/src/app.module.ts`
 
 ### Service & Controller Implementation
+
 - [x] T010 Implement session CRUD methods in `apps/api/src/chat/chat.service.ts` with User scope enforcement
 - [x] T011 Implement message creation, retrieval, and batch persistence endpoints in `apps/api/src/chat/chat.service.ts`
 - [x] T012 Implement structured audit logging in `apps/api/src/chat/chat.service.ts` using `AuditService`
 - [x] T013 Implement HTTP endpoints in `apps/api/src/chat/chat.controller.ts` with `JwtAuthGuard` protection
 
 ### E2E Verification
+
 - [x] T014 Write NestJS ChatModule E2E integration tests in `apps/api/test/chat.e2e-spec.ts`
 - [x] T015 Run and verify NestJS ChatModule E2E tests
 
@@ -111,9 +115,9 @@
 
 **Independent Test**: Send consecutive messages to the chatbot and verify it retains context from prior turns.
 
-- [ ] T027 Implement memory manager in `apps/agent/src/agent/memory/manager.py` (load recent messages/summary from NestJS memory endpoint)
-- [ ] T028 Implement post-response token budget check using tiktoken and async summarization trigger in `apps/agent/src/agent/memory/manager.py`
-- [ ] T029 Write unit tests for memory assembly and summarization in `apps/agent/tests/test_memory.py`
+- [x] T027 Implement memory manager in `apps/agent/src/agent/memory/manager.py` (load recent messages/summary from NestJS memory endpoint)
+- [x] T028 Implement post-response token budget check using tiktoken and async summarization trigger in `apps/agent/src/agent/memory/manager.py`
+- [x] T029 Write unit tests for memory assembly and summarization in `apps/agent/tests/test_memory.py`
 
 ---
 
@@ -123,9 +127,9 @@
 
 **Independent Test**: Send concurrent messages to the same conversation and verify they are serialized; verify session isolation.
 
-- [ ] T030 Implement per-conversation message queue in `apps/agent/src/agent/queue/message_queue.py`
-- [ ] T031 Integrate message queue in FastAPI request handler in `apps/agent/src/agent/main.py`
-- [ ] T032 Write integration tests for concurrency queue limits and session isolation in `apps/agent/tests/test_queue.py`
+- [x] T030 Implement per-conversation message queue in `apps/agent/src/agent/queue/message_queue.py`
+- [x] T031 Integrate message queue in FastAPI request handler in `apps/agent/src/agent/main.py`
+- [x] T032 Write integration tests for concurrency queue limits and session isolation in `apps/agent/tests/test_queue.py`
 
 ---
 

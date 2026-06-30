@@ -60,142 +60,159 @@ async def chat_stream(
             logger.error(f"Failed to create session on NestJS API: {e!s}")
             raise HTTPException(status_code=503, detail="NestJS API unavailable") from e
 
-    # 5. Fetch memory context from NestJS Client
+    # 4.5. Message Queue Locking
+    queue_manager = getattr(request.app.state, "message_queue", None)
+    if queue_manager:
+        await queue_manager.acquire(session_id)
+
+    released = False
     try:
-        memory_data = await client.get_memory(session_id, recent_count=settings.MEMORY_WINDOW_SIZE)
-        history = memory_data.get("recentMessages", [])
-        summary = memory_data.get("summary", None)
-    except Exception as e:
-        logger.error(f"Failed to fetch memory from NestJS API: {e!s}")
-        raise HTTPException(status_code=503, detail="NestJS API memory service unavailable") from e
-
-    # 6. Generator-based SSE streaming with bounded queue (maxsize=100)
-    q = asyncio.Queue(maxsize=100)
-    from agent.main import active_streams
-    active_streams.add(q)
-
-    # Background producer task
-    async def producer():
-        partial_response = ""
-        persisted = False
+        # 5. Fetch memory context from NestJS Client
         try:
-            # Format messages for LangChain agent
-            messages = format_messages(
-                history=history,
-                current_message=body.message,
-                summary=summary
-            )
-            
-            # Streaming LLM tokens
-            model = get_chat_model()
-            async for chunk in model.astream(messages):
-                token_content = chunk.content
-                if token_content:
-                    partial_response += token_content
-                    await q.put({
-                        "event": "token",
-                        "data": json.dumps({"content": token_content})
-                    })
-            
-            # Done event - Persist message batch and send done event
-            messages_payload = [
-                {"sender": "USER", "type": "STANDARD", "content": body.message},
-                {"sender": "AGENT", "type": "STANDARD", "content": partial_response}
-            ]
+            memory_data = await client.get_memory(session_id, recent_count=settings.MEMORY_WINDOW_SIZE)
+            history = memory_data.get("recentMessages", [])
+            summary = memory_data.get("summary", None)
+        except Exception as e:
+            logger.error(f"Failed to fetch memory from NestJS API: {e!s}")
+            raise HTTPException(status_code=503, detail="NestJS API memory service unavailable") from e
+
+        # 6. Generator-based SSE streaming with bounded queue (maxsize=100)
+        q = asyncio.Queue(maxsize=100)
+        from agent.main import active_streams
+        active_streams.add(q)
+
+        # Background producer task
+        async def producer():
+            partial_response = ""
+            persisted = False
             try:
-                batch_res = await client.create_message_batch(session_id, messages_payload)
-                persisted = True
-            except Exception as persist_err:
-                logger.error(f"Failed to persist completed response: {persist_err!s}")
+                # Format messages for LangChain agent
+                messages = format_messages(
+                    history=history,
+                    current_message=body.message,
+                    summary=summary
+                )
+                
+                # Streaming LLM tokens
+                model = get_chat_model()
+                async for chunk in model.astream(messages):
+                    token_content = chunk.content
+                    if token_content:
+                        partial_response += token_content
+                        await q.put({
+                            "event": "token",
+                            "data": json.dumps({"content": token_content})
+                        })
+                
+                # Done event - Persist message batch and send done event
+                messages_payload = [
+                    {"sender": "USER", "type": "STANDARD", "content": body.message},
+                    {"sender": "AGENT", "type": "STANDARD", "content": partial_response}
+                ]
+                try:
+                    batch_res = await client.create_message_batch(session_id, messages_payload)
+                    persisted = True
+                except Exception as persist_err:
+                    logger.error(f"Failed to persist completed response: {persist_err!s}")
+                    await q.put({
+                        "event": "error",
+                        "data": json.dumps({
+                            "code": "PERSISTENCE_ERROR",
+                            "message": "The response was generated but could not be saved.",
+                            "partialMessageId": None
+                        })
+                    })
+                    return
+                
+                # Extract agent message id
+                agent_message_id = None
+                for msg in batch_res.get("messages", []):
+                    if msg.get("sender") == "AGENT":
+                        agent_message_id = msg.get("id")
+                
+                await q.put({
+                    "event": "done",
+                    "data": json.dumps({
+                        "messageId": agent_message_id,
+                        "sessionId": session_id
+                    })
+                })
+
+                # Asynchronously trigger token budget check and summarization in the background
+                memory_mgr = MemoryManager(
+                    window_size=settings.MEMORY_WINDOW_SIZE,
+                    token_budget=settings.MEMORY_TOKEN_BUDGET
+                )
+                # The session message count has increased by 2 (user message + agent response)
+                original_total = memory_data.get("totalMessageCount", 0)
+                asyncio.create_task(memory_mgr.check_and_summarize(session_id, client, total_count=original_total + 2))
+            except asyncio.CancelledError:
+                # Handle mid-stream connection drop or cancellation
+                logger.warning(f"Connection dropped mid-stream for session {session_id}.")
+                if not persisted:
+                    try:
+                        messages_payload = [
+                            {"sender": "USER", "type": "STANDARD", "content": body.message},
+                            {"sender": "AGENT", "type": "STANDARD", "content": partial_response}
+                        ]
+                        await asyncio.shield(client.create_message_batch(session_id, messages_payload))
+                        persisted = True
+                    except Exception as e:
+                        logger.error(f"Failed to persist partial response on connection drop: {e!s}")
+                raise
+            except Exception as e:
+                # Handle LLM provider or other runtime failures
+                logger.error(f"LLM error during streaming: {e!s}")
+                partial_message_id = None
+                if not persisted:
+                    try:
+                        messages_payload = [
+                            {"sender": "USER", "type": "STANDARD", "content": body.message},
+                            {"sender": "AGENT", "type": "STANDARD", "content": partial_response}
+                        ]
+                        batch_res = await client.create_message_batch(session_id, messages_payload)
+                        persisted = True
+                        for msg in batch_res.get("messages", []):
+                            if msg.get("sender") == "AGENT":
+                                partial_message_id = msg.get("id")
+                    except Exception as persist_err:
+                        logger.error(f"Failed to persist partial response on LLM error: {persist_err!s}")
+                
                 await q.put({
                     "event": "error",
                     "data": json.dumps({
-                        "code": "PERSISTENCE_ERROR",
-                        "message": "The response was generated but could not be saved.",
-                        "partialMessageId": None
+                        "code": "LLM_ERROR",
+                        "message": "The AI model encountered an error. Please try again.",
+                        "partialMessageId": partial_message_id
                     })
                 })
-                return
-            
-            # Extract agent message id
-            agent_message_id = None
-            for msg in batch_res.get("messages", []):
-                if msg.get("sender") == "AGENT":
-                    agent_message_id = msg.get("id")
-            
-            await q.put({
-                "event": "done",
-                "data": json.dumps({
-                    "messageId": agent_message_id,
-                    "sessionId": session_id
-                })
-            })
+            finally:
+                await q.put(None)
 
-            # Asynchronously trigger token budget check and summarization in the background
-            memory_mgr = MemoryManager(
-                window_size=settings.MEMORY_WINDOW_SIZE,
-                token_budget=settings.MEMORY_TOKEN_BUDGET
-            )
-            # The session message count has increased by 2 (user message + agent response)
-            original_total = memory_data.get("totalMessageCount", 0)
-            asyncio.create_task(memory_mgr.check_and_summarize(session_id, client, total_count=original_total + 2))
-        except asyncio.CancelledError:
-            # Handle mid-stream connection drop or cancellation
-            logger.warning(f"Connection dropped mid-stream for session {session_id}.")
-            if not persisted:
-                try:
-                    messages_payload = [
-                        {"sender": "USER", "type": "STANDARD", "content": body.message},
-                        {"sender": "AGENT", "type": "STANDARD", "content": partial_response}
-                    ]
-                    await asyncio.shield(client.create_message_batch(session_id, messages_payload))
-                    persisted = True
-                except Exception as e:
-                    logger.error(f"Failed to persist partial response on connection drop: {e!s}")
-            raise
-        except Exception as e:
-            # Handle LLM provider or other runtime failures
-            logger.error(f"LLM error during streaming: {e!s}")
-            partial_message_id = None
-            if not persisted:
-                try:
-                    messages_payload = [
-                        {"sender": "USER", "type": "STANDARD", "content": body.message},
-                        {"sender": "AGENT", "type": "STANDARD", "content": partial_response}
-                    ]
-                    batch_res = await client.create_message_batch(session_id, messages_payload)
-                    persisted = True
-                    for msg in batch_res.get("messages", []):
-                        if msg.get("sender") == "AGENT":
-                            partial_message_id = msg.get("id")
-                except Exception as persist_err:
-                    logger.error(f"Failed to persist partial response on LLM error: {persist_err!s}")
-            
-            await q.put({
-                "event": "error",
-                "data": json.dumps({
-                    "code": "LLM_ERROR",
-                    "message": "The AI model encountered an error. Please try again.",
-                    "partialMessageId": partial_message_id
-                })
-            })
-        finally:
-            await q.put(None)
+        producer_task = asyncio.create_task(producer())
 
-    producer_task = asyncio.create_task(producer())
+        async def sse_generator():
+            nonlocal released
+            try:
+                while True:
+                    event = await q.get()
+                    if event is None:
+                        break
+                    yield event
+                    if event.get("event") == "error":
+                        break
+            finally:
+                active_streams.discard(q)
+                if not producer_task.done():
+                    producer_task.cancel()
+                if queue_manager and not released:
+                    released = True
+                    await queue_manager.release(session_id)
 
-    async def sse_generator():
-        try:
-            while True:
-                event = await q.get()
-                if event is None:
-                    break
-                yield event
-                if event.get("event") == "error":
-                    break
-        finally:
-            active_streams.discard(q)
-            if not producer_task.done():
-                producer_task.cancel()
+        return EventSourceResponse(sse_generator())
 
-    return EventSourceResponse(sse_generator())
+    except Exception:
+        if queue_manager and not released:
+            released = True
+            await queue_manager.release(session_id)
+        raise

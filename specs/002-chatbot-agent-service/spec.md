@@ -18,7 +18,7 @@
 - Q: What happens when conversation summary generation fails? → A: Fall back to truncation — use the most recent N messages without a summary; older context is temporarily lost but the conversation continues.
 - Q: What happens when a user sends an extremely long message that exceeds input limits? → A: Reject with limit — enforce a maximum message length and reject messages exceeding it with a clear error showing the limit.
 
-## User Scenarios & Testing *(mandatory)*
+## User Scenarios & Testing _(mandatory)_
 
 ### User Story 1 - Real-Time Chat Conversation (Priority: P1)
 
@@ -108,7 +108,7 @@ A user can start new conversations, switch between existing conversations, and v
 - If conversation summary generation fails, the system falls back to truncation — using only the most recent N messages without a summary. Older context is temporarily unavailable but the conversation continues without interruption. Summarization is retried on the next turn.
 - Concurrent messages from the same user in the same conversation are queued and processed one at a time in arrival order. A maximum queue depth limit is enforced — messages exceeding the limit are rejected with a clear error asking the user to wait.
 
-## Requirements *(mandatory)*
+## Requirements _(mandatory)_
 
 ### Functional Requirements
 
@@ -134,7 +134,7 @@ A user can start new conversations, switch between existing conversations, and v
 - **ChatMessage**: A single message within a session — either from the user or the agent. Contains the message content, sender type, timestamp, and an optional type flag (e.g., "summary" for compressed memory entries).
 - **ConversationMemory**: The working memory context constructed for each LLM invocation — composed of a system prompt, an optional summary of older messages, the most recent N messages, and the new user input.
 
-## Success Criteria *(mandatory)*
+## Success Criteria _(mandatory)_
 
 ### Measurable Outcomes
 

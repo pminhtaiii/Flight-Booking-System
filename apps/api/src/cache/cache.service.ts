@@ -45,9 +45,7 @@ export class CacheService implements OnModuleInit, OnModuleDestroy {
         return await this.redisClient.get(key);
       } catch (err: unknown) {
         const errMsg = err instanceof Error ? err.message : String(err);
-        this.logger.warn(
-          `Redis GET failed for key ${key}: ${errMsg}. Using in-memory fallback.`,
-        );
+        this.logger.warn(`Redis GET failed for key ${key}: ${errMsg}. Using in-memory fallback.`);
       }
     }
 
@@ -71,9 +69,7 @@ export class CacheService implements OnModuleInit, OnModuleDestroy {
         return;
       } catch (err: unknown) {
         const errMsg = err instanceof Error ? err.message : String(err);
-        this.logger.warn(
-          `Redis SET failed for key ${key}: ${errMsg}. Using in-memory fallback.`,
-        );
+        this.logger.warn(`Redis SET failed for key ${key}: ${errMsg}. Using in-memory fallback.`);
       }
     }
 
@@ -91,9 +87,7 @@ export class CacheService implements OnModuleInit, OnModuleDestroy {
         return val;
       } catch (err: unknown) {
         const errMsg = err instanceof Error ? err.message : String(err);
-        this.logger.warn(
-          `Redis INCR failed for key ${key}: ${errMsg}. Using in-memory fallback.`,
-        );
+        this.logger.warn(`Redis INCR failed for key ${key}: ${errMsg}. Using in-memory fallback.`);
       }
     }
 
@@ -120,9 +114,7 @@ export class CacheService implements OnModuleInit, OnModuleDestroy {
         return;
       } catch (err: unknown) {
         const errMsg = err instanceof Error ? err.message : String(err);
-        this.logger.warn(
-          `Redis DEL failed for key ${key}: ${errMsg}. Using in-memory fallback.`,
-        );
+        this.logger.warn(`Redis DEL failed for key ${key}: ${errMsg}. Using in-memory fallback.`);
       }
     }
 
@@ -135,9 +127,7 @@ export class CacheService implements OnModuleInit, OnModuleDestroy {
         return await this.redisClient.ttl(key);
       } catch (err: unknown) {
         const errMsg = err instanceof Error ? err.message : String(err);
-        this.logger.warn(
-          `Redis TTL failed for key ${key}: ${errMsg}. Using in-memory fallback.`,
-        );
+        this.logger.warn(`Redis TTL failed for key ${key}: ${errMsg}. Using in-memory fallback.`);
       }
     }
 
