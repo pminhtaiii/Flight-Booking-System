@@ -6,9 +6,9 @@ Update this file after every completed feature. Any AI agent reading this should
 
 ## Current Status
 
-**Feature:** Chatbot Agent Service (Phase 7)
-**Last completed:** Phase 7: Conversation Management & Concurrent Message Queue (per-conversation request serialization using asyncio.Lock, queue depth limit of 3 with HTTP 429 fallback, and integration/unit test suite).
-**Next:** Phase 8: Polish & Cross-Cutting Concerns (OpenAPI documentation, quickstart validation, and final updates).
+**Feature:** Agent Tool-Calling & Data Access (Phase 1)
+**Last completed:** Phase 1: Database Schema & Mock Seed Data (Created TravelerProfile and Booking Prisma models, ran migrations, and seeded mock traveler preferences and bookings).
+**Next:** Phase 2: Agent Gateway REST Endpoints & Authentication (Secure gateway REST API endpoints with auth guards).
 
 ---
 
@@ -25,6 +25,16 @@ Update this file after every completed feature. Any AI agent reading this should
 - [x] Implement LangChain agent completion & persistence (Phase 4B)
 - [x] Implement sliding window & summary memory manager
 - [x] Implement per-conversation concurrency queue
+
+### [/] Feature: Agent Tool-Calling & Data Access
+
+- [x] Phase 1: Database Schema & Mock Seed Data (Prisma models `TravelerProfile`, `Booking`, and database migrations)
+- [ ] Phase 2: Agent Gateway REST Endpoints & Authentication
+- [ ] Phase 3: PII Stripping, Caching & Auditing
+- [ ] Phase 4: Python Client, Auth Headers & PII Scrubber
+- [ ] Phase 5: LangGraph State Machine & Read-Only Tools
+- [ ] Phase 6: Human-in-the-Loop Gate & SSE Streaming Status
+- [ ] Phase 7: Polish & Cross-Cutting Concerns
 
 ### [x] Feature: Monorepo Scaffold & Shared Infrastructure
 
