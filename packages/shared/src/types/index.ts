@@ -18,8 +18,20 @@ export type Flight = {
 export type Booking = {
   id: string;
   userId: string;
-  flightId: string;
-  status: 'CONFIRMED' | 'PENDING' | 'CANCELLED';
+  status: 'CONFIRMED' | 'PENDING' | 'CANCELLED' | 'REFUNDED';
+  airline: string;
+  flightNumber: string;
+  origin: string;
+  destination: string;
+  departureTime: Date;
+  arrivalTime: Date;
+  duration: number;
+  stops: number;
+  fareClass?: string | null;
+  price: number;
+  currency: string;
+  passengers: number;
+  baggageAllowance?: string | null;
   createdAt: Date;
 };
 

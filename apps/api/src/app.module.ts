@@ -6,6 +6,7 @@ import { CacheModule } from './cache/cache.module';
 import { AuthModule } from './auth/auth.module';
 import { AuditModule } from './audit/audit.module';
 import { ChatModule } from './chat/chat.module';
+import { AgentGatewayModule } from './agent-gateway/agent-gateway.module';
 
 @Module({
   imports: [
@@ -18,6 +19,7 @@ import { ChatModule } from './chat/chat.module';
     AuthModule,
     AuditModule,
     ChatModule,
+    AgentGatewayModule,
   ],
   controllers: [],
   providers: [],

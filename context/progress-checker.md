@@ -6,15 +6,26 @@ Update this file after every completed feature. Any AI agent reading this should
 
 ## Current Status
 
-**Feature:** Chatbot Agent Service (Phase 7)
-**Last completed:** Phase 7: Conversation Management & Concurrent Message Queue (per-conversation request serialization using asyncio.Lock, queue depth limit of 3 with HTTP 429 fallback, and integration/unit test suite).
-**Next:** Phase 8: Polish & Cross-Cutting Concerns (OpenAPI documentation, quickstart validation, and final updates).
+**Feature:** Agent Tool-Calling & Data Access (Phase 2)
+**Last completed:** Phase 2: Agent Gateway REST Endpoints & Authentication (secure dual-layer authentication with X-Agent-API-Key guard and HMAC-SHA256 user claim token guard, active status db checks, DTO validation, and PII-safe NestJS E2E tests).
+**Next:** Phase 3: PII Stripping, Caching & Auditing (Gateway Polish)
 
 ---
 
 ## Progress by Feature
 
-### [/] Feature: Chatbot Agent Service
+### [/] Feature: Agent Tool-Calling & Data Access
+
+- [x] T001–T004: Database Schema & Mock Seed Data (Phase 1)
+- [x] T005–T011: Agent Gateway REST Endpoints & Authentication (Phase 2)
+- [ ] T012–T015: PII Stripping, Caching & Auditing (Phase 3)
+- [ ] T016–T019: Python Client, Auth Headers & PII Scrubber (Phase 4)
+- [ ] T020–T025: LangGraph State Machine & Read-Only Tools (Phase 5)
+- [ ] T026–T028: Human-in-the-Loop Gate & SSE Streaming Status (Phase 6)
+- [ ] T029–T031: Polish & Cross-Cutting Concerns (Phase 7)
+
+### [x] Feature: Chatbot Agent Service
+
 
 - [x] Define ChatSession and ChatMessage database schema
 - [x] Implement NestJS ChatModule endpoints (CRUD, batch, memory)

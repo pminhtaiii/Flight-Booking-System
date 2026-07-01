@@ -29,7 +29,9 @@ Data flow is described in `context/architecture.md`.
 | M4  | User Login & Redis Rate-Limited Lockout     | Implement login API and UI, Redis rate-limiting (5 failures), and escalating lockout (1, 2, 4, 8m).   | M3           | DONE        |
 | M5  | JWT Session Handshake & Protected Dashboard | Configure NextAuth.js, JWT session strategy, JwtAuthGuard, middleware redirects, and dashboard fetch. | M4           | DONE        |
 | M6  | Polish, E2E Verification & Stress Testing   | Unified E2E flow pass, concurrency testing, and linting/type-checking.                                | M5           | DONE        |
-| M7  | Chatbot Agent Service                       | Python/FastAPI service with JWT auth, safety guardrails, SSE streaming, memory, and persistence.      | M6           | IN_PROGRESS |
+| M7  | Chatbot Agent Service                       | Python/FastAPI service with JWT auth, safety guardrails, SSE streaming, memory, and persistence.      | M6           | DONE        |
+| M8  | Agent Tool-Calling & Data Access           | PII-stripped Agent Gateway module, HMAC claim authentication, LangGraph tool state machine.           | M7           | IN_PROGRESS |
+
 
 ## Interface Contracts
 
