@@ -45,9 +45,11 @@ class NestJSClient:
             response.raise_for_status()
             return response.json()
 
-    async def get_memory(self, session_id: str, recent_count: int = 20) -> Dict[str, Any]:
+    async def get_memory(self, session_id: str, recent_count: int = 20, unsummarized_only: bool = False) -> Dict[str, Any]:
         url = f"{self.base_url}/chat/sessions/{session_id}/memory"
         params = {"recentCount": recent_count}
+        if unsummarized_only:
+            params["unsummarizedOnly"] = "true"
         async with httpx.AsyncClient() as client:
             response = await client.get(url, params=params, headers=self.headers)
             response.raise_for_status()

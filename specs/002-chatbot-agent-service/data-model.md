@@ -10,20 +10,22 @@
 
 Represents a single conversation thread belonging to a user.
 
-| Field | Type | Constraints | Notes |
-|-------|------|-------------|-------|
-| id | UUID | PK, auto-generated | |
-| userId | String (FK → User.id) | NOT NULL | Scoped to authenticated user |
-| title | String | NULLABLE | Auto-generated from first message preview, or user-editable |
-| createdAt | DateTime | NOT NULL, default now() | |
-| updatedAt | DateTime | NOT NULL, auto-updated | |
-| lastActiveAt | DateTime | NOT NULL, default now() | Updated on every new message |
+| Field        | Type                  | Constraints             | Notes                                                       |
+| ------------ | --------------------- | ----------------------- | ----------------------------------------------------------- |
+| id           | UUID                  | PK, auto-generated      |                                                             |
+| userId       | String (FK → User.id) | NOT NULL                | Scoped to authenticated user                                |
+| title        | String                | NULLABLE                | Auto-generated from first message preview, or user-editable |
+| createdAt    | DateTime              | NOT NULL, default now() |                                                             |
+| updatedAt    | DateTime              | NOT NULL, auto-updated  |                                                             |
+| lastActiveAt | DateTime              | NOT NULL, default now() | Updated on every new message                                |
 
 **Indexes**:
+
 - `[userId]` — filter sessions by user
 - `[userId, lastActiveAt]` — list user's sessions sorted by recent activity
 
 **Relations**:
+
 - Belongs to `User` (many-to-one)
 - Has many `ChatMessage` (one-to-many, cascade delete)
 
@@ -33,21 +35,23 @@ Represents a single conversation thread belonging to a user.
 
 A single message within a session — from the user, the agent, or a system-generated summary.
 
-| Field | Type | Constraints | Notes |
-|-------|------|-------------|-------|
-| id | UUID | PK, auto-generated | |
-| sessionId | String (FK → ChatSession.id) | NOT NULL | |
-| sender | Enum: USER, AGENT | NOT NULL | Who authored the message |
-| type | Enum: STANDARD, SUMMARY | NOT NULL, default STANDARD | SUMMARY = compressed memory entry |
-| content | Text | NOT NULL | Message body (or summary text) |
-| createdAt | DateTime | NOT NULL, default now() | |
+| Field     | Type                         | Constraints                | Notes                             |
+| --------- | ---------------------------- | -------------------------- | --------------------------------- |
+| id        | UUID                         | PK, auto-generated         |                                   |
+| sessionId | String (FK → ChatSession.id) | NOT NULL                   |                                   |
+| sender    | Enum: USER, AGENT            | NOT NULL                   | Who authored the message          |
+| type      | Enum: STANDARD, SUMMARY      | NOT NULL, default STANDARD | SUMMARY = compressed memory entry |
+| content   | Text                         | NOT NULL                   | Message body (or summary text)    |
+| createdAt | DateTime                     | NOT NULL, default now()    |                                   |
 
 **Indexes**:
+
 - `[sessionId]` — filter messages by session
 - `[sessionId, createdAt]` — load messages in chronological order (memory assembly)
 - `[sessionId, type]` — quickly find summary messages for a session
 
 **Relations**:
+
 - Belongs to `ChatSession` (many-to-one, cascade delete)
 
 ---
@@ -56,12 +60,12 @@ A single message within a session — from the user, the agent, or a system-gene
 
 The working memory context assembled for each LLM invocation. Not stored as a separate entity — composed at runtime from ChatMessage records.
 
-| Component | Source | Notes |
-|-----------|--------|-------|
-| System prompt | Hardcoded in agent config | Travel assistant persona |
-| Summary | Most recent `ChatMessage` with `type: SUMMARY` | Compressed older context |
-| Recent messages | Last N `ChatMessage` with `type: STANDARD` | Sliding window (e.g., N=20) |
-| New user input | Current request | Not yet persisted |
+| Component       | Source                                         | Notes                       |
+| --------------- | ---------------------------------------------- | --------------------------- |
+| System prompt   | Hardcoded in agent config                      | Travel assistant persona    |
+| Summary         | Most recent `ChatMessage` with `type: SUMMARY` | Compressed older context    |
+| Recent messages | Last N `ChatMessage` with `type: STANDARD`     | Sliding window (e.g., N=20) |
+| New user input  | Current request                                | Not yet persisted           |
 
 **Assembly order for LLM**: system prompt → summary → recent messages → new input
 
@@ -71,17 +75,17 @@ The working memory context assembled for each LLM invocation. Not stored as a se
 
 ### MessageSender
 
-| Value | Description |
-|-------|-------------|
-| `USER` | Message authored by the authenticated user |
-| `AGENT` | Response generated by the AI agent |
+| Value   | Description                                |
+| ------- | ------------------------------------------ |
+| `USER`  | Message authored by the authenticated user |
+| `AGENT` | Response generated by the AI agent         |
 
 ### MessageType
 
-| Value | Description |
-|-------|-------------|
-| `STANDARD` | Normal conversational message |
-| `SUMMARY` | Compressed summary of older messages (memory management) |
+| Value      | Description                                              |
+| ---------- | -------------------------------------------------------- |
+| `STANDARD` | Normal conversational message                            |
+| `SUMMARY`  | Compressed summary of older messages (memory management) |
 
 ---
 
@@ -183,10 +187,10 @@ Token budget checked (post-response — FR-006)
 
 ## Validation Rules
 
-| Field | Rule | Source |
-|-------|------|--------|
-| ChatMessage.content | Max length enforced (e.g., 10,000 chars) | FR-015 |
-| ChatSession.userId | Must match authenticated user | FR-002, FR-003 |
-| ChatMessage.sessionId | Session must belong to authenticated user | FR-003, SC-006 |
-| ChatMessage.sender | Must be valid enum value | Schema constraint |
-| ChatMessage.type | Must be valid enum value | Schema constraint |
+| Field                 | Rule                                      | Source            |
+| --------------------- | ----------------------------------------- | ----------------- |
+| ChatMessage.content   | Max length enforced (e.g., 10,000 chars)  | FR-015            |
+| ChatSession.userId    | Must match authenticated user             | FR-002, FR-003    |
+| ChatMessage.sessionId | Session must belong to authenticated user | FR-003, SC-006    |
+| ChatMessage.sender    | Must be valid enum value                  | Schema constraint |
+| ChatMessage.type      | Must be valid enum value                  | Schema constraint |

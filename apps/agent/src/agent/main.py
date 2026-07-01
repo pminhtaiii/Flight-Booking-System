@@ -1,29 +1,35 @@
 import time
 import httpx
+import asyncio
+from typing import Set
 from fastapi import FastAPI, Request
 from agent.config import get_settings
 from agent.middleware.auth import JWTAuthMiddleware
 from agent.middleware.rate_limit import RateLimitMiddleware
 from fastapi.middleware.cors import CORSMiddleware
 from agent.guardrails.nemo import NemoGuardrailService
-
+from agent.streaming.sse import router as sse_router
 from contextlib import asynccontextmanager
 
 settings = get_settings()
-
-import asyncio
-from typing import Set
 
 # Global set to track active SSE connection queues for graceful shutdown (M2)
 active_streams: Set[asyncio.Queue] = set()
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    """
+    Lifespan context manager that initializes NeMo Guardrails configuration,
+    message queue manager on startup, and flushes active SSE connections on shutdown.
+    """
     # Pre-load NeMo Guardrails configuration at service startup (M6)
     guardrails = NemoGuardrailService()
     app.state.guardrails = guardrails
     # Run async probe on startup
     await guardrails.probe()
+    # Initialize message queue manager
+    from agent.queue.message_queue import MessageQueueManager
+    app.state.message_queue = MessageQueueManager(max_depth=settings.QUEUE_MAX_DEPTH)
     yield
     # Graceful shutdown: notify all active SSE streams
     if active_streams:
@@ -41,6 +47,7 @@ async def lifespan(app: FastAPI):
         await asyncio.sleep(0.5)
 
 app = FastAPI(title="AI Chatbot Agent Service", version="0.1.0", lifespan=lifespan)
+app.include_router(sse_router)
 
 
 app.add_middleware(
@@ -65,6 +72,9 @@ app.add_middleware(
 
 @app.get("/health")
 async def health_check(request: Request):
+    """
+    Perform a health check verification by checking NestJS and NeMo Guardrails status.
+    """
     nestjs_status = "ok"
     nestjs_latency = 0
     start_time = time.time()

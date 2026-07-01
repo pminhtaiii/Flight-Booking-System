@@ -13,15 +13,17 @@ enum UserStatus {
 }
 
 model User {
-  id          String        @id @default(uuid())
-  email       String        @unique
-  password    String
-  status      UserStatus    @default(ACTIVE)
-  createdAt   DateTime      @default(now())
-  updatedAt   DateTime      @updatedAt
-  lastLogin   DateTime?
-  auditLogs   AuditLog[]
-  chatSessions ChatSession[]
+  id              String           @id @default(uuid())
+  email           String           @unique
+  password        String
+  status          UserStatus       @default(ACTIVE)
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+  lastLogin       DateTime?
+  auditLogs       AuditLog[]
+  chatSessions    ChatSession[]
+  travelerProfile TravelerProfile?
+  bookings        Booking[]
 
   @@map("users")
 }
@@ -80,5 +82,66 @@ model ChatMessage {
   @@index([sessionId, createdAt])
   @@index([sessionId, type])
   @@map("chat_messages")
+}
+
+/// TravelerProfile holds user travel preferences and sensitive travel identity documents.
+/// All sensitive PII fields (like passportNumber and passportExpiry) are encrypted
+/// at the application level using AES-256-GCM before storage to comply with GDPR requirements.
+model TravelerProfile {
+  id                  String   @id @default(uuid())
+  userId              String   @unique
+  seatPreference      String?
+  classPreference     String?
+  preferredAirlines   String[]
+  blacklistedAirlines String[]
+  dietaryNeeds        String?
+  nationality         String?
+  /// @encrypted
+  /// Sensitive PII. Encrypted at the application layer using AES-256-GCM before database insertion.
+  passportNumber      String?
+  /// @encrypted
+  /// Sensitive PII. Encrypted/tokenized at the application layer to comply with GDPR data protection requirements.
+  passportExpiry      DateTime?
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+  user                User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("traveler_profiles")
+}
+
+model Booking {
+  id               String        @id @default(uuid())
+  userId           String
+  pnrCode          String?
+  eTicketNumber    String?
+  status           BookingStatus @default(PENDING)
+  airline          String
+  flightNumber     String
+  origin           String        @db.VarChar(3)
+  destination      String        @db.VarChar(3)
+  departureTime    DateTime
+  arrivalTime      DateTime
+  duration         Int
+  stops            Int           @default(0)
+  fareClass        String?
+  price            Decimal       @db.Decimal(10, 2)
+  currency         String        @default("USD")
+  passengers       Int           @default(1)
+  baggageAllowance String?
+  paymentReference String?
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+  user             User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([userId, status])
+  @@map("bookings")
+}
+
+enum BookingStatus {
+  PENDING
+  CONFIRMED
+  CANCELLED
+  REFUNDED
 }
 

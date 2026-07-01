@@ -6,58 +6,66 @@ Update this file after every completed feature. Any AI agent reading this should
 
 ## Current Status
 
-**Feature:** Chatbot Agent Service (Phase 3)
-**Last completed:** NeMo-style Input Guardrails (character length limits, regex prompt injection heuristic blocks, and Mimo LLM safety classifier API) with fail-closed safety and health check status.
-**Next:** Phase 4A: SSE Streaming & API Client Foundation.
+**Feature:** Chatbot Agent Service (Phase 7)
+**Last completed:** Phase 7: Conversation Management & Concurrent Message Queue (per-conversation request serialization using asyncio.Lock, queue depth limit of 3 with HTTP 429 fallback, and integration/unit test suite).
+**Next:** Phase 8: Polish & Cross-Cutting Concerns (OpenAPI documentation, quickstart validation, and final updates).
 
 ---
 
 ## Progress by Feature
 
 ### [/] Feature: Chatbot Agent Service
+
 - [x] Define ChatSession and ChatMessage database schema
 - [x] Implement NestJS ChatModule endpoints (CRUD, batch, memory)
 - [x] Implement structured audit logs for chat operations
 - [x] Implement FastAPI Python Agent Service Scaffold & JWT Auth middleware
 - [x] Implement NeMo Guardrails input guardrails
-- [ ] Implement SSE streaming and LangChain agent completion
-- [ ] Implement sliding window & summary memory manager
-- [ ] Implement per-conversation concurrency queue
-
+- [x] Implement SSE streaming foundation (Phase 4A)
+- [x] Implement LangChain agent completion & persistence (Phase 4B)
+- [x] Implement sliding window & summary memory manager
+- [x] Implement per-conversation concurrency queue
 
 ### [x] Feature: Monorepo Scaffold & Shared Infrastructure
+
 - [x] Configure workspace `package.json` and workspaces
 - [x] Set up strict compiler, linting, and formatting rules
 - [x] Define shared domain models, types, and constants
 
 ### [x] Feature: Database & Health Endpoint
+
 - [x] Define User and AuditLog schemas in Prisma
 - [x] Implement PrismaService database wrapper
 - [x] Add `GET /health` verification endpoint with E2E tests
 
 ### [x] Feature: User Registration
+
 - [x] Define registration validation contracts
 - [x] Build PII-safe logger and AuditLog writer
 - [x] Implement AuthService registration with password hashing
 - [x] Expose `POST /auth/register` and build Registration UI
 
 ### [x] Feature: User Login & Rate-Limited Lockout
+
 - [x] Define login validation contracts
 - [x] Set up Redis cache service wrapper
 - [x] Implement escalating brute-force lockout logic
 - [x] Expose `POST /auth/login` and build Login UI
 
 ### [x] Feature: JWT Session Handshake
+
 - [x] Configure Passport JWT Strategy and Guards
 - [x] Implement `GET /auth/me` identity endpoint
 - [x] Configure NextAuth credentials provider session
 - [x] Create apiClient helper and protect `/dashboard` route
 
 ### [x] Feature: User Logout
+
 - [x] Expose `POST /auth/logout` audit endpoint
 - [x] Implement frontend logout flow and NextAuth clear-session
 
 ### [x] Feature: E2E Polish & Verification
+
 - [x] Clean ESLint and type checking globally
 - [x] Run concurrency stress tests (100 parallel requests)
 - [x] Walkthrough verification and documentation

@@ -88,3 +88,21 @@ async def test_get_memory():
             params={"recentCount": 20},
             headers={"Authorization": "Bearer test-token"}
         )
+
+@pytest.mark.asyncio
+async def test_get_memory_unsummarized_only():
+    client = NestJSClient(base_url="http://localhost:3001/api", token="test-token")
+    req = httpx.Request("GET", "http://localhost:3001/api/chat/sessions/session-123/memory")
+    mock_response = httpx.Response(200, json={"summary": None, "recentMessages": []}, request=req)
+    
+    with patch("httpx.AsyncClient.get", new_callable=AsyncMock) as mock_get:
+        mock_get.return_value = mock_response
+        
+        result = await client.get_memory(session_id="session-123", recent_count=20, unsummarized_only=True)
+        
+        assert result == {"summary": None, "recentMessages": []}
+        mock_get.assert_called_once_with(
+            "http://localhost:3001/api/chat/sessions/session-123/memory",
+            params={"recentCount": 20, "unsummarizedOnly": "true"},
+            headers={"Authorization": "Bearer test-token"}
+        )

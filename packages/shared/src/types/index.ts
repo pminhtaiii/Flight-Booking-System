@@ -45,4 +45,3 @@ export type ChatMessage = {
   content: string;
   createdAt: string;
 };
-

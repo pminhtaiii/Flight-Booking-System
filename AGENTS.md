@@ -15,6 +15,7 @@ This version has breaking changes — APIs, conventions, and file structure may 
 ## Read Before Anything Else
 
 Read only the context files relevant to the specific task:
+
 - For general understanding or new features: read `context/project-overview.md`.
 - For system layout, routing, database, and backend/frontend setup: read `context/architecture.md`.
 - For linting, file structure, naming conventions, and code guidelines: read `context/code-standards.md`.
@@ -46,7 +47,9 @@ Read only the context files relevant to the specific task:
 - **Sub-Agent Delegation**: Use specialized sub-agents whenever possible, especially when performing code implementation or code reviews, to optimize task distribution and avoid context bloating.
 
 ### E2E Testing Instructions
+
 When the task involves writing, running, or verifying E2E tests:
+
 1. **Locating E2E Tests**:
    - Backend NestJS API E2E tests reside in `apps/api/test/` (e.g., `*.e2e-spec.ts`).
    - Frontend Next.js Playwright UI tests reside in `apps/web/tests/` (e.g., `*.spec.ts`).
@@ -61,7 +64,9 @@ When the task involves writing, running, or verifying E2E tests:
    - Use time acceleration (`POST /auth/test/reset-lockout` when `NODE_ENV === 'test'`) and database assertions.
 
 ### GitHub MCP & CodeRabbit Integration
+
 When a task involves creating a pull request or requesting CodeRabbit reviews:
+
 1. **PR Creation**: Use the `github-mcp-server` to create Pull Requests directly. The target repository details are `owner: "pminhtaiii"`, `repo: "Flight-Booking-System"`. The base branch is typically `development`. Do not ask the user to manually create the PR.
 2. **Triggering CodeRabbit**: CodeRabbit skips automatic reviews on non-default target branches (like `development`). You must trigger the review manually:
    - Use the `add_issue_comment` tool from `github-mcp-server` to post `@coderabbitai review` on the pull request (pass the PR number as `issue_number`).
@@ -71,7 +76,9 @@ When a task involves creating a pull request or requesting CodeRabbit reviews:
    - Address all findings, push changes, and post `@coderabbitai review` again to confirm convergence. Do not consider a planning or implementation phase complete until all CodeRabbit comments are resolved.
 
 <!-- SPECKIT START -->
+
 For additional context about technologies to be used, project structure,
 shell commands, and other important information, read the current plan
 at specs/002-chatbot-agent-service/plan.md
+
 <!-- SPECKIT END -->

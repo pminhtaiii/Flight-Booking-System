@@ -17,6 +17,7 @@
    - Virtual environment set up: `cd apps/agent && uv venv && uv sync`
 
 3. **Environment variables** (`apps/agent/.env`):
+
    ```bash
    JWT_SECRET=<same JWT_SECRET used by NestJS to sign standard HS256 JWTs>
    FRONTEND_URL=http://localhost:3000
@@ -60,6 +61,7 @@ curl http://localhost:3002/health
 ```
 
 **Expected**:
+
 ```json
 {
   "status": "ok",
@@ -104,6 +106,7 @@ curl -X POST http://localhost:3001/api/chat/sessions \
 ```
 
 **Expected**:
+
 ```json
 {
   "id": "uuid-of-new-session",
@@ -128,6 +131,7 @@ curl -N -X POST http://localhost:3002/chat/stream \
 ```
 
 **Expected**: SSE stream with token events followed by done event:
+
 ```
 event: token
 data: {"content": "I"}
@@ -157,6 +161,7 @@ curl -N -X POST http://localhost:3002/chat/stream \
 ```
 
 **Expected**: SSE error event:
+
 ```
 event: error
 data: {"code": "GUARDRAIL_BLOCKED", "message": "Your message could not be processed.", "partialMessageId": null}

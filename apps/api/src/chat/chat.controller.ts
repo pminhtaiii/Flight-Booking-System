@@ -97,13 +97,7 @@ export class ChatController {
     @Param('sessionId') sessionId: string,
   ) {
     const { ipAddress, traceId, correlationId } = this.getRequestDetails(req, headers);
-    await this.chatService.deleteSession(
-      req.user.id,
-      sessionId,
-      ipAddress,
-      traceId,
-      correlationId,
-    );
+    await this.chatService.deleteSession(req.user.id, sessionId, ipAddress, traceId, correlationId);
   }
 
   @Post('sessions/:sessionId/messages')

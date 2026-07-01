@@ -53,7 +53,11 @@ export class AuthController {
 
   @Post('login')
   @HttpCode(200)
-  async login(@Body() dto: LoginDto, @Req() req: Request, @Headers() headers: Record<string, string>) {
+  async login(
+    @Body() dto: LoginDto,
+    @Req() req: Request,
+    @Headers() headers: Record<string, string>,
+  ) {
     const { ipAddress, traceId, correlationId } = this.getRequestDetails(req, headers);
 
     const lockout = await this.lockoutService.isLockedOut(ipAddress);

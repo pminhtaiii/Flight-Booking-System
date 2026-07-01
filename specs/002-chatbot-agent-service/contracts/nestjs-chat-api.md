@@ -13,6 +13,7 @@ Base URL: `http://localhost:3001/api`
 Create a new chat session.
 
 **Request**:
+
 ```json
 {
   "title": "string | null"
@@ -20,6 +21,7 @@ Create a new chat session.
 ```
 
 **Response** (201):
+
 ```json
 {
   "id": "uuid",
@@ -32,6 +34,7 @@ Create a new chat session.
 ```
 
 **Errors**:
+
 - `401` — Missing or invalid JWT
 - `400` — Validation error
 
@@ -48,6 +51,7 @@ List the authenticated user's chat sessions, paginated by recent activity.
 | cursor | ISO-8601 string | null | `lastActiveAt` of last item from previous page |
 
 **Response** (200):
+
 ```json
 {
   "sessions": [
@@ -70,6 +74,7 @@ List the authenticated user's chat sessions, paginated by recent activity.
 Get session details.
 
 **Response** (200):
+
 ```json
 {
   "id": "uuid",
@@ -83,6 +88,7 @@ Get session details.
 ```
 
 **Errors**:
+
 - `404` — Session not found or does not belong to user
 
 ---
@@ -92,6 +98,7 @@ Get session details.
 Update session metadata.
 
 **Request**:
+
 ```json
 {
   "title": "string | null"
@@ -115,6 +122,7 @@ Delete a session and all its messages (cascade).
 Create a message in a session. Also updates `session.lastActiveAt`.
 
 **Request**:
+
 ```json
 {
   "sender": "USER | AGENT",
@@ -124,6 +132,7 @@ Create a message in a session. Also updates `session.lastActiveAt`.
 ```
 
 **Response** (201):
+
 ```json
 {
   "id": "uuid",
@@ -136,6 +145,7 @@ Create a message in a session. Also updates `session.lastActiveAt`.
 ```
 
 **Errors**:
+
 - `404` — Session not found or does not belong to user
 - `400` — Content exceeds maximum length
 
@@ -153,6 +163,7 @@ Get messages for a session, paginated in chronological order.
 | direction | "before" \| "after" | "before" | Pagination direction |
 
 **Response** (200):
+
 ```json
 {
   "messages": [
@@ -176,6 +187,7 @@ Get messages for a session, paginated in chronological order.
 Persist a batch of messages (e.g. user message + agent response pair, or partial messages during mid-stream drop) atomically in a single transaction. Also updates `session.lastActiveAt` and writes to the audit log.
 
 **Request**:
+
 ```json
 {
   "messages": [
@@ -189,6 +201,7 @@ Persist a batch of messages (e.g. user message + agent response pair, or partial
 ```
 
 **Response** (201):
+
 ```json
 {
   "messages": [
@@ -205,6 +218,7 @@ Persist a batch of messages (e.g. user message + agent response pair, or partial
 ```
 
 **Errors**:
+
 - `404` — Session not found or does not belong to user
 - `400` — Validation error / message length exceeded
 
@@ -220,6 +234,7 @@ Get conversation memory for LLM context assembly. Returns the most recent summar
 | recentCount | number | 20 | Number of recent standard messages to return |
 
 **Response** (200):
+
 ```json
 {
   "summary": "string | null",
@@ -236,6 +251,7 @@ Get conversation memory for LLM context assembly. Returns the most recent summar
 ```
 
 **Notes**:
+
 - `summary` is the content of the most recent SUMMARY-type message
 - `recentMessages` are STANDARD-type messages only, ordered oldest → newest
 - This is the primary endpoint the Python agent calls before each LLM invocation
@@ -245,6 +261,7 @@ Get conversation memory for LLM context assembly. Returns the most recent summar
 ## Audit Logging Requirements
 
 Every write endpoint MUST log a structured record to the `audit_logs` table via `AuditService`:
+
 - `POST /chat/sessions` → action: `chat_session_create`, resourceType: `ChatSession`
 - `PATCH /chat/sessions/:sessionId` → action: `chat_session_update`, resourceType: `ChatSession`
 - `DELETE /chat/sessions/:sessionId` → action: `chat_session_delete`, resourceType: `ChatSession`
