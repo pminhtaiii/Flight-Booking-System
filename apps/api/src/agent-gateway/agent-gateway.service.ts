@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, Logger } from '@nestjs/common';
+import { Injectable, NotFoundException, Logger, HttpException } from '@nestjs/common';
 import { PrismaService } from '@/prisma/prisma.service';
 import { AuditService } from '@/audit/audit.service';
 import { FlightSearchQueryDto } from './dto/flight-search-query.dto';
@@ -18,17 +18,30 @@ export class AgentGatewayService {
   private async logToolCall(
     userId: string,
     toolName: string,
-    params: any,
+    params: unknown,
     startTime: number,
     traceId?: string | null,
     correlationId?: string | null,
     success: boolean = true,
-    error: any = null,
-    response: any = null,
+    error: unknown = null,
+    response: unknown = null,
   ) {
     const durationMs = Date.now() - startTime;
     const responseSize = response ? Buffer.byteLength(JSON.stringify(response)) : 0;
-    const errorMessage = error instanceof Error ? error.message : error ? String(error) : null;
+    
+    let errorMessage: string | null = null;
+    if (error) {
+      const rawMessage = error instanceof Error ? error.message : String(error);
+      if (error instanceof HttpException) {
+        errorMessage = rawMessage;
+      } else {
+        const errorName = error instanceof Error ? error.name : 'Error';
+        errorMessage = `Internal Service Error: ${errorName}`;
+      }
+      if (errorMessage.length > 256) {
+        errorMessage = errorMessage.substring(0, 256) + '...';
+      }
+    }
 
     try {
       await this.auditService.createLog(null, {
@@ -48,8 +61,9 @@ export class AgentGatewayService {
         traceId,
         correlationId,
       });
-    } catch (logErr: any) {
-      this.logger.error(`Failed to write tool call audit log: ${logErr.message}`);
+    } catch (logErr: unknown) {
+      const logMsg = logErr instanceof Error ? logErr.message : String(logErr);
+      this.logger.error(`Failed to write tool call audit log: ${logMsg}`);
     }
   }
 

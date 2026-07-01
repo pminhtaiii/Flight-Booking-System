@@ -1,6 +1,7 @@
 import { Injectable, UnauthorizedException, ForbiddenException, Logger } from '@nestjs/common';
 import { PrismaService } from '@/prisma/prisma.service';
 import { ClaimTokenPayload } from './claim-token.types';
+import { User } from '@prisma/client';
 import * as crypto from 'crypto';
 
 @Injectable()
@@ -9,7 +10,7 @@ export class ClaimTokenService {
 
   constructor(private readonly prisma: PrismaService) {}
 
-  async validateToken(token: string): Promise<any> {
+  async validateToken(token: string): Promise<User> {
     if (!token) {
       this.logger.warn('Claim token is missing');
       throw new UnauthorizedException({
@@ -34,8 +35,9 @@ export class ClaimTokenService {
     let payloadStr: string;
     try {
       payloadStr = Buffer.from(payloadPart, 'base64url').toString('utf8');
-    } catch (err: any) {
-      this.logger.warn(`Failed to base64url-decode payload: ${err.message}`);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      this.logger.warn(`Failed to base64url-decode payload: ${msg}`);
       throw new UnauthorizedException({
         statusCode: 401,
         message: 'Invalid claim token encoding',
@@ -46,8 +48,9 @@ export class ClaimTokenService {
     let payload: ClaimTokenPayload;
     try {
       payload = JSON.parse(payloadStr);
-    } catch (err: any) {
-      this.logger.warn(`Failed to parse payload JSON: ${err.message}`);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      this.logger.warn(`Failed to parse payload JSON: ${msg}`);
       throw new UnauthorizedException({
         statusCode: 401,
         message: 'Invalid claim token JSON',
@@ -83,8 +86,9 @@ export class ClaimTokenService {
     let signatureBuffer: Buffer;
     try {
       signatureBuffer = Buffer.from(signaturePart, 'base64url');
-    } catch (err: any) {
-      this.logger.warn(`Failed to base64url-decode signature: ${err.message}`);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      this.logger.warn(`Failed to base64url-decode signature: ${msg}`);
       throw new UnauthorizedException({
         statusCode: 401,
         message: 'Invalid claim token signature encoding',

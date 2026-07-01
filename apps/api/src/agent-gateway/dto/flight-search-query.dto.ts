@@ -2,14 +2,14 @@ import { IsInt, Max, Min, IsString, Matches, registerDecorator, ValidationOption
 import { Transform, Type } from 'class-transformer';
 
 export function IsFutureDateString(validationOptions?: ValidationOptions) {
-  return function (object: Object, propertyName: string) {
+  return function (object: object, propertyName: string) {
     registerDecorator({
       name: 'isFutureDateString',
       target: object.constructor,
       propertyName: propertyName,
       options: validationOptions,
       validator: {
-        validate(value: any, args: ValidationArguments) {
+        validate(value: unknown) {
           if (typeof value !== 'string') return false;
           if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
           

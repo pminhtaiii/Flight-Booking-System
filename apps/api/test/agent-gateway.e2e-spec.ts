@@ -5,6 +5,7 @@ import { AppModule } from '@/app.module';
 import { PrismaService } from '@/prisma/prisma.service';
 import * as crypto from 'crypto';
 import { HttpExceptionFilter } from '@/common/filters/http-exception.filter';
+import { User } from '@prisma/client';
 
 function mintClaimToken(userId: string, iat: number, secret = 'test-claim-token-secret'): string {
   const payload = { userId, iat };
@@ -328,7 +329,7 @@ describe('Agent Gateway (E2E)', () => {
 
   describe('Flight Search Endpoint (GET /flights/search)', () => {
     let token: string;
-    let user: any;
+    let user: User;
 
     beforeEach(async () => {
       user = await prisma.user.create({
@@ -430,7 +431,15 @@ describe('Agent Gateway (E2E)', () => {
       expect(log.traceId).toBe(traceId);
       expect(log.correlationId).toBe(correlationId);
 
-      const metadata = log.metadata as any;
+      interface ToolCallMetadata {
+        toolName: string;
+        claimTokenUserId: string;
+        success: boolean;
+        parameters: Record<string, unknown>;
+        durationMs: number;
+        responseSize: number;
+      }
+      const metadata = log.metadata as unknown as ToolCallMetadata;
       expect(metadata.toolName).toBe('flights/search');
       expect(metadata.claimTokenUserId).toBe(user.id);
       expect(metadata.success).toBe(true);
