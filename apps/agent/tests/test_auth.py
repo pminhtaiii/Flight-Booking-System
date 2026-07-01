@@ -1,11 +1,9 @@
 import time
 import jwt
-import pytest
 from fastapi import FastAPI, Request
 from fastapi.testclient import TestClient
-from fastapi.responses import JSONResponse
 from agent.middleware.auth import JWTAuthMiddleware
-from agent.config import Settings
+from agent.middleware.rate_limit import RateLimitMiddleware
 
 # Create a mock FastAPI app for testing
 app = FastAPI()
@@ -62,7 +60,6 @@ def test_protected_valid_token():
     assert response.status_code == 200
     assert response.json()["user"] == {"sub": "12345", "email": "test@example.com", "exp": payload["exp"]}
 
-from agent.middleware.rate_limit import RateLimitMiddleware
 
 app_limiter = FastAPI()
 app_limiter.add_middleware(RateLimitMiddleware, limit=2, window=10)

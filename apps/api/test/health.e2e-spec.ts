@@ -126,13 +126,17 @@ describe('Health Check (E2E)', () => {
 
   it('GET /health - should return status 503 within 150ms if database query times out (> 100ms delay)', async () => {
     // Measure a base normal request duration right before the timeout request to get current environmental overhead
-    dbMockSpy.mockImplementationOnce(() => Promise.resolve([1]) as unknown as Prisma.PrismaPromise<unknown>);
+    dbMockSpy.mockImplementationOnce(
+      () => Promise.resolve([1]) as unknown as Prisma.PrismaPromise<unknown>,
+    );
     const baseStart = Date.now();
     await request(app.getHttpServer()).get('/health').expect(200);
     const baseDuration = Date.now() - baseStart;
 
     // Simulate database timeout by delaying query execution indefinitely
-    dbMockSpy.mockImplementation(() => new Promise<unknown>(() => {}) as unknown as Prisma.PrismaPromise<unknown>);
+    dbMockSpy.mockImplementation(
+      () => new Promise<unknown>(() => {}) as unknown as Prisma.PrismaPromise<unknown>,
+    );
 
     const startTime = Date.now();
     const response = await request(app.getHttpServer())

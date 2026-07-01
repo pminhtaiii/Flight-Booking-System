@@ -8,7 +8,7 @@
 
 ## Summary
 
-Build a standalone Python/FastAPI agent service (`apps/agent/`) that receives user questions via SSE streaming, validates authentication, applies LlamaFirewall input guardrails, orchestrates a LangChain-powered conversational agent, manages conversation memory (sliding window + summary), and persists all chat data through the existing NestJS API. The NestJS API is extended with a ChatModule providing REST endpoints for session/message CRUD and memory retrieval.
+Build a standalone Python/FastAPI agent service (`apps/agent/`) that receives user questions via SSE streaming, validates authentication, applies NeMo Guardrails input guardrails, orchestrates a LangChain-powered conversational agent, manages conversation memory (sliding window + summary), and persists all chat data through the existing NestJS API. The NestJS API is extended with a ChatModule providing REST endpoints for session/message CRUD and memory retrieval.
 
 ---
 
@@ -17,7 +17,8 @@ Build a standalone Python/FastAPI agent service (`apps/agent/`) that receives us
 **Language/Version**: Python 3.11+ (agent service), TypeScript strict (NestJS chat module, shared types)
 
 **Primary Dependencies**:
-- Agent: FastAPI, sse-starlette, PyJWT, LangChain, langchain-openai, LangGraph, LlamaFirewall, httpx, python-dotenv
+
+- Agent: FastAPI, sse-starlette, PyJWT, LangChain, langchain-openai, LangGraph, nemoguardrails, httpx, python-dotenv
 - NestJS: Prisma (schema extension), class-validator, existing auth guards
 
 **Storage**: PostgreSQL (existing instance) — new `ChatSession` and `ChatMessage` models via Prisma migration
@@ -38,15 +39,15 @@ Build a standalone Python/FastAPI agent service (`apps/agent/`) that receives us
 
 ## Constitution Check
 
-*GATE: Must pass before Phase 0 research. Re-check after Phase 1 design.*
+_GATE: Must pass before Phase 0 research. Re-check after Phase 1 design._
 
-| Principle | Status | Justification |
-|-----------|--------|---------------|
-| I. Flight-First Architecture | ✅ PASS | Chatbot is supplementary — does not block, delay, or complicate the booking pipeline |
-| II. Deterministic Transaction Boundary | ✅ PASS | Agent is advisory only. Read-only tools by default. No booking/payment mutations. All transactional operations remain in NestJS deterministic services |
-| III. API Budget Discipline | ✅ PASS | Agent does not call Amadeus API directly. Tool calls go through NestJS services which enforce caching and budget limits |
-| IV. Observability & Operational Visibility | ✅ PASS | Health check endpoint (FR-008), structured logging (FR-009), LangSmith tracing for all agent runs, security event logging |
-| V. Incremental Delivery | ✅ PASS | Feature is split into 6 independently deployable phases. Each phase delivers a testable increment |
+| Principle                                  | Status  | Justification                                                                                                                                          |
+| ------------------------------------------ | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| I. Flight-First Architecture               | ✅ PASS | Chatbot is supplementary — does not block, delay, or complicate the booking pipeline                                                                   |
+| II. Deterministic Transaction Boundary     | ✅ PASS | Agent is advisory only. Read-only tools by default. No booking/payment mutations. All transactional operations remain in NestJS deterministic services |
+| III. API Budget Discipline                 | ✅ PASS | Agent does not call Amadeus API directly. Tool calls go through NestJS services which enforce caching and budget limits                                |
+| IV. Observability & Operational Visibility | ✅ PASS | Health check endpoint (FR-008), structured logging (FR-009), LangSmith tracing for all agent runs, security event logging                              |
+| V. Incremental Delivery                    | ✅ PASS | Feature is split into 6 independently deployable phases. Each phase delivers a testable increment                                                      |
 
 **Post-design re-check**: All principles remain satisfied. The Python service is an isolated advisory layer with no access to the transactional path.
 
@@ -101,7 +102,7 @@ apps/
 │   │       │   └── auth.py           # JWT validation middleware
 │   │       ├── guardrails/
 │   │       │   ├── base.py           # GuardrailService protocol
-│   │       │   └── firewall.py       # LlamaFirewall implementation
+│   │       │   └── nemo.py           # NeMo Guardrails implementation
 │   │       ├── agents/
 │   │       │   └── chat_agent.py     # LangChain conversational agent
 │   │       ├── memory/
@@ -144,6 +145,7 @@ This feature is organized into **6 phases**, each independently testable and dep
 **Covers**: FR-005, FR-007, FR-003, SC-006, H6, H7
 
 **Scope**:
+
 - Add `ChatSession` and `ChatMessage` Prisma models (see [data-model.md](specs/002-chatbot-agent-service/data-model.md))
 - Add `MessageSender` and `MessageType` enums
 - Add `chatSessions` relation to existing `User` model
@@ -164,6 +166,7 @@ This feature is organized into **6 phases**, each independently testable and dep
 **Covers**: FR-002, FR-011, FR-008, SC-002, SC-005, C1, C2, H5, M1, M2
 
 **Scope**:
+
 - Create `apps/agent/` directory structure
 - Set up `pyproject.toml` with dependencies including `fastapi`, `sse-starlette`, `pyjwt`, `pydantic-settings`, `tiktoken`
 - Create minimal `package.json` for pnpm workspace
@@ -188,9 +191,10 @@ This feature is organized into **6 phases**, each independently testable and dep
 **Covers**: FR-004, FR-012, FR-009, FR-015, SC-003, M6
 
 **Scope**:
+
 - Define `GuardrailService` protocol (abstract interface)
-- Implement LlamaFirewall-based guardrail (`firewall.py`)
-- Pre-load LlamaFirewall BERT model at service startup via FastAPI lifespan events to avoid cold-start latency (M6)
+- Implement NeMo Guardrails-based guardrail (`nemo.py`)
+- Pre-load NeMo Guardrails configuration at service startup via FastAPI lifespan events to avoid cold-start latency (M6)
 - Implement fail-closed behavior (FR-012): when guardrails unavailable, block all messages
 - Implement max message length validation (FR-015)
 - Implement structured security event logging (FR-009): blocked inputs, guardrail triggers
@@ -207,6 +211,7 @@ This feature is organized into **6 phases**, each independently testable and dep
 **Covers**: FR-001, H1, M2
 
 **Scope**:
+
 - Implement SSE streaming endpoint (`POST /chat/stream`)
 - Implement SSE event protocol: `token`, `done`, `error` events with mock streaming response
 - Implement NestJS API client (`nestjs_client.py`) using httpx for authenticated API requests
@@ -223,6 +228,7 @@ This feature is organized into **6 phases**, each independently testable and dep
 **Covers**: FR-001, FR-010, SC-001, H3
 
 **Scope**:
+
 - Set up LangChain `ChatOpenAI` with Mimo endpoint (streaming=True)
 - Create conversational agent with system prompt
 - Handle LLM provider failures gracefully (FR-010): user-friendly error event
@@ -239,6 +245,7 @@ This feature is organized into **6 phases**, each independently testable and dep
 **Covers**: FR-006, FR-014, SC-004, M3, M5
 
 **Scope**:
+
 - Implement memory manager (`memory/manager.py`)
 - Load conversation memory from NestJS `/memory` endpoint: summary + recent N messages
 - Assemble LLM context: system prompt → summary → recent messages → new input
@@ -259,6 +266,7 @@ This feature is organized into **6 phases**, each independently testable and dep
 **Covers**: FR-013, FR-007
 
 **Scope**:
+
 - Implement per-conversation message queue (`queue/message_queue.py`)
 - Enforce one message at a time per conversation (arrival order)
 - Enforce max queue depth limit; reject excess messages with error
@@ -282,34 +290,34 @@ No constitution violations — no complexity justification needed.
 
 ### apps/agent/.env
 
-| Variable | Purpose |
-|----------|---------|
-| `JWT_SECRET` | Shared JWT secret used by NestJS to sign standard HS256 tokens (not NEXTAUTH_SECRET) |
-| `FRONTEND_URL` | Next.js frontend origin (default: `http://localhost:3000`) for CORS (C2) |
-| `NESTJS_API_URL` | NestJS API base URL (e.g., `http://localhost:3001`) |
-| `MIMO_API_URL` | Mimo OpenAI-compatible endpoint |
-| `MIMO_API_KEY` | Mimo API key |
-| `MIMO_MODEL_NAME` | Model identifier (default: `mimo`) |
-| `LANGCHAIN_TRACING_V2` | Enable LangSmith tracing (`true`) |
-| `LANGCHAIN_API_KEY` | LangSmith API key |
-| `LANGCHAIN_PROJECT` | LangSmith project name |
-| `AGENT_PORT` | Agent service port (default: `3002`) |
-| `MAX_MESSAGE_LENGTH` | Max input message chars (default: `10000`) |
-| `MEMORY_WINDOW_SIZE` | Recent messages to keep (default: `20`) |
-| `MEMORY_TOKEN_BUDGET` | Token budget before summarization (default: `4000`) |
-| `QUEUE_MAX_DEPTH` | Max queued messages per conversation (default: `3`) |
+| Variable               | Purpose                                                                              |
+| ---------------------- | ------------------------------------------------------------------------------------ |
+| `JWT_SECRET`           | Shared JWT secret used by NestJS to sign standard HS256 tokens (not NEXTAUTH_SECRET) |
+| `FRONTEND_URL`         | Next.js frontend origin (default: `http://localhost:3000`) for CORS (C2)             |
+| `NESTJS_API_URL`       | NestJS API base URL (e.g., `http://localhost:3001`)                                  |
+| `MIMO_API_URL`         | Mimo OpenAI-compatible endpoint                                                      |
+| `MIMO_API_KEY`         | Mimo API key                                                                         |
+| `MIMO_MODEL_NAME`      | Model identifier (default: `mimo`)                                                   |
+| `LANGCHAIN_TRACING_V2` | Enable LangSmith tracing (`true`)                                                    |
+| `LANGCHAIN_API_KEY`    | LangSmith API key                                                                    |
+| `LANGCHAIN_PROJECT`    | LangSmith project name                                                               |
+| `AGENT_PORT`           | Agent service port (default: `3002`)                                                 |
+| `MAX_MESSAGE_LENGTH`   | Max input message chars (default: `10000`)                                           |
+| `MEMORY_WINDOW_SIZE`   | Recent messages to keep (default: `20`)                                              |
+| `MEMORY_TOKEN_BUDGET`  | Token budget before summarization (default: `4000`)                                  |
+| `QUEUE_MAX_DEPTH`      | Max queued messages per conversation (default: `3`)                                  |
 
 ---
 
 ## Cross-References
 
-| Artifact | Path |
-|----------|------|
-| Feature Spec | [spec.md](specs/002-chatbot-agent-service/spec.md) |
-| Research | [research.md](specs/002-chatbot-agent-service/research.md) |
-| Data Model | [data-model.md](specs/002-chatbot-agent-service/data-model.md) |
+| Artifact            | Path                                                                                         |
+| ------------------- | -------------------------------------------------------------------------------------------- |
+| Feature Spec        | [spec.md](specs/002-chatbot-agent-service/spec.md)                                           |
+| Research            | [research.md](specs/002-chatbot-agent-service/research.md)                                   |
+| Data Model          | [data-model.md](specs/002-chatbot-agent-service/data-model.md)                               |
 | NestJS API Contract | [contracts/nestjs-chat-api.md](specs/002-chatbot-agent-service/contracts/nestjs-chat-api.md) |
-| Agent SSE Contract | [contracts/agent-sse-api.md](specs/002-chatbot-agent-service/contracts/agent-sse-api.md) |
-| Quickstart | [quickstart.md](specs/002-chatbot-agent-service/quickstart.md) |
-| Grilling Decisions | [research/chatbot-backend-architecture.md](research/chatbot-backend-architecture.md) |
-| Constitution | [.specify/memory/constitution.md](.specify/memory/constitution.md) |
+| Agent SSE Contract  | [contracts/agent-sse-api.md](specs/002-chatbot-agent-service/contracts/agent-sse-api.md)     |
+| Quickstart          | [quickstart.md](specs/002-chatbot-agent-service/quickstart.md)                               |
+| Grilling Decisions  | [research/chatbot-backend-architecture.md](research/chatbot-backend-architecture.md)         |
+| Constitution        | [.specify/memory/constitution.md](.specify/memory/constitution.md)                           |

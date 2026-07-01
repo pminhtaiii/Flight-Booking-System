@@ -57,29 +57,20 @@ export class ChatService {
       cursorId = parts[1];
 
       where.OR = cursorId
-        ? [
-            { lastActiveAt: { lt: cursorDate } },
-            { lastActiveAt: cursorDate, id: { lt: cursorId } },
-          ]
+        ? [{ lastActiveAt: { lt: cursorDate } }, { lastActiveAt: cursorDate, id: { lt: cursorId } }]
         : [{ lastActiveAt: { lt: cursorDate } }];
     }
 
     const sessions = await this.prisma.chatSession.findMany({
       where,
       take: query.limit + 1,
-      orderBy: [
-        { lastActiveAt: 'desc' },
-        { id: 'desc' },
-      ],
+      orderBy: [{ lastActiveAt: 'desc' }, { id: 'desc' }],
       include: {
         messages: {
           where: {
             type: 'STANDARD',
           },
-          orderBy: [
-            { createdAt: 'desc' },
-            { id: 'desc' },
-          ],
+          orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
           take: 1,
         },
       },
@@ -312,10 +303,7 @@ export class ChatService {
       const rawMessages = await this.prisma.chatMessage.findMany({
         where,
         take: query.limit + 1,
-        orderBy: [
-          { createdAt: 'desc' },
-          { id: 'desc' },
-        ],
+        orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
       });
 
       if (rawMessages.length > query.limit) {
@@ -343,10 +331,7 @@ export class ChatService {
       const rawMessages = await this.prisma.chatMessage.findMany({
         where,
         take: query.limit + 1,
-        orderBy: [
-          { createdAt: 'asc' },
-          { id: 'asc' },
-        ],
+        orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
       });
 
       if (rawMessages.length > query.limit) {
@@ -468,22 +453,28 @@ export class ChatService {
         sessionId,
         type: 'SUMMARY',
       },
-      orderBy: [
-        { createdAt: 'desc' },
-        { id: 'desc' },
-      ],
+      orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
     });
 
+    const whereClause: Prisma.ChatMessageWhereInput = {
+      sessionId,
+      type: 'STANDARD',
+    };
+
+    if (query.unsummarizedOnly && lastSummaryMessage) {
+      whereClause.OR = [
+        { createdAt: { gt: lastSummaryMessage.createdAt } },
+        {
+          createdAt: lastSummaryMessage.createdAt,
+          id: { gt: lastSummaryMessage.id },
+        },
+      ];
+    }
+
     const recentStandardMessages = await this.prisma.chatMessage.findMany({
-      where: {
-        sessionId,
-        type: 'STANDARD',
-      },
+      where: whereClause,
       take: query.recentCount,
-      orderBy: [
-        { createdAt: 'desc' },
-        { id: 'desc' },
-      ],
+      orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
     });
 
     const recentMessages = recentStandardMessages.reverse().map((m) => ({

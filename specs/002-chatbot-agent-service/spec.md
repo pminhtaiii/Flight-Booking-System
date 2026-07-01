@@ -18,7 +18,7 @@
 - Q: What happens when conversation summary generation fails? → A: Fall back to truncation — use the most recent N messages without a summary; older context is temporarily lost but the conversation continues.
 - Q: What happens when a user sends an extremely long message that exceeds input limits? → A: Reject with limit — enforce a maximum message length and reject messages exceeding it with a clear error showing the limit.
 
-## User Scenarios & Testing *(mandatory)*
+## User Scenarios & Testing _(mandatory)_
 
 ### User Story 1 - Real-Time Chat Conversation (Priority: P1)
 
@@ -108,7 +108,7 @@ A user can start new conversations, switch between existing conversations, and v
 - If conversation summary generation fails, the system falls back to truncation — using only the most recent N messages without a summary. Older context is temporarily unavailable but the conversation continues without interruption. Summarization is retried on the next turn.
 - Concurrent messages from the same user in the same conversation are queued and processed one at a time in arrival order. A maximum queue depth limit is enforced — messages exceeding the limit are rejected with a clear error asking the user to wait.
 
-## Requirements *(mandatory)*
+## Requirements _(mandatory)_
 
 ### Functional Requirements
 
@@ -134,7 +134,7 @@ A user can start new conversations, switch between existing conversations, and v
 - **ChatMessage**: A single message within a session — either from the user or the agent. Contains the message content, sender type, timestamp, and an optional type flag (e.g., "summary" for compressed memory entries).
 - **ConversationMemory**: The working memory context constructed for each LLM invocation — composed of a system prompt, an optional summary of older messages, the most recent N messages, and the new user input.
 
-## Success Criteria *(mandatory)*
+## Success Criteria _(mandatory)_
 
 ### Measurable Outcomes
 
@@ -151,7 +151,7 @@ A user can start new conversations, switch between existing conversations, and v
 - The existing PostgreSQL database managed by Prisma can accommodate new models for chat data without requiring a separate database.
 - The authentication system (JWT-based) from the `001-db-init-auth-handshake` spec is implemented and tokens can be validated independently by the agent service using a shared secret.
 - The LLM provider exposes an API compatible with standard chat-completion interfaces (e.g., OpenAI-compatible endpoint).
-- The guardrail library (LlamaFirewall) is available as a dependency and can run as an in-process component within the agent service.
+- The guardrail library (NeMo Guardrails) is available as a dependency and can run as an in-process component within the agent service.
 - Conversation memory summarization is triggered when the token count of older messages exceeds a defined budget threshold, checked after the agent finishes streaming a response. If the budget is exceeded, summarization runs asynchronously before the next message is processed. Summarization MUST NOT run during active streaming or response generation to avoid interfering with the user's experience.
 - The multi-agent topology (router vs. single agent vs. supervisor graph) is out of scope for this spec — this spec covers the foundational service infrastructure, not the internal agent orchestration strategy.
 - The specific LLM model/provider selection is out of scope — the service will use an abstraction layer that supports swapping providers.

@@ -33,22 +33,26 @@
 **⚠️ CRITICAL**: All Python agent user stories depend on this persistence layer being fully operational.
 
 ### Database Setup
+
 - [x] T004 Add `ChatSession` and `ChatMessage` models, enums `MessageSender` and `MessageType`, and relation `chatSessions` in `apps/api/prisma/schema.prisma`
 - [x] T005 Run Prisma migration and regenerate client in `apps/api/` using `npx prisma migrate dev`
 - [x] T006 [P] Add ChatSession and ChatMessage TypeScript types to `packages/shared/src/types/index.ts`
 
 ### NestJS ChatModule Scaffolding
+
 - [x] T007 [P] Create ChatSession and ChatMessage DTOs in `apps/api/src/chat/dto/` (create-session, update-session, list-sessions-query, create-message)
 - [x] T008 [P] Create `ChatModule` file structure: service, controller, and module in `apps/api/src/chat/`
 - [x] T009 Import `ChatModule` into `apps/api/src/app.module.ts`
 
 ### Service & Controller Implementation
+
 - [x] T010 Implement session CRUD methods in `apps/api/src/chat/chat.service.ts` with User scope enforcement
 - [x] T011 Implement message creation, retrieval, and batch persistence endpoints in `apps/api/src/chat/chat.service.ts`
 - [x] T012 Implement structured audit logging in `apps/api/src/chat/chat.service.ts` using `AuditService`
 - [x] T013 Implement HTTP endpoints in `apps/api/src/chat/chat.controller.ts` with `JwtAuthGuard` protection
 
 ### E2E Verification
+
 - [x] T014 Write NestJS ChatModule E2E integration tests in `apps/api/test/chat.e2e-spec.ts`
 - [x] T015 Run and verify NestJS ChatModule E2E tests
 
@@ -70,38 +74,38 @@
 
 ## Phase 4: User Story 3 - Malicious Input Protection (Priority: P1)
 
-**Goal**: Apply LlamaFirewall input guardrails to block prompt injection and fail closed.
+**Goal**: Apply NeMo Guardrails input guardrails to block prompt injection and fail closed.
 
 **Independent Test**: Send known prompt injections and check that they are blocked with <500ms latency.
 
-- [ ] T019 Define `GuardrailService` abstract interface in `apps/agent/src/agent/guardrails/base.py`
-- [ ] T020 Implement LlamaFirewall-based guardrail in `apps/agent/src/agent/guardrails/firewall.py` with BERT model pre-loading
-- [ ] T021 Implement structured security event logging for blocked inputs in `apps/agent/src/agent/guardrails/firewall.py`
-- [ ] T022 Write unit tests for guardrail layer in `apps/agent/tests/test_guardrails.py`
+- [x] T019 Define `GuardrailService` abstract interface in `apps/agent/src/agent/guardrails/base.py`
+- [x] T020 Implement NeMo Guardrails-based guardrail in `apps/agent/src/agent/guardrails/nemo.py` with config pre-loading
+- [x] T021 Implement structured security event logging for blocked inputs in `apps/agent/src/agent/guardrails/nemo.py`
+- [x] T022 Write unit tests for guardrail layer in `apps/agent/tests/test_guardrails.py`
 
 ---
 
-## Phase 5A: User Story 1 - Real-Time Chat Foundation (Priority: P1)
+## Phase 4A: User Story 1 - Real-Time Chat Foundation (Priority: P1)
 
 **Goal**: Setup FastAPI SSE streaming structure and the NestJS client foundation.
 
 **Independent Test**: Verify mock token streaming over `/chat/stream` via SSE and check that the NestJS API client creates sessions correctly.
 
 - [x] T023 Implement NestJS API client using httpx in `apps/agent/src/agent/tools/nestjs_client.py`
-- [ ] T025a Implement base SSE event streaming endpoint and session auto-creation in `apps/agent/src/agent/streaming/sse.py`
-- [ ] T026a Write unit/integration tests for the streaming foundation and API client in `apps/agent/tests/test_streaming_foundation.py`
+- [x] T025a Implement base SSE event streaming endpoint and session auto-creation in `apps/agent/src/agent/streaming/sse.py`
+- [x] T026a Write unit/integration tests for the streaming foundation and API client in `apps/agent/tests/test_streaming_foundation.py`
 
 ---
 
-## Phase 5B: User Story 1 - LangChain Streaming & Failure Handling (Priority: P1)
+## Phase 4B: User Story 1 - LangChain Streaming & Failure Handling (Priority: P1)
 
 **Goal**: Orchestrate the LangChain agent stream and handle mid-stream connection drops / LLM failures.
 
 **Independent Test**: Connect to `/chat/stream` and verify end-to-end token delivery from the agent, database persistence on success, and partial persistence on mid-stream drop.
 
-- [ ] T024 Setup LangChain ChatOpenAI and chat agent prompt template in `apps/agent/src/agent/agents/chat_agent.py`
-- [ ] T025b Wire agent streaming into the SSE endpoint and implement the connection drop handler / batch persistence in `apps/agent/src/agent/streaming/sse.py`
-- [ ] T026b Write integration tests for full agent streaming and drop persistence in `apps/agent/tests/test_streaming_agent.py`
+- [x] T024 Setup LangChain ChatOpenAI and chat agent prompt template in `apps/agent/src/agent/agents/chat_agent.py`
+- [x] T025b Wire agent streaming into the SSE endpoint and implement the connection drop handler / batch persistence in `apps/agent/src/agent/streaming/sse.py`
+- [x] T026b Write integration tests for full agent streaming and drop persistence in `apps/agent/tests/test_streaming_agent.py`
 
 ---
 
@@ -111,9 +115,9 @@
 
 **Independent Test**: Send consecutive messages to the chatbot and verify it retains context from prior turns.
 
-- [ ] T027 Implement memory manager in `apps/agent/src/agent/memory/manager.py` (load recent messages/summary from NestJS memory endpoint)
-- [ ] T028 Implement post-response token budget check using tiktoken and async summarization trigger in `apps/agent/src/agent/memory/manager.py`
-- [ ] T029 Write unit tests for memory assembly and summarization in `apps/agent/tests/test_memory.py`
+- [x] T027 Implement memory manager in `apps/agent/src/agent/memory/manager.py` (load recent messages/summary from NestJS memory endpoint)
+- [x] T028 Implement post-response token budget check using tiktoken and async summarization trigger in `apps/agent/src/agent/memory/manager.py`
+- [x] T029 Write unit tests for memory assembly and summarization in `apps/agent/tests/test_memory.py`
 
 ---
 
@@ -123,9 +127,9 @@
 
 **Independent Test**: Send concurrent messages to the same conversation and verify they are serialized; verify session isolation.
 
-- [ ] T030 Implement per-conversation message queue in `apps/agent/src/agent/queue/message_queue.py`
-- [ ] T031 Integrate message queue in FastAPI request handler in `apps/agent/src/agent/main.py`
-- [ ] T032 Write integration tests for concurrency queue limits and session isolation in `apps/agent/tests/test_queue.py`
+- [x] T030 Implement per-conversation message queue in `apps/agent/src/agent/queue/message_queue.py`
+- [x] T031 Integrate message queue in FastAPI request handler in `apps/agent/src/agent/main.py`
+- [x] T032 Write integration tests for concurrency queue limits and session isolation in `apps/agent/tests/test_queue.py`
 
 ---
 
