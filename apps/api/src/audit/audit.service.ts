@@ -41,7 +41,7 @@ export class AuditService {
         } else if (
           lowerKey.includes('password') ||
           lowerKey.includes('jwt') ||
-          lowerKey.includes('token') ||
+          (lowerKey.includes('token') && lowerKey !== 'claimtokenuserid') ||
           lowerKey.includes('secret') ||
           lowerKey.includes('authorization') ||
           lowerKey.includes('cookie') ||

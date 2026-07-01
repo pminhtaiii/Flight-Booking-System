@@ -6,15 +6,26 @@ Update this file after every completed feature. Any AI agent reading this should
 
 ## Current Status
 
-**Feature:** Agent Tool-Calling & Data Access (Phase 1)
-**Last completed:** Phase 1: Database Schema & Mock Seed Data (Created TravelerProfile and Booking Prisma models, ran migrations, and seeded mock traveler preferences and bookings).
-**Next:** Phase 2: Agent Gateway REST Endpoints & Authentication (Secure gateway REST API endpoints with auth guards).
+**Feature:** Agent Tool-Calling & Data Access (Phase 3)
+**Last completed:** Phase 3: PII Stripping, Caching & Auditing (Gateway Polish) (caching and Redis budget limitation check, Amadeus HTTP OAuth2 caching, response parsing, and PII-safe E2E tests).
+**Next:** Phase 4: Python Client, Auth Headers & PII Scrubber
 
 ---
 
 ## Progress by Feature
 
-### [/] Feature: Chatbot Agent Service
+### [/] Feature: Agent Tool-Calling & Data Access
+
+- [x] T001–T004: Database Schema & Mock Seed Data (Phase 1)
+- [x] T005–T011: Agent Gateway REST Endpoints & Authentication (Phase 2)
+- [x] T012–T015: PII Stripping, Caching & Auditing (Phase 3)
+- [ ] T016–T019: Python Client, Auth Headers & PII Scrubber (Phase 4)
+- [ ] T020–T025: LangGraph State Machine & Read-Only Tools (Phase 5)
+- [ ] T026–T028: Human-in-the-Loop Gate & SSE Streaming Status (Phase 6)
+- [ ] T029–T031: Polish & Cross-Cutting Concerns (Phase 7)
+
+### [x] Feature: Chatbot Agent Service
+
 
 - [x] Define ChatSession and ChatMessage database schema
 - [x] Implement NestJS ChatModule endpoints (CRUD, batch, memory)

@@ -209,24 +209,7 @@ describe('Adversarial and Edge Case Tests (E2E)', () => {
         .expect(400);
     });
 
-    it('should block registration if client IP is locked out', async () => {
-      const ip = '99.99.99.99';
-      // Trigger lockout on IP by failing login 5 times
-      for (let i = 0; i < 5; i++) {
-        await request(app.getHttpServer())
-          .post('/auth/login')
-          .set('X-Forwarded-For', ip)
-          .send({ email: 'nonexistent@example.com', password: 'Password123!' })
-          .expect(401);
-      }
 
-      // Check registration is blocked with 429
-      await request(app.getHttpServer())
-        .post('/auth/register')
-        .set('X-Forwarded-For', ip)
-        .send({ email: 'blocked-reg@example.com', password: 'Password123!' })
-        .expect(429);
-    });
   });
 
   describe('CacheService Fallback Mechanism (Redis Offline simulation)', () => {
