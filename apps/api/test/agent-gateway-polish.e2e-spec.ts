@@ -5,6 +5,7 @@ import { AppModule } from '@/app.module';
 import { PrismaService } from '@/prisma/prisma.service';
 import { CacheService } from '@/cache/cache.service';
 import { AmadeusService } from '@/agent-gateway/amadeus/amadeus.service';
+import { AmadeusFlightSearchResponse } from '@/agent-gateway/amadeus/amadeus.types';
 import * as crypto from 'crypto';
 import { HttpExceptionFilter } from '@/common/filters/http-exception.filter';
 import { User } from '@prisma/client';
@@ -269,7 +270,7 @@ describe('Agent Gateway Polish (E2E)', () => {
 
       const searchSpy = jest
         .spyOn(amadeusService, 'searchFlights')
-        .mockResolvedValue(rawAmadeusResponse as any);
+        .mockResolvedValue(rawAmadeusResponse as unknown as AmadeusFlightSearchResponse);
 
       const res = await request(app.getHttpServer())
         .get('/agent-gateway/flights/search')
@@ -311,7 +312,7 @@ describe('Agent Gateway Polish (E2E)', () => {
         .mockResolvedValue({
           data: [],
           dictionaries: { carriers: {} },
-        } as any);
+        } as unknown as AmadeusFlightSearchResponse);
 
       await request(app.getHttpServer())
         .get('/agent-gateway/flights/search')

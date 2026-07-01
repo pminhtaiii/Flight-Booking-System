@@ -4,6 +4,7 @@ import request from 'supertest';
 import { AppModule } from '@/app.module';
 import { PrismaService } from '@/prisma/prisma.service';
 import { AmadeusService } from '@/agent-gateway/amadeus/amadeus.service';
+import { AmadeusFlightSearchResponse } from '@/agent-gateway/amadeus/amadeus.types';
 import * as crypto from 'crypto';
 import { HttpExceptionFilter } from '@/common/filters/http-exception.filter';
 import { User } from '@prisma/client';
@@ -202,7 +203,7 @@ describe('Agent Gateway (E2E)', () => {
             SQ: 'SINGAPORE AIRLINES'
           }
         }
-      } as any;
+      } as unknown as AmadeusFlightSearchResponse;
     });
   });
 
