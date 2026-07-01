@@ -93,7 +93,11 @@ model TravelerProfile {
   blacklistedAirlines String[]
   dietaryNeeds        String?
   nationality         String?
+  /// @encrypted
+  /// Sensitive PII. Encrypted at the application layer using AES-256-GCM before database insertion.
   passportNumber      String?
+  /// @encrypted
+  /// Sensitive PII. Encrypted/tokenized at the application layer to comply with GDPR data protection requirements.
   passportExpiry      DateTime?
   createdAt           DateTime @default(now())
   updatedAt           DateTime @updatedAt
@@ -117,7 +121,7 @@ model Booking {
   duration         Int
   stops            Int           @default(0)
   fareClass        String?
-  price            Decimal
+  price            Decimal       @db.Decimal(10, 2)
   currency         String        @default("USD")
   passengers       Int           @default(1)
   baggageAllowance String?
