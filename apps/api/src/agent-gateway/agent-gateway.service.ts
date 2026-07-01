@@ -1,10 +1,44 @@
-import { Injectable, NotFoundException, Logger, HttpException } from '@nestjs/common';
+import { Injectable, NotFoundException, Logger, HttpException, HttpStatus } from '@nestjs/common';
 import { PrismaService } from '@/prisma/prisma.service';
 import { AuditService } from '@/audit/audit.service';
+import { CacheService } from '@/cache/cache.service';
+import { AmadeusService } from './amadeus/amadeus.service';
 import { FlightSearchQueryDto } from './dto/flight-search-query.dto';
 import { FlightSearchResponseDto, FlightResultDto } from './dto/flight-result.dto';
 import { UserPreferencesDto } from './dto/user-preferences.dto';
 import { UserBookingsResponseDto, BookingResultDto } from './dto/user-bookings.dto';
+import * as crypto from 'crypto';
+
+function toTitleCase(str: string): string {
+  if (!str) return '';
+  return str
+    .trim()
+    .toLowerCase()
+    .split(/\s+/)
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(' ');
+}
+
+function parseISODurationToMinutes(durationStr: string): number {
+  const regex = /P(?:(\d+)D)?T(?:(\d+)H)?(?:(\d+)M)?/;
+  const matches = durationStr.match(regex);
+  if (!matches) return 0;
+  const days = parseInt(matches[1] || '0', 10);
+  const hours = parseInt(matches[2] || '0', 10);
+  const minutes = parseInt(matches[3] || '0', 10);
+  return days * 1440 + hours * 60 + minutes;
+}
+
+function formatBaggageAllowance(baggage?: { quantity?: number; weight?: number; weightUnit?: string }): string {
+  if (!baggage) return 'No checked baggage';
+  if (typeof baggage.quantity === 'number') {
+    return `${baggage.quantity} checked bag(s)`;
+  }
+  if (typeof baggage.weight === 'number') {
+    return `${baggage.weight}${baggage.weightUnit?.toLowerCase() || 'kg'} checked`;
+  }
+  return 'No checked baggage';
+}
 
 @Injectable()
 export class AgentGatewayService {
@@ -13,6 +47,8 @@ export class AgentGatewayService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly auditService: AuditService,
+    private readonly cacheService: CacheService,
+    private readonly amadeusService: AmadeusService,
   ) {}
 
   private async logToolCall(
@@ -75,87 +111,157 @@ export class AgentGatewayService {
   ): Promise<FlightSearchResponseDto> {
     const startTime = Date.now();
     try {
-      const { origin, destination, date, passengers } = query;
+      const now = new Date();
+      const year = now.getFullYear();
+      const month = String(now.getMonth() + 1).padStart(2, '0');
+      const budgetKey = `budget:amadeus:${year}-${month}`;
 
-      // Mock flight search results (Amadeus client/cache is Phase 3)
-      const results: FlightResultDto[] = [
-        {
-          airline: 'Vietnam Airlines',
-          flightNumber: 'VN310',
-          departureAirport: origin,
-          arrivalAirport: destination,
-          departureTime: `${date}T08:30:00Z`,
-          arrivalTime: `${date}T15:00:00Z`,
-          duration: 330,
-          stops: 0,
-          price: 452.00 * passengers,
-          currency: 'USD',
-          fareClass: 'Economy',
-          baggageAllowance: '23kg checked + 7kg carry-on',
-        },
-        {
-          airline: 'ANA',
-          flightNumber: 'NH858',
-          departureAirport: origin,
-          arrivalAirport: destination,
-          departureTime: `${date}T10:15:00Z`,
-          arrivalTime: `${date}T17:45:00Z`,
-          duration: 390,
-          stops: 1,
-          price: 389.00 * passengers,
-          currency: 'USD',
-          fareClass: 'Economy',
-          baggageAllowance: '23kg checked + 7kg carry-on',
-        },
-        {
-          airline: 'Japan Airlines',
-          flightNumber: 'JL752',
-          departureAirport: origin,
-          arrivalAirport: destination,
-          departureTime: `${date}T23:55:00Z`,
-          arrivalTime: `${date}T07:30:00Z`,
-          duration: 335,
-          stops: 0,
-          price: 520.00 * passengers,
-          currency: 'USD',
-          fareClass: 'Business',
-          baggageAllowance: '32kg checked + 10kg carry-on',
-        },
-        {
-          airline: 'VietJet Air',
-          flightNumber: 'VJ932',
-          departureAirport: origin,
-          arrivalAirport: destination,
-          departureTime: `${date}T00:15:00Z`,
-          arrivalTime: `${date}T08:00:00Z`,
-          duration: 345,
-          stops: 0,
-          price: 199.00 * passengers,
-          currency: 'USD',
-          fareClass: 'Eco',
-          baggageAllowance: '7kg carry-on only',
-        },
-        {
-          airline: 'Singapore Airlines',
-          flightNumber: 'SQ176',
-          departureAirport: origin,
-          arrivalAirport: destination,
-          departureTime: `${date}T12:00:00Z`,
-          arrivalTime: `${date}T21:30:00Z`,
-          duration: 570,
-          stops: 1,
-          price: 610.00 * passengers,
-          currency: 'USD',
-          fareClass: 'Premium Economy',
-          baggageAllowance: '30kg checked + 7kg carry-on',
-        },
-      ];
+      // 1. Perform budget check
+      const currentBudgetStr = await this.cacheService.get(budgetKey);
+      const currentBudget = currentBudgetStr ? parseInt(currentBudgetStr, 10) : 0;
+      if (currentBudget >= 2000) {
+        throw new HttpException(
+          {
+            message: 'Amadeus API monthly search budget limit exceeded',
+            code: 'RATE_LIMIT_EXCEEDED',
+          },
+          HttpStatus.TOO_MANY_REQUESTS,
+        );
+      }
 
-      const response = { results };
-      await this.logToolCall(userId, 'flights/search', query, startTime, traceId, correlationId, true, null, response);
+      // 2. Check Redis cache first
+      const normalizedQuery = {
+        origin: query.origin,
+        destination: query.destination,
+        date: query.date,
+        passengers: Number(query.passengers),
+      };
+      const queryStr = JSON.stringify(normalizedQuery);
+      const sha256 = crypto.createHash('sha256').update(queryStr).digest('hex');
+      const cacheKey = `flights:search:${sha256}`;
+
+      const cachedData = await this.cacheService.get(cacheKey);
+      if (cachedData) {
+        const parsed = JSON.parse(cachedData) as FlightSearchResponseDto;
+        await this.logToolCall(
+          userId,
+          'flights/search',
+          query,
+          startTime,
+          traceId,
+          correlationId,
+          true,
+          null,
+          parsed,
+        );
+        return parsed;
+      }
+
+      // 3. On cache miss: increment budget
+      const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
+      const ttlSeconds = Math.max(0, Math.ceil((endOfMonth.getTime() - Date.now()) / 1000));
+      await this.cacheService.incr(budgetKey, ttlSeconds);
+
+      // 4. Call AmadeusService.searchFlights()
+      let rawResponse;
+      try {
+        rawResponse = await this.amadeusService.searchFlights(query);
+      } catch (err: unknown) {
+        if (err instanceof HttpException) {
+          throw err;
+        }
+        throw new HttpException(
+          {
+            message: err instanceof Error ? err.message : 'Upstream flight search service is temporarily unavailable',
+            code: 'UPSTREAM_UNAVAILABLE',
+          },
+          HttpStatus.BAD_GATEWAY,
+        );
+      }
+
+      // 5. Parse/map raw response to FlightResultDto (limit to 5 results)
+      const offers = rawResponse.data || [];
+      const limitedOffers = offers.slice(0, 5);
+
+      const results: FlightResultDto[] = [];
+      for (const offer of limitedOffers) {
+        const itinerary = offer.itineraries?.[0];
+        if (!itinerary || !itinerary.segments || itinerary.segments.length === 0) {
+          continue;
+        }
+
+        const segments = itinerary.segments;
+        const firstSegment = segments[0];
+        const lastSegment = segments[segments.length - 1];
+
+        const carrierCode = firstSegment.carrierCode;
+        const rawAirlineName = rawResponse.dictionaries?.carriers?.[carrierCode] || carrierCode;
+        const airline = toTitleCase(rawAirlineName);
+        const flightNumber = `${firstSegment.carrierCode}${firstSegment.number}`;
+
+        const departureAirport = firstSegment.departure.iataCode;
+        const arrivalAirport = lastSegment.arrival.iataCode;
+        const departureTime = firstSegment.departure.at;
+        const arrivalTime = lastSegment.arrival.at;
+
+        const duration = parseISODurationToMinutes(itinerary.duration);
+        const stops = segments.length - 1;
+
+        const price = parseFloat(offer.price.total);
+        const currency = offer.price.currency;
+
+        const travelerPricing = offer.travelerPricings?.[0];
+        const firstSegmentFareDetails = travelerPricing?.fareDetailsBySegment?.[0];
+        const fareClass = firstSegmentFareDetails?.cabin ? toTitleCase(firstSegmentFareDetails.cabin) : null;
+        const baggageAllowance = firstSegmentFareDetails ? formatBaggageAllowance(firstSegmentFareDetails.includedCheckedBags) : null;
+
+        results.push({
+          airline,
+          flightNumber,
+          departureAirport,
+          arrivalAirport,
+          departureTime,
+          arrivalTime,
+          duration,
+          stops,
+          price,
+          currency,
+          fareClass,
+          baggageAllowance,
+        });
+      }
+
+      const response: FlightSearchResponseDto = { results };
+
+      // 6. Cache mapped results in Redis with TTL 900 seconds
+      await this.cacheService.set(cacheKey, JSON.stringify(response), 900);
+
+      // 7. Log TOOL_CALL audit log
+      await this.logToolCall(
+        userId,
+        'flights/search',
+        query,
+        startTime,
+        traceId,
+        correlationId,
+        true,
+        null,
+        response,
+      );
+
       return response;
-    } catch (err) {
-      await this.logToolCall(userId, 'flights/search', query, startTime, traceId, correlationId, false, err, null);
+    } catch (err: unknown) {
+      await this.logToolCall(
+        userId,
+        'flights/search',
+        query,
+        startTime,
+        traceId,
+        correlationId,
+        false,
+        err,
+        null,
+      );
       throw err;
     }
   }

@@ -6,9 +6,9 @@ Update this file after every completed feature. Any AI agent reading this should
 
 ## Current Status
 
-**Feature:** Agent Tool-Calling & Data Access (Phase 2)
-**Last completed:** Phase 2: Agent Gateway REST Endpoints & Authentication (secure dual-layer authentication with X-Agent-API-Key guard and HMAC-SHA256 user claim token guard, active status db checks, DTO validation, and PII-safe NestJS E2E tests).
-**Next:** Phase 3: PII Stripping, Caching & Auditing (Gateway Polish)
+**Feature:** Agent Tool-Calling & Data Access (Phase 3)
+**Last completed:** Phase 3: PII Stripping, Caching & Auditing (Gateway Polish) (caching and Redis budget limitation check, Amadeus HTTP OAuth2 caching, response parsing, and PII-safe E2E tests).
+**Next:** Phase 4: Python Client, Auth Headers & PII Scrubber
 
 ---
 
@@ -18,7 +18,7 @@ Update this file after every completed feature. Any AI agent reading this should
 
 - [x] T001–T004: Database Schema & Mock Seed Data (Phase 1)
 - [x] T005–T011: Agent Gateway REST Endpoints & Authentication (Phase 2)
-- [ ] T012–T015: PII Stripping, Caching & Auditing (Phase 3)
+- [x] T012–T015: PII Stripping, Caching & Auditing (Phase 3)
 - [ ] T016–T019: Python Client, Auth Headers & PII Scrubber (Phase 4)
 - [ ] T020–T025: LangGraph State Machine & Read-Only Tools (Phase 5)
 - [ ] T026–T028: Human-in-the-Loop Gate & SSE Streaming Status (Phase 6)

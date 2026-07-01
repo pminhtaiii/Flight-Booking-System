@@ -3,6 +3,7 @@ import { INestApplication, ValidationPipe } from '@nestjs/common';
 import request from 'supertest';
 import { AppModule } from '@/app.module';
 import { PrismaService } from '@/prisma/prisma.service';
+import { AmadeusService } from '@/agent-gateway/amadeus/amadeus.service';
 import * as crypto from 'crypto';
 import { HttpExceptionFilter } from '@/common/filters/http-exception.filter';
 import { User } from '@prisma/client';
@@ -52,6 +53,157 @@ describe('Agent Gateway (E2E)', () => {
     await app.init();
 
     prisma = moduleFixture.get<PrismaService>(PrismaService);
+
+    jest.spyOn(AmadeusService.prototype, 'searchFlights').mockImplementation(async (query) => {
+      return {
+        data: [
+          {
+            id: '1',
+            itineraries: [
+              {
+                duration: 'PT5H30M',
+                segments: [
+                  {
+                    departure: { iataCode: 'HAN', at: '2026-07-15T08:30:00Z' },
+                    arrival: { iataCode: 'NRT', at: '2026-07-15T15:00:00Z' },
+                    carrierCode: 'VN',
+                    number: '310',
+                  }
+                ]
+              }
+            ],
+            price: { currency: 'USD', total: String(452.00 * (Number(query.passengers) || 2)) },
+            travelerPricings: [
+              {
+                fareDetailsBySegment: [
+                  {
+                    cabin: 'ECONOMY',
+                    includedCheckedBags: { weight: 23, weightUnit: 'KG' }
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            id: '2',
+            itineraries: [
+              {
+                duration: 'PT6H30M',
+                segments: [
+                  {
+                    departure: { iataCode: 'HAN', at: '2026-07-15T10:15:00Z' },
+                    arrival: { iataCode: 'NRT', at: '2026-07-15T17:45:00Z' },
+                    carrierCode: 'NH',
+                    number: '858',
+                  }
+                ]
+              }
+            ],
+            price: { currency: 'USD', total: String(389.00 * (Number(query.passengers) || 2)) },
+            travelerPricings: [
+              {
+                fareDetailsBySegment: [
+                  {
+                    cabin: 'ECONOMY',
+                    includedCheckedBags: { weight: 23, weightUnit: 'KG' }
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            id: '3',
+            itineraries: [
+              {
+                duration: 'PT5H35M',
+                segments: [
+                  {
+                    departure: { iataCode: 'HAN', at: '2026-07-15T23:55:00Z' },
+                    arrival: { iataCode: 'NRT', at: '2026-07-15T07:30:00Z' },
+                    carrierCode: 'JL',
+                    number: '752',
+                  }
+                ]
+              }
+            ],
+            price: { currency: 'USD', total: String(520.00 * (Number(query.passengers) || 2)) },
+            travelerPricings: [
+              {
+                fareDetailsBySegment: [
+                  {
+                    cabin: 'BUSINESS',
+                    includedCheckedBags: { weight: 32, weightUnit: 'KG' }
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            id: '4',
+            itineraries: [
+              {
+                duration: 'PT5H45M',
+                segments: [
+                  {
+                    departure: { iataCode: 'HAN', at: '2026-07-15T00:15:00Z' },
+                    arrival: { iataCode: 'NRT', at: '2026-07-15T08:00:00Z' },
+                    carrierCode: 'VJ',
+                    number: '932',
+                  }
+                ]
+              }
+            ],
+            price: { currency: 'USD', total: String(199.00 * (Number(query.passengers) || 2)) },
+            travelerPricings: [
+              {
+                fareDetailsBySegment: [
+                  {
+                    cabin: 'ECO',
+                    includedCheckedBags: { quantity: 0 }
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            id: '5',
+            itineraries: [
+              {
+                duration: 'PT9H30M',
+                segments: [
+                  {
+                    departure: { iataCode: 'HAN', at: '2026-07-15T12:00:00Z' },
+                    arrival: { iataCode: 'NRT', at: '2026-07-15T21:30:00Z' },
+                    carrierCode: 'SQ',
+                    number: '176',
+                  }
+                ]
+              }
+            ],
+            price: { currency: 'USD', total: String(610.00 * (Number(query.passengers) || 2)) },
+            travelerPricings: [
+              {
+                fareDetailsBySegment: [
+                  {
+                    cabin: 'PREMIUM ECONOMY',
+                    includedCheckedBags: { weight: 30, weightUnit: 'KG' }
+                  }
+                ]
+              }
+            ]
+          }
+        ],
+        dictionaries: {
+          carriers: {
+            VN: 'VIETNAM AIRLINES',
+            NH: 'ANA',
+            JL: 'JAPAN AIRLINES',
+            VJ: 'VIETJET AIR',
+            SQ: 'SINGAPORE AIRLINES'
+          }
+        }
+      } as any;
+    });
   });
 
   afterAll(async () => {
@@ -390,7 +542,7 @@ describe('Agent Gateway (E2E)', () => {
       expect(firstResult.price).toBe(452.00 * 2);
       expect(firstResult.currency).toBe('USD');
       expect(firstResult.fareClass).toBe('Economy');
-      expect(firstResult.baggageAllowance).toBe('23kg checked + 7kg carry-on');
+      expect(firstResult.baggageAllowance).toBe('23kg checked');
     });
   });
 
