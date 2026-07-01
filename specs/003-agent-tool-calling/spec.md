@@ -192,7 +192,7 @@ A system operator can review a complete audit log of every tool call the agent m
 ## Assumptions
 
 - The chatbot agent service (JWT auth, SSE streaming, memory management, concurrency queue) is fully built and operational as a prerequisite — this feature extends that service with tool-calling capabilities.
-- The NestJS backend already has functional services for flight search (Amadeus integration), user profiles, and booking management that can be proxied through the gateway.
+- The NestJS backend does not yet have standalone flight, profile, or booking services; the gateway queries Amadeus and Prisma directly.
 - The Amadeus Self-Service API is the sole flight data provider; API budget constraints (2,000 calls/month) apply to agent-initiated searches equally.
 - Users typically have a small number of active bookings (1–5), so booking list queries do not require pagination in this phase.
 - The LLM provider (Mimo) supports OpenAI-compatible function/tool calling API natively — no text-based parsing or ReAct-style workarounds are needed.

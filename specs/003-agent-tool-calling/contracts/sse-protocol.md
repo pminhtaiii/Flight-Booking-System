@@ -10,7 +10,7 @@
 
 Extension of the existing SSE streaming protocol to support tool-calling events. Three new event types are added alongside the existing `token`, `done`, and `error` events.
 
-**Endpoint**: `POST /api/chat/send` (existing — unchanged)
+**Endpoint**: `POST /chat/stream` (new SSE route)
 
 **Content-Type**: `text/event-stream`
 

@@ -197,7 +197,7 @@ Each scenario targets specific spec requirements. Cross-references use FR/SC cod
 **Covers**: FR-006, FR-007, SC-005
 
 **Steps**:
-1. Manually craft a request to the agent gateway endpoint (e.g., `GET /api/agent-gateway/bookings`)
+1. Manually craft a request to the agent gateway endpoint (e.g., `GET /api/agent-gateway/users/bookings`)
 2. Include the `X-Agent-API-Key` header with the correct API key
 3. Set the `X-User-Claim` header to one of:
    - An expired token (issued more than `CLAIM_TOKEN_TTL_SECONDS` ago)

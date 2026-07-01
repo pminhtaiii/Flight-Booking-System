@@ -333,23 +333,25 @@ sequenceDiagram
     Agent->>Agent: HMAC-SHA256 sign {userId, iat}
     Agent->>Gateway: HTTP request + X-User-Claim header
     Gateway->>Gateway: Verify HMAC signature
-    Gateway->>Gateway: Check iat + TTL (configurable, default 30s)
+    Gateway->>Gateway: Check iat + TTL (configurable, default 300s)
     Gateway->>Gateway: Verify User.status === ACTIVE
     alt Valid
         Gateway->>Agent: 200 + PII-stripped data
-    else Invalid / Expired / Inactive User
+    else Invalid / Expired Claim Token
         Gateway->>Agent: 401 Unauthorized
+    else Inactive User
+        Gateway->>Agent: 403 Forbidden (USER_INACTIVE)
     end
 ```
 
 ### 4.3 Validation Rules
 
-| Rule | Constraint | Enforcement Layer |
-|------|-----------|-------------------|
-| HMAC signature must be valid | `crypto.timingSafeEqual` comparison | `ClaimTokenService` (NestJS) |
-| `iat` must be within TTL window | `now() - iat <= CLAIM_TOKEN_TTL_SECONDS` | `ClaimTokenService` (NestJS) |
-| `userId` must reference an `ACTIVE` user | DB lookup: `User.status === ACTIVE` | `ClaimTokenService` (NestJS) |
-| TTL must be configurable without code changes | `CLAIM_TOKEN_TTL_SECONDS` env var | `ConfigService` |
+| Rule | Constraint | Failure Response | Enforcement Layer |
+|------|-----------|------------------|-------------------|
+| HMAC signature must be valid | `crypto.timingSafeEqual` comparison | `401 Unauthorized` | `ClaimTokenService` (NestJS) |
+| `iat` must be within TTL window | `now() - iat <= CLAIM_TOKEN_TTL_SECONDS` (default: 300s) | `401 Unauthorized` | `ClaimTokenService` (NestJS) |
+| `userId` must reference an `ACTIVE` user | DB lookup: `User.status === ACTIVE` | `403 USER_INACTIVE` | `ClaimTokenService` (NestJS) |
+| TTL must be configurable without code changes | `CLAIM_TOKEN_TTL_SECONDS` env var | N/A | `ConfigService` |
 
 ### 4.4 TypeScript Interface
 
