@@ -462,7 +462,13 @@ export class ChatService {
     };
 
     if (query.unsummarizedOnly && lastSummaryMessage) {
-      whereClause.createdAt = { gt: lastSummaryMessage.createdAt };
+      whereClause.OR = [
+        { createdAt: { gt: lastSummaryMessage.createdAt } },
+        {
+          createdAt: lastSummaryMessage.createdAt,
+          id: { gt: lastSummaryMessage.id },
+        },
+      ];
     }
 
     const recentStandardMessages = await this.prisma.chatMessage.findMany({

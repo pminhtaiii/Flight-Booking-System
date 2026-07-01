@@ -10,7 +10,11 @@ export class MemoryQueryDto {
   recentCount: number = 20;
 
   @IsOptional()
-  @Transform(({ value }) => value === 'true' || value === true)
+  @Transform(({ value }) => {
+    if (value === 'true' || value === true) return true;
+    if (value === 'false' || value === false) return false;
+    return value;
+  })
   @IsBoolean()
   unsummarizedOnly?: boolean;
 }

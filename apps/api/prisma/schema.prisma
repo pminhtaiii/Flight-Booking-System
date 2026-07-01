@@ -84,6 +84,9 @@ model ChatMessage {
   @@map("chat_messages")
 }
 
+/// TravelerProfile holds user travel preferences and sensitive travel identity documents.
+/// All sensitive PII fields (like passportNumber and passportExpiry) are encrypted
+/// at the application level using AES-256-GCM before storage to comply with GDPR requirements.
 model TravelerProfile {
   id                  String   @id @default(uuid())
   userId              String   @unique
