@@ -56,13 +56,15 @@ class MemoryManager:
             if total_count <= self.window_size:
                 return
 
-            # 2. Fetch all messages in the session
-            all_memory = await client.get_memory(session_id, recent_count=total_count)
+            # 2. Fetch all unsummarized messages in the session
+            all_memory = await client.get_memory(session_id, recent_count=total_count, unsummarized_only=True)
             all_messages = all_memory.get("recentMessages", [])
             summary = all_memory.get("summary", None)
 
             # Messages that have slid out of the sliding window
             older_messages = all_messages[:-self.window_size]
+            if not older_messages:
+                return
 
             # 3. Calculate token count of older messages + summary
             older_tokens = self.get_older_messages_tokens(older_messages, summary)

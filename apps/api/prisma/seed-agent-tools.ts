@@ -1,3 +1,4 @@
+/* eslint-disable no-console */
 import { PrismaClient, BookingStatus } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
 
@@ -22,7 +23,7 @@ async function main() {
   console.log(`User created/updated: ${user.id} (${user.email})`);
 
   // 2. Create TravelerProfile
-  const profile = await prisma.travelerProfile.upsert({
+  await prisma.travelerProfile.upsert({
     where: { userId: user.id },
     update: {
       seatPreference: 'window',

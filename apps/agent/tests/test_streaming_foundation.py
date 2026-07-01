@@ -285,19 +285,16 @@ async def test_stream_graceful_shutdown(monkeypatch):
     async def run_request():
         transport = httpx.ASGITransport(app=app)
         async with httpx.AsyncClient(transport=transport, base_url="http://test") as ac:
-            try:
-                async with ac.stream(
-                    "POST",
-                    "/chat/stream",
-                    json={"message": "hello", "sessionId": "session-123"},
-                    headers=headers
-                ) as response:
-                    lines = []
-                    async for line in response.aiter_lines():
-                        lines.append(line)
-                    return lines
-            except Exception as e:
-                return [f"error: {str(e)}"]
+            async with ac.stream(
+                "POST",
+                "/chat/stream",
+                json={"message": "hello", "sessionId": "session-123"},
+                headers=headers
+            ) as response:
+                lines = []
+                async for line in response.aiter_lines():
+                    lines.append(line)
+                return lines
                 
     task = asyncio.create_task(run_request())
     

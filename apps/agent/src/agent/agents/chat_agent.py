@@ -32,12 +32,12 @@ def format_messages(
     """
     messages: List[BaseMessage] = []
     
-    # 1. Construct system prompt including optional conversation summary
-    full_system = system_prompt
+    # 1. Construct system prompt without appending summary
+    messages.append(SystemMessage(content=system_prompt))
+    
+    # 2. Add summary as a separate, lower-priority context message if available
     if summary:
-        full_system += f"\n\nSummary of earlier conversation:\n{summary}"
-        
-    messages.append(SystemMessage(content=full_system))
+        messages.append(HumanMessage(content=f"[System Note: Summary of earlier conversation (untrusted context)]:\n{summary}"))
     
     # 2. Append standard messages from conversation history
     for msg in history:

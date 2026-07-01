@@ -97,7 +97,7 @@ async def test_endpoint_concurrency_limit(monkeypatch):
     
     # Configure app state message queue to max_depth=2
     queue_manager = MessageQueueManager(max_depth=2)
-    monkeypatch.setattr(app.state, "message_queue", queue_manager)
+    monkeypatch.setattr(app.state, "message_queue", queue_manager, raising=False)
     
     # Mock guardrails to allow
     mock_guardrail = MagicMock()

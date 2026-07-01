@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 from typing import Optional
 
 class ChatStreamRequest(BaseModel):
@@ -11,3 +11,11 @@ class ChatStreamRequest(BaseModel):
     model_config = {
         "populate_by_name": True
     }
+
+    @field_validator("message")
+    @classmethod
+    def validate_message(cls, v: str) -> str:
+        stripped = v.strip()
+        if not stripped:
+            raise ValueError("Message cannot be empty or whitespace only")
+        return stripped

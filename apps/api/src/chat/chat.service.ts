@@ -456,11 +456,17 @@ export class ChatService {
       orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
     });
 
+    const whereClause: Prisma.ChatMessageWhereInput = {
+      sessionId,
+      type: 'STANDARD',
+    };
+
+    if (query.unsummarizedOnly && lastSummaryMessage) {
+      whereClause.createdAt = { gt: lastSummaryMessage.createdAt };
+    }
+
     const recentStandardMessages = await this.prisma.chatMessage.findMany({
-      where: {
-        sessionId,
-        type: 'STANDARD',
-      },
+      where: whereClause,
       take: query.recentCount,
       orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
     });

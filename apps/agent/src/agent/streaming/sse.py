@@ -109,51 +109,54 @@ async def chat_stream(
                         })
                 
                 # Done event - Persist message batch and send done event
-                messages_payload = [
-                    {"sender": "USER", "type": "STANDARD", "content": body.message},
-                    {"sender": "AGENT", "type": "STANDARD", "content": partial_response}
-                ]
-                try:
-                    batch_res = await client.create_message_batch(session_id, messages_payload)
-                    persisted = True
-                except Exception as persist_err:
-                    logger.error(f"Failed to persist completed response: {persist_err!s}")
+                if partial_response.strip():
+                    messages_payload = [
+                        {"sender": "USER", "type": "STANDARD", "content": body.message},
+                        {"sender": "AGENT", "type": "STANDARD", "content": partial_response}
+                    ]
+                    try:
+                        batch_res = await client.create_message_batch(session_id, messages_payload)
+                        persisted = True
+                    except Exception as persist_err:
+                        logger.error(f"Failed to persist completed response: {persist_err!s}")
+                        await q.put({
+                            "event": "error",
+                            "data": json.dumps({
+                                "code": "PERSISTENCE_ERROR",
+                                "message": "The response was generated but could not be saved.",
+                                "partialMessageId": None
+                            })
+                        })
+                        return
+                    
+                    # Extract agent message id
+                    agent_message_id = None
+                    for msg in batch_res.get("messages", []):
+                        if msg.get("sender") == "AGENT":
+                            agent_message_id = msg.get("id")
+                    
                     await q.put({
-                        "event": "error",
+                        "event": "done",
                         "data": json.dumps({
-                            "code": "PERSISTENCE_ERROR",
-                            "message": "The response was generated but could not be saved.",
-                            "partialMessageId": None
+                            "messageId": agent_message_id,
+                            "sessionId": session_id
                         })
                     })
-                    return
-                
-                # Extract agent message id
-                agent_message_id = None
-                for msg in batch_res.get("messages", []):
-                    if msg.get("sender") == "AGENT":
-                        agent_message_id = msg.get("id")
-                
-                await q.put({
-                    "event": "done",
-                    "data": json.dumps({
-                        "messageId": agent_message_id,
-                        "sessionId": session_id
-                    })
-                })
 
-                # Asynchronously trigger token budget check and summarization in the background
-                memory_mgr = MemoryManager(
-                    window_size=settings.MEMORY_WINDOW_SIZE,
-                    token_budget=settings.MEMORY_TOKEN_BUDGET
-                )
-                # The session message count has increased by 2 (user message + agent response)
-                original_total = memory_data.get("totalMessageCount", 0)
-                asyncio.create_task(memory_mgr.check_and_summarize(session_id, client, total_count=original_total + 2))
+                    # Asynchronously trigger token budget check and summarization in the background
+                    memory_mgr = MemoryManager(
+                        window_size=settings.MEMORY_WINDOW_SIZE,
+                        token_budget=settings.MEMORY_TOKEN_BUDGET
+                    )
+                    # The session message count has increased by 2 (user message + agent response)
+                    original_total = memory_data.get("totalMessageCount", 0)
+                    asyncio.create_task(memory_mgr.check_and_summarize(session_id, client, total_count=original_total + 2))
+                else:
+                    logger.warning(f"Empty or whitespace-only response generated for session {session_id}.")
             except asyncio.CancelledError:
                 # Handle mid-stream connection drop or cancellation
                 logger.warning(f"Connection dropped mid-stream for session {session_id}.")
-                if not persisted and partial_response:
+                if not persisted and partial_response and partial_response.strip():
                     try:
                         messages_payload = [
                             {"sender": "USER", "type": "STANDARD", "content": body.message},
@@ -168,7 +171,7 @@ async def chat_stream(
                 # Handle LLM provider or other runtime failures
                 logger.error(f"LLM error during streaming: {e!s}")
                 partial_message_id = None
-                if not persisted and partial_response:
+                if not persisted and partial_response and partial_response.strip():
                     try:
                         messages_payload = [
                             {"sender": "USER", "type": "STANDARD", "content": body.message},
@@ -191,7 +194,10 @@ async def chat_stream(
                     })
                 })
             finally:
-                await q.put(None)
+                try:
+                    q.put_nowait(None)
+                except asyncio.QueueFull:
+                    pass
 
         producer_task = asyncio.create_task(producer())
 

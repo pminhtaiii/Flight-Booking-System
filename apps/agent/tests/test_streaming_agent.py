@@ -78,6 +78,10 @@ async def test_stream_success_path(monkeypatch):
         "agent.tools.nestjs_client.NestJSClient.create_message_batch",
         mock_create_batch
     )
+    monkeypatch.setattr(
+        "agent.memory.manager.MemoryManager.check_and_summarize",
+        AsyncMock()
+    )
     
     # 3. Mock ChatOpenAI astream
     mock_model = MagicMock()
@@ -119,10 +123,8 @@ async def test_stream_success_path(monkeypatch):
                 
                 # Verify NestJS calls
                 settings = get_settings()
-                assert mock_get_memory.call_count == 2
-                for call_args in mock_get_memory.call_args_list:
-                    assert call_args[0][0] == "session-123"
-                    assert call_args[1]["recent_count"] == settings.MEMORY_WINDOW_SIZE
+                assert mock_get_memory.call_count == 1
+                mock_get_memory.assert_called_once_with("session-123", recent_count=settings.MEMORY_WINDOW_SIZE)
                 mock_create_batch.assert_called_once_with("session-123", [
                     {"sender": "USER", "type": "STANDARD", "content": "how are you?"},
                     {"sender": "AGENT", "type": "STANDARD", "content": "Hello there human!"}
