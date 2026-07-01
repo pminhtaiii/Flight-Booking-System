@@ -20,7 +20,6 @@ export class CacheService implements OnModuleInit, OnModuleDestroy {
         this.logger.warn(
           `Redis connection error: ${err.message}. Falling back to in-memory cache.`,
         );
-        this.redisClient = null;
       });
 
       this.redisClient.on('connect', () => {
@@ -35,7 +34,12 @@ export class CacheService implements OnModuleInit, OnModuleDestroy {
 
   async onModuleDestroy() {
     if (this.redisClient) {
-      await this.redisClient.quit();
+      try {
+        await this.redisClient.quit();
+      } catch (err: unknown) {
+        const errMsg = err instanceof Error ? err.message : String(err);
+        this.logger.warn(`Failed to close Redis client: ${errMsg}`);
+      }
     }
   }
 
@@ -134,6 +138,10 @@ export class CacheService implements OnModuleInit, OnModuleDestroy {
     const item = this.inMemoryStore.get(key);
     if (!item) return -2;
     if (item.expiry === Infinity) return -1;
+    if (Date.now() > item.expiry) {
+      this.inMemoryStore.delete(key);
+      return -2;
+    }
     const remaining = Math.max(0, Math.ceil((item.expiry - Date.now()) / 1000));
     return remaining > 0 ? remaining : -2;
   }
@@ -149,15 +157,19 @@ export class CacheService implements OnModuleInit, OnModuleDestroy {
     }
 
     const matched: string[] = [];
-    const regex = new RegExp('^' + pattern.replace(/\*/g, '.*') + '$');
+    const escapedPattern = pattern
+      .replace(/[\\^$.|()+[\]{}]/g, '\\$&')
+      .replace(/\*/g, '.*')
+      .replace(/\?/g, '.');
+    const regex = new RegExp('^' + escapedPattern + '$');
     const now = Date.now();
     for (const [key, item] of this.inMemoryStore.entries()) {
+      if (now > item.expiry) {
+        this.inMemoryStore.delete(key);
+        continue;
+      }
       if (regex.test(key)) {
-        if (now > item.expiry) {
-          this.inMemoryStore.delete(key);
-        } else {
-          matched.push(key);
-        }
+        matched.push(key);
       }
     }
     return matched;

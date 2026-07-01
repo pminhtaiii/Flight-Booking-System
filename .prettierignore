@@ -2,5 +2,5 @@ node_modules
 dist
 .next
 out
-prisma/migrations
+apps/api/prisma/migrations
 coverage

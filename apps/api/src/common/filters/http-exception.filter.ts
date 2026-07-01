@@ -53,7 +53,13 @@ export class HttpExceptionFilter implements ExceptionFilter {
       if (!val) return null;
       const strVal = Array.isArray(val) ? val[0] : val;
       if (!strVal) return null;
-      return strVal.length > 64 ? strVal.substring(0, 64) : strVal;
+      const cleanVal = Array.from(strVal)
+        .filter((char) => {
+          const code = char.charCodeAt(0);
+          return !(code <= 31 || code === 127);
+        })
+        .join('');
+      return cleanVal.length > 64 ? cleanVal.substring(0, 64) : cleanVal;
     };
 
     const traceId = getSanitizedHeader(request.headers['x-trace-id']);

@@ -37,6 +37,16 @@ Update this file after every completed feature. Any AI agent reading this should
 - [x] Implement sliding window & summary memory manager
 - [x] Implement per-conversation concurrency queue
 
+### [/] Feature: Agent Tool-Calling & Data Access
+
+- [x] Phase 1: Database Schema & Mock Seed Data (Prisma models `TravelerProfile`, `Booking`, and database migrations)
+- [ ] Phase 2: Agent Gateway REST Endpoints & Authentication
+- [ ] Phase 3: PII Stripping, Caching & Auditing
+- [ ] Phase 4: Python Client, Auth Headers & PII Scrubber
+- [ ] Phase 5: LangGraph State Machine & Read-Only Tools
+- [ ] Phase 6: Human-in-the-Loop Gate & SSE Streaming Status
+- [ ] Phase 7: Polish & Cross-Cutting Concerns
+
 ### [x] Feature: Monorepo Scaffold & Shared Infrastructure
 
 - [x] Configure workspace `package.json` and workspaces

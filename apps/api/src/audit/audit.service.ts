@@ -42,7 +42,13 @@ export class AuditService {
           lowerKey.includes('password') ||
           lowerKey.includes('jwt') ||
           (lowerKey.includes('token') && lowerKey !== 'claimtokenuserid') ||
-          lowerKey.includes('secret')
+          lowerKey.includes('secret') ||
+          lowerKey.includes('authorization') ||
+          lowerKey.includes('cookie') ||
+          lowerKey.includes('set-cookie') ||
+          lowerKey.includes('ipaddress') ||
+          lowerKey.includes('ip_address') ||
+          lowerKey.includes('ip-address')
         ) {
           // Exclude these sensitive keys
         } else {
