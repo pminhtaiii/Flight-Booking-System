@@ -6,9 +6,9 @@ Update this file after every completed feature. Any AI agent reading this should
 
 ## Current Status
 
-**Feature:** Agent Tool-Calling & Data Access (Phase 6)
-**Last completed:** Phase 5 LangGraph State Machine & Read-Only Tools (Compiled State Graph, nodes, state, router, and comprehensive integration test suite).
-**Next:** Phase 6: Human-in-the-Loop Gate & SSE Streaming Status.
+**Feature:** Agent Tool-Calling & Data Access (Phase 7)
+**Last completed:** Phase 6 Human-in-the-Loop Gate & SSE Streaming Status (LangGraph interrupts, SSE streaming extensions, and integration tests).
+**Next:** Phase 7: Polish & Cross-Cutting Concerns.
 
 ---
 
@@ -21,7 +21,7 @@ Update this file after every completed feature. Any AI agent reading this should
 - [x] T012–T015: PII Stripping, Caching & Auditing (Phase 3)
 - [x] T016–T019: Python Client, Auth Headers & PII Scrubber (Phase 4)
 - [x] T020–T025: LangGraph State Machine & Read-Only Tools (Phase 5)
-- [ ] T026–T028: Human-in-the-Loop Gate & SSE Streaming Status (Phase 6)
+- [x] T026–T028: Human-in-the-Loop Gate & SSE Streaming Status (Phase 6)
 - [ ] T029–T031: Polish & Cross-Cutting Concerns (Phase 7)
 
 ### [x] Feature: Chatbot Agent Service
@@ -44,7 +44,7 @@ Update this file after every completed feature. Any AI agent reading this should
 - [x] Phase 3: PII Stripping, Caching & Auditing
 - [x] Phase 4: Python Client, Auth Headers & PII Scrubber
 - [x] Phase 5: LangGraph State Machine & Read-Only Tools
-- [ ] Phase 6: Human-in-the-Loop Gate & SSE Streaming Status
+- [x] Phase 6: Human-in-the-Loop Gate & SSE Streaming Status
 - [ ] Phase 7: Polish & Cross-Cutting Concerns
 
 ### [x] Feature: Monorepo Scaffold & Shared Infrastructure

@@ -195,7 +195,7 @@ async def test_list_user_bookings_error(mock_client, run_config):
 
 def test_registry():
     tools = get_tools()
-    assert len(tools) == 3
+    assert len(tools) == 4
 
     t1 = get_tool_by_name("search_flights")
     assert t1 == search_flights
@@ -208,6 +208,10 @@ def test_registry():
     t3 = get_tool_by_name("list_user_bookings")
     assert t3 == list_user_bookings
     assert not requires_confirmation("list_user_bookings")
+
+    t4 = get_tool_by_name("book_flight")
+    assert t4.name == "book_flight"
+    assert requires_confirmation("book_flight")
 
     with pytest.raises(ValueError, match="Tool 'non_existent' is not registered."):
         get_tool_by_name("non_existent")

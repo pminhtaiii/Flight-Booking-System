@@ -267,3 +267,126 @@ async def test_graph_iteration_limit_capping(mock_nestjs_client, mock_llm):
         final_state = await graph.ainvoke(initial_state, config=config)
         assert final_state["iteration_count"] == 5
         assert "limit reached" in final_state["messages"][-1].content.lower()
+
+
+@pytest.mark.asyncio
+async def test_graph_confirm_gate_approved(mock_nestjs_client, mock_llm):
+    mock_model, mock_model_with_tools = mock_llm
+
+    # Setup LLM trace:
+    # 1. First invoke: returns tool call to book_flight
+    # 2. Second invoke (after confirmation resume): returns final answer
+    mock_model_with_tools.ainvoke.side_effect = [
+        AIMessage(
+            content="",
+            tool_calls=[
+                {
+                    "name": "book_flight",
+                    "args": {"flight_number": "VN310", "date": "2026-07-15"},
+                    "id": "call_book"
+                }
+            ],
+            id="ai_call_1"
+        ),
+        AIMessage(content="I have successfully booked flight VN310 for you on 2026-07-15.")
+    ]
+
+    config = RunnableConfig(
+        configurable={"nestjs_client": mock_nestjs_client, "thread_id": "test_thread_confirm_approve"},
+        configurable_keys=["nestjs_client", "thread_id"]
+    )
+
+    with patch("agent.graph.nodes.get_chat_model", return_value=mock_model):
+        initial_state = {
+            "messages": [HumanMessage(content="please book flight VN310 on July 15")],
+            "iteration_count": 0
+        }
+        
+        # Run graph until it interrupts before "confirm"
+        final_state = await graph.ainvoke(initial_state, config=config)
+
+        # Assert graph is suspended before "confirm"
+        current_state = await graph.aget_state(config)
+        assert current_state.next == ("confirm",)
+        
+        # Check pending confirmation state details
+        pending = current_state.values.get("pending_confirmation")
+        assert pending is not None
+        assert pending["name"] == "book_flight"
+        assert pending["args"] == {"flight_number": "VN310", "date": "2026-07-15"}
+        assert pending["id"] == "call_book"
+        
+        # Approve the booking: update the state
+        pending["confirmed"] = True
+        await graph.aupdate_state(config, {"pending_confirmation": pending}, as_node="agent")
+
+        # Resume the graph
+        resumed_state = await graph.ainvoke(None, config=config)
+
+        # Assertions after resumption
+        # The tool should have been executed, and final answer returned
+        assert len(resumed_state["messages"]) >= 3
+        # The final message from the LLM should summarize success
+        assert "booked flight VN310" in resumed_state["messages"][-1].content
+        # pending_confirmation should be cleared
+        assert resumed_state.get("pending_confirmation") is None
+
+
+@pytest.mark.asyncio
+async def test_graph_confirm_gate_aborted(mock_nestjs_client, mock_llm):
+    mock_model, mock_model_with_tools = mock_llm
+
+    # Setup LLM trace:
+    # 1. First invoke: returns tool call to book_flight
+    # 2. Second invoke (after cancellation resume): returns final answer
+    mock_model_with_tools.ainvoke.side_effect = [
+        AIMessage(
+            content="",
+            tool_calls=[
+                {
+                    "name": "book_flight",
+                    "args": {"flight_number": "VN310", "date": "2026-07-15"},
+                    "id": "call_book"
+                }
+            ],
+            id="ai_call_1"
+        ),
+        AIMessage(content="I have cancelled the booking of flight VN310 as requested.")
+    ]
+
+    config = RunnableConfig(
+        configurable={"nestjs_client": mock_nestjs_client, "thread_id": "test_thread_confirm_abort"},
+        configurable_keys=["nestjs_client", "thread_id"]
+    )
+
+    with patch("agent.graph.nodes.get_chat_model", return_value=mock_model):
+        initial_state = {
+            "messages": [HumanMessage(content="please book flight VN310 on July 15")],
+            "iteration_count": 0
+        }
+        
+        # Run graph until it interrupts before "confirm"
+        final_state = await graph.ainvoke(initial_state, config=config)
+
+        # Assert graph is suspended before "confirm"
+        current_state = await graph.aget_state(config)
+        assert current_state.next == ("confirm",)
+        
+        # Check pending confirmation state details
+        pending = current_state.values.get("pending_confirmation")
+        assert pending is not None
+        assert pending["name"] == "book_flight"
+        
+        # Abort the booking: update the state
+        pending["confirmed"] = False
+        await graph.aupdate_state(config, {"pending_confirmation": pending}, as_node="agent")
+
+        # Resume the graph
+        resumed_state = await graph.ainvoke(None, config=config)
+
+        # Assertions after resumption
+        assert len(resumed_state["messages"]) >= 3
+        # The final message from the LLM should summarize cancellation
+        assert "cancelled" in resumed_state["messages"][-1].content.lower()
+        # pending_confirmation should be cleared
+        assert resumed_state.get("pending_confirmation") is None

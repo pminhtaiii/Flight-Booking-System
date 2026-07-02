@@ -64,9 +64,9 @@
 
 **Purpose**: Graph interrupts, SSE streaming extensions, and error handling
 
-- [ ] T026 [P] Implement graph suspension using interrupts for confirmation-required tools in apps/agent/src/agent/graph/
-- [ ] T027 Extend SSE streaming generator to yield tool_call and tool_result events in apps/agent/src/agent/streaming/sse.py
-- [ ] T028 Write integration tests for SSE streams and graph suspension/resume/abort in apps/agent/tests/test_sse_integration.py
+- [x] T026 [P] Implement graph suspension using interrupts for confirmation-required tools in apps/agent/src/agent/graph/
+- [x] T027 Extend SSE streaming generator to yield tool_call and tool_result events in apps/agent/src/agent/streaming/sse.py
+- [x] T028 Write integration tests for SSE streams and graph suspension/resume/abort in apps/agent/tests/test_sse_integration.py
 
 ## Phase 7: Polish & Cross-Cutting Concerns
 

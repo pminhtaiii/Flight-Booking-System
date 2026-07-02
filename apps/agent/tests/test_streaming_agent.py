@@ -83,16 +83,30 @@ async def test_stream_success_path(monkeypatch):
         AsyncMock()
     )
     
-    # 3. Mock ChatOpenAI astream
-    mock_model = MagicMock()
-    async def mock_astream(*args, **kwargs):
-        yield AIMessageChunk(content="Hello ")
-        yield AIMessageChunk(content="there ")
-        yield AIMessageChunk(content="human!")
-        
-    mock_model.astream = mock_astream
+    # 3. Mock graph.astream_events
+    mock_graph = MagicMock()
+    async def mock_astream_events(*args, **kwargs):
+        yield {
+            "event": "on_chat_model_stream",
+            "data": {"chunk": AIMessageChunk(content="Hello ")}
+        }
+        yield {
+            "event": "on_chat_model_stream",
+            "data": {"chunk": AIMessageChunk(content="there ")}
+        }
+        yield {
+            "event": "on_chat_model_stream",
+            "data": {"chunk": AIMessageChunk(content="human!")}
+        }
+    mock_graph.astream_events = mock_astream_events
+
+    mock_state = MagicMock()
+    mock_state.next = ()
+    from langchain_core.messages import HumanMessage
+    mock_state.values = {"messages": [HumanMessage(content="how are you?")]}
+    mock_graph.aget_state = AsyncMock(return_value=mock_state)
     
-    with patch("agent.streaming.sse.get_chat_model", return_value=mock_model):
+    with patch("agent.streaming.sse.graph", mock_graph):
         transport = httpx.ASGITransport(app=app)
         async with httpx.AsyncClient(transport=transport, base_url="http://test") as ac:
             async with ac.stream(
@@ -160,15 +174,23 @@ async def test_stream_llm_error_path(monkeypatch):
         mock_create_batch
     )
     
-    # 3. Mock ChatOpenAI astream to raise exception mid-stream
-    mock_model = MagicMock()
+    # 3. Mock graph.astream_events to raise exception mid-stream
+    mock_graph = MagicMock()
     async def mock_astream_error(*args, **kwargs):
-        yield AIMessageChunk(content="Partial answer...")
+        yield {
+            "event": "on_chat_model_stream",
+            "data": {"chunk": AIMessageChunk(content="Partial answer...")}
+        }
         raise ValueError("Simulated LLM connection error")
-        
-    mock_model.astream = mock_astream_error
+    mock_graph.astream_events = mock_astream_error
+
+    mock_state = MagicMock()
+    mock_state.next = ()
+    from langchain_core.messages import HumanMessage
+    mock_state.values = {"messages": [HumanMessage(content="fail for me")]}
+    mock_graph.aget_state = AsyncMock(return_value=mock_state)
     
-    with patch("agent.streaming.sse.get_chat_model", return_value=mock_model):
+    with patch("agent.streaming.sse.graph", mock_graph):
         transport = httpx.ASGITransport(app=app)
         async with httpx.AsyncClient(transport=transport, base_url="http://test") as ac:
             async with ac.stream(
@@ -240,19 +262,30 @@ async def test_stream_connection_drop_path(monkeypatch):
         mock_create_batch
     )
     
-    # 3. Mock ChatOpenAI astream to stream slowly
-    mock_model = MagicMock()
+    # 3. Mock graph.astream_events to stream slowly
+    mock_graph = MagicMock()
     async def mock_astream_slow(*args, **kwargs):
-        yield AIMessageChunk(content="First chunk")
+        yield {
+            "event": "on_chat_model_stream",
+            "data": {"chunk": AIMessageChunk(content="First chunk")}
+        }
         await asyncio.sleep(0.5)
-        yield AIMessageChunk(content="Second chunk")
-        
-    mock_model.astream = mock_astream_slow
+        yield {
+            "event": "on_chat_model_stream",
+            "data": {"chunk": AIMessageChunk(content="Second chunk")}
+        }
+    mock_graph.astream_events = mock_astream_slow
+
+    mock_state = MagicMock()
+    mock_state.next = ()
+    from langchain_core.messages import HumanMessage
+    mock_state.values = {"messages": [HumanMessage(content="drop me")]}
+    mock_graph.aget_state = AsyncMock(return_value=mock_state)
     
     # Clear active streams
     active_streams.clear()
     
-    with patch("agent.streaming.sse.get_chat_model", return_value=mock_model):
+    with patch("agent.streaming.sse.graph", mock_graph):
         transport = httpx.ASGITransport(app=app)
         async with httpx.AsyncClient(transport=transport, base_url="http://test") as ac:
             # We open the stream, read one line, and then close the connection (exit the block)
