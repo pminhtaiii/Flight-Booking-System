@@ -2,11 +2,11 @@ import asyncio
 import pytest
 import jwt
 import time
-from unittest.mock import AsyncMock, patch, MagicMock
+from unittest.mock import AsyncMock, MagicMock
 from fastapi import HTTPException
-from fastapi.testclient import TestClient
 import httpx
 from agent.queue.message_queue import MessageQueueManager
+
 from agent.main import app
 
 # JWT Secret from conftest / env
@@ -120,15 +120,23 @@ async def test_endpoint_concurrency_limit(monkeypatch):
     })
     monkeypatch.setattr("agent.tools.nestjs_client.NestJSClient.create_message_batch", mock_create_batch)
     
-    # Mock chat model
-    from langchain_core.messages import AIMessageChunk
-    mock_model = MagicMock()
-    async def mock_astream(*args, **kwargs):
-        yield AIMessageChunk(content="Word")
-    mock_model.astream = mock_astream
+    # Mock graph
+    mock_graph = MagicMock()
+    async def mock_astream_events(*args, **kwargs):
+        yield {
+            "event": "on_chat_model_stream",
+            "data": {"chunk": AIMessageChunk(content="Word")}
+        }
+    mock_graph.astream_events = mock_astream_events
     
+    mock_state = MagicMock()
+    mock_state.next = ()
+    from langchain_core.messages import HumanMessage
+    mock_state.values = {"messages": [HumanMessage(content="hello")]}
+    mock_graph.aget_state = AsyncMock(return_value=mock_state)
+
     import agent.streaming.sse
-    monkeypatch.setattr(agent.streaming.sse, "get_chat_model", lambda: mock_model)
+    monkeypatch.setattr(agent.streaming.sse, "graph", mock_graph)
     
     transport = httpx.ASGITransport(app=app)
     async with httpx.AsyncClient(transport=transport, base_url="http://test") as ac:

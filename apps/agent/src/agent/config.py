@@ -18,6 +18,11 @@ class Settings(BaseSettings):
     MEMORY_TOKEN_BUDGET: int = 4000
     QUEUE_MAX_DEPTH: int = 3
 
+    AGENT_SERVICE_API_KEY: str = Field(..., min_length=1)
+    CLAIM_TOKEN_SECRET: str = Field(..., min_length=1)
+    CLAIM_TOKEN_TTL_SECONDS: int = 300
+    AGENT_MAX_ITERATIONS: int = 5
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",

@@ -6,15 +6,26 @@ Update this file after every completed feature. Any AI agent reading this should
 
 ## Current Status
 
-**Feature:** Agent Tool-Calling & Data Access (Phase 1)
-**Last completed:** Phase 1: Database Schema & Mock Seed Data (Created TravelerProfile and Booking Prisma models, ran migrations, and seeded mock traveler preferences and bookings).
-**Next:** Phase 2: Agent Gateway REST Endpoints & Authentication (Secure gateway REST API endpoints with auth guards).
+**Feature:** Agent Tool-Calling & Data Access (Phase 7)
+**Last completed:** Phase 6 Human-in-the-Loop Gate & SSE Streaming Status (LangGraph interrupts, SSE streaming extensions, and integration tests).
+**Next:** Phase 7: Polish & Cross-Cutting Concerns.
 
 ---
 
 ## Progress by Feature
 
-### [/] Feature: Chatbot Agent Service
+### [/] Feature: Agent Tool-Calling & Data Access
+
+- [x] T001–T004: Database Schema & Mock Seed Data (Phase 1)
+- [x] T005–T011: Agent Gateway REST Endpoints & Authentication (Phase 2)
+- [x] T012–T015: PII Stripping, Caching & Auditing (Phase 3)
+- [x] T016–T019: Python Client, Auth Headers & PII Scrubber (Phase 4)
+- [x] T020–T025: LangGraph State Machine & Read-Only Tools (Phase 5)
+- [x] T026–T028: Human-in-the-Loop Gate & SSE Streaming Status (Phase 6)
+- [ ] T029–T031: Polish & Cross-Cutting Concerns (Phase 7)
+
+### [x] Feature: Chatbot Agent Service
+
 
 - [x] Define ChatSession and ChatMessage database schema
 - [x] Implement NestJS ChatModule endpoints (CRUD, batch, memory)
@@ -29,11 +40,11 @@ Update this file after every completed feature. Any AI agent reading this should
 ### [/] Feature: Agent Tool-Calling & Data Access
 
 - [x] Phase 1: Database Schema & Mock Seed Data (Prisma models `TravelerProfile`, `Booking`, and database migrations)
-- [ ] Phase 2: Agent Gateway REST Endpoints & Authentication
-- [ ] Phase 3: PII Stripping, Caching & Auditing
-- [ ] Phase 4: Python Client, Auth Headers & PII Scrubber
-- [ ] Phase 5: LangGraph State Machine & Read-Only Tools
-- [ ] Phase 6: Human-in-the-Loop Gate & SSE Streaming Status
+- [x] Phase 2: Agent Gateway REST Endpoints & Authentication
+- [x] Phase 3: PII Stripping, Caching & Auditing
+- [x] Phase 4: Python Client, Auth Headers & PII Scrubber
+- [x] Phase 5: LangGraph State Machine & Read-Only Tools
+- [x] Phase 6: Human-in-the-Loop Gate & SSE Streaming Status
 - [ ] Phase 7: Polish & Cross-Cutting Concerns
 
 ### [x] Feature: Monorepo Scaffold & Shared Infrastructure

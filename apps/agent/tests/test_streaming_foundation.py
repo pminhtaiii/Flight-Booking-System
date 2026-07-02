@@ -4,6 +4,7 @@ import jwt
 import pytest
 import httpx
 from unittest.mock import AsyncMock, patch, MagicMock
+from langchain_core.messages import AIMessageChunk
 from fastapi.testclient import TestClient
 from agent.main import app, active_streams
 
@@ -147,19 +148,39 @@ def test_stream_with_valid_session_id(monkeypatch):
     })
     monkeypatch.setattr("agent.tools.nestjs_client.NestJSClient.create_message_batch", mock_create_batch)
     
-    # Mock chat model
-    from langchain_core.messages import AIMessageChunk
-    mock_model = MagicMock()
-    async def mock_astream(*args, **kwargs):
-        yield AIMessageChunk(content="This ")
-        yield AIMessageChunk(content="is ")
-        yield AIMessageChunk(content="a ")
-        yield AIMessageChunk(content="mock ")
-        yield AIMessageChunk(content="response.")
-    mock_model.astream = mock_astream
+    # Mock graph
+    mock_graph = MagicMock()
+    async def mock_astream_events(*args, **kwargs):
+        yield {
+            "event": "on_chat_model_stream",
+            "data": {"chunk": AIMessageChunk(content="This ")}
+        }
+        yield {
+            "event": "on_chat_model_stream",
+            "data": {"chunk": AIMessageChunk(content="is ")}
+        }
+        yield {
+            "event": "on_chat_model_stream",
+            "data": {"chunk": AIMessageChunk(content="a ")}
+        }
+        yield {
+            "event": "on_chat_model_stream",
+            "data": {"chunk": AIMessageChunk(content="mock ")}
+        }
+        yield {
+            "event": "on_chat_model_stream",
+            "data": {"chunk": AIMessageChunk(content="response.")}
+        }
+    mock_graph.astream_events = mock_astream_events
     
+    mock_state = MagicMock()
+    mock_state.next = ()
+    from langchain_core.messages import HumanMessage
+    mock_state.values = {"messages": [HumanMessage(content="hello")]}
+    mock_graph.aget_state = AsyncMock(return_value=mock_state)
+
     import agent.streaming.sse
-    monkeypatch.setattr(agent.streaming.sse, "get_chat_model", lambda: mock_model)
+    monkeypatch.setattr(agent.streaming.sse, "graph", mock_graph)
     
     with client.stream(
         "POST",
@@ -204,19 +225,39 @@ async def test_stream_omitted_session_id(monkeypatch):
     })
     monkeypatch.setattr("agent.tools.nestjs_client.NestJSClient.create_message_batch", mock_create_batch)
     
-    # Mock chat model
-    from langchain_core.messages import AIMessageChunk
-    mock_model = MagicMock()
-    async def mock_astream(*args, **kwargs):
-        yield AIMessageChunk(content="This ")
-        yield AIMessageChunk(content="is ")
-        yield AIMessageChunk(content="a ")
-        yield AIMessageChunk(content="mock ")
-        yield AIMessageChunk(content="response.")
-    mock_model.astream = mock_astream
+    # Mock graph
+    mock_graph = MagicMock()
+    async def mock_astream_events(*args, **kwargs):
+        yield {
+            "event": "on_chat_model_stream",
+            "data": {"chunk": AIMessageChunk(content="This ")}
+        }
+        yield {
+            "event": "on_chat_model_stream",
+            "data": {"chunk": AIMessageChunk(content="is ")}
+        }
+        yield {
+            "event": "on_chat_model_stream",
+            "data": {"chunk": AIMessageChunk(content="a ")}
+        }
+        yield {
+            "event": "on_chat_model_stream",
+            "data": {"chunk": AIMessageChunk(content="mock ")}
+        }
+        yield {
+            "event": "on_chat_model_stream",
+            "data": {"chunk": AIMessageChunk(content="response.")}
+        }
+    mock_graph.astream_events = mock_astream_events
     
+    mock_state = MagicMock()
+    mock_state.next = ()
+    from langchain_core.messages import HumanMessage
+    mock_state.values = {"messages": [HumanMessage(content="hello")]}
+    mock_graph.aget_state = AsyncMock(return_value=mock_state)
+
     import agent.streaming.sse
-    monkeypatch.setattr(agent.streaming.sse, "get_chat_model", lambda: mock_model)
+    monkeypatch.setattr(agent.streaming.sse, "graph", mock_graph)
     
     # Mock NestJSClient
     with patch("agent.tools.nestjs_client.NestJSClient.create_session", new_callable=AsyncMock) as mock_create_session:
@@ -264,20 +305,40 @@ async def test_stream_graceful_shutdown(monkeypatch):
     })
     monkeypatch.setattr("agent.tools.nestjs_client.NestJSClient.create_message_batch", mock_create_batch)
     
-    # Mock chat model
-    from langchain_core.messages import AIMessageChunk
-    mock_model = MagicMock()
-    async def mock_astream(*args, **kwargs):
-        yield AIMessageChunk(content="This ")
+    # Mock graph
+    mock_graph = MagicMock()
+    async def mock_astream_events(*args, **kwargs):
+        yield {
+            "event": "on_chat_model_stream",
+            "data": {"chunk": AIMessageChunk(content="This ")}
+        }
         await asyncio.sleep(0.1)
-        yield AIMessageChunk(content="is ")
-        yield AIMessageChunk(content="a ")
-        yield AIMessageChunk(content="mock ")
-        yield AIMessageChunk(content="response.")
-    mock_model.astream = mock_astream
+        yield {
+            "event": "on_chat_model_stream",
+            "data": {"chunk": AIMessageChunk(content="is ")}
+        }
+        yield {
+            "event": "on_chat_model_stream",
+            "data": {"chunk": AIMessageChunk(content="a ")}
+        }
+        yield {
+            "event": "on_chat_model_stream",
+            "data": {"chunk": AIMessageChunk(content="mock ")}
+        }
+        yield {
+            "event": "on_chat_model_stream",
+            "data": {"chunk": AIMessageChunk(content="response.")}
+        }
+    mock_graph.astream_events = mock_astream_events
     
+    mock_state = MagicMock()
+    mock_state.next = ()
+    from langchain_core.messages import HumanMessage
+    mock_state.values = {"messages": [HumanMessage(content="hello")]}
+    mock_graph.aget_state = AsyncMock(return_value=mock_state)
+
     import agent.streaming.sse
-    monkeypatch.setattr(agent.streaming.sse, "get_chat_model", lambda: mock_model)
+    monkeypatch.setattr(agent.streaming.sse, "graph", mock_graph)
     
     # Ensure we start with clean active_streams
     active_streams.clear()
