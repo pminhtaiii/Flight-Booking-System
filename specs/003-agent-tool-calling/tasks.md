@@ -44,10 +44,10 @@
 
 **Purpose**: Claim token generation, authenticated client request headers, and user-input PII scrubbing
 
-- [ ] T016 [P] Implement HMAC-SHA256 claim token generation in Python in apps/agent/src/agent/auth/claim_token.py
-- [ ] T017 Extend nestjs_client.py to attach API keys and signed user claim tokens in apps/agent/src/agent/tools/nestjs_client.py
-- [ ] T018 [P] Implement pii_scrubber.py to scrub regex-matched PII from chat messages in apps/agent/src/agent/sanitization/pii_scrubber.py
-- [ ] T019 Write unit tests for claim tokens, NestJS client, and PII scrubbing in apps/agent/tests/
+- [x] T016 [P] Implement HMAC-SHA256 claim token generation in Python in apps/agent/src/agent/auth/claim_token.py
+- [x] T017 Extend nestjs_client.py to attach API keys and signed user claim tokens in apps/agent/src/agent/tools/nestjs_client.py
+- [x] T018 [P] Implement pii_scrubber.py to scrub regex-matched PII from chat messages in apps/agent/src/agent/sanitization/pii_scrubber.py
+- [x] T019 Write unit tests for claim tokens, NestJS client, and PII scrubbing in apps/agent/tests/
 
 ## Phase 5: LangGraph State Machine & Read-Only Tools (Agent Core)
 

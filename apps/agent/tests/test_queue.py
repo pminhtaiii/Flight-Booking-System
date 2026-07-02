@@ -2,11 +2,11 @@ import asyncio
 import pytest
 import jwt
 import time
-from unittest.mock import AsyncMock, patch, MagicMock
+from unittest.mock import AsyncMock, MagicMock
 from fastapi import HTTPException
-from fastapi.testclient import TestClient
 import httpx
 from agent.queue.message_queue import MessageQueueManager
+
 from agent.main import app
 
 # JWT Secret from conftest / env
