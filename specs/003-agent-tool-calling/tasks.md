@@ -23,22 +23,22 @@
 
 **Purpose**: Secure gateway REST API endpoints with auth guards
 
-- [ ] T005 Implement agent-api-key.guard.ts to validate X-Agent-API-Key header in apps/api/src/agent-gateway/auth/agent-api-key.guard.ts
-- [ ] T006 Implement claim-token.guard.ts and claim-token.service.ts to validate HMAC-SHA256 user claim tokens in apps/api/src/agent-gateway/auth/
-- [ ] T007 [P] Create flight-search-query.dto.ts, flight-result.dto.ts, user-preferences.dto.ts, and user-bookings.dto.ts in apps/api/src/agent-gateway/dto/
-- [ ] T008 Implement AgentGatewayController with the 3 required endpoints in apps/api/src/agent-gateway/agent-gateway.controller.ts
-- [ ] T009 Implement AgentGatewayService to orchestrate data access in apps/api/src/agent-gateway/agent-gateway.service.ts
-- [ ] T010 [P] Create agent-gateway.module.ts and register it in apps/api/src/app.module.ts
-- [ ] T011 Write NestJS E2E tests for authentication and endpoint validation in apps/api/test/agent-gateway.e2e-spec.ts
+- [x] T005 Implement agent-api-key.guard.ts to validate X-Agent-API-Key header in apps/api/src/agent-gateway/auth/agent-api-key.guard.ts
+- [x] T006 Implement claim-token.guard.ts and claim-token.service.ts to validate HMAC-SHA256 user claim tokens in apps/api/src/agent-gateway/auth/
+- [x] T007 [P] Create flight-search-query.dto.ts, flight-result.dto.ts, user-preferences.dto.ts, and user-bookings.dto.ts in apps/api/src/agent-gateway/dto/
+- [x] T008 Implement AgentGatewayController with the 3 required endpoints in apps/api/src/agent-gateway/agent-gateway.controller.ts
+- [x] T009 Implement AgentGatewayService to orchestrate data access in apps/api/src/agent-gateway/agent-gateway.service.ts
+- [x] T010 [P] Create agent-gateway.module.ts and register it in apps/api/src/app.module.ts
+- [x] T011 Write NestJS E2E tests for authentication and endpoint validation in apps/api/test/agent-gateway.e2e-spec.ts
 
 ## Phase 3: PII Stripping, Caching & Auditing (Gateway Polish)
 
 **Purpose**: Strip PII, integrate caching/Amadeus client, and audit-log tool calls
 
-- [ ] T012 [P] Implement PII stripping logic in apps/api/src/agent-gateway/agent-gateway.service.ts
-- [ ] T013 Integrate Amadeus Flight Offers Search client, Redis CacheService, and rate limiting in apps/api/src/agent-gateway/amadeus/
-- [ ] T014 Implement structured auditing to write TOOL_CALL logs using AuditService in apps/api/src/agent-gateway/agent-gateway.service.ts
-- [ ] T015 Write E2E tests for PII stripping and audit logging in apps/api/test/agent-gateway-polish.e2e-spec.ts
+- [x] T012 [P] Implement PII stripping logic in apps/api/src/agent-gateway/agent-gateway.service.ts
+- [x] T013 Integrate Amadeus Flight Offers Search client, Redis CacheService, and rate limiting in apps/api/src/agent-gateway/amadeus/
+- [x] T014 Implement structured auditing to write TOOL_CALL logs using AuditService in apps/api/src/agent-gateway/agent-gateway.service.ts
+- [x] T015 Write E2E tests for PII stripping and audit logging in apps/api/test/agent-gateway-polish.e2e-spec.ts
 
 ## Phase 4: Python Client, Auth Headers & PII Scrubber (Agent Foundation)
 
