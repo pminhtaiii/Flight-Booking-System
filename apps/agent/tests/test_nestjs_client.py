@@ -140,23 +140,13 @@ async def test_get_gateway_headers_valid_signature():
 
 @pytest.mark.asyncio
 async def test_get_gateway_headers_invalid_signature_fallback():
-    settings = get_settings()
     # Sign with a different secret
     token = jwt.encode({"sub": "user-456"}, "wrong-secret", algorithm="HS256")
     client = NestJSClient(base_url="http://localhost:3001/api", token=token)
     
-    headers = client._get_gateway_headers()
-    assert headers["X-Agent-API-Key"] == settings.AGENT_SERVICE_API_KEY
-    assert "X-User-Claim" in headers
-    
-    # decode the user claim to verify
-    claim = headers["X-User-Claim"]
-    payload_b64 = claim.split(".")[0]
-    missing_padding = len(payload_b64) % 4
-    if missing_padding:
-        payload_b64 += '=' * (4 - missing_padding)
-    payload = json.loads(base64.urlsafe_b64decode(payload_b64).decode('utf-8'))
-    assert payload["userId"] == "user-456"
+    with pytest.raises(ValueError) as excinfo:
+        client._get_gateway_headers()
+    assert "Invalid authentication token" in str(excinfo.value)
 
 @pytest.mark.asyncio
 async def test_get_gateway_headers_missing_claims():

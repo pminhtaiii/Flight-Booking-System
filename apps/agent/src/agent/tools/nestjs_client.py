@@ -1,5 +1,6 @@
 import httpx
 import jwt
+from jwt import InvalidTokenError
 from typing import Optional, List, Dict, Any
 from agent.config import get_settings
 from agent.auth.claim_token import create_claim_token
@@ -63,8 +64,8 @@ class NestJSClient:
         settings = get_settings()
         try:
             payload = jwt.decode(self.token, settings.JWT_SECRET, algorithms=["HS256"])
-        except Exception:
-            payload = jwt.decode(self.token, options={"verify_signature": False})
+        except InvalidTokenError as exc:
+            raise ValueError("Invalid authentication token") from exc
         
         user_id = payload.get("id") or payload.get("sub")
         if not user_id:
