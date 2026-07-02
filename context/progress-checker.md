@@ -6,9 +6,9 @@ Update this file after every completed feature. Any AI agent reading this should
 
 ## Current Status
 
-**Feature:** Agent Tool-Calling & Data Access (Phase 4)
-**Last completed:** Phase 4: Python Client, Auth Headers & PII Scrubber (Claim token generation, gateway auth headers, and user-input PII scrubbing with Luhn and lookbehind/lookahead validators).
-**Next:** Phase 5: LangGraph State Machine & Read-Only Tools
+**Feature:** Agent Tool-Calling & Data Access (Phase 6)
+**Last completed:** Phase 5 LangGraph State Machine & Read-Only Tools (Compiled State Graph, nodes, state, router, and comprehensive integration test suite).
+**Next:** Phase 6: Human-in-the-Loop Gate & SSE Streaming Status.
 
 ---
 
@@ -20,7 +20,7 @@ Update this file after every completed feature. Any AI agent reading this should
 - [x] T005–T011: Agent Gateway REST Endpoints & Authentication (Phase 2)
 - [x] T012–T015: PII Stripping, Caching & Auditing (Phase 3)
 - [x] T016–T019: Python Client, Auth Headers & PII Scrubber (Phase 4)
-- [ ] T020–T025: LangGraph State Machine & Read-Only Tools (Phase 5)
+- [x] T020–T025: LangGraph State Machine & Read-Only Tools (Phase 5)
 - [ ] T026–T028: Human-in-the-Loop Gate & SSE Streaming Status (Phase 6)
 - [ ] T029–T031: Polish & Cross-Cutting Concerns (Phase 7)
 
@@ -43,7 +43,7 @@ Update this file after every completed feature. Any AI agent reading this should
 - [x] Phase 2: Agent Gateway REST Endpoints & Authentication
 - [x] Phase 3: PII Stripping, Caching & Auditing
 - [x] Phase 4: Python Client, Auth Headers & PII Scrubber
-- [ ] Phase 5: LangGraph State Machine & Read-Only Tools
+- [x] Phase 5: LangGraph State Machine & Read-Only Tools
 - [ ] Phase 6: Human-in-the-Loop Gate & SSE Streaming Status
 - [ ] Phase 7: Polish & Cross-Cutting Concerns
 

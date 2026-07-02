@@ -53,12 +53,12 @@
 
 **Purpose**: LangGraph state graph and read-only tools implementation
 
-- [ ] T020 [P] [US2] Implement get_user_preferences tool calling gateway preferences endpoint in apps/agent/src/agent/tools/get_preferences.py
-- [ ] T021 [P] [US3] Implement list_user_bookings tool calling gateway bookings endpoint in apps/agent/src/agent/tools/list_bookings.py
-- [ ] T022 [P] [US1] Implement search_flights tool calling gateway search endpoint with top 5 results limit in apps/agent/src/agent/tools/search_flights.py
-- [ ] T023 [US1] Define AgentState and compile LangGraph StateGraph in apps/agent/src/agent/graph/
-- [ ] T024 [US1] Bind tools and configure iteration capping router in apps/agent/src/agent/graph/router.py
-- [ ] T025 Write integration tests for the compiled graph, tools, and closed-world prompt in apps/agent/tests/test_graph.py
+- [x] T020 [P] [US2] Implement get_user_preferences tool calling gateway preferences endpoint in apps/agent/src/agent/tools/get_preferences.py
+- [x] T021 [P] [US3] Implement list_user_bookings tool calling gateway bookings endpoint in apps/agent/src/agent/tools/list_bookings.py
+- [x] T022 [P] [US1] Implement search_flights tool calling gateway search endpoint with top 5 results limit in apps/agent/src/agent/tools/search_flights.py
+- [x] T023 [US1] Define AgentState and compile LangGraph StateGraph in apps/agent/src/agent/graph/
+- [x] T024 [US1] Bind tools and configure iteration capping router in apps/agent/src/agent/graph/router.py
+- [x] T025 Write integration tests for the compiled graph, tools, and closed-world prompt in apps/agent/tests/test_graph.py
 
 ## Phase 6: Human-in-the-Loop Gate & SSE Streaming Status (Agent Polish & Integration)
 
