@@ -167,7 +167,7 @@ FastAPI NemoGuardrailService runs safety checks (length, regex heuristics, Mimo 
         └── Safety check PASSES ↓
             Agent checks conversation memory (loads history/summary from NestJS Chat API)
                 ↓
-            Orchestrates LangChain conversational agent with Mimo model
+            Orchestrates LangGraph StateGraph agent with Mimo model and read-only tools (search_flights, get_user_preferences, list_user_bookings) via NestJS Agent Gateway
                 ↓
             Tokens streamed back to frontend via SSE in real time
                 ↓

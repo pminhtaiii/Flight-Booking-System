@@ -1,11 +1,16 @@
 import httpx
+import jwt
+from jwt import InvalidTokenError
 from typing import Optional, List, Dict, Any
+from agent.config import get_settings
+from agent.auth.claim_token import create_claim_token
 
 class NestJSClient:
     def __init__(self, base_url: str, token: str):
         self.base_url = base_url.rstrip("/")
         self.token = token
         self.headers = {"Authorization": f"Bearer {token}"}
+
 
     async def create_session(self, title: Optional[str] = None) -> Dict[str, Any]:
         url = f"{self.base_url}/chat/sessions"
@@ -54,3 +59,51 @@ class NestJSClient:
             response = await client.get(url, params=params, headers=self.headers)
             response.raise_for_status()
             return response.json()
+
+    def _get_gateway_headers(self) -> dict:
+        settings = get_settings()
+        try:
+            payload = jwt.decode(self.token, settings.JWT_SECRET, algorithms=["HS256"])
+        except InvalidTokenError as exc:
+            raise ValueError("Invalid authentication token") from exc
+        
+        user_id = payload.get("id") or payload.get("sub")
+        if not user_id:
+            raise ValueError("Token is missing user identification claims ('id' or 'sub')")
+            
+        claim_token = create_claim_token(str(user_id), settings.CLAIM_TOKEN_SECRET)
+        return {
+            "X-Agent-API-Key": settings.AGENT_SERVICE_API_KEY,
+            "X-User-Claim": claim_token
+        }
+
+    async def get_gateway_flights_search(self, origin: str, destination: str, date: str, passengers: int) -> dict:
+        url = f"{self.base_url}/agent-gateway/flights/search"
+        params = {
+            "origin": origin,
+            "destination": destination,
+            "date": date,
+            "passengers": passengers
+        }
+        headers = self._get_gateway_headers()
+        async with httpx.AsyncClient() as client:
+            response = await client.get(url, params=params, headers=headers)
+            response.raise_for_status()
+            return response.json()
+
+    async def get_gateway_user_preferences(self) -> dict:
+        url = f"{self.base_url}/agent-gateway/users/preferences"
+        headers = self._get_gateway_headers()
+        async with httpx.AsyncClient() as client:
+            response = await client.get(url, headers=headers)
+            response.raise_for_status()
+            return response.json()
+
+    async def get_gateway_user_bookings(self) -> dict:
+        url = f"{self.base_url}/agent-gateway/users/bookings"
+        headers = self._get_gateway_headers()
+        async with httpx.AsyncClient() as client:
+            response = await client.get(url, headers=headers)
+            response.raise_for_status()
+            return response.json()
+

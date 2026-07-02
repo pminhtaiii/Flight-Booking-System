@@ -7,7 +7,9 @@ from agent.config import get_settings
 from agent.models.requests import ChatStreamRequest
 from agent.tools.nestjs_client import NestJSClient
 from agent.agents.chat_agent import get_chat_model, format_messages
+from agent.graph.graph import graph
 from agent.memory.manager import MemoryManager
+from langchain_core.messages import HumanMessage
 
 logger = logging.getLogger("agent.streaming")
 router = APIRouter()
@@ -20,7 +22,7 @@ async def chat_stream(
 ):
     """
     Handle POST /chat/stream requests, performing validation, checking guardrails,
-    fetching memory context, and returning an SSE stream with LangChain output.
+    fetching memory context, and returning an SSE stream with LangGraph output.
     """
     settings = get_settings()
 
@@ -32,12 +34,12 @@ async def chat_stream(
     client = NestJSClient(base_url=settings.NESTJS_API_URL, token=token)
 
     # 2. Message length check
-    if len(body.message) > settings.MAX_MESSAGE_LENGTH:
+    if body.message and len(body.message) > settings.MAX_MESSAGE_LENGTH:
         raise HTTPException(status_code=400, detail="Message exceeds maximum length")
 
     # 3. Guardrails check
     guardrails = getattr(request.app.state, "guardrails", None)
-    if guardrails:
+    if guardrails and body.message:
         is_allowed, reason = await guardrails.validate_message(body.message)
         if not is_allowed:
             if "unavailable" in reason.lower():
@@ -89,77 +91,157 @@ async def chat_stream(
         async def producer():
             partial_response = ""
             persisted = False
+            config = {
+                "configurable": {
+                    "thread_id": session_id,
+                    "nestjs_client": client
+                }
+            }
             try:
-                # Format messages for LangChain agent
-                messages = format_messages(
-                    history=history,
-                    current_message=body.message,
-                    summary=summary
-                )
-                
-                # Streaming LLM tokens
-                model = get_chat_model()
-                async for chunk in model.astream(messages):
-                    token_content = chunk.content
-                    if token_content:
-                        partial_response += token_content
+                # Check if resume operation
+                if body.confirmed is not None:
+                    current_state = await graph.aget_state(config)
+                    pending = current_state.values.get("pending_confirmation")
+                    if not pending:
+                        pending = {}
+                    pending["confirmed"] = body.confirmed
+                    
+                    await graph.aupdate_state(config, {"pending_confirmation": pending}, as_node="agent")
+                    event_stream = graph.astream_events(None, config=config, version="v2")
+                else:
+                    # New message
+                    messages = format_messages(
+                        history=history,
+                        current_message=body.message,
+                        summary=summary
+                    )
+                    event_stream = graph.astream_events(
+                        {"messages": messages, "iteration_count": 0, "pending_confirmation": None},
+                        config=config,
+                        version="v2"
+                    )
+
+                async for event in event_stream:
+                    kind = event.get("event")
+                    
+                    if kind == "on_chat_model_stream":
+                        chunk = event["data"].get("chunk")
+                        if chunk and hasattr(chunk, "content") and chunk.content:
+                            token_content = chunk.content
+                            partial_response += token_content
+                            await q.put({
+                                "event": "token",
+                                "data": json.dumps({"content": token_content})
+                            })
+                            
+                    elif kind == "on_tool_start":
+                        tool_name = event.get("name")
+                        tool_input = event["data"].get("input")
                         await q.put({
-                            "event": "token",
-                            "data": json.dumps({"content": token_content})
-                        })
-                
-                # Done event - Persist message batch and send done event
-                if partial_response.strip():
-                    messages_payload = [
-                        {"sender": "USER", "type": "STANDARD", "content": body.message},
-                        {"sender": "AGENT", "type": "STANDARD", "content": partial_response}
-                    ]
-                    try:
-                        batch_res = await client.create_message_batch(session_id, messages_payload)
-                        persisted = True
-                    except Exception as persist_err:
-                        logger.error(f"Failed to persist completed response: {persist_err!s}")
-                        await q.put({
-                            "event": "error",
+                            "event": "tool_call",
                             "data": json.dumps({
-                                "code": "PERSISTENCE_ERROR",
-                                "message": "The response was generated but could not be saved.",
-                                "partialMessageId": None
+                                "name": tool_name,
+                                "inputs": tool_input
                             })
                         })
-                        return
-                    
-                    # Extract agent message id
-                    agent_message_id = None
-                    for msg in batch_res.get("messages", []):
-                        if msg.get("sender") == "AGENT":
-                            agent_message_id = msg.get("id")
-                    
-                    await q.put({
-                        "event": "done",
-                        "data": json.dumps({
-                            "messageId": agent_message_id,
-                            "sessionId": session_id
+                        
+                    elif kind == "on_tool_end":
+                        tool_name = event.get("name")
+                        tool_output = event["data"].get("output")
+                        if tool_output:
+                            if hasattr(tool_output, "content"):
+                                output_str = str(tool_output.content)
+                            else:
+                                output_str = str(tool_output)
+                            summary_str = output_str.split("\n")[0].strip()
+                        else:
+                            summary_str = ""
+                        await q.put({
+                            "event": "tool_result",
+                            "data": json.dumps({
+                                "name": tool_name,
+                                "result": summary_str
+                            })
                         })
-                    })
 
-                    # Asynchronously trigger token budget check and summarization in the background
-                    memory_mgr = MemoryManager(
-                        window_size=settings.MEMORY_WINDOW_SIZE,
-                        token_budget=settings.MEMORY_TOKEN_BUDGET
-                    )
-                    # The session message count has increased by 2 (user message + agent response)
-                    original_total = memory_data.get("totalMessageCount", 0)
-                    asyncio.create_task(memory_mgr.check_and_summarize(session_id, client, total_count=original_total + 2))
+                # Check if the graph is suspended
+                current_state = await graph.aget_state(config)
+                if current_state.next and "confirm" in current_state.next:
+                    pending = current_state.values.get("pending_confirmation") or {}
+                    await q.put({
+                        "event": "confirmation_required",
+                        "data": json.dumps(pending)
+                    })
                 else:
-                    logger.warning(f"Empty or whitespace-only response generated for session {session_id}.")
+                    # Completed turn - Persist message batch and send done event
+                    if partial_response.strip():
+                        # Extract original user message content
+                        user_msg_content = body.message
+                        if not user_msg_content:
+                            for msg in reversed(current_state.values.get("messages", [])):
+                                if isinstance(msg, HumanMessage) or msg.__class__.__name__ == "HumanMessage" or getattr(msg, "type", "") == "human":
+                                    user_msg_content = msg.content
+                                    break
+                        if not user_msg_content:
+                            user_msg_content = "Action confirmed"
+
+                        messages_payload = [
+                            {"sender": "USER", "type": "STANDARD", "content": user_msg_content},
+                            {"sender": "AGENT", "type": "STANDARD", "content": partial_response}
+                        ]
+                        try:
+                            batch_res = await client.create_message_batch(session_id, messages_payload)
+                            persisted = True
+                        except Exception as persist_err:
+                            logger.error(f"Failed to persist completed response: {persist_err!s}")
+                            await q.put({
+                                "event": "error",
+                                "data": json.dumps({
+                                    "code": "PERSISTENCE_ERROR",
+                                    "message": "The response was generated but could not be saved.",
+                                    "partialMessageId": None
+                                })
+                            })
+                            return
+                        
+                        agent_message_id = None
+                        for msg in batch_res.get("messages", []):
+                            if msg.get("sender") == "AGENT":
+                                agent_message_id = msg.get("id")
+                        
+                        await q.put({
+                            "event": "done",
+                            "data": json.dumps({
+                                "messageId": agent_message_id,
+                                "sessionId": session_id
+                            })
+                        })
+
+                        # Trigger token budget check and summarization
+                        memory_mgr = MemoryManager(
+                            window_size=settings.MEMORY_WINDOW_SIZE,
+                            token_budget=settings.MEMORY_TOKEN_BUDGET
+                        )
+                        original_total = memory_data.get("totalMessageCount", 0)
+                        asyncio.create_task(memory_mgr.check_and_summarize(session_id, client, total_count=original_total + 2))
+                    else:
+                        logger.warning(f"Empty or whitespace-only response generated for session {session_id}.")
             except asyncio.CancelledError:
-                # Handle mid-stream connection drop or cancellation
                 logger.warning(f"Connection dropped mid-stream for session {session_id}.")
                 if not persisted and partial_response and partial_response.strip():
                     try:
+                        user_msg_content = body.message
+                        if not user_msg_content:
+                            current_state = await graph.aget_state(config)
+                            for msg in reversed(current_state.values.get("messages", [])):
+                                if isinstance(msg, HumanMessage) or msg.__class__.__name__ == "HumanMessage" or getattr(msg, "type", "") == "human":
+                                    user_msg_content = msg.content
+                                    break
+                        if not user_msg_content:
+                            user_msg_content = "Action confirmed"
+
                         messages_payload = [
-                            {"sender": "USER", "type": "STANDARD", "content": body.message},
+                            {"sender": "USER", "type": "STANDARD", "content": user_msg_content},
                             {"sender": "AGENT", "type": "STANDARD", "content": partial_response}
                         ]
                         await asyncio.shield(client.create_message_batch(session_id, messages_payload))
@@ -168,13 +250,22 @@ async def chat_stream(
                         logger.error(f"Failed to persist partial response on connection drop: {e!s}")
                 raise
             except Exception as e:
-                # Handle LLM provider or other runtime failures
-                logger.error(f"LLM error during streaming: {e!s}")
+                logger.exception("LLM error during streaming")
                 partial_message_id = None
                 if not persisted and partial_response and partial_response.strip():
                     try:
+                        user_msg_content = body.message
+                        if not user_msg_content:
+                            current_state = await graph.aget_state(config)
+                            for msg in reversed(current_state.values.get("messages", [])):
+                                if isinstance(msg, HumanMessage) or msg.__class__.__name__ == "HumanMessage" or getattr(msg, "type", "") == "human":
+                                    user_msg_content = msg.content
+                                    break
+                        if not user_msg_content:
+                            user_msg_content = "Action confirmed"
+
                         messages_payload = [
-                            {"sender": "USER", "type": "STANDARD", "content": body.message},
+                            {"sender": "USER", "type": "STANDARD", "content": user_msg_content},
                             {"sender": "AGENT", "type": "STANDARD", "content": partial_response}
                         ]
                         batch_res = await client.create_message_batch(session_id, messages_payload)
