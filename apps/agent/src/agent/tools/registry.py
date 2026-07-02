@@ -1,8 +1,13 @@
 from typing import Dict, Any, List
-from langchain_core.tools import BaseTool
+from langchain_core.tools import BaseTool, tool
 from agent.tools.search_flights import search_flights
 from agent.tools.get_preferences import get_user_preferences
 from agent.tools.list_bookings import list_user_bookings
+
+@tool("book_flight")
+async def book_flight(flight_number: str, date: str) -> str:
+    """Book a flight with a flight number and date. This action requires confirmation."""
+    return f"Flight {flight_number} on {date} has been successfully booked."
 
 TOOL_REGISTRY: Dict[str, Dict[str, Any]] = {
     "search_flights": {
@@ -16,6 +21,10 @@ TOOL_REGISTRY: Dict[str, Dict[str, Any]] = {
     "list_user_bookings": {
         "tool": list_user_bookings,
         "requires_confirmation": False,
+    },
+    "book_flight": {
+        "tool": book_flight,
+        "requires_confirmation": True,
     },
 }
 

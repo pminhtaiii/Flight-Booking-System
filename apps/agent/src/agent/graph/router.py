@@ -14,6 +14,11 @@ def should_continue(state: AgentState) -> str:
     if not tool_calls:
         return END
 
+    # Handle confirmation gate check
+    pending = state.get("pending_confirmation")
+    if pending and pending.get("confirmed") is not True:
+        return "confirm"
+
     settings = get_settings()
     max_iterations = getattr(settings, "AGENT_MAX_ITERATIONS", 5)
     current_iterations = state.get("iteration_count") or 0
@@ -22,3 +27,11 @@ def should_continue(state: AgentState) -> str:
         return "final_answer"
 
     return "tools"
+
+
+def route_confirm(state: AgentState) -> str:
+    """Route from confirm node based on confirmation status."""
+    pending = state.get("pending_confirmation")
+    if pending and pending.get("confirmed") is True:
+        return "tools"
+    return "agent"

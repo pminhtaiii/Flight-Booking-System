@@ -1,4 +1,4 @@
-from langchain_core.messages import SystemMessage, HumanMessage
+from langchain_core.messages import SystemMessage, HumanMessage, ToolMessage
 from langchain_core.runnables import RunnableConfig
 from langgraph.prebuilt import ToolNode
 
@@ -30,7 +30,25 @@ async def agent_node(state: AgentState, config: RunnableConfig) -> dict:
         messages.insert(0, SystemMessage(content=CLOSED_WORLD_SYSTEM_PROMPT))
 
     response = await model_with_tools.ainvoke(messages, config=config)
-    return {"messages": [response]}
+    
+    pending = None
+    tool_calls = getattr(response, "tool_calls", None)
+    if tool_calls:
+        from agent.tools.registry import requires_confirmation
+        for tc in tool_calls:
+            if requires_confirmation(tc["name"]):
+                pending = {
+                    "name": tc["name"],
+                    "args": tc["args"],
+                    "id": tc["id"],
+                    "confirmed": None
+                }
+                break
+
+    ret = {"messages": [response]}
+    if pending:
+        ret["pending_confirmation"] = pending
+    return ret
 
 async def final_answer_node(state: AgentState, config: RunnableConfig) -> dict:
     """Call the LLM without tools bound to provide a final summary answer when iteration limit is reached."""
@@ -60,4 +78,28 @@ async def custom_tool_node(state: AgentState, config: RunnableConfig) -> dict:
     
     current_iter = state.get("iteration_count") or 0
     result["iteration_count"] = current_iter + 1
+    result["pending_confirmation"] = None
     return result
+
+
+async def confirm_node(state: AgentState, config: RunnableConfig) -> dict:
+    """Handle confirmation gate. If aborted, append a cancellation ToolMessage."""
+    pending = state.get("pending_confirmation")
+    if not pending:
+        return {}
+
+    confirmed = pending.get("confirmed")
+    if confirmed is False:
+        tool_call_id = pending.get("id")
+        tool_name = pending.get("name")
+        cancellation_msg = ToolMessage(
+            content=f"Booking for tool '{tool_name}' was aborted/cancelled by the user.",
+            tool_call_id=tool_call_id,
+            name=tool_name
+        )
+        return {
+            "messages": [cancellation_msg],
+            "pending_confirmation": None
+        }
+
+    return {}
