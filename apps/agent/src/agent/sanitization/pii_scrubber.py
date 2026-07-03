@@ -1,6 +1,15 @@
 import re
 from typing import Optional
 
+PASSPORT_REGEX = re.compile(r'\b[A-Z]{1,2}\d{6,9}\b')
+CARD_REGEX = re.compile(r'\b\d(?:[ -]?\d){12,18}\b')
+EMAIL_REGEX = re.compile(r'\b[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}\b')
+PHONE_REGEX = re.compile(
+    r'(?<!\w)(?<!\d-)(?<!\d\.)(?<!\d\s)'
+    r'(?:\+\d{1,3}[-.\s]?)?\+?\(?\d{2,4}\)?[-.\s]?\d{3,4}[-.\s]?\d{3,4}\b'
+    r'(?![-\s]?\d)'
+)
+
 def is_luhn_valid(card_num: str) -> bool:
     """
     Validates a credit card number using the Luhn algorithm.
@@ -28,29 +37,21 @@ def scrub_pii(text: str) -> str:
         return text
 
     # 1. Passport numbers
-    passport_regex = re.compile(r'\b[A-Z]{1,2}\d{6,9}\b')
-    text = passport_regex.sub('[PASSPORT REDACTED]', text)
+    text = PASSPORT_REGEX.sub('[PASSPORT REDACTED]', text)
 
     # 2. Credit card numbers
-    card_regex = re.compile(r'\b\d(?:[ -]?\d){12,18}\b')
     def card_replacer(match: re.Match) -> str:
         matched_str = match.group(0)
         if is_luhn_valid(matched_str):
             return '[CARD REDACTED]'
         return matched_str
-    text = card_regex.sub(card_replacer, text)
+    text = CARD_REGEX.sub(card_replacer, text)
 
     # 3. Email addresses
-    email_regex = re.compile(r'\b[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}\b')
-    text = email_regex.sub('[EMAIL REDACTED]', text)
+    text = EMAIL_REGEX.sub('[EMAIL REDACTED]', text)
 
     # 4. Phone numbers
-    phone_regex = re.compile(
-        r'(?<!\w)(?<!\d-)(?<!\d\.)(?<!\d\s)'
-        r'(?:\+\d{1,3}[-.\s]?)?\+?\(?\d{2,4}\)?[-.\s]?\d{3,4}[-.\s]?\d{3,4}\b'
-        r'(?![-\s]?\d)'
-    )
-    text = phone_regex.sub('[PHONE REDACTED]', text)
+    text = PHONE_REGEX.sub('[PHONE REDACTED]', text)
 
     return text
 
@@ -63,29 +64,22 @@ def detect_pii(text: Optional[str]) -> bool:
         return False
 
     # 1. Passport numbers
-    passport_regex = re.compile(r'\b[A-Z]{1,2}\d{6,9}\b')
-    if passport_regex.search(text):
+    if PASSPORT_REGEX.search(text):
         return True
 
     # 2. Credit card numbers
-    card_regex = re.compile(r'\b\d(?:[ -]?\d){12,18}\b')
-    for match in card_regex.finditer(text):
+    for match in CARD_REGEX.finditer(text):
         if is_luhn_valid(match.group(0)):
             return True
 
     # 3. Email addresses
-    email_regex = re.compile(r'\b[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}\b')
-    if email_regex.search(text):
+    if EMAIL_REGEX.search(text):
         return True
 
     # 4. Phone numbers
-    phone_regex = re.compile(
-        r'(?<!\w)(?<!\d-)(?<!\d\.)(?<!\d\s)'
-        r'(?:\+\d{1,3}[-.\s]?)?\+?\(?\d{2,4}\)?[-.\s]?\d{3,4}[-.\s]?\d{3,4}\b'
-        r'(?![-\s]?\d)'
-    )
-    if phone_regex.search(text):
+    if PHONE_REGEX.search(text):
         return True
 
     return False
+
 

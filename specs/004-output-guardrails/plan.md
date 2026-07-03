@@ -1,6 +1,6 @@
 # Implementation Plan: LLM Output Guardrails
 
-**Branch**: `004-output-guardrails` | **Date**: 2026-07-03 | **Spec**: [spec.md](file:///c:/Booking%20Systems/specs/004-output-guardrails/spec.md)
+**Branch**: `004-output-guardrails` | **Date**: 2026-07-03 | **Spec**: [spec.md](spec.md)
 
 **Input**: Feature specification from `/specs/004-output-guardrails/spec.md`
 
@@ -87,7 +87,7 @@ No constitution violations requiring justification. All changes are within the e
 
 ## Phase Overview
 
-```
+```text
 Phase 0: Research ──────────────────────── ✅ Complete
 Phase 1: Design & Contracts ────────────── ✅ Complete
 Phase 2: Configuration & PII Detection ─── Foundation layer
@@ -103,7 +103,7 @@ Phase 10: E2E Testing & Validation ─────── Integration tests + ben
 
 ### Dependency Graph
 
-```
+```text
 Phase 2 (Config + PII Detection)
     ↓
 Phase 3 (ChunkBuffer)
@@ -127,7 +127,7 @@ Phase 10 (E2E Tests + Validation)
 
 ## Phase 0: Research — ✅ Complete
 
-See [research.md](file:///c:/Booking%20Systems/specs/004-output-guardrails/research.md). All 4 unknowns resolved:
+See [research.md](research.md). All 4 unknowns resolved:
 
 1. ✅ Sentence detection edge cases → heuristic boundary detector
 2. ✅ Sliding window token count → 30 tokens default, configurable
@@ -138,7 +138,7 @@ See [research.md](file:///c:/Booking%20Systems/specs/004-output-guardrails/resea
 
 ## Phase 1: Design & Contracts — ✅ Complete
 
-See [data-model.md](file:///c:/Booking%20Systems/specs/004-output-guardrails/data-model.md), [contracts/](file:///c:/Booking%20Systems/specs/004-output-guardrails/contracts/), [quickstart.md](file:///c:/Booking%20Systems/specs/004-output-guardrails/quickstart.md).
+See [data-model.md](data-model.md), [contracts/](contracts/), [quickstart.md](quickstart.md).
 
 ---
 

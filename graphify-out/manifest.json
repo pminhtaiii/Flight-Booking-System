@@ -30,9 +30,9 @@
     "semantic_hash": "4e7b44d022fab7b65e599d7f34e13c56"
   },
   "apps/agent/src/agent/config.py": {
-    "mtime": 1782958884.0375364,
-    "ast_hash": "b63551f820cd2ad1134eeecd39be4dae",
-    "semantic_hash": "b63551f820cd2ad1134eeecd39be4dae"
+    "mtime": 1783070221.9640286,
+    "ast_hash": "ffa556a2320e52439cf8937b5c223c2b",
+    "semantic_hash": ""
   },
   "apps/agent/src/agent/graph/__init__.py": {
     "mtime": 1782989310.621338,
@@ -125,9 +125,9 @@
     "semantic_hash": "20656ca5e1567fb3ed0f723888084271"
   },
   "apps/agent/src/agent/sanitization/pii_scrubber.py": {
-    "mtime": 1782959187.9981575,
-    "ast_hash": "764263e758613de655aa959fcc7194f6",
-    "semantic_hash": "764263e758613de655aa959fcc7194f6"
+    "mtime": 1783071818.7079365,
+    "ast_hash": "f996fea7e7314733ffd92db78c92ab4c",
+    "semantic_hash": ""
   },
   "apps/agent/src/agent/streaming/sse.py": {
     "mtime": 1782992825.2061017,
@@ -770,9 +770,9 @@
     "semantic_hash": "13d24df073aeafdf3c5c1bc2507eb893"
   },
   "context/progress-checker.md": {
-    "mtime": 1782993144.6762288,
-    "ast_hash": "6cf0f0737798b0c4f009c2b1230cca72",
-    "semantic_hash": "6cf0f0737798b0c4f009c2b1230cca72"
+    "mtime": 1783070541.9583173,
+    "ast_hash": "6619b8c40ca94c34a6633754299c62d6",
+    "semantic_hash": ""
   },
   "context/project-overview.md": {
     "mtime": 1782792218.8549414,
@@ -980,9 +980,9 @@
     "semantic_hash": "2d27779fa59873ac300ca2c637e60835"
   },
   "specs/004-output-guardrails/plan.md": {
-    "mtime": 1783054100.1835258,
-    "ast_hash": "95f6afad8d50838d0e31c9aa759d60f5",
-    "semantic_hash": "95f6afad8d50838d0e31c9aa759d60f5"
+    "mtime": 1783071929.6048427,
+    "ast_hash": "617250c0e72d8c1d0ff1e0def05793b0",
+    "semantic_hash": ""
   },
   "specs/004-output-guardrails/prd.md": {
     "mtime": 1783059017.4508243,
@@ -1003,5 +1003,20 @@
     "mtime": 1783054020.2097082,
     "ast_hash": "78bb6a876feebbca7c0d9226a0755968",
     "semantic_hash": "78bb6a876feebbca7c0d9226a0755968"
+  },
+  "apps/agent/tests/test_config_defaults.py": {
+    "mtime": 1783070173.1180198,
+    "ast_hash": "ce1f8a3b7c09e9d0a0a0f971f5a5fec5",
+    "semantic_hash": ""
+  },
+  "apps/agent/tests/test_pii_detection.py": {
+    "mtime": 1783070272.8900292,
+    "ast_hash": "75e656c0e4a07cc0b33feeb9e2cb15e5",
+    "semantic_hash": ""
+  },
+  "specs/004-output-guardrails/tasks.md": {
+    "mtime": 1783070531.3201413,
+    "ast_hash": "3f79f75ac502a83284b3dd20ffcc45d7",
+    "semantic_hash": ""
   }
 }
