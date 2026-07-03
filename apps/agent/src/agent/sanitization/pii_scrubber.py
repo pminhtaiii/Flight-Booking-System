@@ -1,4 +1,5 @@
 import re
+from typing import Optional
 
 def is_luhn_valid(card_num: str) -> bool:
     """
@@ -52,3 +53,39 @@ def scrub_pii(text: str) -> str:
     text = phone_regex.sub('[PHONE REDACTED]', text)
 
     return text
+
+def detect_pii(text: Optional[str]) -> bool:
+    """
+    Detects if the input text contains Passport numbers, Credit card numbers (Luhn checked),
+    email addresses, or phone numbers. Returns True if PII is detected, False otherwise.
+    """
+    if not text:
+        return False
+
+    # 1. Passport numbers
+    passport_regex = re.compile(r'\b[A-Z]{1,2}\d{6,9}\b')
+    if passport_regex.search(text):
+        return True
+
+    # 2. Credit card numbers
+    card_regex = re.compile(r'\b\d(?:[ -]?\d){12,18}\b')
+    for match in card_regex.finditer(text):
+        if is_luhn_valid(match.group(0)):
+            return True
+
+    # 3. Email addresses
+    email_regex = re.compile(r'\b[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}\b')
+    if email_regex.search(text):
+        return True
+
+    # 4. Phone numbers
+    phone_regex = re.compile(
+        r'(?<!\w)(?<!\d-)(?<!\d\.)(?<!\d\s)'
+        r'(?:\+\d{1,3}[-.\s]?)?\+?\(?\d{2,4}\)?[-.\s]?\d{3,4}[-.\s]?\d{3,4}\b'
+        r'(?![-\s]?\d)'
+    )
+    if phone_regex.search(text):
+        return True
+
+    return False
+

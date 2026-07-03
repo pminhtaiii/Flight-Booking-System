@@ -6,13 +6,26 @@ Update this file after every completed feature. Any AI agent reading this should
 
 ## Current Status
 
-**Feature:** Agent Tool-Calling & Data Access (Phase 7)
-**Last completed:** Phase 6 Human-in-the-Loop Gate & SSE Streaming Status (LangGraph interrupts, SSE streaming extensions, and integration tests).
-**Next:** Phase 7: Polish & Cross-Cutting Concerns.
+**Feature:** LLM Output Guardrails (Phase 2)
+**Last completed:** Phase 2 Configuration & PII Detection — Foundation (flat settings, detect_pii, and unit tests).
+**Next:** Phase 3: Sentence-Boundary Chunking (ChunkBuffer).
 
 ---
 
 ## Progress by Feature
+
+### [/] Feature: LLM Output Guardrails
+
+- [x] Phase 1: Design & Contracts
+- [x] Phase 2: Configuration & PII Detection — Foundation
+- [ ] Phase 3: Sentence-Boundary Chunking — Token Accumulation
+- [ ] Phase 4: NeMo Output Rail — Safety Classification
+- [ ] Phase 5: Output Guardrail Pipeline — Orchestration
+- [ ] Phase 6: SSE Integration — Wire Pipeline Into Streaming
+- [ ] Phase 7: Hard Stop & Partial Persistence — Failure Handling
+- [ ] Phase 8: Pipeline Parallelism — Latency Optimization
+- [ ] Phase 9: Observability & Logging — Structured Telemetry
+- [ ] Phase 10: E2E Testing & Validation — Final Verification
 
 ### [/] Feature: Agent Tool-Calling & Data Access
 
