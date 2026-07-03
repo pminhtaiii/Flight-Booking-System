@@ -18,5 +18,4 @@ __pycache__/
 .ipynb_checkpoints/
 
 # Graphify
-graphify-out/.graphify_python
-graphify-out/.graphify_root
+graphify-out/
