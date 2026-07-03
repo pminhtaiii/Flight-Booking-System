@@ -46,6 +46,7 @@ Accumulates incoming LLM tokens and produces sentence-boundary chunks. Tracks co
 3. NOT inside code fence
 4. `.` NOT preceded by single uppercase letter (abbreviation)
 5. `.` NOT preceded by only digits (decimal number)
+6. `.` NOT part of a URL (e.g., `example.com`) or email address (e.g., `john.doe@domain.com`)
 
 ---
 

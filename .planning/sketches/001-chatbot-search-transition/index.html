@@ -1664,10 +1664,17 @@
         // Add user message
         const userMsgDiv = document.createElement('div');
         userMsgDiv.className = 'msg user';
-        userMsgDiv.innerHTML = `
-        <div class="sender-name">Traveler</div>
-        <div class="bubble">${userQuery}</div>
-      `;
+        
+        const senderEl = document.createElement('div');
+        senderEl.className = 'sender-name';
+        senderEl.textContent = 'Traveler';
+        
+        const bubbleEl = document.createElement('div');
+        bubbleEl.className = 'bubble';
+        bubbleEl.textContent = userQuery;
+        
+        userMsgDiv.appendChild(senderEl);
+        userMsgDiv.appendChild(bubbleEl);
         chatMessages.appendChild(userMsgDiv);
         chatMessages.scrollTop = chatMessages.scrollHeight;
         chatInput.value = '';
