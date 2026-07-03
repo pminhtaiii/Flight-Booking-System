@@ -2,11 +2,16 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 from pydantic import Field, BaseModel
 from typing import Optional
 
+DEFAULT_OUTPUT_GUARDRAIL_ENABLED = True
+DEFAULT_OUTPUT_GUARDRAIL_OVERLAP_TOKENS = 30
+DEFAULT_OUTPUT_GUARDRAIL_MAX_CHUNK_TOKENS = 200
+DEFAULT_OUTPUT_GUARDRAIL_NEMO_TIMEOUT = 2.0
+
 class OutputGuardrailConfig(BaseModel):
-    enabled: bool = True
-    overlap_tokens: int = 30
-    max_chunk_tokens: int = 200
-    nemo_timeout: float = 2.0
+    enabled: bool = DEFAULT_OUTPUT_GUARDRAIL_ENABLED
+    overlap_tokens: int = DEFAULT_OUTPUT_GUARDRAIL_OVERLAP_TOKENS
+    max_chunk_tokens: int = DEFAULT_OUTPUT_GUARDRAIL_MAX_CHUNK_TOKENS
+    nemo_timeout: float = DEFAULT_OUTPUT_GUARDRAIL_NEMO_TIMEOUT
 
 class Settings(BaseSettings):
     JWT_SECRET: str = Field(..., min_length=1)
@@ -29,10 +34,10 @@ class Settings(BaseSettings):
     CLAIM_TOKEN_TTL_SECONDS: int = 300
     AGENT_MAX_ITERATIONS: int = 5
 
-    OUTPUT_GUARDRAIL_ENABLED: bool = True
-    OUTPUT_GUARDRAIL_OVERLAP_TOKENS: int = 30
-    OUTPUT_GUARDRAIL_MAX_CHUNK_TOKENS: int = 200
-    OUTPUT_GUARDRAIL_NEMO_TIMEOUT: float = 2.0
+    OUTPUT_GUARDRAIL_ENABLED: bool = DEFAULT_OUTPUT_GUARDRAIL_ENABLED
+    OUTPUT_GUARDRAIL_OVERLAP_TOKENS: int = DEFAULT_OUTPUT_GUARDRAIL_OVERLAP_TOKENS
+    OUTPUT_GUARDRAIL_MAX_CHUNK_TOKENS: int = DEFAULT_OUTPUT_GUARDRAIL_MAX_CHUNK_TOKENS
+    OUTPUT_GUARDRAIL_NEMO_TIMEOUT: float = DEFAULT_OUTPUT_GUARDRAIL_NEMO_TIMEOUT
 
     @property
     def output_guardrail(self) -> OutputGuardrailConfig:
