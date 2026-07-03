@@ -10,6 +10,7 @@ from agent.agents.chat_agent import get_chat_model, format_messages
 from agent.graph.graph import graph
 from agent.memory.manager import MemoryManager
 from langchain_core.messages import HumanMessage
+from agent.guardrails.output_pipeline import OutputGuardrailPipeline, OutputGuardrailBlockedError
 
 logger = logging.getLogger("agent.streaming")
 router = APIRouter()
@@ -89,6 +90,8 @@ async def chat_stream(
 
         # Background producer task
         async def producer():
+            output_config = settings.output_guardrail
+            pipeline = OutputGuardrailPipeline(config=output_config, nemo_service=guardrails)
             partial_response = ""
             persisted = False
             config = {
@@ -128,11 +131,12 @@ async def chat_stream(
                         chunk = event["data"].get("chunk")
                         if chunk and hasattr(chunk, "content") and chunk.content:
                             token_content = chunk.content
-                            partial_response += token_content
-                            await q.put({
-                                "event": "token",
-                                "data": json.dumps({"content": token_content})
-                            })
+                            async for safe_chunk in pipeline.process_token(token_content):
+                                partial_response += safe_chunk
+                                await q.put({
+                                    "event": "token",
+                                    "data": json.dumps({"content": safe_chunk})
+                                })
                             
                     elif kind == "on_tool_start":
                         tool_name = event.get("name")
@@ -163,6 +167,14 @@ async def chat_stream(
                                 "result": summary_str
                             })
                         })
+
+                # Flush the pipeline and yield any remaining safe chunks
+                async for safe_chunk in pipeline.flush():
+                    partial_response += safe_chunk
+                    await q.put({
+                        "event": "token",
+                        "data": json.dumps({"content": safe_chunk})
+                    })
 
                 # Check if the graph is suspended
                 current_state = await graph.aget_state(config)
@@ -226,6 +238,41 @@ async def chat_stream(
                         asyncio.create_task(memory_mgr.check_and_summarize(session_id, client, total_count=original_total + 2))
                     else:
                         logger.warning(f"Empty or whitespace-only response generated for session {session_id}.")
+            except OutputGuardrailBlockedError as e:
+                logger.warning("Security alert: LLM output blocked by guardrail.")
+                partial_message_id = None
+                if not persisted and e.partial_response and e.partial_response.strip():
+                    try:
+                        user_msg_content = body.message
+                        if not user_msg_content:
+                            current_state = await graph.aget_state(config)
+                            for msg in reversed(current_state.values.get("messages", [])):
+                                if isinstance(msg, HumanMessage) or msg.__class__.__name__ == "HumanMessage" or getattr(msg, "type", "") == "human":
+                                    user_msg_content = msg.content
+                                    break
+                        if not user_msg_content:
+                            user_msg_content = "Action confirmed"
+
+                        messages_payload = [
+                            {"sender": "USER", "type": "STANDARD", "content": user_msg_content},
+                            {"sender": "AGENT", "type": "STANDARD", "content": e.partial_response}
+                        ]
+                        batch_res = await client.create_message_batch(session_id, messages_payload)
+                        persisted = True
+                        for msg in batch_res.get("messages", []):
+                            if msg.get("sender") == "AGENT":
+                                partial_message_id = msg.get("id")
+                    except Exception as persist_err:
+                        logger.error(f"Failed to persist partial response on guardrail block: {persist_err!s}")
+                
+                await q.put({
+                    "event": "error",
+                    "data": json.dumps({
+                        "code": "OUTPUT_GUARDRAIL_BLOCKED",
+                        "message": "Response was blocked for safety reasons.",
+                        "partialMessageId": partial_message_id
+                    })
+                })
             except asyncio.CancelledError:
                 logger.warning(f"Connection dropped mid-stream for session {session_id}.")
                 if not persisted and partial_response and partial_response.strip():

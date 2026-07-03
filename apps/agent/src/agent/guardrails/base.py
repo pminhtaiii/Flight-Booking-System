@@ -15,6 +15,20 @@ class GuardrailService(Protocol):
         """
         ...
 
+    async def validate_output_chunk(self, chunk: str) -> Tuple[bool, str]:
+        """
+        Validates an output chunk.
+        
+        Args:
+            chunk: The output chunk string.
+            
+        Returns:
+            Tuple[bool, str]: A tuple where the first element indicates whether the chunk
+                             is allowed, and the second element is the error reason if blocked
+                             (or an empty string if allowed).
+        """
+        ...
+
     def is_healthy(self) -> bool:
         """
         Checks if the guardrail service is healthy and available.

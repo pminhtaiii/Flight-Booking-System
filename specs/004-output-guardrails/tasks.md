@@ -49,17 +49,17 @@
 
 > **NOTE: Write these tests FIRST, ensure they FAIL before implementation**
 
-- [ ] T006 [P] [US1] Create ChunkBuffer unit tests in apps/agent/tests/test_chunk_buffer.py
-- [ ] T007 [P] [US1] Create NeMo output rail unit tests in apps/agent/tests/test_output_guardrail_nemo.py
-- [ ] T008 [P] [US1] Create OutputGuardrailPipeline unit tests in apps/agent/tests/test_output_pipeline.py
-- [ ] T009 [US1] Create SSE output guardrail integration tests in apps/agent/tests/test_sse_output_guardrail.py
+- [x] T006 [P] [US1] Create ChunkBuffer unit tests in apps/agent/tests/test_chunk_buffer.py
+- [x] T007 [P] [US1] Create NeMo output rail unit tests in apps/agent/tests/test_output_guardrail_nemo.py
+- [x] T008 [P] [US1] Create OutputGuardrailPipeline unit tests in apps/agent/tests/test_output_pipeline.py
+- [x] T009 [US1] Create SSE output guardrail integration tests in apps/agent/tests/test_sse_output_guardrail.py
 
 ### Implementation for User Story 1
 
-- [ ] T010 [P] [US1] Create ChunkBuffer class in apps/agent/src/agent/streaming/chunk_buffer.py
-- [ ] T011 [P] [US1] Implement validate_output_chunk in apps/agent/src/agent/guardrails/nemo.py and base.py
-- [ ] T012 [P] [US1] Create OutputGuardrailPipeline class in apps/agent/src/agent/guardrails/output_pipeline.py
-- [ ] T013 [US1] Integrate OutputGuardrailPipeline into SSE streaming producer in apps/agent/src/agent/streaming/sse.py
+- [x] T010 [P] [US1] Create ChunkBuffer class in apps/agent/src/agent/streaming/chunk_buffer.py
+- [x] T011 [P] [US1] Implement validate_output_chunk in apps/agent/src/agent/guardrails/nemo.py and base.py
+- [x] T012 [P] [US1] Create OutputGuardrailPipeline class in apps/agent/src/agent/guardrails/output_pipeline.py
+- [x] T013 [US1] Integrate OutputGuardrailPipeline into SSE streaming producer in apps/agent/src/agent/streaming/sse.py
 
 **Checkpoint**: At this point, User Story 1 should be fully functional and testable independently
 

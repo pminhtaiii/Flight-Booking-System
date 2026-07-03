@@ -755,9 +755,9 @@
     "semantic_hash": "e97a9e557a49c17b89348caa804b6b91"
   },
   "context/architecture.md": {
-    "mtime": 1783081640.7292545,
-    "ast_hash": "e1bdb9b101b1cf9238171b26d977b01d",
-    "semantic_hash": ""
+    "mtime": 1782989993.9250557,
+    "ast_hash": "e8434c5dd6d07e0233279e999ea58dbb",
+    "semantic_hash": "e8434c5dd6d07e0233279e999ea58dbb"
   },
   "context/code-standards.md": {
     "mtime": 1782792218.4690502,
@@ -770,8 +770,8 @@
     "semantic_hash": "13d24df073aeafdf3c5c1bc2507eb893"
   },
   "context/progress-checker.md": {
-    "mtime": 1783081635.9371839,
-    "ast_hash": "c657b96bc176d3b0de2d479a6213dad8",
+    "mtime": 1783081249.1409638,
+    "ast_hash": "b68ee758ca5776e1e831e8cb2bcbd2a0",
     "semantic_hash": ""
   },
   "context/project-overview.md": {
@@ -1015,8 +1015,8 @@
     "semantic_hash": ""
   },
   "specs/004-output-guardrails/tasks.md": {
-    "mtime": 1783081551.785205,
-    "ast_hash": "d9e9380c84dd2ae3df8086cc21f431a7",
+    "mtime": 1783081241.782289,
+    "ast_hash": "838dea94d4f18a96e78bd9b9904736a1",
     "semantic_hash": ""
   },
   "apps/agent/src/agent/streaming/chunk_buffer.py": {

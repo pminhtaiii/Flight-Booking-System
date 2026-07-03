@@ -6,9 +6,9 @@ Update this file after every completed feature. Any AI agent reading this should
 
 ## Current Status
 
-**Feature:** LLM Output Guardrails (Phase 2)
-**Last completed:** Phase 2 Configuration & PII Detection — Foundation (flat settings, detect_pii, and unit tests).
-**Next:** Phase 3: Sentence-Boundary Chunking (ChunkBuffer).
+**Feature:** LLM Output Guardrails (Phase 6)
+**Last completed:** Phase 6: SSE Integration — Wire Pipeline Into Streaming (Integrated OutputGuardrailPipeline into sse.py with integration tests).
+**Next:** Phase 7: Hard Stop & Partial Persistence — Failure Handling.
 
 ---
 
@@ -18,10 +18,10 @@ Update this file after every completed feature. Any AI agent reading this should
 
 - [x] Phase 1: Design & Contracts
 - [x] Phase 2: Configuration & PII Detection — Foundation
-- [ ] Phase 3: Sentence-Boundary Chunking — Token Accumulation
-- [ ] Phase 4: NeMo Output Rail — Safety Classification
-- [ ] Phase 5: Output Guardrail Pipeline — Orchestration
-- [ ] Phase 6: SSE Integration — Wire Pipeline Into Streaming
+- [x] Phase 3: Sentence-Boundary Chunking — Token Accumulation
+- [x] Phase 4: NeMo Output Rail — Safety Classification
+- [x] Phase 5: Output Guardrail Pipeline — Orchestration
+- [x] Phase 6: SSE Integration — Wire Pipeline Into Streaming
 - [ ] Phase 7: Hard Stop & Partial Persistence — Failure Handling
 - [ ] Phase 8: Pipeline Parallelism — Latency Optimization
 - [ ] Phase 9: Observability & Logging — Structured Telemetry

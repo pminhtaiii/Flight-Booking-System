@@ -1,7 +1,7 @@
 # Graph Report - Booking Systems  (2026-07-03)
 
 ## Corpus Check
-- 206 files · ~115,248 words
+- 206 files · ~115,209 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
