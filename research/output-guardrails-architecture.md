@@ -35,7 +35,7 @@ Input guardrails (NeMo) already validate the **user's message** before it reache
 
 **Flow**:
 
-```
+```text
 Time →
 ───────────────────────────────────────────────
 Chunk 1:  [Guard ✓] [Stream to user ──────────]
@@ -61,7 +61,7 @@ Or multi-sentence PII reveals:
 
 Each sentence individually may pass guardrails, but concatenated they reveal PII.
 
-**Implementation**: Maintain a sliding window of the last ~20 tokens from the previous chunk. Before running the main guardrail on chunk N, concatenate `[tail of N-1] + [head of N]` (~40 tokens) and run the regex PII scanner on this overlap region. If the overlap check fails, treat it as a chunk N failure (hard stop).
+**Implementation**: Maintain a sliding window of the last 30 tokens from the previous chunk. Before running the main guardrail on chunk N, concatenate `[tail of N-1] + [head of N]` (60-token overlap) and run the regex PII scanner on this overlap region. If the overlap check fails, treat it as a chunk N failure (hard stop).
 
 ---
 
@@ -100,7 +100,7 @@ Each sentence individually may pass guardrails, but concatenated they reveal PII
 
 ## Full Pipeline Flow
 
-```
+```text
 LLM generates tokens continuously
         ↓
 Accumulate tokens in buffer
@@ -110,8 +110,8 @@ Sentence boundary detected? (. ! ? \n + whitespace/EOF)
         └── Yes → chunk ready
                     ↓
             ┌─ Sliding window boundary check ─┐
-            │  [tail ~20 tokens of chunk N-1]  │
-            │  + [head ~20 tokens of chunk N]  │
+            │  [tail 30 tokens of chunk N-1]   │
+            │  + [head 30 tokens of chunk N]   │
             │  → Regex PII scan               │
             └──────────────────────────────────┘
                     ↓ Pass?

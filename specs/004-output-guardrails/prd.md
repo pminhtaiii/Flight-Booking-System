@@ -72,7 +72,7 @@ From the user's perspective: safe conversations feel the same. Unsafe responses 
 
 ### Sentence-Boundary Chunking
 
-LLM output tokens are accumulated in a buffer and split into chunks at sentence boundaries (`.`, `!`, `?`, `\n` followed by whitespace + uppercase or end-of-stream). This ensures the guardrail always receives complete semantic units. A heuristic handles edge cases: code blocks (triple-backtick fences) are accumulated as single chunks, abbreviations (`Dr.`, `Mr.`) don't trigger splits, and decimal numbers (`$1,234.56`) are preserved. A configurable max chunk size (default 200 tokens) force-splits excessively long sentences.
+LLM output tokens are accumulated in a buffer and split into chunks at sentence boundaries (`.`, `!`, `?`, `\n` followed by whitespace + uppercase or end-of-stream). This ensures the guardrail always receives complete semantic units. A heuristic handles edge cases: code blocks (triple-backtick fences) are accumulated as single chunks, abbreviations (`Dr.`, `Mr.`) don't trigger splits, decimal numbers (`$1,234.56`) are preserved, and periods within text patterns matching URLs or email addresses (such as `example.com` or `john.doe@domain.com`) are ignored. A configurable max chunk size (default 200 tokens) force-splits excessively long sentences.
 
 ### Pipeline Parallelism
 
@@ -85,12 +85,14 @@ A configurable window (default 30 tokens) of the previous chunk's tail is concat
 ### Layered Guardrail Execution
 
 Two layers run sequentially on every chunk:
+
 1. **Regex PII Scanner** (~1ms): Pattern-matches email, phone, passport, credit card. Also runs on the sliding window overlap region. If this fails → hard stop immediately, NeMo skipped.
 2. **NeMo Output Rail** (~100-300ms): Calls the Mimo safety classification endpoint with an output-specific system prompt. Catches harmful content, toxicity, prompt injection artifacts, subtle PII references. Only runs if regex passes.
 
 ### Hard Stop Behavior
 
 On any guardrail failure at any layer:
+
 1. Stop consuming tokens from the LLM
 2. Send SSE error event: `{"code": "OUTPUT_GUARDRAIL_BLOCKED", "message": "Response was blocked for safety reasons.", "partialMessageId": "<uuid|null>"}`
 3. Persist partial response (safe chunks before the block) to NestJS via batch message endpoint
@@ -104,11 +106,12 @@ The existing `GuardrailService` protocol gains a new `validate_output_chunk(chun
 
 ### SSE Contract Extension
 
-A new error code `OUTPUT_GUARDRAIL_BLOCKED` is added to the existing `error` event type. No new SSE event types are introduced. The `token` event now carries sentence-sized content (not single tokens) when output guardrails are enabled — this is backward compatible.
+A new error code `OUTPUT_GUARDRAIL_BLOCKED` is added to the existing `error` event type. No new SSE event types are introduced. The `token` event now carries sentence-sized content (not single tokens) when output guardrails are enabled. This changes payload granularity and streaming cadence, requiring clients to explicitly opt-in or perform streaming compatibility checks to support sentence-sized chunks.
 
 ### Configuration
 
 Four new environment variables control the pipeline:
+
 - `OUTPUT_GUARDRAIL_ENABLED` (bool, default true) — kill switch
 - `OUTPUT_GUARDRAIL_OVERLAP_TOKENS` (int, default 30) — sliding window size
 - `OUTPUT_GUARDRAIL_MAX_CHUNK_TOKENS` (int, default 200) — force-split threshold

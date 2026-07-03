@@ -74,6 +74,7 @@ class GuardrailService(Protocol):
 ```
 
 The `validate_output_chunk` method:
+
 - Takes a chunk of LLM output text
 - Returns `(True, "")` if safe, `(False, reason)` if unsafe
 - Uses the output-specific system prompt (see research.md Finding 3)
@@ -86,36 +87,36 @@ The `validate_output_chunk` method:
 
 ### Existing Events (unchanged)
 
-| Event | Payload | Description |
-|-------|---------|-------------|
-| `token` | `{"content": "<text>"}` | Incremental response text |
-| `done` | `{"messageId": "<uuid>", "sessionId": "<uuid>"}` | Response complete |
-| `error` | `{"code": "<CODE>", "message": "<text>", "partialMessageId": "<uuid|null>"}` | Error occurred |
-| `tool_call` | `{"name": "<tool>", "inputs": {...}}` | Tool invoked |
-| `tool_result` | `{"name": "<tool>", "result": "<summary>"}` | Tool completed |
-| `confirmation_required` | `{"action": "<desc>", ...}` | Write tool needs approval |
+| Event                   | Payload                                                                       | Description               |
+| ----------------------- | ----------------------------------------------------------------------------- | ------------------------- |
+| `token`                 | `{"content": "<text>"}`                                                       | Incremental response text |
+| `done`                  | `{"messageId": "<uuid>", "sessionId": "<uuid>"}`                              | Response complete         |
+| `error`                 | `{"code": "<CODE>", "message": "<text>", "partialMessageId": "<uuid\|null>"}` | Error occurred            |
+| `tool_call`             | `{"name": "<tool>", "inputs": {...}}`                                         | Tool invoked              |
+| `tool_result`           | `{"name": "<tool>", "result": "<summary>"}`                                   | Tool completed            |
+| `confirmation_required` | `{"action": "<desc>", ...}`                                                   | Write tool needs approval |
 
 ### New Error Code
 
-| Code | Description |
-|------|-------------|
+| Code                       | Description                                    |
+| -------------------------- | ---------------------------------------------- |
 | `OUTPUT_GUARDRAIL_BLOCKED` | LLM output blocked by output safety guardrails |
 
 This code is used in the existing `error` event — no new event type is needed. The error event payload includes `partialMessageId` which is the ID of the persisted partial response (safe chunks streamed before the block).
 
 ### Behavioral Change
 
-The `token` event payload now contains sentence-sized text instead of single tokens when output guardrails are enabled. This is backward compatible — the frontend already handles arbitrary-length `content` strings.
+The `token` event payload now contains sentence-sized text instead of single tokens when output guardrails are enabled. This changes payload granularity and streaming cadence, requiring clients to explicitly opt-in or perform streaming compatibility checks to support sentence-sized chunks.
 
 ---
 
 ## Configuration Contract
 
-| Env Var | Type | Default | Description |
-|---------|------|---------|-------------|
-| `OUTPUT_GUARDRAIL_ENABLED` | bool | `true` | Kill switch for output guardrails |
-| `OUTPUT_GUARDRAIL_OVERLAP_TOKENS` | int | `30` | Sliding window overlap size |
-| `OUTPUT_GUARDRAIL_MAX_CHUNK_TOKENS` | int | `200` | Max chunk size before force-split |
-| `OUTPUT_GUARDRAIL_NEMO_TIMEOUT` | float | `2.0` | NeMo classification timeout (seconds) |
+| Env Var                             | Type  | Default | Description                           |
+| ----------------------------------- | ----- | ------- | ------------------------------------- |
+| `OUTPUT_GUARDRAIL_ENABLED`          | bool  | `true`  | Kill switch for output guardrails     |
+| `OUTPUT_GUARDRAIL_OVERLAP_TOKENS`   | int   | `30`    | Sliding window overlap size           |
+| `OUTPUT_GUARDRAIL_MAX_CHUNK_TOKENS` | int   | `200`   | Max chunk size before force-split     |
+| `OUTPUT_GUARDRAIL_NEMO_TIMEOUT`     | float | `2.0`   | NeMo classification timeout (seconds) |
 
 All values configurable per deployment without code changes. Added to `apps/agent/src/agent/config.py` via pydantic `BaseSettings`.
