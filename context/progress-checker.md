@@ -6,9 +6,9 @@ Update this file after every completed feature. Any AI agent reading this should
 
 ## Current Status
 
-**Feature:** LLM Output Guardrails (Phase 6)
-**Last completed:** Phase 6: SSE Integration — Wire Pipeline Into Streaming (Integrated OutputGuardrailPipeline into sse.py with integration tests).
-**Next:** Phase 7: Hard Stop & Partial Persistence — Failure Handling.
+**Feature:** LLM Output Guardrails (Phase 6 / User Story 3)
+**Last completed:** Phase 4 (US2: PII Leak Prevention & Boundary Detection) and Phase 5 (US3: Harmful Content Blocking / NeMo wiring) tasks in `tasks.md` are implemented and verified.
+**Next:** Phase 7: Hard Stop & Partial Persistence — Failure Handling (implementation of formal tests, logging, etc.).
 
 ---
 

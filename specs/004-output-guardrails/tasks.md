@@ -73,12 +73,12 @@
 
 ### Tests for User Story 2
 
-- [ ] T014 [P] [US2] Create unit tests for sliding window and boundary PII in apps/agent/tests/test_output_pipeline.py
+- [x] T014 [P] [US2] Create unit tests for sliding window and boundary PII in apps/agent/tests/test_output_pipeline.py
 
 ### Implementation for User Story 2
 
-- [ ] T015 [US2] Implement regex PII scanning on chunks in apps/agent/src/agent/guardrails/output_pipeline.py
-- [ ] T016 [US2] Implement sliding window and scan overlap region in apps/agent/src/agent/guardrails/output_pipeline.py
+- [x] T015 [US2] Implement regex PII scanning on chunks in apps/agent/src/agent/guardrails/output_pipeline.py
+- [x] T016 [US2] Implement sliding window and scan overlap region in apps/agent/src/agent/guardrails/output_pipeline.py
 
 **Checkpoint**: At this point, User Stories 1 AND 2 should both work independently
 
@@ -92,11 +92,11 @@
 
 ### Tests for User Story 3
 
-- [ ] T017 [P] [US3] Create unit tests for NeMo classification and timeout fail-closed behavior in apps/agent/tests/test_output_pipeline.py
+- [x] T017 [P] [US3] Create unit tests for NeMo classification and timeout fail-closed behavior in apps/agent/tests/test_output_pipeline.py
 
 ### Implementation for User Story 3
 
-- [ ] T018 [US3] Wire NeMo validation layer into the OutputGuardrailPipeline in apps/agent/src/agent/guardrails/output_pipeline.py
+- [x] T018 [US3] Wire NeMo validation layer into the OutputGuardrailPipeline in apps/agent/src/agent/guardrails/output_pipeline.py
 
 **Checkpoint**: All P1 user stories should now be independently functional
 

@@ -1,5 +1,5 @@
 import pytest
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
 from agent.guardrails.output_pipeline import OutputGuardrailPipeline, OutputGuardrailBlockedError
 from agent.config import OutputGuardrailConfig
 
@@ -112,3 +112,73 @@ async def test_pipeline_disabled_passthrough(disabled_config, mock_nemo_service)
     # In disabled mode, tokens must be passed through immediately (without chunk buffering/validation)
     assert yielded_chunks == tokens
     mock_nemo_service.validate_output_chunk.assert_not_called()
+
+@pytest.mark.asyncio
+async def test_pipeline_regex_pii_blocking(enabled_config, mock_nemo_service):
+    pipeline = OutputGuardrailPipeline(config=enabled_config, nemo_service=mock_nemo_service)
+    
+    # Email PII in token
+    tokens = ["Email", " ", "is", " ", "test@example.com", ". ", "Next", " ", "sentence", "."]
+    
+    with pytest.raises(OutputGuardrailBlockedError) as exc_info:
+        for token in tokens:
+            async for _ in pipeline.process_token(token):
+                pass
+        async for _ in pipeline.flush():
+            pass
+
+    assert exc_info.value.partial_response == ""
+    assert str(exc_info.value) == "Output safety violation: PII detected."
+    # NeMo should NOT be called because regex failed first (FR-005)
+    mock_nemo_service.validate_output_chunk.assert_not_called()
+
+@pytest.mark.asyncio
+async def test_pipeline_boundary_pii_blocking(enabled_config, mock_nemo_service):
+    pipeline = OutputGuardrailPipeline(config=enabled_config, nemo_service=mock_nemo_service)
+    mock_nemo_service.validate_output_chunk.return_value = (True, "")
+
+    # We manually feed chunks to test the boundary check.
+    # Chunk 1 ends with "john.doe", Chunk 2 starts with "@example.com"
+    # Separately, neither contains PII. Combined, they contain john.doe@example.com.
+    
+    # 1. Process first safe chunk
+    # We will patch ChunkBuffer to return the chunks we want
+    with patch.object(pipeline.buffer, "add_token") as mock_add_token:
+        mock_add_token.return_value = "My contact is john.doe"
+        yielded = []
+        async for chunk in pipeline.process_token("dummy"):
+            yielded.append(chunk)
+            
+        assert len(yielded) == 1
+        assert yielded[0] == "My contact is john.doe"
+        assert pipeline.partial_response == "My contact is john.doe"
+        
+    # 2. Process second chunk which completes the email address
+    with patch.object(pipeline.buffer, "add_token") as mock_add_token:
+        mock_add_token.return_value = "@example.com is the address."
+        
+        with pytest.raises(OutputGuardrailBlockedError) as exc_info:
+            async for chunk in pipeline.process_token("dummy"):
+                pass
+                
+        assert exc_info.value.partial_response == "My contact is john.doe"
+        assert str(exc_info.value) == "Output safety violation: PII detected."
+
+@pytest.mark.asyncio
+async def test_pipeline_nemo_timeout_fail_closed(enabled_config, mock_nemo_service):
+    # If NeMo fails closed (timeout or exception), it should block
+    mock_nemo_service.validate_output_chunk.return_value = (False, "Safety check unavailable.")
+    
+    pipeline = OutputGuardrailPipeline(config=enabled_config, nemo_service=mock_nemo_service)
+    
+    tokens = ["This", " ", "is", " ", "a", " ", "chunk", "."]
+    
+    with pytest.raises(OutputGuardrailBlockedError) as exc_info:
+        for token in tokens:
+            async for _ in pipeline.process_token(token):
+                pass
+        async for _ in pipeline.flush():
+            pass
+            
+    assert str(exc_info.value) == "Safety check unavailable."
+
