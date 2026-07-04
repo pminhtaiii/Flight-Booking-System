@@ -169,10 +169,10 @@ FastAPI NemoGuardrailService runs safety checks (length, regex heuristics, Mimo 
                 ↓
             Orchestrates LangGraph StateGraph agent with Mimo model and read-only tools (search_flights, get_user_preferences, list_user_bookings) via NestJS Agent Gateway
                 ↓
-            Tokens fed into OutputGuardrailPipeline (accumulates tokens to sentences → regex scan & NeMo safety check)
+            Tokens fed into OutputGuardrailPipeline (accumulates tokens to sentences → concurrent lookahead regex scan & NeMo safety check)
                 ├── Safety check FAILS/BLOCKED → Log security event, emit OUTPUT_GUARDRAIL_BLOCKED error, persist partial response, and close stream
                 └── Safety check PASSES ↓
-                    Safe chunks streamed back to frontend via SSE in real time
+                    Safe chunks streamed back to frontend via SSE in real time (structured JSON latency & verdict logged per check)
                 ↓
             Upon completion, full conversation Turn persisted via NestJS Chat API
 ```
