@@ -2,6 +2,7 @@ import re
 import time
 import logging
 import httpx
+import asyncio
 from typing import Tuple
 from agent.config import get_settings
 
@@ -221,48 +222,60 @@ class NemoGuardrailService:
             "max_tokens": 5
         }
 
-        try:
-            async with httpx.AsyncClient() as client:
-                response = await client.post(
-                    url, 
-                    json=payload, 
-                    headers=headers, 
-                    timeout=self.nemo_timeout
-                )
-                response.raise_for_status()
-                data = response.json()
-                classification = data["choices"][0]["message"]["content"].strip().upper()
-                latency_ms = int((time.time() - start_time) * 1000)
-
-                if classification == "UNSAFE":
-                    self._is_healthy = True
-                    logger.warning(
-                        "Security event: output blocked. Reason: LLM Safety Violation. Latency: %dms.",
+        max_attempts = 2
+        classification = None
+        for attempt in range(max_attempts):
+            try:
+                async with httpx.AsyncClient() as client:
+                    response = await client.post(
+                        url, 
+                        json=payload, 
+                        headers=headers, 
+                        timeout=self.nemo_timeout
+                    )
+                    response.raise_for_status()
+                    data = response.json()
+                    classification = data["choices"][0]["message"]["content"].strip().upper()
+                    break
+            except Exception as e:  # noqa: BLE001
+                if attempt == max_attempts - 1:
+                    latency_ms = int((time.time() - start_time) * 1000)
+                    logger.error(
+                        "Security event: output blocked. Reason: Guardrails API error after %d attempts: %s. Latency: %dms.",
+                        max_attempts,
+                        str(e),
                         latency_ms
                     )
-                    return False, "Output safety violation."
-                elif classification == "SAFE":
-                    self._is_healthy = True
-                    logger.info("Security event: output allowed. Latency: %dms.", latency_ms)
-                    return True, ""
-                else:
                     self._is_healthy = False
-                    logger.warning(
-                        "Security event: output blocked. Reason: Unexpected LLM classification '%s'. Latency: %dms.",
-                        classification,
-                        latency_ms
-                    )
-                    return False, "Output safety violation."
+                    return False, "Safety check unavailable."
+                
+                logger.warning(
+                    "Guardrails API attempt %d failed: %s. Retrying in 100ms...",
+                    attempt + 1,
+                    str(e)
+                )
+                await asyncio.sleep(0.1)
 
-        except Exception as e:
-            latency_ms = int((time.time() - start_time) * 1000)
-            logger.error(
-                "Security event: output blocked. Reason: Guardrails API error: %s. Latency: %dms.",
-                str(e),
+        latency_ms = int((time.time() - start_time) * 1000)
+        if classification == "UNSAFE":
+            self._is_healthy = True
+            logger.warning(
+                "Security event: output blocked. Reason: LLM Safety Violation. Latency: %dms.",
                 latency_ms
             )
+            return False, "Output safety violation."
+        elif classification == "SAFE":
+            self._is_healthy = True
+            logger.info("Security event: output allowed. Latency: %dms.", latency_ms)
+            return True, ""
+        else:
             self._is_healthy = False
-            return False, "Safety check unavailable."
+            logger.warning(
+                "Security event: output blocked. Reason: Unexpected LLM classification '%s'. Latency: %dms.",
+                classification,
+                latency_ms
+            )
+            return False, "Output safety violation."
 
     def is_healthy(self) -> bool:
         if not self.mimo_api_url or not self.mimo_api_key:

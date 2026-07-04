@@ -15,6 +15,36 @@ from agent.guardrails.output_pipeline import OutputGuardrailPipeline, OutputGuar
 logger = logging.getLogger("agent.streaming")
 router = APIRouter()
 
+async def _resolve_user_message(body, graph, config) -> str:
+    """
+    Resolves the original user message from body or graph state.
+    """
+    if body.message:
+        return body.message
+    try:
+        current_state = await graph.aget_state(config)
+        for msg in reversed(current_state.values.get("messages", [])):
+            if (isinstance(msg, HumanMessage) or 
+                msg.__class__.__name__ == "HumanMessage" or 
+                getattr(msg, "type", "") == "human"):
+                return msg.content
+    except Exception as e:  # noqa: BLE001
+        logger.warning(f"Failed to retrieve user message from graph state: {e!s}")
+    return "Action confirmed"
+
+async def _persist_response(client, session_id: str, user_msg: str, response_text: str, use_shield: bool = False):
+    """
+    Persists the user and agent messages as a batch.
+    Returns the batch result dictionary.
+    """
+    payload = [
+        {"sender": "USER", "type": "STANDARD", "content": user_msg},
+        {"sender": "AGENT", "type": "STANDARD", "content": response_text}
+    ]
+    if use_shield:
+        return await asyncio.shield(client.create_message_batch(session_id, payload))
+    return await client.create_message_batch(session_id, payload)
+
 @router.post("/chat/stream")
 async def chat_stream(
     request: Request,
@@ -187,24 +217,11 @@ async def chat_stream(
                 else:
                     # Completed turn - Persist message batch and send done event
                     if partial_response.strip():
-                        # Extract original user message content
-                        user_msg_content = body.message
-                        if not user_msg_content:
-                            for msg in reversed(current_state.values.get("messages", [])):
-                                if isinstance(msg, HumanMessage) or msg.__class__.__name__ == "HumanMessage" or getattr(msg, "type", "") == "human":
-                                    user_msg_content = msg.content
-                                    break
-                        if not user_msg_content:
-                            user_msg_content = "Action confirmed"
-
-                        messages_payload = [
-                            {"sender": "USER", "type": "STANDARD", "content": user_msg_content},
-                            {"sender": "AGENT", "type": "STANDARD", "content": partial_response}
-                        ]
+                        user_msg_content = await _resolve_user_message(body, graph, config)
                         try:
-                            batch_res = await client.create_message_batch(session_id, messages_payload)
+                            batch_res = await _persist_response(client, session_id, user_msg_content, partial_response)
                             persisted = True
-                        except Exception as persist_err:
+                        except Exception as persist_err:  # noqa: BLE001
                             logger.error(f"Failed to persist completed response: {persist_err!s}")
                             await q.put({
                                 "event": "error",
@@ -243,26 +260,13 @@ async def chat_stream(
                 partial_message_id = None
                 if not persisted and e.partial_response and e.partial_response.strip():
                     try:
-                        user_msg_content = body.message
-                        if not user_msg_content:
-                            current_state = await graph.aget_state(config)
-                            for msg in reversed(current_state.values.get("messages", [])):
-                                if isinstance(msg, HumanMessage) or msg.__class__.__name__ == "HumanMessage" or getattr(msg, "type", "") == "human":
-                                    user_msg_content = msg.content
-                                    break
-                        if not user_msg_content:
-                            user_msg_content = "Action confirmed"
-
-                        messages_payload = [
-                            {"sender": "USER", "type": "STANDARD", "content": user_msg_content},
-                            {"sender": "AGENT", "type": "STANDARD", "content": e.partial_response}
-                        ]
-                        batch_res = await client.create_message_batch(session_id, messages_payload)
+                        user_msg_content = await _resolve_user_message(body, graph, config)
+                        batch_res = await _persist_response(client, session_id, user_msg_content, e.partial_response)
                         persisted = True
                         for msg in batch_res.get("messages", []):
                             if msg.get("sender") == "AGENT":
                                 partial_message_id = msg.get("id")
-                    except Exception as persist_err:
+                    except Exception as persist_err:  # noqa: BLE001
                         logger.error(f"Failed to persist partial response on guardrail block: {persist_err!s}")
                 
                 await q.put({
@@ -277,50 +281,24 @@ async def chat_stream(
                 logger.warning(f"Connection dropped mid-stream for session {session_id}.")
                 if not persisted and partial_response and partial_response.strip():
                     try:
-                        user_msg_content = body.message
-                        if not user_msg_content:
-                            current_state = await graph.aget_state(config)
-                            for msg in reversed(current_state.values.get("messages", [])):
-                                if isinstance(msg, HumanMessage) or msg.__class__.__name__ == "HumanMessage" or getattr(msg, "type", "") == "human":
-                                    user_msg_content = msg.content
-                                    break
-                        if not user_msg_content:
-                            user_msg_content = "Action confirmed"
-
-                        messages_payload = [
-                            {"sender": "USER", "type": "STANDARD", "content": user_msg_content},
-                            {"sender": "AGENT", "type": "STANDARD", "content": partial_response}
-                        ]
-                        await asyncio.shield(client.create_message_batch(session_id, messages_payload))
+                        user_msg_content = await _resolve_user_message(body, graph, config)
+                        await _persist_response(client, session_id, user_msg_content, partial_response, use_shield=True)
                         persisted = True
-                    except Exception as e:
+                    except Exception as e:  # noqa: BLE001
                         logger.error(f"Failed to persist partial response on connection drop: {e!s}")
                 raise
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001
                 logger.exception("LLM error during streaming")
                 partial_message_id = None
                 if not persisted and partial_response and partial_response.strip():
                     try:
-                        user_msg_content = body.message
-                        if not user_msg_content:
-                            current_state = await graph.aget_state(config)
-                            for msg in reversed(current_state.values.get("messages", [])):
-                                if isinstance(msg, HumanMessage) or msg.__class__.__name__ == "HumanMessage" or getattr(msg, "type", "") == "human":
-                                    user_msg_content = msg.content
-                                    break
-                        if not user_msg_content:
-                            user_msg_content = "Action confirmed"
-
-                        messages_payload = [
-                            {"sender": "USER", "type": "STANDARD", "content": user_msg_content},
-                            {"sender": "AGENT", "type": "STANDARD", "content": partial_response}
-                        ]
-                        batch_res = await client.create_message_batch(session_id, messages_payload)
+                        user_msg_content = await _resolve_user_message(body, graph, config)
+                        batch_res = await _persist_response(client, session_id, user_msg_content, partial_response)
                         persisted = True
                         for msg in batch_res.get("messages", []):
                             if msg.get("sender") == "AGENT":
                                 partial_message_id = msg.get("id")
-                    except Exception as persist_err:
+                    except Exception as persist_err:  # noqa: BLE001
                         logger.error(f"Failed to persist partial response on LLM error: {persist_err!s}")
                 
                 await q.put({

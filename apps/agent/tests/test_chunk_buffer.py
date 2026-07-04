@@ -65,6 +65,14 @@ def test_abbreviation_heuristics():
     assert buffer2.add_token("They had a meeting. ") == "Dr. Smith met Mr. Jones on St. Jude road. "
     assert buffer2.flush() == "They had a meeting. "
 
+    # Compound time abbreviations: a.m., p.m., am, pm
+    buffer3 = ChunkBuffer()
+    assert buffer3.add_token("We arrive at 10 p.m. Wednesday. ") is None
+    assert buffer3.add_token("Then we leave at 8 a.m. Thursday. ") == "We arrive at 10 p.m. Wednesday. "
+    assert buffer3.add_token("Flight at 12 pm. Friday. ") == "Then we leave at 8 a.m. Thursday. "
+    assert buffer3.add_token("Ok") == "Flight at 12 pm. Friday. "
+    assert buffer3.flush() == "Ok"
+
 def test_decimal_numbers():
     # Should skip splitting on decimal numbers (dot preceded by digits and followed by digit)
     buffer = ChunkBuffer()

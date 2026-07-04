@@ -58,7 +58,7 @@ class ChunkBuffer:
         # Common abbreviations to skip
         ABBREVIATIONS = {
             "mr", "dr", "st", "mrs", "ms", "jr", "sr", "prof", "vs",
-            "inc", "co", "corp", "a.m", "p.m"
+            "inc", "co", "corp", "am", "pm"
         }
 
         while i < n:
@@ -94,7 +94,15 @@ class ChunkBuffer:
                         if len(prev_word) == 1 and prev_word.isupper():
                             i += 1
                             continue
-                        if prev_word.lower() in ABBREVIATIONS:
+                        
+                        # Check for compound abbreviations like a.m. / p.m.
+                        is_ampm = False
+                        if i >= 3:
+                            last_3 = text[i-3:i].lower()
+                            if last_3 in ("a.m", "p.m"):
+                                is_ampm = True
+
+                        if prev_word.lower() in ABBREVIATIONS or is_ampm:
                             i += 1
                             continue
                             
@@ -128,8 +136,8 @@ class ChunkBuffer:
             try:
                 tokens = self.encoding.encode(self.buffer)
                 return len(tokens) > self.max_chunk_tokens
-            except Exception:
-                pass
+            except Exception as e:  # noqa: BLE001
+                logger.warning(f"tiktoken encode failed, falling back to char approximation: {e!s}")
         # Fallback to character approximation
         return len(self.buffer) > self.max_chunk_tokens * 4
 
@@ -149,8 +157,8 @@ class ChunkBuffer:
                 
                 self.buffer = suffix
                 return prefix
-            except Exception:
-                pass
+            except Exception as e:  # noqa: BLE001
+                logger.warning(f"tiktoken split failed, falling back to char approximation: {e!s}")
                 
         # Fallback to character split
         char_limit = self.max_chunk_tokens * 4

@@ -20,16 +20,6 @@ class OutputGuardrailPipeline:
         self.buffer = ChunkBuffer(max_chunk_tokens=getattr(config, "max_chunk_tokens", 200))
         self.partial_response = ""
 
-        # Safe mock interception to prevent other tests from throwing "MagicMock can't be used in 'await' expression"
-        try:
-            from unittest.mock import Mock, AsyncMock
-            if isinstance(nemo_service, Mock):
-                val_func = getattr(nemo_service, "validate_output_chunk", None)
-                if val_func is not None and not isinstance(val_func, AsyncMock):
-                    nemo_service.validate_output_chunk = AsyncMock(return_value=(True, ""))
-        except Exception:
-            pass
-
     async def process_token(self, token: str) -> AsyncGenerator[str, None]:
         """
         Feeds a token into the pipeline, yielding any safe completed chunks.
