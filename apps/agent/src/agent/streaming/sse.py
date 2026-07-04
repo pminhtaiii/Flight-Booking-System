@@ -13,6 +13,7 @@ from langchain_core.messages import HumanMessage
 from agent.guardrails.output_pipeline import OutputGuardrailPipeline, OutputGuardrailBlockedError
 
 logger = logging.getLogger("agent.streaming")
+guardrails_logger = logging.getLogger("agent.guardrails")
 router = APIRouter()
 
 async def _resolve_user_message(body, graph, config) -> str:
@@ -121,7 +122,7 @@ async def chat_stream(
         # Background producer task
         async def producer():
             output_config = settings.output_guardrail
-            pipeline = OutputGuardrailPipeline(config=output_config, nemo_service=guardrails)
+            pipeline = OutputGuardrailPipeline(config=output_config, nemo_service=guardrails, session_id=session_id)
             partial_response = ""
             persisted = False
             config = {
@@ -256,7 +257,13 @@ async def chat_stream(
                     else:
                         logger.warning(f"Empty or whitespace-only response generated for session {session_id}.")
             except OutputGuardrailBlockedError as e:
-                logger.warning("Security alert: LLM output blocked by guardrail.")
+                guardrails_logger.warning(json.dumps({
+                    "event": "security_block",
+                    "session_id": session_id,
+                    "guardrail_layer": e.layer,
+                    "rule_name": e.rule,
+                    "message": "LLM output blocked by guardrail"
+                }))
                 partial_message_id = None
                 if not persisted and e.partial_response and e.partial_response.strip():
                     try:

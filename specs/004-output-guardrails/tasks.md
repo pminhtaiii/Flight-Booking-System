@@ -110,12 +110,12 @@
 
 ### Tests for User Story 4
 
-- [ ] T019 [P] [US4] Create unit tests for hard stop, partial persistence, and error events in apps/agent/tests/test_hard_stop.py
+- [x] T019 [P] [US4] Create unit tests for hard stop, partial persistence, and error events in apps/agent/tests/test_hard_stop.py
 
 ### Implementation for User Story 4
 
-- [ ] T020 [US4] Implement Hard Stop handler in apps/agent/src/agent/streaming/sse.py
-- [ ] T021 [US4] Implement partial response persistence via NestJS client in apps/agent/src/agent/streaming/sse.py
+- [x] T020 [US4] Implement Hard Stop handler in apps/agent/src/agent/streaming/sse.py
+- [x] T021 [US4] Implement partial response persistence via NestJS client in apps/agent/src/agent/streaming/sse.py
 
 ---
 

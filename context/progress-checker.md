@@ -6,9 +6,9 @@ Update this file after every completed feature. Any AI agent reading this should
 
 ## Current Status
 
-**Feature:** LLM Output Guardrails (Phase 6 / User Story 3)
-**Last completed:** Phase 4 (US2: PII Leak Prevention & Boundary Detection) and Phase 5 (US3: Harmful Content Blocking / NeMo wiring) tasks in `tasks.md` are implemented and verified.
-**Next:** Phase 7: Hard Stop & Partial Persistence — Failure Handling (implementation of formal tests, logging, etc.).
+**Feature:** LLM Output Guardrails (Phase 7 / User Story 4)
+**Last completed:** Phase 7: Hard Stop & Partial Persistence (implementation of formal tests, logging, etc.) is implemented and verified.
+**Next:** Phase 8: Pipeline Parallelism — Latency Optimization.
 
 ---
 
@@ -22,7 +22,7 @@ Update this file after every completed feature. Any AI agent reading this should
 - [x] Phase 4: NeMo Output Rail — Safety Classification
 - [x] Phase 5: Output Guardrail Pipeline — Orchestration
 - [x] Phase 6: SSE Integration — Wire Pipeline Into Streaming
-- [ ] Phase 7: Hard Stop & Partial Persistence — Failure Handling
+- [x] Phase 7: Hard Stop & Partial Persistence — Failure Handling
 - [ ] Phase 8: Pipeline Parallelism — Latency Optimization
 - [ ] Phase 9: Observability & Logging — Structured Telemetry
 - [ ] Phase 10: E2E Testing & Validation — Final Verification

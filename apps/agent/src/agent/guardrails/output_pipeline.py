@@ -8,17 +8,20 @@ class OutputGuardrailBlockedError(Exception):
     """
     Raised when an output chunk fails safety validation.
     """
-    def __init__(self, partial_response: str, message: str = "Response was blocked for safety reasons."):
+    def __init__(self, partial_response: str, layer: str, rule: str, message: str = "Response was blocked for safety reasons."):
         self.partial_response = partial_response
+        self.layer = layer
+        self.rule = rule
         super().__init__(message)
 
 class OutputGuardrailPipeline:
     """
     Orchestrates output safety validation using a layered pipeline.
     """
-    def __init__(self, config, nemo_service: GuardrailService):
+    def __init__(self, config, nemo_service: GuardrailService, session_id: str = None):
         self.config = config
         self.nemo_service = nemo_service
+        self.session_id = session_id
         self.buffer = ChunkBuffer(max_chunk_tokens=getattr(config, "max_chunk_tokens", 200))
         self.overlap_tokens = getattr(config, "overlap_tokens", 30)
         self.partial_response = ""
@@ -65,6 +68,8 @@ class OutputGuardrailPipeline:
         if detect_pii(overlap_string):
             raise OutputGuardrailBlockedError(
                 partial_response=self.partial_response,
+                layer="boundary",
+                rule="PII detection",
                 message="Output safety violation: PII detected."
             )
 
@@ -78,6 +83,8 @@ class OutputGuardrailPipeline:
         if detect_pii(chunk):
             raise OutputGuardrailBlockedError(
                 partial_response=self.partial_response,
+                layer="regex",
+                rule="PII detection",
                 message="Output safety violation: PII detected."
             )
 
@@ -85,12 +92,16 @@ class OutputGuardrailPipeline:
         if not self.nemo_service:
             raise OutputGuardrailBlockedError(
                 partial_response=self.partial_response,
+                layer="nemo",
+                rule="Safety check unavailable.",
                 message="Safety check unavailable."
             )
         is_safe, reason = await self.nemo_service.validate_output_chunk(chunk)
         if not is_safe:
             raise OutputGuardrailBlockedError(
                 partial_response=self.partial_response,
+                layer="nemo",
+                rule=reason or "Output safety violation.",
                 message=reason or "Output safety violation."
             )
 
