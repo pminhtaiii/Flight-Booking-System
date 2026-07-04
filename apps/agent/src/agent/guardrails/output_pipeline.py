@@ -142,13 +142,13 @@ class OutputGuardrailPipeline:
                         )
                 except OutputGuardrailBlockedError:
                     raise
-                except Exception:
+                except Exception as e:
                     raise OutputGuardrailBlockedError(
                         partial_response=self.partial_response,
                         layer="nemo",
                         rule="Safety check unavailable.",
                         message="Safety check unavailable."
-                    )
+                    ) from e
                 self.partial_response += self.pending_chunk
                 yield self.pending_chunk
                 self.pending_validation_task = None
@@ -211,7 +211,7 @@ class OutputGuardrailPipeline:
                         layer="nemo",
                         rule="Safety check unavailable.",
                         message="Safety check unavailable."
-                    )
+                    ) from e
                 finally:
                     latency_nemo = (time.perf_counter() - start_nemo) * 1000.0
                     self._log_sync_check(
@@ -261,13 +261,13 @@ class OutputGuardrailPipeline:
                         )
                 except OutputGuardrailBlockedError:
                     raise
-                except Exception:
+                except Exception as e:
                     raise OutputGuardrailBlockedError(
                         partial_response=self.partial_response,
                         layer="nemo",
                         rule="Safety check unavailable.",
                         message="Safety check unavailable."
-                    )
+                    ) from e
                 self.partial_response += self.pending_chunk
                 yield self.pending_chunk
                 self.pending_validation_task = None
@@ -329,7 +329,7 @@ class OutputGuardrailPipeline:
                     layer="nemo",
                     rule="Safety check unavailable.",
                     message="Safety check unavailable."
-                )
+                ) from e
             finally:
                 latency_nemo = (time.perf_counter() - start_nemo) * 1000.0
                 self._log_sync_check(
@@ -363,17 +363,31 @@ class OutputGuardrailPipeline:
                         )
                 except OutputGuardrailBlockedError:
                     raise
-                except Exception:
+                except Exception as e:
                     raise OutputGuardrailBlockedError(
                         partial_response=self.partial_response,
                         layer="nemo",
                         rule="Safety check unavailable.",
                         message="Safety check unavailable."
-                    )
+                    ) from e
                 self.partial_response += self.pending_chunk
                 yield self.pending_chunk
                 self.pending_validation_task = None
                 self.pending_chunk = None
+
+    async def aclose(self) -> None:
+        """
+        Cancels any in-flight background validation task.
+        """
+        if self.pending_validation_task and not self.pending_validation_task.done():
+            self.pending_validation_task.cancel()
+            try:
+                await self.pending_validation_task
+            except asyncio.CancelledError:
+                pass
+            except Exception:  # noqa: BLE001
+                pass
+            self.pending_validation_task = None
 
 
 

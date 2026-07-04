@@ -104,6 +104,7 @@ async def chat_stream(
         await queue_manager.acquire(session_id)
 
     released = False
+    pipeline = None
     try:
         # 5. Fetch memory context from NestJS Client
         try:
@@ -121,6 +122,7 @@ async def chat_stream(
 
         # Background producer task
         async def producer():
+            nonlocal pipeline
             output_config = settings.output_guardrail
             pipeline = OutputGuardrailPipeline(config=output_config, nemo_service=guardrails, session_id=session_id)
             partial_response = ""
@@ -338,6 +340,8 @@ async def chat_stream(
                 active_streams.discard(q)
                 if not producer_task.done():
                     producer_task.cancel()
+                if pipeline:
+                    await pipeline.aclose()
                 if queue_manager and not released:
                     released = True
                     await queue_manager.release(session_id)
