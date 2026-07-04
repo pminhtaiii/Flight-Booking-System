@@ -377,17 +377,22 @@ class OutputGuardrailPipeline:
 
     async def aclose(self) -> None:
         """
-        Cancels any in-flight background validation task.
+        Cancels and cleans up any background validation tasks.
         """
-        if self.pending_validation_task and not self.pending_validation_task.done():
-            self.pending_validation_task.cancel()
+        task = self.pending_validation_task
+        self.pending_validation_task = None
+        self.pending_chunk = None
+
+        if task:
+            if not task.done():
+                task.cancel()
             try:
-                await self.pending_validation_task
+                await task
             except asyncio.CancelledError:
                 pass
-            except Exception:  # noqa: BLE001
-                pass
-            self.pending_validation_task = None
+            except Exception as e:  # noqa: BLE001
+                logger = logging.getLogger("agent.guardrails")
+                logger.warning(f"Background validation task encountered error during cleanup: {e!s}")
 
 
 
