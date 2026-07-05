@@ -6,9 +6,9 @@ Update this file after every completed feature. Any AI agent reading this should
 
 ## Current Status
 
-**Feature:** Map Integration (Phase 2)
-**Last completed:** Phase 2: Airport REST API Endpoints (GET /airports/search, GET /airports/nearby, GET /airports/all, and GET /airports/:iataCode with Redis caching).
-**Next:** Phase 3: Map Component Foundation.
+**Feature:** Map Integration (Phase 6)
+**Last completed:** Phase 3-6: Map Component Foundation, Airport Markers & Popups, Flight Route Arc Rendering, and Search Page Integration (complete search results layout with real-time map preview).
+**Next:** Phase 7: Flight Details Page Map & Polish.
 
 ---
 
@@ -108,10 +108,10 @@ Update this file after every completed feature. Any AI agent reading this should
 
 - [x] Phase 1: Airport Data Model & Database Seed (Airport Prisma model, database migration, shared typescript definitions, and OurAirports CSV database seed)
 - [x] Phase 2: Airport REST API Endpoints
-- [ ] Phase 3: Map Component Foundation
-- [ ] Phase 4: Airport Markers & Popups
-- [ ] Phase 5: Flight Route Arc Rendering
-- [ ] Phase 6: Search Page Integration
+- [x] Phase 3: Map Component Foundation
+- [x] Phase 4: Airport Markers & Popups
+- [x] Phase 5: Flight Route Arc Rendering
+- [x] Phase 6: Search Page Integration
 - [ ] Phase 7: Flight Details Page Map & Polish
 
 ---

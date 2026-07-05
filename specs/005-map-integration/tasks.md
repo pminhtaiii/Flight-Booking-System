@@ -55,15 +55,15 @@
 
 ### Frontend Map Foundation & Components
 
-- [ ] T013 Install map dependencies: `maplibre-gl`, `react-map-gl`, `@turf/great-circle`, `@turf/helpers` in `apps/web/package.json`
-- [ ] T014 [US1] Create frontend API client in `apps/web/lib/airport-service.ts` to call backend airport endpoints
-- [ ] T015 [US1] Create `MapContainer.tsx` in `apps/web/components/map/MapContainer.tsx` with dynamic Next.js wrapper (ssr: false)
-- [ ] T016 [US1] Create `MapControls.tsx` in `apps/web/components/map/MapControls.tsx` for zoom and styles
-- [ ] T017 [US1] Create `AirportMarkerLayer.tsx` in `apps/web/components/map/AirportMarkerLayer.tsx` using clustered markers
-- [ ] T018 [US1] Create `AirportPopup.tsx` in `apps/web/components/map/AirportPopup.tsx` showing details on click
-- [ ] T019 [US1] Create `FlightRouteLayer.tsx` in `apps/web/components/map/FlightRouteLayer.tsx` using Turf great-circle arcs
-- [ ] T020 [US1] Create helper utilities in `apps/web/components/map/map-utils.ts` for great-circle routes and viewport bound fits
-- [ ] T021 [US1] Integrate map panel into the search results page layout in `apps/web/app/search/page.tsx`
+- [x] T013 Install map dependencies: `maplibre-gl`, `react-map-gl`, `@turf/great-circle`, `@turf/helpers` in `apps/web/package.json`
+- [x] T014 [US1] Create frontend API client in `apps/web/lib/airport-service.ts` to call backend airport endpoints
+- [x] T015 [US1] Create `MapContainer.tsx` in `apps/web/components/map/MapContainer.tsx` with dynamic Next.js wrapper (ssr: false)
+- [x] T016 [US1] Create `MapControls.tsx` in `apps/web/components/map/MapControls.tsx` for zoom and styles
+- [x] T017 [US1] Create `AirportMarkerLayer.tsx` in `apps/web/components/map/AirportMarkerLayer.tsx` using clustered markers
+- [x] T018 [US1] Create `AirportPopup.tsx` in `apps/web/components/map/AirportPopup.tsx` showing details on click
+- [x] T019 [US1] Create `FlightRouteLayer.tsx` in `apps/web/components/map/FlightRouteLayer.tsx` using Turf great-circle arcs
+- [x] T020 [US1] Create helper utilities in `apps/web/components/map/map-utils.ts` for great-circle routes and viewport bound fits
+- [x] T021 [US1] Integrate map panel into the search results page layout in `apps/web/app/search/page.tsx`
 
 **Checkpoint**: User Story 1 is functional. Can search flights, see markers and curved route arc on results page.
 
