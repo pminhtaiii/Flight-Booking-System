@@ -73,8 +73,8 @@
 
 **Goal**: real-time map preview during autocomplete typing and selection
 
-- [ ] T022 [US2] Implement autocomplete suggestion list dropdown on origin/destination fields in flight search form
-- [ ] T023 [US2] Wire selection change in search form to place live preview markers and dashed preview arcs on map
+- [x] T022 [US2] Implement autocomplete suggestion list dropdown on origin/destination fields in flight search form
+- [x] T023 [US2] Wire selection change in search form to place live preview markers and dashed preview arcs on map
 
 ---
 

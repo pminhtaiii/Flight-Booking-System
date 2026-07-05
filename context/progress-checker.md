@@ -6,9 +6,9 @@ Update this file after every completed feature. Any AI agent reading this should
 
 ## Current Status
 
-**Feature:** Map Integration (Phase 6)
-**Last completed:** Phase 3-6: Map Component Foundation, Airport Markers & Popups, Flight Route Arc Rendering, and Search Page Integration (complete search results layout with real-time map preview).
-**Next:** Phase 7: Flight Details Page Map & Polish.
+**Feature:** Map Integration (Phase 4 of Tasks: Autocomplete & Live Map Preview)
+**Last completed:** Phase 4: Autocomplete suggestion dropdowns (click-outside and Escape key handling) and live map markers/dashed preview arcs synchronization.
+**Next:** Phase 5: Flight Route Details Map (layovers & detail mapping).
 
 ---
 

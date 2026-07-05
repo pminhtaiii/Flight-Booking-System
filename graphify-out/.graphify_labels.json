@@ -249,5 +249,16 @@
   "247": "test_pipeline_parallelism.py",
   "248": "Sketch Manifest",
   "249": "airports.ts",
-  "250": "seed.ts"
+  "250": "seed.ts",
+  "251": "devDependencies",
+  "252": "MapContainerInner.tsx",
+  "253": "page.tsx",
+  "254": "test_tools.py",
+  "255": "scripts",
+  "256": "plan.md",
+  "259": "amadeus.types.ts",
+  "260": "index.ts",
+  "261": "package.json",
+  "262": "page.tsx",
+  "264": "adversarial.e2e-spec.ts"
 }

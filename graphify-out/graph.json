@@ -400,7 +400,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "apps_agent_src_agent_config",
-      "community": 0,
+      "community": 167,
       "norm_label": "config.py"
     },
     {
@@ -850,7 +850,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "exception",
-      "community": 13,
+      "community": 254,
       "norm_label": "exception"
     },
     {
@@ -1010,7 +1010,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "apps_agent_src_agent_main",
-      "community": 39,
+      "community": 167,
       "norm_label": "main.py"
     },
     {
@@ -1040,7 +1040,7 @@
       "source_location": "L74",
       "_origin": "ast",
       "id": "apps_agent_src_agent_main_health_check",
-      "community": 39,
+      "community": 167,
       "norm_label": "health_check()"
     },
     {
@@ -1050,7 +1050,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "apps_agent_src_agent_main_py_request",
-      "community": 39,
+      "community": 167,
       "norm_label": "request"
     },
     {
@@ -1070,7 +1070,7 @@
       "source_location": "L75",
       "_origin": "ast",
       "id": "apps_agent_src_agent_main_rationale_75",
-      "community": 39,
+      "community": 167,
       "norm_label": "perform a health check verification by checking nestjs and nemo guardrails statu"
     },
     {
@@ -1920,7 +1920,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "apps_agent_src_agent_tools_nestjs_client",
-      "community": 0,
+      "community": 167,
       "norm_label": "nestjs_client.py"
     },
     {
@@ -2540,7 +2540,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "apps_agent_tests_test_e2e_output_guardrails",
-      "community": 39,
+      "community": 167,
       "norm_label": "test_e2e_output_guardrails.py"
     },
     {
@@ -2550,7 +2550,7 @@
       "source_location": "L12",
       "_origin": "ast",
       "id": "apps_agent_tests_test_e2e_output_guardrails_mock_nestjs_client",
-      "community": 39,
+      "community": 167,
       "norm_label": "mock_nestjs_client()"
     },
     {
@@ -2560,7 +2560,7 @@
       "source_location": "L24",
       "_origin": "ast",
       "id": "apps_agent_tests_test_e2e_output_guardrails_test_e2e_output_guardrail_pipeline_validation",
-      "community": 39,
+      "community": 167,
       "norm_label": "test_e2e_output_guardrail_pipeline_validation()"
     },
     {
@@ -2840,7 +2840,7 @@
       "source_location": "L168",
       "_origin": "ast",
       "id": "apps_agent_tests_test_hard_stop_test_nestjs_persistence_fails",
-      "community": 13,
+      "community": 167,
       "norm_label": "test_nestjs_persistence_fails()"
     },
     {
@@ -3910,7 +3910,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "apps_agent_tests_test_tools",
-      "community": 13,
+      "community": 254,
       "norm_label": "test_tools.py"
     },
     {
@@ -3920,7 +3920,7 @@
       "source_location": "L14",
       "_origin": "ast",
       "id": "apps_agent_tests_test_tools_mock_client",
-      "community": 13,
+      "community": 254,
       "norm_label": "mock_client()"
     },
     {
@@ -3930,7 +3930,7 @@
       "source_location": "L23",
       "_origin": "ast",
       "id": "apps_agent_tests_test_tools_run_config",
-      "community": 13,
+      "community": 254,
       "norm_label": "run_config()"
     },
     {
@@ -3950,7 +3950,7 @@
       "source_location": "L42",
       "_origin": "ast",
       "id": "apps_agent_tests_test_tools_test_search_flights_success",
-      "community": 13,
+      "community": 254,
       "norm_label": "test_search_flights_success()"
     },
     {
@@ -3960,7 +3960,7 @@
       "source_location": "L79",
       "_origin": "ast",
       "id": "apps_agent_tests_test_tools_test_search_flights_empty",
-      "community": 13,
+      "community": 254,
       "norm_label": "test_search_flights_empty()"
     },
     {
@@ -3970,7 +3970,7 @@
       "source_location": "L91",
       "_origin": "ast",
       "id": "apps_agent_tests_test_tools_test_search_flights_error",
-      "community": 13,
+      "community": 254,
       "norm_label": "test_search_flights_error()"
     },
     {
@@ -3980,7 +3980,7 @@
       "source_location": "L103",
       "_origin": "ast",
       "id": "apps_agent_tests_test_tools_test_get_user_preferences_success",
-      "community": 13,
+      "community": 254,
       "norm_label": "test_get_user_preferences_success()"
     },
     {
@@ -3990,7 +3990,7 @@
       "source_location": "L126",
       "_origin": "ast",
       "id": "apps_agent_tests_test_tools_test_get_user_preferences_profile_not_found",
-      "community": 13,
+      "community": 254,
       "norm_label": "test_get_user_preferences_profile_not_found()"
     },
     {
@@ -4000,7 +4000,7 @@
       "source_location": "L136",
       "_origin": "ast",
       "id": "apps_agent_tests_test_tools_test_get_user_preferences_error",
-      "community": 13,
+      "community": 254,
       "norm_label": "test_get_user_preferences_error()"
     },
     {
@@ -4010,7 +4010,7 @@
       "source_location": "L144",
       "_origin": "ast",
       "id": "apps_agent_tests_test_tools_test_list_user_bookings_success",
-      "community": 13,
+      "community": 254,
       "norm_label": "test_list_user_bookings_success()"
     },
     {
@@ -4020,7 +4020,7 @@
       "source_location": "L181",
       "_origin": "ast",
       "id": "apps_agent_tests_test_tools_test_list_user_bookings_empty",
-      "community": 13,
+      "community": 254,
       "norm_label": "test_list_user_bookings_empty()"
     },
     {
@@ -4030,7 +4030,7 @@
       "source_location": "L189",
       "_origin": "ast",
       "id": "apps_agent_tests_test_tools_test_list_user_bookings_error",
-      "community": 13,
+      "community": 254,
       "norm_label": "test_list_user_bookings_error()"
     },
     {
@@ -4200,7 +4200,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "apps_api_package",
-      "community": 5,
+      "community": 261,
       "norm_label": "package.json"
     },
     {
@@ -4210,7 +4210,7 @@
       "source_location": "L2",
       "_origin": "ast",
       "id": "apps_api_package_name",
-      "community": 5,
+      "community": 261,
       "norm_label": "name"
     },
     {
@@ -4220,7 +4220,7 @@
       "source_location": "L3",
       "_origin": "ast",
       "id": "apps_api_package_version",
-      "community": 5,
+      "community": 261,
       "norm_label": "version"
     },
     {
@@ -4230,7 +4230,7 @@
       "source_location": "L4",
       "_origin": "ast",
       "id": "apps_api_package_private",
-      "community": 5,
+      "community": 261,
       "norm_label": "private"
     },
     {
@@ -4240,7 +4240,7 @@
       "source_location": "L5",
       "_origin": "ast",
       "id": "apps_api_package_scripts",
-      "community": 5,
+      "community": 255,
       "norm_label": "scripts"
     },
     {
@@ -4250,7 +4250,7 @@
       "source_location": "L6",
       "_origin": "ast",
       "id": "apps_api_package_scripts_build",
-      "community": 5,
+      "community": 255,
       "norm_label": "build"
     },
     {
@@ -4260,7 +4260,7 @@
       "source_location": "L7",
       "_origin": "ast",
       "id": "apps_api_package_scripts_start",
-      "community": 5,
+      "community": 255,
       "norm_label": "start"
     },
     {
@@ -4270,7 +4270,7 @@
       "source_location": "L8",
       "_origin": "ast",
       "id": "apps_api_package_scripts_start_dev",
-      "community": 5,
+      "community": 255,
       "norm_label": "start:dev"
     },
     {
@@ -4280,7 +4280,7 @@
       "source_location": "L9",
       "_origin": "ast",
       "id": "apps_api_package_scripts_start_debug",
-      "community": 5,
+      "community": 255,
       "norm_label": "start:debug"
     },
     {
@@ -4290,7 +4290,7 @@
       "source_location": "L10",
       "_origin": "ast",
       "id": "apps_api_package_scripts_start_prod",
-      "community": 5,
+      "community": 255,
       "norm_label": "start:prod"
     },
     {
@@ -4300,7 +4300,7 @@
       "source_location": "L11",
       "_origin": "ast",
       "id": "apps_api_package_scripts_test",
-      "community": 5,
+      "community": 255,
       "norm_label": "test"
     },
     {
@@ -4310,7 +4310,7 @@
       "source_location": "L12",
       "_origin": "ast",
       "id": "apps_api_package_scripts_test_watch",
-      "community": 5,
+      "community": 255,
       "norm_label": "test:watch"
     },
     {
@@ -4320,7 +4320,7 @@
       "source_location": "L13",
       "_origin": "ast",
       "id": "apps_api_package_scripts_test_cov",
-      "community": 5,
+      "community": 255,
       "norm_label": "test:cov"
     },
     {
@@ -4330,7 +4330,7 @@
       "source_location": "L14",
       "_origin": "ast",
       "id": "apps_api_package_scripts_test_debug",
-      "community": 5,
+      "community": 255,
       "norm_label": "test:debug"
     },
     {
@@ -4340,7 +4340,7 @@
       "source_location": "L15",
       "_origin": "ast",
       "id": "apps_api_package_scripts_test_e2e",
-      "community": 5,
+      "community": 255,
       "norm_label": "test:e2e"
     },
     {
@@ -4590,7 +4590,7 @@
       "source_location": "L42",
       "_origin": "ast",
       "id": "apps_api_package_devdependencies",
-      "community": 11,
+      "community": 251,
       "norm_label": "devdependencies"
     },
     {
@@ -4600,7 +4600,7 @@
       "source_location": "L43",
       "_origin": "ast",
       "id": "apps_api_package_devdependencies_nestjs_cli",
-      "community": 11,
+      "community": 251,
       "norm_label": "@nestjs/cli"
     },
     {
@@ -4610,7 +4610,7 @@
       "source_location": "L44",
       "_origin": "ast",
       "id": "apps_api_package_devdependencies_nestjs_schematics",
-      "community": 11,
+      "community": 251,
       "norm_label": "@nestjs/schematics"
     },
     {
@@ -4620,7 +4620,7 @@
       "source_location": "L45",
       "_origin": "ast",
       "id": "apps_api_package_devdependencies_nestjs_testing",
-      "community": 11,
+      "community": 251,
       "norm_label": "@nestjs/testing"
     },
     {
@@ -4630,7 +4630,7 @@
       "source_location": "L46",
       "_origin": "ast",
       "id": "apps_api_package_devdependencies_types_bcrypt",
-      "community": 11,
+      "community": 251,
       "norm_label": "@types/bcrypt"
     },
     {
@@ -4640,7 +4640,7 @@
       "source_location": "L47",
       "_origin": "ast",
       "id": "apps_api_package_devdependencies_types_express",
-      "community": 11,
+      "community": 251,
       "norm_label": "@types/express"
     },
     {
@@ -4650,7 +4650,7 @@
       "source_location": "L48",
       "_origin": "ast",
       "id": "apps_api_package_devdependencies_types_jest",
-      "community": 11,
+      "community": 251,
       "norm_label": "@types/jest"
     },
     {
@@ -4660,7 +4660,7 @@
       "source_location": "L49",
       "_origin": "ast",
       "id": "apps_api_package_devdependencies_types_node",
-      "community": 11,
+      "community": 251,
       "norm_label": "@types/node"
     },
     {
@@ -4670,7 +4670,7 @@
       "source_location": "L50",
       "_origin": "ast",
       "id": "apps_api_package_devdependencies_types_passport_jwt",
-      "community": 11,
+      "community": 251,
       "norm_label": "@types/passport-jwt"
     },
     {
@@ -4680,7 +4680,7 @@
       "source_location": "L51",
       "_origin": "ast",
       "id": "apps_api_package_devdependencies_types_supertest",
-      "community": 11,
+      "community": 251,
       "norm_label": "@types/supertest"
     },
     {
@@ -4690,7 +4690,7 @@
       "source_location": "L52",
       "_origin": "ast",
       "id": "apps_api_package_devdependencies_jest",
-      "community": 11,
+      "community": 251,
       "norm_label": "jest"
     },
     {
@@ -4700,7 +4700,7 @@
       "source_location": "L53",
       "_origin": "ast",
       "id": "apps_api_package_devdependencies_prisma",
-      "community": 11,
+      "community": 251,
       "norm_label": "prisma"
     },
     {
@@ -4710,7 +4710,7 @@
       "source_location": "L54",
       "_origin": "ast",
       "id": "apps_api_package_devdependencies_supertest",
-      "community": 11,
+      "community": 251,
       "norm_label": "supertest"
     },
     {
@@ -4720,7 +4720,7 @@
       "source_location": "L55",
       "_origin": "ast",
       "id": "apps_api_package_devdependencies_ts_jest",
-      "community": 11,
+      "community": 251,
       "norm_label": "ts-jest"
     },
     {
@@ -4730,7 +4730,7 @@
       "source_location": "L56",
       "_origin": "ast",
       "id": "apps_api_package_devdependencies_ts_loader",
-      "community": 11,
+      "community": 251,
       "norm_label": "ts-loader"
     },
     {
@@ -4740,7 +4740,7 @@
       "source_location": "L57",
       "_origin": "ast",
       "id": "apps_api_package_devdependencies_ts_node",
-      "community": 11,
+      "community": 251,
       "norm_label": "ts-node"
     },
     {
@@ -4750,7 +4750,7 @@
       "source_location": "L58",
       "_origin": "ast",
       "id": "apps_api_package_devdependencies_tsconfig_paths",
-      "community": 11,
+      "community": 8,
       "norm_label": "tsconfig-paths"
     },
     {
@@ -4760,7 +4760,7 @@
       "source_location": "L59",
       "_origin": "ast",
       "id": "apps_api_package_devdependencies_typescript",
-      "community": 11,
+      "community": 251,
       "norm_label": "typescript"
     },
     {
@@ -4770,7 +4770,7 @@
       "source_location": "L61",
       "_origin": "ast",
       "id": "apps_api_package_prisma",
-      "community": 5,
+      "community": 261,
       "norm_label": "prisma"
     },
     {
@@ -4780,7 +4780,7 @@
       "source_location": "L62",
       "_origin": "ast",
       "id": "apps_api_package_prisma_seed",
-      "community": 5,
+      "community": 261,
       "norm_label": "seed"
     },
     {
@@ -4940,7 +4940,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "apps_api_src_agent_gateway_agent_gateway_module",
-      "community": 151,
+      "community": 6,
       "norm_label": "agent-gateway.module.ts"
     },
     {
@@ -4950,7 +4950,7 @@
       "source_location": "L15",
       "_origin": "ast",
       "id": "apps_api_src_agent_gateway_agent_gateway_module_agentgatewaymodule",
-      "community": 151,
+      "community": 6,
       "norm_label": "agentgatewaymodule"
     },
     {
@@ -5010,7 +5010,7 @@
       "source_location": "L47",
       "_origin": "ast",
       "id": "apps_api_src_agent_gateway_agent_gateway_service_agentgatewayservice_constructor",
-      "community": 164,
+      "community": 6,
       "norm_label": ".constructor()"
     },
     {
@@ -5110,7 +5110,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "apps_api_src_agent_gateway_amadeus_amadeus_types",
-      "community": 6,
+      "community": 259,
       "norm_label": "amadeus.types.ts"
     },
     {
@@ -5120,7 +5120,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "apps_api_src_agent_gateway_amadeus_amadeus_types_amadeuscarrierdictionary",
-      "community": 6,
+      "community": 259,
       "norm_label": "amadeuscarrierdictionary"
     },
     {
@@ -5130,7 +5130,7 @@
       "source_location": "L5",
       "_origin": "ast",
       "id": "apps_api_src_agent_gateway_amadeus_amadeus_types_amadeusdictionaries",
-      "community": 6,
+      "community": 259,
       "norm_label": "amadeusdictionaries"
     },
     {
@@ -5140,7 +5140,7 @@
       "source_location": "L12",
       "_origin": "ast",
       "id": "apps_api_src_agent_gateway_amadeus_amadeus_types_amadeussegment",
-      "community": 6,
+      "community": 259,
       "norm_label": "amadeussegment"
     },
     {
@@ -5150,7 +5150,7 @@
       "source_location": "L32",
       "_origin": "ast",
       "id": "apps_api_src_agent_gateway_amadeus_amadeus_types_amadeusitinerary",
-      "community": 6,
+      "community": 259,
       "norm_label": "amadeusitinerary"
     },
     {
@@ -5160,7 +5160,7 @@
       "source_location": "L37",
       "_origin": "ast",
       "id": "apps_api_src_agent_gateway_amadeus_amadeus_types_amadeusbaggageallowance",
-      "community": 6,
+      "community": 259,
       "norm_label": "amadeusbaggageallowance"
     },
     {
@@ -5170,7 +5170,7 @@
       "source_location": "L43",
       "_origin": "ast",
       "id": "apps_api_src_agent_gateway_amadeus_amadeus_types_amadeusfaredetailsbysegment",
-      "community": 6,
+      "community": 259,
       "norm_label": "amadeusfaredetailsbysegment"
     },
     {
@@ -5180,7 +5180,7 @@
       "source_location": "L51",
       "_origin": "ast",
       "id": "apps_api_src_agent_gateway_amadeus_amadeus_types_amadeustravelerpricing",
-      "community": 6,
+      "community": 259,
       "norm_label": "amadeustravelerpricing"
     },
     {
@@ -5190,7 +5190,7 @@
       "source_location": "L63",
       "_origin": "ast",
       "id": "apps_api_src_agent_gateway_amadeus_amadeus_types_amadeusflightoffer",
-      "community": 6,
+      "community": 259,
       "norm_label": "amadeusflightoffer"
     },
     {
@@ -5500,7 +5500,7 @@
       "source_location": "L9",
       "_origin": "ast",
       "id": "apps_api_src_airports_airports_service_airportsservice_constructor",
-      "community": 29,
+      "community": 2,
       "norm_label": ".constructor()"
     },
     {
@@ -5700,7 +5700,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "apps_api_src_auth_auth_controller",
-      "community": 37,
+      "community": 2,
       "norm_label": "auth.controller.ts"
     },
     {
@@ -5710,7 +5710,7 @@
       "source_location": "L20",
       "_origin": "ast",
       "id": "apps_api_src_auth_auth_controller_authenticatedrequest",
-      "community": 37,
+      "community": 2,
       "norm_label": "authenticatedrequest"
     },
     {
@@ -5730,7 +5730,7 @@
       "source_location": "L29",
       "_origin": "ast",
       "id": "apps_api_src_auth_auth_controller_authcontroller_constructor",
-      "community": 37,
+      "community": 2,
       "norm_label": ".constructor()"
     },
     {
@@ -5800,7 +5800,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "apps_api_src_auth_auth_module",
-      "community": 37,
+      "community": 2,
       "norm_label": "auth.module.ts"
     },
     {
@@ -5810,7 +5810,7 @@
       "source_location": "L25",
       "_origin": "ast",
       "id": "apps_api_src_auth_auth_module_authmodule",
-      "community": 37,
+      "community": 151,
       "norm_label": "authmodule"
     },
     {
@@ -5840,7 +5840,7 @@
       "source_location": "L16",
       "_origin": "ast",
       "id": "apps_api_src_auth_auth_service_authservice",
-      "community": 37,
+      "community": 2,
       "norm_label": "authservice"
     },
     {
@@ -5880,7 +5880,7 @@
       "source_location": "L186",
       "_origin": "ast",
       "id": "apps_api_src_auth_auth_service_authservice_logout",
-      "community": 37,
+      "community": 164,
       "norm_label": ".logout()"
     },
     {
@@ -5900,7 +5900,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "apps_api_src_auth_dto_login_dto",
-      "community": 37,
+      "community": 2,
       "norm_label": "login.dto.ts"
     },
     {
@@ -5910,7 +5910,7 @@
       "source_location": "L4",
       "_origin": "ast",
       "id": "apps_api_src_auth_dto_login_dto_logindto",
-      "community": 37,
+      "community": 2,
       "norm_label": "logindto"
     },
     {
@@ -5920,7 +5920,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "apps_api_src_auth_dto_register_dto",
-      "community": 37,
+      "community": 2,
       "norm_label": "register.dto.ts"
     },
     {
@@ -5930,7 +5930,7 @@
       "source_location": "L4",
       "_origin": "ast",
       "id": "apps_api_src_auth_dto_register_dto_registerdto",
-      "community": 37,
+      "community": 2,
       "norm_label": "registerdto"
     },
     {
@@ -6000,7 +6000,7 @@
       "source_location": "L9",
       "_origin": "ast",
       "id": "apps_api_src_auth_rate_limit_lockout_service_lockoutservice_haship",
-      "community": 2,
+      "community": 37,
       "norm_label": ".haship()"
     },
     {
@@ -6010,7 +6010,7 @@
       "source_location": "L13",
       "_origin": "ast",
       "id": "apps_api_src_auth_rate_limit_lockout_service_lockoutservice_islockedout",
-      "community": 2,
+      "community": 37,
       "norm_label": ".islockedout()"
     },
     {
@@ -6030,7 +6030,7 @@
       "source_location": "L51",
       "_origin": "ast",
       "id": "apps_api_src_auth_rate_limit_lockout_service_lockoutservice_resetlockoutstate",
-      "community": 2,
+      "community": 37,
       "norm_label": ".resetlockoutstate()"
     },
     {
@@ -6040,7 +6040,7 @@
       "source_location": "L62",
       "_origin": "ast",
       "id": "apps_api_src_auth_rate_limit_lockout_service_lockoutservice_clearlockoutforip",
-      "community": 2,
+      "community": 37,
       "norm_label": ".clearlockoutforip()"
     },
     {
@@ -6050,7 +6050,7 @@
       "source_location": "L75",
       "_origin": "ast",
       "id": "apps_api_src_auth_rate_limit_lockout_service_lockoutservice_clearalllockouts",
-      "community": 2,
+      "community": 37,
       "norm_label": ".clearalllockouts()"
     },
     {
@@ -6060,7 +6060,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "apps_api_src_auth_strategies_jwt_strategy",
-      "community": 37,
+      "community": 2,
       "norm_label": "jwt.strategy.ts"
     },
     {
@@ -6070,7 +6070,7 @@
       "source_location": "L9",
       "_origin": "ast",
       "id": "apps_api_src_auth_strategies_jwt_strategy_jwtstrategy",
-      "community": 37,
+      "community": 2,
       "norm_label": "jwtstrategy"
     },
     {
@@ -6080,7 +6080,7 @@
       "source_location": "L10",
       "_origin": "ast",
       "id": "apps_api_src_auth_strategies_jwt_strategy_jwtstrategy_constructor",
-      "community": 37,
+      "community": 2,
       "norm_label": ".constructor()"
     },
     {
@@ -6180,7 +6180,7 @@
       "source_location": "L84",
       "_origin": "ast",
       "id": "apps_api_src_cache_cache_service_cacheservice_incr",
-      "community": 6,
+      "community": 37,
       "norm_label": ".incr()"
     },
     {
@@ -6190,7 +6190,7 @@
       "source_location": "L114",
       "_origin": "ast",
       "id": "apps_api_src_cache_cache_service_cacheservice_del",
-      "community": 2,
+      "community": 37,
       "norm_label": ".del()"
     },
     {
@@ -6200,7 +6200,7 @@
       "source_location": "L128",
       "_origin": "ast",
       "id": "apps_api_src_cache_cache_service_cacheservice_getttl",
-      "community": 2,
+      "community": 37,
       "norm_label": ".getttl()"
     },
     {
@@ -6210,7 +6210,7 @@
       "source_location": "L149",
       "_origin": "ast",
       "id": "apps_api_src_cache_cache_service_cacheservice_keys",
-      "community": 2,
+      "community": 37,
       "norm_label": ".keys()"
     },
     {
@@ -6670,7 +6670,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "apps_api_src_health_health_controller",
-      "community": 151,
+      "community": 29,
       "norm_label": "health.controller.ts"
     },
     {
@@ -6680,7 +6680,7 @@
       "source_location": "L6",
       "_origin": "ast",
       "id": "apps_api_src_health_health_controller_healthcontroller",
-      "community": 151,
+      "community": 29,
       "norm_label": "healthcontroller"
     },
     {
@@ -6690,7 +6690,7 @@
       "source_location": "L9",
       "_origin": "ast",
       "id": "apps_api_src_health_health_controller_healthcontroller_constructor",
-      "community": 151,
+      "community": 29,
       "norm_label": ".constructor()"
     },
     {
@@ -6700,7 +6700,7 @@
       "source_location": "L12",
       "_origin": "ast",
       "id": "apps_api_src_health_health_controller_healthcontroller_check",
-      "community": 151,
+      "community": 29,
       "norm_label": ".check()"
     },
     {
@@ -6820,7 +6820,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "apps_api_test_adversarial_e2e_spec",
-      "community": 2,
+      "community": 264,
       "norm_label": "adversarial.e2e-spec.ts"
     },
     {
@@ -6830,7 +6830,7 @@
       "source_location": "L11",
       "_origin": "ast",
       "id": "apps_api_test_adversarial_e2e_spec_cacheservicewithinternal",
-      "community": 2,
+      "community": 264,
       "norm_label": "cacheservicewithinternal"
     },
     {
@@ -6840,7 +6840,7 @@
       "source_location": "L15",
       "_origin": "ast",
       "id": "apps_api_test_adversarial_e2e_spec_sanitizedusermetadata",
-      "community": 2,
+      "community": 264,
       "norm_label": "sanitizedusermetadata"
     },
     {
@@ -6850,7 +6850,7 @@
       "source_location": "L26",
       "_origin": "ast",
       "id": "apps_api_test_adversarial_e2e_spec_sanitizedvariantsmetadata",
-      "community": 2,
+      "community": 264,
       "norm_label": "sanitizedvariantsmetadata"
     },
     {
@@ -6860,7 +6860,7 @@
       "source_location": "L33",
       "_origin": "ast",
       "id": "apps_api_test_adversarial_e2e_spec_circularmetadata",
-      "community": 2,
+      "community": 264,
       "norm_label": "circularmetadata"
     },
     {
@@ -7170,7 +7170,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "apps_web_app_api_auth_nextauth_route",
-      "community": 16,
+      "community": 262,
       "norm_label": "route.ts"
     },
     {
@@ -7180,7 +7180,7 @@
       "source_location": "L4",
       "_origin": "ast",
       "id": "apps_web_app_api_auth_nextauth_route_handler",
-      "community": 16,
+      "community": 262,
       "norm_label": "handler"
     },
     {
@@ -7190,7 +7190,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "apps_web_app_dashboard_page",
-      "community": 16,
+      "community": 262,
       "norm_label": "page.tsx"
     },
     {
@@ -7200,7 +7200,7 @@
       "source_location": "L7",
       "_origin": "ast",
       "id": "apps_web_app_dashboard_page_dashboardpage",
-      "community": 16,
+      "community": 262,
       "norm_label": "dashboardpage()"
     },
     {
@@ -7314,6 +7314,26 @@
       "norm_label": "registerpage()"
     },
     {
+      "label": "page.tsx",
+      "file_type": "code",
+      "source_file": "apps/web/app/search/page.tsx",
+      "source_location": "L1",
+      "_origin": "ast",
+      "id": "apps_web_app_search_page",
+      "community": 262,
+      "norm_label": "page.tsx"
+    },
+    {
+      "label": "SearchPage()",
+      "file_type": "code",
+      "source_file": "apps/web/app/search/page.tsx",
+      "source_location": "L9",
+      "_origin": "ast",
+      "id": "apps_web_app_search_page_searchpage",
+      "community": 262,
+      "norm_label": "searchpage()"
+    },
+    {
       "label": "LoginForm.tsx",
       "file_type": "code",
       "source_file": "apps/web/components/auth/LoginForm.tsx",
@@ -7340,7 +7360,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "apps_web_components_auth_logoutbutton",
-      "community": 16,
+      "community": 262,
       "norm_label": "logoutbutton.tsx"
     },
     {
@@ -7350,7 +7370,7 @@
       "source_location": "L5",
       "_origin": "ast",
       "id": "apps_web_components_auth_logoutbutton_logoutbutton",
-      "community": 16,
+      "community": 262,
       "norm_label": "logoutbutton()"
     },
     {
@@ -7380,7 +7400,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "apps_web_components_layout_header",
-      "community": 16,
+      "community": 262,
       "norm_label": "header.tsx"
     },
     {
@@ -7390,8 +7410,228 @@
       "source_location": "L4",
       "_origin": "ast",
       "id": "apps_web_components_layout_header_header",
-      "community": 16,
+      "community": 262,
       "norm_label": "header()"
+    },
+    {
+      "label": "AirportMarkerLayer.tsx",
+      "file_type": "code",
+      "source_file": "apps/web/components/map/AirportMarkerLayer.tsx",
+      "source_location": "L1",
+      "_origin": "ast",
+      "id": "apps_web_components_map_airportmarkerlayer",
+      "community": 252,
+      "norm_label": "airportmarkerlayer.tsx"
+    },
+    {
+      "label": "Props",
+      "file_type": "code",
+      "source_file": "apps/web/components/map/AirportMarkerLayer.tsx",
+      "source_location": "L10",
+      "_origin": "ast",
+      "id": "apps_web_components_map_airportmarkerlayer_props",
+      "community": 252,
+      "norm_label": "props"
+    },
+    {
+      "label": "AirportMarkerLayer()",
+      "file_type": "code",
+      "source_file": "apps/web/components/map/AirportMarkerLayer.tsx",
+      "source_location": "L18",
+      "_origin": "ast",
+      "id": "apps_web_components_map_airportmarkerlayer_airportmarkerlayer",
+      "community": 252,
+      "norm_label": "airportmarkerlayer()"
+    },
+    {
+      "label": "AirportPopup.tsx",
+      "file_type": "code",
+      "source_file": "apps/web/components/map/AirportPopup.tsx",
+      "source_location": "L1",
+      "_origin": "ast",
+      "id": "apps_web_components_map_airportpopup",
+      "community": 260,
+      "norm_label": "airportpopup.tsx"
+    },
+    {
+      "label": "Props",
+      "file_type": "code",
+      "source_file": "apps/web/components/map/AirportPopup.tsx",
+      "source_location": "L7",
+      "_origin": "ast",
+      "id": "apps_web_components_map_airportpopup_props",
+      "community": 260,
+      "norm_label": "props"
+    },
+    {
+      "label": "AirportPopup()",
+      "file_type": "code",
+      "source_file": "apps/web/components/map/AirportPopup.tsx",
+      "source_location": "L12",
+      "_origin": "ast",
+      "id": "apps_web_components_map_airportpopup_airportpopup",
+      "community": 260,
+      "norm_label": "airportpopup()"
+    },
+    {
+      "label": "FlightRouteLayer.tsx",
+      "file_type": "code",
+      "source_file": "apps/web/components/map/FlightRouteLayer.tsx",
+      "source_location": "L1",
+      "_origin": "ast",
+      "id": "apps_web_components_map_flightroutelayer",
+      "community": 252,
+      "norm_label": "flightroutelayer.tsx"
+    },
+    {
+      "label": "Props",
+      "file_type": "code",
+      "source_file": "apps/web/components/map/FlightRouteLayer.tsx",
+      "source_location": "L9",
+      "_origin": "ast",
+      "id": "apps_web_components_map_flightroutelayer_props",
+      "community": 252,
+      "norm_label": "props"
+    },
+    {
+      "label": "FlightRouteLayer()",
+      "file_type": "code",
+      "source_file": "apps/web/components/map/FlightRouteLayer.tsx",
+      "source_location": "L16",
+      "_origin": "ast",
+      "id": "apps_web_components_map_flightroutelayer_flightroutelayer",
+      "community": 252,
+      "norm_label": "flightroutelayer()"
+    },
+    {
+      "label": "MapContainer.tsx",
+      "file_type": "code",
+      "source_file": "apps/web/components/map/MapContainer.tsx",
+      "source_location": "L1",
+      "_origin": "ast",
+      "id": "apps_web_components_map_mapcontainer",
+      "community": 256,
+      "norm_label": "mapcontainer.tsx"
+    },
+    {
+      "label": "MapContainer",
+      "file_type": "code",
+      "source_file": "apps/web/components/map/MapContainer.tsx",
+      "source_location": "L5",
+      "_origin": "ast",
+      "id": "apps_web_components_map_mapcontainer_mapcontainer",
+      "community": 256,
+      "norm_label": "mapcontainer"
+    },
+    {
+      "label": "MapContainerInner.tsx",
+      "file_type": "code",
+      "source_file": "apps/web/components/map/MapContainerInner.tsx",
+      "source_location": "L1",
+      "_origin": "ast",
+      "id": "apps_web_components_map_mapcontainerinner",
+      "community": 252,
+      "norm_label": "mapcontainerinner.tsx"
+    },
+    {
+      "label": "Props",
+      "file_type": "code",
+      "source_file": "apps/web/components/map/MapContainerInner.tsx",
+      "source_location": "L15",
+      "_origin": "ast",
+      "id": "apps_web_components_map_mapcontainerinner_props",
+      "community": 252,
+      "norm_label": "props"
+    },
+    {
+      "label": "DEFAULT_VIEW_STATE",
+      "file_type": "code",
+      "source_file": "apps/web/components/map/MapContainerInner.tsx",
+      "source_location": "L23",
+      "_origin": "ast",
+      "id": "apps_web_components_map_mapcontainerinner_default_view_state",
+      "community": 252,
+      "norm_label": "default_view_state"
+    },
+    {
+      "label": "MapContainerInner()",
+      "file_type": "code",
+      "source_file": "apps/web/components/map/MapContainerInner.tsx",
+      "source_location": "L29",
+      "_origin": "ast",
+      "id": "apps_web_components_map_mapcontainerinner_mapcontainerinner",
+      "community": 252,
+      "norm_label": "mapcontainerinner()"
+    },
+    {
+      "label": "MapControls.tsx",
+      "file_type": "code",
+      "source_file": "apps/web/components/map/MapControls.tsx",
+      "source_location": "L1",
+      "_origin": "ast",
+      "id": "apps_web_components_map_mapcontrols",
+      "community": 252,
+      "norm_label": "mapcontrols.tsx"
+    },
+    {
+      "label": "Props",
+      "file_type": "code",
+      "source_file": "apps/web/components/map/MapControls.tsx",
+      "source_location": "L7",
+      "_origin": "ast",
+      "id": "apps_web_components_map_mapcontrols_props",
+      "community": 252,
+      "norm_label": "props"
+    },
+    {
+      "label": "MapControls()",
+      "file_type": "code",
+      "source_file": "apps/web/components/map/MapControls.tsx",
+      "source_location": "L12",
+      "_origin": "ast",
+      "id": "apps_web_components_map_mapcontrols_mapcontrols",
+      "community": 252,
+      "norm_label": "mapcontrols()"
+    },
+    {
+      "label": "map-utils.ts",
+      "file_type": "code",
+      "source_file": "apps/web/components/map/map-utils.ts",
+      "source_location": "L1",
+      "_origin": "ast",
+      "id": "apps_web_components_map_map_utils",
+      "community": 252,
+      "norm_label": "map-utils.ts"
+    },
+    {
+      "label": "calculateGreatCircleArc()",
+      "file_type": "code",
+      "source_file": "apps/web/components/map/map-utils.ts",
+      "source_location": "L8",
+      "_origin": "ast",
+      "id": "apps_web_components_map_map_utils_calculategreatcirclearc",
+      "community": 252,
+      "norm_label": "calculategreatcirclearc()"
+    },
+    {
+      "label": "getMapBounds()",
+      "file_type": "code",
+      "source_file": "apps/web/components/map/map-utils.ts",
+      "source_location": "L21",
+      "_origin": "ast",
+      "id": "apps_web_components_map_map_utils_getmapbounds",
+      "community": 252,
+      "norm_label": "getmapbounds()"
+    },
+    {
+      "label": "getThemeColor()",
+      "file_type": "code",
+      "source_file": "apps/web/components/map/map-utils.ts",
+      "source_location": "L53",
+      "_origin": "ast",
+      "id": "apps_web_components_map_map_utils_getthemecolor",
+      "community": 252,
+      "norm_label": "getthemecolor()"
     },
     {
       "label": "providers.tsx",
@@ -7424,13 +7664,133 @@
       "norm_label": "providers()"
     },
     {
+      "label": "SearchPageClient.tsx",
+      "file_type": "code",
+      "source_file": "apps/web/components/search/SearchPageClient.tsx",
+      "source_location": "L1",
+      "_origin": "ast",
+      "id": "apps_web_components_search_searchpageclient",
+      "community": 256,
+      "norm_label": "searchpageclient.tsx"
+    },
+    {
+      "label": "EMPTY_STOPS",
+      "file_type": "code",
+      "source_file": "apps/web/components/search/SearchPageClient.tsx",
+      "source_location": "L9",
+      "_origin": "ast",
+      "id": "apps_web_components_search_searchpageclient_empty_stops",
+      "community": 256,
+      "norm_label": "empty_stops"
+    },
+    {
+      "label": "Props",
+      "file_type": "code",
+      "source_file": "apps/web/components/search/SearchPageClient.tsx",
+      "source_location": "L11",
+      "_origin": "ast",
+      "id": "apps_web_components_search_searchpageclient_props",
+      "community": 256,
+      "norm_label": "props"
+    },
+    {
+      "label": "SearchPageClient()",
+      "file_type": "code",
+      "source_file": "apps/web/components/search/SearchPageClient.tsx",
+      "source_location": "L15",
+      "_origin": "ast",
+      "id": "apps_web_components_search_searchpageclient_searchpageclient",
+      "community": 256,
+      "norm_label": "searchpageclient()"
+    },
+    {
+      "label": "airport-service.ts",
+      "file_type": "code",
+      "source_file": "apps/web/lib/airport-service.ts",
+      "source_location": "L1",
+      "_origin": "ast",
+      "id": "apps_web_lib_airport_service",
+      "community": 253,
+      "norm_label": "airport-service.ts"
+    },
+    {
+      "label": "fetchWithTimeout()",
+      "file_type": "code",
+      "source_file": "apps/web/lib/airport-service.ts",
+      "source_location": "L7",
+      "_origin": "ast",
+      "id": "apps_web_lib_airport_service_fetchwithtimeout",
+      "community": 253,
+      "norm_label": "fetchwithtimeout()"
+    },
+    {
+      "label": "NearbyAirportResponse",
+      "file_type": "code",
+      "source_file": "apps/web/lib/airport-service.ts",
+      "source_location": "L17",
+      "_origin": "ast",
+      "id": "apps_web_lib_airport_service_nearbyairportresponse",
+      "community": 253,
+      "norm_label": "nearbyairportresponse"
+    },
+    {
+      "label": "AirportSearchResponse",
+      "file_type": "code",
+      "source_file": "apps/web/lib/airport-service.ts",
+      "source_location": "L24",
+      "_origin": "ast",
+      "id": "apps_web_lib_airport_service_airportsearchresponse",
+      "community": 253,
+      "norm_label": "airportsearchresponse"
+    },
+    {
+      "label": "searchAirports()",
+      "file_type": "code",
+      "source_file": "apps/web/lib/airport-service.ts",
+      "source_location": "L29",
+      "_origin": "ast",
+      "id": "apps_web_lib_airport_service_searchairports",
+      "community": 253,
+      "norm_label": "searchairports()"
+    },
+    {
+      "label": "getAirportByIataCode()",
+      "file_type": "code",
+      "source_file": "apps/web/lib/airport-service.ts",
+      "source_location": "L45",
+      "_origin": "ast",
+      "id": "apps_web_lib_airport_service_getairportbyiatacode",
+      "community": 253,
+      "norm_label": "getairportbyiatacode()"
+    },
+    {
+      "label": "getNearbyAirports()",
+      "file_type": "code",
+      "source_file": "apps/web/lib/airport-service.ts",
+      "source_location": "L61",
+      "_origin": "ast",
+      "id": "apps_web_lib_airport_service_getnearbyairports",
+      "community": 253,
+      "norm_label": "getnearbyairports()"
+    },
+    {
+      "label": "getAllAirports()",
+      "file_type": "code",
+      "source_file": "apps/web/lib/airport-service.ts",
+      "source_location": "L88",
+      "_origin": "ast",
+      "id": "apps_web_lib_airport_service_getallairports",
+      "community": 262,
+      "norm_label": "getallairports()"
+    },
+    {
       "label": "auth.ts",
       "file_type": "code",
       "source_file": "apps/web/lib/auth.ts",
       "source_location": "L1",
       "_origin": "ast",
       "id": "apps_web_lib_auth",
-      "community": 16,
+      "community": 262,
       "norm_label": "auth.ts"
     },
     {
@@ -7440,7 +7800,7 @@
       "source_location": "L4",
       "_origin": "ast",
       "id": "apps_web_lib_auth_authoptions",
-      "community": 16,
+      "community": 262,
       "norm_label": "authoptions"
     },
     {
@@ -7624,10 +7984,30 @@
       "norm_label": "@tailwindcss/postcss"
     },
     {
-      "label": "class-variance-authority",
+      "label": "@turf/great-circle",
       "file_type": "code",
       "source_file": "apps/web/package.json",
       "source_location": "L15",
+      "_origin": "ast",
+      "id": "apps_web_package_dependencies_turf_great_circle",
+      "community": 7,
+      "norm_label": "@turf/great-circle"
+    },
+    {
+      "label": "@turf/helpers",
+      "file_type": "code",
+      "source_file": "apps/web/package.json",
+      "source_location": "L16",
+      "_origin": "ast",
+      "id": "apps_web_package_dependencies_turf_helpers",
+      "community": 7,
+      "norm_label": "@turf/helpers"
+    },
+    {
+      "label": "class-variance-authority",
+      "file_type": "code",
+      "source_file": "apps/web/package.json",
+      "source_location": "L17",
       "_origin": "ast",
       "id": "apps_web_package_dependencies_class_variance_authority",
       "community": 7,
@@ -7637,7 +8017,7 @@
       "label": "clsx",
       "file_type": "code",
       "source_file": "apps/web/package.json",
-      "source_location": "L16",
+      "source_location": "L18",
       "_origin": "ast",
       "id": "apps_web_package_dependencies_clsx",
       "community": 7,
@@ -7647,17 +8027,27 @@
       "label": "lucide-react",
       "file_type": "code",
       "source_file": "apps/web/package.json",
-      "source_location": "L17",
+      "source_location": "L19",
       "_origin": "ast",
       "id": "apps_web_package_dependencies_lucide_react",
       "community": 7,
       "norm_label": "lucide-react"
     },
     {
+      "label": "maplibre-gl",
+      "file_type": "code",
+      "source_file": "apps/web/package.json",
+      "source_location": "L20",
+      "_origin": "ast",
+      "id": "apps_web_package_dependencies_maplibre_gl",
+      "community": 7,
+      "norm_label": "maplibre-gl"
+    },
+    {
       "label": "next",
       "file_type": "code",
       "source_file": "apps/web/package.json",
-      "source_location": "L18",
+      "source_location": "L21",
       "_origin": "ast",
       "id": "apps_web_package_dependencies_next",
       "community": 7,
@@ -7667,7 +8057,7 @@
       "label": "next-auth",
       "file_type": "code",
       "source_file": "apps/web/package.json",
-      "source_location": "L19",
+      "source_location": "L22",
       "_origin": "ast",
       "id": "apps_web_package_dependencies_next_auth",
       "community": 7,
@@ -7677,7 +8067,7 @@
       "label": "postcss",
       "file_type": "code",
       "source_file": "apps/web/package.json",
-      "source_location": "L20",
+      "source_location": "L23",
       "_origin": "ast",
       "id": "apps_web_package_dependencies_postcss",
       "community": 7,
@@ -7687,7 +8077,7 @@
       "label": "react",
       "file_type": "code",
       "source_file": "apps/web/package.json",
-      "source_location": "L21",
+      "source_location": "L24",
       "_origin": "ast",
       "id": "apps_web_package_dependencies_react",
       "community": 7,
@@ -7697,17 +8087,27 @@
       "label": "react-dom",
       "file_type": "code",
       "source_file": "apps/web/package.json",
-      "source_location": "L22",
+      "source_location": "L25",
       "_origin": "ast",
       "id": "apps_web_package_dependencies_react_dom",
       "community": 7,
       "norm_label": "react-dom"
     },
     {
+      "label": "react-map-gl",
+      "file_type": "code",
+      "source_file": "apps/web/package.json",
+      "source_location": "L26",
+      "_origin": "ast",
+      "id": "apps_web_package_dependencies_react_map_gl",
+      "community": 7,
+      "norm_label": "react-map-gl"
+    },
+    {
       "label": "tailwind-merge",
       "file_type": "code",
       "source_file": "apps/web/package.json",
-      "source_location": "L23",
+      "source_location": "L27",
       "_origin": "ast",
       "id": "apps_web_package_dependencies_tailwind_merge",
       "community": 7,
@@ -7717,7 +8117,7 @@
       "label": "tailwindcss",
       "file_type": "code",
       "source_file": "apps/web/package.json",
-      "source_location": "L24",
+      "source_location": "L28",
       "_origin": "ast",
       "id": "apps_web_package_dependencies_tailwindcss",
       "community": 7,
@@ -7727,7 +8127,7 @@
       "label": "zod",
       "file_type": "code",
       "source_file": "apps/web/package.json",
-      "source_location": "L25",
+      "source_location": "L29",
       "_origin": "ast",
       "id": "apps_web_package_dependencies_zod",
       "community": 7,
@@ -7737,7 +8137,7 @@
       "label": "devDependencies",
       "file_type": "code",
       "source_file": "apps/web/package.json",
-      "source_location": "L27",
+      "source_location": "L31",
       "_origin": "ast",
       "id": "apps_web_package_devdependencies",
       "community": 7,
@@ -7747,17 +8147,27 @@
       "label": "@playwright/test",
       "file_type": "code",
       "source_file": "apps/web/package.json",
-      "source_location": "L28",
+      "source_location": "L32",
       "_origin": "ast",
       "id": "apps_web_package_devdependencies_playwright_test",
       "community": 7,
       "norm_label": "@playwright/test"
     },
     {
+      "label": "@types/geojson",
+      "file_type": "code",
+      "source_file": "apps/web/package.json",
+      "source_location": "L33",
+      "_origin": "ast",
+      "id": "apps_web_package_devdependencies_types_geojson",
+      "community": 7,
+      "norm_label": "@types/geojson"
+    },
+    {
       "label": "@types/node",
       "file_type": "code",
       "source_file": "apps/web/package.json",
-      "source_location": "L29",
+      "source_location": "L34",
       "_origin": "ast",
       "id": "apps_web_package_devdependencies_types_node",
       "community": 7,
@@ -7767,7 +8177,7 @@
       "label": "@types/react",
       "file_type": "code",
       "source_file": "apps/web/package.json",
-      "source_location": "L30",
+      "source_location": "L35",
       "_origin": "ast",
       "id": "apps_web_package_devdependencies_types_react",
       "community": 7,
@@ -7777,7 +8187,7 @@
       "label": "@types/react-dom",
       "file_type": "code",
       "source_file": "apps/web/package.json",
-      "source_location": "L31",
+      "source_location": "L36",
       "_origin": "ast",
       "id": "apps_web_package_devdependencies_types_react_dom",
       "community": 7,
@@ -7787,7 +8197,7 @@
       "label": "eslint",
       "file_type": "code",
       "source_file": "apps/web/package.json",
-      "source_location": "L32",
+      "source_location": "L37",
       "_origin": "ast",
       "id": "apps_web_package_devdependencies_eslint",
       "community": 7,
@@ -7797,7 +8207,7 @@
       "label": "eslint-config-next",
       "file_type": "code",
       "source_file": "apps/web/package.json",
-      "source_location": "L33",
+      "source_location": "L38",
       "_origin": "ast",
       "id": "apps_web_package_devdependencies_eslint_config_next",
       "community": 7,
@@ -7807,7 +8217,7 @@
       "label": "typescript",
       "file_type": "code",
       "source_file": "apps/web/package.json",
-      "source_location": "L34",
+      "source_location": "L39",
       "_origin": "ast",
       "id": "apps_web_package_devdependencies_typescript",
       "community": 7,
@@ -8470,7 +8880,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "packages_shared_src_types_airport",
-      "community": 14,
+      "community": 260,
       "norm_label": "airport.ts"
     },
     {
@@ -8480,7 +8890,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "packages_shared_src_types_airport_airporttype",
-      "community": 14,
+      "community": 260,
       "norm_label": "airporttype"
     },
     {
@@ -8490,7 +8900,7 @@
       "source_location": "L3",
       "_origin": "ast",
       "id": "packages_shared_src_types_airport_airport",
-      "community": 14,
+      "community": 260,
       "norm_label": "airport"
     },
     {
@@ -8500,7 +8910,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "packages_shared_src_types_index",
-      "community": 14,
+      "community": 260,
       "norm_label": "index.ts"
     },
     {
@@ -8510,7 +8920,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "packages_shared_src_types_index_user",
-      "community": 14,
+      "community": 260,
       "norm_label": "user"
     },
     {
@@ -8520,7 +8930,7 @@
       "source_location": "L8",
       "_origin": "ast",
       "id": "packages_shared_src_types_index_flight",
-      "community": 14,
+      "community": 260,
       "norm_label": "flight"
     },
     {
@@ -8530,7 +8940,7 @@
       "source_location": "L18",
       "_origin": "ast",
       "id": "packages_shared_src_types_index_booking",
-      "community": 14,
+      "community": 260,
       "norm_label": "booking"
     },
     {
@@ -8540,7 +8950,7 @@
       "source_location": "L38",
       "_origin": "ast",
       "id": "packages_shared_src_types_index_messagesender",
-      "community": 14,
+      "community": 260,
       "norm_label": "messagesender"
     },
     {
@@ -8550,7 +8960,7 @@
       "source_location": "L40",
       "_origin": "ast",
       "id": "packages_shared_src_types_index_messagetype",
-      "community": 14,
+      "community": 260,
       "norm_label": "messagetype"
     },
     {
@@ -8560,7 +8970,7 @@
       "source_location": "L42",
       "_origin": "ast",
       "id": "packages_shared_src_types_index_chatsession",
-      "community": 14,
+      "community": 260,
       "norm_label": "chatsession"
     },
     {
@@ -8570,7 +8980,7 @@
       "source_location": "L52",
       "_origin": "ast",
       "id": "packages_shared_src_types_index_chatmessage",
-      "community": 14,
+      "community": 260,
       "norm_label": "chatmessage"
     },
     {
@@ -9374,10 +9784,20 @@
       "norm_label": "flight search (deterministic path)"
     },
     {
-      "label": "Booking Flow (Deterministic Path \u2014 No AI)",
+      "label": "Airport & Map Integration (Deterministic Path)",
       "file_type": "document",
       "source_file": "context/architecture.md",
       "source_location": "L110",
+      "_origin": "ast",
+      "id": "context_architecture_airport_map_integration_deterministic_path",
+      "community": 156,
+      "norm_label": "airport & map integration (deterministic path)"
+    },
+    {
+      "label": "Booking Flow (Deterministic Path \u2014 No AI)",
+      "file_type": "document",
+      "source_file": "context/architecture.md",
+      "source_location": "L131",
       "_origin": "ast",
       "id": "context_architecture_booking_flow_deterministic_path_no_ai",
       "community": 156,
@@ -9387,7 +9807,7 @@
       "label": "Payment Flow (Deterministic Path \u2014 No AI)",
       "file_type": "document",
       "source_file": "context/architecture.md",
-      "source_location": "L130",
+      "source_location": "L151",
       "_origin": "ast",
       "id": "context_architecture_payment_flow_deterministic_path_no_ai",
       "community": 156,
@@ -9397,7 +9817,7 @@
       "label": "AI Chatbot Agent Flow (SSE Streaming)",
       "file_type": "document",
       "source_file": "context/architecture.md",
-      "source_location": "L156",
+      "source_location": "L177",
       "_origin": "ast",
       "id": "context_architecture_ai_chatbot_agent_flow_sse_streaming",
       "community": 156,
@@ -9407,7 +9827,7 @@
       "label": "Containerization",
       "file_type": "document",
       "source_file": "context/architecture.md",
-      "source_location": "L182",
+      "source_location": "L203",
       "_origin": "ast",
       "id": "context_architecture_containerization",
       "community": 156,
@@ -9417,7 +9837,7 @@
       "label": "Invariants",
       "file_type": "document",
       "source_file": "context/architecture.md",
-      "source_location": "L194",
+      "source_location": "L215",
       "_origin": "ast",
       "id": "context_architecture_invariants",
       "community": 156,
@@ -27307,7 +27727,7 @@
       "weight": 1.0,
       "context": "import",
       "source": "apps_api_package_devdependencies_tsconfig_paths",
-      "target": "apps_web_tsconfig_paths",
+      "target": "apps_api_tsconfig_paths",
       "confidence_score": 1.0
     },
     {
@@ -33585,6 +34005,115 @@
     {
       "relation": "contains",
       "confidence": "EXTRACTED",
+      "source_file": "apps/web/app/search/page.tsx",
+      "source_location": "L9",
+      "weight": 1.0,
+      "source": "apps_web_app_search_page",
+      "target": "apps_web_app_search_page_searchpage",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports_from",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "apps/web/app/search/page.tsx",
+      "source_location": "L5",
+      "weight": 1.0,
+      "source": "apps_web_app_search_page",
+      "target": "apps_web_components_layout_header",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "apps/web/app/search/page.tsx",
+      "source_location": "L5",
+      "weight": 1.0,
+      "source": "apps_web_app_search_page",
+      "target": "apps_web_components_layout_header_header",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports_from",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "apps/web/app/search/page.tsx",
+      "source_location": "L6",
+      "weight": 1.0,
+      "source": "apps_web_app_search_page",
+      "target": "apps_web_components_search_searchpageclient",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "apps/web/app/search/page.tsx",
+      "source_location": "L6",
+      "weight": 1.0,
+      "source": "apps_web_app_search_page",
+      "target": "apps_web_components_search_searchpageclient_searchpageclient",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports_from",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "apps/web/app/search/page.tsx",
+      "source_location": "L7",
+      "weight": 1.0,
+      "source": "apps_web_app_search_page",
+      "target": "apps_web_lib_airport_service",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "apps/web/app/search/page.tsx",
+      "source_location": "L7",
+      "weight": 1.0,
+      "source": "apps_web_app_search_page",
+      "target": "apps_web_lib_airport_service_getallairports",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports_from",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "apps/web/app/search/page.tsx",
+      "source_location": "L4",
+      "weight": 1.0,
+      "source": "apps_web_app_search_page",
+      "target": "apps_web_lib_auth",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "apps/web/app/search/page.tsx",
+      "source_location": "L4",
+      "weight": 1.0,
+      "source": "apps_web_app_search_page",
+      "target": "apps_web_lib_auth_authoptions",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "apps/web/app/search/page.tsx",
+      "source_location": "L40",
+      "weight": 1.0,
+      "source": "apps_web_app_search_page_searchpage",
+      "target": "apps_web_lib_airport_service_getallairports"
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
       "source_file": "apps/web/components/auth/LoginForm.tsx",
       "source_location": "L7",
       "weight": 1.0,
@@ -33669,6 +34198,431 @@
     {
       "relation": "contains",
       "confidence": "EXTRACTED",
+      "source_file": "apps/web/components/map/AirportMarkerLayer.tsx",
+      "source_location": "L18",
+      "weight": 1.0,
+      "source": "apps_web_components_map_airportmarkerlayer",
+      "target": "apps_web_components_map_airportmarkerlayer_airportmarkerlayer",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "apps/web/components/map/AirportMarkerLayer.tsx",
+      "source_location": "L10",
+      "weight": 1.0,
+      "source": "apps_web_components_map_airportmarkerlayer",
+      "target": "apps_web_components_map_airportmarkerlayer_props",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports_from",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "apps/web/components/map/AirportMarkerLayer.tsx",
+      "source_location": "L6",
+      "weight": 1.0,
+      "source": "apps_web_components_map_airportmarkerlayer",
+      "target": "apps_web_components_map_map_utils",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "apps/web/components/map/AirportMarkerLayer.tsx",
+      "source_location": "L6",
+      "weight": 1.0,
+      "source": "apps_web_components_map_airportmarkerlayer",
+      "target": "apps_web_components_map_map_utils_getthemecolor",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "apps/web/components/map/AirportMarkerLayer.tsx",
+      "source_location": "L5",
+      "weight": 1.0,
+      "source": "apps_web_components_map_airportmarkerlayer",
+      "target": "packages_shared_src_types_airport_airport",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports_from",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "apps/web/components/map/AirportMarkerLayer.tsx",
+      "source_location": "L5",
+      "weight": 1.0,
+      "source": "apps_web_components_map_airportmarkerlayer",
+      "target": "packages_shared_src_types_index",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports_from",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "apps/web/components/map/MapContainerInner.tsx",
+      "source_location": "L9",
+      "weight": 1.0,
+      "source": "apps_web_components_map_mapcontainerinner",
+      "target": "apps_web_components_map_airportmarkerlayer",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "apps/web/components/map/MapContainerInner.tsx",
+      "source_location": "L9",
+      "weight": 1.0,
+      "source": "apps_web_components_map_mapcontainerinner",
+      "target": "apps_web_components_map_airportmarkerlayer_airportmarkerlayer",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "apps/web/components/map/AirportPopup.tsx",
+      "source_location": "L12",
+      "weight": 1.0,
+      "source": "apps_web_components_map_airportpopup",
+      "target": "apps_web_components_map_airportpopup_airportpopup",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "apps/web/components/map/AirportPopup.tsx",
+      "source_location": "L7",
+      "weight": 1.0,
+      "source": "apps_web_components_map_airportpopup",
+      "target": "apps_web_components_map_airportpopup_props",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "apps/web/components/map/AirportPopup.tsx",
+      "source_location": "L4",
+      "weight": 1.0,
+      "source": "apps_web_components_map_airportpopup",
+      "target": "packages_shared_src_types_airport_airport",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports_from",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "apps/web/components/map/AirportPopup.tsx",
+      "source_location": "L4",
+      "weight": 1.0,
+      "source": "apps_web_components_map_airportpopup",
+      "target": "packages_shared_src_types_index",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports_from",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "apps/web/components/map/MapContainerInner.tsx",
+      "source_location": "L10",
+      "weight": 1.0,
+      "source": "apps_web_components_map_mapcontainerinner",
+      "target": "apps_web_components_map_airportpopup",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "apps/web/components/map/MapContainerInner.tsx",
+      "source_location": "L10",
+      "weight": 1.0,
+      "source": "apps_web_components_map_mapcontainerinner",
+      "target": "apps_web_components_map_airportpopup_airportpopup",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "apps/web/components/map/FlightRouteLayer.tsx",
+      "source_location": "L16",
+      "weight": 1.0,
+      "source": "apps_web_components_map_flightroutelayer",
+      "target": "apps_web_components_map_flightroutelayer_flightroutelayer",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "apps/web/components/map/FlightRouteLayer.tsx",
+      "source_location": "L9",
+      "weight": 1.0,
+      "source": "apps_web_components_map_flightroutelayer",
+      "target": "apps_web_components_map_flightroutelayer_props",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports_from",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "apps/web/components/map/FlightRouteLayer.tsx",
+      "source_location": "L7",
+      "weight": 1.0,
+      "source": "apps_web_components_map_flightroutelayer",
+      "target": "apps_web_components_map_map_utils",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "apps/web/components/map/FlightRouteLayer.tsx",
+      "source_location": "L7",
+      "weight": 1.0,
+      "source": "apps_web_components_map_flightroutelayer",
+      "target": "apps_web_components_map_map_utils_calculategreatcirclearc",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "apps/web/components/map/FlightRouteLayer.tsx",
+      "source_location": "L7",
+      "weight": 1.0,
+      "source": "apps_web_components_map_flightroutelayer",
+      "target": "apps_web_components_map_map_utils_getthemecolor",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "apps/web/components/map/FlightRouteLayer.tsx",
+      "source_location": "L6",
+      "weight": 1.0,
+      "source": "apps_web_components_map_flightroutelayer",
+      "target": "packages_shared_src_types_airport_airport",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports_from",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "apps/web/components/map/FlightRouteLayer.tsx",
+      "source_location": "L6",
+      "weight": 1.0,
+      "source": "apps_web_components_map_flightroutelayer",
+      "target": "packages_shared_src_types_index",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports_from",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "apps/web/components/map/MapContainerInner.tsx",
+      "source_location": "L11",
+      "weight": 1.0,
+      "source": "apps_web_components_map_mapcontainerinner",
+      "target": "apps_web_components_map_flightroutelayer",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "apps/web/components/map/MapContainerInner.tsx",
+      "source_location": "L11",
+      "weight": 1.0,
+      "source": "apps_web_components_map_mapcontainerinner",
+      "target": "apps_web_components_map_flightroutelayer_flightroutelayer",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "apps/web/components/map/MapContainer.tsx",
+      "source_location": "L5",
+      "weight": 1.0,
+      "source": "apps_web_components_map_mapcontainer",
+      "target": "apps_web_components_map_mapcontainer_mapcontainer",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports_from",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "apps/web/components/search/SearchPageClient.tsx",
+      "source_location": "L6",
+      "weight": 1.0,
+      "source": "apps_web_components_search_searchpageclient",
+      "target": "apps_web_components_map_mapcontainer",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "apps/web/components/search/SearchPageClient.tsx",
+      "source_location": "L6",
+      "weight": 1.0,
+      "source": "apps_web_components_search_searchpageclient",
+      "target": "apps_web_components_map_mapcontainer_mapcontainer",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports_from",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "apps/web/components/map/MapContainerInner.tsx",
+      "source_location": "L7",
+      "weight": 1.0,
+      "source": "apps_web_components_map_mapcontainerinner",
+      "target": "apps_web_components_map_map_utils",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "apps/web/components/map/MapContainerInner.tsx",
+      "source_location": "L7",
+      "weight": 1.0,
+      "source": "apps_web_components_map_mapcontainerinner",
+      "target": "apps_web_components_map_map_utils_getmapbounds",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "apps/web/components/map/MapContainerInner.tsx",
+      "source_location": "L23",
+      "weight": 1.0,
+      "source": "apps_web_components_map_mapcontainerinner",
+      "target": "apps_web_components_map_mapcontainerinner_default_view_state",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "apps/web/components/map/MapContainerInner.tsx",
+      "source_location": "L29",
+      "weight": 1.0,
+      "source": "apps_web_components_map_mapcontainerinner",
+      "target": "apps_web_components_map_mapcontainerinner_mapcontainerinner",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "apps/web/components/map/MapContainerInner.tsx",
+      "source_location": "L15",
+      "weight": 1.0,
+      "source": "apps_web_components_map_mapcontainerinner",
+      "target": "apps_web_components_map_mapcontainerinner_props",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports_from",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "apps/web/components/map/MapContainerInner.tsx",
+      "source_location": "L8",
+      "weight": 1.0,
+      "source": "apps_web_components_map_mapcontainerinner",
+      "target": "apps_web_components_map_mapcontrols",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "apps/web/components/map/MapContainerInner.tsx",
+      "source_location": "L8",
+      "weight": 1.0,
+      "source": "apps_web_components_map_mapcontainerinner",
+      "target": "apps_web_components_map_mapcontrols_mapcontrols",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "apps/web/components/map/MapContainerInner.tsx",
+      "source_location": "L6",
+      "weight": 1.0,
+      "source": "apps_web_components_map_mapcontainerinner",
+      "target": "packages_shared_src_types_airport_airport",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports_from",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "apps/web/components/map/MapContainerInner.tsx",
+      "source_location": "L6",
+      "weight": 1.0,
+      "source": "apps_web_components_map_mapcontainerinner",
+      "target": "packages_shared_src_types_index",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "apps/web/components/map/MapControls.tsx",
+      "source_location": "L12",
+      "weight": 1.0,
+      "source": "apps_web_components_map_mapcontrols",
+      "target": "apps_web_components_map_mapcontrols_mapcontrols",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "apps/web/components/map/MapControls.tsx",
+      "source_location": "L7",
+      "weight": 1.0,
+      "source": "apps_web_components_map_mapcontrols",
+      "target": "apps_web_components_map_mapcontrols_props",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "apps/web/components/map/map-utils.ts",
+      "source_location": "L8",
+      "weight": 1.0,
+      "source": "apps_web_components_map_map_utils",
+      "target": "apps_web_components_map_map_utils_calculategreatcirclearc",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "apps/web/components/map/map-utils.ts",
+      "source_location": "L21",
+      "weight": 1.0,
+      "source": "apps_web_components_map_map_utils",
+      "target": "apps_web_components_map_map_utils_getmapbounds",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "apps/web/components/map/map-utils.ts",
+      "source_location": "L53",
+      "weight": 1.0,
+      "source": "apps_web_components_map_map_utils",
+      "target": "apps_web_components_map_map_utils_getthemecolor",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
       "source_file": "apps/web/components/providers.tsx",
       "source_location": "L5",
       "weight": 1.0,
@@ -33684,6 +34638,194 @@
       "weight": 1.0,
       "source": "apps_web_components_providers",
       "target": "apps_web_components_providers_providers",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "apps/web/components/search/SearchPageClient.tsx",
+      "source_location": "L9",
+      "weight": 1.0,
+      "source": "apps_web_components_search_searchpageclient",
+      "target": "apps_web_components_search_searchpageclient_empty_stops",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "apps/web/components/search/SearchPageClient.tsx",
+      "source_location": "L11",
+      "weight": 1.0,
+      "source": "apps_web_components_search_searchpageclient",
+      "target": "apps_web_components_search_searchpageclient_props",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "apps/web/components/search/SearchPageClient.tsx",
+      "source_location": "L15",
+      "weight": 1.0,
+      "source": "apps_web_components_search_searchpageclient",
+      "target": "apps_web_components_search_searchpageclient_searchpageclient",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "apps/web/components/search/SearchPageClient.tsx",
+      "source_location": "L5",
+      "weight": 1.0,
+      "source": "apps_web_components_search_searchpageclient",
+      "target": "packages_shared_src_types_airport_airport",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports_from",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "apps/web/components/search/SearchPageClient.tsx",
+      "source_location": "L5",
+      "weight": 1.0,
+      "source": "apps_web_components_search_searchpageclient",
+      "target": "packages_shared_src_types_index",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "apps/web/lib/airport-service.ts",
+      "source_location": "L24",
+      "weight": 1.0,
+      "source": "apps_web_lib_airport_service",
+      "target": "apps_web_lib_airport_service_airportsearchresponse",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "apps/web/lib/airport-service.ts",
+      "source_location": "L7",
+      "weight": 1.0,
+      "source": "apps_web_lib_airport_service",
+      "target": "apps_web_lib_airport_service_fetchwithtimeout",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "apps/web/lib/airport-service.ts",
+      "source_location": "L45",
+      "weight": 1.0,
+      "source": "apps_web_lib_airport_service",
+      "target": "apps_web_lib_airport_service_getairportbyiatacode",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "apps/web/lib/airport-service.ts",
+      "source_location": "L88",
+      "weight": 1.0,
+      "source": "apps_web_lib_airport_service",
+      "target": "apps_web_lib_airport_service_getallairports",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "apps/web/lib/airport-service.ts",
+      "source_location": "L61",
+      "weight": 1.0,
+      "source": "apps_web_lib_airport_service",
+      "target": "apps_web_lib_airport_service_getnearbyairports",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "apps/web/lib/airport-service.ts",
+      "source_location": "L17",
+      "weight": 1.0,
+      "source": "apps_web_lib_airport_service",
+      "target": "apps_web_lib_airport_service_nearbyairportresponse",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "apps/web/lib/airport-service.ts",
+      "source_location": "L29",
+      "weight": 1.0,
+      "source": "apps_web_lib_airport_service",
+      "target": "apps_web_lib_airport_service_searchairports",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "apps/web/lib/airport-service.ts",
+      "source_location": "L1",
+      "weight": 1.0,
+      "source": "apps_web_lib_airport_service",
+      "target": "packages_shared_src_types_airport_airport",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports_from",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "apps/web/lib/airport-service.ts",
+      "source_location": "L1",
+      "weight": 1.0,
+      "source": "apps_web_lib_airport_service",
+      "target": "packages_shared_src_types_index",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "apps/web/lib/airport-service.ts",
+      "source_location": "L47",
+      "weight": 1.0,
+      "source": "apps_web_lib_airport_service_getairportbyiatacode",
+      "target": "apps_web_lib_airport_service_fetchwithtimeout",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "apps/web/lib/airport-service.ts",
+      "source_location": "L90",
+      "weight": 1.0,
+      "source": "apps_web_lib_airport_service_getallairports",
+      "target": "apps_web_lib_airport_service_fetchwithtimeout",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "apps/web/lib/airport-service.ts",
+      "source_location": "L75",
+      "weight": 1.0,
+      "source": "apps_web_lib_airport_service_getnearbyairports",
+      "target": "apps_web_lib_airport_service_fetchwithtimeout",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "apps/web/lib/airport-service.ts",
+      "source_location": "L32",
+      "weight": 1.0,
+      "source": "apps_web_lib_airport_service_searchairports",
+      "target": "apps_web_lib_airport_service_fetchwithtimeout",
       "confidence_score": 1.0
     },
     {
@@ -33730,7 +34872,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "apps/web/package.json",
-      "source_location": "L27",
+      "source_location": "L31",
       "weight": 1.0,
       "source": "apps_web_package",
       "target": "apps_web_package_devdependencies",
@@ -33830,7 +34972,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "apps/web/package.json",
-      "source_location": "L15",
+      "source_location": "L17",
       "weight": 1.0,
       "source": "apps_web_package_dependencies",
       "target": "apps_web_package_dependencies_class_variance_authority",
@@ -33840,7 +34982,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "apps/web/package.json",
-      "source_location": "L16",
+      "source_location": "L18",
       "weight": 1.0,
       "source": "apps_web_package_dependencies",
       "target": "apps_web_package_dependencies_clsx",
@@ -33850,7 +34992,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "apps/web/package.json",
-      "source_location": "L17",
+      "source_location": "L19",
       "weight": 1.0,
       "source": "apps_web_package_dependencies",
       "target": "apps_web_package_dependencies_lucide_react",
@@ -33860,30 +35002,10 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "apps/web/package.json",
-      "source_location": "L18",
-      "weight": 1.0,
-      "source": "apps_web_package_dependencies",
-      "target": "apps_web_package_dependencies_next",
-      "confidence_score": 1.0
-    },
-    {
-      "relation": "contains",
-      "confidence": "EXTRACTED",
-      "source_file": "apps/web/package.json",
-      "source_location": "L19",
-      "weight": 1.0,
-      "source": "apps_web_package_dependencies",
-      "target": "apps_web_package_dependencies_next_auth",
-      "confidence_score": 1.0
-    },
-    {
-      "relation": "contains",
-      "confidence": "EXTRACTED",
-      "source_file": "apps/web/package.json",
       "source_location": "L20",
       "weight": 1.0,
       "source": "apps_web_package_dependencies",
-      "target": "apps_web_package_dependencies_postcss",
+      "target": "apps_web_package_dependencies_maplibre_gl",
       "confidence_score": 1.0
     },
     {
@@ -33893,7 +35015,7 @@
       "source_location": "L21",
       "weight": 1.0,
       "source": "apps_web_package_dependencies",
-      "target": "apps_web_package_dependencies_react",
+      "target": "apps_web_package_dependencies_next",
       "confidence_score": 1.0
     },
     {
@@ -33903,7 +35025,47 @@
       "source_location": "L22",
       "weight": 1.0,
       "source": "apps_web_package_dependencies",
+      "target": "apps_web_package_dependencies_next_auth",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "apps/web/package.json",
+      "source_location": "L23",
+      "weight": 1.0,
+      "source": "apps_web_package_dependencies",
+      "target": "apps_web_package_dependencies_postcss",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "apps/web/package.json",
+      "source_location": "L24",
+      "weight": 1.0,
+      "source": "apps_web_package_dependencies",
+      "target": "apps_web_package_dependencies_react",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "apps/web/package.json",
+      "source_location": "L25",
+      "weight": 1.0,
+      "source": "apps_web_package_dependencies",
       "target": "apps_web_package_dependencies_react_dom",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "apps/web/package.json",
+      "source_location": "L26",
+      "weight": 1.0,
+      "source": "apps_web_package_dependencies",
+      "target": "apps_web_package_dependencies_react_map_gl",
       "confidence_score": 1.0
     },
     {
@@ -33920,7 +35082,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "apps/web/package.json",
-      "source_location": "L23",
+      "source_location": "L27",
       "weight": 1.0,
       "source": "apps_web_package_dependencies",
       "target": "apps_web_package_dependencies_tailwind_merge",
@@ -33930,7 +35092,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "apps/web/package.json",
-      "source_location": "L24",
+      "source_location": "L28",
       "weight": 1.0,
       "source": "apps_web_package_dependencies",
       "target": "apps_web_package_dependencies_tailwindcss",
@@ -33950,7 +35112,27 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "apps/web/package.json",
-      "source_location": "L25",
+      "source_location": "L15",
+      "weight": 1.0,
+      "source": "apps_web_package_dependencies",
+      "target": "apps_web_package_dependencies_turf_great_circle",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "apps/web/package.json",
+      "source_location": "L16",
+      "weight": 1.0,
+      "source": "apps_web_package_dependencies",
+      "target": "apps_web_package_dependencies_turf_helpers",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "apps/web/package.json",
+      "source_location": "L29",
       "weight": 1.0,
       "source": "apps_web_package_dependencies",
       "target": "apps_web_package_dependencies_zod",
@@ -33960,7 +35142,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "apps/web/package.json",
-      "source_location": "L32",
+      "source_location": "L37",
       "weight": 1.0,
       "source": "apps_web_package_devdependencies",
       "target": "apps_web_package_devdependencies_eslint",
@@ -33970,7 +35152,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "apps/web/package.json",
-      "source_location": "L33",
+      "source_location": "L38",
       "weight": 1.0,
       "source": "apps_web_package_devdependencies",
       "target": "apps_web_package_devdependencies_eslint_config_next",
@@ -33980,7 +35162,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "apps/web/package.json",
-      "source_location": "L28",
+      "source_location": "L32",
       "weight": 1.0,
       "source": "apps_web_package_devdependencies",
       "target": "apps_web_package_devdependencies_playwright_test",
@@ -33990,7 +35172,17 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "apps/web/package.json",
-      "source_location": "L29",
+      "source_location": "L33",
+      "weight": 1.0,
+      "source": "apps_web_package_devdependencies",
+      "target": "apps_web_package_devdependencies_types_geojson",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "apps/web/package.json",
+      "source_location": "L34",
       "weight": 1.0,
       "source": "apps_web_package_devdependencies",
       "target": "apps_web_package_devdependencies_types_node",
@@ -34000,7 +35192,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "apps/web/package.json",
-      "source_location": "L30",
+      "source_location": "L35",
       "weight": 1.0,
       "source": "apps_web_package_devdependencies",
       "target": "apps_web_package_devdependencies_types_react",
@@ -34010,7 +35202,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "apps/web/package.json",
-      "source_location": "L31",
+      "source_location": "L36",
       "weight": 1.0,
       "source": "apps_web_package_devdependencies",
       "target": "apps_web_package_devdependencies_types_react_dom",
@@ -34020,7 +35212,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "apps/web/package.json",
-      "source_location": "L34",
+      "source_location": "L39",
       "weight": 1.0,
       "source": "apps_web_package_devdependencies",
       "target": "apps_web_package_devdependencies_typescript",
@@ -35364,7 +36556,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "context/architecture.md",
-      "source_location": "L182",
+      "source_location": "L203",
       "weight": 1.0,
       "source": "context_architecture_architecture",
       "target": "context_architecture_containerization",
@@ -35384,7 +36576,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "context/architecture.md",
-      "source_location": "L194",
+      "source_location": "L215",
       "weight": 1.0,
       "source": "context_architecture_architecture",
       "target": "context_architecture_invariants",
@@ -35414,7 +36606,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "context/architecture.md",
-      "source_location": "L156",
+      "source_location": "L177",
       "weight": 1.0,
       "source": "context_architecture_data_flow",
       "target": "context_architecture_ai_chatbot_agent_flow_sse_streaming",
@@ -35425,6 +36617,16 @@
       "confidence": "EXTRACTED",
       "source_file": "context/architecture.md",
       "source_location": "L110",
+      "weight": 1.0,
+      "source": "context_architecture_data_flow",
+      "target": "context_architecture_airport_map_integration_deterministic_path",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "context/architecture.md",
+      "source_location": "L131",
       "weight": 1.0,
       "source": "context_architecture_data_flow",
       "target": "context_architecture_booking_flow_deterministic_path_no_ai",
@@ -35444,7 +36646,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "context/architecture.md",
-      "source_location": "L130",
+      "source_location": "L151",
       "weight": 1.0,
       "source": "context_architecture_data_flow",
       "target": "context_architecture_payment_flow_deterministic_path_no_ai",
@@ -44757,5 +45959,5 @@
       "source_file": "specs/004-output-guardrails/data-model.md"
     }
   ],
-  "built_at_commit": "52096425cb4f5b170789bdb63edd655679acea8a"
+  "built_at_commit": "dbbbb89c5006d62a19b35d452a36f9bd841dfb70"
 }

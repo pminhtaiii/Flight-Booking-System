@@ -630,9 +630,9 @@
     "semantic_hash": "f53bf377566882e87c2a1687e6c30d77"
   },
   "apps/web/package.json": {
-    "mtime": 1782792217.8420503,
-    "ast_hash": "ab106dad6ff47d74c2aa941f43a9a462",
-    "semantic_hash": "ab106dad6ff47d74c2aa941f43a9a462"
+    "mtime": 1783242911.1696951,
+    "ast_hash": "6160e756ef1c2ecfc2539119eabe0a9e",
+    "semantic_hash": ""
   },
   "apps/web/postcss.config.js": {
     "mtime": 1782641806.8467054,
@@ -660,9 +660,9 @@
     "semantic_hash": "9f3df4d57cd3cfe2fba1ff0fa4e531ad"
   },
   "apps/web/tsconfig.json": {
-    "mtime": 1782792218.1308208,
-    "ast_hash": "cc5e39c41e23f684d37e4427b8361b74",
-    "semantic_hash": "cc5e39c41e23f684d37e4427b8361b74"
+    "mtime": 1783242983.1128068,
+    "ast_hash": "0ba925125bc82a74115be3785773fdbf",
+    "semantic_hash": ""
   },
   "package.json": {
     "mtime": 1782792218.954232,
@@ -735,8 +735,8 @@
     "semantic_hash": "e97a9e557a49c17b89348caa804b6b91"
   },
   "context/architecture.md": {
-    "mtime": 1783235994.708338,
-    "ast_hash": "ae84bfc125e0e975f28906bf129baa65",
+    "mtime": 1783238928.8649678,
+    "ast_hash": "7c6f0129b76a13e4c0f590c31845fc2b",
     "semantic_hash": ""
   },
   "context/code-standards.md": {
@@ -750,8 +750,8 @@
     "semantic_hash": "13d24df073aeafdf3c5c1bc2507eb893"
   },
   "context/progress-checker.md": {
-    "mtime": 1783238691.4843454,
-    "ast_hash": "4479fc01bf4985b53f34849654622cfb",
+    "mtime": 1783250184.4338415,
+    "ast_hash": "f10be7229bb6a3be8e957813389c0db8",
     "semantic_hash": ""
   },
   "context/project-overview.md": {
@@ -990,8 +990,8 @@
     "semantic_hash": ""
   },
   "specs/005-map-integration/tasks.md": {
-    "mtime": 1783235650.186796,
-    "ast_hash": "4817e9b54b45f0b3d3777a5d0d47f14e",
+    "mtime": 1783250165.7122464,
+    "ast_hash": "c547c4a8e34ddebfc6e824d2fd854bf5",
     "semantic_hash": ""
   },
   "apps/agent/src/agent/guardrails/output_pipeline.py": {
@@ -1090,8 +1090,8 @@
     "semantic_hash": ""
   },
   "apps/api/src/airports/airports.service.ts": {
-    "mtime": 1783238562.267117,
-    "ast_hash": "74a500d5b463259d5b69c6502ab3bbfb",
+    "mtime": 1783248918.6171465,
+    "ast_hash": "235ce3e50859a704adb3069fbeec754a",
     "semantic_hash": ""
   },
   "apps/api/src/airports/dto/nearby-airports.dto.ts": {
@@ -1177,6 +1177,56 @@
   "specs/004-output-guardrails/tasks.md": {
     "mtime": 1783235994.738351,
     "ast_hash": "f310dfff049aaece27d6785e07d74c41",
+    "semantic_hash": ""
+  },
+  "apps/web/app/search/page.tsx": {
+    "mtime": 1783242908.227857,
+    "ast_hash": "c7b62e387538a40cd6689d6a6d4e5a13",
+    "semantic_hash": ""
+  },
+  "apps/web/components/map/AirportMarkerLayer.tsx": {
+    "mtime": 1783243226.1373367,
+    "ast_hash": "3004b804757f416984abfda4638d1afd",
+    "semantic_hash": ""
+  },
+  "apps/web/components/map/AirportPopup.tsx": {
+    "mtime": 1783248924.948117,
+    "ast_hash": "0bb0ceac690673f59ddfa7f8ceb418a8",
+    "semantic_hash": ""
+  },
+  "apps/web/components/map/FlightRouteLayer.tsx": {
+    "mtime": 1783243229.5117917,
+    "ast_hash": "24838a1f5cfd9aa9c0ec12790441a1ae",
+    "semantic_hash": ""
+  },
+  "apps/web/components/map/MapContainer.tsx": {
+    "mtime": 1783242875.8977466,
+    "ast_hash": "a5a9f0015fb1786ac0d0a1fef6e40bfc",
+    "semantic_hash": ""
+  },
+  "apps/web/components/map/MapContainerInner.tsx": {
+    "mtime": 1783243220.063401,
+    "ast_hash": "e1d1fef0171eab880ddcf1a6a41a8af4",
+    "semantic_hash": ""
+  },
+  "apps/web/components/map/MapControls.tsx": {
+    "mtime": 1783243234.569455,
+    "ast_hash": "aeef9596103a18e0d42c4d18437958ff",
+    "semantic_hash": ""
+  },
+  "apps/web/components/map/map-utils.ts": {
+    "mtime": 1783242825.3466942,
+    "ast_hash": "755405d004b71593829e9af7b11d1b04",
+    "semantic_hash": ""
+  },
+  "apps/web/components/search/SearchPageClient.tsx": {
+    "mtime": 1783250075.2620237,
+    "ast_hash": "4fed7637583dba44c3b3bb0bbc3359f4",
+    "semantic_hash": ""
+  },
+  "apps/web/lib/airport-service.ts": {
+    "mtime": 1783248945.868156,
+    "ast_hash": "b55882dd32790a1f5185302b251d53d3",
     "semantic_hash": ""
   }
 }

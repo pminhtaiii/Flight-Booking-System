@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef, useEffect } from 'react';
 import { Airport } from '@shared/types';
 import { MapContainer } from '@/components/map/MapContainer';
 import { Search, Calendar, Users, PlaneTakeoff, PlaneLanding, Info } from 'lucide-react';
@@ -13,6 +13,9 @@ type Props = {
 };
 
 export function SearchPageClient({ allAirports }: Props) {
+  const originRef = useRef<HTMLDivElement>(null);
+  const destRef = useRef<HTMLDivElement>(null);
+
   const [originInput, setOriginInput] = useState('');
   const [destInput, setDestInput] = useState('');
   const [departDate, setDepartDate] = useState('2026-07-10');
@@ -26,6 +29,21 @@ export function SearchPageClient({ allAirports }: Props) {
 
   const [showOriginDropdown, setShowOriginDropdown] = useState(false);
   const [showDestDropdown, setShowDestDropdown] = useState(false);
+
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (originRef.current && !originRef.current.contains(event.target as Node)) {
+        setShowOriginDropdown(false);
+      }
+      if (destRef.current && !destRef.current.contains(event.target as Node)) {
+        setShowDestDropdown(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
 
   const [hasSearched, setHasSearched] = useState(false);
   const [isSearching, setIsSearching] = useState(false);
@@ -140,7 +158,7 @@ export function SearchPageClient({ allAirports }: Props) {
 
           <form onSubmit={handleSearch} className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 relative">
-              <div className="relative">
+              <div ref={originRef} className="relative">
                 <label className="block text-xs font-semibold text-text-secondary mb-1">Origin</label>
                 <div className="relative">
                   <PlaneTakeoff className="absolute left-3 top-3 w-4 h-4 text-text-muted" />
@@ -150,9 +168,15 @@ export function SearchPageClient({ allAirports }: Props) {
                     onChange={(e) => {
                       setOriginInput(e.target.value);
                       setSelectedOrigin(null);
+                      setMapOrigin(null);
                       setShowOriginDropdown(true);
                     }}
                     onFocus={() => setShowOriginDropdown(true)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Escape') {
+                        setShowOriginDropdown(false);
+                      }
+                    }}
                     placeholder="Enter city or airport code"
                     className="form-input w-full pl-10"
                     required
@@ -179,7 +203,7 @@ export function SearchPageClient({ allAirports }: Props) {
                 )}
               </div>
 
-              <div className="relative">
+              <div ref={destRef} className="relative">
                 <label className="block text-xs font-semibold text-text-secondary mb-1">Destination</label>
                 <div className="relative">
                   <PlaneLanding className="absolute left-3 top-3 w-4 h-4 text-text-muted" />
@@ -189,9 +213,15 @@ export function SearchPageClient({ allAirports }: Props) {
                     onChange={(e) => {
                       setDestInput(e.target.value);
                       setSelectedDest(null);
+                      setMapDest(null);
                       setShowDestDropdown(true);
                     }}
                     onFocus={() => setShowDestDropdown(true)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Escape') {
+                        setShowDestDropdown(false);
+                      }
+                    }}
                     placeholder="Enter city or airport code"
                     className="form-input w-full pl-10"
                     required
