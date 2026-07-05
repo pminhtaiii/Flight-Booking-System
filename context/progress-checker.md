@@ -4,11 +4,11 @@ Update this file after every completed feature. Any AI agent reading this should
 
 ---
 
-## Current Status
+### Current Status
 
-**Feature:** Map Integration (Phase 6 of Tasks: Dark Mode & Destination Explorer)
+**Feature:** Map Integration (Phase 6 of 7: Dark Mode & Destination Explorer)
 **Last completed:** Phase 6: Dark Mode & Destination Explorer (tile style toggle, app theme sync, and explore map with popular destination prefill/redirect).
-**Next:** Polish & review next milestone features.
+**Next:** Phase 7: Polish & E2E Validation.
 
 ---
 
@@ -104,16 +104,15 @@ Update this file after every completed feature. Any AI agent reading this should
 - [x] Run concurrency stress tests (100 parallel requests)
 - [x] Walkthrough verification and documentation
 
-### [x] Feature: Map Integration
+### [/] Feature: Map Integration
 
-- [x] Phase 1: Airport Data Model & Database Seed (Airport Prisma model, database migration, shared typescript definitions, and OurAirports CSV database seed)
-- [x] Phase 2: Airport REST API Endpoints
-- [x] Phase 3: Map Component Foundation
-- [x] Phase 4: Airport Markers & Popups
-- [x] Phase 5: Flight Route Arc Rendering
-- [x] Phase 6: Search Page Integration
-- [x] Phase 7: Flight Details Page Map & Polish (Dynamic details page /search/[flightId] with side-by-side timeline and interactive map container, custom amber markers for stops with hover tooltips displaying layover duration)
-- [x] Phase 8: Dark Mode & Destination Explorer (tile style toggle, app theme sync, explore map with popular destinations pre-fill/redirect)
+- [x] Phase 1: Setup (Shared Infrastructure)
+- [x] Phase 2: Foundational (Database Schema & Seed)
+- [x] Phase 3: Airport Map & REST API (Backend & Frontend MVP)
+- [x] Phase 4: Airport Autocomplete with Map Preview
+- [x] Phase 5: Flight Route Details Map
+- [x] Phase 6: Dark Mode & Destination Explorer (tile style toggle, app theme sync, explore map with popular destinations pre-fill/redirect)
+- [ ] Phase 7: Polish & E2E Validation
 
 ---
 
