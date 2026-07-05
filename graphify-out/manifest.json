@@ -560,9 +560,9 @@
     "semantic_hash": "879766cbe9d4dc8c233d3ca8888cf5cf"
   },
   "apps/web/app/dashboard/page.tsx": {
-    "mtime": 1782792217.3013778,
-    "ast_hash": "24d546cc50d2361a930700a6625ae6b7",
-    "semantic_hash": "24d546cc50d2361a930700a6625ae6b7"
+    "mtime": 1783253708.124863,
+    "ast_hash": "cd8afa5a8e9a54689ba0ca1233db9cde",
+    "semantic_hash": ""
   },
   "apps/web/app/layout.tsx": {
     "mtime": 1782792217.3217506,
@@ -600,9 +600,9 @@
     "semantic_hash": "7841d6f7399a887fc737dd784148c987"
   },
   "apps/web/components/layout/Header.tsx": {
-    "mtime": 1782792217.5871985,
-    "ast_hash": "ce78dda2f975984a7c0ba884a72b975b",
-    "semantic_hash": "ce78dda2f975984a7c0ba884a72b975b"
+    "mtime": 1783253656.6123056,
+    "ast_hash": "f4540533a8ae451e3198503b73b36e03",
+    "semantic_hash": ""
   },
   "apps/web/components/providers.tsx": {
     "mtime": 1782792217.6101906,
@@ -730,9 +730,9 @@
     "semantic_hash": "91bf39e701c5a87b6e2dd98c180d5eaf"
   },
   "apps/web/playwright-report/index.html": {
-    "mtime": 1782745097.514125,
-    "ast_hash": "e97a9e557a49c17b89348caa804b6b91",
-    "semantic_hash": "e97a9e557a49c17b89348caa804b6b91"
+    "mtime": 1783271186.4605818,
+    "ast_hash": "fe4307209ab3f4833288fef7a5ba25f8",
+    "semantic_hash": ""
   },
   "context/architecture.md": {
     "mtime": 1783238928.8649678,
@@ -750,8 +750,8 @@
     "semantic_hash": "13d24df073aeafdf3c5c1bc2507eb893"
   },
   "context/progress-checker.md": {
-    "mtime": 1783251356.6924143,
-    "ast_hash": "10e10f6a0fb3b3fd99e76882990959a7",
+    "mtime": 1783271234.4554157,
+    "ast_hash": "bcd0f892d4bd86a2f6583d03b31b9f87",
     "semantic_hash": ""
   },
   "context/project-overview.md": {
@@ -990,8 +990,8 @@
     "semantic_hash": ""
   },
   "specs/005-map-integration/tasks.md": {
-    "mtime": 1783251332.5608246,
-    "ast_hash": "1e530c5e4a5811f19dd4d4eadc9aea9d",
+    "mtime": 1783271227.6225672,
+    "ast_hash": "7178ecfa83e42b4b457d38d846a07347",
     "semantic_hash": ""
   },
   "apps/agent/src/agent/guardrails/output_pipeline.py": {
@@ -1065,13 +1065,13 @@
     "semantic_hash": ""
   },
   "apps/api/prisma/seed.ts": {
-    "mtime": 1783235548.4915934,
-    "ast_hash": "3552d08726d4d800af321fcb2476d7cc",
+    "mtime": 1783253886.0577133,
+    "ast_hash": "86e9d4982f6d34cc687589877feb9434",
     "semantic_hash": ""
   },
   "apps/api/prisma/seed/airports.ts": {
-    "mtime": 1783235439.318217,
-    "ast_hash": "d02c7d828005e260cc8a5622c5bc5d20",
+    "mtime": 1783253890.1216784,
+    "ast_hash": "72c8000a009dd9d60ef459a1211a46a2",
     "semantic_hash": ""
   },
   "apps/api/src/airports/airports.constants.ts": {
@@ -1090,8 +1090,8 @@
     "semantic_hash": ""
   },
   "apps/api/src/airports/airports.service.ts": {
-    "mtime": 1783248918.6171465,
-    "ast_hash": "235ce3e50859a704adb3069fbeec754a",
+    "mtime": 1783253850.0388322,
+    "ast_hash": "a991e70e085e5a7262bc5857e4d0f1c3",
     "semantic_hash": ""
   },
   "apps/api/src/airports/dto/nearby-airports.dto.ts": {
@@ -1180,18 +1180,18 @@
     "semantic_hash": ""
   },
   "apps/web/app/search/page.tsx": {
-    "mtime": 1783242908.227857,
-    "ast_hash": "c7b62e387538a40cd6689d6a6d4e5a13",
+    "mtime": 1783253666.300315,
+    "ast_hash": "57c8904bc4c09f4eead656a5459ec236",
     "semantic_hash": ""
   },
   "apps/web/components/map/AirportMarkerLayer.tsx": {
-    "mtime": 1783251292.6445947,
-    "ast_hash": "278c9fc5bf9bc8022b9fd5854894919a",
+    "mtime": 1783255027.4247174,
+    "ast_hash": "1b87b64b1ea9c8aa0864bad5b8fcddcd",
     "semantic_hash": ""
   },
   "apps/web/components/map/AirportPopup.tsx": {
-    "mtime": 1783248924.948117,
-    "ast_hash": "0bb0ceac690673f59ddfa7f8ceb418a8",
+    "mtime": 1783253679.7429879,
+    "ast_hash": "2a84e5402cf9cf141cdf7271764b859d",
     "semantic_hash": ""
   },
   "apps/web/components/map/FlightRouteLayer.tsx": {
@@ -1205,8 +1205,8 @@
     "semantic_hash": ""
   },
   "apps/web/components/map/MapContainerInner.tsx": {
-    "mtime": 1783251294.239933,
-    "ast_hash": "3aad5c4a43030dabbbad60f4e72aeee4",
+    "mtime": 1783253689.6433609,
+    "ast_hash": "c68cbdfaa1b155e2e0dcddff5be36f2b",
     "semantic_hash": ""
   },
   "apps/web/components/map/MapControls.tsx": {
@@ -1220,8 +1220,8 @@
     "semantic_hash": ""
   },
   "apps/web/components/search/SearchPageClient.tsx": {
-    "mtime": 1783251302.2570949,
-    "ast_hash": "2688c011c578c1dd8085dec6d0b7c167",
+    "mtime": 1783270798.7891326,
+    "ast_hash": "bb4335fd6cb37a1c9e1d645fed4a1668",
     "semantic_hash": ""
   },
   "apps/web/lib/airport-service.ts": {
@@ -1237,6 +1237,21 @@
   "apps/web/components/search/FlightDetailPageClient.tsx": {
     "mtime": 1783252352.2087014,
     "ast_hash": "5b5e6f4eef7b3019a7c720a99ba886db",
+    "semantic_hash": ""
+  },
+  "apps/web/components/dashboard/ExploreDashboardClient.tsx": {
+    "mtime": 1783253705.476673,
+    "ast_hash": "7ef51bbeb2e1ae1bbf317b8cf839c301",
+    "semantic_hash": ""
+  },
+  "apps/web/components/layout/ThemeToggle.tsx": {
+    "mtime": 1783253653.6881094,
+    "ast_hash": "899ec1277d8d519148b99750e5281945",
+    "semantic_hash": ""
+  },
+  "apps/web/tests/map.spec.ts": {
+    "mtime": 1783270802.377046,
+    "ast_hash": "b91e40a7186bd09d6a6bb008bd96923e",
     "semantic_hash": ""
   }
 }

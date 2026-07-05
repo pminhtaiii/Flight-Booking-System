@@ -100,10 +100,10 @@
 
 **Purpose**: UI/UX polish, bundle optimization, and Playwright UI tests
 
-- [ ] T028 [P] Update documentation in `docs/` and walkthrough
-- [ ] T029 Code cleanups, linting, type-checking fixes
-- [ ] T030 Write Playwright E2E tests for map search flow and interactions in `apps/web/tests/map.spec.ts`
-- [ ] T031 Run validation scenarios in `specs/005-map-integration/quickstart.md`
+- [x] T028 [P] Update documentation in `docs/` and walkthrough
+- [x] T029 Code cleanups, linting, type-checking fixes
+- [x] T030 Write Playwright E2E tests for map search flow and interactions in `apps/web/tests/map.spec.ts`
+- [x] T031 Run validation scenarios in `specs/005-map-integration/quickstart.md`
 
 ---
 

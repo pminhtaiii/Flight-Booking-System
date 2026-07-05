@@ -67,31 +67,32 @@ export function SearchPageClient({ allAirports }: Props) {
   const [isSearching, setIsSearching] = useState(false);
   const [searchResults, setSearchResults] = useState<any[]>([]);
 
-  const originSuggestions = useMemo(() => {
-    if (originInput.length < 2) return [];
-    const term = originInput.toLowerCase();
+  const getSuggestions = (input: string) => {
+    if (input.length < 2) return [];
+    const term = input.toLowerCase();
     return allAirports
-      .filter(
-        (ap) =>
-          ap.iataCode.toLowerCase().includes(term) ||
-          ap.name.toLowerCase().includes(term) ||
-          ap.city.toLowerCase().includes(term)
-      )
-      .slice(0, 5);
-  }, [originInput, allAirports]);
+      .map((ap) => {
+        const iata = ap.iataCode.toLowerCase();
+        const name = ap.name.toLowerCase();
+        const city = ap.city.toLowerCase();
 
-  const destSuggestions = useMemo(() => {
-    if (destInput.length < 2) return [];
-    const term = destInput.toLowerCase();
-    return allAirports
-      .filter(
-        (ap) =>
-          ap.iataCode.toLowerCase().includes(term) ||
-          ap.name.toLowerCase().includes(term) ||
-          ap.city.toLowerCase().includes(term)
-      )
+        let score = 0;
+        if (iata === term) score = 100;
+        else if (iata.startsWith(term)) score = 80;
+        else if (city.startsWith(term)) score = 60;
+        else if (name.startsWith(term)) score = 40;
+        else if (iata.includes(term) || name.includes(term) || city.includes(term)) score = 20;
+
+        return { ap, score };
+      })
+      .filter((item) => item.score > 0)
+      .sort((a, b) => b.score - a.score)
+      .map((item) => item.ap)
       .slice(0, 5);
-  }, [destInput, allAirports]);
+  };
+
+  const originSuggestions = useMemo(() => getSuggestions(originInput), [originInput, allAirports]);
+  const destSuggestions = useMemo(() => getSuggestions(destInput), [destInput, allAirports]);
 
   const handleSelectOrigin = (ap: Airport) => {
     setSelectedOrigin(ap);
