@@ -165,10 +165,14 @@
   "163": "E2E Test Suite - Ready for Verification",
   "164": "AuditService",
   "165": "health.controller.ts",
+  "166": "Decisions",
+  "167": "get_settings",
   "168": "Specification Quality Checklist: Database Initialization & Auth Handshake",
   "169": "Environment Contract",
   "170": "Specification Quality Checklist: AI Chatbot Agent Service",
   "171": "Specification Quality Checklist: Agent Tool-Calling & Data Access",
+  "172": "detect_pii",
+  "173": "chat_stream",
   "174": "Chatbot-first split screen layout",
   "175": "NestJS Agent Gateway PII Boundary",
   "176": "LangGraph State Machine Orchestration",
@@ -238,5 +242,12 @@
   "240": "Sliding Window Size Decision",
   "241": "Database-Asserted Audit Log Checks",
   "242": "Frontend UI Test Suite",
-  "243": "Opaque-Box Testing Strategy"
+  "243": "Opaque-Box Testing Strategy",
+  "244": "Sketch 001: Chatbot-Search Transition",
+  "245": "Sketch Wrap-Up Summary",
+  "246": "test_guardrail_logging.py",
+  "247": "test_pipeline_parallelism.py",
+  "248": "Sketch Manifest",
+  "249": "airports.ts",
+  "250": "seed.ts"
 }

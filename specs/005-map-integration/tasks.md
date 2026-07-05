@@ -46,12 +46,12 @@
 
 ### Backend Airports REST Endpoints
 
-- [ ] T007 Create NestJS `AirportsModule`, `AirportsController`, and `AirportsService` in `apps/api/src/airports/`
-- [ ] T008 [US1] Implement `GET /airports/search?q=` with Redis caching in `apps/api/src/airports/airports.controller.ts`
-- [ ] T009 [US1] Implement `GET /airports/:iataCode` with Redis caching in `apps/api/src/airports/airports.controller.ts`
-- [ ] T010 [US1] Implement `GET /airports/nearby` with Redis caching in `apps/api/src/airports/airports.controller.ts`
-- [ ] T011 [US1] Implement `GET /airports/all` with Redis caching in `apps/api/src/airports/airports.controller.ts`
-- [ ] T012 [US1] Write API E2E tests in `apps/api/test/airports.e2e-spec.ts` and verify they pass
+- [x] T007 Create NestJS `AirportsModule`, `AirportsController`, and `AirportsService` in `apps/api/src/airports/`
+- [x] T008 [US1] Implement `GET /airports/search?q=` with Redis caching in `apps/api/src/airports/airports.controller.ts`
+- [x] T009 [US1] Implement `GET /airports/:iataCode` with Redis caching in `apps/api/src/airports/airports.controller.ts`
+- [x] T010 [US1] Implement `GET /airports/nearby` with Redis caching in `apps/api/src/airports/airports.controller.ts`
+- [x] T011 [US1] Implement `GET /airports/all` with Redis caching in `apps/api/src/airports/airports.controller.ts`
+- [x] T012 [US1] Write API E2E tests in `apps/api/test/airports.e2e-spec.ts` and verify they pass
 
 ### Frontend Map Foundation & Components
 
