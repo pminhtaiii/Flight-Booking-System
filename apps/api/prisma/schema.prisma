@@ -169,6 +169,7 @@ model Airport {
   @@index([country])
   @@index([icaoCode])
   @@index([latitude, longitude])
+  @@index([name])
   @@map("airports")
 }
 
