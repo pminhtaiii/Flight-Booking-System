@@ -19,6 +19,9 @@
   --theme-text-pending: #B45309;
   --theme-bg-cancelled: #FEF2F2;
   --theme-text-cancelled: #DC2626;
+  --theme-danger: #FFFFFF;
+  --theme-danger-border: #DC2626;
+  --theme-danger-foreground: #DC2626;
 
   /* Match Score Colors */
   --theme-bg-match-strong: #ECFDF5;
@@ -48,6 +51,9 @@
   --theme-text-pending: #FBBF24;
   --theme-bg-cancelled: #7F1D1D;
   --theme-text-cancelled: #FCA5A5;
+  --theme-danger: #1F2937;
+  --theme-danger-border: #FCA5A5;
+  --theme-danger-foreground: #FCA5A5;
 
   /* Match Score Colors */
   --theme-bg-match-strong: #065F46;
@@ -69,9 +75,9 @@
   --color-secondary: var(--theme-secondary);
   --color-secondary-border: var(--theme-secondary-border);
   --color-secondary-foreground: var(--theme-secondary-foreground);
-  --color-danger: #FFFFFF;
-  --color-danger-border: #DC2626;
-  --color-danger-foreground: #DC2626;
+  --color-danger: var(--theme-danger);
+  --color-danger-border: var(--theme-danger-border);
+  --color-danger-foreground: var(--theme-danger-foreground);
   --color-muted: var(--theme-text-muted);
   
   /* Text and Card Colors */

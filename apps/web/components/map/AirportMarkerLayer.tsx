@@ -220,7 +220,7 @@ export function AirportMarkerLayer({
           }}
         >
           <div className="flex flex-col items-center group cursor-pointer">
-            <div className="bg-accent border border-white text-white px-2 py-0.5 rounded shadow text-[10px] font-bold whitespace-nowrap mb-1">
+            <div className="bg-accent border border-card text-card px-2 py-0.5 rounded shadow text-[10px] font-bold whitespace-nowrap mb-1">
               {dest.city || dest.name}
             </div>
             <MapPin className="w-8 h-8 text-accent drop-shadow-md" />
