@@ -107,6 +107,27 @@ cache.service checks Redis for matching cached results
                     Results returned to frontend
 ```
 
+### Airport & Map Integration (Deterministic Path)
+
+```
+User visits search results page or homepage map
+        ↓
+Next.js client-side map calls GET /airports/search, GET /airports/nearby, or GET /airports/all
+        ↓
+NestJS airports.controller validates query parameters (via DTOs)
+        ↓
+cache.service checks Redis for cached query response
+        ├── Cache HIT → return cached JSON immediately
+        └── Cache MISS ↓
+            airports.service executes Prisma query against PostgreSQL database
+                ├── Standard search/lookup -> SELECT/findUnique/findMany
+                └── Proximity search (GET /nearby) -> PostgreSQL clamped Haversine raw SQL query
+            ↓
+            Response cached in Redis (TTL: 24h for search/all/details, 1h for nearby)
+            ↓
+            Results returned to frontend
+```
+
 ### Booking Flow (Deterministic Path — No AI)
 
 ```
@@ -176,6 +197,18 @@ FastAPI NemoGuardrailService runs safety checks (length, regex heuristics, Mimo 
                 ↓
             Upon completion, full conversation Turn persisted via NestJS Chat API
 ```
+
+---
+
+## Containerization
+
+A single `docker-compose.yml` file is located at the root of the project to orchestrate the database and cache services for local development:
+- **PostgreSQL**: Version 16 (Alpine). Runs on host port `5432` with username `postgres`, password `postgres`, and database `flight_booking`. Persists database files using the `postgres_data` volume.
+- **Redis**: Version 7 (Alpine). Runs on host port `6379`. Persists data using the `redis_data` volume.
+
+To manage the services:
+- Start services: `docker compose up -d`
+- Stop services: `docker compose down`
 
 ---
 

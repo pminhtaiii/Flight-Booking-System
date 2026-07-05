@@ -3,6 +3,8 @@ import { redirect } from 'next/navigation';
 import { headers } from 'next/headers';
 import { authOptions } from '@/lib/auth';
 import { Header } from '@/components/layout/Header';
+import { ExploreDashboardClient } from '@/components/dashboard/ExploreDashboardClient';
+import { getAllAirports } from '@/lib/airport-service';
 
 export default async function DashboardPage() {
   const session = await getServerSession(authOptions);
@@ -35,16 +37,20 @@ export default async function DashboardPage() {
     redirect('/login?message=session_expired');
   }
 
+  const allAirports = await getAllAirports();
+
   return (
     <div className="min-h-screen flex flex-col bg-background">
       <Header />
-      <main className="flex-1 max-w-[1440px] w-full mx-auto p-8">
+      <main className="flex-1 max-w-[1440px] w-full mx-auto p-8 space-y-8">
         <div className="card">
           <h2 className="text-lg font-semibold text-text-primary mb-2">
             Welcome to your Dashboard
           </h2>
           <p className="text-sm text-text-secondary">Logged in as {session.user?.email}</p>
         </div>
+
+        <ExploreDashboardClient allAirports={allAirports} />
       </main>
     </div>
   );

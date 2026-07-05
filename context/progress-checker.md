@@ -4,11 +4,11 @@ Update this file after every completed feature. Any AI agent reading this should
 
 ---
 
-## Current Status
+### Current Status
 
-**Feature:** LLM Output Guardrails (Complete)
-**Last completed:** Phase 8-10: Pipeline Parallelism, Structured Logging, E2E Testing, Benchmarks, and Documentation are implemented and verified.
-**Next:** Feature Complete.
+**Feature:** Map Integration (Fully Completed)
+**Last completed:** Phase 7: Polish & E2E Validation (linter/type-check verification, ignore files check, Playwright E2E tests, and quickstart scenario verification).
+**Next:** Done!
 
 ---
 
@@ -104,10 +104,21 @@ Update this file after every completed feature. Any AI agent reading this should
 - [x] Run concurrency stress tests (100 parallel requests)
 - [x] Walkthrough verification and documentation
 
+### [x] Feature: Map Integration
+
+- [x] Phase 1: Setup (Shared Infrastructure)
+- [x] Phase 2: Foundational (Database Schema & Seed)
+- [x] Phase 3: Airport Map & REST API (Backend & Frontend MVP)
+- [x] Phase 4: Airport Autocomplete with Map Preview
+- [x] Phase 5: Flight Route Details Map
+- [x] Phase 6: Dark Mode & Destination Explorer (tile style toggle, app theme sync, explore map with popular destinations pre-fill/redirect)
+- [x] Phase 7: Polish & E2E Validation
+
 ---
 
 ## Decisions Made During Build
 
+- Consolidated separate PostgreSQL and Redis standalone docker containers into a single `docker-compose.yml` file at the project root for streamlined development service management.
 - Refactored `PrismaService` to remove the query interceptor facade. This ensures it behaves as a genuine client and reports health status truthfully based on real database availability.
 - Implemented clean Jest spies and mock lifecycles directly in `test/health.e2e-spec.ts` to manage database connectivity states in local environments where PostgreSQL and Redis are unavailable.
 - Added client warming to E2E setup in `health.e2e-spec.ts` to bypass Express/NestJS router bootstrap cold-start latencies.
