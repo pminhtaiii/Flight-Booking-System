@@ -55,7 +55,7 @@ export function FlightDetailPageClient({
     for (let i = 0; i < 6; i++) {
       code += chars.charAt(Math.floor(Math.random() * chars.length));
     }
-    setPnrCode(code);
+    setPnrCode(`DEMO-${code}`);
     setIsBooked(true);
   };
 
@@ -88,14 +88,14 @@ export function FlightDetailPageClient({
           <div className="card border-text-confirmed bg-bg-confirmed text-text-primary p-6 flex flex-col items-center text-center gap-4">
             <CheckCircle2 className="w-16 h-16 text-text-confirmed" />
             <div>
-              <h3 className="text-xl font-bold text-text-confirmed">Booking Confirmed!</h3>
+              <h3 className="text-xl font-bold text-text-confirmed">Booking Preview Created</h3>
               <p className="text-sm text-text-secondary mt-1">
-                Your ticket has been successfully booked. Have a safe journey!
+                This is a simulated flight itinerary preview. Please note that this is not a real booking.
               </p>
             </div>
             <div className="bg-card border border-card-border rounded-xl p-4 w-full max-w-sm mt-2 flex flex-col gap-2">
               <div className="flex justify-between text-sm">
-                <span className="text-text-muted font-medium">PNR Reference:</span>
+                <span className="text-text-muted font-medium">Demo Reference:</span>
                 <span className="font-extrabold text-accent">{pnrCode}</span>
               </div>
               <div className="flex justify-between text-sm border-t border-card-border pt-2">
@@ -243,7 +243,7 @@ export function FlightDetailPageClient({
               </div>
             </div>
 
-            <div className="flex items-center justify-between border-t border-card-border pt-4 mt-2">
+             <div className="flex items-center justify-between border-t border-card-border pt-4 mt-2">
               <div>
                 <span className="text-xs text-text-muted block font-medium">Total Fare (1 Adult)</span>
                 <span className="text-2xl font-extrabold text-accent">${flight.price}</span>
@@ -252,7 +252,7 @@ export function FlightDetailPageClient({
                 onClick={handleBook}
                 className="btn-primary py-2.5 px-6 font-bold cursor-pointer text-sm"
               >
-                Confirm & Book Flight
+                Preview Booking
               </button>
             </div>
           </div>
@@ -261,9 +261,9 @@ export function FlightDetailPageClient({
         <div className="card bg-accent/5 border-accent/15 p-4 flex items-start gap-3">
           <ShieldCheck className="w-5 h-5 text-accent mt-0.5 flex-shrink-0" />
           <div>
-            <h5 className="font-bold text-xs text-accent">Safe Booking Guarantee</h5>
+            <h5 className="font-bold text-xs text-accent">Simulated Itinerary Preview</h5>
             <p className="text-[11px] text-text-secondary mt-0.5 leading-relaxed">
-              Your flight booking is protected. Free cancellation within 24 hours of confirmation. All payments are processed securely via Stripe.
+              This page demonstrates the layout and routing map for the flight details page. No actual booking, ticket confirmation, or payment transactions are processed.
             </p>
           </div>
         </div>

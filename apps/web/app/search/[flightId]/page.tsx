@@ -1,6 +1,6 @@
 import { Metadata } from 'next';
 import { getServerSession } from 'next-auth';
-import { redirect } from 'next/navigation';
+import { notFound, redirect } from 'next/navigation';
 import { headers } from 'next/headers';
 import { authOptions } from '@/lib/auth';
 import { Header } from '@/components/layout/Header';
@@ -99,13 +99,21 @@ export default async function FlightDetailPage({ params, searchParams }: Props) 
   }
 
   const token = (session as { accessToken?: string }).accessToken;
+  if (!token) {
+    redirect('/login?message=session_expired');
+  }
+
   const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 5000);
 
   try {
     const res = await fetch(`${apiUrl}/api/auth/me`, {
       headers: {
         Authorization: `Bearer ${token}`,
       },
+      cache: 'no-store',
+      signal: controller.signal,
     });
 
     if (!res.ok) {
@@ -113,10 +121,15 @@ export default async function FlightDetailPage({ params, searchParams }: Props) 
     }
   } catch {
     redirect('/login?message=session_expired');
+  } finally {
+    clearTimeout(timeoutId);
   }
 
   const flightId = params.flightId;
-  const flight = MOCK_FLIGHTS[flightId] || MOCK_FLIGHTS['FL-101'];
+  const flight = MOCK_FLIGHTS[flightId];
+  if (!flight) {
+    notFound();
+  }
 
   const originCode = searchParams?.from || 'HAN';
   const destCode = searchParams?.to || 'NRT';
@@ -127,6 +140,10 @@ export default async function FlightDetailPage({ params, searchParams }: Props) 
     flight.layoverAirport ? getAirportByIataCode(flight.layoverAirport) : Promise.resolve(null),
     getAllAirports(),
   ]);
+
+  if (!origin || !destination || (flight.layoverAirport && !layover)) {
+    notFound();
+  }
 
   return (
     <div className="min-h-screen flex flex-col bg-background">
