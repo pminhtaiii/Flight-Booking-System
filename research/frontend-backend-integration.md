@@ -91,7 +91,7 @@ Implementation notes:
 
 Call chain:
 
-```
+```text
 Server Component / Server Action
         ↓
 Domain Module  (lib/api/flights.ts)
@@ -109,7 +109,7 @@ NestJS
 
 ## 8. File Structure
 
-```
+```text
 apps/web/
 ├── lib/
 │   ├── api-client.ts          ← generic apiClient (one file, stable)

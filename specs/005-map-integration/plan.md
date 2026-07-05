@@ -1,6 +1,6 @@
 # Implementation Plan: Map Integration
 
-**Branch**: `feature/005-map-integration` | **Date**: 2026-07-05 | **Spec**: [spec.md](file:///c:/Booking%20Systems/specs/005-map-integration/spec.md)
+**Branch**: `feature/005-map-integration` | **Date**: 2026-07-05 | **Spec**: [spec.md](spec.md)
 
 **Input**: Feature specification from `/specs/005-map-integration/spec.md`
 

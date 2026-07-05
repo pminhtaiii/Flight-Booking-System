@@ -39,7 +39,7 @@ Search airports by name or IATA code (autocomplete).
 { "statusCode": 400, "message": ["q must be at least 2 characters"], "error": "Bad Request" }
 ```
 
-**Cache**: Redis, TTL 24 hours, key pattern `airports:search:{sha256(q+limit)}`
+**Cache**: Redis, TTL 24 hours, key pattern `airports:search:{sha256(JSON.stringify({ q, limit }))}`
 
 ---
 
@@ -111,7 +111,7 @@ Find airports within a radius of a geographic point.
 }
 ```
 
-**Cache**: Redis, TTL 1 hour, key pattern `airports:nearby:{sha256(lat+lng+radius+limit)}`
+**Cache**: Redis, TTL 1 hour, key pattern `airports:nearby:{sha256(JSON.stringify({ lat, lng, radius, limit }))}`
 
 ---
 

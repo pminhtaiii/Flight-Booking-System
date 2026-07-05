@@ -27,7 +27,7 @@ npm run prisma:migrate --workspace=apps/api
 npm run prisma:seed --workspace=apps/api
 
 # 3. Verify count
-npx prisma studio --workspace=apps/api
+cd apps/api && npx prisma studio
 # → Open airports table → Expect ~7,700 rows
 ```
 
