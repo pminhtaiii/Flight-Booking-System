@@ -1,7 +1,7 @@
 # Graph Report - Booking Systems  (2026-07-05)
 
 ## Corpus Check
-- 243 files · ~134,422 words
+- 243 files · ~134,471 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
@@ -10,7 +10,7 @@
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `0591a995`
+- Built from commit: `b90736f5`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 

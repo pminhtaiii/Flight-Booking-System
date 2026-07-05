@@ -6820,7 +6820,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "apps_api_test_adversarial_e2e_spec",
-      "community": 264,
+      "community": 2,
       "norm_label": "adversarial.e2e-spec.ts"
     },
     {
@@ -6830,7 +6830,7 @@
       "source_location": "L11",
       "_origin": "ast",
       "id": "apps_api_test_adversarial_e2e_spec_cacheservicewithinternal",
-      "community": 264,
+      "community": 2,
       "norm_label": "cacheservicewithinternal"
     },
     {
@@ -6840,7 +6840,7 @@
       "source_location": "L15",
       "_origin": "ast",
       "id": "apps_api_test_adversarial_e2e_spec_sanitizedusermetadata",
-      "community": 264,
+      "community": 2,
       "norm_label": "sanitizedusermetadata"
     },
     {
@@ -6850,7 +6850,7 @@
       "source_location": "L26",
       "_origin": "ast",
       "id": "apps_api_test_adversarial_e2e_spec_sanitizedvariantsmetadata",
-      "community": 264,
+      "community": 2,
       "norm_label": "sanitizedvariantsmetadata"
     },
     {
@@ -6860,7 +6860,7 @@
       "source_location": "L33",
       "_origin": "ast",
       "id": "apps_api_test_adversarial_e2e_spec_circularmetadata",
-      "community": 264,
+      "community": 2,
       "norm_label": "circularmetadata"
     },
     {
@@ -7170,7 +7170,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "apps_web_app_api_auth_nextauth_route",
-      "community": 262,
+      "community": 16,
       "norm_label": "route.ts"
     },
     {
@@ -7180,7 +7180,7 @@
       "source_location": "L4",
       "_origin": "ast",
       "id": "apps_web_app_api_auth_nextauth_route_handler",
-      "community": 262,
+      "community": 16,
       "norm_label": "handler"
     },
     {
@@ -7316,11 +7316,61 @@
     {
       "label": "page.tsx",
       "file_type": "code",
+      "source_file": "apps/web/app/search/[flightId]/page.tsx",
+      "source_location": "L1",
+      "_origin": "ast",
+      "id": "apps_web_app_search_flightid_page",
+      "community": 253,
+      "norm_label": "page.tsx"
+    },
+    {
+      "label": "Props",
+      "file_type": "code",
+      "source_file": "apps/web/app/search/[flightId]/page.tsx",
+      "source_location": "L10",
+      "_origin": "ast",
+      "id": "apps_web_app_search_flightid_page_props",
+      "community": 253,
+      "norm_label": "props"
+    },
+    {
+      "label": "generateMetadata()",
+      "file_type": "code",
+      "source_file": "apps/web/app/search/[flightId]/page.tsx",
+      "source_location": "L20",
+      "_origin": "ast",
+      "id": "apps_web_app_search_flightid_page_generatemetadata",
+      "community": 253,
+      "norm_label": "generatemetadata()"
+    },
+    {
+      "label": "MOCK_FLIGHTS",
+      "file_type": "code",
+      "source_file": "apps/web/app/search/[flightId]/page.tsx",
+      "source_location": "L27",
+      "_origin": "ast",
+      "id": "apps_web_app_search_flightid_page_mock_flights",
+      "community": 253,
+      "norm_label": "mock_flights"
+    },
+    {
+      "label": "FlightDetailPage()",
+      "file_type": "code",
+      "source_file": "apps/web/app/search/[flightId]/page.tsx",
+      "source_location": "L87",
+      "_origin": "ast",
+      "id": "apps_web_app_search_flightid_page_flightdetailpage",
+      "community": 253,
+      "norm_label": "flightdetailpage()"
+    },
+    {
+      "label": "page.tsx",
+      "file_type": "code",
       "source_file": "apps/web/app/search/page.tsx",
       "source_location": "L1",
       "_origin": "ast",
       "id": "apps_web_app_search_page",
-      "community": 262,
+      "community": 253,
       "norm_label": "page.tsx"
     },
     {
@@ -7330,7 +7380,7 @@
       "source_location": "L9",
       "_origin": "ast",
       "id": "apps_web_app_search_page_searchpage",
-      "community": 262,
+      "community": 253,
       "norm_label": "searchpage()"
     },
     {
@@ -7664,6 +7714,36 @@
       "norm_label": "providers()"
     },
     {
+      "label": "FlightDetailPageClient.tsx",
+      "file_type": "code",
+      "source_file": "apps/web/components/search/FlightDetailPageClient.tsx",
+      "source_location": "L1",
+      "_origin": "ast",
+      "id": "apps_web_components_search_flightdetailpageclient",
+      "community": 256,
+      "norm_label": "flightdetailpageclient.tsx"
+    },
+    {
+      "label": "Props",
+      "file_type": "code",
+      "source_file": "apps/web/components/search/FlightDetailPageClient.tsx",
+      "source_location": "L19",
+      "_origin": "ast",
+      "id": "apps_web_components_search_flightdetailpageclient_props",
+      "community": 256,
+      "norm_label": "props"
+    },
+    {
+      "label": "FlightDetailPageClient()",
+      "file_type": "code",
+      "source_file": "apps/web/components/search/FlightDetailPageClient.tsx",
+      "source_location": "L41",
+      "_origin": "ast",
+      "id": "apps_web_components_search_flightdetailpageclient_flightdetailpageclient",
+      "community": 256,
+      "norm_label": "flightdetailpageclient()"
+    },
+    {
       "label": "SearchPageClient.tsx",
       "file_type": "code",
       "source_file": "apps/web/components/search/SearchPageClient.tsx",
@@ -7677,7 +7757,7 @@
       "label": "EMPTY_STOPS",
       "file_type": "code",
       "source_file": "apps/web/components/search/SearchPageClient.tsx",
-      "source_location": "L9",
+      "source_location": "L10",
       "_origin": "ast",
       "id": "apps_web_components_search_searchpageclient_empty_stops",
       "community": 256,
@@ -7687,7 +7767,7 @@
       "label": "Props",
       "file_type": "code",
       "source_file": "apps/web/components/search/SearchPageClient.tsx",
-      "source_location": "L11",
+      "source_location": "L12",
       "_origin": "ast",
       "id": "apps_web_components_search_searchpageclient_props",
       "community": 256,
@@ -7697,7 +7777,7 @@
       "label": "SearchPageClient()",
       "file_type": "code",
       "source_file": "apps/web/components/search/SearchPageClient.tsx",
-      "source_location": "L15",
+      "source_location": "L16",
       "_origin": "ast",
       "id": "apps_web_components_search_searchpageclient_searchpageclient",
       "community": 256,
@@ -7780,7 +7860,7 @@
       "source_location": "L88",
       "_origin": "ast",
       "id": "apps_web_lib_airport_service_getallairports",
-      "community": 262,
+      "community": 253,
       "norm_label": "getallairports()"
     },
     {
@@ -7790,7 +7870,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "apps_web_lib_auth",
-      "community": 262,
+      "community": 16,
       "norm_label": "auth.ts"
     },
     {
@@ -7800,7 +7880,7 @@
       "source_location": "L4",
       "_origin": "ast",
       "id": "apps_web_lib_auth_authoptions",
-      "community": 262,
+      "community": 16,
       "norm_label": "authoptions"
     },
     {
@@ -8880,7 +8960,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "packages_shared_src_types_airport",
-      "community": 260,
+      "community": 256,
       "norm_label": "airport.ts"
     },
     {
@@ -8890,7 +8970,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "packages_shared_src_types_airport_airporttype",
-      "community": 260,
+      "community": 256,
       "norm_label": "airporttype"
     },
     {
@@ -8900,7 +8980,7 @@
       "source_location": "L3",
       "_origin": "ast",
       "id": "packages_shared_src_types_airport_airport",
-      "community": 260,
+      "community": 256,
       "norm_label": "airport"
     },
     {
@@ -17180,7 +17260,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_data_model",
-      "community": 31,
+      "community": 257,
       "norm_label": "data-model.md"
     },
     {
@@ -17190,7 +17270,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_data_model_data_model_llm_output_guardrails",
-      "community": 31,
+      "community": 257,
       "norm_label": "data model: llm output guardrails"
     },
     {
@@ -17200,7 +17280,7 @@
       "source_location": "L9",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_data_model_entities",
-      "community": 31,
+      "community": 257,
       "norm_label": "entities"
     },
     {
@@ -17210,7 +17290,7 @@
       "source_location": "L11",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_data_model_1_outputguardrailconfig",
-      "community": 31,
+      "community": 257,
       "norm_label": "1. outputguardrailconfig"
     },
     {
@@ -17220,7 +17300,7 @@
       "source_location": "L24",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_data_model_2_chunkbuffer",
-      "community": 31,
+      "community": 257,
       "norm_label": "2. chunkbuffer"
     },
     {
@@ -17230,7 +17310,7 @@
       "source_location": "L53",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_data_model_3_slidingwindow",
-      "community": 31,
+      "community": 257,
       "norm_label": "3. slidingwindow"
     },
     {
@@ -17240,7 +17320,7 @@
       "source_location": "L71",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_data_model_4_outputguardrailresult",
-      "community": 31,
+      "community": 257,
       "norm_label": "4. outputguardrailresult"
     },
     {
@@ -17250,7 +17330,7 @@
       "source_location": "L97",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_data_model_5_outputguardrailpipeline",
-      "community": 31,
+      "community": 257,
       "norm_label": "5. outputguardrailpipeline"
     },
     {
@@ -17260,7 +17340,7 @@
       "source_location": "L121",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_data_model_6_outputguardrailblockederror",
-      "community": 31,
+      "community": 257,
       "norm_label": "6. outputguardrailblockederror"
     },
     {
@@ -17270,7 +17350,7 @@
       "source_location": "L132",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_data_model_sse_event_extension",
-      "community": 31,
+      "community": 257,
       "norm_label": "sse event extension"
     },
     {
@@ -17280,7 +17360,7 @@
       "source_location": "L154",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_data_model_relationships",
-      "community": 31,
+      "community": 257,
       "norm_label": "relationships"
     },
     {
@@ -17290,7 +17370,7 @@
       "source_location": "L176",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_data_model_state_transitions",
-      "community": 31,
+      "community": 257,
       "norm_label": "state transitions"
     },
     {
@@ -17300,7 +17380,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_plan",
-      "community": 31,
+      "community": 258,
       "norm_label": "plan.md"
     },
     {
@@ -17430,7 +17510,7 @@
       "source_location": "L145",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_plan_phase_2_configuration_pii_detection_foundation",
-      "community": 132,
+      "community": 264,
       "norm_label": "phase 2: configuration & pii detection \u2014 foundation"
     },
     {
@@ -17440,7 +17520,7 @@
       "source_location": "L151",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_plan_files",
-      "community": 132,
+      "community": 264,
       "norm_label": "files"
     },
     {
@@ -17450,7 +17530,7 @@
       "source_location": "L158",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_plan_acceptance",
-      "community": 132,
+      "community": 264,
       "norm_label": "acceptance"
     },
     {
@@ -17460,7 +17540,7 @@
       "source_location": "L166",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_plan_tests",
-      "community": 132,
+      "community": 264,
       "norm_label": "tests"
     },
     {
@@ -17470,7 +17550,7 @@
       "source_location": "L173",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_plan_phase_3_sentence_boundary_chunking_token_accumulation",
-      "community": 132,
+      "community": 265,
       "norm_label": "phase 3: sentence-boundary chunking \u2014 token accumulation"
     },
     {
@@ -17480,7 +17560,7 @@
       "source_location": "L179",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_plan_files_179",
-      "community": 132,
+      "community": 265,
       "norm_label": "files"
     },
     {
@@ -17490,7 +17570,7 @@
       "source_location": "L185",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_plan_acceptance_185",
-      "community": 132,
+      "community": 265,
       "norm_label": "acceptance"
     },
     {
@@ -17500,7 +17580,7 @@
       "source_location": "L196",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_plan_tests_196",
-      "community": 132,
+      "community": 265,
       "norm_label": "tests"
     },
     {
@@ -17510,7 +17590,7 @@
       "source_location": "L202",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_plan_phase_4_nemo_output_rail_safety_classification",
-      "community": 132,
+      "community": 266,
       "norm_label": "phase 4: nemo output rail \u2014 safety classification"
     },
     {
@@ -17520,7 +17600,7 @@
       "source_location": "L208",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_plan_files_208",
-      "community": 132,
+      "community": 266,
       "norm_label": "files"
     },
     {
@@ -17530,7 +17610,7 @@
       "source_location": "L215",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_plan_acceptance_215",
-      "community": 132,
+      "community": 266,
       "norm_label": "acceptance"
     },
     {
@@ -17540,7 +17620,7 @@
       "source_location": "L224",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_plan_tests_224",
-      "community": 132,
+      "community": 266,
       "norm_label": "tests"
     },
     {
@@ -17550,7 +17630,7 @@
       "source_location": "L230",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_plan_phase_5_output_guardrail_pipeline_orchestration",
-      "community": 132,
+      "community": 267,
       "norm_label": "phase 5: output guardrail pipeline \u2014 orchestration"
     },
     {
@@ -17560,7 +17640,7 @@
       "source_location": "L236",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_plan_files_236",
-      "community": 132,
+      "community": 267,
       "norm_label": "files"
     },
     {
@@ -17570,7 +17650,7 @@
       "source_location": "L242",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_plan_acceptance_242",
-      "community": 132,
+      "community": 267,
       "norm_label": "acceptance"
     },
     {
@@ -17580,7 +17660,7 @@
       "source_location": "L253",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_plan_tests_253",
-      "community": 132,
+      "community": 267,
       "norm_label": "tests"
     },
     {
@@ -17590,7 +17670,7 @@
       "source_location": "L259",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_plan_phase_6_sse_integration_wire_pipeline_into_streaming",
-      "community": 132,
+      "community": 268,
       "norm_label": "phase 6: sse integration \u2014 wire pipeline into streaming"
     },
     {
@@ -17600,7 +17680,7 @@
       "source_location": "L265",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_plan_files_265",
-      "community": 132,
+      "community": 268,
       "norm_label": "files"
     },
     {
@@ -17610,7 +17690,7 @@
       "source_location": "L271",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_plan_acceptance_271",
-      "community": 132,
+      "community": 268,
       "norm_label": "acceptance"
     },
     {
@@ -17620,7 +17700,7 @@
       "source_location": "L279",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_plan_tests_279",
-      "community": 132,
+      "community": 268,
       "norm_label": "tests"
     },
     {
@@ -17630,7 +17710,7 @@
       "source_location": "L285",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_plan_phase_7_hard_stop_partial_persistence_failure_handling",
-      "community": 132,
+      "community": 269,
       "norm_label": "phase 7: hard stop & partial persistence \u2014 failure handling"
     },
     {
@@ -17640,7 +17720,7 @@
       "source_location": "L291",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_plan_files_291",
-      "community": 132,
+      "community": 269,
       "norm_label": "files"
     },
     {
@@ -17650,7 +17730,7 @@
       "source_location": "L297",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_plan_acceptance_297",
-      "community": 132,
+      "community": 269,
       "norm_label": "acceptance"
     },
     {
@@ -17660,7 +17740,7 @@
       "source_location": "L306",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_plan_tests_306",
-      "community": 132,
+      "community": 269,
       "norm_label": "tests"
     },
     {
@@ -17670,7 +17750,7 @@
       "source_location": "L312",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_plan_phase_8_pipeline_parallelism_latency_optimization",
-      "community": 132,
+      "community": 270,
       "norm_label": "phase 8: pipeline parallelism \u2014 latency optimization"
     },
     {
@@ -17680,7 +17760,7 @@
       "source_location": "L318",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_plan_files_318",
-      "community": 132,
+      "community": 270,
       "norm_label": "files"
     },
     {
@@ -17690,7 +17770,7 @@
       "source_location": "L324",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_plan_acceptance_324",
-      "community": 132,
+      "community": 270,
       "norm_label": "acceptance"
     },
     {
@@ -17700,7 +17780,7 @@
       "source_location": "L332",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_plan_tests_332",
-      "community": 132,
+      "community": 270,
       "norm_label": "tests"
     },
     {
@@ -17710,7 +17790,7 @@
       "source_location": "L338",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_plan_phase_9_observability_logging_structured_telemetry",
-      "community": 132,
+      "community": 271,
       "norm_label": "phase 9: observability & logging \u2014 structured telemetry"
     },
     {
@@ -17720,7 +17800,7 @@
       "source_location": "L344",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_plan_files_344",
-      "community": 132,
+      "community": 271,
       "norm_label": "files"
     },
     {
@@ -17730,7 +17810,7 @@
       "source_location": "L351",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_plan_acceptance_351",
-      "community": 132,
+      "community": 271,
       "norm_label": "acceptance"
     },
     {
@@ -17740,7 +17820,7 @@
       "source_location": "L359",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_plan_tests_359",
-      "community": 132,
+      "community": 271,
       "norm_label": "tests"
     },
     {
@@ -17750,7 +17830,7 @@
       "source_location": "L365",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_plan_phase_10_e2e_testing_validation_final_verification",
-      "community": 132,
+      "community": 272,
       "norm_label": "phase 10: e2e testing & validation \u2014 final verification"
     },
     {
@@ -17760,7 +17840,7 @@
       "source_location": "L371",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_plan_files_371",
-      "community": 132,
+      "community": 272,
       "norm_label": "files"
     },
     {
@@ -17770,7 +17850,7 @@
       "source_location": "L378",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_plan_acceptance_success_criteria_verification",
-      "community": 132,
+      "community": 272,
       "norm_label": "acceptance \u2014 success criteria verification"
     },
     {
@@ -17780,7 +17860,7 @@
       "source_location": "L388",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_plan_checklist",
-      "community": 132,
+      "community": 272,
       "norm_label": "checklist"
     },
     {
@@ -18000,7 +18080,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_quickstart",
-      "community": 31,
+      "community": 258,
       "norm_label": "quickstart.md"
     },
     {
@@ -18010,7 +18090,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_quickstart_quickstart_validation_guide_llm_output_guardrails",
-      "community": 31,
+      "community": 263,
       "norm_label": "quickstart validation guide: llm output guardrails"
     },
     {
@@ -18020,7 +18100,7 @@
       "source_location": "L7",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_quickstart_prerequisites",
-      "community": 31,
+      "community": 263,
       "norm_label": "prerequisites"
     },
     {
@@ -18030,7 +18110,7 @@
       "source_location": "L20",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_quickstart_scenario_1_safe_response_streams_normally",
-      "community": 31,
+      "community": 263,
       "norm_label": "scenario 1: safe response streams normally"
     },
     {
@@ -18040,7 +18120,7 @@
       "source_location": "L43",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_quickstart_scenario_2_pii_in_output_triggers_hard_stop",
-      "community": 31,
+      "community": 263,
       "norm_label": "scenario 2: pii in output triggers hard stop"
     },
     {
@@ -18050,7 +18130,7 @@
       "source_location": "L83",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_quickstart_scenario_3_boundary_pii_detected_by_sliding_window",
-      "community": 31,
+      "community": 263,
       "norm_label": "scenario 3: boundary pii detected by sliding window"
     },
     {
@@ -18060,7 +18140,7 @@
       "source_location": "L123",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_quickstart_scenario_4_nemo_output_rail_blocks_harmful_content",
-      "community": 31,
+      "community": 263,
       "norm_label": "scenario 4: nemo output rail blocks harmful content"
     },
     {
@@ -18070,7 +18150,7 @@
       "source_location": "L155",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_quickstart_scenario_5_partial_response_persisted_on_block",
-      "community": 31,
+      "community": 263,
       "norm_label": "scenario 5: partial response persisted on block"
     },
     {
@@ -18080,7 +18160,7 @@
       "source_location": "L184",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_quickstart_scenario_6_kill_switch_disables_guardrails",
-      "community": 31,
+      "community": 263,
       "norm_label": "scenario 6: kill switch disables guardrails"
     },
     {
@@ -18090,7 +18170,7 @@
       "source_location": "L202",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_quickstart_running_tests",
-      "community": 31,
+      "community": 263,
       "norm_label": "running tests"
     },
     {
@@ -18100,7 +18180,7 @@
       "source_location": "L221",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_quickstart_verification_checklist",
-      "community": 31,
+      "community": 263,
       "norm_label": "verification checklist"
     },
     {
@@ -18110,7 +18190,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_research",
-      "community": 31,
+      "community": 258,
       "norm_label": "research.md"
     },
     {
@@ -18120,7 +18200,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_research_phase_0_research_llm_output_guardrails",
-      "community": 31,
+      "community": 258,
       "norm_label": "phase 0 research: llm output guardrails"
     },
     {
@@ -18130,7 +18210,7 @@
       "source_location": "L11",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_research_findings",
-      "community": 31,
+      "community": 258,
       "norm_label": "findings"
     },
     {
@@ -18140,7 +18220,7 @@
       "source_location": "L13",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_research_1_sentence_detection_edge_cases",
-      "community": 31,
+      "community": 258,
       "norm_label": "1. sentence detection edge cases"
     },
     {
@@ -18150,7 +18230,7 @@
       "source_location": "L45",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_research_2_sliding_window_token_count",
-      "community": 31,
+      "community": 258,
       "norm_label": "2. sliding window token count"
     },
     {
@@ -18160,7 +18240,7 @@
       "source_location": "L76",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_research_3_nemo_output_rail_configuration",
-      "community": 31,
+      "community": 258,
       "norm_label": "3. nemo output rail configuration"
     },
     {
@@ -18170,7 +18250,7 @@
       "source_location": "L118",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_research_4_streaming_ux_sentence_boundary_chunking_bursty_arrival",
-      "community": 31,
+      "community": 258,
       "norm_label": "4. streaming ux \u2014 sentence-boundary chunking bursty arrival"
     },
     {
@@ -18180,7 +18260,7 @@
       "source_location": "L149",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_research_summary_of_decisions",
-      "community": 31,
+      "community": 258,
       "norm_label": "summary of decisions"
     },
     {
@@ -18190,7 +18270,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_spec",
-      "community": 31,
+      "community": 258,
       "norm_label": "spec.md"
     },
     {
@@ -34005,6 +34085,167 @@
     {
       "relation": "contains",
       "confidence": "EXTRACTED",
+      "source_file": "apps/web/app/search/[flightId]/page.tsx",
+      "source_location": "L87",
+      "weight": 1.0,
+      "source": "apps_web_app_search_flightid_page",
+      "target": "apps_web_app_search_flightid_page_flightdetailpage",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "apps/web/app/search/[flightId]/page.tsx",
+      "source_location": "L20",
+      "weight": 1.0,
+      "source": "apps_web_app_search_flightid_page",
+      "target": "apps_web_app_search_flightid_page_generatemetadata",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "apps/web/app/search/[flightId]/page.tsx",
+      "source_location": "L27",
+      "weight": 1.0,
+      "source": "apps_web_app_search_flightid_page",
+      "target": "apps_web_app_search_flightid_page_mock_flights",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "apps/web/app/search/[flightId]/page.tsx",
+      "source_location": "L10",
+      "weight": 1.0,
+      "source": "apps_web_app_search_flightid_page",
+      "target": "apps_web_app_search_flightid_page_props",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports_from",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "apps/web/app/search/[flightId]/page.tsx",
+      "source_location": "L6",
+      "weight": 1.0,
+      "source": "apps_web_app_search_flightid_page",
+      "target": "apps_web_components_layout_header",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "apps/web/app/search/[flightId]/page.tsx",
+      "source_location": "L6",
+      "weight": 1.0,
+      "source": "apps_web_app_search_flightid_page",
+      "target": "apps_web_components_layout_header_header",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports_from",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "apps/web/app/search/[flightId]/page.tsx",
+      "source_location": "L7",
+      "weight": 1.0,
+      "source": "apps_web_app_search_flightid_page",
+      "target": "apps_web_components_search_flightdetailpageclient",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "apps/web/app/search/[flightId]/page.tsx",
+      "source_location": "L7",
+      "weight": 1.0,
+      "source": "apps_web_app_search_flightid_page",
+      "target": "apps_web_components_search_flightdetailpageclient_flightdetailpageclient",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports_from",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "apps/web/app/search/[flightId]/page.tsx",
+      "source_location": "L8",
+      "weight": 1.0,
+      "source": "apps_web_app_search_flightid_page",
+      "target": "apps_web_lib_airport_service",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "apps/web/app/search/[flightId]/page.tsx",
+      "source_location": "L8",
+      "weight": 1.0,
+      "source": "apps_web_app_search_flightid_page",
+      "target": "apps_web_lib_airport_service_getairportbyiatacode",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "apps/web/app/search/[flightId]/page.tsx",
+      "source_location": "L8",
+      "weight": 1.0,
+      "source": "apps_web_app_search_flightid_page",
+      "target": "apps_web_lib_airport_service_getallairports",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports_from",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "apps/web/app/search/[flightId]/page.tsx",
+      "source_location": "L5",
+      "weight": 1.0,
+      "source": "apps_web_app_search_flightid_page",
+      "target": "apps_web_lib_auth",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "apps/web/app/search/[flightId]/page.tsx",
+      "source_location": "L5",
+      "weight": 1.0,
+      "source": "apps_web_app_search_flightid_page",
+      "target": "apps_web_lib_auth_authoptions",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "apps/web/app/search/[flightId]/page.tsx",
+      "source_location": "L125",
+      "weight": 1.0,
+      "source": "apps_web_app_search_flightid_page_flightdetailpage",
+      "target": "apps_web_lib_airport_service_getairportbyiatacode"
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "apps/web/app/search/[flightId]/page.tsx",
+      "source_location": "L128",
+      "weight": 1.0,
+      "source": "apps_web_app_search_flightid_page_flightdetailpage",
+      "target": "apps_web_lib_airport_service_getallairports"
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
       "source_file": "apps/web/app/search/page.tsx",
       "source_location": "L9",
       "weight": 1.0,
@@ -34456,8 +34697,19 @@
       "relation": "imports_from",
       "context": "import",
       "confidence": "EXTRACTED",
-      "source_file": "apps/web/components/search/SearchPageClient.tsx",
+      "source_file": "apps/web/components/search/FlightDetailPageClient.tsx",
       "source_location": "L6",
+      "weight": 1.0,
+      "source": "apps_web_components_search_flightdetailpageclient",
+      "target": "apps_web_components_map_mapcontainer",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports_from",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "apps/web/components/search/SearchPageClient.tsx",
+      "source_location": "L7",
       "weight": 1.0,
       "source": "apps_web_components_search_searchpageclient",
       "target": "apps_web_components_map_mapcontainer",
@@ -34467,8 +34719,19 @@
       "relation": "imports",
       "context": "import",
       "confidence": "EXTRACTED",
-      "source_file": "apps/web/components/search/SearchPageClient.tsx",
+      "source_file": "apps/web/components/search/FlightDetailPageClient.tsx",
       "source_location": "L6",
+      "weight": 1.0,
+      "source": "apps_web_components_search_flightdetailpageclient",
+      "target": "apps_web_components_map_mapcontainer_mapcontainer",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "apps/web/components/search/SearchPageClient.tsx",
+      "source_location": "L7",
       "weight": 1.0,
       "source": "apps_web_components_search_searchpageclient",
       "target": "apps_web_components_map_mapcontainer_mapcontainer",
@@ -34643,8 +34906,50 @@
     {
       "relation": "contains",
       "confidence": "EXTRACTED",
+      "source_file": "apps/web/components/search/FlightDetailPageClient.tsx",
+      "source_location": "L41",
+      "weight": 1.0,
+      "source": "apps_web_components_search_flightdetailpageclient",
+      "target": "apps_web_components_search_flightdetailpageclient_flightdetailpageclient",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "apps/web/components/search/FlightDetailPageClient.tsx",
+      "source_location": "L19",
+      "weight": 1.0,
+      "source": "apps_web_components_search_flightdetailpageclient",
+      "target": "apps_web_components_search_flightdetailpageclient_props",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "apps/web/components/search/FlightDetailPageClient.tsx",
+      "source_location": "L5",
+      "weight": 1.0,
+      "source": "apps_web_components_search_flightdetailpageclient",
+      "target": "packages_shared_src_types_airport_airport",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports_from",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "apps/web/components/search/FlightDetailPageClient.tsx",
+      "source_location": "L5",
+      "weight": 1.0,
+      "source": "apps_web_components_search_flightdetailpageclient",
+      "target": "packages_shared_src_types_index",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
       "source_file": "apps/web/components/search/SearchPageClient.tsx",
-      "source_location": "L9",
+      "source_location": "L10",
       "weight": 1.0,
       "source": "apps_web_components_search_searchpageclient",
       "target": "apps_web_components_search_searchpageclient_empty_stops",
@@ -34654,7 +34959,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "apps/web/components/search/SearchPageClient.tsx",
-      "source_location": "L11",
+      "source_location": "L12",
       "weight": 1.0,
       "source": "apps_web_components_search_searchpageclient",
       "target": "apps_web_components_search_searchpageclient_props",
@@ -34664,7 +34969,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "apps/web/components/search/SearchPageClient.tsx",
-      "source_location": "L15",
+      "source_location": "L16",
       "weight": 1.0,
       "source": "apps_web_components_search_searchpageclient",
       "target": "apps_web_components_search_searchpageclient_searchpageclient",
@@ -34675,7 +34980,7 @@
       "context": "import",
       "confidence": "EXTRACTED",
       "source_file": "apps/web/components/search/SearchPageClient.tsx",
-      "source_location": "L5",
+      "source_location": "L6",
       "weight": 1.0,
       "source": "apps_web_components_search_searchpageclient",
       "target": "packages_shared_src_types_airport_airport",
@@ -34686,7 +34991,7 @@
       "context": "import",
       "confidence": "EXTRACTED",
       "source_file": "apps/web/components/search/SearchPageClient.tsx",
-      "source_location": "L5",
+      "source_location": "L6",
       "weight": 1.0,
       "source": "apps_web_components_search_searchpageclient",
       "target": "packages_shared_src_types_index",
@@ -45959,5 +46264,5 @@
       "source_file": "specs/004-output-guardrails/data-model.md"
     }
   ],
-  "built_at_commit": "dbbbb89c5006d62a19b35d452a36f9bd841dfb70"
+  "built_at_commit": "0591a99577380c0fa551c1813aba876f2cb561a5"
 }

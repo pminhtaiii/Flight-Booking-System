@@ -34227,7 +34227,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "apps/web/app/search/[flightId]/page.tsx",
-      "source_location": "L125",
+      "source_location": "L138",
       "weight": 1.0,
       "source": "apps_web_app_search_flightid_page_flightdetailpage",
       "target": "apps_web_lib_airport_service_getairportbyiatacode"
@@ -34238,7 +34238,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "apps/web/app/search/[flightId]/page.tsx",
-      "source_location": "L128",
+      "source_location": "L141",
       "weight": 1.0,
       "source": "apps_web_app_search_flightid_page_flightdetailpage",
       "target": "apps_web_lib_airport_service_getallairports"
@@ -46264,5 +46264,5 @@
       "source_file": "specs/004-output-guardrails/data-model.md"
     }
   ],
-  "built_at_commit": "0591a99577380c0fa551c1813aba876f2cb561a5"
+  "built_at_commit": "b90736f541d3019e9a7c974b7a00b8662a5fb4cf"
 }

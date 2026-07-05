@@ -1230,13 +1230,13 @@
     "semantic_hash": ""
   },
   "apps/web/app/search/[flightId]/page.tsx": {
-    "mtime": 1783251318.022861,
-    "ast_hash": "2e070c6e882b0ce51c55211ef5c808f4",
+    "mtime": 1783252332.6926157,
+    "ast_hash": "6d0f4c79147455677018b0570bc92a9b",
     "semantic_hash": ""
   },
   "apps/web/components/search/FlightDetailPageClient.tsx": {
-    "mtime": 1783251390.1276717,
-    "ast_hash": "4c8f678cd6f63bd63bf5be5aee4c01ae",
+    "mtime": 1783252352.2087014,
+    "ast_hash": "5b5e6f4eef7b3019a7c720a99ba886db",
     "semantic_hash": ""
   }
 }
