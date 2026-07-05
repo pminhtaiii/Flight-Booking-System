@@ -31,6 +31,8 @@ Data flow is described in `context/architecture.md`.
 | M6  | Polish, E2E Verification & Stress Testing   | Unified E2E flow pass, concurrency testing, and linting/type-checking.                                | M5           | DONE        |
 | M7  | Chatbot Agent Service                       | Python/FastAPI service with JWT auth, safety guardrails, SSE streaming, memory, and persistence.      | M6           | DONE        |
 | M8  | Agent Tool-Calling & Data Access           | PII-stripped Agent Gateway module, HMAC claim authentication, LangGraph tool state machine.           | M7           | IN_PROGRESS |
+| M9  | Map Integration                             | Interactive map visualization with airport markers, great-circle flight route arcs, and auto-complete. | M8           | IN_PROGRESS |
+
 
 
 ## Interface Contracts

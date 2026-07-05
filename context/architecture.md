@@ -176,6 +176,18 @@ FastAPI NemoGuardrailService runs safety checks (length, regex heuristics, Mimo 
 
 ---
 
+## Containerization
+
+A single `docker-compose.yml` file is located at the root of the project to orchestrate the database and cache services for local development:
+- **PostgreSQL**: Version 16 (Alpine). Runs on host port `5432` with username `postgres`, password `postgres`, and database `flight_booking`. Persists database files using the `postgres_data` volume.
+- **Redis**: Version 7 (Alpine). Runs on host port `6379`. Persists data using the `redis_data` volume.
+
+To manage the services:
+- Start services: `docker compose up -d`
+- Stop services: `docker compose down`
+
+---
+
 ## Invariants
 
 The following are **architecture-specific** invariants that enforce the system design:

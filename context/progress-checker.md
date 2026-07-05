@@ -6,9 +6,9 @@ Update this file after every completed feature. Any AI agent reading this should
 
 ## Current Status
 
-**Feature:** Agent Tool-Calling & Data Access (Phase 7)
-**Last completed:** Phase 6 Human-in-the-Loop Gate & SSE Streaming Status (LangGraph interrupts, SSE streaming extensions, and integration tests).
-**Next:** Phase 7: Polish & Cross-Cutting Concerns.
+**Feature:** Map Integration (Phase 1)
+**Last completed:** Phase 1: Airport Data Model & Database Seed (Airport Prisma model, database migration, shared typescript definitions, and OurAirports CSV database seed).
+**Next:** Phase 2: Airport REST API Endpoints.
 
 ---
 
@@ -91,10 +91,21 @@ Update this file after every completed feature. Any AI agent reading this should
 - [x] Run concurrency stress tests (100 parallel requests)
 - [x] Walkthrough verification and documentation
 
+### [/] Feature: Map Integration
+
+- [x] Phase 1: Airport Data Model & Database Seed (Airport Prisma model, database migration, shared typescript definitions, and OurAirports CSV database seed)
+- [ ] Phase 2: Airport REST API Endpoints
+- [ ] Phase 3: Map Component Foundation
+- [ ] Phase 4: Airport Markers & Popups
+- [ ] Phase 5: Flight Route Arc Rendering
+- [ ] Phase 6: Search Page Integration
+- [ ] Phase 7: Flight Details Page Map & Polish
+
 ---
 
 ## Decisions Made During Build
 
+- Consolidated separate PostgreSQL and Redis standalone docker containers into a single `docker-compose.yml` file at the project root for streamlined development service management.
 - Refactored `PrismaService` to remove the query interceptor facade. This ensures it behaves as a genuine client and reports health status truthfully based on real database availability.
 - Implemented clean Jest spies and mock lifecycles directly in `test/health.e2e-spec.ts` to manage database connectivity states in local environments where PostgreSQL and Redis are unavailable.
 - Added client warming to E2E setup in `health.e2e-spec.ts` to bypass Express/NestJS router bootstrap cold-start latencies.
