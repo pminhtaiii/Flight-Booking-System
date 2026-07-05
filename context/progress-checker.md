@@ -14,6 +14,19 @@ Update this file after every completed feature. Any AI agent reading this should
 
 ## Progress by Feature
 
+### [x] Feature: LLM Output Guardrails
+
+- [x] Phase 1: Design & Contracts
+- [x] Phase 2: Configuration & PII Detection — Foundation
+- [x] Phase 3: Sentence-Boundary Chunking — Token Accumulation
+- [x] Phase 4: NeMo Output Rail — Safety Classification
+- [x] Phase 5: Output Guardrail Pipeline — Orchestration
+- [x] Phase 6: SSE Integration — Wire Pipeline Into Streaming
+- [x] Phase 7: Hard Stop & Partial Persistence — Failure Handling
+- [x] Phase 8: Pipeline Parallelism — Latency Optimization
+- [x] Phase 9: Observability & Logging — Structured Telemetry
+- [x] Phase 10: E2E Testing & Validation — Final Verification
+
 ### [/] Feature: Agent Tool-Calling & Data Access
 
 - [x] T001–T004: Database Schema & Mock Seed Data (Phase 1)
