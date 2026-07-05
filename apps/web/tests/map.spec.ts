@@ -1,10 +1,10 @@
 import { test, expect } from '@playwright/test';
 
 test.describe('Map Integration E2E Flows', () => {
-  const email = `maptest-${Date.now()}@example.com`;
   const password = 'Password123!';
 
   test.beforeEach(async ({ request, context, page }) => {
+    const email = `maptest-${Date.now()}-${Math.random().toString(36).slice(2)}@example.com`;
     // Reset database lockouts
     const res = await request.post('http://localhost:3001/api/auth/test/reset-lockout', {
       data: { clearAll: true },
