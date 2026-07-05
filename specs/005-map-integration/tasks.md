@@ -82,8 +82,8 @@
 
 **Goal**: Show route map with layovers on flight details page
 
-- [ ] T024 [US3] Create specific flight route detail map rendering (with stopovers) on `/search/[flightId]` page
-- [ ] T025 [US3] Show details popup or tooltip on layover markers on hover
+- [x] T024 [US3] Create specific flight route detail map rendering (with stopovers) on `/search/[flightId]` page
+- [x] T025 [US3] Show details popup or tooltip on layover markers on hover
 
 ---
 

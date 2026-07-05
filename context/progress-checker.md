@@ -6,9 +6,9 @@ Update this file after every completed feature. Any AI agent reading this should
 
 ## Current Status
 
-**Feature:** Map Integration (Phase 4 of Tasks: Autocomplete & Live Map Preview)
-**Last completed:** Phase 4: Autocomplete suggestion dropdowns (click-outside and Escape key handling) and live map markers/dashed preview arcs synchronization.
-**Next:** Phase 5: Flight Route Details Map (layovers & detail mapping).
+**Feature:** Map Integration (Phase 5 of Tasks: Flight Route Details Map)
+**Last completed:** Phase 5: Flight Route Details Map (layovers & detail mapping on dynamic /search/[flightId] page with hover tooltips).
+**Next:** Phase 6: Dark Mode & Destination Explorer.
 
 ---
 
@@ -112,7 +112,7 @@ Update this file after every completed feature. Any AI agent reading this should
 - [x] Phase 4: Airport Markers & Popups
 - [x] Phase 5: Flight Route Arc Rendering
 - [x] Phase 6: Search Page Integration
-- [ ] Phase 7: Flight Details Page Map & Polish
+- [x] Phase 7: Flight Details Page Map & Polish (Dynamic details page /search/[flightId] with side-by-side timeline and interactive map container, custom amber markers for stops with hover tooltips displaying layover duration)
 
 ---
 

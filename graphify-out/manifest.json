@@ -750,8 +750,8 @@
     "semantic_hash": "13d24df073aeafdf3c5c1bc2507eb893"
   },
   "context/progress-checker.md": {
-    "mtime": 1783250184.4338415,
-    "ast_hash": "f10be7229bb6a3be8e957813389c0db8",
+    "mtime": 1783251356.6924143,
+    "ast_hash": "10e10f6a0fb3b3fd99e76882990959a7",
     "semantic_hash": ""
   },
   "context/project-overview.md": {
@@ -990,8 +990,8 @@
     "semantic_hash": ""
   },
   "specs/005-map-integration/tasks.md": {
-    "mtime": 1783250165.7122464,
-    "ast_hash": "c547c4a8e34ddebfc6e824d2fd854bf5",
+    "mtime": 1783251332.5608246,
+    "ast_hash": "1e530c5e4a5811f19dd4d4eadc9aea9d",
     "semantic_hash": ""
   },
   "apps/agent/src/agent/guardrails/output_pipeline.py": {
@@ -1185,8 +1185,8 @@
     "semantic_hash": ""
   },
   "apps/web/components/map/AirportMarkerLayer.tsx": {
-    "mtime": 1783243226.1373367,
-    "ast_hash": "3004b804757f416984abfda4638d1afd",
+    "mtime": 1783251292.6445947,
+    "ast_hash": "278c9fc5bf9bc8022b9fd5854894919a",
     "semantic_hash": ""
   },
   "apps/web/components/map/AirportPopup.tsx": {
@@ -1205,8 +1205,8 @@
     "semantic_hash": ""
   },
   "apps/web/components/map/MapContainerInner.tsx": {
-    "mtime": 1783243220.063401,
-    "ast_hash": "e1d1fef0171eab880ddcf1a6a41a8af4",
+    "mtime": 1783251294.239933,
+    "ast_hash": "3aad5c4a43030dabbbad60f4e72aeee4",
     "semantic_hash": ""
   },
   "apps/web/components/map/MapControls.tsx": {
@@ -1220,13 +1220,23 @@
     "semantic_hash": ""
   },
   "apps/web/components/search/SearchPageClient.tsx": {
-    "mtime": 1783250075.2620237,
-    "ast_hash": "4fed7637583dba44c3b3bb0bbc3359f4",
+    "mtime": 1783251302.2570949,
+    "ast_hash": "2688c011c578c1dd8085dec6d0b7c167",
     "semantic_hash": ""
   },
   "apps/web/lib/airport-service.ts": {
     "mtime": 1783248945.868156,
     "ast_hash": "b55882dd32790a1f5185302b251d53d3",
+    "semantic_hash": ""
+  },
+  "apps/web/app/search/[flightId]/page.tsx": {
+    "mtime": 1783251318.022861,
+    "ast_hash": "2e070c6e882b0ce51c55211ef5c808f4",
+    "semantic_hash": ""
+  },
+  "apps/web/components/search/FlightDetailPageClient.tsx": {
+    "mtime": 1783251390.1276717,
+    "ast_hash": "4c8f678cd6f63bd63bf5be5aee4c01ae",
     "semantic_hash": ""
   }
 }

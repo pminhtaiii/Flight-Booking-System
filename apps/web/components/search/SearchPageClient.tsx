@@ -2,6 +2,7 @@
 'use client';
 
 import { useState, useMemo, useRef, useEffect } from 'react';
+import Link from 'next/link';
 import { Airport } from '@shared/types';
 import { MapContainer } from '@/components/map/MapContainer';
 import { Search, Calendar, Users, PlaneTakeoff, PlaneLanding, Info } from 'lucide-react';
@@ -352,9 +353,12 @@ export function SearchPageClient({ allAirports }: Props) {
                       </div>
                       <div className="text-right">
                         <span className="text-lg font-extrabold text-accent">${flight.price}</span>
-                        <button className="btn-primary py-1 px-3 text-xs ml-3 sm:mt-1 cursor-pointer">
-                          Book
-                        </button>
+                        <Link
+                          href={`/search/${flight.id}?from=${selectedOrigin?.iataCode || ''}&to=${selectedDest?.iataCode || ''}`}
+                          className="btn-primary py-1 px-3 text-xs ml-3 sm:mt-1 cursor-pointer no-underline inline-block"
+                        >
+                          View Details & Book
+                        </Link>
                       </div>
                     </div>
                   </div>

@@ -15,7 +15,7 @@ import 'maplibre-gl/dist/maplibre-gl.css';
 type Props = {
   origin?: Airport | null;
   destination?: Airport | null;
-  stops?: Airport[];
+  stops?: (Airport & { layoverDuration?: string })[];
   allAirports?: Airport[];
   preview?: boolean;
 };

@@ -10,7 +10,7 @@ import { useEffect, useState, useMemo } from 'react';
 type Props = {
   origin?: Airport | null;
   destination?: Airport | null;
-  stops?: Airport[];
+  stops?: (Airport & { layoverDuration?: string })[];
   allAirports?: Airport[];
   onSelectAirport: (airport: Airport) => void;
 };
@@ -180,7 +180,17 @@ export function AirportMarkerLayer({
             onSelectAirport(stop);
           }}
         >
-          <div className="flex flex-col items-center group cursor-pointer">
+          <div className="flex flex-col items-center group cursor-pointer relative">
+            <div className="absolute bottom-full mb-2 hidden group-hover:flex flex-col bg-card border border-card-border p-2.5 rounded-lg shadow-lg z-50 text-xs w-48 text-text-primary">
+              <div className="font-bold truncate">{stop.name}</div>
+              <div className="text-[10px] text-text-muted mt-0.5">IATA: {stop.iataCode}</div>
+              {stop.layoverDuration && (
+                <div className="mt-1 text-accent font-semibold">
+                  Layover: {stop.layoverDuration}
+                </div>
+              )}
+            </div>
+
             <div className="bg-bg-pending border-2 border-text-pending text-text-pending px-2 py-0.5 rounded shadow text-[10px] font-bold whitespace-nowrap mb-1">
               {stop.iataCode}
             </div>

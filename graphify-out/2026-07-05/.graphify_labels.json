@@ -256,21 +256,9 @@
   "254": "test_tools.py",
   "255": "scripts",
   "256": "plan.md",
-  "257": "Entities",
-  "258": "Quickstart Validation Guide: LLM Output Guardrails",
   "259": "amadeus.types.ts",
   "260": "index.ts",
   "261": "package.json",
   "262": "page.tsx",
-  "263": "Airport",
-  "264": "adversarial.e2e-spec.ts",
-  "265": "Phase 2: Configuration & PII Detection — Foundation",
-  "266": "Phase 3: Sentence-Boundary Chunking — Token Accumulation",
-  "267": "Phase 4: NeMo Output Rail — Safety Classification",
-  "268": "Phase 5: Output Guardrail Pipeline — Orchestration",
-  "269": "Phase 6: SSE Integration — Wire Pipeline Into Streaming",
-  "270": "Phase 7: Hard Stop & Partial Persistence — Failure Handling",
-  "271": "Phase 8: Pipeline Parallelism — Latency Optimization",
-  "272": "Phase 9: Observability & Logging — Structured Telemetry",
-  "273": "Phase 10: E2E Testing & Validation — Final Verification"
+  "264": "adversarial.e2e-spec.ts"
 }

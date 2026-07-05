@@ -7170,7 +7170,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "apps_web_app_api_auth_nextauth_route",
-      "community": 16,
+      "community": 262,
       "norm_label": "route.ts"
     },
     {
@@ -7180,7 +7180,7 @@
       "source_location": "L4",
       "_origin": "ast",
       "id": "apps_web_app_api_auth_nextauth_route_handler",
-      "community": 16,
+      "community": 262,
       "norm_label": "handler"
     },
     {
@@ -7320,7 +7320,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "apps_web_app_search_page",
-      "community": 253,
+      "community": 262,
       "norm_label": "page.tsx"
     },
     {
@@ -7330,7 +7330,7 @@
       "source_location": "L9",
       "_origin": "ast",
       "id": "apps_web_app_search_page_searchpage",
-      "community": 253,
+      "community": 262,
       "norm_label": "searchpage()"
     },
     {
@@ -7450,7 +7450,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "apps_web_components_map_airportpopup",
-      "community": 263,
+      "community": 260,
       "norm_label": "airportpopup.tsx"
     },
     {
@@ -7460,7 +7460,7 @@
       "source_location": "L7",
       "_origin": "ast",
       "id": "apps_web_components_map_airportpopup_props",
-      "community": 263,
+      "community": 260,
       "norm_label": "props"
     },
     {
@@ -7470,7 +7470,7 @@
       "source_location": "L12",
       "_origin": "ast",
       "id": "apps_web_components_map_airportpopup_airportpopup",
-      "community": 263,
+      "community": 260,
       "norm_label": "airportpopup()"
     },
     {
@@ -7510,7 +7510,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "apps_web_components_map_mapcontainer",
-      "community": 253,
+      "community": 256,
       "norm_label": "mapcontainer.tsx"
     },
     {
@@ -7520,7 +7520,7 @@
       "source_location": "L5",
       "_origin": "ast",
       "id": "apps_web_components_map_mapcontainer_mapcontainer",
-      "community": 253,
+      "community": 256,
       "norm_label": "mapcontainer"
     },
     {
@@ -7670,27 +7670,37 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "apps_web_components_search_searchpageclient",
-      "community": 253,
+      "community": 256,
       "norm_label": "searchpageclient.tsx"
+    },
+    {
+      "label": "EMPTY_STOPS",
+      "file_type": "code",
+      "source_file": "apps/web/components/search/SearchPageClient.tsx",
+      "source_location": "L9",
+      "_origin": "ast",
+      "id": "apps_web_components_search_searchpageclient_empty_stops",
+      "community": 256,
+      "norm_label": "empty_stops"
     },
     {
       "label": "Props",
       "file_type": "code",
       "source_file": "apps/web/components/search/SearchPageClient.tsx",
-      "source_location": "L9",
+      "source_location": "L11",
       "_origin": "ast",
       "id": "apps_web_components_search_searchpageclient_props",
-      "community": 253,
+      "community": 256,
       "norm_label": "props"
     },
     {
       "label": "SearchPageClient()",
       "file_type": "code",
       "source_file": "apps/web/components/search/SearchPageClient.tsx",
-      "source_location": "L13",
+      "source_location": "L15",
       "_origin": "ast",
       "id": "apps_web_components_search_searchpageclient_searchpageclient",
-      "community": 253,
+      "community": 256,
       "norm_label": "searchpageclient()"
     },
     {
@@ -7704,10 +7714,20 @@
       "norm_label": "airport-service.ts"
     },
     {
+      "label": "fetchWithTimeout()",
+      "file_type": "code",
+      "source_file": "apps/web/lib/airport-service.ts",
+      "source_location": "L7",
+      "_origin": "ast",
+      "id": "apps_web_lib_airport_service_fetchwithtimeout",
+      "community": 253,
+      "norm_label": "fetchwithtimeout()"
+    },
+    {
       "label": "NearbyAirportResponse",
       "file_type": "code",
       "source_file": "apps/web/lib/airport-service.ts",
-      "source_location": "L5",
+      "source_location": "L17",
       "_origin": "ast",
       "id": "apps_web_lib_airport_service_nearbyairportresponse",
       "community": 253,
@@ -7717,7 +7737,7 @@
       "label": "AirportSearchResponse",
       "file_type": "code",
       "source_file": "apps/web/lib/airport-service.ts",
-      "source_location": "L12",
+      "source_location": "L24",
       "_origin": "ast",
       "id": "apps_web_lib_airport_service_airportsearchresponse",
       "community": 253,
@@ -7727,7 +7747,7 @@
       "label": "searchAirports()",
       "file_type": "code",
       "source_file": "apps/web/lib/airport-service.ts",
-      "source_location": "L17",
+      "source_location": "L29",
       "_origin": "ast",
       "id": "apps_web_lib_airport_service_searchairports",
       "community": 253,
@@ -7737,7 +7757,7 @@
       "label": "getAirportByIataCode()",
       "file_type": "code",
       "source_file": "apps/web/lib/airport-service.ts",
-      "source_location": "L33",
+      "source_location": "L45",
       "_origin": "ast",
       "id": "apps_web_lib_airport_service_getairportbyiatacode",
       "community": 253,
@@ -7747,7 +7767,7 @@
       "label": "getNearbyAirports()",
       "file_type": "code",
       "source_file": "apps/web/lib/airport-service.ts",
-      "source_location": "L49",
+      "source_location": "L61",
       "_origin": "ast",
       "id": "apps_web_lib_airport_service_getnearbyairports",
       "community": 253,
@@ -7757,10 +7777,10 @@
       "label": "getAllAirports()",
       "file_type": "code",
       "source_file": "apps/web/lib/airport-service.ts",
-      "source_location": "L76",
+      "source_location": "L88",
       "_origin": "ast",
       "id": "apps_web_lib_airport_service_getallairports",
-      "community": 253,
+      "community": 262,
       "norm_label": "getallairports()"
     },
     {
@@ -7770,7 +7790,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "apps_web_lib_auth",
-      "community": 16,
+      "community": 262,
       "norm_label": "auth.ts"
     },
     {
@@ -7780,7 +7800,7 @@
       "source_location": "L4",
       "_origin": "ast",
       "id": "apps_web_lib_auth_authoptions",
-      "community": 16,
+      "community": 262,
       "norm_label": "authoptions"
     },
     {
@@ -8860,7 +8880,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "packages_shared_src_types_airport",
-      "community": 263,
+      "community": 260,
       "norm_label": "airport.ts"
     },
     {
@@ -8870,7 +8890,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "packages_shared_src_types_airport_airporttype",
-      "community": 263,
+      "community": 260,
       "norm_label": "airporttype"
     },
     {
@@ -8880,7 +8900,7 @@
       "source_location": "L3",
       "_origin": "ast",
       "id": "packages_shared_src_types_airport_airport",
-      "community": 263,
+      "community": 260,
       "norm_label": "airport"
     },
     {
@@ -17160,7 +17180,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_data_model",
-      "community": 256,
+      "community": 31,
       "norm_label": "data-model.md"
     },
     {
@@ -17170,7 +17190,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_data_model_data_model_llm_output_guardrails",
-      "community": 257,
+      "community": 31,
       "norm_label": "data model: llm output guardrails"
     },
     {
@@ -17180,7 +17200,7 @@
       "source_location": "L9",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_data_model_entities",
-      "community": 257,
+      "community": 31,
       "norm_label": "entities"
     },
     {
@@ -17190,7 +17210,7 @@
       "source_location": "L11",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_data_model_1_outputguardrailconfig",
-      "community": 257,
+      "community": 31,
       "norm_label": "1. outputguardrailconfig"
     },
     {
@@ -17200,7 +17220,7 @@
       "source_location": "L24",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_data_model_2_chunkbuffer",
-      "community": 257,
+      "community": 31,
       "norm_label": "2. chunkbuffer"
     },
     {
@@ -17210,7 +17230,7 @@
       "source_location": "L53",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_data_model_3_slidingwindow",
-      "community": 257,
+      "community": 31,
       "norm_label": "3. slidingwindow"
     },
     {
@@ -17220,7 +17240,7 @@
       "source_location": "L71",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_data_model_4_outputguardrailresult",
-      "community": 257,
+      "community": 31,
       "norm_label": "4. outputguardrailresult"
     },
     {
@@ -17230,7 +17250,7 @@
       "source_location": "L97",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_data_model_5_outputguardrailpipeline",
-      "community": 257,
+      "community": 31,
       "norm_label": "5. outputguardrailpipeline"
     },
     {
@@ -17240,7 +17260,7 @@
       "source_location": "L121",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_data_model_6_outputguardrailblockederror",
-      "community": 257,
+      "community": 31,
       "norm_label": "6. outputguardrailblockederror"
     },
     {
@@ -17250,7 +17270,7 @@
       "source_location": "L132",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_data_model_sse_event_extension",
-      "community": 257,
+      "community": 31,
       "norm_label": "sse event extension"
     },
     {
@@ -17260,7 +17280,7 @@
       "source_location": "L154",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_data_model_relationships",
-      "community": 257,
+      "community": 31,
       "norm_label": "relationships"
     },
     {
@@ -17270,7 +17290,7 @@
       "source_location": "L176",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_data_model_state_transitions",
-      "community": 257,
+      "community": 31,
       "norm_label": "state transitions"
     },
     {
@@ -17280,7 +17300,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_plan",
-      "community": 256,
+      "community": 31,
       "norm_label": "plan.md"
     },
     {
@@ -17410,7 +17430,7 @@
       "source_location": "L145",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_plan_phase_2_configuration_pii_detection_foundation",
-      "community": 265,
+      "community": 132,
       "norm_label": "phase 2: configuration & pii detection \u2014 foundation"
     },
     {
@@ -17420,7 +17440,7 @@
       "source_location": "L151",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_plan_files",
-      "community": 265,
+      "community": 132,
       "norm_label": "files"
     },
     {
@@ -17430,7 +17450,7 @@
       "source_location": "L158",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_plan_acceptance",
-      "community": 265,
+      "community": 132,
       "norm_label": "acceptance"
     },
     {
@@ -17440,7 +17460,7 @@
       "source_location": "L166",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_plan_tests",
-      "community": 265,
+      "community": 132,
       "norm_label": "tests"
     },
     {
@@ -17450,7 +17470,7 @@
       "source_location": "L173",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_plan_phase_3_sentence_boundary_chunking_token_accumulation",
-      "community": 266,
+      "community": 132,
       "norm_label": "phase 3: sentence-boundary chunking \u2014 token accumulation"
     },
     {
@@ -17460,7 +17480,7 @@
       "source_location": "L179",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_plan_files_179",
-      "community": 266,
+      "community": 132,
       "norm_label": "files"
     },
     {
@@ -17470,7 +17490,7 @@
       "source_location": "L185",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_plan_acceptance_185",
-      "community": 266,
+      "community": 132,
       "norm_label": "acceptance"
     },
     {
@@ -17480,7 +17500,7 @@
       "source_location": "L196",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_plan_tests_196",
-      "community": 266,
+      "community": 132,
       "norm_label": "tests"
     },
     {
@@ -17490,7 +17510,7 @@
       "source_location": "L202",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_plan_phase_4_nemo_output_rail_safety_classification",
-      "community": 267,
+      "community": 132,
       "norm_label": "phase 4: nemo output rail \u2014 safety classification"
     },
     {
@@ -17500,7 +17520,7 @@
       "source_location": "L208",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_plan_files_208",
-      "community": 267,
+      "community": 132,
       "norm_label": "files"
     },
     {
@@ -17510,7 +17530,7 @@
       "source_location": "L215",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_plan_acceptance_215",
-      "community": 267,
+      "community": 132,
       "norm_label": "acceptance"
     },
     {
@@ -17520,7 +17540,7 @@
       "source_location": "L224",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_plan_tests_224",
-      "community": 267,
+      "community": 132,
       "norm_label": "tests"
     },
     {
@@ -17530,7 +17550,7 @@
       "source_location": "L230",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_plan_phase_5_output_guardrail_pipeline_orchestration",
-      "community": 268,
+      "community": 132,
       "norm_label": "phase 5: output guardrail pipeline \u2014 orchestration"
     },
     {
@@ -17540,7 +17560,7 @@
       "source_location": "L236",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_plan_files_236",
-      "community": 268,
+      "community": 132,
       "norm_label": "files"
     },
     {
@@ -17550,7 +17570,7 @@
       "source_location": "L242",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_plan_acceptance_242",
-      "community": 268,
+      "community": 132,
       "norm_label": "acceptance"
     },
     {
@@ -17560,7 +17580,7 @@
       "source_location": "L253",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_plan_tests_253",
-      "community": 268,
+      "community": 132,
       "norm_label": "tests"
     },
     {
@@ -17570,7 +17590,7 @@
       "source_location": "L259",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_plan_phase_6_sse_integration_wire_pipeline_into_streaming",
-      "community": 269,
+      "community": 132,
       "norm_label": "phase 6: sse integration \u2014 wire pipeline into streaming"
     },
     {
@@ -17580,7 +17600,7 @@
       "source_location": "L265",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_plan_files_265",
-      "community": 269,
+      "community": 132,
       "norm_label": "files"
     },
     {
@@ -17590,7 +17610,7 @@
       "source_location": "L271",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_plan_acceptance_271",
-      "community": 269,
+      "community": 132,
       "norm_label": "acceptance"
     },
     {
@@ -17600,7 +17620,7 @@
       "source_location": "L279",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_plan_tests_279",
-      "community": 269,
+      "community": 132,
       "norm_label": "tests"
     },
     {
@@ -17610,7 +17630,7 @@
       "source_location": "L285",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_plan_phase_7_hard_stop_partial_persistence_failure_handling",
-      "community": 270,
+      "community": 132,
       "norm_label": "phase 7: hard stop & partial persistence \u2014 failure handling"
     },
     {
@@ -17620,7 +17640,7 @@
       "source_location": "L291",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_plan_files_291",
-      "community": 270,
+      "community": 132,
       "norm_label": "files"
     },
     {
@@ -17630,7 +17650,7 @@
       "source_location": "L297",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_plan_acceptance_297",
-      "community": 270,
+      "community": 132,
       "norm_label": "acceptance"
     },
     {
@@ -17640,7 +17660,7 @@
       "source_location": "L306",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_plan_tests_306",
-      "community": 270,
+      "community": 132,
       "norm_label": "tests"
     },
     {
@@ -17650,7 +17670,7 @@
       "source_location": "L312",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_plan_phase_8_pipeline_parallelism_latency_optimization",
-      "community": 271,
+      "community": 132,
       "norm_label": "phase 8: pipeline parallelism \u2014 latency optimization"
     },
     {
@@ -17660,7 +17680,7 @@
       "source_location": "L318",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_plan_files_318",
-      "community": 271,
+      "community": 132,
       "norm_label": "files"
     },
     {
@@ -17670,7 +17690,7 @@
       "source_location": "L324",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_plan_acceptance_324",
-      "community": 271,
+      "community": 132,
       "norm_label": "acceptance"
     },
     {
@@ -17680,7 +17700,7 @@
       "source_location": "L332",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_plan_tests_332",
-      "community": 271,
+      "community": 132,
       "norm_label": "tests"
     },
     {
@@ -17690,7 +17710,7 @@
       "source_location": "L338",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_plan_phase_9_observability_logging_structured_telemetry",
-      "community": 272,
+      "community": 132,
       "norm_label": "phase 9: observability & logging \u2014 structured telemetry"
     },
     {
@@ -17700,7 +17720,7 @@
       "source_location": "L344",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_plan_files_344",
-      "community": 272,
+      "community": 132,
       "norm_label": "files"
     },
     {
@@ -17710,7 +17730,7 @@
       "source_location": "L351",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_plan_acceptance_351",
-      "community": 272,
+      "community": 132,
       "norm_label": "acceptance"
     },
     {
@@ -17720,7 +17740,7 @@
       "source_location": "L359",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_plan_tests_359",
-      "community": 272,
+      "community": 132,
       "norm_label": "tests"
     },
     {
@@ -17730,7 +17750,7 @@
       "source_location": "L365",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_plan_phase_10_e2e_testing_validation_final_verification",
-      "community": 273,
+      "community": 132,
       "norm_label": "phase 10: e2e testing & validation \u2014 final verification"
     },
     {
@@ -17740,7 +17760,7 @@
       "source_location": "L371",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_plan_files_371",
-      "community": 273,
+      "community": 132,
       "norm_label": "files"
     },
     {
@@ -17750,7 +17770,7 @@
       "source_location": "L378",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_plan_acceptance_success_criteria_verification",
-      "community": 273,
+      "community": 132,
       "norm_label": "acceptance \u2014 success criteria verification"
     },
     {
@@ -17760,7 +17780,7 @@
       "source_location": "L388",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_plan_checklist",
-      "community": 273,
+      "community": 132,
       "norm_label": "checklist"
     },
     {
@@ -17980,7 +18000,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_quickstart",
-      "community": 256,
+      "community": 31,
       "norm_label": "quickstart.md"
     },
     {
@@ -17990,7 +18010,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_quickstart_quickstart_validation_guide_llm_output_guardrails",
-      "community": 258,
+      "community": 31,
       "norm_label": "quickstart validation guide: llm output guardrails"
     },
     {
@@ -18000,7 +18020,7 @@
       "source_location": "L7",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_quickstart_prerequisites",
-      "community": 258,
+      "community": 31,
       "norm_label": "prerequisites"
     },
     {
@@ -18010,7 +18030,7 @@
       "source_location": "L20",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_quickstart_scenario_1_safe_response_streams_normally",
-      "community": 258,
+      "community": 31,
       "norm_label": "scenario 1: safe response streams normally"
     },
     {
@@ -18020,7 +18040,7 @@
       "source_location": "L43",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_quickstart_scenario_2_pii_in_output_triggers_hard_stop",
-      "community": 258,
+      "community": 31,
       "norm_label": "scenario 2: pii in output triggers hard stop"
     },
     {
@@ -18030,7 +18050,7 @@
       "source_location": "L83",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_quickstart_scenario_3_boundary_pii_detected_by_sliding_window",
-      "community": 258,
+      "community": 31,
       "norm_label": "scenario 3: boundary pii detected by sliding window"
     },
     {
@@ -18040,7 +18060,7 @@
       "source_location": "L123",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_quickstart_scenario_4_nemo_output_rail_blocks_harmful_content",
-      "community": 258,
+      "community": 31,
       "norm_label": "scenario 4: nemo output rail blocks harmful content"
     },
     {
@@ -18050,7 +18070,7 @@
       "source_location": "L155",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_quickstart_scenario_5_partial_response_persisted_on_block",
-      "community": 258,
+      "community": 31,
       "norm_label": "scenario 5: partial response persisted on block"
     },
     {
@@ -18060,7 +18080,7 @@
       "source_location": "L184",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_quickstart_scenario_6_kill_switch_disables_guardrails",
-      "community": 258,
+      "community": 31,
       "norm_label": "scenario 6: kill switch disables guardrails"
     },
     {
@@ -18070,7 +18090,7 @@
       "source_location": "L202",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_quickstart_running_tests",
-      "community": 258,
+      "community": 31,
       "norm_label": "running tests"
     },
     {
@@ -18080,7 +18100,7 @@
       "source_location": "L221",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_quickstart_verification_checklist",
-      "community": 258,
+      "community": 31,
       "norm_label": "verification checklist"
     },
     {
@@ -18090,7 +18110,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_research",
-      "community": 256,
+      "community": 31,
       "norm_label": "research.md"
     },
     {
@@ -18100,7 +18120,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_research_phase_0_research_llm_output_guardrails",
-      "community": 256,
+      "community": 31,
       "norm_label": "phase 0 research: llm output guardrails"
     },
     {
@@ -18110,7 +18130,7 @@
       "source_location": "L11",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_research_findings",
-      "community": 256,
+      "community": 31,
       "norm_label": "findings"
     },
     {
@@ -18120,7 +18140,7 @@
       "source_location": "L13",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_research_1_sentence_detection_edge_cases",
-      "community": 256,
+      "community": 31,
       "norm_label": "1. sentence detection edge cases"
     },
     {
@@ -18130,7 +18150,7 @@
       "source_location": "L45",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_research_2_sliding_window_token_count",
-      "community": 256,
+      "community": 31,
       "norm_label": "2. sliding window token count"
     },
     {
@@ -18140,7 +18160,7 @@
       "source_location": "L76",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_research_3_nemo_output_rail_configuration",
-      "community": 256,
+      "community": 31,
       "norm_label": "3. nemo output rail configuration"
     },
     {
@@ -18150,7 +18170,7 @@
       "source_location": "L118",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_research_4_streaming_ux_sentence_boundary_chunking_bursty_arrival",
-      "community": 256,
+      "community": 31,
       "norm_label": "4. streaming ux \u2014 sentence-boundary chunking bursty arrival"
     },
     {
@@ -18160,7 +18180,7 @@
       "source_location": "L149",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_research_summary_of_decisions",
-      "community": 256,
+      "community": 31,
       "norm_label": "summary of decisions"
     },
     {
@@ -34627,6 +34647,16 @@
       "source_location": "L9",
       "weight": 1.0,
       "source": "apps_web_components_search_searchpageclient",
+      "target": "apps_web_components_search_searchpageclient_empty_stops",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "apps/web/components/search/SearchPageClient.tsx",
+      "source_location": "L11",
+      "weight": 1.0,
+      "source": "apps_web_components_search_searchpageclient",
       "target": "apps_web_components_search_searchpageclient_props",
       "confidence_score": 1.0
     },
@@ -34634,7 +34664,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "apps/web/components/search/SearchPageClient.tsx",
-      "source_location": "L13",
+      "source_location": "L15",
       "weight": 1.0,
       "source": "apps_web_components_search_searchpageclient",
       "target": "apps_web_components_search_searchpageclient_searchpageclient",
@@ -34666,7 +34696,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "apps/web/lib/airport-service.ts",
-      "source_location": "L12",
+      "source_location": "L24",
       "weight": 1.0,
       "source": "apps_web_lib_airport_service",
       "target": "apps_web_lib_airport_service_airportsearchresponse",
@@ -34676,7 +34706,17 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "apps/web/lib/airport-service.ts",
-      "source_location": "L33",
+      "source_location": "L7",
+      "weight": 1.0,
+      "source": "apps_web_lib_airport_service",
+      "target": "apps_web_lib_airport_service_fetchwithtimeout",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "apps/web/lib/airport-service.ts",
+      "source_location": "L45",
       "weight": 1.0,
       "source": "apps_web_lib_airport_service",
       "target": "apps_web_lib_airport_service_getairportbyiatacode",
@@ -34686,7 +34726,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "apps/web/lib/airport-service.ts",
-      "source_location": "L76",
+      "source_location": "L88",
       "weight": 1.0,
       "source": "apps_web_lib_airport_service",
       "target": "apps_web_lib_airport_service_getallairports",
@@ -34696,7 +34736,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "apps/web/lib/airport-service.ts",
-      "source_location": "L49",
+      "source_location": "L61",
       "weight": 1.0,
       "source": "apps_web_lib_airport_service",
       "target": "apps_web_lib_airport_service_getnearbyairports",
@@ -34706,7 +34746,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "apps/web/lib/airport-service.ts",
-      "source_location": "L5",
+      "source_location": "L17",
       "weight": 1.0,
       "source": "apps_web_lib_airport_service",
       "target": "apps_web_lib_airport_service_nearbyairportresponse",
@@ -34716,7 +34756,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "apps/web/lib/airport-service.ts",
-      "source_location": "L17",
+      "source_location": "L29",
       "weight": 1.0,
       "source": "apps_web_lib_airport_service",
       "target": "apps_web_lib_airport_service_searchairports",
@@ -34742,6 +34782,50 @@
       "weight": 1.0,
       "source": "apps_web_lib_airport_service",
       "target": "packages_shared_src_types_index",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "apps/web/lib/airport-service.ts",
+      "source_location": "L47",
+      "weight": 1.0,
+      "source": "apps_web_lib_airport_service_getairportbyiatacode",
+      "target": "apps_web_lib_airport_service_fetchwithtimeout",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "apps/web/lib/airport-service.ts",
+      "source_location": "L90",
+      "weight": 1.0,
+      "source": "apps_web_lib_airport_service_getallairports",
+      "target": "apps_web_lib_airport_service_fetchwithtimeout",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "apps/web/lib/airport-service.ts",
+      "source_location": "L75",
+      "weight": 1.0,
+      "source": "apps_web_lib_airport_service_getnearbyairports",
+      "target": "apps_web_lib_airport_service_fetchwithtimeout",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "apps/web/lib/airport-service.ts",
+      "source_location": "L32",
+      "weight": 1.0,
+      "source": "apps_web_lib_airport_service_searchairports",
+      "target": "apps_web_lib_airport_service_fetchwithtimeout",
       "confidence_score": 1.0
     },
     {
@@ -45875,5 +45959,5 @@
       "source_file": "specs/004-output-guardrails/data-model.md"
     }
   ],
-  "built_at_commit": "76f3b650ddfebadac8e7953665ed901aba716a1e"
+  "built_at_commit": "dbbbb89c5006d62a19b35d452a36f9bd841dfb70"
 }

@@ -1,16 +1,16 @@
 # Graph Report - Booking Systems  (2026-07-05)
 
 ## Corpus Check
-- 241 files · ~133,010 words
+- 241 files · ~133,134 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 2066 nodes · 2417 edges · 274 communities (145 shown, 129 thin omitted)
+- 2068 nodes · 2423 edges · 262 communities (133 shown, 129 thin omitted)
 - Extraction: 94% EXTRACTED · 6% INFERRED · 0% AMBIGUOUS · INFERRED: 134 edges (avg confidence: 0.78)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `76f3b650`
+- Built from commit: `dbbbb89c`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -251,23 +251,11 @@
 - [[_COMMUNITY_test_tools.py|test_tools.py]]
 - [[_COMMUNITY_scripts|scripts]]
 - [[_COMMUNITY_plan|plan.md]]
-- [[_COMMUNITY_Entities|Entities]]
-- [[_COMMUNITY_Quickstart Validation Guide LLM Output Guardrails|Quickstart Validation Guide: LLM Output Guardrails]]
 - [[_COMMUNITY_amadeus.types.ts|amadeus.types.ts]]
 - [[_COMMUNITY_index.ts|index.ts]]
 - [[_COMMUNITY_package.json|package.json]]
 - [[_COMMUNITY_page.tsx|page.tsx]]
-- [[_COMMUNITY_Airport|Airport]]
 - [[_COMMUNITY_adversarial.e2e-spec.ts|adversarial.e2e-spec.ts]]
-- [[_COMMUNITY_Phase 2 Configuration & PII Detection — Foundation|Phase 2: Configuration & PII Detection — Foundation]]
-- [[_COMMUNITY_Phase 3 Sentence-Boundary Chunking — Token Accumulation|Phase 3: Sentence-Boundary Chunking — Token Accumulation]]
-- [[_COMMUNITY_Phase 4 NeMo Output Rail — Safety Classification|Phase 4: NeMo Output Rail — Safety Classification]]
-- [[_COMMUNITY_Phase 5 Output Guardrail Pipeline — Orchestration|Phase 5: Output Guardrail Pipeline — Orchestration]]
-- [[_COMMUNITY_Phase 6 SSE Integration — Wire Pipeline Into Streaming|Phase 6: SSE Integration — Wire Pipeline Into Streaming]]
-- [[_COMMUNITY_Phase 7 Hard Stop & Partial Persistence — Failure Handling|Phase 7: Hard Stop & Partial Persistence — Failure Handling]]
-- [[_COMMUNITY_Phase 8 Pipeline Parallelism — Latency Optimization|Phase 8: Pipeline Parallelism — Latency Optimization]]
-- [[_COMMUNITY_Phase 9 Observability & Logging — Structured Telemetry|Phase 9: Observability & Logging — Structured Telemetry]]
-- [[_COMMUNITY_Phase 10 E2E Testing & Validation — Final Verification|Phase 10: E2E Testing & Validation — Final Verification]]
 
 ## God Nodes (most connected - your core abstractions)
 1. `PrismaService` - 38 edges
@@ -304,7 +292,7 @@
 - **Agent Gateway REST Endpoints** — specs_003_agent_tool_calling_contracts_agent_gateway_api_get_search_flights, specs_003_agent_tool_calling_contracts_agent_gateway_api_get_user_preferences, specs_003_agent_tool_calling_contracts_agent_gateway_api_get_user_bookings [EXTRACTED 1.00]
 - **Output Guardrail Pipeline Components** — specs_004_output_guardrails_data_model_chunkbuffer_model, specs_004_output_guardrails_data_model_slidingwindow_model, specs_004_output_guardrails_data_model_outputguardrailconfig_model, specs_004_output_guardrails_data_model_outputguardrailpipeline_model [EXTRACTED 1.00]
 
-## Communities (274 total, 129 thin omitted)
+## Communities (262 total, 129 thin omitted)
 
 ### Community 0 - "NestJSClient"
 Cohesion: 0.31
@@ -362,10 +350,6 @@ Nodes (13): get_nestjs_client(), RunnableConfig, Extract NestJSClient from Runna
 Cohesion: 0.28
 Nodes (3): RegisterForm(), RegisterInput, registerSchema
 
-### Community 16 - "page.tsx"
-Cohesion: 0.31
-Nodes (4): handler, LoginPageProps, LoginForm(), authOptions
-
 ### Community 17 - "test_auth.py"
 Cohesion: 0.05
 Nodes (21): lifespan(), Lifespan context manager that initializes NeMo Guardrails configuration,     me, JWTAuthMiddleware, Request, Response, Request, Response, RateLimitMiddleware (+13 more)
@@ -419,8 +403,8 @@ Cohesion: 0.10
 Nodes (3): NemoGuardrailService, guardrail_service(), guardrail_service()
 
 ### Community 31 - "MessageQueueManager"
-Cohesion: 0.12
-Nodes (16): Assumptions, Context, Edge Cases, Feature Specification: LLM Output Guardrails, Functional Requirements, Key Entities, Measurable Outcomes, Requirements *(mandatory)* (+8 more)
+Cohesion: 0.04
+Nodes (44): 1. OutputGuardrailConfig, 2. ChunkBuffer, 3. SlidingWindow, 4. OutputGuardrailResult, 5. OutputGuardrailPipeline, 6. OutputGuardrailBlockedError, Data Model: LLM Output Guardrails, Entities (+36 more)
 
 ### Community 32 - "NestJSClient"
 Cohesion: 0.17
@@ -531,8 +515,8 @@ Cohesion: 0.11
 Nodes (17): (a) Simple Chat — No Tools, (b) Single Tool Call, (c) Multi-Tool Call, `confirmation_required`, Contract: SSE Event Protocol, (d) Confirmation Flow (Dormant — Future Write Tools), `done`, `error` (+9 more)
 
 ### Community 132 - "NemoGuardrailService"
-Cohesion: 0.17
-Nodes (12): Complexity Tracking, Constitution Check, Dependency Graph, Documentation (this feature), Implementation Plan: LLM Output Guardrails, Phase 0: Research — ✅ Complete, Phase 1: Design & Contracts — ✅ Complete, Phase Overview (+4 more)
+Cohesion: 0.04
+Nodes (48): Acceptance, Acceptance, Acceptance, Acceptance, Acceptance, Acceptance, Acceptance, Acceptance (+40 more)
 
 ### Community 133 - "Progress by Feature"
 Cohesion: 0.11
@@ -723,8 +707,8 @@ Cohesion: 0.18
 Nodes (11): AirportMarkerLayer(), Props, FlightRouteLayer(), Props, calculateGreatCircleArc(), getMapBounds(), getThemeColor(), DEFAULT_VIEW_STATE (+3 more)
 
 ### Community 253 - "page.tsx"
-Cohesion: 0.19
-Nodes (7): SearchPage(), MapContainer, Props, SearchPageClient(), AirportSearchResponse, getAllAirports(), NearbyAirportResponse
+Cohesion: 0.43
+Nodes (6): AirportSearchResponse, fetchWithTimeout(), getAirportByIataCode(), getNearbyAirports(), NearbyAirportResponse, searchAirports()
 
 ### Community 254 - "test_tools.py"
 Cohesion: 0.18
@@ -735,75 +719,31 @@ Cohesion: 0.18
 Nodes (11): scripts, build, start, start:debug, start:dev, start:prod, test, test:cov (+3 more)
 
 ### Community 256 - "plan.md"
-Cohesion: 0.18
-Nodes (7): 1. Sentence Detection Edge Cases, 2. Sliding Window Token Count, 3. NeMo Output Rail Configuration, 4. Streaming UX — Sentence-Boundary Chunking Bursty Arrival, Findings, Phase 0 Research: LLM Output Guardrails, Summary of Decisions
-
-### Community 257 - "Entities"
-Cohesion: 0.18
-Nodes (11): 1. OutputGuardrailConfig, 2. ChunkBuffer, 3. SlidingWindow, 4. OutputGuardrailResult, 5. OutputGuardrailPipeline, 6. OutputGuardrailBlockedError, Data Model: LLM Output Guardrails, Entities (+3 more)
-
-### Community 258 - "Quickstart Validation Guide: LLM Output Guardrails"
-Cohesion: 0.20
-Nodes (10): Prerequisites, Quickstart Validation Guide: LLM Output Guardrails, Running Tests, Scenario 1: Safe Response Streams Normally, Scenario 2: PII in Output Triggers Hard Stop, Scenario 3: Boundary PII Detected by Sliding Window, Scenario 4: NeMo Output Rail Blocks Harmful Content, Scenario 5: Partial Response Persisted on Block (+2 more)
+Cohesion: 0.40
+Nodes (4): MapContainer, EMPTY_STOPS, Props, SearchPageClient()
 
 ### Community 259 - "amadeus.types.ts"
 Cohesion: 0.22
 Nodes (8): AmadeusBaggageAllowance, AmadeusCarrierDictionary, AmadeusDictionaries, AmadeusFareDetailsBySegment, AmadeusFlightOffer, AmadeusItinerary, AmadeusSegment, AmadeusTravelerPricing
 
 ### Community 260 - "index.ts"
-Cohesion: 0.25
-Nodes (7): Booking, ChatMessage, ChatSession, Flight, MessageSender, MessageType, User
+Cohesion: 0.15
+Nodes (11): AirportPopup(), Props, Airport, AirportType, Booking, ChatMessage, ChatSession, Flight (+3 more)
 
 ### Community 261 - "package.json"
 Cohesion: 0.33
 Nodes (5): name, prisma, seed, private, version
 
-### Community 263 - "Airport"
-Cohesion: 0.33
-Nodes (4): AirportPopup(), Props, Airport, AirportType
+### Community 262 - "page.tsx"
+Cohesion: 0.26
+Nodes (6): handler, SearchPage(), LogoutButton(), Header(), getAllAirports(), authOptions
 
 ### Community 264 - "adversarial.e2e-spec.ts"
 Cohesion: 0.40
 Nodes (4): CacheServiceWithInternal, CircularMetadata, SanitizedUserMetadata, SanitizedVariantsMetadata
 
-### Community 265 - "Phase 2: Configuration & PII Detection — Foundation"
-Cohesion: 0.50
-Nodes (4): Acceptance, Files, Phase 2: Configuration & PII Detection — Foundation, Tests
-
-### Community 266 - "Phase 3: Sentence-Boundary Chunking — Token Accumulation"
-Cohesion: 0.50
-Nodes (4): Acceptance, Files, Phase 3: Sentence-Boundary Chunking — Token Accumulation, Tests
-
-### Community 267 - "Phase 4: NeMo Output Rail — Safety Classification"
-Cohesion: 0.50
-Nodes (4): Acceptance, Files, Phase 4: NeMo Output Rail — Safety Classification, Tests
-
-### Community 268 - "Phase 5: Output Guardrail Pipeline — Orchestration"
-Cohesion: 0.50
-Nodes (4): Acceptance, Files, Phase 5: Output Guardrail Pipeline — Orchestration, Tests
-
-### Community 269 - "Phase 6: SSE Integration — Wire Pipeline Into Streaming"
-Cohesion: 0.50
-Nodes (4): Acceptance, Files, Phase 6: SSE Integration — Wire Pipeline Into Streaming, Tests
-
-### Community 270 - "Phase 7: Hard Stop & Partial Persistence — Failure Handling"
-Cohesion: 0.50
-Nodes (4): Acceptance, Files, Phase 7: Hard Stop & Partial Persistence — Failure Handling, Tests
-
-### Community 271 - "Phase 8: Pipeline Parallelism — Latency Optimization"
-Cohesion: 0.50
-Nodes (4): Acceptance, Files, Phase 8: Pipeline Parallelism — Latency Optimization, Tests
-
-### Community 272 - "Phase 9: Observability & Logging — Structured Telemetry"
-Cohesion: 0.50
-Nodes (4): Acceptance, Files, Phase 9: Observability & Logging — Structured Telemetry, Tests
-
-### Community 273 - "Phase 10: E2E Testing & Validation — Final Verification"
-Cohesion: 0.50
-Nodes (4): Acceptance — Success Criteria Verification, Checklist, Files, Phase 10: E2E Testing & Validation — Final Verification
-
 ## Knowledge Gaps
-- **1058 isolated node(s):** `root`, `parser`, `plugins`, `extends`, `node` (+1053 more)
+- **1059 isolated node(s):** `root`, `parser`, `plugins`, `extends`, `node` (+1054 more)
   These have ≤1 connection - possible missing edges or undocumented components.
 - **129 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
@@ -819,7 +759,7 @@ _Questions this graph is uniquely positioned to answer:_
 - **Are the 20 inferred relationships involving `NestJSClient` (e.g. with `MemoryManager` and `chat_stream()`) actually correct?**
   _`NestJSClient` has 20 INFERRED edges - model-reasoned connections that need verification._
 - **What connects `root`, `parser`, `plugins` to the rest of the system?**
-  _1151 weakly-connected nodes found - possible documentation gaps or missing edges._
+  _1152 weakly-connected nodes found - possible documentation gaps or missing edges._
 - **Should `PrismaService` be split into smaller, more focused modules?**
   _Cohesion score 0.0625 - nodes in this community are weakly interconnected._
 - **Should `test_tools.py` be split into smaller, more focused modules?**
