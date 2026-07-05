@@ -1,3 +1,4 @@
+import { Suspense } from 'react';
 import { getServerSession } from 'next-auth';
 import { redirect } from 'next/navigation';
 import { headers } from 'next/headers';
@@ -43,7 +44,9 @@ export default async function SearchPage() {
     <div className="min-h-screen flex flex-col bg-background">
       <Header />
       <main className="flex-1 max-w-[1440px] w-full mx-auto p-8">
-        <SearchPageClient allAirports={allAirports} />
+        <Suspense fallback={<div className="text-text-primary">Loading Search...</div>}>
+          <SearchPageClient allAirports={allAirports} />
+        </Suspense>
       </main>
     </div>
   );

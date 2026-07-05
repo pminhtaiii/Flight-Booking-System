@@ -91,8 +91,8 @@
 
 **Goal**: Support dark/light map styles and destination exploration
 
-- [ ] T026 [US4] Configure map tile style toggle and automatic sync with app theme (light/dark tiles)
-- [ ] T027 [US5] Implement popular destination markers on homepage/explore map with search form pre-fill on click
+- [x] T026 [US4] Configure map tile style toggle and automatic sync with app theme (light/dark tiles)
+- [x] T027 [US5] Implement popular destination markers on homepage/explore map with search form pre-fill on click
 
 ---
 

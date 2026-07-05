@@ -13,6 +13,8 @@ type Props = {
   stops?: (Airport & { layoverDuration?: string })[];
   allAirports?: Airport[];
   onSelectAirport: (airport: Airport) => void;
+  popularDestinations?: Airport[];
+  onSelectPopularDestination?: (airport: Airport) => void;
 };
 
 export function AirportMarkerLayer({
@@ -21,6 +23,8 @@ export function AirportMarkerLayer({
   stops = [],
   allAirports = [],
   onSelectAirport,
+  popularDestinations = [],
+  onSelectPopularDestination,
 }: Props) {
   const [colors, setColors] = useState({
     accent: '#7C5CFC',
@@ -38,16 +42,17 @@ export function AirportMarkerLayer({
     });
   }, []);
 
-  // Filter out origin, destination, and stops from background clustered list
+  // Filter out origin, destination, stops, and popular destinations from background clustered list
   const backgroundAirports = useMemo(() => {
     if (allAirports.length === 0) return [];
     const activeIatas = new Set<string>();
     if (origin) activeIatas.add(origin.iataCode);
     if (destination) activeIatas.add(destination.iataCode);
     stops.forEach((s) => activeIatas.add(s.iataCode));
+    popularDestinations.forEach((pd) => activeIatas.add(pd.iataCode));
 
     return allAirports.filter((ap) => !activeIatas.has(ap.iataCode));
-  }, [allAirports, origin, destination, stops]);
+  }, [allAirports, origin, destination, stops, popularDestinations]);
 
   const geojson = useMemo(() => {
     return {
@@ -195,6 +200,30 @@ export function AirportMarkerLayer({
               {stop.iataCode}
             </div>
             <MapPin className="w-7 h-7 text-text-pending drop-shadow-md" />
+          </div>
+        </Marker>
+      ))}
+
+      {popularDestinations.map((dest) => (
+        <Marker
+          key={`popular-${dest.iataCode}`}
+          longitude={dest.longitude}
+          latitude={dest.latitude}
+          anchor="bottom"
+          onClick={(e: any) => {
+            e.originalEvent.stopPropagation();
+            if (onSelectPopularDestination) {
+              onSelectPopularDestination(dest);
+            } else {
+              onSelectAirport(dest);
+            }
+          }}
+        >
+          <div className="flex flex-col items-center group cursor-pointer">
+            <div className="bg-accent border border-white text-white px-2 py-0.5 rounded shadow text-[10px] font-bold whitespace-nowrap mb-1">
+              {dest.city || dest.name}
+            </div>
+            <MapPin className="w-8 h-8 text-accent drop-shadow-md" />
           </div>
         </Marker>
       ))}

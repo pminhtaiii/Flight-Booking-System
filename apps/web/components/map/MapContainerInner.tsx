@@ -18,6 +18,8 @@ type Props = {
   stops?: (Airport & { layoverDuration?: string })[];
   allAirports?: Airport[];
   preview?: boolean;
+  popularDestinations?: Airport[];
+  onSelectPopularDestination?: (airport: Airport) => void;
 };
 
 const DEFAULT_VIEW_STATE = {
@@ -32,6 +34,8 @@ export default function MapContainerInner({
   stops = [],
   allAirports = [],
   preview = false,
+  popularDestinations = [],
+  onSelectPopularDestination,
 }: Props) {
   const mapRef = useRef<MapRef>(null);
   const [isDarkMode, setIsDarkMode] = useState(false);
@@ -99,6 +103,8 @@ export default function MapContainerInner({
             stops={stops}
             allAirports={allAirports}
             onSelectAirport={setSelectedAirport}
+            popularDestinations={popularDestinations}
+            onSelectPopularDestination={onSelectPopularDestination}
           />
 
           {selectedAirport && (

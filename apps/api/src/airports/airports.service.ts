@@ -59,6 +59,7 @@ export class AirportsService {
   async findNearby(lat: number, lng: number, radiusKm: number, limit: number) {
     try {
       // Clamped Haversine formula
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const results = await this.prisma.$queryRaw<any[]>`
         SELECT *, 
                (6371 * acos(LEAST(GREATEST(cos(radians(${lat})) * cos(radians(latitude)) * cos(radians(longitude) - radians(${lng})) + sin(radians(${lat})) * sin(radians(latitude)), -1.0), 1.0))) AS "distanceKm"

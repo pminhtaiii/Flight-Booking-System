@@ -3,6 +3,7 @@
 
 import { useState, useMemo, useRef, useEffect } from 'react';
 import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
 import { Airport } from '@shared/types';
 import { MapContainer } from '@/components/map/MapContainer';
 import { Search, Calendar, Users, PlaneTakeoff, PlaneLanding, Info } from 'lucide-react';
@@ -16,6 +17,9 @@ type Props = {
 export function SearchPageClient({ allAirports }: Props) {
   const originRef = useRef<HTMLDivElement>(null);
   const destRef = useRef<HTMLDivElement>(null);
+  
+  const searchParams = useSearchParams();
+  const toParam = searchParams ? searchParams.get('to') : null;
 
   const [originInput, setOriginInput] = useState('');
   const [destInput, setDestInput] = useState('');
@@ -30,6 +34,19 @@ export function SearchPageClient({ allAirports }: Props) {
 
   const [showOriginDropdown, setShowOriginDropdown] = useState(false);
   const [showDestDropdown, setShowDestDropdown] = useState(false);
+
+  useEffect(() => {
+    if (toParam && allAirports && allAirports.length > 0) {
+      const match = allAirports.find(
+        (ap) => ap.iataCode.toUpperCase() === toParam.toUpperCase()
+      );
+      if (match) {
+        setSelectedDest(match);
+        setDestInput(`${match.iataCode} - ${match.name}`);
+        setMapDest(match);
+      }
+    }
+  }, [toParam, allAirports]);
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -87,6 +104,17 @@ export function SearchPageClient({ allAirports }: Props) {
     setSelectedDest(ap);
     setDestInput(`${ap.iataCode} - ${ap.name}`);
     setShowDestDropdown(false);
+    setMapDest(ap);
+  };
+
+  const popularAirports = useMemo(() => {
+    const popularCodes = ['HAN', 'SGN', 'NRT', 'LHR', 'CDG', 'JFK', 'SIN', 'SYD'];
+    return allAirports.filter((ap) => popularCodes.includes(ap.iataCode.toUpperCase()));
+  }, [allAirports]);
+
+  const handleSelectPopularDestination = (ap: Airport) => {
+    setSelectedDest(ap);
+    setDestInput(`${ap.iataCode} - ${ap.name}`);
     setMapDest(ap);
   };
 
@@ -376,6 +404,8 @@ export function SearchPageClient({ allAirports }: Props) {
           stops={EMPTY_STOPS}
           allAirports={allAirports}
           preview={!hasSearched && !!mapOrigin && !!mapDest}
+          popularDestinations={popularAirports}
+          onSelectPopularDestination={handleSelectPopularDestination}
         />
       </div>
     </div>

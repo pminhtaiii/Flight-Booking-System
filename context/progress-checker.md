@@ -6,9 +6,9 @@ Update this file after every completed feature. Any AI agent reading this should
 
 ## Current Status
 
-**Feature:** Map Integration (Phase 5 of Tasks: Flight Route Details Map)
-**Last completed:** Phase 5: Flight Route Details Map (layovers & detail mapping on dynamic /search/[flightId] page with hover tooltips).
-**Next:** Phase 6: Dark Mode & Destination Explorer.
+**Feature:** Map Integration (Phase 6 of Tasks: Dark Mode & Destination Explorer)
+**Last completed:** Phase 6: Dark Mode & Destination Explorer (tile style toggle, app theme sync, and explore map with popular destination prefill/redirect).
+**Next:** Polish & review next milestone features.
 
 ---
 
@@ -104,7 +104,7 @@ Update this file after every completed feature. Any AI agent reading this should
 - [x] Run concurrency stress tests (100 parallel requests)
 - [x] Walkthrough verification and documentation
 
-### [/] Feature: Map Integration
+### [x] Feature: Map Integration
 
 - [x] Phase 1: Airport Data Model & Database Seed (Airport Prisma model, database migration, shared typescript definitions, and OurAirports CSV database seed)
 - [x] Phase 2: Airport REST API Endpoints
@@ -113,6 +113,7 @@ Update this file after every completed feature. Any AI agent reading this should
 - [x] Phase 5: Flight Route Arc Rendering
 - [x] Phase 6: Search Page Integration
 - [x] Phase 7: Flight Details Page Map & Polish (Dynamic details page /search/[flightId] with side-by-side timeline and interactive map container, custom amber markers for stops with hover tooltips displaying layover duration)
+- [x] Phase 8: Dark Mode & Destination Explorer (tile style toggle, app theme sync, explore map with popular destinations pre-fill/redirect)
 
 ---
 

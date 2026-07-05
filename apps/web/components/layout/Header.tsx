@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { LogoutButton } from '@/components/auth/LogoutButton';
+import { ThemeToggle } from './ThemeToggle';
 
 export function Header() {
   return (
@@ -30,7 +31,8 @@ export function Header() {
           </Link>
         </nav>
       </div>
-      <div>
+      <div className="flex items-center gap-4">
+        <ThemeToggle />
         <LogoutButton />
       </div>
     </header>

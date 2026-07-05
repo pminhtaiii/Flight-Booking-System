@@ -3,6 +3,7 @@
 import { Popup } from 'react-map-gl/maplibre';
 import { Airport } from '@shared/types';
 import { X } from 'lucide-react';
+import Link from 'next/link';
 
 type Props = {
   airport: Airport;
@@ -53,6 +54,14 @@ export function AirportPopup({ airport, onClose }: Props) {
           <div className="text-[10px] text-text-muted mt-1">
             {airport.latitude.toFixed(4)}°, {airport.longitude.toFixed(4)}°
           </div>
+        </div>
+        <div className="mt-3 border-t border-card-border pt-2">
+          <Link
+            href={`/search?to=${airport.iataCode}`}
+            className="w-full text-center block btn-primary py-1 px-3 text-xs font-semibold no-underline"
+          >
+            Search Flights
+          </Link>
         </div>
       </div>
     </Popup>

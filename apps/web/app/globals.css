@@ -1,5 +1,63 @@
 @import "tailwindcss";
 
+:root {
+  --theme-secondary: #FFFFFF;
+  --theme-secondary-border: #E7EAF3;
+  --theme-secondary-foreground: #101828;
+  --theme-background: #F9FAFB;
+  --theme-text-primary: #101828;
+  --theme-text-secondary: #4A5565;
+  --theme-text-muted: #99A1AF;
+  --theme-card: #FFFFFF;
+  --theme-card-border: #E7EAF3;
+  --theme-card-foreground: #101828;
+
+  /* Status Colors */
+  --theme-bg-confirmed: #ECFDF5;
+  --theme-text-confirmed: #009966;
+  --theme-bg-pending: #FFFBEB;
+  --theme-text-pending: #B45309;
+  --theme-bg-cancelled: #FEF2F2;
+  --theme-text-cancelled: #DC2626;
+
+  /* Match Score Colors */
+  --theme-bg-match-strong: #ECFDF5;
+  --theme-text-match-strong: #009966;
+  --theme-bg-match-fair: #EFF6FF;
+  --theme-text-match-fair: #2563EB;
+  --theme-bg-match-weak: #FFF7ED;
+  --theme-text-match-weak: #EA580C;
+}
+
+:root.dark {
+  --theme-secondary: #1F2937;
+  --theme-secondary-border: #374151;
+  --theme-secondary-foreground: #F9FAFB;
+  --theme-background: #0B0F19;
+  --theme-text-primary: #F9FAFB;
+  --theme-text-secondary: #D1D5DB;
+  --theme-text-muted: #6B7280;
+  --theme-card: #111827;
+  --theme-card-border: #1F2937;
+  --theme-card-foreground: #F9FAFB;
+
+  /* Status Colors */
+  --theme-bg-confirmed: #065F46;
+  --theme-text-confirmed: #34D399;
+  --theme-bg-pending: #78350F;
+  --theme-text-pending: #FBBF24;
+  --theme-bg-cancelled: #7F1D1D;
+  --theme-text-cancelled: #FCA5A5;
+
+  /* Match Score Colors */
+  --theme-bg-match-strong: #065F46;
+  --theme-text-match-strong: #34D399;
+  --theme-bg-match-fair: #1E3A8A;
+  --theme-text-match-fair: #93C5FD;
+  --theme-bg-match-weak: #7C2D12;
+  --theme-text-match-weak: #FDBA74;
+}
+
 @theme {
   /* Font Family Link to Next Font variable */
   --font-sans: var(--font-sans), ui-sans-serif, system-ui, sans-serif;
@@ -8,38 +66,38 @@
   --color-accent: #7C5CFC;
   --color-primary: #7C5CFC;
   --color-primary-foreground: #FFFFFF;
-  --color-secondary: #FFFFFF;
-  --color-secondary-border: #E7EAF3;
-  --color-secondary-foreground: #101828;
+  --color-secondary: var(--theme-secondary);
+  --color-secondary-border: var(--theme-secondary-border);
+  --color-secondary-foreground: var(--theme-secondary-foreground);
   --color-danger: #FFFFFF;
   --color-danger-border: #DC2626;
   --color-danger-foreground: #DC2626;
-  --color-muted: #99A1AF;
+  --color-muted: var(--theme-text-muted);
   
   /* Text and Card Colors */
-  --color-background: #F9FAFB;
-  --color-text-primary: #101828;
-  --color-text-secondary: #4A5565;
-  --color-text-muted: #99A1AF;
-  --color-card: #FFFFFF;
-  --color-card-border: #E7EAF3;
-  --color-card-foreground: #101828;
+  --color-background: var(--theme-background);
+  --color-text-primary: var(--theme-text-primary);
+  --color-text-secondary: var(--theme-text-secondary);
+  --color-text-muted: var(--theme-text-muted);
+  --color-card: var(--theme-card);
+  --color-card-border: var(--theme-card-border);
+  --color-card-foreground: var(--theme-card-foreground);
 
   /* Status Colors */
-  --color-bg-confirmed: #ECFDF5;
-  --color-text-confirmed: #009966;
-  --color-bg-pending: #FFFBEB;
-  --color-text-pending: #B45309;
-  --color-bg-cancelled: #FEF2F2;
-  --color-text-cancelled: #DC2626;
+  --color-bg-confirmed: var(--theme-bg-confirmed);
+  --color-text-confirmed: var(--theme-text-confirmed);
+  --color-bg-pending: var(--theme-bg-pending);
+  --color-text-pending: var(--theme-text-pending);
+  --color-bg-cancelled: var(--theme-bg-cancelled);
+  --color-text-cancelled: var(--theme-text-cancelled);
 
   /* Match Score Colors */
-  --color-bg-match-strong: #ECFDF5;
-  --color-text-match-strong: #009966;
-  --color-bg-match-fair: #EFF6FF;
-  --color-text-match-fair: #2563EB;
-  --color-bg-match-weak: #FFF7ED;
-  --color-text-match-weak: #EA580C;
+  --color-bg-match-strong: var(--theme-bg-match-strong);
+  --color-text-match-strong: var(--theme-text-match-strong);
+  --color-bg-match-fair: var(--theme-bg-match-fair);
+  --color-text-match-fair: var(--theme-text-match-fair);
+  --color-bg-match-weak: var(--theme-bg-match-weak);
+  --color-text-match-weak: var(--theme-text-match-weak);
 }
 
 /* Custom UI Utilities following UI Rules */
