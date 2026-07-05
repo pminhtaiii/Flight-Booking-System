@@ -12,7 +12,7 @@ type Props = {
 export function AirportPopup({ airport, onClose }: Props) {
   const formatAirportType = (type: string) => {
     return type
-      .replace('_', ' ')
+      .replace(/_/g, ' ')
       .toLowerCase()
       .replace(/\b\w/g, (char) => char.toUpperCase());
   };

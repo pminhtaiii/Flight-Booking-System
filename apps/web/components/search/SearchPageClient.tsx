@@ -6,6 +6,8 @@ import { Airport } from '@shared/types';
 import { MapContainer } from '@/components/map/MapContainer';
 import { Search, Calendar, Users, PlaneTakeoff, PlaneLanding, Info } from 'lucide-react';
 
+const EMPTY_STOPS: Airport[] = [];
+
 type Props = {
   allAirports: Airport[];
 };
@@ -241,7 +243,7 @@ export function SearchPageClient({ allAirports }: Props) {
                     min="1"
                     max="9"
                     value={passengers}
-                    onChange={(e) => setPassengers(parseInt(e.target.value))}
+                    onChange={(e) => setPassengers(Number.isNaN(parseInt(e.target.value, 10)) ? 1 : parseInt(e.target.value, 10))}
                     className="form-input w-full pl-10"
                     required
                   />
@@ -337,7 +339,7 @@ export function SearchPageClient({ allAirports }: Props) {
         <MapContainer
           origin={mapOrigin}
           destination={mapDest}
-          stops={[]}
+          stops={EMPTY_STOPS}
           allAirports={allAirports}
           preview={!hasSearched && !!mapOrigin && !!mapDest}
         />

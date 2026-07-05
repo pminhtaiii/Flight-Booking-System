@@ -41,7 +41,7 @@ export class AirportsService {
   async findByIataCode(iataCode: string) {
     try {
       const airport = await this.prisma.airport.findUnique({
-        where: { iataCode: iataCode.toUpperCase() },
+        where: { iataCode: iataCode.trim().toUpperCase() },
       });
       if (!airport) {
         throw new NotFoundException(`Airport with IATA code '${iataCode}' not found`);
