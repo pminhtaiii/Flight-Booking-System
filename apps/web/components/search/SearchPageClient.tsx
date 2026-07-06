@@ -522,7 +522,7 @@ export function SearchPageClient({ allAirports }: Props) {
   };
 
   return (
-    <div className="flex flex-col lg:flex-row gap-6 w-full min-h-[calc(100vh-120px)] relative overflow-hidden">
+    <div className="main-workspace flex flex-col lg:flex-row gap-6 w-full min-h-[calc(100vh-120px)] relative overflow-hidden">
       
       {/* ── Chat Container (Centred to Left slide transition) ── */}
       <div

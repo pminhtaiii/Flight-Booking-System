@@ -435,3 +435,9 @@
   font-weight: 600;
 }
 
+@media (min-width: 1024px) and (max-width: 1536px) {
+  .main-workspace {
+    zoom: 0.9;
+  }
+}
+
