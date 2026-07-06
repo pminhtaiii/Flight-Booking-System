@@ -63,6 +63,29 @@ When the task involves writing, running, or verifying E2E tests:
    - Follow the opaque-box verification strategies defined in [TEST_INFRA.md](file:///c:/Booking%20Systems/TEST_INFRA.md).
    - Use time acceleration (`POST /auth/test/reset-lockout` when `NODE_ENV === 'test'`) and database assertions.
 
+### Local Development Startup
+
+To run the full stack locally (Next.js frontend, NestJS backend, and Python agent service), follow these instructions:
+
+1. **Docker Services**: Ensure Docker Desktop is active, then start PostgreSQL and Redis:
+   ```bash
+   docker compose up -d
+   ```
+2. **Database Setup**: Run migrations and seeding from the workspace root (or using local `prisma` package in `apps/api`):
+   ```bash
+   npx prisma migrate dev --schema=apps/api/prisma/schema.prisma
+   npx prisma db seed --schema=apps/api/prisma/schema.prisma
+   ```
+3. **Shared Secrets (.env)**: Ensure both `apps/api/.env` and `apps/agent/.env` contain matching secret configuration variables:
+   - `JWT_SECRET` (NextAuth token generation)
+   - `AGENT_SERVICE_API_KEY` (Gateway protection)
+   - `CLAIM_TOKEN_SECRET` (Agent user claim verification)
+4. **Execution**: Start the development servers:
+   - **Full Stack (Concurrently)**: `pnpm dev`
+   - **Next.js Frontend only (Port 3000)**: `pnpm --filter @web/frontend dev`
+   - **NestJS Backend only (Port 3001)**: `pnpm --filter @api/backend start:dev`
+   - **Python Agent only (Port 3002)**: `uv run uvicorn agent.main:app --port 3002 --app-dir src` inside `apps/agent/`
+
 ### GitHub MCP & CodeRabbit Integration
 
 When a task involves creating a pull request or requesting CodeRabbit reviews:

@@ -527,8 +527,8 @@ export function SearchPageClient({ allAirports }: Props) {
       {/* ── Chat Container (Centred to Left slide transition) ── */}
       <div
         className={cn(
-          "bg-card border border-card-border rounded-2xl shadow-md flex flex-col overflow-hidden transition-all duration-[750ms] cubic-bezier(0.19,1,0.22,1) will-change-[width,max-width]",
-          isSplitActive ? "w-full lg:w-[38%] lg:max-w-[420px] h-[calc(100vh-140px)]" : "w-full max-w-[680px] mx-auto h-[600px]"
+          "chat-card-container flex flex-col overflow-hidden",
+          isSplitActive ? "w-full lg:w-[38%] lg:max-w-[420px] h-[calc(100vh-140px)] rounded-[20px]" : "w-full max-w-[680px] mx-auto h-[600px] rounded-[24px]"
         )}
       >
         {/* Chat Header */}
@@ -568,10 +568,8 @@ export function SearchPageClient({ allAirports }: Props) {
               </span>
               <div
                 className={cn(
-                  "px-4 py-3 rounded-2xl text-sm leading-relaxed shadow-sm",
-                  msg.sender === 'USER'
-                    ? "bg-gradient-to-br from-accent to-gradient-end text-white rounded-br-none"
-                    : "bg-card border border-card-border text-text-primary rounded-bl-none"
+                  "px-4 py-3 text-sm leading-relaxed",
+                  msg.sender === 'USER' ? "bubble-user" : "bubble-agent"
                 )}
               >
                 {msg.content || (msg.isStreaming && (
@@ -694,14 +692,7 @@ export function SearchPageClient({ allAirports }: Props) {
       </div>
 
       {/* ── Results & Map Column (Sliding in / hidden initially) ── */}
-      <div
-        className={cn(
-          "flex flex-col gap-6 transition-all duration-[850ms] cubic-bezier(0.19,1,0.22,1) will-change-[width,opacity,transform] h-[calc(100vh-140px)]",
-          isSplitActive
-            ? "w-full lg:w-[62%] opacity-100 translate-x-0 pointer-events-auto overflow-y-auto pr-1"
-            : "w-0 opacity-0 translate-x-10 pointer-events-none hidden"
-        )}
-      >
+      <div className={cn("results-area w-full lg:w-[62%]", isSplitActive && "results-area-active")}>
         
         {/* Search Controls Card */}
         <div className="card">
@@ -883,7 +874,7 @@ export function SearchPageClient({ allAirports }: Props) {
               </div>
 
               {searchResults.map((flight) => (
-                <div key={flight.id} className="chat-flight-card hover:shadow-md transition duration-200">
+                <div key={flight.id} className="chat-flight-card hover:shadow-md transition duration-200 flex-shrink-0">
                   <div className="chat-flight-header">
                     <div className="chat-flight-airline">
                       <div className="airline-logo-placeholder uppercase">
@@ -912,7 +903,7 @@ export function SearchPageClient({ allAirports }: Props) {
                   <div className="chat-flight-route">
                     <div className="route-times-row flex justify-between items-center w-full">
                       <span className="route-time">{flight.departureTime}</span>
-                      <div className="route-path-line flex-1 mx-4 relative height-[2px] bg-secondary-border">
+                      <div className="route-path-line flex-1 mx-4 relative h-[2px] bg-secondary-border">
                         <span className="path-stops absolute top-[-11px] left-1/2 -translate-x-1/2 text-[10px] font-semibold bg-background border border-card-border px-2 py-0.5 rounded-full leading-none">
                           {flight.stops === 0 ? 'Non-stop' : `${flight.stops} Stop`}
                         </span>

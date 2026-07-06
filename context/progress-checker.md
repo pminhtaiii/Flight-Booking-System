@@ -7,7 +7,7 @@ Update this file after every completed feature. Any AI agent reading this should
 ### Current Status
 
 **Feature:** Chatbot UI Integration (Fully Completed)
-**Last completed:** Implementation of conversational chatbot UI client on /search page with SSE streaming, transition split view, map/results synchronization, and confirmation gates.
+**Last completed:** Implementation of conversational chatbot UI client on /search page with SSE streaming, transition split view, map/results synchronization, confirmation gates, and exact visual styling updates matching the design sketches (custom bubbles, card container transitions, input wrappers, flight cards, match score progress bars, and route details).
 **Next:** Done!
 
 ---
