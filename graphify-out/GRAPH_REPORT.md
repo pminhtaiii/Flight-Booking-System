@@ -1,16 +1,16 @@
 # Graph Report - Booking Systems  (2026-07-06)
 
 ## Corpus Check
-- 246 files · ~137,425 words
+- 246 files · ~137,507 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 2083 nodes · 2462 edges · 260 communities (134 shown, 126 thin omitted)
+- 2083 nodes · 2462 edges · 257 communities (131 shown, 126 thin omitted)
 - Extraction: 95% EXTRACTED · 5% INFERRED · 0% AMBIGUOUS · INFERRED: 134 edges (avg confidence: 0.78)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `4baddaea`
+- Built from commit: `6e898664`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -246,11 +246,8 @@
 - [[_COMMUNITY_test_pipeline_parallelism.py|test_pipeline_parallelism.py]]
 - [[_COMMUNITY_Sketch Manifest|Sketch Manifest]]
 - [[_COMMUNITY_airports.ts|airports.ts]]
-- [[_COMMUNITY_devDependencies|devDependencies]]
 - [[_COMMUNITY_MapContainerInner.tsx|MapContainerInner.tsx]]
 - [[_COMMUNITY_page.tsx|page.tsx]]
-- [[_COMMUNITY_scripts|scripts]]
-- [[_COMMUNITY_package.json|package.json]]
 - [[_COMMUNITY_plan|plan.md]]
 - [[_COMMUNITY_amadeus.types.ts|amadeus.types.ts]]
 - [[_COMMUNITY_index.ts|index.ts]]
@@ -291,7 +288,7 @@
 - **Agent Gateway REST Endpoints** — specs_003_agent_tool_calling_contracts_agent_gateway_api_get_search_flights, specs_003_agent_tool_calling_contracts_agent_gateway_api_get_user_preferences, specs_003_agent_tool_calling_contracts_agent_gateway_api_get_user_bookings [EXTRACTED 1.00]
 - **Output Guardrail Pipeline Components** — specs_004_output_guardrails_data_model_chunkbuffer_model, specs_004_output_guardrails_data_model_slidingwindow_model, specs_004_output_guardrails_data_model_outputguardrailconfig_model, specs_004_output_guardrails_data_model_outputguardrailpipeline_model [EXTRACTED 1.00]
 
-## Communities (260 total, 126 thin omitted)
+## Communities (257 total, 126 thin omitted)
 
 ### Community 0 - "NestJSClient"
 Cohesion: 0.27
@@ -314,8 +311,8 @@ Cohesion: 0.11
 Nodes (11): JwtAuthGuard, AuthenticatedRequest, ChatController, ChatService, BatchMessagesDto, CreateMessageDto, CreateSessionDto, ListMessagesQueryDto (+3 more)
 
 ### Community 5 - "dependencies"
-Cohesion: 0.08
-Nodes (24): dependencies, amadeus, bcrypt, class-transformer, class-validator, ioredis, langchain, @langchain/core (+16 more)
+Cohesion: 0.05
+Nodes (40): dependencies, amadeus, bcrypt, class-transformer, class-validator, ioredis, langchain, @langchain/core (+32 more)
 
 ### Community 6 - "agent-gateway.service.ts"
 Cohesion: 0.13
@@ -326,16 +323,16 @@ Cohesion: 0.05
 Nodes (36): dependencies, class-variance-authority, clsx, lucide-react, maplibre-gl, next, next-auth, postcss (+28 more)
 
 ### Community 8 - "tsconfig.json"
-Cohesion: 0.18
-Nodes (10): tsconfig-paths, compilerOptions, baseUrl, outDir, paths, exclude, extends, include (+2 more)
+Cohesion: 0.20
+Nodes (9): compilerOptions, baseUrl, outDir, paths, exclude, extends, include, @/* (+1 more)
 
 ### Community 10 - "MockStreamingLLM"
 Cohesion: 0.21
 Nodes (14): get_auth_headers(), MockStreamingLLM, parse_sse(), Any, BaseMessage, test_sse_confirm_gate_suspension(), test_sse_gateway_error(), test_sse_readonly_tool() (+6 more)
 
 ### Community 11 - "devDependencies"
-Cohesion: 0.10
-Nodes (20): compilerOptions, allowJs, esModuleInterop, incremental, isolatedModules, jsx, lib, module (+12 more)
+Cohesion: 0.05
+Nodes (38): devDependencies, jest, @nestjs/cli, @nestjs/schematics, @nestjs/testing, prisma, supertest, ts-jest (+30 more)
 
 ### Community 12 - "devDependencies"
 Cohesion: 0.10
@@ -350,8 +347,8 @@ Cohesion: 0.28
 Nodes (3): RegisterForm(), RegisterInput, registerSchema
 
 ### Community 16 - "page.tsx"
-Cohesion: 0.31
-Nodes (4): handler, LoginPageProps, LoginForm(), authOptions
+Cohesion: 0.25
+Nodes (5): handler, LoginPageProps, SearchPage(), LoginForm(), authOptions
 
 ### Community 17 - "test_auth.py"
 Cohesion: 0.05
@@ -438,8 +435,8 @@ Cohesion: 0.27
 Nodes (6): get_settings(), test_first_chunk_unsafe(), test_mid_stream_chunk_unsafe(), test_sse_output_guardrail_disabled(), test_sse_output_guardrail_safe(), test_sse_output_guardrail_unsafe_blocking()
 
 ### Community 48 - "utils.ts"
-Cohesion: 0.38
-Nodes (4): DashboardPage(), ExploreDashboardClient(), Props, MapContainer
+Cohesion: 0.27
+Nodes (6): DashboardPage(), ExploreDashboardClient(), Props, MapContainer, FlightDetailPageClient(), Props
 
 ### Community 51 - "Code Standards"
 Cohesion: 0.06
@@ -535,7 +532,7 @@ Nodes (48): Acceptance, Acceptance, Acceptance, Acceptance, Acceptance, Acceptan
 
 ### Community 133 - "Progress by Feature"
 Cohesion: 0.11
-Nodes (17): Current Status, Decisions Made During Build, Notes, Progress by Feature, Progress Tracker, [x] Feature: Agent Tool-Calling & Data Access, [x] Feature: Agent Tool-Calling & Data Access, [x] Feature: Chatbot Agent Service (+9 more)
+Nodes (17): Current Status, Decisions Made During Build, Notes, Progress by Feature, Progress Tracker, [x] Feature: Agent Gateway & Tool Execution (NestJS/LangGraph), [x] Feature: Agent Tool-Calling & Data Access, [x] Feature: Chatbot Agent Service (+9 more)
 
 ### Community 134 - "User Scenarios & Testing _(mandatory)_"
 Cohesion: 0.12
@@ -713,25 +710,13 @@ Nodes (3): enabled_config(), test_pipeline_parallelism_fail_lookahead(), test_pi
 Cohesion: 0.40
 Nodes (4): Design Direction, Reference Points, Sketch Manifest, Sketches
 
-### Community 251 - "devDependencies"
-Cohesion: 0.12
-Nodes (17): devDependencies, jest, @nestjs/cli, @nestjs/schematics, @nestjs/testing, prisma, supertest, ts-jest (+9 more)
-
 ### Community 252 - "MapContainerInner.tsx"
-Cohesion: 0.14
-Nodes (15): AirportMarkerLayer(), Props, AirportPopup(), Props, FlightRouteLayer(), Props, calculateGreatCircleArc(), getMapBounds() (+7 more)
+Cohesion: 0.18
+Nodes (11): AirportMarkerLayer(), Props, FlightRouteLayer(), Props, calculateGreatCircleArc(), getMapBounds(), getThemeColor(), DEFAULT_VIEW_STATE (+3 more)
 
 ### Community 253 - "page.tsx"
-Cohesion: 0.31
-Nodes (9): FlightDetailPage(), SearchPage(), AirportSearchResponse, fetchWithTimeout(), getAirportByIataCode(), getAllAirports(), getNearbyAirports(), NearbyAirportResponse (+1 more)
-
-### Community 254 - "scripts"
-Cohesion: 0.18
-Nodes (11): scripts, build, start, start:debug, start:dev, start:prod, test, test:cov (+3 more)
-
-### Community 255 - "package.json"
-Cohesion: 0.33
-Nodes (5): name, prisma, seed, private, version
+Cohesion: 0.26
+Nodes (10): FlightDetailPage(), MOCK_FLIGHTS, Props, AirportSearchResponse, fetchWithTimeout(), getAirportByIataCode(), getAllAirports(), getNearbyAirports() (+2 more)
 
 ### Community 256 - "plan.md"
 Cohesion: 0.38
@@ -742,12 +727,12 @@ Cohesion: 0.16
 Nodes (10): AmadeusService, AmadeusBaggageAllowance, AmadeusCarrierDictionary, AmadeusDictionaries, AmadeusFareDetailsBySegment, AmadeusFlightOffer, AmadeusFlightSearchResponse, AmadeusItinerary (+2 more)
 
 ### Community 260 - "index.ts"
-Cohesion: 0.25
-Nodes (7): Booking, ChatMessage, ChatSession, Flight, MessageSender, MessageType, User
+Cohesion: 0.15
+Nodes (11): AirportPopup(), Props, Airport, AirportType, Booking, ChatMessage, ChatSession, Flight (+3 more)
 
 ### Community 262 - "page.tsx"
-Cohesion: 0.21
-Nodes (7): MOCK_FLIGHTS, Props, LogoutButton(), Header(), ThemeToggle(), FlightDetailPageClient(), Props
+Cohesion: 0.47
+Nodes (3): LogoutButton(), Header(), ThemeToggle()
 
 ## Knowledge Gaps
 - **1064 isolated node(s):** `root`, `parser`, `plugins`, `extends`, `node` (+1059 more)

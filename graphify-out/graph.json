@@ -4200,7 +4200,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "apps_api_package",
-      "community": 255,
+      "community": 5,
       "norm_label": "package.json"
     },
     {
@@ -4210,7 +4210,7 @@
       "source_location": "L2",
       "_origin": "ast",
       "id": "apps_api_package_name",
-      "community": 255,
+      "community": 5,
       "norm_label": "name"
     },
     {
@@ -4220,7 +4220,7 @@
       "source_location": "L3",
       "_origin": "ast",
       "id": "apps_api_package_version",
-      "community": 255,
+      "community": 5,
       "norm_label": "version"
     },
     {
@@ -4230,7 +4230,7 @@
       "source_location": "L4",
       "_origin": "ast",
       "id": "apps_api_package_private",
-      "community": 255,
+      "community": 5,
       "norm_label": "private"
     },
     {
@@ -4240,7 +4240,7 @@
       "source_location": "L5",
       "_origin": "ast",
       "id": "apps_api_package_scripts",
-      "community": 254,
+      "community": 5,
       "norm_label": "scripts"
     },
     {
@@ -4250,7 +4250,7 @@
       "source_location": "L6",
       "_origin": "ast",
       "id": "apps_api_package_scripts_build",
-      "community": 254,
+      "community": 5,
       "norm_label": "build"
     },
     {
@@ -4260,7 +4260,7 @@
       "source_location": "L7",
       "_origin": "ast",
       "id": "apps_api_package_scripts_start",
-      "community": 254,
+      "community": 5,
       "norm_label": "start"
     },
     {
@@ -4270,7 +4270,7 @@
       "source_location": "L8",
       "_origin": "ast",
       "id": "apps_api_package_scripts_start_dev",
-      "community": 254,
+      "community": 5,
       "norm_label": "start:dev"
     },
     {
@@ -4280,7 +4280,7 @@
       "source_location": "L9",
       "_origin": "ast",
       "id": "apps_api_package_scripts_start_debug",
-      "community": 254,
+      "community": 5,
       "norm_label": "start:debug"
     },
     {
@@ -4290,7 +4290,7 @@
       "source_location": "L10",
       "_origin": "ast",
       "id": "apps_api_package_scripts_start_prod",
-      "community": 254,
+      "community": 5,
       "norm_label": "start:prod"
     },
     {
@@ -4300,7 +4300,7 @@
       "source_location": "L11",
       "_origin": "ast",
       "id": "apps_api_package_scripts_test",
-      "community": 254,
+      "community": 5,
       "norm_label": "test"
     },
     {
@@ -4310,7 +4310,7 @@
       "source_location": "L12",
       "_origin": "ast",
       "id": "apps_api_package_scripts_test_watch",
-      "community": 254,
+      "community": 5,
       "norm_label": "test:watch"
     },
     {
@@ -4320,7 +4320,7 @@
       "source_location": "L13",
       "_origin": "ast",
       "id": "apps_api_package_scripts_test_cov",
-      "community": 254,
+      "community": 5,
       "norm_label": "test:cov"
     },
     {
@@ -4330,7 +4330,7 @@
       "source_location": "L14",
       "_origin": "ast",
       "id": "apps_api_package_scripts_test_debug",
-      "community": 254,
+      "community": 5,
       "norm_label": "test:debug"
     },
     {
@@ -4340,7 +4340,7 @@
       "source_location": "L15",
       "_origin": "ast",
       "id": "apps_api_package_scripts_test_e2e",
-      "community": 254,
+      "community": 5,
       "norm_label": "test:e2e"
     },
     {
@@ -4590,7 +4590,7 @@
       "source_location": "L42",
       "_origin": "ast",
       "id": "apps_api_package_devdependencies",
-      "community": 251,
+      "community": 11,
       "norm_label": "devdependencies"
     },
     {
@@ -4600,7 +4600,7 @@
       "source_location": "L43",
       "_origin": "ast",
       "id": "apps_api_package_devdependencies_nestjs_cli",
-      "community": 251,
+      "community": 11,
       "norm_label": "@nestjs/cli"
     },
     {
@@ -4610,7 +4610,7 @@
       "source_location": "L44",
       "_origin": "ast",
       "id": "apps_api_package_devdependencies_nestjs_schematics",
-      "community": 251,
+      "community": 11,
       "norm_label": "@nestjs/schematics"
     },
     {
@@ -4620,7 +4620,7 @@
       "source_location": "L45",
       "_origin": "ast",
       "id": "apps_api_package_devdependencies_nestjs_testing",
-      "community": 251,
+      "community": 11,
       "norm_label": "@nestjs/testing"
     },
     {
@@ -4630,7 +4630,7 @@
       "source_location": "L46",
       "_origin": "ast",
       "id": "apps_api_package_devdependencies_types_bcrypt",
-      "community": 251,
+      "community": 11,
       "norm_label": "@types/bcrypt"
     },
     {
@@ -4640,7 +4640,7 @@
       "source_location": "L47",
       "_origin": "ast",
       "id": "apps_api_package_devdependencies_types_express",
-      "community": 251,
+      "community": 11,
       "norm_label": "@types/express"
     },
     {
@@ -4650,7 +4650,7 @@
       "source_location": "L48",
       "_origin": "ast",
       "id": "apps_api_package_devdependencies_types_jest",
-      "community": 251,
+      "community": 11,
       "norm_label": "@types/jest"
     },
     {
@@ -4660,7 +4660,7 @@
       "source_location": "L49",
       "_origin": "ast",
       "id": "apps_api_package_devdependencies_types_node",
-      "community": 251,
+      "community": 11,
       "norm_label": "@types/node"
     },
     {
@@ -4670,7 +4670,7 @@
       "source_location": "L50",
       "_origin": "ast",
       "id": "apps_api_package_devdependencies_types_passport_jwt",
-      "community": 251,
+      "community": 11,
       "norm_label": "@types/passport-jwt"
     },
     {
@@ -4680,7 +4680,7 @@
       "source_location": "L51",
       "_origin": "ast",
       "id": "apps_api_package_devdependencies_types_supertest",
-      "community": 251,
+      "community": 11,
       "norm_label": "@types/supertest"
     },
     {
@@ -4690,7 +4690,7 @@
       "source_location": "L52",
       "_origin": "ast",
       "id": "apps_api_package_devdependencies_jest",
-      "community": 251,
+      "community": 11,
       "norm_label": "jest"
     },
     {
@@ -4700,7 +4700,7 @@
       "source_location": "L53",
       "_origin": "ast",
       "id": "apps_api_package_devdependencies_prisma",
-      "community": 251,
+      "community": 11,
       "norm_label": "prisma"
     },
     {
@@ -4710,7 +4710,7 @@
       "source_location": "L54",
       "_origin": "ast",
       "id": "apps_api_package_devdependencies_supertest",
-      "community": 251,
+      "community": 11,
       "norm_label": "supertest"
     },
     {
@@ -4720,7 +4720,7 @@
       "source_location": "L55",
       "_origin": "ast",
       "id": "apps_api_package_devdependencies_ts_jest",
-      "community": 251,
+      "community": 11,
       "norm_label": "ts-jest"
     },
     {
@@ -4730,7 +4730,7 @@
       "source_location": "L56",
       "_origin": "ast",
       "id": "apps_api_package_devdependencies_ts_loader",
-      "community": 251,
+      "community": 11,
       "norm_label": "ts-loader"
     },
     {
@@ -4740,7 +4740,7 @@
       "source_location": "L57",
       "_origin": "ast",
       "id": "apps_api_package_devdependencies_ts_node",
-      "community": 251,
+      "community": 11,
       "norm_label": "ts-node"
     },
     {
@@ -4750,7 +4750,7 @@
       "source_location": "L58",
       "_origin": "ast",
       "id": "apps_api_package_devdependencies_tsconfig_paths",
-      "community": 8,
+      "community": 11,
       "norm_label": "tsconfig-paths"
     },
     {
@@ -4760,7 +4760,7 @@
       "source_location": "L59",
       "_origin": "ast",
       "id": "apps_api_package_devdependencies_typescript",
-      "community": 251,
+      "community": 11,
       "norm_label": "typescript"
     },
     {
@@ -4770,7 +4770,7 @@
       "source_location": "L61",
       "_origin": "ast",
       "id": "apps_api_package_prisma",
-      "community": 255,
+      "community": 5,
       "norm_label": "prisma"
     },
     {
@@ -4780,7 +4780,7 @@
       "source_location": "L62",
       "_origin": "ast",
       "id": "apps_api_package_prisma_seed",
-      "community": 255,
+      "community": 5,
       "norm_label": "seed"
     },
     {
@@ -7320,7 +7320,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "apps_web_app_search_flightid_page",
-      "community": 262,
+      "community": 253,
       "norm_label": "page.tsx"
     },
     {
@@ -7330,7 +7330,7 @@
       "source_location": "L10",
       "_origin": "ast",
       "id": "apps_web_app_search_flightid_page_props",
-      "community": 262,
+      "community": 253,
       "norm_label": "props"
     },
     {
@@ -7340,7 +7340,7 @@
       "source_location": "L20",
       "_origin": "ast",
       "id": "apps_web_app_search_flightid_page_generatemetadata",
-      "community": 262,
+      "community": 253,
       "norm_label": "generatemetadata()"
     },
     {
@@ -7350,7 +7350,7 @@
       "source_location": "L27",
       "_origin": "ast",
       "id": "apps_web_app_search_flightid_page_mock_flights",
-      "community": 262,
+      "community": 253,
       "norm_label": "mock_flights"
     },
     {
@@ -7370,7 +7370,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "apps_web_app_search_page",
-      "community": 253,
+      "community": 16,
       "norm_label": "page.tsx"
     },
     {
@@ -7380,7 +7380,7 @@
       "source_location": "L10",
       "_origin": "ast",
       "id": "apps_web_app_search_page_searchpage",
-      "community": 253,
+      "community": 16,
       "norm_label": "searchpage()"
     },
     {
@@ -7550,7 +7550,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "apps_web_components_map_airportpopup",
-      "community": 252,
+      "community": 260,
       "norm_label": "airportpopup.tsx"
     },
     {
@@ -7560,7 +7560,7 @@
       "source_location": "L8",
       "_origin": "ast",
       "id": "apps_web_components_map_airportpopup_props",
-      "community": 252,
+      "community": 260,
       "norm_label": "props"
     },
     {
@@ -7570,7 +7570,7 @@
       "source_location": "L13",
       "_origin": "ast",
       "id": "apps_web_components_map_airportpopup_airportpopup",
-      "community": 252,
+      "community": 260,
       "norm_label": "airportpopup()"
     },
     {
@@ -7770,7 +7770,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "apps_web_components_search_flightdetailpageclient",
-      "community": 262,
+      "community": 48,
       "norm_label": "flightdetailpageclient.tsx"
     },
     {
@@ -7780,7 +7780,7 @@
       "source_location": "L19",
       "_origin": "ast",
       "id": "apps_web_components_search_flightdetailpageclient_props",
-      "community": 262,
+      "community": 48,
       "norm_label": "props"
     },
     {
@@ -7790,7 +7790,7 @@
       "source_location": "L41",
       "_origin": "ast",
       "id": "apps_web_components_search_flightdetailpageclient_flightdetailpageclient",
-      "community": 262,
+      "community": 48,
       "norm_label": "flightdetailpageclient()"
     },
     {
@@ -9030,7 +9030,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "packages_shared_src_types_airport",
-      "community": 252,
+      "community": 260,
       "norm_label": "airport.ts"
     },
     {
@@ -9040,7 +9040,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "packages_shared_src_types_airport_airporttype",
-      "community": 252,
+      "community": 260,
       "norm_label": "airporttype"
     },
     {
@@ -9050,7 +9050,7 @@
       "source_location": "L3",
       "_origin": "ast",
       "id": "packages_shared_src_types_airport_airport",
-      "community": 252,
+      "community": 260,
       "norm_label": "airport"
     },
     {
@@ -10784,14 +10784,14 @@
       "norm_label": "[x] feature: chatbot agent service"
     },
     {
-      "label": "[x] Feature: Agent Tool-Calling & Data Access",
+      "label": "[x] Feature: Agent Gateway & Tool Execution (NestJS/LangGraph)",
       "file_type": "document",
       "source_file": "context/progress-checker.md",
       "source_location": "L53",
       "_origin": "ast",
-      "id": "context_progress_checker_x_feature_agent_tool_calling_data_access_53",
+      "id": "context_progress_checker_x_feature_agent_gateway_tool_execution_nestjs_langgraph",
       "community": 133,
-      "norm_label": "[x] feature: agent tool-calling & data access"
+      "norm_label": "[x] feature: agent gateway & tool execution (nestjs/langgraph)"
     },
     {
       "label": "[x] Feature: Monorepo Scaffold & Shared Infrastructure",
@@ -27877,7 +27877,7 @@
       "weight": 1.0,
       "context": "import",
       "source": "apps_api_package_devdependencies_tsconfig_paths",
-      "target": "apps_api_tsconfig_paths",
+      "target": "apps_web_tsconfig_paths",
       "confidence_score": 1.0
     },
     {
@@ -35256,7 +35256,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "apps/web/components/search/SearchPageClient.tsx",
-      "source_location": "L525",
+      "source_location": "L529",
       "weight": 1.0,
       "source": "apps_web_components_search_searchpageclient_searchpageclient",
       "target": "apps_web_lib_utils_cn"
@@ -37975,20 +37975,20 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "context/progress-checker.md",
-      "source_location": "L30",
+      "source_location": "L53",
       "weight": 1.0,
       "source": "context_progress_checker_progress_by_feature",
-      "target": "context_progress_checker_x_feature_agent_tool_calling_data_access",
+      "target": "context_progress_checker_x_feature_agent_gateway_tool_execution_nestjs_langgraph",
       "confidence_score": 1.0
     },
     {
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "context/progress-checker.md",
-      "source_location": "L53",
+      "source_location": "L30",
       "weight": 1.0,
       "source": "context_progress_checker_progress_by_feature",
-      "target": "context_progress_checker_x_feature_agent_tool_calling_data_access_53",
+      "target": "context_progress_checker_x_feature_agent_tool_calling_data_access",
       "confidence_score": 1.0
     },
     {
@@ -46528,5 +46528,5 @@
       "source_file": "specs/004-output-guardrails/data-model.md"
     }
   ],
-  "built_at_commit": "4baddaea4889282be409a35a009de9a893428f51"
+  "built_at_commit": "6e8986643e63641ea12c39a4af92e7908384e2d5"
 }
