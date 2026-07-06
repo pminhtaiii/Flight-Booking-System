@@ -43,7 +43,21 @@ async def search_flights(
     if config:
         thread_id = config.get("configurable", {}).get("thread_id")
         if thread_id:
-            FLIGHTS_CACHE[thread_id] = results
+            import time
+            now = time.time()
+            # 1. Clean up stale entries (> 1 hour old)
+            stale_keys = [k for k, v in FLIGHTS_CACHE.items() if now - v.get("timestamp", 0) > 3600]
+            for k in stale_keys:
+                FLIGHTS_CACHE.pop(k, None)
+            # 2. Bounded size (limit to 100 sessions)
+            if len(FLIGHTS_CACHE) > 100:
+                oldest_key = min(FLIGHTS_CACHE.keys(), key=lambda k: FLIGHTS_CACHE[k].get("timestamp", 0))
+                FLIGHTS_CACHE.pop(oldest_key, None)
+            # 3. Cache results
+            FLIGHTS_CACHE[thread_id] = {
+                "results": results,
+                "timestamp": now
+            }
 
     if not results:
         return f"Found 0 flights from {origin} to {destination} on {date}."

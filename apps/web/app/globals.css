@@ -30,6 +30,7 @@
   --theme-text-match-fair: #2563EB;
   --theme-bg-match-weak: #FFF7ED;
   --theme-text-match-weak: #EA580C;
+  --theme-gradient-end: #633BF7;
 }
 
 :root.dark {
@@ -59,9 +60,10 @@
   --theme-bg-match-strong: #065F46;
   --theme-text-match-strong: #34D399;
   --theme-bg-match-fair: #1E3A8A;
-  --theme-text-match-fair: #93C5FD;
+  --theme-text-match-fair: #60A5FA;
   --theme-bg-match-weak: #7C2D12;
-  --theme-text-match-weak: #FDBA74;
+  --theme-text-match-weak: #FB923C;
+  --theme-gradient-end: #512FD6;
 }
 
 @theme {
@@ -104,6 +106,7 @@
   --color-text-match-fair: var(--theme-text-match-fair);
   --color-bg-match-weak: var(--theme-bg-match-weak);
   --color-text-match-weak: var(--theme-text-match-weak);
+  --color-gradient-end: var(--theme-gradient-end);
 }
 
 /* Custom UI Utilities following UI Rules */

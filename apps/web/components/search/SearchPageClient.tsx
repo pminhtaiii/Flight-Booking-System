@@ -410,6 +410,7 @@ export function SearchPageClient({ allAirports }: Props) {
 
       let buffer = '';
       let accumulatedContent = '';
+      let currentEventName = '';
 
       // eslint-disable-next-line no-constant-condition
       while (true) {
@@ -420,7 +421,6 @@ export function SearchPageClient({ allAirports }: Props) {
         const lines = buffer.split('\n');
         buffer = lines.pop() || '';
 
-        let currentEventName = '';
         for (const line of lines) {
           const trimmed = line.trim();
           if (!trimmed) continue;
@@ -475,8 +475,12 @@ export function SearchPageClient({ allAirports }: Props) {
               // Update Map
               if (data.results && data.results.length > 0) {
                 const first = data.results[0];
-                const originAp = allAirports.find(ap => ap.iataCode.toUpperCase() === first.departureAirport.toUpperCase());
-                const destAp = allAirports.find(ap => ap.iataCode.toUpperCase() === first.arrivalAirport.toUpperCase());
+                const originAp = first.departureAirport
+                  ? allAirports.find(ap => ap.iataCode.toUpperCase() === first.departureAirport.toUpperCase())
+                  : undefined;
+                const destAp = first.arrivalAirport
+                  ? allAirports.find(ap => ap.iataCode.toUpperCase() === first.arrivalAirport.toUpperCase())
+                  : undefined;
                 if (originAp) setMapOrigin(originAp);
                 if (destAp) setMapDest(destAp);
               }
@@ -535,15 +539,15 @@ export function SearchPageClient({ allAirports }: Props) {
             </div>
             <div>
               <h3 className="font-semibold text-text-primary text-sm">SkyBook AI Assistant</h3>
-              <span className="text-[10px] text-green-500 font-bold uppercase tracking-wider flex items-center gap-1">
-                <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" /> Online
+              <span className="text-[10px] text-text-confirmed font-bold uppercase tracking-wider flex items-center gap-1">
+                <span className="w-1.5 h-1.5 rounded-full bg-bg-confirmed animate-pulse" /> Online
               </span>
             </div>
           </div>
           <button
             onClick={clearChatHistory}
             title="Reset conversation"
-            className="p-1.5 text-text-muted hover:text-red-500 hover:bg-red-500/5 rounded-lg transition"
+            className="p-1.5 text-text-muted hover:text-danger-foreground hover:bg-bg-cancelled rounded-lg transition"
           >
             <Trash2 className="w-4 h-4" />
           </button>
@@ -566,7 +570,7 @@ export function SearchPageClient({ allAirports }: Props) {
                 className={cn(
                   "px-4 py-3 rounded-2xl text-sm leading-relaxed shadow-sm",
                   msg.sender === 'USER'
-                    ? "bg-gradient-to-br from-accent to-[#633BF7] text-white rounded-br-none"
+                    ? "bg-gradient-to-br from-accent to-gradient-end text-white rounded-br-none"
                     : "bg-card border border-card-border text-text-primary rounded-bl-none"
                 )}
               >
@@ -597,15 +601,15 @@ export function SearchPageClient({ allAirports }: Props) {
 
           {/* Confirmation Required Box */}
           {pendingConfirmation && (
-            <div className="card border border-amber-200 bg-amber-50/50 p-4 rounded-xl space-y-3 animate-fade-in self-start max-w-[90%]">
-              <div className="flex items-center gap-2 text-amber-700">
+            <div className="card border border-text-pending/30 bg-bg-pending p-4 rounded-xl space-y-3 animate-fade-in self-start max-w-[90%]">
+              <div className="flex items-center gap-2 text-text-pending">
                 <AlertCircle className="w-4 h-4" />
                 <span className="font-semibold text-xs uppercase tracking-wider">Confirmation Required</span>
               </div>
               <p className="text-xs text-text-secondary">
                 Are you sure you want to book the following flight?
               </p>
-              <div className="border-t border-amber-200/50 pt-2 text-xs space-y-1">
+              <div className="border-t border-text-pending/20 pt-2 text-xs space-y-1">
                 <div><strong>Flight:</strong> {pendingConfirmation.args?.flight_number}</div>
                 <div><strong>Date:</strong> {pendingConfirmation.args?.date}</div>
               </div>
@@ -627,7 +631,7 @@ export function SearchPageClient({ allAirports }: Props) {
           )}
 
           {errorMessage && (
-            <div className="flex items-center gap-2 p-3 bg-red-500/5 border border-red-500/20 text-red-500 rounded-xl text-xs max-w-[85%] self-start animate-fade-in">
+            <div className="flex items-center gap-2 p-3 bg-bg-cancelled border border-text-cancelled/20 text-text-cancelled rounded-xl text-xs max-w-[85%] self-start animate-fade-in">
               <AlertCircle className="w-4 h-4 flex-shrink-0" />
               <span>{errorMessage}</span>
             </div>
@@ -908,8 +912,8 @@ export function SearchPageClient({ allAirports }: Props) {
                   <div className="chat-flight-route">
                     <div className="route-times-row flex justify-between items-center w-full">
                       <span className="route-time">{flight.departureTime}</span>
-                      <div className="route-path-line flex-1 mx-4 relative height-[2px] bg-[#D9E1F0]">
-                        <span className="path-stops absolute top-[-11px] left-1/2 -translate-x-1/2 text-[10px] font-semibold bg-[#F1F4FA] border border-[#E2E8F0] px-2 py-0.5 rounded-full leading-none">
+                      <div className="route-path-line flex-1 mx-4 relative height-[2px] bg-secondary-border">
+                        <span className="path-stops absolute top-[-11px] left-1/2 -translate-x-1/2 text-[10px] font-semibold bg-background border border-card-border px-2 py-0.5 rounded-full leading-none">
                           {flight.stops === 0 ? 'Non-stop' : `${flight.stops} Stop`}
                         </span>
                       </div>

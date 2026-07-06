@@ -50,7 +50,7 @@ Update this file after every completed feature. Any AI agent reading this should
 - [x] Implement sliding window & summary memory manager
 - [x] Implement per-conversation concurrency queue
 
-### [x] Feature: Agent Tool-Calling & Data Access
+### [x] Feature: Agent Gateway & Tool Execution (NestJS/LangGraph)
 
 - [x] Phase 1: Database Schema & Mock Seed Data (Prisma models `TravelerProfile`, `Booking`, and database migrations)
 - [x] Phase 2: Agent Gateway REST Endpoints & Authentication

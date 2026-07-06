@@ -202,7 +202,8 @@ async def chat_stream(
                         })
                         if tool_name == "search_flights":
                             from agent.tools.search_flights import FLIGHTS_CACHE
-                            raw_results = FLIGHTS_CACHE.pop(session_id, None)
+                            raw_cache = FLIGHTS_CACHE.pop(session_id, None)
+                            raw_results = raw_cache.get("results") if raw_cache else None
                             if raw_results:
                                 await q.put({
                                     "event": "flight_results",
