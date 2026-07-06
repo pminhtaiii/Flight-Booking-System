@@ -1,16 +1,16 @@
 # Graph Report - Booking Systems  (2026-07-06)
 
 ## Corpus Check
-- 246 files · ~135,544 words
+- 246 files · ~137,425 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 2082 nodes · 2458 edges · 260 communities (133 shown, 127 thin omitted)
+- 2083 nodes · 2462 edges · 260 communities (134 shown, 126 thin omitted)
 - Extraction: 95% EXTRACTED · 5% INFERRED · 0% AMBIGUOUS · INFERRED: 134 edges (avg confidence: 0.78)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `4199fe49`
+- Built from commit: `4baddaea`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -61,6 +61,7 @@
 - [[_COMMUNITY_NeMo Input Guardrails Layer|NeMo Input Guardrails Layer]]
 - [[_COMMUNITY_GET apiagent-gatewayusersbookings|GET /api/agent-gateway/users/bookings]]
 - [[_COMMUNITY_Variant C Modern Split Refined|Variant C: Modern Split Refined]]
+- [[_COMMUNITY_utils.ts|utils.ts]]
 - [[_COMMUNITY_next.config.mjs|next.config.mjs]]
 - [[_COMMUNITY_AI Direct Database Access Restriction|AI Direct Database Access Restriction]]
 - [[_COMMUNITY_Code Standards|Code Standards]]
@@ -272,12 +273,12 @@
   apps/agent/tests/test_guardrail_logging.py → apps/agent/src/agent/config.py
 - `enabled_config()` --calls--> `OutputGuardrailConfig`  [INFERRED]
   apps/agent/tests/test_pipeline_parallelism.py → apps/agent/src/agent/config.py
-- `guardrail_service()` --calls--> `NemoGuardrailService`  [INFERRED]
-  apps/agent/tests/test_guardrails.py → apps/agent/src/agent/guardrails/nemo.py
 - `test_benchmark_output_pipeline_latency()` --calls--> `OutputGuardrailPipeline`  [INFERRED]
   apps/agent/tests/test_benchmark_output_pipeline.py → apps/agent/src/agent/guardrails/output_pipeline.py
 - `test_guardrail_logging_safe_chunks()` --calls--> `OutputGuardrailPipeline`  [INFERRED]
   apps/agent/tests/test_guardrail_logging.py → apps/agent/src/agent/guardrails/output_pipeline.py
+- `test_pipeline_parallelism_latency()` --calls--> `OutputGuardrailPipeline`  [INFERRED]
+  apps/agent/tests/test_pipeline_parallelism.py → apps/agent/src/agent/guardrails/output_pipeline.py
 
 ## Import Cycles
 - None detected.
@@ -290,11 +291,11 @@
 - **Agent Gateway REST Endpoints** — specs_003_agent_tool_calling_contracts_agent_gateway_api_get_search_flights, specs_003_agent_tool_calling_contracts_agent_gateway_api_get_user_preferences, specs_003_agent_tool_calling_contracts_agent_gateway_api_get_user_bookings [EXTRACTED 1.00]
 - **Output Guardrail Pipeline Components** — specs_004_output_guardrails_data_model_chunkbuffer_model, specs_004_output_guardrails_data_model_slidingwindow_model, specs_004_output_guardrails_data_model_outputguardrailconfig_model, specs_004_output_guardrails_data_model_outputguardrailpipeline_model [EXTRACTED 1.00]
 
-## Communities (260 total, 127 thin omitted)
+## Communities (260 total, 126 thin omitted)
 
 ### Community 0 - "NestJSClient"
-Cohesion: 0.15
-Nodes (13): get_settings(), Settings, test_output_guardrail_config_custom(), test_output_guardrail_config_defaults(), test_config_custom_values(), test_config_defaults(), test_config_missing_required(), test_first_chunk_unsafe() (+5 more)
+Cohesion: 0.27
+Nodes (7): Settings, test_output_guardrail_config_custom(), test_output_guardrail_config_defaults(), test_config_custom_values(), test_config_defaults(), test_config_missing_required(), BaseSettings
 
 ### Community 1 - "PrismaService"
 Cohesion: 0.06
@@ -305,8 +306,8 @@ Cohesion: 0.13
 Nodes (8): AuthModule, JwtStrategy, CacheModule, CacheService, CacheServiceWithInternal, CircularMetadata, SanitizedUserMetadata, SanitizedVariantsMetadata
 
 ### Community 3 - "test_tools.py"
-Cohesion: 0.10
-Nodes (25): agent_node(), confirm_node(), custom_tool_node(), final_answer_node(), RunnableConfig, Call the LLM with registered tools bound and closed-world prompt., Call the LLM without tools bound to provide a final summary answer when iteratio, Execute prebuilt ToolNode and increment iteration count by 1. (+17 more)
+Cohesion: 0.07
+Nodes (32): format_messages(), get_chat_model(), Any, BaseMessage, Initialize and return the LangChain ChatOpenAI instance configured with Mimo end, Format chat session history, summary, and current user message into a list of La, agent_node(), confirm_node() (+24 more)
 
 ### Community 4 - "chat.controller.ts"
 Cohesion: 0.11
@@ -329,8 +330,8 @@ Cohesion: 0.18
 Nodes (10): tsconfig-paths, compilerOptions, baseUrl, outDir, paths, exclude, extends, include (+2 more)
 
 ### Community 10 - "MockStreamingLLM"
-Cohesion: 0.17
-Nodes (15): test_e2e_output_guardrail_pipeline_validation(), get_auth_headers(), MockStreamingLLM, parse_sse(), Any, BaseMessage, test_sse_confirm_gate_suspension(), test_sse_gateway_error() (+7 more)
+Cohesion: 0.21
+Nodes (14): get_auth_headers(), MockStreamingLLM, parse_sse(), Any, BaseMessage, test_sse_confirm_gate_suspension(), test_sse_gateway_error(), test_sse_readonly_tool() (+6 more)
 
 ### Community 11 - "devDependencies"
 Cohesion: 0.10
@@ -349,8 +350,8 @@ Cohesion: 0.28
 Nodes (3): RegisterForm(), RegisterInput, registerSchema
 
 ### Community 16 - "page.tsx"
-Cohesion: 0.25
-Nodes (5): handler, LoginPageProps, SearchPage(), LoginForm(), authOptions
+Cohesion: 0.31
+Nodes (4): handler, LoginPageProps, LoginForm(), authOptions
 
 ### Community 17 - "test_auth.py"
 Cohesion: 0.05
@@ -400,6 +401,10 @@ Nodes (7): collection, compilerOptions, assets, deleteOutDir, watchAssets, $sche
 Cohesion: 0.21
 Nodes (8): AgentGatewayModule, AppModule, AuditModule, ChatModule, HttpExceptionFilter, bootstrap(), PrismaModule, ToolCallMetadata
 
+### Community 30 - "NemoGuardrailService"
+Cohesion: 0.10
+Nodes (3): NemoGuardrailService, guardrail_service(), guardrail_service()
+
 ### Community 31 - "MessageQueueManager"
 Cohesion: 0.04
 Nodes (44): 1. OutputGuardrailConfig, 2. ChunkBuffer, 3. SlidingWindow, 4. OutputGuardrailResult, 5. OutputGuardrailPipeline, 6. OutputGuardrailBlockedError, Data Model: LLM Output Guardrails, Entities (+36 more)
@@ -429,8 +434,12 @@ Cohesion: 0.40
 Nodes (4): extends, rootDir, settings, next
 
 ### Community 39 - "FastAPI"
-Cohesion: 0.25
-Nodes (7): format_messages(), get_chat_model(), Any, BaseMessage, Initialize and return the LangChain ChatOpenAI instance configured with Mimo end, Format chat session history, summary, and current user message into a list of La, ChatOpenAI
+Cohesion: 0.27
+Nodes (6): get_settings(), test_first_chunk_unsafe(), test_mid_stream_chunk_unsafe(), test_sse_output_guardrail_disabled(), test_sse_output_guardrail_safe(), test_sse_output_guardrail_unsafe_blocking()
+
+### Community 48 - "utils.ts"
+Cohesion: 0.38
+Nodes (4): DashboardPage(), ExploreDashboardClient(), Props, MapContainer
 
 ### Community 51 - "Code Standards"
 Cohesion: 0.06
@@ -526,7 +535,7 @@ Nodes (48): Acceptance, Acceptance, Acceptance, Acceptance, Acceptance, Acceptan
 
 ### Community 133 - "Progress by Feature"
 Cohesion: 0.11
-Nodes (17): Current Status, Decisions Made During Build, [/] Feature: Agent Tool-Calling & Data Access, [/] Feature: Agent Tool-Calling & Data Access, Notes, Progress by Feature, Progress Tracker, [x] Feature: Chatbot Agent Service (+9 more)
+Nodes (17): Current Status, Decisions Made During Build, Notes, Progress by Feature, Progress Tracker, [x] Feature: Agent Tool-Calling & Data Access, [x] Feature: Agent Tool-Calling & Data Access, [x] Feature: Chatbot Agent Service (+9 more)
 
 ### Community 134 - "User Scenarios & Testing _(mandatory)_"
 Cohesion: 0.12
@@ -605,8 +614,8 @@ Cohesion: 0.18
 Nodes (10): 1. Target Audience, 2. Core User Flow (Flight-First), 3. Data Sources & APIs, 4. AI Agents vs. Deterministic Services (Hybrid Architecture), AI Agents (LLM-powered) — Advisory Role, Boundary Rule, Deterministic Backend Services — Transactional Role, Flight Booking System — Architecture Decisions (+2 more)
 
 ### Community 154 - "RateLimitMiddleware"
-Cohesion: 0.15
-Nodes (14): OutputGuardrailBlockedError, OutputGuardrailPipeline, Feeds a token into the pipeline, yielding any safe completed chunks., Raised when an output chunk fails safety validation., Orchestrates output safety validation using a layered pipeline., Flushes the remaining buffered tokens and validates the final chunk., Cancels and cleans up any background validation tasks., Maintains a sliding window of the last N tokens from the previous chunk (+6 more)
+Cohesion: 0.22
+Nodes (11): OutputGuardrailBlockedError, OutputGuardrailPipeline, Raised when an output chunk fails safety validation., Orchestrates output safety validation using a layered pipeline., Cancels and cleans up any background validation tasks., test_pipeline_blocking_nemo_unsafe(), test_pipeline_boundary_pii_blocking(), test_pipeline_disabled_passthrough() (+3 more)
 
 ### Community 155 - "test_output_guardrail_nemo.py"
 Cohesion: 0.14
@@ -657,8 +666,8 @@ Cohesion: 0.17
 Nodes (11): 1. Sentence-Boundary Chunking (not fixed token size), 2. Pipeline Parallelism, 3. Cross-Chunk Sliding Window for Boundary PII, 4. Layered Guardrail Checks (Regex PII + NeMo Output Rail), 5. Hard Stop on Failure, Decisions, Full Pipeline Flow, Open Questions (for implementation phase) (+3 more)
 
 ### Community 167 - "get_settings"
-Cohesion: 0.12
-Nodes (4): health_check(), Request, Perform a health check verification by checking NestJS and NeMo Guardrails statu, guardrail_service()
+Cohesion: 0.18
+Nodes (4): health_check(), Request, Perform a health check verification by checking NestJS and NeMo Guardrails statu, test_e2e_output_guardrail_pipeline_validation()
 
 ### Community 168 - "Specification Quality Checklist: Database Initialization & Auth Handshake"
 Cohesion: 0.33
@@ -677,8 +686,8 @@ Cohesion: 0.33
 Nodes (5): Content Quality, Feature Readiness, Notes, Requirement Completeness, Specification Quality Checklist: Agent Tool-Calling & Data Access
 
 ### Community 172 - "detect_pii"
-Cohesion: 0.36
-Nodes (8): detect_pii(), Detects if the input text contains Passport numbers, Credit card numbers (Luhn c, test_detect_pii_clean_text(), test_detect_pii_credit_card(), test_detect_pii_email(), test_detect_pii_multiple(), test_detect_pii_passport(), test_detect_pii_phone()
+Cohesion: 0.18
+Nodes (11): Feeds a token into the pipeline, yielding any safe completed chunks., Flushes the remaining buffered tokens and validates the final chunk., Maintains a sliding window of the last N tokens from the previous chunk, detect_pii(), Detects if the input text contains Passport numbers, Credit card numbers (Luhn c, test_detect_pii_clean_text(), test_detect_pii_credit_card(), test_detect_pii_email() (+3 more)
 
 ### Community 173 - "chat_stream"
 Cohesion: 0.25
@@ -709,12 +718,12 @@ Cohesion: 0.12
 Nodes (17): devDependencies, jest, @nestjs/cli, @nestjs/schematics, @nestjs/testing, prisma, supertest, ts-jest (+9 more)
 
 ### Community 252 - "MapContainerInner.tsx"
-Cohesion: 0.16
-Nodes (14): AirportMarkerLayer(), Props, AirportPopup(), Props, FlightRouteLayer(), Props, calculateGreatCircleArc(), getMapBounds() (+6 more)
+Cohesion: 0.14
+Nodes (15): AirportMarkerLayer(), Props, AirportPopup(), Props, FlightRouteLayer(), Props, calculateGreatCircleArc(), getMapBounds() (+7 more)
 
 ### Community 253 - "page.tsx"
-Cohesion: 0.26
-Nodes (10): FlightDetailPage(), MOCK_FLIGHTS, Props, AirportSearchResponse, fetchWithTimeout(), getAirportByIataCode(), getAllAirports(), getNearbyAirports() (+2 more)
+Cohesion: 0.31
+Nodes (9): FlightDetailPage(), SearchPage(), AirportSearchResponse, fetchWithTimeout(), getAirportByIataCode(), getAllAirports(), getNearbyAirports(), NearbyAirportResponse (+1 more)
 
 ### Community 254 - "scripts"
 Cohesion: 0.18
@@ -725,40 +734,40 @@ Cohesion: 0.33
 Nodes (5): name, prisma, seed, private, version
 
 ### Community 256 - "plan.md"
-Cohesion: 0.28
-Nodes (6): MapContainer, FlightDetailPageClient(), Props, EMPTY_STOPS, Props, SearchPageClient()
+Cohesion: 0.38
+Nodes (5): EMPTY_STOPS, Message, Props, SearchPageClient(), cn()
 
 ### Community 259 - "amadeus.types.ts"
 Cohesion: 0.16
 Nodes (10): AmadeusService, AmadeusBaggageAllowance, AmadeusCarrierDictionary, AmadeusDictionaries, AmadeusFareDetailsBySegment, AmadeusFlightOffer, AmadeusFlightSearchResponse, AmadeusItinerary (+2 more)
 
 ### Community 260 - "index.ts"
-Cohesion: 0.20
-Nodes (8): AirportType, Booking, ChatMessage, ChatSession, Flight, MessageSender, MessageType, User
+Cohesion: 0.25
+Nodes (7): Booking, ChatMessage, ChatSession, Flight, MessageSender, MessageType, User
 
 ### Community 262 - "page.tsx"
-Cohesion: 0.25
-Nodes (6): DashboardPage(), LogoutButton(), ExploreDashboardClient(), Props, Header(), ThemeToggle()
+Cohesion: 0.21
+Nodes (7): MOCK_FLIGHTS, Props, LogoutButton(), Header(), ThemeToggle(), FlightDetailPageClient(), Props
 
 ## Knowledge Gaps
-- **1063 isolated node(s):** `root`, `parser`, `plugins`, `extends`, `node` (+1058 more)
+- **1064 isolated node(s):** `root`, `parser`, `plugins`, `extends`, `node` (+1059 more)
   These have ≤1 connection - possible missing edges or undocumented components.
-- **127 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
+- **126 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
 - **Why does `NestJSClient` connect `MemoryManager` to `NestJSClient`, `MockStreamingLLM`, `get_nestjs_client`, `chat_stream`, `User Scenarios & Testing *(mandatory)*`, `ChunkBuffer`?**
   _High betweenness centrality (0.021) - this node is a cross-community bridge._
-- **Why does `get_settings()` connect `NestJSClient` to `test_tools.py`, `FastAPI`, `MockStreamingLLM`, `chat_stream`, `get_nestjs_client`, `Decisions`, `NemoGuardrailService`, `test_streaming_foundation.py`, `MemoryManager`?**
+- **Why does `get_settings()` connect `FastAPI` to `NestJSClient`, `test_tools.py`, `get_settings`, `chat_stream`, `get_nestjs_client`, `Decisions`, `NemoGuardrailService`, `test_streaming_foundation.py`, `MemoryManager`?**
   _High betweenness centrality (0.010) - this node is a cross-community bridge._
-- **Why does `OutputGuardrailBlockedError` connect `RateLimitMiddleware` to `test_output_guardrail_nemo.py`, `get_nestjs_client`, `test_guardrail_logging.py`, `test_pipeline_parallelism.py`, `devDependencies`?**
+- **Why does `OutputGuardrailBlockedError` connect `RateLimitMiddleware` to `detect_pii`, `test_output_guardrail_nemo.py`, `get_nestjs_client`, `test_guardrail_logging.py`, `test_pipeline_parallelism.py`, `devDependencies`?**
   _High betweenness centrality (0.010) - this node is a cross-community bridge._
 - **Are the 20 inferred relationships involving `NestJSClient` (e.g. with `MemoryManager` and `chat_stream()`) actually correct?**
   _`NestJSClient` has 20 INFERRED edges - model-reasoned connections that need verification._
 - **What connects `root`, `parser`, `plugins` to the rest of the system?**
-  _1156 weakly-connected nodes found - possible documentation gaps or missing edges._
-- **Should `NestJSClient` be split into smaller, more focused modules?**
-  _Cohesion score 0.14761904761904762 - nodes in this community are weakly interconnected._
+  _1157 weakly-connected nodes found - possible documentation gaps or missing edges._
 - **Should `PrismaService` be split into smaller, more focused modules?**
   _Cohesion score 0.0625 - nodes in this community are weakly interconnected._
+- **Should `prisma.service.ts` be split into smaller, more focused modules?**
+  _Cohesion score 0.12648221343873517 - nodes in this community are weakly interconnected._

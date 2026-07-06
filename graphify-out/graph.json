@@ -310,7 +310,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "apps_agent_src_agent_agents_chat_agent",
-      "community": 39,
+      "community": 3,
       "norm_label": "chat_agent.py"
     },
     {
@@ -320,7 +320,7 @@
       "source_location": "L12",
       "_origin": "ast",
       "id": "apps_agent_src_agent_agents_chat_agent_get_chat_model",
-      "community": 39,
+      "community": 3,
       "norm_label": "get_chat_model()"
     },
     {
@@ -330,7 +330,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "chatopenai",
-      "community": 39,
+      "community": 3,
       "norm_label": "chatopenai"
     },
     {
@@ -340,7 +340,7 @@
       "source_location": "L24",
       "_origin": "ast",
       "id": "apps_agent_src_agent_agents_chat_agent_format_messages",
-      "community": 39,
+      "community": 3,
       "norm_label": "format_messages()"
     },
     {
@@ -350,7 +350,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "apps_agent_src_agent_agents_chat_agent_py_any",
-      "community": 39,
+      "community": 3,
       "norm_label": "any"
     },
     {
@@ -360,7 +360,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "apps_agent_src_agent_agents_chat_agent_py_basemessage",
-      "community": 39,
+      "community": 3,
       "norm_label": "basemessage"
     },
     {
@@ -370,7 +370,7 @@
       "source_location": "L13",
       "_origin": "ast",
       "id": "apps_agent_src_agent_agents_chat_agent_rationale_13",
-      "community": 39,
+      "community": 3,
       "norm_label": "initialize and return the langchain chatopenai instance configured with mimo end"
     },
     {
@@ -380,7 +380,7 @@
       "source_location": "L30",
       "_origin": "ast",
       "id": "apps_agent_src_agent_agents_chat_agent_rationale_30",
-      "community": 39,
+      "community": 3,
       "norm_label": "format chat session history, summary, and current user message into a list of la"
     },
     {
@@ -460,7 +460,7 @@
       "source_location": "L59",
       "_origin": "ast",
       "id": "apps_agent_src_agent_config_get_settings",
-      "community": 0,
+      "community": 39,
       "norm_label": "get_settings()"
     },
     {
@@ -890,7 +890,7 @@
       "source_location": "L41",
       "_origin": "ast",
       "id": "apps_agent_src_agent_guardrails_output_pipeline_outputguardrailpipeline_log_sync_check",
-      "community": 154,
+      "community": 172,
       "norm_label": "._log_sync_check()"
     },
     {
@@ -900,7 +900,7 @@
       "source_location": "L52",
       "_origin": "ast",
       "id": "apps_agent_src_agent_guardrails_output_pipeline_outputguardrailpipeline_validate_chunk_async_wrapper",
-      "community": 154,
+      "community": 172,
       "norm_label": "._validate_chunk_async_wrapper()"
     },
     {
@@ -910,7 +910,7 @@
       "source_location": "L75",
       "_origin": "ast",
       "id": "apps_agent_src_agent_guardrails_output_pipeline_outputguardrailpipeline_check_boundary_pii",
-      "community": 154,
+      "community": 172,
       "norm_label": "._check_boundary_pii()"
     },
     {
@@ -920,7 +920,7 @@
       "source_location": "L119",
       "_origin": "ast",
       "id": "apps_agent_src_agent_guardrails_output_pipeline_outputguardrailpipeline_process_token",
-      "community": 154,
+      "community": 172,
       "norm_label": ".process_token()"
     },
     {
@@ -930,7 +930,7 @@
       "source_location": "L239",
       "_origin": "ast",
       "id": "apps_agent_src_agent_guardrails_output_pipeline_outputguardrailpipeline_flush",
-      "community": 154,
+      "community": 172,
       "norm_label": ".flush()"
     },
     {
@@ -970,7 +970,7 @@
       "source_location": "L76",
       "_origin": "ast",
       "id": "apps_agent_src_agent_guardrails_output_pipeline_rationale_76",
-      "community": 154,
+      "community": 172,
       "norm_label": "maintains a sliding window of the last n tokens from the previous chunk"
     },
     {
@@ -980,7 +980,7 @@
       "source_location": "L120",
       "_origin": "ast",
       "id": "apps_agent_src_agent_guardrails_output_pipeline_rationale_120",
-      "community": 154,
+      "community": 172,
       "norm_label": "feeds a token into the pipeline, yielding any safe completed chunks."
     },
     {
@@ -990,7 +990,7 @@
       "source_location": "L240",
       "_origin": "ast",
       "id": "apps_agent_src_agent_guardrails_output_pipeline_rationale_240",
-      "community": 154,
+      "community": 172,
       "norm_label": "flushes the remaining buffered tokens and validates the final chunk."
     },
     {
@@ -2147,7 +2147,7 @@
       "label": "search_flights()",
       "file_type": "code",
       "source_file": "apps/agent/src/agent/tools/search_flights.py",
-      "source_location": "L14",
+      "source_location": "L16",
       "_origin": "ast",
       "id": "apps_agent_src_agent_tools_search_flights_search_flights",
       "community": 13,
@@ -2167,9 +2167,9 @@
       "label": "Search for available flights between two airports on a specific date. Returns th",
       "file_type": "rationale",
       "source_file": "apps/agent/src/agent/tools/search_flights.py",
-      "source_location": "L21",
+      "source_location": "L23",
       "_origin": "ast",
-      "id": "apps_agent_src_agent_tools_search_flights_rationale_21",
+      "id": "apps_agent_src_agent_tools_search_flights_rationale_23",
       "community": 13,
       "norm_label": "search for available flights between two airports on a specific date. returns th"
     },
@@ -2540,7 +2540,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "apps_agent_tests_test_e2e_output_guardrails",
-      "community": 10,
+      "community": 167,
       "norm_label": "test_e2e_output_guardrails.py"
     },
     {
@@ -2550,7 +2550,7 @@
       "source_location": "L12",
       "_origin": "ast",
       "id": "apps_agent_tests_test_e2e_output_guardrails_mock_nestjs_client",
-      "community": 10,
+      "community": 167,
       "norm_label": "mock_nestjs_client()"
     },
     {
@@ -2560,7 +2560,7 @@
       "source_location": "L24",
       "_origin": "ast",
       "id": "apps_agent_tests_test_e2e_output_guardrails_test_e2e_output_guardrail_pipeline_validation",
-      "community": 10,
+      "community": 167,
       "norm_label": "test_e2e_output_guardrail_pipeline_validation()"
     },
     {
@@ -2720,7 +2720,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "apps_agent_tests_test_guardrails",
-      "community": 167,
+      "community": 30,
       "norm_label": "test_guardrails.py"
     },
     {
@@ -2730,7 +2730,7 @@
       "source_location": "L9",
       "_origin": "ast",
       "id": "apps_agent_tests_test_guardrails_guardrail_service",
-      "community": 167,
+      "community": 30,
       "norm_label": "guardrail_service()"
     },
     {
@@ -2740,7 +2740,7 @@
       "source_location": "L22",
       "_origin": "ast",
       "id": "apps_agent_tests_test_guardrails_test_guardrail_length_limit",
-      "community": 167,
+      "community": 30,
       "norm_label": "test_guardrail_length_limit()"
     },
     {
@@ -2750,7 +2750,7 @@
       "source_location": "L31",
       "_origin": "ast",
       "id": "apps_agent_tests_test_guardrails_test_guardrail_regex_heuristic",
-      "community": 167,
+      "community": 30,
       "norm_label": "test_guardrail_regex_heuristic()"
     },
     {
@@ -2760,7 +2760,7 @@
       "source_location": "L49",
       "_origin": "ast",
       "id": "apps_agent_tests_test_guardrails_test_guardrail_llm_safe",
-      "community": 167,
+      "community": 30,
       "norm_label": "test_guardrail_llm_safe()"
     },
     {
@@ -2770,7 +2770,7 @@
       "source_location": "L64",
       "_origin": "ast",
       "id": "apps_agent_tests_test_guardrails_test_guardrail_llm_unsafe",
-      "community": 167,
+      "community": 30,
       "norm_label": "test_guardrail_llm_unsafe()"
     },
     {
@@ -2780,7 +2780,7 @@
       "source_location": "L79",
       "_origin": "ast",
       "id": "apps_agent_tests_test_guardrails_test_guardrail_llm_fail_closed",
-      "community": 167,
+      "community": 30,
       "norm_label": "test_guardrail_llm_fail_closed()"
     },
     {
@@ -2790,7 +2790,7 @@
       "source_location": "L89",
       "_origin": "ast",
       "id": "apps_agent_tests_test_guardrails_test_health_endpoint_with_guardrails",
-      "community": 167,
+      "community": 30,
       "norm_label": "test_health_endpoint_with_guardrails()"
     },
     {
@@ -2800,7 +2800,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "apps_agent_tests_test_hard_stop",
-      "community": 0,
+      "community": 39,
       "norm_label": "test_hard_stop.py"
     },
     {
@@ -2810,7 +2810,7 @@
       "source_location": "L11",
       "_origin": "ast",
       "id": "apps_agent_tests_test_hard_stop_mock_nestjs_client",
-      "community": 0,
+      "community": 39,
       "norm_label": "mock_nestjs_client()"
     },
     {
@@ -2820,7 +2820,7 @@
       "source_location": "L23",
       "_origin": "ast",
       "id": "apps_agent_tests_test_hard_stop_test_first_chunk_unsafe",
-      "community": 0,
+      "community": 39,
       "norm_label": "test_first_chunk_unsafe()"
     },
     {
@@ -2830,7 +2830,7 @@
       "source_location": "L90",
       "_origin": "ast",
       "id": "apps_agent_tests_test_hard_stop_test_mid_stream_chunk_unsafe",
-      "community": 0,
+      "community": 39,
       "norm_label": "test_mid_stream_chunk_unsafe()"
     },
     {
@@ -3700,7 +3700,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "apps_agent_tests_test_sse_output_guardrail",
-      "community": 0,
+      "community": 39,
       "norm_label": "test_sse_output_guardrail.py"
     },
     {
@@ -3710,7 +3710,7 @@
       "source_location": "L15",
       "_origin": "ast",
       "id": "apps_agent_tests_test_sse_output_guardrail_mock_nestjs_client",
-      "community": 0,
+      "community": 39,
       "norm_label": "mock_nestjs_client()"
     },
     {
@@ -3720,7 +3720,7 @@
       "source_location": "L27",
       "_origin": "ast",
       "id": "apps_agent_tests_test_sse_output_guardrail_test_sse_output_guardrail_safe",
-      "community": 0,
+      "community": 39,
       "norm_label": "test_sse_output_guardrail_safe()"
     },
     {
@@ -3730,7 +3730,7 @@
       "source_location": "L66",
       "_origin": "ast",
       "id": "apps_agent_tests_test_sse_output_guardrail_test_sse_output_guardrail_unsafe_blocking",
-      "community": 0,
+      "community": 39,
       "norm_label": "test_sse_output_guardrail_unsafe_blocking()"
     },
     {
@@ -3740,7 +3740,7 @@
       "source_location": "L125",
       "_origin": "ast",
       "id": "apps_agent_tests_test_sse_output_guardrail_test_sse_output_guardrail_disabled",
-      "community": 0,
+      "community": 39,
       "norm_label": "test_sse_output_guardrail_disabled()"
     },
     {
@@ -7190,7 +7190,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "apps_web_app_dashboard_page",
-      "community": 262,
+      "community": 48,
       "norm_label": "page.tsx"
     },
     {
@@ -7200,7 +7200,7 @@
       "source_location": "L9",
       "_origin": "ast",
       "id": "apps_web_app_dashboard_page_dashboardpage",
-      "community": 262,
+      "community": 48,
       "norm_label": "dashboardpage()"
     },
     {
@@ -7320,7 +7320,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "apps_web_app_search_flightid_page",
-      "community": 253,
+      "community": 262,
       "norm_label": "page.tsx"
     },
     {
@@ -7330,7 +7330,7 @@
       "source_location": "L10",
       "_origin": "ast",
       "id": "apps_web_app_search_flightid_page_props",
-      "community": 253,
+      "community": 262,
       "norm_label": "props"
     },
     {
@@ -7340,7 +7340,7 @@
       "source_location": "L20",
       "_origin": "ast",
       "id": "apps_web_app_search_flightid_page_generatemetadata",
-      "community": 253,
+      "community": 262,
       "norm_label": "generatemetadata()"
     },
     {
@@ -7350,7 +7350,7 @@
       "source_location": "L27",
       "_origin": "ast",
       "id": "apps_web_app_search_flightid_page_mock_flights",
-      "community": 253,
+      "community": 262,
       "norm_label": "mock_flights"
     },
     {
@@ -7370,7 +7370,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "apps_web_app_search_page",
-      "community": 16,
+      "community": 253,
       "norm_label": "page.tsx"
     },
     {
@@ -7380,7 +7380,7 @@
       "source_location": "L10",
       "_origin": "ast",
       "id": "apps_web_app_search_page_searchpage",
-      "community": 16,
+      "community": 253,
       "norm_label": "searchpage()"
     },
     {
@@ -7450,7 +7450,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "apps_web_components_dashboard_exploredashboardclient",
-      "community": 262,
+      "community": 48,
       "norm_label": "exploredashboardclient.tsx"
     },
     {
@@ -7460,7 +7460,7 @@
       "source_location": "L8",
       "_origin": "ast",
       "id": "apps_web_components_dashboard_exploredashboardclient_props",
-      "community": 262,
+      "community": 48,
       "norm_label": "props"
     },
     {
@@ -7470,7 +7470,7 @@
       "source_location": "L12",
       "_origin": "ast",
       "id": "apps_web_components_dashboard_exploredashboardclient_exploredashboardclient",
-      "community": 262,
+      "community": 48,
       "norm_label": "exploredashboardclient()"
     },
     {
@@ -7610,7 +7610,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "apps_web_components_map_mapcontainer",
-      "community": 256,
+      "community": 48,
       "norm_label": "mapcontainer.tsx"
     },
     {
@@ -7620,7 +7620,7 @@
       "source_location": "L5",
       "_origin": "ast",
       "id": "apps_web_components_map_mapcontainer_mapcontainer",
-      "community": 256,
+      "community": 48,
       "norm_label": "mapcontainer"
     },
     {
@@ -7770,7 +7770,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "apps_web_components_search_flightdetailpageclient",
-      "community": 256,
+      "community": 262,
       "norm_label": "flightdetailpageclient.tsx"
     },
     {
@@ -7780,7 +7780,7 @@
       "source_location": "L19",
       "_origin": "ast",
       "id": "apps_web_components_search_flightdetailpageclient_props",
-      "community": 256,
+      "community": 262,
       "norm_label": "props"
     },
     {
@@ -7790,7 +7790,7 @@
       "source_location": "L41",
       "_origin": "ast",
       "id": "apps_web_components_search_flightdetailpageclient_flightdetailpageclient",
-      "community": 256,
+      "community": 262,
       "norm_label": "flightdetailpageclient()"
     },
     {
@@ -7807,7 +7807,7 @@
       "label": "EMPTY_STOPS",
       "file_type": "code",
       "source_file": "apps/web/components/search/SearchPageClient.tsx",
-      "source_location": "L11",
+      "source_location": "L24",
       "_origin": "ast",
       "id": "apps_web_components_search_searchpageclient_empty_stops",
       "community": 256,
@@ -7817,17 +7817,27 @@
       "label": "Props",
       "file_type": "code",
       "source_file": "apps/web/components/search/SearchPageClient.tsx",
-      "source_location": "L13",
+      "source_location": "L26",
       "_origin": "ast",
       "id": "apps_web_components_search_searchpageclient_props",
       "community": 256,
       "norm_label": "props"
     },
     {
+      "label": "Message",
+      "file_type": "code",
+      "source_file": "apps/web/components/search/SearchPageClient.tsx",
+      "source_location": "L30",
+      "_origin": "ast",
+      "id": "apps_web_components_search_searchpageclient_message",
+      "community": 256,
+      "norm_label": "message"
+    },
+    {
       "label": "SearchPageClient()",
       "file_type": "code",
       "source_file": "apps/web/components/search/SearchPageClient.tsx",
-      "source_location": "L17",
+      "source_location": "L37",
       "_origin": "ast",
       "id": "apps_web_components_search_searchpageclient_searchpageclient",
       "community": 256,
@@ -7940,7 +7950,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "apps_web_lib_utils",
-      "community": 48,
+      "community": 256,
       "norm_label": "utils.ts"
     },
     {
@@ -7950,7 +7960,7 @@
       "source_location": "L4",
       "_origin": "ast",
       "id": "apps_web_lib_utils_cn",
-      "community": 48,
+      "community": 256,
       "norm_label": "cn()"
     },
     {
@@ -9020,7 +9030,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "packages_shared_src_types_airport",
-      "community": 260,
+      "community": 252,
       "norm_label": "airport.ts"
     },
     {
@@ -9030,7 +9040,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "packages_shared_src_types_airport_airporttype",
-      "community": 260,
+      "community": 252,
       "norm_label": "airporttype"
     },
     {
@@ -10754,14 +10764,14 @@
       "norm_label": "[x] feature: llm output guardrails"
     },
     {
-      "label": "[/] Feature: Agent Tool-Calling & Data Access",
+      "label": "[x] Feature: Agent Tool-Calling & Data Access",
       "file_type": "document",
       "source_file": "context/progress-checker.md",
       "source_location": "L30",
       "_origin": "ast",
-      "id": "context_progress_checker_feature_agent_tool_calling_data_access",
+      "id": "context_progress_checker_x_feature_agent_tool_calling_data_access",
       "community": 133,
-      "norm_label": "[/] feature: agent tool-calling & data access"
+      "norm_label": "[x] feature: agent tool-calling & data access"
     },
     {
       "label": "[x] Feature: Chatbot Agent Service",
@@ -10774,14 +10784,14 @@
       "norm_label": "[x] feature: chatbot agent service"
     },
     {
-      "label": "[/] Feature: Agent Tool-Calling & Data Access",
+      "label": "[x] Feature: Agent Tool-Calling & Data Access",
       "file_type": "document",
       "source_file": "context/progress-checker.md",
       "source_location": "L53",
       "_origin": "ast",
-      "id": "context_progress_checker_feature_agent_tool_calling_data_access_53",
+      "id": "context_progress_checker_x_feature_agent_tool_calling_data_access_53",
       "community": 133,
-      "norm_label": "[/] feature: agent tool-calling & data access"
+      "norm_label": "[x] feature: agent tool-calling & data access"
     },
     {
       "label": "[x] Feature: Monorepo Scaffold & Shared Infrastructure",
@@ -24408,7 +24418,7 @@
       "confidence": "INFERRED",
       "confidence_score": 0.8,
       "source_file": "apps/agent/src/agent/tools/search_flights.py",
-      "source_location": "L23",
+      "source_location": "L25",
       "weight": 1.0,
       "source": "apps_agent_src_agent_tools_search_flights_search_flights",
       "target": "apps_agent_src_agent_tools_base_get_nestjs_client"
@@ -25000,7 +25010,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "apps/agent/src/agent/tools/search_flights.py",
-      "source_location": "L14",
+      "source_location": "L16",
       "weight": 1.0,
       "source": "apps_agent_src_agent_tools_search_flights",
       "target": "apps_agent_src_agent_tools_search_flights_search_flights",
@@ -25010,9 +25020,9 @@
       "relation": "rationale_for",
       "confidence": "EXTRACTED",
       "source_file": "apps/agent/src/agent/tools/search_flights.py",
-      "source_location": "L21",
+      "source_location": "L23",
       "weight": 1.0,
-      "source": "apps_agent_src_agent_tools_search_flights_rationale_21",
+      "source": "apps_agent_src_agent_tools_search_flights_rationale_23",
       "target": "apps_agent_src_agent_tools_search_flights_search_flights",
       "confidence_score": 1.0
     },
@@ -25021,7 +25031,7 @@
       "context": "parameter_type",
       "confidence": "EXTRACTED",
       "source_file": "apps/agent/src/agent/tools/search_flights.py",
-      "source_location": "L14",
+      "source_location": "L16",
       "weight": 1.0,
       "source": "apps_agent_src_agent_tools_search_flights_search_flights",
       "target": "apps_agent_src_agent_tools_search_flights_py_runnableconfig",
@@ -34920,7 +34930,7 @@
       "context": "import",
       "confidence": "EXTRACTED",
       "source_file": "apps/web/components/search/SearchPageClient.tsx",
-      "source_location": "L8",
+      "source_location": "L9",
       "weight": 1.0,
       "source": "apps_web_components_search_searchpageclient",
       "target": "apps_web_components_map_mapcontainer",
@@ -34942,7 +34952,7 @@
       "context": "import",
       "confidence": "EXTRACTED",
       "source_file": "apps/web/components/search/SearchPageClient.tsx",
-      "source_location": "L8",
+      "source_location": "L9",
       "weight": 1.0,
       "source": "apps_web_components_search_searchpageclient",
       "target": "apps_web_components_map_mapcontainer_mapcontainer",
@@ -35160,7 +35170,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "apps/web/components/search/SearchPageClient.tsx",
-      "source_location": "L11",
+      "source_location": "L24",
       "weight": 1.0,
       "source": "apps_web_components_search_searchpageclient",
       "target": "apps_web_components_search_searchpageclient_empty_stops",
@@ -35170,7 +35180,17 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "apps/web/components/search/SearchPageClient.tsx",
-      "source_location": "L13",
+      "source_location": "L30",
+      "weight": 1.0,
+      "source": "apps_web_components_search_searchpageclient",
+      "target": "apps_web_components_search_searchpageclient_message",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "apps/web/components/search/SearchPageClient.tsx",
+      "source_location": "L26",
       "weight": 1.0,
       "source": "apps_web_components_search_searchpageclient",
       "target": "apps_web_components_search_searchpageclient_props",
@@ -35180,10 +35200,21 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "apps/web/components/search/SearchPageClient.tsx",
-      "source_location": "L17",
+      "source_location": "L37",
       "weight": 1.0,
       "source": "apps_web_components_search_searchpageclient",
       "target": "apps_web_components_search_searchpageclient_searchpageclient",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports_from",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "apps/web/components/search/SearchPageClient.tsx",
+      "source_location": "L22",
+      "weight": 1.0,
+      "source": "apps_web_components_search_searchpageclient",
+      "target": "apps_web_lib_utils",
       "confidence_score": 1.0
     },
     {
@@ -35191,7 +35222,18 @@
       "context": "import",
       "confidence": "EXTRACTED",
       "source_file": "apps/web/components/search/SearchPageClient.tsx",
-      "source_location": "L7",
+      "source_location": "L22",
+      "weight": 1.0,
+      "source": "apps_web_components_search_searchpageclient",
+      "target": "apps_web_lib_utils_cn",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "apps/web/components/search/SearchPageClient.tsx",
+      "source_location": "L8",
       "weight": 1.0,
       "source": "apps_web_components_search_searchpageclient",
       "target": "packages_shared_src_types_airport_airport",
@@ -35202,11 +35244,22 @@
       "context": "import",
       "confidence": "EXTRACTED",
       "source_file": "apps/web/components/search/SearchPageClient.tsx",
-      "source_location": "L7",
+      "source_location": "L8",
       "weight": 1.0,
       "source": "apps_web_components_search_searchpageclient",
       "target": "packages_shared_src_types_index",
       "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "apps/web/components/search/SearchPageClient.tsx",
+      "source_location": "L525",
+      "weight": 1.0,
+      "source": "apps_web_components_search_searchpageclient_searchpageclient",
+      "target": "apps_web_lib_utils_cn"
     },
     {
       "relation": "contains",
@@ -37925,7 +37978,7 @@
       "source_location": "L30",
       "weight": 1.0,
       "source": "context_progress_checker_progress_by_feature",
-      "target": "context_progress_checker_feature_agent_tool_calling_data_access",
+      "target": "context_progress_checker_x_feature_agent_tool_calling_data_access",
       "confidence_score": 1.0
     },
     {
@@ -37935,7 +37988,7 @@
       "source_location": "L53",
       "weight": 1.0,
       "source": "context_progress_checker_progress_by_feature",
-      "target": "context_progress_checker_feature_agent_tool_calling_data_access_53",
+      "target": "context_progress_checker_x_feature_agent_tool_calling_data_access_53",
       "confidence_score": 1.0
     },
     {
@@ -46475,5 +46528,5 @@
       "source_file": "specs/004-output-guardrails/data-model.md"
     }
   ],
-  "built_at_commit": "4199fe49330b89db164131e37bc958addfbb4231"
+  "built_at_commit": "4baddaea4889282be409a35a009de9a893428f51"
 }

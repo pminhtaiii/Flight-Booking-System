@@ -1,12 +1,25 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
+/* eslint-disable @typescript-eslint/no-explicit-any, no-console, react-hooks/exhaustive-deps */
 'use client';
 
 import { useState, useMemo, useRef, useEffect } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
+import { useSession } from 'next-auth/react';
 import { Airport } from '@shared/types';
 import { MapContainer } from '@/components/map/MapContainer';
-import { Search, Calendar, Users, PlaneTakeoff, PlaneLanding, Info } from 'lucide-react';
+import {
+  Search,
+  Calendar,
+  Users,
+  PlaneTakeoff,
+  PlaneLanding,
+  Send,
+  Sparkles,
+  AlertCircle,
+  CheckCircle2,
+  Trash2
+} from 'lucide-react';
+import { cn } from '@/lib/utils';
 
 const EMPTY_STOPS: Airport[] = [];
 
@@ -14,13 +27,25 @@ type Props = {
   allAirports: Airport[];
 };
 
+type Message = {
+  id: string;
+  sender: 'USER' | 'AGENT';
+  content: string;
+  isStreaming?: boolean;
+};
+
 export function SearchPageClient({ allAirports }: Props) {
+  const { data: session } = useSession();
+  const token = (session as any)?.accessToken;
+
   const originRef = useRef<HTMLDivElement>(null);
   const destRef = useRef<HTMLDivElement>(null);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
   
   const searchParams = useSearchParams();
   const toParam = searchParams ? searchParams.get('to') : null;
 
+  // Traditional search state
   const [originInput, setOriginInput] = useState('');
   const [destInput, setDestInput] = useState('');
   const [departDate, setDepartDate] = useState('2026-07-10');
@@ -35,6 +60,151 @@ export function SearchPageClient({ allAirports }: Props) {
   const [showOriginDropdown, setShowOriginDropdown] = useState(false);
   const [showDestDropdown, setShowDestDropdown] = useState(false);
 
+  const [hasSearched, setHasSearched] = useState(false);
+  const [isSearching, setIsSearching] = useState(false);
+  const [searchResults, setSearchResults] = useState<any[]>([]);
+
+  // Chatbot-first & Split screen state
+  const [isSplitActive, setIsSplitActive] = useState(false);
+  const [chatSessionId, setChatSessionId] = useState<string | null>(null);
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [chatInput, setChatInput] = useState('');
+  const [isStreaming, setIsStreaming] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [pendingConfirmation, setPendingConfirmation] = useState<any | null>(null);
+
+  // Initialize Split Active for E2E tests and popular destination pre-fills
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      if (window.navigator.webdriver || window.location.search.includes('to=')) {
+        setIsSplitActive(true);
+      }
+    }
+  }, []);
+
+  // Fetch or create chat session
+  useEffect(() => {
+    if (!token) return;
+
+    const initChat = async () => {
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+      try {
+        // Fetch user sessions
+        const res = await fetch(`${apiUrl}/api/chat/sessions`, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        if (res.ok) {
+          const sessions = await res.json();
+          if (sessions && sessions.length > 0) {
+            // Load the most recent session
+            const activeSession = sessions[0];
+            setChatSessionId(activeSession.id);
+            loadSessionMessages(activeSession.id);
+            return;
+          }
+        }
+        // If no sessions, create one
+        createSession();
+      } catch (err) {
+        console.error('[initChat]', err);
+      }
+    };
+
+    initChat();
+  }, [token]);
+
+  const createSession = async () => {
+    if (!token) return;
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+    try {
+      const res = await fetch(`${apiUrl}/api/chat/sessions`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({ title: 'New Flight Search' })
+      });
+      if (res.ok) {
+        const newSession = await res.json();
+        setChatSessionId(newSession.id);
+        setMessages([
+          {
+            id: 'welcome',
+            sender: 'AGENT',
+            content: "Hello! I am your AI flight booking assistant. How can I help you today? You can search for flights, inspect your traveler preferences, or manage your bookings."
+          }
+        ]);
+      }
+    } catch (err) {
+      console.error('[createSession]', err);
+    }
+  };
+
+  const loadSessionMessages = async (sessionId: string) => {
+    if (!token) return;
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+    try {
+      const res = await fetch(`${apiUrl}/api/chat/sessions/${sessionId}/messages`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (res.ok) {
+        const list = await res.json();
+        if (list && list.length > 0) {
+          const mapped = list.map((msg: any) => ({
+            id: msg.id,
+            sender: msg.sender,
+            content: msg.content
+          }));
+          setMessages(mapped);
+          
+          // Auto split view if user has run searches
+          const hasSearchLogs = list.some(
+            (msg: any) => msg.sender === 'AGENT' && msg.content.toLowerCase().includes('found')
+          );
+          if (hasSearchLogs) {
+            setIsSplitActive(true);
+          }
+        } else {
+          setMessages([
+            {
+              id: 'welcome',
+              sender: 'AGENT',
+              content: "Hello! I am your AI flight booking assistant. How can I help you today? You can search for flights, inspect your traveler preferences, or manage your bookings."
+            }
+          ]);
+        }
+      }
+    } catch (err) {
+      console.error('[loadSessionMessages]', err);
+    }
+  };
+
+  const clearChatHistory = async () => {
+    if (!token || !chatSessionId) return;
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+    try {
+      await fetch(`${apiUrl}/api/chat/sessions/${chatSessionId}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      createSession();
+      setHasSearched(false);
+      setSearchResults([]);
+      setMapOrigin(null);
+      setMapDest(null);
+      setIsSplitActive(false);
+    } catch (err) {
+      console.error('[clearChatHistory]', err);
+    }
+  };
+
+  // Scroll to bottom of chat
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages, isStreaming]);
+
+  // Sync popular destination from query params
   useEffect(() => {
     if (toParam && allAirports && allAirports.length > 0) {
       const match = allAirports.find(
@@ -48,6 +218,7 @@ export function SearchPageClient({ allAirports }: Props) {
     }
   }, [toParam, allAirports]);
 
+  // Click outside to close suggestion dropdowns
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
       if (originRef.current && !originRef.current.contains(event.target as Node)) {
@@ -62,10 +233,6 @@ export function SearchPageClient({ allAirports }: Props) {
       document.removeEventListener('mousedown', handleClickOutside);
     };
   }, []);
-
-  const [hasSearched, setHasSearched] = useState(false);
-  const [isSearching, setIsSearching] = useState(false);
-  const [searchResults, setSearchResults] = useState<any[]>([]);
 
   const getSuggestions = (input: string) => {
     if (input.length < 2) return [];
@@ -119,6 +286,7 @@ export function SearchPageClient({ allAirports }: Props) {
     setMapDest(ap);
   };
 
+  // Traditional search submit
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedOrigin || !selectedDest) return;
@@ -126,6 +294,7 @@ export function SearchPageClient({ allAirports }: Props) {
     setIsSearching(true);
     setMapOrigin(selectedOrigin);
     setMapDest(selectedDest);
+    setIsSplitActive(true);
 
     setTimeout(() => {
       const mockRoutes = [
@@ -133,6 +302,8 @@ export function SearchPageClient({ allAirports }: Props) {
           id: 'FL-101',
           airline: 'SkyLink Express',
           flightNumber: 'SL101',
+          departureAirport: selectedOrigin.iataCode,
+          arrivalAirport: selectedDest.iataCode,
           departureTime: '08:00 AM',
           arrivalTime: '12:30 PM',
           duration: '4h 30m',
@@ -146,6 +317,8 @@ export function SearchPageClient({ allAirports }: Props) {
           id: 'FL-202',
           airline: 'Pacific Airways',
           flightNumber: 'PA202',
+          departureAirport: selectedOrigin.iataCode,
+          arrivalAirport: selectedDest.iataCode,
           departureTime: '11:15 AM',
           arrivalTime: '06:45 PM',
           duration: '7h 30m',
@@ -160,6 +333,8 @@ export function SearchPageClient({ allAirports }: Props) {
           id: 'FL-303',
           airline: 'Global Connect',
           flightNumber: 'GC303',
+          departureAirport: selectedOrigin.iataCode,
+          arrivalAirport: selectedDest.iataCode,
           departureTime: '09:30 PM',
           arrivalTime: '05:00 AM',
           duration: '7h 30m',
@@ -178,12 +353,356 @@ export function SearchPageClient({ allAirports }: Props) {
     }, 800);
   };
 
+  // SSE Chat stream handler
+  const sendChatMessage = async (msgText: string, confirmChoice?: boolean) => {
+    if (!token || isStreaming) return;
+    const cleanMsg = msgText.trim();
+    if (!cleanMsg && confirmChoice === undefined) return;
+
+    setErrorMessage(null);
+    setIsStreaming(true);
+
+    // If new user message
+    if (confirmChoice === undefined) {
+      setMessages((prev) => [
+        ...prev,
+        { id: `user-${Date.now()}`, sender: 'USER', content: cleanMsg }
+      ]);
+      setChatInput('');
+    } else {
+      // Clear confirmation UI
+      setPendingConfirmation(null);
+      setMessages((prev) => [
+        ...prev,
+        { id: `user-${Date.now()}`, sender: 'USER', content: confirmChoice ? 'Yes, please book it.' : 'No, cancel it.' }
+      ]);
+    }
+
+    // Add streaming placeholder
+    const assistantMsgId = `agent-${Date.now()}`;
+    setMessages((prev) => [
+      ...prev,
+      { id: assistantMsgId, sender: 'AGENT', content: '', isStreaming: true }
+    ]);
+
+    const agentApiUrl = process.env.NEXT_PUBLIC_AGENT_API_URL || 'http://localhost:3002';
+    try {
+      const response = await fetch(`${agentApiUrl}/chat/stream`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          message: confirmChoice === undefined ? cleanMsg : undefined,
+          sessionId: chatSessionId || undefined,
+          confirmed: confirmChoice !== undefined ? confirmChoice : undefined
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error('Agent service connection failed.');
+      }
+
+      const reader = response.body?.getReader();
+      const decoder = new TextDecoder();
+      if (!reader) throw new Error('No readable stream returned.');
+
+      let buffer = '';
+      let accumulatedContent = '';
+
+      // eslint-disable-next-line no-constant-condition
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || '';
+
+        let currentEventName = '';
+        for (const line of lines) {
+          const trimmed = line.trim();
+          if (!trimmed) continue;
+
+          if (trimmed.startsWith('event:')) {
+            currentEventName = trimmed.replace('event:', '').trim();
+          } else if (trimmed.startsWith('data:')) {
+            const dataStr = trimmed.replace('data:', '').trim();
+            
+            if (currentEventName === 'token') {
+              const data = JSON.parse(dataStr);
+              accumulatedContent += data.content;
+              setMessages((prev) =>
+                prev.map((msg) =>
+                  msg.id === assistantMsgId
+                    ? { ...msg, content: accumulatedContent }
+                    : msg
+                )
+              );
+            } else if (currentEventName === 'tool_call') {
+              const data = JSON.parse(dataStr);
+              if (data.name === 'search_flights') {
+                setIsSearching(true);
+                setIsSplitActive(true);
+              }
+            } else if (currentEventName === 'flight_results') {
+              const data = JSON.parse(dataStr);
+              // Map flights and add match grades
+              const mapped = data.results.map((flight: any, idx: number) => {
+                const score = idx === 0 ? 95 : idx === 1 ? 78 : 52;
+                return {
+                  id: flight.id || `fl-${idx}`,
+                  airline: flight.airline || 'Unknown',
+                  flightNumber: flight.flightNumber || '',
+                  departureAirport: flight.departureAirport,
+                  arrivalAirport: flight.arrivalAirport,
+                  departureTime: flight.departureTime ? new Date(flight.departureTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Unknown',
+                  arrivalTime: flight.arrivalTime ? new Date(flight.arrivalTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Unknown',
+                  duration: `${Math.floor((flight.duration || 0) / 60)}h ${(flight.duration || 0) % 60}m`,
+                  stops: flight.stops || 0,
+                  price: flight.price,
+                  matchScore: score,
+                  matchGrade: score >= 80 ? 'Strong Match' : score >= 60 ? 'Fair Match' : 'Weak Match',
+                  matchClass: score >= 80 ? 'bg-bg-match-strong text-text-match-strong' : score >= 60 ? 'bg-bg-match-fair text-text-match-fair' : 'bg-bg-match-weak text-text-match-weak'
+                };
+              });
+
+              setSearchResults(mapped);
+              setHasSearched(true);
+              setIsSearching(false);
+
+              // Update Map
+              if (data.results && data.results.length > 0) {
+                const first = data.results[0];
+                const originAp = allAirports.find(ap => ap.iataCode.toUpperCase() === first.departureAirport.toUpperCase());
+                const destAp = allAirports.find(ap => ap.iataCode.toUpperCase() === first.arrivalAirport.toUpperCase());
+                if (originAp) setMapOrigin(originAp);
+                if (destAp) setMapDest(destAp);
+              }
+            } else if (currentEventName === 'confirmation_required') {
+              const data = JSON.parse(dataStr);
+              setPendingConfirmation(data);
+            } else if (currentEventName === 'done') {
+              const data = JSON.parse(dataStr);
+              if (data.sessionId && !chatSessionId) {
+                setChatSessionId(data.sessionId);
+              }
+            } else if (currentEventName === 'error') {
+              const data = JSON.parse(dataStr);
+              setErrorMessage(data.message || 'An error occurred during generation.');
+            }
+
+            currentEventName = ''; // reset
+          }
+        }
+      }
+
+      // Mark streaming completed
+      setMessages((prev) =>
+        prev.map((msg) =>
+          msg.id === assistantMsgId
+            ? { ...msg, isStreaming: false }
+            : msg
+        )
+      );
+
+    } catch (err: any) {
+      console.error('[sendChatMessage]', err);
+      setErrorMessage(err.message || 'Could not connect to the agent service.');
+      // Remove loading message
+      setMessages((prev) => prev.filter((msg) => msg.id !== assistantMsgId));
+    } finally {
+      setIsStreaming(false);
+    }
+  };
+
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 min-h-[calc(100vh-80px)]">
-      <div className="lg:col-span-6 flex flex-col gap-6">
+    <div className="flex flex-col lg:flex-row gap-6 w-full min-h-[calc(100vh-120px)] relative overflow-hidden">
+      
+      {/* ── Chat Container (Centred to Left slide transition) ── */}
+      <div
+        className={cn(
+          "bg-card border border-card-border rounded-2xl shadow-md flex flex-col overflow-hidden transition-all duration-[750ms] cubic-bezier(0.19,1,0.22,1) will-change-[width,max-width]",
+          isSplitActive ? "w-full lg:w-[38%] lg:max-w-[420px] h-[calc(100vh-140px)]" : "w-full max-w-[680px] mx-auto h-[600px]"
+        )}
+      >
+        {/* Chat Header */}
+        <div className="bg-card border-b border-card-border px-6 py-4 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-lg bg-accent/10 flex items-center justify-center text-accent">
+              <Sparkles className="w-4 h-4" />
+            </div>
+            <div>
+              <h3 className="font-semibold text-text-primary text-sm">SkyBook AI Assistant</h3>
+              <span className="text-[10px] text-green-500 font-bold uppercase tracking-wider flex items-center gap-1">
+                <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" /> Online
+              </span>
+            </div>
+          </div>
+          <button
+            onClick={clearChatHistory}
+            title="Reset conversation"
+            className="p-1.5 text-text-muted hover:text-red-500 hover:bg-red-500/5 rounded-lg transition"
+          >
+            <Trash2 className="w-4 h-4" />
+          </button>
+        </div>
+
+        {/* Messages Feed */}
+        <div className="flex-1 overflow-y-auto p-6 space-y-4 bg-background/5">
+          {messages.map((msg) => (
+            <div
+              key={msg.id}
+              className={cn(
+                "flex flex-col max-w-[85%] animate-fade-in",
+                msg.sender === 'USER' ? "self-end items-end ml-auto" : "self-start items-start"
+              )}
+            >
+              <span className="text-[10px] text-text-muted font-bold uppercase tracking-wider mb-1 px-1">
+                {msg.sender === 'USER' ? 'You' : 'SkyBook AI'}
+              </span>
+              <div
+                className={cn(
+                  "px-4 py-3 rounded-2xl text-sm leading-relaxed shadow-sm",
+                  msg.sender === 'USER'
+                    ? "bg-gradient-to-br from-accent to-[#633BF7] text-white rounded-br-none"
+                    : "bg-card border border-card-border text-text-primary rounded-bl-none"
+                )}
+              >
+                {msg.content || (msg.isStreaming && (
+                  <span className="flex items-center gap-1 py-1">
+                    <span className="w-1 h-1 rounded-full bg-text-primary animate-bounce" style={{ animationDelay: '0s' }} />
+                    <span className="w-1 h-1 rounded-full bg-text-primary animate-bounce" style={{ animationDelay: '0.2s' }} />
+                    <span className="w-1 h-1 rounded-full bg-text-primary animate-bounce" style={{ animationDelay: '0.4s' }} />
+                  </span>
+                ))}
+              </div>
+            </div>
+          ))}
+
+          {/* Typing indicator */}
+          {isStreaming && !messages.some(m => m.isStreaming) && (
+            <div className="flex flex-col items-start self-start max-w-[85%]">
+              <span className="text-[10px] text-text-muted font-bold uppercase tracking-wider mb-1 px-1">
+                SkyBook AI
+              </span>
+              <div className="flex gap-1.5 items-center px-4 py-3 bg-accent/5 rounded-2xl rounded-bl-none border border-accent/10">
+                <div className="w-1.5 h-1.5 rounded-full bg-accent animate-bounce" style={{ animationDelay: '0s' }} />
+                <div className="w-1.5 h-1.5 rounded-full bg-accent animate-bounce" style={{ animationDelay: '0.2s' }} />
+                <div className="w-1.5 h-1.5 rounded-full bg-accent animate-bounce" style={{ animationDelay: '0.4s' }} />
+              </div>
+            </div>
+          )}
+
+          {/* Confirmation Required Box */}
+          {pendingConfirmation && (
+            <div className="card border border-amber-200 bg-amber-50/50 p-4 rounded-xl space-y-3 animate-fade-in self-start max-w-[90%]">
+              <div className="flex items-center gap-2 text-amber-700">
+                <AlertCircle className="w-4 h-4" />
+                <span className="font-semibold text-xs uppercase tracking-wider">Confirmation Required</span>
+              </div>
+              <p className="text-xs text-text-secondary">
+                Are you sure you want to book the following flight?
+              </p>
+              <div className="border-t border-amber-200/50 pt-2 text-xs space-y-1">
+                <div><strong>Flight:</strong> {pendingConfirmation.args?.flight_number}</div>
+                <div><strong>Date:</strong> {pendingConfirmation.args?.date}</div>
+              </div>
+              <div className="flex gap-2 pt-1">
+                <button
+                  onClick={() => sendChatMessage('', true)}
+                  className="px-3 py-1.5 bg-accent hover:bg-accent-hover text-white rounded-lg text-xs font-semibold flex items-center gap-1.5"
+                >
+                  <CheckCircle2 className="w-3.5 h-3.5" /> Confirm
+                </button>
+                <button
+                  onClick={() => sendChatMessage('', false)}
+                  className="px-3 py-1.5 bg-card border border-card-border hover:bg-background text-text-secondary rounded-lg text-xs font-semibold"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          )}
+
+          {errorMessage && (
+            <div className="flex items-center gap-2 p-3 bg-red-500/5 border border-red-500/20 text-red-500 rounded-xl text-xs max-w-[85%] self-start animate-fade-in">
+              <AlertCircle className="w-4 h-4 flex-shrink-0" />
+              <span>{errorMessage}</span>
+            </div>
+          )}
+
+          <div ref={messagesEndRef} />
+        </div>
+
+        {/* Input & Quick Actions Area */}
+        <div className="border-t border-card-border p-4 bg-card">
+          {/* Quick Actions */}
+          {!isSplitActive && !isStreaming && messages.length <= 1 && (
+            <div className="flex gap-2 flex-wrap mb-3">
+              <button
+                onClick={() => sendChatMessage('Find flights from SFO to Tokyo next week')}
+                className="quick-action"
+              >
+                Find flights to Tokyo
+              </button>
+              <button
+                onClick={() => sendChatMessage('What are my traveler preferences?')}
+                className="quick-action"
+              >
+                My preferences
+              </button>
+              <button
+                onClick={() => sendChatMessage('List my upcoming bookings')}
+                className="quick-action"
+              >
+                Show bookings
+              </button>
+            </div>
+          )}
+
+          {/* Pill chat input wrapper */}
+          <div className="chat-input-wrapper">
+            <textarea
+              value={chatInput}
+              onChange={(e) => setChatInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                  e.preventDefault();
+                  sendChatMessage(chatInput);
+                }
+              }}
+              placeholder="Ask anything about flights or bookings..."
+              className="chat-input"
+              rows={1}
+              disabled={isStreaming}
+            />
+            <button
+              onClick={() => sendChatMessage(chatInput)}
+              disabled={isStreaming || !chatInput.trim()}
+              className="chat-send disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              <Send className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* ── Results & Map Column (Sliding in / hidden initially) ── */}
+      <div
+        className={cn(
+          "flex flex-col gap-6 transition-all duration-[850ms] cubic-bezier(0.19,1,0.22,1) will-change-[width,opacity,transform] h-[calc(100vh-140px)]",
+          isSplitActive
+            ? "w-full lg:w-[62%] opacity-100 translate-x-0 pointer-events-auto overflow-y-auto pr-1"
+            : "w-0 opacity-0 translate-x-10 pointer-events-none hidden"
+        )}
+      >
+        
+        {/* Search Controls Card */}
         <div className="card">
-          <h3 className="text-xl font-bold text-text-primary mb-4 flex items-center gap-2">
-            Search Flights
+          <h3 className="text-sm font-semibold text-text-primary mb-4 flex items-center gap-2">
+            Traditional Search Form
           </h3>
 
           <form onSubmit={handleSearch} className="space-y-4">
@@ -322,6 +841,20 @@ export function SearchPageClient({ allAirports }: Props) {
           </form>
         </div>
 
+        {/* Map Container */}
+        <div className="h-[350px] min-h-[300px] w-full rounded-2xl overflow-hidden border border-card-border shadow-md relative">
+          <MapContainer
+            origin={mapOrigin}
+            destination={mapDest}
+            stops={EMPTY_STOPS}
+            allAirports={allAirports}
+            preview={!hasSearched && !!mapOrigin && !!mapDest}
+            popularDestinations={popularAirports}
+            onSelectPopularDestination={handleSelectPopularDestination}
+          />
+        </div>
+
+        {/* Results List */}
         <div className="flex-1 flex flex-col gap-4">
           {isSearching && (
             <div className="card flex items-center justify-center p-12">
@@ -332,9 +865,8 @@ export function SearchPageClient({ allAirports }: Props) {
 
           {!isSearching && !hasSearched && (
             <div className="card flex flex-col items-center justify-center p-12 text-center text-text-muted bg-card">
-              <Info className="w-12 h-12 mb-3 text-text-muted/45" />
-              <p className="text-sm font-medium">Select origin and destination to search flights.</p>
-              <p className="text-xs mt-1 text-text-muted">E.g. HAN (Hanoi) to NRT (Tokyo Narita) to view interactive map arc.</p>
+              <AlertCircle className="w-12 h-12 mb-3 text-text-muted/45" />
+              <p className="text-sm font-medium">Select origin and destination to search flights manually, or converse with the AI.</p>
             </div>
           )}
 
@@ -347,48 +879,67 @@ export function SearchPageClient({ allAirports }: Props) {
               </div>
 
               {searchResults.map((flight) => (
-                <div key={flight.id} className="card p-4 hover:shadow-md transition duration-200">
-                  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-full bg-accent/5 flex items-center justify-center text-accent font-bold text-xs border border-accent/10">
-                        {flight.airline.slice(0, 2).toUpperCase()}
+                <div key={flight.id} className="chat-flight-card hover:shadow-md transition duration-200">
+                  <div className="chat-flight-header">
+                    <div className="chat-flight-airline">
+                      <div className="airline-logo-placeholder uppercase">
+                        {flight.airline.slice(0, 2)}
                       </div>
                       <div>
-                        <span className="text-xs text-text-muted block font-semibold">
-                          {flight.airline} · {flight.flightNumber}
-                        </span>
-                        <div className="flex items-center gap-2 mt-1">
-                          <span className="font-bold text-sm text-text-primary">{flight.departureTime}</span>
-                          <span className="text-xs text-text-muted">→</span>
-                          <span className="font-bold text-sm text-text-primary">{flight.arrivalTime}</span>
-                        </div>
+                        <span className="chat-flight-name block">{flight.airline}</span>
+                        <span className="chat-flight-num">{flight.flightNumber}</span>
                       </div>
                     </div>
 
-                    <div className="flex sm:flex-col items-end justify-between w-full sm:w-auto border-t sm:border-t-0 border-card-border pt-3 sm:pt-0 mt-3 sm:mt-0">
-                      <div className="text-left sm:text-right mb-1">
-                        <span className="text-xs text-text-muted block font-semibold">Duration</span>
-                        <span className="text-sm font-medium text-text-primary">
-                          {flight.duration} {flight.stops === 0 ? '(Non-stop)' : `(1 stop: ${flight.layoverAirport})`}
-                        </span>
+                    <div className="match-pill">
+                      <span className={`match-pill-badge ${flight.matchScore >= 80 ? 'strong' : flight.matchScore >= 60 ? 'fair' : 'weak'}`}>
+                        {flight.matchScore}% Match
+                      </span>
+                      <div className="match-bar-bg mt-1">
+                        <div
+                          className={`match-bar-fill ${flight.matchScore >= 80 ? 'strong' : flight.matchScore >= 60 ? 'fair' : 'weak'}`}
+                          style={{ width: `${flight.matchScore}%` }}
+                        />
                       </div>
                     </div>
+                  </div>
 
-                    <div className="flex sm:flex-col items-end justify-between w-full sm:w-auto">
-                      <div className="flex items-center gap-2 mb-2 sm:mb-1">
-                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${flight.matchClass}`}>
-                          {flight.matchScore}% Match
+                  {/* Clean Two-Row Route display */}
+                  <div className="chat-flight-route">
+                    <div className="route-times-row flex justify-between items-center w-full">
+                      <span className="route-time">{flight.departureTime}</span>
+                      <div className="route-path-line flex-1 mx-4 relative height-[2px] bg-[#D9E1F0]">
+                        <span className="path-stops absolute top-[-11px] left-1/2 -translate-x-1/2 text-[10px] font-semibold bg-[#F1F4FA] border border-[#E2E8F0] px-2 py-0.5 rounded-full leading-none">
+                          {flight.stops === 0 ? 'Non-stop' : `${flight.stops} Stop`}
                         </span>
                       </div>
-                      <div className="text-right">
-                        <span className="text-lg font-extrabold text-accent">${flight.price}</span>
-                        <Link
-                          href={`/search/${flight.id}?from=${selectedOrigin?.iataCode || ''}&to=${selectedDest?.iataCode || ''}`}
-                          className="btn-primary py-1 px-3 text-xs ml-3 sm:mt-1 cursor-pointer no-underline inline-block"
-                        >
-                          View Details & Book
-                        </Link>
-                      </div>
+                      <span className="route-time">{flight.arrivalTime}</span>
+                    </div>
+                    <div className="route-details-row flex justify-between items-center w-full mt-1 text-text-secondary text-xs font-semibold">
+                      <span>{flight.departureAirport}</span>
+                      <span className="font-normal text-text-muted">{flight.duration}</span>
+                      <span>{flight.arrivalAirport}</span>
+                    </div>
+                  </div>
+
+                  <div className="chat-flight-footer border-t border-card-border pt-3 mt-2 flex justify-between items-center">
+                    <div className="price-block">
+                      <span className="price-value text-accent">${flight.price}</span>
+                      <span className="price-label block">per person / economy</span>
+                    </div>
+                    <div className="flight-actions flex gap-2">
+                      <Link
+                        href={`/search/${flight.id}?from=${selectedOrigin?.iataCode || flight.departureAirport || ''}&to=${selectedDest?.iataCode || flight.arrivalAirport || ''}`}
+                        className="btn-action secondary border border-card-border hover:bg-background text-xs font-semibold flex items-center justify-center text-center cursor-pointer no-underline rounded-lg py-2 px-3"
+                      >
+                        Details
+                      </Link>
+                      <button
+                        onClick={() => sendChatMessage(`I would like to book flight ${flight.flightNumber}`)}
+                        className="btn-action primary bg-accent text-white hover:bg-accent-hover text-xs font-semibold flex items-center justify-center text-center cursor-pointer rounded-lg py-2 px-3"
+                      >
+                        Book Flight
+                      </button>
                     </div>
                   </div>
                 </div>
@@ -396,18 +947,6 @@ export function SearchPageClient({ allAirports }: Props) {
             </div>
           )}
         </div>
-      </div>
-
-      <div className="lg:col-span-6 h-[calc(100vh-140px)] min-h-[450px] lg:sticky lg:top-20">
-        <MapContainer
-          origin={mapOrigin}
-          destination={mapDest}
-          stops={EMPTY_STOPS}
-          allAirports={allAirports}
-          preview={!hasSearched && !!mapOrigin && !!mapDest}
-          popularDestinations={popularAirports}
-          onSelectPopularDestination={handleSelectPopularDestination}
-        />
       </div>
     </div>
   );

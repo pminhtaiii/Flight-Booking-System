@@ -10,6 +10,8 @@ AIRLINE_MAP = {
     "SQ": "Singapore Airlines",
 }
 
+FLIGHTS_CACHE = {}
+
 @tool("search_flights")
 async def search_flights(
     origin: str,
@@ -37,6 +39,11 @@ async def search_flights(
     results = data.get("results", [])
     # Limit results to top 5
     results = results[:5]
+
+    if config:
+        thread_id = config.get("configurable", {}).get("thread_id")
+        if thread_id:
+            FLIGHTS_CACHE[thread_id] = results
 
     if not results:
         return f"Found 0 flights from {origin} to {destination} on {date}."
