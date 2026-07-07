@@ -5,9 +5,9 @@
     "semantic_hash": "eca9ca4846c7081eceff8ee5eeb66c4e"
   },
   "apps/agent/package.json": {
-    "mtime": 1782792214.5527904,
-    "ast_hash": "707541a2a8f86c7ede843e1cb138044b",
-    "semantic_hash": "707541a2a8f86c7ede843e1cb138044b"
+    "mtime": 1783350388.2286303,
+    "ast_hash": "9f5be78c3acf2b08a5070b7a1702af4b",
+    "semantic_hash": ""
   },
   "apps/agent/pyproject.toml": {
     "mtime": 1782902645.9828677,
@@ -65,14 +65,14 @@
     "semantic_hash": ""
   },
   "apps/agent/src/agent/guardrails/nemo.py": {
-    "mtime": 1783302256.3977125,
-    "ast_hash": "e8e8c612f097256eef1246360fa745aa",
+    "mtime": 1783349673.7616086,
+    "ast_hash": "da1d47897672b9b7f911b7f0808c0a74",
     "semantic_hash": ""
   },
   "apps/agent/src/agent/main.py": {
-    "mtime": 1782902645.9935172,
-    "ast_hash": "1bba392f7aef558a0dedeca4ed08612f",
-    "semantic_hash": "1bba392f7aef558a0dedeca4ed08612f"
+    "mtime": 1783347274.5199492,
+    "ast_hash": "650f3b23067cfb5b6b4b1162c95ee171",
+    "semantic_hash": ""
   },
   "apps/agent/src/agent/memory/__init__.py": {
     "mtime": 1782902645.9963088,
@@ -90,14 +90,14 @@
     "semantic_hash": "08a7996988a924e5b68e17440950c923"
   },
   "apps/agent/src/agent/middleware/auth.py": {
-    "mtime": 1782745097.4384296,
-    "ast_hash": "722fe042862f12f07787a7c3bb2fcb5e",
-    "semantic_hash": "722fe042862f12f07787a7c3bb2fcb5e"
+    "mtime": 1783351128.947127,
+    "ast_hash": "e661464b969f85b59eb854321288d62f",
+    "semantic_hash": ""
   },
   "apps/agent/src/agent/middleware/rate_limit.py": {
-    "mtime": 1782745097.4414206,
-    "ast_hash": "847482e6ebcb62e8ecf59b055bb8f4f3",
-    "semantic_hash": "847482e6ebcb62e8ecf59b055bb8f4f3"
+    "mtime": 1783351131.9477773,
+    "ast_hash": "892cc02008bf6a9fa1c49be38878d152",
+    "semantic_hash": ""
   },
   "apps/agent/src/agent/models/__init__.py": {
     "mtime": 1782902646.0018477,
@@ -710,8 +710,8 @@
     "semantic_hash": "3a89cf70d9efdf2106c64e1684391665"
   },
   "AGENTS.md": {
-    "mtime": 1783302256.3771796,
-    "ast_hash": "0e75a535890b8ab6e0bde06356cc4618",
+    "mtime": 1783330364.0627685,
+    "ast_hash": "c01d80e1e2aec0c15f02d6b441b55f5a",
     "semantic_hash": ""
   },
   "PROJECT.md": {
@@ -750,8 +750,8 @@
     "semantic_hash": "13d24df073aeafdf3c5c1bc2507eb893"
   },
   "context/progress-checker.md": {
-    "mtime": 1783311572.1791036,
-    "ast_hash": "46072dace540f56a0f3ef659ab9db972",
+    "mtime": 1783350422.7296174,
+    "ast_hash": "8db030b1293926fd1b4f8cc857b519aa",
     "semantic_hash": ""
   },
   "context/project-overview.md": {
@@ -1220,8 +1220,8 @@
     "semantic_hash": ""
   },
   "apps/web/components/search/SearchPageClient.tsx": {
-    "mtime": 1783311567.094643,
-    "ast_hash": "6126523b0454e5147d58fad1b6200a2a",
+    "mtime": 1783340890.8180864,
+    "ast_hash": "63d22ee988cbb059bca861b92ea30c9f",
     "semantic_hash": ""
   },
   "apps/web/lib/airport-service.ts": {
@@ -1252,6 +1252,11 @@
   "apps/web/tests/map.spec.ts": {
     "mtime": 1783302256.624538,
     "ast_hash": "177f319d56a38a28ee5e811e028c9566",
+    "semantic_hash": ""
+  },
+  "apps/agent/src/agent/test_llm_connection.py": {
+    "mtime": 1783350806.780311,
+    "ast_hash": "904c774b2659e56c229bfe5472d0b758",
     "semantic_hash": ""
   }
 }

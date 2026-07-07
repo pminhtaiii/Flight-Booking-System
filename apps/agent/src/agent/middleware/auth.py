@@ -11,6 +11,9 @@ class JWTAuthMiddleware(BaseHTTPMiddleware):
         self.exclude_paths = exclude_paths or []
 
     async def dispatch(self, request: Request, call_next) -> Response:
+        if request.method == "OPTIONS":
+            return await call_next(request)
+
         path = request.url.path
         if any(
             path == normalized or path.startswith(f"{normalized}/")

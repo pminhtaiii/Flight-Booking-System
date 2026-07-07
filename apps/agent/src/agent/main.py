@@ -80,7 +80,12 @@ async def health_check(request: Request):
     start_time = time.time()
     try:
         async with httpx.AsyncClient() as client:
-            response = await client.get(f"{settings.NESTJS_API_URL}/health", timeout=2.0)
+            base_url = settings.NESTJS_API_URL
+            if base_url.endswith("/api"):
+                base_url = base_url[:-4]
+            elif base_url.endswith("/api/"):
+                base_url = base_url[:-5]
+            response = await client.get(f"{base_url.rstrip('/')}/health", timeout=2.0)
             if response.status_code != 200:
                 nestjs_status = "down"
     except Exception:

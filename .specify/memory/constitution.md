@@ -53,7 +53,7 @@ scope creep and reduces integration risk.
 AI agents (LLM-powered) MUST NEVER participate in the critical
 booking/payment path. The boundary is defined as follows:
 
-- **Deterministic services only**: flight search & pricing (Amadeus API),
+- **Deterministic services only**: flight search & pricing (Duffel API),
   PNR creation, payment processing, ticket issuance, refund handling,
   user authentication, and notification delivery.
 - **AI agents (advisory role only)**: smart search assistance, result
@@ -70,8 +70,9 @@ PCI-DSS and payment regulations require strict, traceable flows.
 
 ### III. API Budget Discipline
 
-The Amadeus Self-Service API free tier grants **2,000 calls/month**. This
-hard constraint imposes the following non-negotiable rules:
+The Duffel API operates on a pay-as-you-go model with a 1500:1 search-to-book
+ratio and rate limits of 120 requests per 60 seconds. This constraint
+imposes the following non-negotiable rules:
 
 - Every external API call MUST be justified with a clear user-facing purpose.
 - Response caching MUST be implemented for search results (TTL-based).
@@ -80,8 +81,9 @@ hard constraint imposes the following non-negotiable rules:
 - Batch and deduplication strategies MUST be used where the API supports them.
 - API usage MUST be monitored with alerts at 50%, 75%, and 90% thresholds.
 
-**Rationale**: Exceeding the free tier silently breaks the product for all
-users. Budget discipline is an architectural constraint, not an optimization.
+**Rationale**: Unmanaged API usage silently drives up costs and can trigger
+rate limiting for all users. Budget discipline is an architectural constraint,
+not an optimization.
 
 ### IV. Observability & Operational Visibility
 
@@ -104,7 +106,7 @@ changes or redeployment. The following are non-negotiable:
   - Cache hit/miss ratios for search results.
 - **Distributed Tracing**: All cross-service and cross-boundary calls MUST
   propagate a `trace_id` to enable end-to-end request tracing. This
-  includes calls to the Amadeus API and payment processor.
+  includes calls to the Duffel API and payment processor.
 - **Alerting**: Alerts MUST be defined for:
   - Error rate exceeding baseline by 2× over a 5-minute window.
   - Latency p95 exceeding SLO for any critical endpoint.
