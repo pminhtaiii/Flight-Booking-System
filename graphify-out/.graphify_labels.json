@@ -260,5 +260,15 @@
   "258": "package.json",
   "259": "amadeus.types.ts",
   "260": "index.ts",
-  "262": "page.tsx"
+  "261": "MessageQueueManager",
+  "262": "page.tsx",
+  "263": "GET /api/flights/:id",
+  "264": "NestJSClient",
+  "265": "Data Model: Duffel Flight Search Service",
+  "266": "Research: Duffel Flight Search Service",
+  "267": "NemoGuardrailService",
+  "268": "JWTAuthMiddleware",
+  "269": "RateLimitMiddleware",
+  "270": "test_output_guardrail_nemo.py",
+  "271": ".aclose"
 }

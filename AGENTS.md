@@ -81,9 +81,9 @@ To run the full stack locally (Next.js frontend, NestJS backend, and Python agen
    - `AGENT_SERVICE_API_KEY` (Gateway protection)
    - `CLAIM_TOKEN_SECRET` (Agent user claim verification)
 4. **Execution**: Start the development servers:
-   - **Full Stack (Concurrently)**: `pnpm dev`
+   - **Full Stack (Frontend & Backend concurrently)**: `pnpm dev`
    - **Next.js Frontend only (Port 3000)**: `pnpm --filter @web/frontend dev`
-   - **NestJS Backend only (Port 3001)**: `pnpm --filter @api/backend start:dev`
+   - **NestJS Backend only (Port 3001)**: `pnpm --filter @api/backend dev`
    - **Python Agent only (Port 3002)**: `uv run uvicorn agent.main:app --port 3002 --app-dir src` inside `apps/agent/`
 
 ### GitHub MCP & CodeRabbit Integration

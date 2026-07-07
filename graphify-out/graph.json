@@ -410,7 +410,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "apps_agent_src_agent_config",
-      "community": 167,
+      "community": 0,
       "norm_label": "config.py"
     },
     {
@@ -420,7 +420,7 @@
       "source_location": "L10",
       "_origin": "ast",
       "id": "apps_agent_src_agent_config_outputguardrailconfig",
-      "community": 159,
+      "community": 0,
       "norm_label": "outputguardrailconfig"
     },
     {
@@ -460,7 +460,7 @@
       "source_location": "L43",
       "_origin": "ast",
       "id": "apps_agent_src_agent_config_settings_output_guardrail",
-      "community": 159,
+      "community": 0,
       "norm_label": ".output_guardrail()"
     },
     {
@@ -470,7 +470,7 @@
       "source_location": "L59",
       "_origin": "ast",
       "id": "apps_agent_src_agent_config_get_settings",
-      "community": 167,
+      "community": 126,
       "norm_label": "get_settings()"
     },
     {
@@ -770,67 +770,77 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "apps_agent_src_agent_guardrails_nemo",
-      "community": 30,
+      "community": 267,
       "norm_label": "nemo.py"
     },
     {
       "label": "NemoGuardrailService",
       "file_type": "code",
       "source_file": "apps/agent/src/agent/guardrails/nemo.py",
-      "source_location": "L19",
+      "source_location": "L20",
       "_origin": "ast",
       "id": "apps_agent_src_agent_guardrails_nemo_nemoguardrailservice",
-      "community": 30,
+      "community": 267,
       "norm_label": "nemoguardrailservice"
     },
     {
       "label": ".__init__()",
       "file_type": "code",
       "source_file": "apps/agent/src/agent/guardrails/nemo.py",
-      "source_location": "L20",
+      "source_location": "L21",
       "_origin": "ast",
       "id": "apps_agent_src_agent_guardrails_nemo_nemoguardrailservice_init",
-      "community": 30,
+      "community": 267,
       "norm_label": ".__init__()"
+    },
+    {
+      "label": "._clean_verdict()",
+      "file_type": "code",
+      "source_file": "apps/agent/src/agent/guardrails/nemo.py",
+      "source_location": "L36",
+      "_origin": "ast",
+      "id": "apps_agent_src_agent_guardrails_nemo_nemoguardrailservice_clean_verdict",
+      "community": 267,
+      "norm_label": "._clean_verdict()"
     },
     {
       "label": ".probe()",
       "file_type": "code",
       "source_file": "apps/agent/src/agent/guardrails/nemo.py",
-      "source_location": "L32",
+      "source_location": "L45",
       "_origin": "ast",
       "id": "apps_agent_src_agent_guardrails_nemo_nemoguardrailservice_probe",
-      "community": 30,
+      "community": 267,
       "norm_label": ".probe()"
     },
     {
       "label": ".validate_message()",
       "file_type": "code",
       "source_file": "apps/agent/src/agent/guardrails/nemo.py",
-      "source_location": "L79",
+      "source_location": "L93",
       "_origin": "ast",
       "id": "apps_agent_src_agent_guardrails_nemo_nemoguardrailservice_validate_message",
-      "community": 30,
+      "community": 267,
       "norm_label": ".validate_message()"
     },
     {
       "label": ".validate_output_chunk()",
       "file_type": "code",
       "source_file": "apps/agent/src/agent/guardrails/nemo.py",
-      "source_location": "L178",
+      "source_location": "L193",
       "_origin": "ast",
       "id": "apps_agent_src_agent_guardrails_nemo_nemoguardrailservice_validate_output_chunk",
-      "community": 30,
+      "community": 267,
       "norm_label": ".validate_output_chunk()"
     },
     {
       "label": ".is_healthy()",
       "file_type": "code",
       "source_file": "apps/agent/src/agent/guardrails/nemo.py",
-      "source_location": "L280",
+      "source_location": "L295",
       "_origin": "ast",
       "id": "apps_agent_src_agent_guardrails_nemo_nemoguardrailservice_is_healthy",
-      "community": 30,
+      "community": 267,
       "norm_label": ".is_healthy()"
     },
     {
@@ -860,7 +870,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "exception",
-      "community": 148,
+      "community": 10,
       "norm_label": "exception"
     },
     {
@@ -900,7 +910,7 @@
       "source_location": "L41",
       "_origin": "ast",
       "id": "apps_agent_src_agent_guardrails_output_pipeline_outputguardrailpipeline_log_sync_check",
-      "community": 172,
+      "community": 154,
       "norm_label": "._log_sync_check()"
     },
     {
@@ -910,7 +920,7 @@
       "source_location": "L52",
       "_origin": "ast",
       "id": "apps_agent_src_agent_guardrails_output_pipeline_outputguardrailpipeline_validate_chunk_async_wrapper",
-      "community": 172,
+      "community": 154,
       "norm_label": "._validate_chunk_async_wrapper()"
     },
     {
@@ -920,7 +930,7 @@
       "source_location": "L75",
       "_origin": "ast",
       "id": "apps_agent_src_agent_guardrails_output_pipeline_outputguardrailpipeline_check_boundary_pii",
-      "community": 172,
+      "community": 154,
       "norm_label": "._check_boundary_pii()"
     },
     {
@@ -930,7 +940,7 @@
       "source_location": "L119",
       "_origin": "ast",
       "id": "apps_agent_src_agent_guardrails_output_pipeline_outputguardrailpipeline_process_token",
-      "community": 172,
+      "community": 154,
       "norm_label": ".process_token()"
     },
     {
@@ -940,7 +950,7 @@
       "source_location": "L239",
       "_origin": "ast",
       "id": "apps_agent_src_agent_guardrails_output_pipeline_outputguardrailpipeline_flush",
-      "community": 172,
+      "community": 154,
       "norm_label": ".flush()"
     },
     {
@@ -950,7 +960,7 @@
       "source_location": "L378",
       "_origin": "ast",
       "id": "apps_agent_src_agent_guardrails_output_pipeline_outputguardrailpipeline_aclose",
-      "community": 154,
+      "community": 271,
       "norm_label": ".aclose()"
     },
     {
@@ -980,7 +990,7 @@
       "source_location": "L76",
       "_origin": "ast",
       "id": "apps_agent_src_agent_guardrails_output_pipeline_rationale_76",
-      "community": 172,
+      "community": 154,
       "norm_label": "maintains a sliding window of the last n tokens from the previous chunk"
     },
     {
@@ -990,7 +1000,7 @@
       "source_location": "L120",
       "_origin": "ast",
       "id": "apps_agent_src_agent_guardrails_output_pipeline_rationale_120",
-      "community": 172,
+      "community": 154,
       "norm_label": "feeds a token into the pipeline, yielding any safe completed chunks."
     },
     {
@@ -1000,7 +1010,7 @@
       "source_location": "L240",
       "_origin": "ast",
       "id": "apps_agent_src_agent_guardrails_output_pipeline_rationale_240",
-      "community": 172,
+      "community": 154,
       "norm_label": "flushes the remaining buffered tokens and validates the final chunk."
     },
     {
@@ -1010,7 +1020,7 @@
       "source_location": "L379",
       "_origin": "ast",
       "id": "apps_agent_src_agent_guardrails_output_pipeline_rationale_379",
-      "community": 154,
+      "community": 271,
       "norm_label": "cancels and cleans up any background validation tasks."
     },
     {
@@ -1020,7 +1030,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "apps_agent_src_agent_main",
-      "community": 167,
+      "community": 10,
       "norm_label": "main.py"
     },
     {
@@ -1030,7 +1040,7 @@
       "source_location": "L20",
       "_origin": "ast",
       "id": "apps_agent_src_agent_main_lifespan",
-      "community": 17,
+      "community": 173,
       "norm_label": "lifespan()"
     },
     {
@@ -1040,7 +1050,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "fastapi",
-      "community": 17,
+      "community": 173,
       "norm_label": "fastapi"
     },
     {
@@ -1050,7 +1060,7 @@
       "source_location": "L74",
       "_origin": "ast",
       "id": "apps_agent_src_agent_main_health_check",
-      "community": 167,
+      "community": 10,
       "norm_label": "health_check()"
     },
     {
@@ -1060,7 +1070,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "apps_agent_src_agent_main_py_request",
-      "community": 167,
+      "community": 10,
       "norm_label": "request"
     },
     {
@@ -1070,7 +1080,7 @@
       "source_location": "L21",
       "_origin": "ast",
       "id": "apps_agent_src_agent_main_rationale_21",
-      "community": 17,
+      "community": 173,
       "norm_label": "lifespan context manager that initializes nemo guardrails configuration,     me"
     },
     {
@@ -1080,7 +1090,7 @@
       "source_location": "L75",
       "_origin": "ast",
       "id": "apps_agent_src_agent_main_rationale_75",
-      "community": 167,
+      "community": 10,
       "norm_label": "perform a health check verification by checking nestjs and nemo guardrails statu"
     },
     {
@@ -1240,7 +1250,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "apps_agent_src_agent_middleware_auth",
-      "community": 17,
+      "community": 268,
       "norm_label": "auth.py"
     },
     {
@@ -1250,7 +1260,7 @@
       "source_location": "L7",
       "_origin": "ast",
       "id": "apps_agent_src_agent_middleware_auth_jwtauthmiddleware",
-      "community": 17,
+      "community": 268,
       "norm_label": "jwtauthmiddleware"
     },
     {
@@ -1260,7 +1270,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "basehttpmiddleware",
-      "community": 17,
+      "community": 268,
       "norm_label": "basehttpmiddleware"
     },
     {
@@ -1270,7 +1280,7 @@
       "source_location": "L8",
       "_origin": "ast",
       "id": "apps_agent_src_agent_middleware_auth_jwtauthmiddleware_init",
-      "community": 17,
+      "community": 268,
       "norm_label": ".__init__()"
     },
     {
@@ -1280,7 +1290,7 @@
       "source_location": "L13",
       "_origin": "ast",
       "id": "apps_agent_src_agent_middleware_auth_jwtauthmiddleware_dispatch",
-      "community": 17,
+      "community": 268,
       "norm_label": ".dispatch()"
     },
     {
@@ -1290,7 +1300,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "apps_agent_src_agent_middleware_auth_py_request",
-      "community": 17,
+      "community": 268,
       "norm_label": "request"
     },
     {
@@ -1300,7 +1310,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "apps_agent_src_agent_middleware_auth_py_response",
-      "community": 17,
+      "community": 268,
       "norm_label": "response"
     },
     {
@@ -1310,7 +1320,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "apps_agent_src_agent_middleware_rate_limit",
-      "community": 17,
+      "community": 269,
       "norm_label": "rate_limit.py"
     },
     {
@@ -1320,7 +1330,7 @@
       "source_location": "L8",
       "_origin": "ast",
       "id": "apps_agent_src_agent_middleware_rate_limit_ratelimitmiddleware",
-      "community": 17,
+      "community": 269,
       "norm_label": "ratelimitmiddleware"
     },
     {
@@ -1330,7 +1340,7 @@
       "source_location": "L9",
       "_origin": "ast",
       "id": "apps_agent_src_agent_middleware_rate_limit_ratelimitmiddleware_init",
-      "community": 17,
+      "community": 269,
       "norm_label": ".__init__()"
     },
     {
@@ -1340,7 +1350,7 @@
       "source_location": "L15",
       "_origin": "ast",
       "id": "apps_agent_src_agent_middleware_rate_limit_ratelimitmiddleware_dispatch",
-      "community": 17,
+      "community": 269,
       "norm_label": ".dispatch()"
     },
     {
@@ -1350,7 +1360,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "apps_agent_src_agent_middleware_rate_limit_py_request",
-      "community": 17,
+      "community": 269,
       "norm_label": "request"
     },
     {
@@ -1360,7 +1370,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "apps_agent_src_agent_middleware_rate_limit_py_response",
-      "community": 17,
+      "community": 269,
       "norm_label": "response"
     },
     {
@@ -1430,7 +1440,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "apps_agent_src_agent_queue_message_queue",
-      "community": 17,
+      "community": 173,
       "norm_label": "message_queue.py"
     },
     {
@@ -1440,7 +1450,7 @@
       "source_location": "L7",
       "_origin": "ast",
       "id": "apps_agent_src_agent_queue_message_queue_messagequeuemanager",
-      "community": 17,
+      "community": 261,
       "norm_label": "messagequeuemanager"
     },
     {
@@ -1450,7 +1460,7 @@
       "source_location": "L12",
       "_origin": "ast",
       "id": "apps_agent_src_agent_queue_message_queue_messagequeuemanager_init",
-      "community": 17,
+      "community": 261,
       "norm_label": ".__init__()"
     },
     {
@@ -1460,7 +1470,7 @@
       "source_location": "L18",
       "_origin": "ast",
       "id": "apps_agent_src_agent_queue_message_queue_messagequeuemanager_acquire",
-      "community": 17,
+      "community": 261,
       "norm_label": ".acquire()"
     },
     {
@@ -1470,7 +1480,7 @@
       "source_location": "L51",
       "_origin": "ast",
       "id": "apps_agent_src_agent_queue_message_queue_messagequeuemanager_release",
-      "community": 17,
+      "community": 261,
       "norm_label": ".release()"
     },
     {
@@ -1480,7 +1490,7 @@
       "source_location": "L8",
       "_origin": "ast",
       "id": "apps_agent_src_agent_queue_message_queue_rationale_8",
-      "community": 17,
+      "community": 261,
       "norm_label": "manages per-session locks and request depths to queue concurrent requests"
     },
     {
@@ -1490,7 +1500,7 @@
       "source_location": "L19",
       "_origin": "ast",
       "id": "apps_agent_src_agent_queue_message_queue_rationale_19",
-      "community": 17,
+      "community": 261,
       "norm_label": "increment the depth for a session_id. if the depth is already at or above"
     },
     {
@@ -1500,7 +1510,7 @@
       "source_location": "L52",
       "_origin": "ast",
       "id": "apps_agent_src_agent_queue_message_queue_rationale_52",
-      "community": 17,
+      "community": 261,
       "norm_label": "release the lock for session_id and decrement the depth."
     },
     {
@@ -1750,7 +1760,7 @@
       "source_location": "L50",
       "_origin": "ast",
       "id": "apps_agent_src_agent_streaming_sse_chat_stream",
-      "community": 173,
+      "community": 159,
       "norm_label": "chat_stream()"
     },
     {
@@ -1760,7 +1770,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "apps_agent_src_agent_streaming_sse_py_request",
-      "community": 173,
+      "community": 159,
       "norm_label": "request"
     },
     {
@@ -1790,7 +1800,7 @@
       "source_location": "L55",
       "_origin": "ast",
       "id": "apps_agent_src_agent_streaming_sse_rationale_55",
-      "community": 173,
+      "community": 159,
       "norm_label": "handle post /chat/stream requests, performing validation, checking guardrails,"
     },
     {
@@ -1960,7 +1970,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "apps_agent_src_agent_tools_nestjs_client",
-      "community": 167,
+      "community": 0,
       "norm_label": "nestjs_client.py"
     },
     {
@@ -1970,7 +1980,7 @@
       "source_location": "L8",
       "_origin": "ast",
       "id": "apps_agent_src_agent_tools_nestjs_client_nestjsclient",
-      "community": 126,
+      "community": 264,
       "norm_label": "nestjsclient"
     },
     {
@@ -1980,7 +1990,7 @@
       "source_location": "L9",
       "_origin": "ast",
       "id": "apps_agent_src_agent_tools_nestjs_client_nestjsclient_init",
-      "community": 126,
+      "community": 264,
       "norm_label": ".__init__()"
     },
     {
@@ -1990,7 +2000,7 @@
       "source_location": "L15",
       "_origin": "ast",
       "id": "apps_agent_src_agent_tools_nestjs_client_nestjsclient_create_session",
-      "community": 126,
+      "community": 264,
       "norm_label": ".create_session()"
     },
     {
@@ -2000,7 +2010,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "apps_agent_src_agent_tools_nestjs_client_py_any",
-      "community": 126,
+      "community": 264,
       "norm_label": "any"
     },
     {
@@ -2010,7 +2020,7 @@
       "source_location": "L23",
       "_origin": "ast",
       "id": "apps_agent_src_agent_tools_nestjs_client_nestjsclient_create_message",
-      "community": 126,
+      "community": 264,
       "norm_label": ".create_message()"
     },
     {
@@ -2020,7 +2030,7 @@
       "source_location": "L41",
       "_origin": "ast",
       "id": "apps_agent_src_agent_tools_nestjs_client_nestjsclient_create_message_batch",
-      "community": 126,
+      "community": 264,
       "norm_label": ".create_message_batch()"
     },
     {
@@ -2030,7 +2040,7 @@
       "source_location": "L53",
       "_origin": "ast",
       "id": "apps_agent_src_agent_tools_nestjs_client_nestjsclient_get_memory",
-      "community": 126,
+      "community": 264,
       "norm_label": ".get_memory()"
     },
     {
@@ -2040,7 +2050,7 @@
       "source_location": "L63",
       "_origin": "ast",
       "id": "apps_agent_src_agent_tools_nestjs_client_nestjsclient_get_gateway_headers",
-      "community": 126,
+      "community": 264,
       "norm_label": "._get_gateway_headers()"
     },
     {
@@ -2050,7 +2060,7 @@
       "source_location": "L80",
       "_origin": "ast",
       "id": "apps_agent_src_agent_tools_nestjs_client_nestjsclient_get_gateway_flights_search",
-      "community": 126,
+      "community": 264,
       "norm_label": ".get_gateway_flights_search()"
     },
     {
@@ -2060,7 +2070,7 @@
       "source_location": "L94",
       "_origin": "ast",
       "id": "apps_agent_src_agent_tools_nestjs_client_nestjsclient_get_gateway_user_preferences",
-      "community": 126,
+      "community": 264,
       "norm_label": ".get_gateway_user_preferences()"
     },
     {
@@ -2070,7 +2080,7 @@
       "source_location": "L102",
       "_origin": "ast",
       "id": "apps_agent_src_agent_tools_nestjs_client_nestjsclient_get_gateway_user_bookings",
-      "community": 126,
+      "community": 264,
       "norm_label": ".get_gateway_user_bookings()"
     },
     {
@@ -2390,7 +2400,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "apps_agent_tests_test_benchmark_output_pipeline",
-      "community": 159,
+      "community": 0,
       "norm_label": "test_benchmark_output_pipeline.py"
     },
     {
@@ -2400,7 +2410,7 @@
       "source_location": "L9",
       "_origin": "ast",
       "id": "apps_agent_tests_test_benchmark_output_pipeline_mock_nemo_service",
-      "community": 159,
+      "community": 0,
       "norm_label": "mock_nemo_service()"
     },
     {
@@ -2410,7 +2420,7 @@
       "source_location": "L15",
       "_origin": "ast",
       "id": "apps_agent_tests_test_benchmark_output_pipeline_enabled_config",
-      "community": 159,
+      "community": 0,
       "norm_label": "enabled_config()"
     },
     {
@@ -2420,7 +2430,7 @@
       "source_location": "L24",
       "_origin": "ast",
       "id": "apps_agent_tests_test_benchmark_output_pipeline_test_benchmark_output_pipeline_latency",
-      "community": 159,
+      "community": 0,
       "norm_label": "test_benchmark_output_pipeline_latency()"
     },
     {
@@ -2580,7 +2590,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "apps_agent_tests_test_e2e_output_guardrails",
-      "community": 167,
+      "community": 10,
       "norm_label": "test_e2e_output_guardrails.py"
     },
     {
@@ -2590,7 +2600,7 @@
       "source_location": "L12",
       "_origin": "ast",
       "id": "apps_agent_tests_test_e2e_output_guardrails_mock_nestjs_client",
-      "community": 167,
+      "community": 10,
       "norm_label": "mock_nestjs_client()"
     },
     {
@@ -2600,7 +2610,7 @@
       "source_location": "L24",
       "_origin": "ast",
       "id": "apps_agent_tests_test_e2e_output_guardrails_test_e2e_output_guardrail_pipeline_validation",
-      "community": 167,
+      "community": 10,
       "norm_label": "test_e2e_output_guardrail_pipeline_validation()"
     },
     {
@@ -2840,7 +2850,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "apps_agent_tests_test_hard_stop",
-      "community": 167,
+      "community": 10,
       "norm_label": "test_hard_stop.py"
     },
     {
@@ -2850,7 +2860,7 @@
       "source_location": "L11",
       "_origin": "ast",
       "id": "apps_agent_tests_test_hard_stop_mock_nestjs_client",
-      "community": 167,
+      "community": 10,
       "norm_label": "mock_nestjs_client()"
     },
     {
@@ -2860,7 +2870,7 @@
       "source_location": "L23",
       "_origin": "ast",
       "id": "apps_agent_tests_test_hard_stop_test_first_chunk_unsafe",
-      "community": 167,
+      "community": 10,
       "norm_label": "test_first_chunk_unsafe()"
     },
     {
@@ -2870,7 +2880,7 @@
       "source_location": "L90",
       "_origin": "ast",
       "id": "apps_agent_tests_test_hard_stop_test_mid_stream_chunk_unsafe",
-      "community": 167,
+      "community": 10,
       "norm_label": "test_mid_stream_chunk_unsafe()"
     },
     {
@@ -2880,7 +2890,7 @@
       "source_location": "L168",
       "_origin": "ast",
       "id": "apps_agent_tests_test_hard_stop_test_nestjs_persistence_fails",
-      "community": 167,
+      "community": 10,
       "norm_label": "test_nestjs_persistence_fails()"
     },
     {
@@ -2890,7 +2900,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "apps_agent_tests_test_health",
-      "community": 251,
+      "community": 10,
       "norm_label": "test_health.py"
     },
     {
@@ -2900,7 +2910,7 @@
       "source_location": "L8",
       "_origin": "ast",
       "id": "apps_agent_tests_test_health_test_health_success",
-      "community": 251,
+      "community": 10,
       "norm_label": "test_health_success()"
     },
     {
@@ -2910,7 +2920,7 @@
       "source_location": "L38",
       "_origin": "ast",
       "id": "apps_agent_tests_test_health_test_health_nestjs_down",
-      "community": 251,
+      "community": 10,
       "norm_label": "test_health_nestjs_down()"
     },
     {
@@ -2920,7 +2930,7 @@
       "source_location": "L61",
       "_origin": "ast",
       "id": "apps_agent_tests_test_health_test_lifespan_shutdown",
-      "community": 251,
+      "community": 10,
       "norm_label": "test_lifespan_shutdown()"
     },
     {
@@ -3120,7 +3130,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "apps_agent_tests_test_output_guardrail_nemo",
-      "community": 30,
+      "community": 270,
       "norm_label": "test_output_guardrail_nemo.py"
     },
     {
@@ -3130,7 +3140,7 @@
       "source_location": "L7",
       "_origin": "ast",
       "id": "apps_agent_tests_test_output_guardrail_nemo_guardrail_service",
-      "community": 30,
+      "community": 270,
       "norm_label": "guardrail_service()"
     },
     {
@@ -3140,7 +3150,7 @@
       "source_location": "L21",
       "_origin": "ast",
       "id": "apps_agent_tests_test_output_guardrail_nemo_test_validate_output_chunk_safe",
-      "community": 30,
+      "community": 270,
       "norm_label": "test_validate_output_chunk_safe()"
     },
     {
@@ -3150,7 +3160,7 @@
       "source_location": "L50",
       "_origin": "ast",
       "id": "apps_agent_tests_test_output_guardrail_nemo_test_validate_output_chunk_unsafe",
-      "community": 30,
+      "community": 270,
       "norm_label": "test_validate_output_chunk_unsafe()"
     },
     {
@@ -3160,7 +3170,7 @@
       "source_location": "L65",
       "_origin": "ast",
       "id": "apps_agent_tests_test_output_guardrail_nemo_test_validate_output_chunk_timeout",
-      "community": 30,
+      "community": 270,
       "norm_label": "test_validate_output_chunk_timeout()"
     },
     {
@@ -3170,7 +3180,7 @@
       "source_location": "L75",
       "_origin": "ast",
       "id": "apps_agent_tests_test_output_guardrail_nemo_test_validate_output_chunk_unexpected_response",
-      "community": 30,
+      "community": 270,
       "norm_label": "test_validate_output_chunk_unexpected_response()"
     },
     {
@@ -3200,7 +3210,7 @@
       "source_location": "L13",
       "_origin": "ast",
       "id": "apps_agent_tests_test_output_pipeline_enabled_config",
-      "community": 159,
+      "community": 0,
       "norm_label": "enabled_config()"
     },
     {
@@ -3210,7 +3220,7 @@
       "source_location": "L22",
       "_origin": "ast",
       "id": "apps_agent_tests_test_output_pipeline_disabled_config",
-      "community": 159,
+      "community": 0,
       "norm_label": "disabled_config()"
     },
     {
@@ -3470,7 +3480,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "apps_agent_tests_test_queue",
-      "community": 17,
+      "community": 261,
       "norm_label": "test_queue.py"
     },
     {
@@ -3480,7 +3490,7 @@
       "source_location": "L15",
       "_origin": "ast",
       "id": "apps_agent_tests_test_queue_get_auth_headers",
-      "community": 17,
+      "community": 261,
       "norm_label": "get_auth_headers()"
     },
     {
@@ -3490,7 +3500,7 @@
       "source_location": "L27",
       "_origin": "ast",
       "id": "apps_agent_tests_test_queue_test_queue_manager_max_depth",
-      "community": 17,
+      "community": 261,
       "norm_label": "test_queue_manager_max_depth()"
     },
     {
@@ -3500,7 +3510,7 @@
       "source_location": "L51",
       "_origin": "ast",
       "id": "apps_agent_tests_test_queue_test_queue_manager_fifo_order",
-      "community": 17,
+      "community": 261,
       "norm_label": "test_queue_manager_fifo_order()"
     },
     {
@@ -3510,7 +3520,7 @@
       "source_location": "L79",
       "_origin": "ast",
       "id": "apps_agent_tests_test_queue_test_queue_manager_session_isolation",
-      "community": 17,
+      "community": 261,
       "norm_label": "test_queue_manager_session_isolation()"
     },
     {
@@ -3520,7 +3530,7 @@
       "source_location": "L95",
       "_origin": "ast",
       "id": "apps_agent_tests_test_queue_test_endpoint_concurrency_limit",
-      "community": 17,
+      "community": 261,
       "norm_label": "test_endpoint_concurrency_limit()"
     },
     {
@@ -3660,7 +3670,7 @@
       "source_location": "L103",
       "_origin": "ast",
       "id": "apps_agent_tests_test_sse_integration_mock_nestjs_client",
-      "community": 126,
+      "community": 264,
       "norm_label": "mock_nestjs_client()"
     },
     {
@@ -3740,7 +3750,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "apps_agent_tests_test_sse_output_guardrail",
-      "community": 167,
+      "community": 10,
       "norm_label": "test_sse_output_guardrail.py"
     },
     {
@@ -3750,7 +3760,7 @@
       "source_location": "L15",
       "_origin": "ast",
       "id": "apps_agent_tests_test_sse_output_guardrail_mock_nestjs_client",
-      "community": 167,
+      "community": 10,
       "norm_label": "mock_nestjs_client()"
     },
     {
@@ -3760,7 +3770,7 @@
       "source_location": "L27",
       "_origin": "ast",
       "id": "apps_agent_tests_test_sse_output_guardrail_test_sse_output_guardrail_safe",
-      "community": 167,
+      "community": 10,
       "norm_label": "test_sse_output_guardrail_safe()"
     },
     {
@@ -3770,7 +3780,7 @@
       "source_location": "L66",
       "_origin": "ast",
       "id": "apps_agent_tests_test_sse_output_guardrail_test_sse_output_guardrail_unsafe_blocking",
-      "community": 167,
+      "community": 10,
       "norm_label": "test_sse_output_guardrail_unsafe_blocking()"
     },
     {
@@ -3780,7 +3790,7 @@
       "source_location": "L125",
       "_origin": "ast",
       "id": "apps_agent_tests_test_sse_output_guardrail_test_sse_output_guardrail_disabled",
-      "community": 167,
+      "community": 10,
       "norm_label": "test_sse_output_guardrail_disabled()"
     },
     {
@@ -3850,7 +3860,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "apps_agent_tests_test_streaming_foundation",
-      "community": 25,
+      "community": 10,
       "norm_label": "test_streaming_foundation.py"
     },
     {
@@ -3860,7 +3870,7 @@
       "source_location": "L14",
       "_origin": "ast",
       "id": "apps_agent_tests_test_streaming_foundation_get_auth_headers",
-      "community": 25,
+      "community": 10,
       "norm_label": "get_auth_headers()"
     },
     {
@@ -3870,7 +3880,7 @@
       "source_location": "L25",
       "_origin": "ast",
       "id": "apps_agent_tests_test_streaming_foundation_parse_sse",
-      "community": 25,
+      "community": 10,
       "norm_label": "parse_sse()"
     },
     {
@@ -3880,7 +3890,7 @@
       "source_location": "L50",
       "_origin": "ast",
       "id": "apps_agent_tests_test_streaming_foundation_test_stream_unauthorized",
-      "community": 25,
+      "community": 10,
       "norm_label": "test_stream_unauthorized()"
     },
     {
@@ -3890,7 +3900,7 @@
       "source_location": "L67",
       "_origin": "ast",
       "id": "apps_agent_tests_test_streaming_foundation_test_stream_message_too_long",
-      "community": 25,
+      "community": 10,
       "norm_label": "test_stream_message_too_long()"
     },
     {
@@ -3900,7 +3910,7 @@
       "source_location": "L84",
       "_origin": "ast",
       "id": "apps_agent_tests_test_streaming_foundation_test_stream_guardrails_unavailable",
-      "community": 25,
+      "community": 10,
       "norm_label": "test_stream_guardrails_unavailable()"
     },
     {
@@ -3910,7 +3920,7 @@
       "source_location": "L101",
       "_origin": "ast",
       "id": "apps_agent_tests_test_streaming_foundation_test_stream_guardrails_blocked",
-      "community": 25,
+      "community": 10,
       "norm_label": "test_stream_guardrails_blocked()"
     },
     {
@@ -3920,7 +3930,7 @@
       "source_location": "L129",
       "_origin": "ast",
       "id": "apps_agent_tests_test_streaming_foundation_test_stream_with_valid_session_id",
-      "community": 25,
+      "community": 10,
       "norm_label": "test_stream_with_valid_session_id()"
     },
     {
@@ -3930,7 +3940,7 @@
       "source_location": "L207",
       "_origin": "ast",
       "id": "apps_agent_tests_test_streaming_foundation_test_stream_omitted_session_id",
-      "community": 25,
+      "community": 10,
       "norm_label": "test_stream_omitted_session_id()"
     },
     {
@@ -3940,7 +3950,7 @@
       "source_location": "L287",
       "_origin": "ast",
       "id": "apps_agent_tests_test_streaming_foundation_test_stream_graceful_shutdown",
-      "community": 25,
+      "community": 10,
       "norm_label": "test_stream_graceful_shutdown()"
     },
     {
@@ -3950,7 +3960,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "apps_agent_tests_test_tools",
-      "community": 148,
+      "community": 10,
       "norm_label": "test_tools.py"
     },
     {
@@ -3960,7 +3970,7 @@
       "source_location": "L14",
       "_origin": "ast",
       "id": "apps_agent_tests_test_tools_mock_client",
-      "community": 148,
+      "community": 10,
       "norm_label": "mock_client()"
     },
     {
@@ -3970,7 +3980,7 @@
       "source_location": "L23",
       "_origin": "ast",
       "id": "apps_agent_tests_test_tools_run_config",
-      "community": 148,
+      "community": 10,
       "norm_label": "run_config()"
     },
     {
@@ -3990,7 +4000,7 @@
       "source_location": "L42",
       "_origin": "ast",
       "id": "apps_agent_tests_test_tools_test_search_flights_success",
-      "community": 148,
+      "community": 10,
       "norm_label": "test_search_flights_success()"
     },
     {
@@ -4000,7 +4010,7 @@
       "source_location": "L79",
       "_origin": "ast",
       "id": "apps_agent_tests_test_tools_test_search_flights_empty",
-      "community": 148,
+      "community": 10,
       "norm_label": "test_search_flights_empty()"
     },
     {
@@ -4010,7 +4020,7 @@
       "source_location": "L91",
       "_origin": "ast",
       "id": "apps_agent_tests_test_tools_test_search_flights_error",
-      "community": 148,
+      "community": 10,
       "norm_label": "test_search_flights_error()"
     },
     {
@@ -4020,7 +4030,7 @@
       "source_location": "L103",
       "_origin": "ast",
       "id": "apps_agent_tests_test_tools_test_get_user_preferences_success",
-      "community": 148,
+      "community": 10,
       "norm_label": "test_get_user_preferences_success()"
     },
     {
@@ -4030,7 +4040,7 @@
       "source_location": "L126",
       "_origin": "ast",
       "id": "apps_agent_tests_test_tools_test_get_user_preferences_profile_not_found",
-      "community": 148,
+      "community": 10,
       "norm_label": "test_get_user_preferences_profile_not_found()"
     },
     {
@@ -4040,7 +4050,7 @@
       "source_location": "L136",
       "_origin": "ast",
       "id": "apps_agent_tests_test_tools_test_get_user_preferences_error",
-      "community": 148,
+      "community": 10,
       "norm_label": "test_get_user_preferences_error()"
     },
     {
@@ -4050,7 +4060,7 @@
       "source_location": "L144",
       "_origin": "ast",
       "id": "apps_agent_tests_test_tools_test_list_user_bookings_success",
-      "community": 148,
+      "community": 10,
       "norm_label": "test_list_user_bookings_success()"
     },
     {
@@ -4060,7 +4070,7 @@
       "source_location": "L181",
       "_origin": "ast",
       "id": "apps_agent_tests_test_tools_test_list_user_bookings_empty",
-      "community": 148,
+      "community": 10,
       "norm_label": "test_list_user_bookings_empty()"
     },
     {
@@ -4070,7 +4080,7 @@
       "source_location": "L189",
       "_origin": "ast",
       "id": "apps_agent_tests_test_tools_test_list_user_bookings_error",
-      "community": 148,
+      "community": 10,
       "norm_label": "test_list_user_bookings_error()"
     },
     {
@@ -4294,10 +4304,20 @@
       "norm_label": "build"
     },
     {
-      "label": "start",
+      "label": "dev",
       "file_type": "code",
       "source_file": "apps/api/package.json",
       "source_location": "L7",
+      "_origin": "ast",
+      "id": "apps_api_package_scripts_dev",
+      "community": 257,
+      "norm_label": "dev"
+    },
+    {
+      "label": "start",
+      "file_type": "code",
+      "source_file": "apps/api/package.json",
+      "source_location": "L8",
       "_origin": "ast",
       "id": "apps_api_package_scripts_start",
       "community": 257,
@@ -4307,7 +4327,7 @@
       "label": "start:dev",
       "file_type": "code",
       "source_file": "apps/api/package.json",
-      "source_location": "L8",
+      "source_location": "L9",
       "_origin": "ast",
       "id": "apps_api_package_scripts_start_dev",
       "community": 257,
@@ -4317,7 +4337,7 @@
       "label": "start:debug",
       "file_type": "code",
       "source_file": "apps/api/package.json",
-      "source_location": "L9",
+      "source_location": "L10",
       "_origin": "ast",
       "id": "apps_api_package_scripts_start_debug",
       "community": 257,
@@ -4327,7 +4347,7 @@
       "label": "start:prod",
       "file_type": "code",
       "source_file": "apps/api/package.json",
-      "source_location": "L10",
+      "source_location": "L11",
       "_origin": "ast",
       "id": "apps_api_package_scripts_start_prod",
       "community": 257,
@@ -4337,7 +4357,7 @@
       "label": "test",
       "file_type": "code",
       "source_file": "apps/api/package.json",
-      "source_location": "L11",
+      "source_location": "L12",
       "_origin": "ast",
       "id": "apps_api_package_scripts_test",
       "community": 257,
@@ -4347,7 +4367,7 @@
       "label": "test:watch",
       "file_type": "code",
       "source_file": "apps/api/package.json",
-      "source_location": "L12",
+      "source_location": "L13",
       "_origin": "ast",
       "id": "apps_api_package_scripts_test_watch",
       "community": 257,
@@ -4357,7 +4377,7 @@
       "label": "test:cov",
       "file_type": "code",
       "source_file": "apps/api/package.json",
-      "source_location": "L13",
+      "source_location": "L14",
       "_origin": "ast",
       "id": "apps_api_package_scripts_test_cov",
       "community": 257,
@@ -4367,7 +4387,7 @@
       "label": "test:debug",
       "file_type": "code",
       "source_file": "apps/api/package.json",
-      "source_location": "L14",
+      "source_location": "L15",
       "_origin": "ast",
       "id": "apps_api_package_scripts_test_debug",
       "community": 257,
@@ -4377,7 +4397,7 @@
       "label": "test:e2e",
       "file_type": "code",
       "source_file": "apps/api/package.json",
-      "source_location": "L15",
+      "source_location": "L16",
       "_origin": "ast",
       "id": "apps_api_package_scripts_test_e2e",
       "community": 257,
@@ -4387,7 +4407,7 @@
       "label": "dependencies",
       "file_type": "code",
       "source_file": "apps/api/package.json",
-      "source_location": "L17",
+      "source_location": "L18",
       "_origin": "ast",
       "id": "apps_api_package_dependencies",
       "community": 5,
@@ -4397,7 +4417,7 @@
       "label": "@langchain/core",
       "file_type": "code",
       "source_file": "apps/api/package.json",
-      "source_location": "L18",
+      "source_location": "L19",
       "_origin": "ast",
       "id": "apps_api_package_dependencies_langchain_core",
       "community": 5,
@@ -4407,7 +4427,7 @@
       "label": "@langchain/openai",
       "file_type": "code",
       "source_file": "apps/api/package.json",
-      "source_location": "L19",
+      "source_location": "L20",
       "_origin": "ast",
       "id": "apps_api_package_dependencies_langchain_openai",
       "community": 5,
@@ -4417,7 +4437,7 @@
       "label": "@nestjs/common",
       "file_type": "code",
       "source_file": "apps/api/package.json",
-      "source_location": "L20",
+      "source_location": "L21",
       "_origin": "ast",
       "id": "apps_api_package_dependencies_nestjs_common",
       "community": 5,
@@ -4427,7 +4447,7 @@
       "label": "@nestjs/config",
       "file_type": "code",
       "source_file": "apps/api/package.json",
-      "source_location": "L21",
+      "source_location": "L22",
       "_origin": "ast",
       "id": "apps_api_package_dependencies_nestjs_config",
       "community": 5,
@@ -4437,7 +4457,7 @@
       "label": "@nestjs/core",
       "file_type": "code",
       "source_file": "apps/api/package.json",
-      "source_location": "L22",
+      "source_location": "L23",
       "_origin": "ast",
       "id": "apps_api_package_dependencies_nestjs_core",
       "community": 5,
@@ -4447,7 +4467,7 @@
       "label": "@nestjs/jwt",
       "file_type": "code",
       "source_file": "apps/api/package.json",
-      "source_location": "L23",
+      "source_location": "L24",
       "_origin": "ast",
       "id": "apps_api_package_dependencies_nestjs_jwt",
       "community": 5,
@@ -4457,7 +4477,7 @@
       "label": "@nestjs/passport",
       "file_type": "code",
       "source_file": "apps/api/package.json",
-      "source_location": "L24",
+      "source_location": "L25",
       "_origin": "ast",
       "id": "apps_api_package_dependencies_nestjs_passport",
       "community": 5,
@@ -4467,7 +4487,7 @@
       "label": "@nestjs/platform-express",
       "file_type": "code",
       "source_file": "apps/api/package.json",
-      "source_location": "L25",
+      "source_location": "L26",
       "_origin": "ast",
       "id": "apps_api_package_dependencies_nestjs_platform_express",
       "community": 5,
@@ -4477,7 +4497,7 @@
       "label": "@prisma/client",
       "file_type": "code",
       "source_file": "apps/api/package.json",
-      "source_location": "L26",
+      "source_location": "L27",
       "_origin": "ast",
       "id": "apps_api_package_dependencies_prisma_client",
       "community": 5,
@@ -4487,7 +4507,7 @@
       "label": "@shared/types",
       "file_type": "code",
       "source_file": "apps/api/package.json",
-      "source_location": "L27",
+      "source_location": "L28",
       "_origin": "ast",
       "id": "apps_api_package_dependencies_shared_types",
       "community": 5,
@@ -4497,7 +4517,7 @@
       "label": "amadeus",
       "file_type": "code",
       "source_file": "apps/api/package.json",
-      "source_location": "L28",
+      "source_location": "L29",
       "_origin": "ast",
       "id": "apps_api_package_dependencies_amadeus",
       "community": 5,
@@ -4507,7 +4527,7 @@
       "label": "bcrypt",
       "file_type": "code",
       "source_file": "apps/api/package.json",
-      "source_location": "L29",
+      "source_location": "L30",
       "_origin": "ast",
       "id": "apps_api_package_dependencies_bcrypt",
       "community": 5,
@@ -4517,7 +4537,7 @@
       "label": "class-transformer",
       "file_type": "code",
       "source_file": "apps/api/package.json",
-      "source_location": "L30",
+      "source_location": "L31",
       "_origin": "ast",
       "id": "apps_api_package_dependencies_class_transformer",
       "community": 5,
@@ -4527,7 +4547,7 @@
       "label": "class-validator",
       "file_type": "code",
       "source_file": "apps/api/package.json",
-      "source_location": "L31",
+      "source_location": "L32",
       "_origin": "ast",
       "id": "apps_api_package_dependencies_class_validator",
       "community": 5,
@@ -4537,7 +4557,7 @@
       "label": "ioredis",
       "file_type": "code",
       "source_file": "apps/api/package.json",
-      "source_location": "L32",
+      "source_location": "L33",
       "_origin": "ast",
       "id": "apps_api_package_dependencies_ioredis",
       "community": 5,
@@ -4547,7 +4567,7 @@
       "label": "langchain",
       "file_type": "code",
       "source_file": "apps/api/package.json",
-      "source_location": "L33",
+      "source_location": "L34",
       "_origin": "ast",
       "id": "apps_api_package_dependencies_langchain",
       "community": 5,
@@ -4557,7 +4577,7 @@
       "label": "langsmith",
       "file_type": "code",
       "source_file": "apps/api/package.json",
-      "source_location": "L34",
+      "source_location": "L35",
       "_origin": "ast",
       "id": "apps_api_package_dependencies_langsmith",
       "community": 5,
@@ -4567,7 +4587,7 @@
       "label": "passport",
       "file_type": "code",
       "source_file": "apps/api/package.json",
-      "source_location": "L35",
+      "source_location": "L36",
       "_origin": "ast",
       "id": "apps_api_package_dependencies_passport",
       "community": 5,
@@ -4577,7 +4597,7 @@
       "label": "passport-jwt",
       "file_type": "code",
       "source_file": "apps/api/package.json",
-      "source_location": "L36",
+      "source_location": "L37",
       "_origin": "ast",
       "id": "apps_api_package_dependencies_passport_jwt",
       "community": 5,
@@ -4587,7 +4607,7 @@
       "label": "reflect-metadata",
       "file_type": "code",
       "source_file": "apps/api/package.json",
-      "source_location": "L37",
+      "source_location": "L38",
       "_origin": "ast",
       "id": "apps_api_package_dependencies_reflect_metadata",
       "community": 5,
@@ -4597,7 +4617,7 @@
       "label": "rxjs",
       "file_type": "code",
       "source_file": "apps/api/package.json",
-      "source_location": "L38",
+      "source_location": "L39",
       "_origin": "ast",
       "id": "apps_api_package_dependencies_rxjs",
       "community": 5,
@@ -4607,7 +4627,7 @@
       "label": "stripe",
       "file_type": "code",
       "source_file": "apps/api/package.json",
-      "source_location": "L39",
+      "source_location": "L40",
       "_origin": "ast",
       "id": "apps_api_package_dependencies_stripe",
       "community": 5,
@@ -4617,7 +4637,7 @@
       "label": "zod",
       "file_type": "code",
       "source_file": "apps/api/package.json",
-      "source_location": "L40",
+      "source_location": "L41",
       "_origin": "ast",
       "id": "apps_api_package_dependencies_zod",
       "community": 5,
@@ -4627,7 +4647,7 @@
       "label": "devDependencies",
       "file_type": "code",
       "source_file": "apps/api/package.json",
-      "source_location": "L42",
+      "source_location": "L43",
       "_origin": "ast",
       "id": "apps_api_package_devdependencies",
       "community": 255,
@@ -4637,7 +4657,7 @@
       "label": "@nestjs/cli",
       "file_type": "code",
       "source_file": "apps/api/package.json",
-      "source_location": "L43",
+      "source_location": "L44",
       "_origin": "ast",
       "id": "apps_api_package_devdependencies_nestjs_cli",
       "community": 255,
@@ -4647,7 +4667,7 @@
       "label": "@nestjs/schematics",
       "file_type": "code",
       "source_file": "apps/api/package.json",
-      "source_location": "L44",
+      "source_location": "L45",
       "_origin": "ast",
       "id": "apps_api_package_devdependencies_nestjs_schematics",
       "community": 255,
@@ -4657,7 +4677,7 @@
       "label": "@nestjs/testing",
       "file_type": "code",
       "source_file": "apps/api/package.json",
-      "source_location": "L45",
+      "source_location": "L46",
       "_origin": "ast",
       "id": "apps_api_package_devdependencies_nestjs_testing",
       "community": 255,
@@ -4667,7 +4687,7 @@
       "label": "@types/bcrypt",
       "file_type": "code",
       "source_file": "apps/api/package.json",
-      "source_location": "L46",
+      "source_location": "L47",
       "_origin": "ast",
       "id": "apps_api_package_devdependencies_types_bcrypt",
       "community": 255,
@@ -4677,7 +4697,7 @@
       "label": "@types/express",
       "file_type": "code",
       "source_file": "apps/api/package.json",
-      "source_location": "L47",
+      "source_location": "L48",
       "_origin": "ast",
       "id": "apps_api_package_devdependencies_types_express",
       "community": 255,
@@ -4687,7 +4707,7 @@
       "label": "@types/jest",
       "file_type": "code",
       "source_file": "apps/api/package.json",
-      "source_location": "L48",
+      "source_location": "L49",
       "_origin": "ast",
       "id": "apps_api_package_devdependencies_types_jest",
       "community": 255,
@@ -4697,7 +4717,7 @@
       "label": "@types/node",
       "file_type": "code",
       "source_file": "apps/api/package.json",
-      "source_location": "L49",
+      "source_location": "L50",
       "_origin": "ast",
       "id": "apps_api_package_devdependencies_types_node",
       "community": 255,
@@ -4707,7 +4727,7 @@
       "label": "@types/passport-jwt",
       "file_type": "code",
       "source_file": "apps/api/package.json",
-      "source_location": "L50",
+      "source_location": "L51",
       "_origin": "ast",
       "id": "apps_api_package_devdependencies_types_passport_jwt",
       "community": 255,
@@ -4717,7 +4737,7 @@
       "label": "@types/supertest",
       "file_type": "code",
       "source_file": "apps/api/package.json",
-      "source_location": "L51",
+      "source_location": "L52",
       "_origin": "ast",
       "id": "apps_api_package_devdependencies_types_supertest",
       "community": 255,
@@ -4727,7 +4747,7 @@
       "label": "jest",
       "file_type": "code",
       "source_file": "apps/api/package.json",
-      "source_location": "L52",
+      "source_location": "L53",
       "_origin": "ast",
       "id": "apps_api_package_devdependencies_jest",
       "community": 255,
@@ -4737,7 +4757,7 @@
       "label": "prisma",
       "file_type": "code",
       "source_file": "apps/api/package.json",
-      "source_location": "L53",
+      "source_location": "L54",
       "_origin": "ast",
       "id": "apps_api_package_devdependencies_prisma",
       "community": 255,
@@ -4747,7 +4767,7 @@
       "label": "supertest",
       "file_type": "code",
       "source_file": "apps/api/package.json",
-      "source_location": "L54",
+      "source_location": "L55",
       "_origin": "ast",
       "id": "apps_api_package_devdependencies_supertest",
       "community": 255,
@@ -4757,7 +4777,7 @@
       "label": "ts-jest",
       "file_type": "code",
       "source_file": "apps/api/package.json",
-      "source_location": "L55",
+      "source_location": "L56",
       "_origin": "ast",
       "id": "apps_api_package_devdependencies_ts_jest",
       "community": 255,
@@ -4767,7 +4787,7 @@
       "label": "ts-loader",
       "file_type": "code",
       "source_file": "apps/api/package.json",
-      "source_location": "L56",
+      "source_location": "L57",
       "_origin": "ast",
       "id": "apps_api_package_devdependencies_ts_loader",
       "community": 255,
@@ -4777,7 +4797,7 @@
       "label": "ts-node",
       "file_type": "code",
       "source_file": "apps/api/package.json",
-      "source_location": "L57",
+      "source_location": "L58",
       "_origin": "ast",
       "id": "apps_api_package_devdependencies_ts_node",
       "community": 255,
@@ -4787,7 +4807,7 @@
       "label": "tsconfig-paths",
       "file_type": "code",
       "source_file": "apps/api/package.json",
-      "source_location": "L58",
+      "source_location": "L59",
       "_origin": "ast",
       "id": "apps_api_package_devdependencies_tsconfig_paths",
       "community": 8,
@@ -4797,7 +4817,7 @@
       "label": "typescript",
       "file_type": "code",
       "source_file": "apps/api/package.json",
-      "source_location": "L59",
+      "source_location": "L60",
       "_origin": "ast",
       "id": "apps_api_package_devdependencies_typescript",
       "community": 255,
@@ -4807,7 +4827,7 @@
       "label": "prisma",
       "file_type": "code",
       "source_file": "apps/api/package.json",
-      "source_location": "L61",
+      "source_location": "L62",
       "_origin": "ast",
       "id": "apps_api_package_prisma",
       "community": 258,
@@ -4817,7 +4837,7 @@
       "label": "seed",
       "file_type": "code",
       "source_file": "apps/api/package.json",
-      "source_location": "L62",
+      "source_location": "L63",
       "_origin": "ast",
       "id": "apps_api_package_prisma_seed",
       "community": 258,
@@ -5540,7 +5560,7 @@
       "source_location": "L9",
       "_origin": "ast",
       "id": "apps_api_src_airports_airports_service_airportsservice_constructor",
-      "community": 2,
+      "community": 152,
       "norm_label": ".constructor()"
     },
     {
@@ -5630,7 +5650,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "apps_api_src_app_module",
-      "community": 254,
+      "community": 29,
       "norm_label": "app.module.ts"
     },
     {
@@ -5670,7 +5690,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "apps_api_src_audit_audit_service",
-      "community": 2,
+      "community": 254,
       "norm_label": "audit.service.ts"
     },
     {
@@ -5680,7 +5700,7 @@
       "source_location": "L7",
       "_origin": "ast",
       "id": "apps_api_src_audit_audit_service_auditservice",
-      "community": 164,
+      "community": 254,
       "norm_label": "auditservice"
     },
     {
@@ -5690,7 +5710,7 @@
       "source_location": "L8",
       "_origin": "ast",
       "id": "apps_api_src_audit_audit_service_auditservice_constructor",
-      "community": 164,
+      "community": 254,
       "norm_label": ".constructor()"
     },
     {
@@ -5700,7 +5720,7 @@
       "source_location": "L10",
       "_origin": "ast",
       "id": "apps_api_src_audit_audit_service_auditservice_hashvalue",
-      "community": 164,
+      "community": 254,
       "norm_label": ".hashvalue()"
     },
     {
@@ -5710,7 +5730,7 @@
       "source_location": "L14",
       "_origin": "ast",
       "id": "apps_api_src_audit_audit_service_auditservice_safesanitize",
-      "community": 164,
+      "community": 254,
       "norm_label": ".safesanitize()"
     },
     {
@@ -5720,7 +5740,7 @@
       "source_location": "L63",
       "_origin": "ast",
       "id": "apps_api_src_audit_audit_service_auditservice_sanitizemetadata",
-      "community": 164,
+      "community": 254,
       "norm_label": ".sanitizemetadata()"
     },
     {
@@ -5730,7 +5750,7 @@
       "source_location": "L71",
       "_origin": "ast",
       "id": "apps_api_src_audit_audit_service_auditservice_createlog",
-      "community": 164,
+      "community": 254,
       "norm_label": ".createlog()"
     },
     {
@@ -6030,7 +6050,7 @@
       "source_location": "L7",
       "_origin": "ast",
       "id": "apps_api_src_auth_rate_limit_lockout_service_lockoutservice_constructor",
-      "community": 37,
+      "community": 2,
       "norm_label": ".constructor()"
     },
     {
@@ -6140,7 +6160,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "apps_api_src_cache_cache_module",
-      "community": 254,
+      "community": 2,
       "norm_label": "cache.module.ts"
     },
     {
@@ -6150,7 +6170,7 @@
       "source_location": "L9",
       "_origin": "ast",
       "id": "apps_api_src_cache_cache_module_cachemodule",
-      "community": 254,
+      "community": 2,
       "norm_label": "cachemodule"
     },
     {
@@ -6220,7 +6240,7 @@
       "source_location": "L84",
       "_origin": "ast",
       "id": "apps_api_src_cache_cache_service_cacheservice_incr",
-      "community": 37,
+      "community": 2,
       "norm_label": ".incr()"
     },
     {
@@ -6240,7 +6260,7 @@
       "source_location": "L128",
       "_origin": "ast",
       "id": "apps_api_src_cache_cache_service_cacheservice_getttl",
-      "community": 37,
+      "community": 2,
       "norm_label": ".getttl()"
     },
     {
@@ -6250,7 +6270,7 @@
       "source_location": "L149",
       "_origin": "ast",
       "id": "apps_api_src_cache_cache_service_cacheservice_keys",
-      "community": 37,
+      "community": 2,
       "norm_label": ".keys()"
     },
     {
@@ -6420,7 +6440,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "apps_api_src_chat_chat_service",
-      "community": 4,
+      "community": 254,
       "norm_label": "chat.service.ts"
     },
     {
@@ -6750,7 +6770,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "apps_api_src_health_health_module",
-      "community": 254,
+      "community": 29,
       "norm_label": "health.module.ts"
     },
     {
@@ -6760,7 +6780,7 @@
       "source_location": "L7",
       "_origin": "ast",
       "id": "apps_api_src_health_health_module_healthmodule",
-      "community": 254,
+      "community": 29,
       "norm_label": "healthmodule"
     },
     {
@@ -6860,7 +6880,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "apps_api_test_adversarial_e2e_spec",
-      "community": 2,
+      "community": 29,
       "norm_label": "adversarial.e2e-spec.ts"
     },
     {
@@ -6870,7 +6890,7 @@
       "source_location": "L11",
       "_origin": "ast",
       "id": "apps_api_test_adversarial_e2e_spec_cacheservicewithinternal",
-      "community": 2,
+      "community": 29,
       "norm_label": "cacheservicewithinternal"
     },
     {
@@ -6880,7 +6900,7 @@
       "source_location": "L15",
       "_origin": "ast",
       "id": "apps_api_test_adversarial_e2e_spec_sanitizedusermetadata",
-      "community": 2,
+      "community": 29,
       "norm_label": "sanitizedusermetadata"
     },
     {
@@ -6890,7 +6910,7 @@
       "source_location": "L26",
       "_origin": "ast",
       "id": "apps_api_test_adversarial_e2e_spec_sanitizedvariantsmetadata",
-      "community": 2,
+      "community": 29,
       "norm_label": "sanitizedvariantsmetadata"
     },
     {
@@ -6900,7 +6920,7 @@
       "source_location": "L33",
       "_origin": "ast",
       "id": "apps_api_test_adversarial_e2e_spec_circularmetadata",
-      "community": 2,
+      "community": 29,
       "norm_label": "circularmetadata"
     },
     {
@@ -7360,7 +7380,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "apps_web_app_search_flightid_page",
-      "community": 262,
+      "community": 253,
       "norm_label": "page.tsx"
     },
     {
@@ -7370,7 +7390,7 @@
       "source_location": "L10",
       "_origin": "ast",
       "id": "apps_web_app_search_flightid_page_props",
-      "community": 262,
+      "community": 253,
       "norm_label": "props"
     },
     {
@@ -7380,7 +7400,7 @@
       "source_location": "L20",
       "_origin": "ast",
       "id": "apps_web_app_search_flightid_page_generatemetadata",
-      "community": 262,
+      "community": 253,
       "norm_label": "generatemetadata()"
     },
     {
@@ -7390,7 +7410,7 @@
       "source_location": "L27",
       "_origin": "ast",
       "id": "apps_web_app_search_flightid_page_mock_flights",
-      "community": 262,
+      "community": 253,
       "norm_label": "mock_flights"
     },
     {
@@ -7410,7 +7430,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "apps_web_app_search_page",
-      "community": 253,
+      "community": 16,
       "norm_label": "page.tsx"
     },
     {
@@ -7420,7 +7440,7 @@
       "source_location": "L10",
       "_origin": "ast",
       "id": "apps_web_app_search_page_searchpage",
-      "community": 253,
+      "community": 16,
       "norm_label": "searchpage()"
     },
     {
@@ -7590,7 +7610,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "apps_web_components_map_airportpopup",
-      "community": 252,
+      "community": 260,
       "norm_label": "airportpopup.tsx"
     },
     {
@@ -7600,7 +7620,7 @@
       "source_location": "L8",
       "_origin": "ast",
       "id": "apps_web_components_map_airportpopup_props",
-      "community": 252,
+      "community": 260,
       "norm_label": "props"
     },
     {
@@ -7610,7 +7630,7 @@
       "source_location": "L13",
       "_origin": "ast",
       "id": "apps_web_components_map_airportpopup_airportpopup",
-      "community": 252,
+      "community": 260,
       "norm_label": "airportpopup()"
     },
     {
@@ -7810,7 +7830,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "apps_web_components_search_flightdetailpageclient",
-      "community": 262,
+      "community": 48,
       "norm_label": "flightdetailpageclient.tsx"
     },
     {
@@ -7820,7 +7840,7 @@
       "source_location": "L19",
       "_origin": "ast",
       "id": "apps_web_components_search_flightdetailpageclient_props",
-      "community": 262,
+      "community": 48,
       "norm_label": "props"
     },
     {
@@ -7830,7 +7850,7 @@
       "source_location": "L41",
       "_origin": "ast",
       "id": "apps_web_components_search_flightdetailpageclient_flightdetailpageclient",
-      "community": 262,
+      "community": 48,
       "norm_label": "flightdetailpageclient()"
     },
     {
@@ -7854,10 +7874,20 @@
       "norm_label": "empty_stops"
     },
     {
-      "label": "Props",
+      "label": "AIRLINE_MAP",
       "file_type": "code",
       "source_file": "apps/web/components/search/SearchPageClient.tsx",
       "source_location": "L26",
+      "_origin": "ast",
+      "id": "apps_web_components_search_searchpageclient_airline_map",
+      "community": 13,
+      "norm_label": "airline_map"
+    },
+    {
+      "label": "Props",
+      "file_type": "code",
+      "source_file": "apps/web/components/search/SearchPageClient.tsx",
+      "source_location": "L33",
       "_origin": "ast",
       "id": "apps_web_components_search_searchpageclient_props",
       "community": 256,
@@ -7867,7 +7897,7 @@
       "label": "Message",
       "file_type": "code",
       "source_file": "apps/web/components/search/SearchPageClient.tsx",
-      "source_location": "L30",
+      "source_location": "L37",
       "_origin": "ast",
       "id": "apps_web_components_search_searchpageclient_message",
       "community": 256,
@@ -7877,7 +7907,7 @@
       "label": "SearchPageClient()",
       "file_type": "code",
       "source_file": "apps/web/components/search/SearchPageClient.tsx",
-      "source_location": "L37",
+      "source_location": "L44",
       "_origin": "ast",
       "id": "apps_web_components_search_searchpageclient_searchpageclient",
       "community": 256,
@@ -9070,7 +9100,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "packages_shared_src_types_airport",
-      "community": 252,
+      "community": 260,
       "norm_label": "airport.ts"
     },
     {
@@ -9080,7 +9110,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "packages_shared_src_types_airport_airporttype",
-      "community": 252,
+      "community": 260,
       "norm_label": "airporttype"
     },
     {
@@ -9090,7 +9120,7 @@
       "source_location": "L3",
       "_origin": "ast",
       "id": "packages_shared_src_types_airport_airport",
-      "community": 252,
+      "community": 260,
       "norm_label": "airport"
     },
     {
@@ -11872,6 +11902,146 @@
       "id": "research_decision_boundaries_open_questions_not_yet_resolved",
       "community": 153,
       "norm_label": "open questions (not yet resolved)"
+    },
+    {
+      "label": "flight-search-decisions.md",
+      "file_type": "document",
+      "source_file": "research/flight-search-decisions.md",
+      "source_location": "L1",
+      "_origin": "ast",
+      "id": "research_flight_search_decisions",
+      "community": 167,
+      "norm_label": "flight-search-decisions.md"
+    },
+    {
+      "label": "Flight Search Service \u2014 Architectural Decisions",
+      "file_type": "document",
+      "source_file": "research/flight-search-decisions.md",
+      "source_location": "L1",
+      "_origin": "ast",
+      "id": "research_flight_search_decisions_flight_search_service_architectural_decisions",
+      "community": 167,
+      "norm_label": "flight search service \u2014 architectural decisions"
+    },
+    {
+      "label": "Core Principle",
+      "file_type": "document",
+      "source_file": "research/flight-search-decisions.md",
+      "source_location": "L9",
+      "_origin": "ast",
+      "id": "research_flight_search_decisions_core_principle",
+      "community": 167,
+      "norm_label": "core principle"
+    },
+    {
+      "label": "Decision Summary",
+      "file_type": "document",
+      "source_file": "research/flight-search-decisions.md",
+      "source_location": "L15",
+      "_origin": "ast",
+      "id": "research_flight_search_decisions_decision_summary",
+      "community": 167,
+      "norm_label": "decision summary"
+    },
+    {
+      "label": "Duffel API Key Differences from Amadeus",
+      "file_type": "document",
+      "source_file": "research/flight-search-decisions.md",
+      "source_location": "L34",
+      "_origin": "ast",
+      "id": "research_flight_search_decisions_duffel_api_key_differences_from_amadeus",
+      "community": 167,
+      "norm_label": "duffel api key differences from amadeus"
+    },
+    {
+      "label": "Implementation Phases",
+      "file_type": "document",
+      "source_file": "research/flight-search-decisions.md",
+      "source_location": "L49",
+      "_origin": "ast",
+      "id": "research_flight_search_decisions_implementation_phases",
+      "community": 167,
+      "norm_label": "implementation phases"
+    },
+    {
+      "label": "Phase 1: DuffelService & Shared Module",
+      "file_type": "document",
+      "source_file": "research/flight-search-decisions.md",
+      "source_location": "L51",
+      "_origin": "ast",
+      "id": "research_flight_search_decisions_phase_1_duffelservice_shared_module",
+      "community": 167,
+      "norm_label": "phase 1: duffelservice & shared module"
+    },
+    {
+      "label": "Phase 2: Database Schema \u2014 `flight_offers` & `search_history`",
+      "file_type": "document",
+      "source_file": "research/flight-search-decisions.md",
+      "source_location": "L83",
+      "_origin": "ast",
+      "id": "research_flight_search_decisions_phase_2_database_schema_flight_offers_search_history",
+      "community": 167,
+      "norm_label": "phase 2: database schema \u2014 `flight_offers` & `search_history`"
+    },
+    {
+      "label": "Phase 3: FlightsModule \u2014 Deterministic Search Endpoint",
+      "file_type": "document",
+      "source_file": "research/flight-search-decisions.md",
+      "source_location": "L122",
+      "_origin": "ast",
+      "id": "research_flight_search_decisions_phase_3_flightsmodule_deterministic_search_endpoint",
+      "community": 167,
+      "norm_label": "phase 3: flightsmodule \u2014 deterministic search endpoint"
+    },
+    {
+      "label": "Phase 4: Flight Detail & Re-price Endpoint",
+      "file_type": "document",
+      "source_file": "research/flight-search-decisions.md",
+      "source_location": "L144",
+      "_origin": "ast",
+      "id": "research_flight_search_decisions_phase_4_flight_detail_re_price_endpoint",
+      "community": 167,
+      "norm_label": "phase 4: flight detail & re-price endpoint"
+    },
+    {
+      "label": "Phase 5: Frontend Integration",
+      "file_type": "document",
+      "source_file": "research/flight-search-decisions.md",
+      "source_location": "L163",
+      "_origin": "ast",
+      "id": "research_flight_search_decisions_phase_5_frontend_integration",
+      "community": 167,
+      "norm_label": "phase 5: frontend integration"
+    },
+    {
+      "label": "Phase 6: E2E Testing & Verification",
+      "file_type": "document",
+      "source_file": "research/flight-search-decisions.md",
+      "source_location": "L182",
+      "_origin": "ast",
+      "id": "research_flight_search_decisions_phase_6_e2e_testing_verification",
+      "community": 167,
+      "norm_label": "phase 6: e2e testing & verification"
+    },
+    {
+      "label": "Environment Variables (Updated)",
+      "file_type": "document",
+      "source_file": "research/flight-search-decisions.md",
+      "source_location": "L201",
+      "_origin": "ast",
+      "id": "research_flight_search_decisions_environment_variables_updated",
+      "community": 167,
+      "norm_label": "environment variables (updated)"
+    },
+    {
+      "label": "Architecture Invariants (Reinforced)",
+      "file_type": "document",
+      "source_file": "research/flight-search-decisions.md",
+      "source_location": "L213",
+      "_origin": "ast",
+      "id": "research_flight_search_decisions_architecture_invariants_reinforced",
+      "community": 167,
+      "norm_label": "architecture invariants (reinforced)"
     },
     {
       "label": "frontend-backend-integration.md",
@@ -19774,6 +19944,1156 @@
       "norm_label": "phase dependencies"
     },
     {
+      "label": "requirements.md",
+      "file_type": "document",
+      "source_file": "specs/006-flight-search-service/checklists/requirements.md",
+      "source_location": "L1",
+      "_origin": "ast",
+      "id": "specs_006_flight_search_service_checklists_requirements",
+      "community": 148,
+      "norm_label": "requirements.md"
+    },
+    {
+      "label": "Specification Quality Checklist: Duffel Flight Search Service",
+      "file_type": "document",
+      "source_file": "specs/006-flight-search-service/checklists/requirements.md",
+      "source_location": "L1",
+      "_origin": "ast",
+      "id": "specs_006_flight_search_service_checklists_requirements_specification_quality_checklist_duffel_flight_search_service",
+      "community": 148,
+      "norm_label": "specification quality checklist: duffel flight search service"
+    },
+    {
+      "label": "Content Quality",
+      "file_type": "document",
+      "source_file": "specs/006-flight-search-service/checklists/requirements.md",
+      "source_location": "L7",
+      "_origin": "ast",
+      "id": "specs_006_flight_search_service_checklists_requirements_content_quality",
+      "community": 148,
+      "norm_label": "content quality"
+    },
+    {
+      "label": "Requirement Completeness",
+      "file_type": "document",
+      "source_file": "specs/006-flight-search-service/checklists/requirements.md",
+      "source_location": "L14",
+      "_origin": "ast",
+      "id": "specs_006_flight_search_service_checklists_requirements_requirement_completeness",
+      "community": 148,
+      "norm_label": "requirement completeness"
+    },
+    {
+      "label": "Feature Readiness",
+      "file_type": "document",
+      "source_file": "specs/006-flight-search-service/checklists/requirements.md",
+      "source_location": "L25",
+      "_origin": "ast",
+      "id": "specs_006_flight_search_service_checklists_requirements_feature_readiness",
+      "community": 148,
+      "norm_label": "feature readiness"
+    },
+    {
+      "label": "Notes",
+      "file_type": "document",
+      "source_file": "specs/006-flight-search-service/checklists/requirements.md",
+      "source_location": "L32",
+      "_origin": "ast",
+      "id": "specs_006_flight_search_service_checklists_requirements_notes",
+      "community": 148,
+      "norm_label": "notes"
+    },
+    {
+      "label": "api.md",
+      "file_type": "document",
+      "source_file": "specs/006-flight-search-service/contracts/api.md",
+      "source_location": "L1",
+      "_origin": "ast",
+      "id": "specs_006_flight_search_service_contracts_api",
+      "community": 263,
+      "norm_label": "api.md"
+    },
+    {
+      "label": "API Contract: Flight Search",
+      "file_type": "document",
+      "source_file": "specs/006-flight-search-service/contracts/api.md",
+      "source_location": "L1",
+      "_origin": "ast",
+      "id": "specs_006_flight_search_service_contracts_api_api_contract_flight_search",
+      "community": 263,
+      "norm_label": "api contract: flight search"
+    },
+    {
+      "label": "POST /api/flights/search",
+      "file_type": "document",
+      "source_file": "specs/006-flight-search-service/contracts/api.md",
+      "source_location": "L9",
+      "_origin": "ast",
+      "id": "specs_006_flight_search_service_contracts_api_post_api_flights_search",
+      "community": 263,
+      "norm_label": "post /api/flights/search"
+    },
+    {
+      "label": "Authentication",
+      "file_type": "document",
+      "source_file": "specs/006-flight-search-service/contracts/api.md",
+      "source_location": "L13",
+      "_origin": "ast",
+      "id": "specs_006_flight_search_service_contracts_api_authentication",
+      "community": 263,
+      "norm_label": "authentication"
+    },
+    {
+      "label": "Request Body",
+      "file_type": "document",
+      "source_file": "specs/006-flight-search-service/contracts/api.md",
+      "source_location": "L17",
+      "_origin": "ast",
+      "id": "specs_006_flight_search_service_contracts_api_request_body",
+      "community": 263,
+      "norm_label": "request body"
+    },
+    {
+      "label": "Success Response (200 OK)",
+      "file_type": "document",
+      "source_file": "specs/006-flight-search-service/contracts/api.md",
+      "source_location": "L37",
+      "_origin": "ast",
+      "id": "specs_006_flight_search_service_contracts_api_success_response_200_ok",
+      "community": 263,
+      "norm_label": "success response (200 ok)"
+    },
+    {
+      "label": "Error Responses",
+      "file_type": "document",
+      "source_file": "specs/006-flight-search-service/contracts/api.md",
+      "source_location": "L104",
+      "_origin": "ast",
+      "id": "specs_006_flight_search_service_contracts_api_error_responses",
+      "community": 263,
+      "norm_label": "error responses"
+    },
+    {
+      "label": "GET /api/flights/:id",
+      "file_type": "document",
+      "source_file": "specs/006-flight-search-service/contracts/api.md",
+      "source_location": "L124",
+      "_origin": "ast",
+      "id": "specs_006_flight_search_service_contracts_api_get_api_flights_id",
+      "community": 263,
+      "norm_label": "get /api/flights/:id"
+    },
+    {
+      "label": "Authentication",
+      "file_type": "document",
+      "source_file": "specs/006-flight-search-service/contracts/api.md",
+      "source_location": "L128",
+      "_origin": "ast",
+      "id": "specs_006_flight_search_service_contracts_api_authentication_128",
+      "community": 263,
+      "norm_label": "authentication"
+    },
+    {
+      "label": "Path Parameters",
+      "file_type": "document",
+      "source_file": "specs/006-flight-search-service/contracts/api.md",
+      "source_location": "L132",
+      "_origin": "ast",
+      "id": "specs_006_flight_search_service_contracts_api_path_parameters",
+      "community": 263,
+      "norm_label": "path parameters"
+    },
+    {
+      "label": "Success Response (200 OK)",
+      "file_type": "document",
+      "source_file": "specs/006-flight-search-service/contracts/api.md",
+      "source_location": "L138",
+      "_origin": "ast",
+      "id": "specs_006_flight_search_service_contracts_api_success_response_200_ok_138",
+      "community": 263,
+      "norm_label": "success response (200 ok)"
+    },
+    {
+      "label": "Error Responses",
+      "file_type": "document",
+      "source_file": "specs/006-flight-search-service/contracts/api.md",
+      "source_location": "L196",
+      "_origin": "ast",
+      "id": "specs_006_flight_search_service_contracts_api_error_responses_196",
+      "community": 263,
+      "norm_label": "error responses"
+    },
+    {
+      "label": "410 Gone Response (Expired Offer)",
+      "file_type": "document",
+      "source_file": "specs/006-flight-search-service/contracts/api.md",
+      "source_location": "L206",
+      "_origin": "ast",
+      "id": "specs_006_flight_search_service_contracts_api_410_gone_response_expired_offer",
+      "community": 263,
+      "norm_label": "410 gone response (expired offer)"
+    },
+    {
+      "label": "data-model.md",
+      "file_type": "document",
+      "source_file": "specs/006-flight-search-service/data-model.md",
+      "source_location": "L1",
+      "_origin": "ast",
+      "id": "specs_006_flight_search_service_data_model",
+      "community": 265,
+      "norm_label": "data-model.md"
+    },
+    {
+      "label": "Data Model: Duffel Flight Search Service",
+      "file_type": "document",
+      "source_file": "specs/006-flight-search-service/data-model.md",
+      "source_location": "L1",
+      "_origin": "ast",
+      "id": "specs_006_flight_search_service_data_model_data_model_duffel_flight_search_service",
+      "community": 265,
+      "norm_label": "data model: duffel flight search service"
+    },
+    {
+      "label": "New Entities",
+      "file_type": "document",
+      "source_file": "specs/006-flight-search-service/data-model.md",
+      "source_location": "L6",
+      "_origin": "ast",
+      "id": "specs_006_flight_search_service_data_model_new_entities",
+      "community": 265,
+      "norm_label": "new entities"
+    },
+    {
+      "label": "FlightOffer",
+      "file_type": "document",
+      "source_file": "specs/006-flight-search-service/data-model.md",
+      "source_location": "L8",
+      "_origin": "ast",
+      "id": "specs_006_flight_search_service_data_model_flightoffer",
+      "community": 265,
+      "norm_label": "flightoffer"
+    },
+    {
+      "label": "SearchHistory",
+      "file_type": "document",
+      "source_file": "specs/006-flight-search-service/data-model.md",
+      "source_location": "L37",
+      "_origin": "ast",
+      "id": "specs_006_flight_search_service_data_model_searchhistory",
+      "community": 265,
+      "norm_label": "searchhistory"
+    },
+    {
+      "label": "OfferRecovery",
+      "file_type": "document",
+      "source_file": "specs/006-flight-search-service/data-model.md",
+      "source_location": "L66",
+      "_origin": "ast",
+      "id": "specs_006_flight_search_service_data_model_offerrecovery",
+      "community": 265,
+      "norm_label": "offerrecovery"
+    },
+    {
+      "label": "Modified Entities",
+      "file_type": "document",
+      "source_file": "specs/006-flight-search-service/data-model.md",
+      "source_location": "L82",
+      "_origin": "ast",
+      "id": "specs_006_flight_search_service_data_model_modified_entities",
+      "community": 265,
+      "norm_label": "modified entities"
+    },
+    {
+      "label": "User (existing)",
+      "file_type": "document",
+      "source_file": "specs/006-flight-search-service/data-model.md",
+      "source_location": "L84",
+      "_origin": "ast",
+      "id": "specs_006_flight_search_service_data_model_user_existing",
+      "community": 265,
+      "norm_label": "user (existing)"
+    },
+    {
+      "label": "Prisma Schema Additions",
+      "file_type": "document",
+      "source_file": "specs/006-flight-search-service/data-model.md",
+      "source_location": "L96",
+      "_origin": "ast",
+      "id": "specs_006_flight_search_service_data_model_prisma_schema_additions",
+      "community": 265,
+      "norm_label": "prisma schema additions"
+    },
+    {
+      "label": "State Transitions",
+      "file_type": "document",
+      "source_file": "specs/006-flight-search-service/data-model.md",
+      "source_location": "L152",
+      "_origin": "ast",
+      "id": "specs_006_flight_search_service_data_model_state_transitions",
+      "community": 265,
+      "norm_label": "state transitions"
+    },
+    {
+      "label": "FlightOffer Lifecycle",
+      "file_type": "document",
+      "source_file": "specs/006-flight-search-service/data-model.md",
+      "source_location": "L154",
+      "_origin": "ast",
+      "id": "specs_006_flight_search_service_data_model_flightoffer_lifecycle",
+      "community": 265,
+      "norm_label": "flightoffer lifecycle"
+    },
+    {
+      "label": "Search Flow State",
+      "file_type": "document",
+      "source_file": "specs/006-flight-search-service/data-model.md",
+      "source_location": "L164",
+      "_origin": "ast",
+      "id": "specs_006_flight_search_service_data_model_search_flow_state",
+      "community": 265,
+      "norm_label": "search flow state"
+    },
+    {
+      "label": "plan.md",
+      "file_type": "document",
+      "source_file": "specs/006-flight-search-service/plan.md",
+      "source_location": "L1",
+      "_origin": "ast",
+      "id": "specs_006_flight_search_service_plan",
+      "community": 164,
+      "norm_label": "plan.md"
+    },
+    {
+      "label": "Implementation Plan: Duffel Flight Search Service",
+      "file_type": "document",
+      "source_file": "specs/006-flight-search-service/plan.md",
+      "source_location": "L1",
+      "_origin": "ast",
+      "id": "specs_006_flight_search_service_plan_implementation_plan_duffel_flight_search_service",
+      "community": 164,
+      "norm_label": "implementation plan: duffel flight search service"
+    },
+    {
+      "label": "Summary",
+      "file_type": "document",
+      "source_file": "specs/006-flight-search-service/plan.md",
+      "source_location": "L9",
+      "_origin": "ast",
+      "id": "specs_006_flight_search_service_plan_summary",
+      "community": 164,
+      "norm_label": "summary"
+    },
+    {
+      "label": "Technical Context",
+      "file_type": "document",
+      "source_file": "specs/006-flight-search-service/plan.md",
+      "source_location": "L13",
+      "_origin": "ast",
+      "id": "specs_006_flight_search_service_plan_technical_context",
+      "community": 164,
+      "norm_label": "technical context"
+    },
+    {
+      "label": "Constitution Check",
+      "file_type": "document",
+      "source_file": "specs/006-flight-search-service/plan.md",
+      "source_location": "L33",
+      "_origin": "ast",
+      "id": "specs_006_flight_search_service_plan_constitution_check",
+      "community": 164,
+      "norm_label": "constitution check"
+    },
+    {
+      "label": "Project Structure",
+      "file_type": "document",
+      "source_file": "specs/006-flight-search-service/plan.md",
+      "source_location": "L43",
+      "_origin": "ast",
+      "id": "specs_006_flight_search_service_plan_project_structure",
+      "community": 164,
+      "norm_label": "project structure"
+    },
+    {
+      "label": "Documentation (this feature)",
+      "file_type": "document",
+      "source_file": "specs/006-flight-search-service/plan.md",
+      "source_location": "L45",
+      "_origin": "ast",
+      "id": "specs_006_flight_search_service_plan_documentation_this_feature",
+      "community": 164,
+      "norm_label": "documentation (this feature)"
+    },
+    {
+      "label": "Source Code (repository root)",
+      "file_type": "document",
+      "source_file": "specs/006-flight-search-service/plan.md",
+      "source_location": "L57",
+      "_origin": "ast",
+      "id": "specs_006_flight_search_service_plan_source_code_repository_root",
+      "community": 164,
+      "norm_label": "source code (repository root)"
+    },
+    {
+      "label": "Implementation Phases",
+      "file_type": "document",
+      "source_file": "specs/006-flight-search-service/plan.md",
+      "source_location": "L84",
+      "_origin": "ast",
+      "id": "specs_006_flight_search_service_plan_implementation_phases",
+      "community": 164,
+      "norm_label": "implementation phases"
+    },
+    {
+      "label": "Phase 1: DuffelService & Shared Module Extraction",
+      "file_type": "document",
+      "source_file": "specs/006-flight-search-service/plan.md",
+      "source_location": "L86",
+      "_origin": "ast",
+      "id": "specs_006_flight_search_service_plan_phase_1_duffelservice_shared_module_extraction",
+      "community": 164,
+      "norm_label": "phase 1: duffelservice & shared module extraction"
+    },
+    {
+      "label": "Phase 2: Database Schema \u2014 `flight_offers` & `search_history`",
+      "file_type": "document",
+      "source_file": "specs/006-flight-search-service/plan.md",
+      "source_location": "L110",
+      "_origin": "ast",
+      "id": "specs_006_flight_search_service_plan_phase_2_database_schema_flight_offers_search_history",
+      "community": 164,
+      "norm_label": "phase 2: database schema \u2014 `flight_offers` & `search_history`"
+    },
+    {
+      "label": "Phase 3: FlightsModule \u2014 User-Facing Search Endpoint",
+      "file_type": "document",
+      "source_file": "specs/006-flight-search-service/plan.md",
+      "source_location": "L128",
+      "_origin": "ast",
+      "id": "specs_006_flight_search_service_plan_phase_3_flightsmodule_user_facing_search_endpoint",
+      "community": 164,
+      "norm_label": "phase 3: flightsmodule \u2014 user-facing search endpoint"
+    },
+    {
+      "label": "Phase 4: Flight Detail & Re-price Endpoint",
+      "file_type": "document",
+      "source_file": "specs/006-flight-search-service/plan.md",
+      "source_location": "L148",
+      "_origin": "ast",
+      "id": "specs_006_flight_search_service_plan_phase_4_flight_detail_re_price_endpoint",
+      "community": 164,
+      "norm_label": "phase 4: flight detail & re-price endpoint"
+    },
+    {
+      "label": "Phase 5: Frontend Integration",
+      "file_type": "document",
+      "source_file": "specs/006-flight-search-service/plan.md",
+      "source_location": "L166",
+      "_origin": "ast",
+      "id": "specs_006_flight_search_service_plan_phase_5_frontend_integration",
+      "community": 164,
+      "norm_label": "phase 5: frontend integration"
+    },
+    {
+      "label": "Phase 6: E2E Testing & Verification",
+      "file_type": "document",
+      "source_file": "specs/006-flight-search-service/plan.md",
+      "source_location": "L185",
+      "_origin": "ast",
+      "id": "specs_006_flight_search_service_plan_phase_6_e2e_testing_verification",
+      "community": 164,
+      "norm_label": "phase 6: e2e testing & verification"
+    },
+    {
+      "label": "Environment Variables",
+      "file_type": "document",
+      "source_file": "specs/006-flight-search-service/plan.md",
+      "source_location": "L205",
+      "_origin": "ast",
+      "id": "specs_006_flight_search_service_plan_environment_variables",
+      "community": 164,
+      "norm_label": "environment variables"
+    },
+    {
+      "label": "Verification Plan",
+      "file_type": "document",
+      "source_file": "specs/006-flight-search-service/plan.md",
+      "source_location": "L215",
+      "_origin": "ast",
+      "id": "specs_006_flight_search_service_plan_verification_plan",
+      "community": 164,
+      "norm_label": "verification plan"
+    },
+    {
+      "label": "Automated Tests",
+      "file_type": "document",
+      "source_file": "specs/006-flight-search-service/plan.md",
+      "source_location": "L217",
+      "_origin": "ast",
+      "id": "specs_006_flight_search_service_plan_automated_tests",
+      "community": 164,
+      "norm_label": "automated tests"
+    },
+    {
+      "label": "Manual Verification",
+      "file_type": "document",
+      "source_file": "specs/006-flight-search-service/plan.md",
+      "source_location": "L230",
+      "_origin": "ast",
+      "id": "specs_006_flight_search_service_plan_manual_verification",
+      "community": 164,
+      "norm_label": "manual verification"
+    },
+    {
+      "label": "prd.md",
+      "file_type": "document",
+      "source_file": "specs/006-flight-search-service/prd.md",
+      "source_location": "L1",
+      "_origin": "ast",
+      "id": "specs_006_flight_search_service_prd",
+      "community": 25,
+      "norm_label": "prd.md"
+    },
+    {
+      "label": "PRD: Duffel Flight Search Service",
+      "file_type": "document",
+      "source_file": "specs/006-flight-search-service/prd.md",
+      "source_location": "L1",
+      "_origin": "ast",
+      "id": "specs_006_flight_search_service_prd_prd_duffel_flight_search_service",
+      "community": 25,
+      "norm_label": "prd: duffel flight search service"
+    },
+    {
+      "label": "Problem Statement",
+      "file_type": "document",
+      "source_file": "specs/006-flight-search-service/prd.md",
+      "source_location": "L8",
+      "_origin": "ast",
+      "id": "specs_006_flight_search_service_prd_problem_statement",
+      "community": 25,
+      "norm_label": "problem statement"
+    },
+    {
+      "label": "Solution",
+      "file_type": "document",
+      "source_file": "specs/006-flight-search-service/prd.md",
+      "source_location": "L12",
+      "_origin": "ast",
+      "id": "specs_006_flight_search_service_prd_solution",
+      "community": 25,
+      "norm_label": "solution"
+    },
+    {
+      "label": "User Stories",
+      "file_type": "document",
+      "source_file": "specs/006-flight-search-service/prd.md",
+      "source_location": "L18",
+      "_origin": "ast",
+      "id": "specs_006_flight_search_service_prd_user_stories",
+      "community": 25,
+      "norm_label": "user stories"
+    },
+    {
+      "label": "Implementation Decisions",
+      "file_type": "document",
+      "source_file": "specs/006-flight-search-service/prd.md",
+      "source_location": "L62",
+      "_origin": "ast",
+      "id": "specs_006_flight_search_service_prd_implementation_decisions",
+      "community": 25,
+      "norm_label": "implementation decisions"
+    },
+    {
+      "label": "DuffelService Extraction to Shared Module",
+      "file_type": "document",
+      "source_file": "specs/006-flight-search-service/prd.md",
+      "source_location": "L64",
+      "_origin": "ast",
+      "id": "specs_006_flight_search_service_prd_duffelservice_extraction_to_shared_module",
+      "community": 25,
+      "norm_label": "duffelservice extraction to shared module"
+    },
+    {
+      "label": "Raw Response Caching Strategy",
+      "file_type": "document",
+      "source_file": "specs/006-flight-search-service/prd.md",
+      "source_location": "L67",
+      "_origin": "ast",
+      "id": "specs_006_flight_search_service_prd_raw_response_caching_strategy",
+      "community": 25,
+      "norm_label": "raw response caching strategy"
+    },
+    {
+      "label": "Budget Priority Thresholds",
+      "file_type": "document",
+      "source_file": "specs/006-flight-search-service/prd.md",
+      "source_location": "L70",
+      "_origin": "ast",
+      "id": "specs_006_flight_search_service_prd_budget_priority_thresholds",
+      "community": 25,
+      "norm_label": "budget priority thresholds"
+    },
+    {
+      "label": "Hybrid Persistence (Redis + PostgreSQL)",
+      "file_type": "document",
+      "source_file": "specs/006-flight-search-service/prd.md",
+      "source_location": "L73",
+      "_origin": "ast",
+      "id": "specs_006_flight_search_service_prd_hybrid_persistence_redis_postgresql",
+      "community": 25,
+      "norm_label": "hybrid persistence (redis + postgresql)"
+    },
+    {
+      "label": "Async Write-Behind for Zero-Latency Persistence",
+      "file_type": "document",
+      "source_file": "specs/006-flight-search-service/prd.md",
+      "source_location": "L76",
+      "_origin": "ast",
+      "id": "specs_006_flight_search_service_prd_async_write_behind_for_zero_latency_persistence",
+      "community": 25,
+      "norm_label": "async write-behind for zero-latency persistence"
+    },
+    {
+      "label": "Two-Table Design",
+      "file_type": "document",
+      "source_file": "specs/006-flight-search-service/prd.md",
+      "source_location": "L79",
+      "_origin": "ast",
+      "id": "specs_006_flight_search_service_prd_two_table_design",
+      "community": 25,
+      "norm_label": "two-table design"
+    },
+    {
+      "label": "Flight Detail Re-Pricing Trigger Timing",
+      "file_type": "document",
+      "source_file": "specs/006-flight-search-service/prd.md",
+      "source_location": "L82",
+      "_origin": "ast",
+      "id": "specs_006_flight_search_service_prd_flight_detail_re_pricing_trigger_timing",
+      "community": 25,
+      "norm_label": "flight detail re-pricing trigger timing"
+    },
+    {
+      "label": "Expired Offer 410 Gone Recovery Pattern",
+      "file_type": "document",
+      "source_file": "specs/006-flight-search-service/prd.md",
+      "source_location": "L85",
+      "_origin": "ast",
+      "id": "specs_006_flight_search_service_prd_expired_offer_410_gone_recovery_pattern",
+      "community": 25,
+      "norm_label": "expired offer 410 gone recovery pattern"
+    },
+    {
+      "label": "Internal UUID vs Duffel Offer IDs",
+      "file_type": "document",
+      "source_file": "specs/006-flight-search-service/prd.md",
+      "source_location": "L88",
+      "_origin": "ast",
+      "id": "specs_006_flight_search_service_prd_internal_uuid_vs_duffel_offer_ids",
+      "community": 25,
+      "norm_label": "internal uuid vs duffel offer ids"
+    },
+    {
+      "label": "Round-Trip Support via Duffel Multi-Slice",
+      "file_type": "document",
+      "source_file": "specs/006-flight-search-service/prd.md",
+      "source_location": "L91",
+      "_origin": "ast",
+      "id": "specs_006_flight_search_service_prd_round_trip_support_via_duffel_multi_slice",
+      "community": 25,
+      "norm_label": "round-trip support via duffel multi-slice"
+    },
+    {
+      "label": "Testing Decisions",
+      "file_type": "document",
+      "source_file": "specs/006-flight-search-service/prd.md",
+      "source_location": "L94",
+      "_origin": "ast",
+      "id": "specs_006_flight_search_service_prd_testing_decisions",
+      "community": 25,
+      "norm_label": "testing decisions"
+    },
+    {
+      "label": "Testing Philosophy",
+      "file_type": "document",
+      "source_file": "specs/006-flight-search-service/prd.md",
+      "source_location": "L96",
+      "_origin": "ast",
+      "id": "specs_006_flight_search_service_prd_testing_philosophy",
+      "community": 25,
+      "norm_label": "testing philosophy"
+    },
+    {
+      "label": "Backend E2E Tests",
+      "file_type": "document",
+      "source_file": "specs/006-flight-search-service/prd.md",
+      "source_location": "L99",
+      "_origin": "ast",
+      "id": "specs_006_flight_search_service_prd_backend_e2e_tests",
+      "community": 25,
+      "norm_label": "backend e2e tests"
+    },
+    {
+      "label": "Frontend Smoke Tests",
+      "file_type": "document",
+      "source_file": "specs/006-flight-search-service/prd.md",
+      "source_location": "L107",
+      "_origin": "ast",
+      "id": "specs_006_flight_search_service_prd_frontend_smoke_tests",
+      "community": 25,
+      "norm_label": "frontend smoke tests"
+    },
+    {
+      "label": "Agent-Gateway Regression Tests",
+      "file_type": "document",
+      "source_file": "specs/006-flight-search-service/prd.md",
+      "source_location": "L114",
+      "_origin": "ast",
+      "id": "specs_006_flight_search_service_prd_agent_gateway_regression_tests",
+      "community": 25,
+      "norm_label": "agent-gateway regression tests"
+    },
+    {
+      "label": "Out of Scope",
+      "file_type": "document",
+      "source_file": "specs/006-flight-search-service/prd.md",
+      "source_location": "L120",
+      "_origin": "ast",
+      "id": "specs_006_flight_search_service_prd_out_of_scope",
+      "community": 25,
+      "norm_label": "out of scope"
+    },
+    {
+      "label": "Further Notes",
+      "file_type": "document",
+      "source_file": "specs/006-flight-search-service/prd.md",
+      "source_location": "L130",
+      "_origin": "ast",
+      "id": "specs_006_flight_search_service_prd_further_notes",
+      "community": 25,
+      "norm_label": "further notes"
+    },
+    {
+      "label": "6-Phase Delivery Plan",
+      "file_type": "document",
+      "source_file": "specs/006-flight-search-service/prd.md",
+      "source_location": "L132",
+      "_origin": "ast",
+      "id": "specs_006_flight_search_service_prd_6_phase_delivery_plan",
+      "community": 25,
+      "norm_label": "6-phase delivery plan"
+    },
+    {
+      "label": "Environment Variable Configuration",
+      "file_type": "document",
+      "source_file": "specs/006-flight-search-service/prd.md",
+      "source_location": "L135",
+      "_origin": "ast",
+      "id": "specs_006_flight_search_service_prd_environment_variable_configuration",
+      "community": 25,
+      "norm_label": "environment variable configuration"
+    },
+    {
+      "label": "Architecture Invariants",
+      "file_type": "document",
+      "source_file": "specs/006-flight-search-service/prd.md",
+      "source_location": "L138",
+      "_origin": "ast",
+      "id": "specs_006_flight_search_service_prd_architecture_invariants",
+      "community": 25,
+      "norm_label": "architecture invariants"
+    },
+    {
+      "label": "Dependency on Existing Systems",
+      "file_type": "document",
+      "source_file": "specs/006-flight-search-service/prd.md",
+      "source_location": "L141",
+      "_origin": "ast",
+      "id": "specs_006_flight_search_service_prd_dependency_on_existing_systems",
+      "community": 25,
+      "norm_label": "dependency on existing systems"
+    },
+    {
+      "label": "quickstart.md",
+      "file_type": "document",
+      "source_file": "specs/006-flight-search-service/quickstart.md",
+      "source_location": "L1",
+      "_origin": "ast",
+      "id": "specs_006_flight_search_service_quickstart",
+      "community": 251,
+      "norm_label": "quickstart.md"
+    },
+    {
+      "label": "Quickstart: Duffel Flight Search Service",
+      "file_type": "document",
+      "source_file": "specs/006-flight-search-service/quickstart.md",
+      "source_location": "L1",
+      "_origin": "ast",
+      "id": "specs_006_flight_search_service_quickstart_quickstart_duffel_flight_search_service",
+      "community": 251,
+      "norm_label": "quickstart: duffel flight search service"
+    },
+    {
+      "label": "Prerequisites",
+      "file_type": "document",
+      "source_file": "specs/006-flight-search-service/quickstart.md",
+      "source_location": "L6",
+      "_origin": "ast",
+      "id": "specs_006_flight_search_service_quickstart_prerequisites",
+      "community": 251,
+      "norm_label": "prerequisites"
+    },
+    {
+      "label": "Starting the Services",
+      "file_type": "document",
+      "source_file": "specs/006-flight-search-service/quickstart.md",
+      "source_location": "L23",
+      "_origin": "ast",
+      "id": "specs_006_flight_search_service_quickstart_starting_the_services",
+      "community": 251,
+      "norm_label": "starting the services"
+    },
+    {
+      "label": "Validation Scenarios",
+      "file_type": "document",
+      "source_file": "specs/006-flight-search-service/quickstart.md",
+      "source_location": "L36",
+      "_origin": "ast",
+      "id": "specs_006_flight_search_service_quickstart_validation_scenarios",
+      "community": 251,
+      "norm_label": "validation scenarios"
+    },
+    {
+      "label": "Scenario 1: One-Way Flight Search (P1 \u2014 Core Value)",
+      "file_type": "document",
+      "source_file": "specs/006-flight-search-service/quickstart.md",
+      "source_location": "L38",
+      "_origin": "ast",
+      "id": "specs_006_flight_search_service_quickstart_scenario_1_one_way_flight_search_p1_core_value",
+      "community": 251,
+      "norm_label": "scenario 1: one-way flight search (p1 \u2014 core value)"
+    },
+    {
+      "label": "Scenario 2: Round-Trip Flight Search (P1)",
+      "file_type": "document",
+      "source_file": "specs/006-flight-search-service/quickstart.md",
+      "source_location": "L65",
+      "_origin": "ast",
+      "id": "specs_006_flight_search_service_quickstart_scenario_2_round_trip_flight_search_p1",
+      "community": 251,
+      "norm_label": "scenario 2: round-trip flight search (p1)"
+    },
+    {
+      "label": "Scenario 3: Flight Detail with Live Re-pricing (P2)",
+      "file_type": "document",
+      "source_file": "specs/006-flight-search-service/quickstart.md",
+      "source_location": "L85",
+      "_origin": "ast",
+      "id": "specs_006_flight_search_service_quickstart_scenario_3_flight_detail_with_live_re_pricing_p2",
+      "community": 251,
+      "norm_label": "scenario 3: flight detail with live re-pricing (p2)"
+    },
+    {
+      "label": "Scenario 4: Expired Offer Recovery (P2)",
+      "file_type": "document",
+      "source_file": "specs/006-flight-search-service/quickstart.md",
+      "source_location": "L105",
+      "_origin": "ast",
+      "id": "specs_006_flight_search_service_quickstart_scenario_4_expired_offer_recovery_p2",
+      "community": 251,
+      "norm_label": "scenario 4: expired offer recovery (p2)"
+    },
+    {
+      "label": "Scenario 5: Budget Exhaustion Handling",
+      "file_type": "document",
+      "source_file": "specs/006-flight-search-service/quickstart.md",
+      "source_location": "L125",
+      "_origin": "ast",
+      "id": "specs_006_flight_search_service_quickstart_scenario_5_budget_exhaustion_handling",
+      "community": 251,
+      "norm_label": "scenario 5: budget exhaustion handling"
+    },
+    {
+      "label": "Scenario 6: Cache Hit Verification",
+      "file_type": "document",
+      "source_file": "specs/006-flight-search-service/quickstart.md",
+      "source_location": "L138",
+      "_origin": "ast",
+      "id": "specs_006_flight_search_service_quickstart_scenario_6_cache_hit_verification",
+      "community": 251,
+      "norm_label": "scenario 6: cache hit verification"
+    },
+    {
+      "label": "Scenario 7: Async Persistence Verification",
+      "file_type": "document",
+      "source_file": "specs/006-flight-search-service/quickstart.md",
+      "source_location": "L158",
+      "_origin": "ast",
+      "id": "specs_006_flight_search_service_quickstart_scenario_7_async_persistence_verification",
+      "community": 251,
+      "norm_label": "scenario 7: async persistence verification"
+    },
+    {
+      "label": "E2E Test Commands",
+      "file_type": "document",
+      "source_file": "specs/006-flight-search-service/quickstart.md",
+      "source_location": "L178",
+      "_origin": "ast",
+      "id": "specs_006_flight_search_service_quickstart_e2e_test_commands",
+      "community": 251,
+      "norm_label": "e2e test commands"
+    },
+    {
+      "label": "Troubleshooting",
+      "file_type": "document",
+      "source_file": "specs/006-flight-search-service/quickstart.md",
+      "source_location": "L191",
+      "_origin": "ast",
+      "id": "specs_006_flight_search_service_quickstart_troubleshooting",
+      "community": 251,
+      "norm_label": "troubleshooting"
+    },
+    {
+      "label": "research.md",
+      "file_type": "document",
+      "source_file": "specs/006-flight-search-service/research.md",
+      "source_location": "L1",
+      "_origin": "ast",
+      "id": "specs_006_flight_search_service_research",
+      "community": 266,
+      "norm_label": "research.md"
+    },
+    {
+      "label": "Research: Duffel Flight Search Service",
+      "file_type": "document",
+      "source_file": "specs/006-flight-search-service/research.md",
+      "source_location": "L1",
+      "_origin": "ast",
+      "id": "specs_006_flight_search_service_research_research_duffel_flight_search_service",
+      "community": 266,
+      "norm_label": "research: duffel flight search service"
+    },
+    {
+      "label": "R0: API Provider Migration (Amadeus \u2192 Duffel)",
+      "file_type": "document",
+      "source_file": "specs/006-flight-search-service/research.md",
+      "source_location": "L7",
+      "_origin": "ast",
+      "id": "specs_006_flight_search_service_research_r0_api_provider_migration_amadeus_duffel",
+      "community": 266,
+      "norm_label": "r0: api provider migration (amadeus \u2192 duffel)"
+    },
+    {
+      "label": "R1: DuffelService Extraction Pattern",
+      "file_type": "document",
+      "source_file": "specs/006-flight-search-service/research.md",
+      "source_location": "L22",
+      "_origin": "ast",
+      "id": "specs_006_flight_search_service_research_r1_duffelservice_extraction_pattern",
+      "community": 266,
+      "norm_label": "r1: duffelservice extraction pattern"
+    },
+    {
+      "label": "R2: Caching at Raw Response Level",
+      "file_type": "document",
+      "source_file": "specs/006-flight-search-service/research.md",
+      "source_location": "L32",
+      "_origin": "ast",
+      "id": "specs_006_flight_search_service_research_r2_caching_at_raw_response_level",
+      "community": 266,
+      "norm_label": "r2: caching at raw response level"
+    },
+    {
+      "label": "R3: Budget Priority Thresholds",
+      "file_type": "document",
+      "source_file": "specs/006-flight-search-service/research.md",
+      "source_location": "L42",
+      "_origin": "ast",
+      "id": "specs_006_flight_search_service_research_r3_budget_priority_thresholds",
+      "community": 266,
+      "norm_label": "r3: budget priority thresholds"
+    },
+    {
+      "label": "R4: Round-Trip via Duffel Multi-Slice",
+      "file_type": "document",
+      "source_file": "specs/006-flight-search-service/research.md",
+      "source_location": "L52",
+      "_origin": "ast",
+      "id": "specs_006_flight_search_service_research_r4_round_trip_via_duffel_multi_slice",
+      "community": 266,
+      "norm_label": "r4: round-trip via duffel multi-slice"
+    },
+    {
+      "label": "R5: Persistence Strategy \u2014 Hybrid Redis + PostgreSQL",
+      "file_type": "document",
+      "source_file": "specs/006-flight-search-service/research.md",
+      "source_location": "L66",
+      "_origin": "ast",
+      "id": "specs_006_flight_search_service_research_r5_persistence_strategy_hybrid_redis_postgresql",
+      "community": 266,
+      "norm_label": "r5: persistence strategy \u2014 hybrid redis + postgresql"
+    },
+    {
+      "label": "R6: Flight Detail Re-pricing via Duffel",
+      "file_type": "document",
+      "source_file": "specs/006-flight-search-service/research.md",
+      "source_location": "L72",
+      "_origin": "ast",
+      "id": "specs_006_flight_search_service_research_r6_flight_detail_re_pricing_via_duffel",
+      "community": 266,
+      "norm_label": "r6: flight detail re-pricing via duffel"
+    },
+    {
+      "label": "R7: Expired Offer Recovery (410 Gone)",
+      "file_type": "document",
+      "source_file": "specs/006-flight-search-service/research.md",
+      "source_location": "L82",
+      "_origin": "ast",
+      "id": "specs_006_flight_search_service_research_r7_expired_offer_recovery_410_gone",
+      "community": 266,
+      "norm_label": "r7: expired offer recovery (410 gone)"
+    },
+    {
+      "label": "R8: Duffel SDK Integration Pattern",
+      "file_type": "document",
+      "source_file": "specs/006-flight-search-service/research.md",
+      "source_location": "L88",
+      "_origin": "ast",
+      "id": "specs_006_flight_search_service_research_r8_duffel_sdk_integration_pattern",
+      "community": 266,
+      "norm_label": "r8: duffel sdk integration pattern"
+    },
+    {
+      "label": "spec.md",
+      "file_type": "document",
+      "source_file": "specs/006-flight-search-service/spec.md",
+      "source_location": "L1",
+      "_origin": "ast",
+      "id": "specs_006_flight_search_service_spec",
+      "community": 148,
+      "norm_label": "spec.md"
+    },
+    {
+      "label": "Feature Specification: Duffel Flight Search Service",
+      "file_type": "document",
+      "source_file": "specs/006-flight-search-service/spec.md",
+      "source_location": "L1",
+      "_origin": "ast",
+      "id": "specs_006_flight_search_service_spec_feature_specification_duffel_flight_search_service",
+      "community": 148,
+      "norm_label": "feature specification: duffel flight search service"
+    },
+    {
+      "label": "User Scenarios & Testing *(mandatory)*",
+      "file_type": "document",
+      "source_file": "specs/006-flight-search-service/spec.md",
+      "source_location": "L11",
+      "_origin": "ast",
+      "id": "specs_006_flight_search_service_spec_user_scenarios_testing_mandatory",
+      "community": 148,
+      "norm_label": "user scenarios & testing *(mandatory)*"
+    },
+    {
+      "label": "User Story 1 - Search for Flights (Priority: P1)",
+      "file_type": "document",
+      "source_file": "specs/006-flight-search-service/spec.md",
+      "source_location": "L13",
+      "_origin": "ast",
+      "id": "specs_006_flight_search_service_spec_user_story_1_search_for_flights_priority_p1",
+      "community": 148,
+      "norm_label": "user story 1 - search for flights (priority: p1)"
+    },
+    {
+      "label": "User Story 2 - View Flight Details with Live Pricing (Priority: P2)",
+      "file_type": "document",
+      "source_file": "specs/006-flight-search-service/spec.md",
+      "source_location": "L35",
+      "_origin": "ast",
+      "id": "specs_006_flight_search_service_spec_user_story_2_view_flight_details_with_live_pricing_priority_p2",
+      "community": 148,
+      "norm_label": "user story 2 - view flight details with live pricing (priority: p2)"
+    },
+    {
+      "label": "User Story 3 - Search History & Analytics Capture (Priority: P3)",
+      "file_type": "document",
+      "source_file": "specs/006-flight-search-service/spec.md",
+      "source_location": "L53",
+      "_origin": "ast",
+      "id": "specs_006_flight_search_service_spec_user_story_3_search_history_analytics_capture_priority_p3",
+      "community": 148,
+      "norm_label": "user story 3 - search history & analytics capture (priority: p3)"
+    },
+    {
+      "label": "Edge Cases",
+      "file_type": "document",
+      "source_file": "specs/006-flight-search-service/spec.md",
+      "source_location": "L71",
+      "_origin": "ast",
+      "id": "specs_006_flight_search_service_spec_edge_cases",
+      "community": 148,
+      "norm_label": "edge cases"
+    },
+    {
+      "label": "Requirements *(mandatory)*",
+      "file_type": "document",
+      "source_file": "specs/006-flight-search-service/spec.md",
+      "source_location": "L81",
+      "_origin": "ast",
+      "id": "specs_006_flight_search_service_spec_requirements_mandatory",
+      "community": 148,
+      "norm_label": "requirements *(mandatory)*"
+    },
+    {
+      "label": "Functional Requirements",
+      "file_type": "document",
+      "source_file": "specs/006-flight-search-service/spec.md",
+      "source_location": "L83",
+      "_origin": "ast",
+      "id": "specs_006_flight_search_service_spec_functional_requirements",
+      "community": 148,
+      "norm_label": "functional requirements"
+    },
+    {
+      "label": "Key Entities",
+      "file_type": "document",
+      "source_file": "specs/006-flight-search-service/spec.md",
+      "source_location": "L99",
+      "_origin": "ast",
+      "id": "specs_006_flight_search_service_spec_key_entities",
+      "community": 148,
+      "norm_label": "key entities"
+    },
+    {
+      "label": "Success Criteria *(mandatory)*",
+      "file_type": "document",
+      "source_file": "specs/006-flight-search-service/spec.md",
+      "source_location": "L105",
+      "_origin": "ast",
+      "id": "specs_006_flight_search_service_spec_success_criteria_mandatory",
+      "community": 148,
+      "norm_label": "success criteria *(mandatory)*"
+    },
+    {
+      "label": "Measurable Outcomes",
+      "file_type": "document",
+      "source_file": "specs/006-flight-search-service/spec.md",
+      "source_location": "L107",
+      "_origin": "ast",
+      "id": "specs_006_flight_search_service_spec_measurable_outcomes",
+      "community": 148,
+      "norm_label": "measurable outcomes"
+    },
+    {
+      "label": "Assumptions",
+      "file_type": "document",
+      "source_file": "specs/006-flight-search-service/spec.md",
+      "source_location": "L119",
+      "_origin": "ast",
+      "id": "specs_006_flight_search_service_spec_assumptions",
+      "community": 148,
+      "norm_label": "assumptions"
+    },
+    {
       "label": "Variant C: Modern Split Refined",
       "file_type": "rationale",
       "source_file": ".planning/sketches/001-chatbot-search-transition/README.md",
@@ -21488,7 +22808,7 @@
       "context": "import",
       "confidence": "EXTRACTED",
       "source_file": "apps/agent/src/agent/guardrails/nemo.py",
-      "source_location": "L7",
+      "source_location": "L8",
       "weight": 1.0,
       "source": "apps_agent_src_agent_guardrails_nemo",
       "target": "apps_agent_src_agent_config",
@@ -21859,7 +23179,7 @@
       "confidence": "INFERRED",
       "confidence_score": 0.8,
       "source_file": "apps/agent/src/agent/guardrails/nemo.py",
-      "source_location": "L21",
+      "source_location": "L22",
       "weight": 1.0,
       "source": "apps_agent_src_agent_guardrails_nemo_nemoguardrailservice_init",
       "target": "apps_agent_src_agent_config_get_settings"
@@ -22438,7 +23758,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "apps/agent/src/agent/guardrails/nemo.py",
-      "source_location": "L19",
+      "source_location": "L20",
       "weight": 1.0,
       "source": "apps_agent_src_agent_guardrails_nemo",
       "target": "apps_agent_src_agent_guardrails_nemo_nemoguardrailservice",
@@ -22448,7 +23768,17 @@
       "relation": "method",
       "confidence": "EXTRACTED",
       "source_file": "apps/agent/src/agent/guardrails/nemo.py",
-      "source_location": "L20",
+      "source_location": "L36",
+      "weight": 1.0,
+      "source": "apps_agent_src_agent_guardrails_nemo_nemoguardrailservice",
+      "target": "apps_agent_src_agent_guardrails_nemo_nemoguardrailservice_clean_verdict",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "method",
+      "confidence": "EXTRACTED",
+      "source_file": "apps/agent/src/agent/guardrails/nemo.py",
+      "source_location": "L21",
       "weight": 1.0,
       "source": "apps_agent_src_agent_guardrails_nemo_nemoguardrailservice",
       "target": "apps_agent_src_agent_guardrails_nemo_nemoguardrailservice_init",
@@ -22458,7 +23788,7 @@
       "relation": "method",
       "confidence": "EXTRACTED",
       "source_file": "apps/agent/src/agent/guardrails/nemo.py",
-      "source_location": "L280",
+      "source_location": "L295",
       "weight": 1.0,
       "source": "apps_agent_src_agent_guardrails_nemo_nemoguardrailservice",
       "target": "apps_agent_src_agent_guardrails_nemo_nemoguardrailservice_is_healthy",
@@ -22468,7 +23798,7 @@
       "relation": "method",
       "confidence": "EXTRACTED",
       "source_file": "apps/agent/src/agent/guardrails/nemo.py",
-      "source_location": "L32",
+      "source_location": "L45",
       "weight": 1.0,
       "source": "apps_agent_src_agent_guardrails_nemo_nemoguardrailservice",
       "target": "apps_agent_src_agent_guardrails_nemo_nemoguardrailservice_probe",
@@ -22478,7 +23808,7 @@
       "relation": "method",
       "confidence": "EXTRACTED",
       "source_file": "apps/agent/src/agent/guardrails/nemo.py",
-      "source_location": "L79",
+      "source_location": "L93",
       "weight": 1.0,
       "source": "apps_agent_src_agent_guardrails_nemo_nemoguardrailservice",
       "target": "apps_agent_src_agent_guardrails_nemo_nemoguardrailservice_validate_message",
@@ -22488,7 +23818,7 @@
       "relation": "method",
       "confidence": "EXTRACTED",
       "source_file": "apps/agent/src/agent/guardrails/nemo.py",
-      "source_location": "L178",
+      "source_location": "L193",
       "weight": 1.0,
       "source": "apps_agent_src_agent_guardrails_nemo_nemoguardrailservice",
       "target": "apps_agent_src_agent_guardrails_nemo_nemoguardrailservice_validate_output_chunk",
@@ -22526,6 +23856,28 @@
       "weight": 1.0,
       "source": "apps_agent_tests_test_output_guardrail_nemo_guardrail_service",
       "target": "apps_agent_src_agent_guardrails_nemo_nemoguardrailservice"
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "apps/agent/src/agent/guardrails/nemo.py",
+      "source_location": "L82",
+      "weight": 1.0,
+      "source": "apps_agent_src_agent_guardrails_nemo_nemoguardrailservice_probe",
+      "target": "apps_agent_src_agent_guardrails_nemo_nemoguardrailservice_clean_verdict",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "apps/agent/src/agent/guardrails/nemo.py",
+      "source_location": "L159",
+      "weight": 1.0,
+      "source": "apps_agent_src_agent_guardrails_nemo_nemoguardrailservice_validate_message",
+      "target": "apps_agent_src_agent_guardrails_nemo_nemoguardrailservice_clean_verdict",
+      "confidence_score": 1.0
     },
     {
       "relation": "contains",
@@ -24547,6 +25899,17 @@
       "confidence_score": 1.0
     },
     {
+      "relation": "references",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "apps/agent/src/agent/tools/get_preferences.py",
+      "source_location": "L43",
+      "weight": 1.0,
+      "source": "apps_agent_src_agent_tools_get_preferences_get_user_preferences",
+      "target": "apps_web_components_search_searchpageclient_airline_map"
+    },
+    {
       "relation": "rationale_for",
       "confidence": "EXTRACTED",
       "source_file": "apps/agent/src/agent/tools/get_preferences.py",
@@ -24576,6 +25939,17 @@
       "source": "apps_agent_src_agent_tools_list_bookings_list_user_bookings",
       "target": "apps_agent_src_agent_tools_list_bookings_py_runnableconfig",
       "confidence_score": 1.0
+    },
+    {
+      "relation": "references",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "apps/agent/src/agent/tools/list_bookings.py",
+      "source_location": "L33",
+      "weight": 1.0,
+      "source": "apps_agent_src_agent_tools_list_bookings_list_user_bookings",
+      "target": "apps_web_components_search_searchpageclient_airline_map"
     },
     {
       "relation": "rationale_for",
@@ -25127,6 +26501,17 @@
       "source": "apps_agent_src_agent_tools_search_flights_search_flights",
       "target": "apps_agent_src_agent_tools_search_flights_py_runnableconfig",
       "confidence_score": 1.0
+    },
+    {
+      "relation": "references",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "apps/agent/src/agent/tools/search_flights.py",
+      "source_location": "L68",
+      "weight": 1.0,
+      "source": "apps_agent_src_agent_tools_search_flights_search_flights",
+      "target": "apps_web_components_search_searchpageclient_airline_map"
     },
     {
       "relation": "contains",
@@ -27394,7 +28779,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "apps/api/package.json",
-      "source_location": "L17",
+      "source_location": "L18",
       "weight": 1.0,
       "source": "apps_api_package",
       "target": "apps_api_package_dependencies",
@@ -27404,7 +28789,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "apps/api/package.json",
-      "source_location": "L42",
+      "source_location": "L43",
       "weight": 1.0,
       "source": "apps_api_package",
       "target": "apps_api_package_devdependencies",
@@ -27424,7 +28809,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "apps/api/package.json",
-      "source_location": "L61",
+      "source_location": "L62",
       "weight": 1.0,
       "source": "apps_api_package",
       "target": "apps_api_package_prisma",
@@ -27477,17 +28862,7 @@
       "source_location": "L7",
       "weight": 1.0,
       "source": "apps_api_package_scripts",
-      "target": "apps_api_package_scripts_start",
-      "confidence_score": 1.0
-    },
-    {
-      "relation": "contains",
-      "confidence": "EXTRACTED",
-      "source_file": "apps/api/package.json",
-      "source_location": "L9",
-      "weight": 1.0,
-      "source": "apps_api_package_scripts",
-      "target": "apps_api_package_scripts_start_debug",
+      "target": "apps_api_package_scripts_dev",
       "confidence_score": 1.0
     },
     {
@@ -27497,7 +28872,7 @@
       "source_location": "L8",
       "weight": 1.0,
       "source": "apps_api_package_scripts",
-      "target": "apps_api_package_scripts_start_dev",
+      "target": "apps_api_package_scripts_start",
       "confidence_score": 1.0
     },
     {
@@ -27507,7 +28882,17 @@
       "source_location": "L10",
       "weight": 1.0,
       "source": "apps_api_package_scripts",
-      "target": "apps_api_package_scripts_start_prod",
+      "target": "apps_api_package_scripts_start_debug",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "apps/api/package.json",
+      "source_location": "L9",
+      "weight": 1.0,
+      "source": "apps_api_package_scripts",
+      "target": "apps_api_package_scripts_start_dev",
       "confidence_score": 1.0
     },
     {
@@ -27517,37 +28902,7 @@
       "source_location": "L11",
       "weight": 1.0,
       "source": "apps_api_package_scripts",
-      "target": "apps_api_package_scripts_test",
-      "confidence_score": 1.0
-    },
-    {
-      "relation": "contains",
-      "confidence": "EXTRACTED",
-      "source_file": "apps/api/package.json",
-      "source_location": "L13",
-      "weight": 1.0,
-      "source": "apps_api_package_scripts",
-      "target": "apps_api_package_scripts_test_cov",
-      "confidence_score": 1.0
-    },
-    {
-      "relation": "contains",
-      "confidence": "EXTRACTED",
-      "source_file": "apps/api/package.json",
-      "source_location": "L14",
-      "weight": 1.0,
-      "source": "apps_api_package_scripts",
-      "target": "apps_api_package_scripts_test_debug",
-      "confidence_score": 1.0
-    },
-    {
-      "relation": "contains",
-      "confidence": "EXTRACTED",
-      "source_file": "apps/api/package.json",
-      "source_location": "L15",
-      "weight": 1.0,
-      "source": "apps_api_package_scripts",
-      "target": "apps_api_package_scripts_test_e2e",
+      "target": "apps_api_package_scripts_start_prod",
       "confidence_score": 1.0
     },
     {
@@ -27557,17 +28912,47 @@
       "source_location": "L12",
       "weight": 1.0,
       "source": "apps_api_package_scripts",
-      "target": "apps_api_package_scripts_test_watch",
+      "target": "apps_api_package_scripts_test",
       "confidence_score": 1.0
     },
     {
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "apps/api/package.json",
-      "source_location": "L28",
+      "source_location": "L14",
       "weight": 1.0,
-      "source": "apps_api_package_dependencies",
-      "target": "apps_api_package_dependencies_amadeus",
+      "source": "apps_api_package_scripts",
+      "target": "apps_api_package_scripts_test_cov",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "apps/api/package.json",
+      "source_location": "L15",
+      "weight": 1.0,
+      "source": "apps_api_package_scripts",
+      "target": "apps_api_package_scripts_test_debug",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "apps/api/package.json",
+      "source_location": "L16",
+      "weight": 1.0,
+      "source": "apps_api_package_scripts",
+      "target": "apps_api_package_scripts_test_e2e",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "apps/api/package.json",
+      "source_location": "L13",
+      "weight": 1.0,
+      "source": "apps_api_package_scripts",
+      "target": "apps_api_package_scripts_test_watch",
       "confidence_score": 1.0
     },
     {
@@ -27577,7 +28962,7 @@
       "source_location": "L29",
       "weight": 1.0,
       "source": "apps_api_package_dependencies",
-      "target": "apps_api_package_dependencies_bcrypt",
+      "target": "apps_api_package_dependencies_amadeus",
       "confidence_score": 1.0
     },
     {
@@ -27587,7 +28972,7 @@
       "source_location": "L30",
       "weight": 1.0,
       "source": "apps_api_package_dependencies",
-      "target": "apps_api_package_dependencies_class_transformer",
+      "target": "apps_api_package_dependencies_bcrypt",
       "confidence_score": 1.0
     },
     {
@@ -27597,7 +28982,7 @@
       "source_location": "L31",
       "weight": 1.0,
       "source": "apps_api_package_dependencies",
-      "target": "apps_api_package_dependencies_class_validator",
+      "target": "apps_api_package_dependencies_class_transformer",
       "confidence_score": 1.0
     },
     {
@@ -27607,7 +28992,7 @@
       "source_location": "L32",
       "weight": 1.0,
       "source": "apps_api_package_dependencies",
-      "target": "apps_api_package_dependencies_ioredis",
+      "target": "apps_api_package_dependencies_class_validator",
       "confidence_score": 1.0
     },
     {
@@ -27617,27 +29002,7 @@
       "source_location": "L33",
       "weight": 1.0,
       "source": "apps_api_package_dependencies",
-      "target": "apps_api_package_dependencies_langchain",
-      "confidence_score": 1.0
-    },
-    {
-      "relation": "contains",
-      "confidence": "EXTRACTED",
-      "source_file": "apps/api/package.json",
-      "source_location": "L18",
-      "weight": 1.0,
-      "source": "apps_api_package_dependencies",
-      "target": "apps_api_package_dependencies_langchain_core",
-      "confidence_score": 1.0
-    },
-    {
-      "relation": "contains",
-      "confidence": "EXTRACTED",
-      "source_file": "apps/api/package.json",
-      "source_location": "L19",
-      "weight": 1.0,
-      "source": "apps_api_package_dependencies",
-      "target": "apps_api_package_dependencies_langchain_openai",
+      "target": "apps_api_package_dependencies_ioredis",
       "confidence_score": 1.0
     },
     {
@@ -27647,7 +29012,17 @@
       "source_location": "L34",
       "weight": 1.0,
       "source": "apps_api_package_dependencies",
-      "target": "apps_api_package_dependencies_langsmith",
+      "target": "apps_api_package_dependencies_langchain",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "apps/api/package.json",
+      "source_location": "L19",
+      "weight": 1.0,
+      "source": "apps_api_package_dependencies",
+      "target": "apps_api_package_dependencies_langchain_core",
       "confidence_score": 1.0
     },
     {
@@ -27657,57 +29032,7 @@
       "source_location": "L20",
       "weight": 1.0,
       "source": "apps_api_package_dependencies",
-      "target": "apps_api_package_dependencies_nestjs_common",
-      "confidence_score": 1.0
-    },
-    {
-      "relation": "contains",
-      "confidence": "EXTRACTED",
-      "source_file": "apps/api/package.json",
-      "source_location": "L21",
-      "weight": 1.0,
-      "source": "apps_api_package_dependencies",
-      "target": "apps_api_package_dependencies_nestjs_config",
-      "confidence_score": 1.0
-    },
-    {
-      "relation": "contains",
-      "confidence": "EXTRACTED",
-      "source_file": "apps/api/package.json",
-      "source_location": "L22",
-      "weight": 1.0,
-      "source": "apps_api_package_dependencies",
-      "target": "apps_api_package_dependencies_nestjs_core",
-      "confidence_score": 1.0
-    },
-    {
-      "relation": "contains",
-      "confidence": "EXTRACTED",
-      "source_file": "apps/api/package.json",
-      "source_location": "L23",
-      "weight": 1.0,
-      "source": "apps_api_package_dependencies",
-      "target": "apps_api_package_dependencies_nestjs_jwt",
-      "confidence_score": 1.0
-    },
-    {
-      "relation": "contains",
-      "confidence": "EXTRACTED",
-      "source_file": "apps/api/package.json",
-      "source_location": "L24",
-      "weight": 1.0,
-      "source": "apps_api_package_dependencies",
-      "target": "apps_api_package_dependencies_nestjs_passport",
-      "confidence_score": 1.0
-    },
-    {
-      "relation": "contains",
-      "confidence": "EXTRACTED",
-      "source_file": "apps/api/package.json",
-      "source_location": "L25",
-      "weight": 1.0,
-      "source": "apps_api_package_dependencies",
-      "target": "apps_api_package_dependencies_nestjs_platform_express",
+      "target": "apps_api_package_dependencies_langchain_openai",
       "confidence_score": 1.0
     },
     {
@@ -27717,17 +29042,57 @@
       "source_location": "L35",
       "weight": 1.0,
       "source": "apps_api_package_dependencies",
-      "target": "apps_api_package_dependencies_passport",
+      "target": "apps_api_package_dependencies_langsmith",
       "confidence_score": 1.0
     },
     {
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "apps/api/package.json",
-      "source_location": "L36",
+      "source_location": "L21",
       "weight": 1.0,
       "source": "apps_api_package_dependencies",
-      "target": "apps_api_package_dependencies_passport_jwt",
+      "target": "apps_api_package_dependencies_nestjs_common",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "apps/api/package.json",
+      "source_location": "L22",
+      "weight": 1.0,
+      "source": "apps_api_package_dependencies",
+      "target": "apps_api_package_dependencies_nestjs_config",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "apps/api/package.json",
+      "source_location": "L23",
+      "weight": 1.0,
+      "source": "apps_api_package_dependencies",
+      "target": "apps_api_package_dependencies_nestjs_core",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "apps/api/package.json",
+      "source_location": "L24",
+      "weight": 1.0,
+      "source": "apps_api_package_dependencies",
+      "target": "apps_api_package_dependencies_nestjs_jwt",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "apps/api/package.json",
+      "source_location": "L25",
+      "weight": 1.0,
+      "source": "apps_api_package_dependencies",
+      "target": "apps_api_package_dependencies_nestjs_passport",
       "confidence_score": 1.0
     },
     {
@@ -27737,7 +29102,17 @@
       "source_location": "L26",
       "weight": 1.0,
       "source": "apps_api_package_dependencies",
-      "target": "apps_api_package_dependencies_prisma_client",
+      "target": "apps_api_package_dependencies_nestjs_platform_express",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "apps/api/package.json",
+      "source_location": "L36",
+      "weight": 1.0,
+      "source": "apps_api_package_dependencies",
+      "target": "apps_api_package_dependencies_passport",
       "confidence_score": 1.0
     },
     {
@@ -27747,17 +29122,7 @@
       "source_location": "L37",
       "weight": 1.0,
       "source": "apps_api_package_dependencies",
-      "target": "apps_api_package_dependencies_reflect_metadata",
-      "confidence_score": 1.0
-    },
-    {
-      "relation": "contains",
-      "confidence": "EXTRACTED",
-      "source_file": "apps/api/package.json",
-      "source_location": "L38",
-      "weight": 1.0,
-      "source": "apps_api_package_dependencies",
-      "target": "apps_api_package_dependencies_rxjs",
+      "target": "apps_api_package_dependencies_passport_jwt",
       "confidence_score": 1.0
     },
     {
@@ -27767,7 +29132,17 @@
       "source_location": "L27",
       "weight": 1.0,
       "source": "apps_api_package_dependencies",
-      "target": "apps_api_package_dependencies_shared_types",
+      "target": "apps_api_package_dependencies_prisma_client",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "apps/api/package.json",
+      "source_location": "L38",
+      "weight": 1.0,
+      "source": "apps_api_package_dependencies",
+      "target": "apps_api_package_dependencies_reflect_metadata",
       "confidence_score": 1.0
     },
     {
@@ -27777,7 +29152,17 @@
       "source_location": "L39",
       "weight": 1.0,
       "source": "apps_api_package_dependencies",
-      "target": "apps_api_package_dependencies_stripe",
+      "target": "apps_api_package_dependencies_rxjs",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "apps/api/package.json",
+      "source_location": "L28",
+      "weight": 1.0,
+      "source": "apps_api_package_dependencies",
+      "target": "apps_api_package_dependencies_shared_types",
       "confidence_score": 1.0
     },
     {
@@ -27787,47 +29172,17 @@
       "source_location": "L40",
       "weight": 1.0,
       "source": "apps_api_package_dependencies",
+      "target": "apps_api_package_dependencies_stripe",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "apps/api/package.json",
+      "source_location": "L41",
+      "weight": 1.0,
+      "source": "apps_api_package_dependencies",
       "target": "apps_api_package_dependencies_zod",
-      "confidence_score": 1.0
-    },
-    {
-      "relation": "contains",
-      "confidence": "EXTRACTED",
-      "source_file": "apps/api/package.json",
-      "source_location": "L52",
-      "weight": 1.0,
-      "source": "apps_api_package_devdependencies",
-      "target": "apps_api_package_devdependencies_jest",
-      "confidence_score": 1.0
-    },
-    {
-      "relation": "contains",
-      "confidence": "EXTRACTED",
-      "source_file": "apps/api/package.json",
-      "source_location": "L43",
-      "weight": 1.0,
-      "source": "apps_api_package_devdependencies",
-      "target": "apps_api_package_devdependencies_nestjs_cli",
-      "confidence_score": 1.0
-    },
-    {
-      "relation": "contains",
-      "confidence": "EXTRACTED",
-      "source_file": "apps/api/package.json",
-      "source_location": "L44",
-      "weight": 1.0,
-      "source": "apps_api_package_devdependencies",
-      "target": "apps_api_package_devdependencies_nestjs_schematics",
-      "confidence_score": 1.0
-    },
-    {
-      "relation": "contains",
-      "confidence": "EXTRACTED",
-      "source_file": "apps/api/package.json",
-      "source_location": "L45",
-      "weight": 1.0,
-      "source": "apps_api_package_devdependencies",
-      "target": "apps_api_package_devdependencies_nestjs_testing",
       "confidence_score": 1.0
     },
     {
@@ -27837,57 +29192,27 @@
       "source_location": "L53",
       "weight": 1.0,
       "source": "apps_api_package_devdependencies",
-      "target": "apps_api_package_devdependencies_prisma",
+      "target": "apps_api_package_devdependencies_jest",
       "confidence_score": 1.0
     },
     {
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "apps/api/package.json",
-      "source_location": "L54",
+      "source_location": "L44",
       "weight": 1.0,
       "source": "apps_api_package_devdependencies",
-      "target": "apps_api_package_devdependencies_supertest",
+      "target": "apps_api_package_devdependencies_nestjs_cli",
       "confidence_score": 1.0
     },
     {
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "apps/api/package.json",
-      "source_location": "L55",
+      "source_location": "L45",
       "weight": 1.0,
       "source": "apps_api_package_devdependencies",
-      "target": "apps_api_package_devdependencies_ts_jest",
-      "confidence_score": 1.0
-    },
-    {
-      "relation": "contains",
-      "confidence": "EXTRACTED",
-      "source_file": "apps/api/package.json",
-      "source_location": "L56",
-      "weight": 1.0,
-      "source": "apps_api_package_devdependencies",
-      "target": "apps_api_package_devdependencies_ts_loader",
-      "confidence_score": 1.0
-    },
-    {
-      "relation": "contains",
-      "confidence": "EXTRACTED",
-      "source_file": "apps/api/package.json",
-      "source_location": "L57",
-      "weight": 1.0,
-      "source": "apps_api_package_devdependencies",
-      "target": "apps_api_package_devdependencies_ts_node",
-      "confidence_score": 1.0
-    },
-    {
-      "relation": "contains",
-      "confidence": "EXTRACTED",
-      "source_file": "apps/api/package.json",
-      "source_location": "L58",
-      "weight": 1.0,
-      "source": "apps_api_package_devdependencies",
-      "target": "apps_api_package_devdependencies_tsconfig_paths",
+      "target": "apps_api_package_devdependencies_nestjs_schematics",
       "confidence_score": 1.0
     },
     {
@@ -27897,57 +29222,57 @@
       "source_location": "L46",
       "weight": 1.0,
       "source": "apps_api_package_devdependencies",
-      "target": "apps_api_package_devdependencies_types_bcrypt",
+      "target": "apps_api_package_devdependencies_nestjs_testing",
       "confidence_score": 1.0
     },
     {
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "apps/api/package.json",
-      "source_location": "L47",
+      "source_location": "L54",
       "weight": 1.0,
       "source": "apps_api_package_devdependencies",
-      "target": "apps_api_package_devdependencies_types_express",
+      "target": "apps_api_package_devdependencies_prisma",
       "confidence_score": 1.0
     },
     {
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "apps/api/package.json",
-      "source_location": "L48",
+      "source_location": "L55",
       "weight": 1.0,
       "source": "apps_api_package_devdependencies",
-      "target": "apps_api_package_devdependencies_types_jest",
+      "target": "apps_api_package_devdependencies_supertest",
       "confidence_score": 1.0
     },
     {
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "apps/api/package.json",
-      "source_location": "L49",
+      "source_location": "L56",
       "weight": 1.0,
       "source": "apps_api_package_devdependencies",
-      "target": "apps_api_package_devdependencies_types_node",
+      "target": "apps_api_package_devdependencies_ts_jest",
       "confidence_score": 1.0
     },
     {
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "apps/api/package.json",
-      "source_location": "L50",
+      "source_location": "L57",
       "weight": 1.0,
       "source": "apps_api_package_devdependencies",
-      "target": "apps_api_package_devdependencies_types_passport_jwt",
+      "target": "apps_api_package_devdependencies_ts_loader",
       "confidence_score": 1.0
     },
     {
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "apps/api/package.json",
-      "source_location": "L51",
+      "source_location": "L58",
       "weight": 1.0,
       "source": "apps_api_package_devdependencies",
-      "target": "apps_api_package_devdependencies_types_supertest",
+      "target": "apps_api_package_devdependencies_ts_node",
       "confidence_score": 1.0
     },
     {
@@ -27957,6 +29282,76 @@
       "source_location": "L59",
       "weight": 1.0,
       "source": "apps_api_package_devdependencies",
+      "target": "apps_api_package_devdependencies_tsconfig_paths",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "apps/api/package.json",
+      "source_location": "L47",
+      "weight": 1.0,
+      "source": "apps_api_package_devdependencies",
+      "target": "apps_api_package_devdependencies_types_bcrypt",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "apps/api/package.json",
+      "source_location": "L48",
+      "weight": 1.0,
+      "source": "apps_api_package_devdependencies",
+      "target": "apps_api_package_devdependencies_types_express",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "apps/api/package.json",
+      "source_location": "L49",
+      "weight": 1.0,
+      "source": "apps_api_package_devdependencies",
+      "target": "apps_api_package_devdependencies_types_jest",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "apps/api/package.json",
+      "source_location": "L50",
+      "weight": 1.0,
+      "source": "apps_api_package_devdependencies",
+      "target": "apps_api_package_devdependencies_types_node",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "apps/api/package.json",
+      "source_location": "L51",
+      "weight": 1.0,
+      "source": "apps_api_package_devdependencies",
+      "target": "apps_api_package_devdependencies_types_passport_jwt",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "apps/api/package.json",
+      "source_location": "L52",
+      "weight": 1.0,
+      "source": "apps_api_package_devdependencies",
+      "target": "apps_api_package_devdependencies_types_supertest",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "apps/api/package.json",
+      "source_location": "L60",
+      "weight": 1.0,
+      "source": "apps_api_package_devdependencies",
       "target": "apps_api_package_devdependencies_typescript",
       "confidence_score": 1.0
     },
@@ -27964,7 +29359,7 @@
       "relation": "imports",
       "confidence": "EXTRACTED",
       "source_file": "apps/api/package.json",
-      "source_location": "L58",
+      "source_location": "L59",
       "weight": 1.0,
       "context": "import",
       "source": "apps_api_package_devdependencies_tsconfig_paths",
@@ -27975,7 +29370,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "apps/api/package.json",
-      "source_location": "L62",
+      "source_location": "L63",
       "weight": 1.0,
       "source": "apps_api_package_prisma",
       "target": "apps_api_package_prisma_seed",
@@ -35261,6 +36656,16 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "apps/web/components/search/SearchPageClient.tsx",
+      "source_location": "L26",
+      "weight": 1.0,
+      "source": "apps_web_components_search_searchpageclient",
+      "target": "apps_web_components_search_searchpageclient_airline_map",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "apps/web/components/search/SearchPageClient.tsx",
       "source_location": "L24",
       "weight": 1.0,
       "source": "apps_web_components_search_searchpageclient",
@@ -35271,7 +36676,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "apps/web/components/search/SearchPageClient.tsx",
-      "source_location": "L30",
+      "source_location": "L37",
       "weight": 1.0,
       "source": "apps_web_components_search_searchpageclient",
       "target": "apps_web_components_search_searchpageclient_message",
@@ -35281,7 +36686,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "apps/web/components/search/SearchPageClient.tsx",
-      "source_location": "L26",
+      "source_location": "L33",
       "weight": 1.0,
       "source": "apps_web_components_search_searchpageclient",
       "target": "apps_web_components_search_searchpageclient_props",
@@ -35291,7 +36696,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "apps/web/components/search/SearchPageClient.tsx",
-      "source_location": "L37",
+      "source_location": "L44",
       "weight": 1.0,
       "source": "apps_web_components_search_searchpageclient",
       "target": "apps_web_components_search_searchpageclient_searchpageclient",
@@ -35347,7 +36752,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "apps/web/components/search/SearchPageClient.tsx",
-      "source_location": "L529",
+      "source_location": "L551",
       "weight": 1.0,
       "source": "apps_web_components_search_searchpageclient_searchpageclient",
       "target": "apps_web_lib_utils_cn"
@@ -39080,6 +40485,136 @@
       "weight": 1.0,
       "source": "research_decision_boundaries_4_ai_agents_vs_deterministic_services_hybrid_architecture",
       "target": "research_decision_boundaries_rationale",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "research/flight-search-decisions.md",
+      "source_location": "L1",
+      "weight": 1.0,
+      "source": "research_flight_search_decisions",
+      "target": "research_flight_search_decisions_flight_search_service_architectural_decisions",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "research/flight-search-decisions.md",
+      "source_location": "L213",
+      "weight": 1.0,
+      "source": "research_flight_search_decisions_flight_search_service_architectural_decisions",
+      "target": "research_flight_search_decisions_architecture_invariants_reinforced",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "research/flight-search-decisions.md",
+      "source_location": "L9",
+      "weight": 1.0,
+      "source": "research_flight_search_decisions_flight_search_service_architectural_decisions",
+      "target": "research_flight_search_decisions_core_principle",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "research/flight-search-decisions.md",
+      "source_location": "L15",
+      "weight": 1.0,
+      "source": "research_flight_search_decisions_flight_search_service_architectural_decisions",
+      "target": "research_flight_search_decisions_decision_summary",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "research/flight-search-decisions.md",
+      "source_location": "L34",
+      "weight": 1.0,
+      "source": "research_flight_search_decisions_flight_search_service_architectural_decisions",
+      "target": "research_flight_search_decisions_duffel_api_key_differences_from_amadeus",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "research/flight-search-decisions.md",
+      "source_location": "L201",
+      "weight": 1.0,
+      "source": "research_flight_search_decisions_flight_search_service_architectural_decisions",
+      "target": "research_flight_search_decisions_environment_variables_updated",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "research/flight-search-decisions.md",
+      "source_location": "L49",
+      "weight": 1.0,
+      "source": "research_flight_search_decisions_flight_search_service_architectural_decisions",
+      "target": "research_flight_search_decisions_implementation_phases",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "research/flight-search-decisions.md",
+      "source_location": "L51",
+      "weight": 1.0,
+      "source": "research_flight_search_decisions_implementation_phases",
+      "target": "research_flight_search_decisions_phase_1_duffelservice_shared_module",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "research/flight-search-decisions.md",
+      "source_location": "L83",
+      "weight": 1.0,
+      "source": "research_flight_search_decisions_implementation_phases",
+      "target": "research_flight_search_decisions_phase_2_database_schema_flight_offers_search_history",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "research/flight-search-decisions.md",
+      "source_location": "L122",
+      "weight": 1.0,
+      "source": "research_flight_search_decisions_implementation_phases",
+      "target": "research_flight_search_decisions_phase_3_flightsmodule_deterministic_search_endpoint",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "research/flight-search-decisions.md",
+      "source_location": "L144",
+      "weight": 1.0,
+      "source": "research_flight_search_decisions_implementation_phases",
+      "target": "research_flight_search_decisions_phase_4_flight_detail_re_price_endpoint",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "research/flight-search-decisions.md",
+      "source_location": "L163",
+      "weight": 1.0,
+      "source": "research_flight_search_decisions_implementation_phases",
+      "target": "research_flight_search_decisions_phase_5_frontend_integration",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "research/flight-search-decisions.md",
+      "source_location": "L182",
+      "weight": 1.0,
+      "source": "research_flight_search_decisions_implementation_phases",
+      "target": "research_flight_search_decisions_phase_6_e2e_testing_verification",
       "confidence_score": 1.0
     },
     {
@@ -46541,6 +48076,1086 @@
       "source": "specs_005_map_integration_tasks_dependencies_execution_order",
       "target": "specs_005_map_integration_tasks_phase_dependencies",
       "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "specs/006-flight-search-service/checklists/requirements.md",
+      "source_location": "L1",
+      "weight": 1.0,
+      "source": "specs_006_flight_search_service_checklists_requirements",
+      "target": "specs_006_flight_search_service_checklists_requirements_specification_quality_checklist_duffel_flight_search_service",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "source_file": "specs/006-flight-search-service/checklists/requirements.md",
+      "source_location": "L5",
+      "weight": 1.0,
+      "source": "specs_006_flight_search_service_checklists_requirements",
+      "target": "specs_006_flight_search_service_spec",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "specs/006-flight-search-service/checklists/requirements.md",
+      "source_location": "L7",
+      "weight": 1.0,
+      "source": "specs_006_flight_search_service_checklists_requirements_specification_quality_checklist_duffel_flight_search_service",
+      "target": "specs_006_flight_search_service_checklists_requirements_content_quality",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "specs/006-flight-search-service/checklists/requirements.md",
+      "source_location": "L25",
+      "weight": 1.0,
+      "source": "specs_006_flight_search_service_checklists_requirements_specification_quality_checklist_duffel_flight_search_service",
+      "target": "specs_006_flight_search_service_checklists_requirements_feature_readiness",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "specs/006-flight-search-service/checklists/requirements.md",
+      "source_location": "L32",
+      "weight": 1.0,
+      "source": "specs_006_flight_search_service_checklists_requirements_specification_quality_checklist_duffel_flight_search_service",
+      "target": "specs_006_flight_search_service_checklists_requirements_notes",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "specs/006-flight-search-service/checklists/requirements.md",
+      "source_location": "L14",
+      "weight": 1.0,
+      "source": "specs_006_flight_search_service_checklists_requirements_specification_quality_checklist_duffel_flight_search_service",
+      "target": "specs_006_flight_search_service_checklists_requirements_requirement_completeness",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "specs/006-flight-search-service/contracts/api.md",
+      "source_location": "L1",
+      "weight": 1.0,
+      "source": "specs_006_flight_search_service_contracts_api",
+      "target": "specs_006_flight_search_service_contracts_api_api_contract_flight_search",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "specs/006-flight-search-service/contracts/api.md",
+      "source_location": "L124",
+      "weight": 1.0,
+      "source": "specs_006_flight_search_service_contracts_api_api_contract_flight_search",
+      "target": "specs_006_flight_search_service_contracts_api_get_api_flights_id",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "specs/006-flight-search-service/contracts/api.md",
+      "source_location": "L9",
+      "weight": 1.0,
+      "source": "specs_006_flight_search_service_contracts_api_api_contract_flight_search",
+      "target": "specs_006_flight_search_service_contracts_api_post_api_flights_search",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "specs/006-flight-search-service/contracts/api.md",
+      "source_location": "L13",
+      "weight": 1.0,
+      "source": "specs_006_flight_search_service_contracts_api_post_api_flights_search",
+      "target": "specs_006_flight_search_service_contracts_api_authentication",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "specs/006-flight-search-service/contracts/api.md",
+      "source_location": "L104",
+      "weight": 1.0,
+      "source": "specs_006_flight_search_service_contracts_api_post_api_flights_search",
+      "target": "specs_006_flight_search_service_contracts_api_error_responses",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "specs/006-flight-search-service/contracts/api.md",
+      "source_location": "L17",
+      "weight": 1.0,
+      "source": "specs_006_flight_search_service_contracts_api_post_api_flights_search",
+      "target": "specs_006_flight_search_service_contracts_api_request_body",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "specs/006-flight-search-service/contracts/api.md",
+      "source_location": "L37",
+      "weight": 1.0,
+      "source": "specs_006_flight_search_service_contracts_api_post_api_flights_search",
+      "target": "specs_006_flight_search_service_contracts_api_success_response_200_ok",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "specs/006-flight-search-service/contracts/api.md",
+      "source_location": "L128",
+      "weight": 1.0,
+      "source": "specs_006_flight_search_service_contracts_api_get_api_flights_id",
+      "target": "specs_006_flight_search_service_contracts_api_authentication_128",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "specs/006-flight-search-service/contracts/api.md",
+      "source_location": "L196",
+      "weight": 1.0,
+      "source": "specs_006_flight_search_service_contracts_api_get_api_flights_id",
+      "target": "specs_006_flight_search_service_contracts_api_error_responses_196",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "specs/006-flight-search-service/contracts/api.md",
+      "source_location": "L132",
+      "weight": 1.0,
+      "source": "specs_006_flight_search_service_contracts_api_get_api_flights_id",
+      "target": "specs_006_flight_search_service_contracts_api_path_parameters",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "specs/006-flight-search-service/contracts/api.md",
+      "source_location": "L138",
+      "weight": 1.0,
+      "source": "specs_006_flight_search_service_contracts_api_get_api_flights_id",
+      "target": "specs_006_flight_search_service_contracts_api_success_response_200_ok_138",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "specs/006-flight-search-service/contracts/api.md",
+      "source_location": "L206",
+      "weight": 1.0,
+      "source": "specs_006_flight_search_service_contracts_api_error_responses_196",
+      "target": "specs_006_flight_search_service_contracts_api_410_gone_response_expired_offer",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "specs/006-flight-search-service/data-model.md",
+      "source_location": "L1",
+      "weight": 1.0,
+      "source": "specs_006_flight_search_service_data_model",
+      "target": "specs_006_flight_search_service_data_model_data_model_duffel_flight_search_service",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "specs/006-flight-search-service/data-model.md",
+      "source_location": "L82",
+      "weight": 1.0,
+      "source": "specs_006_flight_search_service_data_model_data_model_duffel_flight_search_service",
+      "target": "specs_006_flight_search_service_data_model_modified_entities",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "specs/006-flight-search-service/data-model.md",
+      "source_location": "L6",
+      "weight": 1.0,
+      "source": "specs_006_flight_search_service_data_model_data_model_duffel_flight_search_service",
+      "target": "specs_006_flight_search_service_data_model_new_entities",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "specs/006-flight-search-service/data-model.md",
+      "source_location": "L96",
+      "weight": 1.0,
+      "source": "specs_006_flight_search_service_data_model_data_model_duffel_flight_search_service",
+      "target": "specs_006_flight_search_service_data_model_prisma_schema_additions",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "specs/006-flight-search-service/data-model.md",
+      "source_location": "L152",
+      "weight": 1.0,
+      "source": "specs_006_flight_search_service_data_model_data_model_duffel_flight_search_service",
+      "target": "specs_006_flight_search_service_data_model_state_transitions",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "specs/006-flight-search-service/data-model.md",
+      "source_location": "L8",
+      "weight": 1.0,
+      "source": "specs_006_flight_search_service_data_model_new_entities",
+      "target": "specs_006_flight_search_service_data_model_flightoffer",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "specs/006-flight-search-service/data-model.md",
+      "source_location": "L66",
+      "weight": 1.0,
+      "source": "specs_006_flight_search_service_data_model_new_entities",
+      "target": "specs_006_flight_search_service_data_model_offerrecovery",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "specs/006-flight-search-service/data-model.md",
+      "source_location": "L37",
+      "weight": 1.0,
+      "source": "specs_006_flight_search_service_data_model_new_entities",
+      "target": "specs_006_flight_search_service_data_model_searchhistory",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "specs/006-flight-search-service/data-model.md",
+      "source_location": "L84",
+      "weight": 1.0,
+      "source": "specs_006_flight_search_service_data_model_modified_entities",
+      "target": "specs_006_flight_search_service_data_model_user_existing",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "specs/006-flight-search-service/data-model.md",
+      "source_location": "L154",
+      "weight": 1.0,
+      "source": "specs_006_flight_search_service_data_model_state_transitions",
+      "target": "specs_006_flight_search_service_data_model_flightoffer_lifecycle",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "specs/006-flight-search-service/data-model.md",
+      "source_location": "L164",
+      "weight": 1.0,
+      "source": "specs_006_flight_search_service_data_model_state_transitions",
+      "target": "specs_006_flight_search_service_data_model_search_flow_state",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "specs/006-flight-search-service/plan.md",
+      "source_location": "L1",
+      "weight": 1.0,
+      "source": "specs_006_flight_search_service_plan",
+      "target": "specs_006_flight_search_service_plan_implementation_plan_duffel_flight_search_service",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "specs/006-flight-search-service/plan.md",
+      "source_location": "L33",
+      "weight": 1.0,
+      "source": "specs_006_flight_search_service_plan_implementation_plan_duffel_flight_search_service",
+      "target": "specs_006_flight_search_service_plan_constitution_check",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "specs/006-flight-search-service/plan.md",
+      "source_location": "L205",
+      "weight": 1.0,
+      "source": "specs_006_flight_search_service_plan_implementation_plan_duffel_flight_search_service",
+      "target": "specs_006_flight_search_service_plan_environment_variables",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "specs/006-flight-search-service/plan.md",
+      "source_location": "L84",
+      "weight": 1.0,
+      "source": "specs_006_flight_search_service_plan_implementation_plan_duffel_flight_search_service",
+      "target": "specs_006_flight_search_service_plan_implementation_phases",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "specs/006-flight-search-service/plan.md",
+      "source_location": "L43",
+      "weight": 1.0,
+      "source": "specs_006_flight_search_service_plan_implementation_plan_duffel_flight_search_service",
+      "target": "specs_006_flight_search_service_plan_project_structure",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "specs/006-flight-search-service/plan.md",
+      "source_location": "L9",
+      "weight": 1.0,
+      "source": "specs_006_flight_search_service_plan_implementation_plan_duffel_flight_search_service",
+      "target": "specs_006_flight_search_service_plan_summary",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "specs/006-flight-search-service/plan.md",
+      "source_location": "L13",
+      "weight": 1.0,
+      "source": "specs_006_flight_search_service_plan_implementation_plan_duffel_flight_search_service",
+      "target": "specs_006_flight_search_service_plan_technical_context",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "specs/006-flight-search-service/plan.md",
+      "source_location": "L215",
+      "weight": 1.0,
+      "source": "specs_006_flight_search_service_plan_implementation_plan_duffel_flight_search_service",
+      "target": "specs_006_flight_search_service_plan_verification_plan",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "specs/006-flight-search-service/plan.md",
+      "source_location": "L45",
+      "weight": 1.0,
+      "source": "specs_006_flight_search_service_plan_project_structure",
+      "target": "specs_006_flight_search_service_plan_documentation_this_feature",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "specs/006-flight-search-service/plan.md",
+      "source_location": "L57",
+      "weight": 1.0,
+      "source": "specs_006_flight_search_service_plan_project_structure",
+      "target": "specs_006_flight_search_service_plan_source_code_repository_root",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "specs/006-flight-search-service/plan.md",
+      "source_location": "L86",
+      "weight": 1.0,
+      "source": "specs_006_flight_search_service_plan_implementation_phases",
+      "target": "specs_006_flight_search_service_plan_phase_1_duffelservice_shared_module_extraction",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "specs/006-flight-search-service/plan.md",
+      "source_location": "L110",
+      "weight": 1.0,
+      "source": "specs_006_flight_search_service_plan_implementation_phases",
+      "target": "specs_006_flight_search_service_plan_phase_2_database_schema_flight_offers_search_history",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "specs/006-flight-search-service/plan.md",
+      "source_location": "L128",
+      "weight": 1.0,
+      "source": "specs_006_flight_search_service_plan_implementation_phases",
+      "target": "specs_006_flight_search_service_plan_phase_3_flightsmodule_user_facing_search_endpoint",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "specs/006-flight-search-service/plan.md",
+      "source_location": "L148",
+      "weight": 1.0,
+      "source": "specs_006_flight_search_service_plan_implementation_phases",
+      "target": "specs_006_flight_search_service_plan_phase_4_flight_detail_re_price_endpoint",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "specs/006-flight-search-service/plan.md",
+      "source_location": "L166",
+      "weight": 1.0,
+      "source": "specs_006_flight_search_service_plan_implementation_phases",
+      "target": "specs_006_flight_search_service_plan_phase_5_frontend_integration",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "specs/006-flight-search-service/plan.md",
+      "source_location": "L185",
+      "weight": 1.0,
+      "source": "specs_006_flight_search_service_plan_implementation_phases",
+      "target": "specs_006_flight_search_service_plan_phase_6_e2e_testing_verification",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "specs/006-flight-search-service/plan.md",
+      "source_location": "L217",
+      "weight": 1.0,
+      "source": "specs_006_flight_search_service_plan_verification_plan",
+      "target": "specs_006_flight_search_service_plan_automated_tests",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "specs/006-flight-search-service/plan.md",
+      "source_location": "L230",
+      "weight": 1.0,
+      "source": "specs_006_flight_search_service_plan_verification_plan",
+      "target": "specs_006_flight_search_service_plan_manual_verification",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "specs/006-flight-search-service/prd.md",
+      "source_location": "L1",
+      "weight": 1.0,
+      "source": "specs_006_flight_search_service_prd",
+      "target": "specs_006_flight_search_service_prd_prd_duffel_flight_search_service",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "specs/006-flight-search-service/prd.md",
+      "source_location": "L130",
+      "weight": 1.0,
+      "source": "specs_006_flight_search_service_prd_prd_duffel_flight_search_service",
+      "target": "specs_006_flight_search_service_prd_further_notes",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "specs/006-flight-search-service/prd.md",
+      "source_location": "L62",
+      "weight": 1.0,
+      "source": "specs_006_flight_search_service_prd_prd_duffel_flight_search_service",
+      "target": "specs_006_flight_search_service_prd_implementation_decisions",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "specs/006-flight-search-service/prd.md",
+      "source_location": "L120",
+      "weight": 1.0,
+      "source": "specs_006_flight_search_service_prd_prd_duffel_flight_search_service",
+      "target": "specs_006_flight_search_service_prd_out_of_scope",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "specs/006-flight-search-service/prd.md",
+      "source_location": "L8",
+      "weight": 1.0,
+      "source": "specs_006_flight_search_service_prd_prd_duffel_flight_search_service",
+      "target": "specs_006_flight_search_service_prd_problem_statement",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "specs/006-flight-search-service/prd.md",
+      "source_location": "L12",
+      "weight": 1.0,
+      "source": "specs_006_flight_search_service_prd_prd_duffel_flight_search_service",
+      "target": "specs_006_flight_search_service_prd_solution",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "specs/006-flight-search-service/prd.md",
+      "source_location": "L94",
+      "weight": 1.0,
+      "source": "specs_006_flight_search_service_prd_prd_duffel_flight_search_service",
+      "target": "specs_006_flight_search_service_prd_testing_decisions",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "specs/006-flight-search-service/prd.md",
+      "source_location": "L18",
+      "weight": 1.0,
+      "source": "specs_006_flight_search_service_prd_prd_duffel_flight_search_service",
+      "target": "specs_006_flight_search_service_prd_user_stories",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "specs/006-flight-search-service/prd.md",
+      "source_location": "L76",
+      "weight": 1.0,
+      "source": "specs_006_flight_search_service_prd_implementation_decisions",
+      "target": "specs_006_flight_search_service_prd_async_write_behind_for_zero_latency_persistence",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "specs/006-flight-search-service/prd.md",
+      "source_location": "L70",
+      "weight": 1.0,
+      "source": "specs_006_flight_search_service_prd_implementation_decisions",
+      "target": "specs_006_flight_search_service_prd_budget_priority_thresholds",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "specs/006-flight-search-service/prd.md",
+      "source_location": "L64",
+      "weight": 1.0,
+      "source": "specs_006_flight_search_service_prd_implementation_decisions",
+      "target": "specs_006_flight_search_service_prd_duffelservice_extraction_to_shared_module",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "specs/006-flight-search-service/prd.md",
+      "source_location": "L85",
+      "weight": 1.0,
+      "source": "specs_006_flight_search_service_prd_implementation_decisions",
+      "target": "specs_006_flight_search_service_prd_expired_offer_410_gone_recovery_pattern",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "specs/006-flight-search-service/prd.md",
+      "source_location": "L82",
+      "weight": 1.0,
+      "source": "specs_006_flight_search_service_prd_implementation_decisions",
+      "target": "specs_006_flight_search_service_prd_flight_detail_re_pricing_trigger_timing",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "specs/006-flight-search-service/prd.md",
+      "source_location": "L73",
+      "weight": 1.0,
+      "source": "specs_006_flight_search_service_prd_implementation_decisions",
+      "target": "specs_006_flight_search_service_prd_hybrid_persistence_redis_postgresql",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "specs/006-flight-search-service/prd.md",
+      "source_location": "L88",
+      "weight": 1.0,
+      "source": "specs_006_flight_search_service_prd_implementation_decisions",
+      "target": "specs_006_flight_search_service_prd_internal_uuid_vs_duffel_offer_ids",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "specs/006-flight-search-service/prd.md",
+      "source_location": "L67",
+      "weight": 1.0,
+      "source": "specs_006_flight_search_service_prd_implementation_decisions",
+      "target": "specs_006_flight_search_service_prd_raw_response_caching_strategy",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "specs/006-flight-search-service/prd.md",
+      "source_location": "L91",
+      "weight": 1.0,
+      "source": "specs_006_flight_search_service_prd_implementation_decisions",
+      "target": "specs_006_flight_search_service_prd_round_trip_support_via_duffel_multi_slice",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "specs/006-flight-search-service/prd.md",
+      "source_location": "L79",
+      "weight": 1.0,
+      "source": "specs_006_flight_search_service_prd_implementation_decisions",
+      "target": "specs_006_flight_search_service_prd_two_table_design",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "specs/006-flight-search-service/prd.md",
+      "source_location": "L114",
+      "weight": 1.0,
+      "source": "specs_006_flight_search_service_prd_testing_decisions",
+      "target": "specs_006_flight_search_service_prd_agent_gateway_regression_tests",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "specs/006-flight-search-service/prd.md",
+      "source_location": "L99",
+      "weight": 1.0,
+      "source": "specs_006_flight_search_service_prd_testing_decisions",
+      "target": "specs_006_flight_search_service_prd_backend_e2e_tests",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "specs/006-flight-search-service/prd.md",
+      "source_location": "L107",
+      "weight": 1.0,
+      "source": "specs_006_flight_search_service_prd_testing_decisions",
+      "target": "specs_006_flight_search_service_prd_frontend_smoke_tests",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "specs/006-flight-search-service/prd.md",
+      "source_location": "L96",
+      "weight": 1.0,
+      "source": "specs_006_flight_search_service_prd_testing_decisions",
+      "target": "specs_006_flight_search_service_prd_testing_philosophy",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "specs/006-flight-search-service/prd.md",
+      "source_location": "L132",
+      "weight": 1.0,
+      "source": "specs_006_flight_search_service_prd_further_notes",
+      "target": "specs_006_flight_search_service_prd_6_phase_delivery_plan",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "specs/006-flight-search-service/prd.md",
+      "source_location": "L138",
+      "weight": 1.0,
+      "source": "specs_006_flight_search_service_prd_further_notes",
+      "target": "specs_006_flight_search_service_prd_architecture_invariants",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "specs/006-flight-search-service/prd.md",
+      "source_location": "L141",
+      "weight": 1.0,
+      "source": "specs_006_flight_search_service_prd_further_notes",
+      "target": "specs_006_flight_search_service_prd_dependency_on_existing_systems",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "specs/006-flight-search-service/prd.md",
+      "source_location": "L135",
+      "weight": 1.0,
+      "source": "specs_006_flight_search_service_prd_further_notes",
+      "target": "specs_006_flight_search_service_prd_environment_variable_configuration",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "specs/006-flight-search-service/quickstart.md",
+      "source_location": "L1",
+      "weight": 1.0,
+      "source": "specs_006_flight_search_service_quickstart",
+      "target": "specs_006_flight_search_service_quickstart_quickstart_duffel_flight_search_service",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "specs/006-flight-search-service/quickstart.md",
+      "source_location": "L178",
+      "weight": 1.0,
+      "source": "specs_006_flight_search_service_quickstart_quickstart_duffel_flight_search_service",
+      "target": "specs_006_flight_search_service_quickstart_e2e_test_commands",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "specs/006-flight-search-service/quickstart.md",
+      "source_location": "L6",
+      "weight": 1.0,
+      "source": "specs_006_flight_search_service_quickstart_quickstart_duffel_flight_search_service",
+      "target": "specs_006_flight_search_service_quickstart_prerequisites",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "specs/006-flight-search-service/quickstart.md",
+      "source_location": "L23",
+      "weight": 1.0,
+      "source": "specs_006_flight_search_service_quickstart_quickstart_duffel_flight_search_service",
+      "target": "specs_006_flight_search_service_quickstart_starting_the_services",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "specs/006-flight-search-service/quickstart.md",
+      "source_location": "L191",
+      "weight": 1.0,
+      "source": "specs_006_flight_search_service_quickstart_quickstart_duffel_flight_search_service",
+      "target": "specs_006_flight_search_service_quickstart_troubleshooting",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "specs/006-flight-search-service/quickstart.md",
+      "source_location": "L36",
+      "weight": 1.0,
+      "source": "specs_006_flight_search_service_quickstart_quickstart_duffel_flight_search_service",
+      "target": "specs_006_flight_search_service_quickstart_validation_scenarios",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "specs/006-flight-search-service/quickstart.md",
+      "source_location": "L38",
+      "weight": 1.0,
+      "source": "specs_006_flight_search_service_quickstart_validation_scenarios",
+      "target": "specs_006_flight_search_service_quickstart_scenario_1_one_way_flight_search_p1_core_value",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "specs/006-flight-search-service/quickstart.md",
+      "source_location": "L65",
+      "weight": 1.0,
+      "source": "specs_006_flight_search_service_quickstart_validation_scenarios",
+      "target": "specs_006_flight_search_service_quickstart_scenario_2_round_trip_flight_search_p1",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "specs/006-flight-search-service/quickstart.md",
+      "source_location": "L85",
+      "weight": 1.0,
+      "source": "specs_006_flight_search_service_quickstart_validation_scenarios",
+      "target": "specs_006_flight_search_service_quickstart_scenario_3_flight_detail_with_live_re_pricing_p2",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "specs/006-flight-search-service/quickstart.md",
+      "source_location": "L105",
+      "weight": 1.0,
+      "source": "specs_006_flight_search_service_quickstart_validation_scenarios",
+      "target": "specs_006_flight_search_service_quickstart_scenario_4_expired_offer_recovery_p2",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "specs/006-flight-search-service/quickstart.md",
+      "source_location": "L125",
+      "weight": 1.0,
+      "source": "specs_006_flight_search_service_quickstart_validation_scenarios",
+      "target": "specs_006_flight_search_service_quickstart_scenario_5_budget_exhaustion_handling",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "specs/006-flight-search-service/quickstart.md",
+      "source_location": "L138",
+      "weight": 1.0,
+      "source": "specs_006_flight_search_service_quickstart_validation_scenarios",
+      "target": "specs_006_flight_search_service_quickstart_scenario_6_cache_hit_verification",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "specs/006-flight-search-service/quickstart.md",
+      "source_location": "L158",
+      "weight": 1.0,
+      "source": "specs_006_flight_search_service_quickstart_validation_scenarios",
+      "target": "specs_006_flight_search_service_quickstart_scenario_7_async_persistence_verification",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "specs/006-flight-search-service/research.md",
+      "source_location": "L1",
+      "weight": 1.0,
+      "source": "specs_006_flight_search_service_research",
+      "target": "specs_006_flight_search_service_research_research_duffel_flight_search_service",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "specs/006-flight-search-service/research.md",
+      "source_location": "L7",
+      "weight": 1.0,
+      "source": "specs_006_flight_search_service_research_research_duffel_flight_search_service",
+      "target": "specs_006_flight_search_service_research_r0_api_provider_migration_amadeus_duffel",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "specs/006-flight-search-service/research.md",
+      "source_location": "L22",
+      "weight": 1.0,
+      "source": "specs_006_flight_search_service_research_research_duffel_flight_search_service",
+      "target": "specs_006_flight_search_service_research_r1_duffelservice_extraction_pattern",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "specs/006-flight-search-service/research.md",
+      "source_location": "L32",
+      "weight": 1.0,
+      "source": "specs_006_flight_search_service_research_research_duffel_flight_search_service",
+      "target": "specs_006_flight_search_service_research_r2_caching_at_raw_response_level",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "specs/006-flight-search-service/research.md",
+      "source_location": "L42",
+      "weight": 1.0,
+      "source": "specs_006_flight_search_service_research_research_duffel_flight_search_service",
+      "target": "specs_006_flight_search_service_research_r3_budget_priority_thresholds",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "specs/006-flight-search-service/research.md",
+      "source_location": "L52",
+      "weight": 1.0,
+      "source": "specs_006_flight_search_service_research_research_duffel_flight_search_service",
+      "target": "specs_006_flight_search_service_research_r4_round_trip_via_duffel_multi_slice",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "specs/006-flight-search-service/research.md",
+      "source_location": "L66",
+      "weight": 1.0,
+      "source": "specs_006_flight_search_service_research_research_duffel_flight_search_service",
+      "target": "specs_006_flight_search_service_research_r5_persistence_strategy_hybrid_redis_postgresql",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "specs/006-flight-search-service/research.md",
+      "source_location": "L72",
+      "weight": 1.0,
+      "source": "specs_006_flight_search_service_research_research_duffel_flight_search_service",
+      "target": "specs_006_flight_search_service_research_r6_flight_detail_re_pricing_via_duffel",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "specs/006-flight-search-service/research.md",
+      "source_location": "L82",
+      "weight": 1.0,
+      "source": "specs_006_flight_search_service_research_research_duffel_flight_search_service",
+      "target": "specs_006_flight_search_service_research_r7_expired_offer_recovery_410_gone",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "specs/006-flight-search-service/research.md",
+      "source_location": "L88",
+      "weight": 1.0,
+      "source": "specs_006_flight_search_service_research_research_duffel_flight_search_service",
+      "target": "specs_006_flight_search_service_research_r8_duffel_sdk_integration_pattern",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "specs/006-flight-search-service/spec.md",
+      "source_location": "L1",
+      "weight": 1.0,
+      "source": "specs_006_flight_search_service_spec",
+      "target": "specs_006_flight_search_service_spec_feature_specification_duffel_flight_search_service",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "specs/006-flight-search-service/spec.md",
+      "source_location": "L119",
+      "weight": 1.0,
+      "source": "specs_006_flight_search_service_spec_feature_specification_duffel_flight_search_service",
+      "target": "specs_006_flight_search_service_spec_assumptions",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "specs/006-flight-search-service/spec.md",
+      "source_location": "L81",
+      "weight": 1.0,
+      "source": "specs_006_flight_search_service_spec_feature_specification_duffel_flight_search_service",
+      "target": "specs_006_flight_search_service_spec_requirements_mandatory",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "specs/006-flight-search-service/spec.md",
+      "source_location": "L105",
+      "weight": 1.0,
+      "source": "specs_006_flight_search_service_spec_feature_specification_duffel_flight_search_service",
+      "target": "specs_006_flight_search_service_spec_success_criteria_mandatory",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "specs/006-flight-search-service/spec.md",
+      "source_location": "L11",
+      "weight": 1.0,
+      "source": "specs_006_flight_search_service_spec_feature_specification_duffel_flight_search_service",
+      "target": "specs_006_flight_search_service_spec_user_scenarios_testing_mandatory",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "specs/006-flight-search-service/spec.md",
+      "source_location": "L71",
+      "weight": 1.0,
+      "source": "specs_006_flight_search_service_spec_user_scenarios_testing_mandatory",
+      "target": "specs_006_flight_search_service_spec_edge_cases",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "specs/006-flight-search-service/spec.md",
+      "source_location": "L13",
+      "weight": 1.0,
+      "source": "specs_006_flight_search_service_spec_user_scenarios_testing_mandatory",
+      "target": "specs_006_flight_search_service_spec_user_story_1_search_for_flights_priority_p1",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "specs/006-flight-search-service/spec.md",
+      "source_location": "L35",
+      "weight": 1.0,
+      "source": "specs_006_flight_search_service_spec_user_scenarios_testing_mandatory",
+      "target": "specs_006_flight_search_service_spec_user_story_2_view_flight_details_with_live_pricing_priority_p2",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "specs/006-flight-search-service/spec.md",
+      "source_location": "L53",
+      "weight": 1.0,
+      "source": "specs_006_flight_search_service_spec_user_scenarios_testing_mandatory",
+      "target": "specs_006_flight_search_service_spec_user_story_3_search_history_analytics_capture_priority_p3",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "specs/006-flight-search-service/spec.md",
+      "source_location": "L83",
+      "weight": 1.0,
+      "source": "specs_006_flight_search_service_spec_requirements_mandatory",
+      "target": "specs_006_flight_search_service_spec_functional_requirements",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "specs/006-flight-search-service/spec.md",
+      "source_location": "L99",
+      "weight": 1.0,
+      "source": "specs_006_flight_search_service_spec_requirements_mandatory",
+      "target": "specs_006_flight_search_service_spec_key_entities",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "specs/006-flight-search-service/spec.md",
+      "source_location": "L107",
+      "weight": 1.0,
+      "source": "specs_006_flight_search_service_spec_success_criteria_mandatory",
+      "target": "specs_006_flight_search_service_spec_measurable_outcomes",
+      "confidence_score": 1.0
     }
   ],
   "hyperedges": [
@@ -46629,5 +49244,5 @@
       "source_file": "specs/004-output-guardrails/data-model.md"
     }
   ],
-  "built_at_commit": "fdfb6453f1aa0f2e4724157787c2a9d0c57917bc"
+  "built_at_commit": "7c5147bb7f13d089a9ad42aa7dd5c6ea6b9d2996"
 }

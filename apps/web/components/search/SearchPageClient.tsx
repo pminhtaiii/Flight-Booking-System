@@ -23,6 +23,13 @@ import { cn } from '@/lib/utils';
 
 const EMPTY_STOPS: Airport[] = [];
 
+const AIRLINE_MAP: Record<string, string> = {
+  VN: 'Vietnam Airlines',
+  NH: 'ANA',
+  JL: 'Japan Airlines',
+  SQ: 'Singapore Airlines',
+};
+
 type Props = {
   allAirports: Airport[];
 };
@@ -41,6 +48,13 @@ export function SearchPageClient({ allAirports }: Props) {
   const originRef = useRef<HTMLDivElement>(null);
   const destRef = useRef<HTMLDivElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const streamAbortRef = useRef<AbortController | null>(null);
+
+  useEffect(() => {
+    return () => {
+      streamAbortRef.current?.abort();
+    };
+  }, []);
   
   const searchParams = useSearchParams();
   const toParam = searchParams ? searchParams.get('to') : null;
@@ -387,8 +401,11 @@ export function SearchPageClient({ allAirports }: Props) {
 
     const agentApiUrl = process.env.NEXT_PUBLIC_AGENT_API_URL || 'http://localhost:3002';
     try {
+      const controller = new AbortController();
+      streamAbortRef.current = controller;
       const response = await fetch(`${agentApiUrl}/chat/stream`, {
         method: 'POST',
+        signal: controller.signal,
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`
@@ -453,7 +470,7 @@ export function SearchPageClient({ allAirports }: Props) {
                 const score = idx === 0 ? 95 : idx === 1 ? 78 : 52;
                 return {
                   id: flight.id || `fl-${idx}`,
-                  airline: flight.airline || 'Unknown',
+                  airline: AIRLINE_MAP[flight.airline.toUpperCase()] || flight.airline || 'Unknown',
                   flightNumber: flight.flightNumber || '',
                   departureAirport: flight.departureAirport,
                   arrivalAirport: flight.arrivalAirport,
@@ -512,11 +529,16 @@ export function SearchPageClient({ allAirports }: Props) {
       );
 
     } catch (err: any) {
+      if (err.name === 'AbortError') {
+        console.log('[sendChatMessage] Stream aborted');
+        return;
+      }
       console.error('[sendChatMessage]', err);
       setErrorMessage(err.message || 'Could not connect to the agent service.');
       // Remove loading message
       setMessages((prev) => prev.filter((msg) => msg.id !== assistantMsgId));
     } finally {
+      streamAbortRef.current = null;
       setIsStreaming(false);
     }
   };
@@ -614,7 +636,7 @@ export function SearchPageClient({ allAirports }: Props) {
               <div className="flex gap-2 pt-1">
                 <button
                   onClick={() => sendChatMessage('', true)}
-                  className="px-3 py-1.5 bg-accent hover:bg-accent-hover text-white rounded-lg text-xs font-semibold flex items-center gap-1.5"
+                  className="px-3 py-1.5 bg-accent hover:bg-accent-hover text-primary-foreground rounded-lg text-xs font-semibold flex items-center gap-1.5"
                 >
                   <CheckCircle2 className="w-3.5 h-3.5" /> Confirm
                 </button>
@@ -919,7 +941,7 @@ export function SearchPageClient({ allAirports }: Props) {
 
                   <div className="chat-flight-footer border-t border-card-border pt-3 mt-2 flex justify-between items-center">
                     <div className="price-block">
-                      <span className="price-value text-accent">${flight.price}</span>
+                      <span className="price-value text-accent">${Number(flight.price ?? 0).toFixed(2)}</span>
                       <span className="price-label block">per person / economy</span>
                     </div>
                     <div className="flight-actions flex gap-2">

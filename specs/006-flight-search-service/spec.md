@@ -89,11 +89,11 @@ Every flight search performed by a user is recorded as lightweight metadata (rou
 - **FR-005**: System MUST apply different budget thresholds for user-initiated searches (higher priority) versus AI chatbot-initiated searches (lower priority), ensuring user searches are never blocked by chatbot usage.
 - **FR-006**: System MUST persist raw flight offer data for a configurable retention period to support flight detail retrieval and re-pricing.
 - **FR-007**: System MUST persist lightweight search metadata (route, dates, price range, result count) indefinitely for analytics and dashboard features.
-- **FR-008**: System MUST write persistent data asynchronously after returning the search response to the user, ensuring zero additional latency on the user's critical path.
+- **FR-008**: System MUST write persistent data asynchronously after returning the search response to the user, ensuring zero additional latency on the user's critical path. This write-behind job MUST be queued durably (e.g., using a Redis-backed job queue or transactional outbox) to ensure that the data is eventually persisted and not lost in case of a process exit.
 - **FR-009**: System MUST provide a flight detail view that retrieves the full flight offer and re-confirms the live price from the external data source before displaying it to the user.
 - **FR-010**: System MUST return a clear "offer expired" response when a flight detail is requested for an offer that has been removed from both cache and persistent storage, including the original search parameters to enable one-click re-search.
 - **FR-011**: System MUST validate all search inputs (valid airport codes, future departure dates, passenger count within allowed range) and return clear error messages for invalid inputs.
-- **FR-012**: System MUST log all search operations with structured audit records including user identity, search parameters, result count, and response time — without logging any PII.
+- **FR-012**: System MUST log all search operations with structured audit records including the user's internal opaque ID, search parameters, result count, and response time — explicitly redacting and forbidding names, emails, IP addresses, or other personal identifiers to prevent logging any PII.
 - **FR-013**: System MUST automatically purge expired raw flight offer data on a scheduled basis according to the configured retention window.
 
 ### Key Entities

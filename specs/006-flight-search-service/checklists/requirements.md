@@ -1,8 +1,8 @@
-# Specification Quality Checklist: Amadeus Flight Search Service
+# Specification Quality Checklist: Duffel Flight Search Service
 
 **Purpose**: Validate specification completeness and quality before proceeding to planning
 **Created**: 2026-07-07
-**Feature**: [spec.md](file:///c:/Booking%20Systems/specs/006-flight-search-service/spec.md)
+**Feature**: [spec.md](../spec.md)
 
 ## Content Quality
 

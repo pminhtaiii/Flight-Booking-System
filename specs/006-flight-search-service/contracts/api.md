@@ -84,11 +84,15 @@ Required. Bearer JWT token in `Authorization` header.
 | results[].id | Internal UUID (from `flight_offers` table). Used in `GET /api/flights/:id` |
 | results[].airline | Human-readable airline name (title case) |
 | results[].flightNumber | Combined carrier code + number (e.g., "VN123") |
+| results[].departureTime | ISO 8601 date-time string at departure airport (e.g. YYYY-MM-DDTHH:MM:SS) without offset. |
+| results[].arrivalTime | ISO 8601 date-time string at arrival airport (e.g. YYYY-MM-DDTHH:MM:SS) without offset. |
 | results[].segments | Array of outbound flight segments with full detail |
 | results[].returnSegments | Array of return segments (null for one-way) |
 | results[].segments[].operatingCarrier | Operating airline name (Duffel provides this natively) |
+| results[].segments[].departureTime | ISO 8601 local date-time string at departure airport without offset. |
+| results[].segments[].arrivalTime | ISO 8601 local date-time string at arrival airport without offset. |
 | results[].duration | Total duration in minutes |
-| results[].stops | Number of stops (segments.length - 1) |
+| results[].stops | Number of stops for the outbound leg (segments.length - 1). For round-trips, separate counts are provided in outbound/return segments. |
 | results[].price | Total price as decimal |
 | results[].currency | ISO 4217 currency code |
 | results[].fareClass | Cabin class (economy, business, etc.) or null |
@@ -184,7 +188,9 @@ Required. Bearer JWT token in `Authorization` header.
 | originalPrice | Price from the original search result |
 | confirmedPrice | Live re-confirmed price from Duffel `GET /air/offers/{id}` |
 | priceChanged | Boolean flag indicating if the price differs from the original |
-| expiresAt | ISO 8601 timestamp when the offer expires on Duffel's side |
+| expiresAt | ISO 8601 UTC timestamp when the offer expires on Duffel's side (e.g., YYYY-MM-DDTHH:MM:SSZ). |
+| departureTime | ISO 8601 local date-time string at departure airport without offset. |
+| arrivalTime | ISO 8601 local date-time string at arrival airport without offset. |
 | conditions | Fare conditions (refundable, changeable) — Duffel provides this natively |
 
 ### Error Responses

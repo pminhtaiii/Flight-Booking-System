@@ -63,6 +63,22 @@ Lightweight metadata about each search performed. Preserved indefinitely for das
 
 ---
 
+### OfferRecovery
+
+Stores the durable mapping from `offerId` (UUID) to `searchHash` (SHA-256) so that the `410 Gone` recovery path can find the original search parameters for pre-filling a new search, even after the bulky raw `FlightOffer` row is cleaned up.
+
+| Field | Type | Constraints | Description |
+|-------|------|-------------|-------------|
+| id | UUID | PK | The offer UUID that was generated during search |
+| searchHash | String | Not null | SHA-256 linking to the search query |
+| createdAt | DateTime | Auto, indexed | Timestamp of record creation (for cleanup retention) |
+
+**Indexes**: `createdAt`
+**Table name**: `offer_recoveries`
+**Retention**: Configurable via `OFFER_RECOVERY_RETENTION_DAYS` (default: 30 days)
+
+---
+
 ## Modified Entities
 
 ### User (existing)
@@ -119,6 +135,15 @@ model SearchHistory {
   @@index([createdAt])
   @@index([userId, createdAt])
   @@map("search_history")
+}
+
+model OfferRecovery {
+  id          String   @id // The offer UUID
+  searchHash  String
+  createdAt   DateTime @default(now())
+
+  @@index([createdAt])
+  @@map("offer_recoveries")
 }
 ```
 

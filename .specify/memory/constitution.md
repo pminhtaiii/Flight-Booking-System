@@ -98,7 +98,7 @@ changes or redeployment. The following are non-negotiable:
 - **Health Checks**: Every deployable service MUST expose a `/health`
   endpoint (or equivalent) that reports readiness and liveness status.
   Health checks MUST include downstream dependency status (database,
-  Amadeus API, payment provider).
+  Duffel API, payment provider).
 - **Metrics**: Key operational metrics MUST be collected and exposed:
   - Request rate, error rate, and latency (p50, p95, p99) per endpoint.
   - API budget consumption (ties to Principle III thresholds).

@@ -122,7 +122,7 @@ The existing agent-gateway E2E tests must continue to pass after the DuffelServi
 - **Booking and payment flow** — "Proceed to Booking" is a placeholder action; the full booking, payment, and ticketing pipeline is a separate future feature.
 - **Mobile-specific optimization** — the responsive web experience is sufficient for this feature; native mobile apps or mobile-specific UX are not included.
 - **Hotel and restaurant integration** — the search feature covers flights only; other travel verticals are separate features.
-- **AI-powered search ranking** — results are returned in the order provided by the Amadeus API; AI-driven personalization or re-ranking is not part of this feature.
+- **AI-powered search ranking** — results are returned in the order provided by the Duffel API; AI-driven personalization or re-ranking is not part of this feature.
 - **Multi-city flights** — only one-way and round-trip itineraries are supported; complex multi-city routing is out of scope.
 - **Seat selection** — the search and detail views show fare class and baggage but do not support seat map browsing or seat assignment.
 - **Ancillary services** — add-ons such as extra baggage, lounge access, travel insurance, or meal selection are not part of this feature.

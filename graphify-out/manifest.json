@@ -30,7 +30,7 @@
     "semantic_hash": ""
   },
   "apps/agent/src/agent/config.py": {
-    "mtime": 1783302256.3848934,
+    "mtime": 1783355135.3688629,
     "ast_hash": "f378701feb23f000268dc6aa3483b26f",
     "semantic_hash": ""
   },
@@ -65,8 +65,8 @@
     "semantic_hash": ""
   },
   "apps/agent/src/agent/guardrails/nemo.py": {
-    "mtime": 1783349673.7616086,
-    "ast_hash": "da1d47897672b9b7f911b7f0808c0a74",
+    "mtime": 1783355228.9242303,
+    "ast_hash": "97252cd7f86079ddd1f415f0e17ea919",
     "semantic_hash": ""
   },
   "apps/agent/src/agent/main.py": {
@@ -260,8 +260,8 @@
     "semantic_hash": "e28ebfa9e660cc2e531d474ccdf9b2b4"
   },
   "apps/api/package.json": {
-    "mtime": 1783302256.4491048,
-    "ast_hash": "67b8fcfb33fa97a631ebc4ecbdd036ee",
+    "mtime": 1783439037.9769492,
+    "ast_hash": "c18dfb6f076369bf34da47553542ad9b",
     "semantic_hash": ""
   },
   "apps/api/prisma/migrations/20260629043309_init/migration.sql": {
@@ -710,8 +710,8 @@
     "semantic_hash": "3a89cf70d9efdf2106c64e1684391665"
   },
   "AGENTS.md": {
-    "mtime": 1783330364.0627685,
-    "ast_hash": "c01d80e1e2aec0c15f02d6b441b55f5a",
+    "mtime": 1783439041.1744618,
+    "ast_hash": "ba5c81f11167a01524061cc9217ddf2c",
     "semantic_hash": ""
   },
   "PROJECT.md": {
@@ -1220,8 +1220,8 @@
     "semantic_hash": ""
   },
   "apps/web/components/search/SearchPageClient.tsx": {
-    "mtime": 1783340890.8180864,
-    "ast_hash": "63d22ee988cbb059bca861b92ea30c9f",
+    "mtime": 1783439058.0878131,
+    "ast_hash": "b8dd495ebe3d51e90b4a8827fbcf5abc",
     "semantic_hash": ""
   },
   "apps/web/lib/airport-service.ts": {
@@ -1257,6 +1257,51 @@
   "apps/agent/src/agent/test_llm_connection.py": {
     "mtime": 1783350806.780311,
     "ast_hash": "904c774b2659e56c229bfe5472d0b758",
+    "semantic_hash": ""
+  },
+  "research/flight-search-decisions.md": {
+    "mtime": 1783421166.9151552,
+    "ast_hash": "d87df3c8f97baf741203a9e1743b4e11",
+    "semantic_hash": ""
+  },
+  "specs/006-flight-search-service/checklists/requirements.md": {
+    "mtime": 1783439062.5638313,
+    "ast_hash": "e90750bbad222d78a507c6c5f6af0874",
+    "semantic_hash": ""
+  },
+  "specs/006-flight-search-service/contracts/api.md": {
+    "mtime": 1783439071.5156393,
+    "ast_hash": "e7c94b6c5e98e3552deb5c9b068a7e59",
+    "semantic_hash": ""
+  },
+  "specs/006-flight-search-service/data-model.md": {
+    "mtime": 1783439081.1992056,
+    "ast_hash": "6ae764d36b8b6b5e04069c2e8f4e0d5a",
+    "semantic_hash": ""
+  },
+  "specs/006-flight-search-service/plan.md": {
+    "mtime": 1783421230.4620492,
+    "ast_hash": "22f0c51f78854818a90ed75a0da89baa",
+    "semantic_hash": ""
+  },
+  "specs/006-flight-search-service/prd.md": {
+    "mtime": 1783439086.7895122,
+    "ast_hash": "05cd7e0fd1502a98e87eced50c9c5515",
+    "semantic_hash": ""
+  },
+  "specs/006-flight-search-service/quickstart.md": {
+    "mtime": 1783421399.16322,
+    "ast_hash": "6f8d6a7744c3b4e957e683f96eceec3b",
+    "semantic_hash": ""
+  },
+  "specs/006-flight-search-service/research.md": {
+    "mtime": 1783421298.0971742,
+    "ast_hash": "5b2c4c5c41405e1a2dd778762416f7a2",
+    "semantic_hash": ""
+  },
+  "specs/006-flight-search-service/spec.md": {
+    "mtime": 1783439093.4908864,
+    "ast_hash": "8ba534207377531988159c946079cbab",
     "semantic_hash": ""
   }
 }

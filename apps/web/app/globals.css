@@ -218,7 +218,7 @@
 @utility bubble-user {
   border-radius: 18px 18px 2px 18px;
   background: linear-gradient(135deg, var(--color-accent), var(--color-gradient-end));
-  color: #FFFFFF;
+  color: var(--color-primary-foreground);
   box-shadow: 0 4px 12px var(--color-user-bubble-shadow);
 }
 
