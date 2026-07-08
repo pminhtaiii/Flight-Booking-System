@@ -63,8 +63,16 @@ export function SearchPageClient({ allAirports }: Props) {
   const [tripType, setTripType] = useState<'one-way' | 'round-trip'>('one-way');
   const [originInput, setOriginInput] = useState('');
   const [destInput, setDestInput] = useState('');
-  const [departDate, setDepartDate] = useState('2026-07-10');
-  const [returnDate, setReturnDate] = useState('2026-07-15');
+  const [departDate, setDepartDate] = useState(() => {
+    const d = new Date();
+    d.setDate(d.getDate() + 7);
+    return d.toISOString().slice(0, 10);
+  });
+  const [returnDate, setReturnDate] = useState(() => {
+    const d = new Date();
+    d.setDate(d.getDate() + 14);
+    return d.toISOString().slice(0, 10);
+  });
   const [passengers, setPassengers] = useState(1);
   const [formError, setFormError] = useState<string | null>(null);
 
@@ -746,7 +754,7 @@ export function SearchPageClient({ allAirports }: Props) {
                 className={cn(
                   "px-4 py-2 text-xs font-semibold rounded-lg border transition",
                   tripType === 'one-way'
-                    ? "bg-accent text-white border-accent"
+                    ? "bg-accent text-primary-foreground border-accent"
                     : "bg-card border-card-border text-text-secondary hover:bg-background"
                 )}
               >
@@ -758,7 +766,7 @@ export function SearchPageClient({ allAirports }: Props) {
                 className={cn(
                   "px-4 py-2 text-xs font-semibold rounded-lg border transition",
                   tripType === 'round-trip'
-                    ? "bg-accent text-white border-accent"
+                    ? "bg-accent text-primary-foreground border-accent"
                     : "bg-card border-card-border text-text-secondary hover:bg-background"
                 )}
               >
@@ -1005,7 +1013,7 @@ export function SearchPageClient({ allAirports }: Props) {
                   </div>
 
                   {/* Outbound Segments */}
-                  {flight.segments && (
+                  {flight.segments && flight.segments.length > 0 && (
                     <div className="outbound-segments mt-2 border-t border-card-border/50 pt-2 space-y-1">
                       <span className="text-[10px] font-bold uppercase tracking-wider text-text-muted block">Outbound</span>
                       {flight.segments.map((seg: any, sIdx: number) => (
@@ -1043,13 +1051,13 @@ export function SearchPageClient({ allAirports }: Props) {
                     <div className="flight-actions flex gap-2">
                       <Link
                         href={`/search/${flight.id}?from=${selectedOrigin?.iataCode || flight.departureAirport || ''}&to=${selectedDest?.iataCode || flight.arrivalAirport || ''}`}
-                        className="btn-action secondary border border-card-border hover:bg-background text-xs font-semibold flex items-center justify-center text-center cursor-pointer no-underline rounded-lg py-2 px-3"
+                        className="btn-action secondary border border-card-border hover:bg-background text-xs font-semibold flex items-center justify-center text-center no-underline rounded-lg py-2 px-3"
                       >
                         Details
                       </Link>
                       <button
                         onClick={() => sendChatMessage(`I would like to book flight ${flight.flightNumber}`)}
-                        className="btn-action primary bg-accent text-white hover:bg-accent-hover text-xs font-semibold flex items-center justify-center text-center cursor-pointer rounded-lg py-2 px-3"
+                        className="btn-action primary bg-accent text-primary-foreground hover:bg-accent-hover text-xs font-semibold flex items-center justify-center text-center cursor-pointer rounded-lg py-2 px-3"
                       >
                         Book Flight
                       </button>
