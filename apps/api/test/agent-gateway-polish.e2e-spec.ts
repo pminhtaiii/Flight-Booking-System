@@ -4,8 +4,8 @@ import request from 'supertest';
 import { AppModule } from '@/app.module';
 import { PrismaService } from '@/prisma/prisma.service';
 import { CacheService } from '@/cache/cache.service';
-import { AmadeusService } from '@/agent-gateway/amadeus/amadeus.service';
-import { AmadeusFlightSearchResponse } from '@/agent-gateway/amadeus/amadeus.types';
+import { DuffelService } from '@/duffel/duffel.service';
+import { DuffelOfferRequest } from '@/duffel/duffel.types';
 import * as crypto from 'crypto';
 import { HttpExceptionFilter } from '@/common/filters/http-exception.filter';
 import { User } from '@prisma/client';
@@ -30,7 +30,7 @@ describe('Agent Gateway Polish (E2E)', () => {
   let app: INestApplication;
   let prisma: PrismaService;
   let cacheService: CacheService;
-  let amadeusService: AmadeusService;
+  let duffelService: DuffelService;
 
   const apiKey = 'test-agent-api-key';
   let token: string;
@@ -40,8 +40,7 @@ describe('Agent Gateway Polish (E2E)', () => {
     process.env.AGENT_SERVICE_API_KEY = apiKey;
     process.env.CLAIM_TOKEN_SECRET = 'test-claim-token-secret';
     process.env.CLAIM_TOKEN_TTL_SECONDS = '300';
-    process.env.AMADEUS_API_KEY = 'mock-key';
-    process.env.AMADEUS_API_SECRET = 'mock-secret';
+    process.env.DUFFEL_ACCESS_TOKEN = 'mock-token';
 
     const moduleFixture: TestingModule = await Test.createTestingModule({
       imports: [AppModule],
@@ -60,7 +59,7 @@ describe('Agent Gateway Polish (E2E)', () => {
 
     prisma = moduleFixture.get<PrismaService>(PrismaService);
     cacheService = moduleFixture.get<CacheService>(CacheService);
-    amadeusService = moduleFixture.get<AmadeusService>(AmadeusService);
+    duffelService = moduleFixture.get<DuffelService>(DuffelService);
   });
 
   afterAll(async () => {
@@ -102,9 +101,7 @@ describe('Agent Gateway Polish (E2E)', () => {
       passengers: '2',
     };
 
-    it('should retrieve search results from Cache directly on cache hit without calling Amadeus service', async () => {
-      // 1. Build expected key
-      // query properties will be parsed to origin, destination, date, passengers (as number or string? Query params in NestJS with transform can be string/number, let's check DTO: passengers is number, others are string)
+    it('should retrieve search results from Cache directly on cache hit without calling Duffel service', async () => {
       const normalizedQuery = {
         origin: 'HAN',
         destination: 'NRT',
@@ -123,8 +120,8 @@ describe('Agent Gateway Polish (E2E)', () => {
             flightNumber: 'VN310',
             departureAirport: 'HAN',
             arrivalAirport: 'NRT',
-            departureTime: '2026-07-20T08:30:00Z',
-            arrivalTime: '2026-07-20T15:00:00Z',
+            departureTime: '2026-07-20T08:30:00',
+            arrivalTime: '2026-07-20T15:00:00',
             duration: 330,
             stops: 0,
             price: 904.0,
@@ -137,8 +134,8 @@ describe('Agent Gateway Polish (E2E)', () => {
 
       await cacheService.set(cacheKey, JSON.stringify(mockCachedResults), 900);
 
-      // Spy on AmadeusService.searchFlights
-      const searchSpy = jest.spyOn(amadeusService, 'searchFlights');
+      // Spy on DuffelService.searchFlights
+      const searchSpy = jest.spyOn(duffelService, 'searchFlights');
 
       // Make search request
       const res = await request(app.getHttpServer())
@@ -158,10 +155,10 @@ describe('Agent Gateway Polish (E2E)', () => {
       const now = new Date();
       const year = now.getFullYear();
       const month = String(now.getMonth() + 1).padStart(2, '0');
-      const budgetKey = `budget:amadeus:${year}-${month}`;
+      const budgetKey = `budget:duffel:${year}-${month}`;
 
-      // Seed budget key with 2000 (which is the limit, so any next increment exceeds it)
-      await cacheService.set(budgetKey, '2000');
+      // Seed budget key with 1200 (which is the limit for agent, so any next increment exceeds it)
+      await cacheService.set(budgetKey, '1200');
 
       // Make search request
       const res = await request(app.getHttpServer())
@@ -174,11 +171,11 @@ describe('Agent Gateway Polish (E2E)', () => {
       expect(res.body.code).toBe('RATE_LIMIT_EXCEEDED');
     });
 
-    it('should return 502 UPSTREAM_UNAVAILABLE on any upstream HTTP or Amadeus client error', async () => {
-      // Mock AmadeusService.searchFlights to reject/throw an error
+    it('should return 502 UPSTREAM_UNAVAILABLE on any upstream HTTP or Duffel client error', async () => {
+      // Mock DuffelService.searchFlights to reject/throw an error
       const searchSpy = jest
-        .spyOn(amadeusService, 'searchFlights')
-        .mockRejectedValue(new Error('Amadeus API down'));
+        .spyOn(duffelService, 'searchFlights')
+        .mockRejectedValue(new Error('Duffel API down'));
 
       const res = await request(app.getHttpServer())
         .get('/agent-gateway/flights/search')
@@ -192,85 +189,55 @@ describe('Agent Gateway Polish (E2E)', () => {
       searchSpy.mockRestore();
     });
 
-    it('should perform PII stripping and map raw Amadeus responses correctly to FlightResultDto', async () => {
-      // Mock Amadeus flight search raw output
-      const rawAmadeusResponse = {
-        data: [
+    it('should perform PII stripping and map raw Duffel responses correctly to FlightResultDto', async () => {
+      // Mock Duffel flight search raw output
+      const rawDuffelResponse = {
+        offers: [
           {
-            type: 'flight-offer',
             id: '1',
-            source: 'GDS',
-            instantTicketingRequired: false,
-            nonHomogeneous: false,
-            oneWay: false,
-            lastTicketingDate: '2026-07-19',
-            numberOfBookableSeats: 9,
-            itineraries: [
+            total_amount: '452.00',
+            total_currency: 'USD',
+            slices: [
               {
+                id: 'sli_1',
                 duration: 'PT5H30M',
+                origin: { id: 'HAN', name: 'Hanoi Airport', iata_code: 'HAN', type: 'airport' },
+                destination: { id: 'NRT', name: 'Narita Airport', iata_code: 'NRT', type: 'airport' },
                 segments: [
                   {
-                    departure: {
-                      iataCode: 'HAN',
-                      at: '2026-07-20T08:30:00',
-                    },
-                    arrival: {
-                      iataCode: 'NRT',
-                      at: '2026-07-20T15:00:00',
-                    },
-                    carrierCode: 'VN',
-                    number: '310',
+                    id: 'seg_1',
                     duration: 'PT5H30M',
-                    numberOfStops: 0,
-                  },
-                ],
-              },
+                    departing_at: '2026-07-20T08:30:00',
+                    arriving_at: '2026-07-20T15:00:00',
+                    origin: { id: 'HAN', name: 'Hanoi Airport', iata_code: 'HAN', type: 'airport' },
+                    destination: { id: 'NRT', name: 'Narita Airport', iata_code: 'NRT', type: 'airport' },
+                    operating_carrier: { id: 'VN', name: 'Vietnam Airlines', iata_code: 'VN' },
+                    marketing_carrier: { id: 'VN', name: 'Vietnam Airlines', iata_code: 'VN' },
+                    marketing_carrier_flight_number: '310',
+                    passengers: [
+                      {
+                        passenger_id: 'pas_1',
+                        cabin_class: 'economy',
+                        baggages: [
+                          { type: 'checked', quantity: 1 }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              }
             ],
-            price: {
-              currency: 'USD',
-              total: '452.00',
-              base: '400.00',
-            },
-            pricingOptions: {
-              fareType: ['PUBLISHED'],
-              includedCheckedBagsOnly: true,
-            },
-            validatingCarrierCodes: ['VN'],
-            travelerPricings: [
-              {
-                travelerId: '1',
-                fareOption: 'STANDARD',
-                travelerType: 'ADULT',
-                price: {
-                  currency: 'USD',
-                  total: '452.00',
-                  base: '400.00',
-                },
-                fareDetailsBySegment: [
-                  {
-                    segmentId: '1',
-                    cabin: 'ECONOMY',
-                    fareBasis: 'EOW',
-                    class: 'E',
-                    includedCheckedBags: {
-                      quantity: 1,
-                    },
-                  },
-                ],
-              },
+            passengers: [
+              { id: 'pas_1', type: 'adult' }
             ],
-          },
-        ],
-        dictionaries: {
-          carriers: {
-            VN: 'VIETNAM AIRLINES',
-          },
-        },
+            passenger_identity_documents_required: false,
+          }
+        ]
       };
 
       const searchSpy = jest
-        .spyOn(amadeusService, 'searchFlights')
-        .mockResolvedValue(rawAmadeusResponse as unknown as AmadeusFlightSearchResponse);
+        .spyOn(duffelService, 'searchFlights')
+        .mockResolvedValue(rawDuffelResponse as unknown as DuffelOfferRequest);
 
       const res = await request(app.getHttpServer())
         .get('/agent-gateway/flights/search')
@@ -283,19 +250,18 @@ describe('Agent Gateway Polish (E2E)', () => {
       expect(res.body.results.length).toBe(1);
       const mapped = res.body.results[0];
 
-      // Convert carrier IATA code to title-cased airline name
       expect(mapped.airline).toBe('Vietnam Airlines');
       expect(mapped.flightNumber).toBe('VN310');
       expect(mapped.departureAirport).toBe('HAN');
       expect(mapped.arrivalAirport).toBe('NRT');
-      expect(mapped.departureTime).toBe('2026-07-20T08:30:00'); // ISO 8601 string
+      expect(mapped.departureTime).toBe('2026-07-20T08:30:00');
       expect(mapped.arrivalTime).toBe('2026-07-20T15:00:00');
-      expect(mapped.duration).toBe(330); // 5h 30m = 330 mins
+      expect(mapped.duration).toBe(330);
       expect(mapped.stops).toBe(0);
-      expect(mapped.price).toBe(452.00); // 452.00 as number
+      expect(mapped.price).toBe(452.00);
       expect(mapped.currency).toBe('USD');
-      expect(mapped.fareClass).toBe('Economy'); // Cabin title cased
-      expect(mapped.baggageAllowance).toBe('1 checked bag(s)'); // formatted bag
+      expect(mapped.fareClass).toBe('Economy');
+      expect(mapped.baggageAllowance).toBe('1 checked bag(s)');
 
       // PII exclusions checks
       expect(mapped.pnrCode).toBeUndefined();
@@ -306,13 +272,11 @@ describe('Agent Gateway Polish (E2E)', () => {
     });
 
     it('should create an AuditLog with ACTION = TOOL_CALL when flight search succeeds', async () => {
-      // Mock Amadeus success
       const searchSpy = jest
-        .spyOn(amadeusService, 'searchFlights')
+        .spyOn(duffelService, 'searchFlights')
         .mockResolvedValue({
-          data: [],
-          dictionaries: { carriers: {} },
-        } as unknown as AmadeusFlightSearchResponse);
+          offers: [],
+        } as unknown as DuffelOfferRequest);
 
       await request(app.getHttpServer())
         .get('/agent-gateway/flights/search')
@@ -331,10 +295,9 @@ describe('Agent Gateway Polish (E2E)', () => {
     });
 
     it('should create an AuditLog with ACTION = TOOL_CALL when flight search fails', async () => {
-      // Mock Amadeus failure
       const searchSpy = jest
-        .spyOn(amadeusService, 'searchFlights')
-        .mockRejectedValue(new Error('Amadeus API down'));
+        .spyOn(duffelService, 'searchFlights')
+        .mockRejectedValue(new Error('Duffel API down'));
 
       await request(app.getHttpServer())
         .get('/agent-gateway/flights/search')

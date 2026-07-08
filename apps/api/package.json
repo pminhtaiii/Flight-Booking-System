@@ -16,6 +16,7 @@
     "test:e2e": "jest --config ./test/jest-e2e.json --runInBand"
   },
   "dependencies": {
+    "@duffel/api": "^4.28.0",
     "@langchain/core": "^0.2.3",
     "@langchain/openai": "^0.1.1",
     "@nestjs/common": "^10.0.0",
@@ -26,7 +27,6 @@
     "@nestjs/platform-express": "^10.0.0",
     "@prisma/client": "^5.14.0",
     "@shared/types": "workspace:*",
-    "amadeus": "^10.0.0",
     "bcrypt": "^5.1.1",
     "class-transformer": "^0.5.1",
     "class-validator": "^0.14.1",
@@ -63,4 +63,3 @@
     "seed": "ts-node -r tsconfig-paths/register prisma/seed.ts"
   }
 }
-

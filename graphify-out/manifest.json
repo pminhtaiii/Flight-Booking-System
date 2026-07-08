@@ -260,8 +260,8 @@
     "semantic_hash": "e28ebfa9e660cc2e531d474ccdf9b2b4"
   },
   "apps/api/package.json": {
-    "mtime": 1783439037.9769492,
-    "ast_hash": "c18dfb6f076369bf34da47553542ad9b",
+    "mtime": 1783477110.7604897,
+    "ast_hash": "b93d6c24fed3b798a6c62a6434b933a8",
     "semantic_hash": ""
   },
   "apps/api/prisma/migrations/20260629043309_init/migration.sql": {
@@ -290,23 +290,13 @@
     "semantic_hash": ""
   },
   "apps/api/src/agent-gateway/agent-gateway.module.ts": {
-    "mtime": 1783232763.1997914,
-    "ast_hash": "a42fd08ecd622638ec5c9b0605b8dfe7",
+    "mtime": 1783477121.80266,
+    "ast_hash": "8876514394f0fd52d361352a35005fac",
     "semantic_hash": ""
   },
   "apps/api/src/agent-gateway/agent-gateway.service.ts": {
-    "mtime": 1783232763.2117736,
-    "ast_hash": "bfbedccd51fe0f0a58d2d736f77c68aa",
-    "semantic_hash": ""
-  },
-  "apps/api/src/agent-gateway/amadeus/amadeus.service.ts": {
-    "mtime": 1783232763.2201493,
-    "ast_hash": "8f4dbb9a158058307e3d0d64d542874e",
-    "semantic_hash": ""
-  },
-  "apps/api/src/agent-gateway/amadeus/amadeus.types.ts": {
-    "mtime": 1783232763.2206652,
-    "ast_hash": "148ce042a3e53c2a048b9b4db234c55f",
+    "mtime": 1783477146.9408557,
+    "ast_hash": "457820a368725dfac8b8be89e3e60ece",
     "semantic_hash": ""
   },
   "apps/api/src/agent-gateway/auth/agent-api-key.guard.ts": {
@@ -335,8 +325,8 @@
     "semantic_hash": ""
   },
   "apps/api/src/app.module.ts": {
-    "mtime": 1783302256.5325558,
-    "ast_hash": "fc3c98155eb2f82f2a7bf033325711f3",
+    "mtime": 1783477119.540646,
+    "ast_hash": "4531285a6fc472ec10054017faded137",
     "semantic_hash": ""
   },
   "apps/api/src/audit/audit.module.ts": {
@@ -495,13 +485,13 @@
     "semantic_hash": ""
   },
   "apps/api/test/agent-gateway-polish.e2e-spec.ts": {
-    "mtime": 1783232763.2702644,
-    "ast_hash": "613daf9294ff8c410c486fc6d2c64433",
+    "mtime": 1783477188.7583952,
+    "ast_hash": "61cd33fff8a63568ba0038f83b5d8752",
     "semantic_hash": ""
   },
   "apps/api/test/agent-gateway.e2e-spec.ts": {
-    "mtime": 1783232763.2723322,
-    "ast_hash": "51457ca9506e978b5e1669932d16ee28",
+    "mtime": 1783477173.9829779,
+    "ast_hash": "605d2fb110172d5b3f7b815e9a825f1b",
     "semantic_hash": ""
   },
   "apps/api/test/audit-log.e2e-spec.ts": {
@@ -750,8 +740,8 @@
     "semantic_hash": "13d24df073aeafdf3c5c1bc2507eb893"
   },
   "context/progress-checker.md": {
-    "mtime": 1783350422.7296174,
-    "ast_hash": "8db030b1293926fd1b4f8cc857b519aa",
+    "mtime": 1783477391.728799,
+    "ast_hash": "ab6237fac000de1a5d06101c29151fcb",
     "semantic_hash": ""
   },
   "context/project-overview.md": {
@@ -1302,6 +1292,26 @@
   "specs/006-flight-search-service/spec.md": {
     "mtime": 1783439093.4908864,
     "ast_hash": "8ba534207377531988159c946079cbab",
+    "semantic_hash": ""
+  },
+  "apps/api/src/duffel/duffel.module.ts": {
+    "mtime": 1783477069.434335,
+    "ast_hash": "66e11e2f9d2639119515e4ed592e8bfa",
+    "semantic_hash": ""
+  },
+  "apps/api/src/duffel/duffel.service.ts": {
+    "mtime": 1783477324.2253327,
+    "ast_hash": "218abe514b00b57f0c07d26776d0be63",
+    "semantic_hash": ""
+  },
+  "apps/api/src/duffel/duffel.types.ts": {
+    "mtime": 1783477062.2849894,
+    "ast_hash": "6e5e09c54eefbb4382a3e31102a172a2",
+    "semantic_hash": ""
+  },
+  "specs/006-flight-search-service/tasks.md": {
+    "mtime": 1783444194.046142,
+    "ast_hash": "8b2b190e09b97ad4503dbfffeb6cb726",
     "semantic_hash": ""
   }
 }

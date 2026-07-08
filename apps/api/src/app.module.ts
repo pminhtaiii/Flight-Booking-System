@@ -8,6 +8,7 @@ import { AuditModule } from './audit/audit.module';
 import { ChatModule } from './chat/chat.module';
 import { AgentGatewayModule } from './agent-gateway/agent-gateway.module';
 import { AirportsModule } from './airports/airports.module';
+import { DuffelModule } from './duffel/duffel.module';
 
 @Module({
   imports: [
@@ -22,6 +23,7 @@ import { AirportsModule } from './airports/airports.module';
     ChatModule,
     AgentGatewayModule,
     AirportsModule,
+    DuffelModule,
   ],
   controllers: [],
   providers: [],

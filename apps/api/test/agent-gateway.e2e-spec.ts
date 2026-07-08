@@ -3,8 +3,8 @@ import { INestApplication, ValidationPipe } from '@nestjs/common';
 import request from 'supertest';
 import { AppModule } from '@/app.module';
 import { PrismaService } from '@/prisma/prisma.service';
-import { AmadeusService } from '@/agent-gateway/amadeus/amadeus.service';
-import { AmadeusFlightSearchResponse } from '@/agent-gateway/amadeus/amadeus.types';
+import { DuffelService } from '@/duffel/duffel.service';
+import { DuffelOfferRequest } from '@/duffel/duffel.types';
 import * as crypto from 'crypto';
 import { HttpExceptionFilter } from '@/common/filters/http-exception.filter';
 import { User } from '@prisma/client';
@@ -55,155 +55,209 @@ describe('Agent Gateway (E2E)', () => {
 
     prisma = moduleFixture.get<PrismaService>(PrismaService);
 
-    jest.spyOn(AmadeusService.prototype, 'searchFlights').mockImplementation(async (query) => {
+    jest.spyOn(DuffelService.prototype, 'searchFlights').mockImplementation(async (query) => {
       return {
-        data: [
+        id: 'or_123',
+        offers: [
           {
-            id: '1',
-            itineraries: [
+            id: 'off_1',
+            total_amount: String(452.00 * (Number(query.passengers) || 2)),
+            total_currency: 'USD',
+            slices: [
               {
+                id: 'sli_1',
                 duration: 'PT5H30M',
+                origin: { id: 'HAN', name: 'Hanoi', iata_code: 'HAN', type: 'airport' },
+                destination: { id: 'NRT', name: 'Narita', iata_code: 'NRT', type: 'airport' },
                 segments: [
                   {
-                    departure: { iataCode: 'HAN', at: '2026-07-15T08:30:00Z' },
-                    arrival: { iataCode: 'NRT', at: '2026-07-15T15:00:00Z' },
-                    carrierCode: 'VN',
-                    number: '310',
+                    id: 'seg_1',
+                    duration: 'PT5H30M',
+                    departing_at: '2026-07-15T08:30:00',
+                    arriving_at: '2026-07-15T15:00:00',
+                    origin: { id: 'HAN', name: 'Hanoi', iata_code: 'HAN', type: 'airport' },
+                    destination: { id: 'NRT', name: 'Narita', iata_code: 'NRT', type: 'airport' },
+                    operating_carrier: { id: 'VN', name: 'Vietnam Airlines', iata_code: 'VN' },
+                    marketing_carrier: { id: 'VN', name: 'Vietnam Airlines', iata_code: 'VN' },
+                    marketing_carrier_flight_number: '310',
+                    passengers: [
+                      {
+                        passenger_id: 'pas_1',
+                        cabin_class: 'economy',
+                        baggages: [
+                          { type: 'checked', weight: 23, weight_unit: 'KG' }
+                        ]
+                      }
+                    ]
                   }
                 ]
               }
             ],
-            price: { currency: 'USD', total: String(452.00 * (Number(query.passengers) || 2)) },
-            travelerPricings: [
-              {
-                fareDetailsBySegment: [
-                  {
-                    cabin: 'ECONOMY',
-                    includedCheckedBags: { weight: 23, weightUnit: 'KG' }
-                  }
-                ]
-              }
-            ]
+            passengers: [
+              { id: 'pas_1', type: 'adult' }
+            ],
+            passenger_identity_documents_required: false,
           },
           {
-            id: '2',
-            itineraries: [
+            id: 'off_2',
+            total_amount: String(389.00 * (Number(query.passengers) || 2)),
+            total_currency: 'USD',
+            slices: [
               {
+                id: 'sli_2',
                 duration: 'PT6H30M',
+                origin: { id: 'HAN', name: 'Hanoi', iata_code: 'HAN', type: 'airport' },
+                destination: { id: 'NRT', name: 'Narita', iata_code: 'NRT', type: 'airport' },
                 segments: [
                   {
-                    departure: { iataCode: 'HAN', at: '2026-07-15T10:15:00Z' },
-                    arrival: { iataCode: 'NRT', at: '2026-07-15T17:45:00Z' },
-                    carrierCode: 'NH',
-                    number: '858',
+                    id: 'seg_2',
+                    duration: 'PT6H30M',
+                    departing_at: '2026-07-15T10:15:00',
+                    arriving_at: '2026-07-15T17:45:00',
+                    origin: { id: 'HAN', name: 'Hanoi', iata_code: 'HAN', type: 'airport' },
+                    destination: { id: 'NRT', name: 'Narita', iata_code: 'NRT', type: 'airport' },
+                    operating_carrier: { id: 'NH', name: 'Ana', iata_code: 'NH' },
+                    marketing_carrier: { id: 'NH', name: 'Ana', iata_code: 'NH' },
+                    marketing_carrier_flight_number: '858',
+                    passengers: [
+                      {
+                        passenger_id: 'pas_1',
+                        cabin_class: 'economy',
+                        baggages: [
+                          { type: 'checked', weight: 23, weight_unit: 'KG' }
+                        ]
+                      }
+                    ]
                   }
                 ]
               }
             ],
-            price: { currency: 'USD', total: String(389.00 * (Number(query.passengers) || 2)) },
-            travelerPricings: [
-              {
-                fareDetailsBySegment: [
-                  {
-                    cabin: 'ECONOMY',
-                    includedCheckedBags: { weight: 23, weightUnit: 'KG' }
-                  }
-                ]
-              }
-            ]
+            passengers: [
+              { id: 'pas_1', type: 'adult' }
+            ],
+            passenger_identity_documents_required: false,
           },
           {
-            id: '3',
-            itineraries: [
+            id: 'off_3',
+            total_amount: String(520.00 * (Number(query.passengers) || 2)),
+            total_currency: 'USD',
+            slices: [
               {
+                id: 'sli_3',
                 duration: 'PT5H35M',
+                origin: { id: 'HAN', name: 'Hanoi', iata_code: 'HAN', type: 'airport' },
+                destination: { id: 'NRT', name: 'Narita', iata_code: 'NRT', type: 'airport' },
                 segments: [
                   {
-                    departure: { iataCode: 'HAN', at: '2026-07-15T23:55:00Z' },
-                    arrival: { iataCode: 'NRT', at: '2026-07-15T07:30:00Z' },
-                    carrierCode: 'JL',
-                    number: '752',
+                    id: 'seg_3',
+                    duration: 'PT5H35M',
+                    departing_at: '2026-07-15T23:55:00',
+                    arriving_at: '2026-07-15T07:30:00',
+                    origin: { id: 'HAN', name: 'Hanoi', iata_code: 'HAN', type: 'airport' },
+                    destination: { id: 'NRT', name: 'Narita', iata_code: 'NRT', type: 'airport' },
+                    operating_carrier: { id: 'JL', name: 'Japan Airlines', iata_code: 'JL' },
+                    marketing_carrier: { id: 'JL', name: 'Japan Airlines', iata_code: 'JL' },
+                    marketing_carrier_flight_number: '752',
+                    passengers: [
+                      {
+                        passenger_id: 'pas_1',
+                        cabin_class: 'business',
+                        baggages: [
+                          { type: 'checked', weight: 32, weight_unit: 'KG' }
+                        ]
+                      }
+                    ]
                   }
                 ]
               }
             ],
-            price: { currency: 'USD', total: String(520.00 * (Number(query.passengers) || 2)) },
-            travelerPricings: [
-              {
-                fareDetailsBySegment: [
-                  {
-                    cabin: 'BUSINESS',
-                    includedCheckedBags: { weight: 32, weightUnit: 'KG' }
-                  }
-                ]
-              }
-            ]
+            passengers: [
+              { id: 'pas_1', type: 'adult' }
+            ],
+            passenger_identity_documents_required: false,
           },
           {
-            id: '4',
-            itineraries: [
+            id: 'off_4',
+            total_amount: String(199.00 * (Number(query.passengers) || 2)),
+            total_currency: 'USD',
+            slices: [
               {
+                id: 'sli_4',
                 duration: 'PT5H45M',
+                origin: { id: 'HAN', name: 'Hanoi', iata_code: 'HAN', type: 'airport' },
+                destination: { id: 'NRT', name: 'Narita', iata_code: 'NRT', type: 'airport' },
                 segments: [
                   {
-                    departure: { iataCode: 'HAN', at: '2026-07-15T00:15:00Z' },
-                    arrival: { iataCode: 'NRT', at: '2026-07-15T08:00:00Z' },
-                    carrierCode: 'VJ',
-                    number: '932',
+                    id: 'seg_4',
+                    duration: 'PT5H45M',
+                    departing_at: '2026-07-15T00:15:00',
+                    arriving_at: '2026-07-15T08:00:00',
+                    origin: { id: 'HAN', name: 'Hanoi', iata_code: 'HAN', type: 'airport' },
+                    destination: { id: 'NRT', name: 'Narita', iata_code: 'NRT', type: 'airport' },
+                    operating_carrier: { id: 'VJ', name: 'Vietjet Air', iata_code: 'VJ' },
+                    marketing_carrier: { id: 'VJ', name: 'Vietjet Air', iata_code: 'VJ' },
+                    marketing_carrier_flight_number: '932',
+                    passengers: [
+                      {
+                        passenger_id: 'pas_1',
+                        cabin_class: 'economy',
+                        baggages: [
+                          { type: 'checked', quantity: 0 }
+                        ]
+                      }
+                    ]
                   }
                 ]
               }
             ],
-            price: { currency: 'USD', total: String(199.00 * (Number(query.passengers) || 2)) },
-            travelerPricings: [
-              {
-                fareDetailsBySegment: [
-                  {
-                    cabin: 'ECO',
-                    includedCheckedBags: { quantity: 0 }
-                  }
-                ]
-              }
-            ]
+            passengers: [
+              { id: 'pas_1', type: 'adult' }
+            ],
+            passenger_identity_documents_required: false,
           },
           {
-            id: '5',
-            itineraries: [
+            id: 'off_5',
+            total_amount: String(610.00 * (Number(query.passengers) || 2)),
+            total_currency: 'USD',
+            slices: [
               {
+                id: 'sli_5',
                 duration: 'PT9H30M',
+                origin: { id: 'HAN', name: 'Hanoi', iata_code: 'HAN', type: 'airport' },
+                destination: { id: 'NRT', name: 'Narita', iata_code: 'NRT', type: 'airport' },
                 segments: [
                   {
-                    departure: { iataCode: 'HAN', at: '2026-07-15T12:00:00Z' },
-                    arrival: { iataCode: 'NRT', at: '2026-07-15T21:30:00Z' },
-                    carrierCode: 'SQ',
-                    number: '176',
+                    id: 'seg_5',
+                    duration: 'PT9H30M',
+                    departing_at: '2026-07-15T12:00:00',
+                    arriving_at: '2026-07-15T21:30:00',
+                    origin: { id: 'HAN', name: 'Hanoi', iata_code: 'HAN', type: 'airport' },
+                    destination: { id: 'NRT', name: 'Narita', iata_code: 'NRT', type: 'airport' },
+                    operating_carrier: { id: 'SQ', name: 'Singapore Airlines', iata_code: 'SQ' },
+                    marketing_carrier: { id: 'SQ', name: 'Singapore Airlines', iata_code: 'SQ' },
+                    marketing_carrier_flight_number: '176',
+                    passengers: [
+                      {
+                        passenger_id: 'pas_1',
+                        cabin_class: 'premium_economy',
+                        baggages: [
+                          { type: 'checked', weight: 30, weight_unit: 'KG' }
+                        ]
+                      }
+                    ]
                   }
                 ]
               }
             ],
-            price: { currency: 'USD', total: String(610.00 * (Number(query.passengers) || 2)) },
-            travelerPricings: [
-              {
-                fareDetailsBySegment: [
-                  {
-                    cabin: 'PREMIUM ECONOMY',
-                    includedCheckedBags: { weight: 30, weightUnit: 'KG' }
-                  }
-                ]
-              }
-            ]
+            passengers: [
+              { id: 'pas_1', type: 'adult' }
+            ],
+            passenger_identity_documents_required: false,
           }
         ],
-        dictionaries: {
-          carriers: {
-            VN: 'VIETNAM AIRLINES',
-            NH: 'ANA',
-            JL: 'JAPAN AIRLINES',
-            VJ: 'VIETJET AIR',
-            SQ: 'SINGAPORE AIRLINES'
-          }
-        }
-      } as unknown as AmadeusFlightSearchResponse;
+        slices: [],
+        passengers: []
+      } as unknown as DuffelOfferRequest;
     });
   });
 
@@ -536,8 +590,8 @@ describe('Agent Gateway (E2E)', () => {
       expect(firstResult.flightNumber).toBe('VN310');
       expect(firstResult.departureAirport).toBe('HAN');
       expect(firstResult.arrivalAirport).toBe('NRT');
-      expect(firstResult.departureTime).toBe('2026-07-15T08:30:00Z');
-      expect(firstResult.arrivalTime).toBe('2026-07-15T15:00:00Z');
+      expect(firstResult.departureTime).toBe('2026-07-15T08:30:00');
+      expect(firstResult.arrivalTime).toBe('2026-07-15T15:00:00');
       expect(firstResult.duration).toBe(330);
       expect(firstResult.stops).toBe(0);
       expect(firstResult.price).toBe(452.00 * 2);
