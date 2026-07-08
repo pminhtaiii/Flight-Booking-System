@@ -111,6 +111,32 @@ export class CacheService implements OnModuleInit, OnModuleDestroy {
     return nextVal;
   }
 
+  async decr(key: string): Promise<number> {
+    if (this.redisClient) {
+      try {
+        return await this.redisClient.decr(key);
+      } catch (err: unknown) {
+        const errMsg = err instanceof Error ? err.message : String(err);
+        this.logger.warn(`Redis DECR failed for key ${key}: ${errMsg}. Using in-memory fallback.`);
+      }
+    }
+
+    const now = Date.now();
+    const item = this.inMemoryStore.get(key);
+
+    let current = 0;
+    let expiry = Infinity;
+
+    if (item && now <= item.expiry) {
+      current = parseInt(item.value, 10) || 0;
+      expiry = item.expiry;
+    }
+
+    const nextVal = current - 1;
+    this.inMemoryStore.set(key, { value: String(nextVal), expiry });
+    return nextVal;
+  }
+
   async del(key: string): Promise<void> {
     if (this.redisClient) {
       try {

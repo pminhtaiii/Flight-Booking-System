@@ -40,7 +40,10 @@ function cleanIsoTime(t: string): string {
 
 function formatDuffelBaggageAllowance(baggages?: DuffelBaggage[]): string {
   if (!baggages || baggages.length === 0) return 'No checked baggage';
-  const checked = baggages.find((b) => b.type === 'checked') || baggages[0];
+  const checked = baggages.find((b) => b.type === 'checked');
+  if (!checked) {
+    return 'No checked baggage';
+  }
   if (checked.quantity === 0) {
     return 'No checked baggage';
   }

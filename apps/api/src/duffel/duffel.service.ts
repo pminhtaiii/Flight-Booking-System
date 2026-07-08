@@ -77,6 +77,7 @@ export class DuffelService {
       const newBudget = await this.cacheService.incr(budgetKey, ttlSeconds);
       if (newBudget > callerLimit || newBudget > totalLimit) {
         this.logger.warn(`Duffel search throttled after increment. Budget key: ${budgetKey}, New: ${newBudget}, Limits: (Caller: ${callerLimit}, Total: ${totalLimit})`);
+        await this.cacheService.decr(budgetKey);
         throw new HttpException(
           {
             message: 'Flight search capacity temporarily reached. Please try again later.',
