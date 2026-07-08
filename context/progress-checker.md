@@ -7,8 +7,8 @@ Update this file after every completed feature. Any AI agent reading this should
 ### Current Status
 
 **Feature:** Duffel Flight Search Service Setup & Agent Gateway Refactoring (In Progress)
-**Last completed:** Phase 3: FlightsModule & User Search Endpoint and Frontend Component Wiring (manual search form wiring, results list rendering with outbound/return segments, fare class, baggage allowance, validation error alert, and E2E Playwright integration tests).
-**Next:** Phase 4: Flight Detail & Re-pricing API.
+**Last completed:** Phase 4: Flight Detail & Re-pricing API, Expired Offer Recovery flow, and Frontend Details Page Integration.
+**Next:** Phase 5: Search History & Analytics Capture.
 
 ---
 
@@ -19,8 +19,8 @@ Update this file after every completed feature. Any AI agent reading this should
 - [x] Phase 1: Duffel Service Setup & Agent Gateway Refactoring (Duffel module extraction, SDK setup, cache, budget check, and agent gateway service updates)
 - [x] Phase 2: Database Schema & Cron Cleanup (Prisma model updates for FlightOffer and SearchHistory, daily cron retention task)
 - [x] Phase 3: FlightsModule & User Search Endpoint and Frontend Integration
-- [ ] Phase 4: Flight Detail & Re-pricing API
-- [ ] Phase 5: Frontend Integration (Search details page, expired offer recovery)
+- [x] Phase 4: Flight Detail & Re-pricing API
+- [x] Phase 5: Frontend Integration (Search details page, expired offer recovery)
 - [ ] Phase 6: E2E Verification & Testing (Automated Jest/Playwright tests, chatbot integration verification)
 
 ### [x] Feature: LLM Output Guardrails

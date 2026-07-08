@@ -13,7 +13,8 @@ import {
   Wifi,
   Tv,
   Coffee,
-  BatteryCharging
+  BatteryCharging,
+  AlertCircle
 } from 'lucide-react';
 
 type Props = {
@@ -21,35 +22,45 @@ type Props = {
     id: string;
     airline: string;
     flightNumber: string;
+    departureAirport: string;
+    arrivalAirport: string;
     departureTime: string;
     arrivalTime: string;
-    duration: string;
+    duration: number;
     stops: number;
-    price: number;
-    layoverAirport?: string;
-    layoverDuration?: string;
-    matchScore: number;
-    matchGrade: string;
-    matchClass: string;
+    originalPrice: number;
+    confirmedPrice: number;
+    priceChanged: boolean;
+    currency: string;
+    fareClass: string | null;
+    baggageAllowance: string | null;
+    segments: any[];
+    returnSegments: any[] | null;
+    expiresAt: string;
+    conditions: {
+      refundable: boolean;
+      changeable: boolean;
+      changeBeforeDeparture: {
+        allowed: boolean;
+        penaltyAmount: string | null;
+        penaltyCurrency: string | null;
+      } | null;
+    };
   };
-  origin: Airport | null;
-  destination: Airport | null;
-  layover: Airport | null;
   allAirports: Airport[];
 };
 
 export function FlightDetailPageClient({
   flight,
-  origin,
-  destination,
-  layover,
   allAirports
 }: Props) {
   const [isBooked, setIsBooked] = useState(false);
   const [pnrCode, setPnrCode] = useState('');
 
+  const origin = allAirports.find(ap => ap.iataCode === flight.departureAirport) || null;
+  const destination = allAirports.find(ap => ap.iataCode === flight.arrivalAirport) || null;
+
   const handleBook = () => {
-    // Generate a mock PNR code
     const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
     let code = '';
     for (let i = 0; i < 6; i++) {
@@ -59,10 +70,42 @@ export function FlightDetailPageClient({
     setIsBooked(true);
   };
 
-  // Construct stops array with layoverDuration attached
-  const stops = layover
-    ? [{ ...layover, layoverDuration: flight.layoverDuration }]
-    : [];
+  // Construct stops array with layoverDuration dynamically computed
+  const stops: any[] = [];
+  if (flight.segments && flight.segments.length > 1) {
+    for (let i = 0; i < flight.segments.length - 1; i++) {
+      const segment = flight.segments[i];
+      const nextSegment = flight.segments[i + 1];
+      const connectionAirport = allAirports.find(ap => ap.iataCode === segment.arrivalAirport);
+      if (connectionAirport) {
+        const arrivalTime = new Date(segment.arrivalTime);
+        const departureTime = new Date(nextSegment.departureTime);
+        const diffMs = departureTime.getTime() - arrivalTime.getTime();
+        const diffMin = Math.max(0, Math.floor(diffMs / 60000));
+        const layoverDuration = `${Math.floor(diffMin / 60)}h ${diffMin % 60}m`;
+        stops.push({
+          ...connectionAirport,
+          layoverDuration,
+        });
+      }
+    }
+  }
+
+  const formatTime = (isoString: string) => {
+    try {
+      return new Date(isoString).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    } catch {
+      return isoString;
+    }
+  };
+
+  const formatDate = (isoString: string) => {
+    try {
+      return new Date(isoString).toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' });
+    } catch {
+      return isoString;
+    }
+  };
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 min-h-[calc(100vh-80px)]">
@@ -83,6 +126,18 @@ export function FlightDetailPageClient({
             Review your itinerary and spatial flight path before booking.
           </p>
         </div>
+
+        {flight.priceChanged && (
+          <div className="bg-bg-match-fair border border-text-match-fair/20 text-text-primary rounded-xl p-4 flex gap-2.5 items-start">
+            <AlertCircle className="w-5 h-5 text-text-match-fair flex-shrink-0 mt-0.5" />
+            <div>
+              <h4 className="font-bold text-sm text-text-match-fair">Price Update Notification</h4>
+              <p className="text-xs text-text-secondary mt-0.5">
+                The price of this flight changed since your initial search. Original price: <span className="font-bold">${flight.originalPrice.toFixed(2)}</span>. Current live confirmed price: <span className="font-extrabold text-accent">${flight.confirmedPrice.toFixed(2)}</span>.
+              </p>
+            </div>
+          </div>
+        )}
 
         {isBooked ? (
           <div className="card border-text-confirmed bg-bg-confirmed text-text-primary p-6 flex flex-col items-center text-center gap-4">
@@ -105,7 +160,7 @@ export function FlightDetailPageClient({
               <div className="flex justify-between text-sm">
                 <span className="text-text-muted font-medium">Route:</span>
                 <span className="font-bold">
-                  {origin?.iataCode} → {layover ? `${layover.iataCode} → ` : ''}{destination?.iataCode}
+                  {origin?.iataCode} → {stops.length > 0 ? stops.map(s => s.iataCode).join(' → ') + ' → ' : ''}{destination?.iataCode}
                 </span>
               </div>
             </div>
@@ -128,95 +183,281 @@ export function FlightDetailPageClient({
               </div>
 
               <div className="flex flex-col items-end gap-1">
-                <span className={`text-xs font-bold px-2 py-0.5 rounded ${flight.matchClass}`}>
-                  {flight.matchScore}% Match · {flight.matchGrade}
+                <span className="text-xs font-bold px-2 py-0.5 rounded bg-bg-match-strong text-text-match-strong">
+                  {flight.stops === 0 ? 'Non-stop' : `${flight.stops} Stop(s)`}
                 </span>
-                <span className="text-xs text-text-muted">Personalized Recommendation</span>
+                <span className="text-xs text-text-muted">Live Re-confirmed Price</span>
               </div>
             </div>
 
-            {/* Timeline Segment */}
-            <div className="relative border-l-2 border-dashed border-card-border ml-4 pl-8 space-y-8 py-2">
-              {/* Origin Stop */}
-              <div className="relative">
-                <div className="absolute -left-[41px] top-0.5 bg-bg-confirmed border-2 border-text-confirmed rounded-full p-1.5 z-10">
-                  <MapPin className="w-3.5 h-3.5 text-text-confirmed" />
-                </div>
-                <div>
-                  <span className="text-xs text-text-muted font-semibold block">Departure</span>
-                  <div className="flex items-baseline gap-2 mt-0.5">
-                    <span className="font-extrabold text-base text-text-primary">{flight.departureTime}</span>
-                    <span className="font-bold text-accent">{origin?.iataCode}</span>
-                  </div>
-                  <span className="text-sm font-medium text-text-secondary block mt-0.5">
-                    {origin?.name}
-                  </span>
-                  <span className="text-xs text-text-muted">
-                    {origin?.city}, {origin?.country}
-                  </span>
-                </div>
-              </div>
+            {/* Outbound Timeline */}
+            <div>
+              <h3 className="text-xs font-bold uppercase tracking-wider text-text-muted mb-4">Outbound Flight Itinerary</h3>
+              <div className="relative border-l-2 border-dashed border-card-border ml-4 pl-8 space-y-6 py-2">
+                {flight.segments.map((segment, index) => {
+                  const segOrigin = allAirports.find(ap => ap.iataCode === segment.departureAirport);
+                  const segDest = allAirports.find(ap => ap.iataCode === segment.arrivalAirport);
+                  const showLayover = index < flight.segments.length - 1;
+                  const layoverAirport = showLayover ? allAirports.find(ap => ap.iataCode === segment.arrivalAirport) : null;
+                  
+                  let layoverDuration = '';
+                  if (showLayover) {
+                    const nextSegment = flight.segments[index + 1];
+                    const arrivalTime = new Date(segment.arrivalTime);
+                    const departureTime = new Date(nextSegment.departureTime);
+                    const diffMs = departureTime.getTime() - arrivalTime.getTime();
+                    const diffMin = Math.max(0, Math.floor(diffMs / 60000));
+                    layoverDuration = `${Math.floor(diffMin / 60)}h ${diffMin % 60}m`;
+                  }
 
-              {/* Layover Stop if applicable */}
-              {layover && (
-                <div className="relative">
-                  <div className="absolute -left-[41px] top-0.5 bg-bg-pending border-2 border-text-pending rounded-full p-1.5 z-10">
-                    <Clock className="w-3.5 h-3.5 text-text-pending" />
-                  </div>
-                  <div className="bg-bg-pending border border-text-pending/10 rounded-xl p-3 max-w-md">
-                    <span className="text-xs text-text-pending font-bold block">
-                      Layover in {layover.city} ({layover.iataCode})
-                    </span>
-                    <span className="text-xs text-text-secondary mt-0.5 block">
-                      {layover.name}
-                    </span>
-                    <span className="text-xs font-semibold text-text-pending mt-1 block">
-                      Duration: {flight.layoverDuration}
-                    </span>
-                  </div>
-                </div>
-              )}
+                  return (
+                    <div key={index} className="space-y-6">
+                      {/* Segment Departure */}
+                      <div className="relative">
+                        <div className="absolute -left-[41px] top-0.5 bg-bg-confirmed border-2 border-text-confirmed rounded-full p-1.5 z-10">
+                          <MapPin className="w-3.5 h-3.5 text-text-confirmed" />
+                        </div>
+                        <div>
+                          <span className="text-xs text-text-muted font-semibold block">
+                            Departure · {formatDate(segment.departureTime)}
+                          </span>
+                          <div className="flex items-baseline gap-2 mt-0.5">
+                            <span className="font-extrabold text-base text-text-primary">{formatTime(segment.departureTime)}</span>
+                            <span className="font-bold text-accent">{segment.departureAirport}</span>
+                            {segment.departureTerminal && (
+                              <span className="text-xs text-text-muted">Terminal {segment.departureTerminal}</span>
+                            )}
+                          </div>
+                          <span className="text-xs font-medium text-text-secondary block mt-0.5">
+                            {segOrigin?.name || segment.departureAirport}
+                          </span>
+                          <span className="text-[10px] text-text-muted block">
+                            {segOrigin?.city || ''}, {segOrigin?.country || ''}
+                          </span>
+                        </div>
+                      </div>
 
-              {/* Destination Stop */}
-              <div className="relative">
-                <div className="absolute -left-[41px] top-0.5 bg-bg-cancelled border-2 border-text-cancelled rounded-full p-1.5 z-10">
-                  <MapPin className="w-3.5 h-3.5 text-text-cancelled" />
-                </div>
-                <div>
-                  <span className="text-xs text-text-muted font-semibold block">Arrival</span>
-                  <div className="flex items-baseline gap-2 mt-0.5">
-                    <span className="font-extrabold text-base text-text-primary">{flight.arrivalTime}</span>
-                    <span className="font-bold text-accent">{destination?.iataCode}</span>
-                  </div>
-                  <span className="text-sm font-medium text-text-secondary block mt-0.5">
-                    {destination?.name}
-                  </span>
-                  <span className="text-xs text-text-muted">
-                    {destination?.city}, {destination?.country}
-                  </span>
-                </div>
+                      {/* Segment Mid Info */}
+                      <div className="bg-background border border-card-border rounded-xl p-3 max-w-md ml-2 text-xs text-text-secondary space-y-1">
+                        <div className="flex justify-between">
+                          <span className="font-semibold text-text-primary">{segment.operatingCarrier} ({segment.carrierCode}{segment.flightNumber})</span>
+                          <span>Duration: {Math.floor(segment.duration / 60)}h {segment.duration % 60}m</span>
+                        </div>
+                        {segment.aircraft && (
+                          <div className="text-[11px] text-text-muted">Aircraft: {segment.aircraft}</div>
+                        )}
+                      </div>
+
+                      {/* Segment Arrival */}
+                      <div className="relative">
+                        <div className="absolute -left-[41px] top-0.5 bg-bg-cancelled border-2 border-text-cancelled rounded-full p-1.5 z-10">
+                          <MapPin className="w-3.5 h-3.5 text-text-cancelled" />
+                        </div>
+                        <div>
+                          <span className="text-xs text-text-muted font-semibold block">
+                            Arrival · {formatDate(segment.arrivalTime)}
+                          </span>
+                          <div className="flex items-baseline gap-2 mt-0.5">
+                            <span className="font-extrabold text-base text-text-primary">{formatTime(segment.arrivalTime)}</span>
+                            <span className="font-bold text-accent">{segment.arrivalAirport}</span>
+                            {segment.arrivalTerminal && (
+                              <span className="text-xs text-text-muted">Terminal {segment.arrivalTerminal}</span>
+                            )}
+                          </div>
+                          <span className="text-xs font-medium text-text-secondary block mt-0.5">
+                            {segDest?.name || segment.arrivalAirport}
+                          </span>
+                          <span className="text-[10px] text-text-muted block">
+                            {segDest?.city || ''}, {segDest?.country || ''}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Layover block */}
+                      {showLayover && layoverAirport && (
+                        <div className="relative">
+                          <div className="absolute -left-[41px] top-0.5 bg-bg-pending border-2 border-text-pending rounded-full p-1.5 z-10">
+                            <Clock className="w-3.5 h-3.5 text-text-pending" />
+                          </div>
+                          <div className="bg-bg-pending border border-text-pending/10 rounded-xl p-3 max-w-md ml-2">
+                            <span className="text-xs text-text-pending font-bold block">
+                              Layover in {layoverAirport.city} ({layoverAirport.iataCode})
+                            </span>
+                            <span className="text-[11px] text-text-secondary mt-0.5 block">
+                              {layoverAirport.name}
+                            </span>
+                            <span className="text-xs font-semibold text-text-pending mt-1 block">
+                              Duration: {layoverDuration}
+                            </span>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             </div>
+
+            {/* Return Timeline (if present) */}
+            {flight.returnSegments && flight.returnSegments.length > 0 && (
+              <div>
+                <h3 className="text-xs font-bold uppercase tracking-wider text-text-muted mb-4">Return Flight Itinerary</h3>
+                <div className="relative border-l-2 border-dashed border-card-border ml-4 pl-8 space-y-6 py-2">
+                  {flight.returnSegments.map((segment, index) => {
+                    const segOrigin = allAirports.find(ap => ap.iataCode === segment.departureAirport);
+                    const segDest = allAirports.find(ap => ap.iataCode === segment.arrivalAirport);
+                    const showLayover = index < flight.returnSegments!.length - 1;
+                    const layoverAirport = showLayover ? allAirports.find(ap => ap.iataCode === segment.arrivalAirport) : null;
+                    
+                    let layoverDuration = '';
+                    if (showLayover) {
+                      const nextSegment = flight.returnSegments![index + 1];
+                      const arrivalTime = new Date(segment.arrivalTime);
+                      const departureTime = new Date(nextSegment.departureTime);
+                      const diffMs = departureTime.getTime() - arrivalTime.getTime();
+                      const diffMin = Math.max(0, Math.floor(diffMs / 60000));
+                      layoverDuration = `${Math.floor(diffMin / 60)}h ${diffMin % 60}m`;
+                    }
+
+                    return (
+                      <div key={index} className="space-y-6">
+                        {/* Segment Departure */}
+                        <div className="relative">
+                          <div className="absolute -left-[41px] top-0.5 bg-bg-confirmed border-2 border-text-confirmed rounded-full p-1.5 z-10">
+                            <MapPin className="w-3.5 h-3.5 text-text-confirmed" />
+                          </div>
+                          <div>
+                            <span className="text-xs text-text-muted font-semibold block">
+                              Departure · {formatDate(segment.departureTime)}
+                            </span>
+                            <div className="flex items-baseline gap-2 mt-0.5">
+                              <span className="font-extrabold text-base text-text-primary">{formatTime(segment.departureTime)}</span>
+                              <span className="font-bold text-accent">{segment.departureAirport}</span>
+                              {segment.departureTerminal && (
+                                <span className="text-xs text-text-muted">Terminal {segment.departureTerminal}</span>
+                              )}
+                            </div>
+                            <span className="text-xs font-medium text-text-secondary block mt-0.5">
+                              {segOrigin?.name || segment.departureAirport}
+                            </span>
+                            <span className="text-[10px] text-text-muted block">
+                              {segOrigin?.city || ''}, {segOrigin?.country || ''}
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Segment Mid Info */}
+                        <div className="bg-background border border-card-border rounded-xl p-3 max-w-md ml-2 text-xs text-text-secondary space-y-1">
+                          <div className="flex justify-between">
+                            <span className="font-semibold text-text-primary">{segment.operatingCarrier} ({segment.carrierCode}{segment.flightNumber})</span>
+                            <span>Duration: {Math.floor(segment.duration / 60)}h {segment.duration % 60}m</span>
+                          </div>
+                          {segment.aircraft && (
+                            <div className="text-[11px] text-text-muted">Aircraft: {segment.aircraft}</div>
+                          )}
+                        </div>
+
+                        {/* Segment Arrival */}
+                        <div className="relative">
+                          <div className="absolute -left-[41px] top-0.5 bg-bg-cancelled border-2 border-text-cancelled rounded-full p-1.5 z-10">
+                            <MapPin className="w-3.5 h-3.5 text-text-cancelled" />
+                          </div>
+                          <div>
+                            <span className="text-xs text-text-muted font-semibold block">
+                              Arrival · {formatDate(segment.arrivalTime)}
+                            </span>
+                            <div className="flex items-baseline gap-2 mt-0.5">
+                              <span className="font-extrabold text-base text-text-primary">{formatTime(segment.arrivalTime)}</span>
+                              <span className="font-bold text-accent">{segment.arrivalAirport}</span>
+                              {segment.arrivalTerminal && (
+                                <span className="text-xs text-text-muted">Terminal {segment.arrivalTerminal}</span>
+                              )}
+                            </div>
+                            <span className="text-xs font-medium text-text-secondary block mt-0.5">
+                              {segDest?.name || segment.arrivalAirport}
+                            </span>
+                            <span className="text-[10px] text-text-muted block">
+                              {segDest?.city || ''}, {segDest?.country || ''}
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Layover block */}
+                        {showLayover && layoverAirport && (
+                          <div className="relative">
+                            <div className="absolute -left-[41px] top-0.5 bg-bg-pending border-2 border-text-pending rounded-full p-1.5 z-10">
+                              <Clock className="w-3.5 h-3.5 text-text-pending" />
+                            </div>
+                            <div className="bg-bg-pending border border-text-pending/10 rounded-xl p-3 max-w-md ml-2">
+                              <span className="text-xs text-text-pending font-bold block">
+                                Layover in {layoverAirport.city} ({layoverAirport.iataCode})
+                              </span>
+                              <span className="text-[11px] text-text-secondary mt-0.5 block">
+                                {layoverAirport.name}
+                              </span>
+                              <span className="text-xs font-semibold text-text-pending mt-1 block">
+                                Duration: {layoverDuration}
+                              </span>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
 
             {/* Flight info details summary */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 border-y border-card-border py-4 my-2">
               <div>
-                <span className="text-xs text-text-muted block font-medium">Flight Duration</span>
-                <span className="font-bold text-sm text-text-primary">{flight.duration}</span>
+                <span className="text-xs text-text-muted block font-medium">Total Duration</span>
+                <span className="font-bold text-sm text-text-primary">{Math.floor(flight.duration / 60)}h {flight.duration % 60}m</span>
               </div>
               <div>
                 <span className="text-xs text-text-muted block font-medium">Stops</span>
                 <span className="font-bold text-sm text-text-primary">
-                  {flight.stops === 0 ? 'Non-stop' : `${flight.stops} Stop`}
+                  {flight.stops === 0 ? 'Non-stop' : `${flight.stops} Stop(s)`}
                 </span>
               </div>
               <div>
                 <span className="text-xs text-text-muted block font-medium">Baggage</span>
-                <span className="font-bold text-sm text-text-primary">23kg Included</span>
+                <span className="font-bold text-sm text-text-primary">{flight.baggageAllowance || 'Checked bag included'}</span>
               </div>
               <div>
                 <span className="text-xs text-text-muted block font-medium">Fare Type</span>
-                <span className="font-bold text-sm text-text-primary">Economy Standard</span>
+                <span className="font-bold text-sm text-text-primary">{flight.fareClass || 'Economy Standard'}</span>
+              </div>
+            </div>
+
+            {/* Fare Conditions */}
+            <div className="bg-background border border-card-border rounded-xl p-4 space-y-3">
+              <h4 className="font-bold text-sm text-text-primary">Fare Conditions & Rules</h4>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
+                <div className="flex justify-between border-b border-card-border/50 pb-2">
+                  <span className="text-text-muted font-medium">Refundable:</span>
+                  <span className={flight.conditions.refundable ? "text-text-confirmed font-bold" : "text-text-cancelled font-bold"}>
+                    {flight.conditions.refundable ? "Yes" : "No"}
+                  </span>
+                </div>
+                <div className="flex justify-between border-b border-card-border/50 pb-2">
+                  <span className="text-text-muted font-medium">Changeable:</span>
+                  <span className={flight.conditions.changeable ? "text-text-confirmed font-bold" : "text-text-cancelled font-bold"}>
+                    {flight.conditions.changeable ? "Yes" : "No"}
+                  </span>
+                </div>
+                {flight.conditions.changeBeforeDeparture && (
+                  <div className="flex justify-between col-span-1 md:col-span-2">
+                    <span className="text-text-muted font-medium">Change Penalty (Before Departure):</span>
+                    <span className="font-bold text-text-primary">
+                      {flight.conditions.changeBeforeDeparture.allowed
+                        ? flight.conditions.changeBeforeDeparture.penaltyAmount
+                          ? `${flight.conditions.changeBeforeDeparture.penaltyAmount} ${flight.conditions.changeBeforeDeparture.penaltyCurrency}`
+                          : "No Penalty"
+                        : "Not Allowed"}
+                    </span>
+                  </div>
+                )}
               </div>
             </div>
 
@@ -243,10 +484,12 @@ export function FlightDetailPageClient({
               </div>
             </div>
 
-             <div className="flex items-center justify-between border-t border-card-border pt-4 mt-2">
+            <div className="flex items-center justify-between border-t border-card-border pt-4 mt-2">
               <div>
                 <span className="text-xs text-text-muted block font-medium">Total Fare (1 Adult)</span>
-                <span className="text-2xl font-extrabold text-accent">${flight.price}</span>
+                <span className="text-2xl font-extrabold text-accent">
+                  ${flight.confirmedPrice.toFixed(2)}
+                </span>
               </div>
               <button 
                 onClick={handleBook}

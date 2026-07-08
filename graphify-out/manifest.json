@@ -740,8 +740,8 @@
     "semantic_hash": "13d24df073aeafdf3c5c1bc2507eb893"
   },
   "context/progress-checker.md": {
-    "mtime": 1783499236.1086829,
-    "ast_hash": "3d50f4d9d5806ab82a4b781392729d77",
+    "mtime": 1783516712.0643685,
+    "ast_hash": "2d23b59f7ff48ef2445f069f9479cf0a",
     "semantic_hash": ""
   },
   "context/project-overview.md": {
@@ -1210,8 +1210,8 @@
     "semantic_hash": ""
   },
   "apps/web/components/search/SearchPageClient.tsx": {
-    "mtime": 1783497515.7766006,
-    "ast_hash": "982881bfb6fcd00b7a0f2b1bd5a34973",
+    "mtime": 1783516477.631074,
+    "ast_hash": "7a74fde38a335fbe359d1547d0e28539",
     "semantic_hash": ""
   },
   "apps/web/lib/airport-service.ts": {
@@ -1220,13 +1220,13 @@
     "semantic_hash": ""
   },
   "apps/web/app/search/[flightId]/page.tsx": {
-    "mtime": 1783302256.550822,
-    "ast_hash": "a672fd7b165c8cefe3cf99162b50786c",
+    "mtime": 1783516442.254605,
+    "ast_hash": "0d929c7cb99eeb5be09408b59c6f3207",
     "semantic_hash": ""
   },
   "apps/web/components/search/FlightDetailPageClient.tsx": {
-    "mtime": 1783302256.6022408,
-    "ast_hash": "81be96ae3d9272b0f5191054864d82d6",
+    "mtime": 1783516461.6582582,
+    "ast_hash": "d9089dce8097eb2f8e3e02da36d438c1",
     "semantic_hash": ""
   },
   "apps/web/components/dashboard/ExploreDashboardClient.tsx": {
@@ -1310,8 +1310,8 @@
     "semantic_hash": ""
   },
   "specs/006-flight-search-service/tasks.md": {
-    "mtime": 1783499298.898608,
-    "ast_hash": "996efc6ece56295671907d4980ad6409",
+    "mtime": 1783516718.3267245,
+    "ast_hash": "f4409096df05a81f99f0d95188bc2b52",
     "semantic_hash": ""
   },
   "apps/api/prisma/migrations/20260708030243_add_flight_search_models/migration.sql": {
@@ -1335,8 +1335,8 @@
     "semantic_hash": ""
   },
   "apps/api/src/flights/flights.controller.ts": {
-    "mtime": 1783498384.1488528,
-    "ast_hash": "750e1b96ba1803b0706a890f0218095a",
+    "mtime": 1783516410.552106,
+    "ast_hash": "5c97cf9b32b3959346cf126ffca57120",
     "semantic_hash": ""
   },
   "apps/api/src/flights/flights.module.ts": {
@@ -1345,8 +1345,8 @@
     "semantic_hash": ""
   },
   "apps/api/src/flights/flights.service.ts": {
-    "mtime": 1783513813.0786562,
-    "ast_hash": "b1110175f0e2625b39c83dbed95a0b23",
+    "mtime": 1783516400.8183308,
+    "ast_hash": "657c3df9d8b758beb1145dbe59e175fc",
     "semantic_hash": ""
   },
   "apps/api/test/flights-search.e2e-spec.ts": {
@@ -1357,6 +1357,16 @@
   "apps/web/tests/search.spec.ts": {
     "mtime": 1783514259.8158467,
     "ast_hash": "691e5cad5a1b64eacdfd4e8e167af42d",
+    "semantic_hash": ""
+  },
+  "apps/api/src/flights/dto/detail-flight.dto.ts": {
+    "mtime": 1783516380.5933282,
+    "ast_hash": "ba794e7c1e0745c03f877f1107b26928",
+    "semantic_hash": ""
+  },
+  "apps/api/test/flights-detail.e2e-spec.ts": {
+    "mtime": 1783516605.0608485,
+    "ast_hash": "d962011235cea39f777e081451be9af9",
     "semantic_hash": ""
   }
 }

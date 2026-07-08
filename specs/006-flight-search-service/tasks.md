@@ -75,16 +75,16 @@
 
 ### Tests for User Story 2
 
-- [ ] T020 [P] [US2] Write backend detail and re-price E2E tests in `apps/api/test/flights-detail.e2e-spec.ts`
+- [x] T020 [P] [US2] Write backend detail and re-price E2E tests in `apps/api/test/flights-detail.e2e-spec.ts`
 
 ### Implementation for User Story 2
 
-- [ ] T021 [P] [US2] Implement flight detail response DTOs in `apps/api/src/flights/dto/detail-flight.dto.ts`
-- [ ] T022 [US2] Add detail retrieval endpoint in `apps/api/src/flights/flights.controller.ts`
-- [ ] T023 [US2] Implement re-price call and fallback recovery parameters in `apps/api/src/flights/flights.service.ts`
-- [ ] T024 [US2] Create flight detail view page in `apps/web/app/search/[flightId]/page.tsx`
-- [ ] T025 [US2] Implement details card component in `apps/web/components/search/FlightDetailPageClient.tsx`
-- [ ] T026 [US2] Add expired offer recovery redirect in `apps/web/components/search/SearchPageClient.tsx`
+- [x] T021 [P] [US2] Implement flight detail response DTOs in `apps/api/src/flights/dto/detail-flight.dto.ts`
+- [x] T022 [US2] Add detail retrieval endpoint in `apps/api/src/flights/flights.controller.ts`
+- [x] T023 [US2] Implement re-price call and fallback recovery parameters in `apps/api/src/flights/flights.service.ts`
+- [x] T024 [US2] Create flight detail view page in `apps/web/app/search/[flightId]/page.tsx`
+- [x] T025 [US2] Implement details card component in `apps/web/components/search/FlightDetailPageClient.tsx`
+- [x] T026 [US2] Add expired offer recovery redirect in `apps/web/components/search/SearchPageClient.tsx`
 
 **Checkpoint**: User Stories 1 and 2 are fully functional and integrated.
 

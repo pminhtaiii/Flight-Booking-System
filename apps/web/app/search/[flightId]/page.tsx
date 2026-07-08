@@ -126,34 +126,50 @@ export default async function FlightDetailPage({ params, searchParams }: Props) 
   }
 
   const flightId = params.flightId;
-  const flight = MOCK_FLIGHTS[flightId];
-  if (!flight) {
+  let flightData;
+
+  try {
+    const detailRes = await fetch(`${apiUrl}/api/flights/${flightId}`, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+      cache: 'no-store',
+    });
+
+    if (!detailRes.ok) {
+      if (detailRes.status === 410) {
+        const errorJson = await detailRes.json();
+        const rec = errorJson.recovery;
+        const queryParams = new URLSearchParams({
+          origin: rec.origin,
+          destination: rec.destination,
+          departureDate: rec.departureDate,
+          ...(rec.returnDate ? { returnDate: rec.returnDate } : {}),
+          passengers: String(rec.passengers),
+          expired: 'true',
+        });
+        redirect(`/search?${queryParams.toString()}`);
+      }
+      if (detailRes.status === 404 || detailRes.status === 400) {
+        notFound();
+      }
+      throw new Error('Failed to fetch flight details');
+    }
+
+    flightData = await detailRes.json();
+  } catch (err) {
+    console.error('Error fetching flight detail:', err);
     notFound();
   }
 
-  const originCode = searchParams?.from || 'HAN';
-  const destCode = searchParams?.to || 'NRT';
-
-  const [origin, destination, layover, allAirports] = await Promise.all([
-    getAirportByIataCode(originCode),
-    getAirportByIataCode(destCode),
-    flight.layoverAirport ? getAirportByIataCode(flight.layoverAirport) : Promise.resolve(null),
-    getAllAirports(),
-  ]);
-
-  if (!origin || !destination || (flight.layoverAirport && !layover)) {
-    notFound();
-  }
+  const allAirports = await getAllAirports();
 
   return (
     <div className="min-h-screen flex flex-col bg-background">
       <Header />
       <main className="flex-1 max-w-[1440px] w-full mx-auto p-8">
         <FlightDetailPageClient
-          flight={flight}
-          origin={origin}
-          destination={destination}
-          layover={layover}
+          flight={flightData}
           allAirports={allAirports}
         />
       </main>

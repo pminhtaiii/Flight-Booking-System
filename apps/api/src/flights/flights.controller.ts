@@ -7,10 +7,13 @@ import {
   Headers,
   HttpCode,
   HttpStatus,
+  Get,
+  Param,
 } from '@nestjs/common';
 import { JwtAuthGuard } from '@/auth/guards/jwt-auth.guard';
 import { FlightsService } from './flights.service';
 import { FlightSearchRequestDto, FlightSearchResponseDto } from './dto/search-flight.dto';
+import { FlightDetailResponseDto } from './dto/detail-flight.dto';
 import { Request } from 'express';
 
 interface AuthenticatedRequest extends Request {
@@ -41,5 +44,13 @@ export class FlightsController {
       traceId,
       correlationId,
     );
+  }
+
+  @Get(':id')
+  async findOne(
+    @Param('id') id: string,
+    @Req() req: AuthenticatedRequest,
+  ): Promise<FlightDetailResponseDto> {
+    return this.flightsService.getFlightDetail(id, req.user.id);
   }
 }

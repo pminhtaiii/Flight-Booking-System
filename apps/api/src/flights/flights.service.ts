@@ -1,9 +1,10 @@
-import { Injectable, BadRequestException, Logger } from '@nestjs/common';
+import { Injectable, BadRequestException, Logger, HttpException, HttpStatus } from '@nestjs/common';
 import { PrismaService } from '@/prisma/prisma.service';
 import { CacheService } from '@/cache/cache.service';
 import { DuffelService } from '@/duffel/duffel.service';
 import { AuditService } from '@/audit/audit.service';
 import { FlightSearchRequestDto, FlightSearchResponseDto, FlightOfferDto, FlightSegmentDto } from './dto/search-flight.dto';
+import { FlightDetailResponseDto } from './dto/detail-flight.dto';
 import { DuffelOffer, DuffelSegment } from '@/duffel/duffel.types';
 import { Prisma } from '@prisma/client';
 import * as crypto from 'crypto';
@@ -250,6 +251,185 @@ export class FlightsService {
         searchHash: sha256,
         cached,
       },
+    };
+  }
+
+  async getFlightDetail(id: string, userId: string): Promise<FlightDetailResponseDto> {
+    // 1. Look up flight offer in database
+    const flightOffer = await this.prisma.flightOffer.findUnique({
+      where: { id },
+    });
+
+    if (!flightOffer) {
+      // 2. Fallback: check if the offer existed in offerRecovery
+      const recoveryRecord = await this.prisma.offerRecovery.findUnique({
+        where: { id },
+      });
+
+      if (recoveryRecord) {
+        // Find the original search history
+        const searchHistory = await this.prisma.searchHistory.findFirst({
+          where: { searchHash: recoveryRecord.searchHash },
+          orderBy: { createdAt: 'desc' },
+        });
+
+        if (searchHistory) {
+          throw new HttpException(
+            {
+              message: 'This flight offer has expired. Use the search parameters below to find current availability.',
+              code: 'OFFER_EXPIRED',
+              recovery: {
+                origin: searchHistory.origin,
+                destination: searchHistory.destination,
+                departureDate: searchHistory.departureDate.toISOString().slice(0, 10),
+                returnDate: searchHistory.returnDate ? searchHistory.returnDate.toISOString().slice(0, 10) : null,
+                passengers: searchHistory.passengers,
+              },
+            },
+            HttpStatus.GONE,
+          );
+        }
+      }
+
+      // If not in recovery either, check if it's a valid UUID
+      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+      if (!uuidRegex.test(id)) {
+        throw new BadRequestException('Invalid UUID format');
+      }
+
+      throw new HttpException(
+        {
+          message: `Flight offer with ID ${id} never existed or has been completely removed.`,
+          code: 'NOT_FOUND',
+        },
+        HttpStatus.NOT_FOUND,
+      );
+    }
+
+    // 3. Offer found: Retrieve live details from Duffel API
+    let liveOffer: any;
+    try {
+      // Check if testing environment / mock mode
+      const isJest = process.env.JEST_WORKER_ID !== undefined;
+      const isTestEnv = process.env.NODE_ENV === 'test' || isJest;
+      const token = process.env.DUFFEL_ACCESS_TOKEN;
+
+      if (!isJest && (process.env.NODE_ENV === 'test' || token === 'mock')) {
+        // Mock get offer response
+        liveOffer = flightOffer.rawOffer;
+      } else {
+        const duffelResponse = await this.duffelService['duffel'].offers.get(flightOffer.duffelOfferId);
+        liveOffer = duffelResponse.data;
+      }
+    } catch (err: any) {
+      // If Duffel API indicates that the offer is gone/expired (e.g. 404/410 status)
+      const errStatus = err?.status || err?.statusCode || 500;
+      if (errStatus === 404 || errStatus === 410) {
+        this.logger.warn(`Flight offer ${flightOffer.duffelOfferId} expired on Duffel side. Purging from DB.`);
+        
+        // Delete the flight offer row
+        await this.prisma.flightOffer.delete({ where: { id } }).catch(() => {});
+
+        throw new HttpException(
+          {
+            message: 'This flight offer has expired. Use the search parameters below to find current availability.',
+            code: 'OFFER_EXPIRED',
+            recovery: {
+              origin: flightOffer.origin,
+              destination: flightOffer.destination,
+              departureDate: flightOffer.departureDate.toISOString().slice(0, 10),
+              returnDate: flightOffer.returnDate ? flightOffer.returnDate.toISOString().slice(0, 10) : null,
+              passengers: flightOffer.passengers,
+            },
+          },
+          HttpStatus.GONE,
+        );
+      }
+
+      this.logger.error(`Failed to retrieve offer from Duffel: ${err.message}`, err.stack);
+      throw new HttpException(
+        {
+          message: 'Upstream flight search service is temporarily unavailable',
+          code: 'UPSTREAM_UNAVAILABLE',
+        },
+        HttpStatus.BAD_GATEWAY,
+      );
+    }
+
+    // 4. Map live offer to DTO and check for price changes
+    const originalPrice = Number(flightOffer.price);
+    const confirmedPrice = Number(liveOffer.total_amount);
+    const priceChanged = originalPrice !== confirmedPrice;
+
+    // Use existing mapping functions
+    const outboundSlice = liveOffer.slices[0];
+    const firstSegment = outboundSlice?.segments[0];
+    const lastSegment = outboundSlice?.segments[outboundSlice.segments.length - 1];
+
+    const airline = firstSegment?.operating_carrier?.name || firstSegment?.marketing_carrier?.name || 'Unknown Airline';
+    const flightNumber = (firstSegment?.marketing_carrier?.iata_code || '') + (firstSegment?.marketing_carrier_flight_number || '');
+
+    const segmentBaggage = firstSegment?.passengers?.[0]?.baggages;
+    let baggageAllowance: string | null = null;
+    if (segmentBaggage && segmentBaggage.length > 0) {
+      const bag = segmentBaggage[0];
+      baggageAllowance = `${bag.quantity || 0} ${bag.type} bag(s)`;
+    }
+
+    const cabinClass = firstSegment?.passengers?.[0]?.cabin_class || null;
+    const returnSlice = liveOffer.slices[1];
+
+    // Map conditions
+    const rawConditions = liveOffer.conditions;
+    const refundable = rawConditions?.refund_before_departure?.allowed ?? false;
+    const changeable = rawConditions?.change_before_departure?.allowed ?? false;
+    const changeBeforeDeparture = rawConditions?.change_before_departure ? {
+      allowed: rawConditions.change_before_departure.allowed,
+      penaltyAmount: rawConditions.change_before_departure.penalty_amount || null,
+      penaltyCurrency: rawConditions.change_before_departure.penalty_currency || null,
+    } : null;
+
+    const conditions = {
+      refundable,
+      changeable,
+      changeBeforeDeparture,
+    };
+
+    // 5. Create audit log
+    await this.auditService.createLog(this.prisma, {
+      userId,
+      action: 'flight_detail_view',
+      resourceType: 'Flight',
+      resourceId: id,
+      metadata: {
+        flightId: id,
+        duffelOfferId: flightOffer.duffelOfferId,
+        priceChanged,
+        originalPrice,
+        confirmedPrice,
+      },
+    });
+
+    return {
+      id,
+      airline,
+      flightNumber,
+      departureAirport: firstSegment?.origin?.iata_code || '',
+      arrivalAirport: lastSegment?.destination?.iata_code || '',
+      departureTime: firstSegment?.departing_at || '',
+      arrivalTime: lastSegment?.arriving_at || '',
+      duration: parseISO8601Duration(outboundSlice?.duration || 'PT0H0M'),
+      stops: outboundSlice ? outboundSlice.segments.length - 1 : 0,
+      originalPrice,
+      confirmedPrice,
+      priceChanged,
+      currency: liveOffer.total_currency,
+      fareClass: capitalize(cabinClass),
+      baggageAllowance,
+      segments: outboundSlice?.segments.map(mapSegment) || [],
+      returnSegments: returnSlice ? returnSlice.segments.map(mapSegment) : null,
+      expiresAt: liveOffer.expires_at,
+      conditions,
     };
   }
 }

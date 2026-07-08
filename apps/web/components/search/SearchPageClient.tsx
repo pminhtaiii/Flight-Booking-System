@@ -58,6 +58,12 @@ export function SearchPageClient({ allAirports }: Props) {
   
   const searchParams = useSearchParams();
   const toParam = searchParams ? searchParams.get('to') : null;
+  const originParam = searchParams ? searchParams.get('origin') : null;
+  const destinationParam = searchParams ? searchParams.get('destination') : null;
+  const departureDateParam = searchParams ? searchParams.get('departureDate') : null;
+  const returnDateParam = searchParams ? searchParams.get('returnDate') : null;
+  const passengersParam = searchParams ? searchParams.get('passengers') : null;
+  const expiredParam = searchParams ? searchParams.get('expired') : null;
 
   // Traditional search state
   const [tripType, setTripType] = useState<'one-way' | 'round-trip'>('one-way');
@@ -242,6 +248,50 @@ export function SearchPageClient({ allAirports }: Props) {
       }
     }
   }, [toParam, allAirports]);
+
+  // Sync recovery parameters from query params (e.g. from 410 redirect)
+  useEffect(() => {
+    if (allAirports && allAirports.length > 0) {
+      if (originParam) {
+        const match = allAirports.find(
+          (ap) => ap.iataCode.toUpperCase() === originParam.toUpperCase()
+        );
+        if (match) {
+          setSelectedOrigin(match);
+          setOriginInput(`${match.iataCode} - ${match.name}`);
+          setMapOrigin(match);
+        }
+      }
+      if (destinationParam) {
+        const match = allAirports.find(
+          (ap) => ap.iataCode.toUpperCase() === destinationParam.toUpperCase()
+        );
+        if (match) {
+          setSelectedDest(match);
+          setDestInput(`${match.iataCode} - ${match.name}`);
+          setMapDest(match);
+        }
+      }
+    }
+    if (departureDateParam) {
+      setDepartDate(departureDateParam);
+    }
+    if (returnDateParam) {
+      setTripType('round-trip');
+      setReturnDate(returnDateParam);
+    } else if (originParam && destinationParam) {
+      setTripType('one-way');
+    }
+    if (passengersParam) {
+      const parsed = parseInt(passengersParam, 10);
+      if (!isNaN(parsed) && parsed >= 1 && parsed <= 9) {
+        setPassengers(parsed);
+      }
+    }
+    if (expiredParam === 'true') {
+      setFormError('This flight offer has expired. Use the search parameters below to find current availability.');
+    }
+  }, [originParam, destinationParam, departureDateParam, returnDateParam, passengersParam, expiredParam, allAirports]);
 
   // Click outside to close suggestion dropdowns
   useEffect(() => {
