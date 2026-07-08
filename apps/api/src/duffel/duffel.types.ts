@@ -43,6 +43,8 @@ export interface DuffelSegment {
   arriving_at: string;
   origin: DuffelPlace;
   destination: DuffelPlace;
+  origin_terminal?: string | null;
+  destination_terminal?: string | null;
   operating_carrier: DuffelAirline;
   marketing_carrier: DuffelAirline;
   marketing_carrier_flight_number: string;

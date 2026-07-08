@@ -88,6 +88,106 @@ export class DuffelService {
       }
 
       // 4. Create Duffel offer request
+      const isJest = process.env.JEST_WORKER_ID !== undefined;
+      if (!isJest && (process.env.NODE_ENV === 'test' || !process.env.DUFFEL_ACCESS_TOKEN || process.env.DUFFEL_ACCESS_TOKEN === 'mock')) {
+        this.logger.log(`Mocking Duffel API response for test environment. NODE_ENV: ${process.env.NODE_ENV}`);
+        
+        const slices: any[] = [
+          {
+            id: 'sli_mock_1',
+            duration: 'PT2H10M',
+            origin: { id: normalizedQuery.origin, name: `${normalizedQuery.origin} Airport`, iata_code: normalizedQuery.origin, type: 'airport' },
+            destination: { id: normalizedQuery.destination, name: `${normalizedQuery.destination} Airport`, iata_code: normalizedQuery.destination, type: 'airport' },
+            segments: [
+              {
+                id: 'seg_mock_1',
+                duration: 'PT2H10M',
+                departing_at: `${normalizedQuery.departureDate}T08:00:00`,
+                arriving_at: `${normalizedQuery.departureDate}T10:10:00`,
+                origin: { id: normalizedQuery.origin, name: `${normalizedQuery.origin} Airport`, iata_code: normalizedQuery.origin, type: 'airport' },
+                destination: { id: normalizedQuery.destination, name: `${normalizedQuery.destination} Airport`, iata_code: normalizedQuery.destination, type: 'airport' },
+                operating_carrier: { id: 'VN', name: 'Vietnam Airlines', iata_code: 'VN' },
+                marketing_carrier: { id: 'VN', name: 'Vietnam Airlines', iata_code: 'VN' },
+                marketing_carrier_flight_number: '123',
+                aircraft: { id: 'arc_mock_1', name: 'Airbus A321', iata_code: '321' },
+                passengers: Array.from({ length: normalizedQuery.passengers }, (_, i) => ({
+                  passenger_id: `pas_mock_${i + 1}`,
+                  cabin_class: 'economy',
+                  baggages: [
+                    { type: 'checked', quantity: 1 }
+                  ]
+                }))
+              }
+            ]
+          }
+        ];
+
+        if (normalizedQuery.returnDate) {
+          slices.push({
+            id: 'sli_mock_2',
+            duration: 'PT2H10M',
+            origin: { id: normalizedQuery.destination, name: `${normalizedQuery.destination} Airport`, iata_code: normalizedQuery.destination, type: 'airport' },
+            destination: { id: normalizedQuery.origin, name: `${normalizedQuery.origin} Airport`, iata_code: normalizedQuery.origin, type: 'airport' },
+            segments: [
+              {
+                id: 'seg_mock_2',
+                duration: 'PT2H10M',
+                departing_at: `${normalizedQuery.returnDate}T15:00:00`,
+                arriving_at: `${normalizedQuery.returnDate}T17:10:00`,
+                origin: { id: normalizedQuery.destination, name: `${normalizedQuery.destination} Airport`, iata_code: normalizedQuery.destination, type: 'airport' },
+                destination: { id: normalizedQuery.origin, name: `${normalizedQuery.origin} Airport`, iata_code: normalizedQuery.origin, type: 'airport' },
+                operating_carrier: { id: 'VN', name: 'Vietnam Airlines', iata_code: 'VN' },
+                marketing_carrier: { id: 'VN', name: 'Vietnam Airlines', iata_code: 'VN' },
+                marketing_carrier_flight_number: '124',
+                aircraft: { id: 'arc_mock_1', name: 'Airbus A321', iata_code: '321' },
+                passengers: Array.from({ length: normalizedQuery.passengers }, (_, i) => ({
+                  passenger_id: `pas_mock_${i + 1}`,
+                  cabin_class: 'economy',
+                  baggages: [
+                    { type: 'checked', quantity: 1 }
+                  ]
+                }))
+              }
+            ]
+          });
+        }
+
+        const offers = [
+          {
+            id: 'off_mock_123',
+            total_amount: '125.50',
+            total_currency: 'USD',
+            slices: slices.map((s, idx) => ({
+              ...s,
+              segments: s.segments.map((seg: any) => ({
+                ...seg,
+                passengers: seg.passengers
+              }))
+            })),
+            passengers: Array.from({ length: normalizedQuery.passengers }, (_, i) => ({
+              id: `pas_mock_${i + 1}`,
+              type: 'adult'
+            })),
+            passenger_identity_documents_required: false
+          }
+        ];
+
+        const offerRequest = {
+          id: 'or_mock_123',
+          slices,
+          passengers: Array.from({ length: normalizedQuery.passengers }, (_, i) => ({
+            id: `pas_mock_${i + 1}`,
+            type: 'adult'
+          })),
+          offers
+        } as unknown as DuffelOfferRequest;
+
+        // Cache raw response in Redis
+        await this.cacheService.set(rawCacheKey, JSON.stringify(offerRequest), 900);
+
+        return offerRequest;
+      }
+
       const slices = [
         {
           origin: normalizedQuery.origin,
