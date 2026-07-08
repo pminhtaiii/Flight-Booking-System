@@ -10,6 +10,7 @@ import { ChatModule } from './chat/chat.module';
 import { AgentGatewayModule } from './agent-gateway/agent-gateway.module';
 import { AirportsModule } from './airports/airports.module';
 import { DuffelModule } from './duffel/duffel.module';
+import { FlightsModule } from './flights/flights.module';
 
 @Module({
   imports: [
@@ -26,6 +27,7 @@ import { DuffelModule } from './duffel/duffel.module';
     AgentGatewayModule,
     AirportsModule,
     DuffelModule,
+    FlightsModule,
   ],
   controllers: [],
   providers: [],
