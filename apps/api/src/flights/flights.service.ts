@@ -314,7 +314,7 @@ export class FlightsService {
       const isTestEnv = process.env.NODE_ENV === 'test' || isJest;
       const token = process.env.DUFFEL_ACCESS_TOKEN;
 
-      if (!isJest && (process.env.NODE_ENV === 'test' || token === 'mock')) {
+      if (!isJest && (isTestEnv || token === 'mock')) {
         // Mock get offer response
         liveOffer = flightOffer.rawOffer;
       } else {
