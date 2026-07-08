@@ -271,5 +271,19 @@
   "269": "RateLimitMiddleware",
   "270": "test_output_guardrail_nemo.py",
   "271": ".aclose",
-  "272": "JwtStrategy"
+  "272": "JwtStrategy",
+  "273": "health.controller.ts",
+  "274": "Quickstart Validation Guide: LLM Output Guardrails",
+  "275": "Data Model: LLM Output Guardrails",
+  "276": "Findings",
+  "277": "Entities",
+  "278": "Phase 2: Configuration & PII Detection — Foundation",
+  "279": "Phase 3: Sentence-Boundary Chunking — Token Accumulation",
+  "280": "Phase 4: NeMo Output Rail — Safety Classification",
+  "281": "Phase 5: Output Guardrail Pipeline — Orchestration",
+  "282": "Phase 6: SSE Integration — Wire Pipeline Into Streaming",
+  "283": "Phase 7: Hard Stop & Partial Persistence — Failure Handling",
+  "284": "Phase 8: Pipeline Parallelism — Latency Optimization",
+  "285": "Phase 10: E2E Testing & Validation — Final Verification",
+  "286": "search.spec.ts"
 }

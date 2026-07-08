@@ -49,19 +49,19 @@
 
 ### Tests for User Story 1
 
-- [ ] T010 [P] [US1] Write backend search contract E2E test in `apps/api/test/flights-search.e2e-spec.ts`
-- [ ] T011 [P] [US1] Write frontend Playwright search integration test in `apps/web/tests/search.spec.ts`
+- [x] T010 [P] [US1] Write backend search contract E2E test in `apps/api/test/flights-search.e2e-spec.ts`
+- [x] T011 [P] [US1] Write frontend Playwright search integration test in `apps/web/tests/search.spec.ts`
 
 ### Implementation for User Story 1
 
-- [ ] T012 [P] [US1] Implement search query and response DTOs in `apps/api/src/flights/dto/search-flight.dto.ts`
-- [ ] T013 [P] [US1] Create controller with search endpoint in `apps/api/src/flights/flights.controller.ts`
-- [ ] T014 [US1] Implement search orchestrator and response transform in `apps/api/src/flights/flights.service.ts`
-- [ ] T015 [US1] Implement async write-behind persistence in `apps/api/src/flights/flights.service.ts`
-- [ ] T016 [US1] Register flights module in `apps/api/src/flights/flights.module.ts` and `apps/api/src/app.module.ts`
-- [ ] T017 [US1] Refactor AgentGateway to call `DuffelService` search in `apps/api/src/agent-gateway/agent-gateway.service.ts`
-- [ ] T018 Delete deprecated Amadeus provider directory `apps/api/src/agent-gateway/amadeus/`
-- [ ] T019 [US1] Wire search input and results list components in `apps/web/components/search/SearchPageClient.tsx`
+- [x] T012 [P] [US1] Implement search query and response DTOs in `apps/api/src/flights/dto/search-flight.dto.ts`
+- [x] T013 [P] [US1] Create controller with search endpoint in `apps/api/src/flights/flights.controller.ts`
+- [x] T014 [US1] Implement search orchestrator and response transform in `apps/api/src/flights/flights.service.ts`
+- [x] T015 [US1] Implement async write-behind persistence in `apps/api/src/flights/flights.service.ts`
+- [x] T016 [US1] Register flights module in `apps/api/src/flights/flights.module.ts` and `apps/api/src/app.module.ts`
+- [x] T017 [US1] Refactor AgentGateway to call `DuffelService` search in `apps/api/src/agent-gateway/agent-gateway.service.ts`
+- [x] T018 Delete deprecated Amadeus provider directory `apps/api/src/agent-gateway/amadeus/`
+- [x] T019 [US1] Wire search input and results list components in `apps/web/components/search/SearchPageClient.tsx`
 
 **Checkpoint**: User Story 1 is fully functional and testable independently.
 

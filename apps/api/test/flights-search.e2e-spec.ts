@@ -36,6 +36,10 @@ describe('Flights Search (E2E)', () => {
   }
 
   beforeAll(async () => {
+    jest.useFakeTimers({
+      doNotFake: ['nextTick', 'setImmediate', 'clearImmediate', 'setInterval', 'setTimeout'],
+    }).setSystemTime(new Date('2026-07-08T12:00:00.000Z'));
+
     const moduleFixture: TestingModule = await Test.createTestingModule({
       imports: [AppModule],
     }).compile();
@@ -58,6 +62,7 @@ describe('Flights Search (E2E)', () => {
   });
 
   afterAll(async () => {
+    jest.useRealTimers();
     await app.close();
   });
 

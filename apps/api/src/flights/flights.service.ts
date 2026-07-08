@@ -212,9 +212,11 @@ export class FlightsService {
             if (flightOffersData.length > 0) {
               await tx.flightOffer.createMany({
                 data: flightOffersData,
+                skipDuplicates: true,
               });
               await tx.offerRecovery.createMany({
                 data: offerRecoveriesData,
+                skipDuplicates: true,
               });
             }
           });

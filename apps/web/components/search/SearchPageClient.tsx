@@ -60,10 +60,13 @@ export function SearchPageClient({ allAirports }: Props) {
   const toParam = searchParams ? searchParams.get('to') : null;
 
   // Traditional search state
+  const [tripType, setTripType] = useState<'one-way' | 'round-trip'>('one-way');
   const [originInput, setOriginInput] = useState('');
   const [destInput, setDestInput] = useState('');
   const [departDate, setDepartDate] = useState('2026-07-10');
+  const [returnDate, setReturnDate] = useState('2026-07-15');
   const [passengers, setPassengers] = useState(1);
+  const [formError, setFormError] = useState<string | null>(null);
 
   const [selectedOrigin, setSelectedOrigin] = useState<Airport | null>(null);
   const [selectedDest, setSelectedDest] = useState<Airport | null>(null);
@@ -301,70 +304,78 @@ export function SearchPageClient({ allAirports }: Props) {
   };
 
   // Traditional search submit
-  const handleSearch = (e: React.FormEvent) => {
+  const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedOrigin || !selectedDest) return;
 
+    setFormError(null);
     setIsSearching(true);
     setMapOrigin(selectedOrigin);
     setMapDest(selectedDest);
     setIsSplitActive(true);
 
-    setTimeout(() => {
-      const mockRoutes = [
-        {
-          id: 'FL-101',
-          airline: 'SkyLink Express',
-          flightNumber: 'SL101',
-          departureAirport: selectedOrigin.iataCode,
-          arrivalAirport: selectedDest.iataCode,
-          departureTime: '08:00 AM',
-          arrivalTime: '12:30 PM',
-          duration: '4h 30m',
-          stops: 0,
-          price: 340,
-          matchScore: 92,
-          matchGrade: 'Strong Match',
-          matchClass: 'bg-bg-match-strong text-text-match-strong',
-        },
-        {
-          id: 'FL-202',
-          airline: 'Pacific Airways',
-          flightNumber: 'PA202',
-          departureAirport: selectedOrigin.iataCode,
-          arrivalAirport: selectedDest.iataCode,
-          departureTime: '11:15 AM',
-          arrivalTime: '06:45 PM',
-          duration: '7h 30m',
-          stops: 1,
-          layoverAirport: 'ICN',
-          price: 280,
-          matchScore: 84,
-          matchGrade: 'Fair Match',
-          matchClass: 'bg-bg-match-fair text-text-match-fair',
-        },
-        {
-          id: 'FL-303',
-          airline: 'Global Connect',
-          flightNumber: 'GC303',
-          departureAirport: selectedOrigin.iataCode,
-          arrivalAirport: selectedDest.iataCode,
-          departureTime: '09:30 PM',
-          arrivalTime: '05:00 AM',
-          duration: '7h 30m',
-          stops: 1,
-          layoverAirport: 'TPE',
-          price: 220,
-          matchScore: 68,
-          matchGrade: 'Weak Match',
-          matchClass: 'bg-bg-match-weak text-text-match-weak',
-        },
-      ];
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
-      setSearchResults(mockRoutes);
-      setIsSearching(false);
+    try {
+      const body: any = {
+        origin: selectedOrigin.iataCode,
+        destination: selectedDest.iataCode,
+        departureDate: departDate,
+        passengers,
+      };
+
+      if (tripType === 'round-trip') {
+        body.returnDate = returnDate;
+      }
+
+      const res = await fetch(`${apiUrl}/api/flights/search`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify(body),
+      });
+
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.message || 'Failed to fetch flight search results.');
+      }
+
+      const data = await res.json();
+
+      // Map results to searchResults state
+      const mapped = (data.results || []).map((flight: any, idx: number) => {
+        const score = idx === 0 ? 95 : idx === 1 ? 78 : 52;
+        return {
+          id: flight.id || `fl-${idx}`,
+          airline: flight.airline || 'Unknown',
+          flightNumber: flight.flightNumber || '',
+          departureAirport: flight.departureAirport,
+          arrivalAirport: flight.arrivalAirport,
+          departureTime: flight.departureTime ? new Date(flight.departureTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Unknown',
+          arrivalTime: flight.arrivalTime ? new Date(flight.arrivalTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Unknown',
+          duration: `${Math.floor((flight.duration || 0) / 60)}h ${(flight.duration || 0) % 60}m`,
+          stops: flight.stops || 0,
+          price: flight.price,
+          matchScore: score,
+          matchGrade: score >= 80 ? 'Strong Match' : score >= 60 ? 'Fair Match' : 'Weak Match',
+          matchClass: score >= 80 ? 'bg-bg-match-strong text-text-match-strong' : score >= 60 ? 'bg-bg-match-fair text-text-match-fair' : 'bg-bg-match-weak text-text-match-weak',
+          fareClass: flight.fareClass,
+          baggageAllowance: flight.baggageAllowance,
+          segments: flight.segments,
+          returnSegments: flight.returnSegments,
+        };
+      });
+
+      setSearchResults(mapped);
       setHasSearched(true);
-    }, 800);
+    } catch (err: any) {
+      console.error('[handleSearch]', err);
+      setFormError(err.message || 'An error occurred during search.');
+    } finally {
+      setIsSearching(false);
+    }
   };
 
   // SSE Chat stream handler
@@ -481,7 +492,11 @@ export function SearchPageClient({ allAirports }: Props) {
                   price: flight.price,
                   matchScore: score,
                   matchGrade: score >= 80 ? 'Strong Match' : score >= 60 ? 'Fair Match' : 'Weak Match',
-                  matchClass: score >= 80 ? 'bg-bg-match-strong text-text-match-strong' : score >= 60 ? 'bg-bg-match-fair text-text-match-fair' : 'bg-bg-match-weak text-text-match-weak'
+                  matchClass: score >= 80 ? 'bg-bg-match-strong text-text-match-strong' : score >= 60 ? 'bg-bg-match-fair text-text-match-fair' : 'bg-bg-match-weak text-text-match-weak',
+                  fareClass: flight.fareClass,
+                  baggageAllowance: flight.baggageAllowance,
+                  segments: flight.segments,
+                  returnSegments: flight.returnSegments,
                 };
               });
 
@@ -723,6 +738,34 @@ export function SearchPageClient({ allAirports }: Props) {
           </h3>
 
           <form onSubmit={handleSearch} className="space-y-4">
+            {/* Trip Type Toggle */}
+            <div className="flex gap-2 mb-4">
+              <button
+                type="button"
+                onClick={() => setTripType('one-way')}
+                className={cn(
+                  "px-4 py-2 text-xs font-semibold rounded-lg border transition",
+                  tripType === 'one-way'
+                    ? "bg-accent text-white border-accent"
+                    : "bg-card border-card-border text-text-secondary hover:bg-background"
+                )}
+              >
+                One-way
+              </button>
+              <button
+                type="button"
+                onClick={() => setTripType('round-trip')}
+                className={cn(
+                  "px-4 py-2 text-xs font-semibold rounded-lg border transition",
+                  tripType === 'round-trip'
+                    ? "bg-accent text-white border-accent"
+                    : "bg-card border-card-border text-text-secondary hover:bg-background"
+                )}
+              >
+                Round-trip
+              </button>
+            </div>
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 relative">
               <div ref={originRef} className="relative">
                 <label className="block text-xs font-semibold text-text-secondary mb-1">Origin</label>
@@ -815,7 +858,7 @@ export function SearchPageClient({ allAirports }: Props) {
               </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className={cn("grid grid-cols-1 gap-4", tripType === 'round-trip' ? "md:grid-cols-3" : "md:grid-cols-2")}>
               <div>
                 <label className="block text-xs font-semibold text-text-secondary mb-1">Departure Date</label>
                 <div className="relative">
@@ -829,6 +872,22 @@ export function SearchPageClient({ allAirports }: Props) {
                   />
                 </div>
               </div>
+
+              {tripType === 'round-trip' && (
+                <div>
+                  <label className="block text-xs font-semibold text-text-secondary mb-1">Return Date</label>
+                  <div className="relative">
+                    <Calendar className="absolute left-3 top-3 w-4 h-4 text-text-muted" />
+                    <input
+                      type="date"
+                      value={returnDate}
+                      onChange={(e) => setReturnDate(e.target.value)}
+                      className="form-input w-full pl-10"
+                      required={tripType === 'round-trip'}
+                    />
+                  </div>
+                </div>
+              )}
 
               <div>
                 <label className="block text-xs font-semibold text-text-secondary mb-1">Passengers</label>
@@ -846,6 +905,12 @@ export function SearchPageClient({ allAirports }: Props) {
                 </div>
               </div>
             </div>
+
+            {formError && (
+              <div className="error-message p-3 bg-bg-cancelled border border-text-cancelled/20 text-text-cancelled rounded-xl text-xs animate-fade-in" role="alert">
+                {formError}
+              </div>
+            )}
 
             <button
               type="submit"
@@ -939,10 +1004,41 @@ export function SearchPageClient({ allAirports }: Props) {
                     </div>
                   </div>
 
+                  {/* Outbound Segments */}
+                  {flight.segments && (
+                    <div className="outbound-segments mt-2 border-t border-card-border/50 pt-2 space-y-1">
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-text-muted block">Outbound</span>
+                      {flight.segments.map((seg: any, sIdx: number) => (
+                        <div key={sIdx} className="flex justify-between items-center text-xs text-text-secondary">
+                          <span>{seg.carrierCode}{seg.flightNumber} ({seg.departureAirport} → {seg.arrivalAirport})</span>
+                          <span>{seg.departureTime ? new Date(seg.departureTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Return Segments */}
+                  {flight.returnSegments && flight.returnSegments.length > 0 && (
+                    <div className="return-segments mt-2 border-t border-card-border/50 pt-2 space-y-1">
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-text-muted block">Return</span>
+                      {flight.returnSegments.map((seg: any, sIdx: number) => (
+                        <div key={sIdx} className="flex justify-between items-center text-xs text-text-secondary">
+                          <span>{seg.carrierCode}{seg.flightNumber} ({seg.departureAirport} → {seg.arrivalAirport})</span>
+                          <span>{seg.departureTime ? new Date(seg.departureTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
                   <div className="chat-flight-footer border-t border-card-border pt-3 mt-2 flex justify-between items-center">
                     <div className="price-block">
                       <span className="price-value text-accent">${Number(flight.price ?? 0).toFixed(2)}</span>
                       <span className="price-label block">per person / economy</span>
+                      <div className="flex gap-2 text-[10px] text-text-muted mt-1 font-medium">
+                        <span>Class: <strong className="fare-class-value text-text-secondary font-semibold">{flight.fareClass ? flight.fareClass.charAt(0).toUpperCase() + flight.fareClass.slice(1).toLowerCase() : 'Economy'}</strong></span>
+                        <span>•</span>
+                        <span>Baggage: <strong className="baggage-value text-text-secondary font-semibold">{flight.baggageAllowance || '1 checked bag(s)'}</strong></span>
+                      </div>
                     </div>
                     <div className="flight-actions flex gap-2">
                       <Link

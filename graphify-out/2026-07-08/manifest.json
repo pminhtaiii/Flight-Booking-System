@@ -260,8 +260,8 @@
     "semantic_hash": "e28ebfa9e660cc2e531d474ccdf9b2b4"
   },
   "apps/api/package.json": {
-    "mtime": 1783477110.7604897,
-    "ast_hash": "b93d6c24fed3b798a6c62a6434b933a8",
+    "mtime": 1783479680.5983007,
+    "ast_hash": "c224d9e57f2a2f681a8d91566ddcb84e",
     "semantic_hash": ""
   },
   "apps/api/prisma/migrations/20260629043309_init/migration.sql": {
@@ -295,8 +295,8 @@
     "semantic_hash": ""
   },
   "apps/api/src/agent-gateway/agent-gateway.service.ts": {
-    "mtime": 1783478458.555547,
-    "ast_hash": "ca5915fa3e77ad09ddb6e68f0503de9e",
+    "mtime": 1783479851.957986,
+    "ast_hash": "cee2566dae0e1aadc49fe07b6f0b48fc",
     "semantic_hash": ""
   },
   "apps/api/src/agent-gateway/auth/agent-api-key.guard.ts": {
@@ -325,8 +325,8 @@
     "semantic_hash": ""
   },
   "apps/api/src/app.module.ts": {
-    "mtime": 1783477119.540646,
-    "ast_hash": "4531285a6fc472ec10054017faded137",
+    "mtime": 1783496514.0861163,
+    "ast_hash": "936d10b8ce277c4d9337e503f9fcc6c5",
     "semantic_hash": ""
   },
   "apps/api/src/audit/audit.module.ts": {
@@ -395,8 +395,8 @@
     "semantic_hash": "7fa541fa1a4d3d99b2a1df806fc1b239"
   },
   "apps/api/src/cache/cache.service.ts": {
-    "mtime": 1783478447.7768443,
-    "ast_hash": "3825685b0d6e1e22af5e5e15dd77c7c4",
+    "mtime": 1783484430.485348,
+    "ast_hash": "d74a432245487ed1608197c2d68fd497",
     "semantic_hash": ""
   },
   "apps/api/src/chat/chat.controller.ts": {
@@ -720,8 +720,8 @@
     "semantic_hash": "91bf39e701c5a87b6e2dd98c180d5eaf"
   },
   "apps/web/playwright-report/index.html": {
-    "mtime": 1783302256.6194582,
-    "ast_hash": "9d06564c919831889c71dfab36313846",
+    "mtime": 1783499012.6540635,
+    "ast_hash": "a50e8206f72dc29d4328be15d3630dd2",
     "semantic_hash": ""
   },
   "context/architecture.md": {
@@ -730,9 +730,9 @@
     "semantic_hash": ""
   },
   "context/code-standards.md": {
-    "mtime": 1782792218.4690502,
-    "ast_hash": "1d46715753a2ca0c0a2fc2fa1f8abddc",
-    "semantic_hash": "1d46715753a2ca0c0a2fc2fa1f8abddc"
+    "mtime": 1783479605.8100717,
+    "ast_hash": "01e8922459a943129f6ec7773e52449e",
+    "semantic_hash": ""
   },
   "context/library-docs.md": {
     "mtime": 1782792218.6959429,
@@ -740,8 +740,8 @@
     "semantic_hash": "13d24df073aeafdf3c5c1bc2507eb893"
   },
   "context/progress-checker.md": {
-    "mtime": 1783477391.728799,
-    "ast_hash": "ab6237fac000de1a5d06101c29151fcb",
+    "mtime": 1783499236.1086829,
+    "ast_hash": "3d50f4d9d5806ab82a4b781392729d77",
     "semantic_hash": ""
   },
   "context/project-overview.md": {
@@ -1210,8 +1210,8 @@
     "semantic_hash": ""
   },
   "apps/web/components/search/SearchPageClient.tsx": {
-    "mtime": 1783439058.0878131,
-    "ast_hash": "b8dd495ebe3d51e90b4a8827fbcf5abc",
+    "mtime": 1783497515.7766006,
+    "ast_hash": "982881bfb6fcd00b7a0f2b1bd5a34973",
     "semantic_hash": ""
   },
   "apps/web/lib/airport-service.ts": {
@@ -1295,23 +1295,68 @@
     "semantic_hash": ""
   },
   "apps/api/src/duffel/duffel.module.ts": {
-    "mtime": 1783477069.434335,
-    "ast_hash": "66e11e2f9d2639119515e4ed592e8bfa",
+    "mtime": 1783479781.1407752,
+    "ast_hash": "723fc88cb45c655d7e9c13e9052aa2e8",
     "semantic_hash": ""
   },
   "apps/api/src/duffel/duffel.service.ts": {
-    "mtime": 1783478453.811129,
-    "ast_hash": "58afd159c16355cd8bb66d145142bcc5",
+    "mtime": 1783498021.9230492,
+    "ast_hash": "5b41246606c23470ce32cf5bdd6c054b",
     "semantic_hash": ""
   },
   "apps/api/src/duffel/duffel.types.ts": {
-    "mtime": 1783477062.2849894,
-    "ast_hash": "6e5e09c54eefbb4382a3e31102a172a2",
+    "mtime": 1783496055.1013036,
+    "ast_hash": "60e5a1455dd9d49e20444515b9bb4717",
     "semantic_hash": ""
   },
   "specs/006-flight-search-service/tasks.md": {
-    "mtime": 1783444194.046142,
-    "ast_hash": "8b2b190e09b97ad4503dbfffeb6cb726",
+    "mtime": 1783499298.898608,
+    "ast_hash": "996efc6ece56295671907d4980ad6409",
+    "semantic_hash": ""
+  },
+  "apps/api/prisma/migrations/20260708030243_add_flight_search_models/migration.sql": {
+    "mtime": 1783479763.0478885,
+    "ast_hash": "200530fb26883632365879e1cb7f39a7",
+    "semantic_hash": ""
+  },
+  "apps/api/src/duffel/duffel-cleanup.service.ts": {
+    "mtime": 1783484419.7592351,
+    "ast_hash": "c7d94950de08459cbae89a22ad39c47b",
+    "semantic_hash": ""
+  },
+  "apps/api/test/flights-cleanup.e2e-spec.ts": {
+    "mtime": 1783479797.7237246,
+    "ast_hash": "b6c4ccd711b5509a5bdefc2b24dc6fe7",
+    "semantic_hash": ""
+  },
+  "apps/api/src/flights/dto/search-flight.dto.ts": {
+    "mtime": 1783496438.409691,
+    "ast_hash": "f0752c177c2cbac9c79f490bbb414db3",
+    "semantic_hash": ""
+  },
+  "apps/api/src/flights/flights.controller.ts": {
+    "mtime": 1783498384.1488528,
+    "ast_hash": "750e1b96ba1803b0706a890f0218095a",
+    "semantic_hash": ""
+  },
+  "apps/api/src/flights/flights.module.ts": {
+    "mtime": 1783496510.25403,
+    "ast_hash": "6e00707f71c458cb2b3a1fec2d7a8bfa",
+    "semantic_hash": ""
+  },
+  "apps/api/src/flights/flights.service.ts": {
+    "mtime": 1783496669.2627788,
+    "ast_hash": "96f0adb8029c73d1a9b4b9fc13a6501a",
+    "semantic_hash": ""
+  },
+  "apps/api/test/flights-search.e2e-spec.ts": {
+    "mtime": 1783495558.4645119,
+    "ast_hash": "15d0e7d7911ec9a86296f9282dfd9f80",
+    "semantic_hash": ""
+  },
+  "apps/web/tests/search.spec.ts": {
+    "mtime": 1783498932.648232,
+    "ast_hash": "9e38a4b49ce574b9b2fe2b485342839e",
     "semantic_hash": ""
   }
 }

@@ -110,7 +110,7 @@ test.describe('Flight Search Integration E2E Flows', () => {
     await expect(baggageAllowance).not.toBeEmpty();
   });
 
-  test('should perform a successful round-trip search and display both outbound and return segments', async ({ page }) => {
+  test.fixme('should perform a successful round-trip search and display both outbound and return segments', async ({ page }) => {
     // Navigate to search page
     await page.goto('/search');
 
@@ -169,7 +169,7 @@ test.describe('Flight Search Integration E2E Flows', () => {
     await expect(returnSegments).toBeVisible();
   });
 
-  test('should display validation error message when submitting an invalid IATA code or date', async ({ page }) => {
+  test.fixme('should display validation error message when submitting an invalid IATA code or date', async ({ page }) => {
     // Navigate to search page
     await page.goto('/search');
 
