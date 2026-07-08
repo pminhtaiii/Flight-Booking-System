@@ -18,9 +18,9 @@
 
 **Purpose**: Project initialization and basic structure
 
-- [ ] T001 Install `@duffel/api` SDK in `apps/api/package.json`
-- [ ] T002 Create types and interfaces in `apps/api/src/duffel/duffel.types.ts`
-- [ ] T003 Create Duffel module definition in `apps/api/src/duffel/duffel.module.ts`
+- [X] T001 Install `@duffel/api` SDK in `apps/api/package.json`
+- [X] T002 Create types and interfaces in `apps/api/src/duffel/duffel.types.ts`
+- [X] T003 Create Duffel module definition in `apps/api/src/duffel/duffel.module.ts`
 
 ---
 
@@ -30,12 +30,12 @@
 
 **⚠️ CRITICAL**: No user story work can begin until this phase is complete
 
-- [ ] T004 Add `FlightOffer`, `SearchHistory`, and `OfferRecovery` models to `apps/api/prisma/schema.prisma`
-- [ ] T005 Run database migration using `npx prisma migrate dev`
-- [ ] T006 [P] Implement base client initialization and configuration in `apps/api/src/duffel/duffel.service.ts`
-- [ ] T007 [P] Implement Redis-based response caching in `apps/api/src/duffel/duffel.service.ts`
-- [ ] T008 [P] Implement API budget tracker with priority thresholds in `apps/api/src/duffel/duffel.service.ts`
-- [ ] T009 [P] Implement daily scheduled cleanup cron job in `apps/api/src/duffel/duffel-cleanup.service.ts`
+- [X] T004 Add `FlightOffer`, `SearchHistory`, and `OfferRecovery` models to `apps/api/prisma/schema.prisma`
+- [X] T005 Run database migration using `npx prisma migrate dev`
+- [X] T006 [P] Implement base client initialization and configuration in `apps/api/src/duffel/duffel.service.ts`
+- [X] T007 [P] Implement Redis-based response caching in `apps/api/src/duffel/duffel.service.ts`
+- [X] T008 [P] Implement API budget tracker with priority thresholds in `apps/api/src/duffel/duffel.service.ts`
+- [X] T009 [P] Implement daily scheduled cleanup cron job in `apps/api/src/duffel/duffel-cleanup.service.ts`
 
 **Checkpoint**: Foundation ready - user story implementation can now begin in parallel
 

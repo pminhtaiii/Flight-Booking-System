@@ -10,16 +10,6 @@ import { UserPreferencesDto } from './dto/user-preferences.dto';
 import { UserBookingsResponseDto, BookingResultDto } from './dto/user-bookings.dto';
 import * as crypto from 'crypto';
 
-function toTitleCase(str: string): string {
-  if (!str) return '';
-  return str
-    .trim()
-    .toLowerCase()
-    .split(/\s+/)
-    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-    .join(' ');
-}
-
 function capitalizeCabinClass(cabinClass: string): string {
   if (!cabinClass) return '';
   return cabinClass
@@ -64,17 +54,6 @@ function parseISODurationToMinutes(durationStr: string): number {
   const hours = parseInt(matches[2] || '0', 10);
   const minutes = parseInt(matches[3] || '0', 10);
   return days * 1440 + hours * 60 + minutes;
-}
-
-function formatBaggageAllowance(baggage?: { quantity?: number; weight?: number; weightUnit?: string }): string {
-  if (!baggage) return 'No checked baggage';
-  if (typeof baggage.quantity === 'number') {
-    return `${baggage.quantity} checked bag(s)`;
-  }
-  if (typeof baggage.weight === 'number') {
-    return `${baggage.weight}${baggage.weightUnit?.toLowerCase() || 'kg'} checked`;
-  }
-  return 'No checked baggage';
 }
 
 @Injectable()

@@ -7,8 +7,8 @@ Update this file after every completed feature. Any AI agent reading this should
 ### Current Status
 
 **Feature:** Duffel Flight Search Service Setup & Agent Gateway Refactoring (In Progress)
-**Last completed:** Setup of Duffel Flight Search Service (`DuffelService`), package installations/removals, cache/budget integration, and refactoring/E2E testing of the `AgentGatewayModule`.
-**Next:** Phase 2: Database Schema & Cron Cleanup (`flight_offers` and `search_history` Prisma models, daily cron retention).
+**Last completed:** Phase 2: Database Schema & Cron Cleanup (`flight_offers`, `search_history`, and `offer_recoveries` Prisma models, daily cleanup cron service setup, and E2E tests).
+**Next:** Phase 3: FlightsModule & User Search Endpoint.
 
 ---
 
@@ -17,7 +17,7 @@ Update this file after every completed feature. Any AI agent reading this should
 ### [ ] Feature: Duffel Flight Search Service Setup & Agent Gateway Refactoring (Feature 6)
 
 - [x] Phase 1: Duffel Service Setup & Agent Gateway Refactoring (Duffel module extraction, SDK setup, cache, budget check, and agent gateway service updates)
-- [ ] Phase 2: Database Schema & Cron Cleanup (Prisma model updates for FlightOffer and SearchHistory, daily cron retention task)
+- [x] Phase 2: Database Schema & Cron Cleanup (Prisma model updates for FlightOffer and SearchHistory, daily cron retention task)
 - [ ] Phase 3: FlightsModule & User Search Endpoint
 - [ ] Phase 4: Flight Detail & Re-pricing API
 - [ ] Phase 5: Frontend Integration (Search forms, results lists, details page, expired offer recovery)

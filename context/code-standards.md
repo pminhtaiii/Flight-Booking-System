@@ -467,6 +467,7 @@ Approved dependencies for this project:
 
 - `@nestjs/common`, `@nestjs/core`, `@nestjs/platform-express` — NestJS framework
 - `@nestjs/config` — Environment variable management
+- `@nestjs/schedule` — Task scheduling / cron jobs
 - `prisma`, `@prisma/client` — ORM and database client
 - `ioredis` — Redis client
 - `amadeus` — Amadeus Self-Service API SDK
