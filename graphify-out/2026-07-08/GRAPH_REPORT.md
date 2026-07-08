@@ -1,16 +1,16 @@
 # Graph Report - Booking Systems  (2026-07-08)
 
 ## Corpus Check
-- 258 files · ~151,646 words
+- 258 files · ~151,740 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 2250 nodes · 2635 edges · 273 communities (140 shown, 133 thin omitted)
+- 2251 nodes · 2637 edges · 273 communities (141 shown, 132 thin omitted)
 - Extraction: 95% EXTRACTED · 5% INFERRED · 0% AMBIGUOUS · INFERRED: 135 edges (avg confidence: 0.78)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `fc240699`
+- Built from commit: `3b6a5311`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -272,7 +272,7 @@
 ## God Nodes (most connected - your core abstractions)
 1. `PrismaService` - 38 edges
 2. `NestJSClient` - 33 edges
-3. `CacheService` - 29 edges
+3. `CacheService` - 30 edges
 4. `Code Standards` - 23 edges
 5. `get_settings()` - 22 edges
 6. `OutputGuardrailPipeline` - 22 edges
@@ -304,7 +304,7 @@
 - **Agent Gateway REST Endpoints** — specs_003_agent_tool_calling_contracts_agent_gateway_api_get_search_flights, specs_003_agent_tool_calling_contracts_agent_gateway_api_get_user_preferences, specs_003_agent_tool_calling_contracts_agent_gateway_api_get_user_bookings [EXTRACTED 1.00]
 - **Output Guardrail Pipeline Components** — specs_004_output_guardrails_data_model_chunkbuffer_model, specs_004_output_guardrails_data_model_slidingwindow_model, specs_004_output_guardrails_data_model_outputguardrailconfig_model, specs_004_output_guardrails_data_model_outputguardrailpipeline_model [EXTRACTED 1.00]
 
-## Communities (273 total, 133 thin omitted)
+## Communities (273 total, 132 thin omitted)
 
 ### Community 0 - "NestJSClient"
 Cohesion: 0.15
@@ -315,8 +315,8 @@ Cohesion: 0.06
 Nodes (30): Complexity Tracking, Constitution Check, Documentation (this feature), Implementation Phases, Implementation Plan: Map Integration, Phase 1: Airport Data Model & Database Seed (Backend), Phase 2: Airport REST API Endpoints (Backend), Phase 3: Map Component Foundation (Frontend) (+22 more)
 
 ### Community 2 - "prisma.service.ts"
-Cohesion: 0.17
-Nodes (4): CacheService, DuffelService, DuffelOfferRequest, ToolCallMetadata
+Cohesion: 0.19
+Nodes (4): CacheModule, CacheService, DuffelModule, DuffelService
 
 ### Community 3 - "test_tools.py"
 Cohesion: 0.07
@@ -331,8 +331,8 @@ Cohesion: 0.08
 Nodes (24): dependencies, bcrypt, class-transformer, class-validator, @duffel/api, ioredis, langchain, @langchain/core (+16 more)
 
 ### Community 6 - "agent-gateway.service.ts"
-Cohesion: 0.08
-Nodes (24): AgentGatewayController, AuthenticatedRequest, AgentGatewayModule, AgentGatewayService, capitalizeCabinClass(), cleanIsoTime(), formatDuffelBaggageAllowance(), parseISODurationToMinutes() (+16 more)
+Cohesion: 0.09
+Nodes (23): AgentGatewayController, AuthenticatedRequest, AgentGatewayService, capitalizeCabinClass(), cleanIsoTime(), formatDuffelBaggageAllowance(), parseISODurationToMinutes(), AgentApiKeyGuard (+15 more)
 
 ### Community 7 - "dependencies"
 Cohesion: 0.05
@@ -407,8 +407,8 @@ Cohesion: 0.25
 Nodes (7): collection, compilerOptions, assets, deleteOutDir, watchAssets, $schema, sourceRoot
 
 ### Community 29 - "app.module.ts"
-Cohesion: 0.19
-Nodes (8): AppModule, HttpExceptionFilter, bootstrap(), PrismaService, CacheServiceWithInternal, CircularMetadata, SanitizedUserMetadata, SanitizedVariantsMetadata
+Cohesion: 0.20
+Nodes (9): AppModule, HttpExceptionFilter, DuffelOfferRequest, bootstrap(), CacheServiceWithInternal, CircularMetadata, SanitizedUserMetadata, SanitizedVariantsMetadata (+1 more)
 
 ### Community 31 - "MessageQueueManager"
 Cohesion: 0.04
@@ -429,10 +429,6 @@ Nodes (4): inter, metadata, Props, Providers()
 ### Community 36 - "package.json"
 Cohesion: 0.29
 Nodes (6): name, private, scripts, test, test:llm, version
-
-### Community 37 - "scripts"
-Cohesion: 0.12
-Nodes (6): AuthController, AuthenticatedRequest, AuthService, LoginDto, RegisterDto, LockoutService
 
 ### Community 38 - ".eslintrc.json"
 Cohesion: 0.40
@@ -611,7 +607,7 @@ Cohesion: 0.17
 Nodes (11): Decision 10: Concurrent Message Handling, Decision 1: Python Framework, Decision 2: SSE Streaming Implementation, Decision 3: JWT Validation in Python, Decision 4: Input Guardrails Library, Decision 5: LangChain Python Agent Setup, Decision 6: Python Project in Monorepo, Decision 7: LangSmith Tracing (+3 more)
 
 ### Community 152 - "AuditService"
-Cohesion: 0.16
+Cohesion: 0.15
 Nodes (7): CACHE_KEYS, CACHE_TTLS, AirportsController, AirportsModule, AirportsService, NearbyAirportsDto, SearchAirportsDto
 
 ### Community 153 - "Flight Booking System — Architecture Decisions"
@@ -731,8 +727,8 @@ Cohesion: 0.26
 Nodes (10): FlightDetailPage(), MOCK_FLIGHTS, Props, AirportSearchResponse, fetchWithTimeout(), getAirportByIataCode(), getAllAirports(), getNearbyAirports() (+2 more)
 
 ### Community 254 - "scripts"
-Cohesion: 0.20
-Nodes (8): AuditModule, AuthModule, CacheModule, ChatModule, DuffelModule, HealthController, HealthModule, PrismaModule
+Cohesion: 0.43
+Nodes (4): AgentGatewayModule, AuditModule, ChatModule, PrismaModule
 
 ### Community 255 - "devDependencies"
 Cohesion: 0.12
@@ -770,6 +766,10 @@ Nodes (3): LogoutButton(), Header(), ThemeToggle()
 Cohesion: 0.15
 Nodes (12): 410 Gone Response (Expired Offer), API Contract: Flight Search, Authentication, Authentication, Error Responses, Error Responses, GET /api/flights/:id, Path Parameters (+4 more)
 
+### Community 264 - "NestJSClient"
+Cohesion: 0.15
+Nodes (4): AuditService, HealthController, HealthModule, PrismaService
+
 ### Community 265 - "Data Model: Duffel Flight Search Service"
 Cohesion: 0.17
 Nodes (11): Data Model: Duffel Flight Search Service, FlightOffer, FlightOffer Lifecycle, Modified Entities, New Entities, OfferRecovery, Prisma Schema Additions, Search Flow State (+3 more)
@@ -786,20 +786,24 @@ Nodes (4): JWTAuthMiddleware, Request, Response, BaseHTTPMiddleware
 Cohesion: 0.33
 Nodes (3): Request, Response, RateLimitMiddleware
 
+### Community 272 - "JwtStrategy"
+Cohesion: 0.22
+Nodes (7): AuthenticatedRequest, AuthModule, AuthService, LoginDto, RegisterDto, LockoutService, JwtStrategy
+
 ## Knowledge Gaps
 - **1179 isolated node(s):** `root`, `parser`, `plugins`, `extends`, `node` (+1174 more)
   These have ≤1 connection - possible missing edges or undocumented components.
-- **133 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
+- **132 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
 - **Why does `NestJSClient` connect `MemoryManager` to `NestJSClient`, `MockStreamingLLM`, `get_nestjs_client`, `User Scenarios & Testing *(mandatory)*`, `ChunkBuffer`, `chat_stream`?**
-  _High betweenness centrality (0.035) - this node is a cross-community bridge._
+  _High betweenness centrality (0.036) - this node is a cross-community bridge._
 - **Why does `get_nestjs_client()` connect `get_nestjs_client` to `MemoryManager`?**
   _High betweenness centrality (0.025) - this node is a cross-community bridge._
 - **Why does `AIRLINE_MAP` connect `get_nestjs_client` to `plan.md`?**
-  _High betweenness centrality (0.019) - this node is a cross-community bridge._
+  _High betweenness centrality (0.020) - this node is a cross-community bridge._
 - **Are the 20 inferred relationships involving `NestJSClient` (e.g. with `MemoryManager` and `chat_stream()`) actually correct?**
   _`NestJSClient` has 20 INFERRED edges - model-reasoned connections that need verification._
 - **What connects `root`, `parser`, `plugins` to the rest of the system?**

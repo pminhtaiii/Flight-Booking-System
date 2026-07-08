@@ -5000,7 +5000,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "apps_api_src_agent_gateway_agent_gateway_module",
-      "community": 6,
+      "community": 254,
       "norm_label": "agent-gateway.module.ts"
     },
     {
@@ -5010,7 +5010,7 @@
       "source_location": "L15",
       "_origin": "ast",
       "id": "apps_api_src_agent_gateway_agent_gateway_module_agentgatewaymodule",
-      "community": 6,
+      "community": 254,
       "norm_label": "agentgatewaymodule"
     },
     {
@@ -5067,7 +5067,7 @@
       "label": "parseISODurationToMinutes()",
       "file_type": "code",
       "source_file": "apps/api/src/agent-gateway/agent-gateway.service.ts",
-      "source_location": "L56",
+      "source_location": "L59",
       "_origin": "ast",
       "id": "apps_api_src_agent_gateway_agent_gateway_service_parseisodurationtominutes",
       "community": 6,
@@ -5077,7 +5077,7 @@
       "label": "formatBaggageAllowance()",
       "file_type": "code",
       "source_file": "apps/api/src/agent-gateway/agent-gateway.service.ts",
-      "source_location": "L66",
+      "source_location": "L69",
       "_origin": "ast",
       "id": "apps_api_src_agent_gateway_agent_gateway_service_formatbaggageallowance",
       "community": 6,
@@ -5087,7 +5087,7 @@
       "label": "AgentGatewayService",
       "file_type": "code",
       "source_file": "apps/api/src/agent-gateway/agent-gateway.service.ts",
-      "source_location": "L78",
+      "source_location": "L81",
       "_origin": "ast",
       "id": "apps_api_src_agent_gateway_agent_gateway_service_agentgatewayservice",
       "community": 6,
@@ -5097,7 +5097,7 @@
       "label": ".constructor()",
       "file_type": "code",
       "source_file": "apps/api/src/agent-gateway/agent-gateway.service.ts",
-      "source_location": "L81",
+      "source_location": "L84",
       "_origin": "ast",
       "id": "apps_api_src_agent_gateway_agent_gateway_service_agentgatewayservice_constructor",
       "community": 2,
@@ -5107,7 +5107,7 @@
       "label": ".logToolCall()",
       "file_type": "code",
       "source_file": "apps/api/src/agent-gateway/agent-gateway.service.ts",
-      "source_location": "L88",
+      "source_location": "L91",
       "_origin": "ast",
       "id": "apps_api_src_agent_gateway_agent_gateway_service_agentgatewayservice_logtoolcall",
       "community": 6,
@@ -5117,7 +5117,7 @@
       "label": ".searchFlights()",
       "file_type": "code",
       "source_file": "apps/api/src/agent-gateway/agent-gateway.service.ts",
-      "source_location": "L140",
+      "source_location": "L143",
       "_origin": "ast",
       "id": "apps_api_src_agent_gateway_agent_gateway_service_agentgatewayservice_searchflights",
       "community": 6,
@@ -5127,7 +5127,7 @@
       "label": ".getUserPreferences()",
       "file_type": "code",
       "source_file": "apps/api/src/agent-gateway/agent-gateway.service.ts",
-      "source_location": "L298",
+      "source_location": "L301",
       "_origin": "ast",
       "id": "apps_api_src_agent_gateway_agent_gateway_service_agentgatewayservice_getuserpreferences",
       "community": 6,
@@ -5137,7 +5137,7 @@
       "label": ".getUserBookings()",
       "file_type": "code",
       "source_file": "apps/api/src/agent-gateway/agent-gateway.service.ts",
-      "source_location": "L333",
+      "source_location": "L336",
       "_origin": "ast",
       "id": "apps_api_src_agent_gateway_agent_gateway_service_agentgatewayservice_getuserbookings",
       "community": 6,
@@ -5440,7 +5440,7 @@
       "source_location": "L9",
       "_origin": "ast",
       "id": "apps_api_src_airports_airports_service_airportsservice_constructor",
-      "community": 2,
+      "community": 264,
       "norm_label": ".constructor()"
     },
     {
@@ -5530,7 +5530,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "apps_api_src_app_module",
-      "community": 254,
+      "community": 29,
       "norm_label": "app.module.ts"
     },
     {
@@ -5570,7 +5570,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "apps_api_src_audit_audit_service",
-      "community": 29,
+      "community": 272,
       "norm_label": "audit.service.ts"
     },
     {
@@ -5640,7 +5640,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "apps_api_src_auth_auth_controller",
-      "community": 37,
+      "community": 272,
       "norm_label": "auth.controller.ts"
     },
     {
@@ -5650,7 +5650,7 @@
       "source_location": "L20",
       "_origin": "ast",
       "id": "apps_api_src_auth_auth_controller_authenticatedrequest",
-      "community": 37,
+      "community": 272,
       "norm_label": "authenticatedrequest"
     },
     {
@@ -5670,7 +5670,7 @@
       "source_location": "L29",
       "_origin": "ast",
       "id": "apps_api_src_auth_auth_controller_authcontroller_constructor",
-      "community": 37,
+      "community": 272,
       "norm_label": ".constructor()"
     },
     {
@@ -5740,7 +5740,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "apps_api_src_auth_auth_module",
-      "community": 37,
+      "community": 272,
       "norm_label": "auth.module.ts"
     },
     {
@@ -5750,7 +5750,7 @@
       "source_location": "L25",
       "_origin": "ast",
       "id": "apps_api_src_auth_auth_module_authmodule",
-      "community": 254,
+      "community": 272,
       "norm_label": "authmodule"
     },
     {
@@ -5760,7 +5760,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "apps_api_src_auth_auth_service_spec",
-      "community": 37,
+      "community": 272,
       "norm_label": "auth.service.spec.ts"
     },
     {
@@ -5770,7 +5770,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "apps_api_src_auth_auth_service",
-      "community": 37,
+      "community": 272,
       "norm_label": "auth.service.ts"
     },
     {
@@ -5780,7 +5780,7 @@
       "source_location": "L16",
       "_origin": "ast",
       "id": "apps_api_src_auth_auth_service_authservice",
-      "community": 37,
+      "community": 272,
       "norm_label": "authservice"
     },
     {
@@ -5790,7 +5790,7 @@
       "source_location": "L17",
       "_origin": "ast",
       "id": "apps_api_src_auth_auth_service_authservice_constructor",
-      "community": 37,
+      "community": 272,
       "norm_label": ".constructor()"
     },
     {
@@ -5820,7 +5820,7 @@
       "source_location": "L186",
       "_origin": "ast",
       "id": "apps_api_src_auth_auth_service_authservice_logout",
-      "community": 37,
+      "community": 264,
       "norm_label": ".logout()"
     },
     {
@@ -5840,7 +5840,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "apps_api_src_auth_dto_login_dto",
-      "community": 37,
+      "community": 272,
       "norm_label": "login.dto.ts"
     },
     {
@@ -5850,7 +5850,7 @@
       "source_location": "L4",
       "_origin": "ast",
       "id": "apps_api_src_auth_dto_login_dto_logindto",
-      "community": 37,
+      "community": 272,
       "norm_label": "logindto"
     },
     {
@@ -5860,7 +5860,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "apps_api_src_auth_dto_register_dto",
-      "community": 37,
+      "community": 272,
       "norm_label": "register.dto.ts"
     },
     {
@@ -5870,7 +5870,7 @@
       "source_location": "L4",
       "_origin": "ast",
       "id": "apps_api_src_auth_dto_register_dto_registerdto",
-      "community": 37,
+      "community": 272,
       "norm_label": "registerdto"
     },
     {
@@ -5900,7 +5900,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "apps_api_src_auth_rate_limit_lockout_service_spec",
-      "community": 37,
+      "community": 272,
       "norm_label": "lockout.service.spec.ts"
     },
     {
@@ -5910,7 +5910,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "apps_api_src_auth_rate_limit_lockout_service",
-      "community": 37,
+      "community": 272,
       "norm_label": "lockout.service.ts"
     },
     {
@@ -5920,7 +5920,7 @@
       "source_location": "L6",
       "_origin": "ast",
       "id": "apps_api_src_auth_rate_limit_lockout_service_lockoutservice",
-      "community": 37,
+      "community": 272,
       "norm_label": "lockoutservice"
     },
     {
@@ -6000,7 +6000,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "apps_api_src_auth_strategies_jwt_strategy",
-      "community": 37,
+      "community": 272,
       "norm_label": "jwt.strategy.ts"
     },
     {
@@ -6020,7 +6020,7 @@
       "source_location": "L10",
       "_origin": "ast",
       "id": "apps_api_src_auth_strategies_jwt_strategy_jwtstrategy_constructor",
-      "community": 272,
+      "community": 264,
       "norm_label": ".constructor()"
     },
     {
@@ -6030,7 +6030,7 @@
       "source_location": "L28",
       "_origin": "ast",
       "id": "apps_api_src_auth_strategies_jwt_strategy_jwtstrategy_validate",
-      "community": 272,
+      "community": 152,
       "norm_label": ".validate()"
     },
     {
@@ -6040,7 +6040,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "apps_api_src_cache_cache_module",
-      "community": 254,
+      "community": 2,
       "norm_label": "cache.module.ts"
     },
     {
@@ -6050,7 +6050,7 @@
       "source_location": "L9",
       "_origin": "ast",
       "id": "apps_api_src_cache_cache_module_cachemodule",
-      "community": 254,
+      "community": 2,
       "norm_label": "cachemodule"
     },
     {
@@ -6060,7 +6060,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "apps_api_src_cache_cache_service",
-      "community": 37,
+      "community": 272,
       "norm_label": "cache.service.ts"
     },
     {
@@ -6120,14 +6120,24 @@
       "source_location": "L84",
       "_origin": "ast",
       "id": "apps_api_src_cache_cache_service_cacheservice_incr",
-      "community": 2,
+      "community": 37,
       "norm_label": ".incr()"
+    },
+    {
+      "label": ".decr()",
+      "file_type": "code",
+      "source_file": "apps/api/src/cache/cache.service.ts",
+      "source_location": "L114",
+      "_origin": "ast",
+      "id": "apps_api_src_cache_cache_service_cacheservice_decr",
+      "community": 2,
+      "norm_label": ".decr()"
     },
     {
       "label": ".del()",
       "file_type": "code",
       "source_file": "apps/api/src/cache/cache.service.ts",
-      "source_location": "L114",
+      "source_location": "L140",
       "_origin": "ast",
       "id": "apps_api_src_cache_cache_service_cacheservice_del",
       "community": 37,
@@ -6137,7 +6147,7 @@
       "label": ".getTtl()",
       "file_type": "code",
       "source_file": "apps/api/src/cache/cache.service.ts",
-      "source_location": "L128",
+      "source_location": "L154",
       "_origin": "ast",
       "id": "apps_api_src_cache_cache_service_cacheservice_getttl",
       "community": 37,
@@ -6147,7 +6157,7 @@
       "label": ".keys()",
       "file_type": "code",
       "source_file": "apps/api/src/cache/cache.service.ts",
-      "source_location": "L149",
+      "source_location": "L175",
       "_origin": "ast",
       "id": "apps_api_src_cache_cache_service_cacheservice_keys",
       "community": 37,
@@ -6610,7 +6620,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "apps_api_src_duffel_duffel_module",
-      "community": 254,
+      "community": 2,
       "norm_label": "duffel.module.ts"
     },
     {
@@ -6620,7 +6630,7 @@
       "source_location": "L11",
       "_origin": "ast",
       "id": "apps_api_src_duffel_duffel_module_duffelmodule",
-      "community": 254,
+      "community": 2,
       "norm_label": "duffelmodule"
     },
     {
@@ -6770,7 +6780,7 @@
       "source_location": "L71",
       "_origin": "ast",
       "id": "apps_api_src_duffel_duffel_types_duffelofferrequest",
-      "community": 2,
+      "community": 29,
       "norm_label": "duffelofferrequest"
     },
     {
@@ -6780,7 +6790,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "apps_api_src_health_health_controller",
-      "community": 254,
+      "community": 264,
       "norm_label": "health.controller.ts"
     },
     {
@@ -6790,7 +6800,7 @@
       "source_location": "L6",
       "_origin": "ast",
       "id": "apps_api_src_health_health_controller_healthcontroller",
-      "community": 254,
+      "community": 264,
       "norm_label": "healthcontroller"
     },
     {
@@ -6800,7 +6810,7 @@
       "source_location": "L9",
       "_origin": "ast",
       "id": "apps_api_src_health_health_controller_healthcontroller_constructor",
-      "community": 254,
+      "community": 264,
       "norm_label": ".constructor()"
     },
     {
@@ -6810,7 +6820,7 @@
       "source_location": "L12",
       "_origin": "ast",
       "id": "apps_api_src_health_health_controller_healthcontroller_check",
-      "community": 254,
+      "community": 264,
       "norm_label": ".check()"
     },
     {
@@ -6820,7 +6830,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "apps_api_src_health_health_module",
-      "community": 254,
+      "community": 264,
       "norm_label": "health.module.ts"
     },
     {
@@ -6830,7 +6840,7 @@
       "source_location": "L7",
       "_origin": "ast",
       "id": "apps_api_src_health_health_module_healthmodule",
-      "community": 254,
+      "community": 264,
       "norm_label": "healthmodule"
     },
     {
@@ -6890,7 +6900,7 @@
       "source_location": "L5",
       "_origin": "ast",
       "id": "apps_api_src_prisma_prisma_service_prismaservice",
-      "community": 29,
+      "community": 264,
       "norm_label": "prismaservice"
     },
     {
@@ -6900,7 +6910,7 @@
       "source_location": "L8",
       "_origin": "ast",
       "id": "apps_api_src_prisma_prisma_service_prismaservice_constructor",
-      "community": 29,
+      "community": 264,
       "norm_label": ".constructor()"
     },
     {
@@ -6910,7 +6920,7 @@
       "source_location": "L12",
       "_origin": "ast",
       "id": "apps_api_src_prisma_prisma_service_prismaservice_onmoduleinit",
-      "community": 29,
+      "community": 264,
       "norm_label": ".onmoduleinit()"
     },
     {
@@ -6920,7 +6930,7 @@
       "source_location": "L23",
       "_origin": "ast",
       "id": "apps_api_src_prisma_prisma_service_prismaservice_onmoduledestroy",
-      "community": 29,
+      "community": 264,
       "norm_label": ".onmoduledestroy()"
     },
     {
@@ -7000,7 +7010,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "apps_api_test_agent_gateway_e2e_spec",
-      "community": 2,
+      "community": 29,
       "norm_label": "agent-gateway.e2e-spec.ts"
     },
     {
@@ -7010,7 +7020,7 @@
       "source_location": "L12",
       "_origin": "ast",
       "id": "apps_api_test_agent_gateway_e2e_spec_mintclaimtoken",
-      "community": 2,
+      "community": 29,
       "norm_label": "mintclaimtoken()"
     },
     {
@@ -7020,7 +7030,7 @@
       "source_location": "L641",
       "_origin": "ast",
       "id": "apps_api_test_agent_gateway_e2e_spec_toolcallmetadata",
-      "community": 2,
+      "community": 29,
       "norm_label": "toolcallmetadata"
     },
     {
@@ -30163,7 +30173,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "apps/api/src/agent-gateway/agent-gateway.service.ts",
-      "source_location": "L78",
+      "source_location": "L81",
       "weight": 1.0,
       "source": "apps_api_src_agent_gateway_agent_gateway_service",
       "target": "apps_api_src_agent_gateway_agent_gateway_service_agentgatewayservice",
@@ -30193,7 +30203,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "apps/api/src/agent-gateway/agent-gateway.service.ts",
-      "source_location": "L66",
+      "source_location": "L69",
       "weight": 1.0,
       "source": "apps_api_src_agent_gateway_agent_gateway_service",
       "target": "apps_api_src_agent_gateway_agent_gateway_service_formatbaggageallowance",
@@ -30213,7 +30223,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "apps/api/src/agent-gateway/agent-gateway.service.ts",
-      "source_location": "L56",
+      "source_location": "L59",
       "weight": 1.0,
       "source": "apps_api_src_agent_gateway_agent_gateway_service",
       "target": "apps_api_src_agent_gateway_agent_gateway_service_parseisodurationtominutes",
@@ -30454,7 +30464,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "apps/api/src/agent-gateway/agent-gateway.service.ts",
-      "source_location": "L242",
+      "source_location": "L245",
       "weight": 1.0,
       "source": "apps_api_src_agent_gateway_agent_gateway_service_agentgatewayservice_searchflights",
       "target": "apps_api_src_agent_gateway_agent_gateway_service_capitalizecabinclass",
@@ -30465,7 +30475,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "apps/api/src/agent-gateway/agent-gateway.service.ts",
-      "source_location": "L223",
+      "source_location": "L226",
       "weight": 1.0,
       "source": "apps_api_src_agent_gateway_agent_gateway_service_agentgatewayservice_searchflights",
       "target": "apps_api_src_agent_gateway_agent_gateway_service_cleanisotime",
@@ -30476,7 +30486,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "apps/api/src/agent-gateway/agent-gateway.service.ts",
-      "source_location": "L245",
+      "source_location": "L248",
       "weight": 1.0,
       "source": "apps_api_src_agent_gateway_agent_gateway_service_agentgatewayservice_searchflights",
       "target": "apps_api_src_agent_gateway_agent_gateway_service_formatduffelbaggageallowance",
@@ -30487,7 +30497,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "apps/api/src/agent-gateway/agent-gateway.service.ts",
-      "source_location": "L229",
+      "source_location": "L232",
       "weight": 1.0,
       "source": "apps_api_src_agent_gateway_agent_gateway_service_agentgatewayservice_searchflights",
       "target": "apps_api_src_agent_gateway_agent_gateway_service_parseisodurationtominutes",
@@ -30497,7 +30507,7 @@
       "relation": "method",
       "confidence": "EXTRACTED",
       "source_file": "apps/api/src/agent-gateway/agent-gateway.service.ts",
-      "source_location": "L81",
+      "source_location": "L84",
       "weight": 1.0,
       "source": "apps_api_src_agent_gateway_agent_gateway_service_agentgatewayservice",
       "target": "apps_api_src_agent_gateway_agent_gateway_service_agentgatewayservice_constructor",
@@ -30507,7 +30517,7 @@
       "relation": "method",
       "confidence": "EXTRACTED",
       "source_file": "apps/api/src/agent-gateway/agent-gateway.service.ts",
-      "source_location": "L333",
+      "source_location": "L336",
       "weight": 1.0,
       "source": "apps_api_src_agent_gateway_agent_gateway_service_agentgatewayservice",
       "target": "apps_api_src_agent_gateway_agent_gateway_service_agentgatewayservice_getuserbookings",
@@ -30517,7 +30527,7 @@
       "relation": "method",
       "confidence": "EXTRACTED",
       "source_file": "apps/api/src/agent-gateway/agent-gateway.service.ts",
-      "source_location": "L298",
+      "source_location": "L301",
       "weight": 1.0,
       "source": "apps_api_src_agent_gateway_agent_gateway_service_agentgatewayservice",
       "target": "apps_api_src_agent_gateway_agent_gateway_service_agentgatewayservice_getuserpreferences",
@@ -30527,7 +30537,7 @@
       "relation": "method",
       "confidence": "EXTRACTED",
       "source_file": "apps/api/src/agent-gateway/agent-gateway.service.ts",
-      "source_location": "L88",
+      "source_location": "L91",
       "weight": 1.0,
       "source": "apps_api_src_agent_gateway_agent_gateway_service_agentgatewayservice",
       "target": "apps_api_src_agent_gateway_agent_gateway_service_agentgatewayservice_logtoolcall",
@@ -30537,7 +30547,7 @@
       "relation": "method",
       "confidence": "EXTRACTED",
       "source_file": "apps/api/src/agent-gateway/agent-gateway.service.ts",
-      "source_location": "L140",
+      "source_location": "L143",
       "weight": 1.0,
       "source": "apps_api_src_agent_gateway_agent_gateway_service_agentgatewayservice",
       "target": "apps_api_src_agent_gateway_agent_gateway_service_agentgatewayservice_searchflights",
@@ -30548,7 +30558,7 @@
       "context": "parameter_type",
       "confidence": "EXTRACTED",
       "source_file": "apps/api/src/agent-gateway/agent-gateway.service.ts",
-      "source_location": "L81",
+      "source_location": "L84",
       "weight": 1.0,
       "source": "apps_api_src_agent_gateway_agent_gateway_service_agentgatewayservice_constructor",
       "target": "apps_api_src_audit_audit_service_auditservice",
@@ -30559,7 +30569,7 @@
       "context": "parameter_type",
       "confidence": "EXTRACTED",
       "source_file": "apps/api/src/agent-gateway/agent-gateway.service.ts",
-      "source_location": "L81",
+      "source_location": "L84",
       "weight": 1.0,
       "source": "apps_api_src_agent_gateway_agent_gateway_service_agentgatewayservice_constructor",
       "target": "apps_api_src_cache_cache_service_cacheservice",
@@ -30570,7 +30580,7 @@
       "context": "parameter_type",
       "confidence": "EXTRACTED",
       "source_file": "apps/api/src/agent-gateway/agent-gateway.service.ts",
-      "source_location": "L81",
+      "source_location": "L84",
       "weight": 1.0,
       "source": "apps_api_src_agent_gateway_agent_gateway_service_agentgatewayservice_constructor",
       "target": "apps_api_src_duffel_duffel_service_duffelservice",
@@ -30581,7 +30591,7 @@
       "context": "parameter_type",
       "confidence": "EXTRACTED",
       "source_file": "apps/api/src/agent-gateway/agent-gateway.service.ts",
-      "source_location": "L81",
+      "source_location": "L84",
       "weight": 1.0,
       "source": "apps_api_src_agent_gateway_agent_gateway_service_agentgatewayservice_constructor",
       "target": "apps_api_src_prisma_prisma_service_prismaservice",
@@ -30592,7 +30602,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "apps/api/src/agent-gateway/agent-gateway.service.ts",
-      "source_location": "L381",
+      "source_location": "L384",
       "weight": 1.0,
       "source": "apps_api_src_agent_gateway_agent_gateway_service_agentgatewayservice_getuserbookings",
       "target": "apps_api_src_agent_gateway_agent_gateway_service_agentgatewayservice_logtoolcall",
@@ -30603,7 +30613,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "apps/api/src/agent-gateway/agent-gateway.service.ts",
-      "source_location": "L325",
+      "source_location": "L328",
       "weight": 1.0,
       "source": "apps_api_src_agent_gateway_agent_gateway_service_agentgatewayservice_getuserpreferences",
       "target": "apps_api_src_agent_gateway_agent_gateway_service_agentgatewayservice_logtoolcall",
@@ -30615,7 +30625,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "apps/api/src/agent-gateway/agent-gateway.service.ts",
-      "source_location": "L117",
+      "source_location": "L120",
       "weight": 1.0,
       "source": "apps_api_src_agent_gateway_agent_gateway_service_agentgatewayservice_logtoolcall",
       "target": "apps_api_src_audit_audit_service_auditservice_createlog"
@@ -30625,7 +30635,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "apps/api/src/agent-gateway/agent-gateway.service.ts",
-      "source_location": "L162",
+      "source_location": "L165",
       "weight": 1.0,
       "source": "apps_api_src_agent_gateway_agent_gateway_service_agentgatewayservice_searchflights",
       "target": "apps_api_src_agent_gateway_agent_gateway_service_agentgatewayservice_logtoolcall",
@@ -30636,7 +30646,7 @@
       "context": "generic_arg",
       "confidence": "EXTRACTED",
       "source_file": "apps/api/src/agent-gateway/agent-gateway.service.ts",
-      "source_location": "L140",
+      "source_location": "L143",
       "weight": 1.0,
       "source": "apps_api_src_agent_gateway_agent_gateway_service_agentgatewayservice_searchflights",
       "target": "apps_api_src_agent_gateway_dto_flight_result_dto_flightsearchresponsedto",
@@ -30647,7 +30657,7 @@
       "context": "parameter_type",
       "confidence": "EXTRACTED",
       "source_file": "apps/api/src/agent-gateway/agent-gateway.service.ts",
-      "source_location": "L140",
+      "source_location": "L143",
       "weight": 1.0,
       "source": "apps_api_src_agent_gateway_agent_gateway_service_agentgatewayservice_searchflights",
       "target": "apps_api_src_agent_gateway_dto_flight_search_query_dto_flightsearchquerydto",
@@ -30659,7 +30669,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "apps/api/src/agent-gateway/agent-gateway.service.ts",
-      "source_location": "L159",
+      "source_location": "L162",
       "weight": 1.0,
       "source": "apps_api_src_agent_gateway_agent_gateway_service_agentgatewayservice_searchflights",
       "target": "apps_api_src_cache_cache_service_cacheservice_get"
@@ -30670,7 +30680,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "apps/api/src/agent-gateway/agent-gateway.service.ts",
-      "source_location": "L179",
+      "source_location": "L182",
       "weight": 1.0,
       "source": "apps_api_src_agent_gateway_agent_gateway_service_agentgatewayservice_searchflights",
       "target": "apps_api_src_duffel_duffel_service_duffelservice_searchflights"
@@ -30680,7 +30690,7 @@
       "context": "generic_arg",
       "confidence": "EXTRACTED",
       "source_file": "apps/api/src/agent-gateway/agent-gateway.service.ts",
-      "source_location": "L298",
+      "source_location": "L301",
       "weight": 1.0,
       "source": "apps_api_src_agent_gateway_agent_gateway_service_agentgatewayservice_getuserpreferences",
       "target": "apps_api_src_agent_gateway_dto_user_preferences_dto_userpreferencesdto",
@@ -30691,7 +30701,7 @@
       "context": "generic_arg",
       "confidence": "EXTRACTED",
       "source_file": "apps/api/src/agent-gateway/agent-gateway.service.ts",
-      "source_location": "L333",
+      "source_location": "L336",
       "weight": 1.0,
       "source": "apps_api_src_agent_gateway_agent_gateway_service_agentgatewayservice_getuserbookings",
       "target": "apps_api_src_agent_gateway_dto_user_bookings_dto_userbookingsresponsedto",
@@ -33453,6 +33463,16 @@
       "source_location": "L114",
       "weight": 1.0,
       "source": "apps_api_src_cache_cache_service_cacheservice",
+      "target": "apps_api_src_cache_cache_service_cacheservice_decr",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "method",
+      "confidence": "EXTRACTED",
+      "source_file": "apps/api/src/cache/cache.service.ts",
+      "source_location": "L140",
+      "weight": 1.0,
+      "source": "apps_api_src_cache_cache_service_cacheservice",
       "target": "apps_api_src_cache_cache_service_cacheservice_del",
       "confidence_score": 1.0
     },
@@ -33470,7 +33490,7 @@
       "relation": "method",
       "confidence": "EXTRACTED",
       "source_file": "apps/api/src/cache/cache.service.ts",
-      "source_location": "L128",
+      "source_location": "L154",
       "weight": 1.0,
       "source": "apps_api_src_cache_cache_service_cacheservice",
       "target": "apps_api_src_cache_cache_service_cacheservice_getttl",
@@ -33490,7 +33510,7 @@
       "relation": "method",
       "confidence": "EXTRACTED",
       "source_file": "apps/api/src/cache/cache.service.ts",
-      "source_location": "L149",
+      "source_location": "L175",
       "weight": 1.0,
       "source": "apps_api_src_cache_cache_service_cacheservice",
       "target": "apps_api_src_cache_cache_service_cacheservice_keys",
@@ -33602,6 +33622,17 @@
       "weight": 1.0,
       "source": "apps_api_src_duffel_duffel_service_duffelservice_searchflights",
       "target": "apps_api_src_cache_cache_service_cacheservice_incr"
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "apps/api/src/duffel/duffel.service.ts",
+      "source_location": "L80",
+      "weight": 1.0,
+      "source": "apps_api_src_duffel_duffel_service_duffelservice_searchflights",
+      "target": "apps_api_src_cache_cache_service_cacheservice_decr"
     },
     {
       "relation": "contains",
@@ -49945,5 +49976,5 @@
       "source_file": "specs/004-output-guardrails/data-model.md"
     }
   ],
-  "built_at_commit": "fc24069948b6b515f7f48c8916bd00c22665238d"
+  "built_at_commit": "3b6a531135dd633009d1bcb3d63187d137d7ec5a"
 }
