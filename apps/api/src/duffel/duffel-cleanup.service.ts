@@ -12,8 +12,13 @@ export class DuffelCleanupService {
   async handleCleanup(): Promise<void> {
     this.logger.log('Starting daily cleanup of expired flight offers and recoveries...');
     try {
-      const flightRetentionDays = Number(process.env.FLIGHT_OFFERS_RETENTION_DAYS || 7);
-      const recoveryRetentionDays = Number(process.env.OFFER_RECOVERY_RETENTION_DAYS || 30);
+      const parseRetentionDays = (value: string | undefined, fallback: number): number => {
+        const parsed = Number(value ?? fallback);
+        return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+      };
+
+      const flightRetentionDays = parseRetentionDays(process.env.FLIGHT_OFFERS_RETENTION_DAYS, 7);
+      const recoveryRetentionDays = parseRetentionDays(process.env.OFFER_RECOVERY_RETENTION_DAYS, 30);
 
       const now = new Date();
 
