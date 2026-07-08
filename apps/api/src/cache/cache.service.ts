@@ -112,13 +112,13 @@ export class CacheService implements OnModuleInit, OnModuleDestroy {
   }
 
   async decr(key: string): Promise<number> {
-    let redisError: Error | null = null;
     if (this.redisClient) {
       try {
         return await this.redisClient.decr(key);
       } catch (err: unknown) {
-        redisError = err instanceof Error ? err : new Error(String(err));
-        this.logger.error(`Redis DECR failed for key ${key}: ${redisError.message}. Using in-memory fallback and throwing error.`);
+        const redisError = err instanceof Error ? err : new Error(String(err));
+        this.logger.error(`Redis DECR failed for key ${key}: ${redisError.message}.`);
+        throw redisError;
       }
     }
 
@@ -135,10 +135,6 @@ export class CacheService implements OnModuleInit, OnModuleDestroy {
 
     const nextVal = current - 1;
     this.inMemoryStore.set(key, { value: String(nextVal), expiry });
-
-    if (redisError) {
-      throw redisError;
-    }
 
     return nextVal;
   }

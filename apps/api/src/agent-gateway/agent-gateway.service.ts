@@ -158,7 +158,7 @@ export class AgentGatewayService {
       // 2. Call DuffelService
       let rawResponse;
       try {
-        rawResponse = await this.duffelService.searchFlights(
+        const searchResult = await this.duffelService.searchFlights(
           {
             origin: query.origin,
             destination: query.destination,
@@ -167,6 +167,7 @@ export class AgentGatewayService {
           },
           'agent',
         );
+        rawResponse = searchResult.offerRequest;
       } catch (err: unknown) {
         if (err instanceof HttpException) {
           throw err;

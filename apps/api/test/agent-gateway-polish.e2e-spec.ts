@@ -237,7 +237,11 @@ describe('Agent Gateway Polish (E2E)', () => {
 
       const searchSpy = jest
         .spyOn(duffelService, 'searchFlights')
-        .mockResolvedValue(rawDuffelResponse as unknown as DuffelOfferRequest);
+        .mockResolvedValue({
+          offerRequest: rawDuffelResponse as unknown as DuffelOfferRequest,
+          cached: false,
+          searchHash: 'mock-hash',
+        });
 
       const res = await request(app.getHttpServer())
         .get('/agent-gateway/flights/search')
@@ -275,8 +279,12 @@ describe('Agent Gateway Polish (E2E)', () => {
       const searchSpy = jest
         .spyOn(duffelService, 'searchFlights')
         .mockResolvedValue({
-          offers: [],
-        } as unknown as DuffelOfferRequest);
+          offerRequest: {
+            offers: [],
+          } as unknown as DuffelOfferRequest,
+          cached: false,
+          searchHash: 'mock-hash',
+        });
 
       await request(app.getHttpServer())
         .get('/agent-gateway/flights/search')

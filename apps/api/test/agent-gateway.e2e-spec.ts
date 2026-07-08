@@ -56,7 +56,7 @@ describe('Agent Gateway (E2E)', () => {
     prisma = moduleFixture.get<PrismaService>(PrismaService);
 
     jest.spyOn(DuffelService.prototype, 'searchFlights').mockImplementation(async (query) => {
-      return {
+      const offerRequest = {
         id: 'or_123',
         offers: [
           {
@@ -258,6 +258,12 @@ describe('Agent Gateway (E2E)', () => {
         slices: [],
         passengers: []
       } as unknown as DuffelOfferRequest;
+
+      return {
+        offerRequest,
+        cached: false,
+        searchHash: 'mock-hash',
+      };
     });
   });
 

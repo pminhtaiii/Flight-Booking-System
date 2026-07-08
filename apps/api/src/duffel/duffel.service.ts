@@ -10,8 +10,16 @@ export class DuffelService {
   private readonly duffel: Duffel;
 
   constructor(private readonly cacheService: CacheService) {
+    const token = process.env.DUFFEL_ACCESS_TOKEN;
+    const isJest = process.env.JEST_WORKER_ID !== undefined;
+    const isTestEnv = process.env.NODE_ENV === 'test' || isJest;
+
+    if (!isTestEnv && (!token || token === '' || token === 'mock')) {
+      this.logger.warn('DUFFEL_ACCESS_TOKEN is missing or invalid in production/development runtime.');
+    }
+
     this.duffel = new Duffel({
-      token: process.env.DUFFEL_ACCESS_TOKEN || '',
+      token: token || '',
     });
   }
 
@@ -24,8 +32,25 @@ export class DuffelService {
       passengers: number;
     },
     caller: 'user' | 'agent',
-  ): Promise<DuffelOfferRequest> {
+  ): Promise<{ offerRequest: DuffelOfferRequest; cached: boolean; searchHash: string }> {
     try {
+      const isJest = process.env.JEST_WORKER_ID !== undefined;
+      const isTestEnv = process.env.NODE_ENV === 'test' || isJest;
+      const token = process.env.DUFFEL_ACCESS_TOKEN;
+
+      // Fail fast in production/development runtime if token is missing
+      if (!isTestEnv) {
+        if (!token || token === '' || token === 'mock') {
+          throw new HttpException(
+            {
+              message: 'Duffel Access Token is missing or invalid in production/development runtime.',
+              code: 'CONFIGURATION_ERROR',
+            },
+            HttpStatus.INTERNAL_SERVER_ERROR,
+          );
+        }
+      }
+
       // 1. Build SHA-256 of normalized query parameters
       const normalizedQuery = {
         origin: query.origin.trim().toUpperCase(),
@@ -42,7 +67,11 @@ export class DuffelService {
       const cachedRaw = await this.cacheService.get(rawCacheKey);
       if (cachedRaw) {
         this.logger.log(`Raw flight search cache hit for hash: ${sha256}`);
-        return JSON.parse(cachedRaw) as DuffelOfferRequest;
+        return {
+          offerRequest: JSON.parse(cachedRaw) as DuffelOfferRequest,
+          cached: true,
+          searchHash: sha256,
+        };
       }
 
       // 3. On cache miss: Check monthly budget limit in Redis
@@ -88,11 +117,10 @@ export class DuffelService {
       }
 
       // 4. Create Duffel offer request
-      const isJest = process.env.JEST_WORKER_ID !== undefined;
-      if (!isJest && (process.env.NODE_ENV === 'test' || !process.env.DUFFEL_ACCESS_TOKEN || process.env.DUFFEL_ACCESS_TOKEN === 'mock')) {
+      if (!isJest && (process.env.NODE_ENV === 'test' || token === 'mock')) {
         this.logger.log(`Mocking Duffel API response for test environment. NODE_ENV: ${process.env.NODE_ENV}`);
         
-        const slices: any[] = [
+        const slices: Record<string, unknown>[] = [
           {
             id: 'sli_mock_1',
             duration: 'PT2H10M',
@@ -157,13 +185,16 @@ export class DuffelService {
             id: 'off_mock_123',
             total_amount: '125.50',
             total_currency: 'USD',
-            slices: slices.map((s, idx) => ({
-              ...s,
-              segments: s.segments.map((seg: any) => ({
-                ...seg,
-                passengers: seg.passengers
-              }))
-            })),
+            slices: slices.map((s) => {
+              const segments = (s.segments as Record<string, unknown>[] || []);
+              return {
+                ...s,
+                segments: segments.map((seg) => ({
+                  ...seg,
+                  passengers: seg.passengers,
+                })),
+              };
+            }),
             passengers: Array.from({ length: normalizedQuery.passengers }, (_, i) => ({
               id: `pas_mock_${i + 1}`,
               type: 'adult'
@@ -185,7 +216,11 @@ export class DuffelService {
         // Cache raw response in Redis
         await this.cacheService.set(rawCacheKey, JSON.stringify(offerRequest), 900);
 
-        return offerRequest;
+        return {
+          offerRequest,
+          cached: false,
+          searchHash: sha256,
+        };
       }
 
       const slices = [
@@ -223,7 +258,11 @@ export class DuffelService {
       // 5. Cache raw response in Redis
       await this.cacheService.set(rawCacheKey, JSON.stringify(offerRequest), 900);
 
-      return offerRequest;
+      return {
+        offerRequest,
+        cached: false,
+        searchHash: sha256,
+      };
     } catch (err: unknown) {
       this.logger.error(`Error in searchFlights: ${err instanceof Error ? err.message : String(err)}`, err instanceof Error ? err.stack : undefined);
       if (err instanceof HttpException) {

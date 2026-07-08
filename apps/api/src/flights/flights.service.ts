@@ -1,20 +1,32 @@
-import { Injectable, BadRequestException, HttpException, HttpStatus, Logger } from '@nestjs/common';
+import { Injectable, BadRequestException, Logger } from '@nestjs/common';
 import { PrismaService } from '@/prisma/prisma.service';
 import { CacheService } from '@/cache/cache.service';
 import { DuffelService } from '@/duffel/duffel.service';
 import { AuditService } from '@/audit/audit.service';
 import { FlightSearchRequestDto, FlightSearchResponseDto, FlightOfferDto, FlightSegmentDto } from './dto/search-flight.dto';
-import { DuffelOffer, DuffelOfferRequest, DuffelSegment } from '@/duffel/duffel.types';
+import { DuffelOffer, DuffelSegment } from '@/duffel/duffel.types';
 import { Prisma } from '@prisma/client';
 import * as crypto from 'crypto';
 
 function parseISO8601Duration(durationStr: string): number {
-  const regex = /PT(?:(\d+)H)?(?:(\d+)M)?/;
+  const regex = /P(?:(\d+)D)?T(?:(\d+)H)?(?:(\d+)M)?/;
   const matches = durationStr.match(regex);
   if (!matches) return 0;
-  const hours = parseInt(matches[1] || '0', 10);
-  const minutes = parseInt(matches[2] || '0', 10);
-  return hours * 60 + minutes;
+  const days = parseInt(matches[1] || '0', 10);
+  const hours = parseInt(matches[2] || '0', 10);
+  const minutes = parseInt(matches[3] || '0', 10);
+  return days * 1440 + hours * 60 + minutes;
+}
+
+function generateDeterministicUUID(input: string): string {
+  const hash = crypto.createHash('sha256').update(input).digest('hex');
+  return [
+    hash.substring(0, 8),
+    hash.substring(8, 12),
+    '4' + hash.substring(13, 16),
+    '8' + hash.substring(17, 20),
+    hash.substring(20, 32)
+  ].join('-');
 }
 
 function capitalize(str: string | null | undefined): string | null {
@@ -128,119 +140,89 @@ export class FlightsService {
       throw new BadRequestException(`Destination airport with code ${destination} does not exist`);
     }
 
-    // Replicate SHA-256 cache key logic
-    const forHash = {
+    const forSearch = {
       origin,
       destination,
       departureDate: query.departureDate,
-      returnDate: query.returnDate || null,
+      returnDate: query.returnDate || undefined,
       passengers: Number(query.passengers),
     };
-    const queryStr = JSON.stringify(forHash);
-    const sha256 = crypto.createHash('sha256').update(queryStr).digest('hex');
-    const rawCacheKey = `flights:raw:${sha256}`;
 
-    const cachedRaw = await this.cacheService.get(rawCacheKey);
-    let rawResult: DuffelOfferRequest;
-    let cached = false;
+    const searchResult = await this.duffelService.searchFlights(forSearch, 'user');
+    const rawResult = searchResult.offerRequest;
+    const cached = searchResult.cached;
+    const sha256 = searchResult.searchHash;
 
-    if (cachedRaw) {
-      cached = true;
-      rawResult = JSON.parse(cachedRaw) as DuffelOfferRequest;
-    } else {
-      cached = false;
-
-      // Check monthly budget limit in Redis
-      const now = new Date();
-      const year = now.getFullYear();
-      const month = String(now.getMonth() + 1).padStart(2, '0');
-      const budgetKey = `budget:duffel:${year}-${month}`;
-
-      const userLimit = Number(process.env.DUFFEL_BUDGET_LIMIT_USER || 1800);
-      const totalLimit = Number(process.env.DUFFEL_BUDGET_LIMIT_TOTAL || 2000);
-
-      const currentBudgetStr = await this.cacheService.get(budgetKey);
-      const currentBudget = currentBudgetStr ? parseInt(currentBudgetStr, 10) : 0;
-
-      if (currentBudget >= userLimit || currentBudget >= totalLimit) {
-        throw new HttpException(
-          {
-            message: 'Flight search capacity temporarily reached. Please try again later.',
-            code: 'RATE_LIMIT_EXCEEDED',
-          },
-          HttpStatus.TOO_MANY_REQUESTS,
-        );
-      }
-
-      const forSearch = {
-        origin,
-        destination,
-        departureDate: query.departureDate,
-        returnDate: query.returnDate || undefined,
-        passengers: Number(query.passengers),
-      };
-      rawResult = await this.duffelService.searchFlights(forSearch, 'user');
-      await this.cacheService.set(rawCacheKey, JSON.stringify(rawResult), 900);
-    }
-
-    // Map raw offers to FlightOfferDto capping at 20 results
+    // Map raw offers to FlightOfferDto capping at 20 results using deterministic UUIDs
     const results: FlightOfferDto[] = (rawResult.offers || [])
       .slice(0, 20)
-      .map((offer) => mapOffer(offer, crypto.randomUUID()));
+      .map((offer) => {
+        const id = generateDeterministicUUID(`${sha256}:${offer.id}`);
+        return mapOffer(offer, id);
+      });
 
-    // Write async write-behind persistence
-    setImmediate(async () => {
-      try {
-        const prices = results.map(r => r.price);
-        const minPrice = prices.length > 0 ? Math.min(...prices) : null;
-        const maxPrice = prices.length > 0 ? Math.max(...prices) : null;
-        const currency = results.length > 0 ? results[0].currency : 'USD';
+    // Write async write-behind persistence only on cache miss (non-cached searches)
+    if (!cached) {
+      setImmediate(async () => {
+        try {
+          const prices = results.map(r => r.price);
+          const minPrice = prices.length > 0 ? Math.min(...prices) : null;
+          const maxPrice = prices.length > 0 ? Math.max(...prices) : null;
+          const currency = results.length > 0 ? results[0].currency : 'USD';
 
-        await this.prisma.searchHistory.create({
-          data: {
-            userId,
-            origin: forHash.origin,
-            destination: forHash.destination,
-            departureDate: new Date(forHash.departureDate),
-            returnDate: forHash.returnDate ? new Date(forHash.returnDate) : null,
-            passengers: forHash.passengers,
-            resultCount: results.length,
-            minPrice,
-            maxPrice,
-            currency,
-            searchHash: sha256,
-          },
-        });
+          await this.prisma.$transaction(async (tx) => {
+            await tx.searchHistory.create({
+              data: {
+                userId,
+                origin,
+                destination,
+                departureDate: new Date(query.departureDate),
+                returnDate: query.returnDate ? new Date(query.returnDate) : null,
+                passengers: Number(query.passengers),
+                resultCount: results.length,
+                minPrice,
+                maxPrice,
+                currency,
+                searchHash: sha256,
+              },
+            });
 
-        for (const offerDto of results) {
-          const rawOffer = rawResult.offers.find(o => o.id === offerDto.duffelOfferId);
-          await this.prisma.flightOffer.create({
-            data: {
+            const flightOffersData = results.map((offerDto) => {
+              const rawOffer = rawResult.offers.find(o => o.id === offerDto.duffelOfferId);
+              return {
+                id: offerDto.id,
+                searchHash: sha256,
+                duffelOfferId: offerDto.duffelOfferId,
+                rawOffer: rawOffer ? (rawOffer as unknown as Prisma.InputJsonValue) : {},
+                origin,
+                destination,
+                departureDate: new Date(query.departureDate),
+                returnDate: query.returnDate ? new Date(query.returnDate) : null,
+                passengers: Number(query.passengers),
+                price: new Prisma.Decimal(offerDto.price),
+                currency: offerDto.currency,
+              };
+            });
+
+            const offerRecoveriesData = results.map((offerDto) => ({
               id: offerDto.id,
               searchHash: sha256,
-              duffelOfferId: offerDto.duffelOfferId,
-              rawOffer: rawOffer ? (rawOffer as any) : {},
-              origin: forHash.origin,
-              destination: forHash.destination,
-              departureDate: new Date(forHash.departureDate),
-              returnDate: forHash.returnDate ? new Date(forHash.returnDate) : null,
-              passengers: forHash.passengers,
-              price: new Prisma.Decimal(offerDto.price),
-              currency: offerDto.currency,
-            },
-          });
+            }));
 
-          await this.prisma.offerRecovery.create({
-            data: {
-              id: offerDto.id,
-              searchHash: sha256,
-            },
+            if (flightOffersData.length > 0) {
+              await tx.flightOffer.createMany({
+                data: flightOffersData,
+              });
+              await tx.offerRecovery.createMany({
+                data: offerRecoveriesData,
+              });
+            }
           });
+        } catch (error) {
+          this.logger.error('Failed to save search history and offers atomically', error);
         }
-      } catch (error) {
-        this.logger.error('Failed to save search history and offers asynchronously', error);
-      }
-    });
+      });
+    }
 
     // Create audit log entry (synchronous so test can immediately assert it)
     await this.auditService.createLog(this.prisma, {
@@ -248,11 +230,11 @@ export class FlightsService {
       action: 'flight_search',
       resourceType: 'Flight',
       metadata: {
-        origin: forHash.origin,
-        destination: forHash.destination,
-        departureDate: forHash.departureDate,
-        returnDate: forHash.returnDate,
-        passengers: forHash.passengers,
+        origin,
+        destination,
+        departureDate: query.departureDate,
+        returnDate: query.returnDate || null,
+        passengers: Number(query.passengers),
         searchHash: sha256,
       },
       traceId,
