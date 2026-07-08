@@ -62,6 +62,8 @@ export default async function FlightDetailPage({ params }: Props) {
   }
 
   const flightId = params.flightId;
+  const detailController = new AbortController();
+  const detailTimeoutId = setTimeout(() => detailController.abort(), 5000);
   let detailRes;
 
   try {
@@ -70,28 +72,44 @@ export default async function FlightDetailPage({ params }: Props) {
         Authorization: `Bearer ${token}`,
       },
       cache: 'no-store',
+      signal: detailController.signal,
     });
   } catch (err) {
     console.error('Error fetching flight detail:', err);
     notFound();
+  } finally {
+    clearTimeout(detailTimeoutId);
   }
 
   if (!detailRes.ok) {
     if (detailRes.status === 410) {
-      const errorJson = await detailRes.json();
-      const rec = errorJson.recovery;
-      const queryParams = new URLSearchParams({
-        origin: rec.origin,
-        destination: rec.destination,
-        departureDate: rec.departureDate,
-        ...(rec.returnDate ? { returnDate: rec.returnDate } : {}),
-        passengers: String(rec.passengers),
-        expired: 'true',
-      });
-      redirect(`/search?${queryParams.toString()}`);
-    }
-    if (detailRes.status === 404 || detailRes.status === 400) {
-      notFound();
+      let recovery = null;
+      try {
+        const errorJson = await detailRes.json();
+        if (
+          errorJson &&
+          errorJson.recovery &&
+          errorJson.recovery.origin &&
+          errorJson.recovery.destination &&
+          errorJson.recovery.departureDate
+        ) {
+          recovery = errorJson.recovery;
+        }
+      } catch (err) {
+        console.error('Error parsing 410 recovery json:', err);
+      }
+
+      if (recovery) {
+        const queryParams = new URLSearchParams({
+          origin: recovery.origin,
+          destination: recovery.destination,
+          departureDate: recovery.departureDate,
+          ...(recovery.returnDate ? { returnDate: recovery.returnDate } : {}),
+          passengers: String(recovery.passengers || 1),
+          expired: 'true',
+        });
+        redirect(`/search?${queryParams.toString()}`);
+      }
     }
     notFound();
   }
