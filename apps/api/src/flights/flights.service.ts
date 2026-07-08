@@ -162,32 +162,32 @@ export class FlightsService {
         return mapOffer(offer, id);
       });
 
-    // Write async write-behind persistence only on cache miss (non-cached searches)
-    if (!cached) {
-      setImmediate(async () => {
-        try {
-          const prices = results.map(r => r.price);
-          const minPrice = prices.length > 0 ? Math.min(...prices) : null;
-          const maxPrice = prices.length > 0 ? Math.max(...prices) : null;
-          const currency = results.length > 0 ? results[0].currency : 'USD';
+    // Write async write-behind persistence
+    setImmediate(async () => {
+      try {
+        const prices = results.map(r => r.price);
+        const minPrice = prices.length > 0 ? Math.min(...prices) : null;
+        const maxPrice = prices.length > 0 ? Math.max(...prices) : null;
+        const currency = results.length > 0 ? results[0].currency : 'USD';
 
-          await this.prisma.$transaction(async (tx) => {
-            await tx.searchHistory.create({
-              data: {
-                userId,
-                origin,
-                destination,
-                departureDate: new Date(query.departureDate),
-                returnDate: query.returnDate ? new Date(query.returnDate) : null,
-                passengers: Number(query.passengers),
-                resultCount: results.length,
-                minPrice,
-                maxPrice,
-                currency,
-                searchHash: sha256,
-              },
-            });
+        await this.prisma.$transaction(async (tx) => {
+          await tx.searchHistory.create({
+            data: {
+              userId,
+              origin,
+              destination,
+              departureDate: new Date(query.departureDate),
+              returnDate: query.returnDate ? new Date(query.returnDate) : null,
+              passengers: Number(query.passengers),
+              resultCount: results.length,
+              minPrice,
+              maxPrice,
+              currency,
+              searchHash: sha256,
+            },
+          });
 
+          if (!cached) {
             const flightOffersData = results.map((offerDto) => {
               const rawOffer = rawResult.offers.find(o => o.id === offerDto.duffelOfferId);
               return {
@@ -220,12 +220,12 @@ export class FlightsService {
                 skipDuplicates: true,
               });
             }
-          });
-        } catch (error) {
-          this.logger.error('Failed to save search history and offers atomically', error);
-        }
-      });
-    }
+          }
+        });
+      } catch (error) {
+        this.logger.error('Failed to save search history and offers atomically', error);
+      }
+    });
 
     // Create audit log entry (synchronous so test can immediately assert it)
     await this.auditService.createLog(this.prisma, {

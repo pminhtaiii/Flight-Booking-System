@@ -98,12 +98,12 @@
 
 ### Tests for User Story 3
 
-- [ ] T027 [P] [US3] Write history persistence and cron cleanup E2E tests in `apps/api/test/flights-analytics.e2e-spec.ts`
+- [x] T027 [P] [US3] Write history persistence and cron cleanup E2E tests in `apps/api/test/flights-analytics.e2e-spec.ts`
 
 ### Implementation for User Story 3
 
-- [ ] T028 [US3] Ensure search metadata writing in write-behind logic in `apps/api/src/flights/flights.service.ts`
-- [ ] T029 [US3] Integrate search history repository in cron task in `apps/api/src/duffel/duffel-cleanup.service.ts`
+- [x] T028 [US3] Ensure search metadata writing in write-behind logic in `apps/api/src/flights/flights.service.ts`
+- [x] T029 [US3] Integrate search history repository in cron task in `apps/api/src/duffel/duffel-cleanup.service.ts`
 
 **Checkpoint**: All user stories are independently functional and history analytics are captured.
 

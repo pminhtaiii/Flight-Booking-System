@@ -45,8 +45,10 @@ export class DuffelCleanupService {
         }),
       ]);
 
+      const searchHistoryCount = await this.prisma.searchHistory.count();
+
       this.logger.log(
-        `Cleanup complete. Purged ${deletedOffers.count} expired flight offers (older than ${flightRetentionDays} days) and ${deletedRecoveries.count} expired offer recoveries (older than ${recoveryRetentionDays} days).`
+        `Cleanup complete. Purged ${deletedOffers.count} expired flight offers (older than ${flightRetentionDays} days) and ${deletedRecoveries.count} expired offer recoveries (older than ${recoveryRetentionDays} days). Preserved ${searchHistoryCount} search history entries indefinitely.`
       );
     } catch (error) {
       this.logger.error('Error occurred during daily cleanup execution:', error);
