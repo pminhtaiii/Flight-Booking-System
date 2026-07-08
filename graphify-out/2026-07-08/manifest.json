@@ -295,8 +295,8 @@
     "semantic_hash": ""
   },
   "apps/api/src/agent-gateway/agent-gateway.service.ts": {
-    "mtime": 1783478458.555547,
-    "ast_hash": "ca5915fa3e77ad09ddb6e68f0503de9e",
+    "mtime": 1783477146.9408557,
+    "ast_hash": "457820a368725dfac8b8be89e3e60ece",
     "semantic_hash": ""
   },
   "apps/api/src/agent-gateway/auth/agent-api-key.guard.ts": {
@@ -395,9 +395,9 @@
     "semantic_hash": "7fa541fa1a4d3d99b2a1df806fc1b239"
   },
   "apps/api/src/cache/cache.service.ts": {
-    "mtime": 1783478447.7768443,
-    "ast_hash": "3825685b0d6e1e22af5e5e15dd77c7c4",
-    "semantic_hash": ""
+    "mtime": 1782917369.2935934,
+    "ast_hash": "70cf0cdd0781b1d3bcf9b0687726f49c",
+    "semantic_hash": "70cf0cdd0781b1d3bcf9b0687726f49c"
   },
   "apps/api/src/chat/chat.controller.ts": {
     "mtime": 1782902646.0946276,
@@ -725,8 +725,8 @@
     "semantic_hash": ""
   },
   "context/architecture.md": {
-    "mtime": 1783477626.9847572,
-    "ast_hash": "8c4f37b884eed9dc3777d8673f163ee5",
+    "mtime": 1783302256.6407588,
+    "ast_hash": "7c6f0129b76a13e4c0f590c31845fc2b",
     "semantic_hash": ""
   },
   "context/code-standards.md": {
@@ -1300,8 +1300,8 @@
     "semantic_hash": ""
   },
   "apps/api/src/duffel/duffel.service.ts": {
-    "mtime": 1783478453.811129,
-    "ast_hash": "58afd159c16355cd8bb66d145142bcc5",
+    "mtime": 1783477324.2253327,
+    "ast_hash": "218abe514b00b57f0c07d26776d0be63",
     "semantic_hash": ""
   },
   "apps/api/src/duffel/duffel.types.ts": {
