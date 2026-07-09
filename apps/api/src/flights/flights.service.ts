@@ -9,6 +9,8 @@ import { DuffelOffer, DuffelSegment } from '@/duffel/duffel.types';
 import { Prisma } from '@prisma/client';
 import * as crypto from 'crypto';
 
+export type CabinClass = 'economy' | 'premium_economy' | 'business' | 'first';
+
 function parseISO8601Duration(durationStr: string): number {
   const regex = /P(?:(\d+)D)?T(?:(\d+)H)?(?:(\d+)M)?/;
   const matches = durationStr.match(regex);
@@ -54,12 +56,19 @@ function mapSegment(segment: DuffelSegment): FlightSegmentDto {
     arrivalTime: segment.arriving_at,
     duration: parseISO8601Duration(segment.duration),
     aircraft,
-    cabinClass: (segment.passengers?.[0]?.cabin_class || 'economy') as any,
+    cabinClass: (segment.passengers?.[0]?.cabin_class || 'economy') as CabinClass,
   };
 }
 
+const CABIN_RANK: Record<CabinClass, number> = {
+  economy: 0,
+  premium_economy: 1,
+  business: 2,
+  first: 3
+};
+
 function computeCabinMatch(
-  requestedCabinClass: string,
+  requestedCabinClass: CabinClass,
   segments: FlightSegmentDto[],
   returnSegments: FlightSegmentDto[] | null
 ): { cabinClassMatch: 'full' | 'mixed' | 'downgraded'; cabinMismatchDetails: CabinMismatchDetail[] | null } {
@@ -75,8 +84,11 @@ function computeCabinMatch(
     }
   }
 
+  const requestedRank = CABIN_RANK[requestedCabinClass] ?? 0;
+  const longestRank = CABIN_RANK[longestSegment.cabinClass] ?? 0;
+
   let cabinClassMatch: 'full' | 'mixed' | 'downgraded' = 'full';
-  if (longestSegment.cabinClass !== requestedCabinClass) {
+  if (longestRank < requestedRank) {
     cabinClassMatch = 'downgraded';
   } else if (allSegments.some(seg => seg.cabinClass !== requestedCabinClass)) {
     cabinClassMatch = 'mixed';
@@ -115,7 +127,7 @@ function computeCabinMatch(
   };
 }
 
-function mapOffer(offer: DuffelOffer, id: string, requestedCabinClass: string): FlightOfferDto {
+function mapOffer(offer: DuffelOffer, id: string, requestedCabinClass: CabinClass): FlightOfferDto {
   const outboundSlice = offer.slices[0];
   const firstSegment = outboundSlice?.segments[0];
   const lastSegment = outboundSlice?.segments[outboundSlice.segments.length - 1];
@@ -158,7 +170,7 @@ function mapOffer(offer: DuffelOffer, id: string, requestedCabinClass: string): 
     currency: offer.total_currency,
     fareClass: capitalize(cabinClass),
     baggageAllowance,
-    requestedCabinClass: requestedCabinClass as any,
+    requestedCabinClass,
     cabinClassMatch,
     cabinMismatchDetails,
     segments,
@@ -216,7 +228,7 @@ export class FlightsService {
       adults: Number(query.adults),
       children: Number(query.children || 0),
       infants: Number(query.infants || 0),
-      cabinClass: query.cabinClass || 'economy',
+      cabinClass: (query.cabinClass || 'economy') as CabinClass,
     };
 
     const forSearch = {
@@ -237,7 +249,7 @@ export class FlightsService {
       .slice(0, 20)
       .map((offer) => {
         const id = generateDeterministicUUID(`${sha256}:${offer.id}`);
-        return mapOffer(offer, id, query.cabinClass || 'economy');
+        return mapOffer(offer, id, passengersInfo.cabinClass);
       });
 
     // Write async write-behind persistence
@@ -472,7 +484,7 @@ export class FlightsService {
     const returnSegments = returnSlice ? returnSlice.segments.map(mapSegment) : null;
 
     const { cabinClassMatch, cabinMismatchDetails } = computeCabinMatch(
-      flightOffer.cabinClass,
+      flightOffer.cabinClass as CabinClass,
       segments,
       returnSegments
     );
@@ -524,7 +536,7 @@ export class FlightsService {
       currency: liveOffer.total_currency,
       fareClass: capitalize(cabinClass),
       baggageAllowance,
-      requestedCabinClass: flightOffer.cabinClass as any,
+      requestedCabinClass: flightOffer.cabinClass as CabinClass,
       cabinClassMatch,
       cabinMismatchDetails,
       segments,

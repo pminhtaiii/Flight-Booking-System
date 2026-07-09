@@ -1345,8 +1345,8 @@
     "semantic_hash": ""
   },
   "apps/api/src/flights/flights.service.ts": {
-    "mtime": 1783601321.311586,
-    "ast_hash": "1b88336f9e803c01119a8466211f2f75",
+    "mtime": 1783604409.8046827,
+    "ast_hash": "0385edbf69f38807d0aa3b5467b770cc",
     "semantic_hash": ""
   },
   "apps/api/test/flights-search.e2e-spec.ts": {
