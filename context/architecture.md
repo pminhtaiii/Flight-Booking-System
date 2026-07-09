@@ -12,7 +12,7 @@
 | Cache / Rate Limit | Redis                        | Search result caching, rate limiting, API budget tracking   |
 | Authentication     | NextAuth.js (Auth.js) + JWT  | Email/password for v1. Social login deferred                |
 | Payment            | Stripe (Payment Intents)     | PCI-DSS compliant payment processing                        |
-| Flight Data        | Amadeus Self-Service API     | Flight search, pricing, PNR creation, ticketing             |
+| Flight Data        | Duffel API                   | Flight search, pricing, PNR creation, ticketing             |
 | AI Model           | Mimo (OpenAI-compatible URL) | Advisory agents — search assistance, recommendations        |
 | AI Framework       | LangChain (JS/Python)        | Agent chains, tool calling, conversation memory             |
 | AI Observability   | LangSmith                    | Agent run tracing, tool call auditing                       |
@@ -98,9 +98,9 @@ cache.service checks Redis for matching cached results
             cache.service checks rate limit + API budget counter
                 ├── Budget exceeded → return 429 with friendly message
                 └── Budget OK ↓
-                    flights.service calls Amadeus Flight Offers API
+                    duffel.service calls Duffel API (offerRequests.create)
                         ↓
-                    Response cached in Redis (TTL: 15-30 min)
+                    Response cached in Redis (TTL: 15 min)
                         ↓
                     API budget counter incremented (Redis INCR)
                         ↓

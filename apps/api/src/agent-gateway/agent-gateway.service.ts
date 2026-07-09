@@ -2,21 +2,48 @@ import { Injectable, NotFoundException, Logger, HttpException, HttpStatus } from
 import { PrismaService } from '@/prisma/prisma.service';
 import { AuditService } from '@/audit/audit.service';
 import { CacheService } from '@/cache/cache.service';
-import { AmadeusService } from './amadeus/amadeus.service';
+import { DuffelService } from '@/duffel/duffel.service';
+import { DuffelBaggage } from '@/duffel/duffel.types';
 import { FlightSearchQueryDto } from './dto/flight-search-query.dto';
 import { FlightSearchResponseDto, FlightResultDto } from './dto/flight-result.dto';
 import { UserPreferencesDto } from './dto/user-preferences.dto';
 import { UserBookingsResponseDto, BookingResultDto } from './dto/user-bookings.dto';
 import * as crypto from 'crypto';
 
-function toTitleCase(str: string): string {
-  if (!str) return '';
-  return str
+function capitalizeCabinClass(cabinClass: string): string {
+  if (!cabinClass) return '';
+  return cabinClass
     .trim()
     .toLowerCase()
-    .split(/\s+/)
+    .split('_')
     .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
     .join(' ');
+}
+
+function cleanIsoTime(t: string): string {
+  if (!t) return '';
+  const [datePart, timePartWithOffset] = t.split('T');
+  if (!timePartWithOffset) return t;
+  const timePart = timePartWithOffset.split('Z')[0].split('+')[0].split('-')[0];
+  return `${datePart}T${timePart}`;
+}
+
+function formatDuffelBaggageAllowance(baggages?: DuffelBaggage[]): string {
+  if (!baggages || baggages.length === 0) return 'No checked baggage';
+  const checked = baggages.find((b) => b.type === 'checked');
+  if (!checked) {
+    return 'No checked baggage';
+  }
+  if (checked.quantity === 0) {
+    return 'No checked baggage';
+  }
+  if (typeof checked.quantity === 'number') {
+    return `${checked.quantity} checked bag(s)`;
+  }
+  if (typeof checked.weight === 'number') {
+    return `${checked.weight}${checked.weight_unit?.toLowerCase() || 'kg'} checked`;
+  }
+  return 'No checked baggage';
 }
 
 function parseISODurationToMinutes(durationStr: string): number {
@@ -29,17 +56,6 @@ function parseISODurationToMinutes(durationStr: string): number {
   return days * 1440 + hours * 60 + minutes;
 }
 
-function formatBaggageAllowance(baggage?: { quantity?: number; weight?: number; weightUnit?: string }): string {
-  if (!baggage) return 'No checked baggage';
-  if (typeof baggage.quantity === 'number') {
-    return `${baggage.quantity} checked bag(s)`;
-  }
-  if (typeof baggage.weight === 'number') {
-    return `${baggage.weight}${baggage.weightUnit?.toLowerCase() || 'kg'} checked`;
-  }
-  return 'No checked baggage';
-}
-
 @Injectable()
 export class AgentGatewayService {
   private readonly logger = new Logger(AgentGatewayService.name);
@@ -48,7 +64,7 @@ export class AgentGatewayService {
     private readonly prisma: PrismaService,
     private readonly auditService: AuditService,
     private readonly cacheService: CacheService,
-    private readonly amadeusService: AmadeusService,
+    private readonly duffelService: DuffelService,
   ) {}
 
   private async logToolCall(
@@ -111,10 +127,10 @@ export class AgentGatewayService {
   ): Promise<FlightSearchResponseDto> {
     const startTime = Date.now();
     try {
-      // 1. Check Redis cache first
+      // 1. Check Redis cache first for mapped results
       const normalizedQuery = {
-        origin: query.origin,
-        destination: query.destination,
+        origin: query.origin.trim().toUpperCase(),
+        destination: query.destination.trim().toUpperCase(),
         date: query.date,
         passengers: Number(query.passengers),
       };
@@ -139,41 +155,19 @@ export class AgentGatewayService {
         return parsed;
       }
 
-      // 2. On cache miss: perform atomic budget check
-      const now = new Date();
-      const year = now.getFullYear();
-      const month = String(now.getMonth() + 1).padStart(2, '0');
-      const budgetKey = `budget:amadeus:${year}-${month}`;
-
-      const currentBudgetStr = await this.cacheService.get(budgetKey);
-      const currentBudget = currentBudgetStr ? parseInt(currentBudgetStr, 10) : 0;
-      if (currentBudget >= 2000) {
-        throw new HttpException(
-          {
-            message: 'Amadeus API monthly search budget limit exceeded',
-            code: 'RATE_LIMIT_EXCEEDED',
-          },
-          HttpStatus.TOO_MANY_REQUESTS,
-        );
-      }
-
-      const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
-      const ttlSeconds = Math.max(0, Math.ceil((endOfMonth.getTime() - Date.now()) / 1000));
-      const newBudget = await this.cacheService.incr(budgetKey, ttlSeconds);
-      if (newBudget > 2000) {
-        throw new HttpException(
-          {
-            message: 'Amadeus API monthly search budget limit exceeded',
-            code: 'RATE_LIMIT_EXCEEDED',
-          },
-          HttpStatus.TOO_MANY_REQUESTS,
-        );
-      }
-
-      // 4. Call AmadeusService.searchFlights()
+      // 2. Call DuffelService
       let rawResponse;
       try {
-        rawResponse = await this.amadeusService.searchFlights(query);
+        const searchResult = await this.duffelService.searchFlights(
+          {
+            origin: query.origin,
+            destination: query.destination,
+            departureDate: query.date,
+            passengers: Number(query.passengers),
+          },
+          'agent',
+        );
+        rawResponse = searchResult.offerRequest;
       } catch (err: unknown) {
         if (err instanceof HttpException) {
           throw err;
@@ -187,41 +181,51 @@ export class AgentGatewayService {
         );
       }
 
-      // 5. Parse/map raw response to FlightResultDto (limit to 5 results)
-      const offers = rawResponse.data || [];
+      // 3. Parse/map raw response to FlightResultDto (limit to 5 results)
+      const offers = rawResponse.offers || [];
       const limitedOffers = offers.slice(0, 5);
 
       const results: FlightResultDto[] = [];
       for (const offer of limitedOffers) {
-        const itinerary = offer.itineraries?.[0];
-        if (!itinerary || !itinerary.segments || itinerary.segments.length === 0) {
+        const slice = offer.slices?.[0];
+        if (!slice || !slice.segments || slice.segments.length === 0) {
           continue;
         }
 
-        const segments = itinerary.segments;
+        const segments = slice.segments;
         const firstSegment = segments[0];
         const lastSegment = segments[segments.length - 1];
 
-        const carrierCode = firstSegment.carrierCode;
-        const rawAirlineName = rawResponse.dictionaries?.carriers?.[carrierCode] || carrierCode;
-        const airline = toTitleCase(rawAirlineName);
-        const flightNumber = `${firstSegment.carrierCode}${firstSegment.number}`;
+        const airline = firstSegment.operating_carrier?.name || 'Unknown Airline';
+        const flightNumber = `${firstSegment.marketing_carrier?.iata_code || ''}${
+          firstSegment.marketing_carrier_flight_number || ''
+        }`;
 
-        const departureAirport = firstSegment.departure.iataCode;
-        const arrivalAirport = lastSegment.arrival.iataCode;
-        const departureTime = firstSegment.departure.at;
-        const arrivalTime = lastSegment.arrival.at;
+        const departureAirport = firstSegment.origin?.iata_code || '';
+        const arrivalAirport = lastSegment.destination?.iata_code || '';
+        const departureTime = cleanIsoTime(firstSegment.departing_at);
+        const arrivalTime = cleanIsoTime(lastSegment.arriving_at);
 
-        const duration = parseISODurationToMinutes(itinerary.duration);
+        let duration = 0;
+        if (slice.duration) {
+          if (slice.duration.startsWith('P')) {
+            duration = parseISODurationToMinutes(slice.duration);
+          } else {
+            duration = parseInt(slice.duration, 10) || 0;
+          }
+        }
         const stops = segments.length - 1;
 
-        const price = parseFloat(offer.price.total);
-        const currency = offer.price.currency;
+        const price = parseFloat(offer.total_amount);
+        const currency = offer.total_currency;
 
-        const travelerPricing = offer.travelerPricings?.[0];
-        const firstSegmentFareDetails = travelerPricing?.fareDetailsBySegment?.[0];
-        const fareClass = firstSegmentFareDetails?.cabin ? toTitleCase(firstSegmentFareDetails.cabin) : null;
-        const baggageAllowance = firstSegmentFareDetails ? formatBaggageAllowance(firstSegmentFareDetails.includedCheckedBags) : null;
+        const segmentPassenger = firstSegment.passengers?.[0];
+        const offerPassenger = offer.passengers?.[0];
+        const cabinClass = segmentPassenger?.cabin_class || '';
+        const fareClass = cabinClass ? capitalizeCabinClass(cabinClass) : null;
+        
+        const baggages = segmentPassenger?.baggages || offerPassenger?.baggages;
+        const baggageAllowance = formatDuffelBaggageAllowance(baggages);
 
         results.push({
           airline,
@@ -241,10 +245,10 @@ export class AgentGatewayService {
 
       const response: FlightSearchResponseDto = { results };
 
-      // 6. Cache mapped results in Redis with TTL 900 seconds
+      // 4. Cache mapped results in Redis with TTL 900 seconds
       await this.cacheService.set(cacheKey, JSON.stringify(response), 900);
 
-      // 7. Log TOOL_CALL audit log
+      // 5. Log TOOL_CALL audit log
       await this.logToolCall(
         userId,
         'flights/search',

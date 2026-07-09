@@ -6,13 +6,22 @@ Update this file after every completed feature. Any AI agent reading this should
 
 ### Current Status
 
-**Feature:** Map Integration (Fully Completed)
-**Last completed:** Phase 7: Polish & E2E Validation (linter/type-check verification, ignore files check, Playwright E2E tests, and quickstart scenario verification).
-**Next:** Done!
+**Feature:** Duffel Flight Search Service Setup & Agent Gateway Refactoring (In Progress)
+**Last completed:** Phase 5: Search History & Analytics Capture.
+**Next:** Phase 6: E2E Verification & Testing (Automated Jest/Playwright tests, chatbot integration verification).
 
 ---
 
 ## Progress by Feature
+
+### [ ] Feature: Duffel Flight Search Service Setup & Agent Gateway Refactoring (Feature 6)
+
+- [x] Phase 1: Duffel Service Setup & Agent Gateway Refactoring (Duffel module extraction, SDK setup, cache, budget check, and agent gateway service updates)
+- [x] Phase 2: Database Schema & Cron Cleanup (Prisma model updates for FlightOffer and SearchHistory, daily cron retention task)
+- [x] Phase 3: FlightsModule & User Search Endpoint and Frontend Integration
+- [x] Phase 4: Flight Detail & Re-pricing API
+- [x] Phase 5: Frontend Integration & Search History Analytics Capture
+- [ ] Phase 6: E2E Verification & Testing (Automated Jest/Playwright tests, chatbot integration verification)
 
 ### [x] Feature: LLM Output Guardrails
 
@@ -27,7 +36,7 @@ Update this file after every completed feature. Any AI agent reading this should
 - [x] Phase 9: Observability & Logging — Structured Telemetry
 - [x] Phase 10: E2E Testing & Validation — Final Verification
 
-### [/] Feature: Agent Tool-Calling & Data Access
+### [x] Feature: Agent Tool-Calling & Data Access
 
 - [x] T001–T004: Database Schema & Mock Seed Data (Phase 1)
 - [x] T005–T011: Agent Gateway REST Endpoints & Authentication (Phase 2)
@@ -35,7 +44,7 @@ Update this file after every completed feature. Any AI agent reading this should
 - [x] T016–T019: Python Client, Auth Headers & PII Scrubber (Phase 4)
 - [x] T020–T025: LangGraph State Machine & Read-Only Tools (Phase 5)
 - [x] T026–T028: Human-in-the-Loop Gate & SSE Streaming Status (Phase 6)
-- [ ] T029–T031: Polish & Cross-Cutting Concerns (Phase 7)
+- [x] T029–T031: Polish & Cross-Cutting Concerns (Phase 7)
 
 ### [x] Feature: Chatbot Agent Service
 
@@ -50,7 +59,7 @@ Update this file after every completed feature. Any AI agent reading this should
 - [x] Implement sliding window & summary memory manager
 - [x] Implement per-conversation concurrency queue
 
-### [/] Feature: Agent Tool-Calling & Data Access
+### [x] Feature: Agent Gateway & Tool Execution (NestJS/LangGraph)
 
 - [x] Phase 1: Database Schema & Mock Seed Data (Prisma models `TravelerProfile`, `Booking`, and database migrations)
 - [x] Phase 2: Agent Gateway REST Endpoints & Authentication
@@ -58,7 +67,7 @@ Update this file after every completed feature. Any AI agent reading this should
 - [x] Phase 4: Python Client, Auth Headers & PII Scrubber
 - [x] Phase 5: LangGraph State Machine & Read-Only Tools
 - [x] Phase 6: Human-in-the-Loop Gate & SSE Streaming Status
-- [ ] Phase 7: Polish & Cross-Cutting Concerns
+- [x] Phase 7: Polish & Cross-Cutting Concerns
 
 ### [x] Feature: Monorepo Scaffold & Shared Infrastructure
 
@@ -128,3 +137,4 @@ Update this file after every completed feature. Any AI agent reading this should
 ## Notes
 
 - The test environment does not run PostgreSQL or Redis services locally. E2E tests use Jest spies on the PrismaClient instance to mock database states, keeping the API source code clean and genuine.
+- Created a Mimo LLM diagnostic script (`apps/agent/src/agent/test_llm_connection.py`) allowing manual verification of API keys and endpoint connectivity directly from the terminal (securely prompts for keys via `getpass` and runs raw HTTP and LangChain tests).

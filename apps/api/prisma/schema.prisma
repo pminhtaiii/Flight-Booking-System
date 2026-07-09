@@ -24,6 +24,7 @@ model User {
   chatSessions    ChatSession[]
   travelerProfile TravelerProfile?
   bookings        Booking[]
+  searchHistory   SearchHistory[]
 
   @@map("users")
 }
@@ -171,6 +172,56 @@ model Airport {
   @@index([latitude, longitude])
   @@index([name])
   @@map("airports")
+}
+
+model FlightOffer {
+  id              String   @id @default(uuid())
+  searchHash      String
+  duffelOfferId   String
+  rawOffer        Json
+  origin          String   @db.VarChar(3)
+  destination     String   @db.VarChar(3)
+  departureDate   DateTime @db.Date
+  returnDate      DateTime? @db.Date
+  passengers      Int
+  price           Decimal  @db.Decimal(10, 2)
+  currency        String   @default("USD")
+  createdAt       DateTime @default(now())
+
+  @@index([searchHash])
+  @@index([createdAt])
+  @@map("flight_offers")
+}
+
+model SearchHistory {
+  id              String   @id @default(uuid())
+  userId          String
+  origin          String   @db.VarChar(3)
+  destination     String   @db.VarChar(3)
+  departureDate   DateTime @db.Date
+  returnDate      DateTime? @db.Date
+  passengers      Int
+  resultCount     Int
+  minPrice        Decimal? @db.Decimal(10, 2)
+  maxPrice        Decimal? @db.Decimal(10, 2)
+  currency        String   @default("USD")
+  searchHash      String
+  createdAt       DateTime @default(now())
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([createdAt])
+  @@index([userId, createdAt])
+  @@map("search_history")
+}
+
+model OfferRecovery {
+  id          String   @id // The offer UUID
+  searchHash  String
+  createdAt   DateTime @default(now())
+
+  @@index([createdAt])
+  @@map("offer_recoveries")
 }
 
 
