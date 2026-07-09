@@ -6,13 +6,22 @@ Update this file after every completed feature. Any AI agent reading this should
 
 ### Current Status
 
-**Feature:** Duffel Flight Search Service Setup & Agent Gateway Refactoring (Completed)
-**Last completed:** Phase 6: E2E Verification & Testing.
-**Next:** Production deployment / Next roadmap feature.
+**Feature:** Cabin Class & Passenger Type Enhancement (In Progress)
+**Last completed:** Phase 1: Database Schema Migration (Feature 8).
+**Next:** Phase 2: DuffelService — Cabin Class & Passenger Mapper.
 
 ---
 
 ## Progress by Feature
+
+### [ ] Feature: Cabin Class & Passenger Type Enhancement (Feature 8)
+
+- [x] Phase 1: Database Schema Migration (Prisma model updates for FlightOffer and SearchHistory, database migrations, client regeneration)
+- [ ] Phase 2: DuffelService — Cabin Class & Passenger Mapper
+- [ ] Phase 3: FlightsModule — Cabin Match Classification & DTOs
+- [ ] Phase 4: Agent Gateway — Honest Degradation
+- [ ] Phase 5: Frontend Integration
+- [ ] Phase 6: E2E Testing & Verification
 
 ### [x] Feature: Duffel Flight Search Service Setup & Agent Gateway Refactoring (Feature 6)
 

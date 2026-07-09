@@ -420,7 +420,7 @@
       "source_location": "L10",
       "_origin": "ast",
       "id": "apps_agent_src_agent_config_outputguardrailconfig",
-      "community": 0,
+      "community": 159,
       "norm_label": "outputguardrailconfig"
     },
     {
@@ -460,7 +460,7 @@
       "source_location": "L43",
       "_origin": "ast",
       "id": "apps_agent_src_agent_config_settings_output_guardrail",
-      "community": 0,
+      "community": 159,
       "norm_label": ".output_guardrail()"
     },
     {
@@ -470,7 +470,7 @@
       "source_location": "L59",
       "_origin": "ast",
       "id": "apps_agent_src_agent_config_get_settings",
-      "community": 2,
+      "community": 0,
       "norm_label": "get_settings()"
     },
     {
@@ -960,7 +960,7 @@
       "source_location": "L378",
       "_origin": "ast",
       "id": "apps_agent_src_agent_guardrails_output_pipeline_outputguardrailpipeline_aclose",
-      "community": 275,
+      "community": 154,
       "norm_label": ".aclose()"
     },
     {
@@ -1020,7 +1020,7 @@
       "source_location": "L379",
       "_origin": "ast",
       "id": "apps_agent_src_agent_guardrails_output_pipeline_rationale_379",
-      "community": 275,
+      "community": 154,
       "norm_label": "cancels and cleans up any background validation tasks."
     },
     {
@@ -1040,7 +1040,7 @@
       "source_location": "L20",
       "_origin": "ast",
       "id": "apps_agent_src_agent_main_lifespan",
-      "community": 257,
+      "community": 287,
       "norm_label": "lifespan()"
     },
     {
@@ -1050,7 +1050,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "fastapi",
-      "community": 257,
+      "community": 287,
       "norm_label": "fastapi"
     },
     {
@@ -1080,7 +1080,7 @@
       "source_location": "L21",
       "_origin": "ast",
       "id": "apps_agent_src_agent_main_rationale_21",
-      "community": 257,
+      "community": 287,
       "norm_label": "lifespan context manager that initializes nemo guardrails configuration,     me"
     },
     {
@@ -1320,7 +1320,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "apps_agent_src_agent_middleware_rate_limit",
-      "community": 268,
+      "community": 285,
       "norm_label": "rate_limit.py"
     },
     {
@@ -1330,7 +1330,7 @@
       "source_location": "L8",
       "_origin": "ast",
       "id": "apps_agent_src_agent_middleware_rate_limit_ratelimitmiddleware",
-      "community": 268,
+      "community": 285,
       "norm_label": "ratelimitmiddleware"
     },
     {
@@ -1340,7 +1340,7 @@
       "source_location": "L9",
       "_origin": "ast",
       "id": "apps_agent_src_agent_middleware_rate_limit_ratelimitmiddleware_init",
-      "community": 268,
+      "community": 285,
       "norm_label": ".__init__()"
     },
     {
@@ -1350,7 +1350,7 @@
       "source_location": "L15",
       "_origin": "ast",
       "id": "apps_agent_src_agent_middleware_rate_limit_ratelimitmiddleware_dispatch",
-      "community": 268,
+      "community": 285,
       "norm_label": ".dispatch()"
     },
     {
@@ -1360,7 +1360,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "apps_agent_src_agent_middleware_rate_limit_py_request",
-      "community": 268,
+      "community": 285,
       "norm_label": "request"
     },
     {
@@ -1370,7 +1370,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "apps_agent_src_agent_middleware_rate_limit_py_response",
-      "community": 268,
+      "community": 285,
       "norm_label": "response"
     },
     {
@@ -1440,7 +1440,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "apps_agent_src_agent_queue_message_queue",
-      "community": 257,
+      "community": 287,
       "norm_label": "message_queue.py"
     },
     {
@@ -1760,7 +1760,7 @@
       "source_location": "L50",
       "_origin": "ast",
       "id": "apps_agent_src_agent_streaming_sse_chat_stream",
-      "community": 159,
+      "community": 173,
       "norm_label": "chat_stream()"
     },
     {
@@ -1770,7 +1770,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "apps_agent_src_agent_streaming_sse_py_request",
-      "community": 159,
+      "community": 173,
       "norm_label": "request"
     },
     {
@@ -1800,7 +1800,7 @@
       "source_location": "L55",
       "_origin": "ast",
       "id": "apps_agent_src_agent_streaming_sse_rationale_55",
-      "community": 159,
+      "community": 173,
       "norm_label": "handle post /chat/stream requests, performing validation, checking guardrails,"
     },
     {
@@ -2400,7 +2400,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "apps_agent_tests_test_benchmark_output_pipeline",
-      "community": 0,
+      "community": 159,
       "norm_label": "test_benchmark_output_pipeline.py"
     },
     {
@@ -2410,7 +2410,7 @@
       "source_location": "L9",
       "_origin": "ast",
       "id": "apps_agent_tests_test_benchmark_output_pipeline_mock_nemo_service",
-      "community": 0,
+      "community": 159,
       "norm_label": "mock_nemo_service()"
     },
     {
@@ -2420,7 +2420,7 @@
       "source_location": "L15",
       "_origin": "ast",
       "id": "apps_agent_tests_test_benchmark_output_pipeline_enabled_config",
-      "community": 0,
+      "community": 159,
       "norm_label": "enabled_config()"
     },
     {
@@ -2430,7 +2430,7 @@
       "source_location": "L24",
       "_origin": "ast",
       "id": "apps_agent_tests_test_benchmark_output_pipeline_test_benchmark_output_pipeline_latency",
-      "community": 0,
+      "community": 159,
       "norm_label": "test_benchmark_output_pipeline_latency()"
     },
     {
@@ -2780,7 +2780,7 @@
       "source_location": "L9",
       "_origin": "ast",
       "id": "apps_agent_tests_test_guardrails_guardrail_service",
-      "community": 267,
+      "community": 30,
       "norm_label": "guardrail_service()"
     },
     {
@@ -2850,7 +2850,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "apps_agent_tests_test_hard_stop",
-      "community": 2,
+      "community": 0,
       "norm_label": "test_hard_stop.py"
     },
     {
@@ -2860,7 +2860,7 @@
       "source_location": "L11",
       "_origin": "ast",
       "id": "apps_agent_tests_test_hard_stop_mock_nestjs_client",
-      "community": 2,
+      "community": 0,
       "norm_label": "mock_nestjs_client()"
     },
     {
@@ -2870,7 +2870,7 @@
       "source_location": "L23",
       "_origin": "ast",
       "id": "apps_agent_tests_test_hard_stop_test_first_chunk_unsafe",
-      "community": 2,
+      "community": 0,
       "norm_label": "test_first_chunk_unsafe()"
     },
     {
@@ -2880,7 +2880,7 @@
       "source_location": "L90",
       "_origin": "ast",
       "id": "apps_agent_tests_test_hard_stop_test_mid_stream_chunk_unsafe",
-      "community": 2,
+      "community": 0,
       "norm_label": "test_mid_stream_chunk_unsafe()"
     },
     {
@@ -3210,7 +3210,7 @@
       "source_location": "L13",
       "_origin": "ast",
       "id": "apps_agent_tests_test_output_pipeline_enabled_config",
-      "community": 0,
+      "community": 159,
       "norm_label": "enabled_config()"
     },
     {
@@ -3220,7 +3220,7 @@
       "source_location": "L22",
       "_origin": "ast",
       "id": "apps_agent_tests_test_output_pipeline_disabled_config",
-      "community": 0,
+      "community": 159,
       "norm_label": "disabled_config()"
     },
     {
@@ -3570,7 +3570,7 @@
       "source_location": "L20",
       "_origin": "ast",
       "id": "apps_agent_tests_test_sse_integration_mockstreamingllm_bind_tools",
-      "community": 271,
+      "community": 258,
       "norm_label": ".bind_tools()"
     },
     {
@@ -3580,7 +3580,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "apps_agent_tests_test_sse_integration_py_any",
-      "community": 271,
+      "community": 258,
       "norm_label": "any"
     },
     {
@@ -3590,7 +3590,7 @@
       "source_location": "L23",
       "_origin": "ast",
       "id": "apps_agent_tests_test_sse_integration_mockstreamingllm_generate",
-      "community": 271,
+      "community": 258,
       "norm_label": "._generate()"
     },
     {
@@ -3600,7 +3600,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "apps_agent_tests_test_sse_integration_py_basemessage",
-      "community": 271,
+      "community": 258,
       "norm_label": "basemessage"
     },
     {
@@ -3610,7 +3610,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "chatresult",
-      "community": 271,
+      "community": 258,
       "norm_label": "chatresult"
     },
     {
@@ -3620,7 +3620,7 @@
       "source_location": "L33",
       "_origin": "ast",
       "id": "apps_agent_tests_test_sse_integration_mockstreamingllm_astream",
-      "community": 271,
+      "community": 258,
       "norm_label": "._astream()"
     },
     {
@@ -3630,7 +3630,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "chatgenerationchunk",
-      "community": 271,
+      "community": 258,
       "norm_label": "chatgenerationchunk"
     },
     {
@@ -3750,7 +3750,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "apps_agent_tests_test_sse_output_guardrail",
-      "community": 2,
+      "community": 0,
       "norm_label": "test_sse_output_guardrail.py"
     },
     {
@@ -3760,7 +3760,7 @@
       "source_location": "L15",
       "_origin": "ast",
       "id": "apps_agent_tests_test_sse_output_guardrail_mock_nestjs_client",
-      "community": 2,
+      "community": 0,
       "norm_label": "mock_nestjs_client()"
     },
     {
@@ -3770,7 +3770,7 @@
       "source_location": "L27",
       "_origin": "ast",
       "id": "apps_agent_tests_test_sse_output_guardrail_test_sse_output_guardrail_safe",
-      "community": 2,
+      "community": 0,
       "norm_label": "test_sse_output_guardrail_safe()"
     },
     {
@@ -3780,7 +3780,7 @@
       "source_location": "L66",
       "_origin": "ast",
       "id": "apps_agent_tests_test_sse_output_guardrail_test_sse_output_guardrail_unsafe_blocking",
-      "community": 2,
+      "community": 0,
       "norm_label": "test_sse_output_guardrail_unsafe_blocking()"
     },
     {
@@ -3790,7 +3790,7 @@
       "source_location": "L125",
       "_origin": "ast",
       "id": "apps_agent_tests_test_sse_output_guardrail_test_sse_output_guardrail_disabled",
-      "community": 2,
+      "community": 0,
       "norm_label": "test_sse_output_guardrail_disabled()"
     },
     {
@@ -3800,7 +3800,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "apps_agent_tests_test_streaming_agent",
-      "community": 39,
+      "community": 257,
       "norm_label": "test_streaming_agent.py"
     },
     {
@@ -3810,7 +3810,7 @@
       "source_location": "L13",
       "_origin": "ast",
       "id": "apps_agent_tests_test_streaming_agent_get_auth_headers",
-      "community": 39,
+      "community": 257,
       "norm_label": "get_auth_headers()"
     },
     {
@@ -3820,7 +3820,7 @@
       "source_location": "L24",
       "_origin": "ast",
       "id": "apps_agent_tests_test_streaming_agent_parse_sse",
-      "community": 39,
+      "community": 257,
       "norm_label": "parse_sse()"
     },
     {
@@ -3830,7 +3830,7 @@
       "source_location": "L50",
       "_origin": "ast",
       "id": "apps_agent_tests_test_streaming_agent_test_stream_success_path",
-      "community": 39,
+      "community": 257,
       "norm_label": "test_stream_success_path()"
     },
     {
@@ -3840,7 +3840,7 @@
       "source_location": "L148",
       "_origin": "ast",
       "id": "apps_agent_tests_test_streaming_agent_test_stream_llm_error_path",
-      "community": 39,
+      "community": 257,
       "norm_label": "test_stream_llm_error_path()"
     },
     {
@@ -3850,7 +3850,7 @@
       "source_location": "L229",
       "_origin": "ast",
       "id": "apps_agent_tests_test_streaming_agent_test_stream_connection_drop_path",
-      "community": 39,
+      "community": 257,
       "norm_label": "test_stream_connection_drop_path()"
     },
     {
@@ -5090,7 +5090,7 @@
       "source_location": "L63",
       "_origin": "ast",
       "id": "apps_api_src_agent_gateway_agent_gateway_service_agentgatewayservice_constructor",
-      "community": 272,
+      "community": 10,
       "norm_label": ".constructor()"
     },
     {
@@ -5410,7 +5410,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "apps_api_src_airports_airports_service",
-      "community": 272,
+      "community": 152,
       "norm_label": "airports.service.ts"
     },
     {
@@ -5430,7 +5430,7 @@
       "source_location": "L9",
       "_origin": "ast",
       "id": "apps_api_src_airports_airports_service_airportsservice_constructor",
-      "community": 152,
+      "community": 37,
       "norm_label": ".constructor()"
     },
     {
@@ -5560,7 +5560,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "apps_api_src_audit_audit_service",
-      "community": 10,
+      "community": 37,
       "norm_label": "audit.service.ts"
     },
     {
@@ -5730,7 +5730,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "apps_api_src_auth_auth_module",
-      "community": 272,
+      "community": 37,
       "norm_label": "auth.module.ts"
     },
     {
@@ -5750,7 +5750,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "apps_api_src_auth_auth_service_spec",
-      "community": 272,
+      "community": 37,
       "norm_label": "auth.service.spec.ts"
     },
     {
@@ -5760,7 +5760,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "apps_api_src_auth_auth_service",
-      "community": 272,
+      "community": 37,
       "norm_label": "auth.service.ts"
     },
     {
@@ -5890,7 +5890,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "apps_api_src_auth_rate_limit_lockout_service_spec",
-      "community": 272,
+      "community": 37,
       "norm_label": "lockout.service.spec.ts"
     },
     {
@@ -5900,7 +5900,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "apps_api_src_auth_rate_limit_lockout_service",
-      "community": 272,
+      "community": 37,
       "norm_label": "lockout.service.ts"
     },
     {
@@ -5990,7 +5990,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "apps_api_src_auth_strategies_jwt_strategy",
-      "community": 272,
+      "community": 37,
       "norm_label": "jwt.strategy.ts"
     },
     {
@@ -6000,7 +6000,7 @@
       "source_location": "L9",
       "_origin": "ast",
       "id": "apps_api_src_auth_strategies_jwt_strategy_jwtstrategy",
-      "community": 272,
+      "community": 37,
       "norm_label": "jwtstrategy"
     },
     {
@@ -6010,7 +6010,7 @@
       "source_location": "L10",
       "_origin": "ast",
       "id": "apps_api_src_auth_strategies_jwt_strategy_jwtstrategy_constructor",
-      "community": 272,
+      "community": 37,
       "norm_label": ".constructor()"
     },
     {
@@ -6020,7 +6020,7 @@
       "source_location": "L28",
       "_origin": "ast",
       "id": "apps_api_src_auth_strategies_jwt_strategy_jwtstrategy_validate",
-      "community": 272,
+      "community": 152,
       "norm_label": ".validate()"
     },
     {
@@ -6050,7 +6050,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "apps_api_src_cache_cache_service",
-      "community": 272,
+      "community": 37,
       "norm_label": "cache.service.ts"
     },
     {
@@ -6060,7 +6060,7 @@
       "source_location": "L5",
       "_origin": "ast",
       "id": "apps_api_src_cache_cache_service_cacheservice",
-      "community": 272,
+      "community": 37,
       "norm_label": "cacheservice"
     },
     {
@@ -6070,7 +6070,7 @@
       "source_location": "L10",
       "_origin": "ast",
       "id": "apps_api_src_cache_cache_service_cacheservice_onmoduleinit",
-      "community": 272,
+      "community": 37,
       "norm_label": ".onmoduleinit()"
     },
     {
@@ -6080,7 +6080,7 @@
       "source_location": "L35",
       "_origin": "ast",
       "id": "apps_api_src_cache_cache_service_cacheservice_onmoduledestroy",
-      "community": 272,
+      "community": 37,
       "norm_label": ".onmoduledestroy()"
     },
     {
@@ -6100,7 +6100,7 @@
       "source_location": "L65",
       "_origin": "ast",
       "id": "apps_api_src_cache_cache_service_cacheservice_set",
-      "community": 272,
+      "community": 37,
       "norm_label": ".set()"
     },
     {
@@ -6110,7 +6110,7 @@
       "source_location": "L84",
       "_origin": "ast",
       "id": "apps_api_src_cache_cache_service_cacheservice_incr",
-      "community": 272,
+      "community": 37,
       "norm_label": ".incr()"
     },
     {
@@ -6120,7 +6120,7 @@
       "source_location": "L114",
       "_origin": "ast",
       "id": "apps_api_src_cache_cache_service_cacheservice_decr",
-      "community": 272,
+      "community": 37,
       "norm_label": ".decr()"
     },
     {
@@ -6670,7 +6670,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "apps_api_src_duffel_duffel_service",
-      "community": 272,
+      "community": 29,
       "norm_label": "duffel.service.ts"
     },
     {
@@ -6680,7 +6680,7 @@
       "source_location": "L8",
       "_origin": "ast",
       "id": "apps_api_src_duffel_duffel_service_duffelservice",
-      "community": 272,
+      "community": 29,
       "norm_label": "duffelservice"
     },
     {
@@ -6690,7 +6690,7 @@
       "source_location": "L12",
       "_origin": "ast",
       "id": "apps_api_src_duffel_duffel_service_duffelservice_constructor",
-      "community": 272,
+      "community": 37,
       "norm_label": ".constructor()"
     },
     {
@@ -6700,7 +6700,7 @@
       "source_location": "L26",
       "_origin": "ast",
       "id": "apps_api_src_duffel_duffel_service_duffelservice_searchflights",
-      "community": 272,
+      "community": 37,
       "norm_label": ".searchflights()"
     },
     {
@@ -6810,7 +6810,7 @@
       "source_location": "L73",
       "_origin": "ast",
       "id": "apps_api_src_duffel_duffel_types_duffelofferrequest",
-      "community": 272,
+      "community": 29,
       "norm_label": "duffelofferrequest"
     },
     {
@@ -7080,7 +7080,7 @@
       "source_location": "L103",
       "_origin": "ast",
       "id": "apps_api_src_flights_flights_service_flightsservice_constructor",
-      "community": 272,
+      "community": 10,
       "norm_label": ".constructor()"
     },
     {
@@ -7110,7 +7110,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "apps_api_src_health_health_controller",
-      "community": 262,
+      "community": 254,
       "norm_label": "health.controller.ts"
     },
     {
@@ -7120,7 +7120,7 @@
       "source_location": "L6",
       "_origin": "ast",
       "id": "apps_api_src_health_health_controller_healthcontroller",
-      "community": 262,
+      "community": 254,
       "norm_label": "healthcontroller"
     },
     {
@@ -7130,7 +7130,7 @@
       "source_location": "L9",
       "_origin": "ast",
       "id": "apps_api_src_health_health_controller_healthcontroller_constructor",
-      "community": 262,
+      "community": 254,
       "norm_label": ".constructor()"
     },
     {
@@ -7140,7 +7140,7 @@
       "source_location": "L12",
       "_origin": "ast",
       "id": "apps_api_src_health_health_controller_healthcontroller_check",
-      "community": 262,
+      "community": 254,
       "norm_label": ".check()"
     },
     {
@@ -7150,7 +7150,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "apps_api_src_health_health_module",
-      "community": 262,
+      "community": 254,
       "norm_label": "health.module.ts"
     },
     {
@@ -7160,7 +7160,7 @@
       "source_location": "L7",
       "_origin": "ast",
       "id": "apps_api_src_health_health_module_healthmodule",
-      "community": 262,
+      "community": 254,
       "norm_label": "healthmodule"
     },
     {
@@ -7310,7 +7310,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "apps_api_test_agent_gateway_polish_e2e_spec",
-      "community": 272,
+      "community": 29,
       "norm_label": "agent-gateway-polish.e2e-spec.ts"
     },
     {
@@ -7320,7 +7320,7 @@
       "source_location": "L13",
       "_origin": "ast",
       "id": "apps_api_test_agent_gateway_polish_e2e_spec_mintclaimtoken",
-      "community": 272,
+      "community": 29,
       "norm_label": "mintclaimtoken()"
     },
     {
@@ -7450,7 +7450,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "apps_api_test_flights_search_e2e_spec",
-      "community": 272,
+      "community": 29,
       "norm_label": "flights-search.e2e-spec.ts"
     },
     {
@@ -7460,7 +7460,7 @@
       "source_location": "L23",
       "_origin": "ast",
       "id": "apps_api_test_flights_search_e2e_spec_waitfor",
-      "community": 272,
+      "community": 29,
       "norm_label": "waitfor()"
     },
     {
@@ -8040,7 +8040,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "apps_web_components_map_airportpopup",
-      "community": 252,
+      "community": 260,
       "norm_label": "airportpopup.tsx"
     },
     {
@@ -8050,7 +8050,7 @@
       "source_location": "L8",
       "_origin": "ast",
       "id": "apps_web_components_map_airportpopup_props",
-      "community": 252,
+      "community": 260,
       "norm_label": "props"
     },
     {
@@ -8060,7 +8060,7 @@
       "source_location": "L13",
       "_origin": "ast",
       "id": "apps_web_components_map_airportpopup_airportpopup",
-      "community": 252,
+      "community": 260,
       "norm_label": "airportpopup()"
     },
     {
@@ -9610,7 +9610,7 @@
       "source_location": "L3",
       "_origin": "ast",
       "id": "packages_shared_src_types_airport_airport",
-      "community": 252,
+      "community": 260,
       "norm_label": "airport"
     },
     {
@@ -9804,30 +9804,10 @@
       "norm_label": "fs"
     },
     {
-      "label": "content",
-      "file_type": "code",
-      "source_file": "parse_comments.js",
-      "source_location": "L2",
-      "_origin": "ast",
-      "id": "parse_comments_content",
-      "community": 264,
-      "norm_label": "content"
-    },
-    {
-      "label": "data",
-      "file_type": "code",
-      "source_file": "parse_comments.js",
-      "source_location": "L3",
-      "_origin": "ast",
-      "id": "parse_comments_data",
-      "community": 264,
-      "norm_label": "data"
-    },
-    {
       "label": "unresolved",
       "file_type": "code",
       "source_file": "parse_comments.js",
-      "source_location": "L7",
+      "source_location": "L36",
       "_origin": "ast",
       "id": "parse_comments_unresolved",
       "community": 264,
@@ -12162,6 +12142,206 @@
       "id": "research_agent_tool_calling_architecture_summary_architecture_at_a_glance",
       "community": 120,
       "norm_label": "summary: architecture at a glance"
+    },
+    {
+      "label": "cabin-passenger-enhancement-decisions.md",
+      "file_type": "document",
+      "source_file": "research/cabin-passenger-enhancement-decisions.md",
+      "source_location": "L1",
+      "_origin": "ast",
+      "id": "research_cabin_passenger_enhancement_decisions",
+      "community": 2,
+      "norm_label": "cabin-passenger-enhancement-decisions.md"
+    },
+    {
+      "label": "Cabin Class & Passenger Type Enhancement \u2014 Grilling Session Decisions",
+      "file_type": "document",
+      "source_file": "research/cabin-passenger-enhancement-decisions.md",
+      "source_location": "L1",
+      "_origin": "ast",
+      "id": "research_cabin_passenger_enhancement_decisions_cabin_class_passenger_type_enhancement_grilling_session_decisions",
+      "community": 2,
+      "norm_label": "cabin class & passenger type enhancement \u2014 grilling session decisions"
+    },
+    {
+      "label": "Context",
+      "file_type": "document",
+      "source_file": "research/cabin-passenger-enhancement-decisions.md",
+      "source_location": "L9",
+      "_origin": "ast",
+      "id": "research_cabin_passenger_enhancement_decisions_context",
+      "community": 2,
+      "norm_label": "context"
+    },
+    {
+      "label": "Feature Priority Order (User Decision)",
+      "file_type": "document",
+      "source_file": "research/cabin-passenger-enhancement-decisions.md",
+      "source_location": "L13",
+      "_origin": "ast",
+      "id": "research_cabin_passenger_enhancement_decisions_feature_priority_order_user_decision",
+      "community": 2,
+      "norm_label": "feature priority order (user decision)"
+    },
+    {
+      "label": "D1: Cabin Class Strategy",
+      "file_type": "document",
+      "source_file": "research/cabin-passenger-enhancement-decisions.md",
+      "source_location": "L24",
+      "_origin": "ast",
+      "id": "research_cabin_passenger_enhancement_decisions_d1_cabin_class_strategy",
+      "community": 2,
+      "norm_label": "d1: cabin class strategy"
+    },
+    {
+      "label": "D2: Mixed-Cabin Validation",
+      "file_type": "document",
+      "source_file": "research/cabin-passenger-enhancement-decisions.md",
+      "source_location": "L35",
+      "_origin": "ast",
+      "id": "research_cabin_passenger_enhancement_decisions_d2_mixed_cabin_validation",
+      "community": 2,
+      "norm_label": "d2: mixed-cabin validation"
+    },
+    {
+      "label": "D3: Three-Tier Cabin Match Status",
+      "file_type": "document",
+      "source_file": "research/cabin-passenger-enhancement-decisions.md",
+      "source_location": "L47",
+      "_origin": "ast",
+      "id": "research_cabin_passenger_enhancement_decisions_d3_three_tier_cabin_match_status",
+      "community": 2,
+      "norm_label": "d3: three-tier cabin match status"
+    },
+    {
+      "label": "D4: Cabin Mismatch Data Shape",
+      "file_type": "document",
+      "source_file": "research/cabin-passenger-enhancement-decisions.md",
+      "source_location": "L68",
+      "_origin": "ast",
+      "id": "research_cabin_passenger_enhancement_decisions_d4_cabin_mismatch_data_shape",
+      "community": 2,
+      "norm_label": "d4: cabin mismatch data shape"
+    },
+    {
+      "label": "FlightSegmentDto additions:",
+      "file_type": "document",
+      "source_file": "research/cabin-passenger-enhancement-decisions.md",
+      "source_location": "L72",
+      "_origin": "ast",
+      "id": "research_cabin_passenger_enhancement_decisions_flightsegmentdto_additions",
+      "community": 2,
+      "norm_label": "flightsegmentdto additions:"
+    },
+    {
+      "label": "FlightOfferDto additions:",
+      "file_type": "document",
+      "source_file": "research/cabin-passenger-enhancement-decisions.md",
+      "source_location": "L77",
+      "_origin": "ast",
+      "id": "research_cabin_passenger_enhancement_decisions_flightofferdto_additions",
+      "community": 2,
+      "norm_label": "flightofferdto additions:"
+    },
+    {
+      "label": "D5: Passenger Type DTO Shape",
+      "file_type": "document",
+      "source_file": "research/cabin-passenger-enhancement-decisions.md",
+      "source_location": "L96",
+      "_origin": "ast",
+      "id": "research_cabin_passenger_enhancement_decisions_d5_passenger_type_dto_shape",
+      "community": 2,
+      "norm_label": "d5: passenger type dto shape"
+    },
+    {
+      "label": "D6: Isolated Passenger Mapper in DuffelService",
+      "file_type": "document",
+      "source_file": "research/cabin-passenger-enhancement-decisions.md",
+      "source_location": "L116",
+      "_origin": "ast",
+      "id": "research_cabin_passenger_enhancement_decisions_d6_isolated_passenger_mapper_in_duffelservice",
+      "community": 2,
+      "norm_label": "d6: isolated passenger mapper in duffelservice"
+    },
+    {
+      "label": "D7: Cache Key Shape",
+      "file_type": "document",
+      "source_file": "research/cabin-passenger-enhancement-decisions.md",
+      "source_location": "L135",
+      "_origin": "ast",
+      "id": "research_cabin_passenger_enhancement_decisions_d7_cache_key_shape",
+      "community": 2,
+      "norm_label": "d7: cache key shape"
+    },
+    {
+      "label": "D8: Database Schema \u2014 Flat Columns",
+      "file_type": "document",
+      "source_file": "research/cabin-passenger-enhancement-decisions.md",
+      "source_location": "L152",
+      "_origin": "ast",
+      "id": "research_cabin_passenger_enhancement_decisions_d8_database_schema_flat_columns",
+      "community": 2,
+      "norm_label": "d8: database schema \u2014 flat columns"
+    },
+    {
+      "label": "Schema changes (both FlightOffer and SearchHistory):",
+      "file_type": "document",
+      "source_file": "research/cabin-passenger-enhancement-decisions.md",
+      "source_location": "L156",
+      "_origin": "ast",
+      "id": "research_cabin_passenger_enhancement_decisions_schema_changes_both_flightoffer_and_searchhistory",
+      "community": 2,
+      "norm_label": "schema changes (both flightoffer and searchhistory):"
+    },
+    {
+      "label": "D9: Agent Gateway \u2014 Default with Honest Degradation",
+      "file_type": "document",
+      "source_file": "research/cabin-passenger-enhancement-decisions.md",
+      "source_location": "L169",
+      "_origin": "ast",
+      "id": "research_cabin_passenger_enhancement_decisions_d9_agent_gateway_default_with_honest_degradation",
+      "community": 2,
+      "norm_label": "d9: agent gateway \u2014 default with honest degradation"
+    },
+    {
+      "label": "Keyword detection behavior:",
+      "file_type": "document",
+      "source_file": "research/cabin-passenger-enhancement-decisions.md",
+      "source_location": "L173",
+      "_origin": "ast",
+      "id": "research_cabin_passenger_enhancement_decisions_keyword_detection_behavior",
+      "community": 2,
+      "norm_label": "keyword detection behavior:"
+    },
+    {
+      "label": "Interface compatibility:",
+      "file_type": "document",
+      "source_file": "research/cabin-passenger-enhancement-decisions.md",
+      "source_location": "L178",
+      "_origin": "ast",
+      "id": "research_cabin_passenger_enhancement_decisions_interface_compatibility",
+      "community": 2,
+      "norm_label": "interface compatibility:"
+    },
+    {
+      "label": "Future upgrade plan:",
+      "file_type": "document",
+      "source_file": "research/cabin-passenger-enhancement-decisions.md",
+      "source_location": "L183",
+      "_origin": "ast",
+      "id": "research_cabin_passenger_enhancement_decisions_future_upgrade_plan",
+      "community": 2,
+      "norm_label": "future upgrade plan:"
+    },
+    {
+      "label": "Open Items (Not Yet Grilled)",
+      "file_type": "document",
+      "source_file": "research/cabin-passenger-enhancement-decisions.md",
+      "source_location": "L190",
+      "_origin": "ast",
+      "id": "research_cabin_passenger_enhancement_decisions_open_items_not_yet_grilled",
+      "community": 2,
+      "norm_label": "open items (not yet grilled)"
     },
     {
       "label": "chatbot-backend-architecture.md",
@@ -18100,7 +18280,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_data_model",
-      "community": 31,
+      "community": 282,
       "norm_label": "data-model.md"
     },
     {
@@ -18110,7 +18290,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_data_model_data_model_llm_output_guardrails",
-      "community": 31,
+      "community": 282,
       "norm_label": "data model: llm output guardrails"
     },
     {
@@ -18120,7 +18300,7 @@
       "source_location": "L9",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_data_model_entities",
-      "community": 31,
+      "community": 284,
       "norm_label": "entities"
     },
     {
@@ -18130,7 +18310,7 @@
       "source_location": "L11",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_data_model_1_outputguardrailconfig",
-      "community": 31,
+      "community": 284,
       "norm_label": "1. outputguardrailconfig"
     },
     {
@@ -18140,7 +18320,7 @@
       "source_location": "L24",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_data_model_2_chunkbuffer",
-      "community": 31,
+      "community": 284,
       "norm_label": "2. chunkbuffer"
     },
     {
@@ -18150,7 +18330,7 @@
       "source_location": "L53",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_data_model_3_slidingwindow",
-      "community": 31,
+      "community": 284,
       "norm_label": "3. slidingwindow"
     },
     {
@@ -18160,7 +18340,7 @@
       "source_location": "L71",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_data_model_4_outputguardrailresult",
-      "community": 31,
+      "community": 284,
       "norm_label": "4. outputguardrailresult"
     },
     {
@@ -18170,7 +18350,7 @@
       "source_location": "L97",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_data_model_5_outputguardrailpipeline",
-      "community": 31,
+      "community": 284,
       "norm_label": "5. outputguardrailpipeline"
     },
     {
@@ -18180,7 +18360,7 @@
       "source_location": "L121",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_data_model_6_outputguardrailblockederror",
-      "community": 31,
+      "community": 284,
       "norm_label": "6. outputguardrailblockederror"
     },
     {
@@ -18190,7 +18370,7 @@
       "source_location": "L132",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_data_model_sse_event_extension",
-      "community": 31,
+      "community": 282,
       "norm_label": "sse event extension"
     },
     {
@@ -18200,7 +18380,7 @@
       "source_location": "L154",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_data_model_relationships",
-      "community": 31,
+      "community": 282,
       "norm_label": "relationships"
     },
     {
@@ -18210,7 +18390,7 @@
       "source_location": "L176",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_data_model_state_transitions",
-      "community": 31,
+      "community": 282,
       "norm_label": "state transitions"
     },
     {
@@ -18220,7 +18400,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_plan",
-      "community": 31,
+      "community": 282,
       "norm_label": "plan.md"
     },
     {
@@ -18350,7 +18530,7 @@
       "source_location": "L145",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_plan_phase_2_configuration_pii_detection_foundation",
-      "community": 132,
+      "community": 288,
       "norm_label": "phase 2: configuration & pii detection \u2014 foundation"
     },
     {
@@ -18360,7 +18540,7 @@
       "source_location": "L151",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_plan_files",
-      "community": 132,
+      "community": 288,
       "norm_label": "files"
     },
     {
@@ -18370,7 +18550,7 @@
       "source_location": "L158",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_plan_acceptance",
-      "community": 132,
+      "community": 288,
       "norm_label": "acceptance"
     },
     {
@@ -18380,7 +18560,7 @@
       "source_location": "L166",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_plan_tests",
-      "community": 132,
+      "community": 288,
       "norm_label": "tests"
     },
     {
@@ -18390,7 +18570,7 @@
       "source_location": "L173",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_plan_phase_3_sentence_boundary_chunking_token_accumulation",
-      "community": 132,
+      "community": 289,
       "norm_label": "phase 3: sentence-boundary chunking \u2014 token accumulation"
     },
     {
@@ -18400,7 +18580,7 @@
       "source_location": "L179",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_plan_files_179",
-      "community": 132,
+      "community": 289,
       "norm_label": "files"
     },
     {
@@ -18410,7 +18590,7 @@
       "source_location": "L185",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_plan_acceptance_185",
-      "community": 132,
+      "community": 289,
       "norm_label": "acceptance"
     },
     {
@@ -18420,7 +18600,7 @@
       "source_location": "L196",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_plan_tests_196",
-      "community": 132,
+      "community": 289,
       "norm_label": "tests"
     },
     {
@@ -18430,7 +18610,7 @@
       "source_location": "L202",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_plan_phase_4_nemo_output_rail_safety_classification",
-      "community": 132,
+      "community": 290,
       "norm_label": "phase 4: nemo output rail \u2014 safety classification"
     },
     {
@@ -18440,7 +18620,7 @@
       "source_location": "L208",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_plan_files_208",
-      "community": 132,
+      "community": 290,
       "norm_label": "files"
     },
     {
@@ -18450,7 +18630,7 @@
       "source_location": "L215",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_plan_acceptance_215",
-      "community": 132,
+      "community": 290,
       "norm_label": "acceptance"
     },
     {
@@ -18460,7 +18640,7 @@
       "source_location": "L224",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_plan_tests_224",
-      "community": 132,
+      "community": 290,
       "norm_label": "tests"
     },
     {
@@ -18470,7 +18650,7 @@
       "source_location": "L230",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_plan_phase_5_output_guardrail_pipeline_orchestration",
-      "community": 132,
+      "community": 291,
       "norm_label": "phase 5: output guardrail pipeline \u2014 orchestration"
     },
     {
@@ -18480,7 +18660,7 @@
       "source_location": "L236",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_plan_files_236",
-      "community": 132,
+      "community": 291,
       "norm_label": "files"
     },
     {
@@ -18490,7 +18670,7 @@
       "source_location": "L242",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_plan_acceptance_242",
-      "community": 132,
+      "community": 291,
       "norm_label": "acceptance"
     },
     {
@@ -18500,7 +18680,7 @@
       "source_location": "L253",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_plan_tests_253",
-      "community": 132,
+      "community": 291,
       "norm_label": "tests"
     },
     {
@@ -18510,7 +18690,7 @@
       "source_location": "L259",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_plan_phase_6_sse_integration_wire_pipeline_into_streaming",
-      "community": 132,
+      "community": 292,
       "norm_label": "phase 6: sse integration \u2014 wire pipeline into streaming"
     },
     {
@@ -18520,7 +18700,7 @@
       "source_location": "L265",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_plan_files_265",
-      "community": 132,
+      "community": 292,
       "norm_label": "files"
     },
     {
@@ -18530,7 +18710,7 @@
       "source_location": "L271",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_plan_acceptance_271",
-      "community": 132,
+      "community": 292,
       "norm_label": "acceptance"
     },
     {
@@ -18540,7 +18720,7 @@
       "source_location": "L279",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_plan_tests_279",
-      "community": 132,
+      "community": 292,
       "norm_label": "tests"
     },
     {
@@ -18550,7 +18730,7 @@
       "source_location": "L285",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_plan_phase_7_hard_stop_partial_persistence_failure_handling",
-      "community": 132,
+      "community": 293,
       "norm_label": "phase 7: hard stop & partial persistence \u2014 failure handling"
     },
     {
@@ -18560,7 +18740,7 @@
       "source_location": "L291",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_plan_files_291",
-      "community": 132,
+      "community": 293,
       "norm_label": "files"
     },
     {
@@ -18570,7 +18750,7 @@
       "source_location": "L297",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_plan_acceptance_297",
-      "community": 132,
+      "community": 293,
       "norm_label": "acceptance"
     },
     {
@@ -18580,7 +18760,7 @@
       "source_location": "L306",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_plan_tests_306",
-      "community": 132,
+      "community": 293,
       "norm_label": "tests"
     },
     {
@@ -18590,7 +18770,7 @@
       "source_location": "L312",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_plan_phase_8_pipeline_parallelism_latency_optimization",
-      "community": 132,
+      "community": 294,
       "norm_label": "phase 8: pipeline parallelism \u2014 latency optimization"
     },
     {
@@ -18600,7 +18780,7 @@
       "source_location": "L318",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_plan_files_318",
-      "community": 132,
+      "community": 294,
       "norm_label": "files"
     },
     {
@@ -18610,7 +18790,7 @@
       "source_location": "L324",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_plan_acceptance_324",
-      "community": 132,
+      "community": 294,
       "norm_label": "acceptance"
     },
     {
@@ -18620,7 +18800,7 @@
       "source_location": "L332",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_plan_tests_332",
-      "community": 132,
+      "community": 294,
       "norm_label": "tests"
     },
     {
@@ -18670,7 +18850,7 @@
       "source_location": "L365",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_plan_phase_10_e2e_testing_validation_final_verification",
-      "community": 132,
+      "community": 295,
       "norm_label": "phase 10: e2e testing & validation \u2014 final verification"
     },
     {
@@ -18680,7 +18860,7 @@
       "source_location": "L371",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_plan_files_371",
-      "community": 132,
+      "community": 295,
       "norm_label": "files"
     },
     {
@@ -18690,7 +18870,7 @@
       "source_location": "L378",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_plan_acceptance_success_criteria_verification",
-      "community": 132,
+      "community": 295,
       "norm_label": "acceptance \u2014 success criteria verification"
     },
     {
@@ -18700,7 +18880,7 @@
       "source_location": "L388",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_plan_checklist",
-      "community": 132,
+      "community": 295,
       "norm_label": "checklist"
     },
     {
@@ -18920,7 +19100,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_quickstart",
-      "community": 31,
+      "community": 282,
       "norm_label": "quickstart.md"
     },
     {
@@ -18930,7 +19110,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_quickstart_quickstart_validation_guide_llm_output_guardrails",
-      "community": 31,
+      "community": 280,
       "norm_label": "quickstart validation guide: llm output guardrails"
     },
     {
@@ -18940,7 +19120,7 @@
       "source_location": "L7",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_quickstart_prerequisites",
-      "community": 31,
+      "community": 280,
       "norm_label": "prerequisites"
     },
     {
@@ -18950,7 +19130,7 @@
       "source_location": "L20",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_quickstart_scenario_1_safe_response_streams_normally",
-      "community": 31,
+      "community": 280,
       "norm_label": "scenario 1: safe response streams normally"
     },
     {
@@ -18960,7 +19140,7 @@
       "source_location": "L43",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_quickstart_scenario_2_pii_in_output_triggers_hard_stop",
-      "community": 31,
+      "community": 280,
       "norm_label": "scenario 2: pii in output triggers hard stop"
     },
     {
@@ -18970,7 +19150,7 @@
       "source_location": "L83",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_quickstart_scenario_3_boundary_pii_detected_by_sliding_window",
-      "community": 31,
+      "community": 280,
       "norm_label": "scenario 3: boundary pii detected by sliding window"
     },
     {
@@ -18980,7 +19160,7 @@
       "source_location": "L123",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_quickstart_scenario_4_nemo_output_rail_blocks_harmful_content",
-      "community": 31,
+      "community": 280,
       "norm_label": "scenario 4: nemo output rail blocks harmful content"
     },
     {
@@ -18990,7 +19170,7 @@
       "source_location": "L155",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_quickstart_scenario_5_partial_response_persisted_on_block",
-      "community": 31,
+      "community": 280,
       "norm_label": "scenario 5: partial response persisted on block"
     },
     {
@@ -19000,7 +19180,7 @@
       "source_location": "L184",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_quickstart_scenario_6_kill_switch_disables_guardrails",
-      "community": 31,
+      "community": 280,
       "norm_label": "scenario 6: kill switch disables guardrails"
     },
     {
@@ -19010,7 +19190,7 @@
       "source_location": "L202",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_quickstart_running_tests",
-      "community": 31,
+      "community": 280,
       "norm_label": "running tests"
     },
     {
@@ -19020,7 +19200,7 @@
       "source_location": "L221",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_quickstart_verification_checklist",
-      "community": 31,
+      "community": 280,
       "norm_label": "verification checklist"
     },
     {
@@ -19030,7 +19210,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_research",
-      "community": 31,
+      "community": 283,
       "norm_label": "research.md"
     },
     {
@@ -19040,7 +19220,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_research_phase_0_research_llm_output_guardrails",
-      "community": 31,
+      "community": 283,
       "norm_label": "phase 0 research: llm output guardrails"
     },
     {
@@ -19050,7 +19230,7 @@
       "source_location": "L11",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_research_findings",
-      "community": 31,
+      "community": 283,
       "norm_label": "findings"
     },
     {
@@ -19060,7 +19240,7 @@
       "source_location": "L13",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_research_1_sentence_detection_edge_cases",
-      "community": 31,
+      "community": 283,
       "norm_label": "1. sentence detection edge cases"
     },
     {
@@ -19070,7 +19250,7 @@
       "source_location": "L45",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_research_2_sliding_window_token_count",
-      "community": 31,
+      "community": 283,
       "norm_label": "2. sliding window token count"
     },
     {
@@ -19080,7 +19260,7 @@
       "source_location": "L76",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_research_3_nemo_output_rail_configuration",
-      "community": 31,
+      "community": 283,
       "norm_label": "3. nemo output rail configuration"
     },
     {
@@ -19090,7 +19270,7 @@
       "source_location": "L118",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_research_4_streaming_ux_sentence_boundary_chunking_bursty_arrival",
-      "community": 31,
+      "community": 283,
       "norm_label": "4. streaming ux \u2014 sentence-boundary chunking bursty arrival"
     },
     {
@@ -19100,7 +19280,7 @@
       "source_location": "L149",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_research_summary_of_decisions",
-      "community": 31,
+      "community": 283,
       "norm_label": "summary of decisions"
     },
     {
@@ -19110,7 +19290,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_spec",
-      "community": 31,
+      "community": 282,
       "norm_label": "spec.md"
     },
     {
@@ -21882,6 +22062,1026 @@
       "id": "specs_006_flight_search_service_tasks_incremental_delivery",
       "community": 259,
       "norm_label": "incremental delivery"
+    },
+    {
+      "label": "api.md",
+      "file_type": "document",
+      "source_file": "specs/008-cabin-passenger-enhancement/contracts/api.md",
+      "source_location": "L1",
+      "_origin": "ast",
+      "id": "specs_008_cabin_passenger_enhancement_contracts_api",
+      "community": 275,
+      "norm_label": "api.md"
+    },
+    {
+      "label": "API Contract Changes: Cabin Class & Passenger Type Enhancement",
+      "file_type": "document",
+      "source_file": "specs/008-cabin-passenger-enhancement/contracts/api.md",
+      "source_location": "L1",
+      "_origin": "ast",
+      "id": "specs_008_cabin_passenger_enhancement_contracts_api_api_contract_changes_cabin_class_passenger_type_enhancement",
+      "community": 275,
+      "norm_label": "api contract changes: cabin class & passenger type enhancement"
+    },
+    {
+      "label": "POST /api/flights/search \u2014 Request Changes",
+      "file_type": "document",
+      "source_file": "specs/008-cabin-passenger-enhancement/contracts/api.md",
+      "source_location": "L11",
+      "_origin": "ast",
+      "id": "specs_008_cabin_passenger_enhancement_contracts_api_post_api_flights_search_request_changes",
+      "community": 275,
+      "norm_label": "post /api/flights/search \u2014 request changes"
+    },
+    {
+      "label": "Updated Request Body",
+      "file_type": "document",
+      "source_file": "specs/008-cabin-passenger-enhancement/contracts/api.md",
+      "source_location": "L13",
+      "_origin": "ast",
+      "id": "specs_008_cabin_passenger_enhancement_contracts_api_updated_request_body",
+      "community": 275,
+      "norm_label": "updated request body"
+    },
+    {
+      "label": "Field Changes",
+      "file_type": "document",
+      "source_file": "specs/008-cabin-passenger-enhancement/contracts/api.md",
+      "source_location": "L28",
+      "_origin": "ast",
+      "id": "specs_008_cabin_passenger_enhancement_contracts_api_field_changes",
+      "community": 275,
+      "norm_label": "field changes"
+    },
+    {
+      "label": "POST /api/flights/search \u2014 Response Changes",
+      "file_type": "document",
+      "source_file": "specs/008-cabin-passenger-enhancement/contracts/api.md",
+      "source_location": "L42",
+      "_origin": "ast",
+      "id": "specs_008_cabin_passenger_enhancement_contracts_api_post_api_flights_search_response_changes",
+      "community": 275,
+      "norm_label": "post /api/flights/search \u2014 response changes"
+    },
+    {
+      "label": "Updated Result Object",
+      "file_type": "document",
+      "source_file": "specs/008-cabin-passenger-enhancement/contracts/api.md",
+      "source_location": "L44",
+      "_origin": "ast",
+      "id": "specs_008_cabin_passenger_enhancement_contracts_api_updated_result_object",
+      "community": 275,
+      "norm_label": "updated result object"
+    },
+    {
+      "label": "New/Changed Fields",
+      "file_type": "document",
+      "source_file": "specs/008-cabin-passenger-enhancement/contracts/api.md",
+      "source_location": "L94",
+      "_origin": "ast",
+      "id": "specs_008_cabin_passenger_enhancement_contracts_api_new_changed_fields",
+      "community": 275,
+      "norm_label": "new/changed fields"
+    },
+    {
+      "label": "Cabin Mismatch Detail Object",
+      "file_type": "document",
+      "source_file": "specs/008-cabin-passenger-enhancement/contracts/api.md",
+      "source_location": "L104",
+      "_origin": "ast",
+      "id": "specs_008_cabin_passenger_enhancement_contracts_api_cabin_mismatch_detail_object",
+      "community": 275,
+      "norm_label": "cabin mismatch detail object"
+    },
+    {
+      "label": "Classification Algorithm",
+      "file_type": "document",
+      "source_file": "specs/008-cabin-passenger-enhancement/contracts/api.md",
+      "source_location": "L124",
+      "_origin": "ast",
+      "id": "specs_008_cabin_passenger_enhancement_contracts_api_classification_algorithm",
+      "community": 275,
+      "norm_label": "classification algorithm"
+    },
+    {
+      "label": "GET /api/flights/:id \u2014 Response Changes",
+      "file_type": "document",
+      "source_file": "specs/008-cabin-passenger-enhancement/contracts/api.md",
+      "source_location": "L136",
+      "_origin": "ast",
+      "id": "specs_008_cabin_passenger_enhancement_contracts_api_get_api_flights_id_response_changes",
+      "community": 275,
+      "norm_label": "get /api/flights/:id \u2014 response changes"
+    },
+    {
+      "label": "Updated Detail Response",
+      "file_type": "document",
+      "source_file": "specs/008-cabin-passenger-enhancement/contracts/api.md",
+      "source_location": "L138",
+      "_origin": "ast",
+      "id": "specs_008_cabin_passenger_enhancement_contracts_api_updated_detail_response",
+      "community": 275,
+      "norm_label": "updated detail response"
+    },
+    {
+      "label": "Updated 410 Gone Recovery Object",
+      "file_type": "document",
+      "source_file": "specs/008-cabin-passenger-enhancement/contracts/api.md",
+      "source_location": "L149",
+      "_origin": "ast",
+      "id": "specs_008_cabin_passenger_enhancement_contracts_api_updated_410_gone_recovery_object",
+      "community": 275,
+      "norm_label": "updated 410 gone recovery object"
+    },
+    {
+      "label": "Error Responses \u2014 New Validation Errors",
+      "file_type": "document",
+      "source_file": "specs/008-cabin-passenger-enhancement/contracts/api.md",
+      "source_location": "L179",
+      "_origin": "ast",
+      "id": "specs_008_cabin_passenger_enhancement_contracts_api_error_responses_new_validation_errors",
+      "community": 275,
+      "norm_label": "error responses \u2014 new validation errors"
+    },
+    {
+      "label": "data-model.md",
+      "file_type": "document",
+      "source_file": "specs/008-cabin-passenger-enhancement/data-model.md",
+      "source_location": "L1",
+      "_origin": "ast",
+      "id": "specs_008_cabin_passenger_enhancement_data_model",
+      "community": 271,
+      "norm_label": "data-model.md"
+    },
+    {
+      "label": "Data Model: Cabin Class & Passenger Type Enhancement",
+      "file_type": "document",
+      "source_file": "specs/008-cabin-passenger-enhancement/data-model.md",
+      "source_location": "L1",
+      "_origin": "ast",
+      "id": "specs_008_cabin_passenger_enhancement_data_model_data_model_cabin_class_passenger_type_enhancement",
+      "community": 271,
+      "norm_label": "data model: cabin class & passenger type enhancement"
+    },
+    {
+      "label": "Modified Entities",
+      "file_type": "document",
+      "source_file": "specs/008-cabin-passenger-enhancement/data-model.md",
+      "source_location": "L6",
+      "_origin": "ast",
+      "id": "specs_008_cabin_passenger_enhancement_data_model_modified_entities",
+      "community": 271,
+      "norm_label": "modified entities"
+    },
+    {
+      "label": "FlightOffer (existing \u2014 `flight_offers`)",
+      "file_type": "document",
+      "source_file": "specs/008-cabin-passenger-enhancement/data-model.md",
+      "source_location": "L8",
+      "_origin": "ast",
+      "id": "specs_008_cabin_passenger_enhancement_data_model_flightoffer_existing_flight_offers",
+      "community": 271,
+      "norm_label": "flightoffer (existing \u2014 `flight_offers`)"
+    },
+    {
+      "label": "SearchHistory (existing \u2014 `search_history`)",
+      "file_type": "document",
+      "source_file": "specs/008-cabin-passenger-enhancement/data-model.md",
+      "source_location": "L18",
+      "_origin": "ast",
+      "id": "specs_008_cabin_passenger_enhancement_data_model_searchhistory_existing_search_history",
+      "community": 271,
+      "norm_label": "searchhistory (existing \u2014 `search_history`)"
+    },
+    {
+      "label": "Prisma Schema Changes",
+      "file_type": "document",
+      "source_file": "specs/008-cabin-passenger-enhancement/data-model.md",
+      "source_location": "L30",
+      "_origin": "ast",
+      "id": "specs_008_cabin_passenger_enhancement_data_model_prisma_schema_changes",
+      "community": 271,
+      "norm_label": "prisma schema changes"
+    },
+    {
+      "label": "DTO Changes (Not Prisma \u2014 TypeScript)",
+      "file_type": "document",
+      "source_file": "specs/008-cabin-passenger-enhancement/data-model.md",
+      "source_location": "L87",
+      "_origin": "ast",
+      "id": "specs_008_cabin_passenger_enhancement_data_model_dto_changes_not_prisma_typescript",
+      "community": 271,
+      "norm_label": "dto changes (not prisma \u2014 typescript)"
+    },
+    {
+      "label": "FlightSearchRequestDto",
+      "file_type": "document",
+      "source_file": "specs/008-cabin-passenger-enhancement/data-model.md",
+      "source_location": "L89",
+      "_origin": "ast",
+      "id": "specs_008_cabin_passenger_enhancement_data_model_flightsearchrequestdto",
+      "community": 271,
+      "norm_label": "flightsearchrequestdto"
+    },
+    {
+      "label": "FlightSegmentDto \u2014 additions",
+      "file_type": "document",
+      "source_file": "specs/008-cabin-passenger-enhancement/data-model.md",
+      "source_location": "L112",
+      "_origin": "ast",
+      "id": "specs_008_cabin_passenger_enhancement_data_model_flightsegmentdto_additions",
+      "community": 271,
+      "norm_label": "flightsegmentdto \u2014 additions"
+    },
+    {
+      "label": "FlightOfferDto \u2014 additions",
+      "file_type": "document",
+      "source_file": "specs/008-cabin-passenger-enhancement/data-model.md",
+      "source_location": "L121",
+      "_origin": "ast",
+      "id": "specs_008_cabin_passenger_enhancement_data_model_flightofferdto_additions",
+      "community": 271,
+      "norm_label": "flightofferdto \u2014 additions"
+    },
+    {
+      "label": "FlightDetailResponseDto \u2014 additions",
+      "file_type": "document",
+      "source_file": "specs/008-cabin-passenger-enhancement/data-model.md",
+      "source_location": "L140",
+      "_origin": "ast",
+      "id": "specs_008_cabin_passenger_enhancement_data_model_flightdetailresponsedto_additions",
+      "community": 271,
+      "norm_label": "flightdetailresponsedto \u2014 additions"
+    },
+    {
+      "label": "410 Gone Recovery Object \u2014 additions",
+      "file_type": "document",
+      "source_file": "specs/008-cabin-passenger-enhancement/data-model.md",
+      "source_location": "L144",
+      "_origin": "ast",
+      "id": "specs_008_cabin_passenger_enhancement_data_model_410_gone_recovery_object_additions",
+      "community": 271,
+      "norm_label": "410 gone recovery object \u2014 additions"
+    },
+    {
+      "label": "Cache Key Shape",
+      "file_type": "document",
+      "source_file": "specs/008-cabin-passenger-enhancement/data-model.md",
+      "source_location": "L161",
+      "_origin": "ast",
+      "id": "specs_008_cabin_passenger_enhancement_data_model_cache_key_shape",
+      "community": 271,
+      "norm_label": "cache key shape"
+    },
+    {
+      "label": "State Transitions",
+      "file_type": "document",
+      "source_file": "specs/008-cabin-passenger-enhancement/data-model.md",
+      "source_location": "L180",
+      "_origin": "ast",
+      "id": "specs_008_cabin_passenger_enhancement_data_model_state_transitions",
+      "community": 271,
+      "norm_label": "state transitions"
+    },
+    {
+      "label": "Migration Strategy",
+      "file_type": "document",
+      "source_file": "specs/008-cabin-passenger-enhancement/data-model.md",
+      "source_location": "L184",
+      "_origin": "ast",
+      "id": "specs_008_cabin_passenger_enhancement_data_model_migration_strategy",
+      "community": 271,
+      "norm_label": "migration strategy"
+    },
+    {
+      "label": "plan.md",
+      "file_type": "document",
+      "source_file": "specs/008-cabin-passenger-enhancement/plan.md",
+      "source_location": "L1",
+      "_origin": "ast",
+      "id": "specs_008_cabin_passenger_enhancement_plan",
+      "community": 39,
+      "norm_label": "plan.md"
+    },
+    {
+      "label": "Implementation Plan: Cabin Class & Passenger Type Enhancement",
+      "file_type": "document",
+      "source_file": "specs/008-cabin-passenger-enhancement/plan.md",
+      "source_location": "L1",
+      "_origin": "ast",
+      "id": "specs_008_cabin_passenger_enhancement_plan_implementation_plan_cabin_class_passenger_type_enhancement",
+      "community": 39,
+      "norm_label": "implementation plan: cabin class & passenger type enhancement"
+    },
+    {
+      "label": "Summary",
+      "file_type": "document",
+      "source_file": "specs/008-cabin-passenger-enhancement/plan.md",
+      "source_location": "L9",
+      "_origin": "ast",
+      "id": "specs_008_cabin_passenger_enhancement_plan_summary",
+      "community": 39,
+      "norm_label": "summary"
+    },
+    {
+      "label": "Technical Context",
+      "file_type": "document",
+      "source_file": "specs/008-cabin-passenger-enhancement/plan.md",
+      "source_location": "L13",
+      "_origin": "ast",
+      "id": "specs_008_cabin_passenger_enhancement_plan_technical_context",
+      "community": 39,
+      "norm_label": "technical context"
+    },
+    {
+      "label": "Constitution Check",
+      "file_type": "document",
+      "source_file": "specs/008-cabin-passenger-enhancement/plan.md",
+      "source_location": "L29",
+      "_origin": "ast",
+      "id": "specs_008_cabin_passenger_enhancement_plan_constitution_check",
+      "community": 39,
+      "norm_label": "constitution check"
+    },
+    {
+      "label": "Project Structure",
+      "file_type": "document",
+      "source_file": "specs/008-cabin-passenger-enhancement/plan.md",
+      "source_location": "L39",
+      "_origin": "ast",
+      "id": "specs_008_cabin_passenger_enhancement_plan_project_structure",
+      "community": 39,
+      "norm_label": "project structure"
+    },
+    {
+      "label": "Documentation (this feature)",
+      "file_type": "document",
+      "source_file": "specs/008-cabin-passenger-enhancement/plan.md",
+      "source_location": "L41",
+      "_origin": "ast",
+      "id": "specs_008_cabin_passenger_enhancement_plan_documentation_this_feature",
+      "community": 39,
+      "norm_label": "documentation (this feature)"
+    },
+    {
+      "label": "Source Code Changes",
+      "file_type": "document",
+      "source_file": "specs/008-cabin-passenger-enhancement/plan.md",
+      "source_location": "L54",
+      "_origin": "ast",
+      "id": "specs_008_cabin_passenger_enhancement_plan_source_code_changes",
+      "community": 39,
+      "norm_label": "source code changes"
+    },
+    {
+      "label": "Implementation Phases",
+      "file_type": "document",
+      "source_file": "specs/008-cabin-passenger-enhancement/plan.md",
+      "source_location": "L89",
+      "_origin": "ast",
+      "id": "specs_008_cabin_passenger_enhancement_plan_implementation_phases",
+      "community": 39,
+      "norm_label": "implementation phases"
+    },
+    {
+      "label": "Phase 1: Database Schema Migration",
+      "file_type": "document",
+      "source_file": "specs/008-cabin-passenger-enhancement/plan.md",
+      "source_location": "L91",
+      "_origin": "ast",
+      "id": "specs_008_cabin_passenger_enhancement_plan_phase_1_database_schema_migration",
+      "community": 39,
+      "norm_label": "phase 1: database schema migration"
+    },
+    {
+      "label": "Phase 2: DuffelService \u2014 Cabin Class & Passenger Mapper",
+      "file_type": "document",
+      "source_file": "specs/008-cabin-passenger-enhancement/plan.md",
+      "source_location": "L107",
+      "_origin": "ast",
+      "id": "specs_008_cabin_passenger_enhancement_plan_phase_2_duffelservice_cabin_class_passenger_mapper",
+      "community": 39,
+      "norm_label": "phase 2: duffelservice \u2014 cabin class & passenger mapper"
+    },
+    {
+      "label": "Phase 3: FlightsModule \u2014 Cabin Match Classification & DTOs",
+      "file_type": "document",
+      "source_file": "specs/008-cabin-passenger-enhancement/plan.md",
+      "source_location": "L126",
+      "_origin": "ast",
+      "id": "specs_008_cabin_passenger_enhancement_plan_phase_3_flightsmodule_cabin_match_classification_dtos",
+      "community": 39,
+      "norm_label": "phase 3: flightsmodule \u2014 cabin match classification & dtos"
+    },
+    {
+      "label": "Phase 4: Agent Gateway \u2014 Honest Degradation",
+      "file_type": "document",
+      "source_file": "specs/008-cabin-passenger-enhancement/plan.md",
+      "source_location": "L151",
+      "_origin": "ast",
+      "id": "specs_008_cabin_passenger_enhancement_plan_phase_4_agent_gateway_honest_degradation",
+      "community": 39,
+      "norm_label": "phase 4: agent gateway \u2014 honest degradation"
+    },
+    {
+      "label": "Phase 5: Frontend Integration",
+      "file_type": "document",
+      "source_file": "specs/008-cabin-passenger-enhancement/plan.md",
+      "source_location": "L169",
+      "_origin": "ast",
+      "id": "specs_008_cabin_passenger_enhancement_plan_phase_5_frontend_integration",
+      "community": 39,
+      "norm_label": "phase 5: frontend integration"
+    },
+    {
+      "label": "Phase 6: E2E Testing & Verification",
+      "file_type": "document",
+      "source_file": "specs/008-cabin-passenger-enhancement/plan.md",
+      "source_location": "L190",
+      "_origin": "ast",
+      "id": "specs_008_cabin_passenger_enhancement_plan_phase_6_e2e_testing_verification",
+      "community": 39,
+      "norm_label": "phase 6: e2e testing & verification"
+    },
+    {
+      "label": "Environment Variables",
+      "file_type": "document",
+      "source_file": "specs/008-cabin-passenger-enhancement/plan.md",
+      "source_location": "L214",
+      "_origin": "ast",
+      "id": "specs_008_cabin_passenger_enhancement_plan_environment_variables",
+      "community": 39,
+      "norm_label": "environment variables"
+    },
+    {
+      "label": "Verification Plan",
+      "file_type": "document",
+      "source_file": "specs/008-cabin-passenger-enhancement/plan.md",
+      "source_location": "L223",
+      "_origin": "ast",
+      "id": "specs_008_cabin_passenger_enhancement_plan_verification_plan",
+      "community": 39,
+      "norm_label": "verification plan"
+    },
+    {
+      "label": "Automated Tests",
+      "file_type": "document",
+      "source_file": "specs/008-cabin-passenger-enhancement/plan.md",
+      "source_location": "L225",
+      "_origin": "ast",
+      "id": "specs_008_cabin_passenger_enhancement_plan_automated_tests",
+      "community": 39,
+      "norm_label": "automated tests"
+    },
+    {
+      "label": "Manual Verification",
+      "file_type": "document",
+      "source_file": "specs/008-cabin-passenger-enhancement/plan.md",
+      "source_location": "L238",
+      "_origin": "ast",
+      "id": "specs_008_cabin_passenger_enhancement_plan_manual_verification",
+      "community": 39,
+      "norm_label": "manual verification"
+    },
+    {
+      "label": "quickstart.md",
+      "file_type": "document",
+      "source_file": "specs/008-cabin-passenger-enhancement/quickstart.md",
+      "source_location": "L1",
+      "_origin": "ast",
+      "id": "specs_008_cabin_passenger_enhancement_quickstart",
+      "community": 262,
+      "norm_label": "quickstart.md"
+    },
+    {
+      "label": "Quickstart: Cabin Class & Passenger Type Enhancement",
+      "file_type": "document",
+      "source_file": "specs/008-cabin-passenger-enhancement/quickstart.md",
+      "source_location": "L1",
+      "_origin": "ast",
+      "id": "specs_008_cabin_passenger_enhancement_quickstart_quickstart_cabin_class_passenger_type_enhancement",
+      "community": 262,
+      "norm_label": "quickstart: cabin class & passenger type enhancement"
+    },
+    {
+      "label": "Prerequisites",
+      "file_type": "document",
+      "source_file": "specs/008-cabin-passenger-enhancement/quickstart.md",
+      "source_location": "L6",
+      "_origin": "ast",
+      "id": "specs_008_cabin_passenger_enhancement_quickstart_prerequisites",
+      "community": 262,
+      "norm_label": "prerequisites"
+    },
+    {
+      "label": "Setup",
+      "file_type": "document",
+      "source_file": "specs/008-cabin-passenger-enhancement/quickstart.md",
+      "source_location": "L13",
+      "_origin": "ast",
+      "id": "specs_008_cabin_passenger_enhancement_quickstart_setup",
+      "community": 262,
+      "norm_label": "setup"
+    },
+    {
+      "label": "Validation Scenarios",
+      "file_type": "document",
+      "source_file": "specs/008-cabin-passenger-enhancement/quickstart.md",
+      "source_location": "L25",
+      "_origin": "ast",
+      "id": "specs_008_cabin_passenger_enhancement_quickstart_validation_scenarios",
+      "community": 262,
+      "norm_label": "validation scenarios"
+    },
+    {
+      "label": "Scenario 1: Cabin Class Selection \u2014 Economy (Baseline)",
+      "file_type": "document",
+      "source_file": "specs/008-cabin-passenger-enhancement/quickstart.md",
+      "source_location": "L27",
+      "_origin": "ast",
+      "id": "specs_008_cabin_passenger_enhancement_quickstart_scenario_1_cabin_class_selection_economy_baseline",
+      "community": 262,
+      "norm_label": "scenario 1: cabin class selection \u2014 economy (baseline)"
+    },
+    {
+      "label": "Scenario 2: Cabin Class Selection \u2014 Business",
+      "file_type": "document",
+      "source_file": "specs/008-cabin-passenger-enhancement/quickstart.md",
+      "source_location": "L33",
+      "_origin": "ast",
+      "id": "specs_008_cabin_passenger_enhancement_quickstart_scenario_2_cabin_class_selection_business",
+      "community": 262,
+      "norm_label": "scenario 2: cabin class selection \u2014 business"
+    },
+    {
+      "label": "Scenario 3: Mixed-Cabin Detection",
+      "file_type": "document",
+      "source_file": "specs/008-cabin-passenger-enhancement/quickstart.md",
+      "source_location": "L39",
+      "_origin": "ast",
+      "id": "specs_008_cabin_passenger_enhancement_quickstart_scenario_3_mixed_cabin_detection",
+      "community": 262,
+      "norm_label": "scenario 3: mixed-cabin detection"
+    },
+    {
+      "label": "Scenario 4: Passenger Type Breakdown",
+      "file_type": "document",
+      "source_file": "specs/008-cabin-passenger-enhancement/quickstart.md",
+      "source_location": "L45",
+      "_origin": "ast",
+      "id": "specs_008_cabin_passenger_enhancement_quickstart_scenario_4_passenger_type_breakdown",
+      "community": 262,
+      "norm_label": "scenario 4: passenger type breakdown"
+    },
+    {
+      "label": "Scenario 5: Passenger Validation \u2014 Infants > Adults",
+      "file_type": "document",
+      "source_file": "specs/008-cabin-passenger-enhancement/quickstart.md",
+      "source_location": "L51",
+      "_origin": "ast",
+      "id": "specs_008_cabin_passenger_enhancement_quickstart_scenario_5_passenger_validation_infants_adults",
+      "community": 262,
+      "norm_label": "scenario 5: passenger validation \u2014 infants > adults"
+    },
+    {
+      "label": "Scenario 6: Passenger Validation \u2014 Total > 9",
+      "file_type": "document",
+      "source_file": "specs/008-cabin-passenger-enhancement/quickstart.md",
+      "source_location": "L57",
+      "_origin": "ast",
+      "id": "specs_008_cabin_passenger_enhancement_quickstart_scenario_6_passenger_validation_total_9",
+      "community": 262,
+      "norm_label": "scenario 6: passenger validation \u2014 total > 9"
+    },
+    {
+      "label": "Scenario 7: Cache Separation by Cabin Class",
+      "file_type": "document",
+      "source_file": "specs/008-cabin-passenger-enhancement/quickstart.md",
+      "source_location": "L63",
+      "_origin": "ast",
+      "id": "specs_008_cabin_passenger_enhancement_quickstart_scenario_7_cache_separation_by_cabin_class",
+      "community": 262,
+      "norm_label": "scenario 7: cache separation by cabin class"
+    },
+    {
+      "label": "Scenario 8: 410 Recovery with Cabin/Passenger Data",
+      "file_type": "document",
+      "source_file": "specs/008-cabin-passenger-enhancement/quickstart.md",
+      "source_location": "L69",
+      "_origin": "ast",
+      "id": "specs_008_cabin_passenger_enhancement_quickstart_scenario_8_410_recovery_with_cabin_passenger_data",
+      "community": 262,
+      "norm_label": "scenario 8: 410 recovery with cabin/passenger data"
+    },
+    {
+      "label": "Scenario 9: Agent Gateway \u2014 Keyword Detection",
+      "file_type": "document",
+      "source_file": "specs/008-cabin-passenger-enhancement/quickstart.md",
+      "source_location": "L75",
+      "_origin": "ast",
+      "id": "specs_008_cabin_passenger_enhancement_quickstart_scenario_9_agent_gateway_keyword_detection",
+      "community": 262,
+      "norm_label": "scenario 9: agent gateway \u2014 keyword detection"
+    },
+    {
+      "label": "Scenario 10: Agent Gateway \u2014 Normal Search (No Keywords)",
+      "file_type": "document",
+      "source_file": "specs/008-cabin-passenger-enhancement/quickstart.md",
+      "source_location": "L81",
+      "_origin": "ast",
+      "id": "specs_008_cabin_passenger_enhancement_quickstart_scenario_10_agent_gateway_normal_search_no_keywords",
+      "community": 262,
+      "norm_label": "scenario 10: agent gateway \u2014 normal search (no keywords)"
+    },
+    {
+      "label": "Automated Test Commands",
+      "file_type": "document",
+      "source_file": "specs/008-cabin-passenger-enhancement/quickstart.md",
+      "source_location": "L89",
+      "_origin": "ast",
+      "id": "specs_008_cabin_passenger_enhancement_quickstart_automated_test_commands",
+      "community": 262,
+      "norm_label": "automated test commands"
+    },
+    {
+      "label": "research.md",
+      "file_type": "document",
+      "source_file": "specs/008-cabin-passenger-enhancement/research.md",
+      "source_location": "L1",
+      "_origin": "ast",
+      "id": "specs_008_cabin_passenger_enhancement_research",
+      "community": 281,
+      "norm_label": "research.md"
+    },
+    {
+      "label": "Research: Cabin Class & Passenger Type Enhancement",
+      "file_type": "document",
+      "source_file": "specs/008-cabin-passenger-enhancement/research.md",
+      "source_location": "L1",
+      "_origin": "ast",
+      "id": "specs_008_cabin_passenger_enhancement_research_research_cabin_class_passenger_type_enhancement",
+      "community": 281,
+      "norm_label": "research: cabin class & passenger type enhancement"
+    },
+    {
+      "label": "R0: Cabin Class \u2014 Request-Level vs Post-Filter",
+      "file_type": "document",
+      "source_file": "specs/008-cabin-passenger-enhancement/research.md",
+      "source_location": "L7",
+      "_origin": "ast",
+      "id": "specs_008_cabin_passenger_enhancement_research_r0_cabin_class_request_level_vs_post_filter",
+      "community": 281,
+      "norm_label": "r0: cabin class \u2014 request-level vs post-filter"
+    },
+    {
+      "label": "R1: Mixed-Cabin Offer Handling",
+      "file_type": "document",
+      "source_file": "specs/008-cabin-passenger-enhancement/research.md",
+      "source_location": "L18",
+      "_origin": "ast",
+      "id": "specs_008_cabin_passenger_enhancement_research_r1_mixed_cabin_offer_handling",
+      "community": 281,
+      "norm_label": "r1: mixed-cabin offer handling"
+    },
+    {
+      "label": "R2: Three-Tier Cabin Match Classification",
+      "file_type": "document",
+      "source_file": "specs/008-cabin-passenger-enhancement/research.md",
+      "source_location": "L30",
+      "_origin": "ast",
+      "id": "specs_008_cabin_passenger_enhancement_research_r2_three_tier_cabin_match_classification",
+      "community": 281,
+      "norm_label": "r2: three-tier cabin match classification"
+    },
+    {
+      "label": "R3: Passenger Type DTO \u2014 Flat Fields",
+      "file_type": "document",
+      "source_file": "specs/008-cabin-passenger-enhancement/research.md",
+      "source_location": "L51",
+      "_origin": "ast",
+      "id": "specs_008_cabin_passenger_enhancement_research_r3_passenger_type_dto_flat_fields",
+      "community": 281,
+      "norm_label": "r3: passenger type dto \u2014 flat fields"
+    },
+    {
+      "label": "R4: Isolated Passenger Mapper",
+      "file_type": "document",
+      "source_file": "specs/008-cabin-passenger-enhancement/research.md",
+      "source_location": "L62",
+      "_origin": "ast",
+      "id": "specs_008_cabin_passenger_enhancement_research_r4_isolated_passenger_mapper",
+      "community": 281,
+      "norm_label": "r4: isolated passenger mapper"
+    },
+    {
+      "label": "R5: Cache Key Expansion",
+      "file_type": "document",
+      "source_file": "specs/008-cabin-passenger-enhancement/research.md",
+      "source_location": "L70",
+      "_origin": "ast",
+      "id": "specs_008_cabin_passenger_enhancement_research_r5_cache_key_expansion",
+      "community": 281,
+      "norm_label": "r5: cache key expansion"
+    },
+    {
+      "label": "R6: Schema Migration \u2014 Flat Columns",
+      "file_type": "document",
+      "source_file": "specs/008-cabin-passenger-enhancement/research.md",
+      "source_location": "L82",
+      "_origin": "ast",
+      "id": "specs_008_cabin_passenger_enhancement_research_r6_schema_migration_flat_columns",
+      "community": 281,
+      "norm_label": "r6: schema migration \u2014 flat columns"
+    },
+    {
+      "label": "R7: Agent Gateway \u2014 Honest Degradation",
+      "file_type": "document",
+      "source_file": "specs/008-cabin-passenger-enhancement/research.md",
+      "source_location": "L94",
+      "_origin": "ast",
+      "id": "specs_008_cabin_passenger_enhancement_research_r7_agent_gateway_honest_degradation",
+      "community": 281,
+      "norm_label": "r7: agent gateway \u2014 honest degradation"
+    },
+    {
+      "label": "spec.md",
+      "file_type": "document",
+      "source_file": "specs/008-cabin-passenger-enhancement/spec.md",
+      "source_location": "L1",
+      "_origin": "ast",
+      "id": "specs_008_cabin_passenger_enhancement_spec",
+      "community": 279,
+      "norm_label": "spec.md"
+    },
+    {
+      "label": "Feature Specification: Cabin Class & Passenger Type Enhancement",
+      "file_type": "document",
+      "source_file": "specs/008-cabin-passenger-enhancement/spec.md",
+      "source_location": "L1",
+      "_origin": "ast",
+      "id": "specs_008_cabin_passenger_enhancement_spec_feature_specification_cabin_class_passenger_type_enhancement",
+      "community": 279,
+      "norm_label": "feature specification: cabin class & passenger type enhancement"
+    },
+    {
+      "label": "User Scenarios & Testing *(mandatory)*",
+      "file_type": "document",
+      "source_file": "specs/008-cabin-passenger-enhancement/spec.md",
+      "source_location": "L11",
+      "_origin": "ast",
+      "id": "specs_008_cabin_passenger_enhancement_spec_user_scenarios_testing_mandatory",
+      "community": 279,
+      "norm_label": "user scenarios & testing *(mandatory)*"
+    },
+    {
+      "label": "User Story 1 - Select Cabin Class for Flight Search (Priority: P1)",
+      "file_type": "document",
+      "source_file": "specs/008-cabin-passenger-enhancement/spec.md",
+      "source_location": "L13",
+      "_origin": "ast",
+      "id": "specs_008_cabin_passenger_enhancement_spec_user_story_1_select_cabin_class_for_flight_search_priority_p1",
+      "community": 279,
+      "norm_label": "user story 1 - select cabin class for flight search (priority: p1)"
+    },
+    {
+      "label": "User Story 2 - Specify Passenger Types (Priority: P1)",
+      "file_type": "document",
+      "source_file": "specs/008-cabin-passenger-enhancement/spec.md",
+      "source_location": "L35",
+      "_origin": "ast",
+      "id": "specs_008_cabin_passenger_enhancement_spec_user_story_2_specify_passenger_types_priority_p1",
+      "community": 279,
+      "norm_label": "user story 2 - specify passenger types (priority: p1)"
+    },
+    {
+      "label": "User Story 3 - Agent Gateway Honest Degradation (Priority: P2)",
+      "file_type": "document",
+      "source_file": "specs/008-cabin-passenger-enhancement/spec.md",
+      "source_location": "L55",
+      "_origin": "ast",
+      "id": "specs_008_cabin_passenger_enhancement_spec_user_story_3_agent_gateway_honest_degradation_priority_p2",
+      "community": 279,
+      "norm_label": "user story 3 - agent gateway honest degradation (priority: p2)"
+    },
+    {
+      "label": "Edge Cases",
+      "file_type": "document",
+      "source_file": "specs/008-cabin-passenger-enhancement/spec.md",
+      "source_location": "L73",
+      "_origin": "ast",
+      "id": "specs_008_cabin_passenger_enhancement_spec_edge_cases",
+      "community": 279,
+      "norm_label": "edge cases"
+    },
+    {
+      "label": "Requirements *(mandatory)*",
+      "file_type": "document",
+      "source_file": "specs/008-cabin-passenger-enhancement/spec.md",
+      "source_location": "L81",
+      "_origin": "ast",
+      "id": "specs_008_cabin_passenger_enhancement_spec_requirements_mandatory",
+      "community": 279,
+      "norm_label": "requirements *(mandatory)*"
+    },
+    {
+      "label": "Functional Requirements",
+      "file_type": "document",
+      "source_file": "specs/008-cabin-passenger-enhancement/spec.md",
+      "source_location": "L83",
+      "_origin": "ast",
+      "id": "specs_008_cabin_passenger_enhancement_spec_functional_requirements",
+      "community": 279,
+      "norm_label": "functional requirements"
+    },
+    {
+      "label": "Key Entities",
+      "file_type": "document",
+      "source_file": "specs/008-cabin-passenger-enhancement/spec.md",
+      "source_location": "L100",
+      "_origin": "ast",
+      "id": "specs_008_cabin_passenger_enhancement_spec_key_entities",
+      "community": 279,
+      "norm_label": "key entities"
+    },
+    {
+      "label": "Success Criteria *(mandatory)*",
+      "file_type": "document",
+      "source_file": "specs/008-cabin-passenger-enhancement/spec.md",
+      "source_location": "L106",
+      "_origin": "ast",
+      "id": "specs_008_cabin_passenger_enhancement_spec_success_criteria_mandatory",
+      "community": 279,
+      "norm_label": "success criteria *(mandatory)*"
+    },
+    {
+      "label": "Measurable Outcomes",
+      "file_type": "document",
+      "source_file": "specs/008-cabin-passenger-enhancement/spec.md",
+      "source_location": "L108",
+      "_origin": "ast",
+      "id": "specs_008_cabin_passenger_enhancement_spec_measurable_outcomes",
+      "community": 279,
+      "norm_label": "measurable outcomes"
+    },
+    {
+      "label": "Assumptions",
+      "file_type": "document",
+      "source_file": "specs/008-cabin-passenger-enhancement/spec.md",
+      "source_location": "L118",
+      "_origin": "ast",
+      "id": "specs_008_cabin_passenger_enhancement_spec_assumptions",
+      "community": 279,
+      "norm_label": "assumptions"
+    },
+    {
+      "label": "tasks.md",
+      "file_type": "document",
+      "source_file": "specs/008-cabin-passenger-enhancement/tasks.md",
+      "source_location": "L1",
+      "_origin": "ast",
+      "id": "specs_008_cabin_passenger_enhancement_tasks",
+      "community": 272,
+      "norm_label": "tasks.md"
+    },
+    {
+      "label": "Tasks: Cabin Class & Passenger Type Enhancement",
+      "file_type": "document",
+      "source_file": "specs/008-cabin-passenger-enhancement/tasks.md",
+      "source_location": "L1",
+      "_origin": "ast",
+      "id": "specs_008_cabin_passenger_enhancement_tasks_tasks_cabin_class_passenger_type_enhancement",
+      "community": 272,
+      "norm_label": "tasks: cabin class & passenger type enhancement"
+    },
+    {
+      "label": "Format: `[ID] [P?] [Story] Description`",
+      "file_type": "document",
+      "source_file": "specs/008-cabin-passenger-enhancement/tasks.md",
+      "source_location": "L11",
+      "_origin": "ast",
+      "id": "specs_008_cabin_passenger_enhancement_tasks_format_id_p_story_description",
+      "community": 272,
+      "norm_label": "format: `[id] [p?] [story] description`"
+    },
+    {
+      "label": "Phase 1: Setup (Shared Infrastructure)",
+      "file_type": "document",
+      "source_file": "specs/008-cabin-passenger-enhancement/tasks.md",
+      "source_location": "L19",
+      "_origin": "ast",
+      "id": "specs_008_cabin_passenger_enhancement_tasks_phase_1_setup_shared_infrastructure",
+      "community": 272,
+      "norm_label": "phase 1: setup (shared infrastructure)"
+    },
+    {
+      "label": "Phase 2: Foundational (Blocking Prerequisites)",
+      "file_type": "document",
+      "source_file": "specs/008-cabin-passenger-enhancement/tasks.md",
+      "source_location": "L28",
+      "_origin": "ast",
+      "id": "specs_008_cabin_passenger_enhancement_tasks_phase_2_foundational_blocking_prerequisites",
+      "community": 272,
+      "norm_label": "phase 2: foundational (blocking prerequisites)"
+    },
+    {
+      "label": "Phase 3: User Story 1 - Select Cabin Class for Flight Search (Priority: P1) \ud83c\udfaf MVP",
+      "file_type": "document",
+      "source_file": "specs/008-cabin-passenger-enhancement/tasks.md",
+      "source_location": "L42",
+      "_origin": "ast",
+      "id": "specs_008_cabin_passenger_enhancement_tasks_phase_3_user_story_1_select_cabin_class_for_flight_search_priority_p1_mvp",
+      "community": 272,
+      "norm_label": "phase 3: user story 1 - select cabin class for flight search (priority: p1) \ud83c\udfaf mvp"
+    },
+    {
+      "label": "Implementation for User Story 1",
+      "file_type": "document",
+      "source_file": "specs/008-cabin-passenger-enhancement/tasks.md",
+      "source_location": "L48",
+      "_origin": "ast",
+      "id": "specs_008_cabin_passenger_enhancement_tasks_implementation_for_user_story_1",
+      "community": 272,
+      "norm_label": "implementation for user story 1"
+    },
+    {
+      "label": "Phase 4: User Story 2 - Specify Passenger Types (Priority: P1)",
+      "file_type": "document",
+      "source_file": "specs/008-cabin-passenger-enhancement/tasks.md",
+      "source_location": "L72",
+      "_origin": "ast",
+      "id": "specs_008_cabin_passenger_enhancement_tasks_phase_4_user_story_2_specify_passenger_types_priority_p1",
+      "community": 272,
+      "norm_label": "phase 4: user story 2 - specify passenger types (priority: p1)"
+    },
+    {
+      "label": "Implementation for User Story 2",
+      "file_type": "document",
+      "source_file": "specs/008-cabin-passenger-enhancement/tasks.md",
+      "source_location": "L78",
+      "_origin": "ast",
+      "id": "specs_008_cabin_passenger_enhancement_tasks_implementation_for_user_story_2",
+      "community": 272,
+      "norm_label": "implementation for user story 2"
+    },
+    {
+      "label": "Phase 5: User Story 3 - Agent Gateway Honest Degradation (Priority: P2)",
+      "file_type": "document",
+      "source_file": "specs/008-cabin-passenger-enhancement/tasks.md",
+      "source_location": "L85",
+      "_origin": "ast",
+      "id": "specs_008_cabin_passenger_enhancement_tasks_phase_5_user_story_3_agent_gateway_honest_degradation_priority_p2",
+      "community": 272,
+      "norm_label": "phase 5: user story 3 - agent gateway honest degradation (priority: p2)"
+    },
+    {
+      "label": "Implementation for User Story 3",
+      "file_type": "document",
+      "source_file": "specs/008-cabin-passenger-enhancement/tasks.md",
+      "source_location": "L91",
+      "_origin": "ast",
+      "id": "specs_008_cabin_passenger_enhancement_tasks_implementation_for_user_story_3",
+      "community": 272,
+      "norm_label": "implementation for user story 3"
+    },
+    {
+      "label": "Phase 6: Polish & Cross-Cutting Concerns",
+      "file_type": "document",
+      "source_file": "specs/008-cabin-passenger-enhancement/tasks.md",
+      "source_location": "L99",
+      "_origin": "ast",
+      "id": "specs_008_cabin_passenger_enhancement_tasks_phase_6_polish_cross_cutting_concerns",
+      "community": 272,
+      "norm_label": "phase 6: polish & cross-cutting concerns"
+    },
+    {
+      "label": "Phase 7: E2E Testing & Verification",
+      "file_type": "document",
+      "source_file": "specs/008-cabin-passenger-enhancement/tasks.md",
+      "source_location": "L108",
+      "_origin": "ast",
+      "id": "specs_008_cabin_passenger_enhancement_tasks_phase_7_e2e_testing_verification",
+      "community": 272,
+      "norm_label": "phase 7: e2e testing & verification"
+    },
+    {
+      "label": "Dependencies & Execution Order",
+      "file_type": "document",
+      "source_file": "specs/008-cabin-passenger-enhancement/tasks.md",
+      "source_location": "L118",
+      "_origin": "ast",
+      "id": "specs_008_cabin_passenger_enhancement_tasks_dependencies_execution_order",
+      "community": 272,
+      "norm_label": "dependencies & execution order"
+    },
+    {
+      "label": "Phase Dependencies",
+      "file_type": "document",
+      "source_file": "specs/008-cabin-passenger-enhancement/tasks.md",
+      "source_location": "L120",
+      "_origin": "ast",
+      "id": "specs_008_cabin_passenger_enhancement_tasks_phase_dependencies",
+      "community": 272,
+      "norm_label": "phase dependencies"
     },
     {
       "label": "Variant C: Modern Split Refined",
@@ -40598,26 +41798,6 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "parse_comments.js",
-      "source_location": "L2",
-      "weight": 1.0,
-      "source": "parse_comments",
-      "target": "parse_comments_content",
-      "confidence_score": 1.0
-    },
-    {
-      "relation": "contains",
-      "confidence": "EXTRACTED",
-      "source_file": "parse_comments.js",
-      "source_location": "L3",
-      "weight": 1.0,
-      "source": "parse_comments",
-      "target": "parse_comments_data",
-      "confidence_score": 1.0
-    },
-    {
-      "relation": "contains",
-      "confidence": "EXTRACTED",
-      "source_file": "parse_comments.js",
       "source_location": "L1",
       "weight": 1.0,
       "source": "parse_comments",
@@ -40628,7 +41808,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "parse_comments.js",
-      "source_location": "L7",
+      "source_location": "L36",
       "weight": 1.0,
       "source": "parse_comments",
       "target": "parse_comments_unresolved",
@@ -42822,6 +44002,196 @@
       "weight": 1.0,
       "source": "research_agent_tool_calling_architecture_agent_tool_calling_architecture_grilling_session_decisions",
       "target": "research_agent_tool_calling_architecture_summary_architecture_at_a_glance",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "research/cabin-passenger-enhancement-decisions.md",
+      "source_location": "L1",
+      "weight": 1.0,
+      "source": "research_cabin_passenger_enhancement_decisions",
+      "target": "research_cabin_passenger_enhancement_decisions_cabin_class_passenger_type_enhancement_grilling_session_decisions",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "research/cabin-passenger-enhancement-decisions.md",
+      "source_location": "L9",
+      "weight": 1.0,
+      "source": "research_cabin_passenger_enhancement_decisions_cabin_class_passenger_type_enhancement_grilling_session_decisions",
+      "target": "research_cabin_passenger_enhancement_decisions_context",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "research/cabin-passenger-enhancement-decisions.md",
+      "source_location": "L24",
+      "weight": 1.0,
+      "source": "research_cabin_passenger_enhancement_decisions_cabin_class_passenger_type_enhancement_grilling_session_decisions",
+      "target": "research_cabin_passenger_enhancement_decisions_d1_cabin_class_strategy",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "research/cabin-passenger-enhancement-decisions.md",
+      "source_location": "L35",
+      "weight": 1.0,
+      "source": "research_cabin_passenger_enhancement_decisions_cabin_class_passenger_type_enhancement_grilling_session_decisions",
+      "target": "research_cabin_passenger_enhancement_decisions_d2_mixed_cabin_validation",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "research/cabin-passenger-enhancement-decisions.md",
+      "source_location": "L47",
+      "weight": 1.0,
+      "source": "research_cabin_passenger_enhancement_decisions_cabin_class_passenger_type_enhancement_grilling_session_decisions",
+      "target": "research_cabin_passenger_enhancement_decisions_d3_three_tier_cabin_match_status",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "research/cabin-passenger-enhancement-decisions.md",
+      "source_location": "L68",
+      "weight": 1.0,
+      "source": "research_cabin_passenger_enhancement_decisions_cabin_class_passenger_type_enhancement_grilling_session_decisions",
+      "target": "research_cabin_passenger_enhancement_decisions_d4_cabin_mismatch_data_shape",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "research/cabin-passenger-enhancement-decisions.md",
+      "source_location": "L96",
+      "weight": 1.0,
+      "source": "research_cabin_passenger_enhancement_decisions_cabin_class_passenger_type_enhancement_grilling_session_decisions",
+      "target": "research_cabin_passenger_enhancement_decisions_d5_passenger_type_dto_shape",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "research/cabin-passenger-enhancement-decisions.md",
+      "source_location": "L116",
+      "weight": 1.0,
+      "source": "research_cabin_passenger_enhancement_decisions_cabin_class_passenger_type_enhancement_grilling_session_decisions",
+      "target": "research_cabin_passenger_enhancement_decisions_d6_isolated_passenger_mapper_in_duffelservice",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "research/cabin-passenger-enhancement-decisions.md",
+      "source_location": "L135",
+      "weight": 1.0,
+      "source": "research_cabin_passenger_enhancement_decisions_cabin_class_passenger_type_enhancement_grilling_session_decisions",
+      "target": "research_cabin_passenger_enhancement_decisions_d7_cache_key_shape",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "research/cabin-passenger-enhancement-decisions.md",
+      "source_location": "L152",
+      "weight": 1.0,
+      "source": "research_cabin_passenger_enhancement_decisions_cabin_class_passenger_type_enhancement_grilling_session_decisions",
+      "target": "research_cabin_passenger_enhancement_decisions_d8_database_schema_flat_columns",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "research/cabin-passenger-enhancement-decisions.md",
+      "source_location": "L169",
+      "weight": 1.0,
+      "source": "research_cabin_passenger_enhancement_decisions_cabin_class_passenger_type_enhancement_grilling_session_decisions",
+      "target": "research_cabin_passenger_enhancement_decisions_d9_agent_gateway_default_with_honest_degradation",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "research/cabin-passenger-enhancement-decisions.md",
+      "source_location": "L13",
+      "weight": 1.0,
+      "source": "research_cabin_passenger_enhancement_decisions_cabin_class_passenger_type_enhancement_grilling_session_decisions",
+      "target": "research_cabin_passenger_enhancement_decisions_feature_priority_order_user_decision",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "research/cabin-passenger-enhancement-decisions.md",
+      "source_location": "L190",
+      "weight": 1.0,
+      "source": "research_cabin_passenger_enhancement_decisions_cabin_class_passenger_type_enhancement_grilling_session_decisions",
+      "target": "research_cabin_passenger_enhancement_decisions_open_items_not_yet_grilled",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "research/cabin-passenger-enhancement-decisions.md",
+      "source_location": "L77",
+      "weight": 1.0,
+      "source": "research_cabin_passenger_enhancement_decisions_d4_cabin_mismatch_data_shape",
+      "target": "research_cabin_passenger_enhancement_decisions_flightofferdto_additions",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "research/cabin-passenger-enhancement-decisions.md",
+      "source_location": "L72",
+      "weight": 1.0,
+      "source": "research_cabin_passenger_enhancement_decisions_d4_cabin_mismatch_data_shape",
+      "target": "research_cabin_passenger_enhancement_decisions_flightsegmentdto_additions",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "research/cabin-passenger-enhancement-decisions.md",
+      "source_location": "L156",
+      "weight": 1.0,
+      "source": "research_cabin_passenger_enhancement_decisions_d8_database_schema_flat_columns",
+      "target": "research_cabin_passenger_enhancement_decisions_schema_changes_both_flightoffer_and_searchhistory",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "research/cabin-passenger-enhancement-decisions.md",
+      "source_location": "L183",
+      "weight": 1.0,
+      "source": "research_cabin_passenger_enhancement_decisions_d9_agent_gateway_default_with_honest_degradation",
+      "target": "research_cabin_passenger_enhancement_decisions_future_upgrade_plan",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "research/cabin-passenger-enhancement-decisions.md",
+      "source_location": "L178",
+      "weight": 1.0,
+      "source": "research_cabin_passenger_enhancement_decisions_d9_agent_gateway_default_with_honest_degradation",
+      "target": "research_cabin_passenger_enhancement_decisions_interface_compatibility",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "research/cabin-passenger-enhancement-decisions.md",
+      "source_location": "L173",
+      "weight": 1.0,
+      "source": "research_cabin_passenger_enhancement_decisions_d9_agent_gateway_default_with_honest_degradation",
+      "target": "research_cabin_passenger_enhancement_decisions_keyword_detection_behavior",
       "confidence_score": 1.0
     },
     {
@@ -51993,6 +53363,956 @@
       "source": "specs_006_flight_search_service_tasks_implementation_strategy",
       "target": "specs_006_flight_search_service_tasks_mvp_first_user_story_1_only",
       "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "specs/008-cabin-passenger-enhancement/contracts/api.md",
+      "source_location": "L1",
+      "weight": 1.0,
+      "source": "specs_008_cabin_passenger_enhancement_contracts_api",
+      "target": "specs_008_cabin_passenger_enhancement_contracts_api_api_contract_changes_cabin_class_passenger_type_enhancement",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "specs/008-cabin-passenger-enhancement/contracts/api.md",
+      "source_location": "L179",
+      "weight": 1.0,
+      "source": "specs_008_cabin_passenger_enhancement_contracts_api_api_contract_changes_cabin_class_passenger_type_enhancement",
+      "target": "specs_008_cabin_passenger_enhancement_contracts_api_error_responses_new_validation_errors",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "specs/008-cabin-passenger-enhancement/contracts/api.md",
+      "source_location": "L136",
+      "weight": 1.0,
+      "source": "specs_008_cabin_passenger_enhancement_contracts_api_api_contract_changes_cabin_class_passenger_type_enhancement",
+      "target": "specs_008_cabin_passenger_enhancement_contracts_api_get_api_flights_id_response_changes",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "specs/008-cabin-passenger-enhancement/contracts/api.md",
+      "source_location": "L11",
+      "weight": 1.0,
+      "source": "specs_008_cabin_passenger_enhancement_contracts_api_api_contract_changes_cabin_class_passenger_type_enhancement",
+      "target": "specs_008_cabin_passenger_enhancement_contracts_api_post_api_flights_search_request_changes",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "specs/008-cabin-passenger-enhancement/contracts/api.md",
+      "source_location": "L42",
+      "weight": 1.0,
+      "source": "specs_008_cabin_passenger_enhancement_contracts_api_api_contract_changes_cabin_class_passenger_type_enhancement",
+      "target": "specs_008_cabin_passenger_enhancement_contracts_api_post_api_flights_search_response_changes",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "specs/008-cabin-passenger-enhancement/contracts/api.md",
+      "source_location": "L28",
+      "weight": 1.0,
+      "source": "specs_008_cabin_passenger_enhancement_contracts_api_post_api_flights_search_request_changes",
+      "target": "specs_008_cabin_passenger_enhancement_contracts_api_field_changes",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "specs/008-cabin-passenger-enhancement/contracts/api.md",
+      "source_location": "L13",
+      "weight": 1.0,
+      "source": "specs_008_cabin_passenger_enhancement_contracts_api_post_api_flights_search_request_changes",
+      "target": "specs_008_cabin_passenger_enhancement_contracts_api_updated_request_body",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "specs/008-cabin-passenger-enhancement/contracts/api.md",
+      "source_location": "L104",
+      "weight": 1.0,
+      "source": "specs_008_cabin_passenger_enhancement_contracts_api_post_api_flights_search_response_changes",
+      "target": "specs_008_cabin_passenger_enhancement_contracts_api_cabin_mismatch_detail_object",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "specs/008-cabin-passenger-enhancement/contracts/api.md",
+      "source_location": "L124",
+      "weight": 1.0,
+      "source": "specs_008_cabin_passenger_enhancement_contracts_api_post_api_flights_search_response_changes",
+      "target": "specs_008_cabin_passenger_enhancement_contracts_api_classification_algorithm",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "specs/008-cabin-passenger-enhancement/contracts/api.md",
+      "source_location": "L94",
+      "weight": 1.0,
+      "source": "specs_008_cabin_passenger_enhancement_contracts_api_post_api_flights_search_response_changes",
+      "target": "specs_008_cabin_passenger_enhancement_contracts_api_new_changed_fields",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "specs/008-cabin-passenger-enhancement/contracts/api.md",
+      "source_location": "L44",
+      "weight": 1.0,
+      "source": "specs_008_cabin_passenger_enhancement_contracts_api_post_api_flights_search_response_changes",
+      "target": "specs_008_cabin_passenger_enhancement_contracts_api_updated_result_object",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "specs/008-cabin-passenger-enhancement/contracts/api.md",
+      "source_location": "L149",
+      "weight": 1.0,
+      "source": "specs_008_cabin_passenger_enhancement_contracts_api_get_api_flights_id_response_changes",
+      "target": "specs_008_cabin_passenger_enhancement_contracts_api_updated_410_gone_recovery_object",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "specs/008-cabin-passenger-enhancement/contracts/api.md",
+      "source_location": "L138",
+      "weight": 1.0,
+      "source": "specs_008_cabin_passenger_enhancement_contracts_api_get_api_flights_id_response_changes",
+      "target": "specs_008_cabin_passenger_enhancement_contracts_api_updated_detail_response",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "specs/008-cabin-passenger-enhancement/data-model.md",
+      "source_location": "L1",
+      "weight": 1.0,
+      "source": "specs_008_cabin_passenger_enhancement_data_model",
+      "target": "specs_008_cabin_passenger_enhancement_data_model_data_model_cabin_class_passenger_type_enhancement",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "specs/008-cabin-passenger-enhancement/data-model.md",
+      "source_location": "L161",
+      "weight": 1.0,
+      "source": "specs_008_cabin_passenger_enhancement_data_model_data_model_cabin_class_passenger_type_enhancement",
+      "target": "specs_008_cabin_passenger_enhancement_data_model_cache_key_shape",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "specs/008-cabin-passenger-enhancement/data-model.md",
+      "source_location": "L87",
+      "weight": 1.0,
+      "source": "specs_008_cabin_passenger_enhancement_data_model_data_model_cabin_class_passenger_type_enhancement",
+      "target": "specs_008_cabin_passenger_enhancement_data_model_dto_changes_not_prisma_typescript",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "specs/008-cabin-passenger-enhancement/data-model.md",
+      "source_location": "L184",
+      "weight": 1.0,
+      "source": "specs_008_cabin_passenger_enhancement_data_model_data_model_cabin_class_passenger_type_enhancement",
+      "target": "specs_008_cabin_passenger_enhancement_data_model_migration_strategy",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "specs/008-cabin-passenger-enhancement/data-model.md",
+      "source_location": "L6",
+      "weight": 1.0,
+      "source": "specs_008_cabin_passenger_enhancement_data_model_data_model_cabin_class_passenger_type_enhancement",
+      "target": "specs_008_cabin_passenger_enhancement_data_model_modified_entities",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "specs/008-cabin-passenger-enhancement/data-model.md",
+      "source_location": "L30",
+      "weight": 1.0,
+      "source": "specs_008_cabin_passenger_enhancement_data_model_data_model_cabin_class_passenger_type_enhancement",
+      "target": "specs_008_cabin_passenger_enhancement_data_model_prisma_schema_changes",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "specs/008-cabin-passenger-enhancement/data-model.md",
+      "source_location": "L180",
+      "weight": 1.0,
+      "source": "specs_008_cabin_passenger_enhancement_data_model_data_model_cabin_class_passenger_type_enhancement",
+      "target": "specs_008_cabin_passenger_enhancement_data_model_state_transitions",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "specs/008-cabin-passenger-enhancement/data-model.md",
+      "source_location": "L8",
+      "weight": 1.0,
+      "source": "specs_008_cabin_passenger_enhancement_data_model_modified_entities",
+      "target": "specs_008_cabin_passenger_enhancement_data_model_flightoffer_existing_flight_offers",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "specs/008-cabin-passenger-enhancement/data-model.md",
+      "source_location": "L18",
+      "weight": 1.0,
+      "source": "specs_008_cabin_passenger_enhancement_data_model_modified_entities",
+      "target": "specs_008_cabin_passenger_enhancement_data_model_searchhistory_existing_search_history",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "specs/008-cabin-passenger-enhancement/data-model.md",
+      "source_location": "L144",
+      "weight": 1.0,
+      "source": "specs_008_cabin_passenger_enhancement_data_model_dto_changes_not_prisma_typescript",
+      "target": "specs_008_cabin_passenger_enhancement_data_model_410_gone_recovery_object_additions",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "specs/008-cabin-passenger-enhancement/data-model.md",
+      "source_location": "L140",
+      "weight": 1.0,
+      "source": "specs_008_cabin_passenger_enhancement_data_model_dto_changes_not_prisma_typescript",
+      "target": "specs_008_cabin_passenger_enhancement_data_model_flightdetailresponsedto_additions",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "specs/008-cabin-passenger-enhancement/data-model.md",
+      "source_location": "L121",
+      "weight": 1.0,
+      "source": "specs_008_cabin_passenger_enhancement_data_model_dto_changes_not_prisma_typescript",
+      "target": "specs_008_cabin_passenger_enhancement_data_model_flightofferdto_additions",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "specs/008-cabin-passenger-enhancement/data-model.md",
+      "source_location": "L89",
+      "weight": 1.0,
+      "source": "specs_008_cabin_passenger_enhancement_data_model_dto_changes_not_prisma_typescript",
+      "target": "specs_008_cabin_passenger_enhancement_data_model_flightsearchrequestdto",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "specs/008-cabin-passenger-enhancement/data-model.md",
+      "source_location": "L112",
+      "weight": 1.0,
+      "source": "specs_008_cabin_passenger_enhancement_data_model_dto_changes_not_prisma_typescript",
+      "target": "specs_008_cabin_passenger_enhancement_data_model_flightsegmentdto_additions",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "specs/008-cabin-passenger-enhancement/plan.md",
+      "source_location": "L1",
+      "weight": 1.0,
+      "source": "specs_008_cabin_passenger_enhancement_plan",
+      "target": "specs_008_cabin_passenger_enhancement_plan_implementation_plan_cabin_class_passenger_type_enhancement",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "specs/008-cabin-passenger-enhancement/plan.md",
+      "source_location": "L29",
+      "weight": 1.0,
+      "source": "specs_008_cabin_passenger_enhancement_plan_implementation_plan_cabin_class_passenger_type_enhancement",
+      "target": "specs_008_cabin_passenger_enhancement_plan_constitution_check",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "specs/008-cabin-passenger-enhancement/plan.md",
+      "source_location": "L214",
+      "weight": 1.0,
+      "source": "specs_008_cabin_passenger_enhancement_plan_implementation_plan_cabin_class_passenger_type_enhancement",
+      "target": "specs_008_cabin_passenger_enhancement_plan_environment_variables",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "specs/008-cabin-passenger-enhancement/plan.md",
+      "source_location": "L89",
+      "weight": 1.0,
+      "source": "specs_008_cabin_passenger_enhancement_plan_implementation_plan_cabin_class_passenger_type_enhancement",
+      "target": "specs_008_cabin_passenger_enhancement_plan_implementation_phases",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "specs/008-cabin-passenger-enhancement/plan.md",
+      "source_location": "L39",
+      "weight": 1.0,
+      "source": "specs_008_cabin_passenger_enhancement_plan_implementation_plan_cabin_class_passenger_type_enhancement",
+      "target": "specs_008_cabin_passenger_enhancement_plan_project_structure",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "specs/008-cabin-passenger-enhancement/plan.md",
+      "source_location": "L9",
+      "weight": 1.0,
+      "source": "specs_008_cabin_passenger_enhancement_plan_implementation_plan_cabin_class_passenger_type_enhancement",
+      "target": "specs_008_cabin_passenger_enhancement_plan_summary",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "specs/008-cabin-passenger-enhancement/plan.md",
+      "source_location": "L13",
+      "weight": 1.0,
+      "source": "specs_008_cabin_passenger_enhancement_plan_implementation_plan_cabin_class_passenger_type_enhancement",
+      "target": "specs_008_cabin_passenger_enhancement_plan_technical_context",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "specs/008-cabin-passenger-enhancement/plan.md",
+      "source_location": "L223",
+      "weight": 1.0,
+      "source": "specs_008_cabin_passenger_enhancement_plan_implementation_plan_cabin_class_passenger_type_enhancement",
+      "target": "specs_008_cabin_passenger_enhancement_plan_verification_plan",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "specs/008-cabin-passenger-enhancement/plan.md",
+      "source_location": "L41",
+      "weight": 1.0,
+      "source": "specs_008_cabin_passenger_enhancement_plan_project_structure",
+      "target": "specs_008_cabin_passenger_enhancement_plan_documentation_this_feature",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "specs/008-cabin-passenger-enhancement/plan.md",
+      "source_location": "L54",
+      "weight": 1.0,
+      "source": "specs_008_cabin_passenger_enhancement_plan_project_structure",
+      "target": "specs_008_cabin_passenger_enhancement_plan_source_code_changes",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "specs/008-cabin-passenger-enhancement/plan.md",
+      "source_location": "L91",
+      "weight": 1.0,
+      "source": "specs_008_cabin_passenger_enhancement_plan_implementation_phases",
+      "target": "specs_008_cabin_passenger_enhancement_plan_phase_1_database_schema_migration",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "specs/008-cabin-passenger-enhancement/plan.md",
+      "source_location": "L107",
+      "weight": 1.0,
+      "source": "specs_008_cabin_passenger_enhancement_plan_implementation_phases",
+      "target": "specs_008_cabin_passenger_enhancement_plan_phase_2_duffelservice_cabin_class_passenger_mapper",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "specs/008-cabin-passenger-enhancement/plan.md",
+      "source_location": "L126",
+      "weight": 1.0,
+      "source": "specs_008_cabin_passenger_enhancement_plan_implementation_phases",
+      "target": "specs_008_cabin_passenger_enhancement_plan_phase_3_flightsmodule_cabin_match_classification_dtos",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "specs/008-cabin-passenger-enhancement/plan.md",
+      "source_location": "L151",
+      "weight": 1.0,
+      "source": "specs_008_cabin_passenger_enhancement_plan_implementation_phases",
+      "target": "specs_008_cabin_passenger_enhancement_plan_phase_4_agent_gateway_honest_degradation",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "specs/008-cabin-passenger-enhancement/plan.md",
+      "source_location": "L169",
+      "weight": 1.0,
+      "source": "specs_008_cabin_passenger_enhancement_plan_implementation_phases",
+      "target": "specs_008_cabin_passenger_enhancement_plan_phase_5_frontend_integration",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "specs/008-cabin-passenger-enhancement/plan.md",
+      "source_location": "L190",
+      "weight": 1.0,
+      "source": "specs_008_cabin_passenger_enhancement_plan_implementation_phases",
+      "target": "specs_008_cabin_passenger_enhancement_plan_phase_6_e2e_testing_verification",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "specs/008-cabin-passenger-enhancement/plan.md",
+      "source_location": "L225",
+      "weight": 1.0,
+      "source": "specs_008_cabin_passenger_enhancement_plan_verification_plan",
+      "target": "specs_008_cabin_passenger_enhancement_plan_automated_tests",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "specs/008-cabin-passenger-enhancement/plan.md",
+      "source_location": "L238",
+      "weight": 1.0,
+      "source": "specs_008_cabin_passenger_enhancement_plan_verification_plan",
+      "target": "specs_008_cabin_passenger_enhancement_plan_manual_verification",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "specs/008-cabin-passenger-enhancement/quickstart.md",
+      "source_location": "L1",
+      "weight": 1.0,
+      "source": "specs_008_cabin_passenger_enhancement_quickstart",
+      "target": "specs_008_cabin_passenger_enhancement_quickstart_quickstart_cabin_class_passenger_type_enhancement",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "specs/008-cabin-passenger-enhancement/quickstart.md",
+      "source_location": "L89",
+      "weight": 1.0,
+      "source": "specs_008_cabin_passenger_enhancement_quickstart_quickstart_cabin_class_passenger_type_enhancement",
+      "target": "specs_008_cabin_passenger_enhancement_quickstart_automated_test_commands",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "specs/008-cabin-passenger-enhancement/quickstart.md",
+      "source_location": "L6",
+      "weight": 1.0,
+      "source": "specs_008_cabin_passenger_enhancement_quickstart_quickstart_cabin_class_passenger_type_enhancement",
+      "target": "specs_008_cabin_passenger_enhancement_quickstart_prerequisites",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "specs/008-cabin-passenger-enhancement/quickstart.md",
+      "source_location": "L13",
+      "weight": 1.0,
+      "source": "specs_008_cabin_passenger_enhancement_quickstart_quickstart_cabin_class_passenger_type_enhancement",
+      "target": "specs_008_cabin_passenger_enhancement_quickstart_setup",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "specs/008-cabin-passenger-enhancement/quickstart.md",
+      "source_location": "L25",
+      "weight": 1.0,
+      "source": "specs_008_cabin_passenger_enhancement_quickstart_quickstart_cabin_class_passenger_type_enhancement",
+      "target": "specs_008_cabin_passenger_enhancement_quickstart_validation_scenarios",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "specs/008-cabin-passenger-enhancement/quickstart.md",
+      "source_location": "L81",
+      "weight": 1.0,
+      "source": "specs_008_cabin_passenger_enhancement_quickstart_validation_scenarios",
+      "target": "specs_008_cabin_passenger_enhancement_quickstart_scenario_10_agent_gateway_normal_search_no_keywords",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "specs/008-cabin-passenger-enhancement/quickstart.md",
+      "source_location": "L27",
+      "weight": 1.0,
+      "source": "specs_008_cabin_passenger_enhancement_quickstart_validation_scenarios",
+      "target": "specs_008_cabin_passenger_enhancement_quickstart_scenario_1_cabin_class_selection_economy_baseline",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "specs/008-cabin-passenger-enhancement/quickstart.md",
+      "source_location": "L33",
+      "weight": 1.0,
+      "source": "specs_008_cabin_passenger_enhancement_quickstart_validation_scenarios",
+      "target": "specs_008_cabin_passenger_enhancement_quickstart_scenario_2_cabin_class_selection_business",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "specs/008-cabin-passenger-enhancement/quickstart.md",
+      "source_location": "L39",
+      "weight": 1.0,
+      "source": "specs_008_cabin_passenger_enhancement_quickstart_validation_scenarios",
+      "target": "specs_008_cabin_passenger_enhancement_quickstart_scenario_3_mixed_cabin_detection",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "specs/008-cabin-passenger-enhancement/quickstart.md",
+      "source_location": "L45",
+      "weight": 1.0,
+      "source": "specs_008_cabin_passenger_enhancement_quickstart_validation_scenarios",
+      "target": "specs_008_cabin_passenger_enhancement_quickstart_scenario_4_passenger_type_breakdown",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "specs/008-cabin-passenger-enhancement/quickstart.md",
+      "source_location": "L51",
+      "weight": 1.0,
+      "source": "specs_008_cabin_passenger_enhancement_quickstart_validation_scenarios",
+      "target": "specs_008_cabin_passenger_enhancement_quickstart_scenario_5_passenger_validation_infants_adults",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "specs/008-cabin-passenger-enhancement/quickstart.md",
+      "source_location": "L57",
+      "weight": 1.0,
+      "source": "specs_008_cabin_passenger_enhancement_quickstart_validation_scenarios",
+      "target": "specs_008_cabin_passenger_enhancement_quickstart_scenario_6_passenger_validation_total_9",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "specs/008-cabin-passenger-enhancement/quickstart.md",
+      "source_location": "L63",
+      "weight": 1.0,
+      "source": "specs_008_cabin_passenger_enhancement_quickstart_validation_scenarios",
+      "target": "specs_008_cabin_passenger_enhancement_quickstart_scenario_7_cache_separation_by_cabin_class",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "specs/008-cabin-passenger-enhancement/quickstart.md",
+      "source_location": "L69",
+      "weight": 1.0,
+      "source": "specs_008_cabin_passenger_enhancement_quickstart_validation_scenarios",
+      "target": "specs_008_cabin_passenger_enhancement_quickstart_scenario_8_410_recovery_with_cabin_passenger_data",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "specs/008-cabin-passenger-enhancement/quickstart.md",
+      "source_location": "L75",
+      "weight": 1.0,
+      "source": "specs_008_cabin_passenger_enhancement_quickstart_validation_scenarios",
+      "target": "specs_008_cabin_passenger_enhancement_quickstart_scenario_9_agent_gateway_keyword_detection",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "specs/008-cabin-passenger-enhancement/research.md",
+      "source_location": "L1",
+      "weight": 1.0,
+      "source": "specs_008_cabin_passenger_enhancement_research",
+      "target": "specs_008_cabin_passenger_enhancement_research_research_cabin_class_passenger_type_enhancement",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "specs/008-cabin-passenger-enhancement/research.md",
+      "source_location": "L7",
+      "weight": 1.0,
+      "source": "specs_008_cabin_passenger_enhancement_research_research_cabin_class_passenger_type_enhancement",
+      "target": "specs_008_cabin_passenger_enhancement_research_r0_cabin_class_request_level_vs_post_filter",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "specs/008-cabin-passenger-enhancement/research.md",
+      "source_location": "L18",
+      "weight": 1.0,
+      "source": "specs_008_cabin_passenger_enhancement_research_research_cabin_class_passenger_type_enhancement",
+      "target": "specs_008_cabin_passenger_enhancement_research_r1_mixed_cabin_offer_handling",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "specs/008-cabin-passenger-enhancement/research.md",
+      "source_location": "L30",
+      "weight": 1.0,
+      "source": "specs_008_cabin_passenger_enhancement_research_research_cabin_class_passenger_type_enhancement",
+      "target": "specs_008_cabin_passenger_enhancement_research_r2_three_tier_cabin_match_classification",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "specs/008-cabin-passenger-enhancement/research.md",
+      "source_location": "L51",
+      "weight": 1.0,
+      "source": "specs_008_cabin_passenger_enhancement_research_research_cabin_class_passenger_type_enhancement",
+      "target": "specs_008_cabin_passenger_enhancement_research_r3_passenger_type_dto_flat_fields",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "specs/008-cabin-passenger-enhancement/research.md",
+      "source_location": "L62",
+      "weight": 1.0,
+      "source": "specs_008_cabin_passenger_enhancement_research_research_cabin_class_passenger_type_enhancement",
+      "target": "specs_008_cabin_passenger_enhancement_research_r4_isolated_passenger_mapper",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "specs/008-cabin-passenger-enhancement/research.md",
+      "source_location": "L70",
+      "weight": 1.0,
+      "source": "specs_008_cabin_passenger_enhancement_research_research_cabin_class_passenger_type_enhancement",
+      "target": "specs_008_cabin_passenger_enhancement_research_r5_cache_key_expansion",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "specs/008-cabin-passenger-enhancement/research.md",
+      "source_location": "L82",
+      "weight": 1.0,
+      "source": "specs_008_cabin_passenger_enhancement_research_research_cabin_class_passenger_type_enhancement",
+      "target": "specs_008_cabin_passenger_enhancement_research_r6_schema_migration_flat_columns",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "specs/008-cabin-passenger-enhancement/research.md",
+      "source_location": "L94",
+      "weight": 1.0,
+      "source": "specs_008_cabin_passenger_enhancement_research_research_cabin_class_passenger_type_enhancement",
+      "target": "specs_008_cabin_passenger_enhancement_research_r7_agent_gateway_honest_degradation",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "specs/008-cabin-passenger-enhancement/spec.md",
+      "source_location": "L1",
+      "weight": 1.0,
+      "source": "specs_008_cabin_passenger_enhancement_spec",
+      "target": "specs_008_cabin_passenger_enhancement_spec_feature_specification_cabin_class_passenger_type_enhancement",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "specs/008-cabin-passenger-enhancement/spec.md",
+      "source_location": "L118",
+      "weight": 1.0,
+      "source": "specs_008_cabin_passenger_enhancement_spec_feature_specification_cabin_class_passenger_type_enhancement",
+      "target": "specs_008_cabin_passenger_enhancement_spec_assumptions",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "specs/008-cabin-passenger-enhancement/spec.md",
+      "source_location": "L81",
+      "weight": 1.0,
+      "source": "specs_008_cabin_passenger_enhancement_spec_feature_specification_cabin_class_passenger_type_enhancement",
+      "target": "specs_008_cabin_passenger_enhancement_spec_requirements_mandatory",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "specs/008-cabin-passenger-enhancement/spec.md",
+      "source_location": "L106",
+      "weight": 1.0,
+      "source": "specs_008_cabin_passenger_enhancement_spec_feature_specification_cabin_class_passenger_type_enhancement",
+      "target": "specs_008_cabin_passenger_enhancement_spec_success_criteria_mandatory",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "specs/008-cabin-passenger-enhancement/spec.md",
+      "source_location": "L11",
+      "weight": 1.0,
+      "source": "specs_008_cabin_passenger_enhancement_spec_feature_specification_cabin_class_passenger_type_enhancement",
+      "target": "specs_008_cabin_passenger_enhancement_spec_user_scenarios_testing_mandatory",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "specs/008-cabin-passenger-enhancement/spec.md",
+      "source_location": "L73",
+      "weight": 1.0,
+      "source": "specs_008_cabin_passenger_enhancement_spec_user_scenarios_testing_mandatory",
+      "target": "specs_008_cabin_passenger_enhancement_spec_edge_cases",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "specs/008-cabin-passenger-enhancement/spec.md",
+      "source_location": "L13",
+      "weight": 1.0,
+      "source": "specs_008_cabin_passenger_enhancement_spec_user_scenarios_testing_mandatory",
+      "target": "specs_008_cabin_passenger_enhancement_spec_user_story_1_select_cabin_class_for_flight_search_priority_p1",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "specs/008-cabin-passenger-enhancement/spec.md",
+      "source_location": "L35",
+      "weight": 1.0,
+      "source": "specs_008_cabin_passenger_enhancement_spec_user_scenarios_testing_mandatory",
+      "target": "specs_008_cabin_passenger_enhancement_spec_user_story_2_specify_passenger_types_priority_p1",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "specs/008-cabin-passenger-enhancement/spec.md",
+      "source_location": "L55",
+      "weight": 1.0,
+      "source": "specs_008_cabin_passenger_enhancement_spec_user_scenarios_testing_mandatory",
+      "target": "specs_008_cabin_passenger_enhancement_spec_user_story_3_agent_gateway_honest_degradation_priority_p2",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "specs/008-cabin-passenger-enhancement/spec.md",
+      "source_location": "L83",
+      "weight": 1.0,
+      "source": "specs_008_cabin_passenger_enhancement_spec_requirements_mandatory",
+      "target": "specs_008_cabin_passenger_enhancement_spec_functional_requirements",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "specs/008-cabin-passenger-enhancement/spec.md",
+      "source_location": "L100",
+      "weight": 1.0,
+      "source": "specs_008_cabin_passenger_enhancement_spec_requirements_mandatory",
+      "target": "specs_008_cabin_passenger_enhancement_spec_key_entities",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "specs/008-cabin-passenger-enhancement/spec.md",
+      "source_location": "L108",
+      "weight": 1.0,
+      "source": "specs_008_cabin_passenger_enhancement_spec_success_criteria_mandatory",
+      "target": "specs_008_cabin_passenger_enhancement_spec_measurable_outcomes",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "specs/008-cabin-passenger-enhancement/tasks.md",
+      "source_location": "L1",
+      "weight": 1.0,
+      "source": "specs_008_cabin_passenger_enhancement_tasks",
+      "target": "specs_008_cabin_passenger_enhancement_tasks_tasks_cabin_class_passenger_type_enhancement",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "specs/008-cabin-passenger-enhancement/tasks.md",
+      "source_location": "L118",
+      "weight": 1.0,
+      "source": "specs_008_cabin_passenger_enhancement_tasks_tasks_cabin_class_passenger_type_enhancement",
+      "target": "specs_008_cabin_passenger_enhancement_tasks_dependencies_execution_order",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "specs/008-cabin-passenger-enhancement/tasks.md",
+      "source_location": "L11",
+      "weight": 1.0,
+      "source": "specs_008_cabin_passenger_enhancement_tasks_tasks_cabin_class_passenger_type_enhancement",
+      "target": "specs_008_cabin_passenger_enhancement_tasks_format_id_p_story_description",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "specs/008-cabin-passenger-enhancement/tasks.md",
+      "source_location": "L19",
+      "weight": 1.0,
+      "source": "specs_008_cabin_passenger_enhancement_tasks_tasks_cabin_class_passenger_type_enhancement",
+      "target": "specs_008_cabin_passenger_enhancement_tasks_phase_1_setup_shared_infrastructure",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "specs/008-cabin-passenger-enhancement/tasks.md",
+      "source_location": "L28",
+      "weight": 1.0,
+      "source": "specs_008_cabin_passenger_enhancement_tasks_tasks_cabin_class_passenger_type_enhancement",
+      "target": "specs_008_cabin_passenger_enhancement_tasks_phase_2_foundational_blocking_prerequisites",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "specs/008-cabin-passenger-enhancement/tasks.md",
+      "source_location": "L42",
+      "weight": 1.0,
+      "source": "specs_008_cabin_passenger_enhancement_tasks_tasks_cabin_class_passenger_type_enhancement",
+      "target": "specs_008_cabin_passenger_enhancement_tasks_phase_3_user_story_1_select_cabin_class_for_flight_search_priority_p1_mvp",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "specs/008-cabin-passenger-enhancement/tasks.md",
+      "source_location": "L72",
+      "weight": 1.0,
+      "source": "specs_008_cabin_passenger_enhancement_tasks_tasks_cabin_class_passenger_type_enhancement",
+      "target": "specs_008_cabin_passenger_enhancement_tasks_phase_4_user_story_2_specify_passenger_types_priority_p1",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "specs/008-cabin-passenger-enhancement/tasks.md",
+      "source_location": "L85",
+      "weight": 1.0,
+      "source": "specs_008_cabin_passenger_enhancement_tasks_tasks_cabin_class_passenger_type_enhancement",
+      "target": "specs_008_cabin_passenger_enhancement_tasks_phase_5_user_story_3_agent_gateway_honest_degradation_priority_p2",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "specs/008-cabin-passenger-enhancement/tasks.md",
+      "source_location": "L99",
+      "weight": 1.0,
+      "source": "specs_008_cabin_passenger_enhancement_tasks_tasks_cabin_class_passenger_type_enhancement",
+      "target": "specs_008_cabin_passenger_enhancement_tasks_phase_6_polish_cross_cutting_concerns",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "specs/008-cabin-passenger-enhancement/tasks.md",
+      "source_location": "L108",
+      "weight": 1.0,
+      "source": "specs_008_cabin_passenger_enhancement_tasks_tasks_cabin_class_passenger_type_enhancement",
+      "target": "specs_008_cabin_passenger_enhancement_tasks_phase_7_e2e_testing_verification",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "specs/008-cabin-passenger-enhancement/tasks.md",
+      "source_location": "L48",
+      "weight": 1.0,
+      "source": "specs_008_cabin_passenger_enhancement_tasks_phase_3_user_story_1_select_cabin_class_for_flight_search_priority_p1_mvp",
+      "target": "specs_008_cabin_passenger_enhancement_tasks_implementation_for_user_story_1",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "specs/008-cabin-passenger-enhancement/tasks.md",
+      "source_location": "L78",
+      "weight": 1.0,
+      "source": "specs_008_cabin_passenger_enhancement_tasks_phase_4_user_story_2_specify_passenger_types_priority_p1",
+      "target": "specs_008_cabin_passenger_enhancement_tasks_implementation_for_user_story_2",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "specs/008-cabin-passenger-enhancement/tasks.md",
+      "source_location": "L91",
+      "weight": 1.0,
+      "source": "specs_008_cabin_passenger_enhancement_tasks_phase_5_user_story_3_agent_gateway_honest_degradation_priority_p2",
+      "target": "specs_008_cabin_passenger_enhancement_tasks_implementation_for_user_story_3",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "specs/008-cabin-passenger-enhancement/tasks.md",
+      "source_location": "L120",
+      "weight": 1.0,
+      "source": "specs_008_cabin_passenger_enhancement_tasks_dependencies_execution_order",
+      "target": "specs_008_cabin_passenger_enhancement_tasks_phase_dependencies",
+      "confidence_score": 1.0
     }
   ],
   "hyperedges": [
@@ -52081,5 +54401,5 @@
       "source_file": "specs/004-output-guardrails/data-model.md"
     }
   ],
-  "built_at_commit": "954f00ca949414d129bffd06c4b57392943c3ce7"
+  "built_at_commit": "3dc0553b56dee02f222446cc3ee3c824226d6cb6"
 }

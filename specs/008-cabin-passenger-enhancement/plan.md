@@ -95,10 +95,10 @@ apps/web/
 
 | Task | Status | Notes |
 |------|--------|-------|
-| Modify `schema.prisma`: replace `passengers` with `adults`, `children`, `infants`, `cabinClass` on `FlightOffer` | ☐ | Add defaults for backward compat |
-| Modify `schema.prisma`: same changes on `SearchHistory` | ☐ | Same pattern |
-| Run `npx prisma migrate dev` (or `prisma migrate reset` since dev-only data) | ☐ | Generate migration |
-| Verify Prisma client types regenerated correctly | ☐ | `npx prisma generate` |
+| Modify `schema.prisma`: replace `passengers` with `adults`, `children`, `infants`, `cabinClass` on `FlightOffer` | ☑ | Add defaults for backward compat |
+| Modify `schema.prisma`: same changes on `SearchHistory` | ☑ | Same pattern |
+| Run `npx prisma migrate dev` (or `prisma migrate reset` since dev-only data) | ☑ | Generate migration |
+| Verify Prisma client types regenerated correctly | ☑ | `npx prisma generate` |
 
 **Exit criteria**: Migration applied, both tables have new columns, old `passengers` column removed, Prisma client types reflect changes.
 

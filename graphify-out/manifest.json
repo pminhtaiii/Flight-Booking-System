@@ -700,8 +700,8 @@
     "semantic_hash": "3a89cf70d9efdf2106c64e1684391665"
   },
   "AGENTS.md": {
-    "mtime": 1783439041.1744618,
-    "ast_hash": "ba5c81f11167a01524061cc9217ddf2c",
+    "mtime": 1783591029.4456248,
+    "ast_hash": "8c19c4a3cb385cbe1f7ad70bdd4623f1",
     "semantic_hash": ""
   },
   "PROJECT.md": {
@@ -1375,8 +1375,53 @@
     "semantic_hash": ""
   },
   "parse_comments.js": {
-    "mtime": 1783522128.777292,
-    "ast_hash": "9547eb1c00c9a1322194973601a02f3f",
+    "mtime": 1783592100.9420016,
+    "ast_hash": "0e112a472c26bc4336f1893a571d5915",
+    "semantic_hash": ""
+  },
+  "apps/api/prisma/migrations/20260709102855_add_cabin_and_passenger_fields/migration.sql": {
+    "mtime": 1783592935.5116177,
+    "ast_hash": "11cf4424e853166df6c748a5e8847a96",
+    "semantic_hash": ""
+  },
+  "research/cabin-passenger-enhancement-decisions.md": {
+    "mtime": 1783592105.4813445,
+    "ast_hash": "6e37736ef43a26561533849cfd53b142",
+    "semantic_hash": ""
+  },
+  "specs/008-cabin-passenger-enhancement/contracts/api.md": {
+    "mtime": 1783591033.613821,
+    "ast_hash": "fba619559f0cd9e1d034075dc9401859",
+    "semantic_hash": ""
+  },
+  "specs/008-cabin-passenger-enhancement/data-model.md": {
+    "mtime": 1783592146.7760413,
+    "ast_hash": "4cdfda40cb0b8b7b3538c4c755a1ff1d",
+    "semantic_hash": ""
+  },
+  "specs/008-cabin-passenger-enhancement/plan.md": {
+    "mtime": 1783592959.290131,
+    "ast_hash": "4bc0a82097860d8949c72e55be84ce96",
+    "semantic_hash": ""
+  },
+  "specs/008-cabin-passenger-enhancement/quickstart.md": {
+    "mtime": 1783591046.2072773,
+    "ast_hash": "1cf448e3a5cd386cc046ed7095bf7a05",
+    "semantic_hash": ""
+  },
+  "specs/008-cabin-passenger-enhancement/research.md": {
+    "mtime": 1783591049.3243034,
+    "ast_hash": "8038a590fc68d0a0621426e79caae7a5",
+    "semantic_hash": ""
+  },
+  "specs/008-cabin-passenger-enhancement/spec.md": {
+    "mtime": 1783591054.303397,
+    "ast_hash": "5a4f552dd9b5ce7775e3cb244ef37ebe",
+    "semantic_hash": ""
+  },
+  "specs/008-cabin-passenger-enhancement/tasks.md": {
+    "mtime": 1783592957.8256578,
+    "ast_hash": "2c104c4e01a2a9cf7c0518c3c9bc9507",
     "semantic_hash": ""
   }
 }
