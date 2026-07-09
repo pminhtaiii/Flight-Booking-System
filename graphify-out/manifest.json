@@ -295,8 +295,8 @@
     "semantic_hash": ""
   },
   "apps/api/src/agent-gateway/agent-gateway.service.ts": {
-    "mtime": 1783502546.1785352,
-    "ast_hash": "82b04871d1da0077adea94f415a56a95",
+    "mtime": 1783598683.540882,
+    "ast_hash": "efaee52b726e488ea7c8a6c6ec6a8c00",
     "semantic_hash": ""
   },
   "apps/api/src/agent-gateway/auth/agent-api-key.guard.ts": {
@@ -310,8 +310,8 @@
     "semantic_hash": ""
   },
   "apps/api/src/agent-gateway/dto/flight-search-query.dto.ts": {
-    "mtime": 1783232763.2538466,
-    "ast_hash": "fcd27e4d39e07ef3107b8c5c667185cc",
+    "mtime": 1783598416.884508,
+    "ast_hash": "13df64f67f7f73f60d1c651837174ba9",
     "semantic_hash": ""
   },
   "apps/api/src/agent-gateway/dto/user-bookings.dto.ts": {
@@ -485,13 +485,13 @@
     "semantic_hash": ""
   },
   "apps/api/test/agent-gateway-polish.e2e-spec.ts": {
-    "mtime": 1783502693.3280015,
-    "ast_hash": "2deafc1b1992cad3ad6edf1969062a88",
+    "mtime": 1783598427.0852914,
+    "ast_hash": "44f097ceaf5fcc1e3d7dd24337d324e7",
     "semantic_hash": ""
   },
   "apps/api/test/agent-gateway.e2e-spec.ts": {
-    "mtime": 1783502725.1240542,
-    "ast_hash": "a2fdf1efdc875061ff7144865e24efbe",
+    "mtime": 1783598887.0460007,
+    "ast_hash": "3bce5c33e79874d76d19f08582a2b80d",
     "semantic_hash": ""
   },
   "apps/api/test/audit-log.e2e-spec.ts": {
@@ -740,8 +740,8 @@
     "semantic_hash": "13d24df073aeafdf3c5c1bc2507eb893"
   },
   "context/progress-checker.md": {
-    "mtime": 1783568597.7032409,
-    "ast_hash": "d0d6aa06c986294e36945e473ab1b747",
+    "mtime": 1783598600.6425188,
+    "ast_hash": "a49767af522d8f8e84a6ab9ae6ffe132",
     "semantic_hash": ""
   },
   "context/project-overview.md": {
@@ -1300,8 +1300,8 @@
     "semantic_hash": ""
   },
   "apps/api/src/duffel/duffel.service.ts": {
-    "mtime": 1783503024.6607938,
-    "ast_hash": "3d32057c6695e88fe171d3dfb0ad3f74",
+    "mtime": 1783598725.6110322,
+    "ast_hash": "45ba65a5880650fd90bf4031bc35c53c",
     "semantic_hash": ""
   },
   "apps/api/src/duffel/duffel.types.ts": {
@@ -1325,13 +1325,13 @@
     "semantic_hash": ""
   },
   "apps/api/test/flights-cleanup.e2e-spec.ts": {
-    "mtime": 1783479797.7237246,
-    "ast_hash": "b6c4ccd711b5509a5bdefc2b24dc6fe7",
+    "mtime": 1783598345.3004358,
+    "ast_hash": "bba571abb6332fe894560fb868467301",
     "semantic_hash": ""
   },
   "apps/api/src/flights/dto/search-flight.dto.ts": {
-    "mtime": 1783496438.409691,
-    "ast_hash": "f0752c177c2cbac9c79f490bbb414db3",
+    "mtime": 1783598048.3001447,
+    "ast_hash": "ced22d81392edb661a4fe5e71ca9f00b",
     "semantic_hash": ""
   },
   "apps/api/src/flights/flights.controller.ts": {
@@ -1345,13 +1345,13 @@
     "semantic_hash": ""
   },
   "apps/api/src/flights/flights.service.ts": {
-    "mtime": 1783567808.8330505,
-    "ast_hash": "3df70f610be2db5ceeaa1d22b61c446f",
+    "mtime": 1783598678.1736135,
+    "ast_hash": "eb484458d30b4ee31c981a3b8d196fff",
     "semantic_hash": ""
   },
   "apps/api/test/flights-search.e2e-spec.ts": {
-    "mtime": 1783513830.0834124,
-    "ast_hash": "4980a50a05c4662b1777858ac28b41c9",
+    "mtime": 1783598335.6830895,
+    "ast_hash": "e3e7f93e5832a4277260f26211693ce5",
     "semantic_hash": ""
   },
   "apps/web/tests/search.spec.ts": {
@@ -1365,13 +1365,13 @@
     "semantic_hash": ""
   },
   "apps/api/test/flights-detail.e2e-spec.ts": {
-    "mtime": 1783516605.0608485,
-    "ast_hash": "d962011235cea39f777e081451be9af9",
+    "mtime": 1783598339.0280945,
+    "ast_hash": "f84bba0ff81a5d2ae7f74cab4026a2b5",
     "semantic_hash": ""
   },
   "apps/api/test/flights-analytics.e2e-spec.ts": {
-    "mtime": 1783564635.0974379,
-    "ast_hash": "433264d4bc931191fa52bdf8006fdb26",
+    "mtime": 1783598342.6671684,
+    "ast_hash": "7c054f97d11fbe0b050bdaab5356f245",
     "semantic_hash": ""
   },
   "parse_comments.js": {
@@ -1380,8 +1380,8 @@
     "semantic_hash": ""
   },
   "apps/api/prisma/migrations/20260709102855_add_cabin_and_passenger_fields/migration.sql": {
-    "mtime": 1783592935.5116177,
-    "ast_hash": "11cf4424e853166df6c748a5e8847a96",
+    "mtime": 1783598004.9381912,
+    "ast_hash": "1000b7fd5a4c98e04538584e40387254",
     "semantic_hash": ""
   },
   "research/cabin-passenger-enhancement-decisions.md": {

@@ -7,16 +7,33 @@
   - Added the required column `adults` to the `search_history` table without a default value. This is not possible if the table is not empty.
 
 */
--- AlterTable
-ALTER TABLE "flight_offers" DROP COLUMN "passengers",
-ADD COLUMN     "adults" INTEGER NOT NULL,
+-- AlterTable: flight_offers
+ALTER TABLE "flight_offers"
+ADD COLUMN     "adults" INTEGER,
 ADD COLUMN     "cabin_class" TEXT NOT NULL DEFAULT 'economy',
 ADD COLUMN     "children" INTEGER NOT NULL DEFAULT 0,
 ADD COLUMN     "infants" INTEGER NOT NULL DEFAULT 0;
 
--- AlterTable
-ALTER TABLE "search_history" DROP COLUMN "passengers",
-ADD COLUMN     "adults" INTEGER NOT NULL,
+-- Backfill: flight_offers
+UPDATE "flight_offers" SET "adults" = "passengers";
+
+-- Set NOT NULL and Drop passengers: flight_offers
+ALTER TABLE "flight_offers"
+ALTER COLUMN "adults" SET NOT NULL,
+DROP COLUMN "passengers";
+
+-- AlterTable: search_history
+ALTER TABLE "search_history"
+ADD COLUMN     "adults" INTEGER,
 ADD COLUMN     "cabin_class" TEXT NOT NULL DEFAULT 'economy',
 ADD COLUMN     "children" INTEGER NOT NULL DEFAULT 0,
 ADD COLUMN     "infants" INTEGER NOT NULL DEFAULT 0;
+
+-- Backfill: search_history
+UPDATE "search_history" SET "adults" = "passengers";
+
+-- Set NOT NULL and Drop passengers: search_history
+ALTER TABLE "search_history"
+ALTER COLUMN "adults" SET NOT NULL,
+DROP COLUMN "passengers";
+

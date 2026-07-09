@@ -132,7 +132,7 @@ export class AgentGatewayService {
         origin: query.origin.trim().toUpperCase(),
         destination: query.destination.trim().toUpperCase(),
         date: query.date,
-        passengers: Number(query.passengers),
+        passengers: Number(query.adults),
       };
       const queryStr = JSON.stringify(normalizedQuery);
       const sha256 = crypto.createHash('sha256').update(queryStr).digest('hex');
@@ -163,7 +163,7 @@ export class AgentGatewayService {
             origin: query.origin,
             destination: query.destination,
             departureDate: query.date,
-            passengers: Number(query.passengers),
+            adults: Number(query.adults),
           },
           'agent',
         );

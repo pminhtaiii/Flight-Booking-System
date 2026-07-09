@@ -48,5 +48,5 @@ export class FlightSearchQueryDto {
   @IsInt()
   @Min(1)
   @Max(9)
-  passengers!: number;
+  adults!: number;
 }

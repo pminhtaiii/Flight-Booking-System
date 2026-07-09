@@ -61,7 +61,7 @@ describe('Agent Gateway (E2E)', () => {
         offers: [
           {
             id: 'off_1',
-            total_amount: String(452.00 * (Number(query.passengers) || 2)),
+            total_amount: String(452.00 * (Number(query.adults) || 2)),
             total_currency: 'USD',
             slices: [
               {
@@ -100,7 +100,7 @@ describe('Agent Gateway (E2E)', () => {
           },
           {
             id: 'off_2',
-            total_amount: String(389.00 * (Number(query.passengers) || 2)),
+            total_amount: String(389.00 * (Number(query.adults) || 2)),
             total_currency: 'USD',
             slices: [
               {
@@ -139,7 +139,7 @@ describe('Agent Gateway (E2E)', () => {
           },
           {
             id: 'off_3',
-            total_amount: String(520.00 * (Number(query.passengers) || 2)),
+            total_amount: String(520.00 * (Number(query.adults) || 2)),
             total_currency: 'USD',
             slices: [
               {
@@ -178,7 +178,7 @@ describe('Agent Gateway (E2E)', () => {
           },
           {
             id: 'off_4',
-            total_amount: String(199.00 * (Number(query.passengers) || 2)),
+            total_amount: String(199.00 * (Number(query.adults) || 2)),
             total_currency: 'USD',
             slices: [
               {
@@ -217,7 +217,7 @@ describe('Agent Gateway (E2E)', () => {
           },
           {
             id: 'off_5',
-            total_amount: String(610.00 * (Number(query.passengers) || 2)),
+            total_amount: String(610.00 * (Number(query.adults) || 2)),
             total_currency: 'USD',
             slices: [
               {
@@ -560,7 +560,7 @@ describe('Agent Gateway (E2E)', () => {
 
     it('should reject invalid airport origin code format', async () => {
       await request(app.getHttpServer())
-        .get('/agent-gateway/flights/search?origin=HANOI&destination=NRT&date=2026-07-15&passengers=2')
+        .get('/agent-gateway/flights/search?origin=HANOI&destination=NRT&date=2026-07-15&adults=2')
         .set('X-Agent-API-Key', apiKey)
         .set('X-User-Claim', token)
         .expect(400);
@@ -568,7 +568,7 @@ describe('Agent Gateway (E2E)', () => {
 
     it('should reject past dates', async () => {
       await request(app.getHttpServer())
-        .get('/agent-gateway/flights/search?origin=HAN&destination=NRT&date=2020-01-01&passengers=2')
+        .get('/agent-gateway/flights/search?origin=HAN&destination=NRT&date=2020-01-01&adults=2')
         .set('X-Agent-API-Key', apiKey)
         .set('X-User-Claim', token)
         .expect(400);
@@ -576,7 +576,7 @@ describe('Agent Gateway (E2E)', () => {
 
     it('should reject passenger count out of range (e.g. 10)', async () => {
       await request(app.getHttpServer())
-        .get('/agent-gateway/flights/search?origin=HAN&destination=NRT&date=2026-07-15&passengers=10')
+        .get('/agent-gateway/flights/search?origin=HAN&destination=NRT&date=2026-07-15&adults=10')
         .set('X-Agent-API-Key', apiKey)
         .set('X-User-Claim', token)
         .expect(400);
@@ -584,7 +584,7 @@ describe('Agent Gateway (E2E)', () => {
 
     it('should successfully search flights and return mock data', async () => {
       const res = await request(app.getHttpServer())
-        .get('/agent-gateway/flights/search?origin=HAN&destination=NRT&date=2026-07-15&passengers=2')
+        .get('/agent-gateway/flights/search?origin=HAN&destination=NRT&date=2026-07-15&adults=2')
         .set('X-Agent-API-Key', apiKey)
         .set('X-User-Claim', token)
         .expect(200);
@@ -625,7 +625,7 @@ describe('Agent Gateway (E2E)', () => {
 
       // Call search
       await request(app.getHttpServer())
-        .get('/agent-gateway/flights/search?origin=HAN&destination=NRT&date=2026-07-15&passengers=1')
+        .get('/agent-gateway/flights/search?origin=HAN&destination=NRT&date=2026-07-15&adults=1')
         .set('X-Agent-API-Key', apiKey)
         .set('X-User-Claim', token)
         .set('X-Trace-Id', traceId)
@@ -660,7 +660,7 @@ describe('Agent Gateway (E2E)', () => {
         origin: 'HAN',
         destination: 'NRT',
         date: '2026-07-15',
-        passengers: 1,
+        adults: 1,
       });
       expect(metadata.durationMs).toBeDefined();
       expect(metadata.responseSize).toBeGreaterThan(0);
