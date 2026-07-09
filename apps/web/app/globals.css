@@ -30,6 +30,13 @@
   --theme-text-match-fair: #2563EB;
   --theme-bg-match-weak: #FFF7ED;
   --theme-text-match-weak: #EA580C;
+  --theme-gradient-end: #633BF7;
+  --theme-agent-bubble-border: #ECEFF5;
+  --theme-match-bar-strong: #10B981;
+  --theme-match-bar-fair: #61A8FF;
+  --theme-match-bar-weak: #FF8904;
+  --theme-user-bubble-shadow: rgba(124, 92, 252, 0.15);
+  --theme-chat-card-shadow: rgba(124, 92, 252, 0.08);
 }
 
 :root.dark {
@@ -59,9 +66,16 @@
   --theme-bg-match-strong: #065F46;
   --theme-text-match-strong: #34D399;
   --theme-bg-match-fair: #1E3A8A;
-  --theme-text-match-fair: #93C5FD;
+  --theme-text-match-fair: #60A5FA;
   --theme-bg-match-weak: #7C2D12;
-  --theme-text-match-weak: #FDBA74;
+  --theme-text-match-weak: #FB923C;
+  --theme-gradient-end: #512FD6;
+  --theme-agent-bubble-border: #1F2937;
+  --theme-match-bar-strong: #10B981;
+  --theme-match-bar-fair: #61A8FF;
+  --theme-match-bar-weak: #FF8904;
+  --theme-user-bubble-shadow: rgba(0, 0, 0, 0.4);
+  --theme-chat-card-shadow: rgba(0, 0, 0, 0.4);
 }
 
 @theme {
@@ -104,6 +118,13 @@
   --color-text-match-fair: var(--theme-text-match-fair);
   --color-bg-match-weak: var(--theme-bg-match-weak);
   --color-text-match-weak: var(--theme-text-match-weak);
+  --color-gradient-end: var(--theme-gradient-end);
+  --color-agent-bubble-border: var(--theme-agent-bubble-border);
+  --color-match-bar-strong: var(--theme-match-bar-strong);
+  --color-match-bar-fair: var(--theme-match-bar-fair);
+  --color-match-bar-weak: var(--theme-match-bar-weak);
+  --color-user-bubble-shadow: var(--theme-user-bubble-shadow);
+  --color-chat-card-shadow: var(--theme-chat-card-shadow);
 }
 
 /* Custom UI Utilities following UI Rules */
@@ -185,3 +206,238 @@
     box-shadow: 0 0 0 1px var(--color-accent);
   }
 }
+
+@utility chat-card-container {
+  background-color: var(--color-card);
+  border: 1px solid var(--color-card-border);
+  box-shadow: 0 10px 40px -10px var(--color-chat-card-shadow);
+  transition: all 0.75s cubic-bezier(0.19, 1, 0.22, 1);
+  will-change: width, max-width, transform, border-radius;
+}
+
+@utility bubble-user {
+  border-radius: 18px 18px 2px 18px;
+  background: linear-gradient(135deg, var(--color-accent), var(--color-gradient-end));
+  color: var(--color-primary-foreground);
+  box-shadow: 0 4px 12px var(--color-user-bubble-shadow);
+}
+
+@utility bubble-agent {
+  border-radius: 18px 18px 18px 2px;
+  background-color: var(--color-card);
+  border: 1px solid var(--color-agent-bubble-border);
+  color: var(--color-text-primary);
+  box-shadow: 0 2px 8px var(--color-chat-card-shadow);
+}
+
+@utility results-area {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  height: calc(100vh - 140px);
+  width: 0;
+  max-width: 0;
+  opacity: 0;
+  transform: translateX(40px) scale(0.95);
+  pointer-events: none;
+  visibility: hidden;
+  transition: width 0.85s cubic-bezier(0.19, 1, 0.22, 1),
+              max-width 0.85s cubic-bezier(0.19, 1, 0.22, 1),
+              opacity 0.85s cubic-bezier(0.19, 1, 0.22, 1),
+              transform 0.85s cubic-bezier(0.19, 1, 0.22, 1),
+              visibility 0.85s cubic-bezier(0.19, 1, 0.22, 1);
+  will-change: width, max-width, opacity, transform;
+}
+
+@utility results-area-active {
+  width: 100%;
+  max-width: 100%;
+  opacity: 1;
+  transform: translateX(0) scale(1);
+  pointer-events: auto;
+  visibility: visible;
+}
+
+@utility chat-input-wrapper {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  border: 1px solid var(--color-secondary-border);
+  border-radius: 9999px;
+  padding: 4px 6px 4px 18px;
+  background-color: var(--color-background);
+  transition: all 0.2s;
+  &:focus-within {
+    border-color: var(--color-accent);
+    box-shadow: 0 0 0 3px var(--color-user-bubble-shadow);
+    background-color: var(--color-card);
+  }
+}
+
+@utility chat-input {
+  flex: 1;
+  border: none;
+  background-color: transparent;
+  padding: 8px 0;
+  height: 36px;
+  font-size: 14px;
+  outline: none;
+  resize: none;
+  color: var(--color-text-primary);
+}
+
+@utility chat-send {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background-color: var(--color-accent);
+  color: var(--color-primary-foreground);
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 8px var(--color-user-bubble-shadow);
+  transition: all 0.2s;
+  &:hover {
+    transform: scale(1.05);
+    opacity: 0.9;
+  }
+}
+
+@utility quick-action {
+  background-color: var(--color-card);
+  border: 1px solid var(--color-agent-bubble-border);
+  color: var(--color-text-secondary);
+  border-radius: 9999px;
+  padding: 6px 14px;
+  font-size: 12px;
+  cursor: pointer;
+  box-shadow: 0 2px 4px var(--color-chat-card-shadow);
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  &:hover {
+    transform: translateY(-1px) scale(1.03);
+    border-color: var(--color-accent);
+    box-shadow: 0 4px 10px var(--color-chat-card-shadow);
+  }
+}
+
+@utility chat-flight-card {
+  border-radius: 16px;
+  box-shadow: 0 2px 10px var(--color-chat-card-shadow);
+  padding: 20px;
+  flex-shrink: 0;
+  border: 1px solid var(--color-card-border);
+  background-color: var(--color-card);
+}
+
+@utility chat-flight-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+  margin-bottom: 12px;
+}
+
+@utility chat-flight-airline {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+@utility airline-logo-placeholder {
+  width: 40px;
+  height: 40px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  background-color: var(--color-background);
+  border: 1px solid var(--color-secondary-border);
+  color: var(--color-text-secondary);
+}
+
+@utility chat-flight-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-text-primary);
+}
+
+@utility chat-flight-num {
+  font-size: 12px;
+  color: var(--color-text-muted);
+}
+
+@utility match-pill {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+}
+
+@utility match-pill-badge {
+  font-size: 12px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 9999px;
+  &.strong {
+    background-color: var(--color-bg-match-strong);
+    color: var(--color-text-match-strong);
+  }
+  &.fair {
+    background-color: var(--color-bg-match-fair);
+    color: var(--color-text-match-fair);
+  }
+  &.weak {
+    background-color: var(--color-bg-match-weak);
+    color: var(--color-text-match-weak);
+  }
+}
+
+@utility match-bar-bg {
+  width: 64px;
+  height: 4px;
+  background-color: var(--color-secondary-border);
+  border-radius: 9999px;
+  overflow: hidden;
+  margin-top: 4px;
+}
+
+@utility match-bar-fill {
+  height: 100%;
+  border-radius: 9999px;
+  &.strong {
+    background-color: var(--color-match-bar-strong);
+  }
+  &.fair {
+    background-color: var(--color-match-bar-fair);
+  }
+  &.weak {
+    background-color: var(--color-match-bar-weak);
+  }
+}
+
+@utility chat-flight-route {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 0;
+}
+
+@utility route-details-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+  margin-top: 4px;
+  color: var(--color-text-secondary);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+@media (min-width: 1024px) and (max-width: 1536px) {
+  .main-workspace {
+    zoom: 0.9;
+  }
+}
+

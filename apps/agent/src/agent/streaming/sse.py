@@ -200,6 +200,17 @@ async def chat_stream(
                                 "result": summary_str
                             })
                         })
+                        if tool_name == "search_flights":
+                            from agent.tools.search_flights import FLIGHTS_CACHE
+                            raw_cache = FLIGHTS_CACHE.pop(session_id, None)
+                            raw_results = raw_cache.get("results") if raw_cache else None
+                            if raw_results:
+                                await q.put({
+                                    "event": "flight_results",
+                                    "data": json.dumps({
+                                        "results": raw_results
+                                    })
+                                })
 
                 # Flush the pipeline and yield any remaining safe chunks
                 async for safe_chunk in pipeline.flush():

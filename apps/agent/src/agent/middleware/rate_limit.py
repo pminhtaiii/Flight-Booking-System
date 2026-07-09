@@ -13,6 +13,9 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         self.requests: Dict[str, List[float]] = defaultdict(list)
 
     async def dispatch(self, request: Request, call_next) -> Response:
+        if request.method == "OPTIONS":
+            return await call_next(request)
+
         if request.url.path == "/health":
             return await call_next(request)
 

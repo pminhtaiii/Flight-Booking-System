@@ -30,8 +30,9 @@ Data flow is described in `context/architecture.md`.
 | M5  | JWT Session Handshake & Protected Dashboard | Configure NextAuth.js, JWT session strategy, JwtAuthGuard, middleware redirects, and dashboard fetch. | M4           | DONE        |
 | M6  | Polish, E2E Verification & Stress Testing   | Unified E2E flow pass, concurrency testing, and linting/type-checking.                                | M5           | DONE        |
 | M7  | Chatbot Agent Service                       | Python/FastAPI service with JWT auth, safety guardrails, SSE streaming, memory, and persistence.      | M6           | DONE        |
-| M8  | Agent Tool-Calling & Data Access           | PII-stripped Agent Gateway module, HMAC claim authentication, LangGraph tool state machine.           | M7           | IN_PROGRESS |
-| M9  | Map Integration                             | Interactive map visualization with airport markers, great-circle flight route arcs, and auto-complete. | M8           | IN_PROGRESS |
+| M8  | Agent Tool-Calling & Data Access           | PII-stripped Agent Gateway module, HMAC claim authentication, LangGraph tool state machine.           | M7           | DONE        |
+| M9  | Map Integration                             | Interactive map visualization with airport markers, great-circle flight route arcs, and auto-complete. | M8           | DONE        |
+| M10 | Duffel Flight Search Service                | Implement deterministic Duffel-based flight search, caching, budget limits, history analytics, detail view with live re-pricing, and expired offer recovery UX. | M9 | DONE |
 
 
 
@@ -44,6 +45,8 @@ Data flow is described in `context/architecture.md`.
 - `POST /auth/logout`: Headers: `Authorization: Bearer <token>` -> `{ success: true }`
 - `GET /auth/me`: Headers: `Authorization: Bearer <token>` -> `{ id, email }`
 - `GET /health`: JSON response `{ status: "ok" | "degraded" | "down", dependencies: { database: "up" | "down" } }`
+- `POST /api/flights/search`: `{ origin, destination, departureDate, returnDate?, passengers }` -> `{ results: FlightOfferDto[], meta: { totalResults, searchHash, cached } }` (JWT protected)
+- `GET /api/flights/:id`: -> `FlightDetailResponseDto` (JWT protected)
 
 ### FastAPI Agent Service
 
