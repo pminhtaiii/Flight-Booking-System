@@ -23,13 +23,13 @@ describe('Flights Analytics & Search History (E2E)', () => {
   const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
   async function waitFor(assertion: () => Promise<void> | void, timeout = 2000, interval = 50) {
-    const start = Date.now();
+    const start = performance.now();
     for (;;) {
       try {
         await assertion();
         return;
       } catch (error) {
-        if (Date.now() - start > timeout) {
+        if (performance.now() - start > timeout) {
           throw error;
         }
         await wait(interval);
