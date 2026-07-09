@@ -470,7 +470,7 @@
       "source_location": "L59",
       "_origin": "ast",
       "id": "apps_agent_src_agent_config_get_settings",
-      "community": 126,
+      "community": 2,
       "norm_label": "get_settings()"
     },
     {
@@ -880,7 +880,7 @@
       "source_location": "L16",
       "_origin": "ast",
       "id": "apps_agent_src_agent_guardrails_output_pipeline_outputguardrailblockederror_init",
-      "community": 154,
+      "community": 27,
       "norm_label": ".__init__()"
     },
     {
@@ -900,7 +900,7 @@
       "source_location": "L26",
       "_origin": "ast",
       "id": "apps_agent_src_agent_guardrails_output_pipeline_outputguardrailpipeline_init",
-      "community": 154,
+      "community": 27,
       "norm_label": ".__init__()"
     },
     {
@@ -910,7 +910,7 @@
       "source_location": "L41",
       "_origin": "ast",
       "id": "apps_agent_src_agent_guardrails_output_pipeline_outputguardrailpipeline_log_sync_check",
-      "community": 172,
+      "community": 154,
       "norm_label": "._log_sync_check()"
     },
     {
@@ -920,7 +920,7 @@
       "source_location": "L52",
       "_origin": "ast",
       "id": "apps_agent_src_agent_guardrails_output_pipeline_outputguardrailpipeline_validate_chunk_async_wrapper",
-      "community": 172,
+      "community": 154,
       "norm_label": "._validate_chunk_async_wrapper()"
     },
     {
@@ -930,7 +930,7 @@
       "source_location": "L75",
       "_origin": "ast",
       "id": "apps_agent_src_agent_guardrails_output_pipeline_outputguardrailpipeline_check_boundary_pii",
-      "community": 172,
+      "community": 154,
       "norm_label": "._check_boundary_pii()"
     },
     {
@@ -940,7 +940,7 @@
       "source_location": "L119",
       "_origin": "ast",
       "id": "apps_agent_src_agent_guardrails_output_pipeline_outputguardrailpipeline_process_token",
-      "community": 172,
+      "community": 154,
       "norm_label": ".process_token()"
     },
     {
@@ -950,7 +950,7 @@
       "source_location": "L239",
       "_origin": "ast",
       "id": "apps_agent_src_agent_guardrails_output_pipeline_outputguardrailpipeline_flush",
-      "community": 172,
+      "community": 154,
       "norm_label": ".flush()"
     },
     {
@@ -960,7 +960,7 @@
       "source_location": "L378",
       "_origin": "ast",
       "id": "apps_agent_src_agent_guardrails_output_pipeline_outputguardrailpipeline_aclose",
-      "community": 154,
+      "community": 275,
       "norm_label": ".aclose()"
     },
     {
@@ -990,7 +990,7 @@
       "source_location": "L76",
       "_origin": "ast",
       "id": "apps_agent_src_agent_guardrails_output_pipeline_rationale_76",
-      "community": 172,
+      "community": 154,
       "norm_label": "maintains a sliding window of the last n tokens from the previous chunk"
     },
     {
@@ -1000,7 +1000,7 @@
       "source_location": "L120",
       "_origin": "ast",
       "id": "apps_agent_src_agent_guardrails_output_pipeline_rationale_120",
-      "community": 172,
+      "community": 154,
       "norm_label": "feeds a token into the pipeline, yielding any safe completed chunks."
     },
     {
@@ -1010,7 +1010,7 @@
       "source_location": "L240",
       "_origin": "ast",
       "id": "apps_agent_src_agent_guardrails_output_pipeline_rationale_240",
-      "community": 172,
+      "community": 154,
       "norm_label": "flushes the remaining buffered tokens and validates the final chunk."
     },
     {
@@ -1020,7 +1020,7 @@
       "source_location": "L379",
       "_origin": "ast",
       "id": "apps_agent_src_agent_guardrails_output_pipeline_rationale_379",
-      "community": 154,
+      "community": 275,
       "norm_label": "cancels and cleans up any background validation tasks."
     },
     {
@@ -1040,7 +1040,7 @@
       "source_location": "L20",
       "_origin": "ast",
       "id": "apps_agent_src_agent_main_lifespan",
-      "community": 173,
+      "community": 257,
       "norm_label": "lifespan()"
     },
     {
@@ -1050,7 +1050,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "fastapi",
-      "community": 173,
+      "community": 257,
       "norm_label": "fastapi"
     },
     {
@@ -1080,7 +1080,7 @@
       "source_location": "L21",
       "_origin": "ast",
       "id": "apps_agent_src_agent_main_rationale_21",
-      "community": 173,
+      "community": 257,
       "norm_label": "lifespan context manager that initializes nemo guardrails configuration,     me"
     },
     {
@@ -1320,7 +1320,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "apps_agent_src_agent_middleware_rate_limit",
-      "community": 48,
+      "community": 268,
       "norm_label": "rate_limit.py"
     },
     {
@@ -1330,7 +1330,7 @@
       "source_location": "L8",
       "_origin": "ast",
       "id": "apps_agent_src_agent_middleware_rate_limit_ratelimitmiddleware",
-      "community": 48,
+      "community": 268,
       "norm_label": "ratelimitmiddleware"
     },
     {
@@ -1340,7 +1340,7 @@
       "source_location": "L9",
       "_origin": "ast",
       "id": "apps_agent_src_agent_middleware_rate_limit_ratelimitmiddleware_init",
-      "community": 48,
+      "community": 268,
       "norm_label": ".__init__()"
     },
     {
@@ -1350,7 +1350,7 @@
       "source_location": "L15",
       "_origin": "ast",
       "id": "apps_agent_src_agent_middleware_rate_limit_ratelimitmiddleware_dispatch",
-      "community": 48,
+      "community": 268,
       "norm_label": ".dispatch()"
     },
     {
@@ -1360,7 +1360,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "apps_agent_src_agent_middleware_rate_limit_py_request",
-      "community": 48,
+      "community": 268,
       "norm_label": "request"
     },
     {
@@ -1370,7 +1370,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "apps_agent_src_agent_middleware_rate_limit_py_response",
-      "community": 48,
+      "community": 268,
       "norm_label": "response"
     },
     {
@@ -1440,7 +1440,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "apps_agent_src_agent_queue_message_queue",
-      "community": 173,
+      "community": 257,
       "norm_label": "message_queue.py"
     },
     {
@@ -1760,7 +1760,7 @@
       "source_location": "L50",
       "_origin": "ast",
       "id": "apps_agent_src_agent_streaming_sse_chat_stream",
-      "community": 126,
+      "community": 159,
       "norm_label": "chat_stream()"
     },
     {
@@ -1770,7 +1770,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "apps_agent_src_agent_streaming_sse_py_request",
-      "community": 126,
+      "community": 159,
       "norm_label": "request"
     },
     {
@@ -1800,7 +1800,7 @@
       "source_location": "L55",
       "_origin": "ast",
       "id": "apps_agent_src_agent_streaming_sse_rationale_55",
-      "community": 126,
+      "community": 159,
       "norm_label": "handle post /chat/stream requests, performing validation, checking guardrails,"
     },
     {
@@ -2590,7 +2590,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "apps_agent_tests_test_e2e_output_guardrails",
-      "community": 257,
+      "community": 258,
       "norm_label": "test_e2e_output_guardrails.py"
     },
     {
@@ -2600,7 +2600,7 @@
       "source_location": "L12",
       "_origin": "ast",
       "id": "apps_agent_tests_test_e2e_output_guardrails_mock_nestjs_client",
-      "community": 257,
+      "community": 258,
       "norm_label": "mock_nestjs_client()"
     },
     {
@@ -2610,7 +2610,7 @@
       "source_location": "L24",
       "_origin": "ast",
       "id": "apps_agent_tests_test_e2e_output_guardrails_test_e2e_output_guardrail_pipeline_validation",
-      "community": 257,
+      "community": 258,
       "norm_label": "test_e2e_output_guardrail_pipeline_validation()"
     },
     {
@@ -2780,7 +2780,7 @@
       "source_location": "L9",
       "_origin": "ast",
       "id": "apps_agent_tests_test_guardrails_guardrail_service",
-      "community": 30,
+      "community": 267,
       "norm_label": "guardrail_service()"
     },
     {
@@ -2850,7 +2850,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "apps_agent_tests_test_hard_stop",
-      "community": 257,
+      "community": 2,
       "norm_label": "test_hard_stop.py"
     },
     {
@@ -2860,7 +2860,7 @@
       "source_location": "L11",
       "_origin": "ast",
       "id": "apps_agent_tests_test_hard_stop_mock_nestjs_client",
-      "community": 257,
+      "community": 2,
       "norm_label": "mock_nestjs_client()"
     },
     {
@@ -2870,7 +2870,7 @@
       "source_location": "L23",
       "_origin": "ast",
       "id": "apps_agent_tests_test_hard_stop_test_first_chunk_unsafe",
-      "community": 257,
+      "community": 2,
       "norm_label": "test_first_chunk_unsafe()"
     },
     {
@@ -2880,7 +2880,7 @@
       "source_location": "L90",
       "_origin": "ast",
       "id": "apps_agent_tests_test_hard_stop_test_mid_stream_chunk_unsafe",
-      "community": 257,
+      "community": 2,
       "norm_label": "test_mid_stream_chunk_unsafe()"
     },
     {
@@ -3750,7 +3750,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "apps_agent_tests_test_sse_output_guardrail",
-      "community": 258,
+      "community": 2,
       "norm_label": "test_sse_output_guardrail.py"
     },
     {
@@ -3760,7 +3760,7 @@
       "source_location": "L15",
       "_origin": "ast",
       "id": "apps_agent_tests_test_sse_output_guardrail_mock_nestjs_client",
-      "community": 258,
+      "community": 2,
       "norm_label": "mock_nestjs_client()"
     },
     {
@@ -3770,7 +3770,7 @@
       "source_location": "L27",
       "_origin": "ast",
       "id": "apps_agent_tests_test_sse_output_guardrail_test_sse_output_guardrail_safe",
-      "community": 258,
+      "community": 2,
       "norm_label": "test_sse_output_guardrail_safe()"
     },
     {
@@ -3780,7 +3780,7 @@
       "source_location": "L66",
       "_origin": "ast",
       "id": "apps_agent_tests_test_sse_output_guardrail_test_sse_output_guardrail_unsafe_blocking",
-      "community": 258,
+      "community": 2,
       "norm_label": "test_sse_output_guardrail_unsafe_blocking()"
     },
     {
@@ -3790,7 +3790,7 @@
       "source_location": "L125",
       "_origin": "ast",
       "id": "apps_agent_tests_test_sse_output_guardrail_test_sse_output_guardrail_disabled",
-      "community": 258,
+      "community": 2,
       "norm_label": "test_sse_output_guardrail_disabled()"
     },
     {
@@ -4250,7 +4250,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "apps_api_package",
-      "community": 262,
+      "community": 278,
       "norm_label": "package.json"
     },
     {
@@ -4260,7 +4260,7 @@
       "source_location": "L2",
       "_origin": "ast",
       "id": "apps_api_package_name",
-      "community": 262,
+      "community": 278,
       "norm_label": "name"
     },
     {
@@ -4270,7 +4270,7 @@
       "source_location": "L3",
       "_origin": "ast",
       "id": "apps_api_package_version",
-      "community": 262,
+      "community": 278,
       "norm_label": "version"
     },
     {
@@ -4280,7 +4280,7 @@
       "source_location": "L4",
       "_origin": "ast",
       "id": "apps_api_package_private",
-      "community": 262,
+      "community": 278,
       "norm_label": "private"
     },
     {
@@ -4290,7 +4290,7 @@
       "source_location": "L5",
       "_origin": "ast",
       "id": "apps_api_package_scripts",
-      "community": 10,
+      "community": 277,
       "norm_label": "scripts"
     },
     {
@@ -4300,7 +4300,7 @@
       "source_location": "L6",
       "_origin": "ast",
       "id": "apps_api_package_scripts_build",
-      "community": 10,
+      "community": 277,
       "norm_label": "build"
     },
     {
@@ -4310,7 +4310,7 @@
       "source_location": "L7",
       "_origin": "ast",
       "id": "apps_api_package_scripts_dev",
-      "community": 10,
+      "community": 277,
       "norm_label": "dev"
     },
     {
@@ -4320,7 +4320,7 @@
       "source_location": "L8",
       "_origin": "ast",
       "id": "apps_api_package_scripts_start",
-      "community": 10,
+      "community": 277,
       "norm_label": "start"
     },
     {
@@ -4330,7 +4330,7 @@
       "source_location": "L9",
       "_origin": "ast",
       "id": "apps_api_package_scripts_start_dev",
-      "community": 10,
+      "community": 277,
       "norm_label": "start:dev"
     },
     {
@@ -4340,7 +4340,7 @@
       "source_location": "L10",
       "_origin": "ast",
       "id": "apps_api_package_scripts_start_debug",
-      "community": 10,
+      "community": 277,
       "norm_label": "start:debug"
     },
     {
@@ -4350,7 +4350,7 @@
       "source_location": "L11",
       "_origin": "ast",
       "id": "apps_api_package_scripts_start_prod",
-      "community": 10,
+      "community": 277,
       "norm_label": "start:prod"
     },
     {
@@ -4360,7 +4360,7 @@
       "source_location": "L12",
       "_origin": "ast",
       "id": "apps_api_package_scripts_test",
-      "community": 10,
+      "community": 277,
       "norm_label": "test"
     },
     {
@@ -4370,7 +4370,7 @@
       "source_location": "L13",
       "_origin": "ast",
       "id": "apps_api_package_scripts_test_watch",
-      "community": 10,
+      "community": 277,
       "norm_label": "test:watch"
     },
     {
@@ -4380,7 +4380,7 @@
       "source_location": "L14",
       "_origin": "ast",
       "id": "apps_api_package_scripts_test_cov",
-      "community": 10,
+      "community": 277,
       "norm_label": "test:cov"
     },
     {
@@ -4390,7 +4390,7 @@
       "source_location": "L15",
       "_origin": "ast",
       "id": "apps_api_package_scripts_test_debug",
-      "community": 10,
+      "community": 277,
       "norm_label": "test:debug"
     },
     {
@@ -4400,7 +4400,7 @@
       "source_location": "L16",
       "_origin": "ast",
       "id": "apps_api_package_scripts_test_e2e",
-      "community": 10,
+      "community": 277,
       "norm_label": "test:e2e"
     },
     {
@@ -4660,7 +4660,7 @@
       "source_location": "L44",
       "_origin": "ast",
       "id": "apps_api_package_devdependencies",
-      "community": 2,
+      "community": 276,
       "norm_label": "devdependencies"
     },
     {
@@ -4670,7 +4670,7 @@
       "source_location": "L45",
       "_origin": "ast",
       "id": "apps_api_package_devdependencies_nestjs_cli",
-      "community": 2,
+      "community": 276,
       "norm_label": "@nestjs/cli"
     },
     {
@@ -4680,7 +4680,7 @@
       "source_location": "L46",
       "_origin": "ast",
       "id": "apps_api_package_devdependencies_nestjs_schematics",
-      "community": 2,
+      "community": 276,
       "norm_label": "@nestjs/schematics"
     },
     {
@@ -4690,7 +4690,7 @@
       "source_location": "L47",
       "_origin": "ast",
       "id": "apps_api_package_devdependencies_nestjs_testing",
-      "community": 2,
+      "community": 276,
       "norm_label": "@nestjs/testing"
     },
     {
@@ -4700,7 +4700,7 @@
       "source_location": "L48",
       "_origin": "ast",
       "id": "apps_api_package_devdependencies_types_bcrypt",
-      "community": 2,
+      "community": 276,
       "norm_label": "@types/bcrypt"
     },
     {
@@ -4710,7 +4710,7 @@
       "source_location": "L49",
       "_origin": "ast",
       "id": "apps_api_package_devdependencies_types_express",
-      "community": 2,
+      "community": 276,
       "norm_label": "@types/express"
     },
     {
@@ -4720,7 +4720,7 @@
       "source_location": "L50",
       "_origin": "ast",
       "id": "apps_api_package_devdependencies_types_jest",
-      "community": 2,
+      "community": 276,
       "norm_label": "@types/jest"
     },
     {
@@ -4730,7 +4730,7 @@
       "source_location": "L51",
       "_origin": "ast",
       "id": "apps_api_package_devdependencies_types_node",
-      "community": 2,
+      "community": 276,
       "norm_label": "@types/node"
     },
     {
@@ -4740,7 +4740,7 @@
       "source_location": "L52",
       "_origin": "ast",
       "id": "apps_api_package_devdependencies_types_passport_jwt",
-      "community": 2,
+      "community": 276,
       "norm_label": "@types/passport-jwt"
     },
     {
@@ -4750,7 +4750,7 @@
       "source_location": "L53",
       "_origin": "ast",
       "id": "apps_api_package_devdependencies_types_supertest",
-      "community": 2,
+      "community": 276,
       "norm_label": "@types/supertest"
     },
     {
@@ -4760,7 +4760,7 @@
       "source_location": "L54",
       "_origin": "ast",
       "id": "apps_api_package_devdependencies_jest",
-      "community": 2,
+      "community": 276,
       "norm_label": "jest"
     },
     {
@@ -4770,7 +4770,7 @@
       "source_location": "L55",
       "_origin": "ast",
       "id": "apps_api_package_devdependencies_prisma",
-      "community": 2,
+      "community": 276,
       "norm_label": "prisma"
     },
     {
@@ -4780,7 +4780,7 @@
       "source_location": "L56",
       "_origin": "ast",
       "id": "apps_api_package_devdependencies_supertest",
-      "community": 2,
+      "community": 276,
       "norm_label": "supertest"
     },
     {
@@ -4790,7 +4790,7 @@
       "source_location": "L57",
       "_origin": "ast",
       "id": "apps_api_package_devdependencies_ts_jest",
-      "community": 2,
+      "community": 276,
       "norm_label": "ts-jest"
     },
     {
@@ -4800,7 +4800,7 @@
       "source_location": "L58",
       "_origin": "ast",
       "id": "apps_api_package_devdependencies_ts_loader",
-      "community": 2,
+      "community": 276,
       "norm_label": "ts-loader"
     },
     {
@@ -4810,7 +4810,7 @@
       "source_location": "L59",
       "_origin": "ast",
       "id": "apps_api_package_devdependencies_ts_node",
-      "community": 2,
+      "community": 276,
       "norm_label": "ts-node"
     },
     {
@@ -4830,7 +4830,7 @@
       "source_location": "L61",
       "_origin": "ast",
       "id": "apps_api_package_devdependencies_typescript",
-      "community": 2,
+      "community": 276,
       "norm_label": "typescript"
     },
     {
@@ -4840,7 +4840,7 @@
       "source_location": "L63",
       "_origin": "ast",
       "id": "apps_api_package_prisma",
-      "community": 262,
+      "community": 278,
       "norm_label": "prisma"
     },
     {
@@ -4850,7 +4850,7 @@
       "source_location": "L64",
       "_origin": "ast",
       "id": "apps_api_package_prisma_seed",
-      "community": 262,
+      "community": 278,
       "norm_label": "seed"
     },
     {
@@ -5430,7 +5430,7 @@
       "source_location": "L9",
       "_origin": "ast",
       "id": "apps_api_src_airports_airports_service_airportsservice_constructor",
-      "community": 272,
+      "community": 152,
       "norm_label": ".constructor()"
     },
     {
@@ -5560,7 +5560,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "apps_api_src_audit_audit_service",
-      "community": 272,
+      "community": 10,
       "norm_label": "audit.service.ts"
     },
     {
@@ -5570,7 +5570,7 @@
       "source_location": "L7",
       "_origin": "ast",
       "id": "apps_api_src_audit_audit_service_auditservice",
-      "community": 272,
+      "community": 10,
       "norm_label": "auditservice"
     },
     {
@@ -5580,7 +5580,7 @@
       "source_location": "L8",
       "_origin": "ast",
       "id": "apps_api_src_audit_audit_service_auditservice_constructor",
-      "community": 272,
+      "community": 10,
       "norm_label": ".constructor()"
     },
     {
@@ -5590,7 +5590,7 @@
       "source_location": "L10",
       "_origin": "ast",
       "id": "apps_api_src_audit_audit_service_auditservice_hashvalue",
-      "community": 272,
+      "community": 10,
       "norm_label": ".hashvalue()"
     },
     {
@@ -5600,7 +5600,7 @@
       "source_location": "L14",
       "_origin": "ast",
       "id": "apps_api_src_audit_audit_service_auditservice_safesanitize",
-      "community": 272,
+      "community": 10,
       "norm_label": ".safesanitize()"
     },
     {
@@ -5610,7 +5610,7 @@
       "source_location": "L63",
       "_origin": "ast",
       "id": "apps_api_src_audit_audit_service_auditservice_sanitizemetadata",
-      "community": 272,
+      "community": 10,
       "norm_label": ".sanitizemetadata()"
     },
     {
@@ -5620,7 +5620,7 @@
       "source_location": "L71",
       "_origin": "ast",
       "id": "apps_api_src_audit_audit_service_auditservice_createlog",
-      "community": 272,
+      "community": 10,
       "norm_label": ".createlog()"
     },
     {
@@ -5780,7 +5780,7 @@
       "source_location": "L17",
       "_origin": "ast",
       "id": "apps_api_src_auth_auth_service_authservice_constructor",
-      "community": 272,
+      "community": 37,
       "norm_label": ".constructor()"
     },
     {
@@ -6020,7 +6020,7 @@
       "source_location": "L28",
       "_origin": "ast",
       "id": "apps_api_src_auth_strategies_jwt_strategy_jwtstrategy_validate",
-      "community": 152,
+      "community": 272,
       "norm_label": ".validate()"
     },
     {
@@ -6110,7 +6110,7 @@
       "source_location": "L84",
       "_origin": "ast",
       "id": "apps_api_src_cache_cache_service_cacheservice_incr",
-      "community": 152,
+      "community": 272,
       "norm_label": ".incr()"
     },
     {
@@ -6120,7 +6120,7 @@
       "source_location": "L114",
       "_origin": "ast",
       "id": "apps_api_src_cache_cache_service_cacheservice_decr",
-      "community": 152,
+      "community": 272,
       "norm_label": ".decr()"
     },
     {
@@ -6610,7 +6610,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "apps_api_src_duffel_duffel_cleanup_service",
-      "community": 254,
+      "community": 29,
       "norm_label": "duffel-cleanup.service.ts"
     },
     {
@@ -6620,7 +6620,7 @@
       "source_location": "L6",
       "_origin": "ast",
       "id": "apps_api_src_duffel_duffel_cleanup_service_duffelcleanupservice",
-      "community": 254,
+      "community": 29,
       "norm_label": "duffelcleanupservice"
     },
     {
@@ -6630,7 +6630,7 @@
       "source_location": "L9",
       "_origin": "ast",
       "id": "apps_api_src_duffel_duffel_cleanup_service_duffelcleanupservice_constructor",
-      "community": 254,
+      "community": 29,
       "norm_label": ".constructor()"
     },
     {
@@ -6640,7 +6640,7 @@
       "source_location": "L12",
       "_origin": "ast",
       "id": "apps_api_src_duffel_duffel_cleanup_service_duffelcleanupservice_handlecleanup",
-      "community": 254,
+      "community": 29,
       "norm_label": ".handlecleanup()"
     },
     {
@@ -6670,7 +6670,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "apps_api_src_duffel_duffel_service",
-      "community": 29,
+      "community": 272,
       "norm_label": "duffel.service.ts"
     },
     {
@@ -6680,7 +6680,7 @@
       "source_location": "L8",
       "_origin": "ast",
       "id": "apps_api_src_duffel_duffel_service_duffelservice",
-      "community": 29,
+      "community": 272,
       "norm_label": "duffelservice"
     },
     {
@@ -6700,7 +6700,7 @@
       "source_location": "L26",
       "_origin": "ast",
       "id": "apps_api_src_duffel_duffel_service_duffelservice_searchflights",
-      "community": 152,
+      "community": 272,
       "norm_label": ".searchflights()"
     },
     {
@@ -6810,7 +6810,7 @@
       "source_location": "L73",
       "_origin": "ast",
       "id": "apps_api_src_duffel_duffel_types_duffelofferrequest",
-      "community": 29,
+      "community": 272,
       "norm_label": "duffelofferrequest"
     },
     {
@@ -7110,7 +7110,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "apps_api_src_health_health_controller",
-      "community": 264,
+      "community": 262,
       "norm_label": "health.controller.ts"
     },
     {
@@ -7120,7 +7120,7 @@
       "source_location": "L6",
       "_origin": "ast",
       "id": "apps_api_src_health_health_controller_healthcontroller",
-      "community": 264,
+      "community": 262,
       "norm_label": "healthcontroller"
     },
     {
@@ -7130,7 +7130,7 @@
       "source_location": "L9",
       "_origin": "ast",
       "id": "apps_api_src_health_health_controller_healthcontroller_constructor",
-      "community": 264,
+      "community": 262,
       "norm_label": ".constructor()"
     },
     {
@@ -7140,7 +7140,7 @@
       "source_location": "L12",
       "_origin": "ast",
       "id": "apps_api_src_health_health_controller_healthcontroller_check",
-      "community": 264,
+      "community": 262,
       "norm_label": ".check()"
     },
     {
@@ -7150,7 +7150,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "apps_api_src_health_health_module",
-      "community": 264,
+      "community": 262,
       "norm_label": "health.module.ts"
     },
     {
@@ -7160,7 +7160,7 @@
       "source_location": "L7",
       "_origin": "ast",
       "id": "apps_api_src_health_health_module_healthmodule",
-      "community": 264,
+      "community": 262,
       "norm_label": "healthmodule"
     },
     {
@@ -7220,7 +7220,7 @@
       "source_location": "L5",
       "_origin": "ast",
       "id": "apps_api_src_prisma_prisma_service_prismaservice",
-      "community": 272,
+      "community": 29,
       "norm_label": "prismaservice"
     },
     {
@@ -7230,7 +7230,7 @@
       "source_location": "L8",
       "_origin": "ast",
       "id": "apps_api_src_prisma_prisma_service_prismaservice_constructor",
-      "community": 272,
+      "community": 29,
       "norm_label": ".constructor()"
     },
     {
@@ -7240,7 +7240,7 @@
       "source_location": "L12",
       "_origin": "ast",
       "id": "apps_api_src_prisma_prisma_service_prismaservice_onmoduleinit",
-      "community": 272,
+      "community": 29,
       "norm_label": ".onmoduleinit()"
     },
     {
@@ -7250,7 +7250,7 @@
       "source_location": "L23",
       "_origin": "ast",
       "id": "apps_api_src_prisma_prisma_service_prismaservice_onmoduledestroy",
-      "community": 272,
+      "community": 29,
       "norm_label": ".onmoduledestroy()"
     },
     {
@@ -7260,7 +7260,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "apps_api_test_adversarial_e2e_spec",
-      "community": 272,
+      "community": 10,
       "norm_label": "adversarial.e2e-spec.ts"
     },
     {
@@ -7270,7 +7270,7 @@
       "source_location": "L11",
       "_origin": "ast",
       "id": "apps_api_test_adversarial_e2e_spec_cacheservicewithinternal",
-      "community": 272,
+      "community": 10,
       "norm_label": "cacheservicewithinternal"
     },
     {
@@ -7280,7 +7280,7 @@
       "source_location": "L15",
       "_origin": "ast",
       "id": "apps_api_test_adversarial_e2e_spec_sanitizedusermetadata",
-      "community": 272,
+      "community": 10,
       "norm_label": "sanitizedusermetadata"
     },
     {
@@ -7290,7 +7290,7 @@
       "source_location": "L26",
       "_origin": "ast",
       "id": "apps_api_test_adversarial_e2e_spec_sanitizedvariantsmetadata",
-      "community": 272,
+      "community": 10,
       "norm_label": "sanitizedvariantsmetadata"
     },
     {
@@ -7300,7 +7300,7 @@
       "source_location": "L33",
       "_origin": "ast",
       "id": "apps_api_test_adversarial_e2e_spec_circularmetadata",
-      "community": 272,
+      "community": 10,
       "norm_label": "circularmetadata"
     },
     {
@@ -7310,7 +7310,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "apps_api_test_agent_gateway_polish_e2e_spec",
-      "community": 29,
+      "community": 272,
       "norm_label": "agent-gateway-polish.e2e-spec.ts"
     },
     {
@@ -7320,7 +7320,7 @@
       "source_location": "L13",
       "_origin": "ast",
       "id": "apps_api_test_agent_gateway_polish_e2e_spec_mintclaimtoken",
-      "community": 29,
+      "community": 272,
       "norm_label": "mintclaimtoken()"
     },
     {
@@ -7404,13 +7404,33 @@
       "norm_label": "concurrency.e2e-spec.ts"
     },
     {
+      "label": "flights-analytics.e2e-spec.ts",
+      "file_type": "code",
+      "source_file": "apps/api/test/flights-analytics.e2e-spec.ts",
+      "source_location": "L1",
+      "_origin": "ast",
+      "id": "apps_api_test_flights_analytics_e2e_spec",
+      "community": 29,
+      "norm_label": "flights-analytics.e2e-spec.ts"
+    },
+    {
+      "label": "waitFor()",
+      "file_type": "code",
+      "source_file": "apps/api/test/flights-analytics.e2e-spec.ts",
+      "source_location": "L25",
+      "_origin": "ast",
+      "id": "apps_api_test_flights_analytics_e2e_spec_waitfor",
+      "community": 29,
+      "norm_label": "waitfor()"
+    },
+    {
       "label": "flights-cleanup.e2e-spec.ts",
       "file_type": "code",
       "source_file": "apps/api/test/flights-cleanup.e2e-spec.ts",
       "source_location": "L1",
       "_origin": "ast",
       "id": "apps_api_test_flights_cleanup_e2e_spec",
-      "community": 254,
+      "community": 29,
       "norm_label": "flights-cleanup.e2e-spec.ts"
     },
     {
@@ -7430,7 +7450,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "apps_api_test_flights_search_e2e_spec",
-      "community": 29,
+      "community": 272,
       "norm_label": "flights-search.e2e-spec.ts"
     },
     {
@@ -7440,7 +7460,7 @@
       "source_location": "L23",
       "_origin": "ast",
       "id": "apps_api_test_flights_search_e2e_spec_waitfor",
-      "community": 29,
+      "community": 272,
       "norm_label": "waitfor()"
     },
     {
@@ -7817,27 +7837,17 @@
       "label": "generateMetadata()",
       "file_type": "code",
       "source_file": "apps/web/app/search/[flightId]/page.tsx",
-      "source_location": "L20",
+      "source_location": "L16",
       "_origin": "ast",
       "id": "apps_web_app_search_flightid_page_generatemetadata",
       "community": 16,
       "norm_label": "generatemetadata()"
     },
     {
-      "label": "MOCK_FLIGHTS",
-      "file_type": "code",
-      "source_file": "apps/web/app/search/[flightId]/page.tsx",
-      "source_location": "L27",
-      "_origin": "ast",
-      "id": "apps_web_app_search_flightid_page_mock_flights",
-      "community": 16,
-      "norm_label": "mock_flights"
-    },
-    {
       "label": "FlightDetailPage()",
       "file_type": "code",
       "source_file": "apps/web/app/search/[flightId]/page.tsx",
-      "source_location": "L87",
+      "source_location": "L23",
       "_origin": "ast",
       "id": "apps_web_app_search_flightid_page_flightdetailpage",
       "community": 16,
@@ -7930,7 +7940,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "apps_web_components_dashboard_exploredashboardclient",
-      "community": 256,
+      "community": 16,
       "norm_label": "exploredashboardclient.tsx"
     },
     {
@@ -7940,7 +7950,7 @@
       "source_location": "L8",
       "_origin": "ast",
       "id": "apps_web_components_dashboard_exploredashboardclient_props",
-      "community": 256,
+      "community": 16,
       "norm_label": "props"
     },
     {
@@ -8090,7 +8100,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "apps_web_components_map_mapcontainer",
-      "community": 256,
+      "community": 48,
       "norm_label": "mapcontainer.tsx"
     },
     {
@@ -8100,7 +8110,7 @@
       "source_location": "L5",
       "_origin": "ast",
       "id": "apps_web_components_map_mapcontainer_mapcontainer",
-      "community": 256,
+      "community": 48,
       "norm_label": "mapcontainer"
     },
     {
@@ -8250,27 +8260,67 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "apps_web_components_search_flightdetailpageclient",
-      "community": 16,
+      "community": 48,
       "norm_label": "flightdetailpageclient.tsx"
+    },
+    {
+      "label": "FlightSegment",
+      "file_type": "code",
+      "source_file": "apps/web/components/search/FlightDetailPageClient.tsx",
+      "source_location": "L20",
+      "_origin": "ast",
+      "id": "apps_web_components_search_flightdetailpageclient_flightsegment",
+      "community": 48,
+      "norm_label": "flightsegment"
     },
     {
       "label": "Props",
       "file_type": "code",
       "source_file": "apps/web/components/search/FlightDetailPageClient.tsx",
-      "source_location": "L20",
+      "source_location": "L34",
       "_origin": "ast",
       "id": "apps_web_components_search_flightdetailpageclient_props",
-      "community": 16,
+      "community": 48,
       "norm_label": "props"
+    },
+    {
+      "label": "computeLayoverDuration()",
+      "file_type": "code",
+      "source_file": "apps/web/components/search/FlightDetailPageClient.tsx",
+      "source_location": "L67",
+      "_origin": "ast",
+      "id": "apps_web_components_search_flightdetailpageclient_computelayoverduration",
+      "community": 48,
+      "norm_label": "computelayoverduration()"
+    },
+    {
+      "label": "TimelineProps",
+      "file_type": "code",
+      "source_file": "apps/web/components/search/FlightDetailPageClient.tsx",
+      "source_location": "L75",
+      "_origin": "ast",
+      "id": "apps_web_components_search_flightdetailpageclient_timelineprops",
+      "community": 48,
+      "norm_label": "timelineprops"
+    },
+    {
+      "label": "SegmentTimeline()",
+      "file_type": "code",
+      "source_file": "apps/web/components/search/FlightDetailPageClient.tsx",
+      "source_location": "L82",
+      "_origin": "ast",
+      "id": "apps_web_components_search_flightdetailpageclient_segmenttimeline",
+      "community": 48,
+      "norm_label": "segmenttimeline()"
     },
     {
       "label": "FlightDetailPageClient()",
       "file_type": "code",
       "source_file": "apps/web/components/search/FlightDetailPageClient.tsx",
-      "source_location": "L53",
+      "source_location": "L189",
       "_origin": "ast",
       "id": "apps_web_components_search_flightdetailpageclient_flightdetailpageclient",
-      "community": 16,
+      "community": 48,
       "norm_label": "flightdetailpageclient()"
     },
     {
@@ -9540,7 +9590,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "packages_shared_src_types_airport",
-      "community": 252,
+      "community": 260,
       "norm_label": "airport.ts"
     },
     {
@@ -9550,7 +9600,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "packages_shared_src_types_airport_airporttype",
-      "community": 252,
+      "community": 260,
       "norm_label": "airporttype"
     },
     {
@@ -9732,6 +9782,56 @@
       "id": "packages_shared_tsconfig_include",
       "community": 26,
       "norm_label": "include"
+    },
+    {
+      "label": "parse_comments.js",
+      "file_type": "code",
+      "source_file": "parse_comments.js",
+      "source_location": "L1",
+      "_origin": "ast",
+      "id": "parse_comments",
+      "community": 264,
+      "norm_label": "parse_comments.js"
+    },
+    {
+      "label": "fs",
+      "file_type": "code",
+      "source_file": "parse_comments.js",
+      "source_location": "L1",
+      "_origin": "ast",
+      "id": "parse_comments_fs",
+      "community": 264,
+      "norm_label": "fs"
+    },
+    {
+      "label": "content",
+      "file_type": "code",
+      "source_file": "parse_comments.js",
+      "source_location": "L2",
+      "_origin": "ast",
+      "id": "parse_comments_content",
+      "community": 264,
+      "norm_label": "content"
+    },
+    {
+      "label": "data",
+      "file_type": "code",
+      "source_file": "parse_comments.js",
+      "source_location": "L3",
+      "_origin": "ast",
+      "id": "parse_comments_data",
+      "community": 264,
+      "norm_label": "data"
+    },
+    {
+      "label": "unresolved",
+      "file_type": "code",
+      "source_file": "parse_comments.js",
+      "source_location": "L7",
+      "_origin": "ast",
+      "id": "parse_comments_unresolved",
+      "community": 264,
+      "norm_label": "unresolved"
     },
     {
       "label": "tsconfig.json",
@@ -32054,6 +32154,17 @@
       "relation": "imports_from",
       "context": "import",
       "confidence": "EXTRACTED",
+      "source_file": "apps/api/test/flights-analytics.e2e-spec.ts",
+      "source_location": "L4",
+      "weight": 1.0,
+      "source": "apps_api_test_flights_analytics_e2e_spec",
+      "target": "apps_api_src_app_module",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports_from",
+      "context": "import",
+      "confidence": "EXTRACTED",
       "source_file": "apps/api/test/flights-cleanup.e2e-spec.ts",
       "source_location": "L3",
       "weight": 1.0,
@@ -32212,6 +32323,17 @@
       "source_location": "L4",
       "weight": 1.0,
       "source": "apps_api_test_concurrency_e2e_spec",
+      "target": "apps_api_src_app_module_appmodule",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "apps/api/test/flights-analytics.e2e-spec.ts",
+      "source_location": "L4",
+      "weight": 1.0,
+      "source": "apps_api_test_flights_analytics_e2e_spec",
       "target": "apps_api_src_app_module_appmodule",
       "confidence_score": 1.0
     },
@@ -34050,6 +34172,17 @@
       "relation": "imports_from",
       "context": "import",
       "confidence": "EXTRACTED",
+      "source_file": "apps/api/test/flights-analytics.e2e-spec.ts",
+      "source_location": "L6",
+      "weight": 1.0,
+      "source": "apps_api_test_flights_analytics_e2e_spec",
+      "target": "apps_api_src_cache_cache_service",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports_from",
+      "context": "import",
+      "confidence": "EXTRACTED",
       "source_file": "apps/api/test/flights-detail.e2e-spec.ts",
       "source_location": "L6",
       "weight": 1.0,
@@ -34232,6 +34365,17 @@
       "source_location": "L6",
       "weight": 1.0,
       "source": "apps_api_test_airports_e2e_spec",
+      "target": "apps_api_src_cache_cache_service_cacheservice",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "apps/api/test/flights-analytics.e2e-spec.ts",
+      "source_location": "L6",
+      "weight": 1.0,
+      "source": "apps_api_test_flights_analytics_e2e_spec",
       "target": "apps_api_src_cache_cache_service_cacheservice",
       "confidence_score": 1.0
     },
@@ -35493,6 +35637,17 @@
       "relation": "imports_from",
       "context": "import",
       "confidence": "EXTRACTED",
+      "source_file": "apps/api/test/flights-analytics.e2e-spec.ts",
+      "source_location": "L10",
+      "weight": 1.0,
+      "source": "apps_api_test_flights_analytics_e2e_spec",
+      "target": "apps_api_src_common_filters_http_exception_filter",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports_from",
+      "context": "import",
+      "confidence": "EXTRACTED",
       "source_file": "apps/api/test/flights-detail.e2e-spec.ts",
       "source_location": "L9",
       "weight": 1.0,
@@ -35635,6 +35790,17 @@
       "relation": "imports",
       "context": "import",
       "confidence": "EXTRACTED",
+      "source_file": "apps/api/test/flights-analytics.e2e-spec.ts",
+      "source_location": "L10",
+      "weight": 1.0,
+      "source": "apps_api_test_flights_analytics_e2e_spec",
+      "target": "apps_api_src_common_filters_http_exception_filter_httpexceptionfilter",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
       "source_file": "apps/api/test/flights-detail.e2e-spec.ts",
       "source_location": "L9",
       "weight": 1.0,
@@ -35711,6 +35877,17 @@
       "relation": "imports_from",
       "context": "import",
       "confidence": "EXTRACTED",
+      "source_file": "apps/api/test/flights-analytics.e2e-spec.ts",
+      "source_location": "L9",
+      "weight": 1.0,
+      "source": "apps_api_test_flights_analytics_e2e_spec",
+      "target": "apps_api_src_duffel_duffel_cleanup_service",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports_from",
+      "context": "import",
+      "confidence": "EXTRACTED",
       "source_file": "apps/api/test/flights-cleanup.e2e-spec.ts",
       "source_location": "L5",
       "weight": 1.0,
@@ -35746,6 +35923,17 @@
       "source_location": "L6",
       "weight": 1.0,
       "source": "apps_api_src_duffel_duffel_module",
+      "target": "apps_api_src_duffel_duffel_cleanup_service_duffelcleanupservice",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "apps/api/test/flights-analytics.e2e-spec.ts",
+      "source_location": "L9",
+      "weight": 1.0,
+      "source": "apps_api_test_flights_analytics_e2e_spec",
       "target": "apps_api_src_duffel_duffel_cleanup_service_duffelcleanupservice",
       "confidence_score": 1.0
     },
@@ -35927,6 +36115,17 @@
       "relation": "imports_from",
       "context": "import",
       "confidence": "EXTRACTED",
+      "source_file": "apps/api/test/flights-analytics.e2e-spec.ts",
+      "source_location": "L8",
+      "weight": 1.0,
+      "source": "apps_api_test_flights_analytics_e2e_spec",
+      "target": "apps_api_src_duffel_duffel_service",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports_from",
+      "context": "import",
+      "confidence": "EXTRACTED",
       "source_file": "apps/api/test/flights-detail.e2e-spec.ts",
       "source_location": "L8",
       "weight": 1.0,
@@ -36006,6 +36205,17 @@
       "source_location": "L7",
       "weight": 1.0,
       "source": "apps_api_test_agent_gateway_polish_e2e_spec",
+      "target": "apps_api_src_duffel_duffel_service_duffelservice",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "apps/api/test/flights-analytics.e2e-spec.ts",
+      "source_location": "L8",
+      "weight": 1.0,
+      "source": "apps_api_test_flights_analytics_e2e_spec",
       "target": "apps_api_src_duffel_duffel_service_duffelservice",
       "confidence_score": 1.0
     },
@@ -36190,6 +36400,17 @@
       "relation": "imports_from",
       "context": "import",
       "confidence": "EXTRACTED",
+      "source_file": "apps/api/test/flights-analytics.e2e-spec.ts",
+      "source_location": "L11",
+      "weight": 1.0,
+      "source": "apps_api_test_flights_analytics_e2e_spec",
+      "target": "apps_api_src_duffel_duffel_types",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports_from",
+      "context": "import",
+      "confidence": "EXTRACTED",
       "source_file": "apps/api/test/flights-search.e2e-spec.ts",
       "source_location": "L10",
       "weight": 1.0,
@@ -36238,6 +36459,17 @@
       "source_location": "L8",
       "weight": 1.0,
       "source": "apps_api_test_agent_gateway_polish_e2e_spec",
+      "target": "apps_api_src_duffel_duffel_types_duffelofferrequest",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "apps/api/test/flights-analytics.e2e-spec.ts",
+      "source_location": "L11",
+      "weight": 1.0,
+      "source": "apps_api_test_flights_analytics_e2e_spec",
       "target": "apps_api_src_duffel_duffel_types_duffelofferrequest",
       "confidence_score": 1.0
     },
@@ -37204,6 +37436,17 @@
       "relation": "imports_from",
       "context": "import",
       "confidence": "EXTRACTED",
+      "source_file": "apps/api/test/flights-analytics.e2e-spec.ts",
+      "source_location": "L5",
+      "weight": 1.0,
+      "source": "apps_api_test_flights_analytics_e2e_spec",
+      "target": "apps_api_src_prisma_prisma_service",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports_from",
+      "context": "import",
+      "confidence": "EXTRACTED",
       "source_file": "apps/api/test/flights-cleanup.e2e-spec.ts",
       "source_location": "L4",
       "weight": 1.0,
@@ -37377,6 +37620,17 @@
       "relation": "imports",
       "context": "import",
       "confidence": "EXTRACTED",
+      "source_file": "apps/api/test/flights-analytics.e2e-spec.ts",
+      "source_location": "L5",
+      "weight": 1.0,
+      "source": "apps_api_test_flights_analytics_e2e_spec",
+      "target": "apps_api_src_prisma_prisma_service_prismaservice",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
       "source_file": "apps/api/test/flights-cleanup.e2e-spec.ts",
       "source_location": "L4",
       "weight": 1.0,
@@ -37496,6 +37750,16 @@
       "weight": 1.0,
       "source": "apps_api_test_agent_gateway_e2e_spec",
       "target": "apps_api_test_agent_gateway_e2e_spec_toolcallmetadata",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "apps/api/test/flights-analytics.e2e-spec.ts",
+      "source_location": "L25",
+      "weight": 1.0,
+      "source": "apps_api_test_flights_analytics_e2e_spec",
+      "target": "apps_api_test_flights_analytics_e2e_spec_waitfor",
       "confidence_score": 1.0
     },
     {
@@ -37961,7 +38225,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "apps/web/app/search/[flightId]/page.tsx",
-      "source_location": "L87",
+      "source_location": "L23",
       "weight": 1.0,
       "source": "apps_web_app_search_flightid_page",
       "target": "apps_web_app_search_flightid_page_flightdetailpage",
@@ -37971,20 +38235,10 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "apps/web/app/search/[flightId]/page.tsx",
-      "source_location": "L20",
+      "source_location": "L16",
       "weight": 1.0,
       "source": "apps_web_app_search_flightid_page",
       "target": "apps_web_app_search_flightid_page_generatemetadata",
-      "confidence_score": 1.0
-    },
-    {
-      "relation": "contains",
-      "confidence": "EXTRACTED",
-      "source_file": "apps/web/app/search/[flightId]/page.tsx",
-      "source_location": "L27",
-      "weight": 1.0,
-      "source": "apps_web_app_search_flightid_page",
-      "target": "apps_web_app_search_flightid_page_mock_flights",
       "confidence_score": 1.0
     },
     {
@@ -38060,17 +38314,6 @@
       "source_location": "L8",
       "weight": 1.0,
       "source": "apps_web_app_search_flightid_page",
-      "target": "apps_web_lib_airport_service_getairportbyiatacode",
-      "confidence_score": 1.0
-    },
-    {
-      "relation": "imports",
-      "context": "import",
-      "confidence": "EXTRACTED",
-      "source_file": "apps/web/app/search/[flightId]/page.tsx",
-      "source_location": "L8",
-      "weight": 1.0,
-      "source": "apps_web_app_search_flightid_page",
       "target": "apps_web_lib_airport_service_getallairports",
       "confidence_score": 1.0
     },
@@ -38102,7 +38345,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "apps/web/app/search/[flightId]/page.tsx",
-      "source_location": "L165",
+      "source_location": "L119",
       "weight": 1.0,
       "source": "apps_web_app_search_flightid_page_flightdetailpage",
       "target": "apps_web_lib_airport_service_getallairports"
@@ -38867,7 +39110,17 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "apps/web/components/search/FlightDetailPageClient.tsx",
-      "source_location": "L53",
+      "source_location": "L67",
+      "weight": 1.0,
+      "source": "apps_web_components_search_flightdetailpageclient",
+      "target": "apps_web_components_search_flightdetailpageclient_computelayoverduration",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "apps/web/components/search/FlightDetailPageClient.tsx",
+      "source_location": "L189",
       "weight": 1.0,
       "source": "apps_web_components_search_flightdetailpageclient",
       "target": "apps_web_components_search_flightdetailpageclient_flightdetailpageclient",
@@ -38880,7 +39133,37 @@
       "source_location": "L20",
       "weight": 1.0,
       "source": "apps_web_components_search_flightdetailpageclient",
+      "target": "apps_web_components_search_flightdetailpageclient_flightsegment",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "apps/web/components/search/FlightDetailPageClient.tsx",
+      "source_location": "L34",
+      "weight": 1.0,
+      "source": "apps_web_components_search_flightdetailpageclient",
       "target": "apps_web_components_search_flightdetailpageclient_props",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "apps/web/components/search/FlightDetailPageClient.tsx",
+      "source_location": "L82",
+      "weight": 1.0,
+      "source": "apps_web_components_search_flightdetailpageclient",
+      "target": "apps_web_components_search_flightdetailpageclient_segmenttimeline",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "apps/web/components/search/FlightDetailPageClient.tsx",
+      "source_location": "L75",
+      "weight": 1.0,
+      "source": "apps_web_components_search_flightdetailpageclient",
+      "target": "apps_web_components_search_flightdetailpageclient_timelineprops",
       "confidence_score": 1.0
     },
     {
@@ -38903,6 +39186,17 @@
       "weight": 1.0,
       "source": "apps_web_components_search_flightdetailpageclient",
       "target": "packages_shared_src_types_index",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "apps/web/components/search/FlightDetailPageClient.tsx",
+      "source_location": "L219",
+      "weight": 1.0,
+      "source": "apps_web_components_search_flightdetailpageclient_flightdetailpageclient",
+      "target": "apps_web_components_search_flightdetailpageclient_computelayoverduration",
       "confidence_score": 1.0
     },
     {
@@ -40298,6 +40592,46 @@
       "weight": 1.0,
       "source": "packages_shared_tsconfig_compileroptions",
       "target": "packages_shared_tsconfig_compileroptions_sourcemap",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "parse_comments.js",
+      "source_location": "L2",
+      "weight": 1.0,
+      "source": "parse_comments",
+      "target": "parse_comments_content",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "parse_comments.js",
+      "source_location": "L3",
+      "weight": 1.0,
+      "source": "parse_comments",
+      "target": "parse_comments_data",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "parse_comments.js",
+      "source_location": "L1",
+      "weight": 1.0,
+      "source": "parse_comments",
+      "target": "parse_comments_fs",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "parse_comments.js",
+      "source_location": "L7",
+      "weight": 1.0,
+      "source": "parse_comments",
+      "target": "parse_comments_unresolved",
       "confidence_score": 1.0
     },
     {
@@ -51747,5 +52081,5 @@
       "source_file": "specs/004-output-guardrails/data-model.md"
     }
   ],
-  "built_at_commit": "bece422ecd369e0a7e1fbad98d3961d259da361d"
+  "built_at_commit": "998d01bf44d75fbf48e17eef355a0c80b79f3348"
 }

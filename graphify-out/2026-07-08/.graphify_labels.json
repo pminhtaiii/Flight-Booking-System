@@ -273,5 +273,16 @@
   "271": ".aclose",
   "272": "JwtStrategy",
   "273": "health.controller.ts",
+  "274": "page.tsx",
+  "275": "Findings",
+  "276": "Entities",
+  "277": "Phase 2: Configuration & PII Detection — Foundation",
+  "278": "Phase 3: Sentence-Boundary Chunking — Token Accumulation",
+  "279": "Phase 4: NeMo Output Rail — Safety Classification",
+  "280": "Phase 5: Output Guardrail Pipeline — Orchestration",
+  "281": "Phase 6: SSE Integration — Wire Pipeline Into Streaming",
+  "282": "Phase 7: Hard Stop & Partial Persistence — Failure Handling",
+  "283": "Phase 8: Pipeline Parallelism — Latency Optimization",
+  "284": "Phase 10: E2E Testing & Validation — Final Verification",
   "286": "search.spec.ts"
 }
