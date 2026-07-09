@@ -52,18 +52,18 @@
 - [x] T008 [US1] Update `duffel.offerRequests.create` call to pass `cabin_class` preference and mapped passengers in `apps/api/src/duffel/duffel.service.ts`
 - [x] T009 [US1] Update cache key SHA-256 computation to include cabin class and passenger breakdown in `apps/api/src/duffel/duffel.service.ts`
 - [x] T010 [P] [US1] Update mock data generation to include cabin class in `apps/api/src/duffel/duffel.service.ts` or `apps/api/src/duffel/duffel.types.ts`
-- [ ] T011 [P] [US1] Update `FlightSearchRequestDto` to replace `passengers` with flat passenger fields and `cabinClass` in `apps/api/src/flights/dto/search-flight.dto.ts`
-- [ ] T012 [P] [US1] Add custom cross-field validators for passenger limits and infants in `apps/api/src/flights/dto/search-flight.dto.ts`
-- [ ] T013 [P] [US1] Add per-segment `cabinClass` and DTO fields for mixed/downgraded cabins in `apps/api/src/flights/dto/search-flight.dto.ts` and `apps/api/src/flights/dto/detail-flight.dto.ts`
-- [ ] T014 [US1] Implement three-tier cabin match classification and mismatch details mapper in `apps/api/src/flights/flights.service.ts`
-- [ ] T015 [US1] Update `search` endpoint in `apps/api/src/flights/flights.controller.ts` to map and pass new request fields
-- [ ] T016 [US1] Update async write-behind persistence logic to save new fields to database in `apps/api/src/flights/flights.service.ts`
-- [ ] T017 [US1] Update `getFlightDetail` and 410 recovery to include cabin class and passenger breakdown in `apps/api/src/flights/flights.service.ts` and `apps/api/src/flights/flights.controller.ts`
-- [ ] T018 [P] [US1] Add cabin class dropdown to Next.js flight search form in `apps/web/components/search/SearchPageClient.tsx`
-- [ ] T019 [US1] Add client-side validation and search API integration in `apps/web/components/search/SearchPageClient.tsx`
-- [ ] T020 [US1] Display `cabinClassMatch` badge and expandable per-segment details on search result cards in `apps/web/components/search/SearchPageClient.tsx`
-- [ ] T021 [P] [US1] Display cabin match details on the flight details page in `apps/web/components/search/FlightDetailPageClient.tsx`
-- [ ] T022 [US1] Update 410 recovery logic to pre-fill search form with recovered cabin/passenger data in `apps/web/components/search/SearchPageClient.tsx`
+- [x] T011 [P] [US1] Update `FlightSearchRequestDto` to replace `passengers` with flat passenger fields and `cabinClass` in `apps/api/src/flights/dto/search-flight.dto.ts`
+- [x] T012 [P] [US1] Add custom cross-field validators for passenger limits and infants in `apps/api/src/flights/dto/search-flight.dto.ts`
+- [x] T013 [P] [US1] Add per-segment `cabinClass` and DTO fields for mixed/downgraded cabins in `apps/api/src/flights/dto/search-flight.dto.ts` and `apps/api/src/flights/dto/detail-flight.dto.ts`
+- [x] T014 [US1] Implement three-tier cabin match classification and mismatch details mapper in `apps/api/src/flights/flights.service.ts`
+- [x] T015 [US1] Update `search` endpoint in `apps/api/src/flights/flights.controller.ts` to map and pass new request fields
+- [x] T016 [US1] Update async write-behind persistence logic to save new fields to database in `apps/api/src/flights/flights.service.ts`
+- [x] T017 [US1] Update `getFlightDetail` and 410 recovery to include cabin class and passenger breakdown in `apps/api/src/flights/flights.service.ts` and `apps/api/src/flights/flights.controller.ts`
+- [x] T018 [P] [US1] Add cabin class dropdown to Next.js flight search form in `apps/web/components/search/SearchPageClient.tsx`
+- [x] T019 [US1] Add client-side validation and search API integration in `apps/web/components/search/SearchPageClient.tsx`
+- [x] T020 [US1] Display `cabinClassMatch` badge and expandable per-segment details on search result cards in `apps/web/components/search/SearchPageClient.tsx`
+- [x] T021 [P] [US1] Display cabin match details on the flight details page in `apps/web/components/search/FlightDetailPageClient.tsx`
+- [x] T022 [US1] Update 410 recovery logic to pre-fill search form with recovered cabin/passenger data in `apps/web/components/search/SearchPageClient.tsx`
 
 **Checkpoint**: User Story 1 functional and testable.
 
