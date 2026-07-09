@@ -7,8 +7,8 @@ Update this file after every completed feature. Any AI agent reading this should
 ### Current Status
 
 **Feature:** Cabin Class & Passenger Type Enhancement (In Progress)
-**Last completed:** Phase 4 (User Story 2): Frontend Passenger Type Picker & Validation.
-**Next:** Phase 5 (User Story 3): Agent Gateway Honest Degradation.
+**Last completed:** Phase 5 (User Story 3): Agent Gateway Honest Degradation.
+**Next:** Phase 6: Polish & Cross-Cutting Concerns.
 
 ---
 
@@ -20,7 +20,7 @@ Update this file after every completed feature. Any AI agent reading this should
 - [x] Phase 2: DuffelService — Cabin Class & Passenger Mapper (Implemented mapPassengersToDuffel, updated searchFlights signature, cache key SHA-256, mock data generation and Duffel API payload)
 - [x] Phase 3: FlightsModule — Cabin Match Classification & DTOs (Implemented FlightSearchRequestDto, FlightSegmentDto, FlightOfferDto, FlightDetailResponseDto, cabin mismatch details, and longest-duration segment cabin match classification, write-behind, detail endpoint recovery)
 - [x] Phase 4: Passenger Type Selector & Frontend Integration (Implemented unified passenger picker dropdown for Adults, Children, Infants with increment/decrement validation)
-- [ ] Phase 5: Agent Gateway — Honest Degradation
+- [x] Phase 5: Agent Gateway — Honest Degradation (Implemented keyword detection, honest limitation response, audit logging, and Python agent integration)
 - [x] Phase 6: E2E Testing & Verification (NestJS test files aligned to new database schema & DTO, all flights & agent gateway E2E tests passing)
 
 ### [x] Feature: Duffel Flight Search Service Setup & Agent Gateway Refactoring (Feature 6)
