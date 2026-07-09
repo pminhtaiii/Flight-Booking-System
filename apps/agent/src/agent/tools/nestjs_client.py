@@ -88,6 +88,14 @@ class NestJSClient:
         headers = self._get_gateway_headers()
         async with httpx.AsyncClient() as client:
             response = await client.get(url, params=params, headers=headers)
+            if response.status_code == 400:
+                try:
+                    data = response.json()
+                    message = data.get("message")
+                    if message:
+                        return {"error": message}
+                except (ValueError, Exception):
+                    pass
             response.raise_for_status()
             return response.json()
 

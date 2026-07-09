@@ -1,4 +1,4 @@
-import { IsInt, Max, Min, IsString, Matches, registerDecorator, ValidationOptions, ValidationArguments } from 'class-validator';
+import { IsInt, Max, Min, IsString, Matches, registerDecorator, ValidationOptions, ValidationArguments, IsOptional } from 'class-validator';
 import { Transform, Type } from 'class-transformer';
 
 export function IsFutureDateString(validationOptions?: ValidationOptions) {
@@ -44,9 +44,18 @@ export class FlightSearchQueryDto {
   @IsFutureDateString({ message: 'date must be a future date in YYYY-MM-DD format' })
   date!: string;
 
+  @IsOptional()
   @Type(() => Number)
   @IsInt()
   @Min(1)
   @Max(9)
-  adults!: number;
+  adults?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(9)
+  passengers?: number;
 }
+

@@ -666,4 +666,120 @@ describe('Agent Gateway (E2E)', () => {
       expect(metadata.responseSize).toBeGreaterThan(0);
     });
   });
+
+  describe('Keyword Degradation and Passenger Validation', () => {
+    let token: string;
+    let user: User;
+
+    beforeEach(async () => {
+      user = await prisma.user.create({
+        data: {
+          id: crypto.randomUUID(),
+          email: 'keyword-tester@example.com',
+          password: 'Password123!',
+          status: 'ACTIVE',
+        },
+      });
+
+      const iat = Math.floor(Date.now() / 1000);
+      token = mintClaimToken(user.id, iat);
+    });
+
+    it('should throw 400 when user latest chat message contains cabin keywords', async () => {
+      // 1. Create a ChatSession
+      const session = await prisma.chatSession.create({
+        data: {
+          userId: user.id,
+          title: 'Degradation Test Session',
+        },
+      });
+
+      // 2. Create a ChatMessage with cabin keyword 'business'
+      await prisma.chatMessage.create({
+        data: {
+          sessionId: session.id,
+          sender: 'USER',
+          content: 'Find me a business class flight from SGN to NRT',
+        },
+      });
+
+      // 3. Perform search
+      const res = await request(app.getHttpServer())
+        .get('/agent-gateway/flights/search?origin=SGN&destination=NRT&date=2026-07-20&adults=1')
+        .set('X-Agent-API-Key', apiKey)
+        .set('X-User-Claim', token)
+        .expect(400);
+
+      expect(res.body.message).toContain('I can currently only search economy class for adult passengers');
+
+      // Verify audit log has AGENT_KEYWORD_TRIGGER
+      const logs = await prisma.auditLog.findMany({
+        where: { userId: user.id, action: 'AGENT_KEYWORD_TRIGGER' },
+      });
+      expect(logs.length).toBe(1);
+      expect(logs[0].metadata).toMatchObject({
+        matchedKeywords: ['business'],
+        originalMessage: 'Find me a business class flight from SGN to NRT',
+      });
+    });
+
+    it('should throw 400 when user latest chat message contains passenger keywords', async () => {
+      // 1. Create a ChatSession
+      const session = await prisma.chatSession.create({
+        data: {
+          userId: user.id,
+          title: 'Degradation Test Session',
+        },
+      });
+
+      // 2. Create a ChatMessage with passenger keyword 'infant'
+      await prisma.chatMessage.create({
+        data: {
+          sessionId: session.id,
+          sender: 'USER',
+          content: 'I want to travel with an infant',
+        },
+      });
+
+      // 3. Perform search
+      const res = await request(app.getHttpServer())
+        .get('/agent-gateway/flights/search?origin=SGN&destination=NRT&date=2026-07-20&adults=1')
+        .set('X-Agent-API-Key', apiKey)
+        .set('X-User-Claim', token)
+        .expect(400);
+
+      expect(res.body.message).toContain('I can currently only search economy class for adult passengers');
+
+      // Verify audit log has AGENT_KEYWORD_TRIGGER
+      const logs = await prisma.auditLog.findMany({
+        where: { userId: user.id, action: 'AGENT_KEYWORD_TRIGGER' },
+      });
+      expect(logs.length).toBe(1);
+      expect(logs[0].metadata).toMatchObject({
+        matchedKeywords: ['infant'],
+        originalMessage: 'I want to travel with an infant',
+      });
+    });
+
+    it('should throw 400 when neither adults nor passengers query param is provided', async () => {
+      const res = await request(app.getHttpServer())
+        .get('/agent-gateway/flights/search?origin=HAN&destination=NRT&date=2026-07-15')
+        .set('X-Agent-API-Key', apiKey)
+        .set('X-User-Claim', token)
+        .expect(400);
+
+      expect(res.body.message).toBe('Adults count is required');
+    });
+
+    it('should successfully search using passengers query param instead of adults (backward compatibility)', async () => {
+      const res = await request(app.getHttpServer())
+        .get('/agent-gateway/flights/search?origin=HAN&destination=NRT&date=2026-07-15&passengers=3')
+        .set('X-Agent-API-Key', apiKey)
+        .set('X-User-Claim', token)
+        .expect(200);
+
+      expect(res.body.results.length).toBe(5);
+      expect(res.body.results[0].price).toBe(452.00 * 3);
+    });
+  });
 });

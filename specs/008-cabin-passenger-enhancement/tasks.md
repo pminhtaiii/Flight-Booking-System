@@ -90,9 +90,9 @@
 
 ### Implementation for User Story 3
 
-- [ ] T025 [P] [US3] Create keyword constants for cabin and passenger types in `apps/api/src/agent-gateway/agent-gateway.constants.ts`
-- [ ] T026 [US3] Implement keyword detection, honest limitation response, and logging in `apps/api/src/agent-gateway/agent-gateway.service.ts`
-- [ ] T027 [US3] Update `searchFlights` in `apps/api/src/agent-gateway/agent-gateway.service.ts` to map request with defaults to the new Flights DTO shape
+- [x] T025 [P] [US3] Create keyword constants for cabin and passenger types in `apps/api/src/agent-gateway/agent-gateway.constants.ts`
+- [x] T026 [US3] Implement keyword detection, honest limitation response, and logging in `apps/api/src/agent-gateway/agent-gateway.service.ts`
+- [x] T027 [US3] Update `searchFlights` in `apps/api/src/agent-gateway/agent-gateway.service.ts` to map request with defaults to the new Flights DTO shape
 
 ---
 
@@ -110,7 +110,7 @@
 **Purpose**: Automated verification of backend, agent gateway, and frontend E2E functionality
 
 - [ ] T030 [P] Implement backend E2E tests for cabin search, mixed/downgraded classification, passenger validation, cache separation, and 410 recovery in `apps/api/test/flights-search.e2e-spec.ts` and `apps/api/test/flights-detail.e2e-spec.ts`
-- [ ] T031 [P] Implement agent gateway keyword detection E2E tests in `apps/api/test/agent-gateway.e2e-spec.ts`
+- [x] T031 [P] Implement agent gateway keyword detection E2E tests in `apps/api/test/agent-gateway.e2e-spec.ts`
 - [ ] T032 [P] Implement Playwright UI E2E tests for cabin selector, passenger picker, and mismatch badges in `apps/web/tests/search.spec.ts`
 
 ---
