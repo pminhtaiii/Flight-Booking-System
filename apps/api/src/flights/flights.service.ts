@@ -113,6 +113,7 @@ export class FlightsService {
     traceId?: string,
     correlationId?: string,
   ): Promise<FlightSearchResponseDto> {
+    const startTime = Date.now();
     const origin = query.origin.trim().toUpperCase();
     const destination = query.destination.trim().toUpperCase();
     
@@ -227,6 +228,8 @@ export class FlightsService {
       }
     });
 
+    const responseTime = Date.now() - startTime;
+
     // Create audit log entry (synchronous so test can immediately assert it)
     await this.auditService.createLog(this.prisma, {
       userId,
@@ -239,6 +242,8 @@ export class FlightsService {
         returnDate: query.returnDate || null,
         passengers: Number(query.passengers),
         searchHash: sha256,
+        resultCount: results.length,
+        responseTime,
       },
       traceId,
       correlationId,

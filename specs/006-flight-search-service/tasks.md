@@ -113,10 +113,10 @@
 
 **Purpose**: Security, logging, documentation, and final E2E verification
 
-- [ ] T030 [P] Ensure audit logs use opaque ID and omit PII in `apps/api/src/flights/flights.service.ts`
-- [ ] T031 Update user guide documentation in `PROJECT.md`
-- [ ] T032 Verify all automated unit and E2E tests pass across workspaces
-- [ ] T033 Run verification scenarios in `specs/006-flight-search-service/quickstart.md`
+- [X] T030 [P] Ensure audit logs use opaque ID and omit PII in `apps/api/src/flights/flights.service.ts`
+- [X] T031 Update user guide documentation in `PROJECT.md`
+- [X] T032 Verify all automated unit and E2E tests pass across workspaces
+- [X] T033 Run verification scenarios in `specs/006-flight-search-service/quickstart.md`
 
 ---
 
