@@ -1,16 +1,16 @@
 # Graph Report - Booking Systems  (2026-07-09)
 
 ## Corpus Check
-- 280 files · ~170,093 words
+- 280 files · ~170,519 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 2426 nodes · 2916 edges · 285 communities (152 shown, 133 thin omitted)
+- 2426 nodes · 2916 edges · 284 communities (152 shown, 132 thin omitted)
 - Extraction: 95% EXTRACTED · 5% INFERRED · 0% AMBIGUOUS · INFERRED: 137 edges (avg confidence: 0.78)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `7ff0bfc9`
+- Built from commit: `20084705`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -275,7 +275,6 @@
 - [[_COMMUNITY_scripts|scripts]]
 - [[_COMMUNITY_Quickstart Validation Guide LLM Output Guardrails|Quickstart Validation Guide: LLM Output Guardrails]]
 - [[_COMMUNITY_Feature Specification Cabin Class & Passenger Type Enhancement|Feature Specification: Cabin Class & Passenger Type Enhancement]]
-- [[_COMMUNITY_Data Model LLM Output Guardrails|Data Model: LLM Output Guardrails]]
 - [[_COMMUNITY_Research Cabin Class & Passenger Type Enhancement|Research: Cabin Class & Passenger Type Enhancement]]
 - [[_COMMUNITY_RateLimitMiddleware|RateLimitMiddleware]]
 - [[_COMMUNITY_FastAPI|FastAPI]]
@@ -315,7 +314,7 @@
 - **Agent Gateway REST Endpoints** — specs_003_agent_tool_calling_contracts_agent_gateway_api_get_search_flights, specs_003_agent_tool_calling_contracts_agent_gateway_api_get_user_preferences, specs_003_agent_tool_calling_contracts_agent_gateway_api_get_user_bookings [EXTRACTED 1.00]
 - **Output Guardrail Pipeline Components** — specs_004_output_guardrails_data_model_chunkbuffer_model, specs_004_output_guardrails_data_model_slidingwindow_model, specs_004_output_guardrails_data_model_outputguardrailconfig_model, specs_004_output_guardrails_data_model_outputguardrailpipeline_model [EXTRACTED 1.00]
 
-## Communities (285 total, 133 thin omitted)
+## Communities (284 total, 132 thin omitted)
 
 ### Community 0 - "NestJSClient"
 Cohesion: 0.15
@@ -354,8 +353,8 @@ Cohesion: 0.18
 Nodes (10): tsconfig-paths, compilerOptions, baseUrl, outDir, paths, exclude, extends, include (+2 more)
 
 ### Community 10 - "MockStreamingLLM"
-Cohesion: 0.14
-Nodes (5): AuditService, AuthService, HealthController, HealthModule, PrismaService
+Cohesion: 0.19
+Nodes (5): AuditService, CacheServiceWithInternal, CircularMetadata, SanitizedUserMetadata, SanitizedVariantsMetadata
 
 ### Community 11 - "devDependencies"
 Cohesion: 0.10
@@ -418,8 +417,8 @@ Cohesion: 0.25
 Nodes (7): collection, compilerOptions, assets, deleteOutDir, watchAssets, $schema, sourceRoot
 
 ### Community 29 - "app.module.ts"
-Cohesion: 0.21
-Nodes (6): AppModule, HttpExceptionFilter, DuffelService, DuffelOfferRequest, bootstrap(), ToolCallMetadata
+Cohesion: 0.16
+Nodes (7): AppModule, HttpExceptionFilter, DuffelCleanupService, HealthController, bootstrap(), PrismaService, ToolCallMetadata
 
 ### Community 31 - "MessageQueueManager"
 Cohesion: 0.04
@@ -440,6 +439,10 @@ Nodes (4): inter, metadata, Props, Providers()
 ### Community 36 - "package.json"
 Cohesion: 0.29
 Nodes (6): name, private, scripts, test, test:llm, version
+
+### Community 37 - "scripts"
+Cohesion: 0.16
+Nodes (4): JwtStrategy, CacheService, DuffelService, DuffelOfferRequest
 
 ### Community 38 - ".eslintrc.json"
 Cohesion: 0.40
@@ -738,16 +741,16 @@ Cohesion: 0.43
 Nodes (6): AirportSearchResponse, fetchWithTimeout(), getAirportByIataCode(), getNearbyAirports(), NearbyAirportResponse, searchAirports()
 
 ### Community 254 - "scripts"
-Cohesion: 0.27
-Nodes (8): AgentGatewayModule, AuditModule, CacheModule, ChatModule, DuffelCleanupService, DuffelModule, FlightsModule, PrismaModule
+Cohesion: 0.31
+Nodes (9): AgentGatewayModule, AuditModule, AuthModule, CacheModule, ChatModule, DuffelModule, FlightsModule, HealthModule (+1 more)
 
 ### Community 255 - "devDependencies"
 Cohesion: 0.16
 Nodes (5): test_nestjs_persistence_fails(), test_get_user_preferences_error(), test_list_user_bookings_error(), test_search_flights_error(), Exception
 
 ### Community 256 - "plan.md"
-Cohesion: 0.12
-Nodes (7): AuthController, AuthenticatedRequest, AuthModule, LoginDto, RegisterDto, LockoutService, JwtStrategy
+Cohesion: 0.11
+Nodes (6): AuthController, AuthenticatedRequest, AuthService, LoginDto, RegisterDto, LockoutService
 
 ### Community 257 - "scripts"
 Cohesion: 0.20
@@ -825,10 +828,6 @@ Nodes (5): name, prisma, seed, private, version
 Cohesion: 0.15
 Nodes (12): Assumptions, Edge Cases, Feature Specification: Cabin Class & Passenger Type Enhancement, Functional Requirements, Key Entities, Measurable Outcomes, Requirements *(mandatory)*, Success Criteria *(mandatory)* (+4 more)
 
-### Community 280 - "Data Model: LLM Output Guardrails"
-Cohesion: 0.40
-Nodes (4): CacheServiceWithInternal, CircularMetadata, SanitizedUserMetadata, SanitizedVariantsMetadata
-
 ### Community 281 - "Research: Cabin Class & Passenger Type Enhancement"
 Cohesion: 0.20
 Nodes (9): R0: Cabin Class — Request-Level vs Post-Filter, R1: Mixed-Cabin Offer Handling, R2: Three-Tier Cabin Match Classification, R3: Passenger Type DTO — Flat Fields, R4: Isolated Passenger Mapper, R5: Cache Key Expansion, R6: Schema Migration — Flat Columns, R7: Agent Gateway — Honest Degradation (+1 more)
@@ -844,7 +843,7 @@ Nodes (3): lifespan(), Lifespan context manager that initializes NeMo Guardrails
 ## Knowledge Gaps
 - **1275 isolated node(s):** `root`, `parser`, `plugins`, `extends`, `node` (+1270 more)
   These have ≤1 connection - possible missing edges or undocumented components.
-- **133 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
+- **132 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_

@@ -5560,7 +5560,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "apps_api_src_audit_audit_service",
-      "community": 10,
+      "community": 256,
       "norm_label": "audit.service.ts"
     },
     {
@@ -5740,7 +5740,7 @@
       "source_location": "L25",
       "_origin": "ast",
       "id": "apps_api_src_auth_auth_module_authmodule",
-      "community": 256,
+      "community": 254,
       "norm_label": "authmodule"
     },
     {
@@ -5750,7 +5750,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "apps_api_src_auth_auth_service_spec",
-      "community": 10,
+      "community": 256,
       "norm_label": "auth.service.spec.ts"
     },
     {
@@ -5760,7 +5760,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "apps_api_src_auth_auth_service",
-      "community": 10,
+      "community": 256,
       "norm_label": "auth.service.ts"
     },
     {
@@ -5770,7 +5770,7 @@
       "source_location": "L16",
       "_origin": "ast",
       "id": "apps_api_src_auth_auth_service_authservice",
-      "community": 10,
+      "community": 256,
       "norm_label": "authservice"
     },
     {
@@ -5780,7 +5780,7 @@
       "source_location": "L17",
       "_origin": "ast",
       "id": "apps_api_src_auth_auth_service_authservice_constructor",
-      "community": 10,
+      "community": 256,
       "norm_label": ".constructor()"
     },
     {
@@ -5790,7 +5790,7 @@
       "source_location": "L25",
       "_origin": "ast",
       "id": "apps_api_src_auth_auth_service_authservice_register",
-      "community": 10,
+      "community": 256,
       "norm_label": ".register()"
     },
     {
@@ -5810,7 +5810,7 @@
       "source_location": "L186",
       "_origin": "ast",
       "id": "apps_api_src_auth_auth_service_authservice_logout",
-      "community": 10,
+      "community": 256,
       "norm_label": ".logout()"
     },
     {
@@ -5990,7 +5990,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "apps_api_src_auth_strategies_jwt_strategy",
-      "community": 256,
+      "community": 37,
       "norm_label": "jwt.strategy.ts"
     },
     {
@@ -6000,7 +6000,7 @@
       "source_location": "L9",
       "_origin": "ast",
       "id": "apps_api_src_auth_strategies_jwt_strategy_jwtstrategy",
-      "community": 256,
+      "community": 37,
       "norm_label": "jwtstrategy"
     },
     {
@@ -6010,7 +6010,7 @@
       "source_location": "L10",
       "_origin": "ast",
       "id": "apps_api_src_auth_strategies_jwt_strategy_jwtstrategy_constructor",
-      "community": 256,
+      "community": 37,
       "norm_label": ".constructor()"
     },
     {
@@ -6050,7 +6050,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "apps_api_src_cache_cache_service",
-      "community": 29,
+      "community": 37,
       "norm_label": "cache.service.ts"
     },
     {
@@ -6110,7 +6110,7 @@
       "source_location": "L84",
       "_origin": "ast",
       "id": "apps_api_src_cache_cache_service_cacheservice_incr",
-      "community": 37,
+      "community": 256,
       "norm_label": ".incr()"
     },
     {
@@ -6140,7 +6140,7 @@
       "source_location": "L156",
       "_origin": "ast",
       "id": "apps_api_src_cache_cache_service_cacheservice_getttl",
-      "community": 37,
+      "community": 256,
       "norm_label": ".getttl()"
     },
     {
@@ -6150,7 +6150,7 @@
       "source_location": "L177",
       "_origin": "ast",
       "id": "apps_api_src_cache_cache_service_cacheservice_keys",
-      "community": 37,
+      "community": 256,
       "norm_label": ".keys()"
     },
     {
@@ -6610,7 +6610,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "apps_api_src_duffel_duffel_cleanup_service",
-      "community": 254,
+      "community": 29,
       "norm_label": "duffel-cleanup.service.ts"
     },
     {
@@ -6620,7 +6620,7 @@
       "source_location": "L6",
       "_origin": "ast",
       "id": "apps_api_src_duffel_duffel_cleanup_service_duffelcleanupservice",
-      "community": 254,
+      "community": 29,
       "norm_label": "duffelcleanupservice"
     },
     {
@@ -6630,7 +6630,7 @@
       "source_location": "L9",
       "_origin": "ast",
       "id": "apps_api_src_duffel_duffel_cleanup_service_duffelcleanupservice_constructor",
-      "community": 254,
+      "community": 29,
       "norm_label": ".constructor()"
     },
     {
@@ -6640,7 +6640,7 @@
       "source_location": "L12",
       "_origin": "ast",
       "id": "apps_api_src_duffel_duffel_cleanup_service_duffelcleanupservice_handlecleanup",
-      "community": 254,
+      "community": 29,
       "norm_label": ".handlecleanup()"
     },
     {
@@ -6670,7 +6670,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "apps_api_src_duffel_duffel_service",
-      "community": 29,
+      "community": 37,
       "norm_label": "duffel.service.ts"
     },
     {
@@ -6680,7 +6680,7 @@
       "source_location": "L8",
       "_origin": "ast",
       "id": "apps_api_src_duffel_duffel_service_duffelservice",
-      "community": 29,
+      "community": 37,
       "norm_label": "duffelservice"
     },
     {
@@ -6820,7 +6820,7 @@
       "source_location": "L73",
       "_origin": "ast",
       "id": "apps_api_src_duffel_duffel_types_duffelofferrequest",
-      "community": 29,
+      "community": 37,
       "norm_label": "duffelofferrequest"
     },
     {
@@ -7170,7 +7170,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "apps_api_src_health_health_controller",
-      "community": 10,
+      "community": 29,
       "norm_label": "health.controller.ts"
     },
     {
@@ -7180,7 +7180,7 @@
       "source_location": "L6",
       "_origin": "ast",
       "id": "apps_api_src_health_health_controller_healthcontroller",
-      "community": 10,
+      "community": 29,
       "norm_label": "healthcontroller"
     },
     {
@@ -7190,7 +7190,7 @@
       "source_location": "L9",
       "_origin": "ast",
       "id": "apps_api_src_health_health_controller_healthcontroller_constructor",
-      "community": 10,
+      "community": 29,
       "norm_label": ".constructor()"
     },
     {
@@ -7200,7 +7200,7 @@
       "source_location": "L12",
       "_origin": "ast",
       "id": "apps_api_src_health_health_controller_healthcontroller_check",
-      "community": 10,
+      "community": 29,
       "norm_label": ".check()"
     },
     {
@@ -7210,7 +7210,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "apps_api_src_health_health_module",
-      "community": 10,
+      "community": 254,
       "norm_label": "health.module.ts"
     },
     {
@@ -7220,7 +7220,7 @@
       "source_location": "L7",
       "_origin": "ast",
       "id": "apps_api_src_health_health_module_healthmodule",
-      "community": 10,
+      "community": 254,
       "norm_label": "healthmodule"
     },
     {
@@ -7280,7 +7280,7 @@
       "source_location": "L5",
       "_origin": "ast",
       "id": "apps_api_src_prisma_prisma_service_prismaservice",
-      "community": 10,
+      "community": 29,
       "norm_label": "prismaservice"
     },
     {
@@ -7290,7 +7290,7 @@
       "source_location": "L8",
       "_origin": "ast",
       "id": "apps_api_src_prisma_prisma_service_prismaservice_constructor",
-      "community": 10,
+      "community": 29,
       "norm_label": ".constructor()"
     },
     {
@@ -7300,7 +7300,7 @@
       "source_location": "L12",
       "_origin": "ast",
       "id": "apps_api_src_prisma_prisma_service_prismaservice_onmoduleinit",
-      "community": 10,
+      "community": 29,
       "norm_label": ".onmoduleinit()"
     },
     {
@@ -7310,7 +7310,7 @@
       "source_location": "L23",
       "_origin": "ast",
       "id": "apps_api_src_prisma_prisma_service_prismaservice_onmoduledestroy",
-      "community": 10,
+      "community": 29,
       "norm_label": ".onmoduledestroy()"
     },
     {
@@ -7320,7 +7320,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "apps_api_test_adversarial_e2e_spec",
-      "community": 280,
+      "community": 10,
       "norm_label": "adversarial.e2e-spec.ts"
     },
     {
@@ -7330,7 +7330,7 @@
       "source_location": "L11",
       "_origin": "ast",
       "id": "apps_api_test_adversarial_e2e_spec_cacheservicewithinternal",
-      "community": 280,
+      "community": 10,
       "norm_label": "cacheservicewithinternal"
     },
     {
@@ -7340,7 +7340,7 @@
       "source_location": "L15",
       "_origin": "ast",
       "id": "apps_api_test_adversarial_e2e_spec_sanitizedusermetadata",
-      "community": 280,
+      "community": 10,
       "norm_label": "sanitizedusermetadata"
     },
     {
@@ -7350,7 +7350,7 @@
       "source_location": "L26",
       "_origin": "ast",
       "id": "apps_api_test_adversarial_e2e_spec_sanitizedvariantsmetadata",
-      "community": 280,
+      "community": 10,
       "norm_label": "sanitizedvariantsmetadata"
     },
     {
@@ -7360,7 +7360,7 @@
       "source_location": "L33",
       "_origin": "ast",
       "id": "apps_api_test_adversarial_e2e_spec_circularmetadata",
-      "community": 280,
+      "community": 10,
       "norm_label": "circularmetadata"
     },
     {
@@ -7370,7 +7370,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "apps_api_test_agent_gateway_polish_e2e_spec",
-      "community": 29,
+      "community": 37,
       "norm_label": "agent-gateway-polish.e2e-spec.ts"
     },
     {
@@ -7380,7 +7380,7 @@
       "source_location": "L13",
       "_origin": "ast",
       "id": "apps_api_test_agent_gateway_polish_e2e_spec_mintclaimtoken",
-      "community": 29,
+      "community": 37,
       "norm_label": "mintclaimtoken()"
     },
     {
@@ -7470,7 +7470,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "apps_api_test_flights_analytics_e2e_spec",
-      "community": 29,
+      "community": 37,
       "norm_label": "flights-analytics.e2e-spec.ts"
     },
     {
@@ -7480,7 +7480,7 @@
       "source_location": "L25",
       "_origin": "ast",
       "id": "apps_api_test_flights_analytics_e2e_spec_waitfor",
-      "community": 29,
+      "community": 37,
       "norm_label": "waitfor()"
     },
     {
@@ -7490,7 +7490,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "apps_api_test_flights_cleanup_e2e_spec",
-      "community": 254,
+      "community": 29,
       "norm_label": "flights-cleanup.e2e-spec.ts"
     },
     {
@@ -7510,7 +7510,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "apps_api_test_flights_search_e2e_spec",
-      "community": 29,
+      "community": 37,
       "norm_label": "flights-search.e2e-spec.ts"
     },
     {
@@ -7520,7 +7520,7 @@
       "source_location": "L23",
       "_origin": "ast",
       "id": "apps_api_test_flights_search_e2e_spec_waitfor",
-      "community": 29,
+      "community": 37,
       "norm_label": "waitfor()"
     },
     {
@@ -40728,7 +40728,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "apps/web/components/search/SearchPageClient.tsx",
-      "source_location": "L687",
+      "source_location": "L728",
       "weight": 1.0,
       "source": "apps_web_components_search_searchpageclient_searchpageclient",
       "target": "apps_web_lib_utils_cn"
@@ -54640,5 +54640,5 @@
       "source_file": "specs/004-output-guardrails/data-model.md"
     }
   ],
-  "built_at_commit": "7ff0bfc9bf090cd936f7ff30703c3daa936c75e0"
+  "built_at_commit": "20084705e97f4be69f94027f2dfb0501ea01ac2a"
 }

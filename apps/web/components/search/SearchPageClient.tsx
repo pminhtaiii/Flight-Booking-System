@@ -47,6 +47,7 @@ export function SearchPageClient({ allAirports }: Props) {
 
   const originRef = useRef<HTMLDivElement>(null);
   const destRef = useRef<HTMLDivElement>(null);
+  const passengerRef = useRef<HTMLDivElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const streamAbortRef = useRef<AbortController | null>(null);
 
@@ -89,6 +90,43 @@ export function SearchPageClient({ allAirports }: Props) {
   const [cabinClass, setCabinClass] = useState('economy');
   const [expandedMismatches, setExpandedMismatches] = useState<Record<string, boolean>>({});
   const [formError, setFormError] = useState<string | null>(null);
+  const [showPassengerDropdown, setShowPassengerDropdown] = useState(false);
+
+  const passengerSummary = useMemo(() => {
+    const parts: string[] = [];
+    if (passengers === 1) {
+      parts.push('1 Adult');
+    } else if (passengers > 1) {
+      parts.push(`${passengers} Adults`);
+    }
+
+    if (children === 1) {
+      parts.push('1 Child');
+    } else if (children > 1) {
+      parts.push(`${children} Children`);
+    }
+
+    if (infants === 1) {
+      parts.push('1 Infant');
+    } else if (infants > 1) {
+      parts.push(`${infants} Infants`);
+    }
+
+    return parts.join(', ') || '1 Adult';
+  }, [passengers, children, infants]);
+
+  const pickerError = useMemo(() => {
+    if (passengers < 1) {
+      return 'At least 1 adult passenger is required';
+    }
+    if (infants > passengers) {
+      return 'Number of infants cannot exceed number of adults';
+    }
+    if (passengers + children + infants > 9) {
+      return 'Maximum 9 passengers per search';
+    }
+    return null;
+  }, [passengers, children, infants]);
 
   const [selectedOrigin, setSelectedOrigin] = useState<Airport | null>(null);
   const [selectedDest, setSelectedDest] = useState<Airport | null>(null);
@@ -339,6 +377,9 @@ export function SearchPageClient({ allAirports }: Props) {
       }
       if (destRef.current && !destRef.current.contains(event.target as Node)) {
         setShowDestDropdown(false);
+      }
+      if (passengerRef.current && !passengerRef.current.contains(event.target as Node)) {
+        setShowPassengerDropdown(false);
       }
     }
     document.addEventListener('mousedown', handleClickOutside);
@@ -1011,45 +1052,112 @@ export function SearchPageClient({ allAirports }: Props) {
               )}
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-              <div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div ref={passengerRef} className="relative">
                 <label className="block text-xs font-semibold text-text-secondary mb-1">Passengers</label>
-                <div className="relative">
-                  <Users className="absolute left-3 top-3 w-4 h-4 text-text-muted" />
-                  <input
-                    type="number"
-                    min="1"
-                    max="9"
-                    value={passengers}
-                    onChange={(e) => setPassengers(Number.isNaN(parseInt(e.target.value, 10)) ? 1 : parseInt(e.target.value, 10))}
-                    className="form-input w-full pl-10"
-                    required
-                  />
-                </div>
-              </div>
+                <button
+                  type="button"
+                  onClick={() => setShowPassengerDropdown(!showPassengerDropdown)}
+                  className="form-input w-full pl-10 pr-4 text-left flex items-center justify-between cursor-pointer"
+                >
+                  <div className="flex items-center">
+                    <Users className="absolute left-3 top-3 w-4 h-4 text-text-muted" />
+                    <span className="truncate text-sm text-text-primary">{passengerSummary}</span>
+                  </div>
+                  <span className="text-text-muted text-xs">▼</span>
+                </button>
 
-              <div>
-                <label className="block text-xs font-semibold text-text-secondary mb-1">Children (2-11)</label>
-                <input
-                  type="number"
-                  min="0"
-                  max="9"
-                  value={children}
-                  onChange={(e) => setChildren(Number.isNaN(parseInt(e.target.value, 10)) ? 0 : parseInt(e.target.value, 10))}
-                  className="form-input w-full"
-                />
-              </div>
+                {showPassengerDropdown && (
+                  <div className="absolute left-0 right-0 mt-1 bg-card border border-card-border rounded-[20px] shadow-lg z-30 p-4 space-y-4">
+                    {/* Adults Row */}
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <div className="text-sm font-semibold text-text-primary">Adults</div>
+                        <div className="text-xs text-text-muted">Age 12+</div>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <button
+                          type="button"
+                          disabled={passengers <= 1 || passengers <= infants}
+                          onClick={() => setPassengers(prev => Math.max(1, prev - 1))}
+                          className="w-8 h-8 rounded-full border border-card-border flex items-center justify-center text-text-primary hover:bg-background disabled:opacity-40 disabled:cursor-not-allowed transition font-semibold"
+                        >
+                          -
+                        </button>
+                        <span className="text-sm font-bold w-4 text-center">{passengers}</span>
+                        <button
+                          type="button"
+                          disabled={passengers + children + infants >= 9}
+                          onClick={() => setPassengers(prev => prev + 1)}
+                          className="w-8 h-8 rounded-full border border-card-border flex items-center justify-center text-text-primary hover:bg-background disabled:opacity-40 disabled:cursor-not-allowed transition font-semibold"
+                        >
+                          +
+                        </button>
+                      </div>
+                    </div>
 
-              <div>
-                <label className="block text-xs font-semibold text-text-secondary mb-1">Infants (on lap)</label>
-                <input
-                  type="number"
-                  min="0"
-                  max="9"
-                  value={infants}
-                  onChange={(e) => setInfants(Number.isNaN(parseInt(e.target.value, 10)) ? 0 : parseInt(e.target.value, 10))}
-                  className="form-input w-full"
-                />
+                    {/* Children Row */}
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <div className="text-sm font-semibold text-text-primary">Children</div>
+                        <div className="text-xs text-text-muted">Age 2-11</div>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <button
+                          type="button"
+                          disabled={children <= 0}
+                          onClick={() => setChildren(prev => Math.max(0, prev - 1))}
+                          className="w-8 h-8 rounded-full border border-card-border flex items-center justify-center text-text-primary hover:bg-background disabled:opacity-40 disabled:cursor-not-allowed transition font-semibold"
+                        >
+                          -
+                        </button>
+                        <span className="text-sm font-bold w-4 text-center">{children}</span>
+                        <button
+                          type="button"
+                          disabled={passengers + children + infants >= 9}
+                          onClick={() => setChildren(prev => prev + 1)}
+                          className="w-8 h-8 rounded-full border border-card-border flex items-center justify-center text-text-primary hover:bg-background disabled:opacity-40 disabled:cursor-not-allowed transition font-semibold"
+                        >
+                          +
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Infants Row */}
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <div className="text-sm font-semibold text-text-primary">Infants</div>
+                        <div className="text-xs text-text-muted">Under 2, on lap</div>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <button
+                          type="button"
+                          disabled={infants <= 0}
+                          onClick={() => setInfants(prev => Math.max(0, prev - 1))}
+                          className="w-8 h-8 rounded-full border border-card-border flex items-center justify-center text-text-primary hover:bg-background disabled:opacity-40 disabled:cursor-not-allowed transition font-semibold"
+                        >
+                          -
+                        </button>
+                        <span className="text-sm font-bold w-4 text-center">{infants}</span>
+                        <button
+                          type="button"
+                          disabled={infants >= passengers || passengers + children + infants >= 9}
+                          onClick={() => setInfants(prev => prev + 1)}
+                          className="w-8 h-8 rounded-full border border-card-border flex items-center justify-center text-text-primary hover:bg-background disabled:opacity-40 disabled:cursor-not-allowed transition font-semibold"
+                        >
+                          +
+                        </button>
+                      </div>
+                    </div>
+
+                    {pickerError && (
+                      <div className="text-xs text-text-cancelled bg-bg-cancelled p-2 rounded-xl border border-text-cancelled/20 flex items-center gap-1.5 animate-fade-in">
+                        <AlertCircle className="w-3.5 h-3.5 flex-shrink-0" />
+                        <span>{pickerError}</span>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
 
               <div>

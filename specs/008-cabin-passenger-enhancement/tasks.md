@@ -77,8 +77,8 @@
 
 ### Implementation for User Story 2
 
-- [ ] T023 [US2] Add passenger type picker (Adults/Children/Infants) in `apps/web/components/search/SearchPageClient.tsx`
-- [ ] T024 [US2] Implement passenger breakdown client-side validation rules in `apps/web/components/search/SearchPageClient.tsx`
+- [x] T023 [US2] Add passenger type picker (Adults/Children/Infants) in `apps/web/components/search/SearchPageClient.tsx`
+- [x] T024 [US2] Implement passenger breakdown client-side validation rules in `apps/web/components/search/SearchPageClient.tsx`
 
 ---
 
