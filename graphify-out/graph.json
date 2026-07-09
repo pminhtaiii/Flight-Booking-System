@@ -7097,7 +7097,7 @@
       "label": ".getFlightDetail()",
       "file_type": "code",
       "source_file": "apps/api/src/flights/flights.service.ts",
-      "source_location": "L257",
+      "source_location": "L262",
       "_origin": "ast",
       "id": "apps_api_src_flights_flights_service_flightsservice_getflightdetail",
       "community": 273,
@@ -10257,7 +10257,7 @@
       "label": "Interface Contracts",
       "file_type": "document",
       "source_file": "PROJECT.md",
-      "source_location": "L38",
+      "source_location": "L39",
       "_origin": "ast",
       "id": "project_interface_contracts",
       "community": 160,
@@ -10267,7 +10267,7 @@
       "label": "NestJS Backend \u2194 Next.js Frontend",
       "file_type": "document",
       "source_file": "PROJECT.md",
-      "source_location": "L40",
+      "source_location": "L41",
       "_origin": "ast",
       "id": "project_nestjs_backend_next_js_frontend",
       "community": 160,
@@ -10277,7 +10277,7 @@
       "label": "FastAPI Agent Service",
       "file_type": "document",
       "source_file": "PROJECT.md",
-      "source_location": "L48",
+      "source_location": "L51",
       "_origin": "ast",
       "id": "project_fastapi_agent_service",
       "community": 160,
@@ -11374,14 +11374,14 @@
       "norm_label": "progress by feature"
     },
     {
-      "label": "[ ] Feature: Duffel Flight Search Service Setup & Agent Gateway Refactoring (Feature 6)",
+      "label": "[x] Feature: Duffel Flight Search Service Setup & Agent Gateway Refactoring (Feature 6)",
       "file_type": "document",
       "source_file": "context/progress-checker.md",
       "source_location": "L17",
       "_origin": "ast",
-      "id": "context_progress_checker_feature_duffel_flight_search_service_setup_agent_gateway_refactoring_feature_6",
+      "id": "context_progress_checker_x_feature_duffel_flight_search_service_setup_agent_gateway_refactoring_feature_6",
       "community": 133,
-      "norm_label": "[ ] feature: duffel flight search service setup & agent gateway refactoring (feature 6)"
+      "norm_label": "[x] feature: duffel flight search service setup & agent gateway refactoring (feature 6)"
     },
     {
       "label": "[x] Feature: LLM Output Guardrails",
@@ -32787,7 +32787,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "apps/api/src/flights/flights.service.ts",
-      "source_location": "L399",
+      "source_location": "L404",
       "weight": 1.0,
       "source": "apps_api_src_flights_flights_service_flightsservice_getflightdetail",
       "target": "apps_api_src_audit_audit_service_auditservice_createlog"
@@ -32798,7 +32798,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "apps/api/src/flights/flights.service.ts",
-      "source_location": "L231",
+      "source_location": "L234",
       "weight": 1.0,
       "source": "apps_api_src_flights_flights_service_flightsservice_search",
       "target": "apps_api_src_audit_audit_service_auditservice_createlog"
@@ -36258,7 +36258,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "apps/api/src/flights/flights.service.ts",
-      "source_location": "L152",
+      "source_location": "L153",
       "weight": 1.0,
       "source": "apps_api_src_flights_flights_service_flightsservice_search",
       "target": "apps_api_src_duffel_duffel_service_duffelservice_searchflights"
@@ -36607,7 +36607,7 @@
       "context": "generic_arg",
       "confidence": "EXTRACTED",
       "source_file": "apps/api/src/flights/flights.service.ts",
-      "source_location": "L257",
+      "source_location": "L262",
       "weight": 1.0,
       "source": "apps_api_src_flights_flights_service_flightsservice_getflightdetail",
       "target": "apps_api_src_flights_dto_detail_flight_dto_flightdetailresponsedto",
@@ -37073,7 +37073,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "apps/api/src/flights/flights.service.ts",
-      "source_location": "L421",
+      "source_location": "L426",
       "weight": 1.0,
       "source": "apps_api_src_flights_flights_service_flightsservice_getflightdetail",
       "target": "apps_api_src_flights_flights_service_parseiso8601duration",
@@ -37106,7 +37106,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "apps/api/src/flights/flights.service.ts",
-      "source_location": "L427",
+      "source_location": "L432",
       "weight": 1.0,
       "source": "apps_api_src_flights_flights_service_flightsservice_getflightdetail",
       "target": "apps_api_src_flights_flights_service_capitalize",
@@ -37128,7 +37128,7 @@
       "context": "argument",
       "confidence": "INFERRED",
       "source_file": "apps/api/src/flights/flights.service.ts",
-      "source_location": "L429",
+      "source_location": "L434",
       "weight": 1.0,
       "source": "apps_api_src_flights_flights_service_flightsservice_getflightdetail",
       "target": "apps_api_src_flights_flights_service_mapsegment",
@@ -37159,7 +37159,7 @@
       "relation": "method",
       "confidence": "EXTRACTED",
       "source_file": "apps/api/src/flights/flights.service.ts",
-      "source_location": "L257",
+      "source_location": "L262",
       "weight": 1.0,
       "source": "apps_api_src_flights_flights_service_flightsservice",
       "target": "apps_api_src_flights_flights_service_flightsservice_getflightdetail",
@@ -40988,7 +40988,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "PROJECT.md",
-      "source_location": "L38",
+      "source_location": "L39",
       "weight": 1.0,
       "source": "project_project_flight_booking_system_monorepo",
       "target": "project_interface_contracts",
@@ -41008,7 +41008,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "PROJECT.md",
-      "source_location": "L48",
+      "source_location": "L51",
       "weight": 1.0,
       "source": "project_interface_contracts",
       "target": "project_fastapi_agent_service",
@@ -41018,7 +41018,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "PROJECT.md",
-      "source_location": "L40",
+      "source_location": "L41",
       "weight": 1.0,
       "source": "project_interface_contracts",
       "target": "project_nestjs_backend_next_js_frontend",
@@ -42078,16 +42078,6 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "context/progress-checker.md",
-      "source_location": "L17",
-      "weight": 1.0,
-      "source": "context_progress_checker_progress_by_feature",
-      "target": "context_progress_checker_feature_duffel_flight_search_service_setup_agent_gateway_refactoring_feature_6",
-      "confidence_score": 1.0
-    },
-    {
-      "relation": "contains",
-      "confidence": "EXTRACTED",
-      "source_file": "context/progress-checker.md",
       "source_location": "L62",
       "weight": 1.0,
       "source": "context_progress_checker_progress_by_feature",
@@ -42122,6 +42112,16 @@
       "weight": 1.0,
       "source": "context_progress_checker_progress_by_feature",
       "target": "context_progress_checker_x_feature_database_health_endpoint",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "context/progress-checker.md",
+      "source_location": "L17",
+      "weight": 1.0,
+      "source": "context_progress_checker_progress_by_feature",
+      "target": "context_progress_checker_x_feature_duffel_flight_search_service_setup_agent_gateway_refactoring_feature_6",
       "confidence_score": 1.0
     },
     {
@@ -52081,5 +52081,5 @@
       "source_file": "specs/004-output-guardrails/data-model.md"
     }
   ],
-  "built_at_commit": "998d01bf44d75fbf48e17eef355a0c80b79f3348"
+  "built_at_commit": "954f00ca949414d129bffd06c4b57392943c3ce7"
 }

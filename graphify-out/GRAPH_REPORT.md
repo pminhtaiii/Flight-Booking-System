@@ -1,7 +1,7 @@
 # Graph Report - Booking Systems  (2026-07-09)
 
 ## Corpus Check
-- 271 files · ~160,231 words
+- 271 files · ~160,293 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
@@ -10,7 +10,7 @@
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `998d01bf`
+- Built from commit: `954f00ca`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -545,7 +545,7 @@ Nodes (48): Acceptance, Acceptance, Acceptance, Acceptance, Acceptance, Acceptan
 
 ### Community 133 - "Progress by Feature"
 Cohesion: 0.11
-Nodes (18): Current Status, Decisions Made During Build, [ ] Feature: Duffel Flight Search Service Setup & Agent Gateway Refactoring (Feature 6), Notes, Progress by Feature, Progress Tracker, [x] Feature: Agent Gateway & Tool Execution (NestJS/LangGraph), [x] Feature: Agent Tool-Calling & Data Access (+10 more)
+Nodes (18): Current Status, Decisions Made During Build, Notes, Progress by Feature, Progress Tracker, [x] Feature: Agent Gateway & Tool Execution (NestJS/LangGraph), [x] Feature: Agent Tool-Calling & Data Access, [x] Feature: Chatbot Agent Service (+10 more)
 
 ### Community 134 - "User Scenarios & Testing _(mandatory)_"
 Cohesion: 0.12
