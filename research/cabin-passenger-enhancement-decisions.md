@@ -177,7 +177,7 @@ SHA-256(JSON.stringify({
 
 ### Interface compatibility:
 - Agent gateway uses the **same DTO shape** as the frontend (`adults`, `children`, `infants`, `cabinClass`)
-- Defaults: `adults = query.passengers`, `children = 0`, `infants = 0`, `cabinClass = 'economy'`
+- Defaults: `adults` mapped from the incoming request's passenger count field, `children = 0`, `infants = 0`, `cabinClass = 'economy'`
 - No interface migration needed when full extraction is implemented later
 
 ### Future upgrade plan:

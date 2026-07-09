@@ -159,7 +159,7 @@ apps/web/
 | Add keyword detection function in `AgentGatewayService` | ☐ | Scan user message before search execution |
 | Add honest limitation response when keywords detected | ☐ | Clear message directing to search page |
 | Log keyword triggers with structured metadata | ☐ | For future upgrade analytics |
-| Update `AgentGatewayService.searchFlights()` to use same DTO shape | ☐ | `adults: query.passengers, children: 0, infants: 0, cabinClass: 'economy'` |
+| Update `AgentGatewayService.searchFlights()` to use same DTO shape | ☐ | Map to new request shape: `adults` derived from the incoming passenger count, `children: 0, infants: 0, cabinClass: 'economy'` |
 | Verify agent gateway E2E tests still pass | ☐ | Regression check |
 
 **Exit criteria**: Agent detects unsupported requests, responds honestly, logs triggers. Normal searches work unchanged. Same DTO shape as frontend.

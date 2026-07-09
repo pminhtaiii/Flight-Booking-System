@@ -43,7 +43,7 @@ model FlightOffer {
   adults          Int
   children        Int      @default(0)
   infants         Int      @default(0)
-  cabinClass      String   @default("economy")
+  cabinClass      String   @default("economy") @map("cabin_class")
   price           Decimal  @db.Decimal(10, 2)
   currency        String   @default("USD")
   createdAt       DateTime @default(now())
@@ -64,7 +64,7 @@ model SearchHistory {
   adults          Int
   children        Int      @default(0)
   infants         Int      @default(0)
-  cabinClass      String   @default("economy")
+  cabinClass      String   @default("economy") @map("cabin_class")
   resultCount     Int
   minPrice        Decimal? @db.Decimal(10, 2)
   maxPrice        Decimal? @db.Decimal(10, 2)
@@ -99,13 +99,14 @@ class FlightSearchRequestDto {
   children?: number;       // optional, default 0, min 0
   infants?: number;        // optional, default 0, min 0
   // NEW
-  cabinClass: 'economy' | 'premium_economy' | 'business' | 'first';  // default 'economy'
+  cabinClass?: 'economy' | 'premium_economy' | 'business' | 'first';  // optional, default 'economy'
 }
 ```
 
 **Validation rules**:
 - `adults >= 1`
 - `infants <= adults`
+- `cabinClass` defaults to `'economy'` if omitted, and is normalized to `'economy'` at the ingestion layer (in FlightsController/FlightsService) so that cache hashing and database persistence treat legacy callers omitting the field identically to explicit `'economy'` values.
 - `adults + (children ?? 0) + (infants ?? 0) <= 9`
 
 ### FlightSegmentDto — additions
