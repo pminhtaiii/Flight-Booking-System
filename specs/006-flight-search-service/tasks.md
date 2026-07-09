@@ -102,8 +102,8 @@
 
 ### Implementation for User Story 3
 
-- [x] T028 [US3] Ensure search metadata writing in write-behind logic in `apps/api/src/flights/flights.service.ts`
-- [x] T029 [US3] Integrate search history repository in cron task in `apps/api/src/duffel/duffel-cleanup.service.ts`
+- [X] T028 [US3] Ensure search metadata writing in write-behind logic in `apps/api/src/flights/flights.service.ts`
+- [X] T029 [US3] Integrate search history repository in cron task in `apps/api/src/duffel/duffel-cleanup.service.ts`
 
 **Checkpoint**: All user stories are independently functional and history analytics are captured.
 
