@@ -100,8 +100,8 @@
 
 **Purpose**: Cleanup, documentation, and manual verification
 
-- [ ] T028 [P] Update project documentation files in `context/`
-- [ ] T029 Run quickstart.md validation scenario verification
+- [x] T028 [P] Update project documentation files in `context/`
+- [x] T029 Run quickstart.md validation scenario verification
 
 ---
 
@@ -109,9 +109,9 @@
 
 **Purpose**: Automated verification of backend, agent gateway, and frontend E2E functionality
 
-- [ ] T030 [P] Implement backend E2E tests for cabin search, mixed/downgraded classification, passenger validation, cache separation, and 410 recovery in `apps/api/test/flights-search.e2e-spec.ts` and `apps/api/test/flights-detail.e2e-spec.ts`
+- [x] T030 [P] Implement backend E2E tests for cabin search, mixed/downgraded classification, passenger validation, cache separation, and 410 recovery in `apps/api/test/flights-search.e2e-spec.ts` and `apps/api/test/flights-detail.e2e-spec.ts`
 - [x] T031 [P] Implement agent gateway keyword detection E2E tests in `apps/api/test/agent-gateway.e2e-spec.ts`
-- [ ] T032 [P] Implement Playwright UI E2E tests for cabin selector, passenger picker, and mismatch badges in `apps/web/tests/search.spec.ts`
+- [x] T032 [P] Implement Playwright UI E2E tests for cabin selector, passenger picker, and mismatch badges in `apps/web/tests/search.spec.ts`
 
 ---
 

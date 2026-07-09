@@ -49,9 +49,16 @@ test.describe('Flight Search Integration E2E Flows', () => {
     await expect(sgnSuggestion).toBeVisible();
     await sgnSuggestion.click();
 
-    // Fill in Passenger count
-    const passengerInput = page.locator('div:has(> label:has-text("Passengers")) input');
-    await passengerInput.fill('2');
+    // Click Passengers button to open dropdown
+    const passengerBtn = page.locator('div:has(> label:has-text("Passengers")) button').first();
+    await passengerBtn.click();
+
+    // Click "+" button in Adults row to increase to 2 (initial value is 1)
+    const plusBtn = page.locator('button:has-text("+")').first();
+    await plusBtn.click();
+
+    // Close dropdown
+    await passengerBtn.click();
 
     // Fill in Departure date (future date)
     const departDateInput = page.locator('div:has(> label:has-text("Departure Date")) input');
@@ -135,9 +142,16 @@ test.describe('Flight Search Integration E2E Flows', () => {
     await expect(sgnSuggestion).toBeVisible();
     await sgnSuggestion.click();
 
-    // Fill in Passenger count
-    const passengerInput = page.locator('div:has(> label:has-text("Passengers")) input');
-    await passengerInput.fill('2');
+    // Click Passengers button to open dropdown
+    const passengerBtn = page.locator('div:has(> label:has-text("Passengers")) button').first();
+    await passengerBtn.click();
+
+    // Click "+" button in Adults row to increase to 2 (initial value is 1)
+    const plusBtn = page.locator('button:has-text("+")').first();
+    await plusBtn.click();
+
+    // Close dropdown
+    await passengerBtn.click();
 
     // Fill in Departure date (future date)
     const departDateInput = page.locator('div:has(> label:has-text("Departure Date")) input');
