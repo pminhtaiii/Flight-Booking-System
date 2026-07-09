@@ -128,34 +128,53 @@ export class AgentGatewayService {
   ): Promise<FlightSearchResponseDto> {
     const startTime = Date.now();
     try {
+      const adultsCount = query.adults || query.passengers;
+      if (!adultsCount) {
+        throw new HttpException('Adults count is required', HttpStatus.BAD_REQUEST);
+      }
+
       // Check for user's latest chat message and perform honest degradation keyword validation
-      const lastMessage = await this.prisma.chatMessage.findFirst({
-        where: {
-          sender: 'USER',
-          session: { userId },
-        },
-        orderBy: { createdAt: 'desc' },
-      });
+      let lastMessage = null;
+      if (correlationId) {
+        lastMessage = await this.prisma.chatMessage.findFirst({
+          where: {
+            sender: 'USER',
+            sessionId: correlationId,
+          },
+          orderBy: { createdAt: 'desc' },
+        });
+      }
+
+      if (!lastMessage) {
+        lastMessage = await this.prisma.chatMessage.findFirst({
+          where: {
+            sender: 'USER',
+            session: { userId },
+          },
+          orderBy: { createdAt: 'desc' },
+        });
+      }
 
       if (lastMessage) {
-        const contentLower = lastMessage.content.toLowerCase();
         const matchedKeywords: string[] = [];
 
         for (const kw of CABIN_KEYWORDS) {
-          if (contentLower.includes(kw)) {
+          const regex = new RegExp(`\\b${kw}\\b`, 'i');
+          if (regex.test(lastMessage.content)) {
             matchedKeywords.push(kw);
           }
         }
 
         for (const kw of PASSENGER_KEYWORDS) {
-          if (contentLower.includes(kw)) {
+          const regex = new RegExp(`\\b${kw}\\b`, 'i');
+          if (regex.test(lastMessage.content)) {
             matchedKeywords.push(kw);
           }
         }
 
         if (matchedKeywords.length > 0) {
           this.logger.warn(
-            `Agent gateway keyword trigger matched for user ${userId}. Message: "${lastMessage.content}". Matched keywords: ${matchedKeywords.join(', ')}`
+            `Agent gateway keyword trigger matched for user ${userId}. Matched keywords: ${matchedKeywords.join(', ')}`
           );
 
           // Write audit log
@@ -166,7 +185,7 @@ export class AgentGatewayService {
             resourceId: lastMessage.id,
             metadata: {
               matchedKeywords,
-              originalMessage: lastMessage.content,
+              messageId: lastMessage.id,
             },
             traceId,
             correlationId,
@@ -177,11 +196,6 @@ export class AgentGatewayService {
             HttpStatus.BAD_REQUEST,
           );
         }
-      }
-
-      const adultsCount = query.adults || query.passengers;
-      if (!adultsCount) {
-        throw new HttpException('Adults count is required', HttpStatus.BAD_REQUEST);
       }
 
       // 1. Check Redis cache first for mapped results

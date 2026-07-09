@@ -1,16 +1,16 @@
 # Graph Report - Booking Systems  (2026-07-09)
 
 ## Corpus Check
-- 281 files · ~171,273 words
+- 281 files · ~171,331 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 2431 nodes · 2926 edges · 283 communities (150 shown, 133 thin omitted)
+- 2431 nodes · 2926 edges · 282 communities (149 shown, 133 thin omitted)
 - Extraction: 95% EXTRACTED · 5% INFERRED · 0% AMBIGUOUS · INFERRED: 139 edges (avg confidence: 0.78)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `7acc2fff`
+- Built from commit: `c9ed718b`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -312,7 +312,7 @@
 - **Agent Gateway REST Endpoints** — specs_003_agent_tool_calling_contracts_agent_gateway_api_get_search_flights, specs_003_agent_tool_calling_contracts_agent_gateway_api_get_user_preferences, specs_003_agent_tool_calling_contracts_agent_gateway_api_get_user_bookings [EXTRACTED 1.00]
 - **Output Guardrail Pipeline Components** — specs_004_output_guardrails_data_model_chunkbuffer_model, specs_004_output_guardrails_data_model_slidingwindow_model, specs_004_output_guardrails_data_model_outputguardrailconfig_model, specs_004_output_guardrails_data_model_outputguardrailpipeline_model [EXTRACTED 1.00]
 
-## Communities (283 total, 133 thin omitted)
+## Communities (282 total, 133 thin omitted)
 
 ### Community 0 - "NestJSClient"
 Cohesion: 0.27
@@ -544,7 +544,7 @@ Nodes (48): Acceptance, Acceptance, Acceptance, Acceptance, Acceptance, Acceptan
 
 ### Community 133 - "Progress by Feature"
 Cohesion: 0.10
-Nodes (19): Current Status, Decisions Made During Build, [ ] Feature: Cabin Class & Passenger Type Enhancement (Feature 8), Notes, Progress by Feature, Progress Tracker, [x] Feature: Agent Gateway & Tool Execution (NestJS/LangGraph), [x] Feature: Agent Tool-Calling & Data Access (+11 more)
+Nodes (19): Current Status, Decisions Made During Build, Notes, Progress by Feature, Progress Tracker, [x] Feature: Agent Gateway & Tool Execution (NestJS/LangGraph), [x] Feature: Agent Tool-Calling & Data Access, [x] Feature: Cabin Class & Passenger Type Enhancement (Feature 8) (+11 more)
 
 ### Community 134 - "User Scenarios & Testing _(mandatory)_"
 Cohesion: 0.12
@@ -743,7 +743,7 @@ Cohesion: 0.33
 Nodes (4): Any, BaseMessage, ChatGenerationChunk, ChatResult
 
 ### Community 256 - "plan.md"
-Cohesion: 0.13
+Cohesion: 0.11
 Nodes (5): AuthController, AuthenticatedRequest, LoginDto, RegisterDto, LockoutService
 
 ### Community 257 - "scripts"

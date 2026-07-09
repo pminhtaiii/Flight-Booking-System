@@ -29,6 +29,29 @@ export function IsFutureDateString(validationOptions?: ValidationOptions) {
   };
 }
 
+export function AtLeastOnePassengerField(validationOptions?: ValidationOptions) {
+  return function (object: Function) {
+    registerDecorator({
+      name: 'atLeastOnePassengerField',
+      target: object,
+      propertyName: '',
+      options: validationOptions,
+      validator: {
+        validate(value: any, args: ValidationArguments) {
+          const obj = args.object as any;
+          const hasAdults = obj.adults !== undefined && obj.adults !== null;
+          const hasPassengers = obj.passengers !== undefined && obj.passengers !== null;
+          return hasAdults || hasPassengers;
+        },
+        defaultMessage() {
+          return 'At least one of adults or passengers must be provided';
+        }
+      },
+    });
+  };
+}
+
+@AtLeastOnePassengerField()
 export class FlightSearchQueryDto {
   @IsString()
   @Matches(/^[A-Z]{3}$/, { message: 'origin must be a 3-character uppercase IATA airport code' })

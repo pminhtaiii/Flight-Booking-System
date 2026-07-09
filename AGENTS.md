@@ -98,8 +98,3 @@ When a task involves creating a pull request or requesting CodeRabbit reviews:
    - Use `pull_request_read` with method `get_review_comments` to fetch CodeRabbit's inline review threads.
    - Address all findings, push changes, and post `@coderabbitai review` again to confirm convergence. Do not consider a planning or implementation phase complete until all CodeRabbit comments are resolved.
 
-<!-- SPECKIT START -->
-For additional context about technologies to be used, project structure,
-shell commands, and other important information, read the current plan
-at specs/008-cabin-passenger-enhancement/plan.md
-<!-- SPECKIT END -->
