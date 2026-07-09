@@ -142,15 +142,19 @@ export class FlightsService {
       throw new BadRequestException(`Destination airport with code ${destination} does not exist`);
     }
 
+    const passengersInfo = {
+      adults: Number(query.adults),
+      children: Number(query.children || 0),
+      infants: Number(query.infants || 0),
+      cabinClass: query.cabinClass || 'economy',
+    };
+
     const forSearch = {
       origin,
       destination,
       departureDate: query.departureDate,
       returnDate: query.returnDate || undefined,
-      adults: Number(query.adults),
-      children: Number(query.children || 0),
-      infants: Number(query.infants || 0),
-      cabinClass: query.cabinClass || 'economy',
+      ...passengersInfo,
     };
 
     const searchResult = await this.duffelService.searchFlights(forSearch, 'user');
@@ -182,10 +186,7 @@ export class FlightsService {
               destination,
               departureDate: new Date(query.departureDate),
               returnDate: query.returnDate ? new Date(query.returnDate) : null,
-              adults: Number(query.adults),
-              children: Number(query.children || 0),
-              infants: Number(query.infants || 0),
-              cabinClass: query.cabinClass || 'economy',
+              ...passengersInfo,
               resultCount: results.length,
               minPrice,
               maxPrice,
@@ -206,10 +207,7 @@ export class FlightsService {
                 destination,
                 departureDate: new Date(query.departureDate),
                 returnDate: query.returnDate ? new Date(query.returnDate) : null,
-                adults: Number(query.adults),
-                children: Number(query.children || 0),
-                infants: Number(query.infants || 0),
-                cabinClass: query.cabinClass || 'economy',
+                ...passengersInfo,
                 price: new Prisma.Decimal(offerDto.price),
                 currency: offerDto.currency,
               };
@@ -249,10 +247,7 @@ export class FlightsService {
         destination,
         departureDate: query.departureDate,
         returnDate: query.returnDate || null,
-        adults: Number(query.adults),
-        children: Number(query.children || 0),
-        infants: Number(query.infants || 0),
-        cabinClass: query.cabinClass || 'economy',
+        ...passengersInfo,
         searchHash: sha256,
         resultCount: results.length,
         responseTime,

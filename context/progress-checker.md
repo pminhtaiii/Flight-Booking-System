@@ -7,8 +7,8 @@ Update this file after every completed feature. Any AI agent reading this should
 ### Current Status
 
 **Feature:** Cabin Class & Passenger Type Enhancement (In Progress)
-**Last completed:** Updated NestJS E2E tests and Agent Gateway queries/DTO to align with new database schema and DTO updates.
-**Next:** Phase 2: DuffelService — Cabin Class & Passenger Mapper.
+**Last completed:** Phase 2: DuffelService — Cabin Class & Passenger Mapper.
+**Next:** Phase 3: FlightsModule — Cabin Match Classification & DTOs.
 
 ---
 
@@ -17,7 +17,7 @@ Update this file after every completed feature. Any AI agent reading this should
 ### [ ] Feature: Cabin Class & Passenger Type Enhancement (Feature 8)
 
 - [x] Phase 1: Database Schema Migration (Prisma model updates for FlightOffer and SearchHistory, database migrations, client regeneration)
-- [ ] Phase 2: DuffelService — Cabin Class & Passenger Mapper
+- [x] Phase 2: DuffelService — Cabin Class & Passenger Mapper (Implemented mapPassengersToDuffel, updated searchFlights signature, cache key SHA-256, mock data generation and Duffel API payload)
 - [ ] Phase 3: FlightsModule — Cabin Match Classification & DTOs
 - [x] Phase 4: Agent Gateway — Honest Degradation (In Progress/Aligned DTO and E2E)
 - [ ] Phase 5: Frontend Integration

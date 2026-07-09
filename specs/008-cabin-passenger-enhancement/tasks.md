@@ -20,8 +20,8 @@
 
 **Purpose**: Project initialization and basic structure
 
-- [ ] T001 Verify/generate ignore files based on project setup (e.g., `.gitignore`, `.dockerignore`, `.eslintignore`, `.prettierignore`)
-- [ ] T002 Update active feature configuration in `.specify/feature.json`
+- [x] T001 Verify/generate ignore files based on project setup (e.g., `.gitignore`, `.dockerignore`, `.eslintignore`, `.prettierignore`)
+- [x] T002 Update active feature configuration in `.specify/feature.json`
 
 ---
 
@@ -47,11 +47,11 @@
 
 ### Implementation for User Story 1
 
-- [ ] T006 [P] [US1] Create isolated `mapPassengersToDuffel` function in `apps/api/src/duffel/duffel.service.ts`
-- [ ] T007 [US1] Modify `searchFlights` signature to accept `cabinClass` and flat passenger breakdown in `apps/api/src/duffel/duffel.service.ts`
-- [ ] T008 [US1] Update `duffel.offerRequests.create` call to pass `cabin_class` preference and mapped passengers in `apps/api/src/duffel/duffel.service.ts`
-- [ ] T009 [US1] Update cache key SHA-256 computation to include cabin class and passenger breakdown in `apps/api/src/duffel/duffel.service.ts`
-- [ ] T010 [P] [US1] Update mock data generation to include cabin class in `apps/api/src/duffel/duffel.service.ts` or `apps/api/src/duffel/duffel.types.ts`
+- [x] T006 [P] [US1] Create isolated `mapPassengersToDuffel` function in `apps/api/src/duffel/duffel.service.ts`
+- [x] T007 [US1] Modify `searchFlights` signature to accept `cabinClass` and flat passenger breakdown in `apps/api/src/duffel/duffel.service.ts`
+- [x] T008 [US1] Update `duffel.offerRequests.create` call to pass `cabin_class` preference and mapped passengers in `apps/api/src/duffel/duffel.service.ts`
+- [x] T009 [US1] Update cache key SHA-256 computation to include cabin class and passenger breakdown in `apps/api/src/duffel/duffel.service.ts`
+- [x] T010 [P] [US1] Update mock data generation to include cabin class in `apps/api/src/duffel/duffel.service.ts` or `apps/api/src/duffel/duffel.types.ts`
 - [ ] T011 [P] [US1] Update `FlightSearchRequestDto` to replace `passengers` with flat passenger fields and `cabinClass` in `apps/api/src/flights/dto/search-flight.dto.ts`
 - [ ] T012 [P] [US1] Add custom cross-field validators for passenger limits and infants in `apps/api/src/flights/dto/search-flight.dto.ts`
 - [ ] T013 [P] [US1] Add per-segment `cabinClass` and DTO fields for mixed/downgraded cabins in `apps/api/src/flights/dto/search-flight.dto.ts` and `apps/api/src/flights/dto/detail-flight.dto.ts`
