@@ -31,7 +31,7 @@ Temporary server-side record bridging flight selection and payment. Stores the c
 | `children` | `Int` | `@default(0)` | Number of child passengers |
 | `infants` | `Int` | `@default(0)` | Number of infant passengers |
 | `rawOfferSnapshot` | `Json` | Required | Full Duffel offer snapshot at re-pricing time |
-| `intentExpiresAt` | `DateTime` | Required, set at creation = `createdAt` + `BOOKING_INTENT_TTL_MINUTES` | Client-facing soft-expiry time for the `PENDING` state. Stored so clients can render a countdown without knowing the server's TTL config. The Phase 1 cron re-evaluates `createdAt` + TTL at run time and is authoritative — this field mirrors that threshold |
+| `intentExpiresAt` | `DateTime` | Required, set at creation = `createdAt` + `BOOKING_INTENT_TTL_MINUTES` | Client-facing soft-expiry time for the `PENDING` state. Stored so clients can render a countdown without knowing the server's TTL config. This is the authoritative expiration deadline for Phase 1 cleanup; the cron job must compare against this stored value instead of recomputing TTL from `createdAt` |
 | `offerExpiresAt` | `DateTime?` | | Duffel offer's own expiration time, as returned by Duffel — distinct from `intentExpiresAt` above (our TTL), and nullable because not every Duffel response includes it |
 | `createdAt` | `DateTime` | `@default(now())` | Creation timestamp |
 | `updatedAt` | `DateTime` | `@updatedAt` | Last update timestamp |
@@ -43,7 +43,7 @@ Temporary server-side record bridging flight selection and payment. Stores the c
 **Indexes**:
 - `@@index([userId])`
 - `@@index([userId, status])`
-- `@@index([status, createdAt])` — for Phase 1 cron (`PENDING` → `EXPIRED`)
+- `@@index([status, intentExpiresAt])` — for Phase 1 cron (`PENDING` → `EXPIRED`)
 - `@@index([status, updatedAt])` — for Phase 2 cron (`EXPIRED` → hard delete)
 - `@@map("booking_intents")`
 
@@ -110,11 +110,11 @@ PENDING ──(payment confirmed, Feature B)──→ COMPLETED ──(retention
 ```
 
 **Transition rules**:
-- `PENDING → EXPIRED`: Cron job, atomic conditional update when `createdAt` + TTL (30 min) < now (see [research.md](./research.md) → R3 for the concurrency-safe claim mechanism)
-- `EXPIRED → [DELETED]`: Cron job, when `updatedAt` + grace period (24h) < now
-- `PENDING → COMPLETED`: Feature B payment webhook, using the same atomic-claim pattern as above (out of scope for Feature A)
+- `PENDING → EXPIRED`: Cron job, atomic conditional update when `intentExpiresAt < now` and `status = PENDING`; the `BOOKING_INTENT_TTL_MINUTES` deadline is applied once at creation, and the conditional update only serializes this local state transition (see [research.md](./research.md) → R3)
+- `EXPIRED → [DELETED]`: Cron job, when `updatedAt` + `BOOKING_INTENT_GRACE_HOURS` grace period < now
+- `PENDING → COMPLETED`: Feature B payment webhook, idempotent by provider event ID and guarded by the same local conditional update pattern; if payment settles after local expiration, the webhook path must reconcile or compensate against the provider result rather than assuming the row claim makes the payment impossible (out of scope for Feature A)
 - `COMPLETED → [DELETED]`: Retention-window cron, out of scope for this feature (see [research.md](./research.md) → R7 for the recommended retention period)
-- `EXPIRED` intents with in-flight payment: cannot occur under the atomic-claim mechanism in R3 — whichever of {cron, webhook} updates the row first wins, and the other write is a no-op
+- `EXPIRED` intents with in-flight payment: local row updates may serialize state changes, but they do not prevent a provider payment from racing with expiration; the payment webhook/reconciliation path must handle that race idempotently
 
 ---
 

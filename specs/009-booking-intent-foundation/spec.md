@@ -51,6 +51,9 @@ A user who has created a booking intent can retrieve it to review passenger deta
 1. **Given** a logged-in user with an existing `BookingIntent` in `PENDING` status, **When** they request the intent by ID, **Then** the system returns all passenger details (with passport data decrypted for the owning user), pricing snapshot, and flight reference.
 2. **Given** a logged-in user requesting a booking intent belonging to a different user, **When** the request is processed, **Then** the system returns 403 Forbidden.
 3. **Given** a booking intent with status `EXPIRED`, **When** the user requests it, **Then** the system returns 410 Gone with a message indicating the intent has expired and they should search again.
+4. **Given** a JWT-authenticated user with a `TravelerProfile`, **When** they request `GET /bookings/intent/prefill`, **Then** the system returns 200 with `hasProfile: true` and the profile-backed passenger fields plus a `missingFields` list for anything still required.
+5. **Given** a JWT-authenticated user without a `TravelerProfile`, **When** they request `GET /bookings/intent/prefill`, **Then** the system returns 200 with `hasProfile: false` and the `missingFields` list needed to complete the passenger form.
+6. **Given** an unauthenticated request to `GET /bookings/intent/prefill`, **When** the request is processed, **Then** the system returns 401 Unauthorized.
 
 ---
 

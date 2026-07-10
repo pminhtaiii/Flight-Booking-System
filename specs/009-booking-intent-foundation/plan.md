@@ -6,7 +6,7 @@
 
 ## Summary
 
-Create a dedicated `BookingIntent` + `BookingIntentPassenger` data model with a `BookingIntentModule` in NestJS. The module validates passenger details, calls Duffel to re-confirm pricing, creates encrypted intent records, pre-fills primary passenger data from `TravelerProfile`, and manages a two-phase cleanup lifecycle (PENDING → EXPIRED → deleted) via scheduled cron jobs.
+Create a dedicated `BookingIntent` + `BookingIntentPassenger` data model with a `BookingIntentModule` in NestJS. The module pre-fills primary passenger data from `TravelerProfile` before validation, validates passenger details, calls Duffel to re-confirm pricing, creates encrypted intent records, and manages a two-phase cleanup lifecycle (PENDING → EXPIRED → deleted) via scheduled cron jobs.
 
 ## Technical Context
 
@@ -105,12 +105,12 @@ packages/shared/
 |------|--------|-------|
 | Create `create-intent.dto.ts` with class-validator decorators | ☐ | Passenger array, cross-field validation (infants ≤ adults, total ≤ 9) |
 | Create `intent-response.dto.ts` for creation and retrieval responses | ☐ | Separate creation vs. detail shapes (passport excluded from creation response) |
-| Create `booking-intent.service.ts` | ☐ | Core logic: validate → look up `FlightOffer` by `flightOfferId` (source of truth for `duffelOfferId`, route, dates) → re-price via Duffel → encrypt PII → create intent + passengers (with `position`) in a transaction |
-| Implement TravelerProfile pre-fill logic | ☐ | If `useProfile: true` on primary adult, merge profile data into passenger fields before validation |
+| Create `booking-intent.service.ts` | ☐ | Core logic: look up `FlightOffer` by `flightOfferId` (source of truth for `duffelOfferId`, route, dates) → apply TravelerProfile pre-fill to the primary adult when requested → validate merged passenger data → re-price via Duffel → encrypt PII → create intent + passengers (with `position`) and audit row in a single transaction |
+| Implement TravelerProfile pre-fill logic | ☐ | If `useProfile: true` on primary adult, merge profile data into passenger fields before validation so the validator sees the effective request shape |
 | Implement Duffel re-pricing (reuse `duffel.offers.get()` pattern) | ☐ | Use the looked-up `FlightOffer`'s stored `duffelOfferId` — never a client-supplied value. Same approach as `getFlightDetail()`: call Duffel, snapshot the response |
 | Create `booking-intent.controller.ts` with `POST /bookings/intent`, `GET /bookings/intent/:id`, `GET /bookings/intent/prefill` | ☐ | JWT-guarded, ownership enforcement |
 | Create `booking-intent.module.ts` and register in `app.module.ts` | ☐ | Import PrismaModule, DuffelModule, AuditModule |
-| Add audit logging for `booking_intent_created` | ☐ | Structured metadata: intentId, userId, offerId, passengerCount, priceChanged |
+| Add audit logging for `booking_intent_created` | ☐ | Structured metadata: intentId, userId, offerId, passengerCount, priceChanged; write the audit row inside the same Prisma transaction as intent creation |
 
 **Exit criteria**: All 3 endpoints work. Intent creation validates passengers, re-prices via Duffel using the `FlightOffer`'s own `duffelOfferId`, encrypts PII, creates DB records in a transaction, and returns confirmed pricing. Retrieval decrypts passport data for the owning user. Pre-fill returns TravelerProfile data.
 
@@ -124,8 +124,8 @@ packages/shared/
 | Task | Status | Notes |
 |------|--------|-------|
 | Create `booking-intent.cron.ts` with `@nestjs/schedule` | ☐ | Two cron methods: Phase 1 (soft expire) and Phase 2 (hard delete) |
-| Phase 1 cron: `PENDING` → `EXPIRED` when `createdAt` + TTL < now | ☐ | Atomic conditional update (`WHERE status = 'PENDING'`); TTL configurable via `BOOKING_INTENT_TTL_MINUTES` env var (default: 30); see [research.md](./research.md) → R3 |
-| Phase 2 cron: hard-delete `EXPIRED` rows when `updatedAt` + grace < now | ☐ | Grace period configurable via `BOOKING_INTENT_GRACE_HOURS` env var (default: 24) |
+| Phase 1 cron: `PENDING` → `EXPIRED` when `intentExpiresAt` < now | ☐ | Atomic conditional update (`WHERE status = 'PENDING'`); expiration deadline is stored at creation from `BOOKING_INTENT_TTL_MINUTES`; see [research.md](./research.md) → R3 |
+| Phase 2 cron: hard-delete `EXPIRED` rows when `updatedAt` + grace < now | ☐ | Grace period configurable via `BOOKING_INTENT_GRACE_HOURS` env var |
 | Cascade delete verification: `BookingIntentPassenger` rows deleted with intent | ☐ | Prisma `onDelete: Cascade` handles this |
 | Structured logging for each cron run | ☐ | Count of intents expired, count deleted, duration |
 | Audit log entries for `booking_intent_expired` and `booking_intent_deleted` | ☐ | Batch audit log with intent IDs |
@@ -150,8 +150,9 @@ packages/shared/
 | E2E: Retrieve own intent (200) | ☐ | Verify decrypted passport data in response |
 | E2E: Retrieve other user's intent (403) | ☐ | Ownership enforcement |
 | E2E: Retrieve expired intent (410) | ☐ | Status = EXPIRED → 410 Gone |
-| E2E: Pre-fill endpoint with profile (200) | ☐ | Verify profile data and missing fields |
-| E2E: Pre-fill endpoint without profile (200) | ☐ | `hasProfile: false` |
+| E2E: Pre-fill endpoint with profile (200) | ☐ | Verify `hasProfile: true`, profile data, and missing fields |
+| E2E: Pre-fill endpoint without profile (200) | ☐ | Verify `hasProfile: false` and missing fields |
+| E2E: Audit write failure rolls back intent creation | ☐ | Force `booking_intent_created` insert to fail, verify both the intent and audit row are rolled back |
 | E2E: Cron Phase 1 — PENDING → EXPIRED | ☐ | Artificially age intent, trigger cron, verify status change |
 | E2E: Cron Phase 2 — EXPIRED → deleted | ☐ | Artificially age expired intent, trigger cron, verify deletion + cascade |
 | E2E: Duffel offer expired during re-pricing (410) | ☐ | Mock Duffel 404/410, verify error response |
@@ -167,8 +168,8 @@ packages/shared/
 | Variable | Default | Required | Notes |
 |----------|---------|----------|-------|
 | `ENCRYPTION_KEY` | — | Yes | 64-character hexadecimal string that decodes to exactly 32 bytes (256 bits) for AES-256-GCM. The encryption service must decode and validate this at startup and refuse to start if the decoded length is not exactly 32 bytes |
-| `BOOKING_INTENT_TTL_MINUTES` | `30` | No | Minutes before PENDING intent is marked EXPIRED |
-| `BOOKING_INTENT_GRACE_HOURS` | `24` | No | Hours before EXPIRED intent is hard-deleted |
+| `BOOKING_INTENT_TTL_MINUTES` | `30` | No | Minutes before a `PENDING` intent's stored `intentExpiresAt` deadline is reached and Phase 1 cleanup can mark it `EXPIRED` |
+| `BOOKING_INTENT_GRACE_HOURS` | `24` | No | Hours before an `EXPIRED` intent is hard-deleted |
 
 **Existing variables** (unchanged):
 - `DUFFEL_ACCESS_TOKEN` — used for re-pricing via `offers.get()`
