@@ -83,14 +83,14 @@ packages/shared/
 
 | Task | Status | Notes |
 |------|--------|-------|
-| Add `BookingIntentStatus` and `PassengerType` enums to `schema.prisma` | ☐ | `PENDING/EXPIRED/COMPLETED` and `ADULT/CHILD/INFANT` |
-| Add `BookingIntent` model to `schema.prisma` | ☐ | See [data-model.md](./data-model.md) for full field list |
-| Add `BookingIntentPassenger` model to `schema.prisma` | ☐ | Cascade delete from `BookingIntent`; includes required `position` field for stable ordering |
-| Add `bookingIntents BookingIntent[]` relation to `User` model | ☐ | One-to-many |
-| Add `bookingIntentPassengers BookingIntentPassenger[]` relation to `TravelerProfile` model | ☐ | Required back-relation for the new `BookingIntentPassenger.travelerProfile` FK (see [data-model.md](./data-model.md) → Relationship to Existing Models) |
-| Run `npx prisma migrate dev` and verify client types | ☐ | Generate migration |
-| Create `common/encryption.service.ts` — AES-256-GCM encrypt/decrypt utility | ☐ | Injectable NestJS service; reads `ENCRYPTION_KEY` env var, decodes as hex, and throws at startup if the decoded length is not exactly 32 bytes |
-| Add shared types to `packages/shared/src/types/booking-intent.types.ts` | ☐ | `BookingIntentStatus`, `PassengerType` enums |
+| Add `BookingIntentStatus` and `PassengerType` enums to `schema.prisma` | ☑ | `PENDING/EXPIRED/COMPLETED` and `ADULT/CHILD/INFANT` |
+| Add `BookingIntent` model to `schema.prisma` | ☑ | See [data-model.md](./data-model.md) for full field list |
+| Add `BookingIntentPassenger` model to `schema.prisma` | ☑ | Cascade delete from `BookingIntent`; includes required `position` field for stable ordering |
+| Add `bookingIntents BookingIntent[]` relation to `User` model | ☑ | One-to-many |
+| Add `bookingIntentPassengers BookingIntentPassenger[]` relation to `TravelerProfile` model | ☑ | Required back-relation for the new `BookingIntentPassenger.travelerProfile` FK (see [data-model.md](./data-model.md) → Relationship to Existing Models) |
+| Run `npx prisma migrate dev` and verify client types | ☑ | Generated migration SQL, applied it non-destructively, and verified Prisma client types; local `migrate dev` prompts for reset because an earlier migration was modified after application |
+| Create `common/encryption.service.ts` — AES-256-GCM encrypt/decrypt utility | ☑ | Injectable NestJS service; reads `ENCRYPTION_KEY` env var, decodes as hex, and throws at startup if the decoded length is not exactly 32 bytes |
+| Add shared types to `packages/shared/src/types/booking-intent.types.ts` | ☑ | `BookingIntentStatus`, `PassengerType` enums |
 
 **Exit criteria**: Migration applied, both tables exist, the `User` and `TravelerProfile` back-relations resolve, Prisma client types generated, encryption service works with AES-256-GCM and rejects invalid key lengths at startup.
 
