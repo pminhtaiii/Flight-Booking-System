@@ -1,7 +1,7 @@
 import 'reflect-metadata';
 import { validate } from 'class-validator';
 import { plainToInstance } from 'class-transformer';
-import { CreateIntentDto, CreateIntentPassengerDto } from './dto/create-intent.dto';
+import { CreateIntentDto } from './dto/create-intent.dto';
 import { PassengerType } from '@prisma/client';
 
 describe('CreateIntentDto Validation', () => {
@@ -44,7 +44,12 @@ describe('CreateIntentDto Validation', () => {
 
     const dto = plainToInstance(CreateIntentDto, rawDto);
     const errors = await validate(dto);
-    expect(errors.length).toBeGreaterThan(0);
+
+    const passengersError = errors.find((e) => e.property === 'passengers');
+    const childErrors = passengersError?.children?.[0]?.children ?? [];
+    const dobError = childErrors.find((e) => e.property === 'dateOfBirth');
+    expect(dobError).toBeDefined();
+    expect(Object.keys(dobError!.constraints ?? {})).toContain('matches');
   });
 
   it('rejects rolled-over calendar dateOfBirth like Feb 30th', async () => {
@@ -64,7 +69,12 @@ describe('CreateIntentDto Validation', () => {
 
     const dto = plainToInstance(CreateIntentDto, rawDto);
     const errors = await validate(dto);
-    expect(errors.length).toBeGreaterThan(0);
+
+    const passengersError = errors.find((e) => e.property === 'passengers');
+    const childErrors = passengersError?.children?.[0]?.children ?? [];
+    const dobError = childErrors.find((e) => e.property === 'dateOfBirth');
+    expect(dobError).toBeDefined();
+    expect(Object.keys(dobError!.constraints ?? {})).toContain('isDateString');
   });
 
   it('rejects lowercase nationality country codes', async () => {
@@ -84,6 +94,11 @@ describe('CreateIntentDto Validation', () => {
 
     const dto = plainToInstance(CreateIntentDto, rawDto);
     const errors = await validate(dto);
-    expect(errors.length).toBeGreaterThan(0);
+
+    const passengersError = errors.find((e) => e.property === 'passengers');
+    const childErrors = passengersError?.children?.[0]?.children ?? [];
+    const natError = childErrors.find((e) => e.property === 'nationality');
+    expect(natError).toBeDefined();
+    expect(Object.keys(natError!.constraints ?? {})).toContain('matches');
   });
 });

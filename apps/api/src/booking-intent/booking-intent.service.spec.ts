@@ -1,75 +1,87 @@
 import 'reflect-metadata';
 import { BookingIntentService } from './booking-intent.service';
-import { EncryptionService } from '@/common/encryption.service';
-import { DuffelService, DuffelTimeoutError } from '@/duffel/duffel.service';
-import { PrismaService } from '@/prisma/prisma.service';
-import { AuditService } from '@/audit/audit.service';
+import { DuffelTimeoutError } from '@/duffel/duffel.service';
 import { HttpException, HttpStatus } from '@nestjs/common';
 
+type MockEncryptionService = {
+  encrypt: jest.Mock;
+  decrypt: jest.Mock;
+};
+
+type MockDuffelService = {
+  getOfferById: jest.Mock;
+};
+
+type TestableService = {
+  decryptProfileField(value: string | null): string | null;
+  fetchLiveOffer(duffelOfferId: string): Promise<{
+    totalAmount: string;
+    currency: string;
+    offerExpiresAt: Date | null;
+    raw: unknown;
+  }>;
+};
+
 describe('BookingIntentService Refinements', () => {
-  let service: BookingIntentService;
-  let mockEncryptionService: EncryptionService;
-  let mockDuffelService: DuffelService;
-  let mockPrismaService: PrismaService;
-  let mockAuditService: AuditService;
+  let testable: TestableService;
+  let mockEncryptionService: MockEncryptionService;
+  let mockDuffelService: MockDuffelService;
 
   beforeEach(() => {
     mockEncryptionService = {
       encrypt: jest.fn(),
-      decrypt: jest.fn((val) => `decrypted-${val}`),
-    } as any;
+      decrypt: jest.fn((val: string) => `decrypted-${val}`),
+    };
 
     mockDuffelService = {
       getOfferById: jest.fn(),
-    } as any;
+    };
 
-    mockPrismaService = {} as any;
-    mockAuditService = {} as any;
-
-    service = new BookingIntentService(
-      mockPrismaService,
-      mockDuffelService,
-      mockAuditService,
-      mockEncryptionService,
+    const service = new BookingIntentService(
+      {} as never,
+      mockDuffelService as never,
+      {} as never,
+      mockEncryptionService as never,
     );
+    testable = service as unknown as TestableService;
   });
 
   describe('decryptProfileField', () => {
     it('returns null if value is null', () => {
-      const result = (service as any).decryptProfileField(null);
+      const result = testable.decryptProfileField(null);
       expect(result).toBeNull();
     });
 
     it('returns legacy plaintext as-is even if it contains colons', () => {
       const legacyValue = 'plain:text:with:colons';
-      const result = (service as any).decryptProfileField(legacyValue);
+      const result = testable.decryptProfileField(legacyValue);
       expect(result).toBe(legacyValue);
       expect(mockEncryptionService.decrypt).not.toHaveBeenCalled();
     });
 
     it('decrypts value if it starts with recognized marker v1:', () => {
       const encryptedValue = 'v1:ciphertext-here';
-      const result = (service as any).decryptProfileField(encryptedValue);
+      const result = testable.decryptProfileField(encryptedValue);
       expect(result).toBe('decrypted-ciphertext-here');
       expect(mockEncryptionService.decrypt).toHaveBeenCalledWith('ciphertext-here');
     });
 
     it('returns null if decryption throws error', () => {
-      jest.spyOn(mockEncryptionService, 'decrypt').mockImplementationOnce(() => {
+      mockEncryptionService.decrypt.mockImplementationOnce(() => {
         throw new Error('decryption failed');
       });
-      const result = (service as any).decryptProfileField('v1:bad-cipher');
+      const result = testable.decryptProfileField('v1:bad-cipher');
       expect(result).toBeNull();
     });
   });
 
   describe('fetchLiveOffer', () => {
     it('rejects offer with missing total_amount', async () => {
-      jest.spyOn(mockDuffelService, 'getOfferById').mockResolvedValueOnce({
+      mockDuffelService.getOfferById.mockResolvedValueOnce({
         total_currency: 'USD',
       });
 
-      await expect((service as any).fetchLiveOffer('offer-123')).rejects.toThrow(
+      await expect(testable.fetchLiveOffer('offer-123')).rejects.toThrow(
         new HttpException(
           {
             code: 'UPSTREAM_UNAVAILABLE',
@@ -81,12 +93,12 @@ describe('BookingIntentService Refinements', () => {
     });
 
     it('rejects offer with non-numeric total_amount', async () => {
-      jest.spyOn(mockDuffelService, 'getOfferById').mockResolvedValueOnce({
+      mockDuffelService.getOfferById.mockResolvedValueOnce({
         total_amount: 'invalid-price',
         total_currency: 'USD',
       });
 
-      await expect((service as any).fetchLiveOffer('offer-123')).rejects.toThrow(
+      await expect(testable.fetchLiveOffer('offer-123')).rejects.toThrow(
         new HttpException(
           {
             code: 'UPSTREAM_UNAVAILABLE',
@@ -98,12 +110,12 @@ describe('BookingIntentService Refinements', () => {
     });
 
     it('rejects offer with non-positive total_amount', async () => {
-      jest.spyOn(mockDuffelService, 'getOfferById').mockResolvedValueOnce({
+      mockDuffelService.getOfferById.mockResolvedValueOnce({
         total_amount: '-10.00',
         total_currency: 'USD',
       });
 
-      await expect((service as any).fetchLiveOffer('offer-123')).rejects.toThrow(
+      await expect(testable.fetchLiveOffer('offer-123')).rejects.toThrow(
         new HttpException(
           {
             code: 'UPSTREAM_UNAVAILABLE',
@@ -120,9 +132,9 @@ describe('BookingIntentService Refinements', () => {
         total_currency: 'USD',
         expires_at: '2026-07-15T00:00:00Z',
       };
-      jest.spyOn(mockDuffelService, 'getOfferById').mockResolvedValueOnce(mockRaw);
+      mockDuffelService.getOfferById.mockResolvedValueOnce(mockRaw);
 
-      const result = await (service as any).fetchLiveOffer('offer-123');
+      const result = await testable.fetchLiveOffer('offer-123');
       expect(result).toEqual({
         totalAmount: '150.00',
         currency: 'USD',
@@ -132,9 +144,9 @@ describe('BookingIntentService Refinements', () => {
     });
 
     it('throws UPSTREAM_TIMEOUT on DuffelTimeoutError', async () => {
-      jest.spyOn(mockDuffelService, 'getOfferById').mockRejectedValueOnce(new DuffelTimeoutError());
+      mockDuffelService.getOfferById.mockRejectedValueOnce(new DuffelTimeoutError());
 
-      await expect((service as any).fetchLiveOffer('offer-123')).rejects.toThrow(
+      await expect(testable.fetchLiveOffer('offer-123')).rejects.toThrow(
         new HttpException(
           {
             code: 'UPSTREAM_TIMEOUT',

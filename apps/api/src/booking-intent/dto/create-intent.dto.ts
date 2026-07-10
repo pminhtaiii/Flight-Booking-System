@@ -13,12 +13,13 @@ import {
   ValidationArguments,
   ValidationOptions,
   IsDateString,
+  IsNotEmpty,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import { PassengerType } from '@prisma/client';
 
-function countPassengerTypes(passengers: any[]): { adults: number; children: number; infants: number } {
-  return passengers.reduce(
+function countPassengerTypes(passengers: readonly unknown[]): { adults: number; children: number; infants: number } {
+  return passengers.reduce<{ adults: number; children: number; infants: number }>(
     (acc, item) => {
       const passenger = item as { type?: PassengerType };
       if (passenger.type === PassengerType.ADULT) acc.adults += 1;
@@ -87,10 +88,12 @@ export class CreateIntentPassengerDto {
   @IsEnum(PassengerType)
   type!: PassengerType;
 
+  @IsNotEmpty()
   @IsString()
   @MaxLength(100)
   givenName!: string;
 
+  @IsNotEmpty()
   @IsString()
   @MaxLength(100)
   familyName!: string;
