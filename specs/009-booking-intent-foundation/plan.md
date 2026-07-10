@@ -6,7 +6,7 @@
 
 ## Summary
 
-Create a dedicated `BookingIntent` + `BookingIntentPassenger` data model with a `BookingIntentModule` in NestJS. The module pre-fills primary passenger data from `TravelerProfile` before validation, validates passenger details, calls Duffel to re-confirm pricing, creates encrypted intent records, and manages a two-phase cleanup lifecycle (PENDING → EXPIRED → deleted) via scheduled cron jobs.
+Create a dedicated `BookingIntent` + `BookingIntentPassenger` data model with a `BookingIntentModule` in NestJS. The module pre-fills primary passenger data from `TravelerProfile` before validation, validates passenger details, calls Duffel to re-confirm pricing, creates intent records with encrypted passport fields, and manages a two-phase cleanup lifecycle (PENDING → EXPIRED → deleted) via scheduled cron jobs.
 
 ## Technical Context
 
@@ -105,9 +105,9 @@ packages/shared/
 |------|--------|-------|
 | Create `create-intent.dto.ts` with class-validator decorators | ☐ | Passenger array, cross-field validation (infants ≤ adults, total ≤ 9) |
 | Create `intent-response.dto.ts` for creation and retrieval responses | ☐ | Separate creation vs. detail shapes (passport excluded from creation response) |
-| Create `booking-intent.service.ts` | ☐ | Core logic: look up `FlightOffer` by `flightOfferId` (source of truth for `duffelOfferId`, route, dates) → apply TravelerProfile pre-fill to the primary adult when requested → validate merged passenger data → re-price via Duffel → encrypt PII → create intent + passengers (with `position`) and audit row in a single transaction |
+| Create `booking-intent.service.ts` | ☐ | Core logic: look up `FlightOffer` by `flightOfferId` (source of truth for `duffelOfferId`, route, dates) → apply TravelerProfile pre-fill to the primary adult when requested → validate merged passenger data → re-price via Duffel with a bounded timeout / AbortSignal → encrypt PII → create intent + passengers (with `position`) and audit row in a single transaction |
 | Implement TravelerProfile pre-fill logic | ☐ | If `useProfile: true` on primary adult, merge profile data into passenger fields before validation so the validator sees the effective request shape |
-| Implement Duffel re-pricing (reuse `duffel.offers.get()` pattern) | ☐ | Use the looked-up `FlightOffer`'s stored `duffelOfferId` — never a client-supplied value. Same approach as `getFlightDetail()`: call Duffel, snapshot the response |
+| Implement Duffel re-pricing (reuse `duffel.offers.get()` pattern) | ☐ | Use the looked-up `FlightOffer`'s stored `duffelOfferId` — never a client-supplied value. Pass a bounded timeout / AbortSignal through to `DuffelService.offerRequests.create()` so the request can be cancelled before the `<5 second` target. Map timeout, rate-limit, and generic upstream failures explicitly instead of flattening them to a single 502 path |
 | Create `booking-intent.controller.ts` with `POST /bookings/intent`, `GET /bookings/intent/:id`, `GET /bookings/intent/prefill` | ☐ | JWT-guarded, ownership enforcement |
 | Create `booking-intent.module.ts` and register in `app.module.ts` | ☐ | Import PrismaModule, DuffelModule, AuditModule |
 | Add audit logging for `booking_intent_created` | ☐ | Structured metadata: intentId, userId, offerId, passengerCount, priceChanged; write the audit row inside the same Prisma transaction as intent creation |
@@ -153,8 +153,8 @@ packages/shared/
 | E2E: Pre-fill endpoint with profile (200) | ☐ | Verify `hasProfile: true`, profile data, and missing fields |
 | E2E: Pre-fill endpoint without profile (200) | ☐ | Verify `hasProfile: false` and missing fields |
 | E2E: Audit write failure rolls back intent creation | ☐ | Force `booking_intent_created` insert to fail, verify both the intent and audit row are rolled back |
-| E2E: Cron Phase 1 — PENDING → EXPIRED | ☐ | Artificially age intent, trigger cron, verify status change |
-| E2E: Cron Phase 2 — EXPIRED → deleted | ☐ | Artificially age expired intent, trigger cron, verify deletion + cascade |
+| E2E: Cron Phase 1 — PENDING → EXPIRED | ☐ | Artificially age intent by the configured `BOOKING_INTENT_TTL_MINUTES`, trigger cron, verify status change; repeat once with a non-default TTL |
+| E2E: Cron Phase 2 — EXPIRED → deleted | ☐ | Artificially age expired intent by the configured `BOOKING_INTENT_GRACE_HOURS`, trigger cron, verify deletion + cascade; repeat once with a non-default grace period |
 | E2E: Duffel offer expired during re-pricing (410) | ☐ | Mock Duffel 404/410, verify error response |
 | E2E: client-supplied `duffelOfferId` is ignored | ☐ | Send a mismatched `duffelOfferId` in the request body and confirm the server still re-prices the `FlightOffer`'s own Duffel offer, not the client's |
 | Regression: existing flight search E2E tests still pass | ☐ | No breakage from schema changes |
@@ -199,8 +199,8 @@ npx prisma validate --schema=apps/api/prisma/schema.prisma
 - Retrieve the intent → verify passport data is decrypted in response
 - Try accessing another user's intent → verify 403
 - Attempt to create an intent with a mismatched `duffelOfferId` in the request body → verify the server ignores it and re-prices the `FlightOffer`'s actual Duffel offer
-- Wait 30+ minutes (or adjust TTL) → verify cron marks intent as EXPIRED
-- Wait 24+ hours (or adjust grace period) → verify cron hard-deletes the intent + passengers
+- Set `BOOKING_INTENT_TTL_MINUTES` to the desired test value, age the intent by that exact amount, and verify cron marks it EXPIRED
+- Set `BOOKING_INTENT_GRACE_HOURS` to the desired test value, age the expired intent by that exact amount, and verify cron hard-deletes the intent + passengers
 - Run flight search E2E tests → verify no regression
 
 ---
