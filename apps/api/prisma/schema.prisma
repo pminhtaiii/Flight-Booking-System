@@ -208,6 +208,7 @@ model BookingIntentPassenger {
   travelerProfile   TravelerProfile? @relation(fields: [travelerProfileId], references: [id], onDelete: SetNull)
 
   @@index([intentId])
+  @@index([travelerProfileId])
   @@unique([intentId, position])
   @@map("booking_intent_passengers")
 }

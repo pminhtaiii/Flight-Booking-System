@@ -20,9 +20,15 @@ export class EncryptionService {
   }
 
   decrypt(payload: string): string {
-    const [ivHex, authTagHex, encryptedHex] = payload.split(':');
+    const parts = payload.split(':');
 
-    if (!ivHex || !authTagHex || !encryptedHex) {
+    if (parts.length !== 3) {
+      throw new Error('Invalid encrypted payload format.');
+    }
+
+    const [ivHex, authTagHex, encryptedHex] = parts;
+
+    if (!ivHex || !authTagHex) {
       throw new Error('Invalid encrypted payload format.');
     }
 
