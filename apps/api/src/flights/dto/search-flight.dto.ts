@@ -30,6 +30,47 @@ export function IsFutureDateString(validationOptions?: ValidationOptions) {
   };
 }
 
+export function IsValidPassengerCount(validationOptions?: ValidationOptions) {
+  return function (object: object, propertyName: string) {
+    registerDecorator({
+      name: 'isValidPassengerCount',
+      target: object.constructor,
+      propertyName: propertyName,
+      options: validationOptions,
+      validator: {
+        validate(value: any, args: ValidationArguments) {
+          const dto = args.object as FlightSearchRequestDto;
+          const adults = dto.adults || 0;
+          const children = dto.children || 0;
+          const infants = dto.infants || 0;
+          
+          if (adults + children + infants > 9) {
+            return false;
+          }
+          if (infants > adults) {
+            return false;
+          }
+          return true;
+        },
+        defaultMessage(args: ValidationArguments) {
+          const dto = args.object as FlightSearchRequestDto;
+          const adults = dto.adults || 0;
+          const children = dto.children || 0;
+          const infants = dto.infants || 0;
+          
+          if (adults + children + infants > 9) {
+            return 'Maximum 9 passengers per search';
+          }
+          if (infants > adults) {
+            return 'Number of infants cannot exceed number of adults';
+          }
+          return 'Invalid passenger count';
+        }
+      },
+    });
+  };
+}
+
 export class FlightSearchRequestDto {
   @IsString()
   @Matches(/^[A-Z]{3}$/, { message: 'origin must be a 3-character uppercase IATA airport code' })
@@ -52,9 +93,37 @@ export class FlightSearchRequestDto {
 
   @Type(() => Number)
   @IsInt()
-  @Min(1)
+  @Min(1, { message: 'At least 1 adult passenger is required' })
+  @Max(9, { message: 'Maximum 9 passengers per search' })
+  @IsValidPassengerCount()
+  adults!: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
   @Max(9)
-  passengers!: number;
+  children?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  @Max(9)
+  infants?: number;
+
+  @IsOptional()
+  @IsString()
+  @Matches(/^(economy|premium_economy|business|first)$/, { message: 'cabinClass must be one of: economy, premium_economy, business, first' })
+  cabinClass?: string;
+}
+
+export interface CabinMismatchDetail {
+  segmentIndex: number;
+  leg: 'outbound' | 'return';
+  expected: string;
+  actual: string;
+  route: string;
 }
 
 export class FlightSegmentDto {
@@ -69,6 +138,7 @@ export class FlightSegmentDto {
   arrivalTime!: string;
   duration!: number;
   aircraft!: string | null;
+  cabinClass!: 'economy' | 'premium_economy' | 'business' | 'first';
 }
 
 export class FlightOfferDto {
@@ -86,6 +156,9 @@ export class FlightOfferDto {
   currency!: string;
   fareClass!: string | null;
   baggageAllowance!: string | null;
+  requestedCabinClass!: 'economy' | 'premium_economy' | 'business' | 'first';
+  cabinClassMatch!: 'full' | 'mixed' | 'downgraded';
+  cabinMismatchDetails!: CabinMismatchDetail[] | null;
   segments!: FlightSegmentDto[];
   returnSegments!: FlightSegmentDto[] | null;
 }
@@ -94,6 +167,7 @@ export class FlightSearchResponseMetaDto {
   totalResults!: number;
   searchHash!: string;
   cached!: boolean;
+  requestedCabinClass!: string;
 }
 
 export class FlightSearchResponseDto {

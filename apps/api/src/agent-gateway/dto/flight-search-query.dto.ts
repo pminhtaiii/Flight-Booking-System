@@ -1,4 +1,4 @@
-import { IsInt, Max, Min, IsString, Matches, registerDecorator, ValidationOptions, ValidationArguments } from 'class-validator';
+import { IsInt, Max, Min, IsString, Matches, registerDecorator, ValidationOptions, ValidationArguments, IsOptional } from 'class-validator';
 import { Transform, Type } from 'class-transformer';
 
 export function IsFutureDateString(validationOptions?: ValidationOptions) {
@@ -29,6 +29,29 @@ export function IsFutureDateString(validationOptions?: ValidationOptions) {
   };
 }
 
+export function AtLeastOnePassengerField(validationOptions?: ValidationOptions) {
+  return function (object: Function) {
+    registerDecorator({
+      name: 'atLeastOnePassengerField',
+      target: object,
+      propertyName: '',
+      options: validationOptions,
+      validator: {
+        validate(value: any, args: ValidationArguments) {
+          const obj = args.object as any;
+          const hasAdults = obj.adults !== undefined && obj.adults !== null;
+          const hasPassengers = obj.passengers !== undefined && obj.passengers !== null;
+          return hasAdults || hasPassengers;
+        },
+        defaultMessage() {
+          return 'At least one of adults or passengers must be provided';
+        }
+      },
+    });
+  };
+}
+
+@AtLeastOnePassengerField()
 export class FlightSearchQueryDto {
   @IsString()
   @Matches(/^[A-Z]{3}$/, { message: 'origin must be a 3-character uppercase IATA airport code' })
@@ -44,9 +67,18 @@ export class FlightSearchQueryDto {
   @IsFutureDateString({ message: 'date must be a future date in YYYY-MM-DD format' })
   date!: string;
 
+  @IsOptional()
   @Type(() => Number)
   @IsInt()
   @Min(1)
   @Max(9)
-  passengers!: number;
+  adults?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(9)
+  passengers?: number;
 }
+

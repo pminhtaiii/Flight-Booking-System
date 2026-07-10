@@ -234,3 +234,30 @@ async def test_get_gateway_user_bookings():
             headers=headers
         )
 
+
+@pytest.mark.asyncio
+async def test_get_gateway_flights_search_400_error():
+    settings = get_settings()
+    token = jwt.encode({"id": "user-123"}, settings.JWT_SECRET, algorithm="HS256")
+    client = NestJSClient(base_url="http://localhost:3001/api", token=token)
+    
+    req = httpx.Request("GET", "http://localhost:3001/api/agent-gateway/flights/search")
+    mock_response = httpx.Response(
+        400,
+        json={"statusCode": 400, "message": "I can currently only search economy class for adult passengers..."},
+        request=req
+    )
+    
+    with patch("httpx.AsyncClient.get", new_callable=AsyncMock) as mock_get:
+        mock_get.return_value = mock_response
+        
+        result = await client.get_gateway_flights_search(
+            origin="SGN",
+            destination="HAN",
+            date="2026-08-01",
+            passengers=1
+        )
+        
+        assert result == {"error": "I can currently only search economy class for adult passengers..."}
+
+

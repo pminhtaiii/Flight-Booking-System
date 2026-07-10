@@ -183,7 +183,10 @@ model FlightOffer {
   destination     String   @db.VarChar(3)
   departureDate   DateTime @db.Date
   returnDate      DateTime? @db.Date
-  passengers      Int
+  adults          Int
+  children        Int      @default(0)
+  infants         Int      @default(0)
+  cabinClass      String   @default("economy") @map("cabin_class")
   price           Decimal  @db.Decimal(10, 2)
   currency        String   @default("USD")
   createdAt       DateTime @default(now())
@@ -200,7 +203,10 @@ model SearchHistory {
   destination     String   @db.VarChar(3)
   departureDate   DateTime @db.Date
   returnDate      DateTime? @db.Date
-  passengers      Int
+  adults          Int
+  children        Int      @default(0)
+  infants         Int      @default(0)
+  cabinClass      String   @default("economy") @map("cabin_class")
   resultCount     Int
   minPrice        Decimal? @db.Decimal(10, 2)
   maxPrice        Decimal? @db.Decimal(10, 2)

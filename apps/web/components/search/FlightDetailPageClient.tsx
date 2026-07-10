@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { Airport } from '@shared/types';
+import { cn } from '@/lib/utils';
 import { MapContainer } from '@/components/map/MapContainer';
 import { 
   ArrowLeft, 
@@ -29,6 +30,7 @@ type FlightSegment = {
   arrivalTime: string;
   duration: number;
   aircraft: string | null;
+  cabinClass?: string;
 };
 
 type Props = {
@@ -51,6 +53,15 @@ type Props = {
     segments: FlightSegment[];
     returnSegments: FlightSegment[] | null;
     expiresAt: string;
+    requestedCabinClass?: 'economy' | 'premium_economy' | 'business' | 'first';
+    cabinClassMatch?: 'full' | 'mixed' | 'downgraded';
+    cabinMismatchDetails?: {
+      segmentIndex: number;
+      leg: 'outbound' | 'return';
+      expected: string;
+      actual: string;
+      route: string;
+    }[] | null;
     conditions: {
       refundable: boolean;
       changeable: boolean;
@@ -132,6 +143,11 @@ export function SegmentTimeline({
               </div>
               {segment.aircraft && (
                 <div className="text-[11px] text-text-muted">Aircraft: {segment.aircraft}</div>
+              )}
+              {segment.cabinClass && (
+                <div className="text-[11px] text-text-muted">
+                  Cabin: <strong className="text-text-secondary uppercase">{segment.cabinClass.replace('_', ' ')}</strong>
+                </div>
               )}
             </div>
 
@@ -266,6 +282,43 @@ export function FlightDetailPageClient({
               <p className="text-xs text-text-secondary mt-0.5">
                 The price of this flight changed since your initial search. Original price: <span className="font-bold">${flight.originalPrice.toFixed(2)}</span>. Current live confirmed price: <span className="font-extrabold text-accent">${flight.confirmedPrice.toFixed(2)}</span>.
               </p>
+            </div>
+          </div>
+        )}
+
+        {flight.cabinClassMatch && flight.cabinClassMatch !== 'full' && (
+          <div className={cn(
+            "border rounded-xl p-4 flex gap-2.5 items-start",
+            flight.cabinClassMatch === 'mixed'
+              ? "bg-bg-pending border-text-pending/20 text-text-primary"
+              : "bg-bg-cancelled border-text-cancelled/20 text-text-primary"
+          )}>
+            <AlertCircle className={cn(
+              "w-5 h-5 flex-shrink-0 mt-0.5",
+              flight.cabinClassMatch === 'mixed' ? "text-text-pending" : "text-text-cancelled"
+            )} />
+            <div>
+              <h4 className={cn(
+                "font-bold text-sm",
+                flight.cabinClassMatch === 'mixed' ? "text-text-pending" : "text-text-cancelled"
+              )}>
+                {flight.cabinClassMatch === 'mixed' ? 'Mixed Cabin Warning' : 'Cabin Class Downgrade Warning'}
+              </h4>
+              <p className="text-xs text-text-secondary mt-0.5 leading-relaxed">
+                {flight.cabinClassMatch === 'mixed'
+                  ? `Some segments of your flight are in a different cabin class than the requested ${flight.requestedCabinClass?.replace('_', ' ')}.`
+                  : `Your main/longest flight segment has been downgraded from your requested ${flight.requestedCabinClass?.replace('_', ' ')}.`
+                }
+              </p>
+              {flight.cabinMismatchDetails && flight.cabinMismatchDetails.length > 0 && (
+                <div className="mt-2 text-xs space-y-1 border-t border-card-border/50 pt-2 text-text-secondary">
+                  {flight.cabinMismatchDetails.map((detail, idx) => (
+                    <div key={idx}>
+                      • Segment {detail.segmentIndex + 1} ({detail.route}) on {detail.leg} is in <strong className="text-text-cancelled uppercase">{detail.actual.replace('_', ' ')}</strong> (expected <strong className="text-text-confirmed uppercase">{detail.expected.replace('_', ' ')}</strong>).
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
         )}

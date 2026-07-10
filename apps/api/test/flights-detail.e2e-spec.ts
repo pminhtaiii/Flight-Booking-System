@@ -207,7 +207,10 @@ describe('Flights Detail & Re-price (E2E)', () => {
             origin: 'HAN',
             destination: 'SGN',
             departureDate: new Date('2026-07-15'),
-            passengers: 1,
+            adults: 1,
+            children: 0,
+            infants: 0,
+            cabinClass: 'economy',
             price: new Prisma.Decimal(125.50), // original price
             currency: 'USD',
           }
@@ -227,7 +230,10 @@ describe('Flights Detail & Re-price (E2E)', () => {
             origin: 'HAN',
             destination: 'SGN',
             departureDate: new Date('2026-07-15'),
-            passengers: 1,
+            adults: 1,
+            children: 0,
+            infants: 0,
+            cabinClass: 'economy',
             resultCount: 1,
             minPrice: new Prisma.Decimal(125.50),
             maxPrice: new Prisma.Decimal(125.50),
@@ -284,7 +290,10 @@ describe('Flights Detail & Re-price (E2E)', () => {
           destination: 'SGN',
           departureDate: '2026-07-15',
           returnDate: null,
-          passengers: 1,
+          adults: 1,
+          children: 0,
+          infants: 0,
+          cabinClass: 'economy',
         });
 
         // Row should be deleted
@@ -310,7 +319,10 @@ describe('Flights Detail & Re-price (E2E)', () => {
             destination: 'SGN',
             departureDate: new Date('2026-07-15'),
             returnDate: new Date('2026-07-20'),
-            passengers: 2,
+            adults: 2,
+            children: 0,
+            infants: 0,
+            cabinClass: 'economy',
             resultCount: 5,
             minPrice: new Prisma.Decimal(125.50),
             maxPrice: new Prisma.Decimal(250.00),
@@ -332,7 +344,10 @@ describe('Flights Detail & Re-price (E2E)', () => {
           destination: 'SGN',
           departureDate: '2026-07-15',
           returnDate: '2026-07-20',
-          passengers: 2,
+          adults: 2,
+          children: 0,
+          infants: 0,
+          cabinClass: 'economy',
         });
       });
     });

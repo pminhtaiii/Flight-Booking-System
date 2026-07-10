@@ -1,4 +1,4 @@
-import { FlightSegmentDto } from './search-flight.dto';
+import { FlightSegmentDto, CabinMismatchDetail } from './search-flight.dto';
 
 export class FlightConditionChangeBeforeDepartureDto {
   allowed!: boolean;
@@ -28,6 +28,9 @@ export class FlightDetailResponseDto {
   currency!: string;
   fareClass!: string | null;
   baggageAllowance!: string | null;
+  requestedCabinClass!: 'economy' | 'premium_economy' | 'business' | 'first';
+  cabinClassMatch!: 'full' | 'mixed' | 'downgraded';
+  cabinMismatchDetails!: CabinMismatchDetail[] | null;
   segments!: FlightSegmentDto[];
   returnSegments!: FlightSegmentDto[] | null;
   expiresAt!: string;

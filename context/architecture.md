@@ -86,7 +86,7 @@
 ### Flight Search (Deterministic Path)
 
 ```
-User enters search criteria (origin, destination, dates, passengers)
+User enters search criteria (origin, destination, dates, adults, children, infants, cabinClass)
         ↓
 Next.js → POST /api/flights/search
         ↓

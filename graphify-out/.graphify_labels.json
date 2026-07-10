@@ -36,7 +36,6 @@
   "34": "layout.tsx",
   "35": "Next.js Frontend UI Service",
   "36": "package.json",
-  "37": "scripts",
   "38": ".eslintrc.json",
   "39": "FastAPI",
   "40": "Backend API Test Suite",
@@ -277,6 +276,9 @@
   "275": ".aclose",
   "276": "devDependencies",
   "277": "scripts",
-  "278": "package.json",
-  "286": "search.spec.ts"
+  "279": "Feature Specification: Cabin Class & Passenger Type Enhancement",
+  "281": "Research: Cabin Class & Passenger Type Enhancement",
+  "285": "RateLimitMiddleware",
+  "286": "search.spec.ts",
+  "287": "FastAPI"
 }

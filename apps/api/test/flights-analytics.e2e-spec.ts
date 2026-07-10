@@ -219,7 +219,7 @@ describe('Flights Analytics & Search History (E2E)', () => {
           origin: 'HAN',
           destination: 'SGN',
           departureDate: '2026-07-15',
-          passengers: 1,
+          adults: 1,
         })
         .expect(200);
 
@@ -248,7 +248,7 @@ describe('Flights Analytics & Search History (E2E)', () => {
           origin: 'HAN',
           destination: 'SGN',
           departureDate: '2026-07-15',
-          passengers: 1,
+          adults: 1,
         })
         .expect(200);
 
@@ -285,7 +285,10 @@ describe('Flights Analytics & Search History (E2E)', () => {
           origin: 'HAN',
           destination: 'SGN',
           departureDate: now,
-          passengers: 1,
+          adults: 1,
+          children: 0,
+          infants: 0,
+          cabinClass: 'economy',
           resultCount: 1,
           minPrice: 100.0,
           maxPrice: 100.0,
@@ -303,7 +306,10 @@ describe('Flights Analytics & Search History (E2E)', () => {
           origin: 'HAN',
           destination: 'SGN',
           departureDate: now,
-          passengers: 1,
+          adults: 1,
+          children: 0,
+          infants: 0,
+          cabinClass: 'economy',
           price: 100.0,
           createdAt: expiredDate,
         },

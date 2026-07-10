@@ -2,14 +2,18 @@ import httpx
 import jwt
 from jwt import InvalidTokenError
 from typing import Optional, List, Dict, Any
+import logging
 from agent.config import get_settings
 from agent.auth.claim_token import create_claim_token
 
+logger = logging.getLogger(__name__)
+
 class NestJSClient:
-    def __init__(self, base_url: str, token: str):
+    def __init__(self, base_url: str, token: str, correlation_id: Optional[str] = None):
         self.base_url = base_url.rstrip("/")
         self.token = token
         self.headers = {"Authorization": f"Bearer {token}"}
+        self.correlation_id = correlation_id
 
 
     async def create_session(self, title: Optional[str] = None) -> Dict[str, Any]:
@@ -72,10 +76,13 @@ class NestJSClient:
             raise ValueError("Token is missing user identification claims ('id' or 'sub')")
             
         claim_token = create_claim_token(str(user_id), settings.CLAIM_TOKEN_SECRET)
-        return {
+        headers = {
             "X-Agent-API-Key": settings.AGENT_SERVICE_API_KEY,
             "X-User-Claim": claim_token
         }
+        if self.correlation_id:
+            headers["X-Correlation-ID"] = self.correlation_id
+        return headers
 
     async def get_gateway_flights_search(self, origin: str, destination: str, date: str, passengers: int) -> dict:
         url = f"{self.base_url}/agent-gateway/flights/search"
@@ -88,6 +95,14 @@ class NestJSClient:
         headers = self._get_gateway_headers()
         async with httpx.AsyncClient() as client:
             response = await client.get(url, params=params, headers=headers)
+            if response.status_code == 400:
+                try:
+                    data = response.json()
+                    message = data.get("message")
+                    if message:
+                        return {"error": message}
+                except ValueError as e:
+                    logger.warning("Failed to parse 400 response JSON in get_gateway_flights_search: %s (response: %s)", e, response.text)
             response.raise_for_status()
             return response.json()
 

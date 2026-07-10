@@ -100,6 +100,21 @@ async def test_search_flights_error(mock_client, run_config):
 
 
 @pytest.mark.asyncio
+async def test_search_flights_honest_degradation_error(mock_client, run_config):
+    mock_client.get_gateway_flights_search.return_value = {
+        "error": "I can currently only search economy class for adult passengers. For other cabin classes or passenger types, please use the search page."
+    }
+
+    result = await search_flights.ainvoke(
+        {"origin": "HAN", "destination": "NRT", "date": "2026-07-15"},
+        config=run_config
+    )
+
+    assert result == "I can currently only search economy class for adult passengers. For other cabin classes or passenger types, please use the search page."
+
+
+
+@pytest.mark.asyncio
 async def test_get_user_preferences_success(mock_client, run_config):
     mock_client.get_gateway_user_preferences.return_value = {
         "seatPreference": "window",
