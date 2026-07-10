@@ -9,6 +9,7 @@ import { FlightSearchResponseDto, FlightResultDto } from './dto/flight-result.dt
 import { UserPreferencesDto } from './dto/user-preferences.dto';
 import { UserBookingsResponseDto, BookingResultDto } from './dto/user-bookings.dto';
 import * as crypto from 'crypto';
+import { CABIN_KEYWORDS, PASSENGER_KEYWORDS } from './agent-gateway.constants';
 
 function capitalizeCabinClass(cabinClass: string): string {
   if (!cabinClass) return '';
@@ -127,12 +128,85 @@ export class AgentGatewayService {
   ): Promise<FlightSearchResponseDto> {
     const startTime = Date.now();
     try {
+      const adultsCount = query.adults || query.passengers;
+      if (!adultsCount) {
+        throw new HttpException('Adults count is required', HttpStatus.BAD_REQUEST);
+      }
+
+      // Check for user's latest chat message and perform honest degradation keyword validation
+      let lastMessage = null;
+      if (correlationId) {
+        lastMessage = await this.prisma.chatMessage.findFirst({
+          where: {
+            sender: 'USER',
+            sessionId: correlationId,
+          },
+          orderBy: { createdAt: 'desc' },
+        });
+      }
+
+      if (!lastMessage) {
+        lastMessage = await this.prisma.chatMessage.findFirst({
+          where: {
+            sender: 'USER',
+            session: { userId },
+          },
+          orderBy: { createdAt: 'desc' },
+        });
+      }
+
+      if (lastMessage) {
+        const matchedKeywords: string[] = [];
+
+        for (const kw of CABIN_KEYWORDS) {
+          const regex = new RegExp(`\\b${kw}\\b`, 'i');
+          if (regex.test(lastMessage.content)) {
+            matchedKeywords.push(kw);
+          }
+        }
+
+        for (const kw of PASSENGER_KEYWORDS) {
+          const regex = new RegExp(`\\b${kw}\\b`, 'i');
+          if (regex.test(lastMessage.content)) {
+            matchedKeywords.push(kw);
+          }
+        }
+
+        if (matchedKeywords.length > 0) {
+          this.logger.warn(
+            `Agent gateway keyword trigger matched for user ${userId}. Matched keywords: ${matchedKeywords.join(', ')}`
+          );
+
+          // Write audit log
+          await this.auditService.createLog(null, {
+            userId,
+            action: 'AGENT_KEYWORD_TRIGGER',
+            resourceType: 'agent-gateway',
+            resourceId: lastMessage.id,
+            metadata: {
+              matchedKeywords,
+              messageId: lastMessage.id,
+            },
+            traceId,
+            correlationId,
+          });
+
+          throw new HttpException(
+            'I can currently only search economy class for adult passengers. For other cabin classes or passenger types, please use the search page.',
+            HttpStatus.BAD_REQUEST,
+          );
+        }
+      }
+
       // 1. Check Redis cache first for mapped results
       const normalizedQuery = {
         origin: query.origin.trim().toUpperCase(),
         destination: query.destination.trim().toUpperCase(),
         date: query.date,
-        passengers: Number(query.passengers),
+        adults: adultsCount,
+        children: 0,
+        infants: 0,
+        cabinClass: 'economy',
       };
       const queryStr = JSON.stringify(normalizedQuery);
       const sha256 = crypto.createHash('sha256').update(queryStr).digest('hex');
@@ -163,7 +237,10 @@ export class AgentGatewayService {
             origin: query.origin,
             destination: query.destination,
             departureDate: query.date,
-            passengers: Number(query.passengers),
+            adults: adultsCount,
+            children: 0,
+            infants: 0,
+            cabinClass: 'economy',
           },
           'agent',
         );

@@ -47,6 +47,7 @@ export function SearchPageClient({ allAirports }: Props) {
 
   const originRef = useRef<HTMLDivElement>(null);
   const destRef = useRef<HTMLDivElement>(null);
+  const passengerRef = useRef<HTMLDivElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const streamAbortRef = useRef<AbortController | null>(null);
 
@@ -63,6 +64,10 @@ export function SearchPageClient({ allAirports }: Props) {
   const departureDateParam = searchParams ? searchParams.get('departureDate') : null;
   const returnDateParam = searchParams ? searchParams.get('returnDate') : null;
   const passengersParam = searchParams ? searchParams.get('passengers') : null;
+  const adultsParam = searchParams ? searchParams.get('adults') : null;
+  const childrenParam = searchParams ? searchParams.get('children') : null;
+  const infantsParam = searchParams ? searchParams.get('infants') : null;
+  const cabinClassParam = searchParams ? searchParams.get('cabinClass') : null;
   const expiredParam = searchParams ? searchParams.get('expired') : null;
 
   // Traditional search state
@@ -80,7 +85,48 @@ export function SearchPageClient({ allAirports }: Props) {
     return d.toISOString().slice(0, 10);
   });
   const [passengers, setPassengers] = useState(1);
+  const [children, setChildren] = useState(0);
+  const [infants, setInfants] = useState(0);
+  const [cabinClass, setCabinClass] = useState('economy');
+  const [expandedMismatches, setExpandedMismatches] = useState<Record<string, boolean>>({});
   const [formError, setFormError] = useState<string | null>(null);
+  const [showPassengerDropdown, setShowPassengerDropdown] = useState(false);
+
+  const passengerSummary = useMemo(() => {
+    const parts: string[] = [];
+    if (passengers === 1) {
+      parts.push('1 Adult');
+    } else if (passengers > 1) {
+      parts.push(`${passengers} Adults`);
+    }
+
+    if (children === 1) {
+      parts.push('1 Child');
+    } else if (children > 1) {
+      parts.push(`${children} Children`);
+    }
+
+    if (infants === 1) {
+      parts.push('1 Infant');
+    } else if (infants > 1) {
+      parts.push(`${infants} Infants`);
+    }
+
+    return parts.join(', ') || '1 Adult';
+  }, [passengers, children, infants]);
+
+  const pickerError = useMemo(() => {
+    if (passengers < 1) {
+      return 'At least 1 adult passenger is required';
+    }
+    if (infants > passengers) {
+      return 'Number of infants cannot exceed number of adults';
+    }
+    if (passengers + children + infants > 9) {
+      return 'Maximum 9 passengers per search';
+    }
+    return null;
+  }, [passengers, children, infants]);
 
   const [selectedOrigin, setSelectedOrigin] = useState<Airport | null>(null);
   const [selectedDest, setSelectedDest] = useState<Airport | null>(null);
@@ -282,16 +328,46 @@ export function SearchPageClient({ allAirports }: Props) {
     } else if (originParam && destinationParam) {
       setTripType('one-way');
     }
-    if (passengersParam) {
-      const parsed = parseInt(passengersParam, 10);
+    
+    const targetAdults = adultsParam || passengersParam;
+    if (targetAdults) {
+      const parsed = parseInt(targetAdults, 10);
       if (!isNaN(parsed) && parsed >= 1 && parsed <= 9) {
         setPassengers(parsed);
       }
     }
+    if (childrenParam) {
+      const parsed = parseInt(childrenParam, 10);
+      if (!isNaN(parsed) && parsed >= 0 && parsed <= 9) {
+        setChildren(parsed);
+      }
+    }
+    if (infantsParam) {
+      const parsed = parseInt(infantsParam, 10);
+      if (!isNaN(parsed) && parsed >= 0 && parsed <= 9) {
+        setInfants(parsed);
+      }
+    }
+    if (cabinClassParam) {
+      setCabinClass(cabinClassParam);
+    }
+    
     if (expiredParam === 'true') {
       setFormError('This flight offer has expired. Use the search parameters below to find current availability.');
     }
-  }, [originParam, destinationParam, departureDateParam, returnDateParam, passengersParam, expiredParam, allAirports]);
+  }, [
+    originParam,
+    destinationParam,
+    departureDateParam,
+    returnDateParam,
+    passengersParam,
+    adultsParam,
+    childrenParam,
+    infantsParam,
+    cabinClassParam,
+    expiredParam,
+    allAirports
+  ]);
 
   // Click outside to close suggestion dropdowns
   useEffect(() => {
@@ -301,6 +377,9 @@ export function SearchPageClient({ allAirports }: Props) {
       }
       if (destRef.current && !destRef.current.contains(event.target as Node)) {
         setShowDestDropdown(false);
+      }
+      if (passengerRef.current && !passengerRef.current.contains(event.target as Node)) {
+        setShowPassengerDropdown(false);
       }
     }
     document.addEventListener('mousedown', handleClickOutside);
@@ -372,6 +451,22 @@ export function SearchPageClient({ allAirports }: Props) {
     setMapDest(selectedDest);
     setIsSplitActive(true);
 
+    if (passengers < 1) {
+      setFormError('At least 1 adult passenger is required');
+      setIsSearching(false);
+      return;
+    }
+    if (infants > passengers) {
+      setFormError('Number of infants cannot exceed number of adults');
+      setIsSearching(false);
+      return;
+    }
+    if (passengers + children + infants > 9) {
+      setFormError('Maximum 9 passengers per search');
+      setIsSearching(false);
+      return;
+    }
+
     const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
     try {
@@ -379,7 +474,10 @@ export function SearchPageClient({ allAirports }: Props) {
         origin: selectedOrigin.iataCode,
         destination: selectedDest.iataCode,
         departureDate: departDate,
-        passengers,
+        adults: passengers,
+        children,
+        infants,
+        cabinClass,
       };
 
       if (tripType === 'round-trip') {
@@ -423,6 +521,9 @@ export function SearchPageClient({ allAirports }: Props) {
           baggageAllowance: flight.baggageAllowance,
           segments: flight.segments,
           returnSegments: flight.returnSegments,
+          requestedCabinClass: flight.requestedCabinClass,
+          cabinClassMatch: flight.cabinClassMatch,
+          cabinMismatchDetails: flight.cabinMismatchDetails,
         };
       });
 
@@ -555,6 +656,9 @@ export function SearchPageClient({ allAirports }: Props) {
                   baggageAllowance: flight.baggageAllowance,
                   segments: flight.segments,
                   returnSegments: flight.returnSegments,
+                  requestedCabinClass: flight.requestedCabinClass,
+                  cabinClassMatch: flight.cabinClassMatch,
+                  cabinMismatchDetails: flight.cabinMismatchDetails,
                 };
               });
 
@@ -916,7 +1020,7 @@ export function SearchPageClient({ allAirports }: Props) {
               </div>
             </div>
 
-            <div className={cn("grid grid-cols-1 gap-4", tripType === 'round-trip' ? "md:grid-cols-3" : "md:grid-cols-2")}>
+            <div className={cn("grid grid-cols-1 gap-4", tripType === 'round-trip' ? "md:grid-cols-2" : "md:grid-cols-1")}>
               <div>
                 <label className="block text-xs font-semibold text-text-secondary mb-1">Departure Date</label>
                 <div className="relative">
@@ -946,21 +1050,128 @@ export function SearchPageClient({ allAirports }: Props) {
                   </div>
                 </div>
               )}
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div ref={passengerRef} className="relative">
+                <label className="block text-xs font-semibold text-text-secondary mb-1">Passengers</label>
+                <button
+                  type="button"
+                  onClick={() => setShowPassengerDropdown(!showPassengerDropdown)}
+                  className="form-input w-full pl-10 pr-4 text-left flex items-center justify-between cursor-pointer"
+                >
+                  <div className="flex items-center">
+                    <Users className="absolute left-3 top-3 w-4 h-4 text-text-muted" />
+                    <span className="truncate text-sm text-text-primary">{passengerSummary}</span>
+                  </div>
+                  <span className="text-text-muted text-xs">▼</span>
+                </button>
+
+                {showPassengerDropdown && (
+                  <div className="absolute left-0 right-0 mt-1 bg-card border border-card-border rounded-[20px] shadow-lg z-30 p-4 space-y-4">
+                    {/* Adults Row */}
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <div className="text-sm font-semibold text-text-primary">Adults</div>
+                        <div className="text-xs text-text-muted">Age 12+</div>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <button
+                          type="button"
+                          disabled={passengers <= 1 || passengers <= infants}
+                          onClick={() => setPassengers(prev => Math.max(1, prev - 1))}
+                          className="w-8 h-8 rounded-full border border-card-border flex items-center justify-center text-text-primary hover:bg-background disabled:opacity-40 disabled:cursor-not-allowed transition font-semibold"
+                        >
+                          -
+                        </button>
+                        <span className="text-sm font-bold w-4 text-center">{passengers}</span>
+                        <button
+                          type="button"
+                          disabled={passengers + children + infants >= 9}
+                          onClick={() => setPassengers(prev => prev + 1)}
+                          className="w-8 h-8 rounded-full border border-card-border flex items-center justify-center text-text-primary hover:bg-background disabled:opacity-40 disabled:cursor-not-allowed transition font-semibold"
+                        >
+                          +
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Children Row */}
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <div className="text-sm font-semibold text-text-primary">Children</div>
+                        <div className="text-xs text-text-muted">Age 2-11</div>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <button
+                          type="button"
+                          disabled={children <= 0}
+                          onClick={() => setChildren(prev => Math.max(0, prev - 1))}
+                          className="w-8 h-8 rounded-full border border-card-border flex items-center justify-center text-text-primary hover:bg-background disabled:opacity-40 disabled:cursor-not-allowed transition font-semibold"
+                        >
+                          -
+                        </button>
+                        <span className="text-sm font-bold w-4 text-center">{children}</span>
+                        <button
+                          type="button"
+                          disabled={passengers + children + infants >= 9}
+                          onClick={() => setChildren(prev => prev + 1)}
+                          className="w-8 h-8 rounded-full border border-card-border flex items-center justify-center text-text-primary hover:bg-background disabled:opacity-40 disabled:cursor-not-allowed transition font-semibold"
+                        >
+                          +
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Infants Row */}
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <div className="text-sm font-semibold text-text-primary">Infants</div>
+                        <div className="text-xs text-text-muted">Under 2, on lap</div>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <button
+                          type="button"
+                          disabled={infants <= 0}
+                          onClick={() => setInfants(prev => Math.max(0, prev - 1))}
+                          className="w-8 h-8 rounded-full border border-card-border flex items-center justify-center text-text-primary hover:bg-background disabled:opacity-40 disabled:cursor-not-allowed transition font-semibold"
+                        >
+                          -
+                        </button>
+                        <span className="text-sm font-bold w-4 text-center">{infants}</span>
+                        <button
+                          type="button"
+                          disabled={infants >= passengers || passengers + children + infants >= 9}
+                          onClick={() => setInfants(prev => prev + 1)}
+                          className="w-8 h-8 rounded-full border border-card-border flex items-center justify-center text-text-primary hover:bg-background disabled:opacity-40 disabled:cursor-not-allowed transition font-semibold"
+                        >
+                          +
+                        </button>
+                      </div>
+                    </div>
+
+                    {pickerError && (
+                      <div className="text-xs text-text-cancelled bg-bg-cancelled p-2 rounded-xl border border-text-cancelled/20 flex items-center gap-1.5 animate-fade-in">
+                        <AlertCircle className="w-3.5 h-3.5 flex-shrink-0" />
+                        <span>{pickerError}</span>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
 
               <div>
-                <label className="block text-xs font-semibold text-text-secondary mb-1">Passengers</label>
-                <div className="relative">
-                  <Users className="absolute left-3 top-3 w-4 h-4 text-text-muted" />
-                  <input
-                    type="number"
-                    min="1"
-                    max="9"
-                    value={passengers}
-                    onChange={(e) => setPassengers(Number.isNaN(parseInt(e.target.value, 10)) ? 1 : parseInt(e.target.value, 10))}
-                    className="form-input w-full pl-10"
-                    required
-                  />
-                </div>
+                <label className="block text-xs font-semibold text-text-secondary mb-1">Cabin Class</label>
+                <select
+                  value={cabinClass}
+                  onChange={(e) => setCabinClass(e.target.value)}
+                  className="form-input w-full bg-card"
+                >
+                  <option value="economy">Economy</option>
+                  <option value="premium_economy">Premium Economy</option>
+                  <option value="business">Business</option>
+                  <option value="first">First Class</option>
+                </select>
               </div>
             </div>
 
@@ -1031,16 +1242,26 @@ export function SearchPageClient({ allAirports }: Props) {
                       </div>
                     </div>
 
-                    <div className="match-pill">
-                      <span className={`match-pill-badge ${flight.matchScore >= 80 ? 'strong' : flight.matchScore >= 60 ? 'fair' : 'weak'}`}>
-                        {flight.matchScore}% Match
-                      </span>
-                      <div className="match-bar-bg mt-1">
-                        <div
-                          className={`match-bar-fill ${flight.matchScore >= 80 ? 'strong' : flight.matchScore >= 60 ? 'fair' : 'weak'}`}
-                          style={{ width: `${flight.matchScore}%` }}
-                        />
+                    <div className="flex flex-col items-end gap-1.5">
+                      <div className="match-pill">
+                        <span className={`match-pill-badge ${flight.matchScore >= 80 ? 'strong' : flight.matchScore >= 60 ? 'fair' : 'weak'}`}>
+                          {flight.matchScore}% Match
+                        </span>
+                        <div className="match-bar-bg mt-1">
+                          <div
+                            className={`match-bar-fill ${flight.matchScore >= 80 ? 'strong' : flight.matchScore >= 60 ? 'fair' : 'weak'}`}
+                            style={{ width: `${flight.matchScore}%` }}
+                          />
+                        </div>
                       </div>
+                      {flight.cabinClassMatch && flight.cabinClassMatch !== 'full' && (
+                        <span className={cn(
+                          "text-[9px] font-extrabold px-1.5 py-0.5 rounded uppercase tracking-wider text-right",
+                          flight.cabinClassMatch === 'mixed' ? "bg-bg-pending text-text-pending" : "bg-bg-cancelled text-text-cancelled"
+                        )}>
+                          {flight.cabinClassMatch === 'mixed' ? 'Mixed Cabin' : 'Downgraded'}
+                        </span>
+                      )}
                     </div>
                   </div>
 
@@ -1068,7 +1289,14 @@ export function SearchPageClient({ allAirports }: Props) {
                       <span className="text-[10px] font-bold uppercase tracking-wider text-text-muted block">Outbound</span>
                       {flight.segments.map((seg: any, sIdx: number) => (
                         <div key={sIdx} className="flex justify-between items-center text-xs text-text-secondary">
-                          <span>{seg.carrierCode}{seg.flightNumber} ({seg.departureAirport} → {seg.arrivalAirport})</span>
+                          <span>
+                            {seg.carrierCode}{seg.flightNumber} ({seg.departureAirport} → {seg.arrivalAirport})
+                            {seg.cabinClass && (
+                              <span className="text-[9px] ml-2 px-1 py-0.2 bg-secondary border border-secondary-border rounded text-text-secondary uppercase font-semibold">
+                                {seg.cabinClass.replace('_', ' ')}
+                              </span>
+                            )}
+                          </span>
                           <span>{seg.departureTime ? new Date(seg.departureTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}</span>
                         </div>
                       ))}
@@ -1081,17 +1309,48 @@ export function SearchPageClient({ allAirports }: Props) {
                       <span className="text-[10px] font-bold uppercase tracking-wider text-text-muted block">Return</span>
                       {flight.returnSegments.map((seg: any, sIdx: number) => (
                         <div key={sIdx} className="flex justify-between items-center text-xs text-text-secondary">
-                          <span>{seg.carrierCode}{seg.flightNumber} ({seg.departureAirport} → {seg.arrivalAirport})</span>
+                          <span>
+                            {seg.carrierCode}{seg.flightNumber} ({seg.departureAirport} → {seg.arrivalAirport})
+                            {seg.cabinClass && (
+                              <span className="text-[9px] ml-2 px-1 py-0.2 bg-secondary border border-secondary-border rounded text-text-secondary uppercase font-semibold">
+                                {seg.cabinClass.replace('_', ' ')}
+                              </span>
+                            )}
+                          </span>
                           <span>{seg.departureTime ? new Date(seg.departureTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}</span>
                         </div>
                       ))}
                     </div>
                   )}
 
+                  {/* Cabin Mismatches */}
+                  {flight.cabinMismatchDetails && flight.cabinMismatchDetails.length > 0 && (
+                    <div className="cabin-mismatches-section mt-2 border-t border-card-border/30 pt-2 px-1">
+                      <button
+                        type="button"
+                        onClick={() => setExpandedMismatches(prev => ({ ...prev, [flight.id]: !prev[flight.id] }))}
+                        className="text-text-pending hover:underline text-xs font-bold flex items-center gap-1 cursor-pointer"
+                      >
+                        <AlertCircle className="w-3.5 h-3.5" />
+                        {expandedMismatches[flight.id] ? 'Hide Cabin Warning' : 'Show Cabin Warning'}
+                      </button>
+                      
+                      {expandedMismatches[flight.id] && (
+                        <div className="mt-2 bg-bg-pending border border-text-pending/10 rounded-lg p-2.5 text-xs text-text-secondary space-y-1 animate-fade-in">
+                          {flight.cabinMismatchDetails.map((detail: any, dIdx: number) => (
+                            <div key={dIdx} className="leading-relaxed">
+                              Segment {detail.segmentIndex + 1} ({detail.route}) on {detail.leg} is in <strong className="text-text-cancelled uppercase">{detail.actual.replace('_', ' ')}</strong> (expected <strong className="text-text-confirmed uppercase">{detail.expected.replace('_', ' ')}</strong>).
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+
                   <div className="chat-flight-footer border-t border-card-border pt-3 mt-2 flex justify-between items-center">
                     <div className="price-block">
                       <span className="price-value text-accent">${Number(flight.price ?? 0).toFixed(2)}</span>
-                      <span className="price-label block">per person / economy</span>
+                      <span className="price-label block">per person / {cabinClass.replace('_', ' ')}</span>
                       <div className="flex gap-2 text-[10px] text-text-muted mt-1 font-medium">
                         <span>Class: <strong className="fare-class-value text-text-secondary font-semibold">{flight.fareClass ? flight.fareClass.charAt(0).toUpperCase() + flight.fareClass.slice(1).toLowerCase() : 'Economy'}</strong></span>
                         <span>•</span>
@@ -1100,7 +1359,7 @@ export function SearchPageClient({ allAirports }: Props) {
                     </div>
                     <div className="flight-actions flex gap-2">
                       <Link
-                        href={`/search/${flight.id}?from=${selectedOrigin?.iataCode || flight.departureAirport || ''}&to=${selectedDest?.iataCode || flight.arrivalAirport || ''}`}
+                        href={`/search/${flight.id}?from=${selectedOrigin?.iataCode || flight.departureAirport || ''}&to=${selectedDest?.iataCode || flight.arrivalAirport || ''}&adults=${passengers}&children=${children}&infants=${infants}&cabinClass=${cabinClass}`}
                         className="btn-action secondary border border-card-border hover:bg-background text-xs font-semibold flex items-center justify-center text-center no-underline rounded-lg py-2 px-3"
                       >
                         Details

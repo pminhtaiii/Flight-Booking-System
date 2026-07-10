@@ -98,6 +98,8 @@ async def chat_stream(
             logger.error(f"Failed to create session on NestJS API: {e!s}")
             raise HTTPException(status_code=503, detail="NestJS API unavailable") from e
 
+    client.correlation_id = session_id
+
     # 4.5. Message Queue Locking
     queue_manager = getattr(request.app.state, "message_queue", None)
     if queue_manager:

@@ -98,7 +98,7 @@ describe('Agent Gateway Polish (E2E)', () => {
       origin: 'HAN',
       destination: 'NRT',
       date: '2026-07-20',
-      passengers: '2',
+      adults: '2',
     };
 
     it('should retrieve search results from Cache directly on cache hit without calling Duffel service', async () => {
@@ -106,7 +106,10 @@ describe('Agent Gateway Polish (E2E)', () => {
         origin: 'HAN',
         destination: 'NRT',
         date: '2026-07-20',
-        passengers: 2,
+        adults: 2,
+        children: 0,
+        infants: 0,
+        cabinClass: 'economy',
       };
       const queryStr = JSON.stringify(normalizedQuery);
       const sha256 = crypto.createHash('sha256').update(queryStr).digest('hex');

@@ -36,6 +36,9 @@ async def search_flights(
     except Exception:
         return "I couldn't search for flights right now. The flight search service is temporarily unavailable. Please try again in a moment."
 
+    if "error" in data:
+        return data["error"]
+
     results = data.get("results", [])
     # Limit results to top 5
     results = results[:5]

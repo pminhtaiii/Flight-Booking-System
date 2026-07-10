@@ -105,7 +105,10 @@ export default async function FlightDetailPage({ params }: Props) {
           destination: recovery.destination,
           departureDate: recovery.departureDate,
           ...(recovery.returnDate ? { returnDate: recovery.returnDate } : {}),
-          passengers: String(recovery.passengers || 1),
+          adults: String(recovery.adults || recovery.passengers || 1),
+          children: String(recovery.children || 0),
+          infants: String(recovery.infants || 0),
+          cabinClass: recovery.cabinClass || 'economy',
           expired: 'true',
         });
         redirect(`/search?${queryParams.toString()}`);

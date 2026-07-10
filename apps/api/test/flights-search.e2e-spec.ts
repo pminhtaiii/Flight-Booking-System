@@ -135,7 +135,7 @@ describe('Flights Search (E2E)', () => {
           origin: 'HAN',
           destination: 'SGN',
           departureDate: '2026-07-15',
-          passengers: 2,
+          adults: 2,
         })
         .expect(401);
     });
@@ -149,7 +149,7 @@ describe('Flights Search (E2E)', () => {
         .send({
           destination: 'SGN',
           departureDate: '2026-07-15',
-          passengers: 2,
+          adults: 2,
         })
         .expect(400);
 
@@ -159,7 +159,7 @@ describe('Flights Search (E2E)', () => {
         .send({
           origin: 'HAN',
           departureDate: '2026-07-15',
-          passengers: 2,
+          adults: 2,
         })
         .expect(400);
     });
@@ -172,7 +172,7 @@ describe('Flights Search (E2E)', () => {
           origin: 'HANOI',
           destination: 'SGN',
           departureDate: '2026-07-15',
-          passengers: 2,
+          adults: 2,
         })
         .expect(400);
 
@@ -183,7 +183,7 @@ describe('Flights Search (E2E)', () => {
           origin: 'HAN',
           destination: 'sg',
           departureDate: '2026-07-15',
-          passengers: 2,
+          adults: 2,
         })
         .expect(400);
     });
@@ -196,12 +196,13 @@ describe('Flights Search (E2E)', () => {
           origin: 'HAN',
           destination: 'HAN',
           departureDate: '2026-07-15',
-          passengers: 2,
+          adults: 2,
         })
         .expect(400);
     });
 
-    it('should return 400 Bad Request when passengers is out of range [1-9]', async () => {
+    it('should return 400 Bad Request when passenger count is invalid (e.g. adults out of bounds, total > 9, infants > adults)', async () => {
+      // adults = 0
       await request(app.getHttpServer())
         .post('/api/flights/search')
         .set('Authorization', `Bearer ${jwtToken}`)
@@ -209,10 +210,11 @@ describe('Flights Search (E2E)', () => {
           origin: 'HAN',
           destination: 'SGN',
           departureDate: '2026-07-15',
-          passengers: 0,
+          adults: 0,
         })
         .expect(400);
 
+      // adults = 10
       await request(app.getHttpServer())
         .post('/api/flights/search')
         .set('Authorization', `Bearer ${jwtToken}`)
@@ -220,7 +222,33 @@ describe('Flights Search (E2E)', () => {
           origin: 'HAN',
           destination: 'SGN',
           departureDate: '2026-07-15',
-          passengers: 10,
+          adults: 10,
+        })
+        .expect(400);
+
+      // total > 9 (adults 6, children 4)
+      await request(app.getHttpServer())
+        .post('/api/flights/search')
+        .set('Authorization', `Bearer ${jwtToken}`)
+        .send({
+          origin: 'HAN',
+          destination: 'SGN',
+          departureDate: '2026-07-15',
+          adults: 6,
+          children: 4,
+        })
+        .expect(400);
+
+      // infants > adults (adults 1, infants 2)
+      await request(app.getHttpServer())
+        .post('/api/flights/search')
+        .set('Authorization', `Bearer ${jwtToken}`)
+        .send({
+          origin: 'HAN',
+          destination: 'SGN',
+          departureDate: '2026-07-15',
+          adults: 1,
+          infants: 2,
         })
         .expect(400);
     });
@@ -234,7 +262,7 @@ describe('Flights Search (E2E)', () => {
           origin: 'HAN',
           destination: 'SGN',
           departureDate: '2026-07-07',
-          passengers: 2,
+          adults: 2,
         })
         .expect(400);
     });
@@ -248,7 +276,7 @@ describe('Flights Search (E2E)', () => {
           destination: 'SGN',
           departureDate: '2026-07-15',
           returnDate: '2026-07-14',
-          passengers: 2,
+          adults: 2,
         })
         .expect(400);
     });
@@ -358,7 +386,7 @@ describe('Flights Search (E2E)', () => {
           origin: 'HAN',
           destination: 'SGN',
           departureDate: '2026-07-15',
-          passengers: 1,
+          adults: 1,
         })
         .expect(200);
 
@@ -406,7 +434,10 @@ describe('Flights Search (E2E)', () => {
         expect(history).toBeDefined();
         expect(history!.origin).toBe('HAN');
         expect(history!.destination).toBe('SGN');
-        expect(history!.passengers).toBe(1);
+        expect(history!.adults).toBe(1);
+        expect(history!.children).toBe(0);
+        expect(history!.infants).toBe(0);
+        expect(history!.cabinClass).toBe('economy');
         expect(history!.resultCount).toBe(1);
         expect(Number(history!.minPrice)).toBe(125.50);
 
@@ -446,7 +477,7 @@ describe('Flights Search (E2E)', () => {
           origin: 'HAN',
           destination: 'SGN',
           departureDate: '2026-07-15',
-          passengers: 1,
+          adults: 1,
         })
         .expect(200);
 
@@ -470,7 +501,7 @@ describe('Flights Search (E2E)', () => {
           origin: 'HAN',
           destination: 'SGN',
           departureDate: '2026-07-15',
-          passengers: 1,
+          adults: 1,
         })
         .expect(200);
 
@@ -495,7 +526,7 @@ describe('Flights Search (E2E)', () => {
           origin: 'HAN',
           destination: 'SGN',
           departureDate: '2026-07-15',
-          passengers: 1,
+          adults: 1,
         })
         .expect(429);
 
@@ -513,7 +544,7 @@ describe('Flights Search (E2E)', () => {
           origin: 'HAN',
           destination: 'SGN',
           departureDate: '2026-07-15',
-          passengers: 1,
+          adults: 1,
         })
         .expect(502);
 

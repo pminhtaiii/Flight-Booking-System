@@ -20,6 +20,33 @@ async function loginUser(page: Page, request: APIRequestContext, context: Browse
   await expect(page).toHaveURL(/\/dashboard/);
 }
 
+// Helper to set passenger count in the dropdown
+async function setAdultsCount(page: Page, targetCount: number) {
+  // Click Passengers button to open dropdown
+  const passengerBtn = page.locator('div:has(> label:has-text("Passengers")) button').first();
+  await passengerBtn.click();
+
+  // Locate the Adults row container
+  const adultsRow = page.locator('div.flex.items-center.justify-between').filter({ hasText: 'Age 12+' }).first();
+  const plusBtn = adultsRow.locator('button', { hasText: '+' });
+  const minusBtn = adultsRow.locator('button', { hasText: '-' });
+  const countSpan = adultsRow.locator('span');
+
+  // Loop to adjust count
+  let currentCount = parseInt((await countSpan.innerText()) || '1', 10);
+  while (currentCount < targetCount) {
+    await plusBtn.click();
+    currentCount++;
+  }
+  while (currentCount > targetCount) {
+    await minusBtn.click();
+    currentCount--;
+  }
+
+  // Close dropdown
+  await passengerBtn.click();
+}
+
 test.describe('Flight Search Integration E2E Flows', () => {
   test.beforeEach(async ({ page, request, context }) => {
     await loginUser(page, request, context);
@@ -49,9 +76,8 @@ test.describe('Flight Search Integration E2E Flows', () => {
     await expect(sgnSuggestion).toBeVisible();
     await sgnSuggestion.click();
 
-    // Fill in Passenger count
-    const passengerInput = page.locator('div:has(> label:has-text("Passengers")) input');
-    await passengerInput.fill('2');
+    // Set passenger count to 2
+    await setAdultsCount(page, 2);
 
     // Fill in Departure date (future date)
     const departDateInput = page.locator('div:has(> label:has-text("Departure Date")) input');
@@ -135,9 +161,8 @@ test.describe('Flight Search Integration E2E Flows', () => {
     await expect(sgnSuggestion).toBeVisible();
     await sgnSuggestion.click();
 
-    // Fill in Passenger count
-    const passengerInput = page.locator('div:has(> label:has-text("Passengers")) input');
-    await passengerInput.fill('2');
+    // Set passenger count to 2
+    await setAdultsCount(page, 2);
 
     // Fill in Departure date (future date)
     const departDateInput = page.locator('div:has(> label:has-text("Departure Date")) input');

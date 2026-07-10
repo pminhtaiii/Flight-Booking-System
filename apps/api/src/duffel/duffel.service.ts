@@ -23,13 +23,30 @@ export class DuffelService {
     });
   }
 
+  mapPassengersToDuffel(adults: number, children = 0, infants = 0): Array<{ type: 'adult' | 'child' | 'infant_without_seat' }> {
+    const passengers: Array<{ type: 'adult' | 'child' | 'infant_without_seat' }> = [];
+    for (let i = 0; i < adults; i++) {
+      passengers.push({ type: 'adult' });
+    }
+    for (let i = 0; i < children; i++) {
+      passengers.push({ type: 'child' });
+    }
+    for (let i = 0; i < infants; i++) {
+      passengers.push({ type: 'infant_without_seat' });
+    }
+    return passengers;
+  }
+
   async searchFlights(
     query: {
       origin: string;
       destination: string;
       departureDate: string;
       returnDate?: string;
-      passengers: number;
+      adults: number;
+      children?: number;
+      infants?: number;
+      cabinClass?: string;
     },
     caller: 'user' | 'agent',
   ): Promise<{ offerRequest: DuffelOfferRequest; cached: boolean; searchHash: string }> {
@@ -57,7 +74,10 @@ export class DuffelService {
         destination: query.destination.trim().toUpperCase(),
         departureDate: query.departureDate,
         returnDate: query.returnDate || null,
-        passengers: Number(query.passengers),
+        adults: Number(query.adults),
+        children: Number(query.children || 0),
+        infants: Number(query.infants || 0),
+        cabinClass: query.cabinClass || 'economy',
       };
       const queryStr = JSON.stringify(normalizedQuery);
       const sha256 = crypto.createHash('sha256').update(queryStr).digest('hex');
@@ -120,6 +140,17 @@ export class DuffelService {
       if (!isJest && (process.env.NODE_ENV === 'test' || token === 'mock')) {
         this.logger.log(`Mocking Duffel API response for test environment. NODE_ENV: ${process.env.NODE_ENV}`);
         
+        const mockPassengers: Array<{ id: string; type: 'adult' | 'child' | 'infant_without_seat' }> = [];
+        for (let i = 0; i < normalizedQuery.adults; i++) {
+          mockPassengers.push({ id: `pas_mock_${mockPassengers.length + 1}`, type: 'adult' });
+        }
+        for (let i = 0; i < normalizedQuery.children; i++) {
+          mockPassengers.push({ id: `pas_mock_${mockPassengers.length + 1}`, type: 'child' });
+        }
+        for (let i = 0; i < normalizedQuery.infants; i++) {
+          mockPassengers.push({ id: `pas_mock_${mockPassengers.length + 1}`, type: 'infant_without_seat' });
+        }
+
         const slices: Record<string, unknown>[] = [
           {
             id: 'sli_mock_1',
@@ -138,9 +169,9 @@ export class DuffelService {
                 marketing_carrier: { id: 'VN', name: 'Vietnam Airlines', iata_code: 'VN' },
                 marketing_carrier_flight_number: '123',
                 aircraft: { id: 'arc_mock_1', name: 'Airbus A321', iata_code: '321' },
-                passengers: Array.from({ length: normalizedQuery.passengers }, (_, i) => ({
-                  passenger_id: `pas_mock_${i + 1}`,
-                  cabin_class: 'economy',
+                passengers: mockPassengers.map((p) => ({
+                  passenger_id: p.id,
+                  cabin_class: normalizedQuery.cabinClass,
                   baggages: [
                     { type: 'checked', quantity: 1 }
                   ]
@@ -168,9 +199,9 @@ export class DuffelService {
                 marketing_carrier: { id: 'VN', name: 'Vietnam Airlines', iata_code: 'VN' },
                 marketing_carrier_flight_number: '124',
                 aircraft: { id: 'arc_mock_1', name: 'Airbus A321', iata_code: '321' },
-                passengers: Array.from({ length: normalizedQuery.passengers }, (_, i) => ({
-                  passenger_id: `pas_mock_${i + 1}`,
-                  cabin_class: 'economy',
+                passengers: mockPassengers.map((p) => ({
+                  passenger_id: p.id,
+                  cabin_class: normalizedQuery.cabinClass,
                   baggages: [
                     { type: 'checked', quantity: 1 }
                   ]
@@ -195,10 +226,7 @@ export class DuffelService {
                 })),
               };
             }),
-            passengers: Array.from({ length: normalizedQuery.passengers }, (_, i) => ({
-              id: `pas_mock_${i + 1}`,
-              type: 'adult'
-            })),
+            passengers: mockPassengers,
             passenger_identity_documents_required: false
           }
         ];
@@ -206,10 +234,7 @@ export class DuffelService {
         const offerRequest = {
           id: 'or_mock_123',
           slices,
-          passengers: Array.from({ length: normalizedQuery.passengers }, (_, i) => ({
-            id: `pas_mock_${i + 1}`,
-            type: 'adult'
-          })),
+          passengers: mockPassengers,
           offers
         } as unknown as DuffelOfferRequest;
 
@@ -242,15 +267,17 @@ export class DuffelService {
         });
       }
 
-      const passengers = Array.from({ length: normalizedQuery.passengers }, () => ({
-        type: 'adult' as const,
-      }));
+      const passengers = this.mapPassengersToDuffel(
+        normalizedQuery.adults,
+        normalizedQuery.children,
+        normalizedQuery.infants,
+      );
 
       this.logger.log(`Calling Duffel API to create offer request. Slices: ${slices.length}, Passengers: ${passengers.length}`);
       const duffelResponse = await this.duffel.offerRequests.create({
         slices,
-        passengers,
-        cabin_class: 'economy',
+        passengers: passengers as any,
+        cabin_class: normalizedQuery.cabinClass as any,
       });
 
       const offerRequest = duffelResponse.data as unknown as DuffelOfferRequest;

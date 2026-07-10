@@ -6,22 +6,32 @@ Update this file after every completed feature. Any AI agent reading this should
 
 ### Current Status
 
-**Feature:** Duffel Flight Search Service Setup & Agent Gateway Refactoring (In Progress)
-**Last completed:** Phase 5: Search History & Analytics Capture.
-**Next:** Phase 6: E2E Verification & Testing (Automated Jest/Playwright tests, chatbot integration verification).
+**Feature:** Cabin Class & Passenger Type Enhancement (Completed)
+**Last completed:** Phase 7: E2E Testing & Verification.
+**Next:** None.
 
 ---
 
 ## Progress by Feature
 
-### [ ] Feature: Duffel Flight Search Service Setup & Agent Gateway Refactoring (Feature 6)
+### [x] Feature: Cabin Class & Passenger Type Enhancement (Feature 8)
+
+- [x] Phase 1: Database Schema Migration (Prisma model updates for FlightOffer and SearchHistory, database migrations, client regeneration)
+- [x] Phase 2: DuffelService — Cabin Class & Passenger Mapper (Implemented mapPassengersToDuffel, updated searchFlights signature, cache key SHA-256, mock data generation and Duffel API payload)
+- [x] Phase 3: FlightsModule — Cabin Match Classification & DTOs (Implemented FlightSearchRequestDto, FlightSegmentDto, FlightOfferDto, FlightDetailResponseDto, cabin mismatch details, and longest-duration segment cabin match classification, write-behind, detail endpoint recovery)
+- [x] Phase 4: Passenger Type Selector & Frontend Integration (Implemented unified passenger picker dropdown for Adults, Children, Infants with increment/decrement validation)
+- [x] Phase 5: Agent Gateway — Honest Degradation (Implemented keyword detection, honest limitation response, audit logging, and Python agent integration)
+- [x] Phase 6: Polish & Cross-Cutting Concerns (Update documentation and execute validation scenarios)
+- [x] Phase 7: E2E Testing & Verification (NestJS and Playwright E2E tests for flights search, detail recovery, and agent gateway limitations)
+
+### [x] Feature: Duffel Flight Search Service Setup & Agent Gateway Refactoring (Feature 6)
 
 - [x] Phase 1: Duffel Service Setup & Agent Gateway Refactoring (Duffel module extraction, SDK setup, cache, budget check, and agent gateway service updates)
 - [x] Phase 2: Database Schema & Cron Cleanup (Prisma model updates for FlightOffer and SearchHistory, daily cron retention task)
 - [x] Phase 3: FlightsModule & User Search Endpoint and Frontend Integration
 - [x] Phase 4: Flight Detail & Re-pricing API
 - [x] Phase 5: Frontend Integration & Search History Analytics Capture
-- [ ] Phase 6: E2E Verification & Testing (Automated Jest/Playwright tests, chatbot integration verification)
+- [x] Phase 6: E2E Verification & Testing (Automated Jest/Playwright tests, chatbot integration verification)
 
 ### [x] Feature: LLM Output Guardrails
 
