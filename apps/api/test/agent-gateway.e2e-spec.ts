@@ -719,7 +719,7 @@ describe('Agent Gateway (E2E)', () => {
       expect(logs.length).toBe(1);
       expect(logs[0].metadata).toMatchObject({
         matchedKeywords: ['business'],
-        originalMessage: 'Find me a business class flight from SGN to NRT',
+        messageId: expect.any(String),
       });
     });
 
@@ -757,10 +757,9 @@ describe('Agent Gateway (E2E)', () => {
       expect(logs.length).toBe(1);
       expect(logs[0].metadata).toMatchObject({
         matchedKeywords: ['infant'],
-        originalMessage: 'I want to travel with an infant',
+        messageId: expect.any(String),
       });
     });
-
     it('should throw 400 when neither adults nor passengers query param is provided', async () => {
       const res = await request(app.getHttpServer())
         .get('/agent-gateway/flights/search?origin=HAN&destination=NRT&date=2026-07-15')
@@ -768,7 +767,7 @@ describe('Agent Gateway (E2E)', () => {
         .set('X-User-Claim', token)
         .expect(400);
 
-      expect(res.body.message).toBe('Adults count is required');
+      expect(res.body.message).toContain('At least one of adults or passengers must be provided');
     });
 
     it('should successfully search using passengers query param instead of adults (backward compatibility)', async () => {
