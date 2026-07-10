@@ -12,9 +12,23 @@ import {
   registerDecorator,
   ValidationArguments,
   ValidationOptions,
+  IsDateString,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import { PassengerType } from '@prisma/client';
+
+function countPassengerTypes(passengers: any[]): { adults: number; children: number; infants: number } {
+  return passengers.reduce(
+    (acc, item) => {
+      const passenger = item as { type?: PassengerType };
+      if (passenger.type === PassengerType.ADULT) acc.adults += 1;
+      if (passenger.type === PassengerType.CHILD) acc.children += 1;
+      if (passenger.type === PassengerType.INFANT) acc.infants += 1;
+      return acc;
+    },
+    { adults: 0, children: 0, infants: 0 },
+  );
+}
 
 function HasValidPassengerMatrix(validationOptions?: ValidationOptions) {
   return function (object: object, propertyName: string) {
@@ -29,16 +43,7 @@ function HasValidPassengerMatrix(validationOptions?: ValidationOptions) {
             return false;
           }
 
-          const counts = value.reduce(
-            (acc, item) => {
-              const passenger = item as { type?: PassengerType };
-              if (passenger.type === PassengerType.ADULT) acc.adults += 1;
-              if (passenger.type === PassengerType.CHILD) acc.children += 1;
-              if (passenger.type === PassengerType.INFANT) acc.infants += 1;
-              return acc;
-            },
-            { adults: 0, children: 0, infants: 0 },
-          );
+          const counts = countPassengerTypes(value);
 
           const total = counts.adults + counts.children + counts.infants;
           if (total > 9) {
@@ -57,16 +62,7 @@ function HasValidPassengerMatrix(validationOptions?: ValidationOptions) {
             return 'At least one passenger is required';
           }
 
-          const counts = value.reduce(
-            (acc, item) => {
-              const passenger = item as { type?: PassengerType };
-              if (passenger.type === PassengerType.ADULT) acc.adults += 1;
-              if (passenger.type === PassengerType.CHILD) acc.children += 1;
-              if (passenger.type === PassengerType.INFANT) acc.infants += 1;
-              return acc;
-            },
-            { adults: 0, children: 0, infants: 0 },
-          );
+          const counts = countPassengerTypes(value);
 
           if (counts.adults + counts.children + counts.infants > 9) {
             return 'Total passengers cannot exceed 9';
@@ -99,7 +95,12 @@ export class CreateIntentPassengerDto {
   @MaxLength(100)
   familyName!: string;
 
-  @IsString()
+  @IsDateString(
+    { strict: true },
+    {
+      message: 'dateOfBirth must be a valid ISO date string',
+    },
+  )
   @Matches(/^\d{4}-\d{2}-\d{2}$/, {
     message: 'dateOfBirth must be in YYYY-MM-DD format',
   })
@@ -113,7 +114,7 @@ export class CreateIntentPassengerDto {
 
   @IsOptional()
   @IsString()
-  @Matches(/^[A-Z]{2}$/i, {
+  @Matches(/^[A-Z]{2}$/, {
     message: 'nationality must be a 2-character country code',
   })
   nationality?: string;
@@ -124,7 +125,12 @@ export class CreateIntentPassengerDto {
   passportNumber?: string;
 
   @IsOptional()
-  @IsString()
+  @IsDateString(
+    { strict: true },
+    {
+      message: 'passportExpiry must be a valid ISO date string',
+    },
+  )
   @Matches(/^\d{4}-\d{2}-\d{2}$/, {
     message: 'passportExpiry must be in YYYY-MM-DD format',
   })

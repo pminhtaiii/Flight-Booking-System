@@ -4,6 +4,15 @@ import { Duffel } from '@duffel/api';
 import { DuffelOfferRequest } from './duffel.types';
 import * as crypto from 'crypto';
 
+export class DuffelTimeoutError extends Error {
+  readonly code = 'DUFFEL_TIMEOUT';
+  constructor(message = 'Duffel offer lookup timed out.') {
+    super(message);
+    this.name = 'DuffelTimeoutError';
+    Object.setPrototypeOf(this, DuffelTimeoutError.prototype);
+  }
+}
+
 @Injectable()
 export class DuffelService {
   private readonly logger = new Logger(DuffelService.name);
@@ -306,15 +315,21 @@ export class DuffelService {
   }
 
   async getOfferById(duffelOfferId: string, timeoutMs = 4500): Promise<unknown> {
-    const timeoutError = new Error('Duffel offer lookup timed out.');
+    const timeoutError = new DuffelTimeoutError();
+    let timeoutHandle: NodeJS.Timeout | undefined;
 
     const timeoutPromise = new Promise<never>((_, reject) => {
-      setTimeout(() => reject(timeoutError), timeoutMs);
+      timeoutHandle = setTimeout(() => reject(timeoutError), timeoutMs);
     });
 
-    const offerPromise = this.duffel.offers.get(duffelOfferId);
-    const result = await Promise.race([offerPromise, timeoutPromise]);
-
-    return (result as { data: unknown }).data;
+    try {
+      const offerPromise = this.duffel.offers.get(duffelOfferId);
+      const result = await Promise.race([offerPromise, timeoutPromise]);
+      return (result as { data: unknown }).data;
+    } finally {
+      if (timeoutHandle) {
+        clearTimeout(timeoutHandle);
+      }
+    }
   }
 }

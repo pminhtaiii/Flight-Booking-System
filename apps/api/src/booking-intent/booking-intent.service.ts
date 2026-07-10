@@ -8,7 +8,7 @@ import {
 } from '@nestjs/common';
 import { Prisma, PassengerType } from '@prisma/client';
 import { PrismaService } from '@/prisma/prisma.service';
-import { DuffelService } from '@/duffel/duffel.service';
+import { DuffelService, DuffelTimeoutError } from '@/duffel/duffel.service';
 import { AuditService } from '@/audit/audit.service';
 import { EncryptionService } from '@/common/encryption.service';
 import { CreateIntentDto, CreateIntentPassengerDto } from './dto/create-intent.dto';
@@ -65,7 +65,8 @@ export class BookingIntentService {
     const confirmedPrice = Number(liveOffer.totalAmount);
     const originalPrice = Number(flightOffer.price);
     const now = new Date();
-    const ttlMinutes = Number(process.env.BOOKING_INTENT_TTL_MINUTES || 30);
+    const parsedTtl = Number(process.env.BOOKING_INTENT_TTL_MINUTES);
+    const ttlMinutes = isNaN(parsedTtl) || !process.env.BOOKING_INTENT_TTL_MINUTES ? 30 : parsedTtl;
     const intentExpiresAt = new Date(now.getTime() + ttlMinutes * 60 * 1000);
 
     const created = await this.prisma.$transaction(async (tx) => {
@@ -104,7 +105,7 @@ export class BookingIntentService {
               familyName: passenger.familyName,
               dateOfBirth: this.asDate(passenger.dateOfBirth),
               gender: passenger.gender.toLowerCase(),
-              nationality: passenger.nationality || null,
+              nationality: passenger.nationality ? passenger.nationality.toUpperCase() : null,
               passportNumber: passenger.passportNumber
                 ? this.encryptionService.encrypt(passenger.passportNumber)
                 : null,
@@ -322,7 +323,7 @@ export class BookingIntentService {
 
     merged[0] = {
       ...primary,
-      nationality: primary.nationality || profile.nationality || undefined,
+      nationality: (primary.nationality || profile.nationality || undefined)?.toUpperCase(),
       passportNumber: primary.passportNumber || resolvedPassport || undefined,
       passportExpiry: primary.passportExpiry || resolvedPassportExpiry || undefined,
       travelerProfileId: profile.id,
@@ -371,8 +372,18 @@ export class BookingIntentService {
         expires_at?: string | null;
       };
 
+      if (!offer || !offer.total_amount || isNaN(Number(offer.total_amount)) || Number(offer.total_amount) <= 0) {
+        throw new HttpException(
+          {
+            code: 'UPSTREAM_UNAVAILABLE',
+            message: 'Failed to confirm live offer pricing',
+          },
+          HttpStatus.BAD_GATEWAY,
+        );
+      }
+
       return {
-        totalAmount: offer.total_amount || '0',
+        totalAmount: offer.total_amount,
         currency: offer.total_currency || 'USD',
         offerExpiresAt: offer.expires_at ? new Date(offer.expires_at) : null,
         raw: rawOffer,
@@ -380,7 +391,7 @@ export class BookingIntentService {
     } catch (error) {
       const err = error as { status?: number; message?: string };
 
-      if (err.message?.includes('timed out')) {
+      if (error instanceof DuffelTimeoutError) {
         throw new HttpException(
           {
             code: 'UPSTREAM_TIMEOUT',
@@ -433,12 +444,14 @@ export class BookingIntentService {
     }
 
     // TravelerProfile rows can contain either plaintext legacy values or encrypted payloads.
-    if (!value.includes(':')) {
+    const marker = 'v1:';
+    if (!value.startsWith(marker)) {
       return value;
     }
 
     try {
-      return this.encryptionService.decrypt(value);
+      const encryptedValue = value.substring(marker.length);
+      return this.encryptionService.decrypt(encryptedValue);
     } catch {
       return null;
     }

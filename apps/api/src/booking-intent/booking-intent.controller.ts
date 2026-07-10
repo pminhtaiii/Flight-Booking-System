@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Headers, Param, Post, Req, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Headers, Param, Post, Req, UseGuards, ParseUUIDPipe } from '@nestjs/common';
 import { Request } from 'express';
 import { JwtAuthGuard } from '@/auth/guards/jwt-auth.guard';
 import { BookingIntentService } from './booking-intent.service';
@@ -38,7 +38,7 @@ export class BookingIntentController {
   }
 
   @Get(':id')
-  async getIntent(@Req() req: AuthenticatedRequest, @Param('id') id: string) {
+  async getIntent(@Req() req: AuthenticatedRequest, @Param('id', new ParseUUIDPipe({ version: '4' })) id: string) {
     return this.bookingIntentService.getIntent(req.user.id, id);
   }
 }
