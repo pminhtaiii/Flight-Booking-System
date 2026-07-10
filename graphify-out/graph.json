@@ -1824,14 +1824,14 @@
       "norm_label": "main()"
     },
     {
-      "label": "Mimo LLM API Connection Diagnostic Tool  Question being answered: Can the user a",
+      "label": "Mimo LLM API Connection Diagnostic Tool  Question being answered: Can the use",
       "file_type": "rationale",
       "source_file": "apps/agent/src/agent/test_llm_connection.py",
       "source_location": "L1",
       "_origin": "ast",
       "id": "apps_agent_src_agent_test_llm_connection_rationale_1",
       "community": 3,
-      "norm_label": "mimo llm api connection diagnostic tool  question being answered: can the user a"
+      "norm_label": "mimo llm api connection diagnostic tool  question being answered: can the use"
     },
     {
       "label": "__init__.py",
@@ -1977,7 +1977,7 @@
       "label": "NestJSClient",
       "file_type": "code",
       "source_file": "apps/agent/src/agent/tools/nestjs_client.py",
-      "source_location": "L8",
+      "source_location": "L11",
       "_origin": "ast",
       "id": "apps_agent_src_agent_tools_nestjs_client_nestjsclient",
       "community": 126,
@@ -1987,7 +1987,7 @@
       "label": ".__init__()",
       "file_type": "code",
       "source_file": "apps/agent/src/agent/tools/nestjs_client.py",
-      "source_location": "L9",
+      "source_location": "L12",
       "_origin": "ast",
       "id": "apps_agent_src_agent_tools_nestjs_client_nestjsclient_init",
       "community": 126,
@@ -1997,7 +1997,7 @@
       "label": ".create_session()",
       "file_type": "code",
       "source_file": "apps/agent/src/agent/tools/nestjs_client.py",
-      "source_location": "L15",
+      "source_location": "L19",
       "_origin": "ast",
       "id": "apps_agent_src_agent_tools_nestjs_client_nestjsclient_create_session",
       "community": 126,
@@ -2017,7 +2017,7 @@
       "label": ".create_message()",
       "file_type": "code",
       "source_file": "apps/agent/src/agent/tools/nestjs_client.py",
-      "source_location": "L23",
+      "source_location": "L27",
       "_origin": "ast",
       "id": "apps_agent_src_agent_tools_nestjs_client_nestjsclient_create_message",
       "community": 126,
@@ -2027,7 +2027,7 @@
       "label": ".create_message_batch()",
       "file_type": "code",
       "source_file": "apps/agent/src/agent/tools/nestjs_client.py",
-      "source_location": "L41",
+      "source_location": "L45",
       "_origin": "ast",
       "id": "apps_agent_src_agent_tools_nestjs_client_nestjsclient_create_message_batch",
       "community": 126,
@@ -2037,7 +2037,7 @@
       "label": ".get_memory()",
       "file_type": "code",
       "source_file": "apps/agent/src/agent/tools/nestjs_client.py",
-      "source_location": "L53",
+      "source_location": "L57",
       "_origin": "ast",
       "id": "apps_agent_src_agent_tools_nestjs_client_nestjsclient_get_memory",
       "community": 126,
@@ -2047,7 +2047,7 @@
       "label": "._get_gateway_headers()",
       "file_type": "code",
       "source_file": "apps/agent/src/agent/tools/nestjs_client.py",
-      "source_location": "L63",
+      "source_location": "L67",
       "_origin": "ast",
       "id": "apps_agent_src_agent_tools_nestjs_client_nestjsclient_get_gateway_headers",
       "community": 126,
@@ -2057,7 +2057,7 @@
       "label": ".get_gateway_flights_search()",
       "file_type": "code",
       "source_file": "apps/agent/src/agent/tools/nestjs_client.py",
-      "source_location": "L80",
+      "source_location": "L87",
       "_origin": "ast",
       "id": "apps_agent_src_agent_tools_nestjs_client_nestjsclient_get_gateway_flights_search",
       "community": 126,
@@ -2067,7 +2067,7 @@
       "label": ".get_gateway_user_preferences()",
       "file_type": "code",
       "source_file": "apps/agent/src/agent/tools/nestjs_client.py",
-      "source_location": "L102",
+      "source_location": "L109",
       "_origin": "ast",
       "id": "apps_agent_src_agent_tools_nestjs_client_nestjsclient_get_gateway_user_preferences",
       "community": 126,
@@ -2077,7 +2077,7 @@
       "label": ".get_gateway_user_bookings()",
       "file_type": "code",
       "source_file": "apps/agent/src/agent/tools/nestjs_client.py",
-      "source_location": "L110",
+      "source_location": "L117",
       "_origin": "ast",
       "id": "apps_agent_src_agent_tools_nestjs_client_nestjsclient_get_gateway_user_bookings",
       "community": 126,
@@ -5167,7 +5167,7 @@
       "label": ".getUserPreferences()",
       "file_type": "code",
       "source_file": "apps/api/src/agent-gateway/agent-gateway.service.ts",
-      "source_location": "L344",
+      "source_location": "L358",
       "_origin": "ast",
       "id": "apps_api_src_agent_gateway_agent_gateway_service_agentgatewayservice_getuserpreferences",
       "community": 6,
@@ -5177,7 +5177,7 @@
       "label": ".getUserBookings()",
       "file_type": "code",
       "source_file": "apps/api/src/agent-gateway/agent-gateway.service.ts",
-      "source_location": "L379",
+      "source_location": "L393",
       "_origin": "ast",
       "id": "apps_api_src_agent_gateway_agent_gateway_service_agentgatewayservice_getuserbookings",
       "community": 6,
@@ -5264,10 +5264,20 @@
       "norm_label": "isfuturedatestring()"
     },
     {
-      "label": "FlightSearchQueryDto",
+      "label": "AtLeastOnePassengerField()",
       "file_type": "code",
       "source_file": "apps/api/src/agent-gateway/dto/flight-search-query.dto.ts",
       "source_location": "L32",
+      "_origin": "ast",
+      "id": "apps_api_src_agent_gateway_dto_flight_search_query_dto_atleastonepassengerfield",
+      "community": 6,
+      "norm_label": "atleastonepassengerfield()"
+    },
+    {
+      "label": "FlightSearchQueryDto",
+      "file_type": "code",
+      "source_file": "apps/api/src/agent-gateway/dto/flight-search-query.dto.ts",
+      "source_location": "L55",
       "_origin": "ast",
       "id": "apps_api_src_agent_gateway_dto_flight_search_query_dto_flightsearchquerydto",
       "community": 6,
@@ -5480,7 +5490,7 @@
       "source_location": "L9",
       "_origin": "ast",
       "id": "apps_api_src_airports_airports_service_airportsservice_constructor",
-      "community": 10,
+      "community": 277,
       "norm_label": ".constructor()"
     },
     {
@@ -5780,7 +5790,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "apps_api_src_auth_auth_module",
-      "community": 10,
+      "community": 256,
       "norm_label": "auth.module.ts"
     },
     {
@@ -5790,7 +5800,7 @@
       "source_location": "L25",
       "_origin": "ast",
       "id": "apps_api_src_auth_auth_module_authmodule",
-      "community": 10,
+      "community": 256,
       "norm_label": "authmodule"
     },
     {
@@ -5840,7 +5850,7 @@
       "source_location": "L25",
       "_origin": "ast",
       "id": "apps_api_src_auth_auth_service_authservice_register",
-      "community": 256,
+      "community": 10,
       "norm_label": ".register()"
     },
     {
@@ -5860,7 +5870,7 @@
       "source_location": "L186",
       "_origin": "ast",
       "id": "apps_api_src_auth_auth_service_authservice_logout",
-      "community": 256,
+      "community": 10,
       "norm_label": ".logout()"
     },
     {
@@ -5940,7 +5950,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "apps_api_src_auth_rate_limit_lockout_service_spec",
-      "community": 10,
+      "community": 256,
       "norm_label": "lockout.service.spec.ts"
     },
     {
@@ -5950,7 +5960,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "apps_api_src_auth_rate_limit_lockout_service",
-      "community": 10,
+      "community": 256,
       "norm_label": "lockout.service.ts"
     },
     {
@@ -5970,7 +5980,7 @@
       "source_location": "L7",
       "_origin": "ast",
       "id": "apps_api_src_auth_rate_limit_lockout_service_lockoutservice_constructor",
-      "community": 10,
+      "community": 277,
       "norm_label": ".constructor()"
     },
     {
@@ -6040,7 +6050,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "apps_api_src_auth_strategies_jwt_strategy",
-      "community": 10,
+      "community": 256,
       "norm_label": "jwt.strategy.ts"
     },
     {
@@ -6050,7 +6060,7 @@
       "source_location": "L9",
       "_origin": "ast",
       "id": "apps_api_src_auth_strategies_jwt_strategy_jwtstrategy",
-      "community": 10,
+      "community": 256,
       "norm_label": "jwtstrategy"
     },
     {
@@ -6060,7 +6070,7 @@
       "source_location": "L10",
       "_origin": "ast",
       "id": "apps_api_src_auth_strategies_jwt_strategy_jwtstrategy_constructor",
-      "community": 10,
+      "community": 256,
       "norm_label": ".constructor()"
     },
     {
@@ -6100,7 +6110,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "apps_api_src_cache_cache_service",
-      "community": 10,
+      "community": 29,
       "norm_label": "cache.service.ts"
     },
     {
@@ -6110,7 +6120,7 @@
       "source_location": "L5",
       "_origin": "ast",
       "id": "apps_api_src_cache_cache_service_cacheservice",
-      "community": 10,
+      "community": 277,
       "norm_label": "cacheservice"
     },
     {
@@ -6120,7 +6130,7 @@
       "source_location": "L10",
       "_origin": "ast",
       "id": "apps_api_src_cache_cache_service_cacheservice_onmoduleinit",
-      "community": 10,
+      "community": 277,
       "norm_label": ".onmoduleinit()"
     },
     {
@@ -6130,7 +6140,7 @@
       "source_location": "L35",
       "_origin": "ast",
       "id": "apps_api_src_cache_cache_service_cacheservice_onmoduledestroy",
-      "community": 10,
+      "community": 277,
       "norm_label": ".onmoduledestroy()"
     },
     {
@@ -6150,7 +6160,7 @@
       "source_location": "L65",
       "_origin": "ast",
       "id": "apps_api_src_cache_cache_service_cacheservice_set",
-      "community": 10,
+      "community": 277,
       "norm_label": ".set()"
     },
     {
@@ -6160,7 +6170,7 @@
       "source_location": "L84",
       "_origin": "ast",
       "id": "apps_api_src_cache_cache_service_cacheservice_incr",
-      "community": 256,
+      "community": 277,
       "norm_label": ".incr()"
     },
     {
@@ -6170,7 +6180,7 @@
       "source_location": "L114",
       "_origin": "ast",
       "id": "apps_api_src_cache_cache_service_cacheservice_decr",
-      "community": 256,
+      "community": 277,
       "norm_label": ".decr()"
     },
     {
@@ -6190,7 +6200,7 @@
       "source_location": "L156",
       "_origin": "ast",
       "id": "apps_api_src_cache_cache_service_cacheservice_getttl",
-      "community": 10,
+      "community": 277,
       "norm_label": ".getttl()"
     },
     {
@@ -6200,7 +6210,7 @@
       "source_location": "L177",
       "_origin": "ast",
       "id": "apps_api_src_cache_cache_service_cacheservice_keys",
-      "community": 256,
+      "community": 277,
       "norm_label": ".keys()"
     },
     {
@@ -6660,7 +6670,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "apps_api_src_duffel_duffel_cleanup_service",
-      "community": 29,
+      "community": 254,
       "norm_label": "duffel-cleanup.service.ts"
     },
     {
@@ -6670,7 +6680,7 @@
       "source_location": "L6",
       "_origin": "ast",
       "id": "apps_api_src_duffel_duffel_cleanup_service_duffelcleanupservice",
-      "community": 29,
+      "community": 254,
       "norm_label": "duffelcleanupservice"
     },
     {
@@ -6680,7 +6690,7 @@
       "source_location": "L9",
       "_origin": "ast",
       "id": "apps_api_src_duffel_duffel_cleanup_service_duffelcleanupservice_constructor",
-      "community": 29,
+      "community": 254,
       "norm_label": ".constructor()"
     },
     {
@@ -6690,7 +6700,7 @@
       "source_location": "L12",
       "_origin": "ast",
       "id": "apps_api_src_duffel_duffel_cleanup_service_duffelcleanupservice_handlecleanup",
-      "community": 29,
+      "community": 254,
       "norm_label": ".handlecleanup()"
     },
     {
@@ -6740,7 +6750,7 @@
       "source_location": "L12",
       "_origin": "ast",
       "id": "apps_api_src_duffel_duffel_service_duffelservice_constructor",
-      "community": 10,
+      "community": 277,
       "norm_label": ".constructor()"
     },
     {
@@ -6750,7 +6760,7 @@
       "source_location": "L26",
       "_origin": "ast",
       "id": "apps_api_src_duffel_duffel_service_duffelservice_mappassengerstoduffel",
-      "community": 256,
+      "community": 277,
       "norm_label": ".mappassengerstoduffel()"
     },
     {
@@ -6760,7 +6770,7 @@
       "source_location": "L40",
       "_origin": "ast",
       "id": "apps_api_src_duffel_duffel_service_duffelservice_searchflights",
-      "community": 256,
+      "community": 277,
       "norm_label": ".searchflights()"
     },
     {
@@ -7180,7 +7190,7 @@
       "source_location": "L182",
       "_origin": "ast",
       "id": "apps_api_src_flights_flights_service_flightsservice",
-      "community": 10,
+      "community": 273,
       "norm_label": "flightsservice"
     },
     {
@@ -7220,7 +7230,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "apps_api_src_health_health_controller",
-      "community": 277,
+      "community": 10,
       "norm_label": "health.controller.ts"
     },
     {
@@ -7230,7 +7240,7 @@
       "source_location": "L6",
       "_origin": "ast",
       "id": "apps_api_src_health_health_controller_healthcontroller",
-      "community": 277,
+      "community": 10,
       "norm_label": "healthcontroller"
     },
     {
@@ -7240,7 +7250,7 @@
       "source_location": "L9",
       "_origin": "ast",
       "id": "apps_api_src_health_health_controller_healthcontroller_constructor",
-      "community": 277,
+      "community": 10,
       "norm_label": ".constructor()"
     },
     {
@@ -7250,7 +7260,7 @@
       "source_location": "L12",
       "_origin": "ast",
       "id": "apps_api_src_health_health_controller_healthcontroller_check",
-      "community": 277,
+      "community": 10,
       "norm_label": ".check()"
     },
     {
@@ -7260,7 +7270,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "apps_api_src_health_health_module",
-      "community": 277,
+      "community": 10,
       "norm_label": "health.module.ts"
     },
     {
@@ -7270,7 +7280,7 @@
       "source_location": "L7",
       "_origin": "ast",
       "id": "apps_api_src_health_health_module_healthmodule",
-      "community": 277,
+      "community": 10,
       "norm_label": "healthmodule"
     },
     {
@@ -7330,7 +7340,7 @@
       "source_location": "L5",
       "_origin": "ast",
       "id": "apps_api_src_prisma_prisma_service_prismaservice",
-      "community": 29,
+      "community": 10,
       "norm_label": "prismaservice"
     },
     {
@@ -7340,7 +7350,7 @@
       "source_location": "L8",
       "_origin": "ast",
       "id": "apps_api_src_prisma_prisma_service_prismaservice_constructor",
-      "community": 29,
+      "community": 10,
       "norm_label": ".constructor()"
     },
     {
@@ -7350,7 +7360,7 @@
       "source_location": "L12",
       "_origin": "ast",
       "id": "apps_api_src_prisma_prisma_service_prismaservice_onmoduleinit",
-      "community": 29,
+      "community": 10,
       "norm_label": ".onmoduleinit()"
     },
     {
@@ -7360,7 +7370,7 @@
       "source_location": "L23",
       "_origin": "ast",
       "id": "apps_api_src_prisma_prisma_service_prismaservice_onmoduledestroy",
-      "community": 29,
+      "community": 10,
       "norm_label": ".onmoduledestroy()"
     },
     {
@@ -7370,7 +7380,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "apps_api_test_adversarial_e2e_spec",
-      "community": 10,
+      "community": 278,
       "norm_label": "adversarial.e2e-spec.ts"
     },
     {
@@ -7380,7 +7390,7 @@
       "source_location": "L11",
       "_origin": "ast",
       "id": "apps_api_test_adversarial_e2e_spec_cacheservicewithinternal",
-      "community": 10,
+      "community": 278,
       "norm_label": "cacheservicewithinternal"
     },
     {
@@ -7390,7 +7400,7 @@
       "source_location": "L15",
       "_origin": "ast",
       "id": "apps_api_test_adversarial_e2e_spec_sanitizedusermetadata",
-      "community": 10,
+      "community": 278,
       "norm_label": "sanitizedusermetadata"
     },
     {
@@ -7400,7 +7410,7 @@
       "source_location": "L26",
       "_origin": "ast",
       "id": "apps_api_test_adversarial_e2e_spec_sanitizedvariantsmetadata",
-      "community": 10,
+      "community": 278,
       "norm_label": "sanitizedvariantsmetadata"
     },
     {
@@ -7410,7 +7420,7 @@
       "source_location": "L33",
       "_origin": "ast",
       "id": "apps_api_test_adversarial_e2e_spec_circularmetadata",
-      "community": 10,
+      "community": 278,
       "norm_label": "circularmetadata"
     },
     {
@@ -7540,7 +7550,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "apps_api_test_flights_cleanup_e2e_spec",
-      "community": 29,
+      "community": 254,
       "norm_label": "flights-cleanup.e2e-spec.ts"
     },
     {
@@ -9092,6 +9102,16 @@
       "id": "apps_web_tests_search_spec_loginuser",
       "community": 286,
       "norm_label": "loginuser()"
+    },
+    {
+      "label": "setAdultsCount()",
+      "file_type": "code",
+      "source_file": "apps/web/tests/search.spec.ts",
+      "source_location": "L24",
+      "_origin": "ast",
+      "id": "apps_web_tests_search_spec_setadultscount",
+      "community": 286,
+      "norm_label": "setadultscount()"
     },
     {
       "label": "tsconfig.json",
@@ -12262,6 +12282,156 @@
       "id": "research_agent_tool_calling_architecture_summary_architecture_at_a_glance",
       "community": 120,
       "norm_label": "summary: architecture at a glance"
+    },
+    {
+      "label": "booking-workflow-decisions.md",
+      "file_type": "document",
+      "source_file": "research/booking-workflow-decisions.md",
+      "source_location": "L1",
+      "_origin": "ast",
+      "id": "research_booking_workflow_decisions",
+      "community": 37,
+      "norm_label": "booking-workflow-decisions.md"
+    },
+    {
+      "label": "Booking Workflow \u2014 Grilling Decisions",
+      "file_type": "document",
+      "source_file": "research/booking-workflow-decisions.md",
+      "source_location": "L1",
+      "_origin": "ast",
+      "id": "research_booking_workflow_decisions_booking_workflow_grilling_decisions",
+      "community": 37,
+      "norm_label": "booking workflow \u2014 grilling decisions"
+    },
+    {
+      "label": "Scope",
+      "file_type": "document",
+      "source_file": "research/booking-workflow-decisions.md",
+      "source_location": "L7",
+      "_origin": "ast",
+      "id": "research_booking_workflow_decisions_scope",
+      "community": 37,
+      "norm_label": "scope"
+    },
+    {
+      "label": "Decision 1: Server-Side Storage, Not Stateless",
+      "file_type": "document",
+      "source_file": "research/booking-workflow-decisions.md",
+      "source_location": "L19",
+      "_origin": "ast",
+      "id": "research_booking_workflow_decisions_decision_1_server_side_storage_not_stateless",
+      "community": 37,
+      "norm_label": "decision 1: server-side storage, not stateless"
+    },
+    {
+      "label": "Decision 2: Dedicated `BookingIntent` Table (Not the `Booking` Table)",
+      "file_type": "document",
+      "source_file": "research/booking-workflow-decisions.md",
+      "source_location": "L32",
+      "_origin": "ast",
+      "id": "research_booking_workflow_decisions_decision_2_dedicated_bookingintent_table_not_the_booking_table",
+      "community": 37,
+      "norm_label": "decision 2: dedicated `bookingintent` table (not the `booking` table)"
+    },
+    {
+      "label": "Decision 3: Two-Phase Cleanup (Soft Expire \u2192 Hard Delete)",
+      "file_type": "document",
+      "source_file": "research/booking-workflow-decisions.md",
+      "source_location": "L45",
+      "_origin": "ast",
+      "id": "research_booking_workflow_decisions_decision_3_two_phase_cleanup_soft_expire_hard_delete",
+      "community": 37,
+      "norm_label": "decision 3: two-phase cleanup (soft expire \u2192 hard delete)"
+    },
+    {
+      "label": "Decision 4: Relational Passenger Model (`BookingIntentPassenger`)",
+      "file_type": "document",
+      "source_file": "research/booking-workflow-decisions.md",
+      "source_location": "L60",
+      "_origin": "ast",
+      "id": "research_booking_workflow_decisions_decision_4_relational_passenger_model_bookingintentpassenger",
+      "community": 37,
+      "norm_label": "decision 4: relational passenger model (`bookingintentpassenger`)"
+    },
+    {
+      "label": "Decision 5: Validation in Application Layer, Not DB Constraints",
+      "file_type": "document",
+      "source_file": "research/booking-workflow-decisions.md",
+      "source_location": "L73",
+      "_origin": "ast",
+      "id": "research_booking_workflow_decisions_decision_5_validation_in_application_layer_not_db_constraints",
+      "community": 37,
+      "norm_label": "decision 5: validation in application layer, not db constraints"
+    },
+    {
+      "label": "Decision 6: Snapshot Copy from TravelerProfile (Pre-Fill)",
+      "file_type": "document",
+      "source_file": "research/booking-workflow-decisions.md",
+      "source_location": "L85",
+      "_origin": "ast",
+      "id": "research_booking_workflow_decisions_decision_6_snapshot_copy_from_travelerprofile_pre_fill",
+      "community": 37,
+      "norm_label": "decision 6: snapshot copy from travelerprofile (pre-fill)"
+    },
+    {
+      "label": "Decision 7: GDPR \u2014 Explicit Retention/Erasure Lifecycle",
+      "file_type": "document",
+      "source_file": "research/booking-workflow-decisions.md",
+      "source_location": "L102",
+      "_origin": "ast",
+      "id": "research_booking_workflow_decisions_decision_7_gdpr_explicit_retention_erasure_lifecycle",
+      "community": 37,
+      "norm_label": "decision 7: gdpr \u2014 explicit retention/erasure lifecycle"
+    },
+    {
+      "label": "Decision 8: Companion Profiles \u2014 Deferred",
+      "file_type": "document",
+      "source_file": "research/booking-workflow-decisions.md",
+      "source_location": "L114",
+      "_origin": "ast",
+      "id": "research_booking_workflow_decisions_decision_8_companion_profiles_deferred",
+      "community": 37,
+      "norm_label": "decision 8: companion profiles \u2014 deferred"
+    },
+    {
+      "label": "Decision 9: Re-Price at Intent Creation",
+      "file_type": "document",
+      "source_file": "research/booking-workflow-decisions.md",
+      "source_location": "L126",
+      "_origin": "ast",
+      "id": "research_booking_workflow_decisions_decision_9_re_price_at_intent_creation",
+      "community": 37,
+      "norm_label": "decision 9: re-price at intent creation"
+    },
+    {
+      "label": "Decision 10: Staleness Check Before Payment (Feature B Constraint)",
+      "file_type": "document",
+      "source_file": "research/booking-workflow-decisions.md",
+      "source_location": "L139",
+      "_origin": "ast",
+      "id": "research_booking_workflow_decisions_decision_10_staleness_check_before_payment_feature_b_constraint",
+      "community": 37,
+      "norm_label": "decision 10: staleness check before payment (feature b constraint)"
+    },
+    {
+      "label": "Decision 11: Frontend UX \u2014 Deferred to Feature B",
+      "file_type": "document",
+      "source_file": "research/booking-workflow-decisions.md",
+      "source_location": "L149",
+      "_origin": "ast",
+      "id": "research_booking_workflow_decisions_decision_11_frontend_ux_deferred_to_feature_b",
+      "community": 37,
+      "norm_label": "decision 11: frontend ux \u2014 deferred to feature b"
+    },
+    {
+      "label": "Open Questions (For Future Features)",
+      "file_type": "document",
+      "source_file": "research/booking-workflow-decisions.md",
+      "source_location": "L157",
+      "_origin": "ast",
+      "id": "research_booking_workflow_decisions_open_questions_for_future_features",
+      "community": 37,
+      "norm_label": "open questions (for future features)"
     },
     {
       "label": "cabin-passenger-enhancement-decisions.md",
@@ -24951,7 +25121,7 @@
       "context": "import",
       "confidence": "EXTRACTED",
       "source_file": "apps/agent/src/agent/tools/nestjs_client.py",
-      "source_location": "L5",
+      "source_location": "L6",
       "weight": 1.0,
       "source": "apps_agent_src_agent_tools_nestjs_client",
       "target": "apps_agent_src_agent_config",
@@ -25322,7 +25492,7 @@
       "confidence": "INFERRED",
       "confidence_score": 0.8,
       "source_file": "apps/agent/src/agent/tools/nestjs_client.py",
-      "source_location": "L64",
+      "source_location": "L68",
       "weight": 1.0,
       "source": "apps_agent_src_agent_tools_nestjs_client_nestjsclient_get_gateway_headers",
       "target": "apps_agent_src_agent_config_get_settings"
@@ -28097,7 +28267,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "apps/agent/src/agent/tools/nestjs_client.py",
-      "source_location": "L8",
+      "source_location": "L11",
       "weight": 1.0,
       "source": "apps_agent_src_agent_tools_nestjs_client",
       "target": "apps_agent_src_agent_tools_nestjs_client_nestjsclient",
@@ -28107,7 +28277,7 @@
       "relation": "method",
       "confidence": "EXTRACTED",
       "source_file": "apps/agent/src/agent/tools/nestjs_client.py",
-      "source_location": "L23",
+      "source_location": "L27",
       "weight": 1.0,
       "source": "apps_agent_src_agent_tools_nestjs_client_nestjsclient",
       "target": "apps_agent_src_agent_tools_nestjs_client_nestjsclient_create_message",
@@ -28117,7 +28287,7 @@
       "relation": "method",
       "confidence": "EXTRACTED",
       "source_file": "apps/agent/src/agent/tools/nestjs_client.py",
-      "source_location": "L41",
+      "source_location": "L45",
       "weight": 1.0,
       "source": "apps_agent_src_agent_tools_nestjs_client_nestjsclient",
       "target": "apps_agent_src_agent_tools_nestjs_client_nestjsclient_create_message_batch",
@@ -28127,7 +28297,7 @@
       "relation": "method",
       "confidence": "EXTRACTED",
       "source_file": "apps/agent/src/agent/tools/nestjs_client.py",
-      "source_location": "L15",
+      "source_location": "L19",
       "weight": 1.0,
       "source": "apps_agent_src_agent_tools_nestjs_client_nestjsclient",
       "target": "apps_agent_src_agent_tools_nestjs_client_nestjsclient_create_session",
@@ -28137,7 +28307,7 @@
       "relation": "method",
       "confidence": "EXTRACTED",
       "source_file": "apps/agent/src/agent/tools/nestjs_client.py",
-      "source_location": "L80",
+      "source_location": "L87",
       "weight": 1.0,
       "source": "apps_agent_src_agent_tools_nestjs_client_nestjsclient",
       "target": "apps_agent_src_agent_tools_nestjs_client_nestjsclient_get_gateway_flights_search",
@@ -28147,7 +28317,7 @@
       "relation": "method",
       "confidence": "EXTRACTED",
       "source_file": "apps/agent/src/agent/tools/nestjs_client.py",
-      "source_location": "L63",
+      "source_location": "L67",
       "weight": 1.0,
       "source": "apps_agent_src_agent_tools_nestjs_client_nestjsclient",
       "target": "apps_agent_src_agent_tools_nestjs_client_nestjsclient_get_gateway_headers",
@@ -28157,7 +28327,7 @@
       "relation": "method",
       "confidence": "EXTRACTED",
       "source_file": "apps/agent/src/agent/tools/nestjs_client.py",
-      "source_location": "L110",
+      "source_location": "L117",
       "weight": 1.0,
       "source": "apps_agent_src_agent_tools_nestjs_client_nestjsclient",
       "target": "apps_agent_src_agent_tools_nestjs_client_nestjsclient_get_gateway_user_bookings",
@@ -28167,7 +28337,7 @@
       "relation": "method",
       "confidence": "EXTRACTED",
       "source_file": "apps/agent/src/agent/tools/nestjs_client.py",
-      "source_location": "L102",
+      "source_location": "L109",
       "weight": 1.0,
       "source": "apps_agent_src_agent_tools_nestjs_client_nestjsclient",
       "target": "apps_agent_src_agent_tools_nestjs_client_nestjsclient_get_gateway_user_preferences",
@@ -28177,7 +28347,7 @@
       "relation": "method",
       "confidence": "EXTRACTED",
       "source_file": "apps/agent/src/agent/tools/nestjs_client.py",
-      "source_location": "L53",
+      "source_location": "L57",
       "weight": 1.0,
       "source": "apps_agent_src_agent_tools_nestjs_client_nestjsclient",
       "target": "apps_agent_src_agent_tools_nestjs_client_nestjsclient_get_memory",
@@ -28187,7 +28357,7 @@
       "relation": "method",
       "confidence": "EXTRACTED",
       "source_file": "apps/agent/src/agent/tools/nestjs_client.py",
-      "source_location": "L9",
+      "source_location": "L12",
       "weight": 1.0,
       "source": "apps_agent_src_agent_tools_nestjs_client_nestjsclient",
       "target": "apps_agent_src_agent_tools_nestjs_client_nestjsclient_init",
@@ -28406,7 +28576,7 @@
       "context": "generic_arg",
       "confidence": "EXTRACTED",
       "source_file": "apps/agent/src/agent/tools/nestjs_client.py",
-      "source_location": "L15",
+      "source_location": "L19",
       "weight": 1.0,
       "source": "apps_agent_src_agent_tools_nestjs_client_nestjsclient_create_session",
       "target": "apps_agent_src_agent_tools_nestjs_client_py_any",
@@ -28417,7 +28587,7 @@
       "context": "generic_arg",
       "confidence": "EXTRACTED",
       "source_file": "apps/agent/src/agent/tools/nestjs_client.py",
-      "source_location": "L23",
+      "source_location": "L27",
       "weight": 1.0,
       "source": "apps_agent_src_agent_tools_nestjs_client_nestjsclient_create_message",
       "target": "apps_agent_src_agent_tools_nestjs_client_py_any",
@@ -28428,7 +28598,7 @@
       "context": "generic_arg",
       "confidence": "EXTRACTED",
       "source_file": "apps/agent/src/agent/tools/nestjs_client.py",
-      "source_location": "L41",
+      "source_location": "L45",
       "weight": 1.0,
       "source": "apps_agent_src_agent_tools_nestjs_client_nestjsclient_create_message_batch",
       "target": "apps_agent_src_agent_tools_nestjs_client_py_any",
@@ -28439,7 +28609,7 @@
       "context": "generic_arg",
       "confidence": "EXTRACTED",
       "source_file": "apps/agent/src/agent/tools/nestjs_client.py",
-      "source_location": "L53",
+      "source_location": "L57",
       "weight": 1.0,
       "source": "apps_agent_src_agent_tools_nestjs_client_nestjsclient_get_memory",
       "target": "apps_agent_src_agent_tools_nestjs_client_py_any",
@@ -28450,7 +28620,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "apps/agent/src/agent/tools/nestjs_client.py",
-      "source_location": "L88",
+      "source_location": "L95",
       "weight": 1.0,
       "source": "apps_agent_src_agent_tools_nestjs_client_nestjsclient_get_gateway_flights_search",
       "target": "apps_agent_src_agent_tools_nestjs_client_nestjsclient_get_gateway_headers",
@@ -28461,7 +28631,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "apps/agent/src/agent/tools/nestjs_client.py",
-      "source_location": "L112",
+      "source_location": "L119",
       "weight": 1.0,
       "source": "apps_agent_src_agent_tools_nestjs_client_nestjsclient_get_gateway_user_bookings",
       "target": "apps_agent_src_agent_tools_nestjs_client_nestjsclient_get_gateway_headers",
@@ -28472,7 +28642,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "apps/agent/src/agent/tools/nestjs_client.py",
-      "source_location": "L104",
+      "source_location": "L111",
       "weight": 1.0,
       "source": "apps_agent_src_agent_tools_nestjs_client_nestjsclient_get_gateway_user_preferences",
       "target": "apps_agent_src_agent_tools_nestjs_client_nestjsclient_get_gateway_headers",
@@ -32349,7 +32519,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "apps/api/src/agent-gateway/agent-gateway.service.ts",
-      "source_location": "L288",
+      "source_location": "L302",
       "weight": 1.0,
       "source": "apps_api_src_agent_gateway_agent_gateway_service_agentgatewayservice_searchflights",
       "target": "apps_api_src_agent_gateway_agent_gateway_service_capitalizecabinclass",
@@ -32360,7 +32530,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "apps/api/src/agent-gateway/agent-gateway.service.ts",
-      "source_location": "L269",
+      "source_location": "L283",
       "weight": 1.0,
       "source": "apps_api_src_agent_gateway_agent_gateway_service_agentgatewayservice_searchflights",
       "target": "apps_api_src_agent_gateway_agent_gateway_service_cleanisotime",
@@ -32371,7 +32541,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "apps/api/src/agent-gateway/agent-gateway.service.ts",
-      "source_location": "L291",
+      "source_location": "L305",
       "weight": 1.0,
       "source": "apps_api_src_agent_gateway_agent_gateway_service_agentgatewayservice_searchflights",
       "target": "apps_api_src_agent_gateway_agent_gateway_service_formatduffelbaggageallowance",
@@ -32382,7 +32552,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "apps/api/src/agent-gateway/agent-gateway.service.ts",
-      "source_location": "L275",
+      "source_location": "L289",
       "weight": 1.0,
       "source": "apps_api_src_agent_gateway_agent_gateway_service_agentgatewayservice_searchflights",
       "target": "apps_api_src_agent_gateway_agent_gateway_service_parseisodurationtominutes",
@@ -32402,7 +32572,7 @@
       "relation": "method",
       "confidence": "EXTRACTED",
       "source_file": "apps/api/src/agent-gateway/agent-gateway.service.ts",
-      "source_location": "L379",
+      "source_location": "L393",
       "weight": 1.0,
       "source": "apps_api_src_agent_gateway_agent_gateway_service_agentgatewayservice",
       "target": "apps_api_src_agent_gateway_agent_gateway_service_agentgatewayservice_getuserbookings",
@@ -32412,7 +32582,7 @@
       "relation": "method",
       "confidence": "EXTRACTED",
       "source_file": "apps/api/src/agent-gateway/agent-gateway.service.ts",
-      "source_location": "L344",
+      "source_location": "L358",
       "weight": 1.0,
       "source": "apps_api_src_agent_gateway_agent_gateway_service_agentgatewayservice",
       "target": "apps_api_src_agent_gateway_agent_gateway_service_agentgatewayservice_getuserpreferences",
@@ -32487,7 +32657,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "apps/api/src/agent-gateway/agent-gateway.service.ts",
-      "source_location": "L427",
+      "source_location": "L441",
       "weight": 1.0,
       "source": "apps_api_src_agent_gateway_agent_gateway_service_agentgatewayservice_getuserbookings",
       "target": "apps_api_src_agent_gateway_agent_gateway_service_agentgatewayservice_logtoolcall",
@@ -32498,7 +32668,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "apps/api/src/agent-gateway/agent-gateway.service.ts",
-      "source_location": "L371",
+      "source_location": "L385",
       "weight": 1.0,
       "source": "apps_api_src_agent_gateway_agent_gateway_service_agentgatewayservice_getuserpreferences",
       "target": "apps_api_src_agent_gateway_agent_gateway_service_agentgatewayservice_logtoolcall",
@@ -32520,7 +32690,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "apps/api/src/agent-gateway/agent-gateway.service.ts",
-      "source_location": "L204",
+      "source_location": "L218",
       "weight": 1.0,
       "source": "apps_api_src_agent_gateway_agent_gateway_service_agentgatewayservice_searchflights",
       "target": "apps_api_src_agent_gateway_agent_gateway_service_agentgatewayservice_logtoolcall",
@@ -32554,7 +32724,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "apps/api/src/agent-gateway/agent-gateway.service.ts",
-      "source_location": "L162",
+      "source_location": "L181",
       "weight": 1.0,
       "source": "apps_api_src_agent_gateway_agent_gateway_service_agentgatewayservice_searchflights",
       "target": "apps_api_src_audit_audit_service_auditservice_createlog"
@@ -32565,7 +32735,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "apps/api/src/agent-gateway/agent-gateway.service.ts",
-      "source_location": "L201",
+      "source_location": "L215",
       "weight": 1.0,
       "source": "apps_api_src_agent_gateway_agent_gateway_service_agentgatewayservice_searchflights",
       "target": "apps_api_src_cache_cache_service_cacheservice_get"
@@ -32576,7 +32746,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "apps/api/src/agent-gateway/agent-gateway.service.ts",
-      "source_location": "L221",
+      "source_location": "L235",
       "weight": 1.0,
       "source": "apps_api_src_agent_gateway_agent_gateway_service_agentgatewayservice_searchflights",
       "target": "apps_api_src_duffel_duffel_service_duffelservice_searchflights"
@@ -32586,7 +32756,7 @@
       "context": "generic_arg",
       "confidence": "EXTRACTED",
       "source_file": "apps/api/src/agent-gateway/agent-gateway.service.ts",
-      "source_location": "L344",
+      "source_location": "L358",
       "weight": 1.0,
       "source": "apps_api_src_agent_gateway_agent_gateway_service_agentgatewayservice_getuserpreferences",
       "target": "apps_api_src_agent_gateway_dto_user_preferences_dto_userpreferencesdto",
@@ -32597,7 +32767,7 @@
       "context": "generic_arg",
       "confidence": "EXTRACTED",
       "source_file": "apps/api/src/agent-gateway/agent-gateway.service.ts",
-      "source_location": "L379",
+      "source_location": "L393",
       "weight": 1.0,
       "source": "apps_api_src_agent_gateway_agent_gateway_service_agentgatewayservice_getuserbookings",
       "target": "apps_api_src_agent_gateway_dto_user_bookings_dto_userbookingsresponsedto",
@@ -32648,6 +32818,16 @@
       "confidence": "EXTRACTED",
       "source_file": "apps/api/src/agent-gateway/dto/flight-search-query.dto.ts",
       "source_location": "L32",
+      "weight": 1.0,
+      "source": "apps_api_src_agent_gateway_dto_flight_search_query_dto",
+      "target": "apps_api_src_agent_gateway_dto_flight_search_query_dto_atleastonepassengerfield",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "apps/api/src/agent-gateway/dto/flight-search-query.dto.ts",
+      "source_location": "L55",
       "weight": 1.0,
       "source": "apps_api_src_agent_gateway_dto_flight_search_query_dto",
       "target": "apps_api_src_agent_gateway_dto_flight_search_query_dto_flightsearchquerydto",
@@ -37469,7 +37649,7 @@
       "source_location": "L3",
       "weight": 1.0,
       "source": "apps_api_src_duffel_duffel_service",
-      "target": "specs_008_cabin_passenger_enhancement_contracts_api",
+      "target": "specs_006_flight_search_service_contracts_api",
       "confidence_score": 1.0
     },
     {
@@ -41428,6 +41608,16 @@
     {
       "relation": "contains",
       "confidence": "EXTRACTED",
+      "source_file": "apps/web/tests/search.spec.ts",
+      "source_location": "L24",
+      "weight": 1.0,
+      "source": "apps_web_tests_search_spec",
+      "target": "apps_web_tests_search_spec_setadultscount",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
       "source_file": "apps/web/tsconfig.json",
       "source_location": "L2",
       "weight": 1.0,
@@ -44397,6 +44587,146 @@
       "weight": 1.0,
       "source": "research_agent_tool_calling_architecture_agent_tool_calling_architecture_grilling_session_decisions",
       "target": "research_agent_tool_calling_architecture_summary_architecture_at_a_glance",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "research/booking-workflow-decisions.md",
+      "source_location": "L1",
+      "weight": 1.0,
+      "source": "research_booking_workflow_decisions",
+      "target": "research_booking_workflow_decisions_booking_workflow_grilling_decisions",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "research/booking-workflow-decisions.md",
+      "source_location": "L139",
+      "weight": 1.0,
+      "source": "research_booking_workflow_decisions_booking_workflow_grilling_decisions",
+      "target": "research_booking_workflow_decisions_decision_10_staleness_check_before_payment_feature_b_constraint",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "research/booking-workflow-decisions.md",
+      "source_location": "L149",
+      "weight": 1.0,
+      "source": "research_booking_workflow_decisions_booking_workflow_grilling_decisions",
+      "target": "research_booking_workflow_decisions_decision_11_frontend_ux_deferred_to_feature_b",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "research/booking-workflow-decisions.md",
+      "source_location": "L19",
+      "weight": 1.0,
+      "source": "research_booking_workflow_decisions_booking_workflow_grilling_decisions",
+      "target": "research_booking_workflow_decisions_decision_1_server_side_storage_not_stateless",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "research/booking-workflow-decisions.md",
+      "source_location": "L32",
+      "weight": 1.0,
+      "source": "research_booking_workflow_decisions_booking_workflow_grilling_decisions",
+      "target": "research_booking_workflow_decisions_decision_2_dedicated_bookingintent_table_not_the_booking_table",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "research/booking-workflow-decisions.md",
+      "source_location": "L45",
+      "weight": 1.0,
+      "source": "research_booking_workflow_decisions_booking_workflow_grilling_decisions",
+      "target": "research_booking_workflow_decisions_decision_3_two_phase_cleanup_soft_expire_hard_delete",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "research/booking-workflow-decisions.md",
+      "source_location": "L60",
+      "weight": 1.0,
+      "source": "research_booking_workflow_decisions_booking_workflow_grilling_decisions",
+      "target": "research_booking_workflow_decisions_decision_4_relational_passenger_model_bookingintentpassenger",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "research/booking-workflow-decisions.md",
+      "source_location": "L73",
+      "weight": 1.0,
+      "source": "research_booking_workflow_decisions_booking_workflow_grilling_decisions",
+      "target": "research_booking_workflow_decisions_decision_5_validation_in_application_layer_not_db_constraints",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "research/booking-workflow-decisions.md",
+      "source_location": "L85",
+      "weight": 1.0,
+      "source": "research_booking_workflow_decisions_booking_workflow_grilling_decisions",
+      "target": "research_booking_workflow_decisions_decision_6_snapshot_copy_from_travelerprofile_pre_fill",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "research/booking-workflow-decisions.md",
+      "source_location": "L102",
+      "weight": 1.0,
+      "source": "research_booking_workflow_decisions_booking_workflow_grilling_decisions",
+      "target": "research_booking_workflow_decisions_decision_7_gdpr_explicit_retention_erasure_lifecycle",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "research/booking-workflow-decisions.md",
+      "source_location": "L114",
+      "weight": 1.0,
+      "source": "research_booking_workflow_decisions_booking_workflow_grilling_decisions",
+      "target": "research_booking_workflow_decisions_decision_8_companion_profiles_deferred",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "research/booking-workflow-decisions.md",
+      "source_location": "L126",
+      "weight": 1.0,
+      "source": "research_booking_workflow_decisions_booking_workflow_grilling_decisions",
+      "target": "research_booking_workflow_decisions_decision_9_re_price_at_intent_creation",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "research/booking-workflow-decisions.md",
+      "source_location": "L157",
+      "weight": 1.0,
+      "source": "research_booking_workflow_decisions_booking_workflow_grilling_decisions",
+      "target": "research_booking_workflow_decisions_open_questions_for_future_features",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "research/booking-workflow-decisions.md",
+      "source_location": "L7",
+      "weight": 1.0,
+      "source": "research_booking_workflow_decisions_booking_workflow_grilling_decisions",
+      "target": "research_booking_workflow_decisions_scope",
       "confidence_score": 1.0
     },
     {
@@ -54796,5 +55126,5 @@
       "source_file": "specs/004-output-guardrails/data-model.md"
     }
   ],
-  "built_at_commit": "c9ed718bb26ab9e4e60b84c3f470257700f91138"
+  "built_at_commit": "5dd701b7f8b1f3efc45048237f22062dfff928bb"
 }
