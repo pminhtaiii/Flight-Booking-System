@@ -6,13 +6,20 @@ Update this file after every completed feature. Any AI agent reading this should
 
 ### Current Status
 
-**Feature:** Cabin Class & Passenger Type Enhancement (Completed)
-**Last completed:** Phase 7: E2E Testing & Verification.
-**Next:** None.
+**Feature:** Booking Intent Foundation (Feature 9)
+**Last completed:** Phase 2: BookingIntentModule Core Service & DTOs.
+**Next:** Phase 3: Two-Phase Cron Cleanup.
 
 ---
 
 ## Progress by Feature
+
+### [ ] Feature: Booking Intent Foundation (Feature 9)
+
+- [x] Phase 1: Database Schema & Encryption Foundation
+- [x] Phase 2: BookingIntentModule Core Service & DTOs (DTOs, controller, service, module registration, Duffel re-pricing with timeout mapping, and transactional audit logging)
+- [ ] Phase 3: Two-Phase Cron Cleanup
+- [ ] Phase 4: E2E Testing & Verification
 
 ### [x] Feature: Cabin Class & Passenger Type Enhancement (Feature 8)
 

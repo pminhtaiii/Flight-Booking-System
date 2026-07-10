@@ -18,4 +18,12 @@ __pycache__/
 .ipynb_checkpoints/
 
 # Graphify
-graphify-out/
+graphify-out/
+
+# Universal
+.DS_Store
+Thumbs.db
+*.tmp
+*.swp
+.vscode/
+.idea/

@@ -11,6 +11,8 @@
         "/^pnpm --filter @api/backend exec prisma migrate dev --schema=prisma/schema\\.prisma --name booking-intent-foundation$/": {
             "approve": true,
             "matchCommandLine": true
-        }
+        },
+        ".\\.specify\\scripts\\powershell\\check-prerequisites.ps1": true,
+        "git rev-parse": true
     }
 }

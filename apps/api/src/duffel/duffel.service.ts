@@ -304,4 +304,17 @@ export class DuffelService {
       );
     }
   }
+
+  async getOfferById(duffelOfferId: string, timeoutMs = 4500): Promise<unknown> {
+    const timeoutError = new Error('Duffel offer lookup timed out.');
+
+    const timeoutPromise = new Promise<never>((_, reject) => {
+      setTimeout(() => reject(timeoutError), timeoutMs);
+    });
+
+    const offerPromise = this.duffel.offers.get(duffelOfferId);
+    const result = await Promise.race([offerPromise, timeoutPromise]);
+
+    return (result as { data: unknown }).data;
+  }
 }
