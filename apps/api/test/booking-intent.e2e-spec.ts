@@ -25,7 +25,6 @@ describe('Booking Intent (E2E)', () => {
 
   let userA: { id: string; email: string };
   let tokenA: string;
-  let userB: { id: string; email: string };
   let tokenB: string;
 
   beforeAll(async () => {
@@ -84,8 +83,12 @@ describe('Booking Intent (E2E)', () => {
         status: 'ACTIVE',
       },
     });
-    userB = { id: uB.id, email: uB.email };
     tokenB = jwtService.sign({ id: uB.id, email: uB.email }, { expiresIn: '24h' });
+  });
+
+  afterEach(async () => {
+    delete process.env.BOOKING_INTENT_TTL_MINUTES;
+    delete process.env.BOOKING_INTENT_GRACE_HOURS;
   });
 
   async function createMockFlightOffer(data: Partial<Prisma.FlightOfferCreateInput> = {}) {
@@ -674,8 +677,6 @@ describe('Booking Intent (E2E)', () => {
       expect(auditExpired).toBeDefined();
       expect((auditExpired!.metadata as any).count).toBe(2);
 
-      // Reset env
-      delete process.env.BOOKING_INTENT_TTL_MINUTES;
     });
 
     it('Phase 2 cleanup: hard-deletes EXPIRED intents after grace period (default and custom grace)', async () => {
@@ -733,17 +734,11 @@ describe('Booking Intent (E2E)', () => {
       });
 
       // 1. Age first intent past default grace hours (24h -> age by 25h)
-      await prisma.bookingIntent.update({
-        where: { id: res1.body.intentId },
-        data: { updatedAt: new Date(Date.now() - 25 * 60 * 60 * 1000) },
-      });
+      await prisma.$executeRaw`UPDATE booking_intents SET "updatedAt" = ${new Date(Date.now() - 25 * 60 * 60 * 1000)} WHERE id = ${res1.body.intentId}`;
 
       // 2. Age second intent past custom grace hours (set grace to 5h, age by 6h)
       process.env.BOOKING_INTENT_GRACE_HOURS = '5';
-      await prisma.bookingIntent.update({
-        where: { id: res2.body.intentId },
-        data: { updatedAt: new Date(Date.now() - 6 * 60 * 60 * 1000) },
-      });
+      await prisma.$executeRaw`UPDATE booking_intents SET "updatedAt" = ${new Date(Date.now() - 6 * 60 * 60 * 1000)} WHERE id = ${res2.body.intentId}`;
 
       // Trigger Phase 2 Cron
       await cron.handleHardDelete();
@@ -765,9 +760,6 @@ describe('Booking Intent (E2E)', () => {
       });
       expect(auditDeleted).toBeDefined();
       expect((auditDeleted!.metadata as any).count).toBe(2);
-
-      // Reset env
-      delete process.env.BOOKING_INTENT_GRACE_HOURS;
     });
   });
 });
