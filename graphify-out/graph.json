@@ -4270,7 +4270,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "apps_api_package",
-      "community": 296,
+      "community": 5,
       "norm_label": "package.json"
     },
     {
@@ -4280,7 +4280,7 @@
       "source_location": "L2",
       "_origin": "ast",
       "id": "apps_api_package_name",
-      "community": 296,
+      "community": 5,
       "norm_label": "name"
     },
     {
@@ -4290,7 +4290,7 @@
       "source_location": "L3",
       "_origin": "ast",
       "id": "apps_api_package_version",
-      "community": 296,
+      "community": 5,
       "norm_label": "version"
     },
     {
@@ -4300,7 +4300,7 @@
       "source_location": "L4",
       "_origin": "ast",
       "id": "apps_api_package_private",
-      "community": 296,
+      "community": 5,
       "norm_label": "private"
     },
     {
@@ -4310,7 +4310,7 @@
       "source_location": "L5",
       "_origin": "ast",
       "id": "apps_api_package_scripts",
-      "community": 283,
+      "community": 5,
       "norm_label": "scripts"
     },
     {
@@ -4320,7 +4320,7 @@
       "source_location": "L6",
       "_origin": "ast",
       "id": "apps_api_package_scripts_build",
-      "community": 283,
+      "community": 5,
       "norm_label": "build"
     },
     {
@@ -4330,7 +4330,7 @@
       "source_location": "L7",
       "_origin": "ast",
       "id": "apps_api_package_scripts_dev",
-      "community": 283,
+      "community": 5,
       "norm_label": "dev"
     },
     {
@@ -4340,7 +4340,7 @@
       "source_location": "L8",
       "_origin": "ast",
       "id": "apps_api_package_scripts_start",
-      "community": 283,
+      "community": 5,
       "norm_label": "start"
     },
     {
@@ -4350,7 +4350,7 @@
       "source_location": "L9",
       "_origin": "ast",
       "id": "apps_api_package_scripts_start_dev",
-      "community": 283,
+      "community": 5,
       "norm_label": "start:dev"
     },
     {
@@ -4360,7 +4360,7 @@
       "source_location": "L10",
       "_origin": "ast",
       "id": "apps_api_package_scripts_start_debug",
-      "community": 283,
+      "community": 5,
       "norm_label": "start:debug"
     },
     {
@@ -4370,7 +4370,7 @@
       "source_location": "L11",
       "_origin": "ast",
       "id": "apps_api_package_scripts_start_prod",
-      "community": 283,
+      "community": 5,
       "norm_label": "start:prod"
     },
     {
@@ -4380,7 +4380,7 @@
       "source_location": "L12",
       "_origin": "ast",
       "id": "apps_api_package_scripts_test",
-      "community": 283,
+      "community": 5,
       "norm_label": "test"
     },
     {
@@ -4390,7 +4390,7 @@
       "source_location": "L13",
       "_origin": "ast",
       "id": "apps_api_package_scripts_test_watch",
-      "community": 283,
+      "community": 5,
       "norm_label": "test:watch"
     },
     {
@@ -4400,7 +4400,7 @@
       "source_location": "L14",
       "_origin": "ast",
       "id": "apps_api_package_scripts_test_cov",
-      "community": 283,
+      "community": 5,
       "norm_label": "test:cov"
     },
     {
@@ -4410,7 +4410,7 @@
       "source_location": "L15",
       "_origin": "ast",
       "id": "apps_api_package_scripts_test_debug",
-      "community": 283,
+      "community": 5,
       "norm_label": "test:debug"
     },
     {
@@ -4420,7 +4420,7 @@
       "source_location": "L16",
       "_origin": "ast",
       "id": "apps_api_package_scripts_test_e2e",
-      "community": 283,
+      "community": 5,
       "norm_label": "test:e2e"
     },
     {
@@ -4680,7 +4680,7 @@
       "source_location": "L44",
       "_origin": "ast",
       "id": "apps_api_package_devdependencies",
-      "community": 278,
+      "community": 11,
       "norm_label": "devdependencies"
     },
     {
@@ -4690,7 +4690,7 @@
       "source_location": "L45",
       "_origin": "ast",
       "id": "apps_api_package_devdependencies_nestjs_cli",
-      "community": 278,
+      "community": 11,
       "norm_label": "@nestjs/cli"
     },
     {
@@ -4700,7 +4700,7 @@
       "source_location": "L46",
       "_origin": "ast",
       "id": "apps_api_package_devdependencies_nestjs_schematics",
-      "community": 278,
+      "community": 11,
       "norm_label": "@nestjs/schematics"
     },
     {
@@ -4710,7 +4710,7 @@
       "source_location": "L47",
       "_origin": "ast",
       "id": "apps_api_package_devdependencies_nestjs_testing",
-      "community": 278,
+      "community": 11,
       "norm_label": "@nestjs/testing"
     },
     {
@@ -4720,7 +4720,7 @@
       "source_location": "L48",
       "_origin": "ast",
       "id": "apps_api_package_devdependencies_types_bcrypt",
-      "community": 278,
+      "community": 11,
       "norm_label": "@types/bcrypt"
     },
     {
@@ -4730,7 +4730,7 @@
       "source_location": "L49",
       "_origin": "ast",
       "id": "apps_api_package_devdependencies_types_express",
-      "community": 278,
+      "community": 11,
       "norm_label": "@types/express"
     },
     {
@@ -4740,7 +4740,7 @@
       "source_location": "L50",
       "_origin": "ast",
       "id": "apps_api_package_devdependencies_types_jest",
-      "community": 278,
+      "community": 11,
       "norm_label": "@types/jest"
     },
     {
@@ -4750,7 +4750,7 @@
       "source_location": "L51",
       "_origin": "ast",
       "id": "apps_api_package_devdependencies_types_node",
-      "community": 278,
+      "community": 11,
       "norm_label": "@types/node"
     },
     {
@@ -4760,7 +4760,7 @@
       "source_location": "L52",
       "_origin": "ast",
       "id": "apps_api_package_devdependencies_types_passport_jwt",
-      "community": 278,
+      "community": 11,
       "norm_label": "@types/passport-jwt"
     },
     {
@@ -4770,7 +4770,7 @@
       "source_location": "L53",
       "_origin": "ast",
       "id": "apps_api_package_devdependencies_types_supertest",
-      "community": 278,
+      "community": 11,
       "norm_label": "@types/supertest"
     },
     {
@@ -4780,7 +4780,7 @@
       "source_location": "L54",
       "_origin": "ast",
       "id": "apps_api_package_devdependencies_jest",
-      "community": 278,
+      "community": 11,
       "norm_label": "jest"
     },
     {
@@ -4790,7 +4790,7 @@
       "source_location": "L55",
       "_origin": "ast",
       "id": "apps_api_package_devdependencies_prisma",
-      "community": 278,
+      "community": 11,
       "norm_label": "prisma"
     },
     {
@@ -4800,7 +4800,7 @@
       "source_location": "L56",
       "_origin": "ast",
       "id": "apps_api_package_devdependencies_supertest",
-      "community": 278,
+      "community": 11,
       "norm_label": "supertest"
     },
     {
@@ -4810,7 +4810,7 @@
       "source_location": "L57",
       "_origin": "ast",
       "id": "apps_api_package_devdependencies_ts_jest",
-      "community": 278,
+      "community": 11,
       "norm_label": "ts-jest"
     },
     {
@@ -4820,7 +4820,7 @@
       "source_location": "L58",
       "_origin": "ast",
       "id": "apps_api_package_devdependencies_ts_loader",
-      "community": 278,
+      "community": 11,
       "norm_label": "ts-loader"
     },
     {
@@ -4830,7 +4830,7 @@
       "source_location": "L59",
       "_origin": "ast",
       "id": "apps_api_package_devdependencies_ts_node",
-      "community": 278,
+      "community": 11,
       "norm_label": "ts-node"
     },
     {
@@ -4840,7 +4840,7 @@
       "source_location": "L60",
       "_origin": "ast",
       "id": "apps_api_package_devdependencies_tsconfig_paths",
-      "community": 8,
+      "community": 11,
       "norm_label": "tsconfig-paths"
     },
     {
@@ -4850,7 +4850,7 @@
       "source_location": "L61",
       "_origin": "ast",
       "id": "apps_api_package_devdependencies_typescript",
-      "community": 278,
+      "community": 11,
       "norm_label": "typescript"
     },
     {
@@ -4860,7 +4860,7 @@
       "source_location": "L63",
       "_origin": "ast",
       "id": "apps_api_package_prisma",
-      "community": 296,
+      "community": 5,
       "norm_label": "prisma"
     },
     {
@@ -4870,7 +4870,7 @@
       "source_location": "L64",
       "_origin": "ast",
       "id": "apps_api_package_prisma_seed",
-      "community": 296,
+      "community": 5,
       "norm_label": "seed"
     },
     {
@@ -6217,7 +6217,7 @@
       "label": ".handleHardDelete()",
       "file_type": "code",
       "source_file": "apps/api/src/booking-intent/booking-intent.cron.ts",
-      "source_location": "L31",
+      "source_location": "L29",
       "_origin": "ast",
       "id": "apps_api_src_booking_intent_booking_intent_cron_bookingintentcron_handleharddelete",
       "community": 37,
@@ -6397,7 +6397,7 @@
       "label": ".deleteExpiredIntents()",
       "file_type": "code",
       "source_file": "apps/api/src/booking-intent/booking-intent.service.ts",
-      "source_location": "L481",
+      "source_location": "L466",
       "_origin": "ast",
       "id": "apps_api_src_booking_intent_booking_intent_service_bookingintentservice_deleteexpiredintents",
       "community": 37,
@@ -6407,7 +6407,7 @@
       "label": ".decryptOptional()",
       "file_type": "code",
       "source_file": "apps/api/src/booking-intent/booking-intent.service.ts",
-      "source_location": "L529",
+      "source_location": "L505",
       "_origin": "ast",
       "id": "apps_api_src_booking_intent_booking_intent_service_bookingintentservice_decryptoptional",
       "community": 37,
@@ -6417,7 +6417,7 @@
       "label": ".decryptProfileField()",
       "file_type": "code",
       "source_file": "apps/api/src/booking-intent/booking-intent.service.ts",
-      "source_location": "L536",
+      "source_location": "L512",
       "_origin": "ast",
       "id": "apps_api_src_booking_intent_booking_intent_service_bookingintentservice_decryptprofilefield",
       "community": 37,
@@ -6427,7 +6427,7 @@
       "label": ".asDate()",
       "file_type": "code",
       "source_file": "apps/api/src/booking-intent/booking-intent.service.ts",
-      "source_location": "L555",
+      "source_location": "L531",
       "_origin": "ast",
       "id": "apps_api_src_booking_intent_booking_intent_service_bookingintentservice_asdate",
       "community": 37,
@@ -6437,7 +6437,7 @@
       "label": ".toDateOnly()",
       "file_type": "code",
       "source_file": "apps/api/src/booking-intent/booking-intent.service.ts",
-      "source_location": "L559",
+      "source_location": "L535",
       "_origin": "ast",
       "id": "apps_api_src_booking_intent_booking_intent_service_bookingintentservice_todateonly",
       "community": 37,
@@ -6447,7 +6447,7 @@
       "label": ".toInputJsonValue()",
       "file_type": "code",
       "source_file": "apps/api/src/booking-intent/booking-intent.service.ts",
-      "source_location": "L563",
+      "source_location": "L539",
       "_origin": "ast",
       "id": "apps_api_src_booking_intent_booking_intent_service_bookingintentservice_toinputjsonvalue",
       "community": 37,
@@ -33066,7 +33066,7 @@
       "weight": 1.0,
       "context": "import",
       "source": "apps_api_package_devdependencies_tsconfig_paths",
-      "target": "apps_api_tsconfig_paths",
+      "target": "apps_web_tsconfig_paths",
       "confidence_score": 1.0
     },
     {
@@ -37300,7 +37300,7 @@
       "context": "import",
       "confidence": "EXTRACTED",
       "source_file": "apps/api/src/booking-intent/booking-intent.cron.spec.ts",
-      "source_location": "L2",
+      "source_location": "L3",
       "weight": 1.0,
       "source": "apps_api_src_booking_intent_booking_intent_cron_spec",
       "target": "apps_api_src_booking_intent_booking_intent_cron",
@@ -37311,10 +37311,32 @@
       "context": "import",
       "confidence": "EXTRACTED",
       "source_file": "apps/api/src/booking-intent/booking-intent.cron.spec.ts",
-      "source_location": "L2",
+      "source_location": "L3",
       "weight": 1.0,
       "source": "apps_api_src_booking_intent_booking_intent_cron_spec",
       "target": "apps_api_src_booking_intent_booking_intent_cron_bookingintentcron",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports_from",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "apps/api/src/booking-intent/booking-intent.cron.spec.ts",
+      "source_location": "L4",
+      "weight": 1.0,
+      "source": "apps_api_src_booking_intent_booking_intent_cron_spec",
+      "target": "apps_api_src_booking_intent_booking_intent_service",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "apps/api/src/booking-intent/booking-intent.cron.spec.ts",
+      "source_location": "L4",
+      "weight": 1.0,
+      "source": "apps_api_src_booking_intent_booking_intent_cron_spec",
+      "target": "apps_api_src_booking_intent_booking_intent_service_bookingintentservice",
       "confidence_score": 1.0
     },
     {
@@ -37384,7 +37406,7 @@
       "relation": "method",
       "confidence": "EXTRACTED",
       "source_file": "apps/api/src/booking-intent/booking-intent.cron.ts",
-      "source_location": "L31",
+      "source_location": "L29",
       "weight": 1.0,
       "source": "apps_api_src_booking_intent_booking_intent_cron_bookingintentcron",
       "target": "apps_api_src_booking_intent_booking_intent_cron_bookingintentcron_handleharddelete",
@@ -37429,7 +37451,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "apps/api/src/booking-intent/booking-intent.cron.ts",
-      "source_location": "L36",
+      "source_location": "L34",
       "weight": 1.0,
       "source": "apps_api_src_booking_intent_booking_intent_cron_bookingintentcron_handleharddelete",
       "target": "apps_api_src_booking_intent_booking_intent_service_bookingintentservice_deleteexpiredintents"
@@ -37794,7 +37816,7 @@
       "relation": "method",
       "confidence": "EXTRACTED",
       "source_file": "apps/api/src/booking-intent/booking-intent.service.ts",
-      "source_location": "L555",
+      "source_location": "L531",
       "weight": 1.0,
       "source": "apps_api_src_booking_intent_booking_intent_service_bookingintentservice",
       "target": "apps_api_src_booking_intent_booking_intent_service_bookingintentservice_asdate",
@@ -37824,7 +37846,7 @@
       "relation": "method",
       "confidence": "EXTRACTED",
       "source_file": "apps/api/src/booking-intent/booking-intent.service.ts",
-      "source_location": "L529",
+      "source_location": "L505",
       "weight": 1.0,
       "source": "apps_api_src_booking_intent_booking_intent_service_bookingintentservice",
       "target": "apps_api_src_booking_intent_booking_intent_service_bookingintentservice_decryptoptional",
@@ -37834,7 +37856,7 @@
       "relation": "method",
       "confidence": "EXTRACTED",
       "source_file": "apps/api/src/booking-intent/booking-intent.service.ts",
-      "source_location": "L536",
+      "source_location": "L512",
       "weight": 1.0,
       "source": "apps_api_src_booking_intent_booking_intent_service_bookingintentservice",
       "target": "apps_api_src_booking_intent_booking_intent_service_bookingintentservice_decryptprofilefield",
@@ -37844,7 +37866,7 @@
       "relation": "method",
       "confidence": "EXTRACTED",
       "source_file": "apps/api/src/booking-intent/booking-intent.service.ts",
-      "source_location": "L481",
+      "source_location": "L466",
       "weight": 1.0,
       "source": "apps_api_src_booking_intent_booking_intent_service_bookingintentservice",
       "target": "apps_api_src_booking_intent_booking_intent_service_bookingintentservice_deleteexpiredintents",
@@ -37894,7 +37916,7 @@
       "relation": "method",
       "confidence": "EXTRACTED",
       "source_file": "apps/api/src/booking-intent/booking-intent.service.ts",
-      "source_location": "L559",
+      "source_location": "L535",
       "weight": 1.0,
       "source": "apps_api_src_booking_intent_booking_intent_service_bookingintentservice",
       "target": "apps_api_src_booking_intent_booking_intent_service_bookingintentservice_todateonly",
@@ -37904,7 +37926,7 @@
       "relation": "method",
       "confidence": "EXTRACTED",
       "source_file": "apps/api/src/booking-intent/booking-intent.service.ts",
-      "source_location": "L563",
+      "source_location": "L539",
       "weight": 1.0,
       "source": "apps_api_src_booking_intent_booking_intent_service_bookingintentservice",
       "target": "apps_api_src_booking_intent_booking_intent_service_bookingintentservice_toinputjsonvalue",
@@ -38135,7 +38157,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "apps/api/src/booking-intent/booking-intent.service.ts",
-      "source_location": "L453",
+      "source_location": "L435",
       "weight": 1.0,
       "source": "apps_api_src_booking_intent_booking_intent_service_bookingintentservice_expireexpiredintents",
       "target": "apps_api_src_prisma_prisma_service_prismaservice"
@@ -38146,7 +38168,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "apps/api/src/booking-intent/booking-intent.service.ts",
-      "source_location": "L504",
+      "source_location": "L477",
       "weight": 1.0,
       "source": "apps_api_src_booking_intent_booking_intent_service_bookingintentservice_deleteexpiredintents",
       "target": "apps_api_src_prisma_prisma_service_prismaservice"
@@ -38157,7 +38179,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "apps/api/src/booking-intent/booking-intent.service.ts",
-      "source_location": "L533",
+      "source_location": "L509",
       "weight": 1.0,
       "source": "apps_api_src_booking_intent_booking_intent_service_bookingintentservice_decryptoptional",
       "target": "apps_api_src_common_encryption_service_encryptionservice_decrypt"
@@ -38168,7 +38190,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "apps/api/src/booking-intent/booking-intent.service.ts",
-      "source_location": "L549",
+      "source_location": "L525",
       "weight": 1.0,
       "source": "apps_api_src_booking_intent_booking_intent_service_bookingintentservice_decryptprofilefield",
       "target": "apps_api_src_common_encryption_service_encryptionservice_decrypt"
@@ -40393,7 +40415,7 @@
       "source_location": "L3",
       "weight": 1.0,
       "source": "apps_api_src_duffel_duffel_service",
-      "target": "specs_006_flight_search_service_contracts_api",
+      "target": "specs_009_booking_intent_foundation_contracts_api",
       "confidence_score": 1.0
     },
     {
@@ -58681,5 +58703,5 @@
       "source_file": "specs/004-output-guardrails/data-model.md"
     }
   ],
-  "built_at_commit": "38c3d99b426735b30ddea94b6477ae21a3058c7a"
+  "built_at_commit": "c9edb176f7d869fb4aa488ac955915c1e63c4d00"
 }

@@ -1,16 +1,16 @@
 # Graph Report - Booking Systems  (2026-07-11)
 
 ## Corpus Check
-- 302 files · ~184,650 words
+- 302 files · ~184,622 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 2584 nodes · 3153 edges · 309 communities (176 shown, 133 thin omitted)
+- 2584 nodes · 3155 edges · 306 communities (173 shown, 133 thin omitted)
 - Extraction: 96% EXTRACTED · 4% INFERRED · 0% AMBIGUOUS · INFERRED: 139 edges (avg confidence: 0.78)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `38c3d99b`
+- Built from commit: `c9edb176`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -273,12 +273,10 @@
 - [[_COMMUNITY_.aclose|.aclose]]
 - [[_COMMUNITY_devDependencies|devDependencies]]
 - [[_COMMUNITY_scripts|scripts]]
-- [[_COMMUNITY_devDependencies|devDependencies]]
 - [[_COMMUNITY_Feature Specification Cabin Class & Passenger Type Enhancement|Feature Specification: Cabin Class & Passenger Type Enhancement]]
 - [[_COMMUNITY_test_tools.py|test_tools.py]]
 - [[_COMMUNITY_Research Cabin Class & Passenger Type Enhancement|Research: Cabin Class & Passenger Type Enhancement]]
 - [[_COMMUNITY_Booking Workflow — Grilling Decisions|Booking Workflow — Grilling Decisions]]
-- [[_COMMUNITY_scripts|scripts]]
 - [[_COMMUNITY_Implementation Plan Booking Intent Foundation|Implementation Plan: Booking Intent Foundation]]
 - [[_COMMUNITY_RateLimitMiddleware|RateLimitMiddleware]]
 - [[_COMMUNITY_FastAPI|FastAPI]]
@@ -290,7 +288,6 @@
 - [[_COMMUNITY_Findings|Findings]]
 - [[_COMMUNITY_Research Booking Intent Foundation|Research: Booking Intent Foundation]]
 - [[_COMMUNITY_Entities|Entities]]
-- [[_COMMUNITY_package.json|package.json]]
 - [[_COMMUNITY_Tasks Booking Intent Foundation (Feature 009)|Tasks: Booking Intent Foundation (Feature 009)]]
 - [[_COMMUNITY_Endpoints|Endpoints]]
 - [[_COMMUNITY_Implementation Phases|Implementation Phases]]
@@ -310,7 +307,7 @@
 4. `get_settings()` - 23 edges
 5. `Code Standards` - 23 edges
 6. `OutputGuardrailPipeline` - 22 edges
-7. `BookingIntentService` - 21 edges
+7. `BookingIntentService` - 22 edges
 8. `MockStreamingLLM` - 20 edges
 9. `AuditService` - 19 edges
 10. `Implementation Plan: LLM Output Guardrails` - 18 edges
@@ -338,7 +335,7 @@
 - **Agent Gateway REST Endpoints** — specs_003_agent_tool_calling_contracts_agent_gateway_api_get_search_flights, specs_003_agent_tool_calling_contracts_agent_gateway_api_get_user_preferences, specs_003_agent_tool_calling_contracts_agent_gateway_api_get_user_bookings [EXTRACTED 1.00]
 - **Output Guardrail Pipeline Components** — specs_004_output_guardrails_data_model_chunkbuffer_model, specs_004_output_guardrails_data_model_slidingwindow_model, specs_004_output_guardrails_data_model_outputguardrailconfig_model, specs_004_output_guardrails_data_model_outputguardrailpipeline_model [EXTRACTED 1.00]
 
-## Communities (309 total, 133 thin omitted)
+## Communities (306 total, 133 thin omitted)
 
 ### Community 0 - "NestJSClient"
 Cohesion: 0.15
@@ -361,8 +358,8 @@ Cohesion: 0.12
 Nodes (10): AuthenticatedRequest, ChatController, ChatService, BatchMessagesDto, CreateMessageDto, CreateSessionDto, ListMessagesQueryDto, ListSessionsQueryDto (+2 more)
 
 ### Community 5 - "dependencies"
-Cohesion: 0.08
-Nodes (25): dependencies, bcrypt, class-transformer, class-validator, @duffel/api, ioredis, langchain, @langchain/core (+17 more)
+Cohesion: 0.05
+Nodes (42): dependencies, bcrypt, class-transformer, class-validator, @duffel/api, ioredis, langchain, @langchain/core (+34 more)
 
 ### Community 6 - "agent-gateway.service.ts"
 Cohesion: 0.12
@@ -373,16 +370,16 @@ Cohesion: 0.05
 Nodes (36): dependencies, class-variance-authority, clsx, lucide-react, maplibre-gl, next, next-auth, postcss (+28 more)
 
 ### Community 8 - "tsconfig.json"
-Cohesion: 0.18
-Nodes (10): tsconfig-paths, compilerOptions, baseUrl, outDir, paths, exclude, extends, include (+2 more)
+Cohesion: 0.20
+Nodes (9): compilerOptions, baseUrl, outDir, paths, exclude, extends, include, @/* (+1 more)
 
 ### Community 10 - "MockStreamingLLM"
 Cohesion: 0.15
 Nodes (7): AuthModule, JwtStrategy, CacheService, CacheServiceWithInternal, CircularMetadata, SanitizedUserMetadata, SanitizedVariantsMetadata
 
 ### Community 11 - "devDependencies"
-Cohesion: 0.10
-Nodes (20): compilerOptions, allowJs, esModuleInterop, incremental, isolatedModules, jsx, lib, module (+12 more)
+Cohesion: 0.05
+Nodes (38): devDependencies, jest, @nestjs/cli, @nestjs/schematics, @nestjs/testing, prisma, supertest, ts-jest (+30 more)
 
 ### Community 12 - "devDependencies"
 Cohesion: 0.10
@@ -844,10 +841,6 @@ Nodes (5): get_auth_headers(), parse_sse(), test_stream_connection_drop_path(), 
 Cohesion: 0.13
 Nodes (7): ResolvedIntentPassenger, MockDuffelService, MockEncryptionService, TestableService, EncryptionService, DuffelService, DuffelTimeoutError
 
-### Community 278 - "devDependencies"
-Cohesion: 0.12
-Nodes (17): devDependencies, jest, @nestjs/cli, @nestjs/schematics, @nestjs/testing, prisma, supertest, ts-jest (+9 more)
-
 ### Community 279 - "Feature Specification: Cabin Class & Passenger Type Enhancement"
 Cohesion: 0.15
 Nodes (12): Assumptions, Edge Cases, Feature Specification: Cabin Class & Passenger Type Enhancement, Functional Requirements, Key Entities, Measurable Outcomes, Requirements *(mandatory)*, Success Criteria *(mandatory)* (+4 more)
@@ -863,10 +856,6 @@ Nodes (9): R0: Cabin Class — Request-Level vs Post-Filter, R1: Mixed-Cabin Off
 ### Community 282 - "Booking Workflow — Grilling Decisions"
 Cohesion: 0.13
 Nodes (14): Booking Workflow — Grilling Decisions, Decision 10: Staleness Check Before Payment (Feature B Constraint), Decision 11: Frontend UX — Deferred to Feature B, Decision 1: Server-Side Storage, Not Stateless, Decision 2: Dedicated `BookingIntent` Table (Not the `Booking` Table), Decision 3: Two-Phase Cleanup (Soft Expire → Hard Delete), Decision 4: Relational Passenger Model (`BookingIntentPassenger`), Decision 5: Validation in Application Layer, Not DB Constraints (+6 more)
-
-### Community 283 - "scripts"
-Cohesion: 0.17
-Nodes (12): scripts, build, dev, start, start:debug, start:dev, start:prod, test (+4 more)
 
 ### Community 284 - "Implementation Plan: Booking Intent Foundation"
 Cohesion: 0.17
@@ -907,10 +896,6 @@ Nodes (8): R1: Intent Storage Strategy, R2: PII Security for Passenger Data, R3:
 ### Community 295 - "Entities"
 Cohesion: 0.29
 Nodes (7): 1. OutputGuardrailConfig, 2. ChunkBuffer, 3. SlidingWindow, 4. OutputGuardrailResult, 5. OutputGuardrailPipeline, 6. OutputGuardrailBlockedError, Entities
-
-### Community 296 - "package.json"
-Cohesion: 0.33
-Nodes (5): name, prisma, seed, private, version
 
 ### Community 297 - "Tasks: Booking Intent Foundation (Feature 009)"
 Cohesion: 0.33
@@ -965,11 +950,11 @@ Nodes (4): Acceptance — Success Criteria Verification, Checklist, Files, Phase
 _Questions this graph is uniquely positioned to answer:_
 
 - **Why does `NestJSClient` connect `MemoryManager` to `NestJSClient`, `package.json`, `get_nestjs_client`, `User Scenarios & Testing *(mandatory)*`, `ChunkBuffer`?**
-  _High betweenness centrality (0.040) - this node is a cross-community bridge._
+  _High betweenness centrality (0.044) - this node is a cross-community bridge._
 - **Why does `get_nestjs_client()` connect `get_nestjs_client` to `MemoryManager`?**
-  _High betweenness centrality (0.034) - this node is a cross-community bridge._
+  _High betweenness centrality (0.036) - this node is a cross-community bridge._
 - **Why does `AIRLINE_MAP` connect `get_nestjs_client` to `utils.ts`?**
-  _High betweenness centrality (0.029) - this node is a cross-community bridge._
+  _High betweenness centrality (0.031) - this node is a cross-community bridge._
 - **Are the 21 inferred relationships involving `NestJSClient` (e.g. with `MemoryManager` and `chat_stream()`) actually correct?**
   _`NestJSClient` has 21 INFERRED edges - model-reasoned connections that need verification._
 - **Are the 21 inferred relationships involving `get_settings()` (e.g. with `get_chat_model()` and `should_continue()`) actually correct?**

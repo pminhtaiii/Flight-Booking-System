@@ -431,99 +431,75 @@ export class BookingIntentService {
     }
   }
 
-  async expireExpiredIntents(now: Date = new Date()): Promise<{ expiredCount: number; expiredIds: string[] }> {
-    const toExpire = await this.prisma.bookingIntent.findMany({
-      where: {
-        status: 'PENDING',
-        intentExpiresAt: {
-          lt: now,
-        },
-      },
-      select: {
-        id: true,
-      },
-    });
-
-    if (toExpire.length === 0) {
-      return { expiredCount: 0, expiredIds: [] };
-    }
-
-    const expiredIds = toExpire.map((intent) => intent.id);
-
+  async expireExpiredIntents(now: Date = new Date()): Promise<{ expiredCount: number }> {
     const updateResult = await this.prisma.$transaction(async (tx) => {
       const result = await tx.bookingIntent.updateMany({
         where: {
-          id: { in: expiredIds },
           status: 'PENDING',
+          intentExpiresAt: {
+            lt: now,
+          },
         },
         data: {
           status: 'EXPIRED',
         },
       });
 
-      await this.auditService.createLog(tx, {
-        userId: null,
-        action: 'booking_intent_expired',
-        resourceType: 'BookingIntent',
-        resourceId: null,
-        metadata: {
-          intentIds: expiredIds,
-          count: result.count,
-        },
-      });
+      if (result.count > 0) {
+        await this.auditService.createLog(tx, {
+          userId: null,
+          action: 'booking_intent_expired',
+          resourceType: 'BookingIntent',
+          resourceId: null,
+          metadata: {
+            count: result.count,
+          },
+        });
+      }
 
       return result;
     });
 
-    return { expiredCount: updateResult.count, expiredIds };
+    return { expiredCount: updateResult.count };
   }
 
-  async deleteExpiredIntents(now: Date = new Date()): Promise<{ deletedCount: number; deletedIds: string[] }> {
-    const parsedGrace = Number(process.env.BOOKING_INTENT_GRACE_HOURS);
-    const graceHours = isNaN(parsedGrace) || !process.env.BOOKING_INTENT_GRACE_HOURS ? 24 : parsedGrace;
-    const cutoff = new Date(now.getTime() - graceHours * 60 * 60 * 1000);
-
-    const toDelete = await this.prisma.bookingIntent.findMany({
-      where: {
-        status: 'EXPIRED',
-        updatedAt: {
-          lt: cutoff,
-        },
-      },
-      select: {
-        id: true,
-      },
-    });
-
-    if (toDelete.length === 0) {
-      return { deletedCount: 0, deletedIds: [] };
+  async deleteExpiredIntents(now: Date = new Date()): Promise<{ deletedCount: number }> {
+    const rawGrace = process.env.BOOKING_INTENT_GRACE_HOURS;
+    let graceHours = 24;
+    if (rawGrace !== undefined && rawGrace !== null && rawGrace !== '') {
+      const parsedGrace = Number(rawGrace);
+      if (Number.isFinite(parsedGrace) && parsedGrace > 0) {
+        graceHours = parsedGrace;
+      }
     }
-
-    const deletedIds = toDelete.map((intent) => intent.id);
+    const cutoff = new Date(now.getTime() - graceHours * 60 * 60 * 1000);
 
     const deleteResult = await this.prisma.$transaction(async (tx) => {
       const result = await tx.bookingIntent.deleteMany({
         where: {
-          id: { in: deletedIds },
           status: 'EXPIRED',
+          updatedAt: {
+            lt: cutoff,
+          },
         },
       });
 
-      await this.auditService.createLog(tx, {
-        userId: null,
-        action: 'booking_intent_deleted',
-        resourceType: 'BookingIntent',
-        resourceId: null,
-        metadata: {
-          intentIds: deletedIds,
-          count: result.count,
-        },
-      });
+      if (result.count > 0) {
+        await this.auditService.createLog(tx, {
+          userId: null,
+          action: 'booking_intent_deleted',
+          resourceType: 'BookingIntent',
+          resourceId: null,
+          metadata: {
+            count: result.count,
+          },
+        });
+      }
 
       return result;
     });
 
-    return { deletedCount: deleteResult.count, deletedIds };
+    return { deletedCount: deleteResult.count };
   }
 
   private decryptOptional(value: string | null): string | null {

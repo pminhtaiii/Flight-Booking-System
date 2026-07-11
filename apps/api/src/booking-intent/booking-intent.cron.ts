@@ -14,13 +14,11 @@ export class BookingIntentCron {
     this.logger.log('Starting booking intent expiration cron (Phase 1: PENDING -> EXPIRED)...');
 
     try {
-      const { expiredCount, expiredIds } = await this.bookingIntentService.expireExpiredIntents();
+      const { expiredCount } = await this.bookingIntentService.expireExpiredIntents();
       const duration = Date.now() - startTime;
 
       this.logger.log(
-        `Phase 1 cron complete. Expired ${expiredCount} intents in ${duration}ms.${
-          expiredCount > 0 ? ` Expired IDs: ${JSON.stringify(expiredIds)}` : ''
-        }`
+        `Phase 1 cron complete. Expired ${expiredCount} intents in ${duration}ms.`
       );
     } catch (error) {
       this.logger.error('Error occurred during booking intent expiration execution:', error);
@@ -33,13 +31,11 @@ export class BookingIntentCron {
     this.logger.log('Starting booking intent hard-delete cron (Phase 2: EXPIRED -> deleted)...');
 
     try {
-      const { deletedCount, deletedIds } = await this.bookingIntentService.deleteExpiredIntents();
+      const { deletedCount } = await this.bookingIntentService.deleteExpiredIntents();
       const duration = Date.now() - startTime;
 
       this.logger.log(
-        `Phase 2 cron complete. Hard-deleted ${deletedCount} intents in ${duration}ms.${
-          deletedCount > 0 ? ` Deleted IDs: ${JSON.stringify(deletedIds)}` : ''
-        }`
+        `Phase 2 cron complete. Hard-deleted ${deletedCount} intents in ${duration}ms.`
       );
     } catch (error) {
       this.logger.error('Error occurred during booking intent hard-delete execution:', error);

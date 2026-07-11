@@ -187,39 +187,33 @@ describe('BookingIntentService Refinements', () => {
     });
 
     afterEach(() => {
-      process.env.BOOKING_INTENT_GRACE_HOURS = originalGraceHours;
+      if (originalGraceHours === undefined) {
+        delete process.env.BOOKING_INTENT_GRACE_HOURS;
+      } else {
+        process.env.BOOKING_INTENT_GRACE_HOURS = originalGraceHours;
+      }
     });
 
     describe('expireExpiredIntents', () => {
-      it('returns 0 and empty array if no intents found to expire', async () => {
-        mockPrisma.bookingIntent.findMany.mockResolvedValueOnce([]);
+      it('returns 0 if no intents were updated', async () => {
+        mockPrisma.bookingIntent.updateMany.mockResolvedValueOnce({ count: 0 });
 
         const result = await service.expireExpiredIntents(new Date());
-        expect(result).toEqual({ expiredCount: 0, expiredIds: [] });
-        expect(mockPrisma.bookingIntent.updateMany).not.toHaveBeenCalled();
+        expect(result).toEqual({ expiredCount: 0 });
         expect(mockAudit.createLog).not.toHaveBeenCalled();
       });
 
-      it('expires intents and creates audit log if expired intents are found', async () => {
-        const mockIntents = [{ id: 'intent-1' }, { id: 'intent-2' }];
-        mockPrisma.bookingIntent.findMany.mockResolvedValueOnce(mockIntents);
+      it('expires intents and creates audit log if expired intents are updated', async () => {
         mockPrisma.bookingIntent.updateMany.mockResolvedValueOnce({ count: 2 });
 
         const now = new Date('2026-07-11T12:00:00Z');
         const result = await service.expireExpiredIntents(now);
 
-        expect(result).toEqual({ expiredCount: 2, expiredIds: ['intent-1', 'intent-2'] });
-        expect(mockPrisma.bookingIntent.findMany).toHaveBeenCalledWith({
+        expect(result).toEqual({ expiredCount: 2 });
+        expect(mockPrisma.bookingIntent.updateMany).toHaveBeenCalledWith({
           where: {
             status: 'PENDING',
             intentExpiresAt: { lt: now },
-          },
-          select: { id: true },
-        });
-        expect(mockPrisma.bookingIntent.updateMany).toHaveBeenCalledWith({
-          where: {
-            id: { in: ['intent-1', 'intent-2'] },
-            status: 'PENDING',
           },
           data: { status: 'EXPIRED' },
         });
@@ -229,7 +223,6 @@ describe('BookingIntentService Refinements', () => {
           resourceType: 'BookingIntent',
           resourceId: null,
           metadata: {
-            intentIds: ['intent-1', 'intent-2'],
             count: 2,
           },
         });
@@ -237,38 +230,28 @@ describe('BookingIntentService Refinements', () => {
     });
 
     describe('deleteExpiredIntents', () => {
-      it('returns 0 and empty array if no intents found to delete', async () => {
-        mockPrisma.bookingIntent.findMany.mockResolvedValueOnce([]);
+      it('returns 0 if no intents were deleted', async () => {
+        mockPrisma.bookingIntent.deleteMany.mockResolvedValueOnce({ count: 0 });
 
         const result = await service.deleteExpiredIntents(new Date());
-        expect(result).toEqual({ deletedCount: 0, deletedIds: [] });
-        expect(mockPrisma.bookingIntent.deleteMany).not.toHaveBeenCalled();
+        expect(result).toEqual({ deletedCount: 0 });
         expect(mockAudit.createLog).not.toHaveBeenCalled();
       });
 
       it('deletes expired intents and creates audit log if intents are past grace period', async () => {
         process.env.BOOKING_INTENT_GRACE_HOURS = '12';
-        const mockIntents = [{ id: 'expired-1' }];
-        mockPrisma.bookingIntent.findMany.mockResolvedValueOnce(mockIntents);
         mockPrisma.bookingIntent.deleteMany.mockResolvedValueOnce({ count: 1 });
 
         const now = new Date('2026-07-11T12:00:00Z');
         const result = await service.deleteExpiredIntents(now);
 
-        expect(result).toEqual({ deletedCount: 1, deletedIds: ['expired-1'] });
+        expect(result).toEqual({ deletedCount: 1 });
 
         const expectedCutoff = new Date(now.getTime() - 12 * 60 * 60 * 1000);
-        expect(mockPrisma.bookingIntent.findMany).toHaveBeenCalledWith({
+        expect(mockPrisma.bookingIntent.deleteMany).toHaveBeenCalledWith({
           where: {
             status: 'EXPIRED',
             updatedAt: { lt: expectedCutoff },
-          },
-          select: { id: true },
-        });
-        expect(mockPrisma.bookingIntent.deleteMany).toHaveBeenCalledWith({
-          where: {
-            id: { in: ['expired-1'] },
-            status: 'EXPIRED',
           },
         });
         expect(mockAudit.createLog).toHaveBeenCalledWith(mockPrisma, {
@@ -277,8 +260,39 @@ describe('BookingIntentService Refinements', () => {
           resourceType: 'BookingIntent',
           resourceId: null,
           metadata: {
-            intentIds: ['expired-1'],
             count: 1,
+          },
+        });
+      });
+
+      it('defaults to 24 hours if grace period configuration is non-finite', async () => {
+        process.env.BOOKING_INTENT_GRACE_HOURS = 'Infinity';
+        mockPrisma.bookingIntent.deleteMany.mockResolvedValueOnce({ count: 0 });
+
+        const now = new Date('2026-07-11T12:00:00Z');
+        await service.deleteExpiredIntents(now);
+
+        const expectedCutoff = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+        expect(mockPrisma.bookingIntent.deleteMany).toHaveBeenCalledWith({
+          where: {
+            status: 'EXPIRED',
+            updatedAt: { lt: expectedCutoff },
+          },
+        });
+      });
+
+      it('defaults to 24 hours if grace period configuration is less than or equal to zero', async () => {
+        process.env.BOOKING_INTENT_GRACE_HOURS = '-5';
+        mockPrisma.bookingIntent.deleteMany.mockResolvedValueOnce({ count: 0 });
+
+        const now = new Date('2026-07-11T12:00:00Z');
+        await service.deleteExpiredIntents(now);
+
+        const expectedCutoff = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+        expect(mockPrisma.bookingIntent.deleteMany).toHaveBeenCalledWith({
+          where: {
+            status: 'EXPIRED',
+            updatedAt: { lt: expectedCutoff },
           },
         });
       });

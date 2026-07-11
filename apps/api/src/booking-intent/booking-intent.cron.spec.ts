@@ -1,9 +1,14 @@
 import 'reflect-metadata';
+import { Logger } from '@nestjs/common';
 import { BookingIntentCron } from './booking-intent.cron';
+import { BookingIntentService } from './booking-intent.service';
 
 describe('BookingIntentCron', () => {
   let cron: BookingIntentCron;
-  let mockBookingIntentService: any;
+  let mockBookingIntentService: {
+    expireExpiredIntents: jest.Mock;
+    deleteExpiredIntents: jest.Mock;
+  };
   let loggerErrorSpy: jest.SpyInstance;
   let loggerLogSpy: jest.SpyInstance;
 
@@ -13,11 +18,11 @@ describe('BookingIntentCron', () => {
       deleteExpiredIntents: jest.fn(),
     };
 
-    cron = new BookingIntentCron(mockBookingIntentService as any);
+    cron = new BookingIntentCron(mockBookingIntentService as unknown as BookingIntentService);
 
     // Spy on logger calls
-    loggerErrorSpy = jest.spyOn((cron as any).logger, 'error').mockImplementation(() => {});
-    loggerLogSpy = jest.spyOn((cron as any).logger, 'log').mockImplementation(() => {});
+    loggerErrorSpy = jest.spyOn(Logger.prototype, 'error').mockImplementation(() => {});
+    loggerLogSpy = jest.spyOn(Logger.prototype, 'log').mockImplementation(() => {});
   });
 
   afterEach(() => {
@@ -28,7 +33,6 @@ describe('BookingIntentCron', () => {
     it('calls expireExpiredIntents and logs success', async () => {
       mockBookingIntentService.expireExpiredIntents.mockResolvedValueOnce({
         expiredCount: 2,
-        expiredIds: ['id-1', 'id-2'],
       });
 
       await cron.handleExpiration();
@@ -39,9 +43,6 @@ describe('BookingIntentCron', () => {
       );
       expect(loggerLogSpy).toHaveBeenCalledWith(
         expect.stringContaining('Expired 2 intents in')
-      );
-      expect(loggerLogSpy).toHaveBeenCalledWith(
-        expect.stringContaining('Expired IDs: ["id-1","id-2"]')
       );
     });
 
@@ -63,7 +64,6 @@ describe('BookingIntentCron', () => {
     it('calls deleteExpiredIntents and logs success', async () => {
       mockBookingIntentService.deleteExpiredIntents.mockResolvedValueOnce({
         deletedCount: 1,
-        deletedIds: ['id-3'],
       });
 
       await cron.handleHardDelete();
@@ -74,9 +74,6 @@ describe('BookingIntentCron', () => {
       );
       expect(loggerLogSpy).toHaveBeenCalledWith(
         expect.stringContaining('Hard-deleted 1 intents in')
-      );
-      expect(loggerLogSpy).toHaveBeenCalledWith(
-        expect.stringContaining('Deleted IDs: ["id-3"]')
       );
     });
 
