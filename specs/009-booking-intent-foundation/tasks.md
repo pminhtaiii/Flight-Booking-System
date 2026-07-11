@@ -24,10 +24,10 @@
 
 ## Phase 3: Two-Phase Cron Cleanup
 
-- [ ] T016 Create `apps/api/src/booking-intent/booking-intent.cron.ts`
-- [ ] T017 Implement Phase 1 cron: `PENDING` -> `EXPIRED`
-- [ ] T018 Implement Phase 2 cron: hard-delete expired intents after grace period
-- [ ] T019 Add structured cron logging and audit events (`booking_intent_expired`, `booking_intent_deleted`)
+- [X] T016 Create `apps/api/src/booking-intent/booking-intent.cron.ts`
+- [X] T017 Implement Phase 1 cron: `PENDING` -> `EXPIRED`
+- [X] T018 Implement Phase 2 cron: hard-delete expired intents after grace period
+- [X] T019 Add structured cron logging and audit events (`booking_intent_expired`, `booking_intent_deleted`)
 
 ## Phase 4: E2E Testing & Verification
 

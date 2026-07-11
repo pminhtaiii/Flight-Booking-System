@@ -431,6 +431,101 @@ export class BookingIntentService {
     }
   }
 
+  async expireExpiredIntents(now: Date = new Date()): Promise<{ expiredCount: number; expiredIds: string[] }> {
+    const toExpire = await this.prisma.bookingIntent.findMany({
+      where: {
+        status: 'PENDING',
+        intentExpiresAt: {
+          lt: now,
+        },
+      },
+      select: {
+        id: true,
+      },
+    });
+
+    if (toExpire.length === 0) {
+      return { expiredCount: 0, expiredIds: [] };
+    }
+
+    const expiredIds = toExpire.map((intent) => intent.id);
+
+    const updateResult = await this.prisma.$transaction(async (tx) => {
+      const result = await tx.bookingIntent.updateMany({
+        where: {
+          id: { in: expiredIds },
+          status: 'PENDING',
+        },
+        data: {
+          status: 'EXPIRED',
+        },
+      });
+
+      await this.auditService.createLog(tx, {
+        userId: null,
+        action: 'booking_intent_expired',
+        resourceType: 'BookingIntent',
+        resourceId: null,
+        metadata: {
+          intentIds: expiredIds,
+          count: result.count,
+        },
+      });
+
+      return result;
+    });
+
+    return { expiredCount: updateResult.count, expiredIds };
+  }
+
+  async deleteExpiredIntents(now: Date = new Date()): Promise<{ deletedCount: number; deletedIds: string[] }> {
+    const parsedGrace = Number(process.env.BOOKING_INTENT_GRACE_HOURS);
+    const graceHours = isNaN(parsedGrace) || !process.env.BOOKING_INTENT_GRACE_HOURS ? 24 : parsedGrace;
+    const cutoff = new Date(now.getTime() - graceHours * 60 * 60 * 1000);
+
+    const toDelete = await this.prisma.bookingIntent.findMany({
+      where: {
+        status: 'EXPIRED',
+        updatedAt: {
+          lt: cutoff,
+        },
+      },
+      select: {
+        id: true,
+      },
+    });
+
+    if (toDelete.length === 0) {
+      return { deletedCount: 0, deletedIds: [] };
+    }
+
+    const deletedIds = toDelete.map((intent) => intent.id);
+
+    const deleteResult = await this.prisma.$transaction(async (tx) => {
+      const result = await tx.bookingIntent.deleteMany({
+        where: {
+          id: { in: deletedIds },
+          status: 'EXPIRED',
+        },
+      });
+
+      await this.auditService.createLog(tx, {
+        userId: null,
+        action: 'booking_intent_deleted',
+        resourceType: 'BookingIntent',
+        resourceId: null,
+        metadata: {
+          intentIds: deletedIds,
+          count: result.count,
+        },
+      });
+
+      return result;
+    });
+
+    return { deletedCount: deleteResult.count, deletedIds };
+  }
+
   private decryptOptional(value: string | null): string | null {
     if (!value) {
       return null;

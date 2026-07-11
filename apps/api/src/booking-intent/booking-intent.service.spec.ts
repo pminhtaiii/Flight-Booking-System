@@ -157,4 +157,131 @@ describe('BookingIntentService Refinements', () => {
       );
     });
   });
+
+  describe('Cron Cleanup Methods', () => {
+    let service: BookingIntentService;
+    let mockPrisma: any;
+    let mockAudit: any;
+    const originalGraceHours = process.env.BOOKING_INTENT_GRACE_HOURS;
+
+    beforeEach(() => {
+      mockPrisma = {
+        bookingIntent: {
+          findMany: jest.fn(),
+          updateMany: jest.fn(),
+          deleteMany: jest.fn(),
+        },
+        $transaction: jest.fn(async (cb) => cb(mockPrisma)),
+      };
+
+      mockAudit = {
+        createLog: jest.fn(),
+      };
+
+      service = new BookingIntentService(
+        mockPrisma as any,
+        {} as any,
+        mockAudit as any,
+        {} as any,
+      );
+    });
+
+    afterEach(() => {
+      process.env.BOOKING_INTENT_GRACE_HOURS = originalGraceHours;
+    });
+
+    describe('expireExpiredIntents', () => {
+      it('returns 0 and empty array if no intents found to expire', async () => {
+        mockPrisma.bookingIntent.findMany.mockResolvedValueOnce([]);
+
+        const result = await service.expireExpiredIntents(new Date());
+        expect(result).toEqual({ expiredCount: 0, expiredIds: [] });
+        expect(mockPrisma.bookingIntent.updateMany).not.toHaveBeenCalled();
+        expect(mockAudit.createLog).not.toHaveBeenCalled();
+      });
+
+      it('expires intents and creates audit log if expired intents are found', async () => {
+        const mockIntents = [{ id: 'intent-1' }, { id: 'intent-2' }];
+        mockPrisma.bookingIntent.findMany.mockResolvedValueOnce(mockIntents);
+        mockPrisma.bookingIntent.updateMany.mockResolvedValueOnce({ count: 2 });
+
+        const now = new Date('2026-07-11T12:00:00Z');
+        const result = await service.expireExpiredIntents(now);
+
+        expect(result).toEqual({ expiredCount: 2, expiredIds: ['intent-1', 'intent-2'] });
+        expect(mockPrisma.bookingIntent.findMany).toHaveBeenCalledWith({
+          where: {
+            status: 'PENDING',
+            intentExpiresAt: { lt: now },
+          },
+          select: { id: true },
+        });
+        expect(mockPrisma.bookingIntent.updateMany).toHaveBeenCalledWith({
+          where: {
+            id: { in: ['intent-1', 'intent-2'] },
+            status: 'PENDING',
+          },
+          data: { status: 'EXPIRED' },
+        });
+        expect(mockAudit.createLog).toHaveBeenCalledWith(mockPrisma, {
+          userId: null,
+          action: 'booking_intent_expired',
+          resourceType: 'BookingIntent',
+          resourceId: null,
+          metadata: {
+            intentIds: ['intent-1', 'intent-2'],
+            count: 2,
+          },
+        });
+      });
+    });
+
+    describe('deleteExpiredIntents', () => {
+      it('returns 0 and empty array if no intents found to delete', async () => {
+        mockPrisma.bookingIntent.findMany.mockResolvedValueOnce([]);
+
+        const result = await service.deleteExpiredIntents(new Date());
+        expect(result).toEqual({ deletedCount: 0, deletedIds: [] });
+        expect(mockPrisma.bookingIntent.deleteMany).not.toHaveBeenCalled();
+        expect(mockAudit.createLog).not.toHaveBeenCalled();
+      });
+
+      it('deletes expired intents and creates audit log if intents are past grace period', async () => {
+        process.env.BOOKING_INTENT_GRACE_HOURS = '12';
+        const mockIntents = [{ id: 'expired-1' }];
+        mockPrisma.bookingIntent.findMany.mockResolvedValueOnce(mockIntents);
+        mockPrisma.bookingIntent.deleteMany.mockResolvedValueOnce({ count: 1 });
+
+        const now = new Date('2026-07-11T12:00:00Z');
+        const result = await service.deleteExpiredIntents(now);
+
+        expect(result).toEqual({ deletedCount: 1, deletedIds: ['expired-1'] });
+
+        const expectedCutoff = new Date(now.getTime() - 12 * 60 * 60 * 1000);
+        expect(mockPrisma.bookingIntent.findMany).toHaveBeenCalledWith({
+          where: {
+            status: 'EXPIRED',
+            updatedAt: { lt: expectedCutoff },
+          },
+          select: { id: true },
+        });
+        expect(mockPrisma.bookingIntent.deleteMany).toHaveBeenCalledWith({
+          where: {
+            id: { in: ['expired-1'] },
+            status: 'EXPIRED',
+          },
+        });
+        expect(mockAudit.createLog).toHaveBeenCalledWith(mockPrisma, {
+          userId: null,
+          action: 'booking_intent_deleted',
+          resourceType: 'BookingIntent',
+          resourceId: null,
+          metadata: {
+            intentIds: ['expired-1'],
+            count: 1,
+          },
+        });
+      });
+    });
+  });
 });
