@@ -31,9 +31,9 @@
 
 ## Phase 4: E2E Testing & Verification
 
-- [ ] T020 Add `apps/api/test/booking-intent.e2e-spec.ts`
-- [ ] T021 Add creation/retrieval/ownership/validation E2E coverage
-- [ ] T022 Add pre-fill endpoint E2E coverage
-- [ ] T023 Add Duffel failure and `duffelOfferId` override regression E2E coverage
-- [ ] T024 Add cron lifecycle E2E coverage and non-default TTL/grace validation
-- [ ] T025 Run full backend E2E regression suite and fix regressions
+- [X] T020 Add `apps/api/test/booking-intent.e2e-spec.ts`
+- [X] T021 Add creation/retrieval/ownership/validation E2E coverage
+- [X] T022 Add pre-fill endpoint E2E coverage
+- [X] T023 Add Duffel failure and `duffelOfferId` override regression E2E coverage
+- [X] T024 Add cron lifecycle E2E coverage and non-default TTL/grace validation
+- [X] T025 Run full backend E2E regression suite and fix regressions
