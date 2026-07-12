@@ -50,7 +50,7 @@ curl -X POST http://localhost:3001/api/payments/confirm \
 
 # 4. Verify DB state
 # - Payment.status = SUCCEEDED
-# - BookingIntent.status = CONFIRMED
+# - BookingIntent.status = COMPLETED
 # - payment_events has CREATED → AUTHORIZED → SUCCEEDED rows
 # - ledger_entries has balanced DEBIT/CREDIT pair
 ```

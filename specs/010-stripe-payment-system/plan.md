@@ -97,7 +97,7 @@ packages/shared/
 | Task | Status | Notes |
 |------|--------|-------|
 | Add `PaymentStatus`, `RefundStatus`, `RefundTriggerType`, `LedgerEntryType`, `PaymentEventSource` enums to `schema.prisma` | ☐ | See [data-model.md](./data-model.md) |
-| Extend `BookingIntentStatus` enum with `AWAITING_PAYMENT`, `PAYMENT_EXHAUSTED`, `CONFIRMED`, `CANCELLED` | ☐ | New values added to existing enum |
+| Extend `BookingIntentStatus` enum with `AWAITING_PAYMENT`, `PAYMENT_EXHAUSTED`, `CANCELLED` | ☐ | New values added to existing enum |
 | Add `Payment` model to `schema.prisma` | ☐ | Includes `version` for optimistic locking, `pre_dispute_status`, unique constraint on `[bookingIntentId, attemptNumber]` |
 | Add `IdempotencyKey` model to `schema.prisma` | ☐ | Unique `key`, `recoveryPoint`, `lockedAt` for claim mechanism |
 | Add `PaymentEvent` model to `schema.prisma` | ☐ | BIGSERIAL PK, unique `stripeEventId` (nullable), immutable |
@@ -207,10 +207,10 @@ packages/shared/
 | Implement `GET /api/payments/:paymentId/status` polling endpoint | ☐ | Returns current payment status, bookingIntent status, PNR reference if available |
 | Add `POST /api/payments/confirm` to controller | ☐ | JWT-guarded, idempotency key extraction |
 | Create ledger entries on successful capture | ☐ | DEBIT CUSTOMER_RECEIVABLE, CREDIT PLATFORM_REVENUE. Duffel cost entry deferred to when cost is known |
-| Update BookingIntent status to CONFIRMED on success | ☐ | Outside of capture network call, coordinated by post-capture DB updates/reconciliation |
+| Update BookingIntent status to COMPLETED on success | ☐ | Outside of capture network call, coordinated by post-capture DB updates/reconciliation |
 | Add audit logging for `payment_authorized`, `payment_captured`, `booking_confirmed` | ☐ | |
 
-**Exit criteria**: Full pipeline works: create → authorize → Duffel PNR → capture → CONFIRMED. Ledger balanced. Recovery points track progress. Duffel failure voids authorization. Async handoff returns 202 with poll URL.
+**Exit criteria**: Full pipeline works: create → authorize → Duffel PNR → capture → COMPLETED. Ledger balanced. Recovery points track progress. Duffel failure voids authorization. Async handoff returns 202 with poll URL.
 
 ---
 
@@ -317,7 +317,7 @@ packages/shared/
 
 | Task | Status | Notes |
 |------|--------|-------|
-| E2E: Happy path — create → authorize → Duffel PNR → capture → CONFIRMED (201/200) | ☐ | Verify DB records, payment_events, ledger_entries |
+| E2E: Happy path — create → authorize → Duffel PNR → capture → COMPLETED (201/200) | ☐ | Verify DB records, payment_events, ledger_entries |
 | E2E: Failed payment — card declined (402) → FAILED terminal | ☐ | Verify no charge, PaymentEvent logged |
 | E2E: Payment retry — first fails, second succeeds | ☐ | Verify attempt_number = 2, paymentAttemptCount = 2 |
 | E2E: Third attempt blocked (429) | ☐ | Verify PAYMENT_EXHAUSTED status |

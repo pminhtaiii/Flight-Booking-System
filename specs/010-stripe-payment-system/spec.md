@@ -14,18 +14,18 @@
 
 ### User Story 1 - One-Time Payment for Flight Booking (Priority: P1)
 
-A customer with a `BookingIntent` in `AWAITING_PAYMENT` state submits their card details to pay for a flight. The system authorizes the card, confirms the booking with Duffel, captures the payment, and transitions the booking to `CONFIRMED`.
+A customer with a `BookingIntent` in `AWAITING_PAYMENT` state submits their card details to pay for a flight. The system authorizes the card, confirms the booking with Duffel, captures the payment, and transitions the booking to `COMPLETED`.
 
 **Why this priority**: This is the core revenue-generating flow. Without it, no bookings generate income.
 
-**Independent Test**: Can be fully tested by creating a BookingIntent, submitting payment via Stripe test mode, and verifying the booking transitions to CONFIRMED with a valid PNR.
+**Independent Test**: Can be fully tested by creating a BookingIntent, submitting payment via Stripe test mode, and verifying the booking transitions to COMPLETED with a valid PNR.
 
 **Acceptance Scenarios**:
 
-1. **Given** a BookingIntent in AWAITING_PAYMENT state, **When** the customer submits valid card details, **Then** the system creates a Stripe PaymentIntent, authorizes the card, calls Duffel to create PNR, captures the payment, and transitions the BookingIntent to CONFIRMED.
+1. **Given** a BookingIntent in AWAITING_PAYMENT state, **When** the customer submits valid card details, **Then** the system creates a Stripe PaymentIntent, authorizes the card, calls Duffel to create PNR, captures the payment, and transitions the BookingIntent to COMPLETED.
 2. **Given** a BookingIntent in AWAITING_PAYMENT state, **When** the card authorization fails (declined), **Then** the Payment is marked FAILED (terminal), the BookingIntent remains in AWAITING_PAYMENT, and the customer is told they can try again.
 3. **Given** a BookingIntent in AWAITING_PAYMENT state, **When** authorization succeeds but Duffel PNR creation fails, **Then** the authorization is voided, the customer's card is released, no charge occurs, and the Payment is marked CANCELLED.
-4. **Given** a successful authorization, **When** Duffel does not respond within 30 seconds, **Then** the system transitions to async mode ("Confirming your flight…"), continues retrying in background, and applies the tiered escalation ladder (Tier 2 at 30s-1min, Tier 3 admin alert at 15min, Tier 4 auto-expire at 30min-1hr).
+4. **Given** a successful authorization, **When** Duffel does not respond within 30 seconds, **Then** the system transitions to async mode ("Confirming your flight…"), continues retrying in background, and applies the tiered escalation ladder (Tier 2 at 30s-1min, Tier 3 admin alert at 15min, Tier 4 auto-expire at 60-90 minutes).
 
 ---
 
@@ -171,7 +171,7 @@ Every financial event produces paired debit/credit ledger entries for auditabili
 - **FR-011**: System MUST maintain an immutable `payment_events` audit log for every state transition.
 - **FR-012**: System MUST maintain a double-entry `ledger_entries` table with 3 accounts (CUSTOMER_RECEIVABLE, PLATFORM_REVENUE, DUFFEL_COST) where debits always equal credits per `transaction_id`.
 - **FR-013**: System MUST use `idempotency_keys` with `recovery_point` tracking for pipeline resumption on crash/retry.
-- **FR-014**: System MUST apply the tiered timeout escalation for authorize-to-capture: Tier 1 (0-30s sync), Tier 2 (30s-1min async), Tier 3 (15min admin alert), Tier 4 (30min-1hr auto-expire).
+- **FR-014**: System MUST apply the tiered timeout escalation for authorize-to-capture: Tier 1 (0-30s sync), Tier 2 (30s-1min async), Tier 3 (15min admin alert), Tier 4 (60-90 minutes auto-expire).
 - **FR-015**: System MUST void/cancel Stripe authorizations when Duffel PNR creation fails, ensuring customers are never charged for non-existent bookings.
 
 ### Non-Functional Requirements

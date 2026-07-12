@@ -73,7 +73,7 @@ Confirm the payment after Stripe client-side authentication (3DS). Triggers the 
 {
   "paymentId": "uuid",
   "status": "SUCCEEDED",
-  "bookingIntentStatus": "CONFIRMED",
+  "bookingIntentStatus": "COMPLETED",
   "pnrReference": "ABC123"
 }
 ```
@@ -111,7 +111,7 @@ Poll payment status (used after async handoff).
 {
   "paymentId": "uuid",
   "status": "SUCCEEDED",
-  "bookingIntentStatus": "CONFIRMED",
+  "bookingIntentStatus": "COMPLETED",
   "amount": 50000,
   "currency": "usd",
   "pnrReference": "ABC123",
@@ -134,7 +134,7 @@ Raw body with `Stripe-Signature` header. Not JWT-guarded — verified via Stripe
 | Event | Action |
 |-------|--------|
 | `payment_intent.created` | Update Payment → CREATED (if not already) |
-| `payment_intent.succeeded` | Route through idempotent finalization/reconciliation path (coordinate Duffel, ledger, BookingIntent) before committing SUCCEEDED status |
+| `payment_intent.succeeded` | Route through idempotent finalization/reconciliation path (coordinate Duffel, ledger, BookingIntent) using `StripeService` to verify live state before committing SUCCEEDED status |
 | `payment_intent.payment_failed` | Update Payment → FAILED |
 | `payment_intent.canceled` | Update Payment → CANCELLED |
 | `charge.refunded` | Update Payment → REFUNDED or PARTIALLY_REFUNDED |
@@ -213,7 +213,7 @@ List saved payment methods for the authenticated user.
 
 ## DELETE /api/payments/methods/:methodId
 
-Remove a saved payment method.
+Remove a saved payment method (soft delete: sets `status = DETACHED`).
 
 ### Response (204 No Content)
 

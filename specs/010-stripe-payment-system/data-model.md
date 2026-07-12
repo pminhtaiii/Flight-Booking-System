@@ -76,7 +76,7 @@ enum BookingIntentStatus {
   COMPLETED        // existing
   AWAITING_PAYMENT // NEW — intent is valid, waiting for payment
   PAYMENT_EXHAUSTED // NEW — 2 attempts failed, no more allowed
-  CONFIRMED        // NEW — payment captured, PNR created
+  COMPLETED        // NEW — payment captured, PNR created (replaces CONFIRMED logic to match existing enum terminal state)
   CANCELLED        // NEW — explicitly cancelled
 }
 ```
@@ -150,7 +150,7 @@ model PaymentEvent {
   paymentId       String
   payment         Payment            @relation(fields: [paymentId], references: [id])
   eventType       String             // e.g., "payment_intent.succeeded", "refund.created"
-  previousStatus  PaymentStatus
+  previousStatus  PaymentStatus      // NOTE: for the first event (creation), use self-transition: previousStatus = CREATED
   newStatus       PaymentStatus
   amount          Int?               // amount involved in this event
   source          PaymentEventSource // WEBHOOK, API, CRON, SYSTEM
@@ -225,9 +225,22 @@ model PaymentMethod {
   savedWithConsent       Boolean  @default(false) // only set to true through validated saveCard opt-in path
   createdAt              DateTime @default(now())
 
+  status                 PaymentMethodStatus @default(ACTIVE)
+  expMonth               Int?
+  expYear                Int?
+
   @@index([stripeCustomerId])
   @@index([userId])
 }
+
+enum PaymentMethodStatus {
+  ACTIVE
+  DETACHED
+  EXPIRED
+}
+
+// NOTE: Add partial unique index via raw SQL migration:
+// CREATE UNIQUE INDEX idx_one_default_per_user ON "PaymentMethod" ("userId") WHERE "isDefault" = true;
 ```
 
 ---
@@ -253,7 +266,7 @@ model User {
 model BookingIntent {
   // ... existing fields ...
   paymentAttemptCount  Int              @default(0) // max 2
-  // status enum extended with AWAITING_PAYMENT, PAYMENT_EXHAUSTED, CONFIRMED, CANCELLED
+  // status enum extended with AWAITING_PAYMENT, PAYMENT_EXHAUSTED, CANCELLED (COMPLETED already exists as terminal state)
   // ... existing relations ...
   payments             Payment[]        // NEW relation (max 2)
 }
@@ -299,6 +312,8 @@ DISPUTED → CHARGEBACK_LOST (dispute lost)
 | `captured` | `SUCCEEDED` | Stripe capture confirmed |
 | `completed` | `SUCCEEDED` | All post-capture steps done (ledger, audit) |
 
+> **CRITICAL CONSTRAINT:** `recoveryPoint` and `Payment.status` MUST be written in the same DB transaction. A mismatch between them is an invariant violation, not a valid intermediate state.
+
 ---
 
 ## V1 Chart of Accounts (ledger_entries.account_id)
@@ -308,6 +323,8 @@ DISPUTED → CHARGEBACK_LOST (dispute lost)
 | `CUSTOMER_RECEIVABLE` | Money owed by/to the customer |
 | `PLATFORM_REVENUE` | Platform's revenue from bookings |
 | `DUFFEL_COST` | What the platform owes Duffel for the ticket |
+
+> **CRITICAL CONSTRAINT:** `LedgerEntry` rows MUST be written in the same transaction as the triggering Payment or Refund state change. SUM(debits) must equal SUM(credits) per transactionId at all times.
 
 ---
 

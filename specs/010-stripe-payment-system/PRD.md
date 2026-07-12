@@ -45,9 +45,9 @@ Good tests will test external behavior and end-to-end flows across defined seams
 
 The system will be tested across four primary seams:
 
-- **Seam 1: `PaymentService`**: Primary orchestrator seam. Tests cover the pipeline execution (create -> authorize -> Duffel PNR -> capture), state machine enforcement, optimistic versioning, and idempotency recovery points. External calls (Stripe/Duffel SDKs) are mocked here.
-- **Seam 2: `PaymentWebhookService`**: Boundary between inbound Stripe webhooks and the FSM. Tests cover deduplication, Tier 1 self-healing, Tier 2 alert/drop, and dispute lifecycles.
-- **Seam 3: `PaymentRefundService`**: Covers the dual-trigger refund logic (automated + admin) and partial refund loops.
+- **Seam 1: `PaymentService`**: Primary orchestrator seam. Tests cover the pipeline execution (create -> authorize -> Duffel PNR -> capture), state machine enforcement, optimistic versioning, and idempotency recovery points. External calls use a shared, mockable `StripeService` wrapper. **Test Case Required**: Simulate a crash between writing `recoveryPoint` and `Payment.status` to confirm the system either rolls back both or the reconciliation sweep detects and repairs the mismatch (they MUST be updated in the same DB transaction).
+- **Seam 2: `PaymentWebhookService`**: Boundary between inbound Stripe webhooks and the FSM. Tests cover deduplication, Tier 1 self-healing (using the shared `StripeService` to fetch live state), Tier 2 alert/drop, and dispute lifecycles.
+- **Seam 3: `PaymentRefundService`**: Covers the dual-trigger refund logic (automated + admin) and partial refund loops. **Test Case Required**: Assert the ledger balance invariant holds (SUM(debits) = SUM(credits) per transactionId) after every refund path (automated, admin, full, partial) and ensure `LedgerEntry` rows are written in the same transaction as the `Payment`/`Refund` status change.
 - **Seam 4: `PaymentReconciliationService` (Background Sweep)**: Tests cover the timer-based load-bearing logic outside the request/response cycle. Verifies auto-expiry of stuck authorizations (60-90m sweep), detecting and auto-refunding duplicate captures, and proactive Stripe API checks for payments lacking resolving webhooks.
 
 ## Out of Scope
@@ -59,5 +59,5 @@ The system will be tested across four primary seams:
 
 ## Further Notes
 
-- Tiered timeout escalation for Authorize-to-Capture: 0-30s (sync) -> 30s-1m (async handoff) -> 15m (admin alert) -> 30m-1h (auto-expire).
+- Tiered timeout escalation for Authorize-to-Capture: 0-30s (sync) -> 30s-1m (async handoff) -> 15m (admin alert) -> 60-90 minutes (auto-expire).
 - Automated refunds must have the `requires_review` flag set to true for a 24h human check.
