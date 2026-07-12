@@ -75,6 +75,7 @@ export default async function FlightDetailPage({ params }: Props) {
       signal: detailController.signal,
     });
   } catch (err) {
+    // eslint-disable-next-line no-console
     console.error('Error fetching flight detail:', err);
     notFound();
   } finally {
@@ -96,6 +97,7 @@ export default async function FlightDetailPage({ params }: Props) {
           recovery = errorJson.recovery;
         }
       } catch (err) {
+        // eslint-disable-next-line no-console
         console.error('Error parsing 410 recovery json:', err);
       }
 

@@ -285,8 +285,9 @@ export class DuffelService {
       this.logger.log(`Calling Duffel API to create offer request. Slices: ${slices.length}, Passengers: ${passengers.length}`);
       const duffelResponse = await this.duffel.offerRequests.create({
         slices,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         passengers: passengers as any,
-        cabin_class: normalizedQuery.cabinClass as any,
+        cabin_class: normalizedQuery.cabinClass as 'first' | 'business' | 'premium_economy' | 'economy',
       });
 
       const offerRequest = duffelResponse.data as unknown as DuffelOfferRequest;

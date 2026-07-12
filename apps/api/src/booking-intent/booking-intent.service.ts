@@ -389,6 +389,9 @@ export class BookingIntentService {
         raw: rawOffer,
       };
     } catch (error) {
+      if (error instanceof HttpException) {
+        throw error;
+      }
       const err = error as { status?: number; message?: string };
 
       if (error instanceof DuffelTimeoutError) {

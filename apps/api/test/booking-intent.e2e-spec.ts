@@ -733,33 +733,54 @@ describe('Booking Intent (E2E)', () => {
         data: { status: 'EXPIRED' },
       });
 
+      // Clear env var for first run
+      delete process.env.BOOKING_INTENT_GRACE_HOURS;
+
       // 1. Age first intent past default grace hours (24h -> age by 25h)
       await prisma.$executeRaw`UPDATE booking_intents SET "updatedAt" = ${new Date(Date.now() - 25 * 60 * 60 * 1000)} WHERE id = ${res1.body.intentId}`;
 
-      // 2. Age second intent past custom grace hours (set grace to 5h, age by 6h)
-      process.env.BOOKING_INTENT_GRACE_HOURS = '5';
+      // 2. Age second intent by 6h (should NOT be deleted yet under default 24h grace)
       await prisma.$executeRaw`UPDATE booking_intents SET "updatedAt" = ${new Date(Date.now() - 6 * 60 * 60 * 1000)} WHERE id = ${res2.body.intentId}`;
 
-      // Trigger Phase 2 Cron
+      // Trigger Phase 2 Cron (default grace)
       await cron.handleHardDelete();
 
-      // Verify both are hard-deleted
+      // Verify only the 25h intent is deleted
       const int1 = await prisma.bookingIntent.findUnique({ where: { id: res1.body.intentId } });
       const int2 = await prisma.bookingIntent.findUnique({ where: { id: res2.body.intentId } });
 
       expect(int1).toBeNull();
-      expect(int2).toBeNull();
+      expect(int2).toBeDefined();
 
-      // Verify cascading passenger deletion
-      const passengerCount = await prisma.bookingIntentPassenger.count();
-      expect(passengerCount).toBe(0);
+      // Verify cascading passenger deletion for the first intent
+      const passengerCount1 = await prisma.bookingIntentPassenger.count({ where: { intentId: res1.body.intentId } });
+      expect(passengerCount1).toBe(0);
 
-      // Verify audit logs written for both deletions
-      const auditDeleted = await prisma.auditLog.findFirst({
+      // Verify audit log for first deletion
+      const auditDeleted1 = await prisma.auditLog.findFirst({
         where: { action: 'booking_intent_deleted' },
+        orderBy: { createdAt: 'desc' },
       });
-      expect(auditDeleted).toBeDefined();
-      expect((auditDeleted!.metadata as any).count).toBe(2);
+      expect(auditDeleted1).toBeDefined();
+      expect((auditDeleted1!.metadata as any).count).toBe(1);
+
+      // Set custom grace to 5h
+      process.env.BOOKING_INTENT_GRACE_HOURS = '5';
+      
+      // Trigger Phase 2 Cron again
+      await cron.handleHardDelete();
+
+      // Verify second intent is now deleted
+      const int2After = await prisma.bookingIntent.findUnique({ where: { id: res2.body.intentId } });
+      expect(int2After).toBeNull();
+
+      // Verify audit log for second deletion
+      const auditDeleted2 = await prisma.auditLog.findFirst({
+        where: { action: 'booking_intent_deleted' },
+        orderBy: { createdAt: 'desc' },
+      });
+      expect(auditDeleted2).toBeDefined();
+      expect((auditDeleted2!.metadata as any).count).toBe(1);
     });
   });
 });

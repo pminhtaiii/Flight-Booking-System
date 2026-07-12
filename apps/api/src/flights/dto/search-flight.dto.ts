@@ -38,7 +38,7 @@ export function IsValidPassengerCount(validationOptions?: ValidationOptions) {
       propertyName: propertyName,
       options: validationOptions,
       validator: {
-        validate(value: any, args: ValidationArguments) {
+        validate(value: unknown, args: ValidationArguments) {
           const dto = args.object as FlightSearchRequestDto;
           const adults = dto.adults || 0;
           const children = dto.children || 0;

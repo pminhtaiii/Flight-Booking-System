@@ -12,6 +12,19 @@ type MockDuffelService = {
   getOfferById: jest.Mock;
 };
 
+type MockPrismaService = {
+  bookingIntent: {
+    findMany: jest.Mock;
+    updateMany: jest.Mock;
+    deleteMany: jest.Mock;
+  };
+  $transaction: jest.Mock;
+};
+
+type MockAuditService = {
+  createLog: jest.Mock;
+};
+
 type TestableService = {
   decryptProfileField(value: string | null): string | null;
   fetchLiveOffer(duffelOfferId: string): Promise<{
@@ -160,8 +173,8 @@ describe('BookingIntentService Refinements', () => {
 
   describe('Cron Cleanup Methods', () => {
     let service: BookingIntentService;
-    let mockPrisma: any;
-    let mockAudit: any;
+    let mockPrisma: MockPrismaService;
+    let mockAudit: MockAuditService;
     const originalGraceHours = process.env.BOOKING_INTENT_GRACE_HOURS;
 
     beforeEach(() => {
@@ -172,17 +185,17 @@ describe('BookingIntentService Refinements', () => {
           deleteMany: jest.fn(),
         },
         $transaction: jest.fn(async (cb) => cb(mockPrisma)),
-      };
+      } as unknown as MockPrismaService;
 
       mockAudit = {
         createLog: jest.fn(),
-      };
+      } as unknown as MockAuditService;
 
       service = new BookingIntentService(
-        mockPrisma as any,
-        {} as any,
-        mockAudit as any,
-        {} as any,
+        mockPrisma as unknown as import('../prisma/prisma.service').PrismaService,
+        {} as import('../duffel/duffel.service').DuffelService,
+        mockAudit as unknown as import('../audit/audit.service').AuditService,
+        {} as import('../common/encryption.service').EncryptionService,
       );
     });
 
