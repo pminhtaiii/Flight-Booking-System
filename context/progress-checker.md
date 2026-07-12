@@ -7,12 +7,23 @@ Update this file after every completed feature. Any AI agent reading this should
 ### Current Status
 
 **Feature:** Stripe Payment System (Feature 10)
-**Last completed:** Feature 9: Booking Intent Foundation - Phase 4: E2E Testing & Verification.
-**Next:** Phase 1 of Stripe Payment System (Feature 10).
+**Last completed:** Feature 10: Stripe Payment System - Phase 1: Database Schema & Enums.
+**Next:** Feature 10: Stripe Payment System - Phase 2: Foundational (Blocking Prerequisites).
 
 ---
 
 ## Progress by Feature
+
+### [ ] Feature: Stripe Payment System (Feature 10)
+
+- [x] Phase 1: Database Schema & Enums (Define models and enums in Prisma, deploy migrations with CHECK constraint and default payment method partial index, add typescript enums in shared package, verify via payment-schema E2E tests)
+- [ ] Phase 2: Foundational (Blocking Prerequisites)
+- [ ] Phase 3: User Story 1 - One-Time Payment for Flight Booking
+- [ ] Phase 4: User Story 2 - Webhook-Driven Payment Status Updates
+- [ ] Phase 5: User Story 3 - Retry Payment (Second Attempt)
+- [ ] Phase 6: User Story 4 - Save Payment Method for Reuse
+- [ ] Phase 7: User Story 5 - Automated System Refunds
+- [ ] Phase 8: E2E Testing & Verification
 
 ### [x] Feature: Booking Intent Foundation (Feature 9)
 
