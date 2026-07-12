@@ -12,18 +12,31 @@ enum UserStatus {
   INACTIVE
 }
 
+enum BookingIntentStatus {
+  PENDING
+  EXPIRED
+  COMPLETED
+}
+
+enum PassengerType {
+  ADULT
+  CHILD
+  INFANT
+}
+
 model User {
-  id              String           @id @default(uuid())
-  email           String           @unique
+  id              String             @id @default(uuid())
+  email           String             @unique
   password        String
-  status          UserStatus       @default(ACTIVE)
-  createdAt       DateTime         @default(now())
-  updatedAt       DateTime         @updatedAt
+  status          UserStatus         @default(ACTIVE)
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
   lastLogin       DateTime?
   auditLogs       AuditLog[]
   chatSessions    ChatSession[]
   travelerProfile TravelerProfile?
   bookings        Booking[]
+  bookingIntents  BookingIntent[]
   searchHistory   SearchHistory[]
 
   @@map("users")
@@ -106,6 +119,7 @@ model TravelerProfile {
   createdAt           DateTime @default(now())
   updatedAt           DateTime @updatedAt
   user                User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  bookingIntentPassengers BookingIntentPassenger[]
 
   @@map("traveler_profiles")
 }
@@ -137,6 +151,66 @@ model Booking {
   @@index([userId])
   @@index([userId, status])
   @@map("bookings")
+}
+
+model BookingIntent {
+  id               String                @id @default(uuid())
+  userId           String
+  flightOfferId    String?
+  duffelOfferId    String
+  status           BookingIntentStatus   @default(PENDING)
+  originalPrice    Decimal               @db.Decimal(10, 2)
+  confirmedPrice   Decimal               @db.Decimal(10, 2)
+  currency         String                @default("USD")
+  priceChanged     Boolean               @default(false)
+  pricedAt         DateTime
+  origin           String                @db.VarChar(3)
+  destination      String                @db.VarChar(3)
+  departureDate    DateTime              @db.Date
+  returnDate       DateTime?             @db.Date
+  cabinClass       String                @default("economy")
+  adults           Int
+  children         Int                   @default(0)
+  infants          Int                   @default(0)
+  rawOfferSnapshot Json
+  intentExpiresAt  DateTime
+  offerExpiresAt   DateTime?
+  createdAt        DateTime              @default(now())
+  updatedAt        DateTime              @updatedAt
+  user             User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  flightOffer      FlightOffer?          @relation(fields: [flightOfferId], references: [id], onDelete: SetNull)
+  passengers       BookingIntentPassenger[]
+
+  @@index([userId])
+  @@index([userId, status])
+  @@index([status, intentExpiresAt])
+  @@index([status, updatedAt])
+  @@map("booking_intents")
+}
+
+model BookingIntentPassenger {
+  id                String           @id @default(uuid())
+  intentId          String
+  position          Int
+  type              PassengerType
+  givenName         String
+  familyName        String
+  dateOfBirth       DateTime         @db.Date
+  gender            String
+  nationality       String?          @db.VarChar(2)
+  /// @encrypted
+  passportNumber    String?
+  /// @encrypted
+  passportExpiry    String?
+  travelerProfileId  String?
+  createdAt         DateTime         @default(now())
+  intent            BookingIntent    @relation(fields: [intentId], references: [id], onDelete: Cascade)
+  travelerProfile   TravelerProfile? @relation(fields: [travelerProfileId], references: [id], onDelete: SetNull)
+
+  @@index([intentId])
+  @@index([travelerProfileId])
+  @@unique([intentId, position])
+  @@map("booking_intent_passengers")
 }
 
 enum BookingStatus {
@@ -190,6 +264,7 @@ model FlightOffer {
   price           Decimal  @db.Decimal(10, 2)
   currency        String   @default("USD")
   createdAt       DateTime @default(now())
+  bookingIntents  BookingIntent[]
 
   @@index([searchHash])
   @@index([createdAt])

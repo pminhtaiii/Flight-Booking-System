@@ -58,5 +58,6 @@ export type ChatMessage = {
   createdAt: string;
 };
 
+export * from './booking-intent.types';
 export * from './airport';
 
