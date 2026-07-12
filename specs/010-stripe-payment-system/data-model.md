@@ -71,13 +71,12 @@ enum PaymentEventSource {
 
 ```prisma
 enum BookingIntentStatus {
-  PENDING          // existing
-  EXPIRED          // existing
-  COMPLETED        // existing
-  AWAITING_PAYMENT // NEW — intent is valid, waiting for payment
+  PENDING           // existing
+  EXPIRED           // existing
+  COMPLETED         // existing — now also used for: payment captured, PNR created
+  AWAITING_PAYMENT  // NEW — intent is valid, waiting for payment
   PAYMENT_EXHAUSTED // NEW — 2 attempts failed, no more allowed
-  COMPLETED        // NEW — payment captured, PNR created (replaces CONFIRMED logic to match existing enum terminal state)
-  CANCELLED        // NEW — explicitly cancelled
+  CANCELLED         // NEW — explicitly cancelled
 }
 ```
 

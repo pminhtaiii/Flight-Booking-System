@@ -389,7 +389,7 @@ On retry, the system reads the recovery point to know which step to resume from,
 | Column | Type | Notes |
 |--------|------|-------|
 | `stripe_customer_id` | TEXT (nullable) | Populated at first payment attempt |
-| `status` | ENUM (extended) | Add: AWAITING_PAYMENT, PAYMENT_EXHAUSTED, CONFIRMED, CANCELLED |
+| `status` | ENUM (extended) | Add: AWAITING_PAYMENT, PAYMENT_EXHAUSTED, CANCELLED |
 | `payment_attempt_count` | INTEGER | Max 2 |
 
 ### `payment_methods`
