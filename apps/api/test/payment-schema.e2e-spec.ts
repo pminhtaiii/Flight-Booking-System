@@ -8,6 +8,7 @@ import {
   LedgerEntryType,
   PaymentEventSource,
   RefundTriggerType,
+  PaymentMethodStatus,
 } from '@shared/types';
 
 describe('Payment Schema & Enums (E2E)', () => {
@@ -53,6 +54,7 @@ describe('Payment Schema & Enums (E2E)', () => {
     expect(LedgerEntryType).toBeDefined();
     expect(PaymentEventSource).toBeDefined();
     expect(RefundTriggerType).toBeDefined();
+    expect(PaymentMethodStatus).toBeDefined();
 
     // Verify enum values mapping
     expect(PaymentStatus.CREATED).toBe('CREATED');
@@ -60,5 +62,6 @@ describe('Payment Schema & Enums (E2E)', () => {
     expect(LedgerEntryType.DEBIT).toBe('DEBIT');
     expect(PaymentEventSource.WEBHOOK).toBe('WEBHOOK');
     expect(RefundTriggerType.SYSTEM_AUTOMATED).toBe('SYSTEM_AUTOMATED');
+    expect(PaymentMethodStatus.ACTIVE).toBe('ACTIVE');
   });
 });

@@ -239,7 +239,7 @@ enum PaymentMethodStatus {
 }
 
 // NOTE: Add partial unique index via raw SQL migration:
-// CREATE UNIQUE INDEX idx_one_default_per_user ON "PaymentMethod" ("userId") WHERE "isDefault" = true;
+// CREATE UNIQUE INDEX idx_one_default_per_user ON "payment_methods" ("userId") WHERE "isDefault" = true;
 ```
 
 ---

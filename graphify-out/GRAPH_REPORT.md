@@ -1,16 +1,16 @@
 # Graph Report - Booking Systems  (2026-07-12)
 
 ## Corpus Check
-- 315 files · ~202,539 words
+- 316 files · ~202,578 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 2794 nodes · 3383 edges · 310 communities (179 shown, 131 thin omitted)
+- 2794 nodes · 3381 edges · 309 communities (177 shown, 132 thin omitted)
 - Extraction: 96% EXTRACTED · 4% INFERRED · 0% AMBIGUOUS · INFERRED: 139 edges (avg confidence: 0.78)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `c14b1c5c`
+- Built from commit: `3f4b9a64`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -338,7 +338,7 @@
 - **Agent Gateway REST Endpoints** — specs_003_agent_tool_calling_contracts_agent_gateway_api_get_search_flights, specs_003_agent_tool_calling_contracts_agent_gateway_api_get_user_preferences, specs_003_agent_tool_calling_contracts_agent_gateway_api_get_user_bookings [EXTRACTED 1.00]
 - **Output Guardrail Pipeline Components** — specs_004_output_guardrails_data_model_chunkbuffer_model, specs_004_output_guardrails_data_model_slidingwindow_model, specs_004_output_guardrails_data_model_outputguardrailconfig_model, specs_004_output_guardrails_data_model_outputguardrailpipeline_model [EXTRACTED 1.00]
 
-## Communities (310 total, 131 thin omitted)
+## Communities (309 total, 132 thin omitted)
 
 ### Community 0 - "NestJSClient"
 Cohesion: 0.20
@@ -373,16 +373,16 @@ Cohesion: 0.05
 Nodes (36): dependencies, class-variance-authority, clsx, lucide-react, maplibre-gl, next, next-auth, postcss (+28 more)
 
 ### Community 8 - "tsconfig.json"
-Cohesion: 0.18
-Nodes (10): tsconfig-paths, compilerOptions, baseUrl, outDir, paths, exclude, extends, include (+2 more)
+Cohesion: 0.20
+Nodes (9): compilerOptions, baseUrl, outDir, paths, exclude, extends, include, @/* (+1 more)
 
 ### Community 10 - "MockStreamingLLM"
 Cohesion: 0.08
 Nodes (25): API Contracts: Stripe Payment System, DELETE /api/payments/methods/:methodId, Error Responses, Error Responses, Error Responses, Error Responses, GET /api/payments/methods, GET /api/payments/:paymentId/status (+17 more)
 
 ### Community 11 - "devDependencies"
-Cohesion: 0.10
-Nodes (20): compilerOptions, allowJs, esModuleInterop, incremental, isolatedModules, jsx, lib, module (+12 more)
+Cohesion: 0.12
+Nodes (17): compilerOptions, allowJs, esModuleInterop, incremental, isolatedModules, jsx, lib, module (+9 more)
 
 ### Community 12 - "devDependencies"
 Cohesion: 0.10
@@ -397,8 +397,8 @@ Cohesion: 0.28
 Nodes (3): RegisterForm(), RegisterInput, registerSchema
 
 ### Community 16 - "page.tsx"
-Cohesion: 0.18
-Nodes (11): handler, DashboardPage(), FlightDetailPage(), Props, SearchPage(), LogoutButton(), ExploreDashboardClient(), Header() (+3 more)
+Cohesion: 0.14
+Nodes (17): handler, DashboardPage(), FlightDetailPage(), Props, SearchPage(), LogoutButton(), ExploreDashboardClient(), Header() (+9 more)
 
 ### Community 18 - "ChunkBuffer"
 Cohesion: 0.15
@@ -760,10 +760,6 @@ Nodes (13): E2E Test Commands, Prerequisites, Quickstart: Duffel Flight Search S
 Cohesion: 0.16
 Nodes (14): AirportMarkerLayer(), Props, AirportPopup(), Props, FlightRouteLayer(), Props, calculateGreatCircleArc(), getMapBounds() (+6 more)
 
-### Community 253 - "page.tsx"
-Cohesion: 0.43
-Nodes (6): AirportSearchResponse, fetchWithTimeout(), getAirportByIataCode(), getNearbyAirports(), NearbyAirportResponse, searchAirports()
-
 ### Community 254 - "scripts"
 Cohesion: 0.29
 Nodes (10): AgentGatewayModule, AuditModule, AuthModule, BookingIntentModule, CacheModule, ChatModule, DuffelModule, FlightsModule (+2 more)
@@ -777,7 +773,7 @@ Cohesion: 0.08
 Nodes (12): AuthController, AuthenticatedRequest, AuthService, LoginDto, RegisterDto, LockoutService, JwtStrategy, CacheService (+4 more)
 
 ### Community 257 - "scripts"
-Cohesion: 0.29
+Cohesion: 0.20
 Nodes (6): health_check(), lifespan(), Request, Lifespan context manager that initializes NeMo Guardrails configuration,     me, Perform a health check verification by checking NestJS and NeMo Guardrails statu, FastAPI
 
 ### Community 258 - "package.json"
@@ -793,7 +789,7 @@ Cohesion: 0.15
 Nodes (10): AirportType, BookingIntentStatus, PassengerType, Booking, ChatMessage, ChatSession, Flight, MessageSender (+2 more)
 
 ### Community 261 - "MessageQueueManager"
-Cohesion: 0.21
+Cohesion: 0.19
 Nodes (9): MessageQueueManager, Increment the depth for a session_id. If the depth is already at or above, Release the lock for session_id and decrement the depth., Manages per-session locks and request depths to queue concurrent requests, get_auth_headers(), test_endpoint_concurrency_limit(), test_queue_manager_fifo_order(), test_queue_manager_max_depth() (+1 more)
 
 ### Community 262 - "health.controller.ts"
@@ -869,8 +865,8 @@ Cohesion: 0.13
 Nodes (14): Booking Workflow — Grilling Decisions, Decision 10: Staleness Check Before Payment (Feature B Constraint), Decision 11: Frontend UX — Deferred to Feature B, Decision 1: Server-Side Storage, Not Stateless, Decision 2: Dedicated `BookingIntent` Table (Not the `Booking` Table), Decision 3: Two-Phase Cleanup (Soft Expire → Hard Delete), Decision 4: Relational Passenger Model (`BookingIntentPassenger`), Decision 5: Validation in Application Layer, Not DB Constraints (+6 more)
 
 ### Community 283 - "devDependencies"
-Cohesion: 0.12
-Nodes (17): devDependencies, jest, @nestjs/cli, @nestjs/schematics, @nestjs/testing, prisma, supertest, ts-jest (+9 more)
+Cohesion: 0.11
+Nodes (19): devDependencies, jest, @nestjs/cli, @nestjs/schematics, @nestjs/testing, prisma, supertest, ts-jest (+11 more)
 
 ### Community 284 - "Implementation Plan: Booking Intent Foundation"
 Cohesion: 0.17
@@ -913,7 +909,7 @@ Cohesion: 0.25
 Nodes (8): R1: Intent Storage Strategy, R2: PII Security for Passenger Data, R3: Abandoned Intent Cleanup, R4: Duffel Re-Pricing Strategy, R5: Pre-Fill from TravelerProfile, R6: Validation Strategy, R7: GDPR Considerations, Research: Booking Intent Foundation
 
 ### Community 295 - "Entities"
-Cohesion: 0.39
+Cohesion: 0.43
 Nodes (6): LedgerEntryType, PaymentEventSource, PaymentMethodStatus, PaymentStatus, RefundStatus, RefundTriggerType
 
 ### Community 296 - "Research: Stripe Payment System"
@@ -965,24 +961,24 @@ Cohesion: 0.50
 Nodes (4): Decision 9: Recovery Points and Dual State Tracking, `idempotency_keys.recovery_point` — Pipeline-internal checkpoint, `payments.status` — Business-facing state, Relationship
 
 ## Knowledge Gaps
-- **1496 isolated node(s):** `root`, `parser`, `plugins`, `extends`, `node` (+1491 more)
+- **1495 isolated node(s):** `root`, `parser`, `plugins`, `extends`, `node` (+1490 more)
   These have ≤1 connection - possible missing edges or undocumented components.
-- **131 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
+- **132 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
-- **Why does `NestJSClient` connect `MemoryManager` to `NestJSClient`, `package.json`, `get_nestjs_client`, `chat_stream`, `User Scenarios & Testing *(mandatory)*`, `ChunkBuffer`?**
-  _High betweenness centrality (0.017) - this node is a cross-community bridge._
-- **Why does `PrismaService` connect `app.module.ts` to `plan.md`, `chat.controller.ts`, `BookingIntentService`, `agent-gateway.service.ts`, `Entities`, `health.controller.ts`, `scripts`, `AuditService`, `scripts`?**
-  _High betweenness centrality (0.009) - this node is a cross-community bridge._
 - **Why does `get_nestjs_client()` connect `get_nestjs_client` to `MemoryManager`?**
-  _High betweenness centrality (0.009) - this node is a cross-community bridge._
+  _High betweenness centrality (0.051) - this node is a cross-community bridge._
+- **Why does `AIRLINE_MAP` connect `get_nestjs_client` to `utils.ts`?**
+  _High betweenness centrality (0.049) - this node is a cross-community bridge._
+- **Why does `NestJSClient` connect `MemoryManager` to `NestJSClient`, `package.json`, `get_nestjs_client`, `chat_stream`, `User Scenarios & Testing *(mandatory)*`, `ChunkBuffer`?**
+  _High betweenness centrality (0.047) - this node is a cross-community bridge._
 - **Are the 21 inferred relationships involving `NestJSClient` (e.g. with `MemoryManager` and `chat_stream()`) actually correct?**
   _`NestJSClient` has 21 INFERRED edges - model-reasoned connections that need verification._
 - **Are the 21 inferred relationships involving `get_settings()` (e.g. with `get_chat_model()` and `should_continue()`) actually correct?**
   _`get_settings()` has 21 INFERRED edges - model-reasoned connections that need verification._
 - **What connects `root`, `parser`, `plugins` to the rest of the system?**
-  _1590 weakly-connected nodes found - possible documentation gaps or missing edges._
+  _1589 weakly-connected nodes found - possible documentation gaps or missing edges._
 - **Should `PrismaService` be split into smaller, more focused modules?**
   _Cohesion score 0.0625 - nodes in this community are weakly interconnected._

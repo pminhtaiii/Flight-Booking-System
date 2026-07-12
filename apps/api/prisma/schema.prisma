@@ -384,6 +384,7 @@ model Payment {
   @@unique([bookingIntentId, attemptNumber])
   @@index([stripeCustomerId])
   @@index([status])
+  @@index([idempotencyKeyId])
   @@map("payments")
 }
 
@@ -466,6 +467,7 @@ model Refund {
 
   @@index([paymentId])
   @@index([status])
+  @@index([idempotencyKeyId])
   @@map("refunds")
 }
 
@@ -485,6 +487,8 @@ model PaymentMethod {
   expMonth               Int?
   expYear                Int?
 
+  // @unique
+  // NOTE: idx_one_default_per_user (userId WHERE isDefault = true) is manually defined in migration SQL
   @@index([stripeCustomerId])
   @@index([userId])
   @@map("payment_methods")

@@ -198,10 +198,10 @@ CREATE INDEX "payment_methods_stripeCustomerId_idx" ON "payment_methods"("stripe
 CREATE INDEX "payment_methods_userId_idx" ON "payment_methods"("userId");
 
 -- CreateIndex
-CREATE INDEX "booking_intent_passengers_travelerProfileId_idx" ON "booking_intent_passengers"("travelerProfileId");
+CREATE INDEX "payments_idempotencyKeyId_idx" ON "payments"("idempotencyKeyId");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "users_stripeCustomerId_key" ON "users"("stripeCustomerId");
+CREATE INDEX "refunds_idempotencyKeyId_idx" ON "refunds"("idempotencyKeyId");
 
 -- AddForeignKey
 ALTER TABLE "payments" ADD CONSTRAINT "payments_bookingIntentId_fkey" FOREIGN KEY ("bookingIntentId") REFERENCES "booking_intents"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
@@ -232,4 +232,7 @@ ALTER TABLE "payment_methods" ADD CONSTRAINT "payment_methods_userId_fkey" FOREI
 
 -- Custom Constraints
 ALTER TABLE "payments" ADD CONSTRAINT "chk_payment_attempt_number" CHECK ("attemptNumber" IN (1, 2));
+ALTER TABLE "payments" ADD CONSTRAINT "chk_payment_amount_positive" CHECK ("amount" > 0);
+ALTER TABLE "ledger_entries" ADD CONSTRAINT "chk_ledger_amount_positive" CHECK ("amount" > 0);
+ALTER TABLE "refunds" ADD CONSTRAINT "chk_refund_amount_positive" CHECK ("amount" > 0);
 CREATE UNIQUE INDEX idx_one_default_per_user ON "payment_methods" ("userId") WHERE "isDefault" = true;

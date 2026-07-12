@@ -305,7 +305,6 @@
   "303": "Phase 4: NeMo Output Rail — Safety Classification",
   "304": "Phase 5: Output Guardrail Pipeline — Orchestration",
   "305": "Phase 6: SSE Integration — Wire Pipeline Into Streaming",
-  "306": "Phase 7: Hard Stop & Partial Persistence — Failure Handling",
   "307": "Phase 8: Pipeline Parallelism — Latency Optimization",
   "308": "Phase 10: E2E Testing & Validation — Final Verification",
   "309": "Decision 9: Recovery Points and Dual State Tracking"

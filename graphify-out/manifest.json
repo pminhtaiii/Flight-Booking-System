@@ -1555,8 +1555,8 @@
     "semantic_hash": ""
   },
   "specs/010-stripe-payment-system/data-model.md": {
-    "mtime": 1783840483.0153322,
-    "ast_hash": "321bcdd00997ddc8b9895601e4245e70",
+    "mtime": 1783847052.39424,
+    "ast_hash": "b61018251a7e792e9a9b32f9147d2408",
     "semantic_hash": ""
   },
   "specs/010-stripe-payment-system/plan.md": {
@@ -1580,13 +1580,13 @@
     "semantic_hash": ""
   },
   "apps/api/prisma/migrations/20260712084100_add_payment_system_schema/migration.sql": {
-    "mtime": 1783845625.4706407,
-    "ast_hash": "589fe8971f21fdbe087c52b09e6d7827",
+    "mtime": 1783847089.1638541,
+    "ast_hash": "e8ce25e16bd383250a0d6ee0bffc35d2",
     "semantic_hash": ""
   },
   "apps/api/test/payment-schema.e2e-spec.ts": {
-    "mtime": 1783845395.5290623,
-    "ast_hash": "c2807ada5ce28f9f8143a291e14f692a",
+    "mtime": 1783847074.8259015,
+    "ast_hash": "c4dc597998a324905002dc4a688e291d",
     "semantic_hash": ""
   },
   "packages/shared/src/types/payment.types.ts": {
@@ -1597,6 +1597,11 @@
   "specs/010-stripe-payment-system/tasks.md": {
     "mtime": 1783845705.7133243,
     "ast_hash": "72921e6a2ef3a5ae3db98780dc0f190d",
+    "semantic_hash": ""
+  },
+  "apps/api/prisma/migrations/20260712084300_concurrent_index_users/migration.sql": {
+    "mtime": 1783847237.0151334,
+    "ast_hash": "7d584f19a2157b57f5c68de56b20c780",
     "semantic_hash": ""
   }
 }
