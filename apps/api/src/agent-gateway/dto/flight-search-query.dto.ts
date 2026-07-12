@@ -30,7 +30,8 @@ export function IsFutureDateString(validationOptions?: ValidationOptions) {
 }
 
 export function AtLeastOnePassengerField(validationOptions?: ValidationOptions) {
-  return function (object: object) {
+// eslint-disable-next-line @typescript-eslint/ban-types
+  return function (object: Function) {
     registerDecorator({
       name: 'atLeastOnePassengerField',
       target: object,
