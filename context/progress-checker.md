@@ -7,8 +7,8 @@ Update this file after every completed feature. Any AI agent reading this should
 ### Current Status
 
 **Feature:** Stripe Payment System (Feature 10)
-**Last completed:** Feature 10: Stripe Payment System - Phase 1: Database Schema & Enums.
-**Next:** Feature 10: Stripe Payment System - Phase 2: Foundational (Blocking Prerequisites).
+**Last completed:** Feature 10: Stripe Payment System - Phase 2: Foundational (Blocking Prerequisites).
+**Next:** Feature 10: Stripe Payment System - Phase 3: User Story 1 - One-Time Payment for Flight Booking.
 
 ---
 
@@ -17,7 +17,7 @@ Update this file after every completed feature. Any AI agent reading this should
 ### [ ] Feature: Stripe Payment System (Feature 10)
 
 - [x] Phase 1: Database Schema & Enums (Define models and enums in Prisma, deploy migrations with CHECK constraint and default payment method partial index, add typescript enums in shared package, verify via payment-schema E2E tests)
-- [ ] Phase 2: Foundational (Blocking Prerequisites)
+- [x] Phase 2: Foundational (Blocking Prerequisites) (Stripe service SDK wrapper, pure FSM transitions, request idempotency key validation with pessimistic locks and recovery points, custom @IdempotencyKey() decorator, and TDD unit tests validation)
 - [ ] Phase 3: User Story 1 - One-Time Payment for Flight Booking
 - [ ] Phase 4: User Story 2 - Webhook-Driven Payment Status Updates
 - [ ] Phase 5: User Story 3 - Retry Payment (Second Attempt)

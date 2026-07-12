@@ -35,12 +35,12 @@
 
 **Purpose**: Stripe SDK integration, FSM, and Idempotency infrastructure
 
-- [ ] T013 Create `apps/api/src/common/stripe.service.ts` for Stripe SDK initialization and signature checks
-- [ ] T014 Implement Stripe helper methods (createPaymentIntent, capturePaymentIntent, cancelPaymentIntent, createCustomer, retrievePaymentIntent, createRefund, constructWebhookEvent) in `apps/api/src/common/stripe.service.ts`
-- [ ] T015 Create `apps/api/src/payment/payment-state-machine.ts` with FSM validation transitions
-- [ ] T016 [P] Write unit tests for FSM transitions in `apps/api/src/payment/payment-state-machine.spec.ts`
-- [ ] T017 Create `apps/api/src/payment/payment-idempotency.service.ts` to manage request hashes and recovery points
-- [ ] T018 [P] Implement custom decorator `@IdempotencyKey()` in `apps/api/src/payment/idempotency-key.decorator.ts`
+- [x] T013 Create `apps/api/src/common/stripe.service.ts` for Stripe SDK initialization and signature checks
+- [x] T014 Implement Stripe helper methods (createPaymentIntent, capturePaymentIntent, cancelPaymentIntent, createCustomer, retrievePaymentIntent, createRefund, constructWebhookEvent) in `apps/api/src/common/stripe.service.ts`
+- [x] T015 Create `apps/api/src/payment/payment-state-machine.ts` with FSM validation transitions
+- [x] T016 [P] Write unit tests for FSM transitions in `apps/api/src/payment/payment-state-machine.spec.ts`
+- [x] T017 Create `apps/api/src/payment/payment-idempotency.service.ts` to manage request hashes and recovery points
+- [x] T018 [P] Implement custom decorator `@IdempotencyKey()` in `apps/api/src/payment/idempotency-key.decorator.ts`
 
 ---
 
