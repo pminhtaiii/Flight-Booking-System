@@ -414,8 +414,8 @@ export class FlightsService {
       const token = process.env.DUFFEL_ACCESS_TOKEN;
 
       if (!isJest && (isTestEnv || token === 'mock')) {
-        // Mock get offer response
-        liveOffer = flightOffer.rawOffer;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        liveOffer = flightOffer.rawOffer as Record<string, any>;
       } else {
         const duffelResponse = await this.duffelService['duffel'].offers.get(flightOffer.duffelOfferId);
         liveOffer = duffelResponse.data;
