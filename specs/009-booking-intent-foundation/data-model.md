@@ -55,7 +55,7 @@ Individual passenger data for a booking intent. PII fields (passport) are encryp
 |-------|------|-------------|-------|
 | `id` | `String` | `@id @default(uuid())` | Primary key |
 | `intentId` | `String` | FK → `BookingIntent.id`, `onDelete: Cascade` | Parent intent |
-| `position` | `Int` | Required | 0-based order of this passenger within the intent. Gives a stable ordering for the passenger array and identifies "the first `ADULT`" for `TravelerProfile` pre-fill, instead of relying on insertion/array order at read time |
+| `position` | `Int` | Required | 0-based order of this passenger within the intent. Gives a stable ordering for the passenger array. The primary passenger for pre-fill is identified by the `useProfile` flag in the request, not by position. |
 | `type` | `PassengerType` | Required | `ADULT`, `CHILD`, `INFANT` |
 | `givenName` | `String` | Required | First name |
 | `familyName` | `String` | Required | Last name |

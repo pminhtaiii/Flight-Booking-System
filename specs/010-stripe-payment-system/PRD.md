@@ -20,7 +20,7 @@ Implement a Stripe-based payment system utilizing an Authorize-then-Capture flow
 8. As a business operator, I want unexplainable webhook transitions to trigger an alert and drop, so that data corruption is avoided.
 9. As a business operator, I want a background reconciliation process to sweep for stuck authorizations (e.g., 60-90 minutes) and auto-expire them, so that customer funds are not held indefinitely.
 10. As a business operator, I want the reconciliation sweep to proactively verify payments that never received a resolving webhook, so that our state doesn't silently drift.
-11. As an accountant, I want every payment, refund, and fee to be recorded in a double-entry ledger (Debits = Credits), so that financial records are strictly auditable.
+11. As an accountant, I want every payment and refund (excluding Stripe processing fees, which are deferred to v2) to be recorded in a double-entry ledger (Debits = Credits), so that financial records are strictly auditable.
 12. As a system administrator, I want to track the pipeline via idempotency keys and recovery points, so that if the system crashes mid-pipeline, it safely resumes from the exact checkpoint.
 13. As an admin, I want to be able to manually trigger a refund for a specific payment, so that I can handle customer support requests.
 14. As a business operator, I want chargebacks (disputes) to be fully tracked and to return to the pre-dispute state if won, or transition to CHARGEBACK_LOST if lost, so that accounting remains accurate.

@@ -245,9 +245,9 @@
     "semantic_hash": ""
   },
   "apps/api/.eslintrc.json": {
-    "mtime": 1782792214.5734618,
-    "ast_hash": "6b8d1c139114ce6136a6969ad7e1f2e9",
-    "semantic_hash": "6b8d1c139114ce6136a6969ad7e1f2e9"
+    "mtime": 1783837287.4129095,
+    "ast_hash": "de31fe8114b12ee4b6508009c067d437",
+    "semantic_hash": ""
   },
   "apps/api/jest.config.json": {
     "mtime": 1782792214.5903466,
@@ -700,8 +700,8 @@
     "semantic_hash": "3a89cf70d9efdf2106c64e1684391665"
   },
   "AGENTS.md": {
-    "mtime": 1783674183.165845,
-    "ast_hash": "ebf6df35ac25f21f147eb9f29a48e933",
+    "mtime": 1783836215.3239942,
+    "ast_hash": "51029e2e789e32efca739442905359dc",
     "semantic_hash": ""
   },
   "PROJECT.md": {
@@ -740,8 +740,8 @@
     "semantic_hash": "13d24df073aeafdf3c5c1bc2507eb893"
   },
   "context/progress-checker.md": {
-    "mtime": 1783763852.592615,
-    "ast_hash": "edcc0a7daa1ccd8d3e692277a531dc10",
+    "mtime": 1783836215.3392045,
+    "ast_hash": "d293281130d8e70d06c04f098a33b762",
     "semantic_hash": ""
   },
   "context/project-overview.md": {
@@ -1430,8 +1430,8 @@
     "semantic_hash": ""
   },
   "apps/api/prisma/migrations/20260710150000_booking_intent_foundation/migration.sql": {
-    "mtime": 1783685414.96322,
-    "ast_hash": "d4d8f98c54658b7d826670d8adaa5bd1",
+    "mtime": 1783837161.7980983,
+    "ast_hash": "5aa6a58ac3f6217353473d75b3309279",
     "semantic_hash": ""
   },
   "apps/api/src/booking-intent/booking-intent.controller.spec.ts": {
@@ -1460,13 +1460,13 @@
     "semantic_hash": ""
   },
   "apps/api/src/booking-intent/booking-intent.service.spec.ts": {
-    "mtime": 1783767872.6421747,
-    "ast_hash": "c468d036638700a57e16d29570874565",
+    "mtime": 1783837402.1495125,
+    "ast_hash": "b0e46d0635fb0b0dd1a712902272ed8a",
     "semantic_hash": ""
   },
   "apps/api/src/booking-intent/booking-intent.service.ts": {
-    "mtime": 1783767844.613463,
-    "ast_hash": "c0a9d6ee98745325da34c4dbcad20aff",
+    "mtime": 1783837410.0892344,
+    "ast_hash": "85711b2d54889db262c9efe7a375a291",
     "semantic_hash": ""
   },
   "apps/api/src/booking-intent/dto/create-intent.dto.ts": {
@@ -1500,18 +1500,18 @@
     "semantic_hash": ""
   },
   "specs/009-booking-intent-foundation/contracts/api.md": {
-    "mtime": 1783682108.3744318,
-    "ast_hash": "0b1dca6ae59faaab6152efba18e71816",
+    "mtime": 1783837357.1215222,
+    "ast_hash": "24404bd7ca45fa017bb8655ba1f628ec",
     "semantic_hash": ""
   },
   "specs/009-booking-intent-foundation/data-model.md": {
-    "mtime": 1783683336.4212265,
-    "ast_hash": "f07825e8a0411eb1c067f85af8eb2ffc",
+    "mtime": 1783837357.5323997,
+    "ast_hash": "5d3cc1fa7b3cc8c8449136e8ef6eeaca",
     "semantic_hash": ""
   },
   "specs/009-booking-intent-foundation/plan.md": {
-    "mtime": 1783685414.9588397,
-    "ast_hash": "993b4660c97e3f84a993e2f075f5e3b8",
+    "mtime": 1783837369.1364038,
+    "ast_hash": "fef8150bbb4b1366fdbc1ab0443534fb",
     "semantic_hash": ""
   },
   "specs/009-booking-intent-foundation/quickstart.md": {
@@ -1520,8 +1520,8 @@
     "semantic_hash": ""
   },
   "specs/009-booking-intent-foundation/research.md": {
-    "mtime": 1783682124.6469107,
-    "ast_hash": "cecd37a7b8db1c32b18d4fa14d9e2e92",
+    "mtime": 1783837174.2340038,
+    "ast_hash": "5e3a6c426971af55d3a1b897daeb6b09",
     "semantic_hash": ""
   },
   "specs/009-booking-intent-foundation/spec.md": {
@@ -1530,8 +1530,53 @@
     "semantic_hash": ""
   },
   "specs/009-booking-intent-foundation/tasks.md": {
-    "mtime": 1783763860.2877822,
-    "ast_hash": "6cb480369e88294f752e9ca0dffab185",
+    "mtime": 1783836215.345613,
+    "ast_hash": "6094fec4791c42b3254307588808f893",
+    "semantic_hash": ""
+  },
+  "apps/api/test/booking-intent.e2e-spec.ts": {
+    "mtime": 1783837333.438516,
+    "ast_hash": "6e233b419ae124eb3c60848db48ee4a7",
+    "semantic_hash": ""
+  },
+  "research/payment-system-decisions.md": {
+    "mtime": 1783837161.8654535,
+    "ast_hash": "1035948c844b52313062f1608bfafc80",
+    "semantic_hash": ""
+  },
+  "specs/010-stripe-payment-system/PRD.md": {
+    "mtime": 1783837240.3267148,
+    "ast_hash": "7c3a89bce0434807caf8f22b272e9ed0",
+    "semantic_hash": ""
+  },
+  "specs/010-stripe-payment-system/contracts/api.md": {
+    "mtime": 1783837187.6442776,
+    "ast_hash": "a371489ccb70241c55ac341603338a65",
+    "semantic_hash": ""
+  },
+  "specs/010-stripe-payment-system/data-model.md": {
+    "mtime": 1783837200.7933686,
+    "ast_hash": "4f30466cf7d0a1daf7471d236e0c3db0",
+    "semantic_hash": ""
+  },
+  "specs/010-stripe-payment-system/plan.md": {
+    "mtime": 1783837220.7835228,
+    "ast_hash": "4155a0358e3a7877fc91f8542df1102b",
+    "semantic_hash": ""
+  },
+  "specs/010-stripe-payment-system/quickstart.md": {
+    "mtime": 1783837240.3810825,
+    "ast_hash": "8adb9974a01b192d79d98b96f5430b99",
+    "semantic_hash": ""
+  },
+  "specs/010-stripe-payment-system/research.md": {
+    "mtime": 1783837250.1149902,
+    "ast_hash": "06969756b7ab110a09ec15b062ff5b12",
+    "semantic_hash": ""
+  },
+  "specs/010-stripe-payment-system/spec.md": {
+    "mtime": 1783837259.3263807,
+    "ast_hash": "8b882fc7348f29ccb2bb963ac66929c5",
     "semantic_hash": ""
   }
 }

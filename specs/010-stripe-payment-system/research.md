@@ -22,7 +22,7 @@ All research questions were resolved during the grilling session. Full decisions
 ## R3: Authorize-Then-Capture Pattern
 
 **Decision**: Separate authorization and capture with tiered timeout escalation.
-**Rationale**: Prevents charging customers for failed Duffel bookings. The 4-tier escalation (30s sync → 1min async → 15min admin → 30min-1hr expire) balances customer experience with investigation time.
+**Rationale**: Prevents charging customers for failed Duffel bookings. The 4-tier escalation (30s sync → 1min async → 15min admin → 60-90min expire) balances customer experience with investigation time.
 **Alternatives considered**: Single-step charge (no auth-capture split) — rejected because Duffel failures would leave customers charged with no ticket.
 
 ## R4: Concurrency Control

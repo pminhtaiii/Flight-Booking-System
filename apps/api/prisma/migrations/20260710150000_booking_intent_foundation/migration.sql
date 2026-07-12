@@ -70,6 +70,9 @@ CREATE INDEX "booking_intent_passengers_intentId_idx" ON "booking_intent_passeng
 -- CreateIndex
 CREATE UNIQUE INDEX "booking_intent_passengers_intentId_position_key" ON "booking_intent_passengers"("intentId", "position");
 
+-- CreateIndex
+CREATE INDEX "booking_intent_passengers_travelerProfileId_idx" ON "booking_intent_passengers"("travelerProfileId");
+
 -- AddForeignKey
 ALTER TABLE "booking_intents" ADD CONSTRAINT "booking_intents_userId_fkey" FOREIGN KEY ("userId") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 

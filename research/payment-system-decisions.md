@@ -103,7 +103,7 @@ REFUNDED → DISPUTED → REFUNDED (dispute won, returns to pre-dispute state)
 | **Tier 2 — Async handoff** | 30s–1min | Stop spinner, show "Confirming your flight…", let customer leave page. Backend continues in background |
 | **Tier 3 — Admin escalation** | ~15min | Alert the payment administrator to investigate (our bug vs. Duffel issue?) |
 | **Tier 4 — Auto-expire** | 30min–1hr | Mark `AUTHORIZED → EXPIRED`, void the hold on the customer's card |
-| **Cleanup sweep** | 5–10 days after expiry | Cron hard-deletes expired authorization records |
+| **Cleanup sweep** | 5–10 days after expiry | Retain under a documented policy for auditable payment and ledger records, limiting cleanup to ephemeral idempotency data or safe archival |
 
 **Notification for async confirmation**: Deferred to a separate email notification system (not in scope for payment feature). A cron will send completion signals to users.
 
@@ -213,7 +213,7 @@ UPDATE payments SET status = 'SUCCEEDED', version = version + 1
 **Tier 2 — Alert + drop (irreconcilable)**:
 - The webhook transition contradicts DB state in a way reconciliation can't explain.
 - Example: Webhook says `succeeded`, DB shows `REFUNDED` — money was already returned.
-- Action: Log full event payload, alert admin, return 200 to Stripe, do **not** change state.
+- Action: Log an allowlisted diagnostic subset of the payload (or use a controlled encrypted audit store with defined retention limits), alert admin, return 200 to Stripe, do **not** change state.
 
 **Design principle**: Stripe is the source of truth, but the state machine is the gatekeeper. Self-heal when the gap is timing. Escalate when the gap implies something fundamentally wrong.
 

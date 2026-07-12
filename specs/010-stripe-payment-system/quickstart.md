@@ -37,13 +37,16 @@ curl -X POST http://localhost:3001/api/payments/create \
   -d '{ "bookingIntentId": "<intent-id>", "saveCard": false }'
 # → Expect 201 with stripeClientSecret
 
-# 3. Confirm Payment (simulates Stripe client-side completion)
+# 3. Confirm Payment with Stripe (simulates client-side completion using Stripe.js or Stripe CLI)
+# stripe payment_intents confirm <pi_xxx> --payment-method pm_card_us
+
+# 4. Finalize Payment on Backend
 curl -X POST http://localhost:3001/api/payments/confirm \
   -H "Authorization: Bearer $JWT" \
-  -H "Idempotency-Key: <same-key>" \
+  -H "Idempotency-Key: <distinct-confirm-key>" \
   -H "Content-Type: application/json" \
   -d '{ "paymentId": "<payment-id>" }'
-# → Expect 200 with status: SUCCEEDED, pnrReference present
+# → Expect 200 or 202 with status: SUCCEEDED or AUTHORIZED, pnrReference present if 200
 
 # 4. Verify DB state
 # - Payment.status = SUCCEEDED
@@ -55,8 +58,10 @@ curl -X POST http://localhost:3001/api/payments/confirm \
 ### Scenario 2: Failed Payment + Retry
 
 ```bash
-# 1. Create Payment with Stripe test card that declines: 4000000000000002
-# → Expect Payment.status = FAILED
+# 1. Create Payment
+# 2. Confirm Payment with Stripe test card that declines: 4000000000000002
+# → Decline occurs during Stripe confirmation step
+# 3. Finalize on backend → Expect Payment.status = FAILED
 
 # 2. Retry with new idempotency key
 curl -X POST http://localhost:3001/api/payments/create \

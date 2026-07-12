@@ -30,15 +30,15 @@ export function IsFutureDateString(validationOptions?: ValidationOptions) {
 }
 
 export function AtLeastOnePassengerField(validationOptions?: ValidationOptions) {
-  return function (object: Function) {
+  return function (object: object) {
     registerDecorator({
       name: 'atLeastOnePassengerField',
       target: object,
       propertyName: '',
       options: validationOptions,
       validator: {
-        validate(value: any, args: ValidationArguments) {
-          const obj = args.object as any;
+        validate(value: unknown, args: ValidationArguments) {
+          const obj = args.object as { adults?: number; passengers?: unknown[] };
           const hasAdults = obj.adults !== undefined && obj.adults !== null;
           const hasPassengers = obj.passengers !== undefined && obj.passengers !== null;
           return hasAdults || hasPassengers;

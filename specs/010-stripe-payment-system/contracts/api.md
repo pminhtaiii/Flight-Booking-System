@@ -65,7 +65,7 @@ Confirm the payment after Stripe client-side authentication (3DS). Triggers the 
 
 **Headers**:
 - `Authorization: Bearer <JWT>`
-- `Idempotency-Key: <same-key-as-create>` (required — pipeline resumption)
+- `Idempotency-Key: <distinct-confirm-key>` (required — distinct from create operation's key)
 
 ### Response (200 OK — synchronous success within 30s)
 
@@ -97,7 +97,7 @@ Confirm the payment after Stripe client-side authentication (3DS). Triggers the 
 | 402 | Card declined / authorization failed → Payment transitions to FAILED |
 | 403 | Payment belongs to another user |
 | 409 | Version conflict (concurrent modification detected) |
-| 502 | Duffel unavailable — authorization voided, Payment transitions to CANCELLED |
+| 502 | Confirmed Duffel failure — authorization voided, Payment transitions to CANCELLED. (Ambiguous Duffel timeouts preserve authorization for later reconciliation.) |
 
 ---
 
@@ -134,7 +134,7 @@ Raw body with `Stripe-Signature` header. Not JWT-guarded — verified via Stripe
 | Event | Action |
 |-------|--------|
 | `payment_intent.created` | Update Payment → CREATED (if not already) |
-| `payment_intent.succeeded` | Update Payment → SUCCEEDED |
+| `payment_intent.succeeded` | Route through idempotent finalization/reconciliation path (coordinate Duffel, ledger, BookingIntent) before committing SUCCEEDED status |
 | `payment_intent.payment_failed` | Update Payment → FAILED |
 | `payment_intent.canceled` | Update Payment → CANCELLED |
 | `charge.refunded` | Update Payment → REFUNDED or PARTIALLY_REFUNDED |
@@ -143,7 +143,7 @@ Raw body with `Stripe-Signature` header. Not JWT-guarded — verified via Stripe
 
 ### Response
 
-Always returns `200 OK` (even for dropped events) to prevent Stripe retries.
+Returns `4xx` for invalid Stripe signatures, `5xx` for retryable database or processing failures, and `200 OK` only after verified duplicate or intentionally dropped irreconcilable events are durably handled.
 
 ---
 

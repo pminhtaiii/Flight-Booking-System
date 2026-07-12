@@ -92,7 +92,7 @@ model Payment {
   id                     String         @id @default(uuid())
   bookingIntentId        String
   bookingIntent          BookingIntent  @relation(fields: [bookingIntentId], references: [id])
-  attemptNumber          Int            // 1 or 2
+  attemptNumber          Int            // 1 or 2 (Database-level CHECK constraint attemptNumber IN (1, 2) enforced in migration)
   idempotencyKeyId       String
   idempotencyKey         IdempotencyKey @relation(fields: [idempotencyKeyId], references: [id])
   stripePaymentIntentId  String         @unique
@@ -219,11 +219,14 @@ model PaymentMethod {
   stripePaymentMethodId  String   @unique
   cardBrand              String?  // visa, mastercard, etc.
   cardLast4              String?  // last 4 digits for display
+  userId                 String
+  user                   User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   isDefault              Boolean  @default(false)
-  savedWithConsent       Boolean  @default(true) // only exists if user opted in
+  savedWithConsent       Boolean  @default(false) // only set to true through validated saveCard opt-in path
   createdAt              DateTime @default(now())
 
   @@index([stripeCustomerId])
+  @@index([userId])
 }
 ```
 
@@ -240,6 +243,7 @@ model User {
   // ... existing relations ...
   idempotencyKeys     IdempotencyKey[]  // NEW relation
   refundsTriggered    Refund[]          // NEW relation
+  paymentMethods      PaymentMethod[]   // NEW relation
 }
 ```
 

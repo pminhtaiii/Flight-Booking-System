@@ -285,8 +285,8 @@ export class DuffelService {
       this.logger.log(`Calling Duffel API to create offer request. Slices: ${slices.length}, Passengers: ${passengers.length}`);
       const duffelResponse = await this.duffel.offerRequests.create({
         slices,
-        passengers: passengers as any,
-        cabin_class: normalizedQuery.cabinClass as any,
+        passengers: passengers as Array<{ type: 'adult' | 'child' | 'infant_without_seat' }>,
+        cabin_class: normalizedQuery.cabinClass as 'first' | 'business' | 'premium_economy' | 'economy',
       });
 
       const offerRequest = duffelResponse.data as unknown as DuffelOfferRequest;

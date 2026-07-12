@@ -47,7 +47,7 @@ Creates a new booking intent with validated passenger details and Duffel-confirm
 - `flightOfferId`: UUID of the `FlightOffer` record from search results. Used to look up the cached offer data (origin, destination, dates, cabin class, passenger counts) **and** the Duffel offer ID for re-pricing.
 - `duffelOfferId` is **not** a request field. The server derives it from the `FlightOffer` row identified by `flightOfferId` and calls `offers.get()` with that value. This guarantees the offer that gets re-priced (and later charged, in Feature B) is always the one the user actually selected — a client cannot redirect re-pricing to a different Duffel offer by supplying an arbitrary ID.
 - `passengers[]`: Array of passenger objects. Count must match the flight offer's `adults + children + infants`. Submission order is preserved and stored (`BookingIntentPassenger.position`).
-- `passengers[].useProfile`: If `true` for the first `ADULT` passenger, backend pre-fills missing fields from the user's `TravelerProfile`. Ignored for non-primary passengers.
+- `passengers[].useProfile`: If `true` for a passenger, backend pre-fills missing fields from the user's `TravelerProfile`. Only one passenger per request may have `useProfile: true`.
 - `passengers[].passportNumber` / `passportExpiry`: optional for every passenger type. Passport is not currently required by this feature (see [spec.md](../spec.md) → User Story 1).
 
 **Success Response (201)**:
@@ -203,7 +203,13 @@ If no profile exists:
 {
   "hasProfile": false,
   "passenger": null,
-  "missingFields": []
+  "missingFields": [
+    "type",
+    "givenName",
+    "familyName",
+    "dateOfBirth",
+    "gender"
+  ]
 }
 ```
 

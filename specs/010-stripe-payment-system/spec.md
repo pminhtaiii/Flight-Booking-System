@@ -150,7 +150,7 @@ Every financial event produces paired debit/credit ledger entries for auditabili
 
 - What happens when Stripe authorization succeeds but the system crashes before writing the AUTHORIZED state to the database? → Recovery point + Stripe PaymentIntent.retrieve() reconciliation.
 - What happens when two users try to book the same flight/seat simultaneously? → Both get AUTHORIZED, but only the first to succeed at Duffel gets CAPTURED. The other's authorization is voided.
-- What happens when a webhook arrives for a payment that doesn't exist in the database yet? → Self-healing Tier 1: call Stripe to verify, then create/update the record.
+- What happens when a webhook arrives for a payment that doesn't exist in the database yet? → Quarantine and alert the event. Require verified Stripe-to-local booking and idempotency mapping before reconciliation or record creation (self-healing applies only to events with trusted ownership and intent context).
 - What happens when the cron expires an AUTHORIZED payment at the exact moment a successful Duffel response arrives? → Optimistic version check catches the conflict; the Duffel success path fails to update (version mismatch), triggering investigation.
 - What happens when an automated refund detects the same error twice? → Idempotency key prevents duplicate refund.
 

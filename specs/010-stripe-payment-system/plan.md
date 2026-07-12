@@ -182,7 +182,7 @@ packages/shared/
 |------|--------|-------|
 | Create `dto/create-payment.dto.ts` | ☐ | `bookingIntentId`, `paymentMethodId?`, `saveCard` |
 | Create `dto/payment-response.dto.ts` | ☐ | Creation, confirmation, and status response shapes |
-| Create `payment.service.ts` — `createPayment()` method | ☐ | Hybrid lock: pessimistic claim on BookingIntent (SELECT FOR UPDATE → check startable state + attempt count < 2 → write CLAIMING marker → commit → release). Then: lazy Stripe Customer creation (idempotent), create Stripe PaymentIntent with `capture_method: 'manual'`, create Payment row, create PaymentEvent, advance recovery point to `started` |
+| Create `payment.service.ts` — `createPayment()` method | ☐ | Hybrid lock: pessimistic claim on BookingIntent (SELECT FOR UPDATE → check startable state + attempt count < 2 → write CLAIMING marker). Persist idempotency/claim record and recovery state before calling Stripe. Then: lazy Stripe Customer creation (idempotent), create Stripe PaymentIntent with `capture_method: 'manual'`, create Payment row, create PaymentEvent, advance recovery point to `started`. Add retrieval-based reconciliation for interrupted creation so an existing Stripe PaymentIntent can be mapped to the local DB after a crash instead of creating an orphaned intent. |
 | Implement Stripe Customer lazy creation | ☐ | Check `User.stripeCustomerId` → if null, create Stripe Customer with idempotency key `customer-create:{userId}`, save to User. If `saveCard`, set `setup_future_usage: 'off_session'` on PaymentIntent |
 | Create `payment.controller.ts` — `POST /api/payments/create` | ☐ | JWT-guarded, extracts `Idempotency-Key` header, delegates to service |
 | Create `payment.module.ts` and register in `app.module.ts` | ☐ | Import PrismaModule, StripeService, BookingIntentModule, AuditModule |
@@ -200,14 +200,14 @@ packages/shared/
 | Task | Status | Notes |
 |------|--------|-------|
 | Create `dto/confirm-payment.dto.ts` | ☐ | `paymentId` |
-| Implement `payment.service.ts` — `confirmPayment()` method | ☐ | Read recovery point → resume from correct step. Pipeline: authorize (if not already) → update recovery point to `stripe_authorized` → call Duffel to create PNR → update recovery point to `duffel_order_created` → capture Stripe payment → update recovery point to `captured` → write ledger entries → update recovery point to `completed`. Each step uses optimistic version check |
+| Implement `payment.service.ts` — `confirmPayment()` method | ☐ | Read recovery point → resume from correct step. Pipeline: authorize (if not already) → update recovery point to `stripe_authorized` → call Duffel to create PNR → update recovery point to `duffel_order_created` → capture Stripe payment (as an external boundary, not wrapped in a single DB transaction) → update recovery point to `captured` → write ledger entries and update DB → update recovery point to `completed`. Add durable post-capture reconciliation that detects successful captures followed by failed database commits to retry or repair booking status, ledger entries, and recovery state. |
 | Implement Duffel PNR creation integration | ☐ | Reuse existing DuffelService. Use BookingIntent's `duffelOfferId`. Bounded timeout (30s). Map timeout/rate-limit/upstream failures explicitly |
 | Implement tiered timeout logic | ☐ | Tier 1: synchronous (0-30s). Tier 2: return 202 Accepted + poll URL (30s-1min). Background processing continues |
 | Implement authorization void on Duffel failure | ☐ | If Duffel PNR creation fails, call `stripe.paymentIntents.cancel()` to void the hold. Payment → CANCELLED |
 | Implement `GET /api/payments/:paymentId/status` polling endpoint | ☐ | Returns current payment status, bookingIntent status, PNR reference if available |
 | Add `POST /api/payments/confirm` to controller | ☐ | JWT-guarded, idempotency key extraction |
 | Create ledger entries on successful capture | ☐ | DEBIT CUSTOMER_RECEIVABLE, CREDIT PLATFORM_REVENUE. Duffel cost entry deferred to when cost is known |
-| Update BookingIntent status to CONFIRMED on success | ☐ | Within same transaction as capture |
+| Update BookingIntent status to CONFIRMED on success | ☐ | Outside of capture network call, coordinated by post-capture DB updates/reconciliation |
 | Add audit logging for `payment_authorized`, `payment_captured`, `booking_confirmed` | ☐ | |
 
 **Exit criteria**: Full pipeline works: create → authorize → Duffel PNR → capture → CONFIRMED. Ledger balanced. Recovery points track progress. Duffel failure voids authorization. Async handoff returns 202 with poll URL.
@@ -300,7 +300,7 @@ packages/shared/
 | Task | Status | Notes |
 |------|--------|-------|
 | Create `payment-cron.service.ts` with `@nestjs/schedule` | ☐ | |
-| Implement authorization expiry sweep | ☐ | Find AUTHORIZED payments older than configurable threshold (30min-1hr via `PAYMENT_AUTH_EXPIRE_MINUTES`). Void Stripe authorization. Payment → EXPIRED. BookingIntent → back to AWAITING_PAYMENT or PAYMENT_EXHAUSTED. PaymentEvent appended. Admin alert at Tier 3 threshold (15min) |
+| Implement authorization expiry sweep | ☐ | Find AUTHORIZED payments older than 60-90 minutes (via `PAYMENT_AUTH_EXPIRE_MINUTES`). Void Stripe authorization. Payment → EXPIRED. BookingIntent → back to AWAITING_PAYMENT or PAYMENT_EXHAUSTED. PaymentEvent appended. Admin alert at Tier 3 threshold (15min). Includes duplicate-capture detection and proactive Stripe status checks for payments whose webhooks have not resolved, including the required repair and alert behavior. |
 | Implement idempotency key cleanup | ☐ | Delete expired idempotency keys (older than `IDEMPOTENCY_KEY_TTL_HOURS`, default 24h). Only delete keys with recovery_point = 'completed' or expired keys |
 | Implement stale lock detection | ☐ | Find idempotency keys with `locked_at` older than threshold (5 min). Clear the lock (set `locked_at = NULL`). Log as warning |
 | Structured logging for each cron run | ☐ | Count of expired authorizations, cleaned keys, cleared locks, duration |

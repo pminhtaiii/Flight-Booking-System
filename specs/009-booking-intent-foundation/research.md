@@ -28,7 +28,7 @@
 **Rationale**:
 - Reuses proven encryption pattern already in the codebase.
 - Per-field encryption enables selective decryption (only decrypt for the owning user).
-- Meets GDPR and data protection requirements.
+- Supports confidentiality and security requirements.
 
 **Implementation reference**: The `TravelerProfile` model already marks `passportNumber` and `passportExpiry` with `@encrypted` doc comments. Same approach applies to `BookingIntentPassenger`.
 
@@ -45,7 +45,7 @@
 - Follows existing cron pattern from `FlightOffer` daily retention cleanup.
 
 **Concurrency guard (atomic claim)**: The race between the Phase 1 cron and Feature B's payment webhook is closed with a compare-and-swap on `status`, not with locking:
-- Phase 1 cron expiry runs as a single conditional update: `UPDATE booking_intents SET status = 'EXPIRED', updatedAt = now() WHERE status = 'PENDING' AND createdAt < (now() - TTL)`. It can only ever move a row *out of* `PENDING`; it never matches rows already in `COMPLETED` or `EXPIRED`.
+- Phase 1 cron expiry runs as a single conditional update: `UPDATE booking_intents SET status = 'EXPIRED', updatedAt = now() WHERE status = 'PENDING' AND intentExpiresAt < now()`. It can only ever move a row *out of* `PENDING`; it never matches rows already in `COMPLETED` or `EXPIRED`.
 - Feature B's payment webhook must claim the intent the same way: `UPDATE booking_intents SET status = 'COMPLETED', ... WHERE id = ? AND status = 'PENDING'`.
 - Whichever writer's `WHERE status = 'PENDING'` predicate matches first wins the row; the other writer's update affects zero rows.
   - If the cron wins: the webhook's update affects 0 rows, and Feature B's conflict-resolution path (re-validate against the now-`EXPIRED` intent — typically re-create a fresh intent or fail the payment) takes over.

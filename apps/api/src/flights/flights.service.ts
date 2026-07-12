@@ -405,7 +405,8 @@ export class FlightsService {
     }
 
     // 3. Offer found: Retrieve live details from Duffel API
-    let liveOffer: any;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    let liveOffer: Record<string, any>;
     try {
       // Check if testing environment / mock mode
       const isJest = process.env.JEST_WORKER_ID !== undefined;
@@ -419,9 +420,10 @@ export class FlightsService {
         const duffelResponse = await this.duffelService['duffel'].offers.get(flightOffer.duffelOfferId);
         liveOffer = duffelResponse.data;
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
+      const errorObj = err as { status?: number; statusCode?: number; message?: string; stack?: string };
       // If Duffel API indicates that the offer is gone/expired (e.g. 404/410 status)
-      const errStatus = err?.status || err?.statusCode || 500;
+      const errStatus = errorObj?.status || errorObj?.statusCode || 500;
       if (errStatus === 404 || errStatus === 410) {
         this.logger.warn(`Flight offer ${flightOffer.duffelOfferId} expired on Duffel side. Purging from DB.`);
         
@@ -447,7 +449,7 @@ export class FlightsService {
         );
       }
 
-      this.logger.error(`Failed to retrieve offer from Duffel: ${err.message}`, err.stack);
+      this.logger.error(`Failed to retrieve offer from Duffel: ${errorObj?.message || 'Unknown error'}`, errorObj?.stack);
       throw new HttpException(
         {
           message: 'Upstream flight search service is temporarily unavailable',
