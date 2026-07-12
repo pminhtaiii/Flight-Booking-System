@@ -39,6 +39,12 @@ describe('StripeService', () => {
   };
 
   beforeEach(async () => {
+    mockConfigService.get.mockImplementation((key: string) => {
+      if (key === 'STRIPE_SECRET_KEY') return 'sk_test_mock';
+      if (key === 'STRIPE_WEBHOOK_SECRET') return 'whsec_mock';
+      return null;
+    });
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         StripeService,
@@ -230,6 +236,16 @@ describe('StripeService', () => {
       });
 
       expect(() => new StripeService(mockConfigService as any)).toThrow('STRIPE_SECRET_KEY is missing');
+    });
+
+    it('should throw error if STRIPE_WEBHOOK_SECRET is missing', () => {
+      mockConfigService.get.mockImplementation((key: string) => {
+        if (key === 'STRIPE_SECRET_KEY') return 'sk_test_mock';
+        if (key === 'STRIPE_WEBHOOK_SECRET') return null;
+        return null;
+      });
+
+      expect(() => new StripeService(mockConfigService as any)).toThrow('STRIPE_WEBHOOK_SECRET is missing');
     });
   });
 });

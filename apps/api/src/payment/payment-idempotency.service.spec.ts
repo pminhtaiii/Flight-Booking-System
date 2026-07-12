@@ -3,6 +3,7 @@ import { PrismaService } from '@/prisma/prisma.service';
 import { ConfigService } from '@nestjs/config';
 import { PaymentIdempotencyService } from './payment-idempotency.service';
 import { ConflictException, UnprocessableEntityException } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 
 describe('PaymentIdempotencyService', () => {
   let service: PaymentIdempotencyService;
@@ -13,6 +14,7 @@ describe('PaymentIdempotencyService', () => {
       findUnique: jest.fn(),
       create: jest.fn(),
       update: jest.fn(),
+      updateMany: jest.fn(),
     },
   };
 
@@ -60,8 +62,7 @@ describe('PaymentIdempotencyService', () => {
     const requestHash = 'hash_123';
     const requestParams = { amount: 1000 };
 
-    it('should acquire lock for a new key', async () => {
-      mockPrismaService.idempotencyKey.findUnique.mockResolvedValue(null);
+    it('should acquire lock for a new key directly via create', async () => {
       const mockCreatedKey = {
         id: 'db_id_123',
         key,
@@ -83,12 +84,18 @@ describe('PaymentIdempotencyService', () => {
         requestParams,
       });
 
-      expect(prisma.idempotencyKey.findUnique).toHaveBeenCalledWith({ where: { key } });
       expect(prisma.idempotencyKey.create).toHaveBeenCalled();
+      expect(prisma.idempotencyKey.findUnique).not.toHaveBeenCalled();
       expect(result).toEqual({ status: 'acquired', idempotencyKey: mockCreatedKey });
     });
 
     it('should replay cached response if key is already completed', async () => {
+      const p2002Error = new Prisma.PrismaClientKnownRequestError('Duplicate key', {
+        code: 'P2002',
+        clientVersion: '5.14.0',
+      });
+      mockPrismaService.idempotencyKey.create.mockRejectedValue(p2002Error);
+
       const mockExistingKey = {
         id: 'db_id_123',
         key,
@@ -112,8 +119,8 @@ describe('PaymentIdempotencyService', () => {
         requestParams,
       });
 
+      expect(prisma.idempotencyKey.create).toHaveBeenCalled();
       expect(prisma.idempotencyKey.findUnique).toHaveBeenCalledWith({ where: { key } });
-      expect(prisma.idempotencyKey.create).not.toHaveBeenCalled();
       expect(result).toEqual({
         status: 'replay',
         responseCode: 201,
@@ -122,6 +129,12 @@ describe('PaymentIdempotencyService', () => {
     });
 
     it('should throw ConflictException if key is currently locked (active)', async () => {
+      const p2002Error = new Prisma.PrismaClientKnownRequestError('Duplicate key', {
+        code: 'P2002',
+        clientVersion: '5.14.0',
+      });
+      mockPrismaService.idempotencyKey.create.mockRejectedValue(p2002Error);
+
       const mockExistingKey = {
         id: 'db_id_123',
         key,
@@ -147,6 +160,12 @@ describe('PaymentIdempotencyService', () => {
     });
 
     it('should re-acquire lock if key is locked but lock is stale', async () => {
+      const p2002Error = new Prisma.PrismaClientKnownRequestError('Duplicate key', {
+        code: 'P2002',
+        clientVersion: '5.14.0',
+      });
+      mockPrismaService.idempotencyKey.create.mockRejectedValue(p2002Error);
+
       const fiveMinutesAgo = new Date();
       fiveMinutesAgo.setMinutes(fiveMinutesAgo.getMinutes() - 10); // 10 minutes ago, stale!
 
@@ -162,12 +181,7 @@ describe('PaymentIdempotencyService', () => {
         recoveryPoint: 'started',
       };
       mockPrismaService.idempotencyKey.findUnique.mockResolvedValue(mockExistingKey);
-
-      const mockUpdatedKey = {
-        ...mockExistingKey,
-        lockedAt: new Date(),
-      };
-      mockPrismaService.idempotencyKey.update.mockResolvedValue(mockUpdatedKey);
+      mockPrismaService.idempotencyKey.updateMany.mockResolvedValue({ count: 1 });
 
       const result = await service.acquireOrReplay({
         key,
@@ -177,11 +191,63 @@ describe('PaymentIdempotencyService', () => {
         requestParams,
       });
 
-      expect(prisma.idempotencyKey.update).toHaveBeenCalled();
-      expect(result).toEqual({ status: 'acquired', idempotencyKey: mockUpdatedKey });
+      expect(prisma.idempotencyKey.updateMany).toHaveBeenCalledWith({
+        where: {
+          key,
+          lockedAt: fiveMinutesAgo,
+        },
+        data: {
+          lockedAt: expect.any(Date),
+        },
+      });
+      expect(result.status).toBe('acquired');
+      if (result.status === 'acquired') {
+        expect(result.idempotencyKey).toBeDefined();
+      }
+    });
+
+    it('should throw ConflictException if updateMany count is 0 (concurrency collision)', async () => {
+      const p2002Error = new Prisma.PrismaClientKnownRequestError('Duplicate key', {
+        code: 'P2002',
+        clientVersion: '5.14.0',
+      });
+      mockPrismaService.idempotencyKey.create.mockRejectedValue(p2002Error);
+
+      const fiveMinutesAgo = new Date();
+      fiveMinutesAgo.setMinutes(fiveMinutesAgo.getMinutes() - 10);
+
+      const mockExistingKey = {
+        id: 'db_id_123',
+        key,
+        requestHash,
+        customerId,
+        requestPath,
+        requestParams,
+        lockedAt: fiveMinutesAgo,
+        expiresAt: new Date(),
+        recoveryPoint: 'started',
+      };
+      mockPrismaService.idempotencyKey.findUnique.mockResolvedValue(mockExistingKey);
+      mockPrismaService.idempotencyKey.updateMany.mockResolvedValue({ count: 0 }); // Collision!
+
+      await expect(
+        service.acquireOrReplay({
+          key,
+          requestHash,
+          customerId,
+          requestPath,
+          requestParams,
+        })
+      ).rejects.toThrow(ConflictException);
     });
 
     it('should throw UnprocessableEntityException if key is used with a different request hash', async () => {
+      const p2002Error = new Prisma.PrismaClientKnownRequestError('Duplicate key', {
+        code: 'P2002',
+        clientVersion: '5.14.0',
+      });
+      mockPrismaService.idempotencyKey.create.mockRejectedValue(p2002Error);
+
       const mockExistingKey = {
         id: 'db_id_123',
         key,

@@ -27,6 +27,7 @@ CREATE TYPE "PaymentMethodStatus" AS ENUM ('ACTIVE', 'DETACHED', 'EXPIRED');
 ALTER TYPE "BookingIntentStatus" ADD VALUE 'AWAITING_PAYMENT';
 ALTER TYPE "BookingIntentStatus" ADD VALUE 'PAYMENT_EXHAUSTED';
 ALTER TYPE "BookingIntentStatus" ADD VALUE 'CANCELLED';
+ALTER TYPE "BookingIntentStatus" ADD VALUE 'CONFIRMED';
 
 -- AlterTable
 ALTER TABLE "booking_intents" ADD COLUMN     "paymentAttemptCount" INTEGER NOT NULL DEFAULT 0;
@@ -228,7 +229,7 @@ ALTER TABLE "refunds" ADD CONSTRAINT "refunds_idempotencyKeyId_fkey" FOREIGN KEY
 ALTER TABLE "refunds" ADD CONSTRAINT "refunds_triggeredByUserId_fkey" FOREIGN KEY ("triggeredByUserId") REFERENCES "users"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "payment_methods" ADD CONSTRAINT "payment_methods_userId_fkey" FOREIGN KEY ("userId") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "payment_methods" ADD CONSTRAINT "payment_methods_userId_fkey" FOREIGN KEY ("userId") REFERENCES "users"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- Custom Constraints
 ALTER TABLE "payments" ADD CONSTRAINT "chk_payment_attempt_number" CHECK ("attemptNumber" IN (1, 2));

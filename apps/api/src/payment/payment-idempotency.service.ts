@@ -1,7 +1,7 @@
 import { Injectable, ConflictException, UnprocessableEntityException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '@/prisma/prisma.service';
-import { IdempotencyKey } from '@prisma/client';
+import { IdempotencyKey, Prisma } from '@prisma/client';
 import * as crypto from 'crypto';
 
 export type AcquireOrReplayResult =
@@ -37,68 +37,95 @@ export class PaymentIdempotencyService {
   }): Promise<AcquireOrReplayResult> {
     const { key, requestHash, customerId, requestPath, requestParams } = params;
 
-    const existing = await this.prisma.idempotencyKey.findUnique({
-      where: { key },
-    });
+    try {
+      const ttlHours = this.configService.get<number>('IDEMPOTENCY_KEY_TTL_HOURS', 24);
+      const expiresAt = new Date(Date.now() + ttlHours * 60 * 60 * 1000);
 
-    if (existing) {
-      if (existing.requestHash !== requestHash) {
-        throw new UnprocessableEntityException('Idempotency key reuse with different payload');
-      }
-
-      if (existing.responseCode !== null && existing.responseCode !== undefined) {
-        return {
-          status: 'replay',
-          responseCode: existing.responseCode,
-          responseBody: existing.responseBody,
-        };
-      }
-
-      if (existing.lockedAt !== null) {
-        const lockTimeoutMinutes = this.configService.get<number>(
-          'IDEMPOTENCY_LOCK_TIMEOUT_MINUTES',
-          5
-        );
-        const isStale =
-          Date.now() - existing.lockedAt.getTime() > lockTimeoutMinutes * 60 * 1000;
-
-        if (!isStale) {
-          throw new ConflictException('A request with this idempotency key is already in progress');
-        }
-      }
-
-      // Re-acquire lock (either it wasn't locked, or the lock was stale)
-      const updated = await this.prisma.idempotencyKey.update({
-        where: { key },
-        data: { lockedAt: new Date() },
+      const created = await this.prisma.idempotencyKey.create({
+        data: {
+          key,
+          requestHash,
+          customerId,
+          requestPath,
+          requestParams: requestParams ?? null,
+          lockedAt: new Date(),
+          expiresAt,
+          recoveryPoint: 'started',
+        },
       });
 
       return {
         status: 'acquired',
-        idempotencyKey: updated,
+        idempotencyKey: created,
+      };
+    } catch (error) {
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === 'P2002'
+      ) {
+        // Key already exists, proceed to existing check
+      } else {
+        throw error;
+      }
+    }
+
+    const existing = await this.prisma.idempotencyKey.findUnique({
+      where: { key },
+    });
+
+    if (!existing) {
+      throw new ConflictException('Concurrency conflict when acquiring idempotency key');
+    }
+
+    if (existing.requestHash !== requestHash) {
+      throw new UnprocessableEntityException('Idempotency key reuse with different payload');
+    }
+
+    if (existing.responseCode !== null && existing.responseCode !== undefined) {
+      return {
+        status: 'replay',
+        responseCode: existing.responseCode,
+        responseBody: existing.responseBody,
       };
     }
 
-    // Create a new key with lock acquired
-    const ttlHours = this.configService.get<number>('IDEMPOTENCY_KEY_TTL_HOURS', 24);
-    const expiresAt = new Date(Date.now() + ttlHours * 60 * 60 * 1000);
+    if (existing.lockedAt !== null) {
+      const lockTimeoutMinutes = this.configService.get<number>(
+        'IDEMPOTENCY_LOCK_TIMEOUT_MINUTES',
+        5
+      );
+      const isStale =
+        Date.now() - existing.lockedAt.getTime() > lockTimeoutMinutes * 60 * 1000;
 
-    const created = await this.prisma.idempotencyKey.create({
-      data: {
+      if (!isStale) {
+        throw new ConflictException('A request with this idempotency key is already in progress');
+      }
+    }
+
+    // Atomic stale lock acquisition (or initial lock acquisition if lockedAt was null)
+    const newLockDate = new Date();
+    const updateResult = await this.prisma.idempotencyKey.updateMany({
+      where: {
         key,
-        requestHash,
-        customerId,
-        requestPath,
-        requestParams: requestParams ?? null,
-        lockedAt: new Date(),
-        expiresAt,
-        recoveryPoint: 'started',
+        lockedAt: existing.lockedAt,
+      },
+      data: {
+        lockedAt: newLockDate,
       },
     });
 
+    if (updateResult.count === 0) {
+      throw new ConflictException('A request with this idempotency key is already in progress');
+    }
+
+    const updated = {
+      ...existing,
+      lockedAt: newLockDate,
+    };
+
     return {
       status: 'acquired',
-      idempotencyKey: created,
+      idempotencyKey: updated,
     };
   }
 

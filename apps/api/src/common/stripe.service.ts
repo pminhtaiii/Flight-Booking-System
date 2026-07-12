@@ -10,12 +10,18 @@ export class StripeService {
 
   constructor(private readonly configService: ConfigService) {
     const secretKey = this.configService.get<string>('STRIPE_SECRET_KEY');
-    this.webhookSecret = this.configService.get<string>('STRIPE_WEBHOOK_SECRET') || '';
+    const webhookSecret = this.configService.get<string>('STRIPE_WEBHOOK_SECRET');
 
     if (!secretKey) {
       this.logger.error('STRIPE_SECRET_KEY is missing');
       throw new Error('STRIPE_SECRET_KEY is missing');
     }
+    if (!webhookSecret) {
+      this.logger.error('STRIPE_WEBHOOK_SECRET is missing');
+      throw new Error('STRIPE_WEBHOOK_SECRET is missing');
+    }
+
+    this.webhookSecret = webhookSecret;
 
     this.stripe = new Stripe(secretKey, {
       apiVersion: '2024-06-20' as Stripe.StripeConfig['apiVersion'],

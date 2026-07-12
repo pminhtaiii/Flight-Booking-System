@@ -19,6 +19,7 @@ enum BookingIntentStatus {
   AWAITING_PAYMENT
   PAYMENT_EXHAUSTED
   CANCELLED
+  CONFIRMED
 }
 
 enum PassengerType {
@@ -478,7 +479,7 @@ model PaymentMethod {
   cardBrand              String?  // visa, mastercard, etc.
   cardLast4              String?  // last 4 digits for display
   userId                 String
-  user                   User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user                   User     @relation(fields: [userId], references: [id], onDelete: Restrict)
   isDefault              Boolean  @default(false)
   savedWithConsent       Boolean  @default(false) // only set to true through validated saveCard opt-in path
   createdAt              DateTime @default(now())
