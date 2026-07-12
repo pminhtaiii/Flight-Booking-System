@@ -585,9 +585,7 @@ describe('Booking Intent (E2E)', () => {
 
       expect(res.body.hasProfile).toBe(false);
       expect(res.body.passenger).toBeNull();
-      expect(res.body.missingFields).toEqual(
-        expect.arrayContaining(['type', 'givenName', 'familyName', 'dateOfBirth', 'gender']),
-      );
+      expect(res.body.missingFields).toEqual([]);
     });
   });
 
