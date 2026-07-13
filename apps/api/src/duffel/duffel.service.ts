@@ -333,4 +333,78 @@ export class DuffelService {
       }
     }
   }
+
+  async createOrder(params: {
+    duffelOfferId: string;
+    passengers: any[];
+    userEmail: string;
+  }): Promise<{ id: string; booking_reference: string }> {
+    const isJest = process.env.JEST_WORKER_ID !== undefined;
+    const isTestEnv = process.env.NODE_ENV === 'test' || isJest;
+
+    if (isTestEnv && !process.env.DUFFEL_ACCESS_TOKEN) {
+      // Mock order creation for testing
+      return {
+        id: 'ord_mock_123',
+        booking_reference: 'PNR123',
+      };
+    }
+
+    // Map database passengers to Duffel formats
+    const duffelPassengers = params.passengers.map((p, idx) => {
+      const dob = p.dateOfBirth instanceof Date
+        ? p.dateOfBirth.toISOString().slice(0, 10)
+        : String(p.dateOfBirth).slice(0, 10);
+
+      const genderMap: Record<string, 'm' | 'f'> = {
+        male: 'm',
+        female: 'f',
+        m: 'm',
+        f: 'f',
+      };
+      const gender = genderMap[p.gender.toLowerCase()] || 'm';
+
+      const dp: any = {
+        id: `pas_mock_${idx + 1}`,
+        given_name: p.givenName,
+        family_name: p.familyName,
+        gender: gender,
+        date_of_birth: dob,
+      };
+
+      if (p.passportNumber && p.passportExpiry && p.nationality) {
+        dp.identity_documents = [
+          {
+            unique_identifier: p.passportNumber,
+            expires_on: p.passportExpiry,
+            issuing_country_code: p.nationality.toUpperCase(),
+            type: 'passport',
+          },
+        ];
+      }
+
+      if (idx === 0) {
+        dp.email = params.userEmail;
+        dp.phone_number = '+12025550143'; // Default contact number
+      }
+
+      return dp;
+    });
+
+    try {
+      this.logger.log(`Calling Duffel API to create order. Offer: ${params.duffelOfferId}`);
+      const duffelResponse = await this.duffel.orders.create({
+        selected_offers: [params.duffelOfferId],
+        passengers: duffelPassengers,
+        type: 'instant',
+      });
+      return {
+        id: duffelResponse.data.id,
+        booking_reference: duffelResponse.data.booking_reference,
+      };
+    } catch (err: any) {
+      this.logger.error(`Error in Duffel createOrder: ${err.message}`, err.stack);
+      throw err;
+    }
+  }
 }

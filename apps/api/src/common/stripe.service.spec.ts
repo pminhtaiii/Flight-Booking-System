@@ -27,8 +27,23 @@ jest.mock('stripe', () => {
 
 describe('StripeService', () => {
   let service: StripeService;
-  let mockStripeInstance: any;
-  let configService: ConfigService;
+  let mockStripeInstance: {
+    paymentIntents: {
+      create: jest.Mock;
+      capture: jest.Mock;
+      cancel: jest.Mock;
+      retrieve: jest.Mock;
+    };
+    customers: {
+      create: jest.Mock;
+    };
+    refunds: {
+      create: jest.Mock;
+    };
+    webhooks: {
+      constructEvent: jest.Mock;
+    };
+  };
 
   const mockConfigService = {
     get: jest.fn((key: string) => {
@@ -48,7 +63,7 @@ describe('StripeService', () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         StripeService,
-        { provide: ConfigService, useValue: mockConfigService },
+        { provide: ConfigService, useValue: mockConfigService as unknown as ConfigService },
       ],
     }).compile();
 
@@ -235,7 +250,7 @@ describe('StripeService', () => {
         return 'whsec_mock';
       });
 
-      expect(() => new StripeService(mockConfigService as any)).toThrow('STRIPE_SECRET_KEY is missing');
+      expect(() => new StripeService(mockConfigService as unknown as ConfigService)).toThrow('STRIPE_SECRET_KEY is missing');
     });
 
     it('should throw error if STRIPE_WEBHOOK_SECRET is missing', () => {
@@ -245,7 +260,7 @@ describe('StripeService', () => {
         return null;
       });
 
-      expect(() => new StripeService(mockConfigService as any)).toThrow('STRIPE_WEBHOOK_SECRET is missing');
+      expect(() => new StripeService(mockConfigService as unknown as ConfigService)).toThrow('STRIPE_WEBHOOK_SECRET is missing');
     });
   });
 });

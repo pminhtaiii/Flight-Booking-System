@@ -35,8 +35,9 @@ export class StripeService {
     metadata?: Record<string, string>;
     idempotencyKey: string;
     setupFutureUsage?: 'off_session';
+    paymentMethodId?: string;
   }): Promise<Stripe.PaymentIntent> {
-    const { amount, currency, customerId, metadata, idempotencyKey, setupFutureUsage } = params;
+    const { amount, currency, customerId, metadata, idempotencyKey, setupFutureUsage, paymentMethodId } = params;
 
     const requestParams: Stripe.PaymentIntentCreateParams = {
       amount,
@@ -52,6 +53,11 @@ export class StripeService {
     }
     if (setupFutureUsage) {
       requestParams.setup_future_usage = setupFutureUsage;
+    }
+    if (paymentMethodId) {
+      requestParams.payment_method = paymentMethodId;
+      requestParams.confirm = true;
+      requestParams.off_session = true;
     }
 
     return this.stripe.paymentIntents.create(requestParams, {
@@ -104,10 +110,18 @@ export class StripeService {
     return this.stripe.paymentIntents.retrieve(paymentIntentId);
   }
 
+  async retrievePaymentMethod(paymentMethodId: string): Promise<Stripe.PaymentMethod> {
+    return this.stripe.paymentMethods.retrieve(paymentMethodId);
+  }
+
+  async detachPaymentMethod(paymentMethodId: string): Promise<Stripe.PaymentMethod> {
+    return this.stripe.paymentMethods.detach(paymentMethodId);
+  }
+
   async createRefund(params: {
     paymentIntentId: string;
     amount: number;
-    reason?: string;
+    reason?: Stripe.RefundCreateParams.Reason;
     idempotencyKey: string;
   }): Promise<Stripe.Refund> {
     const { paymentIntentId, amount, reason, idempotencyKey } = params;
@@ -116,7 +130,7 @@ export class StripeService {
       amount,
     };
     if (reason) {
-      refundParams.reason = reason as Stripe.RefundCreateParams.Reason;
+      refundParams.reason = reason;
     }
     return this.stripe.refunds.create(refundParams, {
       idempotencyKey,
