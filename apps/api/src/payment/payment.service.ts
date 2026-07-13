@@ -185,6 +185,12 @@ export class PaymentService {
         stripePaymentMethodId = savedMethod.stripePaymentMethodId;
       }
 
+      if (!paymentRes.updatedIntent.confirmedPrice) {
+        throw new HttpException(
+          { code: 'PRICE_NOT_CONFIRMED', message: 'Booking intent price has not been confirmed' },
+          HttpStatus.UNPROCESSABLE_ENTITY
+        );
+      }
       const amountCents = Math.round(Number(paymentRes.updatedIntent.confirmedPrice) * 100);
       const currency = paymentRes.updatedIntent.currency.toLowerCase();
 
@@ -658,11 +664,27 @@ export class PaymentService {
       }
 
       await this.prisma.$transaction(async (tx) => {
-        enforceTransition(paymentStatus, PaymentStatus.SUCCEEDED);
+        // Fetch fresh payment to check live status and version
+        const livePayment = await tx.payment.findUnique({
+          where: { id: payment.id },
+        });
+
+        if (!livePayment) {
+          throw new NotFoundException(`Payment ${payment.id} not found`);
+        }
+
+        // If the payment is already in SUCCEEDED status (e.g. webhook won first),
+        // skip processing to prevent duplicate ledger entries.
+        if (livePayment.status === PaymentStatus.SUCCEEDED) {
+          this.logger.log(`Payment ${payment.id} is already SUCCEEDED. Skipping step 4.`);
+          return;
+        }
+
+        enforceTransition(livePayment.status, PaymentStatus.SUCCEEDED);
 
         await tx.payment.update({
-          where: { id: payment.id },
-          data: { status: PaymentStatus.SUCCEEDED },
+          where: { id: payment.id, version: livePayment.version },
+          data: { status: PaymentStatus.SUCCEEDED, version: { increment: 1 } },
         });
 
         await tx.bookingIntent.update({

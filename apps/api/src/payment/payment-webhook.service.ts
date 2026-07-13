@@ -438,7 +438,7 @@ export class PaymentWebhookService {
     const stripeRefundIds = refunds.map((r) => r.id);
 
     // Find the corresponding Refund record that is currently REFUND_PENDING
-    const localRefund = await this.prisma.refund.findFirst({
+    let localRefund = await this.prisma.refund.findFirst({
       where: {
         paymentId: payment.id,
         stripeRefundId: { in: stripeRefundIds },
@@ -447,12 +447,46 @@ export class PaymentWebhookService {
     });
 
     if (!localRefund) {
+      // Fallback: If no match found by Stripe ID (e.g. webhook race), check for a pending local refund with null Stripe ID
+      // matching the refund amount.
+      const stripeRefundAmount = refunds[0]?.amount; // Stripe amount is in cents
+      if (stripeRefundAmount) {
+        localRefund = await this.prisma.refund.findFirst({
+          where: {
+            paymentId: payment.id,
+            stripeRefundId: null,
+            amount: stripeRefundAmount,
+            status: RefundStatus.REFUND_PENDING,
+          },
+        });
+
+        if (localRefund) {
+          this.logger.log(`Found matching pending refund via fallback (matching amount: ${stripeRefundAmount}). Updating stripeRefundId.`);
+          // Back-fill the Stripe refund ID to ensure consistency
+          await this.prisma.refund.update({
+            where: { id: localRefund.id },
+            data: { stripeRefundId: refunds[0].id },
+          });
+        }
+      }
+    }
+
+    if (!localRefund) {
       this.logger.warn(`No pending local Refund record found matching Stripe refund IDs: ${stripeRefundIds.join(', ')}`);
       return;
     }
 
     try {
       await this.prisma.$transaction(async (tx) => {
+        // Fetch the fresh payment record to get live status and version
+        const livePayment = await tx.payment.findUnique({
+          where: { id: payment.id },
+        });
+
+        if (!livePayment) {
+          throw new NotFoundException(`Payment ${payment.id} not found during webhook processing`);
+        }
+
         // 1. Update Refund status to SUCCEEDED
         await tx.refund.update({
           where: { id: localRefund.id },
@@ -472,12 +506,12 @@ export class PaymentWebhookService {
         // Transition Payment status to REFUNDED (if remaining balance is 0) or PARTIALLY_REFUNDED (if > 0)
         const nextPaymentStatus = remainingBalance === 0 ? PaymentStatus.REFUNDED : PaymentStatus.PARTIALLY_REFUNDED;
 
-        // Enforce transition
-        enforceTransition(payment.status, nextPaymentStatus);
+        // Enforce transition using live payment status
+        enforceTransition(livePayment.status, nextPaymentStatus);
 
-        // Update Payment status
+        // Update Payment status using live version for optimistic locking
         await tx.payment.update({
-          where: { id: payment.id, version: payment.version },
+          where: { id: payment.id, version: livePayment.version },
           data: {
             status: nextPaymentStatus,
             version: { increment: 1 },
@@ -498,7 +532,7 @@ export class PaymentWebhookService {
             paymentId: payment.id,
             stripeEventId: event.id,
             eventType: event.type,
-            previousStatus: payment.status,
+            previousStatus: livePayment.status,
             newStatus: nextPaymentStatus,
             amount: localRefund.amount,
             source: 'WEBHOOK',
