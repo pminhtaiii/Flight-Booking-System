@@ -1,0 +1,42 @@
+export enum PaymentStatus {
+  CREATED = 'CREATED',
+  AUTHORIZED = 'AUTHORIZED',
+  SUCCEEDED = 'SUCCEEDED',
+  FAILED = 'FAILED',
+  EXPIRED = 'EXPIRED',
+  CANCELLED = 'CANCELLED',
+  REFUND_PENDING = 'REFUND_PENDING',
+  PARTIALLY_REFUNDED = 'PARTIALLY_REFUNDED',
+  REFUNDED = 'REFUNDED',
+  DISPUTED = 'DISPUTED',
+  CHARGEBACK_LOST = 'CHARGEBACK_LOST',
+}
+
+export enum RefundStatus {
+  REFUND_PENDING = 'REFUND_PENDING',
+  SUCCEEDED = 'SUCCEEDED',
+  FAILED = 'FAILED',
+}
+
+export enum RefundTriggerType {
+  ADMIN = 'ADMIN',
+  SYSTEM_AUTOMATED = 'SYSTEM_AUTOMATED',
+}
+
+export enum LedgerEntryType {
+  DEBIT = 'DEBIT',
+  CREDIT = 'CREDIT',
+}
+
+export enum PaymentEventSource {
+  WEBHOOK = 'WEBHOOK',
+  API = 'API',
+  CRON = 'CRON',
+  SYSTEM = 'SYSTEM',
+}
+
+export enum PaymentMethodStatus {
+  ACTIVE = 'ACTIVE',
+  DETACHED = 'DETACHED',
+  EXPIRED = 'EXPIRED',
+}
