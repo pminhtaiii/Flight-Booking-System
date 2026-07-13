@@ -87,8 +87,8 @@ describe('PaymentIdempotencyService', () => {
         customerId,
         requestPath,
         requestParams,
-        lockedAt: new Date('2026-07-12T13:00:00Z'),
-        expiresAt: new Date('2026-07-13T13:00:00Z'),
+        lockedAt: new Date(),
+        expiresAt: new Date(Date.now() + 3600000),
         recoveryPoint: 'started',
       };
       mockPrismaService.idempotencyKey.create.mockResolvedValue(mockCreatedKey);
@@ -121,7 +121,7 @@ describe('PaymentIdempotencyService', () => {
         responseCode: 201,
         responseBody: { success: true },
         lockedAt: null,
-        expiresAt: new Date('2026-07-13T13:00:00Z'),
+        expiresAt: new Date(Date.now() + 3600000),
         recoveryPoint: 'completed',
       };
       mockPrismaService.idempotencyKey.findUnique.mockResolvedValue(mockExistingKey);

@@ -12,6 +12,7 @@ import { AirportsModule } from './airports/airports.module';
 import { DuffelModule } from './duffel/duffel.module';
 import { FlightsModule } from './flights/flights.module';
 import { BookingIntentModule } from './booking-intent/booking-intent.module';
+import { PaymentModule } from './payment/payment.module';
 
 @Module({
   imports: [
@@ -30,6 +31,7 @@ import { BookingIntentModule } from './booking-intent/booking-intent.module';
     DuffelModule,
     FlightsModule,
     BookingIntentModule,
+    PaymentModule,
   ],
   controllers: [],
   providers: [],
