@@ -229,13 +229,35 @@ export class PaymentWebhookService {
     nextStatus: PaymentStatus
   ): Promise<void> {
     await this.prisma.$transaction(async (tx) => {
+      const livePayment = await tx.payment.findUnique({ where: { id: payment.id } });
+
+      if (!livePayment) {
+        throw new NotFoundException(`Payment ${payment.id} not found during webhook processing`);
+      }
+
+      // Idempotency guard: already transitioned (API pipeline won the race)
+      if (livePayment.status === nextStatus) {
+        await tx.paymentEvent.create({
+          data: {
+            paymentId: payment.id,
+            stripeEventId: event.id,
+            eventType: event.type,
+            previousStatus: livePayment.status,
+            newStatus: nextStatus,
+            amount: payment.amount,
+            source: 'WEBHOOK',
+            createdBy: 'STRIPE_WEBHOOK',
+          },
+        });
+        return;
+      }
+
+      enforceTransition(livePayment.status, nextStatus);
+
       // 1. Update Payment status
       await tx.payment.update({
-        where: { id: payment.id, version: payment.version },
-        data: {
-          status: nextStatus,
-          version: { increment: 1 },
-        },
+        where: { id: payment.id, version: livePayment.version },
+        data: { status: nextStatus, version: { increment: 1 } },
       });
 
       // 2. Update BookingIntent status to COMPLETED
@@ -303,15 +325,23 @@ export class PaymentWebhookService {
     }
 
     try {
-      enforceTransition(payment.status, nextStatus);
-
       const nextIntentStatus =
         payment.bookingIntent.paymentAttemptCount >= 2 ? 'PAYMENT_EXHAUSTED' : 'AWAITING_PAYMENT';
 
       await this.prisma.$transaction(async (tx) => {
+        const livePayment = await tx.payment.findUnique({ where: { id: payment.id } });
+
+        if (!livePayment) {
+          throw new NotFoundException(`Payment ${payment.id} not found during webhook processing`);
+        }
+
+        if (livePayment.status === nextStatus) return;
+
+        enforceTransition(livePayment.status, nextStatus);
+
         // 1. Update Payment status
         await tx.payment.update({
-          where: { id: payment.id, version: payment.version },
+          where: { id: payment.id, version: livePayment.version },
           data: {
             status: nextStatus,
             version: { increment: 1 },
@@ -374,15 +404,23 @@ export class PaymentWebhookService {
     }
 
     try {
-      enforceTransition(payment.status, nextStatus);
-
       const nextIntentStatus =
         payment.bookingIntent.paymentAttemptCount >= 2 ? 'PAYMENT_EXHAUSTED' : 'AWAITING_PAYMENT';
 
       await this.prisma.$transaction(async (tx) => {
+        const livePayment = await tx.payment.findUnique({ where: { id: payment.id } });
+
+        if (!livePayment) {
+          throw new NotFoundException(`Payment ${payment.id} not found during webhook processing`);
+        }
+
+        if (livePayment.status === nextStatus) return;
+
+        enforceTransition(livePayment.status, nextStatus);
+
         // 1. Update Payment status
         await tx.payment.update({
-          where: { id: payment.id, version: payment.version },
+          where: { id: payment.id, version: livePayment.version },
           data: {
             status: nextStatus,
             version: { increment: 1 },
@@ -586,12 +624,22 @@ export class PaymentWebhookService {
 
     try {
       await this.prisma.$transaction(async (tx) => {
+        const livePayment = await tx.payment.findUnique({ where: { id: payment.id } });
+
+        if (!livePayment) {
+          throw new NotFoundException(`Payment ${payment.id} not found during webhook processing`);
+        }
+
+        if (livePayment.status === nextStatus) return;
+
+        enforceTransition(livePayment.status, nextStatus);
+
         // 1. Update Payment status to DISPUTED and store preDisputeStatus
         await tx.payment.update({
-          where: { id: payment.id, version: payment.version },
+          where: { id: payment.id, version: livePayment.version },
           data: {
             status: nextStatus,
-            preDisputeStatus: payment.status,
+            preDisputeStatus: livePayment.status,
             version: { increment: 1 },
           },
         });
@@ -663,9 +711,17 @@ export class PaymentWebhookService {
 
     try {
       await this.prisma.$transaction(async (tx) => {
+        const livePayment = await tx.payment.findUnique({ where: { id: payment.id } });
+
+        if (!livePayment) {
+          throw new NotFoundException(`Payment ${payment.id} not found during webhook processing`);
+        }
+
+        if (livePayment.status === nextStatus) return;
+
         // 1. Update Payment status
         await tx.payment.update({
-          where: { id: payment.id, version: payment.version },
+          where: { id: payment.id, version: livePayment.version },
           data: {
             status: nextStatus,
             version: { increment: 1 },

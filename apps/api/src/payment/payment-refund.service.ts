@@ -110,6 +110,8 @@ export class PaymentRefundService {
       let refundRecord;
       let paymentEventRecord;
       await this.prisma.$transaction(async (tx) => {
+        const livePayment = await tx.payment.findUniqueOrThrow({ where: { id: paymentId } });
+
         // Create local refund record
         refundRecord = await tx.refund.create({
           data: {
@@ -127,7 +129,7 @@ export class PaymentRefundService {
 
         // Update payment status
         await tx.payment.update({
-          where: { id: paymentId, version: payment.version },
+          where: { id: paymentId, version: livePayment.version },
           data: {
             status: PaymentStatus.REFUND_PENDING,
             version: { increment: 1 },
@@ -194,6 +196,39 @@ export class PaymentRefundService {
       return updatedRefund;
     } catch (error: any) {
       this.logger.error(`Failed to initiate refund for Payment ${paymentId}: ${error.message}`, error.stack);
+
+      // If the DB transaction committed (refundRecord exists) but Stripe call failed,
+      // clean up the orphaned REFUND_PENDING record so it does not permanently reduce
+      // the refundable balance on subsequent attempts.
+      if (refundRecord) {
+        try {
+          await this.prisma.$transaction(async (tx) => {
+            const livePayment = await tx.payment.findUnique({ where: { id: paymentId } });
+
+            await tx.refund.update({
+              where: { id: (refundRecord as any).id },
+              data: { status: RefundStatus.FAILED },
+            });
+
+            // Revert payment status to pre-refund state only if it is still REFUND_PENDING
+            if (livePayment && livePayment.status === PaymentStatus.REFUND_PENDING) {
+              await tx.payment.update({
+                where: { id: paymentId, version: livePayment.version },
+                data: {
+                  status: payment.status, // revert to SUCCEEDED or PARTIALLY_REFUNDED
+                  version: { increment: 1 },
+                },
+              });
+            }
+          });
+        } catch (cleanupError: any) {
+          this.logger.error(
+            `Refund cleanup transaction failed for Payment ${paymentId}: ${cleanupError.message}`,
+            cleanupError.stack
+          );
+        }
+      }
+
       await this.idempotencyService.releaseLock(idempotencyKey, leaseToken);
       throw error;
     }

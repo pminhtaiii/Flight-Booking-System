@@ -500,8 +500,21 @@ export class PaymentService {
           enforceTransition(payment.status, PaymentStatus.AUTHORIZED);
 
           await this.prisma.$transaction(async (tx) => {
+            const livePayment = await tx.payment.findUnique({ where: { id: payment.id } });
+
+            if (!livePayment) {
+              throw new NotFoundException('Payment not found during confirmation');
+            }
+
+            // Idempotency guard: webhook may have already authorized this payment
+            if (livePayment.status === PaymentStatus.AUTHORIZED) {
+              return;
+            }
+
+            enforceTransition(livePayment.status, PaymentStatus.AUTHORIZED);
+
             await tx.payment.update({
-              where: { id: payment.id, version: payment.version },
+              where: { id: payment.id, version: livePayment.version },
               data: { status: PaymentStatus.AUTHORIZED, version: { increment: 1 } },
             });
 
@@ -525,8 +538,20 @@ export class PaymentService {
       } else {
         enforceTransition(payment.status, PaymentStatus.FAILED);
         await this.prisma.$transaction(async (tx) => {
+          const livePayment = await tx.payment.findUnique({ where: { id: payment.id } });
+
+          if (!livePayment) {
+            throw new NotFoundException('Payment not found during confirmation');
+          }
+
+          if (livePayment.status === PaymentStatus.FAILED) {
+            return;
+          }
+
+          enforceTransition(livePayment.status, PaymentStatus.FAILED);
+
           await tx.payment.update({
-            where: { id: payment.id, version: payment.version },
+            where: { id: payment.id, version: livePayment.version },
             data: { status: PaymentStatus.FAILED, version: { increment: 1 } },
           });
 
