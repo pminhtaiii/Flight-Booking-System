@@ -205,8 +205,8 @@ export class PaymentRefundService {
           await this.prisma.$transaction(async (tx) => {
             const livePayment = await tx.payment.findUnique({ where: { id: paymentId } });
 
-            await tx.refund.update({
-              where: { id: (refundRecord as any).id },
+            await tx.refund.updateMany({
+              where: { id: (refundRecord as any).id, status: RefundStatus.REFUND_PENDING },
               data: { status: RefundStatus.FAILED },
             });
 
