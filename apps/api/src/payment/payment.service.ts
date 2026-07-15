@@ -129,6 +129,14 @@ export class PaymentService {
         }
 
         const attemptNumber = intent.paymentAttemptCount + 1;
+
+        if (!intent.confirmedPrice) {
+          throw new HttpException(
+            { code: 'PRICE_NOT_CONFIRMED', message: 'Booking intent price has not been confirmed' },
+            HttpStatus.UNPROCESSABLE_ENTITY
+          );
+        }
+
         const updatedIntent = await tx.bookingIntent.update({
           where: { id: bookingIntentId },
           data: {
@@ -185,12 +193,6 @@ export class PaymentService {
         stripePaymentMethodId = savedMethod.stripePaymentMethodId;
       }
 
-      if (!paymentRes.updatedIntent.confirmedPrice) {
-        throw new HttpException(
-          { code: 'PRICE_NOT_CONFIRMED', message: 'Booking intent price has not been confirmed' },
-          HttpStatus.UNPROCESSABLE_ENTITY
-        );
-      }
       const amountCents = Math.round(Number(paymentRes.updatedIntent.confirmedPrice) * 100);
       const currency = paymentRes.updatedIntent.currency.toLowerCase();
 
@@ -457,8 +459,14 @@ export class PaymentService {
     // we must transition it to AUTHORIZED first to preserve FSM flow and logging.
     if (paymentStatus === PaymentStatus.CREATED && currentPoint !== 'started') {
       await this.prisma.$transaction(async (tx) => {
+        const livePayment = await tx.payment.findUnique({ where: { id: payment.id } });
+
+        if (!livePayment || livePayment.status !== PaymentStatus.CREATED) {
+          return;
+        }
+
         await tx.payment.update({
-          where: { id: payment.id },
+          where: { id: payment.id, version: livePayment.version },
           data: { status: PaymentStatus.AUTHORIZED, version: { increment: 1 } },
         });
 

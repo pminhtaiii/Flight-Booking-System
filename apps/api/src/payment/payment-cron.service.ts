@@ -58,8 +58,6 @@ export class PaymentCronService {
               const cancelKey = `payment-cancel-cron:${payment.id}`;
               await this.stripeService.cancelPaymentIntent(payment.stripePaymentIntentId, cancelKey);
 
-              const nextIntentStatus = payment.bookingIntent.paymentAttemptCount >= 2 ? 'PAYMENT_EXHAUSTED' : 'AWAITING_PAYMENT';
-
               await this.prisma.$transaction(async (tx) => {
                 const currentPayment = await tx.payment.findUnique({
                   where: { id: payment.id },
@@ -70,6 +68,11 @@ export class PaymentCronService {
                 }
 
                 enforceTransition(currentPayment.status, PaymentStatus.EXPIRED);
+
+                const nextIntentStatus =
+                  currentPayment.bookingIntent?.paymentAttemptCount >= 2
+                    ? 'PAYMENT_EXHAUSTED'
+                    : 'AWAITING_PAYMENT';
 
                 await tx.payment.update({
                   where: { id: payment.id, version: currentPayment.version },
@@ -148,8 +151,6 @@ export class PaymentCronService {
               healedCount++;
             } else if (stripeIntent.status === 'canceled') {
               // Already canceled on Stripe, transition locally
-              const nextIntentStatus = payment.bookingIntent.paymentAttemptCount >= 2 ? 'PAYMENT_EXHAUSTED' : 'AWAITING_PAYMENT';
-
               await this.prisma.$transaction(async (tx) => {
                 const currentPayment = await tx.payment.findUnique({
                   where: { id: payment.id },
@@ -160,6 +161,11 @@ export class PaymentCronService {
                 }
 
                 enforceTransition(currentPayment.status, PaymentStatus.EXPIRED);
+
+                const nextIntentStatus =
+                  currentPayment.bookingIntent?.paymentAttemptCount >= 2
+                    ? 'PAYMENT_EXHAUSTED'
+                    : 'AWAITING_PAYMENT';
 
                 await tx.payment.update({
                   where: { id: payment.id, version: currentPayment.version },

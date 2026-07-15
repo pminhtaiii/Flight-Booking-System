@@ -2,6 +2,7 @@ import { Injectable, BadRequestException, NotFoundException, Logger, HttpStatus 
 import { PrismaService } from '@/prisma/prisma.service';
 import { StripeService } from '@/common/stripe.service';
 import { PaymentIdempotencyService } from './payment-idempotency.service';
+import { enforceTransition } from './payment-state-machine';
 import { PaymentStatus, RefundStatus, RefundTriggerType, Prisma } from '@prisma/client';
 import Stripe from 'stripe';
 import * as crypto from 'crypto';
@@ -111,6 +112,8 @@ export class PaymentRefundService {
       let paymentEventRecord;
       await this.prisma.$transaction(async (tx) => {
         const livePayment = await tx.payment.findUniqueOrThrow({ where: { id: paymentId } });
+
+        enforceTransition(livePayment.status, PaymentStatus.REFUND_PENDING);
 
         // Create local refund record
         refundRecord = await tx.refund.create({

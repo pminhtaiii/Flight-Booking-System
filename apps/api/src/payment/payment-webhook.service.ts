@@ -132,9 +132,15 @@ export class PaymentWebhookService {
       );
       try {
         await this.prisma.$transaction(async (tx) => {
+          const livePayment = await tx.payment.findUnique({ where: { id: payment.id } });
+
+          if (!livePayment) {
+            throw new NotFoundException(`Payment ${payment.id} not found during duplicate-payment handling`);
+          }
+
           // Update Payment status to SUCCEEDED
           await tx.payment.update({
-            where: { id: payment.id, version: payment.version },
+            where: { id: payment.id, version: livePayment.version },
             data: {
               status: PaymentStatus.SUCCEEDED,
               version: { increment: 1 },
@@ -155,7 +161,7 @@ export class PaymentWebhookService {
               paymentId: payment.id,
               stripeEventId: event.id,
               eventType: event.type,
-              previousStatus: payment.status,
+              previousStatus: livePayment.status,
               newStatus: PaymentStatus.SUCCEEDED,
               amount: payment.amount,
               source: 'WEBHOOK',
