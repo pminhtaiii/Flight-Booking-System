@@ -544,7 +544,9 @@ export class PaymentService {
         currentPoint = 'stripe_authorized';
         await this.idempotencyService.updateRecoveryPoint(idempotencyKey, currentPoint, leaseToken);
       } else {
-        enforceTransition(payment.status, PaymentStatus.FAILED);
+        if (payment.status !== PaymentStatus.FAILED) {
+          enforceTransition(payment.status, PaymentStatus.FAILED);
+        }
         await this.prisma.$transaction(async (tx) => {
           const livePayment = await tx.payment.findUnique({ where: { id: payment.id } });
 

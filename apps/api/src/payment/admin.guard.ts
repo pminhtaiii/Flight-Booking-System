@@ -6,8 +6,11 @@ export class AdminGuard implements CanActivate {
   private readonly adminEmails: string[];
 
   constructor(private readonly configService: ConfigService) {
-    const emailsStr = this.configService.get<string>('ADMIN_EMAILS', 'admin@example.com');
-    this.adminEmails = emailsStr.split(',').map((e) => e.trim().toLowerCase());
+    const emailsStr = this.configService.get<string>('ADMIN_EMAILS', '');
+    this.adminEmails = emailsStr
+      .split(',')
+      .map((e) => e.trim().toLowerCase())
+      .filter(Boolean);
   }
 
   canActivate(context: ExecutionContext): boolean {
