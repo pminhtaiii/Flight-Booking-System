@@ -9,6 +9,7 @@ const ALLOWED_TRANSITIONS: Record<PaymentStatus, Set<PaymentStatus>> = {
   ]),
   [PaymentStatus.AUTHORIZED]: new Set([
     PaymentStatus.SUCCEEDED,
+    PaymentStatus.FAILED,
     PaymentStatus.EXPIRED,
     PaymentStatus.CANCELLED,
   ]),
