@@ -13,10 +13,27 @@ import { DuffelModule } from './duffel/duffel.module';
 import { FlightsModule } from './flights/flights.module';
 import { BookingIntentModule } from './booking-intent/booking-intent.module';
 
+import { z } from 'zod';
+
+const envSchema = z.object({
+  PORT: z.string().optional(),
+  DATABASE_URL: z.string().optional(),
+  REDIS_URL: z.string().optional(),
+  STRIPE_SECRET_KEY: z.string({
+    required_error: 'STRIPE_SECRET_KEY is required',
+  }),
+  STRIPE_WEBHOOK_SECRET: z.string({
+    required_error: 'STRIPE_WEBHOOK_SECRET is required',
+  }),
+  JWT_SECRET: z.string().optional(),
+  ENCRYPTION_KEY: z.string().optional(),
+}).passthrough();
+
 @Module({
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
+      validate: (config) => envSchema.parse(config),
     }),
     ScheduleModule.forRoot(),
     PrismaModule,
