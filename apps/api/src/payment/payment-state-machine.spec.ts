@@ -34,6 +34,7 @@ describe('PaymentStateMachine', () => {
     it('allows valid transitions from REFUND_PENDING', () => {
       expect(canTransition(PaymentStatus.REFUND_PENDING, PaymentStatus.PARTIALLY_REFUNDED)).toBe(true);
       expect(canTransition(PaymentStatus.REFUND_PENDING, PaymentStatus.REFUNDED)).toBe(true);
+      expect(canTransition(PaymentStatus.REFUND_PENDING, PaymentStatus.SUCCEEDED)).toBe(true);
     });
 
     it('allows valid transitions from PARTIALLY_REFUNDED', () => {

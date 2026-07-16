@@ -19,6 +19,7 @@ const ALLOWED_TRANSITIONS: Record<PaymentStatus, Set<PaymentStatus>> = {
   [PaymentStatus.REFUND_PENDING]: new Set([
     PaymentStatus.PARTIALLY_REFUNDED,
     PaymentStatus.REFUNDED,
+    PaymentStatus.SUCCEEDED,
   ]),
   [PaymentStatus.PARTIALLY_REFUNDED]: new Set([
     PaymentStatus.REFUND_PENDING,
