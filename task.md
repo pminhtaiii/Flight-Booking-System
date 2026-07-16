@@ -1,4 +1,4 @@
-# Tasks: Stripe Payment System — PR 4 (Refunds & Disputes)
+# Tasks: Stripe Payment System — PR 5 (Polish & E2E Testing)
 
 - [X] Phase 5: Core Payment Pipeline (Create + Authorize)
   - [X] T001 Create `CreatePaymentDto` in `apps/api/src/payment/dto/create-payment.dto.ts`
@@ -29,18 +29,39 @@
   - [X] T022 Implement Tier 2 alert + drop for irreconcilable transitions
   - [X] T023 Add structured logging for processed webhook events
 
-- [ ] Phase 8: Refund System
-  - [ ] T024 Create `RefundPaymentDto` in `apps/api/src/payment/dto/refund-payment.dto.ts`
-  - [ ] T025 Create refund service in `apps/api/src/payment/payment-refund.service.ts`
-  - [ ] T026 Implement `initiateRefund()` in `payment-refund.service.ts` (validate state, call Stripe refunds, update status, append event)
-  - [ ] T027 Implement automated refund trigger on detected errors (over-capture or other invariants violation)
-  - [ ] T028 Implement `charge.refunded` webhook handler (reversing ledger entries, update Refund status)
-  - [ ] T029 Implement partial refund tracking and refund looping
-  - [ ] T030 Add `POST /api/payments/:paymentId/refund` in `apps/api/src/payment/payment.controller.ts` with Admin role guard
-  - [ ] T031 Add audit logging for `refund_initiated` and `refund_completed` events
+- [X] Phase 8: Refund System
+  - [X] T024 Create `RefundPaymentDto` in `apps/api/src/payment/dto/refund-payment.dto.ts`
+  - [X] T025 Create refund service in `apps/api/src/payment/payment-refund.service.ts`
+  - [X] T026 Implement `initiateRefund()` in `payment-refund.service.ts` (validate state, call Stripe refunds, update status, append event)
+  - [X] T027 Implement automated refund trigger on detected errors (over-capture or other invariants violation)
+  - [X] T028 Implement `charge.refunded` webhook handler (reversing ledger entries, update Refund status)
+  - [X] T029 Implement partial refund tracking and refund looping
+  - [X] T030 Add `POST /api/payments/:paymentId/refund` in `apps/api/src/payment/payment.controller.ts` with Admin role guard
+  - [X] T031 Add audit logging for `refund_initiated` and `refund_completed` events
   
-- [ ] Phase 9: Dispute Handling
-  - [ ] T032 Implement `charge.dispute.created` webhook handler (store `pre_dispute_status`, status to DISPUTED)
-  - [ ] T033 Implement `charge.dispute.closed` webhook handler (restore pre-dispute on win, to CHARGEBACK_LOST on loss)
-  - [ ] T034 Handle dispute on already-refunded payment
-  - [ ] T035 Add audit logging for dispute lifecycle events
+- [X] Phase 9: Dispute Handling
+  - [X] T032 Implement `charge.dispute.created` webhook handler (store `pre_dispute_status`, status to DISPUTED)
+  - [X] T033 Implement `charge.dispute.closed` webhook handler (restore pre-dispute on win, to CHARGEBACK_LOST on loss)
+  - [X] T034 Handle dispute on already-refunded payment
+  - [X] T035 Add audit logging for dispute lifecycle events
+
+- [ ] Phase 10: Saved Payment Methods
+  - [ ] T036 Create `PaymentMethodService` in `apps/api/src/payment/payment-method.service.ts`
+  - [ ] T037 Implement `listMethods()` and `saveMethods()` (sync attached methods after payment success with consent)
+  - [ ] T038 Implement `deleteMethod()` and `setDefault()` methods
+  - [ ] T039 Add endpoints `GET /api/payments/methods`, `DELETE /api/payments/methods/:methodId` in `payment.controller.ts`
+  - [ ] T040 Integrate saved method selection into `createPayment()` service method
+  
+- [ ] Phase 11: Cron Jobs — Authorization Expiry & Cleanup
+  - [ ] T041 Create cron handler in `apps/api/src/payment/payment-cron.service.ts`
+  - [ ] T042 Implement stale key cleanup (delete expired idempotency keys)
+  - [ ] T043 Implement expired authorization checker (void locks/authorized hold if expired)
+  - [ ] T044 Implement stale lock detection for idempotency keys
+  - [ ] T045 Register ScheduleModule if not already registered
+  - [ ] T046 Add structured logging for cron runs
+  
+- [ ] Phase 12: End-to-End Testing
+  - [ ] T047 Write backend NestJS E2E integration tests in `apps/api/test/payment.e2e-spec.ts`
+  - [ ] T048 Write backend webhook E2E tests in `apps/api/test/payment-webhook.e2e-spec.ts`
+  - [ ] T049 Write backend refund E2E tests in `apps/api/test/payment-refund.e2e-spec.ts`
+  - [ ] T050 Write backend idempotency E2E tests in `apps/api/test/payment-idempotency.e2e-spec.ts`
