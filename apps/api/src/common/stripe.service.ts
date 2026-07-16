@@ -29,6 +29,8 @@ export class StripeService {
     customerId?: string,
     metadata?: Record<string, string>,
     idempotencyKey?: string,
+    paymentMethodId?: string,
+    setupFutureUsage?: 'off_session' | 'on_session',
   ): Promise<Stripe.PaymentIntent> {
     const params: Stripe.PaymentIntentCreateParams = {
       amount,
@@ -39,6 +41,14 @@ export class StripeService {
 
     if (customerId) {
       params.customer = customerId;
+    }
+
+    if (paymentMethodId) {
+      params.payment_method = paymentMethodId;
+    }
+
+    if (setupFutureUsage) {
+      params.setup_future_usage = setupFutureUsage;
     }
 
     const options: Stripe.RequestOptions = {};

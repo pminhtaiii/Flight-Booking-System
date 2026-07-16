@@ -7,8 +7,8 @@ Update this file after every completed feature. Any AI agent reading this should
 ### Current Status
 
 **Feature:** Stripe Payment System (Feature 10)
-**Last completed:** Feature 10: Stripe Payment System Foundation - Stripe SDK Wrapper, Payment State Machine & Idempotency Key Service (Phases 2, 3, and 4).
-**Next:** Stripe Payment System (Feature 10) - Phase 5: Core Payment Pipeline (Create + Authorize).
+**Last completed:** Feature 10: Stripe Payment System - Core Payment Pipeline (Phases 5 and 6).
+**Next:** Stripe Payment System (Feature 10) - Phase 7: Webhook Processing.
 
 ---
 
@@ -20,6 +20,8 @@ Update this file after every completed feature. Any AI agent reading this should
 - [x] Phase 2: Stripe SDK Wrapper & Shared Infrastructure (Injectable StripeService with create/capture/cancel PaymentIntent, Customer and Refund operations, and signature verification)
 - [x] Phase 3: Payment State Machine (State machine helpers for valid transition enforcement and dispute state resolution with 100% unit test coverage)
 - [x] Phase 4: Idempotency Key Service (PaymentIdempotencyService with lock acquisition, response replay caching, deterministic hashing, and custom @IdempotencyKey header parameter decorator)
+- [x] Phase 5: Core Payment Pipeline (Create + Authorize) (Pessimistic claim lock on BookingIntent, lazy Customer creation, creation-based reconciliation, and Payment creation)
+- [x] Phase 6: Core Payment Pipeline (Confirm + Capture) (Resuming from recovery points, Duffel PNR creation with 30s timeout, Stripe manual capture, ledger entries, and post-capture reconciliation)
 
 ### [x] Feature: Booking Intent Foundation (Feature 9)
 

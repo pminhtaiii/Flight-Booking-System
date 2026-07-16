@@ -333,4 +333,159 @@ export class DuffelService {
       }
     }
   }
+
+  async createOrder(
+    duffelOfferId: string,
+    passengers: {
+      type: string;
+      gender?: string;
+      title?: string;
+      dateOfBirth?: string | Date;
+      givenName?: string;
+      given_name?: string;
+      familyName?: string;
+      family_name?: string;
+      phoneNumber?: string;
+      phone_number?: string;
+      email?: string;
+    }[],
+    metadata?: Record<string, unknown>,
+  ): Promise<unknown> {
+    try {
+      const rawOffer = await this.getOfferById(duffelOfferId);
+      const offer = rawOffer as {
+        passengers: Array<{
+          id: string;
+          type: string;
+        }>;
+      };
+
+      if (!offer || !offer.passengers) {
+        throw new HttpException(
+          'Duffel offer or passenger list not found.',
+          HttpStatus.NOT_FOUND,
+        );
+      }
+
+      const mapType = (t: string) => {
+        const normalized = t.toLowerCase();
+        if (normalized === 'adult') return 'adult';
+        if (normalized === 'child') return 'child';
+        if (normalized === 'infant') return 'infant_without_seat';
+        return normalized;
+      };
+
+      const offerPassengersByType: Record<string, Array<{ id: string; type: string }>> = {};
+      for (const p of offer.passengers) {
+        const t = p.type;
+        if (!offerPassengersByType[t]) {
+          offerPassengersByType[t] = [];
+        }
+        offerPassengersByType[t].push(p);
+      }
+
+      const typeCounters: Record<string, number> = {};
+      const duffelPassengers = passengers.map((p) => {
+        const duffelType = mapType(p.type);
+        if (!typeCounters[duffelType]) {
+          typeCounters[duffelType] = 0;
+        }
+        const matchedOfferPassenger = offerPassengersByType[duffelType]?.[typeCounters[duffelType]];
+        if (!matchedOfferPassenger) {
+          throw new HttpException(
+            `Could not match passenger of type ${p.type} at index ${typeCounters[duffelType]} with offer passengers`,
+            HttpStatus.BAD_REQUEST,
+          );
+        }
+        typeCounters[duffelType]++;
+
+        let gender: 'm' | 'f' | 'u' = 'u';
+        if (p.gender) {
+          const firstChar = p.gender.trim().toLowerCase()[0];
+          if (firstChar === 'm') gender = 'm';
+          else if (firstChar === 'f') gender = 'f';
+        }
+
+        let title = p.title;
+        if (!title) {
+          title = gender === 'm' ? 'mr' : gender === 'f' ? 'ms' : 'mr';
+        } else {
+          title = title.toLowerCase().trim();
+        }
+
+        let born_on = '';
+        if (p.dateOfBirth) {
+          if (p.dateOfBirth instanceof Date) {
+            born_on = p.dateOfBirth.toISOString().split('T')[0];
+          } else if (typeof p.dateOfBirth === 'string') {
+            born_on = p.dateOfBirth.split('T')[0];
+          }
+        }
+
+        const phone_number = p.phoneNumber || p.phone_number || '+12025550143';
+        const email = p.email || 'traveler@example.com';
+
+        return {
+          id: matchedOfferPassenger.id,
+          given_name: p.givenName || p.given_name,
+          family_name: p.familyName || p.family_name,
+          born_on,
+          gender,
+          title,
+          phone_number,
+          email,
+        };
+      });
+
+      const timeoutMs = 30000;
+      const timeoutError = new HttpException(
+        'Duffel order creation timed out.',
+        HttpStatus.GATEWAY_TIMEOUT,
+      );
+      let timeoutHandle: NodeJS.Timeout | undefined;
+
+      const timeoutPromise = new Promise<never>((_, reject) => {
+        timeoutHandle = setTimeout(() => reject(timeoutError), timeoutMs);
+      });
+
+      try {
+        /* eslint-disable @typescript-eslint/no-explicit-any */
+        const orderPromise = this.duffel.orders.create({
+          type: 'instant',
+          selected_offers: [duffelOfferId],
+          passengers: duffelPassengers as any,
+          metadata: metadata as any,
+        });
+        const result = await Promise.race([orderPromise, timeoutPromise]);
+        return (result as { data: any }).data;
+        /* eslint-enable @typescript-eslint/no-explicit-any */
+      } finally {
+        if (timeoutHandle) {
+          clearTimeout(timeoutHandle);
+        }
+      }
+    } catch (err: unknown) {
+      const error = err as Error & { status?: number };
+      this.logger.error(`Error in createOrder: ${error.message}`, error.stack);
+      if (err instanceof HttpException) {
+        throw err;
+      }
+      if (error.status === 429) {
+        throw new HttpException(
+          {
+            code: 'UPSTREAM_RATE_LIMITED',
+            message: 'Duffel API rate limit exceeded',
+          },
+          HttpStatus.TOO_MANY_REQUESTS,
+        );
+      }
+      throw new HttpException(
+        {
+          code: 'UPSTREAM_UNAVAILABLE',
+          message: error.message || 'Failed to create Duffel order',
+        },
+        HttpStatus.BAD_GATEWAY,
+      );
+    }
+  }
 }
