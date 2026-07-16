@@ -181,6 +181,11 @@ export class PaymentRefundService {
           where: { id: paymentEventRecord.id },
           data: { stripeEventId: stripeRefund.id },
         });
+
+        await tx.payment.update({
+          where: { id: paymentId },
+          data: { pendingRefund: false },
+        });
       });
 
       const updatedRefund = await this.prisma.refund.findUnique({

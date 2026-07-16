@@ -4,7 +4,8 @@ import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '@/prisma/prisma.service';
 import { StripeService } from '@/common/stripe.service';
 import { PaymentLedgerService } from './payment-ledger.service';
-import { PaymentStatus } from '@prisma/client';
+import { PaymentRefundService } from './payment-refund.service';
+import { PaymentStatus, RefundTriggerType } from '@prisma/client';
 import { enforceTransition } from './payment-state-machine';
 
 @Injectable()
@@ -16,6 +17,7 @@ export class PaymentCronService {
     private readonly configService: ConfigService,
     private readonly stripeService: StripeService,
     private readonly ledgerService: PaymentLedgerService,
+    private readonly paymentRefundService: PaymentRefundService,
   ) {}
 
   @Cron('*/5 * * * *')
@@ -275,6 +277,40 @@ export class PaymentCronService {
       this.logger.log(`Stale lock detection cron complete. Cleared ${staleKeys.length} stale locks in ${duration}ms.`);
     } catch (err: any) {
       this.logger.error(`Failed to run stale lock detection cron: ${err.message}`, err.stack);
+    }
+  }
+
+  @Cron('*/5 * * * *')
+  async handlePendingRefundsRetry(): Promise<void> {
+    const startTime = Date.now();
+    this.logger.log('Starting pending refunds retry cron...');
+
+    try {
+      const pendingPayments = await this.prisma.payment.findMany({
+        where: { pendingRefund: true },
+      });
+
+      for (const payment of pendingPayments) {
+        this.logger.log(`Retrying automated refund for duplicate Payment ${payment.id}...`);
+        try {
+          await this.paymentRefundService.initiateRefund(
+            payment.id,
+            payment.amount,
+            'Retry: Duplicate payment detected',
+            RefundTriggerType.SYSTEM_AUTOMATED
+          );
+        } catch (err: any) {
+          this.logger.error(
+            `Failed to retry automated refund for Payment ${payment.id}: ${err.message}`,
+            err.stack
+          );
+        }
+      }
+
+      const duration = Date.now() - startTime;
+      this.logger.log(`Pending refunds retry cron complete. Processed ${pendingPayments.length} payments in ${duration}ms.`);
+    } catch (err: any) {
+      this.logger.error(`Failed to run pending refunds retry cron: ${err.message}`, err.stack);
     }
   }
 }

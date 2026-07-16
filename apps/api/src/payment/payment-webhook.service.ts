@@ -138,11 +138,12 @@ export class PaymentWebhookService {
             throw new NotFoundException(`Payment ${payment.id} not found during duplicate-payment handling`);
           }
 
-          // Update Payment status to SUCCEEDED
+          // Update Payment status to SUCCEEDED and set pendingRefund flag to true
           await tx.payment.update({
             where: { id: payment.id, version: livePayment.version },
             data: {
               status: PaymentStatus.SUCCEEDED,
+              pendingRefund: true,
               version: { increment: 1 },
             },
           });
