@@ -12,6 +12,7 @@ import { AirportsModule } from './airports/airports.module';
 import { DuffelModule } from './duffel/duffel.module';
 import { FlightsModule } from './flights/flights.module';
 import { BookingIntentModule } from './booking-intent/booking-intent.module';
+import { PaymentModule } from './payment/payment.module';
 
 import { z } from 'zod';
 
@@ -47,6 +48,7 @@ const envSchema = z.object({
     DuffelModule,
     FlightsModule,
     BookingIntentModule,
+    PaymentModule,
   ],
   controllers: [],
   providers: [],

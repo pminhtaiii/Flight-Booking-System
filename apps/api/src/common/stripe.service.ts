@@ -12,9 +12,14 @@ export class StripeService {
       this.logger.error('STRIPE_SECRET_KEY environment variable is not defined');
       throw new Error('STRIPE_SECRET_KEY is missing');
     }
+    if (apiKey.startsWith('sk_')) {
+      this.logger.warn(
+        'Stripe secret key (sk_) detected. It is highly recommended to use a restricted API key (rk_) with minimum scopes for security.',
+      );
+    }
     // Instantiate Stripe. We cast the apiVersion as StripeConfig['apiVersion'] to satisfy typing.
     this.stripe = new Stripe(apiKey, {
-      apiVersion: '2024-04-10' as Stripe.StripeConfig['apiVersion'],
+      apiVersion: '2026-05-27.dahlia' as Stripe.StripeConfig['apiVersion'],
     });
   }
 

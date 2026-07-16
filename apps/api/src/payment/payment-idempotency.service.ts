@@ -53,13 +53,20 @@ export class PaymentIdempotencyService {
         }
       }
 
-      // Stale lock: update lockedAt to now to acquire the lock
-      await this.prisma.idempotencyKey.update({
-        where: { id: existing.id },
+      // Stale lock: update lockedAt to now to acquire the lock atomically
+      const result = await this.prisma.idempotencyKey.updateMany({
+        where: {
+          id: existing.id,
+          lockedAt: existing.lockedAt,
+        },
         data: {
           lockedAt: now,
         },
       });
+
+      if (result.count === 0) {
+        throw new ConflictException('Request is already in progress');
+      }
 
       return { status: 'acquired' };
     }
@@ -130,12 +137,19 @@ export class PaymentIdempotencyService {
       }
     }
 
-    await this.prisma.idempotencyKey.update({
-      where: { id: existing.id },
+    const result = await this.prisma.idempotencyKey.updateMany({
+      where: {
+        id: existing.id,
+        lockedAt: existing.lockedAt,
+      },
       data: {
         lockedAt: now,
       },
     });
+
+    if (result.count === 0) {
+      throw new ConflictException('Request is already in progress');
+    }
 
     return { status: 'acquired' };
   }
@@ -212,7 +226,7 @@ export class PaymentIdempotencyService {
    * Computes a deterministic SHA-256 hash of the request body.
    */
   computeHash(body: unknown): string {
-    if (!body) {
+    if (body == null) {
       return crypto.createHash('sha256').update('').digest('hex');
     }
     const sorted = this.sortKeys(body);

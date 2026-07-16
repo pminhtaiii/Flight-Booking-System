@@ -7,6 +7,7 @@ describe('PaymentIdempotencyService', () => {
     findUnique: jest.Mock;
     create: jest.Mock;
     update: jest.Mock;
+    updateMany: jest.Mock;
   };
 
   let service: PaymentIdempotencyService;
@@ -20,6 +21,7 @@ describe('PaymentIdempotencyService', () => {
         findUnique: jest.fn(),
         create: jest.fn(),
         update: jest.fn(),
+        updateMany: jest.fn(),
       },
     };
     service = new PaymentIdempotencyService(mockPrisma as unknown as PrismaService);
@@ -141,13 +143,16 @@ describe('PaymentIdempotencyService', () => {
         responseBody: null,
         lockedAt: sixMinutesAgo,
       });
-      mockPrisma.idempotencyKey.update.mockResolvedValueOnce({});
+      mockPrisma.idempotencyKey.updateMany.mockResolvedValueOnce({ count: 1 });
 
       const result = await service.acquireOrReplay(key, hash, userId, path);
 
       expect(result).toEqual({ status: 'acquired' });
-      expect(mockPrisma.idempotencyKey.update).toHaveBeenCalledWith({
-        where: { id: 'existing-id' },
+      expect(mockPrisma.idempotencyKey.updateMany).toHaveBeenCalledWith({
+        where: {
+          id: 'existing-id',
+          lockedAt: sixMinutesAgo,
+        },
         data: { lockedAt: expect.any(Date) },
       });
     });
@@ -160,15 +165,33 @@ describe('PaymentIdempotencyService', () => {
         responseBody: null,
         lockedAt: null,
       });
-      mockPrisma.idempotencyKey.update.mockResolvedValueOnce({});
+      mockPrisma.idempotencyKey.updateMany.mockResolvedValueOnce({ count: 1 });
 
       const result = await service.acquireOrReplay(key, hash, userId, path);
 
       expect(result).toEqual({ status: 'acquired' });
-      expect(mockPrisma.idempotencyKey.update).toHaveBeenCalledWith({
-        where: { id: 'existing-id' },
+      expect(mockPrisma.idempotencyKey.updateMany).toHaveBeenCalledWith({
+        where: {
+          id: 'existing-id',
+          lockedAt: null,
+        },
         data: { lockedAt: expect.any(Date) },
       });
+    });
+
+    it('throws ConflictException if updateMany returns 0 (lost acquisition race)', async () => {
+      mockPrisma.idempotencyKey.findUnique.mockResolvedValueOnce({
+        id: 'existing-id',
+        key,
+        requestHash: hash,
+        responseBody: null,
+        lockedAt: null,
+      });
+      mockPrisma.idempotencyKey.updateMany.mockResolvedValueOnce({ count: 0 });
+
+      await expect(service.acquireOrReplay(key, hash, userId, path)).rejects.toThrow(
+        ConflictException,
+      );
     });
 
     it('handles P2002 race conditions during concurrent key creation', async () => {
