@@ -1,12 +1,17 @@
-# Tasks: Stripe Payment System — PR 3 (Webhook Processing)
+# Tasks: Stripe Payment System — PR 4 (Refunds & Disputes)
 
-- [ ] Phase 7: Webhook Processing
-  - [ ] T001 Create webhook controller in `apps/api/src/payment/payment-webhook.controller.ts` with raw body parsing and signature verification
-  - [ ] T002 Create webhook service in `apps/api/src/payment/payment-webhook.service.ts` to route events
-  - [ ] T003 Implement webhook event deduplication using `PaymentEvent` table
-  - [ ] T004 Implement `payment_intent.succeeded` event handler (update status, append event)
-  - [ ] T005 Implement `payment_intent.payment_failed` event handler (status to FAILED)
-  - [ ] T006 Implement `payment_intent.canceled` event handler (status to CANCELLED)
-  - [ ] T007 Implement Tier 1 self-healing reconciliation (retrieve payment intent, fast-forward)
-  - [ ] T008 Implement Tier 2 alert + drop for irreconcilable transitions
-  - [ ] T009 Add structured logging for processed webhook events
+- [ ] Phase 8: Refund System
+  - [ ] T001 Create `RefundPaymentDto` in `apps/api/src/payment/dto/refund-payment.dto.ts`
+  - [ ] T002 Create refund service in `apps/api/src/payment/payment-refund.service.ts`
+  - [ ] T003 Implement `initiateRefund()` in `payment-refund.service.ts` (validate state, call Stripe refunds, update status, append event)
+  - [ ] T004 Implement automated refund trigger on detected errors (over-capture or other invariants violation)
+  - [ ] T005 Implement `charge.refunded` webhook handler (reversing ledger entries, update Refund status)
+  - [ ] T006 Implement partial refund tracking and refund looping
+  - [ ] T007 Add `POST /api/payments/:paymentId/refund` in `apps/api/src/payment/payment.controller.ts` with Admin role guard
+  - [ ] T008 Add audit logging for `refund_initiated` and `refund_completed` events
+  
+- [ ] Phase 9: Dispute Handling
+  - [ ] T009 Implement `charge.dispute.created` webhook handler (store `pre_dispute_status`, status to DISPUTED)
+  - [ ] T010 Implement `charge.dispute.closed` webhook handler (restore pre-dispute on win, to CHARGEBACK_LOST on loss)
+  - [ ] T011 Handle dispute on already-refunded payment
+  - [ ] T012 Add audit logging for dispute lifecycle events
