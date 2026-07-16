@@ -626,3 +626,26 @@ export function FlightSearchForm({ flights }: Props) {
 - Next.js is the frontend only — all API calls go to the NestJS backend, not `app/api/` route handlers
 - Minimal `app/api/` usage — only for NextAuth.js auth routes and Stripe webhook receivers
 - Never put business logic in the Next.js layer — it belongs in NestJS services
+
+---
+
+## Greptile
+
+### Code Review Loop (Greploop)
+
+```bash
+# GitHub trigger
+gh pr comment <PR_NUMBER> --body "@greptile review"
+
+# Poll checks status
+gh pr checks <PR_NUMBER> --json name,state
+```
+
+**Rules:**
+
+- Use the `greploop` skill to iteratively optimize pull requests until reaching a 5/5 confidence score with zero unresolved comments.
+- Never exceed 5 review iterations per PR to prevent infinite loops.
+- Greptile reviews are requested using `@greptile review` comments.
+- Always check multiple sources for review results: PR description, issue comments, and PR reviews.
+- Both inline comments and overall summaries (especially the "Prompt to fix all with AI" section) must be addressed.
+- Address all actionable feedback in the local codebase, run local validation gates, commit, push, and resolve the corresponding threads.
