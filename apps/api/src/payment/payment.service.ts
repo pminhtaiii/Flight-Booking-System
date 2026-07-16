@@ -627,9 +627,28 @@ export class PaymentService {
           payment.bookingIntent.paymentAttemptCount >= 2 ? 'PAYMENT_EXHAUSTED' : 'AWAITING_PAYMENT';
 
         await this.prisma.$transaction(async (tx) => {
+          const livePayment = await tx.payment.findUnique({ where: { id: payment.id } });
+
+          if (!livePayment) {
+            throw new NotFoundException(`Payment ${payment.id} not found during Duffel failure cleanup`);
+          }
+
+          if (livePayment.status === PaymentStatus.CANCELLED) {
+            return;
+          }
+
+          const liveIntent = await tx.bookingIntent.findUnique({
+            where: { id: payment.bookingIntentId },
+            select: { paymentAttemptCount: true },
+          });
+          const nextIntentStatus =
+            (liveIntent?.paymentAttemptCount ?? payment.bookingIntent.paymentAttemptCount) >= 2
+              ? 'PAYMENT_EXHAUSTED'
+              : 'AWAITING_PAYMENT';
+
           await tx.payment.update({
-            where: { id: payment.id },
-            data: { status: PaymentStatus.CANCELLED },
+            where: { id: payment.id, version: livePayment.version },
+            data: { status: PaymentStatus.CANCELLED, version: { increment: 1 } },
           });
 
           await tx.bookingIntent.update({

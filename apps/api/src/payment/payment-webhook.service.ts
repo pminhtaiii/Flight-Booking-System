@@ -331,9 +331,6 @@ export class PaymentWebhookService {
     }
 
     try {
-      const nextIntentStatus =
-        payment.bookingIntent.paymentAttemptCount >= 2 ? 'PAYMENT_EXHAUSTED' : 'AWAITING_PAYMENT';
-
       await this.prisma.$transaction(async (tx) => {
         const livePayment = await tx.payment.findUnique({ where: { id: payment.id } });
 
@@ -344,6 +341,15 @@ export class PaymentWebhookService {
         if (livePayment.status === nextStatus) return;
 
         enforceTransition(livePayment.status, nextStatus);
+
+        const liveIntent = await tx.bookingIntent.findUnique({
+          where: { id: payment.bookingIntentId },
+          select: { paymentAttemptCount: true },
+        });
+        const nextIntentStatus =
+          (liveIntent?.paymentAttemptCount ?? payment.bookingIntent.paymentAttemptCount) >= 2
+            ? 'PAYMENT_EXHAUSTED'
+            : 'AWAITING_PAYMENT';
 
         // 1. Update Payment status
         await tx.payment.update({
@@ -410,9 +416,6 @@ export class PaymentWebhookService {
     }
 
     try {
-      const nextIntentStatus =
-        payment.bookingIntent.paymentAttemptCount >= 2 ? 'PAYMENT_EXHAUSTED' : 'AWAITING_PAYMENT';
-
       await this.prisma.$transaction(async (tx) => {
         const livePayment = await tx.payment.findUnique({ where: { id: payment.id } });
 
@@ -423,6 +426,15 @@ export class PaymentWebhookService {
         if (livePayment.status === nextStatus) return;
 
         enforceTransition(livePayment.status, nextStatus);
+
+        const liveIntent = await tx.bookingIntent.findUnique({
+          where: { id: payment.bookingIntentId },
+          select: { paymentAttemptCount: true },
+        });
+        const nextIntentStatus =
+          (liveIntent?.paymentAttemptCount ?? payment.bookingIntent.paymentAttemptCount) >= 2
+            ? 'PAYMENT_EXHAUSTED'
+            : 'AWAITING_PAYMENT';
 
         // 1. Update Payment status
         await tx.payment.update({

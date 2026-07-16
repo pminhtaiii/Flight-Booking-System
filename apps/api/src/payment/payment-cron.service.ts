@@ -61,6 +61,7 @@ export class PaymentCronService {
               await this.prisma.$transaction(async (tx) => {
                 const currentPayment = await tx.payment.findUnique({
                   where: { id: payment.id },
+                  include: { bookingIntent: true },
                 });
 
                 if (!currentPayment || currentPayment.status !== PaymentStatus.AUTHORIZED) {
@@ -154,6 +155,7 @@ export class PaymentCronService {
               await this.prisma.$transaction(async (tx) => {
                 const currentPayment = await tx.payment.findUnique({
                   where: { id: payment.id },
+                  include: { bookingIntent: true },
                 });
 
                 if (!currentPayment || currentPayment.status !== PaymentStatus.AUTHORIZED) {
