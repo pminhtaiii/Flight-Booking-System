@@ -530,6 +530,8 @@ export class DuffelService {
           return body.data;
         })();
 
+        orderPromise.catch(() => {});
+
         const result = await Promise.race([orderPromise, timeoutPromise]);
         return result;
         /* eslint-enable @typescript-eslint/no-explicit-any */

@@ -552,80 +552,82 @@ export class PaymentService {
         }
 
         const transactionId = crypto.randomUUID();
-        enforceTransition(payment.status, 'SUCCEEDED');
+        if (payment.status !== 'SUCCEEDED') {
+          enforceTransition(payment.status, 'SUCCEEDED');
 
-        await this.prisma.$transaction(async (tx) => {
-          // Update Payment status to SUCCEEDED
-          await tx.payment.update({
-            where: { id: payment.id },
-            data: { status: 'SUCCEEDED' },
+          await this.prisma.$transaction(async (tx) => {
+            // Update Payment status to SUCCEEDED
+            await tx.payment.update({
+              where: { id: payment.id },
+              data: { status: 'SUCCEEDED' },
+            });
+
+            // Log FSM transition to SUCCEEDED
+            await tx.paymentEvent.create({
+              data: {
+                paymentId: payment.id,
+                eventType: 'payment_captured',
+                previousStatus: payment.status === 'AUTHORIZED' ? 'AUTHORIZED' : payment.status,
+                newStatus: 'SUCCEEDED',
+                amount: payment.amount,
+                source: 'API',
+                createdBy: userId,
+              },
+            });
+
+            // Update BookingIntent status to CONFIRMED
+            await tx.bookingIntent.update({
+              where: { id: payment.bookingIntentId },
+              data: { status: 'CONFIRMED' },
+            });
+
+            // Create double-entry ledger rows
+            await tx.ledgerEntry.createMany({
+              data: [
+                {
+                  paymentId: payment.id,
+                  transactionId,
+                  accountId: 'CUSTOMER_RECEIVABLE',
+                  entryType: 'DEBIT',
+                  amount: payment.amount,
+                  currency: payment.currency,
+                },
+                {
+                  paymentId: payment.id,
+                  transactionId,
+                  accountId: 'PLATFORM_REVENUE',
+                  entryType: 'CREDIT',
+                  amount: payment.amount,
+                  currency: payment.currency,
+                },
+              ],
+            });
           });
 
-          // Log FSM transition to SUCCEEDED
-          await tx.paymentEvent.create({
-            data: {
-              paymentId: payment.id,
-              eventType: 'payment_captured',
-              previousStatus: payment.status === 'AUTHORIZED' ? 'AUTHORIZED' : payment.status,
-              newStatus: 'SUCCEEDED',
+          // Log audit events
+          await this.auditService.createLog(this.prisma, {
+            userId,
+            action: 'payment_captured',
+            resourceType: 'Payment',
+            resourceId: payment.id,
+            metadata: {
+              transactionId,
               amount: payment.amount,
-              source: 'API',
-              createdBy: userId,
+              currency: payment.currency,
             },
           });
 
-          // Update BookingIntent status to CONFIRMED
-          await tx.bookingIntent.update({
-            where: { id: payment.bookingIntentId },
-            data: { status: 'CONFIRMED' },
+          await this.auditService.createLog(this.prisma, {
+            userId,
+            action: 'booking_confirmed',
+            resourceType: 'BookingIntent',
+            resourceId: payment.bookingIntentId,
+            metadata: {
+              pnr: duffelOrder.booking_reference as string,
+              duffelOrderId: duffelOrder.id as string,
+            },
           });
-
-          // Create double-entry ledger rows
-          await tx.ledgerEntry.createMany({
-            data: [
-              {
-                paymentId: payment.id,
-                transactionId,
-                accountId: 'CUSTOMER_RECEIVABLE',
-                entryType: 'DEBIT',
-                amount: payment.amount,
-                currency: payment.currency,
-              },
-              {
-                paymentId: payment.id,
-                transactionId,
-                accountId: 'PLATFORM_REVENUE',
-                entryType: 'CREDIT',
-                amount: payment.amount,
-                currency: payment.currency,
-              },
-            ],
-          });
-        });
-
-        // Log audit events
-        await this.auditService.createLog(this.prisma, {
-          userId,
-          action: 'payment_captured',
-          resourceType: 'Payment',
-          resourceId: payment.id,
-          metadata: {
-            transactionId,
-            amount: payment.amount,
-            currency: payment.currency,
-          },
-        });
-
-        await this.auditService.createLog(this.prisma, {
-          userId,
-          action: 'booking_confirmed',
-          resourceType: 'BookingIntent',
-          resourceId: payment.bookingIntentId,
-          metadata: {
-            pnr: duffelOrder.booking_reference as string,
-            duffelOrderId: duffelOrder.id as string,
-          },
-        });
+        }
 
         await this.idempotencyService.updateRecoveryPoint(idempotencyKey, 'completed');
 
