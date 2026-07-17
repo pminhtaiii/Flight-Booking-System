@@ -163,4 +163,5 @@ Update this file after every completed feature. Any AI agent reading this should
 ## Notes
 
 - The test environment does not run PostgreSQL or Redis services locally. E2E tests use Jest spies on the PrismaClient instance to mock database states, keeping the API source code clean and genuine.
+- Fixed a double-increment of `paymentAttemptCount` on stale-lock retry of `createPayment` by querying for an existing Payment record before updating `booking_intents` (Step 2) and reusing the existing Payment record if found (Step 5).
 - Created a Mimo LLM diagnostic script (`apps/agent/src/agent/test_llm_connection.py`) allowing manual verification of API keys and endpoint connectivity directly from the terminal (securely prompts for keys via `getpass` and runs raw HTTP and LangChain tests).

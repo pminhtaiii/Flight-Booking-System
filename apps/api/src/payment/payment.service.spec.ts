@@ -327,4 +327,133 @@ describe('PaymentService - recoveryPoint === completed', () => {
       expect(mockPrisma.payment.update).toHaveBeenCalled();
     });
   });
+
+  describe('createPayment - stale-lock retry', () => {
+    const dto = {
+      bookingIntentId: 'intent-123',
+      paymentMethodId: 'pm_123',
+      saveCard: false,
+    };
+    const idempotencyKey = 'key-123';
+    const userId = 'user-123';
+    const ipAddress = '127.0.0.1';
+
+    beforeEach(() => {
+      mockPrisma.$transaction = jest.fn().mockImplementation(async (cb) => cb(mockPrisma));
+      mockPrisma.$queryRaw = jest.fn().mockResolvedValue([
+        {
+          id: 'intent-123',
+          status: 'CREATED',
+          paymentAttemptCount: 1,
+          confirmedPrice: 100,
+          currency: 'USD',
+          userId: 'user-123',
+        },
+      ]);
+      mockPrisma.$executeRaw = jest.fn().mockResolvedValue(1);
+      mockPrisma.payment.findFirst = jest.fn();
+      mockPrisma.payment.create = jest.fn();
+      mockPrisma.user = {
+        findUnique: jest.fn().mockResolvedValue({
+          email: 'test@example.com',
+          stripeCustomerId: 'cus_123',
+        }),
+        updateMany: jest.fn(),
+      };
+      mockPrisma.idempotencyKey = {
+        findUnique: jest.fn().mockResolvedValue({ id: 'key_id_123' }),
+      };
+      mockPrisma.paymentEvent = {
+        create: jest.fn().mockResolvedValue({}),
+      };
+      mockAudit.createLog = jest.fn().mockResolvedValue({});
+      mockIdempotency.updateRecoveryPoint = jest.fn().mockResolvedValue({});
+
+      mockStripe.createPaymentIntent = jest.fn().mockResolvedValue({
+        id: 'pi_123',
+        client_secret: 'secret_123',
+      });
+    });
+
+    it('should skip booking intent count increment when payment already exists for the idempotency key', async () => {
+      const mockPayment = {
+        id: 'payment-123',
+        bookingIntentId: 'intent-123',
+        attemptNumber: 1,
+        idempotencyKeyId: 'key_id_123',
+        stripePaymentIntentId: 'pi_123',
+        stripeCustomerId: 'cus_123',
+        amount: 10000,
+        currency: 'usd',
+        status: 'CREATED',
+      };
+
+      mockPrisma.payment.findFirst.mockResolvedValue(mockPayment);
+
+      const response = await service.createPayment(dto, idempotencyKey, userId, ipAddress);
+
+      expect(mockPrisma.$executeRaw).not.toHaveBeenCalled();
+      expect(mockPrisma.payment.create).not.toHaveBeenCalled();
+      expect(response).toEqual({
+        paymentId: 'payment-123',
+        clientSecret: 'secret_123',
+        status: 'CREATED',
+      });
+    });
+
+    it('should proceed with incrementing booking intent count and creating payment when no payment exists', async () => {
+      mockPrisma.payment.findFirst.mockResolvedValue(null);
+      mockPrisma.payment.create.mockResolvedValue({
+        id: 'payment-456',
+        status: 'CREATED',
+      });
+
+      const response = await service.createPayment(dto, idempotencyKey, userId, ipAddress);
+
+      expect(mockPrisma.$executeRaw).toHaveBeenCalled();
+      expect(mockPrisma.payment.create).toHaveBeenCalled();
+      expect(response).toEqual({
+        paymentId: 'payment-456',
+        clientSecret: 'secret_123',
+        status: 'CREATED',
+      });
+    });
+
+    it('should complete successfully even if paymentAttemptCount is already 2 (exhausted limit) if payment record exists', async () => {
+      mockPrisma.$queryRaw.mockResolvedValueOnce([
+        {
+          id: 'intent-123',
+          status: 'CREATED',
+          paymentAttemptCount: 2,
+          confirmedPrice: 100,
+          currency: 'USD',
+          userId: 'user-123',
+        },
+      ]);
+
+      const mockPayment = {
+        id: 'payment-123',
+        bookingIntentId: 'intent-123',
+        attemptNumber: 1,
+        idempotencyKeyId: 'key_id_123',
+        stripePaymentIntentId: 'pi_123',
+        stripeCustomerId: 'cus_123',
+        amount: 10000,
+        currency: 'usd',
+        status: 'CREATED',
+      };
+
+      mockPrisma.payment.findFirst.mockResolvedValue(mockPayment);
+
+      const response = await service.createPayment(dto, idempotencyKey, userId, ipAddress);
+
+      expect(mockPrisma.$executeRaw).not.toHaveBeenCalled();
+      expect(response).toEqual({
+        paymentId: 'payment-123',
+        clientSecret: 'secret_123',
+        status: 'CREATED',
+      });
+    });
+  });
 });
+

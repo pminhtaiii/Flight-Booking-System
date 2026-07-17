@@ -86,6 +86,22 @@ export class PaymentService {
           throw new BadRequestException('Booking intent is not in an allowed status for payment');
         }
 
+        const existingPayment = await tx.payment.findFirst({
+          where: {
+            idempotencyKey: {
+              key: idempotencyKey,
+            },
+          },
+        });
+
+        if (existingPayment) {
+          return {
+            confirmedPrice: Number(intent.confirmedPrice),
+            currency: intent.currency,
+            attemptNumber: existingPayment.attemptNumber,
+          };
+        }
+
         if (intent.paymentAttemptCount >= 2) {
           throw new BadRequestException('Payment attempts exhausted');
         }
@@ -163,18 +179,26 @@ export class PaymentService {
         throw new InternalServerErrorException('Idempotency key record not found');
       }
 
-      const payment = await this.prisma.payment.create({
-        data: {
-          bookingIntentId: dto.bookingIntentId,
-          attemptNumber: result.attemptNumber,
+      let payment = await this.prisma.payment.findFirst({
+        where: {
           idempotencyKeyId: keyRecord.id,
-          stripePaymentIntentId: paymentIntent.id,
-          stripeCustomerId,
-          amount: amountInCents,
-          currency: result.currency.toLowerCase(),
-          status: 'CREATED',
         },
       });
+
+      if (!payment) {
+        payment = await this.prisma.payment.create({
+          data: {
+            bookingIntentId: dto.bookingIntentId,
+            attemptNumber: result.attemptNumber,
+            idempotencyKeyId: keyRecord.id,
+            stripePaymentIntentId: paymentIntent.id,
+            stripeCustomerId,
+            amount: amountInCents,
+            currency: result.currency.toLowerCase(),
+            status: 'CREATED',
+          },
+        });
+      }
 
       // 6. Log event and audit
       await this.prisma.paymentEvent.create({
