@@ -314,6 +314,59 @@ export class PaymentService {
         recoveryPoint = 'started';
       }
 
+      if (recoveryPoint === 'completed') {
+        if (payment.status === 'SUCCEEDED') {
+          const duffelEvent = await this.prisma.paymentEvent.findFirst({
+            where: {
+              paymentId: payment.id,
+              eventType: 'duffel_order_created',
+            },
+            orderBy: { createdAt: 'desc' },
+          });
+
+          const duffelOrder = duffelEvent?.metadata as Record<string, unknown> | null;
+          if (!duffelOrder) {
+            throw new InternalServerErrorException('Duffel order details not found in payment history.');
+          }
+
+          const successResponse = {
+            success: true,
+            paymentId: payment.id,
+            status: 'SUCCEEDED',
+            bookingReference: duffelOrder.booking_reference as string,
+            duffelOrderId: duffelOrder.id as string,
+          };
+
+          await this.idempotencyService.completeKey(idempotencyKey, HttpStatus.OK, successResponse);
+          return successResponse;
+        } else {
+          const duffelEvent = await this.prisma.paymentEvent.findFirst({
+            where: {
+              paymentId: payment.id,
+              eventType: 'duffel_order_created',
+            },
+            orderBy: { createdAt: 'desc' },
+          });
+
+          const errorMsg = duffelEvent
+            ? 'Stripe capture failed or background processing failed. Duffel order cancelled and hold released.'
+            : 'Duffel booking failed. Payment hold released.';
+
+          const bookingIntent = await this.prisma.bookingIntent.findUnique({
+            where: { id: payment.bookingIntentId },
+          });
+
+          const failureResponse = {
+            success: false,
+            error: errorMsg,
+            bookingStatus: bookingIntent?.status || 'CANCELLED',
+          };
+
+          await this.idempotencyService.completeKey(idempotencyKey, HttpStatus.BAD_GATEWAY, failureResponse);
+          return failureResponse;
+        }
+      }
+
       // Step 1: Authorization Validation
       if (recoveryPoint === 'started') {
         const paymentIntent = await this.stripeService.retrievePaymentIntent(payment.stripePaymentIntentId);
