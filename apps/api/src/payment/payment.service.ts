@@ -683,7 +683,7 @@ export class PaymentService {
         where: { id: paymentId },
       });
 
-      if (!payment || payment.status === 'SUCCEEDED' || payment.status === 'CANCELLED' || payment.status === 'FAILED') {
+      if (!payment || payment.status === 'SUCCEEDED' || payment.status === 'CANCELLED' || payment.status === 'FAILED' || payment.status === 'EXPIRED') {
         return;
       }
 
@@ -718,6 +718,7 @@ export class PaymentService {
       }
 
       // Transition payment to CANCELLED
+      enforceTransition(payment.status, 'CANCELLED');
       await this.prisma.$transaction(async (tx) => {
         await tx.payment.update({
           where: { id: paymentId },

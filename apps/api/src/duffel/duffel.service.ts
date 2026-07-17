@@ -424,6 +424,13 @@ export class DuffelService {
         const phone_number = p.phoneNumber || p.phone_number;
         const email = p.email;
 
+        if (!born_on) {
+          throw new HttpException(
+            `Date of birth is required for passenger ${p.givenName || p.given_name || ''} ${p.familyName || p.family_name || ''}`,
+            HttpStatus.BAD_REQUEST,
+          );
+        }
+
         if (!phone_number) {
           throw new HttpException(
             `Phone number is required for passenger ${p.givenName || p.given_name || ''} ${p.familyName || p.family_name || ''}`,
