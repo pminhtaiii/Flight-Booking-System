@@ -13,6 +13,8 @@ import {
 } from '@nestjs/common';
 import { Request, Response } from 'express';
 import { JwtAuthGuard } from '@/auth/guards/jwt-auth.guard';
+import { RolesGuard } from '@/auth/guards/roles.guard';
+import { Roles } from '@/auth/decorators/roles.decorator';
 import { PaymentService } from './payment.service';
 import { PaymentRefundService } from './payment-refund.service';
 import { CreatePaymentDto } from './dto/create-payment.dto';
@@ -25,6 +27,7 @@ interface AuthenticatedRequest extends Request {
   user: {
     id: string;
     email: string;
+    role: string;
   };
 }
 
@@ -81,6 +84,8 @@ export class PaymentController {
   }
 
   @Post(':paymentId/refund')
+  @UseGuards(RolesGuard)
+  @Roles('ADMIN')
   @HttpCode(HttpStatus.CREATED)
   async refundPayment(
     @Req() req: AuthenticatedRequest,

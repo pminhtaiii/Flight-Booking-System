@@ -4,6 +4,7 @@ import {
   NotFoundException,
   BadRequestException,
   ForbiddenException,
+  ConflictException,
   InternalServerErrorException,
   HttpStatus,
 } from '@nestjs/common';
@@ -92,16 +93,12 @@ export class PaymentRefundService {
         return JSON.parse(idempotency.responseBody) as RefundResponse;
       }
 
-      // 6. Call Stripe to create refund
-      const stripeRefund = await this.stripeService.createRefund(
-        payment.stripePaymentIntentId,
-        dto.amount,
-        dto.reason,
-        `${idempotencyKey}-stripe-refund`,
-      );
-
-      // 7. Create Refund record and transition Payment status in a transaction
-      const refund = await this.prisma.$transaction(async (tx) => {
+      // 6. Create Refund record and transition Payment status BEFORE calling Stripe.
+      //    This ensures we have a traceable record before any money moves.
+      //    Optimistic lock on payment.version prevents concurrent double-refunds.
+      let refund: Awaited<ReturnType<typeof this.prisma.refund.create>>;
+      try {
+      refund = await this.prisma.$transaction(async (tx) => {
         const idempotencyKeyRecord = await tx.idempotencyKey.findUnique({
           where: { key: refundIdempotencyKey },
           select: { id: true },
@@ -115,7 +112,7 @@ export class PaymentRefundService {
           data: {
             paymentId,
             idempotencyKeyId: idempotencyKeyRecord.id,
-            stripeRefundId: stripeRefund.id,
+            stripeRefundId: null,
             amount: dto.amount,
             currency: payment.currency,
             reason: dto.reason,
@@ -125,13 +122,16 @@ export class PaymentRefundService {
           },
         });
 
-        // 8. Transition Payment to REFUND_PENDING
+        // Transition Payment to REFUND_PENDING
         await tx.payment.update({
-          where: { id: paymentId },
-          data: { status: PaymentStatus.REFUND_PENDING },
+          where: { id: paymentId, version: payment.version },
+          data: {
+            status: PaymentStatus.REFUND_PENDING,
+            version: { increment: 1 },
+          },
         });
 
-        // 9. Append PaymentEvent
+        // Append PaymentEvent
         await tx.paymentEvent.create({
           data: {
             paymentId,
@@ -145,6 +145,42 @@ export class PaymentRefundService {
         });
 
         return createdRefund;
+      });
+      } catch (txError) {
+        if (txError instanceof Prisma.PrismaClientKnownRequestError && txError.code === 'P2025') {
+          throw new ConflictException(
+            'Payment status changed concurrently. Please retry.',
+          );
+        }
+        throw txError;
+      }
+
+      // 7. Call Stripe to create refund (after DB record exists)
+      let stripeRefund;
+      try {
+        stripeRefund = await this.stripeService.createRefund(
+          payment.stripePaymentIntentId,
+          dto.amount,
+          dto.reason,
+          `${idempotencyKey}-stripe-refund`,
+        );
+      } catch (stripeError) {
+        // Stripe call failed — mark the Refund as FAILED so it's traceable
+        await this.prisma.refund.update({
+          where: { id: refund.id },
+          data: { status: 'FAILED' },
+        });
+        this.logger.error(
+          `Stripe refund failed for payment ${paymentId}, Refund ${refund.id} marked FAILED`,
+          stripeError instanceof Error ? stripeError.stack : undefined,
+        );
+        throw stripeError;
+      }
+
+      // 8. Update Refund with Stripe refund ID
+      refund = await this.prisma.refund.update({
+        where: { id: refund.id },
+        data: { stripeRefundId: stripeRefund.id },
       });
 
       // 10. Audit log
@@ -408,16 +444,11 @@ export class PaymentRefundService {
         return JSON.parse(idempotency.responseBody) as RefundResponse;
       }
 
-      // Call Stripe to create refund (full refundable amount)
-      const stripeRefund = await this.stripeService.createRefund(
-        payment.stripePaymentIntentId,
-        refundableAmount,
-        reason,
-        `${idempotencyKey}-stripe-refund`,
-      );
-
-      // Create Refund record and transition Payment status
-      const refund = await this.prisma.$transaction(async (tx) => {
+      // Create Refund record and transition Payment status BEFORE calling Stripe
+      //    Optimistic lock on payment.version prevents concurrent double-refunds.
+      let refund: Awaited<ReturnType<typeof this.prisma.refund.create>>;
+      try {
+      refund = await this.prisma.$transaction(async (tx) => {
         const idempotencyKeyRecord = await tx.idempotencyKey.findUnique({
           where: { key: idempotencyKey },
           select: { id: true },
@@ -431,7 +462,7 @@ export class PaymentRefundService {
           data: {
             paymentId,
             idempotencyKeyId: idempotencyKeyRecord.id,
-            stripeRefundId: stripeRefund.id,
+            stripeRefundId: null,
             amount: refundableAmount,
             currency: payment.currency,
             reason,
@@ -443,8 +474,11 @@ export class PaymentRefundService {
         });
 
         await tx.payment.update({
-          where: { id: paymentId },
-          data: { status: PaymentStatus.REFUND_PENDING },
+          where: { id: paymentId, version: payment.version },
+          data: {
+            status: PaymentStatus.REFUND_PENDING,
+            version: { increment: 1 },
+          },
         });
 
         await tx.paymentEvent.create({
@@ -460,6 +494,41 @@ export class PaymentRefundService {
         });
 
         return createdRefund;
+      });
+      } catch (txError) {
+        if (txError instanceof Prisma.PrismaClientKnownRequestError && txError.code === 'P2025') {
+          throw new ConflictException(
+            'Payment status changed concurrently. Please retry.',
+          );
+        }
+        throw txError;
+      }
+
+      // Call Stripe to create refund (after DB record exists)
+      let stripeRefund;
+      try {
+        stripeRefund = await this.stripeService.createRefund(
+          payment.stripePaymentIntentId,
+          refundableAmount,
+          reason,
+          `${idempotencyKey}-stripe-refund`,
+        );
+      } catch (stripeError) {
+        await this.prisma.refund.update({
+          where: { id: refund.id },
+          data: { status: 'FAILED' },
+        });
+        this.logger.error(
+          `Stripe refund failed for automated refund on payment ${paymentId}, Refund ${refund.id} marked FAILED`,
+          stripeError instanceof Error ? stripeError.stack : undefined,
+        );
+        throw stripeError;
+      }
+
+      // Update Refund with Stripe refund ID
+      refund = await this.prisma.refund.update({
+        where: { id: refund.id },
+        data: { stripeRefundId: stripeRefund.id },
       });
 
       // Audit log

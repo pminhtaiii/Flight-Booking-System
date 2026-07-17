@@ -28,10 +28,16 @@ enum PassengerType {
   INFANT
 }
 
+enum UserRole {
+  USER
+  ADMIN
+}
+
 model User {
   id              String             @id @default(uuid())
   email           String             @unique
   password        String
+  role            UserRole           @default(USER)
   status          UserStatus         @default(ACTIVE)
   createdAt       DateTime           @default(now())
   updatedAt       DateTime           @updatedAt
