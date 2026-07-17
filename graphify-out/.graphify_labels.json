@@ -308,5 +308,19 @@
   "306": "Phase 7: Hard Stop & Partial Persistence — Failure Handling",
   "307": "Phase 8: Pipeline Parallelism — Latency Optimization",
   "308": "Phase 10: E2E Testing & Validation — Final Verification",
-  "309": "Decision 9: Recovery Points and Dual State Tracking"
+  "309": "Decision 9: Recovery Points and Dual State Tracking",
+  "310": "create-intent.dto.ts",
+  "311": "New Enums",
+  "312": "test_guardrail_logging.py",
+  "313": ".searchFlights",
+  "314": "FastAPI",
+  "315": "Decision 7: Webhook Processing — Source of Truth with Two-Tier Handling",
+  "316": "Phase 2: Configuration & PII Detection — Foundation",
+  "317": "Phase 3: Sentence-Boundary Chunking — Token Accumulation",
+  "318": "Phase 4: NeMo Output Rail — Safety Classification",
+  "319": "Phase 5: Output Guardrail Pipeline — Orchestration",
+  "320": "Phase 6: SSE Integration — Wire Pipeline Into Streaming",
+  "321": "Phase 7: Hard Stop & Partial Persistence — Failure Handling",
+  "322": "Phase 8: Pipeline Parallelism — Latency Optimization",
+  "323": "Phase 10: E2E Testing & Validation — Final Verification"
 }
