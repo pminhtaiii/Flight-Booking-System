@@ -17,6 +17,9 @@ export class DuffelTimeoutError extends Error {
 export class DuffelService {
   private readonly logger = new Logger(DuffelService.name);
   private readonly duffel: Duffel;
+  private readonly duffelToken: string;
+  private readonly apiVersion = 'v2';
+  private readonly basePath = 'https://api.duffel.com';
 
   constructor(private readonly cacheService: CacheService) {
     const token = process.env.DUFFEL_ACCESS_TOKEN;
@@ -27,8 +30,9 @@ export class DuffelService {
       this.logger.warn('DUFFEL_ACCESS_TOKEN is missing or invalid in production/development runtime.');
     }
 
+    this.duffelToken = token || '';
     this.duffel = new Duffel({
-      token: token || '',
+      token: this.duffelToken,
     });
   }
 
@@ -400,6 +404,23 @@ export class DuffelService {
         }
         typeCounters[duffelType]++;
 
+        const givenName = p.givenName || p.given_name;
+        const familyName = p.familyName || p.family_name;
+
+        if (!givenName) {
+          throw new HttpException(
+            'Given name is required for passenger.',
+            HttpStatus.BAD_REQUEST,
+          );
+        }
+
+        if (!familyName) {
+          throw new HttpException(
+            'Family name is required for passenger.',
+            HttpStatus.BAD_REQUEST,
+          );
+        }
+
         let gender: 'm' | 'f' | 'u' = 'u';
         if (p.gender) {
           const firstChar = p.gender.trim().toLowerCase()[0];
@@ -427,29 +448,29 @@ export class DuffelService {
 
         if (!born_on) {
           throw new HttpException(
-            `Date of birth is required for passenger ${p.givenName || p.given_name || ''} ${p.familyName || p.family_name || ''}`,
+            `Date of birth is required for passenger ${givenName} ${familyName}`,
             HttpStatus.BAD_REQUEST,
           );
         }
 
         if (!phone_number) {
           throw new HttpException(
-            `Phone number is required for passenger ${p.givenName || p.given_name || ''} ${p.familyName || p.family_name || ''}`,
+            `Phone number is required for passenger ${givenName} ${familyName}`,
             HttpStatus.BAD_REQUEST,
           );
         }
 
         if (!email) {
           throw new HttpException(
-            `Email address is required for passenger ${p.givenName || p.given_name || ''} ${p.familyName || p.family_name || ''}`,
+            `Email address is required for passenger ${givenName} ${familyName}`,
             HttpStatus.BAD_REQUEST,
           );
         }
 
         return {
           id: matchedOfferPassenger.id,
-          given_name: p.givenName || p.given_name,
-          family_name: p.familyName || p.family_name,
+          given_name: givenName,
+          family_name: familyName,
           born_on,
           gender,
           title,
@@ -471,9 +492,9 @@ export class DuffelService {
 
       try {
         /* eslint-disable @typescript-eslint/no-explicit-any */
-        const token = (this.duffel as any).client.token;
-        const apiVersion = (this.duffel as any).client.apiVersion || 'v2';
-        const basePath = (this.duffel as any).client.basePath || 'https://api.duffel.com';
+        const token = this.duffelToken;
+        const apiVersion = this.apiVersion;
+        const basePath = this.basePath;
         const key = idempotencyKey || crypto.randomUUID();
 
         const orderPromise = (async () => {
