@@ -5500,7 +5500,7 @@
       "source_location": "L9",
       "_origin": "ast",
       "id": "apps_api_src_airports_airports_service_airportsservice_constructor",
-      "community": 152,
+      "community": 256,
       "norm_label": ".constructor()"
     },
     {
@@ -5590,7 +5590,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "apps_api_src_app_module",
-      "community": 254,
+      "community": 29,
       "norm_label": "app.module.ts"
     },
     {
@@ -5600,7 +5600,7 @@
       "source_location": "L19",
       "_origin": "ast",
       "id": "apps_api_src_app_module_envschema",
-      "community": 254,
+      "community": 29,
       "norm_label": "envschema"
     },
     {
@@ -5640,7 +5640,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "apps_api_src_audit_audit_service",
-      "community": 6,
+      "community": 276,
       "norm_label": "audit.service.ts"
     },
     {
@@ -5950,7 +5950,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "apps_api_src_auth_guards_jwt_auth_guard",
-      "community": 285,
+      "community": 277,
       "norm_label": "jwt-auth.guard.ts"
     },
     {
@@ -5960,7 +5960,7 @@
       "source_location": "L5",
       "_origin": "ast",
       "id": "apps_api_src_auth_guards_jwt_auth_guard_jwtauthguard",
-      "community": 285,
+      "community": 277,
       "norm_label": "jwtauthguard"
     },
     {
@@ -6100,7 +6100,7 @@
       "source_location": "L28",
       "_origin": "ast",
       "id": "apps_api_src_auth_strategies_jwt_strategy_jwtstrategy_validate",
-      "community": 152,
+      "community": 256,
       "norm_label": ".validate()"
     },
     {
@@ -6250,7 +6250,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "apps_api_src_booking_intent_booking_intent_module",
-      "community": 254,
+      "community": 6,
       "norm_label": "booking-intent.module.ts"
     },
     {
@@ -6260,7 +6260,7 @@
       "source_location": "L16",
       "_origin": "ast",
       "id": "apps_api_src_booking_intent_booking_intent_module_bookingintentmodule",
-      "community": 254,
+      "community": 6,
       "norm_label": "bookingintentmodule"
     },
     {
@@ -6360,7 +6360,7 @@
       "source_location": "L27",
       "_origin": "ast",
       "id": "apps_api_src_booking_intent_booking_intent_service_bookingintentservice_constructor",
-      "community": 6,
+      "community": 276,
       "norm_label": ".constructor()"
     },
     {
@@ -7480,7 +7480,7 @@
       "source_location": "L24",
       "_origin": "ast",
       "id": "apps_api_src_duffel_duffel_service_duffelservice_constructor",
-      "community": 276,
+      "community": 256,
       "norm_label": ".constructor()"
     },
     {
@@ -7510,7 +7510,7 @@
       "source_location": "L322",
       "_origin": "ast",
       "id": "apps_api_src_duffel_duffel_service_duffelservice_getofferbyid",
-      "community": 277,
+      "community": 276,
       "norm_label": ".getofferbyid()"
     },
     {
@@ -7520,7 +7520,7 @@
       "source_location": "L341",
       "_origin": "ast",
       "id": "apps_api_src_duffel_duffel_service_duffelservice_createorder",
-      "community": 277,
+      "community": 276,
       "norm_label": ".createorder()"
     },
     {
@@ -7990,7 +7990,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "apps_api_src_health_health_controller",
-      "community": 254,
+      "community": 276,
       "norm_label": "health.controller.ts"
     },
     {
@@ -8000,7 +8000,7 @@
       "source_location": "L6",
       "_origin": "ast",
       "id": "apps_api_src_health_health_controller_healthcontroller",
-      "community": 254,
+      "community": 276,
       "norm_label": "healthcontroller"
     },
     {
@@ -8010,7 +8010,7 @@
       "source_location": "L9",
       "_origin": "ast",
       "id": "apps_api_src_health_health_controller_healthcontroller_constructor",
-      "community": 254,
+      "community": 276,
       "norm_label": ".constructor()"
     },
     {
@@ -8020,7 +8020,7 @@
       "source_location": "L12",
       "_origin": "ast",
       "id": "apps_api_src_health_health_controller_healthcontroller_check",
-      "community": 254,
+      "community": 276,
       "norm_label": ".check()"
     },
     {
@@ -8030,7 +8030,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "apps_api_src_health_health_module",
-      "community": 254,
+      "community": 276,
       "norm_label": "health.module.ts"
     },
     {
@@ -8040,7 +8040,7 @@
       "source_location": "L7",
       "_origin": "ast",
       "id": "apps_api_src_health_health_module_healthmodule",
-      "community": 254,
+      "community": 276,
       "norm_label": "healthmodule"
     },
     {
@@ -8160,7 +8160,7 @@
       "source_location": "L14",
       "_origin": "ast",
       "id": "apps_api_src_payment_payment_idempotency_service_paymentidempotencyservice",
-      "community": 276,
+      "community": 37,
       "norm_label": "paymentidempotencyservice"
     },
     {
@@ -8170,7 +8170,7 @@
       "source_location": "L17",
       "_origin": "ast",
       "id": "apps_api_src_payment_payment_idempotency_service_paymentidempotencyservice_constructor",
-      "community": 276,
+      "community": 37,
       "norm_label": ".constructor()"
     },
     {
@@ -8230,7 +8230,7 @@
       "source_location": "L194",
       "_origin": "ast",
       "id": "apps_api_src_payment_payment_idempotency_service_paymentidempotencyservice_islocked",
-      "community": 276,
+      "community": 37,
       "norm_label": ".islocked()"
     },
     {
@@ -8334,6 +8334,116 @@
       "norm_label": "resolvedisputestatus()"
     },
     {
+      "label": "payment-webhook.controller.spec.ts",
+      "file_type": "code",
+      "source_file": "apps/api/src/payment/payment-webhook.controller.spec.ts",
+      "source_location": "L1",
+      "_origin": "ast",
+      "id": "apps_api_src_payment_payment_webhook_controller_spec",
+      "community": 37,
+      "norm_label": "payment-webhook.controller.spec.ts"
+    },
+    {
+      "label": "payment-webhook.controller.ts",
+      "file_type": "code",
+      "source_file": "apps/api/src/payment/payment-webhook.controller.ts",
+      "source_location": "L1",
+      "_origin": "ast",
+      "id": "apps_api_src_payment_payment_webhook_controller",
+      "community": 37,
+      "norm_label": "payment-webhook.controller.ts"
+    },
+    {
+      "label": "PaymentWebhookController",
+      "file_type": "code",
+      "source_file": "apps/api/src/payment/payment-webhook.controller.ts",
+      "source_location": "L16",
+      "_origin": "ast",
+      "id": "apps_api_src_payment_payment_webhook_controller_paymentwebhookcontroller",
+      "community": 37,
+      "norm_label": "paymentwebhookcontroller"
+    },
+    {
+      "label": ".constructor()",
+      "file_type": "code",
+      "source_file": "apps/api/src/payment/payment-webhook.controller.ts",
+      "source_location": "L19",
+      "_origin": "ast",
+      "id": "apps_api_src_payment_payment_webhook_controller_paymentwebhookcontroller_constructor",
+      "community": 37,
+      "norm_label": ".constructor()"
+    },
+    {
+      "label": ".handleWebhook()",
+      "file_type": "code",
+      "source_file": "apps/api/src/payment/payment-webhook.controller.ts",
+      "source_location": "L26",
+      "_origin": "ast",
+      "id": "apps_api_src_payment_payment_webhook_controller_paymentwebhookcontroller_handlewebhook",
+      "community": 37,
+      "norm_label": ".handlewebhook()"
+    },
+    {
+      "label": "payment-webhook.service.spec.ts",
+      "file_type": "code",
+      "source_file": "apps/api/src/payment/payment-webhook.service.spec.ts",
+      "source_location": "L1",
+      "_origin": "ast",
+      "id": "apps_api_src_payment_payment_webhook_service_spec",
+      "community": 37,
+      "norm_label": "payment-webhook.service.spec.ts"
+    },
+    {
+      "label": "payment-webhook.service.ts",
+      "file_type": "code",
+      "source_file": "apps/api/src/payment/payment-webhook.service.ts",
+      "source_location": "L1",
+      "_origin": "ast",
+      "id": "apps_api_src_payment_payment_webhook_service",
+      "community": 37,
+      "norm_label": "payment-webhook.service.ts"
+    },
+    {
+      "label": "PaymentWebhookService",
+      "file_type": "code",
+      "source_file": "apps/api/src/payment/payment-webhook.service.ts",
+      "source_location": "L9",
+      "_origin": "ast",
+      "id": "apps_api_src_payment_payment_webhook_service_paymentwebhookservice",
+      "community": 37,
+      "norm_label": "paymentwebhookservice"
+    },
+    {
+      "label": ".constructor()",
+      "file_type": "code",
+      "source_file": "apps/api/src/payment/payment-webhook.service.ts",
+      "source_location": "L12",
+      "_origin": "ast",
+      "id": "apps_api_src_payment_payment_webhook_service_paymentwebhookservice_constructor",
+      "community": 37,
+      "norm_label": ".constructor()"
+    },
+    {
+      "label": ".handleWebhookEvent()",
+      "file_type": "code",
+      "source_file": "apps/api/src/payment/payment-webhook.service.ts",
+      "source_location": "L20",
+      "_origin": "ast",
+      "id": "apps_api_src_payment_payment_webhook_service_paymentwebhookservice_handlewebhookevent",
+      "community": 37,
+      "norm_label": ".handlewebhookevent()"
+    },
+    {
+      "label": ".executeStateTransition()",
+      "file_type": "code",
+      "source_file": "apps/api/src/payment/payment-webhook.service.ts",
+      "source_location": "L208",
+      "_origin": "ast",
+      "id": "apps_api_src_payment_payment_webhook_service_paymentwebhookservice_executestatetransition",
+      "community": 37,
+      "norm_label": ".executestatetransition()"
+    },
+    {
       "label": "payment.controller.ts",
       "file_type": "code",
       "source_file": "apps/api/src/payment/payment.controller.ts",
@@ -8417,7 +8527,7 @@
       "label": "PaymentModule",
       "file_type": "code",
       "source_file": "apps/api/src/payment/payment.module.ts",
-      "source_location": "L16",
+      "source_location": "L18",
       "_origin": "ast",
       "id": "apps_api_src_payment_payment_module_paymentmodule",
       "community": 254,
@@ -8477,7 +8587,7 @@
       "label": ".confirmPayment()",
       "file_type": "code",
       "source_file": "apps/api/src/payment/payment.service.ts",
-      "source_location": "L226",
+      "source_location": "L250",
       "_origin": "ast",
       "id": "apps_api_src_payment_payment_service_paymentservice_confirmpayment",
       "community": 37,
@@ -8487,7 +8597,7 @@
       "label": ".executeConfirmPayment()",
       "file_type": "code",
       "source_file": "apps/api/src/payment/payment.service.ts",
-      "source_location": "L278",
+      "source_location": "L302",
       "_origin": "ast",
       "id": "apps_api_src_payment_payment_service_paymentservice_executeconfirmpayment",
       "community": 37,
@@ -8497,7 +8607,7 @@
       "label": ".getPaymentStatus()",
       "file_type": "code",
       "source_file": "apps/api/src/payment/payment.service.ts",
-      "source_location": "L708",
+      "source_location": "L732",
       "_origin": "ast",
       "id": "apps_api_src_payment_payment_service_paymentservice_getpaymentstatus",
       "community": 37,
@@ -8507,7 +8617,7 @@
       "label": ".handleBackgroundError()",
       "file_type": "code",
       "source_file": "apps/api/src/payment/payment.service.ts",
-      "source_location": "L735",
+      "source_location": "L759",
       "_origin": "ast",
       "id": "apps_api_src_payment_payment_service_paymentservice_handlebackgrounderror",
       "community": 37,
@@ -8550,7 +8660,7 @@
       "source_location": "L5",
       "_origin": "ast",
       "id": "apps_api_src_prisma_prisma_service_prismaservice",
-      "community": 29,
+      "community": 276,
       "norm_label": "prismaservice"
     },
     {
@@ -8560,7 +8670,7 @@
       "source_location": "L8",
       "_origin": "ast",
       "id": "apps_api_src_prisma_prisma_service_prismaservice_constructor",
-      "community": 29,
+      "community": 276,
       "norm_label": ".constructor()"
     },
     {
@@ -8570,7 +8680,7 @@
       "source_location": "L12",
       "_origin": "ast",
       "id": "apps_api_src_prisma_prisma_service_prismaservice_onmoduleinit",
-      "community": 29,
+      "community": 276,
       "norm_label": ".onmoduleinit()"
     },
     {
@@ -8580,7 +8690,7 @@
       "source_location": "L23",
       "_origin": "ast",
       "id": "apps_api_src_prisma_prisma_service_prismaservice_onmoduledestroy",
-      "community": 29,
+      "community": 276,
       "norm_label": ".onmoduledestroy()"
     },
     {
@@ -8590,7 +8700,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "apps_api_test_adversarial_e2e_spec",
-      "community": 256,
+      "community": 273,
       "norm_label": "adversarial.e2e-spec.ts"
     },
     {
@@ -8600,7 +8710,7 @@
       "source_location": "L11",
       "_origin": "ast",
       "id": "apps_api_test_adversarial_e2e_spec_cacheservicewithinternal",
-      "community": 256,
+      "community": 273,
       "norm_label": "cacheservicewithinternal"
     },
     {
@@ -8610,7 +8720,7 @@
       "source_location": "L15",
       "_origin": "ast",
       "id": "apps_api_test_adversarial_e2e_spec_sanitizedusermetadata",
-      "community": 256,
+      "community": 273,
       "norm_label": "sanitizedusermetadata"
     },
     {
@@ -8620,7 +8730,7 @@
       "source_location": "L26",
       "_origin": "ast",
       "id": "apps_api_test_adversarial_e2e_spec_sanitizedvariantsmetadata",
-      "community": 256,
+      "community": 273,
       "norm_label": "sanitizedvariantsmetadata"
     },
     {
@@ -8630,7 +8740,7 @@
       "source_location": "L33",
       "_origin": "ast",
       "id": "apps_api_test_adversarial_e2e_spec_circularmetadata",
-      "community": 256,
+      "community": 273,
       "norm_label": "circularmetadata"
     },
     {
@@ -20330,7 +20440,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_data_model",
-      "community": 304,
+      "community": 31,
       "norm_label": "data-model.md"
     },
     {
@@ -20340,7 +20450,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_data_model_data_model_llm_output_guardrails",
-      "community": 304,
+      "community": 31,
       "norm_label": "data model: llm output guardrails"
     },
     {
@@ -20350,7 +20460,7 @@
       "source_location": "L9",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_data_model_entities",
-      "community": 310,
+      "community": 31,
       "norm_label": "entities"
     },
     {
@@ -20360,7 +20470,7 @@
       "source_location": "L11",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_data_model_1_outputguardrailconfig",
-      "community": 310,
+      "community": 31,
       "norm_label": "1. outputguardrailconfig"
     },
     {
@@ -20370,7 +20480,7 @@
       "source_location": "L24",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_data_model_2_chunkbuffer",
-      "community": 310,
+      "community": 31,
       "norm_label": "2. chunkbuffer"
     },
     {
@@ -20380,7 +20490,7 @@
       "source_location": "L53",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_data_model_3_slidingwindow",
-      "community": 310,
+      "community": 31,
       "norm_label": "3. slidingwindow"
     },
     {
@@ -20390,7 +20500,7 @@
       "source_location": "L71",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_data_model_4_outputguardrailresult",
-      "community": 310,
+      "community": 31,
       "norm_label": "4. outputguardrailresult"
     },
     {
@@ -20400,7 +20510,7 @@
       "source_location": "L97",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_data_model_5_outputguardrailpipeline",
-      "community": 310,
+      "community": 31,
       "norm_label": "5. outputguardrailpipeline"
     },
     {
@@ -20410,7 +20520,7 @@
       "source_location": "L121",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_data_model_6_outputguardrailblockederror",
-      "community": 310,
+      "community": 31,
       "norm_label": "6. outputguardrailblockederror"
     },
     {
@@ -20420,7 +20530,7 @@
       "source_location": "L132",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_data_model_sse_event_extension",
-      "community": 304,
+      "community": 31,
       "norm_label": "sse event extension"
     },
     {
@@ -20430,7 +20540,7 @@
       "source_location": "L154",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_data_model_relationships",
-      "community": 304,
+      "community": 31,
       "norm_label": "relationships"
     },
     {
@@ -20440,7 +20550,7 @@
       "source_location": "L176",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_data_model_state_transitions",
-      "community": 304,
+      "community": 31,
       "norm_label": "state transitions"
     },
     {
@@ -20450,7 +20560,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_plan",
-      "community": 304,
+      "community": 31,
       "norm_label": "plan.md"
     },
     {
@@ -20580,7 +20690,7 @@
       "source_location": "L145",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_plan_phase_2_configuration_pii_detection_foundation",
-      "community": 316,
+      "community": 132,
       "norm_label": "phase 2: configuration & pii detection \u2014 foundation"
     },
     {
@@ -20590,7 +20700,7 @@
       "source_location": "L151",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_plan_files",
-      "community": 316,
+      "community": 132,
       "norm_label": "files"
     },
     {
@@ -20600,7 +20710,7 @@
       "source_location": "L158",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_plan_acceptance",
-      "community": 316,
+      "community": 132,
       "norm_label": "acceptance"
     },
     {
@@ -20610,7 +20720,7 @@
       "source_location": "L166",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_plan_tests",
-      "community": 316,
+      "community": 132,
       "norm_label": "tests"
     },
     {
@@ -20620,7 +20730,7 @@
       "source_location": "L173",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_plan_phase_3_sentence_boundary_chunking_token_accumulation",
-      "community": 317,
+      "community": 132,
       "norm_label": "phase 3: sentence-boundary chunking \u2014 token accumulation"
     },
     {
@@ -20630,7 +20740,7 @@
       "source_location": "L179",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_plan_files_179",
-      "community": 317,
+      "community": 132,
       "norm_label": "files"
     },
     {
@@ -20640,7 +20750,7 @@
       "source_location": "L185",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_plan_acceptance_185",
-      "community": 317,
+      "community": 132,
       "norm_label": "acceptance"
     },
     {
@@ -20650,7 +20760,7 @@
       "source_location": "L196",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_plan_tests_196",
-      "community": 317,
+      "community": 132,
       "norm_label": "tests"
     },
     {
@@ -20660,7 +20770,7 @@
       "source_location": "L202",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_plan_phase_4_nemo_output_rail_safety_classification",
-      "community": 318,
+      "community": 132,
       "norm_label": "phase 4: nemo output rail \u2014 safety classification"
     },
     {
@@ -20670,7 +20780,7 @@
       "source_location": "L208",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_plan_files_208",
-      "community": 318,
+      "community": 132,
       "norm_label": "files"
     },
     {
@@ -20680,7 +20790,7 @@
       "source_location": "L215",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_plan_acceptance_215",
-      "community": 318,
+      "community": 132,
       "norm_label": "acceptance"
     },
     {
@@ -20690,7 +20800,7 @@
       "source_location": "L224",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_plan_tests_224",
-      "community": 318,
+      "community": 132,
       "norm_label": "tests"
     },
     {
@@ -20700,7 +20810,7 @@
       "source_location": "L230",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_plan_phase_5_output_guardrail_pipeline_orchestration",
-      "community": 319,
+      "community": 132,
       "norm_label": "phase 5: output guardrail pipeline \u2014 orchestration"
     },
     {
@@ -20710,7 +20820,7 @@
       "source_location": "L236",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_plan_files_236",
-      "community": 319,
+      "community": 132,
       "norm_label": "files"
     },
     {
@@ -20720,7 +20830,7 @@
       "source_location": "L242",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_plan_acceptance_242",
-      "community": 319,
+      "community": 132,
       "norm_label": "acceptance"
     },
     {
@@ -20730,7 +20840,7 @@
       "source_location": "L253",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_plan_tests_253",
-      "community": 319,
+      "community": 132,
       "norm_label": "tests"
     },
     {
@@ -20740,7 +20850,7 @@
       "source_location": "L259",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_plan_phase_6_sse_integration_wire_pipeline_into_streaming",
-      "community": 320,
+      "community": 132,
       "norm_label": "phase 6: sse integration \u2014 wire pipeline into streaming"
     },
     {
@@ -20750,7 +20860,7 @@
       "source_location": "L265",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_plan_files_265",
-      "community": 320,
+      "community": 132,
       "norm_label": "files"
     },
     {
@@ -20760,7 +20870,7 @@
       "source_location": "L271",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_plan_acceptance_271",
-      "community": 320,
+      "community": 132,
       "norm_label": "acceptance"
     },
     {
@@ -20770,7 +20880,7 @@
       "source_location": "L279",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_plan_tests_279",
-      "community": 320,
+      "community": 132,
       "norm_label": "tests"
     },
     {
@@ -20780,7 +20890,7 @@
       "source_location": "L285",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_plan_phase_7_hard_stop_partial_persistence_failure_handling",
-      "community": 321,
+      "community": 132,
       "norm_label": "phase 7: hard stop & partial persistence \u2014 failure handling"
     },
     {
@@ -20790,7 +20900,7 @@
       "source_location": "L291",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_plan_files_291",
-      "community": 321,
+      "community": 132,
       "norm_label": "files"
     },
     {
@@ -20800,7 +20910,7 @@
       "source_location": "L297",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_plan_acceptance_297",
-      "community": 321,
+      "community": 132,
       "norm_label": "acceptance"
     },
     {
@@ -20810,7 +20920,7 @@
       "source_location": "L306",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_plan_tests_306",
-      "community": 321,
+      "community": 132,
       "norm_label": "tests"
     },
     {
@@ -20820,7 +20930,7 @@
       "source_location": "L312",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_plan_phase_8_pipeline_parallelism_latency_optimization",
-      "community": 322,
+      "community": 132,
       "norm_label": "phase 8: pipeline parallelism \u2014 latency optimization"
     },
     {
@@ -20830,7 +20940,7 @@
       "source_location": "L318",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_plan_files_318",
-      "community": 322,
+      "community": 132,
       "norm_label": "files"
     },
     {
@@ -20840,7 +20950,7 @@
       "source_location": "L324",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_plan_acceptance_324",
-      "community": 322,
+      "community": 132,
       "norm_label": "acceptance"
     },
     {
@@ -20850,7 +20960,7 @@
       "source_location": "L332",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_plan_tests_332",
-      "community": 322,
+      "community": 132,
       "norm_label": "tests"
     },
     {
@@ -20900,7 +21010,7 @@
       "source_location": "L365",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_plan_phase_10_e2e_testing_validation_final_verification",
-      "community": 323,
+      "community": 132,
       "norm_label": "phase 10: e2e testing & validation \u2014 final verification"
     },
     {
@@ -20910,7 +21020,7 @@
       "source_location": "L371",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_plan_files_371",
-      "community": 323,
+      "community": 132,
       "norm_label": "files"
     },
     {
@@ -20920,7 +21030,7 @@
       "source_location": "L378",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_plan_acceptance_success_criteria_verification",
-      "community": 323,
+      "community": 132,
       "norm_label": "acceptance \u2014 success criteria verification"
     },
     {
@@ -20930,7 +21040,7 @@
       "source_location": "L388",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_plan_checklist",
-      "community": 323,
+      "community": 132,
       "norm_label": "checklist"
     },
     {
@@ -21150,7 +21260,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_quickstart",
-      "community": 304,
+      "community": 31,
       "norm_label": "quickstart.md"
     },
     {
@@ -21160,7 +21270,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_quickstart_quickstart_validation_guide_llm_output_guardrails",
-      "community": 273,
+      "community": 31,
       "norm_label": "quickstart validation guide: llm output guardrails"
     },
     {
@@ -21170,7 +21280,7 @@
       "source_location": "L7",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_quickstart_prerequisites",
-      "community": 273,
+      "community": 31,
       "norm_label": "prerequisites"
     },
     {
@@ -21180,7 +21290,7 @@
       "source_location": "L20",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_quickstart_scenario_1_safe_response_streams_normally",
-      "community": 273,
+      "community": 31,
       "norm_label": "scenario 1: safe response streams normally"
     },
     {
@@ -21190,7 +21300,7 @@
       "source_location": "L43",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_quickstart_scenario_2_pii_in_output_triggers_hard_stop",
-      "community": 273,
+      "community": 31,
       "norm_label": "scenario 2: pii in output triggers hard stop"
     },
     {
@@ -21200,7 +21310,7 @@
       "source_location": "L83",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_quickstart_scenario_3_boundary_pii_detected_by_sliding_window",
-      "community": 273,
+      "community": 31,
       "norm_label": "scenario 3: boundary pii detected by sliding window"
     },
     {
@@ -21210,7 +21320,7 @@
       "source_location": "L123",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_quickstart_scenario_4_nemo_output_rail_blocks_harmful_content",
-      "community": 273,
+      "community": 31,
       "norm_label": "scenario 4: nemo output rail blocks harmful content"
     },
     {
@@ -21220,7 +21330,7 @@
       "source_location": "L155",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_quickstart_scenario_5_partial_response_persisted_on_block",
-      "community": 273,
+      "community": 31,
       "norm_label": "scenario 5: partial response persisted on block"
     },
     {
@@ -21230,7 +21340,7 @@
       "source_location": "L184",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_quickstart_scenario_6_kill_switch_disables_guardrails",
-      "community": 273,
+      "community": 31,
       "norm_label": "scenario 6: kill switch disables guardrails"
     },
     {
@@ -21240,7 +21350,7 @@
       "source_location": "L202",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_quickstart_running_tests",
-      "community": 273,
+      "community": 31,
       "norm_label": "running tests"
     },
     {
@@ -21250,7 +21360,7 @@
       "source_location": "L221",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_quickstart_verification_checklist",
-      "community": 273,
+      "community": 31,
       "norm_label": "verification checklist"
     },
     {
@@ -21260,7 +21370,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_research",
-      "community": 306,
+      "community": 31,
       "norm_label": "research.md"
     },
     {
@@ -21270,7 +21380,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_research_phase_0_research_llm_output_guardrails",
-      "community": 306,
+      "community": 31,
       "norm_label": "phase 0 research: llm output guardrails"
     },
     {
@@ -21280,7 +21390,7 @@
       "source_location": "L11",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_research_findings",
-      "community": 306,
+      "community": 31,
       "norm_label": "findings"
     },
     {
@@ -21290,7 +21400,7 @@
       "source_location": "L13",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_research_1_sentence_detection_edge_cases",
-      "community": 306,
+      "community": 31,
       "norm_label": "1. sentence detection edge cases"
     },
     {
@@ -21300,7 +21410,7 @@
       "source_location": "L45",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_research_2_sliding_window_token_count",
-      "community": 306,
+      "community": 31,
       "norm_label": "2. sliding window token count"
     },
     {
@@ -21310,7 +21420,7 @@
       "source_location": "L76",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_research_3_nemo_output_rail_configuration",
-      "community": 306,
+      "community": 31,
       "norm_label": "3. nemo output rail configuration"
     },
     {
@@ -21320,7 +21430,7 @@
       "source_location": "L118",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_research_4_streaming_ux_sentence_boundary_chunking_bursty_arrival",
-      "community": 306,
+      "community": 31,
       "norm_label": "4. streaming ux \u2014 sentence-boundary chunking bursty arrival"
     },
     {
@@ -21330,7 +21440,7 @@
       "source_location": "L149",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_research_summary_of_decisions",
-      "community": 306,
+      "community": 31,
       "norm_label": "summary of decisions"
     },
     {
@@ -21340,7 +21450,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_spec",
-      "community": 304,
+      "community": 31,
       "norm_label": "spec.md"
     },
     {
@@ -27224,14 +27334,14 @@
       "norm_label": "task.md"
     },
     {
-      "label": "Tasks: Stripe Payment System \u2014 PR 2 (Core Payment Pipeline)",
+      "label": "Tasks: Stripe Payment System \u2014 PR 3 (Webhook Processing)",
       "file_type": "document",
       "source_file": "task.md",
       "source_location": "L1",
       "_origin": "ast",
-      "id": "task_tasks_stripe_payment_system_pr_2_core_payment_pipeline",
+      "id": "task_tasks_stripe_payment_system_pr_3_webhook_processing",
       "community": 313,
-      "norm_label": "tasks: stripe payment system \u2014 pr 2 (core payment pipeline)"
+      "norm_label": "tasks: stripe payment system \u2014 pr 3 (webhook processing)"
     },
     {
       "label": "Variant C: Modern Split Refined",
@@ -37992,7 +38102,7 @@
       "context": "import",
       "confidence": "EXTRACTED",
       "source_file": "apps/api/src/payment/payment.module.ts",
-      "source_location": "L8",
+      "source_location": "L10",
       "weight": 1.0,
       "source": "apps_api_src_payment_payment_module",
       "target": "apps_api_src_audit_audit_module",
@@ -38036,7 +38146,7 @@
       "context": "import",
       "confidence": "EXTRACTED",
       "source_file": "apps/api/src/payment/payment.module.ts",
-      "source_location": "L8",
+      "source_location": "L10",
       "weight": 1.0,
       "source": "apps_api_src_payment_payment_module",
       "target": "apps_api_src_audit_audit_module_auditmodule",
@@ -38493,7 +38603,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "apps/api/src/payment/payment.service.ts",
-      "source_location": "L192",
+      "source_location": "L216",
       "weight": 1.0,
       "source": "apps_api_src_payment_payment_service_paymentservice_createpayment",
       "target": "apps_api_src_audit_audit_service_auditservice_createlog"
@@ -38504,7 +38614,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "apps/api/src/payment/payment.service.ts",
-      "source_location": "L400",
+      "source_location": "L424",
       "weight": 1.0,
       "source": "apps_api_src_payment_payment_service_paymentservice_executeconfirmpayment",
       "target": "apps_api_src_audit_audit_service_auditservice_createlog"
@@ -43017,6 +43127,50 @@
       "confidence_score": 1.0
     },
     {
+      "relation": "imports_from",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "apps/api/src/payment/payment-webhook.controller.ts",
+      "source_location": "L12",
+      "weight": 1.0,
+      "source": "apps_api_src_payment_payment_webhook_controller",
+      "target": "apps_api_src_common_stripe_service",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports_from",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "apps/api/src/payment/payment-webhook.controller.spec.ts",
+      "source_location": "L4",
+      "weight": 1.0,
+      "source": "apps_api_src_payment_payment_webhook_controller_spec",
+      "target": "apps_api_src_common_stripe_service",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports_from",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "apps/api/src/payment/payment-webhook.service.ts",
+      "source_location": "L3",
+      "weight": 1.0,
+      "source": "apps_api_src_payment_payment_webhook_service",
+      "target": "apps_api_src_common_stripe_service",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports_from",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "apps/api/src/payment/payment-webhook.service.spec.ts",
+      "source_location": "L5",
+      "weight": 1.0,
+      "source": "apps_api_src_payment_payment_webhook_service_spec",
+      "target": "apps_api_src_common_stripe_service",
+      "confidence_score": 1.0
+    },
+    {
       "relation": "method",
       "confidence": "EXTRACTED",
       "source_file": "apps/api/src/common/stripe.service.ts",
@@ -43141,12 +43295,78 @@
       "confidence_score": 1.0
     },
     {
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "apps/api/src/payment/payment-webhook.controller.ts",
+      "source_location": "L12",
+      "weight": 1.0,
+      "source": "apps_api_src_payment_payment_webhook_controller",
+      "target": "apps_api_src_common_stripe_service_stripeservice",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "references",
+      "context": "parameter_type",
+      "confidence": "EXTRACTED",
+      "source_file": "apps/api/src/payment/payment-webhook.controller.ts",
+      "source_location": "L19",
+      "weight": 1.0,
+      "source": "apps_api_src_payment_payment_webhook_controller_paymentwebhookcontroller_constructor",
+      "target": "apps_api_src_common_stripe_service_stripeservice",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "apps/api/src/payment/payment-webhook.controller.spec.ts",
+      "source_location": "L4",
+      "weight": 1.0,
+      "source": "apps_api_src_payment_payment_webhook_controller_spec",
+      "target": "apps_api_src_common_stripe_service_stripeservice",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "apps/api/src/payment/payment-webhook.service.ts",
+      "source_location": "L3",
+      "weight": 1.0,
+      "source": "apps_api_src_payment_payment_webhook_service",
+      "target": "apps_api_src_common_stripe_service_stripeservice",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "references",
+      "context": "parameter_type",
+      "confidence": "EXTRACTED",
+      "source_file": "apps/api/src/payment/payment-webhook.service.ts",
+      "source_location": "L12",
+      "weight": 1.0,
+      "source": "apps_api_src_payment_payment_webhook_service_paymentwebhookservice_constructor",
+      "target": "apps_api_src_common_stripe_service_stripeservice",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "apps/api/src/payment/payment-webhook.service.spec.ts",
+      "source_location": "L5",
+      "weight": 1.0,
+      "source": "apps_api_src_payment_payment_webhook_service_spec",
+      "target": "apps_api_src_common_stripe_service_stripeservice",
+      "confidence_score": 1.0
+    },
+    {
       "relation": "calls",
       "context": "call",
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "apps/api/src/payment/payment.service.ts",
-      "source_location": "L147",
+      "source_location": "L163",
       "weight": 1.0,
       "source": "apps_api_src_payment_payment_service_paymentservice_createpayment",
       "target": "apps_api_src_common_stripe_service_stripeservice_createpaymentintent"
@@ -43157,7 +43377,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "apps/api/src/payment/payment.service.ts",
-      "source_location": "L507",
+      "source_location": "L531",
       "weight": 1.0,
       "source": "apps_api_src_payment_payment_service_paymentservice_executeconfirmpayment",
       "target": "apps_api_src_common_stripe_service_stripeservice_capturepaymentintent"
@@ -43168,7 +43388,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "apps/api/src/payment/payment.service.ts",
-      "source_location": "L441",
+      "source_location": "L465",
       "weight": 1.0,
       "source": "apps_api_src_payment_payment_service_paymentservice_executeconfirmpayment",
       "target": "apps_api_src_common_stripe_service_stripeservice_cancelpaymentintent"
@@ -43179,7 +43399,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "apps/api/src/payment/payment.service.ts",
-      "source_location": "L783",
+      "source_location": "L829",
       "weight": 1.0,
       "source": "apps_api_src_payment_payment_service_paymentservice_handlebackgrounderror",
       "target": "apps_api_src_common_stripe_service_stripeservice_cancelpaymentintent"
@@ -43190,7 +43410,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "apps/api/src/payment/payment.service.ts",
-      "source_location": "L119",
+      "source_location": "L135",
       "weight": 1.0,
       "source": "apps_api_src_payment_payment_service_paymentservice_createpayment",
       "target": "apps_api_src_common_stripe_service_stripeservice_createcustomer"
@@ -43201,10 +43421,43 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "apps/api/src/payment/payment.service.ts",
-      "source_location": "L372",
+      "source_location": "L396",
       "weight": 1.0,
       "source": "apps_api_src_payment_payment_service_paymentservice_executeconfirmpayment",
       "target": "apps_api_src_common_stripe_service_stripeservice_retrievepaymentintent"
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "apps/api/src/payment/payment.service.ts",
+      "source_location": "L776",
+      "weight": 1.0,
+      "source": "apps_api_src_payment_payment_service_paymentservice_handlebackgrounderror",
+      "target": "apps_api_src_common_stripe_service_stripeservice_retrievepaymentintent"
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "apps/api/src/payment/payment-webhook.service.ts",
+      "source_location": "L126",
+      "weight": 1.0,
+      "source": "apps_api_src_payment_payment_webhook_service_paymentwebhookservice_handlewebhookevent",
+      "target": "apps_api_src_common_stripe_service_stripeservice_retrievepaymentintent"
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "apps/api/src/payment/payment-webhook.controller.ts",
+      "source_location": "L49",
+      "weight": 1.0,
+      "source": "apps_api_src_payment_payment_webhook_controller_paymentwebhookcontroller_handlewebhook",
+      "target": "apps_api_src_common_stripe_service_stripeservice_constructwebhookevent"
     },
     {
       "relation": "contains",
@@ -43405,7 +43658,7 @@
       "context": "import",
       "confidence": "EXTRACTED",
       "source_file": "apps/api/src/payment/payment.module.ts",
-      "source_location": "L7",
+      "source_location": "L9",
       "weight": 1.0,
       "source": "apps_api_src_payment_payment_module",
       "target": "apps_api_src_duffel_duffel_module",
@@ -43427,7 +43680,7 @@
       "context": "import",
       "confidence": "EXTRACTED",
       "source_file": "apps/api/src/payment/payment.module.ts",
-      "source_location": "L7",
+      "source_location": "L9",
       "weight": 1.0,
       "source": "apps_api_src_payment_payment_module",
       "target": "apps_api_src_duffel_duffel_module_duffelmodule",
@@ -43815,7 +44068,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "apps/api/src/payment/payment.service.ts",
-      "source_location": "L429",
+      "source_location": "L453",
       "weight": 1.0,
       "source": "apps_api_src_payment_payment_service_paymentservice_executeconfirmpayment",
       "target": "apps_api_src_duffel_duffel_service_duffelservice_createorder"
@@ -43826,7 +44079,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "apps/api/src/payment/payment.service.ts",
-      "source_location": "L530",
+      "source_location": "L554",
       "weight": 1.0,
       "source": "apps_api_src_payment_payment_service_paymentservice_executeconfirmpayment",
       "target": "apps_api_src_duffel_duffel_service_duffelservice_cancelorder"
@@ -43837,7 +44090,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "apps/api/src/payment/payment.service.ts",
-      "source_location": "L773",
+      "source_location": "L819",
       "weight": 1.0,
       "source": "apps_api_src_payment_payment_service_paymentservice_handlebackgrounderror",
       "target": "apps_api_src_duffel_duffel_service_duffelservice_cancelorder"
@@ -45056,7 +45309,7 @@
       "context": "parameter_type",
       "confidence": "EXTRACTED",
       "source_file": "apps/api/src/payment/payment.service.ts",
-      "source_location": "L226",
+      "source_location": "L250",
       "weight": 1.0,
       "source": "apps_api_src_payment_payment_service_paymentservice_confirmpayment",
       "target": "apps_api_src_payment_dto_confirm_payment_dto_confirmpaymentdto",
@@ -45067,7 +45320,7 @@
       "context": "parameter_type",
       "confidence": "EXTRACTED",
       "source_file": "apps/api/src/payment/payment.service.ts",
-      "source_location": "L278",
+      "source_location": "L302",
       "weight": 1.0,
       "source": "apps_api_src_payment_payment_service_paymentservice_executeconfirmpayment",
       "target": "apps_api_src_payment_dto_confirm_payment_dto_confirmpaymentdto",
@@ -45538,7 +45791,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "apps/api/src/payment/payment.service.ts",
-      "source_location": "L286",
+      "source_location": "L310",
       "weight": 1.0,
       "source": "apps_api_src_payment_payment_service_paymentservice_executeconfirmpayment",
       "target": "apps_api_src_payment_payment_idempotency_service_paymentidempotencyservice_acquireorreplay"
@@ -45549,7 +45802,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "apps/api/src/payment/payment.service.ts",
-      "source_location": "L206",
+      "source_location": "L230",
       "weight": 1.0,
       "source": "apps_api_src_payment_payment_service_paymentservice_createpayment",
       "target": "apps_api_src_payment_payment_idempotency_service_paymentidempotencyservice_updaterecoverypoint"
@@ -45560,7 +45813,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "apps/api/src/payment/payment.service.ts",
-      "source_location": "L412",
+      "source_location": "L436",
       "weight": 1.0,
       "source": "apps_api_src_payment_payment_service_paymentservice_executeconfirmpayment",
       "target": "apps_api_src_payment_payment_idempotency_service_paymentidempotencyservice_updaterecoverypoint"
@@ -45571,7 +45824,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "apps/api/src/payment/payment.service.ts",
-      "source_location": "L821",
+      "source_location": "L790",
       "weight": 1.0,
       "source": "apps_api_src_payment_payment_service_paymentservice_handlebackgrounderror",
       "target": "apps_api_src_payment_payment_idempotency_service_paymentidempotencyservice_updaterecoverypoint"
@@ -45582,7 +45835,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "apps/api/src/payment/payment.service.ts",
-      "source_location": "L214",
+      "source_location": "L238",
       "weight": 1.0,
       "source": "apps_api_src_payment_payment_service_paymentservice_createpayment",
       "target": "apps_api_src_payment_payment_idempotency_service_paymentidempotencyservice_completekey"
@@ -45593,7 +45846,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "apps/api/src/payment/payment.service.ts",
-      "source_location": "L340",
+      "source_location": "L364",
       "weight": 1.0,
       "source": "apps_api_src_payment_payment_service_paymentservice_executeconfirmpayment",
       "target": "apps_api_src_payment_payment_idempotency_service_paymentidempotencyservice_completekey"
@@ -45604,7 +45857,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "apps/api/src/payment/payment.service.ts",
-      "source_location": "L822",
+      "source_location": "L868",
       "weight": 1.0,
       "source": "apps_api_src_payment_payment_service_paymentservice_handlebackgrounderror",
       "target": "apps_api_src_payment_payment_idempotency_service_paymentidempotencyservice_completekey"
@@ -45615,7 +45868,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "apps/api/src/payment/payment.service.ts",
-      "source_location": "L312",
+      "source_location": "L336",
       "weight": 1.0,
       "source": "apps_api_src_payment_payment_service_paymentservice_executeconfirmpayment",
       "target": "apps_api_src_payment_payment_idempotency_service_paymentidempotencyservice_getresumepoint"
@@ -45626,7 +45879,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "apps/api/src/payment/payment.service.ts",
-      "source_location": "L750",
+      "source_location": "L786",
       "weight": 1.0,
       "source": "apps_api_src_payment_payment_service_paymentservice_handlebackgrounderror",
       "target": "apps_api_src_payment_payment_idempotency_service_paymentidempotencyservice_getresumepoint"
@@ -45659,7 +45912,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "apps/api/src/payment/payment.service.ts",
-      "source_location": "L285",
+      "source_location": "L309",
       "weight": 1.0,
       "source": "apps_api_src_payment_payment_service_paymentservice_executeconfirmpayment",
       "target": "apps_api_src_payment_payment_idempotency_service_paymentidempotencyservice_computehash"
@@ -45792,6 +46045,17 @@
       "confidence_score": 1.0
     },
     {
+      "relation": "imports_from",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "apps/api/src/payment/payment-webhook.service.ts",
+      "source_location": "L5",
+      "weight": 1.0,
+      "source": "apps_api_src_payment_payment_webhook_service",
+      "target": "apps_api_src_payment_payment_state_machine",
+      "confidence_score": 1.0
+    },
+    {
       "relation": "calls",
       "context": "call",
       "confidence": "EXTRACTED",
@@ -45801,6 +46065,28 @@
       "source": "apps_api_src_payment_payment_state_machine_enforcetransition",
       "target": "apps_api_src_payment_payment_state_machine_cantransition",
       "confidence_score": 1.0
+    },
+    {
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "apps/api/src/payment/payment-webhook.service.ts",
+      "source_location": "L5",
+      "weight": 1.0,
+      "source": "apps_api_src_payment_payment_webhook_service",
+      "target": "apps_api_src_payment_payment_state_machine_cantransition",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "apps/api/src/payment/payment-webhook.service.ts",
+      "source_location": "L105",
+      "weight": 1.0,
+      "source": "apps_api_src_payment_payment_webhook_service_paymentwebhookservice_handlewebhookevent",
+      "target": "apps_api_src_payment_payment_state_machine_cantransition"
     },
     {
       "relation": "imports",
@@ -45819,7 +46105,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "apps/api/src/payment/payment.service.ts",
-      "source_location": "L376",
+      "source_location": "L400",
       "weight": 1.0,
       "source": "apps_api_src_payment_payment_service_paymentservice_executeconfirmpayment",
       "target": "apps_api_src_payment_payment_state_machine_enforcetransition"
@@ -45830,10 +46116,311 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "apps/api/src/payment/payment.service.ts",
-      "source_location": "L790",
+      "source_location": "L836",
       "weight": 1.0,
       "source": "apps_api_src_payment_payment_service_paymentservice_handlebackgrounderror",
       "target": "apps_api_src_payment_payment_state_machine_enforcetransition"
+    },
+    {
+      "relation": "imports_from",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "apps/api/src/payment/payment-webhook.controller.spec.ts",
+      "source_location": "L3",
+      "weight": 1.0,
+      "source": "apps_api_src_payment_payment_webhook_controller_spec",
+      "target": "apps_api_src_payment_payment_webhook_controller",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "apps/api/src/payment/payment-webhook.controller.spec.ts",
+      "source_location": "L3",
+      "weight": 1.0,
+      "source": "apps_api_src_payment_payment_webhook_controller_spec",
+      "target": "apps_api_src_payment_payment_webhook_controller_paymentwebhookcontroller",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports_from",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "apps/api/src/payment/payment-webhook.controller.spec.ts",
+      "source_location": "L5",
+      "weight": 1.0,
+      "source": "apps_api_src_payment_payment_webhook_controller_spec",
+      "target": "apps_api_src_payment_payment_webhook_service",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "apps/api/src/payment/payment-webhook.controller.spec.ts",
+      "source_location": "L5",
+      "weight": 1.0,
+      "source": "apps_api_src_payment_payment_webhook_controller_spec",
+      "target": "apps_api_src_payment_payment_webhook_service_paymentwebhookservice",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports_from",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "apps/api/src/payment/payment.module.ts",
+      "source_location": "L7",
+      "weight": 1.0,
+      "source": "apps_api_src_payment_payment_module",
+      "target": "apps_api_src_payment_payment_webhook_controller",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "apps/api/src/payment/payment-webhook.controller.ts",
+      "source_location": "L16",
+      "weight": 1.0,
+      "source": "apps_api_src_payment_payment_webhook_controller",
+      "target": "apps_api_src_payment_payment_webhook_controller_paymentwebhookcontroller",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports_from",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "apps/api/src/payment/payment-webhook.controller.ts",
+      "source_location": "L13",
+      "weight": 1.0,
+      "source": "apps_api_src_payment_payment_webhook_controller",
+      "target": "apps_api_src_payment_payment_webhook_service",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "apps/api/src/payment/payment-webhook.controller.ts",
+      "source_location": "L13",
+      "weight": 1.0,
+      "source": "apps_api_src_payment_payment_webhook_controller",
+      "target": "apps_api_src_payment_payment_webhook_service_paymentwebhookservice",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "apps/api/src/payment/payment.module.ts",
+      "source_location": "L7",
+      "weight": 1.0,
+      "source": "apps_api_src_payment_payment_module",
+      "target": "apps_api_src_payment_payment_webhook_controller_paymentwebhookcontroller",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "method",
+      "confidence": "EXTRACTED",
+      "source_file": "apps/api/src/payment/payment-webhook.controller.ts",
+      "source_location": "L19",
+      "weight": 1.0,
+      "source": "apps_api_src_payment_payment_webhook_controller_paymentwebhookcontroller",
+      "target": "apps_api_src_payment_payment_webhook_controller_paymentwebhookcontroller_constructor",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "method",
+      "confidence": "EXTRACTED",
+      "source_file": "apps/api/src/payment/payment-webhook.controller.ts",
+      "source_location": "L26",
+      "weight": 1.0,
+      "source": "apps_api_src_payment_payment_webhook_controller_paymentwebhookcontroller",
+      "target": "apps_api_src_payment_payment_webhook_controller_paymentwebhookcontroller_handlewebhook",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "references",
+      "context": "parameter_type",
+      "confidence": "EXTRACTED",
+      "source_file": "apps/api/src/payment/payment-webhook.controller.ts",
+      "source_location": "L19",
+      "weight": 1.0,
+      "source": "apps_api_src_payment_payment_webhook_controller_paymentwebhookcontroller_constructor",
+      "target": "apps_api_src_payment_payment_webhook_service_paymentwebhookservice",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "apps/api/src/payment/payment-webhook.controller.ts",
+      "source_location": "L56",
+      "weight": 1.0,
+      "source": "apps_api_src_payment_payment_webhook_controller_paymentwebhookcontroller_handlewebhook",
+      "target": "apps_api_src_payment_payment_webhook_service_paymentwebhookservice_handlewebhookevent"
+    },
+    {
+      "relation": "imports_from",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "apps/api/src/payment/payment-webhook.service.spec.ts",
+      "source_location": "L3",
+      "weight": 1.0,
+      "source": "apps_api_src_payment_payment_webhook_service_spec",
+      "target": "apps_api_src_payment_payment_webhook_service",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "apps/api/src/payment/payment-webhook.service.spec.ts",
+      "source_location": "L3",
+      "weight": 1.0,
+      "source": "apps_api_src_payment_payment_webhook_service_spec",
+      "target": "apps_api_src_payment_payment_webhook_service_paymentwebhookservice",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports_from",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "apps/api/src/payment/payment-webhook.service.spec.ts",
+      "source_location": "L4",
+      "weight": 1.0,
+      "source": "apps_api_src_payment_payment_webhook_service_spec",
+      "target": "apps_api_src_prisma_prisma_service",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "apps/api/src/payment/payment-webhook.service.spec.ts",
+      "source_location": "L4",
+      "weight": 1.0,
+      "source": "apps_api_src_payment_payment_webhook_service_spec",
+      "target": "apps_api_src_prisma_prisma_service_prismaservice",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports_from",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "apps/api/src/payment/payment.module.ts",
+      "source_location": "L8",
+      "weight": 1.0,
+      "source": "apps_api_src_payment_payment_module",
+      "target": "apps_api_src_payment_payment_webhook_service",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "apps/api/src/payment/payment-webhook.service.ts",
+      "source_location": "L9",
+      "weight": 1.0,
+      "source": "apps_api_src_payment_payment_webhook_service",
+      "target": "apps_api_src_payment_payment_webhook_service_paymentwebhookservice",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports_from",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "apps/api/src/payment/payment-webhook.service.ts",
+      "source_location": "L2",
+      "weight": 1.0,
+      "source": "apps_api_src_payment_payment_webhook_service",
+      "target": "apps_api_src_prisma_prisma_service",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "apps/api/src/payment/payment-webhook.service.ts",
+      "source_location": "L2",
+      "weight": 1.0,
+      "source": "apps_api_src_payment_payment_webhook_service",
+      "target": "apps_api_src_prisma_prisma_service_prismaservice",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "apps/api/src/payment/payment.module.ts",
+      "source_location": "L8",
+      "weight": 1.0,
+      "source": "apps_api_src_payment_payment_module",
+      "target": "apps_api_src_payment_payment_webhook_service_paymentwebhookservice",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "method",
+      "confidence": "EXTRACTED",
+      "source_file": "apps/api/src/payment/payment-webhook.service.ts",
+      "source_location": "L12",
+      "weight": 1.0,
+      "source": "apps_api_src_payment_payment_webhook_service_paymentwebhookservice",
+      "target": "apps_api_src_payment_payment_webhook_service_paymentwebhookservice_constructor",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "method",
+      "confidence": "EXTRACTED",
+      "source_file": "apps/api/src/payment/payment-webhook.service.ts",
+      "source_location": "L208",
+      "weight": 1.0,
+      "source": "apps_api_src_payment_payment_webhook_service_paymentwebhookservice",
+      "target": "apps_api_src_payment_payment_webhook_service_paymentwebhookservice_executestatetransition",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "method",
+      "confidence": "EXTRACTED",
+      "source_file": "apps/api/src/payment/payment-webhook.service.ts",
+      "source_location": "L20",
+      "weight": 1.0,
+      "source": "apps_api_src_payment_payment_webhook_service_paymentwebhookservice",
+      "target": "apps_api_src_payment_payment_webhook_service_paymentwebhookservice_handlewebhookevent",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "references",
+      "context": "parameter_type",
+      "confidence": "EXTRACTED",
+      "source_file": "apps/api/src/payment/payment-webhook.service.ts",
+      "source_location": "L12",
+      "weight": 1.0,
+      "source": "apps_api_src_payment_payment_webhook_service_paymentwebhookservice_constructor",
+      "target": "apps_api_src_prisma_prisma_service_prismaservice",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "apps/api/src/payment/payment-webhook.service.ts",
+      "source_location": "L146",
+      "weight": 1.0,
+      "source": "apps_api_src_payment_payment_webhook_service_paymentwebhookservice_handlewebhookevent",
+      "target": "apps_api_src_payment_payment_webhook_service_paymentwebhookservice_executestatetransition",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "references",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "apps/api/src/payment/payment-webhook.service.ts",
+      "source_location": "L214",
+      "weight": 1.0,
+      "source": "apps_api_src_payment_payment_webhook_service_paymentwebhookservice_executestatetransition",
+      "target": "apps_api_src_prisma_prisma_service_prismaservice"
     },
     {
       "relation": "contains",
@@ -45987,7 +46574,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "apps/api/src/payment/payment.module.ts",
-      "source_location": "L16",
+      "source_location": "L18",
       "weight": 1.0,
       "source": "apps_api_src_payment_payment_module",
       "target": "apps_api_src_payment_payment_module_paymentmodule",
@@ -46117,7 +46704,7 @@
       "relation": "method",
       "confidence": "EXTRACTED",
       "source_file": "apps/api/src/payment/payment.service.ts",
-      "source_location": "L226",
+      "source_location": "L250",
       "weight": 1.0,
       "source": "apps_api_src_payment_payment_service_paymentservice",
       "target": "apps_api_src_payment_payment_service_paymentservice_confirmpayment",
@@ -46147,7 +46734,7 @@
       "relation": "method",
       "confidence": "EXTRACTED",
       "source_file": "apps/api/src/payment/payment.service.ts",
-      "source_location": "L278",
+      "source_location": "L302",
       "weight": 1.0,
       "source": "apps_api_src_payment_payment_service_paymentservice",
       "target": "apps_api_src_payment_payment_service_paymentservice_executeconfirmpayment",
@@ -46157,7 +46744,7 @@
       "relation": "method",
       "confidence": "EXTRACTED",
       "source_file": "apps/api/src/payment/payment.service.ts",
-      "source_location": "L708",
+      "source_location": "L732",
       "weight": 1.0,
       "source": "apps_api_src_payment_payment_service_paymentservice",
       "target": "apps_api_src_payment_payment_service_paymentservice_getpaymentstatus",
@@ -46167,7 +46754,7 @@
       "relation": "method",
       "confidence": "EXTRACTED",
       "source_file": "apps/api/src/payment/payment.service.ts",
-      "source_location": "L735",
+      "source_location": "L759",
       "weight": 1.0,
       "source": "apps_api_src_payment_payment_service_paymentservice",
       "target": "apps_api_src_payment_payment_service_paymentservice_handlebackgrounderror",
@@ -46201,7 +46788,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "apps/api/src/payment/payment.service.ts",
-      "source_location": "L380",
+      "source_location": "L404",
       "weight": 1.0,
       "source": "apps_api_src_payment_payment_service_paymentservice_executeconfirmpayment",
       "target": "apps_api_src_prisma_prisma_service_prismaservice"
@@ -46212,7 +46799,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "apps/api/src/payment/payment.service.ts",
-      "source_location": "L791",
+      "source_location": "L837",
       "weight": 1.0,
       "source": "apps_api_src_payment_payment_service_paymentservice_handlebackgrounderror",
       "target": "apps_api_src_prisma_prisma_service_prismaservice"
@@ -64853,7 +65440,7 @@
       "source_location": "L1",
       "weight": 1.0,
       "source": "task",
-      "target": "task_tasks_stripe_payment_system_pr_2_core_payment_pipeline",
+      "target": "task_tasks_stripe_payment_system_pr_3_webhook_processing",
       "confidence_score": 1.0
     }
   ],
@@ -64943,5 +65530,5 @@
       "source_file": "specs/004-output-guardrails/data-model.md"
     }
   ],
-  "built_at_commit": "30b02bff2fcfeb9b9e04961ef5f6d6dcd6c524b0"
+  "built_at_commit": "7a585e0ce371627f7bd85b4ff51be3ab234cc9da"
 }

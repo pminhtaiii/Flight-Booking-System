@@ -18,13 +18,13 @@
   - [X] T013 Create ledger entries on successful capture (DEBIT CUSTOMER_RECEIVABLE, CREDIT PLATFORM_REVENUE)
   - [X] T014 Add audit logging for `payment_authorized`, `payment_captured`, `booking_confirmed`
 
-- [ ] Phase 7: Webhook Processing
-  - [ ] T001 Create webhook controller in `apps/api/src/payment/payment-webhook.controller.ts` with raw body parsing and signature verification
-  - [ ] T002 Create webhook service in `apps/api/src/payment/payment-webhook.service.ts` to route events
-  - [ ] T003 Implement webhook event deduplication using `PaymentEvent` table
-  - [ ] T004 Implement `payment_intent.succeeded` event handler (update status, append event)
-  - [ ] T005 Implement `payment_intent.payment_failed` event handler (status to FAILED)
-  - [ ] T006 Implement `payment_intent.canceled` event handler (status to CANCELLED)
-  - [ ] T007 Implement Tier 1 self-healing reconciliation (retrieve payment intent, fast-forward)
-  - [ ] T008 Implement Tier 2 alert + drop for irreconcilable transitions
-  - [ ] T009 Add structured logging for processed webhook events
+- [X] Phase 7: Webhook Processing
+  - [X] T001 Create webhook controller in `apps/api/src/payment/payment-webhook.controller.ts` with raw body parsing and signature verification
+  - [X] T002 Create webhook service in `apps/api/src/payment/payment-webhook.service.ts` to route events
+  - [X] T003 Implement webhook event deduplication using `PaymentEvent` table
+  - [X] T004 Implement `payment_intent.succeeded` event handler (update status, append event)
+  - [X] T005 Implement `payment_intent.payment_failed` event handler (status to FAILED)
+  - [X] T006 Implement `payment_intent.canceled` event handler (status to CANCELLED)
+  - [X] T007 Implement Tier 1 self-healing reconciliation (retrieve payment intent, fast-forward)
+  - [X] T008 Implement Tier 2 alert + drop for irreconcilable transitions
+  - [X] T009 Add structured logging for processed webhook events
