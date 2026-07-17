@@ -421,9 +421,22 @@ export class DuffelService {
             born_on = p.dateOfBirth.split('T')[0];
           }
         }
+        const phone_number = p.phoneNumber || p.phone_number;
+        const email = p.email;
 
-        const phone_number = p.phoneNumber || p.phone_number || '+12025550143';
-        const email = p.email || 'traveler@example.com';
+        if (!phone_number) {
+          throw new HttpException(
+            `Phone number is required for passenger ${p.givenName || p.given_name || ''} ${p.familyName || p.family_name || ''}`,
+            HttpStatus.BAD_REQUEST,
+          );
+        }
+
+        if (!email) {
+          throw new HttpException(
+            `Email address is required for passenger ${p.givenName || p.given_name || ''} ${p.familyName || p.family_name || ''}`,
+            HttpStatus.BAD_REQUEST,
+          );
+        }
 
         return {
           id: matchedOfferPassenger.id,

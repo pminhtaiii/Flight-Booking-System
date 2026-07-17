@@ -122,10 +122,24 @@ export class PaymentService {
           `customer-create:${userId}`,
         );
         stripeCustomerId = customer.id;
-        await this.prisma.user.update({
-          where: { id: userId },
-          data: { stripeCustomerId },
+
+        const updateResult = await this.prisma.user.updateMany({
+          where: {
+            id: userId,
+            stripeCustomerId: null,
+          },
+          data: {
+            stripeCustomerId,
+          },
         });
+
+        if (updateResult.count === 0) {
+          const refreshedUser = await this.prisma.user.findUnique({
+            where: { id: userId },
+            select: { stripeCustomerId: true },
+          });
+          stripeCustomerId = refreshedUser?.stripeCustomerId || stripeCustomerId;
+        }
       }
 
       // 4. Create Stripe PaymentIntent
@@ -270,7 +284,7 @@ export class PaymentService {
       }
 
       // 2. Query payment
-      const payment = await this.prisma.payment.findUnique({
+      let payment = await this.prisma.payment.findUnique({
         where: { id: dto.paymentId },
         include: { bookingIntent: true },
       });
@@ -313,6 +327,8 @@ export class PaymentService {
                 },
               });
             });
+
+            payment = { ...payment, status: 'AUTHORIZED' };
 
             await this.auditService.createLog(this.prisma, {
               userId,
