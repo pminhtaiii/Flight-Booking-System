@@ -377,6 +377,7 @@ export class PaymentService {
             bookingIntent.duffelOfferId,
             bookingIntent.passengers,
             { bookingIntentId: bookingIntent.id, paymentId: payment.id },
+            idempotencyKey,
           );
         } catch (duffelError: unknown) {
           const error = duffelError as Error & { status?: number };
@@ -450,7 +451,11 @@ export class PaymentService {
       // Step 3: Stripe Capture
       if (recoveryPoint === 'duffel_order_created') {
         try {
-          await this.stripeService.capturePaymentIntent(payment.stripePaymentIntentId);
+          await this.stripeService.capturePaymentIntent(
+            payment.stripePaymentIntentId,
+            undefined,
+            `${idempotencyKey}-stripe-capture`,
+          );
         } catch (captureError: unknown) {
           const error = captureError as Error;
           this.logger.error(`Stripe capture failed: ${error.message}`, error.stack);

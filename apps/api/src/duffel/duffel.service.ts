@@ -350,6 +350,7 @@ export class DuffelService {
       email?: string;
     }[],
     metadata?: Record<string, unknown>,
+    idempotencyKey?: string,
   ): Promise<unknown> {
     try {
       const rawOffer = await this.getOfferById(duffelOfferId);
@@ -470,14 +471,41 @@ export class DuffelService {
 
       try {
         /* eslint-disable @typescript-eslint/no-explicit-any */
-        const orderPromise = this.duffel.orders.create({
-          type: 'instant',
-          selected_offers: [duffelOfferId],
-          passengers: duffelPassengers as any,
-          metadata: metadata as any,
-        });
+        const token = (this.duffel as any).client.token;
+        const apiVersion = (this.duffel as any).client.apiVersion || 'v2';
+        const basePath = (this.duffel as any).client.basePath || 'https://api.duffel.com';
+        const key = idempotencyKey || crypto.randomUUID();
+
+        const orderPromise = (async () => {
+          const res = await fetch(`${basePath}/air/orders`, {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${token}`,
+              'Duffel-Version': apiVersion,
+              'Content-Type': 'application/json',
+              'Idempotency-Key': `${key}-duffel-order`,
+            },
+            body: JSON.stringify({
+              data: {
+                type: 'instant',
+                selected_offers: [duffelOfferId],
+                passengers: duffelPassengers,
+                metadata,
+              },
+            }),
+          });
+
+          const body = await res.json() as any;
+          if (!res.ok || (body && body.errors)) {
+            const err = new Error(body?.errors?.[0]?.message || 'Failed to create Duffel order');
+            (err as any).status = res.status;
+            throw err;
+          }
+          return body.data;
+        })();
+
         const result = await Promise.race([orderPromise, timeoutPromise]);
-        return (result as { data: any }).data;
+        return result;
         /* eslint-enable @typescript-eslint/no-explicit-any */
       } finally {
         if (timeoutHandle) {
