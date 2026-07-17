@@ -7,8 +7,8 @@ Update this file after every completed feature. Any AI agent reading this should
 ### Current Status
 
 **Feature:** Stripe Payment System (Feature 10)
-**Last completed:** Feature 10: Stripe Payment System - Webhook Processing (Phase 7).
-**Next:** Stripe Payment System (Feature 10) - Phase 8: Refund System.
+**Last completed:** Feature 10: Stripe Payment System - Refund System (Phase 8).
+**Next:** Stripe Payment System (Feature 10) - Phase 9: Dispute Handling.
 
 ---
 
@@ -23,6 +23,7 @@ Update this file after every completed feature. Any AI agent reading this should
 - [x] Phase 5: Core Payment Pipeline (Create + Authorize) (Pessimistic claim lock on BookingIntent, lazy Customer creation, creation-based reconciliation, and Payment creation)
 - [x] Phase 6: Core Payment Pipeline (Confirm + Capture) (Resuming from recovery points, Duffel PNR creation with 30s timeout, Stripe manual capture, ledger entries, and post-capture reconciliation)
 - [x] Phase 7: Webhook Processing (Stripe signature verification, deduplication, event routing, FSM validation, self-healing reconciliation, and structured logging)
+- [x] Phase 8: Refund System (RefundPaymentDto, PaymentRefundService with initiateRefund/handleChargeRefunded/triggerAutomatedRefund, charge.refunded webhook handler, POST /:paymentId/refund endpoint, RefundResponse shared type)
 
 ### [x] Feature: Booking Intent Foundation (Feature 9)
 

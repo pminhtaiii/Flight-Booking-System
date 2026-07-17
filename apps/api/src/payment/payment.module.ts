@@ -3,6 +3,7 @@ import { StripeService } from '../common/stripe.service';
 import { PaymentIdempotencyService } from './payment-idempotency.service';
 import { PrismaModule } from '../prisma/prisma.module';
 import { PaymentService } from './payment.service';
+import { PaymentRefundService } from './payment-refund.service';
 import { PaymentController } from './payment.controller';
 import { PaymentWebhookController } from './payment-webhook.controller';
 import { PaymentWebhookService } from './payment-webhook.service';
@@ -12,7 +13,7 @@ import { AuditModule } from '../audit/audit.module';
 @Module({
   imports: [PrismaModule, DuffelModule, AuditModule],
   controllers: [PaymentController, PaymentWebhookController],
-  providers: [StripeService, PaymentIdempotencyService, PaymentService, PaymentWebhookService],
-  exports: [StripeService, PaymentIdempotencyService, PaymentService, PaymentWebhookService],
+  providers: [StripeService, PaymentIdempotencyService, PaymentService, PaymentRefundService, PaymentWebhookService],
+  exports: [StripeService, PaymentIdempotencyService, PaymentService, PaymentRefundService, PaymentWebhookService],
 })
 export class PaymentModule {}

@@ -1,8 +1,10 @@
 import { Injectable, Logger, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '@/prisma/prisma.service';
 import { StripeService } from '@/common/stripe.service';
+import { PaymentRefundService } from '@/payment/payment-refund.service';
+import { AuditService } from '@/audit/audit.service';
 import { PaymentStatus, PaymentEventSource, Prisma } from '@prisma/client';
-import { canTransition } from './payment-state-machine';
+import { canTransition, getPreDisputeStatus, resolveDisputeStatus } from './payment-state-machine';
 import * as crypto from 'crypto';
 
 @Injectable()
@@ -12,6 +14,8 @@ export class PaymentWebhookService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly stripeService: StripeService,
+    private readonly paymentRefundService: PaymentRefundService,
+    private readonly auditService: AuditService,
   ) {}
 
   /**
@@ -42,6 +46,39 @@ export class PaymentWebhookService {
     }
 
     try {
+      // Handle charge.refunded separately (different data structure)
+      if (eventType === 'charge.refunded') {
+        await this.handleChargeRefunded(event);
+        this.logger.log({
+          message: `Webhook processed successfully`,
+          eventType,
+          paymentId: null,
+          durationMs: Date.now() - startTime,
+        });
+        return true;
+      }
+
+      // Handle dispute events separately (custom preDisputeStatus logic)
+      if (eventType === 'charge.dispute.created') {
+        await this.handleDisputeCreated(event);
+        this.logger.log({
+          message: `Webhook processed successfully`,
+          eventType,
+          durationMs: Date.now() - startTime,
+        });
+        return true;
+      }
+
+      if (eventType === 'charge.dispute.closed') {
+        await this.handleDisputeClosed(event);
+        this.logger.log({
+          message: `Webhook processed successfully`,
+          eventType,
+          durationMs: Date.now() - startTime,
+        });
+        return true;
+      }
+
       // Identify target status based on Stripe event type
       let targetStatus: PaymentStatus;
       if (eventType === 'payment_intent.succeeded') {
@@ -303,5 +340,210 @@ export class PaymentWebhookService {
         }
       }
     });
+  }
+
+  /**
+   * Handles charge.refunded webhook events by delegating to PaymentRefundService.
+   */
+  private async handleChargeRefunded(event: Record<string, unknown>): Promise<void> {
+    await this.paymentRefundService.handleChargeRefunded(event);
+  }
+
+  /**
+   * Handles charge.dispute.created webhook events.
+   * Stores pre_dispute_status and transitions Payment to DISPUTED.
+   */
+  private async handleDisputeCreated(event: Record<string, unknown>): Promise<void> {
+    const data = event.data as Record<string, unknown>;
+    const dispute = data.object as Record<string, unknown>;
+    const paymentIntentId = dispute.payment_intent as string;
+
+    if (!paymentIntentId) {
+      this.logger.warn('charge.dispute.created event missing payment_intent, skipping');
+      return;
+    }
+
+    const payment = await this.prisma.payment.findUnique({
+      where: { stripePaymentIntentId: paymentIntentId },
+    });
+
+    if (!payment) {
+      this.logger.error({
+        message: `Payment not found for stripePaymentIntentId: ${paymentIntentId}`,
+        eventType: 'charge.dispute.created',
+      });
+      return;
+    }
+
+    const currentStatus = payment.status as PaymentStatus;
+
+    // Validate: only SUCCEEDED, PARTIALLY_REFUNDED, REFUNDED can transition to DISPUTED
+    if (!canTransition(currentStatus, PaymentStatus.DISPUTED)) {
+      this.logger.error({
+        message: `ALERT: Cannot transition from ${currentStatus} to DISPUTED. Dropping event.`,
+        level: 'ALERT',
+        paymentId: payment.id,
+        currentStatus,
+      });
+      return;
+    }
+
+    // Store pre_dispute_status before transitioning
+    const preDisputeStatus = getPreDisputeStatus(currentStatus);
+
+    await this.prisma.$transaction(async (tx) => {
+      await tx.payment.update({
+        where: { id: payment.id },
+        data: {
+          status: PaymentStatus.DISPUTED,
+          preDisputeStatus,
+        },
+      });
+
+      await tx.paymentEvent.create({
+        data: {
+          paymentId: payment.id,
+          eventType: 'charge.dispute.created',
+          previousStatus: currentStatus,
+          newStatus: PaymentStatus.DISPUTED,
+          amount: dispute.amount as number,
+          source: PaymentEventSource.WEBHOOK,
+          stripeEventId: event.id as string,
+          createdBy: 'stripe_webhook',
+          metadata: event as Prisma.InputJsonValue,
+        },
+      });
+    });
+
+    await this.auditService.createLog(this.prisma, {
+      userId: null,
+      action: 'dispute_opened',
+      resourceType: 'Payment',
+      resourceId: payment.id,
+      metadata: {
+        preDisputeStatus,
+        disputeAmount: dispute.amount,
+        stripeEventId: event.id,
+      },
+    });
+
+    this.logger.log({
+      message: `Dispute opened for payment ${payment.id}`,
+      paymentId: payment.id,
+      preDisputeStatus,
+      transition: `${currentStatus} -> DISPUTED`,
+    });
+  }
+
+  /**
+   * Handles charge.dispute.closed webhook events.
+   * If won: restores pre_dispute_status. If lost: transitions to CHARGEBACK_LOST.
+   */
+  private async handleDisputeClosed(event: Record<string, unknown>): Promise<void> {
+    const data = event.data as Record<string, unknown>;
+    const dispute = data.object as Record<string, unknown>;
+    const paymentIntentId = dispute.payment_intent as string;
+    const reason = dispute.reason as string | undefined;
+
+    if (!paymentIntentId) {
+      this.logger.warn('charge.dispute.closed event missing payment_intent, skipping');
+      return;
+    }
+
+    const payment = await this.prisma.payment.findUnique({
+      where: { stripePaymentIntentId: paymentIntentId },
+    });
+
+    if (!payment) {
+      this.logger.error({
+        message: `Payment not found for stripePaymentIntentId: ${paymentIntentId}`,
+        eventType: 'charge.dispute.closed',
+      });
+      return;
+    }
+
+    const currentStatus = payment.status as PaymentStatus;
+
+    if (currentStatus !== PaymentStatus.DISPUTED) {
+      this.logger.error({
+        message: `ALERT: Dispute closed for payment not in DISPUTED state (current: ${currentStatus}). Dropping event.`,
+        level: 'ALERT',
+        paymentId: payment.id,
+      });
+      return;
+    }
+
+    // Determine outcome: Stripe sends status 'won' or 'lost' on the dispute
+    const disputeStatus = dispute.status as string;
+    const outcome: 'won' | 'lost' = disputeStatus === 'won' ? 'won' : 'lost';
+
+    // Resolve target status using state machine helper
+    const preDisputeStatus = payment.preDisputeStatus as PaymentStatus | null;
+    if (!preDisputeStatus) {
+      this.logger.error({
+        message: `ALERT: Dispute closed but pre_dispute_status is null for payment ${payment.id}. Cannot resolve.`,
+        level: 'ALERT',
+        paymentId: payment.id,
+      });
+      return;
+    }
+
+    const targetStatus = resolveDisputeStatus(outcome, preDisputeStatus);
+
+    await this.prisma.$transaction(async (tx) => {
+      await tx.payment.update({
+        where: { id: payment.id },
+        data: {
+          status: targetStatus,
+          preDisputeStatus: null, // Clear pre_dispute_status after resolution
+        },
+      });
+
+      await tx.paymentEvent.create({
+        data: {
+          paymentId: payment.id,
+          eventType: 'charge.dispute.closed',
+          previousStatus: currentStatus,
+          newStatus: targetStatus,
+          amount: dispute.amount as number,
+          source: PaymentEventSource.WEBHOOK,
+          stripeEventId: event.id as string,
+          createdBy: 'stripe_webhook',
+          metadata: event as Prisma.InputJsonValue,
+        },
+      });
+    });
+
+    const auditAction = outcome === 'won' ? 'dispute_won' : 'dispute_lost';
+
+    await this.auditService.createLog(this.prisma, {
+      userId: null,
+      action: auditAction,
+      resourceType: 'Payment',
+      resourceId: payment.id,
+      metadata: {
+        outcome,
+        preDisputeStatus,
+        targetStatus,
+        disputeReason: reason,
+        stripeEventId: event.id,
+      },
+    });
+
+    if (outcome === 'lost') {
+      this.logger.error({
+        message: `ALERT: Dispute LOST for payment ${payment.id}. Transitioning to CHARGEBACK_LOST.`,
+        level: 'ALERT',
+        paymentId: payment.id,
+        preDisputeStatus,
+      });
+    } else {
+      this.logger.log({
+        message: `Dispute WON for payment ${payment.id}. Restoring to ${preDisputeStatus}.`,
+        paymentId: payment.id,
+        preDisputeStatus,
+        transition: `${currentStatus} -> ${targetStatus}`,
+      });
+    }
   }
 }

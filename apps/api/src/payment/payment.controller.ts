@@ -14,9 +14,11 @@ import {
 import { Request, Response } from 'express';
 import { JwtAuthGuard } from '@/auth/guards/jwt-auth.guard';
 import { PaymentService } from './payment.service';
+import { PaymentRefundService } from './payment-refund.service';
 import { CreatePaymentDto } from './dto/create-payment.dto';
 import { ConfirmPaymentDto } from './dto/confirm-payment.dto';
 import { PaymentResponseDto } from './dto/payment-response.dto';
+import { RefundPaymentDto } from './dto/refund-payment.dto';
 import { IdempotencyKey } from './payment-idempotency.service';
 
 interface AuthenticatedRequest extends Request {
@@ -29,7 +31,10 @@ interface AuthenticatedRequest extends Request {
 @Controller('bookings/payment')
 @UseGuards(JwtAuthGuard)
 export class PaymentController {
-  constructor(private readonly paymentService: PaymentService) {}
+  constructor(
+    private readonly paymentService: PaymentService,
+    private readonly paymentRefundService: PaymentRefundService,
+  ) {}
 
   @Post('create')
   @HttpCode(HttpStatus.CREATED)
@@ -73,5 +78,19 @@ export class PaymentController {
     @Param('paymentId') paymentId: string,
   ): Promise<unknown> {
     return this.paymentService.getPaymentStatus(paymentId, req.user.id);
+  }
+
+  @Post(':paymentId/refund')
+  @HttpCode(HttpStatus.CREATED)
+  async refundPayment(
+    @Req() req: AuthenticatedRequest,
+    @Param('paymentId') paymentId: string,
+    @IdempotencyKey() idempotencyKey: string | undefined,
+    @Body() dto: RefundPaymentDto,
+  ) {
+    if (!idempotencyKey) {
+      throw new BadRequestException('Idempotency-Key header is required');
+    }
+    return this.paymentRefundService.initiateRefund(paymentId, dto, idempotencyKey, req.user.id);
   }
 }

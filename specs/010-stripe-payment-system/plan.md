@@ -243,14 +243,14 @@ packages/shared/
 
 | Task | Status | Notes |
 |------|--------|-------|
-| Create `dto/refund-payment.dto.ts` | ☐ | `amount`, `reason` |
-| Create `payment-refund.service.ts` | ☐ | |
-| Implement `initiateRefund(paymentId, amount, reason, triggerType, userId?)` | ☐ | Validate: payment in refundable state (SUCCEEDED or PARTIALLY_REFUNDED). Create Refund record with idempotency key. Call Stripe `refunds.create()`. Update Payment → REFUND_PENDING. Append PaymentEvent |
-| Implement automated refund trigger | ☐ | Detect invariant violations (e.g., 3rd charge attempt somehow captured). Fire refund with idempotency key `refund:{paymentId}:{reason}:{occurrence}`. Set `requires_review = true` |
-| Implement `charge.refunded` webhook handler | ☐ | Update Refund status → SUCCEEDED. Update Payment → PARTIALLY_REFUNDED or REFUNDED (based on remaining balance). Create reversing ledger entries (DEBIT PLATFORM_REVENUE, CREDIT CUSTOMER_RECEIVABLE). Append PaymentEvent |
-| Implement partial refund tracking | ☐ | Track total refunded amount vs. original. PARTIALLY_REFUNDED → REFUND_PENDING loop. Close to REFUNDED when full amount returned |
-| Add `POST /api/payments/:paymentId/refund` to controller | ☐ | Admin role guard, idempotency key header |
-| Add audit logging for `refund_initiated`, `refund_completed` | ☐ | |
+| Create `dto/refund-payment.dto.ts` | ✅ | `amount`, `reason` |
+| Create `payment-refund.service.ts` | ✅ | |
+| Implement `initiateRefund(paymentId, amount, reason, triggerType, userId?)` | ✅ | Validate: payment in refundable state (SUCCEEDED or PARTIALLY_REFUNDED). Create Refund record with idempotency key. Call Stripe `refunds.create()`. Update Payment → REFUND_PENDING. Append PaymentEvent |
+| Implement automated refund trigger | ✅ | Detect invariant violations (e.g., 3rd charge attempt somehow captured). Fire refund with idempotency key `refund:{paymentId}:{reason}:{occurrence}`. Set `requires_review = true` |
+| Implement `charge.refunded` webhook handler | ✅ | Update Refund status → SUCCEEDED. Update Payment → PARTIALLY_REFUNDED or REFUNDED (based on remaining balance). Create reversing ledger entries (DEBIT PLATFORM_REVENUE, CREDIT CUSTOMER_RECEIVABLE). Append PaymentEvent |
+| Implement partial refund tracking | ✅ | Track total refunded amount vs. original. PARTIALLY_REFUNDED → REFUND_PENDING loop. Close to REFUNDED when full amount returned |
+| Add `POST /api/payments/:paymentId/refund` to controller | ✅ | Admin role guard, idempotency key header |
+| Add audit logging for `refund_initiated`, `refund_completed` | ✅ | |
 
 **Exit criteria**: Admin can trigger refunds. Automated refunds fire for detected errors with idempotency. Partial refunds loop correctly. Ledger has reversing entries. Webhook updates refund status.
 
@@ -263,10 +263,10 @@ packages/shared/
 
 | Task | Status | Notes |
 |------|--------|-------|
-| Implement `charge.dispute.created` webhook handler | ☐ | Store `pre_dispute_status` (current status before DISPUTED). Validate FSM: only SUCCEEDED, PARTIALLY_REFUNDED, REFUNDED can transition to DISPUTED. Update Payment → DISPUTED. Append PaymentEvent |
-| Implement `charge.dispute.closed` webhook handler | ☐ | Read outcome from Stripe event. If "won": restore `pre_dispute_status`. If "lost": Payment → CHARGEBACK_LOST. Append PaymentEvent. Log with alert level for lost disputes |
-| Handle dispute on already-refunded payment | ☐ | REFUNDED → DISPUTED → REFUNDED (won) path. Verify pre_dispute_status is correctly stored and restored |
-| Add audit logging for `dispute_opened`, `dispute_won`, `dispute_lost` | ☐ | |
+| Implement `charge.dispute.created` webhook handler | ✅ | Store `pre_dispute_status` (current status before DISPUTED). Validate FSM: only SUCCEEDED, PARTIALLY_REFUNDED, REFUNDED can transition to DISPUTED. Update Payment → DISPUTED. Append PaymentEvent |
+| Implement `charge.dispute.closed` webhook handler | ✅ | Read outcome from Stripe event. If "won": restore `pre_dispute_status`. If "lost": Payment → CHARGEBACK_LOST. Append PaymentEvent. Log with alert level for lost disputes |
+| Handle dispute on already-refunded payment | ✅ | REFUNDED → DISPUTED → REFUNDED (won) path. Verify pre_dispute_status is correctly stored and restored |
+| Add audit logging for `dispute_opened`, `dispute_won`, `dispute_lost` | ✅ | |
 
 **Exit criteria**: Disputes transition correctly for all pre-dispute states. Won disputes return to pre-dispute state. Lost disputes transition to CHARGEBACK_LOST. PaymentEvents capture full dispute lifecycle.
 

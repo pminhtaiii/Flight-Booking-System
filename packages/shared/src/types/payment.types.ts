@@ -46,3 +46,12 @@ export type Payment = {
   createdAt: Date;
   updatedAt: Date;
 };
+
+export type RefundResponse = {
+  refundId: string;
+  paymentId: string;
+  amount: number;
+  currency: string;
+  status: string;
+  triggerType: string;
+};
