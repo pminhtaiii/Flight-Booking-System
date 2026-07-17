@@ -485,9 +485,13 @@ export class DuffelService {
         HttpStatus.GATEWAY_TIMEOUT,
       );
       let timeoutHandle: NodeJS.Timeout | undefined;
+      const controller = new AbortController();
 
       const timeoutPromise = new Promise<never>((_, reject) => {
-        timeoutHandle = setTimeout(() => reject(timeoutError), timeoutMs);
+        timeoutHandle = setTimeout(() => {
+          controller.abort();
+          reject(timeoutError);
+        }, timeoutMs);
       });
 
       try {
@@ -500,6 +504,7 @@ export class DuffelService {
         const orderPromise = (async () => {
           const res = await fetch(`${basePath}/air/orders`, {
             method: 'POST',
+            signal: controller.signal,
             headers: {
               'Authorization': `Bearer ${token}`,
               'Duffel-Version': apiVersion,
