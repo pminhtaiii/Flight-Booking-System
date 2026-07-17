@@ -4850,7 +4850,7 @@
       "source_location": "L60",
       "_origin": "ast",
       "id": "apps_api_package_devdependencies_tsconfig_paths",
-      "community": 283,
+      "community": 8,
       "norm_label": "tsconfig-paths"
     },
     {
@@ -10460,7 +10460,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "apps_web_tsconfig",
-      "community": 312,
+      "community": 11,
       "norm_label": "tsconfig.json"
     },
     {
@@ -10630,7 +10630,7 @@
       "source_location": "L22",
       "_origin": "ast",
       "id": "apps_web_tsconfig_paths",
-      "community": 283,
+      "community": 11,
       "norm_label": "@/*"
     },
     {
@@ -10650,7 +10650,7 @@
       "source_location": "L26",
       "_origin": "ast",
       "id": "apps_web_tsconfig_include",
-      "community": 312,
+      "community": 11,
       "norm_label": "include"
     },
     {
@@ -10660,7 +10660,7 @@
       "source_location": "L27",
       "_origin": "ast",
       "id": "apps_web_tsconfig_exclude",
-      "community": 312,
+      "community": 11,
       "norm_label": "exclude"
     },
     {
@@ -20440,7 +20440,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_data_model",
-      "community": 31,
+      "community": 306,
       "norm_label": "data-model.md"
     },
     {
@@ -20450,7 +20450,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_data_model_data_model_llm_output_guardrails",
-      "community": 31,
+      "community": 306,
       "norm_label": "data model: llm output guardrails"
     },
     {
@@ -20460,7 +20460,7 @@
       "source_location": "L9",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_data_model_entities",
-      "community": 31,
+      "community": 312,
       "norm_label": "entities"
     },
     {
@@ -20470,7 +20470,7 @@
       "source_location": "L11",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_data_model_1_outputguardrailconfig",
-      "community": 31,
+      "community": 312,
       "norm_label": "1. outputguardrailconfig"
     },
     {
@@ -20480,7 +20480,7 @@
       "source_location": "L24",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_data_model_2_chunkbuffer",
-      "community": 31,
+      "community": 312,
       "norm_label": "2. chunkbuffer"
     },
     {
@@ -20490,7 +20490,7 @@
       "source_location": "L53",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_data_model_3_slidingwindow",
-      "community": 31,
+      "community": 312,
       "norm_label": "3. slidingwindow"
     },
     {
@@ -20500,7 +20500,7 @@
       "source_location": "L71",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_data_model_4_outputguardrailresult",
-      "community": 31,
+      "community": 312,
       "norm_label": "4. outputguardrailresult"
     },
     {
@@ -20510,7 +20510,7 @@
       "source_location": "L97",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_data_model_5_outputguardrailpipeline",
-      "community": 31,
+      "community": 312,
       "norm_label": "5. outputguardrailpipeline"
     },
     {
@@ -20520,7 +20520,7 @@
       "source_location": "L121",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_data_model_6_outputguardrailblockederror",
-      "community": 31,
+      "community": 312,
       "norm_label": "6. outputguardrailblockederror"
     },
     {
@@ -20530,7 +20530,7 @@
       "source_location": "L132",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_data_model_sse_event_extension",
-      "community": 31,
+      "community": 306,
       "norm_label": "sse event extension"
     },
     {
@@ -20540,7 +20540,7 @@
       "source_location": "L154",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_data_model_relationships",
-      "community": 31,
+      "community": 306,
       "norm_label": "relationships"
     },
     {
@@ -20550,7 +20550,7 @@
       "source_location": "L176",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_data_model_state_transitions",
-      "community": 31,
+      "community": 306,
       "norm_label": "state transitions"
     },
     {
@@ -20560,7 +20560,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_plan",
-      "community": 31,
+      "community": 306,
       "norm_label": "plan.md"
     },
     {
@@ -20690,7 +20690,7 @@
       "source_location": "L145",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_plan_phase_2_configuration_pii_detection_foundation",
-      "community": 132,
+      "community": 316,
       "norm_label": "phase 2: configuration & pii detection \u2014 foundation"
     },
     {
@@ -20700,7 +20700,7 @@
       "source_location": "L151",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_plan_files",
-      "community": 132,
+      "community": 316,
       "norm_label": "files"
     },
     {
@@ -20710,7 +20710,7 @@
       "source_location": "L158",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_plan_acceptance",
-      "community": 132,
+      "community": 316,
       "norm_label": "acceptance"
     },
     {
@@ -20720,7 +20720,7 @@
       "source_location": "L166",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_plan_tests",
-      "community": 132,
+      "community": 316,
       "norm_label": "tests"
     },
     {
@@ -20730,7 +20730,7 @@
       "source_location": "L173",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_plan_phase_3_sentence_boundary_chunking_token_accumulation",
-      "community": 132,
+      "community": 317,
       "norm_label": "phase 3: sentence-boundary chunking \u2014 token accumulation"
     },
     {
@@ -20740,7 +20740,7 @@
       "source_location": "L179",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_plan_files_179",
-      "community": 132,
+      "community": 317,
       "norm_label": "files"
     },
     {
@@ -20750,7 +20750,7 @@
       "source_location": "L185",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_plan_acceptance_185",
-      "community": 132,
+      "community": 317,
       "norm_label": "acceptance"
     },
     {
@@ -20760,7 +20760,7 @@
       "source_location": "L196",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_plan_tests_196",
-      "community": 132,
+      "community": 317,
       "norm_label": "tests"
     },
     {
@@ -20770,7 +20770,7 @@
       "source_location": "L202",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_plan_phase_4_nemo_output_rail_safety_classification",
-      "community": 132,
+      "community": 318,
       "norm_label": "phase 4: nemo output rail \u2014 safety classification"
     },
     {
@@ -20780,7 +20780,7 @@
       "source_location": "L208",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_plan_files_208",
-      "community": 132,
+      "community": 318,
       "norm_label": "files"
     },
     {
@@ -20790,7 +20790,7 @@
       "source_location": "L215",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_plan_acceptance_215",
-      "community": 132,
+      "community": 318,
       "norm_label": "acceptance"
     },
     {
@@ -20800,7 +20800,7 @@
       "source_location": "L224",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_plan_tests_224",
-      "community": 132,
+      "community": 318,
       "norm_label": "tests"
     },
     {
@@ -20810,7 +20810,7 @@
       "source_location": "L230",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_plan_phase_5_output_guardrail_pipeline_orchestration",
-      "community": 132,
+      "community": 319,
       "norm_label": "phase 5: output guardrail pipeline \u2014 orchestration"
     },
     {
@@ -20820,7 +20820,7 @@
       "source_location": "L236",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_plan_files_236",
-      "community": 132,
+      "community": 319,
       "norm_label": "files"
     },
     {
@@ -20830,7 +20830,7 @@
       "source_location": "L242",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_plan_acceptance_242",
-      "community": 132,
+      "community": 319,
       "norm_label": "acceptance"
     },
     {
@@ -20840,7 +20840,7 @@
       "source_location": "L253",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_plan_tests_253",
-      "community": 132,
+      "community": 319,
       "norm_label": "tests"
     },
     {
@@ -20850,7 +20850,7 @@
       "source_location": "L259",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_plan_phase_6_sse_integration_wire_pipeline_into_streaming",
-      "community": 132,
+      "community": 320,
       "norm_label": "phase 6: sse integration \u2014 wire pipeline into streaming"
     },
     {
@@ -20860,7 +20860,7 @@
       "source_location": "L265",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_plan_files_265",
-      "community": 132,
+      "community": 320,
       "norm_label": "files"
     },
     {
@@ -20870,7 +20870,7 @@
       "source_location": "L271",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_plan_acceptance_271",
-      "community": 132,
+      "community": 320,
       "norm_label": "acceptance"
     },
     {
@@ -20880,7 +20880,7 @@
       "source_location": "L279",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_plan_tests_279",
-      "community": 132,
+      "community": 320,
       "norm_label": "tests"
     },
     {
@@ -20890,7 +20890,7 @@
       "source_location": "L285",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_plan_phase_7_hard_stop_partial_persistence_failure_handling",
-      "community": 132,
+      "community": 321,
       "norm_label": "phase 7: hard stop & partial persistence \u2014 failure handling"
     },
     {
@@ -20900,7 +20900,7 @@
       "source_location": "L291",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_plan_files_291",
-      "community": 132,
+      "community": 321,
       "norm_label": "files"
     },
     {
@@ -20910,7 +20910,7 @@
       "source_location": "L297",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_plan_acceptance_297",
-      "community": 132,
+      "community": 321,
       "norm_label": "acceptance"
     },
     {
@@ -20920,7 +20920,7 @@
       "source_location": "L306",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_plan_tests_306",
-      "community": 132,
+      "community": 321,
       "norm_label": "tests"
     },
     {
@@ -20930,7 +20930,7 @@
       "source_location": "L312",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_plan_phase_8_pipeline_parallelism_latency_optimization",
-      "community": 132,
+      "community": 322,
       "norm_label": "phase 8: pipeline parallelism \u2014 latency optimization"
     },
     {
@@ -20940,7 +20940,7 @@
       "source_location": "L318",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_plan_files_318",
-      "community": 132,
+      "community": 322,
       "norm_label": "files"
     },
     {
@@ -20950,7 +20950,7 @@
       "source_location": "L324",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_plan_acceptance_324",
-      "community": 132,
+      "community": 322,
       "norm_label": "acceptance"
     },
     {
@@ -20960,7 +20960,7 @@
       "source_location": "L332",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_plan_tests_332",
-      "community": 132,
+      "community": 322,
       "norm_label": "tests"
     },
     {
@@ -21010,7 +21010,7 @@
       "source_location": "L365",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_plan_phase_10_e2e_testing_validation_final_verification",
-      "community": 132,
+      "community": 323,
       "norm_label": "phase 10: e2e testing & validation \u2014 final verification"
     },
     {
@@ -21020,7 +21020,7 @@
       "source_location": "L371",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_plan_files_371",
-      "community": 132,
+      "community": 323,
       "norm_label": "files"
     },
     {
@@ -21030,7 +21030,7 @@
       "source_location": "L378",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_plan_acceptance_success_criteria_verification",
-      "community": 132,
+      "community": 323,
       "norm_label": "acceptance \u2014 success criteria verification"
     },
     {
@@ -21040,7 +21040,7 @@
       "source_location": "L388",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_plan_checklist",
-      "community": 132,
+      "community": 323,
       "norm_label": "checklist"
     },
     {
@@ -21260,7 +21260,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_quickstart",
-      "community": 31,
+      "community": 306,
       "norm_label": "quickstart.md"
     },
     {
@@ -21270,7 +21270,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_quickstart_quickstart_validation_guide_llm_output_guardrails",
-      "community": 31,
+      "community": 304,
       "norm_label": "quickstart validation guide: llm output guardrails"
     },
     {
@@ -21280,7 +21280,7 @@
       "source_location": "L7",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_quickstart_prerequisites",
-      "community": 31,
+      "community": 304,
       "norm_label": "prerequisites"
     },
     {
@@ -21290,7 +21290,7 @@
       "source_location": "L20",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_quickstart_scenario_1_safe_response_streams_normally",
-      "community": 31,
+      "community": 304,
       "norm_label": "scenario 1: safe response streams normally"
     },
     {
@@ -21300,7 +21300,7 @@
       "source_location": "L43",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_quickstart_scenario_2_pii_in_output_triggers_hard_stop",
-      "community": 31,
+      "community": 304,
       "norm_label": "scenario 2: pii in output triggers hard stop"
     },
     {
@@ -21310,7 +21310,7 @@
       "source_location": "L83",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_quickstart_scenario_3_boundary_pii_detected_by_sliding_window",
-      "community": 31,
+      "community": 304,
       "norm_label": "scenario 3: boundary pii detected by sliding window"
     },
     {
@@ -21320,7 +21320,7 @@
       "source_location": "L123",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_quickstart_scenario_4_nemo_output_rail_blocks_harmful_content",
-      "community": 31,
+      "community": 304,
       "norm_label": "scenario 4: nemo output rail blocks harmful content"
     },
     {
@@ -21330,7 +21330,7 @@
       "source_location": "L155",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_quickstart_scenario_5_partial_response_persisted_on_block",
-      "community": 31,
+      "community": 304,
       "norm_label": "scenario 5: partial response persisted on block"
     },
     {
@@ -21340,7 +21340,7 @@
       "source_location": "L184",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_quickstart_scenario_6_kill_switch_disables_guardrails",
-      "community": 31,
+      "community": 304,
       "norm_label": "scenario 6: kill switch disables guardrails"
     },
     {
@@ -21350,7 +21350,7 @@
       "source_location": "L202",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_quickstart_running_tests",
-      "community": 31,
+      "community": 304,
       "norm_label": "running tests"
     },
     {
@@ -21360,7 +21360,7 @@
       "source_location": "L221",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_quickstart_verification_checklist",
-      "community": 31,
+      "community": 304,
       "norm_label": "verification checklist"
     },
     {
@@ -21370,7 +21370,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_research",
-      "community": 31,
+      "community": 310,
       "norm_label": "research.md"
     },
     {
@@ -21380,7 +21380,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_research_phase_0_research_llm_output_guardrails",
-      "community": 31,
+      "community": 310,
       "norm_label": "phase 0 research: llm output guardrails"
     },
     {
@@ -21390,7 +21390,7 @@
       "source_location": "L11",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_research_findings",
-      "community": 31,
+      "community": 310,
       "norm_label": "findings"
     },
     {
@@ -21400,7 +21400,7 @@
       "source_location": "L13",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_research_1_sentence_detection_edge_cases",
-      "community": 31,
+      "community": 310,
       "norm_label": "1. sentence detection edge cases"
     },
     {
@@ -21410,7 +21410,7 @@
       "source_location": "L45",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_research_2_sliding_window_token_count",
-      "community": 31,
+      "community": 310,
       "norm_label": "2. sliding window token count"
     },
     {
@@ -21420,7 +21420,7 @@
       "source_location": "L76",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_research_3_nemo_output_rail_configuration",
-      "community": 31,
+      "community": 310,
       "norm_label": "3. nemo output rail configuration"
     },
     {
@@ -21430,7 +21430,7 @@
       "source_location": "L118",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_research_4_streaming_ux_sentence_boundary_chunking_bursty_arrival",
-      "community": 31,
+      "community": 310,
       "norm_label": "4. streaming ux \u2014 sentence-boundary chunking bursty arrival"
     },
     {
@@ -21440,7 +21440,7 @@
       "source_location": "L149",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_research_summary_of_decisions",
-      "community": 31,
+      "community": 310,
       "norm_label": "summary of decisions"
     },
     {
@@ -21450,7 +21450,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "specs_004_output_guardrails_spec",
-      "community": 31,
+      "community": 306,
       "norm_label": "spec.md"
     },
     {
@@ -35664,7 +35664,7 @@
       "weight": 1.0,
       "context": "import",
       "source": "apps_api_package_devdependencies_tsconfig_paths",
-      "target": "apps_web_tsconfig_paths",
+      "target": "apps_api_tsconfig_paths",
       "confidence_score": 1.0
     },
     {
@@ -65530,5 +65530,5 @@
       "source_file": "specs/004-output-guardrails/data-model.md"
     }
   ],
-  "built_at_commit": "a0a05a008a8a08f6f4a19f2048eeaee847509753"
+  "built_at_commit": "0d5fc7631054eb4ecb27dcdcc9f00e136e3c6418"
 }

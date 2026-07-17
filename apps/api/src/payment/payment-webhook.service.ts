@@ -70,7 +70,7 @@ export class PaymentWebhookService {
           stripeEventId,
           stripePaymentIntentId,
         });
-        throw new BadRequestException(`Payment record not found for Stripe PaymentIntent ID: ${stripePaymentIntentId}`);
+        return true;
       }
 
       const currentStatus = payment.status;

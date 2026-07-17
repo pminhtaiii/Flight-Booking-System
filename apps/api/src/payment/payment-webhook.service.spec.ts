@@ -284,13 +284,14 @@ describe('PaymentWebhookService', () => {
       expect(mockPrisma.payment.update).not.toHaveBeenCalled();
     });
 
-    it('throws error if payment intent not found in DB', async () => {
+    it('returns true if payment intent not found in DB', async () => {
       mockPrisma.paymentEvent.findUnique.mockResolvedValueOnce(null);
       mockPrisma.payment.findUnique.mockResolvedValueOnce(null);
 
       const event = createMockEvent('payment_intent.succeeded', 'succeeded');
       
-      await expect(service.handleWebhookEvent(event)).rejects.toThrow();
+      const result = await service.handleWebhookEvent(event);
+      expect(result).toBe(true);
     });
 
     it('Issue 1: handles concurrent duplicate event (Prisma P2002 on stripeEventId) gracefully by returning true', async () => {

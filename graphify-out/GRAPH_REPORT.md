@@ -1,16 +1,16 @@
 # Graph Report - Booking Systems  (2026-07-17)
 
 ## Corpus Check
-- 331 files · ~211,431 words
+- 331 files · ~211,426 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 2845 nodes · 3560 edges · 313 communities (179 shown, 134 thin omitted)
+- 2845 nodes · 3560 edges · 324 communities (191 shown, 133 thin omitted)
 - Extraction: 96% EXTRACTED · 4% INFERRED · 0% AMBIGUOUS · INFERRED: 139 edges (avg confidence: 0.78)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `a0a05a00`
+- Built from commit: `0d5fc763`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -297,15 +297,26 @@
 - [[_COMMUNITY_Phase 2 Configuration & PII Detection — Foundation|Phase 2: Configuration & PII Detection — Foundation]]
 - [[_COMMUNITY_Phase 3 Sentence-Boundary Chunking — Token Accumulation|Phase 3: Sentence-Boundary Chunking — Token Accumulation]]
 - [[_COMMUNITY_Phase 4 NeMo Output Rail — Safety Classification|Phase 4: NeMo Output Rail — Safety Classification]]
+- [[_COMMUNITY_Quickstart Validation Guide LLM Output Guardrails|Quickstart Validation Guide: LLM Output Guardrails]]
 - [[_COMMUNITY_Phase 6 SSE Integration — Wire Pipeline Into Streaming|Phase 6: SSE Integration — Wire Pipeline Into Streaming]]
+- [[_COMMUNITY_Data Model LLM Output Guardrails|Data Model: LLM Output Guardrails]]
 - [[_COMMUNITY_Phase 8 Pipeline Parallelism — Latency Optimization|Phase 8: Pipeline Parallelism — Latency Optimization]]
 - [[_COMMUNITY_Phase 10 E2E Testing & Validation — Final Verification|Phase 10: E2E Testing & Validation — Final Verification]]
 - [[_COMMUNITY_Decision 9 Recovery Points and Dual State Tracking|Decision 9: Recovery Points and Dual State Tracking]]
+- [[_COMMUNITY_Findings|Findings]]
 - [[_COMMUNITY_New Enums|New Enums]]
 - [[_COMMUNITY_test_guardrail_logging.py|test_guardrail_logging.py]]
 - [[_COMMUNITY_.searchFlights|.searchFlights]]
 - [[_COMMUNITY_FastAPI|FastAPI]]
 - [[_COMMUNITY_Decision 7 Webhook Processing — Source of Truth with Two-Tier Handling|Decision 7: Webhook Processing — Source of Truth with Two-Tier Handling]]
+- [[_COMMUNITY_Phase 2 Configuration & PII Detection — Foundation|Phase 2: Configuration & PII Detection — Foundation]]
+- [[_COMMUNITY_Phase 3 Sentence-Boundary Chunking — Token Accumulation|Phase 3: Sentence-Boundary Chunking — Token Accumulation]]
+- [[_COMMUNITY_Phase 4 NeMo Output Rail — Safety Classification|Phase 4: NeMo Output Rail — Safety Classification]]
+- [[_COMMUNITY_Phase 5 Output Guardrail Pipeline — Orchestration|Phase 5: Output Guardrail Pipeline — Orchestration]]
+- [[_COMMUNITY_Phase 6 SSE Integration — Wire Pipeline Into Streaming|Phase 6: SSE Integration — Wire Pipeline Into Streaming]]
+- [[_COMMUNITY_Phase 7 Hard Stop & Partial Persistence — Failure Handling|Phase 7: Hard Stop & Partial Persistence — Failure Handling]]
+- [[_COMMUNITY_Phase 8 Pipeline Parallelism — Latency Optimization|Phase 8: Pipeline Parallelism — Latency Optimization]]
+- [[_COMMUNITY_Phase 10 E2E Testing & Validation — Final Verification|Phase 10: E2E Testing & Validation — Final Verification]]
 
 ## God Nodes (most connected - your core abstractions)
 1. `PrismaService` - 65 edges
@@ -342,7 +353,7 @@
 - **Agent Gateway REST Endpoints** — specs_003_agent_tool_calling_contracts_agent_gateway_api_get_search_flights, specs_003_agent_tool_calling_contracts_agent_gateway_api_get_user_preferences, specs_003_agent_tool_calling_contracts_agent_gateway_api_get_user_bookings [EXTRACTED 1.00]
 - **Output Guardrail Pipeline Components** — specs_004_output_guardrails_data_model_chunkbuffer_model, specs_004_output_guardrails_data_model_slidingwindow_model, specs_004_output_guardrails_data_model_outputguardrailconfig_model, specs_004_output_guardrails_data_model_outputguardrailpipeline_model [EXTRACTED 1.00]
 
-## Communities (313 total, 134 thin omitted)
+## Communities (324 total, 133 thin omitted)
 
 ### Community 0 - "NestJSClient"
 Cohesion: 0.27
@@ -377,16 +388,16 @@ Cohesion: 0.05
 Nodes (36): dependencies, class-variance-authority, clsx, lucide-react, maplibre-gl, next, next-auth, postcss (+28 more)
 
 ### Community 8 - "tsconfig.json"
-Cohesion: 0.20
-Nodes (9): compilerOptions, baseUrl, outDir, paths, exclude, extends, include, @/* (+1 more)
+Cohesion: 0.18
+Nodes (10): tsconfig-paths, compilerOptions, baseUrl, outDir, paths, exclude, extends, include (+2 more)
 
 ### Community 10 - "MockStreamingLLM"
 Cohesion: 0.08
 Nodes (25): API Contracts: Stripe Payment System, DELETE /api/payments/methods/:methodId, Error Responses, Error Responses, Error Responses, Error Responses, GET /api/payments/methods, GET /api/payments/:paymentId/status (+17 more)
 
 ### Community 11 - "devDependencies"
-Cohesion: 0.12
-Nodes (17): compilerOptions, allowJs, esModuleInterop, incremental, isolatedModules, jsx, lib, module (+9 more)
+Cohesion: 0.10
+Nodes (20): compilerOptions, allowJs, esModuleInterop, incremental, isolatedModules, jsx, lib, module (+12 more)
 
 ### Community 12 - "devDependencies"
 Cohesion: 0.10
@@ -449,8 +460,8 @@ Cohesion: 0.17
 Nodes (7): AppModule, envSchema, HttpExceptionFilter, DuffelCleanupService, DuffelOfferRequest, bootstrap(), ToolCallMetadata
 
 ### Community 31 - "MessageQueueManager"
-Cohesion: 0.04
-Nodes (44): 1. OutputGuardrailConfig, 2. ChunkBuffer, 3. SlidingWindow, 4. OutputGuardrailResult, 5. OutputGuardrailPipeline, 6. OutputGuardrailBlockedError, Data Model: LLM Output Guardrails, Entities (+36 more)
+Cohesion: 0.12
+Nodes (16): Assumptions, Context, Edge Cases, Feature Specification: LLM Output Guardrails, Functional Requirements, Key Entities, Measurable Outcomes, Requirements *(mandatory)* (+8 more)
 
 ### Community 32 - "NestJSClient"
 Cohesion: 0.17
@@ -573,8 +584,8 @@ Cohesion: 0.11
 Nodes (17): (a) Simple Chat — No Tools, (b) Single Tool Call, (c) Multi-Tool Call, `confirmation_required`, Contract: SSE Event Protocol, (d) Confirmation Flow (Dormant — Future Write Tools), `done`, `error` (+9 more)
 
 ### Community 132 - "NemoGuardrailService"
-Cohesion: 0.04
-Nodes (48): Acceptance, Acceptance, Acceptance, Acceptance, Acceptance, Acceptance, Acceptance, Acceptance (+40 more)
+Cohesion: 0.12
+Nodes (16): Acceptance, Complexity Tracking, Constitution Check, Dependency Graph, Documentation (this feature), Files, Implementation Plan: LLM Output Guardrails, Phase 0: Research — ✅ Complete (+8 more)
 
 ### Community 133 - "Progress by Feature"
 Cohesion: 0.09
@@ -869,8 +880,8 @@ Cohesion: 0.13
 Nodes (14): Booking Workflow — Grilling Decisions, Decision 10: Staleness Check Before Payment (Feature B Constraint), Decision 11: Frontend UX — Deferred to Feature B, Decision 1: Server-Side Storage, Not Stateless, Decision 2: Dedicated `BookingIntent` Table (Not the `Booking` Table), Decision 3: Two-Phase Cleanup (Soft Expire → Hard Delete), Decision 4: Relational Passenger Model (`BookingIntentPassenger`), Decision 5: Validation in Application Layer, Not DB Constraints (+6 more)
 
 ### Community 283 - "devDependencies"
-Cohesion: 0.11
-Nodes (19): devDependencies, jest, @nestjs/cli, @nestjs/schematics, @nestjs/testing, prisma, supertest, ts-jest (+11 more)
+Cohesion: 0.12
+Nodes (17): devDependencies, jest, @nestjs/cli, @nestjs/schematics, @nestjs/testing, prisma, supertest, ts-jest (+9 more)
 
 ### Community 284 - "Implementation Plan: Booking Intent Foundation"
 Cohesion: 0.17
@@ -944,9 +955,17 @@ Nodes (8): Further Notes, Implementation Decisions, Out of Scope, PRD: Stripe Pa
 Cohesion: 0.33
 Nodes (6): `LedgerEntryType`, New Enums, `PaymentEventSource`, `PaymentStatus`, `RefundStatus`, `RefundTriggerType`
 
+### Community 304 - "Quickstart Validation Guide: LLM Output Guardrails"
+Cohesion: 0.20
+Nodes (10): Prerequisites, Quickstart Validation Guide: LLM Output Guardrails, Running Tests, Scenario 1: Safe Response Streams Normally, Scenario 2: PII in Output Triggers Hard Stop, Scenario 3: Boundary PII Detected by Sliding Window, Scenario 4: NeMo Output Rail Blocks Harmful Content, Scenario 5: Partial Response Persisted on Block (+2 more)
+
 ### Community 305 - "Phase 6: SSE Integration — Wire Pipeline Into Streaming"
 Cohesion: 0.33
 Nodes (5): name, prisma, seed, private, version
+
+### Community 306 - "Data Model: LLM Output Guardrails"
+Cohesion: 0.25
+Nodes (4): Data Model: LLM Output Guardrails, Relationships, SSE Event Extension, State Transitions
 
 ### Community 307 - "Phase 8: Pipeline Parallelism — Latency Optimization"
 Cohesion: 0.20
@@ -960,9 +979,17 @@ Nodes (3): enabled_config(), test_guardrail_logging_blocked_chunks(), test_guard
 Cohesion: 0.29
 Nodes (6): LedgerEntryType, Payment, PaymentEventSource, PaymentStatus, RefundStatus, RefundTriggerType
 
+### Community 310 - "Findings"
+Cohesion: 0.25
+Nodes (7): 1. Sentence Detection Edge Cases, 2. Sliding Window Token Count, 3. NeMo Output Rail Configuration, 4. Streaming UX — Sentence-Boundary Chunking Bursty Arrival, Findings, Phase 0 Research: LLM Output Guardrails, Summary of Decisions
+
 ### Community 311 - "New Enums"
 Cohesion: 0.33
 Nodes (3): Request, Response, RateLimitMiddleware
+
+### Community 312 - "test_guardrail_logging.py"
+Cohesion: 0.29
+Nodes (7): 1. OutputGuardrailConfig, 2. ChunkBuffer, 3. SlidingWindow, 4. OutputGuardrailResult, 5. OutputGuardrailPipeline, 6. OutputGuardrailBlockedError, Entities
 
 ### Community 314 - "FastAPI"
 Cohesion: 0.50
@@ -972,10 +999,42 @@ Nodes (3): lifespan(), Lifespan context manager that initializes NeMo Guardrails
 Cohesion: 0.40
 Nodes (3): enabled_config(), test_pipeline_parallelism_fail_lookahead(), test_pipeline_parallelism_latency()
 
+### Community 316 - "Phase 2: Configuration & PII Detection — Foundation"
+Cohesion: 0.50
+Nodes (4): Acceptance, Files, Phase 2: Configuration & PII Detection — Foundation, Tests
+
+### Community 317 - "Phase 3: Sentence-Boundary Chunking — Token Accumulation"
+Cohesion: 0.50
+Nodes (4): Acceptance, Files, Phase 3: Sentence-Boundary Chunking — Token Accumulation, Tests
+
+### Community 318 - "Phase 4: NeMo Output Rail — Safety Classification"
+Cohesion: 0.50
+Nodes (4): Acceptance, Files, Phase 4: NeMo Output Rail — Safety Classification, Tests
+
+### Community 319 - "Phase 5: Output Guardrail Pipeline — Orchestration"
+Cohesion: 0.50
+Nodes (4): Acceptance, Files, Phase 5: Output Guardrail Pipeline — Orchestration, Tests
+
+### Community 320 - "Phase 6: SSE Integration — Wire Pipeline Into Streaming"
+Cohesion: 0.50
+Nodes (4): Acceptance, Files, Phase 6: SSE Integration — Wire Pipeline Into Streaming, Tests
+
+### Community 321 - "Phase 7: Hard Stop & Partial Persistence — Failure Handling"
+Cohesion: 0.50
+Nodes (4): Acceptance, Files, Phase 7: Hard Stop & Partial Persistence — Failure Handling, Tests
+
+### Community 322 - "Phase 8: Pipeline Parallelism — Latency Optimization"
+Cohesion: 0.50
+Nodes (4): Acceptance, Files, Phase 8: Pipeline Parallelism — Latency Optimization, Tests
+
+### Community 323 - "Phase 10: E2E Testing & Validation — Final Verification"
+Cohesion: 0.50
+Nodes (4): Acceptance — Success Criteria Verification, Checklist, Files, Phase 10: E2E Testing & Validation — Final Verification
+
 ## Knowledge Gaps
 - **1494 isolated node(s):** `root`, `parser`, `plugins`, `extends`, `node` (+1489 more)
   These have ≤1 connection - possible missing edges or undocumented components.
-- **134 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
+- **133 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
