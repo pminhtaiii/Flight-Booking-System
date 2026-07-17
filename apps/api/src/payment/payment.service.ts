@@ -694,6 +694,15 @@ export class PaymentService {
         return;
       }
 
+      const recoveryPoint = await this.idempotencyService.getResumePoint(idempotencyKey);
+      if (recoveryPoint === 'captured' || recoveryPoint === 'completed') {
+        this.logger.error(
+          `CRITICAL: Background confirmation failed after Stripe capture for payment ${paymentId}. Customer has been charged. Recovery point is '${recoveryPoint}'. Retries will attempt to resume post-capture updates.`,
+          error instanceof Error ? error.stack : undefined
+        );
+        return;
+      }
+
       // Check if Duffel order was created
       const duffelEvent = await this.prisma.paymentEvent.findFirst({
         where: {
