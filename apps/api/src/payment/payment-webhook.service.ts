@@ -1,7 +1,7 @@
 import { Injectable, Logger, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '@/prisma/prisma.service';
 import { StripeService } from '@/common/stripe.service';
-import { PaymentStatus, PaymentEventSource } from '@prisma/client';
+import { PaymentStatus, PaymentEventSource, Prisma } from '@prisma/client';
 import { canTransition } from './payment-state-machine';
 import * as crypto from 'crypto';
 
@@ -41,165 +41,184 @@ export class PaymentWebhookService {
       return true;
     }
 
-    // Identify target status based on Stripe event type
-    let targetStatus: PaymentStatus;
-    if (eventType === 'payment_intent.succeeded') {
-      targetStatus = PaymentStatus.SUCCEEDED;
-    } else if (eventType === 'payment_intent.payment_failed') {
-      targetStatus = PaymentStatus.FAILED;
-    } else if (eventType === 'payment_intent.canceled') {
-      targetStatus = PaymentStatus.CANCELLED;
-    } else {
-      // Unhandled event type for this service
-      this.logger.warn({
-        message: `Unhandled event type: ${eventType}`,
-        stripeEventId,
-      });
-      return true;
-    }
-
-    const stripePaymentIntentId = event.data.object.id;
-    const payment = await this.prisma.payment.findUnique({
-      where: { stripePaymentIntentId },
-    });
-
-    if (!payment) {
-      this.logger.error({
-        message: `Payment record not found for stripePaymentIntentId: ${stripePaymentIntentId}`,
-        stripeEventId,
-        stripePaymentIntentId,
-      });
-      throw new BadRequestException(`Payment record not found for Stripe PaymentIntent ID: ${stripePaymentIntentId}`);
-    }
-
-    const currentStatus = payment.status;
-
-    // Handle identical state (no-op)
-    if (currentStatus === targetStatus) {
-      await this.prisma.paymentEvent.create({
-        data: {
-          paymentId: payment.id,
-          eventType,
-          previousStatus: currentStatus,
-          newStatus: targetStatus,
-          amount: event.data.object.amount,
-          source: PaymentEventSource.WEBHOOK,
-          stripeEventId,
-          createdBy: 'stripe_webhook',
-          metadata: event,
-        },
-      });
-
-      this.logger.log({
-        message: `No-op transition: payment already in target state ${targetStatus}`,
-        paymentId: payment.id,
-        currentStatus,
-        targetStatus,
-        durationMs: Date.now() - startTime,
-      });
-      return true;
-    }
-
-    let isPlausible = false;
-    // T007: Check if transition is plausible (e.g. out-of-order) even if strictly invalid in FSM
-    if (!canTransition(currentStatus, targetStatus)) {
-      if (
-        (targetStatus === PaymentStatus.SUCCEEDED && (currentStatus === PaymentStatus.CREATED || currentStatus === PaymentStatus.AUTHORIZED)) ||
-        (targetStatus === PaymentStatus.FAILED && (currentStatus === PaymentStatus.CREATED || currentStatus === PaymentStatus.AUTHORIZED)) ||
-        (targetStatus === PaymentStatus.CANCELLED && (currentStatus === PaymentStatus.CREATED || currentStatus === PaymentStatus.AUTHORIZED))
-      ) {
-        isPlausible = true;
-      }
-    }
-
-    // If FSM rejects transition, evaluate for Tier 1 self-healing or Tier 2 drop
-    if (!canTransition(currentStatus, targetStatus)) {
-      if (isPlausible) {
-        // T007: Tier 1 self-healing reconciliation
-        this.logger.warn({
-          message: `Out-of-order/invalid transition [${currentStatus} -> ${targetStatus}] detected. Initiating Tier 1 self-healing.`,
-          paymentId: payment.id,
-          stripePaymentIntentId,
-        });
-
-        try {
-          const canonicalIntent = await this.stripeService.retrievePaymentIntent(stripePaymentIntentId);
-          const canonicalStatus = canonicalIntent.status;
-
-          // Verify canonical state matches target status
-          let isCanonicalVerified = false;
-          if (targetStatus === PaymentStatus.SUCCEEDED && canonicalStatus === 'succeeded') {
-            isCanonicalVerified = true;
-          } else if (targetStatus === PaymentStatus.CANCELLED && canonicalStatus === 'canceled') {
-            isCanonicalVerified = true;
-          } else if (targetStatus === PaymentStatus.FAILED && (canonicalStatus === 'requires_payment_method' || canonicalStatus === 'canceled')) {
-            isCanonicalVerified = true;
-          }
-
-          if (isCanonicalVerified) {
-            this.logger.log({
-              message: `Tier 1 self-healing: Stripe state verified as ${canonicalStatus}. Fast-forwarding local state to ${targetStatus}.`,
-              paymentId: payment.id,
-              stripePaymentIntentId,
-            });
-
-            await this.executeStateTransition(payment, targetStatus, event, stripeEventId);
-
-            this.logger.log({
-              message: `Webhook processed successfully (Self-Healed)`,
-              eventType,
-              paymentId: payment.id,
-              transition: `${currentStatus} -> ${targetStatus}`,
-              selfHealing: true,
-              durationMs: Date.now() - startTime,
-            });
-            return true;
-          } else {
-            // Mismatch between Stripe's API state and webhook event state
-            this.logger.error({
-              message: `ALERT: Tier 1 self-healing failed. Stripe API state (${canonicalStatus}) mismatches webhook target (${targetStatus}). Dropping event.`,
-              level: 'ALERT',
-              paymentId: payment.id,
-              stripePaymentIntentId,
-              event,
-            });
-            return true;
-          }
-        } catch (error) {
-          this.logger.error({
-            message: `Tier 1 self-healing failed due to API error: ${error instanceof Error ? error.message : String(error)}`,
-            paymentId: payment.id,
-            error,
-          });
-          throw error;
-        }
+    try {
+      // Identify target status based on Stripe event type
+      let targetStatus: PaymentStatus;
+      if (eventType === 'payment_intent.succeeded') {
+        targetStatus = PaymentStatus.SUCCEEDED;
+      } else if (eventType === 'payment_intent.payment_failed') {
+        targetStatus = PaymentStatus.FAILED;
+      } else if (eventType === 'payment_intent.canceled') {
+        targetStatus = PaymentStatus.CANCELLED;
       } else {
-        // T008: Tier 2 alert + drop (strictly irreconcilable transition)
-        this.logger.error({
-          message: `ALERT: Irreconcilable webhook transition requested [${currentStatus} -> ${targetStatus}]. Dropping event.`,
-          level: 'ALERT',
-          paymentId: payment.id,
-          stripePaymentIntentId,
-          event,
+        // Unhandled event type for this service
+        this.logger.warn({
+          message: `Unhandled event type: ${eventType}`,
+          stripeEventId,
         });
         return true;
       }
+
+      const stripePaymentIntentId = event.data.object.id;
+      const payment = await this.prisma.payment.findUnique({
+        where: { stripePaymentIntentId },
+      });
+
+      if (!payment) {
+        this.logger.error({
+          message: `Payment record not found for stripePaymentIntentId: ${stripePaymentIntentId}`,
+          stripeEventId,
+          stripePaymentIntentId,
+        });
+        throw new BadRequestException(`Payment record not found for Stripe PaymentIntent ID: ${stripePaymentIntentId}`);
+      }
+
+      const currentStatus = payment.status;
+
+      // Handle identical state (no-op)
+      if (currentStatus === targetStatus) {
+        await this.prisma.paymentEvent.create({
+          data: {
+            paymentId: payment.id,
+            eventType,
+            previousStatus: currentStatus,
+            newStatus: targetStatus,
+            amount: event.data.object.amount,
+            source: PaymentEventSource.WEBHOOK,
+            stripeEventId,
+            createdBy: 'stripe_webhook',
+            metadata: event,
+          },
+        });
+
+        this.logger.log({
+          message: `No-op transition: payment already in target state ${targetStatus}`,
+          paymentId: payment.id,
+          currentStatus,
+          targetStatus,
+          durationMs: Date.now() - startTime,
+        });
+        return true;
+      }
+
+      let isPlausible = false;
+      // T007: Check if transition is plausible (e.g. out-of-order) even if strictly invalid in FSM
+      if (!canTransition(currentStatus, targetStatus)) {
+        if (
+          (targetStatus === PaymentStatus.SUCCEEDED && (currentStatus === PaymentStatus.CREATED || currentStatus === PaymentStatus.AUTHORIZED)) ||
+          (targetStatus === PaymentStatus.FAILED && (currentStatus === PaymentStatus.CREATED || currentStatus === PaymentStatus.AUTHORIZED)) ||
+          (targetStatus === PaymentStatus.CANCELLED && (currentStatus === PaymentStatus.CREATED || currentStatus === PaymentStatus.AUTHORIZED))
+        ) {
+          isPlausible = true;
+        }
+      }
+
+      // If FSM rejects transition, evaluate for Tier 1 self-healing or Tier 2 drop
+      if (!canTransition(currentStatus, targetStatus)) {
+        if (isPlausible) {
+          // T007: Tier 1 self-healing reconciliation
+          this.logger.warn({
+            message: `Out-of-order/invalid transition [${currentStatus} -> ${targetStatus}] detected. Initiating Tier 1 self-healing.`,
+            paymentId: payment.id,
+            stripePaymentIntentId,
+          });
+
+          try {
+            const canonicalIntent = await this.stripeService.retrievePaymentIntent(stripePaymentIntentId);
+            const canonicalStatus = canonicalIntent.status;
+
+            // Verify canonical state matches target status
+            let isCanonicalVerified = false;
+            if (targetStatus === PaymentStatus.SUCCEEDED && canonicalStatus === 'succeeded') {
+              isCanonicalVerified = true;
+            } else if (targetStatus === PaymentStatus.CANCELLED && canonicalStatus === 'canceled') {
+              isCanonicalVerified = true;
+            } else if (targetStatus === PaymentStatus.FAILED && canonicalStatus === 'requires_payment_method') {
+              isCanonicalVerified = true;
+            }
+
+            if (isCanonicalVerified) {
+              this.logger.log({
+                message: `Tier 1 self-healing: Stripe state verified as ${canonicalStatus}. Fast-forwarding local state to ${targetStatus}.`,
+                paymentId: payment.id,
+                stripePaymentIntentId,
+              });
+
+              await this.executeStateTransition(payment, targetStatus, event, stripeEventId);
+
+              this.logger.log({
+                message: `Webhook processed successfully (Self-Healed)`,
+                eventType,
+                paymentId: payment.id,
+                transition: `${currentStatus} -> ${targetStatus}`,
+                selfHealing: true,
+                durationMs: Date.now() - startTime,
+              });
+              return true;
+            } else {
+              // Mismatch between Stripe's API state and webhook event state
+              this.logger.error({
+                message: `ALERT: Tier 1 self-healing failed. Stripe API state (${canonicalStatus}) mismatches webhook target (${targetStatus}). Dropping event.`,
+                level: 'ALERT',
+                paymentId: payment.id,
+                stripePaymentIntentId,
+                event,
+              });
+              return true;
+            }
+          } catch (error) {
+            this.logger.error({
+              message: `Tier 1 self-healing failed due to API error: ${error instanceof Error ? error.message : String(error)}`,
+              paymentId: payment.id,
+              error,
+            });
+            throw error;
+          }
+        } else {
+          // T008: Tier 2 alert + drop (strictly irreconcilable transition)
+          this.logger.error({
+            message: `ALERT: Irreconcilable webhook transition requested [${currentStatus} -> ${targetStatus}]. Dropping event.`,
+            level: 'ALERT',
+            paymentId: payment.id,
+            stripePaymentIntentId,
+            event,
+          });
+          return true;
+        }
+      }
+
+      // Normal path: transition is valid according to FSM
+      await this.executeStateTransition(payment, targetStatus, event, stripeEventId);
+
+      // T009: Structured logging
+      this.logger.log({
+        message: `Webhook processed successfully`,
+        eventType,
+        paymentId: payment.id,
+        transition: `${currentStatus} -> ${targetStatus}`,
+        selfHealing: false,
+        durationMs: Date.now() - startTime,
+      });
+
+      return true;
+    } catch (error) {
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === 'P2002' &&
+        (
+          (Array.isArray(error.meta?.target) && error.meta.target.includes('stripeEventId')) ||
+          (typeof error.meta?.target === 'string' && error.meta.target.includes('stripeEventId'))
+        )
+      ) {
+        this.logger.log({
+          message: `Concurrent duplicate webhook event detected: event ${stripeEventId} already processed. Skipping.`,
+          stripeEventId,
+          eventType,
+        });
+        return true;
+      }
+      throw error;
     }
-
-    // Normal path: transition is valid according to FSM
-    await this.executeStateTransition(payment, targetStatus, event, stripeEventId);
-
-    // T009: Structured logging
-    this.logger.log({
-      message: `Webhook processed successfully`,
-      eventType,
-      paymentId: payment.id,
-      transition: `${currentStatus} -> ${targetStatus}`,
-      selfHealing: false,
-      durationMs: Date.now() - startTime,
-    });
-
-    return true;
   }
 
   /**

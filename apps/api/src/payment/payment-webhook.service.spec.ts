@@ -3,7 +3,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { PaymentWebhookService } from './payment-webhook.service';
 import { PrismaService } from '@/prisma/prisma.service';
 import { StripeService } from '@/common/stripe.service';
-import { PaymentStatus, PaymentEventSource } from '@prisma/client';
+import { PaymentStatus, PaymentEventSource, Prisma } from '@prisma/client';
 
 describe('PaymentWebhookService', () => {
   let service: PaymentWebhookService;
@@ -291,6 +291,52 @@ describe('PaymentWebhookService', () => {
       const event = createMockEvent('payment_intent.succeeded', 'succeeded');
       
       await expect(service.handleWebhookEvent(event)).rejects.toThrow();
+    });
+
+    it('Issue 1: handles concurrent duplicate event (Prisma P2002 on stripeEventId) gracefully by returning true', async () => {
+      mockPrisma.paymentEvent.findUnique.mockResolvedValueOnce(null);
+      mockPrisma.payment.findUnique.mockResolvedValueOnce({
+        id: 'payment_123',
+        bookingIntentId: 'intent_123',
+        stripePaymentIntentId: mockPaymentIntentId,
+        amount: mockAmount,
+        currency: mockCurrency,
+        status: PaymentStatus.AUTHORIZED,
+      });
+      
+      const prismaError = new Prisma.PrismaClientKnownRequestError(
+        'Unique constraint failed',
+        { code: 'P2002', clientVersion: '5.14.0', meta: { target: ['stripeEventId'] } }
+      );
+      mockPrisma.payment.update.mockRejectedValueOnce(prismaError);
+
+      const event = createMockEvent('payment_intent.succeeded', 'succeeded');
+      const result = await service.handleWebhookEvent(event);
+
+      expect(result).toBe(true);
+    });
+
+    it('Issue 2: drops/fails self-healing if target status is FAILED and canonical status is canceled (out-of-order transition AUTHORIZED -> FAILED)', async () => {
+      mockPrisma.paymentEvent.findUnique.mockResolvedValueOnce(null);
+      mockPrisma.payment.findUnique.mockResolvedValueOnce({
+        id: 'payment_123',
+        bookingIntentId: 'intent_123',
+        stripePaymentIntentId: mockPaymentIntentId,
+        amount: mockAmount,
+        currency: mockCurrency,
+        status: PaymentStatus.AUTHORIZED,
+      });
+
+      mockStripe.retrievePaymentIntent.mockResolvedValueOnce({
+        id: mockPaymentIntentId,
+        status: 'canceled',
+      });
+
+      const event = createMockEvent('payment_intent.payment_failed', 'canceled');
+      const result = await service.handleWebhookEvent(event);
+
+      expect(result).toBe(true);
+      expect(mockPrisma.payment.update).not.toHaveBeenCalled();
     });
   });
 });
