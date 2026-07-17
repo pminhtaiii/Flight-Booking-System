@@ -254,6 +254,17 @@ export class PaymentService {
       !isFinished
     ) {
       this.logger.log(`confirmPayment hit Tier 2 timeout (25s). Handoff to async polling.`);
+      
+      confirmPromise.catch((err) => {
+        this.logger.error(
+          `Background confirmPayment execution failed for payment ${dto.paymentId}: ${err instanceof Error ? err.message : String(err)}`,
+          err instanceof Error ? err.stack : undefined
+        );
+        this.handleBackgroundError(dto.paymentId, idempotencyKey, userId, err).catch((dbErr) => {
+          this.logger.error(`Failed to execute background error recovery: ${dbErr.message}`, dbErr.stack);
+        });
+      });
+
       return {
         status: 'PENDING',
         message: 'Booking is being confirmed. Please poll status.',
@@ -310,18 +321,21 @@ export class PaymentService {
         if (paymentIntent.status === 'requires_capture') {
           if (payment.status === 'CREATED') {
             enforceTransition(payment.status, 'AUTHORIZED');
+            const pId = payment.id;
+            const pStatus = payment.status;
+            const pAmount = payment.amount;
             await this.prisma.$transaction(async (tx) => {
               await tx.payment.update({
-                where: { id: payment.id },
+                where: { id: pId },
                 data: { status: 'AUTHORIZED' },
               });
               await tx.paymentEvent.create({
                 data: {
-                  paymentId: payment.id,
+                  paymentId: pId,
                   eventType: 'payment_authorized',
-                  previousStatus: payment.status,
+                  previousStatus: pStatus,
                   newStatus: 'AUTHORIZED',
-                  amount: payment.amount,
+                  amount: pAmount,
                   source: 'API',
                   createdBy: userId,
                 },
@@ -440,13 +454,77 @@ export class PaymentService {
         } catch (captureError: unknown) {
           const error = captureError as Error;
           this.logger.error(`Stripe capture failed: ${error.message}`, error.stack);
-          throw new HttpException(
-            {
-              message: `Stripe payment capture failed: ${error.message}`,
-              code: 'STRIPE_CAPTURE_FAILED',
-            },
-            HttpStatus.INTERNAL_SERVER_ERROR,
-          );
+
+          // Duffel order cancellation compensation
+          let duffelOrderId: string | undefined;
+          try {
+            const duffelEvent = await this.prisma.paymentEvent.findFirst({
+              where: {
+                paymentId: payment.id,
+                eventType: 'duffel_order_created',
+              },
+              orderBy: { createdAt: 'desc' },
+            });
+            const duffelOrder = duffelEvent?.metadata as Record<string, unknown> | null;
+            duffelOrderId = duffelOrder?.id as string | undefined;
+
+            if (duffelOrderId) {
+              await this.duffelService.cancelOrder(duffelOrderId);
+              this.logger.log(`Successfully cancelled Duffel order ${duffelOrderId} as compensation.`);
+            }
+          } catch (cancelError: unknown) {
+            const err = cancelError as Error;
+            this.logger.error(`Duffel order cancellation failed during compensation: ${err.message}`, err.stack);
+          }
+
+          // Release the Stripe authorization hold (cancel intent)
+          try {
+            await this.stripeService.cancelPaymentIntent(payment.stripePaymentIntentId);
+          } catch (stripeCancelError: unknown) {
+            const stripeError = stripeCancelError as Error;
+            this.logger.error(`Stripe cancelPaymentIntent failed during compensation: ${stripeError.message}`, stripeError.stack);
+          }
+
+          // Update Payment status to CANCELLED
+          enforceTransition(payment.status, 'CANCELLED');
+          await this.prisma.$transaction(async (tx) => {
+            await tx.payment.update({
+              where: { id: payment.id },
+              data: { status: 'CANCELLED' },
+            });
+            await tx.paymentEvent.create({
+              data: {
+                paymentId: payment.id,
+                eventType: 'payment_cancelled',
+                previousStatus: payment.status,
+                newStatus: 'CANCELLED',
+                amount: payment.amount,
+                source: 'API',
+                createdBy: userId,
+              },
+            });
+          });
+
+          // Update BookingIntent status
+          const bookingIntent = await this.prisma.bookingIntent.findUnique({
+            where: { id: payment.bookingIntentId },
+          });
+          const nextBookingStatus = (bookingIntent?.paymentAttemptCount || 0) < 2 ? 'AWAITING_PAYMENT' : 'CANCELLED';
+          await this.prisma.bookingIntent.update({
+            where: { id: payment.bookingIntentId },
+            data: { status: nextBookingStatus },
+          });
+
+          // Update recovery point to completed and complete idempotency key
+          await this.idempotencyService.updateRecoveryPoint(idempotencyKey, 'completed');
+          const failureResponse = {
+            success: false,
+            error: `Stripe capture failed: ${error.message || 'Unknown error'}. Duffel order cancelled and hold released.`,
+            bookingStatus: nextBookingStatus,
+          };
+          await this.idempotencyService.completeKey(idempotencyKey, HttpStatus.BAD_GATEWAY, failureResponse);
+
+          throw new HttpException(failureResponse, HttpStatus.BAD_GATEWAY);
         }
 
         await this.idempotencyService.updateRecoveryPoint(idempotencyKey, 'captured');
@@ -589,5 +667,96 @@ export class PaymentService {
       bookingIntentStatus: payment.bookingIntent.status,
       attemptNumber: payment.attemptNumber,
     };
+  }
+
+  /**
+   * Cleans up state and resolves background errors to prevent unhandled rejections
+   */
+  private async handleBackgroundError(
+    paymentId: string,
+    idempotencyKey: string,
+    userId: string,
+    error: unknown,
+  ): Promise<void> {
+    try {
+      const payment = await this.prisma.payment.findUnique({
+        where: { id: paymentId },
+      });
+
+      if (!payment || payment.status === 'SUCCEEDED' || payment.status === 'CANCELLED' || payment.status === 'FAILED') {
+        return;
+      }
+
+      // Check if Duffel order was created
+      const duffelEvent = await this.prisma.paymentEvent.findFirst({
+        where: {
+          paymentId,
+          eventType: 'duffel_order_created',
+        },
+        orderBy: { createdAt: 'desc' },
+      });
+
+      if (duffelEvent) {
+        const duffelOrder = duffelEvent.metadata as Record<string, unknown> | null;
+        const duffelOrderId = duffelOrder?.id as string | undefined;
+        if (duffelOrderId) {
+          try {
+            await this.duffelService.cancelOrder(duffelOrderId);
+          } catch (cancelError: unknown) {
+            const err = cancelError as Error;
+            this.logger.error(`Background cancelOrder failed: ${err.message}`);
+          }
+        }
+      }
+
+      // Release hold if authorized
+      try {
+        await this.stripeService.cancelPaymentIntent(payment.stripePaymentIntentId);
+      } catch (stripeError: unknown) {
+        const err = stripeError as Error;
+        this.logger.error(`Background cancelPaymentIntent failed: ${err.message}`);
+      }
+
+      // Transition payment to CANCELLED
+      await this.prisma.$transaction(async (tx) => {
+        await tx.payment.update({
+          where: { id: paymentId },
+          data: { status: 'CANCELLED' },
+        });
+        await tx.paymentEvent.create({
+          data: {
+            paymentId,
+            eventType: 'payment_cancelled',
+            previousStatus: payment.status,
+            newStatus: 'CANCELLED',
+            amount: payment.amount,
+            source: 'API',
+            createdBy: userId,
+          },
+        });
+      });
+
+      // Update BookingIntent
+      const bookingIntent = await this.prisma.bookingIntent.findUnique({
+        where: { id: payment.bookingIntentId },
+      });
+      const nextBookingStatus = (bookingIntent?.paymentAttemptCount || 0) < 2 ? 'AWAITING_PAYMENT' : 'CANCELLED';
+      await this.prisma.bookingIntent.update({
+        where: { id: payment.bookingIntentId },
+        data: { status: nextBookingStatus },
+      });
+
+      const errObj = error as Error;
+      // Complete idempotency key
+      await this.idempotencyService.updateRecoveryPoint(idempotencyKey, 'completed');
+      await this.idempotencyService.completeKey(idempotencyKey, HttpStatus.BAD_GATEWAY, {
+        success: false,
+        error: `Background processing failed: ${errObj.message || 'Unknown error'}. Hold released.`,
+        bookingStatus: nextBookingStatus,
+      });
+    } catch (err: unknown) {
+      const errorObj = err as Error;
+      this.logger.error(`Error in handleBackgroundError: ${errorObj.message}`, errorObj.stack);
+    }
   }
 }

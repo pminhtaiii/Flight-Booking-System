@@ -501,4 +501,24 @@ export class DuffelService {
       );
     }
   }
+
+  async cancelOrder(duffelOrderId: string): Promise<unknown> {
+    try {
+      const quote = await this.duffel.orderCancellations.create({
+        order_id: duffelOrderId,
+      });
+      const confirmed = await this.duffel.orderCancellations.confirm(quote.data.id);
+      return confirmed.data;
+    } catch (err: unknown) {
+      const error = err as Error;
+      this.logger.error(`Failed to cancel Duffel order ${duffelOrderId}: ${error.message}`, error.stack);
+      throw new HttpException(
+        {
+          code: 'UPSTREAM_CANCEL_FAILED',
+          message: error.message || 'Failed to cancel Duffel order',
+        },
+        HttpStatus.BAD_GATEWAY,
+      );
+    }
+  }
 }
