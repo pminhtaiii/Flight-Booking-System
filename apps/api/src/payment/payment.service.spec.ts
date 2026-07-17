@@ -190,4 +190,141 @@ describe('PaymentService - recoveryPoint === completed', () => {
       });
     });
   });
+
+  describe('handleBackgroundError', () => {
+    const paymentId = 'payment-123';
+    const idempotencyKey = 'key-123';
+    const userId = 'user-123';
+    const error = new Error('Some background error');
+
+    beforeEach(() => {
+      mockPrisma.$transaction = jest.fn().mockImplementation(async (cb) => cb(mockPrisma));
+      mockPrisma.payment.update = jest.fn();
+      mockPrisma.paymentEvent.create = jest.fn();
+      mockPrisma.bookingIntent.update = jest.fn();
+
+      mockStripe.retrievePaymentIntent = jest.fn();
+      mockStripe.cancelPaymentIntent = jest.fn();
+      mockDuffel.cancelOrder = jest.fn();
+      mockIdempotency.updateRecoveryPoint = jest.fn();
+    });
+
+    it('when Stripe retrieval returns status === succeeded, logs/updates recovery point to captured, returns early, and does NOT compensate', async () => {
+      // Setup payment
+      mockPrisma.payment.findUnique.mockResolvedValueOnce({
+        id: paymentId,
+        stripePaymentIntentId: 'pi_123',
+        bookingIntentId: 'intent-123',
+        status: 'AUTHORIZED',
+        amount: 100,
+      });
+
+      // Stripe returns succeeded
+      mockStripe.retrievePaymentIntent.mockResolvedValueOnce({
+        id: 'pi_123',
+        status: 'succeeded',
+      });
+
+      // Resume point is null
+      mockIdempotency.getResumePoint.mockResolvedValueOnce(null);
+
+      // Call handleBackgroundError
+      await (service as any).handleBackgroundError(paymentId, idempotencyKey, userId, error);
+
+      // Verify recovery point updated to 'captured'
+      expect(mockIdempotency.updateRecoveryPoint).toHaveBeenCalledWith(idempotencyKey, 'captured');
+
+      // Verify no compensation methods are called
+      expect(mockDuffel.cancelOrder).not.toHaveBeenCalled();
+      expect(mockStripe.cancelPaymentIntent).not.toHaveBeenCalled();
+      expect(mockPrisma.payment.update).not.toHaveBeenCalled();
+    });
+
+    it('when Stripe retrieval returns status !== succeeded, continues compensation', async () => {
+      // Setup payment
+      mockPrisma.payment.findUnique.mockResolvedValueOnce({
+        id: paymentId,
+        stripePaymentIntentId: 'pi_123',
+        bookingIntentId: 'intent-123',
+        status: 'AUTHORIZED',
+        amount: 100,
+      });
+
+      // Stripe returns requires_capture
+      mockStripe.retrievePaymentIntent.mockResolvedValueOnce({
+        id: 'pi_123',
+        status: 'requires_capture',
+      });
+
+      // Resume point is null
+      mockIdempotency.getResumePoint.mockResolvedValueOnce(null);
+
+      // Mock duffel event query - return one to verify Duffel cancelOrder is called
+      mockPrisma.paymentEvent.findFirst.mockResolvedValueOnce({
+        metadata: { id: 'duffel-order-abc' },
+      });
+
+      // Mock bookingIntent query
+      mockPrisma.bookingIntent.findUnique.mockResolvedValueOnce({
+        id: 'intent-123',
+        paymentAttemptCount: 1,
+      });
+
+      // Call handleBackgroundError
+      await (service as any).handleBackgroundError(paymentId, idempotencyKey, userId, error);
+
+      // Verify recovery point is NOT updated to 'captured'
+      expect(mockIdempotency.updateRecoveryPoint).not.toHaveBeenCalledWith(idempotencyKey, 'captured');
+
+      // Verify compensation methods are called
+      expect(mockDuffel.cancelOrder).toHaveBeenCalledWith('duffel-order-abc');
+      expect(mockStripe.cancelPaymentIntent).toHaveBeenCalledWith('pi_123');
+
+      // Verify payment transitioned to CANCELLED
+      expect(mockPrisma.payment.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: paymentId },
+          data: { status: 'CANCELLED' },
+        })
+      );
+
+      // Verify bookingIntent status is updated
+      expect(mockPrisma.bookingIntent.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: 'intent-123' },
+          data: { status: 'AWAITING_PAYMENT' },
+        })
+      );
+    });
+
+    it('when Stripe retrieval fails (throws), it logs the error but still proceeds with compensation', async () => {
+      // Setup payment
+      mockPrisma.payment.findUnique.mockResolvedValueOnce({
+        id: paymentId,
+        stripePaymentIntentId: 'pi_123',
+        bookingIntentId: 'intent-123',
+        status: 'AUTHORIZED',
+        amount: 100,
+      });
+
+      // Stripe retrieve throws
+      mockStripe.retrievePaymentIntent.mockRejectedValueOnce(new Error('Stripe API error'));
+
+      // Resume point is null
+      mockIdempotency.getResumePoint.mockResolvedValueOnce(null);
+
+      mockPrisma.paymentEvent.findFirst.mockResolvedValueOnce(null);
+      mockPrisma.bookingIntent.findUnique.mockResolvedValueOnce({
+        id: 'intent-123',
+        paymentAttemptCount: 1,
+      });
+
+      // Call handleBackgroundError
+      await (service as any).handleBackgroundError(paymentId, idempotencyKey, userId, error);
+
+      // Verify compensation methods are called
+      expect(mockStripe.cancelPaymentIntent).toHaveBeenCalledWith('pi_123');
+      expect(mockPrisma.payment.update).toHaveBeenCalled();
+    });
+  });
 });

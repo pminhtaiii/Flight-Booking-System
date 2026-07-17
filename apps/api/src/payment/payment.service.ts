@@ -747,8 +747,30 @@ export class PaymentService {
         return;
       }
 
+      let isStripeCaptured = false;
+      try {
+        const paymentIntent = await this.stripeService.retrievePaymentIntent(payment.stripePaymentIntentId);
+        if (paymentIntent?.status === 'succeeded') {
+          isStripeCaptured = true;
+        }
+      } catch (stripeErr: unknown) {
+        this.logger.error(
+          `Failed to retrieve Stripe PaymentIntent for payment ${paymentId}: ${stripeErr instanceof Error ? stripeErr.message : String(stripeErr)}`
+        );
+      }
+
       const recoveryPoint = await this.idempotencyService.getResumePoint(idempotencyKey);
-      if (recoveryPoint === 'captured' || recoveryPoint === 'completed') {
+      if (recoveryPoint === 'captured' || recoveryPoint === 'completed' || isStripeCaptured) {
+        if (isStripeCaptured && recoveryPoint !== 'captured' && recoveryPoint !== 'completed') {
+          try {
+            await this.idempotencyService.updateRecoveryPoint(idempotencyKey, 'captured');
+          } catch (updateErr: unknown) {
+            this.logger.error(
+              `Failed to update recovery point to 'captured' for payment ${paymentId}: ${updateErr instanceof Error ? updateErr.message : String(updateErr)}`
+            );
+          }
+        }
+
         this.logger.error(
           `CRITICAL: Background confirmation failed after Stripe capture for payment ${paymentId}. Customer has been charged. Recovery point is '${recoveryPoint}'. Retries will attempt to resume post-capture updates.`,
           error instanceof Error ? error.stack : undefined
