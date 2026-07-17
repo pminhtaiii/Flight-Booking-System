@@ -96,6 +96,6 @@ export class PaymentController {
     if (!idempotencyKey) {
       throw new BadRequestException('Idempotency-Key header is required');
     }
-    return this.paymentRefundService.initiateRefund(paymentId, dto, idempotencyKey, req.user.id);
+    return this.paymentRefundService.initiateRefund(paymentId, dto, idempotencyKey, req.user.id, req.user.role);
   }
 }

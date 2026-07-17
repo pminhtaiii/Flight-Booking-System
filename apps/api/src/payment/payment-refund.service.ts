@@ -37,6 +37,7 @@ export class PaymentRefundService {
     dto: RefundPaymentDto,
     idempotencyKey: string,
     userId: string,
+    userRole: string,
   ): Promise<RefundResponse> {
     try {
       // 1. Find Payment with bookingIntent
@@ -49,8 +50,8 @@ export class PaymentRefundService {
         throw new NotFoundException('Payment not found');
       }
 
-      // 2. Validate user owns the payment
-      if (payment.bookingIntent.userId !== userId) {
+      // 2. Validate user owns the payment (admins bypass ownership check)
+      if (userRole !== 'ADMIN' && payment.bookingIntent.userId !== userId) {
         throw new ForbiddenException('You do not own this payment');
       }
 
@@ -165,13 +166,30 @@ export class PaymentRefundService {
           `${idempotencyKey}-stripe-refund`,
         );
       } catch (stripeError) {
-        // Stripe call failed — mark the Refund as FAILED so it's traceable
-        await this.prisma.refund.update({
-          where: { id: refund.id },
-          data: { status: 'FAILED' },
+        // Stripe call failed — mark Refund as FAILED and revert Payment to previousStatus
+        await this.prisma.$transaction(async (tx) => {
+          await tx.refund.update({
+            where: { id: refund.id },
+            data: { status: 'FAILED' },
+          });
+          await tx.payment.update({
+            where: { id: paymentId },
+            data: { status: previousStatus },
+          });
+          await tx.paymentEvent.create({
+            data: {
+              paymentId,
+              eventType: 'refund_failed',
+              previousStatus: PaymentStatus.REFUND_PENDING,
+              newStatus: previousStatus,
+              amount: dto.amount,
+              source: PaymentEventSource.API,
+              createdBy: userId,
+            },
+          });
         });
         this.logger.error(
-          `Stripe refund failed for payment ${paymentId}, Refund ${refund.id} marked FAILED`,
+          `Stripe refund failed for payment ${paymentId}, Refund ${refund.id} marked FAILED, Payment reverted to ${previousStatus}`,
           stripeError instanceof Error ? stripeError.stack : undefined,
         );
         throw stripeError;
@@ -514,12 +532,30 @@ export class PaymentRefundService {
           `${idempotencyKey}-stripe-refund`,
         );
       } catch (stripeError) {
-        await this.prisma.refund.update({
-          where: { id: refund.id },
-          data: { status: 'FAILED' },
+        // Stripe call failed — mark Refund as FAILED and revert Payment to previousStatus
+        await this.prisma.$transaction(async (tx) => {
+          await tx.refund.update({
+            where: { id: refund.id },
+            data: { status: 'FAILED' },
+          });
+          await tx.payment.update({
+            where: { id: paymentId },
+            data: { status: previousStatus },
+          });
+          await tx.paymentEvent.create({
+            data: {
+              paymentId,
+              eventType: 'refund_failed',
+              previousStatus: PaymentStatus.REFUND_PENDING,
+              newStatus: previousStatus,
+              amount: refundableAmount,
+              source: PaymentEventSource.SYSTEM,
+              createdBy: 'system',
+            },
+          });
         });
         this.logger.error(
-          `Stripe refund failed for automated refund on payment ${paymentId}, Refund ${refund.id} marked FAILED`,
+          `Stripe refund failed for automated refund on payment ${paymentId}, Refund ${refund.id} marked FAILED, Payment reverted to ${previousStatus}`,
           stripeError instanceof Error ? stripeError.stack : undefined,
         );
         throw stripeError;
