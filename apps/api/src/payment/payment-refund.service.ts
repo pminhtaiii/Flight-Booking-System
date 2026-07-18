@@ -270,30 +270,40 @@ export class PaymentRefundService {
         return;
       }
 
-      // Find all REFUND_PENDING refunds for this payment and mark them SUCCEEDED
+      // Match specific Stripe refunds from the event to our REFUND_PENDING records
+      const stripeRefunds = (charge.refunds as Record<string, unknown>)?.data as Array<Record<string, unknown>> | undefined;
+      const stripeRefundIds = stripeRefunds?.map((r) => r.id as string) ?? [];
+
+      // Find REFUND_PENDING refunds whose stripeRefundId matches one in this event
       const pendingRefunds = await this.prisma.refund.findMany({
         where: {
           paymentId: payment.id,
           status: 'REFUND_PENDING',
+          stripeRefundId: stripeRefundIds.length > 0 ? { in: stripeRefundIds } : undefined,
         },
       });
 
       if (pendingRefunds.length === 0) {
-        this.logger.log({
-          message: `No pending refunds found for payment ${payment.id}, skipping`,
+        this.logger.warn({
+          message: `No matching REFUND_PENDING refunds found for payment ${payment.id} and Stripe refund IDs ${stripeRefundIds.join(', ')}`,
           paymentId: payment.id,
+          stripeRefundIds,
         });
         return;
       }
 
-      // Calculate the refund amount from this event
+      // Calculate the refund amount from matched refunds only
       const chargeAmountRefunded = (charge.amount_refunded as number) || 0;
+      const thisRefundAmount = pendingRefunds.reduce(
+        (sum: number, r: { amount: number }) => sum + r.amount,
+        0,
+      );
 
       await this.prisma.$transaction(async (tx) => {
-        // Update all pending refunds to SUCCEEDED
+        // Update only the matched pending refunds to SUCCEEDED
         await tx.refund.updateMany({
           where: {
-            paymentId: payment.id,
+            id: { in: pendingRefunds.map((r) => r.id) },
             status: 'REFUND_PENDING',
           },
           data: { status: 'SUCCEEDED' },
@@ -349,11 +359,6 @@ export class PaymentRefundService {
         }
 
         // Create reversing ledger entries: DEBIT PLATFORM_REVENUE, CREDIT CUSTOMER_RECEIVABLE
-        const thisRefundAmount = pendingRefunds.reduce(
-          (sum: number, r: { amount: number }) => sum + r.amount,
-          0,
-        );
-
         const transactionId = crypto.randomUUID();
         await tx.ledgerEntry.createMany({
           data: [
@@ -422,7 +427,7 @@ export class PaymentRefundService {
         where: { key: idempotencyKey },
       });
 
-      if (existingKey?.responseBody) {
+      if (existingKey?.responseBody && existingKey.responseCode && existingKey.responseCode >= 200 && existingKey.responseCode < 300) {
         return JSON.parse(
           typeof existingKey.responseBody === 'string'
             ? existingKey.responseBody
