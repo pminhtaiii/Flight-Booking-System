@@ -487,7 +487,7 @@ export class PaymentRefundService {
         '/api/bookings/payment/refund',
       );
 
-      if (idempotency.status === 'replay') {
+      if (idempotency.status === 'replay' && idempotency.responseCode >= 200 && idempotency.responseCode < 300) {
         return JSON.parse(idempotency.responseBody) as RefundResponse;
       }
 
