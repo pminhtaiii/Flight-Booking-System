@@ -192,6 +192,9 @@ export class PaymentRefundService {
           `Stripe refund failed for payment ${paymentId}, Refund ${refund.id} marked FAILED, Payment reverted to ${previousStatus}`,
           stripeError instanceof Error ? stripeError.stack : undefined,
         );
+        await this.idempotencyService.completeKey(refundIdempotencyKey, 500, {
+          error: stripeError instanceof Error ? stripeError.message : String(stripeError),
+        });
         throw stripeError;
       }
 
@@ -566,6 +569,9 @@ export class PaymentRefundService {
           `Stripe refund failed for automated refund on payment ${paymentId}, Refund ${refund.id} marked FAILED, Payment reverted to ${previousStatus}`,
           stripeError instanceof Error ? stripeError.stack : undefined,
         );
+        await this.idempotencyService.completeKey(idempotencyKey, 500, {
+          error: stripeError instanceof Error ? stripeError.message : String(stripeError),
+        });
         throw stripeError;
       }
 
