@@ -339,12 +339,10 @@ export class PaymentRefundService {
           });
         } else {
           // Should never happen: initiateRefund always moves payment to REFUND_PENDING first.
-          this.logger.error({
-            message: `handleChargeRefunded called with unexpected previousStatus: ${previousStatus}`,
-            paymentId: payment.id,
-            previousStatus,
-          });
-          return;
+          // Throw to roll back the transaction so we don't commit partial state.
+          throw new Error(
+            `handleChargeRefunded called with unexpected previousStatus: ${previousStatus}`,
+          );
         }
 
         // Create reversing ledger entries: DEBIT PLATFORM_REVENUE, CREDIT CUSTOMER_RECEIVABLE
