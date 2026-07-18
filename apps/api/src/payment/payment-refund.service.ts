@@ -401,7 +401,7 @@ export class PaymentRefundService {
             eventType: 'charge.refunded',
             previousStatus,
             newStatus,
-            amount: chargeAmountRefunded,
+            amount: thisRefundAmount,
             source: PaymentEventSource.WEBHOOK,
             stripeEventId: event.id as string,
             createdBy: 'stripe_webhook',
