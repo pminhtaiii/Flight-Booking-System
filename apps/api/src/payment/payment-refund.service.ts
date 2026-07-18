@@ -318,24 +318,34 @@ export class PaymentRefundService {
 
         const previousStatus = payment.status as PaymentStatus;
 
-        // Use enforceTransition to validate the state change
-        // REFUND_PENDING can go to PARTIALLY_REFUNDED or REFUNDED
-        // PARTIALLY_REFUNDED can go to REFUND_PENDING (for additional refunds)
-        // We need to handle the transition from the current state
+        // Walk through FSM transitions explicitly so every DB write is a sanctioned edge.
         if (previousStatus === PaymentStatus.REFUND_PENDING) {
           enforceTransition(previousStatus, newStatus);
+          await tx.payment.update({
+            where: { id: payment.id },
+            data: { status: newStatus },
+          });
         } else if (previousStatus === PaymentStatus.PARTIALLY_REFUNDED) {
-          // Already partially refunded, may transition to REFUNDED
+          // PARTIALLY_REFUNDED → REFUND_PENDING → final status
           enforceTransition(previousStatus, PaymentStatus.REFUND_PENDING);
-          // Then from REFUND_PENDING to final status
+          await tx.payment.update({
+            where: { id: payment.id },
+            data: { status: PaymentStatus.REFUND_PENDING },
+          });
           enforceTransition(PaymentStatus.REFUND_PENDING, newStatus);
+          await tx.payment.update({
+            where: { id: payment.id },
+            data: { status: newStatus },
+          });
+        } else {
+          // Should never happen: initiateRefund always moves payment to REFUND_PENDING first.
+          this.logger.error({
+            message: `handleChargeRefunded called with unexpected previousStatus: ${previousStatus}`,
+            paymentId: payment.id,
+            previousStatus,
+          });
+          return;
         }
-
-        // Update Payment status
-        await tx.payment.update({
-          where: { id: payment.id },
-          data: { status: newStatus },
-        });
 
         // Create reversing ledger entries: DEBIT PLATFORM_REVENUE, CREDIT CUSTOMER_RECEIVABLE
         const thisRefundAmount = pendingRefunds.reduce(

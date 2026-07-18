@@ -474,29 +474,20 @@ export class PaymentWebhookService {
     }
 
     // Determine outcome: Stripe sends 'won', 'lost', or 'warning_closed' (inquiry-type)
-    const disputeStatus = dispute.status as string;
+    const rawDisputeStatus = dispute.status as string;
 
-    // warning_closed means the inquiry was closed without a chargeback — no state change needed
-    if (disputeStatus === 'warning_closed') {
-      this.logger.log({
-        message: `Dispute inquiry closed without chargeback (warning_closed) for payment ${payment.id}. No state change.`,
-        paymentId: payment.id,
-        disputeStatus,
-      });
-      return;
-    }
-
-    if (disputeStatus !== 'won' && disputeStatus !== 'lost') {
+    // warning_closed: inquiry closed without a chargeback — merchant retains funds, treat as won
+    if (rawDisputeStatus !== 'won' && rawDisputeStatus !== 'lost' && rawDisputeStatus !== 'warning_closed') {
       this.logger.error({
-        message: `ALERT: Unrecognised dispute status '${disputeStatus}' for payment ${payment.id}. Dropping event.`,
+        message: `ALERT: Unrecognised dispute status '${rawDisputeStatus}' for payment ${payment.id}. Dropping event.`,
         level: 'ALERT',
         paymentId: payment.id,
-        disputeStatus,
+        disputeStatus: rawDisputeStatus,
       });
       return;
     }
 
-    const outcome: 'won' | 'lost' = disputeStatus;
+    const outcome: 'won' | 'lost' = rawDisputeStatus === 'lost' ? 'lost' : 'won';
 
     // Resolve target status using state machine helper
     const preDisputeStatus = payment.preDisputeStatus as PaymentStatus | null;
