@@ -397,6 +397,19 @@ export class PaymentRefundService {
         });
       });
 
+      await this.auditService.createLog(this.prisma, {
+        userId: null,
+        action: 'refund_completed',
+        resourceType: 'Refund',
+        resourceId: pendingRefunds[0].id,
+        metadata: {
+          paymentId: payment.id,
+          refundCount: pendingRefunds.length,
+          totalAmount: thisRefundAmount,
+          stripeEventId: event.id as string,
+        },
+      });
+
       this.logger.log({
         message: `charge.refunded processed for payment ${payment.id}`,
         paymentId: payment.id,

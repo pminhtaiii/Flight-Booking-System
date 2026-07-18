@@ -502,6 +502,17 @@ export class PaymentWebhookService {
 
     const targetStatus = resolveDisputeStatus(outcome, preDisputeStatus);
 
+    if (!canTransition(currentStatus, targetStatus)) {
+      this.logger.error({
+        message: `ALERT: Cannot transition from ${currentStatus} to ${targetStatus} for dispute resolution. Dropping event.`,
+        level: 'ALERT',
+        paymentId: payment.id,
+        currentStatus,
+        targetStatus,
+      });
+      return;
+    }
+
     await this.prisma.$transaction(async (tx) => {
       await tx.payment.update({
         where: { id: payment.id },
