@@ -274,12 +274,25 @@ export class PaymentRefundService {
       const stripeRefunds = (charge.refunds as Record<string, unknown>)?.data as Array<Record<string, unknown>> | undefined;
       const stripeRefundIds = stripeRefunds?.map((r) => r.id as string) ?? [];
 
-      // Find REFUND_PENDING refunds whose stripeRefundId matches one in this event
+      if (stripeRefundIds.length === 0) {
+        this.logger.error({
+          message: `charge.refunded event has no refund IDs for payment ${payment.id}. Dropping event to avoid unfiltered match.`,
+          paymentId: payment.id,
+        });
+        return;
+      }
+
+      // Find REFUND_PENDING refunds whose stripeRefundId matches one in this event,
+      // OR whose stripeRefundId is still null (race window: webhook arrived before
+      // initiateRefund wrote the Stripe refund ID back to the DB).
       const pendingRefunds = await this.prisma.refund.findMany({
         where: {
           paymentId: payment.id,
           status: 'REFUND_PENDING',
-          stripeRefundId: stripeRefundIds.length > 0 ? { in: stripeRefundIds } : undefined,
+          OR: [
+            { stripeRefundId: { in: stripeRefundIds } },
+            { stripeRefundId: null },
+          ],
         },
       });
 
