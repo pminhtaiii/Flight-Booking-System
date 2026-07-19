@@ -172,8 +172,10 @@ packages/shared/
 - UUID stored in component state (available for escape hatch URL immediately)
 - Confirm button disabled on click + `beforeunload` warning registered. The `beforeunload` event listener MUST be programmatically unregistered/removed immediately prior to executing any client-side programmatic navigation or redirects (the Phase 4 timeout redirect, the response-triggered success/failure redirects, or when the user clicks the Phase 3 escape hatch link) to avoid stranding users.
 - `bookingId` sent in the confirm request payload
-- On success response: redirect to `/bookings/[bookingId]?confirmed=true`
-- On failure response: redirect to `/bookings/[bookingId]`
+- HTTP Response Handlers:
+  - **On success (`status === 'CONFIRMED'`)**: Unregister `beforeunload` and redirect to `/bookings/[bookingId]?confirmed=true`.
+  - **On failure (`status === 'FAILED'`)**: Unregister `beforeunload` and redirect to `/bookings/[bookingId]`.
+  - **On processing (`status === 'PROCESSING'`)**: Do NOT redirect. Immediately update the client's `bookingId` state to the canonical `bookingId` returned by the server (in case it differs from the client-generated UUID due to idempotency/intent-collision matching), and let the timed loading stepper continue executing toward Phase 3 and Phase 4 using the updated canonical ID.
 
 **Verification**: All 4 phases transition at correct timings. Escape hatch link points to correct URL. Confirm button disables on click. Redirect works on success and failure.
 

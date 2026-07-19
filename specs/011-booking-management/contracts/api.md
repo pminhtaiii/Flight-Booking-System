@@ -46,7 +46,7 @@ Modification to existing endpoint: accepts `bookingId` from client and creates B
 
 **Idempotency / Collision Replay Response**:
 If a request is received and a `Booking` for the `bookingIntentId` already exists, the server returns the cached response state immediately without re-executing the payment or booking pipeline:
-1. **If status is `PROCESSING`**: The server returns a 200 OK with the existing canonical `bookingId` to allow the client to redirect or poll:
+1. **If status is `PROCESSING`**: The server returns a 200 OK with the existing canonical `bookingId` to allow the client to redirect or poll safely. The frontend client MUST capture the returned `bookingId` to update its local state, ensuring any escape-hatch navigation (Phase 3) or auto-redirects (Phase 4) target the canonical ID rather than the client-generated UUID, while allowing the loading escalation stepper to continue running:
 ```json
 {
   "success": true,
