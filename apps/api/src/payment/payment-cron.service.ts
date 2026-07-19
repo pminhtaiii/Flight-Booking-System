@@ -9,6 +9,7 @@ import {
 import { PrismaService } from '../prisma/prisma.service';
 import { StripeService } from '../common/stripe.service';
 import { enforceTransition } from './payment-state-machine';
+import { PaymentMethodService } from './payment-method.service';
 
 @Injectable()
 export class PaymentCronService {
@@ -18,6 +19,7 @@ export class PaymentCronService {
     private readonly prisma: PrismaService,
     private readonly stripeService: StripeService,
     private readonly configService: ConfigService,
+    private readonly paymentMethodService: PaymentMethodService,
   ) {}
 
   @Cron('*/5 * * * *')
@@ -51,7 +53,10 @@ export class PaymentCronService {
             );
 
           if (stripePaymentIntent.status === 'succeeded') {
-            await this.reconcileSucceededAuthorization(payment);
+            await this.reconcileSucceededAuthorization({
+              ...payment,
+              userId: payment.bookingIntent.userId,
+            });
             this.logger.log(
               `Reconciled succeeded payment ${payment.id} (PI: ${payment.stripePaymentIntentId})`,
             );
@@ -202,9 +207,12 @@ export class PaymentCronService {
   private async reconcileSucceededAuthorization(payment: {
     id: string;
     bookingIntentId: string;
+    stripePaymentIntentId: string;
     version: number;
     amount: number;
     currency: string;
+    userId: string;
+    stripeCustomerId: string | null;
   }): Promise<void> {
     enforceTransition(PaymentStatus.AUTHORIZED, PaymentStatus.SUCCEEDED);
 
@@ -266,5 +274,19 @@ export class PaymentCronService {
         });
       }
     });
+
+    if (payment.stripeCustomerId) {
+      try {
+        await this.paymentMethodService.saveMethod(
+          payment.userId,
+          payment.stripeCustomerId,
+          payment.stripePaymentIntentId,
+        );
+      } catch (error: unknown) {
+        this.logger.warn(
+          `Unable to save payment method for payment ${payment.id}: ${error instanceof Error ? error.message : String(error)}`,
+        );
+      }
+    }
   }
 }

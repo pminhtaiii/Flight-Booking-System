@@ -4,6 +4,7 @@ import { BookingIntentStatus, PaymentEventSource, PaymentStatus } from '@prisma/
 import { PrismaService } from '../prisma/prisma.service';
 import { StripeService } from '../common/stripe.service';
 import { PaymentCronService } from './payment-cron.service';
+import { PaymentMethodService } from './payment-method.service';
 
 describe('PaymentCronService', () => {
   let service: PaymentCronService;
@@ -22,6 +23,7 @@ describe('PaymentCronService', () => {
     ledgerEntry: { findFirst: jest.Mock; createMany: jest.Mock };
   };
   let stripeService: { cancelPaymentIntent: jest.Mock; retrievePaymentIntent: jest.Mock };
+  let paymentMethodService: { saveMethod: jest.Mock };
 
   const payment = {
     id: 'payment-1',
@@ -30,7 +32,8 @@ describe('PaymentCronService', () => {
     version: 0,
     amount: 12000,
     currency: 'usd',
-    bookingIntent: { paymentAttemptCount: 1 },
+    stripeCustomerId: 'cus_1',
+    bookingIntent: { paymentAttemptCount: 1, userId: 'user-1' },
   };
 
   beforeEach(() => {
@@ -50,12 +53,14 @@ describe('PaymentCronService', () => {
     };
     prisma.$transaction.mockImplementation(async (callback) => callback(transaction));
     stripeService = { cancelPaymentIntent: jest.fn(), retrievePaymentIntent: jest.fn() };
+    paymentMethodService = { saveMethod: jest.fn() };
     const configService = { get: jest.fn((_key: string, defaultValue: number) => defaultValue) };
 
     service = new PaymentCronService(
       prisma as unknown as PrismaService,
       stripeService as unknown as StripeService,
       configService as unknown as ConfigService,
+      paymentMethodService as unknown as PaymentMethodService,
     );
   });
 
@@ -93,6 +98,11 @@ describe('PaymentCronService', () => {
       where: { id: payment.bookingIntentId },
       data: { status: BookingIntentStatus.CONFIRMED },
     });
+    expect(paymentMethodService.saveMethod).toHaveBeenCalledWith(
+      payment.bookingIntent.userId,
+      payment.stripeCustomerId,
+      payment.stripePaymentIntentId,
+    );
   });
 
   it('expires an uncaptured authorization together with its event and booking intent', async () => {
