@@ -61,9 +61,11 @@ export class PaymentCronService {
 
           enforceTransition(PaymentStatus.AUTHORIZED, PaymentStatus.EXPIRED);
 
-          await this.stripeService.cancelPaymentIntent(
-            payment.stripePaymentIntentId,
-          );
+          if (stripePaymentIntent.status !== 'canceled') {
+            await this.stripeService.cancelPaymentIntent(
+              payment.stripePaymentIntentId,
+            );
+          }
 
           await this.expireAuthorization(payment);
 

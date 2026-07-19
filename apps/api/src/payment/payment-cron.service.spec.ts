@@ -125,4 +125,30 @@ describe('PaymentCronService', () => {
     expect(prisma.paymentEvent.create).not.toHaveBeenCalled();
     expect(prisma.bookingIntent.update).not.toHaveBeenCalled();
   });
+
+  it('expires a locally authorized payment when its Stripe intent is already canceled', async () => {
+    prisma.payment.findMany.mockResolvedValue([payment]);
+    stripeService.retrievePaymentIntent.mockResolvedValue({ status: 'canceled' });
+
+    await service.handleAuthorizationExpiry();
+
+    expect(stripeService.cancelPaymentIntent).not.toHaveBeenCalled();
+    expect(prisma.$transaction).toHaveBeenCalledTimes(1);
+    expect(transaction.payment.update).toHaveBeenCalledWith({
+      where: { id: payment.id, version: payment.version },
+      data: { status: PaymentStatus.EXPIRED, version: { increment: 1 } },
+    });
+    expect(transaction.paymentEvent.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        eventType: 'authorization.expired',
+        previousStatus: PaymentStatus.AUTHORIZED,
+        newStatus: PaymentStatus.EXPIRED,
+        source: PaymentEventSource.CRON,
+      }),
+    });
+    expect(transaction.bookingIntent.update).toHaveBeenCalledWith({
+      where: { id: payment.bookingIntentId },
+      data: { status: BookingIntentStatus.AWAITING_PAYMENT },
+    });
+  });
 });
