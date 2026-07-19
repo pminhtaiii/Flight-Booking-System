@@ -108,7 +108,7 @@ packages/shared/
 - Add `BookingStatus` and `BookingFailureReason` enums to Prisma schema
 - Add `Booking` model with all fields (id, userId, bookingIntentId, paymentId, status, failureReason, pnrReference, duffelOrderId, flightSnapshot, passengerSnapshot, totalAmount, currency, departureAt, timestamps)
 - Add relations: User.bookings, BookingIntent.booking, Payment.booking
-- Add indexes: userId, userId+status, bookingIntentId, departureAt
+- Add indexes: userId, userId+status, bookingIntentId (unique), departureAt, status+createdAt, status+departureAt
 - Run migration: `npx prisma migrate dev`
 - Export shared types: `BookingStatus`, `BookingFailureReason`, `FlightSnapshot`, `PassengerSnapshot`, `BookingListItemDto`, `BookingDetailDto`
 

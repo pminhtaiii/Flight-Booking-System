@@ -88,6 +88,8 @@ Note: `PAYMENT_DECLINED` is intentionally excluded. Card declines are handled in
 - `userId, status` — tab queries (upcoming = PROCESSING/CONFIRMED, past = COMPLETED)
 - `bookingIntentId` — UNIQUE index (enforces 1-to-1 relation and supports fast lookups)
 - `departureAt` — sorting within tabs
+- `status, createdAt` — composite index supporting the 15-minute stale PROCESSING background sweep and read-time reactive update check
+- `status, departureAt` — composite index supporting the daily CONFIRMED->COMPLETED sweep and read-time reactive checks
 
 **Relations**:
 - `Booking.userId` → `User.id` (many-to-one)
