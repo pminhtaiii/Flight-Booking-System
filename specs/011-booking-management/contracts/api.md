@@ -86,16 +86,32 @@ List all bookings for the authenticated user.
         "cabinClass": "economy"
       },
       "createdAt": "2026-07-19T09:00:00Z"
+    },
+    {
+      "id": "uuid-processing",
+      "status": "PROCESSING",
+      "failureReason": null,
+      "pnrReference": null,
+      "totalAmount": 45000,
+      "currency": "GBP",
+      "departureAt": null,
+      "flightSnapshot": null,
+      "createdAt": "2026-07-19T09:30:00Z"
     }
   ],
   "pagination": {
     "page": 1,
     "limit": 20,
-    "total": 5,
+    "total": 2,
     "totalPages": 1
   }
 }
 ```
+
+**Booking State Field Rules (Important for UI Handlers)**:
+- **`PROCESSING` State Bookings**: Fields `flightSnapshot`, `pnrReference`, and `departureAt` are returned as `null` since the booking pipeline is running and flight details have not been finalized. The frontend `BookingCard` component MUST conditionally handle these null fields (e.g., display a "Processing details..." loading state instead of airline logos or dates, and hide/suppress the PNR field) to prevent page-render crashes.
+- **`FAILED` State Bookings**: Depending on when the failure occurred, `flightSnapshot` and `departureAt` may be `null` (e.g., if it failed during Stripe authorization before Duffel reservation) or populated (e.g. if it failed during capture `CAPTURE_FAILED`). The frontend MUST handle both scenarios.
+- **`CONFIRMED`/`COMPLETED` State Bookings**: All flight, departure, and PNR details will be fully populated.
 
 **Auth**: Required (JWT Bearer token)
 
