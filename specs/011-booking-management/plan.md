@@ -170,7 +170,7 @@ packages/shared/
   - Phase 4 (45s+): Auto-redirect to `/bookings/[bookingId]`
 - Client-side UUID v4 generation on "Confirm Payment" click
 - UUID stored in component state (available for escape hatch URL immediately)
-- Confirm button disabled on click + `beforeunload` warning registered
+- Confirm button disabled on click + `beforeunload` warning registered. The `beforeunload` event listener MUST be programmatically unregistered/removed immediately prior to executing any client-side programmatic navigation or redirects (the Phase 4 timeout redirect, the response-triggered success/failure redirects, or when the user clicks the Phase 3 escape hatch link) to avoid stranding users.
 - `bookingId` sent in the confirm request payload
 - On success response: redirect to `/bookings/[bookingId]?confirmed=true`
 - On failure response: redirect to `/bookings/[bookingId]`
