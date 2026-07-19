@@ -124,7 +124,7 @@ packages/shared/
 - `BookingModule` with controller and service
 - `BookingService.createBooking(userId, bookingId, bookingIntentId, ...)` — creates Booking with PROCESSING status
 - `BookingService.updateToConfirmed(bookingId, pnrReference, duffelOrderId, flightSnapshot, passengerSnapshot)` — updates status + snapshots
-- `BookingService.updateToFailed(bookingId, failureReason)` — sets FAILED + reason
+- `BookingService.updateToFailed(bookingId, failureReason, flightSnapshot?, passengerSnapshot?, departureAt?)` — sets FAILED, reason, and optional snapshots/departure (crucial for preserving data on CAPTURE_FAILED)
 - `BookingService.listBookings(userId, tab, page, limit)` — tab-filtered paginated list
 - `BookingService.getBookingDetail(bookingId, userId)` — full detail with payment status join
 - `GET /api/bookings` — list endpoint with tab/page/limit query params
@@ -148,7 +148,7 @@ packages/shared/
   - Concurrency handling: Catch primary-key unique constraint violations (Prisma error P2002) on insert to prevent TOCTOU race conditions, gracefully falling back to idempotency/ownership checks rather than throwing a 500.
 - Insert `BookingService.createBooking()` as the FIRST step of the confirm pipeline (before Stripe authorization)
 - On pipeline success: call `BookingService.updateToConfirmed()` with PNR, Duffel order ID, and flight/passenger snapshots
-- On pipeline failure: call `BookingService.updateToFailed()` with the appropriate `BookingFailureReason`
+- On pipeline failure: call `BookingService.updateToFailed()` with the appropriate `BookingFailureReason`. For `CAPTURE_FAILED` failures (which occur after Duffel PNR creation), we MUST pass the flight/passenger snapshots and departure date retrieved from Duffel so they are preserved in the DB.
 - Map existing pipeline error types to `BookingFailureReason` enum values
 - Include `bookingId` in the confirm response (success and failure)
 
