@@ -1,7 +1,7 @@
-# Phase 1: Database Schema & Shared Types
+# Phase 2: Booking Service & REST API
 
-- [ ] T001 Define `Booking` model, `BookingStatus` enum, and `BookingFailureReason` enum in [schema.prisma](file:///c:/Booking%20Systems/apps/api/prisma/schema.prisma)
-- [ ] T002 Apply database migration and regenerate Prisma Client using `npx prisma migrate dev`
-- [ ] T003 Define and export `BookingStatus` enum in [booking-status.ts](file:///c:/Booking%20Systems/packages/shared/src/booking-status.ts)
-- [ ] T004 Define and export `BookingFailureReason` enum in [booking-failure-reason.ts](file:///c:/Booking%20Systems/packages/shared/src/booking-failure-reason.ts)
-- [ ] T005 Define and export booking DTOs and snapshots in [booking-types.ts](file:///c:/Booking%20Systems/packages/shared/src/booking-types.ts)
+- [ ] T006 Create NestJS `BookingService` base CRUD in [booking.service.ts](file:///c:/Booking%20Systems/apps/api/src/booking/booking.service.ts)
+- [ ] T007 Implement `listBookings` and `getBookingDetail` queries in [booking.service.ts](file:///c:/Booking%20Systems/apps/api/src/booking/booking.service.ts)
+- [ ] T008 Implement DTOs for paginated list query and responses in [dto/](file:///c:/Booking%20Systems/apps/api/src/booking/dto/)
+- [ ] T009 Create `BookingController` exposing list and detail endpoints in [booking.controller.ts](file:///c:/Booking%20Systems/apps/api/src/booking/booking.controller.ts)
+- [ ] T010 Register `BookingModule` in [app.module.ts](file:///c:/Booking%20Systems/apps/api/src/app.module.ts)
