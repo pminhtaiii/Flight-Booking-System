@@ -1,5 +1,5 @@
-import 'reflect-metadata';
-import { ForbiddenException, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, NotFoundException } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { BookingService } from './booking.service';
 
 describe('BookingService', () => {
@@ -75,5 +75,83 @@ describe('BookingService', () => {
     const service = new BookingService(prisma as never);
 
     await expect(service.getBookingDetail('missing', 'user-1')).rejects.toBeInstanceOf(NotFoundException);
+  });
+
+  describe('concurrency and validation', () => {
+    it('handles unique-constraint violation and returns existing booking if owned by caller', async () => {
+      const error = new Prisma.PrismaClientKnownRequestError('Unique constraint failed', {
+        code: 'P2002',
+        clientVersion: '5.14.0',
+      });
+      const prisma = {
+        bookingIntent: {
+          findUnique: jest.fn().mockResolvedValue({
+            id: 'intent-1',
+            userId: 'user-1',
+            confirmedPrice: { toString: () => '450.00' },
+            currency: 'GBP',
+          }),
+        },
+        booking: {
+          create: jest.fn().mockRejectedValue(error),
+          findFirst: jest.fn().mockResolvedValue({
+            id: 'booking-1',
+            userId: 'user-1',
+            status: 'PROCESSING',
+          }),
+        },
+      };
+      const service = new BookingService(prisma as never);
+
+      await expect(service.createBooking('user-1', 'booking-1', 'intent-1')).resolves.toEqual({
+        id: 'booking-1',
+        userId: 'user-1',
+        status: 'PROCESSING',
+      });
+    });
+
+    it('handles unique-constraint violation and throws ForbiddenException if booking is owned by another user', async () => {
+      const error = new Prisma.PrismaClientKnownRequestError('Unique constraint failed', {
+        code: 'P2002',
+        clientVersion: '5.14.0',
+      });
+      const prisma = {
+        bookingIntent: {
+          findUnique: jest.fn().mockResolvedValue({
+            id: 'intent-1',
+            userId: 'user-1',
+            confirmedPrice: { toString: () => '450.00' },
+            currency: 'GBP',
+          }),
+        },
+        booking: {
+          create: jest.fn().mockRejectedValue(error),
+          findFirst: jest.fn().mockResolvedValue({
+            id: 'booking-1',
+            userId: 'other-user',
+            status: 'PROCESSING',
+          }),
+        },
+      };
+      const service = new BookingService(prisma as never);
+
+      await expect(service.createBooking('user-1', 'booking-1', 'intent-1')).rejects.toBeInstanceOf(ForbiddenException);
+    });
+
+    it('throws BadRequestException in updateToConfirmed if flightSnapshot has no segments', async () => {
+      const prisma = {};
+      const service = new BookingService(prisma as never);
+
+      const flightSnapshot = {
+        segments: [],
+        totalDuration: 'PT2H',
+        stops: 0,
+        cabinClass: 'Economy',
+      };
+
+      await expect(
+        service.updateToConfirmed('booking-1', 'PNR1', 'order-1', flightSnapshot as any, {} as any),
+      ).rejects.toBeInstanceOf(BadRequestException);
+    });
   });
 });

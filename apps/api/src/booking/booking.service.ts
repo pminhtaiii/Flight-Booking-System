@@ -1,4 +1,4 @@
-import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { BookingFailureReason, BookingStatus, Prisma } from '@prisma/client';
 import { PrismaService } from '@/prisma/prisma.service';
 import { FlightSnapshot, PassengerSnapshot } from '@shared/booking-types';
@@ -28,16 +28,36 @@ export class BookingService {
       throw new ForbiddenException('You do not have access to this booking intent');
     }
 
-    return this.prisma.booking.create({
-      data: {
-        id: bookingId,
-        userId,
-        bookingIntentId,
-        totalAmount: bookingIntent.confirmedPrice.toString(),
-        currency: bookingIntent.currency,
-        status: BookingStatus.PROCESSING,
-      },
-    });
+    try {
+      return await this.prisma.booking.create({
+        data: {
+          id: bookingId,
+          userId,
+          bookingIntentId,
+          totalAmount: bookingIntent.confirmedPrice.toString(),
+          currency: bookingIntent.currency,
+          status: BookingStatus.PROCESSING,
+        },
+      });
+    } catch (error) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+        const existing = await this.prisma.booking.findFirst({
+          where: {
+            OR: [
+              { id: bookingId },
+              { bookingIntentId },
+            ],
+          },
+        });
+        if (existing) {
+          if (existing.userId !== userId) {
+            throw new ForbiddenException('You do not have access to this booking intent');
+          }
+          return existing;
+        }
+      }
+      throw error;
+    }
   }
 
   async updateToConfirmed(
@@ -47,6 +67,9 @@ export class BookingService {
     flightSnapshot: FlightSnapshot,
     passengerSnapshot: PassengerSnapshot,
   ) {
+    if (!flightSnapshot?.segments?.length) {
+      throw new BadRequestException('Flight snapshot must contain at least one segment');
+    }
     return this.prisma.booking.update({
       where: { id: bookingId },
       data: {
