@@ -141,10 +141,16 @@ interface PassengerDetail {
   firstName: string;
   lastName: string;
   dateOfBirth?: string;
-  passportNumber?: string;       // Encrypted or masked
+  passportNumber?: string;       // Encrypted at application layer using common/EncryptionService (AES-256-GCM)
   nationality?: string;
 }
 ```
+
+### Passport Number Encryption & Masking Rules
+To protect sensitive personally identifiable information (PII) and comply with regulatory requirements:
+1. **Application-Layer Encryption**: The `passportNumber` MUST be encrypted at the application layer using the existing `EncryptionService` (AES-256-GCM via the `ENCRYPTION_KEY` environment variable) before being stored in the `passengerSnapshot` JSON column.
+2. **Database Integrity**: The raw plaintext passport number must NEVER be stored in the database.
+3. **Display Masking**: The `GET /api/bookings/:bookingId` detail API endpoint will decrypt the passport number using `EncryptionService` and return only a masked version (e.g., `XXXXXX1234` displaying only the last 4 characters) to the client. The full plaintext passport number is never exposed on UI reading routes.
 
 ## Query Patterns
 
@@ -171,7 +177,10 @@ SELECT b.*, p.status as paymentStatus
 FROM bookings b
 LEFT JOIN payments p ON b.paymentId = p.id
 WHERE b.userId = :userId
-  AND (b.status = 'COMPLETED' OR (b.status = 'CONFIRMED' AND b.departureAt <= NOW()))
+  AND (
+    b.status = 'COMPLETED'
+    OR (b.status IN ('CONFIRMED', 'FAILED') AND b.departureAt <= NOW())
+  )
 ORDER BY b.departureAt DESC;
 ```
 

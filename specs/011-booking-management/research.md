@@ -25,6 +25,7 @@
 2. Uniqueness check (SELECT before INSERT)
 3. Ownership check (if exists, must belong to same user → 403 if not)
 4. Same-user duplicate → idempotency replay
+5. Concurrency control: Catch DB-level unique primary key constraint violations (e.g., Prisma error P2002) to handle double-submit race conditions gracefully by running the same ownership/idempotency checks rather than failing with 500.
 
 **Alternatives considered**:
 - Two-phase confirm (init + execute) → rejected (two requests, complex idempotency)

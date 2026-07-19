@@ -145,6 +145,7 @@ packages/shared/
   - Format validation (must be valid UUID v4) → 400
   - Ownership check (existing booking for different user) → 403
   - Same-user idempotency replay
+  - Concurrency handling: Catch primary-key unique constraint violations (Prisma error P2002) on insert to prevent TOCTOU race conditions, gracefully falling back to idempotency/ownership checks rather than throwing a 500.
 - Insert `BookingService.createBooking()` as the FIRST step of the confirm pipeline (before Stripe authorization)
 - On pipeline success: call `BookingService.updateToConfirmed()` with PNR, Duffel order ID, and flight/passenger snapshots
 - On pipeline failure: call `BookingService.updateToFailed()` with the appropriate `BookingFailureReason`

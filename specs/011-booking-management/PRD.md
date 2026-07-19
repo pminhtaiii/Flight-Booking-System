@@ -40,12 +40,13 @@ Build a complete post-payment booking management experience consisting of:
 - **Booking record created at pipeline start**: `Booking(status: PROCESSING)` is the first INSERT in the confirm handler — before any Stripe or Duffel calls. Not created at `/payments/create` (60–80% cart abandonment would pollute the table).
 - **Promote BookingIntent → Booking**: BookingIntent remains a transient pre-payment entity with TTL cleanup. Booking is the durable post-commitment entity, linked back to the intent via foreign key.
 - **Flight snapshot stored as JSON**: Complete flight details captured at PNR creation time and stored on the Booking record. Detail page reads entirely from the local database — zero Duffel API calls at render time.
-- **`failureReason` and charge status are independent**: `Booking.failureReason` determines the retry button. `Payment.status` (live DB read) determines the charge message. Never conflated.
+- **`failureReason` and charge status are independent**: `Booking.failureReason` determines the retry button. `Payment.status` (live DB read) determines the charge message. If the payment record does not exist (null `paymentId` due to early failure), the UI displays "No charge was made to your card." Never conflated.
 - **`PAYMENT_DECLINED` excluded from booking failures**: Card declines happen during Stripe Elements confirmation (client-side), before the Booking record exists. They're handled inline on the checkout page.
 - **Context-aware retry routing**: `OFFER_EXPIRED`/`PRICE_CHANGED` → search results with pre-filled route, `BOOKING_TIMEOUT`/`SYSTEM_ERROR` → flight detail page, `CAPTURE_FAILED` → contact support.
 - **Two tabs only**: Upcoming and Past. No Cancelled tab until the cancellation feature ships.
 - **4-phase loading escalation**: Timed transitions (0–10s confident stepper, 10–20s reassurance, 20s+ escape hatch, 45s+ auto-redirect). Named steps designed for future SSE upgrade without UI rework.
 - **Approach A (synchronous)**: Pipeline stays synchronous. No SSE, no Redis Pub/Sub, no background jobs. EventEmitter2 cross-instance degradation on multi-replica deployments was identified and avoided.
+- **Passport Number PII Encryption**: To prevent plaintext PII storage in the `passengerSnapshot` JSON column, `passportNumber` MUST be encrypted at the application layer using the existing `EncryptionService` (AES-256-GCM). Reading routes (like `GET /api/bookings/:bookingId`) decrypt and mask the value (e.g. `XXXXXX1234` displaying only the last 4 characters) for client display to avoid exposing the full number.
 
 ## Testing Decisions
 

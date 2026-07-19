@@ -101,8 +101,16 @@ Receive bookingId from client
   → SELECT id, userId FROM bookings WHERE id = bookingId
     → EXISTS + different userId  → 403 Forbidden
     → EXISTS + same userId       → Idempotency replay
-    → NOT EXISTS                 → INSERT Booking(id, userId, status: PROCESSING)
+    → NOT EXISTS                 → Try INSERT Booking(id, userId, status: PROCESSING)
+                                     → ON UNIQUE PK CONFLICT (concurrency race)
+                                       → SELECT again and proceed with Idempotency replay / 403 checks
 ```
+
+**Concurrency (TOCTOU) and Idempotency Safety**:
+To prevent race conditions where concurrent double-tapped requests both pass the `NOT EXISTS` check before either inserts, the database-level unique primary key constraint on `Booking.id` MUST be the final authority:
+- Wrap the SELECT-then-INSERT in a transaction (or use Prisma's `upsert` / native upsert query).
+- Catch any unique constraint violation error (e.g., Prisma error code `P2002` for primary key collision).
+- If a collision occurs, gracefully fall back to checking the record again for ownership and executing an idempotency replay, rather than returning a 500 error.
 
 **Security concern addressed**: Without validation, a malicious user could inject another user's bookingId and corrupt their booking. The ownership check prevents this.
 

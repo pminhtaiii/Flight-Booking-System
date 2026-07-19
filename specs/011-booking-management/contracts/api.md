@@ -125,7 +125,7 @@ Get full booking detail for a specific booking.
     "id": "uuid",
     "status": "SUCCEEDED",
     "stripePaymentIntentId": "pi_xxx"
-  },
+  }, // Note: "payment" is null if the pipeline failed before a Payment record was created
   "bookingIntent": {
     "id": "uuid",
     "offerId": "off_xxx"
@@ -134,6 +134,9 @@ Get full booking detail for a specific booking.
   "updatedAt": "2026-07-19T09:00:30Z"
 }
 ```
+
+**Edge Case (Null Payment)**:
+If the booking fails before a Payment record is created (e.g., Stripe authorization fails at the top of the pipeline), `payment` is returned as `null` in the API response. The frontend MUST handle this case and render the charge message: "No charge was made to your card."
 
 **Auth**: Required (JWT Bearer token). Returns 403 if booking belongs to a different user.
 **Error**: Returns 404 if booking does not exist.
