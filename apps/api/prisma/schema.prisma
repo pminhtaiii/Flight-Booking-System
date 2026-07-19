@@ -139,31 +139,31 @@ model TravelerProfile {
 }
 
 model Booking {
-  id               String        @id @default(uuid())
-  userId           String
-  pnrCode          String?
-  eTicketNumber    String?
-  status           BookingStatus @default(PENDING)
-  airline          String
-  flightNumber     String
-  origin           String        @db.VarChar(3)
-  destination      String        @db.VarChar(3)
-  departureTime    DateTime
-  arrivalTime      DateTime
-  duration         Int
-  stops            Int           @default(0)
-  fareClass        String?
-  price            Decimal       @db.Decimal(10, 2)
-  currency         String        @default("USD")
-  passengers       Int           @default(1)
-  baggageAllowance String?
-  paymentReference String?
-  createdAt        DateTime      @default(now())
-  updatedAt        DateTime      @updatedAt
-  user             User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id                String               @id @default(uuid())
+  userId            String
+  bookingIntentId   String               @unique
+  paymentId         String?              @unique
+  status            BookingStatus        @default(PROCESSING)
+  failureReason     BookingFailureReason?
+  pnrReference      String?
+  duffelOrderId     String?
+  flightSnapshot    Json?
+  passengerSnapshot Json?
+  totalAmount       Decimal              @db.Decimal(10, 2)
+  currency          String               @default("GBP")
+  departureAt       DateTime?
+  createdAt         DateTime             @default(now())
+  updatedAt         DateTime             @updatedAt
+
+  user              User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  bookingIntent     BookingIntent        @relation(fields: [bookingIntentId], references: [id], onDelete: Cascade)
+  payment           Payment?             @relation(fields: [paymentId], references: [id], onDelete: SetNull)
 
   @@index([userId])
   @@index([userId, status])
+  @@index([departureAt])
+  @@index([status, createdAt])
+  @@index([status, departureAt])
   @@map("bookings")
 }
 
@@ -196,6 +196,7 @@ model BookingIntent {
   passengers       BookingIntentPassenger[]
   paymentAttemptCount Int                 @default(0)
   payments         Payment[]
+  booking          Booking?
 
   @@index([userId])
   @@index([userId, status])
@@ -230,10 +231,18 @@ model BookingIntentPassenger {
 }
 
 enum BookingStatus {
-  PENDING
+  PROCESSING
   CONFIRMED
-  CANCELLED
-  REFUNDED
+  FAILED
+  COMPLETED
+}
+
+enum BookingFailureReason {
+  OFFER_EXPIRED
+  PRICE_CHANGED
+  BOOKING_TIMEOUT
+  CAPTURE_FAILED
+  SYSTEM_ERROR
 }
 
 enum AirportType {
@@ -379,6 +388,7 @@ model Payment {
   paymentEvents          PaymentEvent[]
   ledgerEntries          LedgerEntry[]
   refunds                Refund[]
+  booking                Booking?
 
   @@unique([bookingIntentId, attemptNumber])
   @@index([stripeCustomerId])
