@@ -17,6 +17,7 @@ export type RefundStatus =
   | 'FAILED';
 
 export type RefundTriggerType =
+  | 'USER'
   | 'ADMIN'
   | 'SYSTEM_AUTOMATED';
 
@@ -53,5 +54,5 @@ export type RefundResponse = {
   amount: number;
   currency: string;
   status: string;
-  triggerType: string;
+  triggerType: RefundTriggerType;
 };
