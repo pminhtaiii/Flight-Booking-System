@@ -1,5 +1,6 @@
-# Phase 4: Checkout Loading Escalation (Frontend)
+# Phase 5: Booking Detail Page (Frontend)
 
-- [ ] T017 [P] [US5] Generate client-side UUID v4 on confirm payment click and pass it in payload in [checkout/page.tsx](file:///c:/Booking%20Systems/apps/web/app/checkout/page.tsx)
-- [ ] T018 [US1] Build `CheckoutLoadingEscalation` component implementing all 4 timed phases (stepper, reassurance, escape hatch, auto-redirect) in [CheckoutLoadingEscalation.tsx](file:///c:/Booking%20Systems/apps/web/components/checkout/CheckoutLoadingEscalation.tsx)
-- [ ] T019 [US1] Register `beforeunload` event handler and programmatically unregister it prior to programmatic redirects in [checkout/page.tsx](file:///c:/Booking%20Systems/apps/web/app/checkout/page.tsx)
+- [ ] T020 [P] [US1] [US4] Implement `BookingStatusBadge` and `BookingConfirmationBanner` in [components/bookings/](file:///c:/Booking%20Systems/apps/web/components/bookings/)
+- [ ] T021 [P] [US2] [US4] Implement `BookingProcessingState` and `BookingFailureState` with context-aware retry button in [components/bookings/](file:///c:/Booking%20Systems/apps/web/components/bookings/)
+- [ ] T022 [US4] [US6] Implement main `BookingDetail` rendering component displaying flight segments snapshot, baggage, and passenger details in [components/bookings/BookingDetail.tsx](file:///c:/Booking%20Systems/apps/web/components/bookings/BookingDetail.tsx)
+- [ ] T023 [US4] Implement booking detail page route with ownership validation in [bookings/[bookingId]/page.tsx](file:///c:/Booking%20Systems/apps/web/app/bookings/%5BbookingId%5D/page.tsx)
