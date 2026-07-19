@@ -48,10 +48,16 @@ CREATE UNIQUE INDEX "bookings_paymentId_key" ON "bookings"("paymentId");
 CREATE INDEX "bookings_userId_idx" ON "bookings"("userId");
 
 -- CreateIndex
-CREATE INDEX "bookings_status_idx" ON "bookings"("status");
+CREATE INDEX "bookings_userId_status_idx" ON "bookings"("userId", "status");
 
 -- CreateIndex
-CREATE INDEX "bookings_userId_status_idx" ON "bookings"("userId", "status");
+CREATE INDEX "bookings_departureAt_idx" ON "bookings"("departureAt");
+
+-- CreateIndex
+CREATE INDEX "bookings_status_createdAt_idx" ON "bookings"("status", "createdAt");
+
+-- CreateIndex
+CREATE INDEX "bookings_status_departureAt_idx" ON "bookings"("status", "departureAt");
 
 -- AddForeignKey (ON DELETE CASCADE matches schema.prisma onDelete: Cascade)
 ALTER TABLE "bookings" ADD CONSTRAINT "bookings_userId_fkey" FOREIGN KEY ("userId") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;

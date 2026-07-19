@@ -1,5 +1,6 @@
 import { BookingStatus } from './booking-status';
 import { BookingFailureReason } from './booking-failure-reason';
+import { PassengerType } from './types';
 
 /**
  * Snapshot of a single flight segment captured at PNR creation time.
@@ -55,7 +56,7 @@ export interface FlightSnapshot {
  * The API returns only a masked version (e.g. XXXXXX1234 showing last 4 chars).
  */
 export interface PassengerDetail {
-  type: 'adult' | 'child' | 'infant';
+  type: PassengerType;
   title?: string;
   firstName: string;
   lastName: string;
