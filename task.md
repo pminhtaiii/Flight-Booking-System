@@ -1,5 +1,5 @@
-# Phase 6: My Bookings List Page (Frontend)
+# Phase 7: E2E Testing & Verification
 
-- [ ] T024 [P] [US3] Build `BookingCard` component displaying departure, destination, dates, PNR, status, and retry action in [components/bookings/BookingCard.tsx](file:///c:/Booking%20Systems/apps/web/components/bookings/BookingCard.tsx)
-- [ ] T025 [US3] Build `BookingsList` component with tabs (Upcoming vs Past) and pagination in [components/bookings/BookingsList.tsx](file:///c:/Booking%20Systems/apps/web/components/bookings/BookingsList.tsx)
-- [ ] T026 [US3] Implement list page route and add My Bookings to top navigation layout in [bookings/page.tsx](file:///c:/Booking%20Systems/apps/web/app/bookings/page.tsx)
+- [ ] T027 [P] Implement backend API E2E tests covering detail, list, ownership, and pipeline in [booking.e2e-spec.ts](file:///c:/Booking%20Systems/apps/api/test/booking.e2e-spec.ts)
+- [ ] T028 [P] Implement Playwright UI E2E tests covering loading escalation, detail states, lists, and retry actions in [bookings.spec.ts](file:///c:/Booking%20Systems/apps/web/tests/bookings.spec.ts)
+- [ ] T029 Update system documentation in [progress-checker.md](file:///c:/Booking%20Systems/context/progress-checker.md) and [architecture.md](file:///c:/Booking%20Systems/context/architecture.md)
