@@ -147,7 +147,7 @@ packages/shared/
   - Same-user idempotency replay
   - Concurrency handling: Catch unique constraint violations (Prisma error P2002) on insert to prevent TOCTOU race conditions.
     - If collision is on `id` (PK): Fall back to standard idempotency replay using the provided `bookingId`.
-    - If collision is on `bookingIntentId`: Query the database for the existing Booking using `bookingIntentId`. Verify ownership (`userId` check). If ownership matches, gracefully return the existing booking (enabling the client to retrieve the correct, pre-existing `bookingId` after page reloads or escape hatch triggers) rather than throwing a 500.
+    - If collision is on `bookingIntentId`: Query the database for the existing Booking using `bookingIntentId`. Verify ownership (`userId` check). If ownership matches, gracefully return the existing booking (enabling the client to retrieve the correct, pre-existing `bookingId` after page reloads or escape hatch triggers). If ownership does NOT match (cross-user injection/collision), return `403 Forbidden` immediately rather than throwing a 500.
 - Insert `BookingService.createBooking()` as the FIRST step of the confirm pipeline (before Stripe authorization)
 - On pipeline success: call `BookingService.updateToConfirmed()` with PNR, Duffel order ID, and flight/passenger snapshots
 - On pipeline failure: call `BookingService.updateToFailed()` with the appropriate `BookingFailureReason`. For `CAPTURE_FAILED` failures (which occur after Duffel PNR creation), we MUST pass the flight/passenger snapshots and departure date retrieved from Duffel so they are preserved in the DB.
