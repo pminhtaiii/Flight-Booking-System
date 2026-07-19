@@ -16,7 +16,7 @@ COMPLETED    → Flight departure date has passed
 **Transitions**:
 ```
 PROCESSING → CONFIRMED   (pipeline success)
-PROCESSING → FAILED      (pipeline failure at any stage)
+PROCESSING → FAILED      (pipeline failure at any stage OR stale timeout)
 CONFIRMED  → COMPLETED   (flight date passes)
 ```
 
@@ -24,6 +24,12 @@ CONFIRMED  → COMPLETED   (flight date passes)
 To ensure real-time accuracy and limit background write overhead:
 1. **Read-Time Reactive Update**: When querying list or detail endpoints, the backend service check MUST dynamically evaluate if a `CONFIRMED` booking's `departureAt` date has passed (`departureAt <= NOW()`). If it has, the service will asynchronously trigger a status update to `COMPLETED` in the database and return `COMPLETED` in the API response. This guarantees users never see elapsed bookings in their "Upcoming" tab.
 2. **Scheduled Sweep (Cron)**: A daily background cron job sweeps the database for any remaining `CONFIRMED` bookings where `departureAt <= NOW()` and updates their status to `COMPLETED`. This serves as a fallback to keep the database state clean even for users who do not actively visit the platform.
+
+**Stale PROCESSING Cleanup Strategy (TTL/Cron)**:
+To prevent bookings from getting permanently stuck in the `PROCESSING` state due to server crashes or unhandled pipeline exceptions:
+1. **Stale Threshold**: Any booking remaining in the `PROCESSING` state for more than 15 minutes is considered stale/stuck (since a typical sync pipeline runs in under 1 minute).
+2. **Read-Time Reactive Fail**: On list or detail API queries, if a `PROCESSING` booking was created more than 15 minutes ago (`createdAt <= NOW() - 15 minutes`), the backend service MUST dynamically treat it as `FAILED` with `failureReason: SYSTEM_ERROR`. The service will asynchronously update the database record to `status: FAILED` and `failureReason: SYSTEM_ERROR`, returning the failed state to the client immediately.
+3. **Scheduled Cleanup Cron**: A background cron job running every 15 minutes sweeps the database for `PROCESSING` bookings older than 15 minutes. It reconciles their payment state using the associated `paymentId` (via Stripe API checks if needed) and updates their status to `FAILED` with `failureReason: SYSTEM_ERROR` if they cannot be completed. This prevents orphaned processing records from accumulating.
 
 ### BookingFailureReason
 
