@@ -112,15 +112,9 @@ export class PaymentMethodService {
       throw new ForbiddenException('You do not own this payment method');
     }
 
-    try {
-      await this.stripeService.detachPaymentMethod(
-        method.stripePaymentMethodId,
-      );
-    } catch (error) {
-      this.logger.warn(
-        `Failed to detach payment method from Stripe: ${(error as Error).message}. Continuing with local deletion.`,
-      );
-    }
+    await this.stripeService.detachPaymentMethod(
+      method.stripePaymentMethodId,
+    );
 
     await this.prisma.paymentMethod.delete({ where: { id: methodId } });
   }

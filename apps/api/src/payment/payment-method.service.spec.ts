@@ -11,9 +11,13 @@ describe('PaymentMethodService', () => {
     paymentMethod: {
       findUnique: jest.Mock;
       create: jest.Mock;
+      delete: jest.Mock;
     };
   };
-  let stripeService: { retrievePaymentIntent: jest.Mock };
+  let stripeService: {
+    retrievePaymentIntent: jest.Mock;
+    detachPaymentMethod: jest.Mock;
+  };
   let service: PaymentMethodService;
 
   beforeEach(() => {
@@ -21,9 +25,13 @@ describe('PaymentMethodService', () => {
       paymentMethod: {
         findUnique: jest.fn().mockResolvedValue(null),
         create: jest.fn().mockResolvedValue({ id: 'method-123' }),
+        delete: jest.fn(),
       },
     };
-    stripeService = { retrievePaymentIntent: jest.fn() };
+    stripeService = {
+      retrievePaymentIntent: jest.fn(),
+      detachPaymentMethod: jest.fn(),
+    };
     service = new PaymentMethodService(
       prisma as unknown as PrismaService,
       stripeService as unknown as StripeService,
@@ -65,5 +73,22 @@ describe('PaymentMethodService', () => {
         savedWithConsent: true,
       }),
     });
+  });
+
+  it('preserves the local method when Stripe detachment fails', async () => {
+    const methodId = 'method-123';
+    const stripeError = new Error('Stripe unavailable');
+    prisma.paymentMethod.findUnique.mockResolvedValue({
+      id: methodId,
+      userId,
+      stripePaymentMethodId: 'pm-123',
+    });
+    stripeService.detachPaymentMethod.mockRejectedValue(stripeError);
+
+    await expect(service.deleteMethod(methodId, userId)).rejects.toThrow(
+      stripeError,
+    );
+
+    expect(prisma.paymentMethod.delete).not.toHaveBeenCalled();
   });
 });
