@@ -44,6 +44,18 @@ Modification to existing endpoint: accepts `bookingId` from client and creates B
 }
 ```
 
+**Idempotency / Collision Replay Response** (when existing booking is still `PROCESSING`):
+If a request is received and a `Booking` for the `bookingIntentId` already exists in `PROCESSING` status (e.g. concurrent submit or page reload), the server returns a 200 OK with the existing canonical `bookingId` to allow the client to redirect or poll safely:
+```json
+{
+  "success": true,
+  "bookingId": "canonical-existing-booking-uuid",
+  "paymentId": null,
+  "pnrReference": null,
+  "status": "PROCESSING"
+}
+```
+
 ---
 
 ### GET /api/bookings
