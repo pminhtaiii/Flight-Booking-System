@@ -7,7 +7,7 @@ async function bootstrap() {
   const logger = new Logger('Bootstrap');
 
   try {
-    const app = await NestFactory.create(AppModule);
+    const app = await NestFactory.create(AppModule, { rawBody: true });
 
     const expressApp = app.getHttpAdapter().getInstance();
     expressApp.set('trust proxy', 'loopback, linklocal, 127.0.0.1, ::1');

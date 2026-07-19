@@ -16,6 +16,10 @@ enum BookingIntentStatus {
   PENDING
   EXPIRED
   COMPLETED
+  AWAITING_PAYMENT
+  PAYMENT_EXHAUSTED
+  CONFIRMED
+  CANCELLED
 }
 
 enum PassengerType {
@@ -24,10 +28,16 @@ enum PassengerType {
   INFANT
 }
 
+enum UserRole {
+  USER
+  ADMIN
+}
+
 model User {
   id              String             @id @default(uuid())
   email           String             @unique
   password        String
+  role            UserRole           @default(USER)
   status          UserStatus         @default(ACTIVE)
   createdAt       DateTime           @default(now())
   updatedAt       DateTime           @updatedAt
@@ -38,6 +48,10 @@ model User {
   bookings        Booking[]
   bookingIntents  BookingIntent[]
   searchHistory   SearchHistory[]
+  stripeCustomerId    String?           @unique
+  idempotencyKeys     IdempotencyKey[]
+  refundsTriggered    Refund[]
+  paymentMethods      PaymentMethod[]
 
   @@map("users")
 }
@@ -180,6 +194,8 @@ model BookingIntent {
   user             User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
   flightOffer      FlightOffer?          @relation(fields: [flightOfferId], references: [id], onDelete: SetNull)
   passengers       BookingIntentPassenger[]
+  paymentAttemptCount Int                 @default(0)
+  payments         Payment[]
 
   @@index([userId])
   @@index([userId, status])
@@ -303,6 +319,170 @@ model OfferRecovery {
 
   @@index([createdAt])
   @@map("offer_recoveries")
+}
+
+enum PaymentStatus {
+  CREATED
+  AUTHORIZED
+  SUCCEEDED
+  FAILED
+  EXPIRED
+  CANCELLED
+  REFUND_PENDING
+  PARTIALLY_REFUNDED
+  REFUNDED
+  DISPUTED
+  CHARGEBACK_LOST
+}
+
+enum RefundStatus {
+  REFUND_PENDING
+  SUCCEEDED
+  FAILED
+}
+
+enum RefundTriggerType {
+  ADMIN
+  SYSTEM_AUTOMATED
+}
+
+enum LedgerEntryType {
+  DEBIT
+  CREDIT
+}
+
+enum PaymentEventSource {
+  WEBHOOK
+  API
+  CRON
+  SYSTEM
+}
+
+model Payment {
+  id                     String         @id @default(uuid())
+  bookingIntentId        String
+  bookingIntent          BookingIntent  @relation(fields: [bookingIntentId], references: [id])
+  attemptNumber          Int            // 1 or 2 (Database-level CHECK constraint attemptNumber IN (1, 2) enforced in migration)
+  idempotencyKeyId       String
+  idempotencyKey         IdempotencyKey @relation(fields: [idempotencyKeyId], references: [id])
+  stripePaymentIntentId  String         @unique
+  stripeCustomerId       String?
+  amount                 Int            // smallest currency unit (cents)
+  currency               String         // ISO 4217 (e.g., "usd")
+  paymentMethodType      String?        // e.g., "card"
+  status                 PaymentStatus  @default(CREATED)
+  preDisputeStatus       PaymentStatus? // populated when entering DISPUTED
+  version                Int            @default(0) // optimistic locking
+  createdAt              DateTime       @default(now())
+  updatedAt              DateTime       @updatedAt
+
+  paymentEvents          PaymentEvent[]
+  ledgerEntries          LedgerEntry[]
+  refunds                Refund[]
+
+  @@unique([bookingIntentId, attemptNumber])
+  @@index([stripeCustomerId])
+  @@index([status])
+  @@map("payments")
+}
+
+model IdempotencyKey {
+  id             String    @id @default(uuid())
+  key            String    @unique
+  requestHash    String    // SHA-256 of request body — catches key reuse with different payload
+  customerId     String
+  customer       User      @relation(fields: [customerId], references: [id])
+  requestPath    String    // API endpoint path
+  requestParams  Json?     // request body snapshot
+  responseCode   Int?      // HTTP status code of cached response
+  responseBody   Json?     // cached response for replay
+  recoveryPoint  String    @default("started") // started → stripe_authorized → duffel_order_created → captured → completed
+  lockedAt       DateTime? // claim mechanism for pessimistic lock
+  createdAt      DateTime  @default(now())
+  expiresAt      DateTime
+
+  payments       Payment[]
+  refunds        Refund[]
+
+  @@index([customerId])
+  @@index([expiresAt])
+  @@map("idempotency_keys")
+}
+
+model PaymentEvent {
+  id              BigInt             @id @default(autoincrement())
+  paymentId       String
+  payment         Payment            @relation(fields: [paymentId], references: [id])
+  eventType       String             // e.g., "payment_intent.succeeded", "refund.created"
+  previousStatus  PaymentStatus
+  newStatus       PaymentStatus
+  amount          Int?               // amount involved in this event
+  source          PaymentEventSource // WEBHOOK, API, CRON, SYSTEM
+  stripeEventId   String?            @unique // webhook deduplication — nullable for non-webhook events
+  metadata        Json?              // raw payload
+  createdAt       DateTime           @default(now())
+  createdBy       String             // user ID, "system", or service name
+
+  @@index([paymentId, createdAt])
+  @@index([eventType])
+  @@map("payment_events")
+}
+
+model LedgerEntry {
+  id              String          @id @default(uuid())
+  paymentId       String
+  payment         Payment         @relation(fields: [paymentId], references: [id])
+  transactionId   String          // groups paired debit/credit rows
+  accountId       String          // CUSTOMER_RECEIVABLE | PLATFORM_REVENUE | DUFFEL_COST
+  entryType       LedgerEntryType // DEBIT or CREDIT
+  amount          Int             // smallest currency unit
+  currency        String          // ISO 4217
+  createdAt       DateTime        @default(now())
+
+  @@index([paymentId])
+  @@index([transactionId])
+  @@index([accountId])
+  @@map("ledger_entries")
+}
+
+model Refund {
+  id                  String            @id @default(uuid())
+  paymentId           String
+  payment             Payment           @relation(fields: [paymentId], references: [id])
+  idempotencyKeyId    String
+  idempotencyKey      IdempotencyKey    @relation(fields: [idempotencyKeyId], references: [id])
+  stripeRefundId      String?           @unique
+  amount              Int               // smallest currency unit
+  currency            String            // ISO 4217
+  reason              String?
+  triggerType         RefundTriggerType // ADMIN or SYSTEM_AUTOMATED
+  triggeredByUserId   String?           // NULL for automated refunds
+  triggeredByUser     User?             @relation(fields: [triggeredByUserId], references: [id])
+  requiresReview      Boolean           @default(false) // flags automated refunds for 24h human check
+  status              RefundStatus      @default(REFUND_PENDING)
+  createdAt           DateTime          @default(now())
+  updatedAt           DateTime          @updatedAt
+
+  @@index([paymentId])
+  @@index([status])
+  @@map("refunds")
+}
+
+model PaymentMethod {
+  id                     String   @id @default(uuid())
+  stripeCustomerId       String
+  stripePaymentMethodId  String   @unique
+  cardBrand              String?  // visa, mastercard, etc.
+  cardLast4              String?  // last 4 digits for display
+  userId                 String
+  user                   User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  isDefault              Boolean  @default(false)
+  savedWithConsent       Boolean  @default(false) // only set to true through validated saveCard opt-in path
+  createdAt              DateTime @default(now())
+
+  @@index([stripeCustomerId])
+  @@index([userId])
+  @@map("payment_methods")
 }
 
 

@@ -17,6 +17,9 @@ export class DuffelTimeoutError extends Error {
 export class DuffelService {
   private readonly logger = new Logger(DuffelService.name);
   private readonly duffel: Duffel;
+  private readonly duffelToken: string;
+  private readonly apiVersion = 'v2';
+  private readonly basePath = 'https://api.duffel.com';
 
   constructor(private readonly cacheService: CacheService) {
     const token = process.env.DUFFEL_ACCESS_TOKEN;
@@ -27,8 +30,9 @@ export class DuffelService {
       this.logger.warn('DUFFEL_ACCESS_TOKEN is missing or invalid in production/development runtime.');
     }
 
+    this.duffelToken = token || '';
     this.duffel = new Duffel({
-      token: token || '',
+      token: this.duffelToken,
     });
   }
 
@@ -331,6 +335,253 @@ export class DuffelService {
       if (timeoutHandle) {
         clearTimeout(timeoutHandle);
       }
+    }
+  }
+
+  async createOrder(
+    duffelOfferId: string,
+    passengers: {
+      type: string;
+      gender?: string;
+      title?: string;
+      dateOfBirth?: string | Date;
+      givenName?: string;
+      given_name?: string;
+      familyName?: string;
+      family_name?: string;
+      phoneNumber?: string;
+      phone_number?: string;
+      email?: string;
+    }[],
+    metadata?: Record<string, unknown>,
+    idempotencyKey?: string,
+  ): Promise<unknown> {
+    try {
+      const rawOffer = await this.getOfferById(duffelOfferId);
+      const offer = rawOffer as {
+        passengers: Array<{
+          id: string;
+          type: string;
+        }>;
+      };
+
+      if (!offer || !offer.passengers) {
+        throw new HttpException(
+          'Duffel offer or passenger list not found.',
+          HttpStatus.NOT_FOUND,
+        );
+      }
+
+      const mapType = (t: string) => {
+        const normalized = t.toLowerCase();
+        if (normalized === 'adult') return 'adult';
+        if (normalized === 'child') return 'child';
+        if (normalized === 'infant') return 'infant_without_seat';
+        return normalized;
+      };
+
+      const offerPassengersByType: Record<string, Array<{ id: string; type: string }>> = {};
+      for (const p of offer.passengers) {
+        const t = p.type;
+        if (!offerPassengersByType[t]) {
+          offerPassengersByType[t] = [];
+        }
+        offerPassengersByType[t].push(p);
+      }
+
+      const typeCounters: Record<string, number> = {};
+      const duffelPassengers = passengers.map((p) => {
+        const duffelType = mapType(p.type);
+        if (!typeCounters[duffelType]) {
+          typeCounters[duffelType] = 0;
+        }
+        const matchedOfferPassenger = offerPassengersByType[duffelType]?.[typeCounters[duffelType]];
+        if (!matchedOfferPassenger) {
+          throw new HttpException(
+            `Could not match passenger of type ${p.type} at index ${typeCounters[duffelType]} with offer passengers`,
+            HttpStatus.BAD_REQUEST,
+          );
+        }
+        typeCounters[duffelType]++;
+
+        const givenName = p.givenName || p.given_name;
+        const familyName = p.familyName || p.family_name;
+
+        if (!givenName) {
+          throw new HttpException(
+            'Given name is required for passenger.',
+            HttpStatus.BAD_REQUEST,
+          );
+        }
+
+        if (!familyName) {
+          throw new HttpException(
+            'Family name is required for passenger.',
+            HttpStatus.BAD_REQUEST,
+          );
+        }
+
+        let gender: 'm' | 'f' | 'u' = 'u';
+        if (p.gender) {
+          const firstChar = p.gender.trim().toLowerCase()[0];
+          if (firstChar === 'm') gender = 'm';
+          else if (firstChar === 'f') gender = 'f';
+        }
+
+        let title = p.title;
+        if (!title) {
+          title = gender === 'm' ? 'mr' : gender === 'f' ? 'ms' : 'mr';
+        } else {
+          title = title.toLowerCase().trim();
+        }
+
+        let born_on = '';
+        if (p.dateOfBirth) {
+          if (p.dateOfBirth instanceof Date) {
+            born_on = p.dateOfBirth.toISOString().split('T')[0];
+          } else if (typeof p.dateOfBirth === 'string') {
+            born_on = p.dateOfBirth.split('T')[0];
+          }
+        }
+        const phone_number = p.phoneNumber || p.phone_number;
+        const email = p.email;
+
+        if (!born_on) {
+          throw new HttpException(
+            `Date of birth is required for passenger ${givenName} ${familyName}`,
+            HttpStatus.BAD_REQUEST,
+          );
+        }
+
+        if (!phone_number) {
+          throw new HttpException(
+            `Phone number is required for passenger ${givenName} ${familyName}`,
+            HttpStatus.BAD_REQUEST,
+          );
+        }
+
+        if (!email) {
+          throw new HttpException(
+            `Email address is required for passenger ${givenName} ${familyName}`,
+            HttpStatus.BAD_REQUEST,
+          );
+        }
+
+        return {
+          id: matchedOfferPassenger.id,
+          given_name: givenName,
+          family_name: familyName,
+          born_on,
+          gender,
+          title,
+          phone_number,
+          email,
+        };
+      });
+
+      const timeoutMs = 30000;
+      const timeoutError = new HttpException(
+        'Duffel order creation timed out.',
+        HttpStatus.GATEWAY_TIMEOUT,
+      );
+      let timeoutHandle: NodeJS.Timeout | undefined;
+      const controller = new AbortController();
+
+      const timeoutPromise = new Promise<never>((_, reject) => {
+        timeoutHandle = setTimeout(() => {
+          controller.abort();
+          reject(timeoutError);
+        }, timeoutMs);
+      });
+
+      try {
+        /* eslint-disable @typescript-eslint/no-explicit-any */
+        const token = this.duffelToken;
+        const apiVersion = this.apiVersion;
+        const basePath = this.basePath;
+        const key = idempotencyKey || crypto.randomUUID();
+
+        const orderPromise = (async () => {
+          const res = await fetch(`${basePath}/air/orders`, {
+            method: 'POST',
+            signal: controller.signal,
+            headers: {
+              'Authorization': `Bearer ${token}`,
+              'Duffel-Version': apiVersion,
+              'Content-Type': 'application/json',
+              'Idempotency-Key': `${key}-duffel-order`,
+            },
+            body: JSON.stringify({
+              data: {
+                type: 'instant',
+                selected_offers: [duffelOfferId],
+                passengers: duffelPassengers,
+                metadata,
+              },
+            }),
+          });
+
+          const body = await res.json() as any;
+          if (!res.ok || (body && body.errors)) {
+            const err = new Error(body?.errors?.[0]?.message || 'Failed to create Duffel order');
+            (err as any).status = res.status;
+            throw err;
+          }
+          return body.data;
+        })();
+
+        orderPromise.catch(() => {});
+
+        const result = await Promise.race([orderPromise, timeoutPromise]);
+        return result;
+        /* eslint-enable @typescript-eslint/no-explicit-any */
+      } finally {
+        if (timeoutHandle) {
+          clearTimeout(timeoutHandle);
+        }
+      }
+    } catch (err: unknown) {
+      const error = err as Error & { status?: number };
+      this.logger.error(`Error in createOrder: ${error.message}`, error.stack);
+      if (err instanceof HttpException) {
+        throw err;
+      }
+      if (error.status === 429) {
+        throw new HttpException(
+          {
+            code: 'UPSTREAM_RATE_LIMITED',
+            message: 'Duffel API rate limit exceeded',
+          },
+          HttpStatus.TOO_MANY_REQUESTS,
+        );
+      }
+      throw new HttpException(
+        {
+          code: 'UPSTREAM_UNAVAILABLE',
+          message: error.message || 'Failed to create Duffel order',
+        },
+        HttpStatus.BAD_GATEWAY,
+      );
+    }
+  }
+
+  async cancelOrder(duffelOrderId: string): Promise<unknown> {
+    try {
+      const quote = await this.duffel.orderCancellations.create({
+        order_id: duffelOrderId,
+      });
+      const confirmed = await this.duffel.orderCancellations.confirm(quote.data.id);
+      return confirmed.data;
+    } catch (err: unknown) {
+      const error = err as Error;
+      this.logger.error(`Failed to cancel Duffel order ${duffelOrderId}: ${error.message}`, error.stack);
+      throw new HttpException(
+        {
+          code: 'UPSTREAM_CANCEL_FAILED',
+          message: error.message || 'Failed to cancel Duffel order',
+        },
+        HttpStatus.BAD_GATEWAY,
+      );
     }
   }
 }
