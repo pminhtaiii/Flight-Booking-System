@@ -173,6 +173,16 @@ export class StripeService {
     }
   }
 
+  async detachPaymentMethod(paymentMethodId: string): Promise<Stripe.PaymentMethod> {
+    try {
+      return await this.stripe.paymentMethods.detach(paymentMethodId);
+    } catch (error) {
+      const err = error as Error;
+      this.logger.error(`Failed to detach PaymentMethod ${paymentMethodId}: ${err.message}`, err.stack);
+      throw error;
+    }
+  }
+
   constructWebhookEvent(
     payload: string | Buffer,
     header: string,

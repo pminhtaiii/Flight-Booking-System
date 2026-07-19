@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Param,
   Post,
@@ -17,6 +18,7 @@ import { RolesGuard } from '@/auth/guards/roles.guard';
 import { Roles } from '@/auth/decorators/roles.decorator';
 import { PaymentService } from './payment.service';
 import { PaymentRefundService } from './payment-refund.service';
+import { PaymentMethodService } from './payment-method.service';
 import { CreatePaymentDto } from './dto/create-payment.dto';
 import { ConfirmPaymentDto } from './dto/confirm-payment.dto';
 import { PaymentResponseDto } from './dto/payment-response.dto';
@@ -37,6 +39,7 @@ export class PaymentController {
   constructor(
     private readonly paymentService: PaymentService,
     private readonly paymentRefundService: PaymentRefundService,
+    private readonly paymentMethodService: PaymentMethodService,
   ) {}
 
   @Post('create')
@@ -97,5 +100,19 @@ export class PaymentController {
       throw new BadRequestException('Idempotency-Key header is required');
     }
     return this.paymentRefundService.initiateRefund(paymentId, dto, idempotencyKey, req.user.id, req.user.role);
+  }
+
+  @Get('methods')
+  async listPaymentMethods(@Req() req: AuthenticatedRequest) {
+    return this.paymentMethodService.listMethods(req.user.id);
+  }
+
+  @Delete('methods/:methodId')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  async deletePaymentMethod(
+    @Req() req: AuthenticatedRequest,
+    @Param('methodId') methodId: string,
+  ) {
+    await this.paymentMethodService.deleteMethod(methodId, req.user.id);
   }
 }

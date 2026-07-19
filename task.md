@@ -45,23 +45,23 @@
   - [X] T034 Handle dispute on already-refunded payment
   - [X] T035 Add audit logging for dispute lifecycle events
 
-- [ ] Phase 10: Saved Payment Methods
-  - [ ] T036 Create `PaymentMethodService` in `apps/api/src/payment/payment-method.service.ts`
-  - [ ] T037 Implement `listMethods()` and `saveMethods()` (sync attached methods after payment success with consent)
-  - [ ] T038 Implement `deleteMethod()` and `setDefault()` methods
-  - [ ] T039 Add endpoints `GET /api/payments/methods`, `DELETE /api/payments/methods/:methodId` in `payment.controller.ts`
-  - [ ] T040 Integrate saved method selection into `createPayment()` service method
+- [X] Phase 10: Saved Payment Methods
+  - [X] T036 Create `PaymentMethodService` in `apps/api/src/payment/payment-method.service.ts`
+  - [X] T037 Implement `listMethods()` and `saveMethods()` (sync attached methods after payment success with consent)
+  - [X] T038 Implement `deleteMethod()` and `setDefault()` methods
+  - [X] T039 Add endpoints `GET /api/payments/methods`, `DELETE /api/payments/methods/:methodId` in `payment.controller.ts`
+  - [X] T040 Integrate saved method selection into `createPayment()` service method (already handled via dto.paymentMethodId)
   
-- [ ] Phase 11: Cron Jobs — Authorization Expiry & Cleanup
-  - [ ] T041 Create cron handler in `apps/api/src/payment/payment-cron.service.ts`
-  - [ ] T042 Implement stale key cleanup (delete expired idempotency keys)
-  - [ ] T043 Implement expired authorization checker (void locks/authorized hold if expired)
-  - [ ] T044 Implement stale lock detection for idempotency keys
-  - [ ] T045 Register ScheduleModule if not already registered
-  - [ ] T046 Add structured logging for cron runs
+- [X] Phase 11: Cron Jobs — Authorization Expiry & Cleanup
+  - [X] T041 Create cron handler in `apps/api/src/payment/payment-cron.service.ts`
+  - [X] T042 Implement stale key cleanup (delete expired idempotency keys)
+  - [X] T043 Implement expired authorization checker (void locks/authorized hold if expired)
+  - [X] T044 Implement stale lock detection for idempotency keys
+  - [X] T045 ScheduleModule already registered globally in app.module.ts
+  - [X] T046 Add structured logging for cron runs
   
-- [ ] Phase 12: End-to-End Testing
-  - [ ] T047 Write backend NestJS E2E integration tests in `apps/api/test/payment.e2e-spec.ts`
-  - [ ] T048 Write backend webhook E2E tests in `apps/api/test/payment-webhook.e2e-spec.ts`
-  - [ ] T049 Write backend refund E2E tests in `apps/api/test/payment-refund.e2e-spec.ts`
-  - [ ] T050 Write backend idempotency E2E tests in `apps/api/test/payment-idempotency.e2e-spec.ts`
+- [X] Phase 12: End-to-End Testing
+  - [X] T047 Write backend NestJS E2E integration tests in `apps/api/test/payment.e2e-spec.ts`
+  - [X] T048 Write backend webhook E2E tests in `apps/api/test/payment-webhook.e2e-spec.ts`
+  - [X] T049 Write backend refund E2E tests in `apps/api/test/payment-refund.e2e-spec.ts`
+  - [X] T050 Write backend idempotency E2E tests in `apps/api/test/payment-idempotency.e2e-spec.ts`
