@@ -17,8 +17,13 @@ COMPLETED    → Flight departure date has passed
 ```
 PROCESSING → CONFIRMED   (pipeline success)
 PROCESSING → FAILED      (pipeline failure at any stage)
-CONFIRMED  → COMPLETED   (flight date passes — updated by cron or on-read)
+CONFIRMED  → COMPLETED   (flight date passes)
 ```
+
+**CONFIRMED → COMPLETED Transition Mechanism**:
+To ensure real-time accuracy and limit background write overhead:
+1. **Read-Time Reactive Update**: When querying list or detail endpoints, the backend service check MUST dynamically evaluate if a `CONFIRMED` booking's `departureAt` date has passed (`departureAt <= NOW()`). If it has, the service will asynchronously trigger a status update to `COMPLETED` in the database and return `COMPLETED` in the API response. This guarantees users never see elapsed bookings in their "Upcoming" tab.
+2. **Scheduled Sweep (Cron)**: A daily background cron job sweeps the database for any remaining `CONFIRMED` bookings where `departureAt <= NOW()` and updates their status to `COMPLETED`. This serves as a fallback to keep the database state clean even for users who do not actively visit the platform.
 
 ### BookingFailureReason
 

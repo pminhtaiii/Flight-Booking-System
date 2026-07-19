@@ -145,7 +145,9 @@ packages/shared/
   - Format validation (must be valid UUID v4) → 400
   - Ownership check (existing booking for different user) → 403
   - Same-user idempotency replay
-  - Concurrency handling: Catch primary-key unique constraint violations (Prisma error P2002) on insert to prevent TOCTOU race conditions, gracefully falling back to idempotency/ownership checks rather than throwing a 500.
+  - Concurrency handling: Catch unique constraint violations (Prisma error P2002) on insert to prevent TOCTOU race conditions.
+    - If collision is on `id` (PK): Fall back to standard idempotency replay using the provided `bookingId`.
+    - If collision is on `bookingIntentId`: Query the database for the existing Booking using `bookingIntentId`. Verify ownership (`userId` check). If ownership matches, gracefully return the existing booking (enabling the client to retrieve the correct, pre-existing `bookingId` after page reloads or escape hatch triggers) rather than throwing a 500.
 - Insert `BookingService.createBooking()` as the FIRST step of the confirm pipeline (before Stripe authorization)
 - On pipeline success: call `BookingService.updateToConfirmed()` with PNR, Duffel order ID, and flight/passenger snapshots
 - On pipeline failure: call `BookingService.updateToFailed()` with the appropriate `BookingFailureReason`. For `CAPTURE_FAILED` failures (which occur after Duffel PNR creation), we MUST pass the flight/passenger snapshots and departure date retrieved from Duffel so they are preserved in the DB.
@@ -184,7 +186,7 @@ packages/shared/
 **Deliverables**:
 - `/bookings/[bookingId]/page.tsx` — Next.js App Router page
 - `BookingDetail` component rendering full flight snapshot, passenger details, PNR, payment summary
-- `BookingConfirmationBanner` — success celebration UI (shown when `?confirmed=true`)
+- `BookingConfirmationBanner` — success celebration UI (shown when `?confirmed=true`). The page component MUST strip the `confirmed` query parameter from the URL on mount (e.g. using `window.history.replaceState` or Next.js `router.replace` to update the URL path without triggering a server re-render) to prevent the banner from displaying again on manual page refreshes.
 - `BookingProcessingState` — processing indicator with "Your booking is being processed" message
 - `BookingFailureState` — failure view with:
   - Error explanation from `failureReason`
