@@ -137,6 +137,7 @@ When a booking is confirmed, the complete flight details are stored as a snapsho
   - If Stripe payment is captured (`SUCCEEDED`) and PNR is successfully created/recovered, transition the booking to `CONFIRMED`.
   - If Stripe payment is captured but PNR creation failed, transition the booking to `FAILED` with `failureReason: CAPTURE_FAILED` and trigger an automated refund.
   - If Stripe payment is not captured (or no payment exists), transition to `FAILED` with `failureReason: SYSTEM_ERROR`.
+  - Concurrency Guard: All status transitions MUST be guarded by a conditional database update (filtering by expected status `PROCESSING`). The downstream refund or void operation MUST only be executed if the update query affected exactly `1` row, preventing double refund transactions.
 
 ### Key Entities
 

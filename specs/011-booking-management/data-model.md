@@ -41,6 +41,11 @@ To prevent bookings from getting permanently stuck in the `PROCESSING` state due
      - If Duffel PNR does not exist: Update booking status to `FAILED` with `failureReason: CAPTURE_FAILED` and trigger an automated refund via `PaymentRefundService`.
    - **If Stripe payment is NOT captured** (e.g. authorization exists but not captured, or void failed): Update status to `FAILED` with `failureReason: SYSTEM_ERROR` and trigger a void/refund if there is an active hold.
    - This ensures orphaned processing records are safely resolved without leaving users charged for unconfirmed flights.
+4. **Concurrency Guard (Double Refund Prevention)**:
+   To prevent race conditions where the read-time reactive update and the scheduled cron job sweep attempt to reconcile and update the same stale booking simultaneously (which could result in duplicate automated refunds or duplicate status transitions), the status update MUST be executed as a conditional DB write (optimistic concurrency guard):
+   - Perform the database update using a query filtered by the expected initial status, e.g., in Prisma: `prisma.booking.updateMany({ where: { id: bookingId, status: 'PROCESSING' }, data: { status: 'FAILED', failureReason: 'CAPTURE_FAILED' } })`.
+   - The executing code MUST check the database response for the number of affected rows.
+   - The downstream automated refund or void operation MUST ONLY be triggered if the affected rows count is exactly `1` (meaning this specific execution thread successfully won the race and transitioned the booking status). If the count is `0`, the current thread MUST immediately abort to prevent duplicate transactions.
 
 ### BookingFailureReason
 
