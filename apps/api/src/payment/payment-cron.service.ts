@@ -161,18 +161,27 @@ export class PaymentCronService {
     bookingIntentId: string;
     version: number;
     amount: number;
-    bookingIntent: { paymentAttemptCount: number };
   }): Promise<void> {
     const maxAttempts = this.configService.get<number>(
       'PAYMENT_MAX_ATTEMPTS',
       2,
     );
-    const newStatus: BookingIntentStatus =
-      payment.bookingIntent.paymentAttemptCount >= maxAttempts
-        ? BookingIntentStatus.PAYMENT_EXHAUSTED
-        : BookingIntentStatus.AWAITING_PAYMENT;
 
-    await this.prisma.$transaction(async (tx) => {
+    const newStatus = await this.prisma.$transaction(async (tx) => {
+      const bookingIntent = await tx.bookingIntent.findUnique({
+        where: { id: payment.bookingIntentId },
+        select: { paymentAttemptCount: true },
+      });
+
+      if (!bookingIntent) {
+        throw new Error(`Booking intent ${payment.bookingIntentId} not found`);
+      }
+
+      const newStatus: BookingIntentStatus =
+        bookingIntent.paymentAttemptCount >= maxAttempts
+          ? BookingIntentStatus.PAYMENT_EXHAUSTED
+          : BookingIntentStatus.AWAITING_PAYMENT;
+
       await tx.payment.update({
         where: { id: payment.id, version: payment.version },
         data: {
@@ -197,6 +206,8 @@ export class PaymentCronService {
         where: { id: payment.bookingIntentId },
         data: { status: newStatus },
       });
+
+      return newStatus;
     });
 
     this.logger.log(

@@ -12,14 +12,14 @@ describe('PaymentCronService', () => {
     payment: { findMany: jest.Mock; update: jest.Mock };
     idempotencyKey: { deleteMany: jest.Mock; updateMany: jest.Mock };
     paymentEvent: { create: jest.Mock };
-    bookingIntent: { update: jest.Mock };
+    bookingIntent: { findUnique: jest.Mock; update: jest.Mock };
     ledgerEntry: { findFirst: jest.Mock; createMany: jest.Mock };
     $transaction: jest.Mock;
   };
   let transaction: {
     payment: { update: jest.Mock };
     paymentEvent: { create: jest.Mock };
-    bookingIntent: { update: jest.Mock };
+    bookingIntent: { findUnique: jest.Mock; update: jest.Mock };
     ledgerEntry: { findFirst: jest.Mock; createMany: jest.Mock };
   };
   let stripeService: { cancelPaymentIntent: jest.Mock; retrievePaymentIntent: jest.Mock };
@@ -41,17 +41,18 @@ describe('PaymentCronService', () => {
       payment: { findMany: jest.fn(), update: jest.fn() },
       idempotencyKey: { deleteMany: jest.fn(), updateMany: jest.fn() },
       paymentEvent: { create: jest.fn() },
-      bookingIntent: { update: jest.fn() },
+      bookingIntent: { findUnique: jest.fn(), update: jest.fn() },
       ledgerEntry: { findFirst: jest.fn(), createMany: jest.fn() },
       $transaction: jest.fn(),
     };
     transaction = {
       payment: { update: jest.fn() },
       paymentEvent: { create: jest.fn() },
-      bookingIntent: { update: jest.fn() },
+      bookingIntent: { findUnique: jest.fn(), update: jest.fn() },
       ledgerEntry: { findFirst: jest.fn(), createMany: jest.fn() },
     };
     prisma.$transaction.mockImplementation(async (callback) => callback(transaction));
+    transaction.bookingIntent.findUnique.mockResolvedValue({ paymentAttemptCount: 1 });
     stripeService = { cancelPaymentIntent: jest.fn(), retrievePaymentIntent: jest.fn() };
     paymentMethodService = { saveMethod: jest.fn() };
     const configService = { get: jest.fn((_key: string, defaultValue: number) => defaultValue) };
@@ -134,6 +135,23 @@ describe('PaymentCronService', () => {
     expect(prisma.payment.update).not.toHaveBeenCalled();
     expect(prisma.paymentEvent.create).not.toHaveBeenCalled();
     expect(prisma.bookingIntent.update).not.toHaveBeenCalled();
+  });
+
+  it('uses the transaction-local payment attempt count when expiring an authorization', async () => {
+    prisma.payment.findMany.mockResolvedValue([payment]);
+    stripeService.retrievePaymentIntent.mockResolvedValue({ status: 'requires_capture' });
+    transaction.bookingIntent.findUnique.mockResolvedValue({ paymentAttemptCount: 2 });
+
+    await service.handleAuthorizationExpiry();
+
+    expect(transaction.bookingIntent.findUnique).toHaveBeenCalledWith({
+      where: { id: payment.bookingIntentId },
+      select: { paymentAttemptCount: true },
+    });
+    expect(transaction.bookingIntent.update).toHaveBeenCalledWith({
+      where: { id: payment.bookingIntentId },
+      data: { status: BookingIntentStatus.PAYMENT_EXHAUSTED },
+    });
   });
 
   it('expires a locally authorized payment when its Stripe intent is already canceled', async () => {
