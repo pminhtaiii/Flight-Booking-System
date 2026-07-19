@@ -135,7 +135,9 @@ export class StripeService {
 
   async retrievePaymentIntent(paymentIntentId: string): Promise<Stripe.PaymentIntent> {
     try {
-      return await this.stripe.paymentIntents.retrieve(paymentIntentId);
+      return await this.stripe.paymentIntents.retrieve(paymentIntentId, {
+        expand: ['payment_method'],
+      });
     } catch (error) {
       const err = error as Error;
       this.logger.error(`Failed to retrieve PaymentIntent ${paymentIntentId}: ${err.message}`, err.stack);
