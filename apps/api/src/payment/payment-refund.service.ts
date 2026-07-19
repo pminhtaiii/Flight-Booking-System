@@ -287,19 +287,50 @@ export class PaymentRefundService {
         return;
       }
 
-      // Find REFUND_PENDING refunds whose stripeRefundId matches one in this event,
-      // OR whose stripeRefundId is still null (race window: webhook arrived before
-      // initiateRefund wrote the Stripe refund ID back to the DB).
-      const pendingRefunds = await this.prisma.refund.findMany({
+      // Phase 1: match REFUND_PENDING rows that already have a known stripeRefundId.
+      const explicitMatches = await this.prisma.refund.findMany({
         where: {
           paymentId: payment.id,
           status: 'REFUND_PENDING',
-          OR: [
-            { stripeRefundId: { in: stripeRefundIds } },
-            { stripeRefundId: null },
-          ],
+          stripeRefundId: { in: stripeRefundIds },
         },
       });
+
+      const matchedStripeIds = new Set(explicitMatches.map((r) => r.stripeRefundId));
+      const unmatchedStripeIds = stripeRefundIds.filter((id) => !matchedStripeIds.has(id));
+
+      // Phase 2: for any Stripe IDs that had no explicit match, attempt to atomically
+      // bind one null-ID REFUND_PENDING row per unmatched ID. We update exactly one
+      // row at a time (LIMIT 1 via sub-select) so two concurrent webhooks cannot both
+      // claim the same null row.
+      const lateBindMatches: Array<{ id: string; amount: number }> = [];
+      for (const stripeId of unmatchedStripeIds) {
+        const claimed = await this.prisma.$queryRaw<Array<{ id: string; amount: number }>>`
+          UPDATE "refunds"
+          SET    "stripeRefundId" = ${stripeId}
+          WHERE  id = (
+            SELECT id FROM "refunds"
+            WHERE  "paymentId" = ${payment.id}
+              AND  status = 'REFUND_PENDING'
+              AND  "stripeRefundId" IS NULL
+            ORDER BY "createdAt" ASC
+            LIMIT  1
+            FOR UPDATE SKIP LOCKED
+          )
+          RETURNING id, amount
+        `;
+        if (claimed.length > 0) {
+          lateBindMatches.push(...claimed);
+        } else {
+          this.logger.warn({
+            message: `Stripe refund ID ${stripeId} could not be bound to any REFUND_PENDING row for payment ${payment.id}`,
+            paymentId: payment.id,
+            stripeRefundId: stripeId,
+          });
+        }
+      }
+
+      const pendingRefunds = [...explicitMatches, ...lateBindMatches];
 
       if (pendingRefunds.length === 0) {
         this.logger.warn({
