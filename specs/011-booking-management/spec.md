@@ -130,7 +130,7 @@ When a booking is confirmed, the complete flight details are stored as a snapsho
 - **FR-005**: System MUST derive charge status messages from `Payment.status` (live DB read), NOT from `Booking.failureReason`. If the payment record does not exist (null `paymentId` due to early failure), the system MUST render: "No charge was made to your card."
 - **FR-006**: System MUST implement a 4-phase loading escalation on the checkout page: confident stepper (0–10s), reassurance (10–20s), escape hatch (20s+), auto-redirect (45s+).
 - **FR-007**: System MUST display bookings in two tabs: Upcoming (future or null flight dates for confirmed, failed, or processing status) and Past (past flight dates for completed, confirmed, or failed status).
-- **FR-008**: System MUST map each `failureReason` to a specific retry destination: `OFFER_EXPIRED`/`PRICE_CHANGED` → search results, `BOOKING_TIMEOUT`/`SYSTEM_ERROR` → flight detail, `CAPTURE_FAILED` → contact support.
+- **FR-008**: System MUST map each `failureReason` to a specific retry destination: `OFFER_EXPIRED` → search results, `PRICE_CHANGED`/`BOOKING_TIMEOUT`/`SYSTEM_ERROR` → flight detail, `CAPTURE_FAILED` → contact support.
 - **FR-009**: System MUST disable the confirm button immediately on click and register a `beforeunload` warning during pipeline execution.
 - **FR-010**: System MUST sort Upcoming bookings by departure date (soonest first) and Past bookings by departure date (most recent first).
 - **FR-011**: System MUST automatically clean up stale `PROCESSING` bookings (older than 15 minutes) using a hybrid strategy (read-time reactive update plus background cron sweep every 15 minutes) following strict reconciliation rules:

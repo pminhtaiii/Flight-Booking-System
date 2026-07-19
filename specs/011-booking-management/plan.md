@@ -192,8 +192,8 @@ packages/shared/
   - Error explanation from `failureReason`
   - Charge status message derived from `Payment.status` (NOT failureReason)
   - Context-aware retry button:
-    - `OFFER_EXPIRED`/`PRICE_CHANGED` → Search results with pre-filled route
-    - `BOOKING_TIMEOUT`/`SYSTEM_ERROR` → Flight detail page
+    - `OFFER_EXPIRED` → Search results with pre-filled route
+    - `PRICE_CHANGED`/`BOOKING_TIMEOUT`/`SYSTEM_ERROR` → Flight detail page
     - `CAPTURE_FAILED` → Contact support
 - `BookingStatusBadge` — color-coded status badge component
 

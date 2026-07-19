@@ -44,8 +44,9 @@ Modification to existing endpoint: accepts `bookingId` from client and creates B
 }
 ```
 
-**Idempotency / Collision Replay Response** (when existing booking is still `PROCESSING`):
-If a request is received and a `Booking` for the `bookingIntentId` already exists in `PROCESSING` status (e.g. concurrent submit or page reload), the server returns a 200 OK with the existing canonical `bookingId` to allow the client to redirect or poll safely:
+**Idempotency / Collision Replay Response**:
+If a request is received and a `Booking` for the `bookingIntentId` already exists, the server returns the cached response state immediately without re-executing the payment or booking pipeline:
+1. **If status is `PROCESSING`**: The server returns a 200 OK with the existing canonical `bookingId` to allow the client to redirect or poll:
 ```json
 {
   "success": true,
@@ -53,6 +54,26 @@ If a request is received and a `Booking` for the `bookingIntentId` already exist
   "paymentId": null,
   "pnrReference": null,
   "status": "PROCESSING"
+}
+```
+2. **If status is `CONFIRMED`**: The server returns the standard successful response payload:
+```json
+{
+  "success": true,
+  "bookingId": "canonical-existing-booking-uuid",
+  "paymentId": "payment-uuid",
+  "pnrReference": "ABC123",
+  "status": "CONFIRMED"
+}
+```
+3. **If status is `FAILED`**: The server returns the standard failure response payload:
+```json
+{
+  "success": false,
+  "bookingId": "canonical-existing-booking-uuid",
+  "status": "FAILED",
+  "failureReason": "OFFER_EXPIRED | PRICE_CHANGED | BOOKING_TIMEOUT | CAPTURE_FAILED | SYSTEM_ERROR",
+  "message": "Human-readable failure explanation"
 }
 ```
 
