@@ -42,7 +42,7 @@ Build a complete post-payment booking management experience consisting of:
 - **Flight snapshot stored as JSON**: Complete flight details captured at PNR creation time and stored on the Booking record. Detail page reads entirely from the local database — zero Duffel API calls at render time.
 - **`failureReason` and charge status are independent**: `Booking.failureReason` determines the retry button. `Payment.status` (live DB read) determines the charge message. If the payment record does not exist (null `paymentId` due to early failure), the UI displays "No charge was made to your card." Never conflated.
 - **`PAYMENT_DECLINED` excluded from booking failures**: Card declines happen during Stripe Elements confirmation (client-side), before the Booking record exists. They're handled inline on the checkout page.
-- **Context-aware retry routing**: `OFFER_EXPIRED`/`PRICE_CHANGED` → search results with pre-filled route, `BOOKING_TIMEOUT`/`SYSTEM_ERROR` → flight detail page, `CAPTURE_FAILED` → contact support.
+- **Context-aware retry routing**: `OFFER_EXPIRED` → search results with pre-filled route, `PRICE_CHANGED`/`BOOKING_TIMEOUT`/`SYSTEM_ERROR` → flight detail page, `CAPTURE_FAILED` → contact support.
 - **Two tabs only**: Upcoming and Past. No Cancelled tab until the cancellation feature ships.
 - **4-phase loading escalation**: Timed transitions (0–10s confident stepper, 10–20s reassurance, 20s+ escape hatch, 45s+ auto-redirect). Named steps designed for future SSE upgrade without UI rework.
 - **Approach A (synchronous)**: Pipeline stays synchronous. No SSE, no Redis Pub/Sub, no background jobs. EventEmitter2 cross-instance degradation on multi-replica deployments was identified and avoided.
