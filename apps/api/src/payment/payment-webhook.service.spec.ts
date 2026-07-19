@@ -3,6 +3,8 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { PaymentWebhookService } from './payment-webhook.service';
 import { PrismaService } from '@/prisma/prisma.service';
 import { StripeService } from '@/common/stripe.service';
+import { PaymentRefundService } from './payment-refund.service';
+import { AuditService } from '@/audit/audit.service';
 import { PaymentStatus, PaymentEventSource, Prisma } from '@prisma/client';
 
 describe('PaymentWebhookService', () => {
@@ -35,11 +37,21 @@ describe('PaymentWebhookService', () => {
       retrievePaymentIntent: jest.fn(),
     };
 
+    const mockPaymentRefundService = {
+      handleChargeRefunded: jest.fn(),
+    };
+
+    const mockAuditService = {
+      createLog: jest.fn(),
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         PaymentWebhookService,
         { provide: PrismaService, useValue: mockPrisma },
         { provide: StripeService, useValue: mockStripe },
+        { provide: PaymentRefundService, useValue: mockPaymentRefundService },
+        { provide: AuditService, useValue: mockAuditService },
       ],
     }).compile();
 
