@@ -35,7 +35,7 @@ To prevent bookings from getting permanently stuck in the `PROCESSING` state due
    - **If Stripe Capture Did Not Succeed** (e.g. Payment is `AUTHORIZED`, `FAILED`, `CANCELLED`, or does not exist):
      - Update the booking to `status: FAILED` and `failureReason: SYSTEM_ERROR`.
      - If the Stripe payment contains an active hold (status `AUTHORIZED`), the service MUST also trigger a void/refund of the authorization hold (releasing the hold immediately).
-   - The service will asynchronously update the database record to the resolved status, initiate any required void/refund actions, and return the resolved status to the client immediately.
+   - The service MUST synchronously await the database update transaction (ensuring the Concurrency Guard's affected-rows check resolves first) before initiating any required void/refund actions or returning the resolved status to the client. The status write and affected-rows check must complete before any refund or void transaction is triggered.
 3. **Scheduled Cleanup Cron**: A background cron job running every 15 minutes sweeps the database for `PROCESSING` bookings older than 15 minutes and executes the same reconciliation logic:
    - Check the associated Stripe `Payment.status` and verify with Duffel if a PNR reference was generated.
    - **If Stripe payment is captured**:

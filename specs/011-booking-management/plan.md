@@ -166,7 +166,7 @@ packages/shared/
 - `CheckoutLoadingEscalation` component with 4 timed phases:
   - Phase 1 (0–10s): Animated stepper with named steps (Authorizing → Reserving → Finalizing)
   - Phase 2 (10–20s): Animation slows, reassurance message appears
-  - Phase 3 (20s+): "Check My Bookings" escape hatch link to `/bookings/[bookingId]`
+  - Phase 3 (20s+): "Check My Bookings" escape hatch to `/bookings/[bookingId]` (MUST NOT be a raw HTML anchor tag. It must be implemented as a `<button>` or Next.js `<Link>` with an `onClick` handler that intercepts the click, programmatically unregisters the `beforeunload` event listener first, and then performs the client-side router navigation via `router.push()`, avoiding the browser's unload intercept dialog).
   - Phase 4 (45s+): Auto-redirect to `/bookings/[bookingId]`
 - Client-side UUID v4 generation on "Confirm Payment" click
 - UUID stored in component state (available for escape hatch URL immediately)
