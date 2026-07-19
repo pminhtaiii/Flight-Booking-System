@@ -48,6 +48,14 @@ export class PaymentMethodService {
     const paymentIntent =
       await this.stripeService.retrievePaymentIntent(stripePaymentIntentId);
 
+    const savedWithConsent = paymentIntent.setup_future_usage === 'off_session';
+    if (!savedWithConsent) {
+      this.logger.warn(
+        `PaymentIntent ${stripePaymentIntentId} was not approved for future use; skipping payment method save`,
+      );
+      return;
+    }
+
     const paymentMethodId =
       typeof paymentIntent.payment_method === 'string'
         ? paymentIntent.payment_method
@@ -86,7 +94,7 @@ export class PaymentMethodService {
         stripePaymentMethodId: paymentMethodId,
         cardBrand,
         cardLast4,
-        savedWithConsent: true,
+        savedWithConsent,
       },
     });
   }

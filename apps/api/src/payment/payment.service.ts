@@ -13,6 +13,7 @@ import { StripeService } from '@/common/stripe.service';
 import { PaymentIdempotencyService } from '@/payment/payment-idempotency.service';
 import { DuffelService } from '@/duffel/duffel.service';
 import { AuditService } from '@/audit/audit.service';
+import { PaymentMethodService } from '@/payment/payment-method.service';
 import { CreatePaymentDto } from '@/payment/dto/create-payment.dto';
 import { ConfirmPaymentDto } from '@/payment/dto/confirm-payment.dto';
 import { PaymentResponseDto } from '@/payment/dto/payment-response.dto';
@@ -30,6 +31,7 @@ export class PaymentService {
     private readonly idempotencyService: PaymentIdempotencyService,
     private readonly duffelService: DuffelService,
     private readonly auditService: AuditService,
+    private readonly paymentMethodService: PaymentMethodService,
   ) {}
 
   /**
@@ -704,6 +706,20 @@ export class PaymentService {
               duffelOrderId: duffelOrder.id as string,
             },
           });
+        }
+
+        if (payment.stripeCustomerId) {
+          try {
+            await this.paymentMethodService.saveMethod(
+              userId,
+              payment.stripeCustomerId,
+              payment.stripePaymentIntentId,
+            );
+          } catch (error: unknown) {
+            this.logger.warn(
+              `Unable to save payment method for payment ${payment.id}: ${error instanceof Error ? error.message : String(error)}`,
+            );
+          }
         }
 
         await this.idempotencyService.updateRecoveryPoint(idempotencyKey, 'completed');

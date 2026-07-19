@@ -1,7 +1,11 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { ConfigService } from '@nestjs/config';
-import { PaymentStatus, BookingIntentStatus } from '@prisma/client';
+import {
+  PaymentStatus,
+  BookingIntentStatus,
+  PaymentEventSource,
+} from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { StripeService } from '../common/stripe.service';
 import { enforceTransition } from './payment-state-machine';
@@ -41,6 +45,20 @@ export class PaymentCronService {
 
       for (const payment of payments) {
         try {
+          const stripePaymentIntent =
+            await this.stripeService.retrievePaymentIntent(
+              payment.stripePaymentIntentId,
+            );
+
+          if (stripePaymentIntent.status === 'succeeded') {
+            await this.reconcileSucceededAuthorization(payment);
+            this.logger.log(
+              `Reconciled succeeded payment ${payment.id} (PI: ${payment.stripePaymentIntentId})`,
+            );
+            expiredCount++;
+            continue;
+          }
+
           enforceTransition(PaymentStatus.AUTHORIZED, PaymentStatus.EXPIRED);
 
           await this.stripeService.cancelPaymentIntent(
@@ -106,7 +124,6 @@ export class PaymentCronService {
       const result = await this.prisma.idempotencyKey.deleteMany({
         where: {
           expiresAt: { lt: new Date() },
-          recoveryPoint: 'completed',
         },
       });
 
@@ -176,5 +193,74 @@ export class PaymentCronService {
     this.logger.log(
       `Updated booking intent ${bookingIntentId} to ${newStatus}`,
     );
+  }
+
+  private async reconcileSucceededAuthorization(payment: {
+    id: string;
+    bookingIntentId: string;
+    version: number;
+    amount: number;
+    currency: string;
+  }): Promise<void> {
+    enforceTransition(PaymentStatus.AUTHORIZED, PaymentStatus.SUCCEEDED);
+
+    await this.prisma.$transaction(async (tx) => {
+      await tx.payment.update({
+        where: { id: payment.id, version: payment.version },
+        data: {
+          status: PaymentStatus.SUCCEEDED,
+          version: { increment: 1 },
+        },
+      });
+
+      await tx.paymentEvent.create({
+        data: {
+          paymentId: payment.id,
+          eventType: 'payment_intent.succeeded',
+          previousStatus: PaymentStatus.AUTHORIZED,
+          newStatus: PaymentStatus.SUCCEEDED,
+          amount: payment.amount,
+          source: PaymentEventSource.CRON,
+          createdBy: 'system',
+          metadata: {
+            reconciledBy: 'authorization_expiry_cron',
+            stripeStatus: 'succeeded',
+          },
+        },
+      });
+
+      await tx.bookingIntent.update({
+        where: { id: payment.bookingIntentId },
+        data: { status: BookingIntentStatus.CONFIRMED },
+      });
+
+      const existingLedger = await tx.ledgerEntry.findFirst({
+        where: { paymentId: payment.id },
+      });
+
+      if (!existingLedger) {
+        const transactionId = crypto.randomUUID();
+        await tx.ledgerEntry.createMany({
+          data: [
+            {
+              paymentId: payment.id,
+              transactionId,
+              accountId: 'CUSTOMER_RECEIVABLE',
+              entryType: 'DEBIT',
+              amount: payment.amount,
+              currency: payment.currency,
+            },
+            {
+              paymentId: payment.id,
+              transactionId,
+              accountId: 'PLATFORM_REVENUE',
+              entryType: 'CREDIT',
+              amount: payment.amount,
+              currency: payment.currency,
+            },
+          ],
+        });
+      }
+    });
   }
 }

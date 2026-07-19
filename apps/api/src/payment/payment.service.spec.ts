@@ -5,6 +5,7 @@ import { StripeService } from '@/common/stripe.service';
 import { PaymentIdempotencyService } from '@/payment/payment-idempotency.service';
 import { DuffelService } from '@/duffel/duffel.service';
 import { AuditService } from '@/audit/audit.service';
+import { PaymentMethodService } from '@/payment/payment-method.service';
 import { HttpStatus, InternalServerErrorException } from '@nestjs/common';
 
 describe('PaymentService - recoveryPoint === completed', () => {
@@ -14,6 +15,7 @@ describe('PaymentService - recoveryPoint === completed', () => {
   let mockIdempotency: any;
   let mockDuffel: any;
   let mockAudit: any;
+  let mockPaymentMethod: any;
 
   beforeEach(() => {
     mockPrisma = {
@@ -39,6 +41,7 @@ describe('PaymentService - recoveryPoint === completed', () => {
 
     mockDuffel = {};
     mockAudit = {};
+    mockPaymentMethod = { saveMethod: jest.fn() };
 
     service = new PaymentService(
       mockPrisma as unknown as PrismaService,
@@ -46,6 +49,7 @@ describe('PaymentService - recoveryPoint === completed', () => {
       mockIdempotency as unknown as PaymentIdempotencyService,
       mockDuffel as unknown as DuffelService,
       mockAudit as unknown as AuditService,
+      mockPaymentMethod as unknown as PaymentMethodService,
     );
   });
 
@@ -188,6 +192,47 @@ describe('PaymentService - recoveryPoint === completed', () => {
         error: 'Duffel booking failed. Payment hold released.',
         bookingStatus: 'AWAITING_PAYMENT',
       });
+    });
+  });
+
+  describe('post-capture saved payment methods', () => {
+    it('syncs the payment method after a successful capture', async () => {
+      mockPrisma.payment.findUnique.mockResolvedValue({
+        id: 'payment-123',
+        bookingIntentId: 'intent-123',
+        stripePaymentIntentId: 'pi-123',
+        stripeCustomerId: 'cus-123',
+        amount: 10000,
+        currency: 'usd',
+        status: 'AUTHORIZED',
+        bookingIntent: { userId: 'user-123' },
+      });
+      mockPrisma.paymentEvent.findFirst.mockResolvedValue({
+        metadata: { id: 'duffel-order-123', booking_reference: 'PNR123' },
+      });
+      mockPrisma.$transaction = jest.fn().mockImplementation(async (callback) =>
+        callback({
+          payment: { update: jest.fn() },
+          paymentEvent: { create: jest.fn() },
+          bookingIntent: { update: jest.fn() },
+          ledgerEntry: { createMany: jest.fn() },
+        }),
+      );
+      mockIdempotency.getResumePoint.mockResolvedValue('captured');
+      mockIdempotency.updateRecoveryPoint = jest.fn();
+      mockAudit.createLog = jest.fn();
+
+      await service.executeConfirmPayment(
+        { paymentId: 'payment-123' },
+        'confirm-key-123',
+        'user-123',
+      );
+
+      expect(mockPaymentMethod.saveMethod).toHaveBeenCalledWith(
+        'user-123',
+        'cus-123',
+        'pi-123',
+      );
     });
   });
 
