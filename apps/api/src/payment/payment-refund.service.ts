@@ -39,6 +39,11 @@ export class PaymentRefundService {
     userId: string,
     userRole: string,
   ): Promise<RefundResponse> {
+    const triggerType =
+      userRole === 'ADMIN'
+        ? RefundTriggerType.ADMIN
+        : RefundTriggerType.USER;
+
     try {
       // 1. Find Payment with bookingIntent
       const payment = await this.prisma.payment.findUnique({
@@ -117,7 +122,7 @@ export class PaymentRefundService {
             amount: dto.amount,
             currency: payment.currency,
             reason: dto.reason,
-            triggerType: RefundTriggerType.ADMIN,
+            triggerType,
             triggeredByUserId: userId,
             status: 'REFUND_PENDING',
           },
@@ -224,7 +229,7 @@ export class PaymentRefundService {
         amount: dto.amount,
         currency: payment.currency,
         status: refund.status,
-        triggerType: RefundTriggerType.ADMIN,
+        triggerType,
       };
 
       await this.idempotencyService.completeKey(

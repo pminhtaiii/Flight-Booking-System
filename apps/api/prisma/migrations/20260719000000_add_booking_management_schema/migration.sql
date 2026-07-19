@@ -1,4 +1,7 @@
--- AlterEnum
+-- AlterEnum: Add USER variant to RefundTriggerType to support non-admin self-service refunds
+ALTER TYPE "RefundTriggerType" ADD VALUE IF NOT EXISTS 'USER';
+
+
 -- We replace existing BookingStatus values with the new lifecycle-based values.
 -- The old enum did not power any active data (booking records were cleared by db reset).
 BEGIN;
@@ -39,7 +42,7 @@ CREATE TABLE "bookings" (
     "flightSnapshot" JSONB,
     "passengerSnapshot" JSONB,
     "totalAmount" DECIMAL(10,2) NOT NULL,
-    "currency" TEXT NOT NULL DEFAULT 'USD',
+    "currency" TEXT NOT NULL DEFAULT 'GBP',
     "departureAt" TIMESTAMP(3),
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,

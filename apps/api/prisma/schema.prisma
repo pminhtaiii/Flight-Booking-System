@@ -351,6 +351,7 @@ enum RefundStatus {
 }
 
 enum RefundTriggerType {
+  USER
   ADMIN
   SYSTEM_AUTOMATED
 }
@@ -465,7 +466,7 @@ model Refund {
   amount              Int               // smallest currency unit
   currency            String            // ISO 4217
   reason              String?
-  triggerType         RefundTriggerType // ADMIN or SYSTEM_AUTOMATED
+  triggerType         RefundTriggerType // USER, ADMIN, or SYSTEM_AUTOMATED
   triggeredByUserId   String?           // NULL for automated refunds
   triggeredByUser     User?             @relation(fields: [triggeredByUserId], references: [id])
   requiresReview      Boolean           @default(false) // flags automated refunds for 24h human check
