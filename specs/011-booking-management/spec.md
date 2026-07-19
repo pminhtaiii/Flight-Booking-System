@@ -133,7 +133,10 @@ When a booking is confirmed, the complete flight details are stored as a snapsho
 - **FR-008**: System MUST map each `failureReason` to a specific retry destination: `OFFER_EXPIRED`/`PRICE_CHANGED` → search results, `BOOKING_TIMEOUT`/`SYSTEM_ERROR` → flight detail, `CAPTURE_FAILED` → contact support.
 - **FR-009**: System MUST disable the confirm button immediately on click and register a `beforeunload` warning during pipeline execution.
 - **FR-010**: System MUST sort Upcoming bookings by departure date (soonest first) and Past bookings by departure date (most recent first).
-- **FR-011**: System MUST automatically clean up and transition stale `PROCESSING` bookings (older than 15 minutes) to `FAILED` with `failureReason: SYSTEM_ERROR` using a hybrid strategy: a read-time reactive update on list/detail queries plus a background cleanup cron job executing every 15 minutes.
+- **FR-011**: System MUST automatically clean up stale `PROCESSING` bookings (older than 15 minutes) using a hybrid strategy (read-time reactive update plus background cron sweep every 15 minutes) following strict reconciliation rules:
+  - If Stripe payment is captured (`SUCCEEDED`) and PNR is successfully created/recovered, transition the booking to `CONFIRMED`.
+  - If Stripe payment is captured but PNR creation failed, transition the booking to `FAILED` with `failureReason: CAPTURE_FAILED` and trigger an automated refund.
+  - If Stripe payment is not captured (or no payment exists), transition to `FAILED` with `failureReason: SYSTEM_ERROR`.
 
 ### Key Entities
 

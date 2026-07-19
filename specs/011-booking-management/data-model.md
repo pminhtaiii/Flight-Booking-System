@@ -28,8 +28,19 @@ To ensure real-time accuracy and limit background write overhead:
 **Stale PROCESSING Cleanup Strategy (TTL/Cron)**:
 To prevent bookings from getting permanently stuck in the `PROCESSING` state due to server crashes or unhandled pipeline exceptions:
 1. **Stale Threshold**: Any booking remaining in the `PROCESSING` state for more than 15 minutes is considered stale/stuck (since a typical sync pipeline runs in under 1 minute).
-2. **Read-Time Reactive Fail**: On list or detail API queries, if a `PROCESSING` booking was created more than 15 minutes ago (`createdAt <= NOW() - 15 minutes`), the backend service MUST dynamically treat it as `FAILED` with `failureReason: SYSTEM_ERROR`. The service will asynchronously update the database record to `status: FAILED` and `failureReason: SYSTEM_ERROR`, returning the failed state to the client immediately.
-3. **Scheduled Cleanup Cron**: A background cron job running every 15 minutes sweeps the database for `PROCESSING` bookings older than 15 minutes. It reconciles their payment state using the associated `paymentId` (via Stripe API checks if needed) and updates their status to `FAILED` with `failureReason: SYSTEM_ERROR` if they cannot be completed. This prevents orphaned processing records from accumulating.
+2. **Read-Time Reactive Fail**: On list or detail API queries, if a `PROCESSING` booking was created more than 15 minutes ago (`createdAt <= NOW() - 15 minutes`), the backend service MUST reconcile the state before returning a status:
+   - **If Stripe Capture Succeeded (`Payment.status === 'SUCCEEDED'`)**:
+     - If PNR creation succeeded (a PNR is found/recovered from Duffel or the DB): Update the booking to `status: CONFIRMED` (and populate PNR, snapshots, and departure date).
+     - If PNR creation failed (no flight was booked): Update the booking to `status: FAILED` with `failureReason: CAPTURE_FAILED` and trigger an automated refund.
+   - **If Stripe Capture Did Not Succeed** (e.g. Payment is `AUTHORIZED`, `FAILED`, `CANCELLED`, or does not exist): Update the booking to `status: FAILED` and `failureReason: SYSTEM_ERROR`.
+   - The service will asynchronously update the database record to the resolved status and return it immediately.
+3. **Scheduled Cleanup Cron**: A background cron job running every 15 minutes sweeps the database for `PROCESSING` bookings older than 15 minutes and executes the same reconciliation logic:
+   - Check the associated Stripe `Payment.status` and verify with Duffel if a PNR reference was generated.
+   - **If Stripe payment is captured**:
+     - If Duffel PNR exists: Update booking status to `CONFIRMED` (recovery path).
+     - If Duffel PNR does not exist: Update booking status to `FAILED` with `failureReason: CAPTURE_FAILED` and trigger an automated refund via `PaymentRefundService`.
+   - **If Stripe payment is NOT captured** (e.g. authorization exists but not captured, or void failed): Update status to `FAILED` with `failureReason: SYSTEM_ERROR` and trigger a void/refund if there is an active hold.
+   - This ensures orphaned processing records are safely resolved without leaving users charged for unconfirmed flights.
 
 ### BookingFailureReason
 
