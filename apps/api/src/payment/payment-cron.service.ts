@@ -65,30 +65,7 @@ export class PaymentCronService {
             payment.stripePaymentIntentId,
           );
 
-          await this.prisma.payment.update({
-            where: {
-              id: payment.id,
-              version: payment.version,
-            },
-            data: {
-              status: PaymentStatus.EXPIRED,
-              version: { increment: 1 },
-            },
-          });
-
-          await this.prisma.paymentEvent.create({
-            data: {
-              paymentId: payment.id,
-              eventType: 'authorization.expired',
-              previousStatus: PaymentStatus.AUTHORIZED,
-              newStatus: PaymentStatus.EXPIRED,
-              amount: payment.amount,
-              source: 'CRON',
-              createdBy: 'system',
-            },
-          });
-
-          await this.updateBookingIntentOnExpiry(payment.bookingIntentId, payment.bookingIntent.paymentAttemptCount);
+          await this.expireAuthorization(payment);
 
           this.logger.log(
             `Expired payment ${payment.id} (PI: ${payment.stripePaymentIntentId})`,
@@ -172,26 +149,51 @@ export class PaymentCronService {
     }
   }
 
-  private async updateBookingIntentOnExpiry(
-    bookingIntentId: string,
-    paymentAttemptCount: number,
-  ): Promise<void> {
+  private async expireAuthorization(payment: {
+    id: string;
+    bookingIntentId: string;
+    version: number;
+    amount: number;
+    bookingIntent: { paymentAttemptCount: number };
+  }): Promise<void> {
     const maxAttempts = this.configService.get<number>(
       'PAYMENT_MAX_ATTEMPTS',
       2,
     );
     const newStatus: BookingIntentStatus =
-      paymentAttemptCount >= maxAttempts
+      payment.bookingIntent.paymentAttemptCount >= maxAttempts
         ? BookingIntentStatus.PAYMENT_EXHAUSTED
         : BookingIntentStatus.AWAITING_PAYMENT;
 
-    await this.prisma.bookingIntent.update({
-      where: { id: bookingIntentId },
-      data: { status: newStatus },
+    await this.prisma.$transaction(async (tx) => {
+      await tx.payment.update({
+        where: { id: payment.id, version: payment.version },
+        data: {
+          status: PaymentStatus.EXPIRED,
+          version: { increment: 1 },
+        },
+      });
+
+      await tx.paymentEvent.create({
+        data: {
+          paymentId: payment.id,
+          eventType: 'authorization.expired',
+          previousStatus: PaymentStatus.AUTHORIZED,
+          newStatus: PaymentStatus.EXPIRED,
+          amount: payment.amount,
+          source: PaymentEventSource.CRON,
+          createdBy: 'system',
+        },
+      });
+
+      await tx.bookingIntent.update({
+        where: { id: payment.bookingIntentId },
+        data: { status: newStatus },
+      });
     });
 
     this.logger.log(
-      `Updated booking intent ${bookingIntentId} to ${newStatus}`,
+      `Updated booking intent ${payment.bookingIntentId} to ${newStatus}`,
     );
   }
 

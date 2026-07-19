@@ -15,6 +15,12 @@ describe('PaymentCronService', () => {
     ledgerEntry: { findFirst: jest.Mock; createMany: jest.Mock };
     $transaction: jest.Mock;
   };
+  let transaction: {
+    payment: { update: jest.Mock };
+    paymentEvent: { create: jest.Mock };
+    bookingIntent: { update: jest.Mock };
+    ledgerEntry: { findFirst: jest.Mock; createMany: jest.Mock };
+  };
   let stripeService: { cancelPaymentIntent: jest.Mock; retrievePaymentIntent: jest.Mock };
 
   const payment = {
@@ -34,8 +40,15 @@ describe('PaymentCronService', () => {
       paymentEvent: { create: jest.fn() },
       bookingIntent: { update: jest.fn() },
       ledgerEntry: { findFirst: jest.fn(), createMany: jest.fn() },
-      $transaction: jest.fn(async (callback) => callback(prisma)),
+      $transaction: jest.fn(),
     };
+    transaction = {
+      payment: { update: jest.fn() },
+      paymentEvent: { create: jest.fn() },
+      bookingIntent: { update: jest.fn() },
+      ledgerEntry: { findFirst: jest.fn(), createMany: jest.fn() },
+    };
+    prisma.$transaction.mockImplementation(async (callback) => callback(transaction));
     stripeService = { cancelPaymentIntent: jest.fn(), retrievePaymentIntent: jest.fn() };
     const configService = { get: jest.fn((_key: string, defaultValue: number) => defaultValue) };
 
@@ -59,16 +72,16 @@ describe('PaymentCronService', () => {
   it('reconciles a succeeded Stripe intent instead of expiring it', async () => {
     prisma.payment.findMany.mockResolvedValue([payment]);
     stripeService.retrievePaymentIntent.mockResolvedValue({ status: 'succeeded' });
-    prisma.ledgerEntry.findFirst.mockResolvedValue(null);
+    transaction.ledgerEntry.findFirst.mockResolvedValue(null);
 
     await service.handleAuthorizationExpiry();
 
     expect(stripeService.cancelPaymentIntent).not.toHaveBeenCalled();
-    expect(prisma.payment.update).toHaveBeenCalledWith({
+    expect(transaction.payment.update).toHaveBeenCalledWith({
       where: { id: payment.id, version: payment.version },
       data: { status: PaymentStatus.SUCCEEDED, version: { increment: 1 } },
     });
-    expect(prisma.paymentEvent.create).toHaveBeenCalledWith({
+    expect(transaction.paymentEvent.create).toHaveBeenCalledWith({
       data: expect.objectContaining({
         eventType: 'payment_intent.succeeded',
         previousStatus: PaymentStatus.AUTHORIZED,
@@ -76,9 +89,40 @@ describe('PaymentCronService', () => {
         source: PaymentEventSource.CRON,
       }),
     });
-    expect(prisma.bookingIntent.update).toHaveBeenCalledWith({
+    expect(transaction.bookingIntent.update).toHaveBeenCalledWith({
       where: { id: payment.bookingIntentId },
       data: { status: BookingIntentStatus.CONFIRMED },
     });
+  });
+
+  it('expires an uncaptured authorization together with its event and booking intent', async () => {
+    prisma.payment.findMany.mockResolvedValue([payment]);
+    stripeService.retrievePaymentIntent.mockResolvedValue({ status: 'requires_capture' });
+
+    await service.handleAuthorizationExpiry();
+
+    expect(stripeService.cancelPaymentIntent).toHaveBeenCalledWith(
+      payment.stripePaymentIntentId,
+    );
+    expect(prisma.$transaction).toHaveBeenCalledTimes(1);
+    expect(transaction.payment.update).toHaveBeenCalledWith({
+      where: { id: payment.id, version: payment.version },
+      data: { status: PaymentStatus.EXPIRED, version: { increment: 1 } },
+    });
+    expect(transaction.paymentEvent.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        eventType: 'authorization.expired',
+        previousStatus: PaymentStatus.AUTHORIZED,
+        newStatus: PaymentStatus.EXPIRED,
+        source: PaymentEventSource.CRON,
+      }),
+    });
+    expect(transaction.bookingIntent.update).toHaveBeenCalledWith({
+      where: { id: payment.bookingIntentId },
+      data: { status: BookingIntentStatus.AWAITING_PAYMENT },
+    });
+    expect(prisma.payment.update).not.toHaveBeenCalled();
+    expect(prisma.paymentEvent.create).not.toHaveBeenCalled();
+    expect(prisma.bookingIntent.update).not.toHaveBeenCalled();
   });
 });
