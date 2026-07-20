@@ -232,6 +232,11 @@ export class BookingService {
         if (res.count > 0) {
           booking.status = 'FAILED';
           booking.failureReason = 'CAPTURE_FAILED';
+          // Advance Payment to CANCELLED so downstream guards don't attempt a second cancellation.
+          await this.prisma.payment.updateMany({
+            where: { id: booking.payment.id, status: { notIn: ['CANCELLED', 'REFUNDED'] } },
+            data: { status: 'CANCELLED' },
+          });
         }
         return booking;
       }
@@ -266,6 +271,11 @@ export class BookingService {
            booking.flightSnapshot = flightSnapshot as any;
            booking.passengerSnapshot = passengerSnapshot as any;
            booking.departureAt = departureAt;
+           // Advance Payment to SUCCEEDED to match the captured Stripe intent.
+           await this.prisma.payment.updateMany({
+             where: { id: booking.payment.id, status: { notIn: ['SUCCEEDED', 'REFUNDED', 'CANCELLED'] } },
+             data: { status: 'SUCCEEDED' },
+           });
          }
       } else {
          const res = await this.prisma.booking.updateMany({
