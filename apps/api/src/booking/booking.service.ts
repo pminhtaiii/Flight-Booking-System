@@ -332,13 +332,18 @@ export class BookingService {
       include: { payment: { select: { id: true, status: true, stripePaymentIntentId: true } }, bookingIntent: { select: { id: true, duffelOfferId: true } } },
     });
     
+    const staleThreshold = new Date(Date.now() - 15 * 60 * 1000);
     const reconciledBookings = await Promise.all(
       bookings.map(async (b) => {
         let updated = b;
-        try {
-          updated = await this.reconcileBookingIfStale(b as any);
-        } catch (e: any) {
-          this.logger.error(`Reactive stale booking reconciliation failed for ${b.id}: ${e.message}`, e.stack);
+        // Only hit the Stripe/Duffel APIs for stale PROCESSING bookings; skip the
+        // full reconciliation for everything else to avoid rate-limiting under burst.
+        if (b.status === BookingStatus.PROCESSING && b.createdAt <= staleThreshold) {
+          try {
+            updated = await this.reconcileBookingIfStale(b as any);
+          } catch (e: any) {
+            this.logger.error(`Reactive stale booking reconciliation failed for ${b.id}: ${e.message}`, e.stack);
+          }
         }
         updated = await this.checkAndCompleteBooking(updated);
         return updated;
