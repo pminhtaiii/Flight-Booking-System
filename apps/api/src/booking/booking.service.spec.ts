@@ -122,6 +122,38 @@ describe('BookingService', () => {
       }));
     });
 
+    it('throws when a booking is deleted after the conditional terminal update', async () => {
+      const prisma = {
+        booking: {
+          updateMany: jest.fn().mockResolvedValue({ count: 0 }),
+          findUnique: jest.fn().mockResolvedValue(null),
+        },
+      };
+      const service = new BookingService(prisma as never, {} as never, {} as never, {} as never);
+
+      await expect(service.updateToFailed('missing-booking', 'BOOKING_TIMEOUT')).rejects.toBeInstanceOf(NotFoundException);
+    });
+
+    it('throws when a booking is deleted after the conditional confirmation update', async () => {
+      const prisma = {
+        booking: {
+          updateMany: jest.fn().mockResolvedValue({ count: 0 }),
+          findUnique: jest.fn().mockResolvedValue(null),
+        },
+      };
+      const service = new BookingService(prisma as never, {} as never, {} as never, {} as never);
+      const flightSnapshot = {
+        segments: [{ departureAt: '2026-09-01T10:00:00.000Z' }],
+        totalDuration: 'PT2H',
+        stops: 0,
+        cabinClass: 'economy',
+      };
+
+      await expect(
+        service.updateToConfirmed('missing-booking', 'PNR1', 'order-1', flightSnapshot as any, {} as any),
+      ).rejects.toBeInstanceOf(NotFoundException);
+    });
+
     it('handles unique-constraint violation and returns existing booking if owned by caller', async () => {
       const error = new Prisma.PrismaClientKnownRequestError('Unique constraint failed', {
         code: 'P2002',

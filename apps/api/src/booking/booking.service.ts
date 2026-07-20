@@ -1,6 +1,6 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException, Logger } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
-import { BookingFailureReason, BookingStatus, Prisma } from '@prisma/client';
+import { Booking, BookingFailureReason, BookingStatus, Prisma } from '@prisma/client';
 import { PrismaService } from '@/prisma/prisma.service';
 import { FlightSnapshot, PassengerSnapshot } from '@shared/booking-types';
 import { BookingDetailResponseDto, BookingListItemResponseDto, BookingListResponseDto, BookingTab } from './dto';
@@ -133,7 +133,7 @@ export class BookingService {
     flightSnapshot: FlightSnapshot,
     passengerSnapshot: PassengerSnapshot,
     tx?: Prisma.TransactionClient,
-  ) {
+  ): Promise<Booking> {
     if (!flightSnapshot?.segments?.length) {
       throw new BadRequestException('Flight snapshot must contain at least one segment');
     }
@@ -152,7 +152,11 @@ export class BookingService {
         departureAt: new Date(flightSnapshot.segments[0].departureAt),
       },
     });
-    return client.booking.findUnique({ where: { id: bookingId } });
+    const booking = await client.booking.findUnique({ where: { id: bookingId } });
+    if (!booking) {
+      throw new NotFoundException('Booking not found');
+    }
+    return booking;
   }
 
   async updateToFailed(
@@ -162,7 +166,7 @@ export class BookingService {
     passengerSnapshot?: PassengerSnapshot,
     departureAt?: Date,
     tx?: Prisma.TransactionClient,
-  ) {
+  ): Promise<Booking> {
     const client = tx || this.prisma;
     await client.booking.updateMany({
       where: { id: bookingId, status: BookingStatus.PROCESSING },
@@ -174,7 +178,11 @@ export class BookingService {
         ...(departureAt ? { departureAt } : {}),
       },
     });
-    return client.booking.findUnique({ where: { id: bookingId } });
+    const booking = await client.booking.findUnique({ where: { id: bookingId } });
+    if (!booking) {
+      throw new NotFoundException('Booking not found');
+    }
+    return booking;
   }
 
   async reconcileBookingIfStale(booking: BookingWithRelations): Promise<BookingWithRelations> {
