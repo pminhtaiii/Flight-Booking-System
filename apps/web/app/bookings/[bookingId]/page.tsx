@@ -37,6 +37,8 @@ export default function BookingDetailPage() {
     const controller = new AbortController();
 
     const loadBooking = async (): Promise<void> => {
+      setError(undefined);
+
       try {
         const response = await fetch(`${apiUrl}/api/bookings/${params.bookingId}`, {
           headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : undefined,

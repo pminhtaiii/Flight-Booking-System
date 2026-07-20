@@ -123,3 +123,35 @@ test('routes price changes back to the original flight detail', async ({ page })
   await expect(page.getByText("A hold was placed on your card — we're working to release it.")).toBeVisible();
   await expect(page.getByRole('link', { name: 'Review this flight' })).toHaveAttribute('href', '/search/offer-123');
 });
+
+test('renders a booking after an unauthenticated request is retried with the session token', async ({ page }) => {
+  await page.route('**/api/auth/session', async (route) => {
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    await route.fulfill({
+      contentType: 'application/json',
+      body: JSON.stringify({
+        user: { id: 'user-123', email: 'traveler@example.com' },
+        accessToken: 'test-access-token',
+        expires: '2099-01-01T00:00:00.000Z',
+      }),
+    });
+  });
+
+  let requestCount = 0;
+  await page.route(`**/api/bookings/${bookingId}`, async (route) => {
+    requestCount += 1;
+    if (requestCount === 1) {
+      await route.fulfill({ status: 401, contentType: 'application/json', body: JSON.stringify({ message: 'Unauthorized' }) });
+      return;
+    }
+
+    await route.fulfill({
+      contentType: 'application/json',
+      body: JSON.stringify({ id: bookingId, status: 'PROCESSING', totalAmount: '49900', currency: 'GBP' }),
+    });
+  });
+
+  await page.goto(`/bookings/${bookingId}`);
+
+  await expect(page.getByRole('heading', { name: 'Your booking is being processed' })).toBeVisible();
+});
