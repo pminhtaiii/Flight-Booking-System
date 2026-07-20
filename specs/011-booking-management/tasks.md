@@ -70,9 +70,9 @@
 
 **Purpose**: Frontend client-side UUID generation, timed progress stepper, and escape hatch handler.
 
-- [ ] T018 [P] [US5] Generate client-side UUID v4 on confirm payment click and pass it in payload in [checkout/page.tsx](apps/web/app/checkout/page.tsx)
-- [ ] T019 [US1] Build `CheckoutLoadingEscalation` component implementing all 4 timed phases (stepper, reassurance, escape hatch, auto-redirect) in [CheckoutLoadingEscalation.tsx](apps/web/components/checkout/CheckoutLoadingEscalation.tsx)
-- [ ] T020 [US1] Register `beforeunload` event handler and programmatically unregister it prior to programmatic redirects in [checkout/page.tsx](apps/web/app/checkout/page.tsx)
+- [X] T018 [P] [US5] Generate client-side UUID v4 on confirm payment click and pass it in payload in [checkout/page.tsx](apps/web/app/checkout/page.tsx)
+- [X] T019 [US1] Build `CheckoutLoadingEscalation` component implementing all 4 timed phases (stepper, reassurance, escape hatch, auto-redirect) in [CheckoutLoadingEscalation.tsx](apps/web/components/checkout/CheckoutLoadingEscalation.tsx)
+- [X] T020 [US1] Register `beforeunload` event handler and programmatically unregister it prior to programmatic redirects in [checkout/page.tsx](apps/web/app/checkout/page.tsx)
 
 **Checkpoint**: Real-time loading indicators and navigation protection active on checkout.
 
@@ -95,9 +95,9 @@
 
 **Purpose**: Tabbed list page rendering upcoming and past booking items with pagination and retry actions.
 
-- [ ] T025 [P] [US3] Build `BookingCard` component displaying departure, destination, dates, PNR, status, and retry action in [components/bookings/BookingCard.tsx](apps/web/components/bookings/BookingCard.tsx)
-- [ ] T026 [US3] Build `BookingsList` component with tabs (Upcoming vs Past) and pagination in [components/bookings/BookingsList.tsx](apps/web/components/bookings/BookingsList.tsx)
-- [ ] T027 [US3] Implement list page route and add My Bookings to top navigation layout in [bookings/page.tsx](apps/web/app/bookings/page.tsx)
+- [X] T025 [P] [US3] Build `BookingCard` component displaying departure, destination, dates, PNR, status, and retry action in [components/bookings/BookingCard.tsx](apps/web/components/bookings/BookingCard.tsx)
+- [X] T026 [US3] Build `BookingsList` component with tabs (Upcoming vs Past) and pagination in [components/bookings/BookingsList.tsx](apps/web/components/bookings/BookingsList.tsx)
+- [X] T027 [US3] Implement list page route and add My Bookings to top navigation layout in [bookings/page.tsx](apps/web/app/bookings/page.tsx)
 
 **Checkpoint**: Users can navigate to, browse, and filter their entire flight booking history.
 

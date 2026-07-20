@@ -148,30 +148,52 @@ Returns booking ID + PNR reference to frontend
 User proceeds to payment
 ```
 
+### Booking Management Read Model (Deterministic Path — No AI)
+
+```
+The payment-confirmation pipeline creates a PROCESSING Booking before Stripe and Duffel work.
+        ↓
+Prisma transitions it to CONFIRMED (snapshot + PNR) or FAILED (reason + available snapshot).
+        ↓
+/bookings/[bookingId] renders the status-specific snapshot without a Duffel read.
+        ↓
+/bookings server-renders GET /api/bookings for the authenticated user.
+        ↓
+The client list component changes Upcoming/Past tabs and pagination through URL query parameters.
+```
+
 ### Payment Flow (Deterministic Path — No AI)
 
 ```
-User on payment page with booking ID
+User triggers payment with Idempotency-Key
         ↓
-Next.js → POST /api/payments/create-intent
+Next.js → POST /api/payments/create
         ↓
-payments.service creates Stripe Payment Intent
+PaymentIdempotencyService.acquireOrReplay checks key and request hash
+        ├── Key exists & same hash -> Replay cached response
+        ├── Key exists & different hash -> Throw 422 UnprocessableEntity
+        └── New key -> Lock key and return acquired status
+                ↓
+StripeService.createPaymentIntent creates Stripe PaymentIntent (capture_method: 'manual')
         ↓
-Stripe client secret returned to frontend
+Prisma writes Payment record (status: CREATED) and logs PaymentEvent
         ↓
-Stripe Elements handles card input (card data NEVER touches our server)
+Next.js confirms PaymentIntent client-side using Stripe Elements
         ↓
-Stripe processes payment
+Next.js → POST /api/payments/confirm
         ↓
-Stripe sends webhook → POST /api/payments/webhook
+PaymentIdempotencyService checks key and runs pipeline:
+        1. Authorize Stripe PaymentIntent
+        2. Call Duffel API to create PNR
+        3. Capture Stripe PaymentIntent
         ↓
-payments.service verifies webhook signature
+Prisma updates Payment status (SUCCEEDED) using PaymentStateMachine to enforce transitions
         ↓
-Prisma updates booking status → CONFIRMED
+Prisma writes balanced double-entry LedgerEntries and records PaymentEvent
         ↓
-notifications.service sends confirmation email
+PaymentIdempotencyService completes key, clears lock, and caches response
         ↓
-Audit log entry written to PostgreSQL
+Results returned to frontend
 ```
 
 ### AI Chatbot Agent Flow (SSE Streaming)

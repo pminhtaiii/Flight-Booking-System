@@ -486,7 +486,7 @@ describe('Agent Gateway (E2E)', () => {
       await prisma.booking.create({
         data: {
           userId: user.id,
-          pnrCode: 'PNR_SECRET_123', // PII
+          pnrReference: 'PNR_SECRET_123', // PII
           eTicketNumber: 'TKT_SECRET_123', // PII
           status: 'CONFIRMED',
           airline: 'VN',
