@@ -41,6 +41,7 @@ test.describe('Checkout loading escalation', () => {
   test('generates a UUID v4 booking id and redirects to the confirmed booking', async ({ page }) => {
     let confirmPayload: Record<string, unknown> | undefined;
     let authorizationHeader: string | undefined;
+    let idempotencyKey: string | undefined;
 
     await authenticateCheckout(page);
 
@@ -48,6 +49,7 @@ test.describe('Checkout loading escalation', () => {
       const payload = route.request().postDataJSON() as Record<string, unknown>;
       confirmPayload = payload;
       authorizationHeader = route.request().headers().authorization;
+      idempotencyKey = route.request().headers()['idempotency-key'];
       await route.fulfill({
         contentType: 'application/json',
         body: JSON.stringify({
@@ -65,6 +67,7 @@ test.describe('Checkout loading escalation', () => {
     await expect(page).toHaveURL(/\/bookings\/[\da-f-]+\?confirmed=true$/);
     expect(confirmPayload?.paymentId).toBe('payment-123');
     expect(authorizationHeader).toBe('Bearer test-access-token');
+    expect(idempotencyKey).toBe(confirmPayload?.bookingId);
     expect(confirmPayload?.bookingId).toMatch(
       /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i,
     );
@@ -84,6 +87,38 @@ test.describe('Checkout loading escalation', () => {
 
     await expect(page).toHaveURL(/\/checkout\?paymentId=payment-123$/);
     await expect(page.getByRole('alert')).toHaveText(/booking is still being prepared/i);
+  });
+
+  test('reuses the booking id and idempotency key after an ambiguous request failure', async ({ page }) => {
+    const confirmRequests: Array<{ bookingId: unknown; idempotencyKey: string | undefined }> = [];
+
+    await authenticateCheckout(page);
+    await page.route('**/api/bookings/payment/confirm', async (route) => {
+      const payload = route.request().postDataJSON() as Record<string, unknown>;
+      confirmRequests.push({
+        bookingId: payload.bookingId,
+        idempotencyKey: route.request().headers()['idempotency-key'],
+      });
+
+      if (confirmRequests.length === 1) {
+        await route.abort('failed');
+        return;
+      }
+
+      await route.fulfill({
+        contentType: 'application/json',
+        body: JSON.stringify({ success: true, bookingId: payload.bookingId, status: 'CONFIRMED' }),
+      });
+    });
+
+    await openAuthenticatedCheckout(page);
+    await page.getByRole('button', { name: 'Confirm payment' }).click();
+    await expect(page.getByRole('alert')).toHaveText(/could not confirm your payment/i);
+    await page.getByRole('button', { name: 'Confirm payment' }).click();
+
+    await expect(page).toHaveURL(/\/bookings\/[\da-f-]+\?confirmed=true$/);
+    expect(confirmRequests).toHaveLength(2);
+    expect(confirmRequests[0]).toEqual(confirmRequests[1]);
   });
 
   test('shows reassurance at ten seconds, an escape hatch at twenty seconds, and redirects at forty-five seconds', async ({ page }) => {

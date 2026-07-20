@@ -59,23 +59,25 @@ export default function CheckoutPage() {
       return;
     }
 
-    const clientBookingId = crypto.randomUUID();
+    const clientBookingId = bookingId ?? crypto.randomUUID();
     setBookingId(clientBookingId);
     setError(undefined);
     setIsConfirming(true);
     registerBeforeUnload();
 
+    let receivedResponse = false;
     try {
       const response = await fetch(`${apiUrl}/api/bookings/payment/confirm`, {
         method: 'POST',
         credentials: 'include',
         headers: {
           'Content-Type': 'application/json',
-          'Idempotency-Key': crypto.randomUUID(),
+          'Idempotency-Key': clientBookingId,
           Authorization: `Bearer ${accessToken}`,
         },
         body: JSON.stringify({ paymentId, bookingId: clientBookingId }),
       });
+      receivedResponse = true;
       const result = (await response.json()) as ConfirmPaymentResponse;
 
       if (!response.ok) {
@@ -107,7 +109,11 @@ export default function CheckoutPage() {
     } catch (caughtError) {
       unregisterBeforeUnload();
       setIsConfirming(false);
-      setError(caughtError instanceof Error ? caughtError.message : 'We could not confirm your payment.');
+      setError(
+        receivedResponse && caughtError instanceof Error
+          ? caughtError.message
+          : 'We could not confirm your payment.',
+      );
     }
   };
 
