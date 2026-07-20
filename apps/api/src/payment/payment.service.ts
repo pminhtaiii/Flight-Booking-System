@@ -916,7 +916,40 @@ export class PaymentService {
         this.logger.error(`Background cancelPaymentIntent failed: ${err.message}`);
       }
 
-      // Transition payment to CANCELLED
+      // 1. Fetch BookingIntent and calculate next status
+      const bookingIntent = await this.prisma.bookingIntent.findUnique({
+        where: { id: payment.bookingIntentId },
+      });
+      const nextBookingStatus = (bookingIntent?.paymentAttemptCount || 0) < 2 ? 'AWAITING_PAYMENT' : 'CANCELLED';
+
+      // 2. Fetch canonical booking
+      const booking = await this.prisma.booking.findFirst({
+        where: { paymentId: payment.id }
+      });
+
+      // 3. Try to extract snapshots if duffelEvent is present
+      let flightSnap: FlightSnapshot | undefined;
+      let passSnap: PassengerSnapshot | undefined;
+      let departAt: Date | undefined;
+      if (booking) {
+        try {
+          if (duffelEvent) {
+            const dOrder = duffelEvent.metadata as any;
+            if (dOrder) {
+              const snaps = this.duffelService.mapDuffelOrderToSnapshots(dOrder);
+              flightSnap = snaps.flightSnapshot;
+              passSnap = snaps.passengerSnapshot;
+              if (flightSnap?.segments?.[0]?.departureAt) {
+                departAt = new Date(flightSnap.segments[0].departureAt);
+              }
+            }
+          }
+        } catch (e: any) {
+          this.logger.warn(`Failed to recover Duffel order snapshots in background handler: ${e.message}`, e.stack);
+        }
+      }
+
+      // 4. Update Payment, BookingIntent, and Booking status atomically inside transaction
       enforceTransition(payment.status, 'CANCELLED');
       await this.prisma.$transaction(async (tx) => {
         await tx.payment.update({
@@ -934,50 +967,21 @@ export class PaymentService {
             createdBy: userId,
           },
         });
-      });
-
-      // Update BookingIntent
-      const bookingIntent = await this.prisma.bookingIntent.findUnique({
-        where: { id: payment.bookingIntentId },
-      });
-      const nextBookingStatus = (bookingIntent?.paymentAttemptCount || 0) < 2 ? 'AWAITING_PAYMENT' : 'CANCELLED';
-      await this.prisma.bookingIntent.update({
-        where: { id: payment.bookingIntentId },
-        data: { status: nextBookingStatus },
-      });
-
-      // Find canonical booking
-      const booking = await this.prisma.booking.findFirst({
-        where: { paymentId: payment.id }
-      });
-      
-      if (booking) {
-        let flightSnap;
-        let passSnap;
-        let departAt;
-        try {
-          if (duffelEvent) {
-            const dOrder = duffelEvent.metadata as any;
-            if (dOrder) {
-              const snaps = this.duffelService.mapDuffelOrderToSnapshots(dOrder);
-              flightSnap = snaps.flightSnapshot;
-              passSnap = snaps.passengerSnapshot;
-              if (flightSnap?.segments?.[0]?.departureAt) {
-                departAt = new Date(flightSnap.segments[0].departureAt);
-              }
-            }
-          }
-        } catch (e: any) {
-          this.logger.warn(`Failed to recover Duffel order snapshots in background handler: ${e.message}`, e.stack);
+        await tx.bookingIntent.update({
+          where: { id: payment.bookingIntentId },
+          data: { status: nextBookingStatus },
+        });
+        if (booking) {
+          await this.bookingService.updateToFailed(
+            booking.id,
+            BookingFailureReason.SYSTEM_ERROR,
+            flightSnap,
+            passSnap,
+            departAt,
+            tx
+          );
         }
-        await this.bookingService.updateToFailed(
-          booking.id,
-          BookingFailureReason.SYSTEM_ERROR,
-          flightSnap,
-          passSnap,
-          departAt
-        );
-      }
+      });
 
       const errObj = error as Error;
       // Complete idempotency key
