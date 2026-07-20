@@ -724,7 +724,8 @@ export class PaymentService {
               duffelOrder.booking_reference as string,
               duffelOrder.id as string,
               flightSnapshot as any,
-              passengerSnapshot as any
+              passengerSnapshot as any,
+              tx
             );
 
             // Create double-entry ledger rows

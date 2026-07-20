@@ -132,11 +132,13 @@ export class BookingService {
     duffelOrderId: string,
     flightSnapshot: FlightSnapshot,
     passengerSnapshot: PassengerSnapshot,
+    tx?: Prisma.TransactionClient,
   ) {
     if (!flightSnapshot?.segments?.length) {
       throw new BadRequestException('Flight snapshot must contain at least one segment');
     }
-    return this.prisma.booking.update({
+    const client = tx || this.prisma;
+    return client.booking.update({
       where: { id: bookingId },
       data: {
         status: BookingStatus.CONFIRMED,
@@ -156,8 +158,10 @@ export class BookingService {
     flightSnapshot?: FlightSnapshot,
     passengerSnapshot?: PassengerSnapshot,
     departureAt?: Date,
+    tx?: Prisma.TransactionClient,
   ) {
-    return this.prisma.booking.update({
+    const client = tx || this.prisma;
+    return client.booking.update({
       where: { id: bookingId },
       data: {
         status: BookingStatus.FAILED,
@@ -217,11 +221,30 @@ export class BookingService {
       
       const order = duffelEvent?.metadata as any;
       if (order && order.id) {
+         const { flightSnapshot, passengerSnapshot } = this.mapDuffelOrderToSnapshots(order);
+         const departureAt = flightSnapshot.segments?.[0]?.departureAt
+           ? new Date(flightSnapshot.segments[0].departureAt)
+           : null;
+
          const res = await this.prisma.booking.updateMany({
            where: { id: booking.id, status: 'PROCESSING' },
-           data: { status: 'CONFIRMED' }
+           data: {
+             status: 'CONFIRMED',
+             pnrReference: order.booking_reference || null,
+             duffelOrderId: order.id,
+             flightSnapshot: flightSnapshot as any,
+             passengerSnapshot: passengerSnapshot as any,
+             departureAt: departureAt,
+           }
          });
-         if (res.count > 0) booking.status = 'CONFIRMED';
+         if (res.count > 0) {
+           booking.status = 'CONFIRMED';
+           booking.pnrReference = order.booking_reference || null;
+           booking.duffelOrderId = order.id;
+           booking.flightSnapshot = flightSnapshot as any;
+           booking.passengerSnapshot = passengerSnapshot as any;
+           booking.departureAt = departureAt;
+         }
       } else {
          try {
            await withTimeout(this.paymentRefundService.triggerAutomatedRefund(booking.payment.id, 'Stale processing booking timeout without duffel order'));
@@ -243,11 +266,17 @@ export class BookingService {
 
   async checkAndCompleteBooking(booking: BookingWithRelations): Promise<BookingWithRelations> {
     if (booking.status === 'CONFIRMED' && booking.departureAt && booking.departureAt < new Date()) {
-      this.prisma.booking.updateMany({
-        where: { id: booking.id, status: 'CONFIRMED' },
-        data: { status: 'COMPLETED' }
-      }).catch(() => {});
-      booking.status = 'COMPLETED';
+      try {
+        const res = await this.prisma.booking.updateMany({
+          where: { id: booking.id, status: 'CONFIRMED' },
+          data: { status: 'COMPLETED' }
+        });
+        if (res.count > 0) {
+          booking.status = 'COMPLETED';
+        }
+      } catch (e: any) {
+        this.logger.error(`Failed to update booking ${booking.id} to COMPLETED: ${e.message}`, e.stack);
+      }
     }
     return booking;
   }
@@ -345,5 +374,76 @@ export class BookingService {
       flightSnapshot: booking.flightSnapshot,
       createdAt: booking.createdAt.toISOString(),
     };
+  }
+
+  private mapDuffelOrderToSnapshots(duffelOrder: any): { flightSnapshot: any; passengerSnapshot: any } {
+    let totalDuration = 'PT0H';
+    let stops = 0;
+    let cabinClass = 'economy';
+    const segments: any[] = [];
+    
+    if (duffelOrder.slices && Array.isArray(duffelOrder.slices)) {
+      totalDuration = duffelOrder.slices[0]?.duration || 'PT0H';
+      for (const slice of duffelOrder.slices) {
+        if (slice.segments && Array.isArray(slice.segments)) {
+          stops += Math.max(0, slice.segments.length - 1);
+          for (const seg of slice.segments) {
+             cabinClass = seg.passengers?.[0]?.cabin_class || cabinClass;
+             segments.push({
+               airline: {
+                 name: seg.operating_carrier?.name || seg.marketing_carrier?.name || 'Unknown',
+                 iataCode: seg.operating_carrier?.iata_code || seg.marketing_carrier?.iata_code || 'XX',
+               },
+               flightNumber: seg.marketing_carrier_flight_number || '0000',
+               departureAirport: {
+                 iataCode: seg.origin?.iata_code || '',
+                 name: seg.origin?.name || '',
+                 city: seg.origin?.city_name || seg.origin?.city?.name || seg.origin?.name || '',
+                 terminal: seg.origin_terminal,
+               },
+               arrivalAirport: {
+                 iataCode: seg.destination?.iata_code || '',
+                 name: seg.destination?.name || '',
+                 city: seg.destination?.city_name || seg.destination?.city?.name || seg.destination?.name || '',
+                 terminal: seg.destination_terminal,
+               },
+               departureAt: seg.departing_at,
+               arrivalAt: seg.arriving_at,
+               duration: seg.duration,
+               aircraftType: seg.aircraft?.name,
+             });
+          }
+        }
+      }
+    }
+
+    const flightSnapshot = {
+      segments,
+      totalDuration,
+      stops,
+      cabinClass,
+    };
+
+    const passengers = [];
+    if (duffelOrder.passengers && Array.isArray(duffelOrder.passengers)) {
+      for (const p of duffelOrder.passengers) {
+        passengers.push({
+          type: p.type === 'infant_without_seat' ? 'infant' : p.type || 'adult',
+          title: p.title,
+          firstName: p.given_name || 'Unknown',
+          lastName: p.family_name || 'Unknown',
+          dateOfBirth: p.born_on,
+        });
+      }
+    }
+    
+    const firstPassenger = duffelOrder.passengers?.[0];
+    const passengerSnapshot = {
+      passengers,
+      contactEmail: firstPassenger?.email || 'unknown@example.com',
+      contactPhone: firstPassenger?.phone_number || '',
+    };
+
+    return { flightSnapshot, passengerSnapshot };
   }
 }
