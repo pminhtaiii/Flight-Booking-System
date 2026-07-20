@@ -7,8 +7,8 @@ Update this file after every completed feature. Any AI agent reading this should
 ### Current Status
 
 **Feature:** Booking Management & Confirmation (Feature 11)
-**Last completed:** Feature 11 Phase 3: Payment Pipeline Integration.
-**Next:** Feature 11 Phase 4: Checkout Loading Escalation (Frontend).
+**Last completed:** Feature 11 Phase 4: Checkout Loading Escalation (Frontend).
+**Next:** Feature 11 Phase 5: Booking Detail Page (Frontend).
 
 ---
 
@@ -19,7 +19,7 @@ Update this file after every completed feature. Any AI agent reading this should
 - [x] Phase 1: Database Schema & Shared Types (Prisma enums/models, database migrations, shared Typescript exports)
 - [x] Phase 2: Booking Service & REST API (NestJS BookingModule, service CRUD, list/detail query, endpoints, validation)
 - [x] Phase 3: Payment Pipeline Integration (Integrated booking creation, UUID validation, concurrency resolution, error mapping, and background/reactive sweeper crons)
-- [ ] Phase 4: Checkout Loading Escalation (Frontend)
+- [x] Phase 4: Checkout Loading Escalation (Frontend) (client UUID v4 confirmation payload, authenticated confirmation request, four-phase loading escalation, safe booking-status escape hatch, and unload protection)
 - [ ] Phase 5: Booking Detail Page (Frontend)
 - [ ] Phase 6: My Bookings List Page (Frontend)
 - [ ] Phase 7: E2E Testing & Verification
