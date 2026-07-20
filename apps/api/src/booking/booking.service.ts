@@ -260,15 +260,6 @@ export class BookingService {
            booking.departureAt = departureAt;
          }
       } else {
-          try {
-            await withTimeout(this.paymentRefundService.triggerAutomatedRefund(booking.payment.id, 'Stale processing booking timeout without duffel order'));
-          } catch (e: any) {
-            this.logger.error(
-              `CRITICAL: Automated refund failed during stale booking reconciliation for payment ${booking.payment.id}: ${e.message}`,
-              e.stack
-            );
-          }
-         
          const res = await this.prisma.booking.updateMany({
            where: { id: booking.id, status: 'PROCESSING' },
            data: { status: 'FAILED', failureReason: 'SYSTEM_ERROR' }
@@ -276,6 +267,15 @@ export class BookingService {
          if (res.count > 0) {
            booking.status = 'FAILED';
            booking.failureReason = 'SYSTEM_ERROR';
+
+           try {
+             await withTimeout(this.paymentRefundService.triggerAutomatedRefund(booking.payment.id, 'Stale processing booking timeout without duffel order'));
+           } catch (e: any) {
+             this.logger.error(
+               `CRITICAL: Automated refund failed during stale booking reconciliation for payment ${booking.payment.id}: ${e.message}`,
+               e.stack
+             );
+           }
          }
       }
 
