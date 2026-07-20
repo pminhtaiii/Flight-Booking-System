@@ -260,7 +260,10 @@ export class BookingService {
          }
       }
 
-    } catch (e) {}
+    } catch (e: any) {
+      this.logger.error(`Error during stale booking reconciliation for ${booking.id}: ${e.message}`, e.stack);
+      throw e;
+    }
     return booking;
   }
 
@@ -304,7 +307,12 @@ export class BookingService {
     
     const reconciledBookings = await Promise.all(
       bookings.map(async (b) => {
-        let updated = await this.reconcileBookingIfStale(b as any);
+        let updated = b;
+        try {
+          updated = await this.reconcileBookingIfStale(b as any);
+        } catch (e: any) {
+          this.logger.error(`Reactive stale booking reconciliation failed for ${b.id}: ${e.message}`, e.stack);
+        }
         updated = await this.checkAndCompleteBooking(updated);
         return updated;
       })
@@ -329,7 +337,12 @@ export class BookingService {
       throw new ForbiddenException('You do not have access to this booking');
     }
     
-    let booking = await this.reconcileBookingIfStale(initialBooking as any) as any;
+    let booking = initialBooking;
+    try {
+      booking = await this.reconcileBookingIfStale(initialBooking as any) as any;
+    } catch (e: any) {
+      this.logger.error(`Reactive stale booking reconciliation failed for ${initialBooking.id}: ${e.message}`, e.stack);
+    }
     booking = await this.checkAndCompleteBooking(booking as any) as any;
 
     return {
