@@ -18,6 +18,16 @@ export default defineConfig({
   ],
   webServer: [
     {
+      command: 'pnpm --filter @api/backend start:prod',
+      url: 'http://localhost:3001/health',
+      reuseExistingServer: !process.env.CI,
+      env: {
+        NODE_ENV: 'test',
+        DATABASE_URL: 'postgresql://postgres:postgres@127.0.0.1:5432/test_db',
+        REDIS_URL: 'redis://127.0.0.1:6379/1',
+      },
+    },
+    {
       command: 'pnpm --filter @web/frontend dev',
       url: 'http://localhost:3000',
       reuseExistingServer: !process.env.CI,
