@@ -246,9 +246,14 @@ export class BookingService {
            booking.departureAt = departureAt;
          }
       } else {
-         try {
-           await withTimeout(this.paymentRefundService.triggerAutomatedRefund(booking.payment.id, 'Stale processing booking timeout without duffel order'));
-         } catch(e) {}
+          try {
+            await withTimeout(this.paymentRefundService.triggerAutomatedRefund(booking.payment.id, 'Stale processing booking timeout without duffel order'));
+          } catch (e: any) {
+            this.logger.error(
+              `CRITICAL: Automated refund failed during stale booking reconciliation for payment ${booking.payment.id}: ${e.message}`,
+              e.stack
+            );
+          }
          
          const res = await this.prisma.booking.updateMany({
            where: { id: booking.id, status: 'PROCESSING' },
