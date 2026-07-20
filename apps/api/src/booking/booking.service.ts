@@ -203,6 +203,20 @@ export class BookingService {
 
       const intent = await withTimeout(this.stripeService.retrievePaymentIntent(booking.payment.stripePaymentIntentId));
       if (intent.status !== 'succeeded') {
+        try {
+          const duffelEvent = await this.prisma.paymentEvent.findFirst({
+            where: { paymentId: booking.payment.id, eventType: 'duffel_order_created' },
+            orderBy: { createdAt: 'desc' }
+          });
+          const duffelOrder = duffelEvent?.metadata as any;
+          if (duffelOrder && duffelOrder.id) {
+            await this.duffelService.cancelOrder(duffelOrder.id);
+            this.logger.log(`Successfully cancelled orphaned Duffel order ${duffelOrder.id} during stale booking sweep.`);
+          }
+        } catch (cancelError: any) {
+          this.logger.error(`Duffel order cancellation failed during stale booking sweep: ${cancelError.message}`, cancelError.stack);
+        }
+
         const res = await this.prisma.booking.updateMany({
           where: { id: booking.id, status: 'PROCESSING' },
           data: { status: 'FAILED', failureReason: 'CAPTURE_FAILED' }
