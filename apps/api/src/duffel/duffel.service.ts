@@ -3,6 +3,7 @@ import { CacheService } from '@/cache/cache.service';
 import { Duffel } from '@duffel/api';
 import { DuffelOfferRequest } from './duffel.types';
 import * as crypto from 'crypto';
+import { FlightSnapshot, PassengerSnapshot } from '@shared/booking-types';
 
 export class DuffelTimeoutError extends Error {
   readonly code = 'DUFFEL_TIMEOUT';
@@ -583,5 +584,76 @@ export class DuffelService {
         HttpStatus.BAD_GATEWAY,
       );
     }
+  }
+
+  mapDuffelOrderToSnapshots(duffelOrder: any): { flightSnapshot: FlightSnapshot; passengerSnapshot: PassengerSnapshot } {
+    let totalDuration = 'PT0H';
+    let stops = 0;
+    let cabinClass = 'economy';
+    const segments: any[] = [];
+    
+    if (duffelOrder.slices && Array.isArray(duffelOrder.slices)) {
+      totalDuration = duffelOrder.slices[0]?.duration || 'PT0H';
+      for (const slice of duffelOrder.slices) {
+        if (slice.segments && Array.isArray(slice.segments)) {
+          stops += Math.max(0, slice.segments.length - 1);
+          for (const seg of slice.segments) {
+             cabinClass = seg.passengers?.[0]?.cabin_class || cabinClass;
+             segments.push({
+               airline: {
+                 name: seg.operating_carrier?.name || seg.marketing_carrier?.name || 'Unknown',
+                 iataCode: seg.operating_carrier?.iata_code || seg.marketing_carrier?.iata_code || 'XX',
+               },
+               flightNumber: seg.marketing_carrier_flight_number || '0000',
+               departureAirport: {
+                 iataCode: seg.origin?.iata_code || '',
+                 name: seg.origin?.name || '',
+                 city: seg.origin?.city_name || seg.origin?.city?.name || seg.origin?.name || '',
+                 terminal: seg.origin_terminal,
+               },
+               arrivalAirport: {
+                 iataCode: seg.destination?.iata_code || '',
+                 name: seg.destination?.name || '',
+                 city: seg.destination?.city_name || seg.destination?.city?.name || seg.destination?.name || '',
+                 terminal: seg.destination_terminal,
+               },
+               departureAt: seg.departing_at,
+               arrivalAt: seg.arriving_at,
+               duration: seg.duration,
+               aircraftType: seg.aircraft?.name,
+             });
+          }
+        }
+      }
+    }
+
+    const flightSnapshot: FlightSnapshot = {
+      segments,
+      totalDuration,
+      stops,
+      cabinClass,
+    };
+
+    const passengers = [];
+    if (duffelOrder.passengers && Array.isArray(duffelOrder.passengers)) {
+      for (const p of duffelOrder.passengers) {
+        passengers.push({
+          type: (p.type === 'infant_without_seat' ? 'infant' : p.type || 'adult') as any,
+          title: p.title,
+          firstName: p.given_name || 'Unknown',
+          lastName: p.family_name || 'Unknown',
+          dateOfBirth: p.born_on,
+        });
+      }
+    }
+    
+    const firstPassenger = duffelOrder.passengers?.[0];
+    const passengerSnapshot: PassengerSnapshot = {
+      passengers,
+      contactEmail: firstPassenger?.email || 'unknown@example.com',
+      contactPhone: firstPassenger?.phone_number || '',
+    };
+
+    return { flightSnapshot, passengerSnapshot };
   }
 }

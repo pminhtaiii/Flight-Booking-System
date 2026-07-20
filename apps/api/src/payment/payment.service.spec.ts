@@ -50,7 +50,12 @@ describe('PaymentService - recoveryPoint === completed', () => {
       completeKey: jest.fn(),
     };
 
-    mockDuffel = {};
+    mockDuffel = {
+      mapDuffelOrderToSnapshots: jest.fn().mockReturnValue({
+        flightSnapshot: { segments: [{ departureAt: '2026-07-20T10:00:00Z' }] },
+        passengerSnapshot: { passengers: [] }
+      })
+    };
     mockAudit = {};
     mockPaymentMethod = { saveMethod: jest.fn() };
     const mockBookingService = { createBooking: jest.fn().mockResolvedValue({ id: '123e4567-e89b-42d3-a456-426614174000', userId: 'user-123' }), updateToConfirmed: jest.fn(), updateToFailed: jest.fn() };

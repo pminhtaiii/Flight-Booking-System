@@ -312,12 +312,6 @@ export class PaymentService {
     userId: string,
   ): Promise<unknown> {
     try {
-      // Validate bookingId as UUID v4
-      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-      if (!uuidRegex.test(dto.bookingId)) {
-        throw new BadRequestException('Invalid booking ID format');
-      }
-
       // 1. Check/acquire the request idempotency key
       const requestHash = this.idempotencyService.computeHash(dto);
       const idempotency = await this.idempotencyService.acquireOrReplay(
@@ -640,14 +634,16 @@ export class PaymentService {
             });
             const dOrder = duffelEvent?.metadata as any;
             if (dOrder) {
-              const snaps = this.mapDuffelOrderToSnapshots(dOrder);
+              const snaps = this.duffelService.mapDuffelOrderToSnapshots(dOrder);
               flightSnap = snaps.flightSnapshot;
               passSnap = snaps.passengerSnapshot;
               if (flightSnap?.segments?.[0]?.departureAt) {
                 departAt = new Date(flightSnap.segments[0].departureAt);
               }
             }
-          } catch (e) { }
+          } catch (e: any) {
+            this.logger.warn(`Failed to recover Duffel order snapshots for booking ${canonicalBooking.id}: ${e.message}`, e.stack);
+          }
 
           await this.bookingService.updateToFailed(
             canonicalBooking.id,
@@ -718,7 +714,7 @@ export class PaymentService {
               data: { status: 'CONFIRMED' },
             });
 
-            const { flightSnapshot, passengerSnapshot } = this.mapDuffelOrderToSnapshots(duffelOrder);
+            const { flightSnapshot, passengerSnapshot } = this.duffelService.mapDuffelOrderToSnapshots(duffelOrder);
             await this.bookingService.updateToConfirmed(
               canonicalBooking.id,
               duffelOrder.booking_reference as string,
@@ -837,79 +833,7 @@ export class PaymentService {
     };
   }
 
-  /**
-   * Helper to map Duffel order to domain snapshots
-   */
-  private mapDuffelOrderToSnapshots(duffelOrder: any): { flightSnapshot: any; passengerSnapshot: any } {
-    let totalDuration = 'PT0H';
-    let stops = 0;
-    let cabinClass = 'economy';
-    const segments: any[] = [];
-    
-    if (duffelOrder.slices && Array.isArray(duffelOrder.slices)) {
-      totalDuration = duffelOrder.slices[0]?.duration || 'PT0H';
-      for (const slice of duffelOrder.slices) {
-        if (slice.segments && Array.isArray(slice.segments)) {
-          stops += Math.max(0, slice.segments.length - 1);
-          for (const seg of slice.segments) {
-             cabinClass = seg.passengers?.[0]?.cabin_class || cabinClass;
-             segments.push({
-               airline: {
-                 name: seg.operating_carrier?.name || seg.marketing_carrier?.name || 'Unknown',
-                 iataCode: seg.operating_carrier?.iata_code || seg.marketing_carrier?.iata_code || 'XX',
-               },
-               flightNumber: seg.marketing_carrier_flight_number || '0000',
-               departureAirport: {
-                 iataCode: seg.origin?.iata_code || '',
-                 name: seg.origin?.name || '',
-                 city: seg.origin?.city_name || seg.origin?.city?.name || seg.origin?.name || '',
-                 terminal: seg.origin_terminal,
-               },
-               arrivalAirport: {
-                 iataCode: seg.destination?.iata_code || '',
-                 name: seg.destination?.name || '',
-                 city: seg.destination?.city_name || seg.destination?.city?.name || seg.destination?.name || '',
-                 terminal: seg.destination_terminal,
-               },
-               departureAt: seg.departing_at,
-               arrivalAt: seg.arriving_at,
-               duration: seg.duration,
-               aircraftType: seg.aircraft?.name,
-             });
-          }
-        }
-      }
-    }
 
-    const flightSnapshot = {
-      segments,
-      totalDuration,
-      stops,
-      cabinClass,
-    };
-
-    const passengers = [];
-    if (duffelOrder.passengers && Array.isArray(duffelOrder.passengers)) {
-      for (const p of duffelOrder.passengers) {
-        passengers.push({
-          type: p.type === 'infant_without_seat' ? 'infant' : p.type || 'adult',
-          title: p.title,
-          firstName: p.given_name || 'Unknown',
-          lastName: p.family_name || 'Unknown',
-          dateOfBirth: p.born_on,
-        });
-      }
-    }
-    
-    const firstPassenger = duffelOrder.passengers?.[0];
-    const passengerSnapshot = {
-      passengers,
-      contactEmail: firstPassenger?.email || 'unknown@example.com',
-      contactPhone: firstPassenger?.phone_number || '',
-    };
-
-    return { flightSnapshot, passengerSnapshot };
-  }
 
   /**
    * Cleans up state and resolves background errors to prevent unhandled rejections
@@ -1029,16 +953,20 @@ export class PaymentService {
         let flightSnap;
         let passSnap;
         let departAt;
-        if (duffelEvent) {
-          const dOrder = duffelEvent.metadata as any;
-          if (dOrder) {
-            const snaps = this.mapDuffelOrderToSnapshots(dOrder);
-            flightSnap = snaps.flightSnapshot;
-            passSnap = snaps.passengerSnapshot;
-            if (flightSnap?.segments?.[0]?.departureAt) {
-              departAt = new Date(flightSnap.segments[0].departureAt);
+        try {
+          if (duffelEvent) {
+            const dOrder = duffelEvent.metadata as any;
+            if (dOrder) {
+              const snaps = this.duffelService.mapDuffelOrderToSnapshots(dOrder);
+              flightSnap = snaps.flightSnapshot;
+              passSnap = snaps.passengerSnapshot;
+              if (flightSnap?.segments?.[0]?.departureAt) {
+                departAt = new Date(flightSnap.segments[0].departureAt);
+              }
             }
           }
+        } catch (e: any) {
+          this.logger.warn(`Failed to recover Duffel order snapshots in background handler: ${e.message}`, e.stack);
         }
         await this.bookingService.updateToFailed(
           booking.id,
