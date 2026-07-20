@@ -33,13 +33,13 @@ test.describe('My Bookings list', () => {
 
     await expect(page.getByRole('heading', { name: 'My Bookings' })).toBeVisible();
     await expect(page.getByRole('tab', { name: 'Upcoming' })).toHaveAttribute('aria-selected', 'true');
-    await expect(page.getByText('No bookings yet â€” start planning your next trip.')).toBeVisible();
+    await expect(page.getByText('No bookings yet — start planning your next trip.')).toBeVisible();
     await expect(page.getByRole('link', { name: 'Search Flights' })).toHaveAttribute('href', '/search');
 
     await page.getByRole('tab', { name: 'Past' }).click();
     await expect(page).toHaveURL(/\/bookings\?tab=past&page=1$/);
     await expect(page.getByRole('tab', { name: 'Past' })).toHaveAttribute('aria-selected', 'true');
-    await expect(page.getByText('No bookings yet â€” start planning your next trip.')).toBeVisible();
+    await expect(page.getByText('No bookings yet — start planning your next trip.')).toBeVisible();
   });
 });
 
@@ -195,7 +195,7 @@ test('routes price changes back to the original flight detail', async ({ page })
 
   await page.goto(`/bookings/${bookingId}`);
 
-  await expect(page.getByText("A hold was placed on your card — we're working to release it.")).toBeVisible();
+  await expect(page.getByText("A hold was placed on your card â€” we're working to release it.")).toBeVisible();
   await expect(page.getByRole('link', { name: 'Review this flight' })).toHaveAttribute('href', '/search/offer-123');
 });
 
