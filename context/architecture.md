@@ -160,6 +160,8 @@ Prisma transitions it to CONFIRMED (snapshot + PNR) or FAILED (reason + availabl
 /bookings server-renders GET /api/bookings for the authenticated user.
         ↓
 The client list component changes Upcoming/Past tabs and pagination through URL query parameters.
+        â†“
+Unique bookingIntentId and status-conditional writes make duplicate submit and stale recovery operations converge on one canonical booking. A captured Stripe payment paired with a Duffel order is authoritative and recovers a stale failed booking to CONFIRMED; completed records remain immutable.
 ```
 
 ### Payment Flow (Deterministic Path — No AI)

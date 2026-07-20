@@ -138,8 +138,10 @@ export class BookingService {
       throw new BadRequestException('Flight snapshot must contain at least one segment');
     }
     const client = tx || this.prisma;
-    return client.booking.update({
-      where: { id: bookingId },
+    await client.booking.updateMany({
+      // A captured Stripe intent plus a Duffel order is authoritative. A concurrent
+      // stale-worker failure is therefore recoverable, but completed records remain immutable.
+      where: { id: bookingId, status: { in: [BookingStatus.PROCESSING, BookingStatus.FAILED] } },
       data: {
         status: BookingStatus.CONFIRMED,
         failureReason: null,
@@ -150,6 +152,7 @@ export class BookingService {
         departureAt: new Date(flightSnapshot.segments[0].departureAt),
       },
     });
+    return client.booking.findUnique({ where: { id: bookingId } });
   }
 
   async updateToFailed(
@@ -161,8 +164,8 @@ export class BookingService {
     tx?: Prisma.TransactionClient,
   ) {
     const client = tx || this.prisma;
-    return client.booking.update({
-      where: { id: bookingId },
+    await client.booking.updateMany({
+      where: { id: bookingId, status: BookingStatus.PROCESSING },
       data: {
         status: BookingStatus.FAILED,
         failureReason,
@@ -171,6 +174,7 @@ export class BookingService {
         ...(departureAt ? { departureAt } : {}),
       },
     });
+    return client.booking.findUnique({ where: { id: bookingId } });
   }
 
   async reconcileBookingIfStale(booking: BookingWithRelations): Promise<BookingWithRelations> {

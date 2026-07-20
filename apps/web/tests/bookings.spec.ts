@@ -2,6 +2,47 @@ import { expect, test } from '@playwright/test';
 
 const bookingId = '8a7466ab-78bd-4a45-8e9e-9b3c62269a9a';
 
+async function authenticateBookingDetail(page: import('@playwright/test').Page) {
+  await page.route('**/api/auth/session', async (route) => {
+    await route.fulfill({
+      contentType: 'application/json',
+      body: JSON.stringify({
+        user: { id: 'user-123', email: 'traveler@example.com' },
+        accessToken: 'test-access-token',
+        expires: '2099-01-01T00:00:00.000Z',
+      }),
+    });
+  });
+}
+
+test.describe('My Bookings list', () => {
+  test('lets a newly registered traveler switch tabs and shows the empty-state search action', async ({ page, request, context }) => {
+    await request.post('http://localhost:3001/api/auth/test/reset-lockout', {
+      data: { clearAll: true },
+    });
+    await context.clearCookies();
+
+    const email = `bookings-${Date.now()}-${Math.random().toString(36).slice(2)}@example.com`;
+    await page.goto('/register');
+    await page.getByRole('textbox', { name: 'Email' }).fill(email);
+    await page.getByRole('textbox', { name: 'Password' }).fill('Password123!');
+    await page.getByRole('button', { name: 'Register' }).click();
+    await expect(page).toHaveURL(/\/dashboard$/);
+
+    await page.goto('/bookings');
+
+    await expect(page.getByRole('heading', { name: 'My Bookings' })).toBeVisible();
+    await expect(page.getByRole('tab', { name: 'Upcoming' })).toHaveAttribute('aria-selected', 'true');
+    await expect(page.getByText('No bookings yet â€” start planning your next trip.')).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Search Flights' })).toHaveAttribute('href', '/search');
+
+    await page.getByRole('tab', { name: 'Past' }).click();
+    await expect(page).toHaveURL(/\/bookings\?tab=past&page=1$/);
+    await expect(page.getByRole('tab', { name: 'Past' })).toHaveAttribute('aria-selected', 'true');
+    await expect(page.getByText('No bookings yet â€” start planning your next trip.')).toBeVisible();
+  });
+});
+
 test('renders a confirmed booking snapshot and confirmation banner', async ({ page }) => {
   await page.route('**/api/auth/session', async (route) => {
     await route.fulfill({
@@ -52,6 +93,39 @@ test('renders a confirmed booking snapshot and confirmation banner', async ({ pa
   await expect(page.getByText('PNR123')).toBeVisible();
   await expect(page.getByText('Example Air EA101')).toBeVisible();
   await expect(page.getByText('Ada Lovelace')).toBeVisible();
+});
+
+test('does not show the confirmation banner after the confirmation query is absent', async ({ page }) => {
+  await authenticateBookingDetail(page);
+  await page.route(`**/api/bookings/${bookingId}`, async (route) => {
+    await route.fulfill({
+      contentType: 'application/json',
+      body: JSON.stringify({
+        id: bookingId,
+        status: 'CONFIRMED',
+        pnrReference: 'PNR123',
+        totalAmount: '49900',
+        currency: 'GBP',
+        flightSnapshot: {
+          segments: [{
+            airline: { name: 'Example Air', iataCode: 'EA' },
+            flightNumber: 'EA101',
+            departureAirport: { iataCode: 'LHR', name: 'Heathrow', city: 'London' },
+            arrivalAirport: { iataCode: 'JFK', name: 'John F. Kennedy', city: 'New York' },
+            departureAt: '2026-08-01T09:00:00.000Z',
+            arrivalAt: '2026-08-01T17:00:00.000Z',
+            duration: 'PT8H',
+          }],
+          totalDuration: 'PT8H', stops: 0, cabinClass: 'ECONOMY',
+        },
+      }),
+    });
+  });
+
+  await page.goto(`/bookings/${bookingId}`);
+
+  await expect(page.getByRole('heading', { name: 'Booking confirmed' })).toHaveCount(0);
+  await expect(page.getByText('PNR123')).toBeVisible();
 });
 
 test('renders a processing booking state while the reservation is pending', async ({ page }) => {

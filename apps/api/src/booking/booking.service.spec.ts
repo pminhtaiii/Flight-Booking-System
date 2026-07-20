@@ -47,6 +47,7 @@ describe('BookingService', () => {
             id: 'processing', status: 'PROCESSING', failureReason: null, pnrReference: null, totalAmount: { toString: () => '250.00' }, currency: 'GBP', departureAt: null, flightSnapshot: null, createdAt: new Date('2026-07-20T11:00:00Z'), payment: null, bookingIntent: { id: 'intent-2', duffelOfferId: 'offer-2' },
           },
         ]),
+        updateMany: jest.fn().mockResolvedValue({ count: 0 }),
       },
     };
     const service = new BookingService(prisma as never, {} as never, {} as never, {} as never);
@@ -79,6 +80,48 @@ describe('BookingService', () => {
   });
 
   describe('concurrency and validation', () => {
+    it('recovers a failed booking when the capture path has authoritative order data', async () => {
+      const prisma = {
+        booking: {
+          updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+          findUnique: jest.fn().mockResolvedValue({ id: 'booking-1', status: 'CONFIRMED' }),
+        },
+      };
+      const service = new BookingService(prisma as never, {} as never, {} as never, {} as never);
+      const flightSnapshot = {
+        segments: [{ departureAt: '2026-09-01T10:00:00.000Z' }],
+        totalDuration: 'PT2H',
+        stops: 0,
+        cabinClass: 'economy',
+      };
+
+      await expect(service.updateToConfirmed('booking-1', 'PNR1', 'order-1', flightSnapshot as any, {} as any)).resolves.toEqual({
+        id: 'booking-1',
+        status: 'CONFIRMED',
+      });
+      expect(prisma.booking.updateMany).toHaveBeenCalledWith(expect.objectContaining({
+        where: { id: 'booking-1', status: { in: ['PROCESSING', 'FAILED'] } },
+      }));
+    });
+
+    it('does not overwrite a terminal booking while recording a failure', async () => {
+      const prisma = {
+        booking: {
+          updateMany: jest.fn().mockResolvedValue({ count: 0 }),
+          findUnique: jest.fn().mockResolvedValue({ id: 'booking-1', status: 'CONFIRMED' }),
+        },
+      };
+      const service = new BookingService(prisma as never, {} as never, {} as never, {} as never);
+
+      await expect(service.updateToFailed('booking-1', 'BOOKING_TIMEOUT')).resolves.toEqual({
+        id: 'booking-1',
+        status: 'CONFIRMED',
+      });
+      expect(prisma.booking.updateMany).toHaveBeenCalledWith(expect.objectContaining({
+        where: { id: 'booking-1', status: 'PROCESSING' },
+      }));
+    });
+
     it('handles unique-constraint violation and returns existing booking if owned by caller', async () => {
       const error = new Prisma.PrismaClientKnownRequestError('Unique constraint failed', {
         code: 'P2002',

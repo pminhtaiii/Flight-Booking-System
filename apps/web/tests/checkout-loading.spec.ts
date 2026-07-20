@@ -173,4 +173,20 @@ test.describe('Checkout loading escalation', () => {
 
     await expect(page).toHaveURL(new RegExp(`/bookings/${canonicalBookingId}$`));
   });
+
+  test('redirects failed confirmations with the canonical booking id and no confirmation query', async ({ page }) => {
+    const canonicalBookingId = 'a4b02d35-4b11-44eb-81bf-29bf5739e91c';
+    await authenticateCheckout(page);
+    await page.route('**/api/bookings/payment/confirm', async (route) => {
+      await route.fulfill({
+        contentType: 'application/json',
+        body: JSON.stringify({ success: false, bookingId: canonicalBookingId, status: 'FAILED' }),
+      });
+    });
+
+    await openAuthenticatedCheckout(page);
+    await page.getByRole('button', { name: 'Confirm payment' }).click();
+
+    await expect(page).toHaveURL(new RegExp(`/bookings/${canonicalBookingId}$`));
+  });
 });
