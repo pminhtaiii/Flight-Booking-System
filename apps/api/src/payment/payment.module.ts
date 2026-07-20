@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { StripeService } from '../common/stripe.service';
 import { PaymentIdempotencyService } from './payment-idempotency.service';
 import { PrismaModule } from '../prisma/prisma.module';
@@ -11,9 +11,10 @@ import { PaymentWebhookService } from './payment-webhook.service';
 import { DuffelModule } from '../duffel/duffel.module';
 import { AuditModule } from '../audit/audit.module';
 import { PaymentCronService } from './payment-cron.service';
+import { BookingModule } from '../booking/booking.module';
 
 @Module({
-  imports: [PrismaModule, DuffelModule, AuditModule],
+  imports: [PrismaModule, DuffelModule, AuditModule, forwardRef(() => BookingModule)],
   controllers: [PaymentController, PaymentWebhookController],
   providers: [StripeService, PaymentIdempotencyService, PaymentService, PaymentRefundService, PaymentMethodService, PaymentWebhookService, PaymentCronService],
   exports: [StripeService, PaymentIdempotencyService, PaymentService, PaymentRefundService, PaymentMethodService, PaymentWebhookService],

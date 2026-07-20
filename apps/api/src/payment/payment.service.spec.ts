@@ -19,14 +19,25 @@ describe('PaymentService - recoveryPoint === completed', () => {
 
   beforeEach(() => {
     mockPrisma = {
+      $transaction: jest.fn((cb) => cb(mockPrisma)),
+      bookingIntent: {
+        findUnique: jest.fn(),
+        update: jest.fn(),
+      },
       payment: {
         findUnique: jest.fn(),
+        findFirst: jest.fn(),
+        update: jest.fn(),
+      },
+      booking: {
+        findFirst: jest.fn().mockResolvedValue(null),
       },
       paymentEvent: {
         findFirst: jest.fn(),
+        create: jest.fn(),
       },
-      bookingIntent: {
-        findUnique: jest.fn(),
+      ledgerEntry: {
+        createMany: jest.fn(),
       },
     };
 
@@ -42,6 +53,7 @@ describe('PaymentService - recoveryPoint === completed', () => {
     mockDuffel = {};
     mockAudit = {};
     mockPaymentMethod = { saveMethod: jest.fn() };
+    const mockBookingService = { createBooking: jest.fn().mockResolvedValue({ id: '123e4567-e89b-42d3-a456-426614174000', userId: 'user-123' }), updateToConfirmed: jest.fn(), updateToFailed: jest.fn() };
 
     service = new PaymentService(
       mockPrisma as unknown as PrismaService,
@@ -50,11 +62,12 @@ describe('PaymentService - recoveryPoint === completed', () => {
       mockDuffel as unknown as DuffelService,
       mockAudit as unknown as AuditService,
       mockPaymentMethod as unknown as PaymentMethodService,
+      mockBookingService as any
     );
   });
 
   describe('confirmPayment recoveryPoint === completed', () => {
-    const dto = { paymentId: 'payment-123' };
+    const dto = { paymentId: 'payment-123', bookingId: '123e4567-e89b-42d3-a456-426614174000' };
     const idempotencyKey = 'key-123';
     const userId = 'user-123';
 
@@ -223,7 +236,7 @@ describe('PaymentService - recoveryPoint === completed', () => {
       mockAudit.createLog = jest.fn();
 
       await service.executeConfirmPayment(
-        { paymentId: 'payment-123' },
+        { paymentId: 'payment-123', bookingId: '123e4567-e89b-42d3-a456-426614174000' },
         'confirm-key-123',
         'user-123',
       );

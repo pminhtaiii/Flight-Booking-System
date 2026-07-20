@@ -17,7 +17,7 @@ describe('BookingService', () => {
         create: jest.fn().mockResolvedValue({ id: 'booking-1', status: 'PROCESSING' }),
       },
     };
-    const service = new BookingService(prisma as never);
+    const service = new BookingService(prisma as never, {} as never, {} as never, {} as never);
 
     await expect(service.createBooking('user-1', 'booking-1', 'intent-1')).resolves.toEqual({
       id: 'booking-1',
@@ -31,6 +31,7 @@ describe('BookingService', () => {
         totalAmount: '450.00',
         currency: 'GBP',
         status: 'PROCESSING',
+        paymentId: null,
       },
     });
   });
@@ -48,7 +49,7 @@ describe('BookingService', () => {
         ]),
       },
     };
-    const service = new BookingService(prisma as never);
+    const service = new BookingService(prisma as never, {} as never, {} as never, {} as never);
 
     await expect(service.listBookings('user-1', 'upcoming', 1, 20)).resolves.toEqual({
       bookings: [
@@ -65,14 +66,14 @@ describe('BookingService', () => {
         findUnique: jest.fn().mockResolvedValue({ id: 'booking-1', userId: 'other-user' }),
       },
     };
-    const service = new BookingService(prisma as never);
+    const service = new BookingService(prisma as never, {} as never, {} as never, {} as never);
 
     await expect(service.getBookingDetail('booking-1', 'user-1')).rejects.toBeInstanceOf(ForbiddenException);
   });
 
   it('reports a missing booking detail as not found', async () => {
     const prisma = { booking: { findUnique: jest.fn().mockResolvedValue(null) } };
-    const service = new BookingService(prisma as never);
+    const service = new BookingService(prisma as never, {} as never, {} as never, {} as never);
 
     await expect(service.getBookingDetail('missing', 'user-1')).rejects.toBeInstanceOf(NotFoundException);
   });
@@ -101,7 +102,7 @@ describe('BookingService', () => {
           }),
         },
       };
-      const service = new BookingService(prisma as never);
+      const service = new BookingService(prisma as never, {} as never, {} as never, {} as never);
 
       await expect(service.createBooking('user-1', 'booking-1', 'intent-1')).resolves.toEqual({
         id: 'booking-1',
@@ -133,14 +134,14 @@ describe('BookingService', () => {
           }),
         },
       };
-      const service = new BookingService(prisma as never);
+      const service = new BookingService(prisma as never, {} as never, {} as never, {} as never);
 
       await expect(service.createBooking('user-1', 'booking-1', 'intent-1')).rejects.toBeInstanceOf(ForbiddenException);
     });
 
     it('throws BadRequestException in updateToConfirmed if flightSnapshot has no segments', async () => {
       const prisma = {};
-      const service = new BookingService(prisma as never);
+      const service = new BookingService(prisma as never, {} as never, {} as never, {} as never);
 
       const flightSnapshot = {
         segments: [],

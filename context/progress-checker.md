@@ -6,15 +6,25 @@ Update this file after every completed feature. Any AI agent reading this should
 
 ### Current Status
 
-**Feature:** Stripe Payment System (Feature 10)
-**Last completed:** Feature 10: Stripe Payment System - Refund System (Phase 8).
-**Next:** Stripe Payment System (Feature 10) - Phase 9: Dispute Handling.
+**Feature:** Booking Management & Confirmation (Feature 11)
+**Last completed:** Feature 11 Phase 3: Payment Pipeline Integration.
+**Next:** Feature 11 Phase 4: Checkout Loading Escalation (Frontend).
 
 ---
 
 ## Progress by Feature
 
-### [ ] Feature: Stripe Payment System (Feature 10)
+### [ ] Feature: Booking Management & Confirmation (Feature 11)
+
+- [x] Phase 1: Database Schema & Shared Types (Prisma enums/models, database migrations, shared Typescript exports)
+- [x] Phase 2: Booking Service & REST API (NestJS BookingModule, service CRUD, list/detail query, endpoints, validation)
+- [x] Phase 3: Payment Pipeline Integration (Integrated booking creation, UUID validation, concurrency resolution, error mapping, and background/reactive sweeper crons)
+- [ ] Phase 4: Checkout Loading Escalation (Frontend)
+- [ ] Phase 5: Booking Detail Page (Frontend)
+- [ ] Phase 6: My Bookings List Page (Frontend)
+- [ ] Phase 7: E2E Testing & Verification
+
+### [x] Feature: Stripe Payment System (Feature 10)
 
 - [x] Phase 1: Database Schema & Enums (Setup environment variables, Zod validation, schema modifications, database migrations, shared types)
 - [x] Phase 2: Stripe SDK Wrapper & Shared Infrastructure (Injectable StripeService with create/capture/cancel PaymentIntent, Customer and Refund operations, and signature verification)
