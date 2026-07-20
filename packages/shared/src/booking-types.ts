@@ -72,8 +72,8 @@ export interface PassengerDetail {
  */
 export interface PassengerSnapshot {
   passengers: PassengerDetail[];
-  contactEmail: string;
-  contactPhone?: string;
+  contactEmail: string | null;
+  contactPhone?: string | null;
 }
 
 /**

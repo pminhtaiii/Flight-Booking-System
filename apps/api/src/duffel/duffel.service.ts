@@ -586,6 +586,26 @@ export class DuffelService {
     }
   }
 
+  private parseIsoDurationToMinutes(durationStr: string): number {
+    if (!durationStr || typeof durationStr !== 'string') return 0;
+    const matches = durationStr.match(/P(?:(\d+)D)?T(?:(\d+)H)?(?:(\d+)M)?/);
+    if (!matches) return 0;
+    const days = parseInt(matches[1] || '0', 10);
+    const hours = parseInt(matches[2] || '0', 10);
+    const minutes = parseInt(matches[3] || '0', 10);
+    return days * 24 * 60 + hours * 60 + minutes;
+  }
+
+  private formatMinutesToIsoDuration(totalMinutes: number): string {
+    if (totalMinutes <= 0) return 'PT0H';
+    const hours = Math.floor(totalMinutes / 60);
+    const minutes = totalMinutes % 60;
+    let result = 'PT';
+    if (hours > 0) result += `${hours}H`;
+    if (minutes > 0) result += `${minutes}M`;
+    return result;
+  }
+
   mapDuffelOrderToSnapshots(duffelOrder: any): { flightSnapshot: FlightSnapshot; passengerSnapshot: PassengerSnapshot } {
     let totalDuration = 'PT0H';
     let stops = 0;
@@ -593,8 +613,11 @@ export class DuffelService {
     const segments: any[] = [];
     
     if (duffelOrder.slices && Array.isArray(duffelOrder.slices)) {
-      totalDuration = duffelOrder.slices[0]?.duration || 'PT0H';
+      let totalMinutes = 0;
       for (const slice of duffelOrder.slices) {
+        if (slice?.duration) {
+          totalMinutes += this.parseIsoDurationToMinutes(slice.duration);
+        }
         if (slice.segments && Array.isArray(slice.segments)) {
           stops += Math.max(0, slice.segments.length - 1);
           for (const seg of slice.segments) {
@@ -625,6 +648,7 @@ export class DuffelService {
           }
         }
       }
+      totalDuration = this.formatMinutesToIsoDuration(totalMinutes);
     }
 
     const flightSnapshot: FlightSnapshot = {
@@ -650,8 +674,8 @@ export class DuffelService {
     const firstPassenger = duffelOrder.passengers?.[0];
     const passengerSnapshot: PassengerSnapshot = {
       passengers,
-      contactEmail: firstPassenger?.email || 'unknown@example.com',
-      contactPhone: firstPassenger?.phone_number || '',
+      contactEmail: firstPassenger?.email || null,
+      contactPhone: firstPassenger?.phone_number || null,
     };
 
     return { flightSnapshot, passengerSnapshot };
