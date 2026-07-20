@@ -28,10 +28,11 @@ export default defineConfig({
       },
     },
     {
-      command: 'pnpm --filter @web/frontend start',
+      command: 'pnpm --filter @web/frontend dev',
       url: 'http://localhost:3000',
       reuseExistingServer: !process.env.CI,
       env: {
+        CI: 'true',
         NEXT_PUBLIC_API_URL: 'http://127.0.0.1:3001',
         NEXTAUTH_SECRET: 'test_secret',
       },
