@@ -11,6 +11,7 @@ import { AgentGatewayModule } from './agent-gateway/agent-gateway.module';
 import { AirportsModule } from './airports/airports.module';
 import { DuffelModule } from './duffel/duffel.module';
 import { FlightsModule } from './flights/flights.module';
+import { BookingIntentModule } from './booking-intent/booking-intent.module';
 
 @Module({
   imports: [
@@ -28,6 +29,7 @@ import { FlightsModule } from './flights/flights.module';
     AirportsModule,
     DuffelModule,
     FlightsModule,
+    BookingIntentModule,
   ],
   controllers: [],
   providers: [],
