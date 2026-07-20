@@ -8,6 +8,7 @@ import { FlightSearchQueryDto } from './dto/flight-search-query.dto';
 import { FlightSearchResponseDto, FlightResultDto } from './dto/flight-result.dto';
 import { UserPreferencesDto } from './dto/user-preferences.dto';
 import { UserBookingsResponseDto, BookingResultDto } from './dto/user-bookings.dto';
+import { FlightSnapshot, PassengerSnapshot } from '@shared/booking-types';
 import * as crypto from 'crypto';
 import { CABIN_KEYWORDS, PASSENGER_KEYWORDS } from './agent-gateway.constants';
 
@@ -397,45 +398,55 @@ export class AgentGatewayService {
   ): Promise<UserBookingsResponseDto> {
     const startTime = Date.now();
     try {
-      // Exclude pnrCode, eTicketNumber, and paymentReference at query level via Prisma select
       const bookings = await this.prisma.booking.findMany({
         where: { userId },
-        select: {
-          id: true,
-          airline: true,
-          flightNumber: true,
-          origin: true,
-          destination: true,
-          departureTime: true,
-          arrivalTime: true,
-          duration: true,
-          stops: true,
-          fareClass: true,
-          price: true,
-          currency: true,
-          passengers: true,
-          baggageAllowance: true,
-          status: true,
+        include: {
+          payment: {
+            select: {
+              status: true,
+            },
+          },
         },
       });
 
-      const formattedBookings: BookingResultDto[] = bookings.map((b) => ({
-        id: b.id,
-        airline: b.airline,
-        flightNumber: b.flightNumber,
-        origin: b.origin,
-        destination: b.destination,
-        departureTime: b.departureTime.toISOString(),
-        arrivalTime: b.arrivalTime.toISOString(),
-        duration: b.duration,
-        stops: b.stops,
-        fareClass: b.fareClass,
-        price: Number(b.price),
-        currency: b.currency,
-        passengers: b.passengers,
-        baggageAllowance: b.baggageAllowance,
-        status: b.status as 'CONFIRMED' | 'PENDING' | 'CANCELLED' | 'REFUNDED',
-      }));
+      const formattedBookings: BookingResultDto[] = bookings.map((b) => {
+        // Assert JsonValue type to FlightSnapshot/PassengerSnapshot as Prisma returns loose JSON
+        const flight = b.flightSnapshot as unknown as FlightSnapshot | null;
+        const passenger = b.passengerSnapshot as unknown as PassengerSnapshot | null;
+
+        const firstSegment = flight?.segments?.[0];
+        const lastSegment = flight?.segments?.[flight.segments.length - 1];
+
+        // Map status: 'CONFIRMED' | 'PENDING' | 'CANCELLED' | 'REFUNDED'
+        let mappedStatus: 'CONFIRMED' | 'PENDING' | 'CANCELLED' | 'REFUNDED' = 'PENDING';
+        if (b.payment?.status === 'REFUNDED') {
+          mappedStatus = 'REFUNDED';
+        } else if (b.status === 'PROCESSING') {
+          mappedStatus = 'PENDING';
+        } else if (b.status === 'FAILED') {
+          mappedStatus = 'CANCELLED';
+        } else if (b.status === 'CONFIRMED' || b.status === 'COMPLETED') {
+          mappedStatus = 'CONFIRMED';
+        }
+
+        return {
+          id: b.id,
+          airline: firstSegment?.airline?.iataCode || 'Unknown',
+          flightNumber: firstSegment?.flightNumber || 'Unknown',
+          origin: firstSegment?.departureAirport?.iataCode || 'Unknown',
+          destination: lastSegment?.arrivalAirport?.iataCode || 'Unknown',
+          departureTime: b.departureAt?.toISOString() || firstSegment?.departureAt || b.createdAt.toISOString(),
+          arrivalTime: lastSegment?.arrivalAt || b.createdAt.toISOString(),
+          duration: flight?.totalDuration ? parseISODurationToMinutes(flight.totalDuration) : 0,
+          stops: flight?.stops ?? 0,
+          fareClass: flight?.fareClass || 'Economy',
+          price: Number(b.totalAmount),
+          currency: b.currency,
+          passengers: passenger?.passengers?.length || 1,
+          baggageAllowance: flight?.baggageAllowance || 'No checked baggage',
+          status: mappedStatus,
+        };
+      });
 
       const response = { bookings: formattedBookings };
       await this.logToolCall(userId, 'users/bookings', {}, startTime, traceId, correlationId, true, null, response);
