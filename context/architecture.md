@@ -148,6 +148,20 @@ Returns booking ID + PNR reference to frontend
 User proceeds to payment
 ```
 
+### Booking Management Read Model (Deterministic Path — No AI)
+
+```
+The payment-confirmation pipeline creates a PROCESSING Booking before Stripe and Duffel work.
+        ↓
+Prisma transitions it to CONFIRMED (snapshot + PNR) or FAILED (reason + available snapshot).
+        ↓
+/bookings/[bookingId] renders the status-specific snapshot without a Duffel read.
+        ↓
+/bookings server-renders GET /api/bookings for the authenticated user.
+        ↓
+The client list component changes Upcoming/Past tabs and pagination through URL query parameters.
+```
+
 ### Payment Flow (Deterministic Path — No AI)
 
 ```

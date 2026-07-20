@@ -7,8 +7,8 @@ Update this file after every completed feature. Any AI agent reading this should
 ### Current Status
 
 **Feature:** Booking Management & Confirmation (Feature 11)
-**Last completed:** Feature 11 Phase 4: Checkout Loading Escalation (Frontend).
-**Next:** Feature 11 Phase 5: Booking Detail Page (Frontend).
+**Last completed:** Feature 11 Phase 6: My Bookings List Page (Frontend).
+**Next:** Feature 11 Phase 7: E2E Testing & Verification.
 
 ---
 
@@ -20,8 +20,8 @@ Update this file after every completed feature. Any AI agent reading this should
 - [x] Phase 2: Booking Service & REST API (NestJS BookingModule, service CRUD, list/detail query, endpoints, validation)
 - [x] Phase 3: Payment Pipeline Integration (Integrated booking creation, UUID validation, concurrency resolution, error mapping, and background/reactive sweeper crons)
 - [x] Phase 4: Checkout Loading Escalation (Frontend) (client UUID v4 confirmation payload, authenticated confirmation request, four-phase loading escalation, safe booking-status escape hatch, and unload protection)
-- [ ] Phase 5: Booking Detail Page (Frontend)
-- [ ] Phase 6: My Bookings List Page (Frontend)
+- [x] Phase 5: Booking Detail Page (Frontend) (status-specific booking detail rendering, confirmation banner, payment-aware failure handling, and safe retry routing)
+- [x] Phase 6: My Bookings List Page (Frontend) (authenticated server-rendered booking history, URL-driven Upcoming/Past tabs and pagination, null-safe status cards, retry links, and empty-state CTA)
 - [ ] Phase 7: E2E Testing & Verification
 
 ### [x] Feature: Stripe Payment System (Feature 10)
