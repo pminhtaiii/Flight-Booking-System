@@ -50,9 +50,10 @@ async function main() {
   console.log(`TravelerProfile created/updated for user ${user.id}`);
 
   // 3. Clear existing bookings for this user to ensure clean state
-  await prisma.booking.deleteMany({ where: { userId: user.id } });
+  // await prisma.booking.deleteMany({ where: { userId: user.id } });
 
-  // 4. Create Bookings
+  // 4. Create Bookings (Temporarily commented out due to new Booking schema changes in Feature 11)
+  /*
   const booking1 = await prisma.booking.create({
     data: {
       userId: user.id,
@@ -100,6 +101,8 @@ async function main() {
   });
 
   console.log(`Bookings seeded: ${booking1.id}, ${booking2.id}`);
+  */
+  console.log('Bookings seeding skipped due to new schema requirements.');
   console.log('Seeding finished successfully.');
 }
 

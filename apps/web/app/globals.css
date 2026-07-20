@@ -79,8 +79,7 @@
 }
 
 @theme {
-  /* Font Family Link to Next Font variable */
-  --font-sans: var(--font-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-sans: ui-sans-serif, system-ui, sans-serif;
 
   /* Brand Colors */
   --color-accent: #7C5CFC;
