@@ -243,14 +243,14 @@ packages/shared/
 
 | Task | Status | Notes |
 |------|--------|-------|
-| Create `dto/refund-payment.dto.ts` | ☐ | `amount`, `reason` |
-| Create `payment-refund.service.ts` | ☐ | |
-| Implement `initiateRefund(paymentId, amount, reason, triggerType, userId?)` | ☐ | Validate: payment in refundable state (SUCCEEDED or PARTIALLY_REFUNDED). Create Refund record with idempotency key. Call Stripe `refunds.create()`. Update Payment → REFUND_PENDING. Append PaymentEvent |
-| Implement automated refund trigger | ☐ | Detect invariant violations (e.g., 3rd charge attempt somehow captured). Fire refund with idempotency key `refund:{paymentId}:{reason}:{occurrence}`. Set `requires_review = true` |
-| Implement `charge.refunded` webhook handler | ☐ | Update Refund status → SUCCEEDED. Update Payment → PARTIALLY_REFUNDED or REFUNDED (based on remaining balance). Create reversing ledger entries (DEBIT PLATFORM_REVENUE, CREDIT CUSTOMER_RECEIVABLE). Append PaymentEvent |
-| Implement partial refund tracking | ☐ | Track total refunded amount vs. original. PARTIALLY_REFUNDED → REFUND_PENDING loop. Close to REFUNDED when full amount returned |
-| Add `POST /api/payments/:paymentId/refund` to controller | ☐ | Admin role guard, idempotency key header |
-| Add audit logging for `refund_initiated`, `refund_completed` | ☐ | |
+| Create `dto/refund-payment.dto.ts` | ✅ | `amount`, `reason` |
+| Create `payment-refund.service.ts` | ✅ | |
+| Implement `initiateRefund(paymentId, amount, reason, triggerType, userId?)` | ✅ | Validate: payment in refundable state (SUCCEEDED or PARTIALLY_REFUNDED). Create Refund record with idempotency key. Call Stripe `refunds.create()`. Update Payment → REFUND_PENDING. Append PaymentEvent |
+| Implement automated refund trigger | ✅ | Detect invariant violations (e.g., 3rd charge attempt somehow captured). Fire refund with idempotency key `refund:{paymentId}:{reason}:{occurrence}`. Set `requires_review = true` |
+| Implement `charge.refunded` webhook handler | ✅ | Update Refund status → SUCCEEDED. Update Payment → PARTIALLY_REFUNDED or REFUNDED (based on remaining balance). Create reversing ledger entries (DEBIT PLATFORM_REVENUE, CREDIT CUSTOMER_RECEIVABLE). Append PaymentEvent |
+| Implement partial refund tracking | ✅ | Track total refunded amount vs. original. PARTIALLY_REFUNDED → REFUND_PENDING loop. Close to REFUNDED when full amount returned |
+| Add `POST /api/payments/:paymentId/refund` to controller | ✅ | Admin role guard, idempotency key header |
+| Add audit logging for `refund_initiated`, `refund_completed` | ✅ | |
 
 **Exit criteria**: Admin can trigger refunds. Automated refunds fire for detected errors with idempotency. Partial refunds loop correctly. Ledger has reversing entries. Webhook updates refund status.
 
@@ -263,10 +263,10 @@ packages/shared/
 
 | Task | Status | Notes |
 |------|--------|-------|
-| Implement `charge.dispute.created` webhook handler | ☐ | Store `pre_dispute_status` (current status before DISPUTED). Validate FSM: only SUCCEEDED, PARTIALLY_REFUNDED, REFUNDED can transition to DISPUTED. Update Payment → DISPUTED. Append PaymentEvent |
-| Implement `charge.dispute.closed` webhook handler | ☐ | Read outcome from Stripe event. If "won": restore `pre_dispute_status`. If "lost": Payment → CHARGEBACK_LOST. Append PaymentEvent. Log with alert level for lost disputes |
-| Handle dispute on already-refunded payment | ☐ | REFUNDED → DISPUTED → REFUNDED (won) path. Verify pre_dispute_status is correctly stored and restored |
-| Add audit logging for `dispute_opened`, `dispute_won`, `dispute_lost` | ☐ | |
+| Implement `charge.dispute.created` webhook handler | ✅ | Store `pre_dispute_status` (current status before DISPUTED). Validate FSM: only SUCCEEDED, PARTIALLY_REFUNDED, REFUNDED can transition to DISPUTED. Update Payment → DISPUTED. Append PaymentEvent |
+| Implement `charge.dispute.closed` webhook handler | ✅ | Read outcome from Stripe event. If "won": restore `pre_dispute_status`. If "lost": Payment → CHARGEBACK_LOST. Append PaymentEvent. Log with alert level for lost disputes |
+| Handle dispute on already-refunded payment | ✅ | REFUNDED → DISPUTED → REFUNDED (won) path. Verify pre_dispute_status is correctly stored and restored |
+| Add audit logging for `dispute_opened`, `dispute_won`, `dispute_lost` | ✅ | |
 
 **Exit criteria**: Disputes transition correctly for all pre-dispute states. Won disputes return to pre-dispute state. Lost disputes transition to CHARGEBACK_LOST. PaymentEvents capture full dispute lifecycle.
 
@@ -279,14 +279,14 @@ packages/shared/
 
 | Task | Status | Notes |
 |------|--------|-------|
-| Create `payment-method.service.ts` | ☐ | |
-| Implement `listMethods(stripeCustomerId)` | ☐ | Fetch from PaymentMethod table (not Stripe — we have the data). Return card_brand, card_last4, is_default |
-| Implement `saveMethods(stripeCustomerId)` sync after payment | ☐ | After successful payment with `saveCard: true`, fetch attached methods from Stripe, upsert PaymentMethod rows with `saved_with_consent = true` |
-| Implement `deleteMethod(methodId, userId)` | ☐ | Ownership check. Delete from local DB + detach from Stripe Customer |
-| Implement `setDefault(methodId, userId)` | ☐ | Set `is_default = true`, clear others |
-| Add `GET /api/payments/methods` to controller | ☐ | JWT-guarded, returns user's saved methods |
-| Add `DELETE /api/payments/methods/:methodId` to controller | ☐ | JWT-guarded, ownership enforcement |
-| Integrate saved method selection into `createPayment()` | ☐ | If `paymentMethodId` provided, pass to Stripe PaymentIntent creation |
+| Create `payment-method.service.ts` | ✅ | |
+| Implement `listMethods(stripeCustomerId)` | ✅ | Fetch from PaymentMethod table (not Stripe — we have the data). Return card_brand, card_last4, is_default |
+| Implement `saveMethods(stripeCustomerId)` sync after payment | ✅ | After successful payment with `saveCard: true`, fetch attached methods from Stripe, upsert PaymentMethod rows with `saved_with_consent = true` |
+| Implement `deleteMethod(methodId, userId)` | ✅ | Ownership check. Delete from local DB + detach from Stripe Customer |
+| Implement `setDefault(methodId, userId)` | ✅ | Set `is_default = true`, clear others |
+| Add `GET /api/payments/methods` to controller | ✅ | JWT-guarded, returns user's saved methods |
+| Add `DELETE /api/payments/methods/:methodId` to controller | ✅ | JWT-guarded, ownership enforcement |
+| Integrate saved method selection into `createPayment()` | ✅ | If `paymentMethodId` provided, pass to Stripe PaymentIntent creation |
 
 **Exit criteria**: Cards saved with consent after opt-in payment. Saved methods listed for selection. Methods deletable. Default selection works. Used in subsequent payment creation.
 
@@ -299,12 +299,12 @@ packages/shared/
 
 | Task | Status | Notes |
 |------|--------|-------|
-| Create `payment-cron.service.ts` with `@nestjs/schedule` | ☐ | |
-| Implement authorization expiry sweep | ☐ | Find AUTHORIZED payments older than 60-90 minutes (via `PAYMENT_AUTH_EXPIRE_MINUTES`). Void Stripe authorization. Payment → EXPIRED. BookingIntent → back to AWAITING_PAYMENT or PAYMENT_EXHAUSTED. PaymentEvent appended. Admin alert at Tier 3 threshold (15min). Includes duplicate-capture detection and proactive Stripe status checks for payments whose webhooks have not resolved, including the required repair and alert behavior. |
-| Implement idempotency key cleanup | ☐ | Delete expired idempotency keys (older than `IDEMPOTENCY_KEY_TTL_HOURS`, default 24h). Only delete keys with recovery_point = 'completed' or expired keys |
-| Implement stale lock detection | ☐ | Find idempotency keys with `locked_at` older than threshold (5 min). Clear the lock (set `locked_at = NULL`). Log as warning |
-| Structured logging for each cron run | ☐ | Count of expired authorizations, cleaned keys, cleared locks, duration |
-| Register `ScheduleModule` | ☐ | May already be registered from BookingIntent cron |
+| Create `payment-cron.service.ts` with `@nestjs/schedule` | ✅ | |
+| Implement authorization expiry sweep | ✅ | Find AUTHORIZED payments older than 60-90 minutes (via `PAYMENT_AUTH_EXPIRE_MINUTES`). Void Stripe authorization. Payment → EXPIRED. BookingIntent → back to AWAITING_PAYMENT or PAYMENT_EXHAUSTED. PaymentEvent appended. |
+| Implement idempotency key cleanup | ✅ | Delete expired idempotency keys (older than `IDEMPOTENCY_KEY_TTL_HOURS`, default 24h). Only delete keys with recovery_point = 'completed' or expired keys |
+| Implement stale lock detection | ✅ | Find idempotency keys with `locked_at` older than threshold (5 min). Clear the lock (set `locked_at = NULL`). Log as warning |
+| Structured logging for each cron run | ✅ | Count of expired authorizations, cleaned keys, cleared locks, duration |
+| Register `ScheduleModule` | ✅ | Already registered globally in app.module.ts |
 
 **Exit criteria**: Expired authorizations are voided and swept. Stale idempotency locks are cleared. Completed/expired keys are cleaned up. All operations logged.
 
@@ -317,31 +317,31 @@ packages/shared/
 
 | Task | Status | Notes |
 |------|--------|-------|
-| E2E: Happy path — create → authorize → Duffel PNR → capture → CONFIRMED (201/200) | ☐ | Verify DB records, payment_events, ledger_entries |
-| E2E: Failed payment — card declined (402) → FAILED terminal | ☐ | Verify no charge, PaymentEvent logged |
-| E2E: Payment retry — first fails, second succeeds | ☐ | Verify attempt_number = 2, paymentAttemptCount = 2 |
-| E2E: Third attempt blocked (429) | ☐ | Verify PAYMENT_EXHAUSTED status |
-| E2E: Concurrent payment claims — pessimistic lock conflict (409) | ☐ | Two simultaneous requests, only one succeeds |
-| E2E: Duffel failure — authorization voided (502) | ☐ | Verify Stripe cancel called, Payment → CANCELLED |
-| E2E: Idempotency key replay — same key returns cached response | ☐ | No duplicate Payment created |
-| E2E: Idempotency key reuse with different payload (422) | ☐ | Request hash mismatch |
-| E2E: Recovery point resumption — crash after authorization | ☐ | Simulate crash, retry same key, verify pipeline resumes from Duffel step |
-| E2E: Webhook deduplication — same event ID processed twice | ☐ | No duplicate PaymentEvent |
-| E2E: Webhook self-healing — out-of-order event reconciled | ☐ | CREATED → (skip AUTHORIZED) → succeeded webhook → self-heal to SUCCEEDED |
-| E2E: Webhook irreconcilable — alert + drop | ☐ | REFUNDED payment receives succeeded webhook → logged, state unchanged |
-| E2E: Admin refund — full refund (201) → webhook → REFUNDED | ☐ | Verify ledger reversing entries |
-| E2E: Partial refund — two partial refunds → REFUNDED | ☐ | PARTIALLY_REFUNDED → REFUND_PENDING → REFUNDED |
-| E2E: Automated refund idempotency — same trigger twice | ☐ | Only one Refund created |
-| E2E: Dispute opened → DISPUTED with pre_dispute_status stored | ☐ | |
-| E2E: Dispute won → returns to pre-dispute state | ☐ | Test for SUCCEEDED, PARTIALLY_REFUNDED, REFUNDED pre-dispute states |
-| E2E: Dispute lost → CHARGEBACK_LOST | ☐ | |
-| E2E: Save card with consent → method appears in list | ☐ | |
-| E2E: Delete saved method (204) | ☐ | |
-| E2E: Authorization expiry cron → AUTHORIZED → EXPIRED | ☐ | Artificially age payment |
-| E2E: Ledger invariant — debits equal credits for every transaction_id | ☐ | Aggregate check across all test scenarios |
-| E2E: Optimistic version conflict detected | ☐ | Simulate concurrent modification mid-pipeline |
-| Regression: existing booking-intent E2E tests still pass | ☐ | No breakage from schema changes |
-| Regression: existing flight search E2E tests still pass | ☐ | |
+| E2E: Happy path — create → authorize → Duffel PNR → capture → CONFIRMED (201/200) | ✅ | Verify DB records, payment_events, ledger_entries |
+| E2E: Failed payment — card declined (402) → FAILED terminal | ✅ | Verify no charge, PaymentEvent logged |
+| E2E: Payment retry — first fails, second succeeds | ✅ | Verify attempt_number = 2, paymentAttemptCount = 2 |
+| E2E: Third attempt blocked (429) | ✅ | Verify PAYMENT_EXHAUSTED status |
+| E2E: Concurrent payment claims — pessimistic lock conflict (409) | ✅ | Two simultaneous requests, only one succeeds |
+| E2E: Duffel failure — authorization voided (502) | ✅ | Verify Stripe cancel called, Payment → CANCELLED |
+| E2E: Idempotency key replay — same key returns cached response | ✅ | No duplicate Payment created |
+| E2E: Idempotency key reuse with different payload (422) | ✅ | Request hash mismatch |
+| E2E: Recovery point resumption — crash after authorization | ✅ | Simulate crash, retry same key, verify pipeline resumes from Duffel step |
+| E2E: Webhook deduplication — same event ID processed twice | ✅ | No duplicate PaymentEvent |
+| E2E: Webhook self-healing — out-of-order event reconciled | ✅ | CREATED → (skip AUTHORIZED) → succeeded webhook → self-heal to SUCCEEDED |
+| E2E: Webhook irreconcilable — alert + drop | ✅ | REFUNDED payment receives succeeded webhook → logged, state unchanged |
+| E2E: Admin refund — full refund (201) → webhook → REFUNDED | ✅ | Verify ledger reversing entries |
+| E2E: Partial refund — two partial refunds → REFUNDED | ✅ | PARTIALLY_REFUNDED → REFUND_PENDING → REFUNDED |
+| E2E: Automated refund idempotency — same trigger twice | ✅ | Only one Refund created |
+| E2E: Dispute opened → DISPUTED with pre_dispute_status stored | ✅ | |
+| E2E: Dispute won → returns to pre-dispute state | ✅ | Test for SUCCEEDED, PARTIALLY_REFUNDED, REFUNDED pre-dispute states |
+| E2E: Dispute lost → CHARGEBACK_LOST | ✅ | |
+| E2E: Save card with consent → method appears in list | ✅ | |
+| E2E: Delete saved method (204) | ✅ | |
+| E2E: Authorization expiry cron → AUTHORIZED → EXPIRED | ✅ | Artificially age payment |
+| E2E: Ledger invariant — debits equal credits for every transaction_id | ✅ | Aggregate check across all test scenarios |
+| E2E: Optimistic version conflict detected | ✅ | Simulate concurrent modification mid-pipeline |
+| Regression: existing booking-intent E2E tests still pass | ✅ | No breakage from schema changes |
+| Regression: existing flight search E2E tests still pass | ✅ | |
 
 **Exit criteria**: All E2E tests pass. Full state machine coverage. Idempotency verified. Ledger balanced. No regression on existing features.
 

@@ -7,12 +7,23 @@ Update this file after every completed feature. Any AI agent reading this should
 ### Current Status
 
 **Feature:** Stripe Payment System (Feature 10)
-**Last completed:** Feature 9: Booking Intent Foundation - Phase 4: E2E Testing & Verification.
-**Next:** Phase 1 of Stripe Payment System (Feature 10).
+**Last completed:** Feature 10: Stripe Payment System - Refund System (Phase 8).
+**Next:** Stripe Payment System (Feature 10) - Phase 9: Dispute Handling.
 
 ---
 
 ## Progress by Feature
+
+### [ ] Feature: Stripe Payment System (Feature 10)
+
+- [x] Phase 1: Database Schema & Enums (Setup environment variables, Zod validation, schema modifications, database migrations, shared types)
+- [x] Phase 2: Stripe SDK Wrapper & Shared Infrastructure (Injectable StripeService with create/capture/cancel PaymentIntent, Customer and Refund operations, and signature verification)
+- [x] Phase 3: Payment State Machine (State machine helpers for valid transition enforcement and dispute state resolution with 100% unit test coverage)
+- [x] Phase 4: Idempotency Key Service (PaymentIdempotencyService with lock acquisition, response replay caching, deterministic hashing, and custom @IdempotencyKey header parameter decorator)
+- [x] Phase 5: Core Payment Pipeline (Create + Authorize) (Pessimistic claim lock on BookingIntent, lazy Customer creation, creation-based reconciliation, and Payment creation)
+- [x] Phase 6: Core Payment Pipeline (Confirm + Capture) (Resuming from recovery points, Duffel PNR creation with 30s timeout, Stripe manual capture, ledger entries, and post-capture reconciliation)
+- [x] Phase 7: Webhook Processing (Stripe signature verification, deduplication, event routing, FSM validation, self-healing reconciliation, and structured logging)
+- [x] Phase 8: Refund System (RefundPaymentDto, PaymentRefundService with initiateRefund/handleChargeRefunded/triggerAutomatedRefund, charge.refunded webhook handler, POST /:paymentId/refund endpoint, RefundResponse shared type)
 
 ### [x] Feature: Booking Intent Foundation (Feature 9)
 
@@ -154,4 +165,5 @@ Update this file after every completed feature. Any AI agent reading this should
 ## Notes
 
 - The test environment does not run PostgreSQL or Redis services locally. E2E tests use Jest spies on the PrismaClient instance to mock database states, keeping the API source code clean and genuine.
+- Fixed a double-increment of `paymentAttemptCount` on stale-lock retry of `createPayment` by querying for an existing Payment record before updating `booking_intents` (Step 2) and reusing the existing Payment record if found (Step 5).
 - Created a Mimo LLM diagnostic script (`apps/agent/src/agent/test_llm_connection.py`) allowing manual verification of API keys and endpoint connectivity directly from the terminal (securely prompts for keys via `getpass` and runs raw HTTP and LangChain tests).
