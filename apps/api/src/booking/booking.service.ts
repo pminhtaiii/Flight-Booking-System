@@ -217,6 +217,14 @@ export class BookingService {
           this.logger.error(`Duffel order cancellation failed during stale booking sweep: ${cancelError.message}`, cancelError.stack);
         }
 
+        // Release the Stripe authorization hold (cancel intent)
+        try {
+          await this.stripeService.cancelPaymentIntent(booking.payment.stripePaymentIntentId);
+          this.logger.log(`Successfully cancelled Stripe PaymentIntent ${booking.payment.stripePaymentIntentId} during stale booking sweep.`);
+        } catch (stripeCancelError: any) {
+          this.logger.error(`Stripe cancelPaymentIntent failed during stale booking sweep: ${stripeCancelError.message}`, stripeCancelError.stack);
+        }
+
         const res = await this.prisma.booking.updateMany({
           where: { id: booking.id, status: 'PROCESSING' },
           data: { status: 'FAILED', failureReason: 'CAPTURE_FAILED' }
