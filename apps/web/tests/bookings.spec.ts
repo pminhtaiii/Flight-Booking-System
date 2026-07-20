@@ -68,6 +68,7 @@ test('renders a processing booking state while the reservation is pending', asyn
   await page.goto(`/bookings/${bookingId}`);
 
   await expect(page.getByRole('heading', { name: 'Your booking is being processed' })).toBeVisible();
+  await expect(page.getByText('Please refresh this page shortly to check its status.')).toBeVisible();
 });
 
 test('explains an expired offer and provides a route-aware retry without assuming a charge', async ({ page }) => {

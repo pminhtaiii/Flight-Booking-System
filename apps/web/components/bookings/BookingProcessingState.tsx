@@ -5,7 +5,7 @@ export function BookingProcessingState() {
         Your booking is being processed
       </h1>
       <p className="mt-2 text-sm text-text-secondary">
-        We are confirming your flight and will update this page as soon as it is complete.
+        We’re confirming your flight. Please refresh this page shortly to check its status.
       </p>
     </section>
   );
