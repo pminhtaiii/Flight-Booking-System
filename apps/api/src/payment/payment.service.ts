@@ -23,6 +23,7 @@ import { Prisma, BookingFailureReason } from '@prisma/client';
 
 import { BookingService } from '@/booking/booking.service';
 import { forwardRef, Inject } from '@nestjs/common';
+import { FlightSnapshot, PassengerSnapshot } from '@shared/booking-types';
 
 @Injectable()
 export class PaymentService {
@@ -487,8 +488,9 @@ export class PaymentService {
             this.logger.error(`Stripe cancelPaymentIntent failed: ${stripeError.message}`, stripeError.stack);
           }
 
-          // Update Payment status to CANCELLED
+          // Update Payment, BookingIntent, and Booking status atomically
           enforceTransition(payment.status, 'CANCELLED');
+          const nextBookingStatus = bookingIntent.paymentAttemptCount < 2 ? 'AWAITING_PAYMENT' : 'CANCELLED';
           await this.prisma.$transaction(async (tx) => {
             await tx.payment.update({
               where: { id: payment.id },
@@ -505,19 +507,19 @@ export class PaymentService {
                 createdBy: userId,
               },
             });
+            await tx.bookingIntent.update({
+              where: { id: bookingIntent.id },
+              data: { status: nextBookingStatus },
+            });
+            await this.bookingService.updateToFailed(
+              canonicalBooking.id,
+              BookingFailureReason.SYSTEM_ERROR,
+              undefined,
+              undefined,
+              undefined,
+              tx
+            );
           });
-
-          // Update BookingIntent status
-          const nextBookingStatus = bookingIntent.paymentAttemptCount < 2 ? 'AWAITING_PAYMENT' : 'CANCELLED';
-          await this.prisma.bookingIntent.update({
-            where: { id: bookingIntent.id },
-            data: { status: nextBookingStatus },
-          });
-
-          await this.bookingService.updateToFailed(
-            canonicalBooking.id,
-            BookingFailureReason.SYSTEM_ERROR
-          );
 
           // Update recovery point to completed and complete idempotency key
           await this.idempotencyService.updateRecoveryPoint(idempotencyKey, 'completed');
@@ -591,39 +593,15 @@ export class PaymentService {
             this.logger.error(`Stripe cancelPaymentIntent failed during compensation: ${stripeError.message}`, stripeError.stack);
           }
 
-          // Update Payment status to CANCELLED
-          enforceTransition(payment.status, 'CANCELLED');
-          await this.prisma.$transaction(async (tx) => {
-            await tx.payment.update({
-              where: { id: payment.id },
-              data: { status: 'CANCELLED' },
-            });
-            await tx.paymentEvent.create({
-              data: {
-                paymentId: payment.id,
-                eventType: 'payment_cancelled',
-                previousStatus: payment.status,
-                newStatus: 'CANCELLED',
-                amount: payment.amount,
-                source: 'API',
-                createdBy: userId,
-              },
-            });
-          });
-
           // Update BookingIntent status
           const bookingIntent = await this.prisma.bookingIntent.findUnique({
             where: { id: payment.bookingIntentId },
           });
           const nextBookingStatus = (bookingIntent?.paymentAttemptCount || 0) < 2 ? 'AWAITING_PAYMENT' : 'CANCELLED';
-          await this.prisma.bookingIntent.update({
-            where: { id: payment.bookingIntentId },
-            data: { status: nextBookingStatus },
-          });
 
-          let flightSnap;
-          let passSnap;
-          let departAt;
+          let flightSnap: FlightSnapshot | undefined;
+          let passSnap: PassengerSnapshot | undefined;
+          let departAt: Date | undefined;
           try {
             const duffelEvent = await this.prisma.paymentEvent.findFirst({
               where: {
@@ -645,13 +623,37 @@ export class PaymentService {
             this.logger.warn(`Failed to recover Duffel order snapshots for booking ${canonicalBooking.id}: ${e.message}`, e.stack);
           }
 
-          await this.bookingService.updateToFailed(
-            canonicalBooking.id,
-            BookingFailureReason.CAPTURE_FAILED,
-            flightSnap,
-            passSnap,
-            departAt
-          );
+          // Update Payment status, BookingIntent, and Booking status to FAILED atomically
+          enforceTransition(payment.status, 'CANCELLED');
+          await this.prisma.$transaction(async (tx) => {
+            await tx.payment.update({
+              where: { id: payment.id },
+              data: { status: 'CANCELLED' },
+            });
+            await tx.paymentEvent.create({
+              data: {
+                paymentId: payment.id,
+                eventType: 'payment_cancelled',
+                previousStatus: payment.status,
+                newStatus: 'CANCELLED',
+                amount: payment.amount,
+                source: 'API',
+                createdBy: userId,
+              },
+            });
+            await tx.bookingIntent.update({
+              where: { id: payment.bookingIntentId },
+              data: { status: nextBookingStatus },
+            });
+            await this.bookingService.updateToFailed(
+              canonicalBooking.id,
+              BookingFailureReason.CAPTURE_FAILED,
+              flightSnap,
+              passSnap,
+              departAt,
+              tx
+            );
+          });
 
           // Update recovery point to completed and complete idempotency key
           await this.idempotencyService.updateRecoveryPoint(idempotencyKey, 'completed');
