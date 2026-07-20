@@ -77,8 +77,8 @@ export default function CheckoutPage() {
         },
         body: JSON.stringify({ paymentId, bookingId: clientBookingId }),
       });
-      receivedResponse = true;
       const result = (await response.json()) as ConfirmPaymentResponse;
+      receivedResponse = true;
 
       if (!response.ok) {
         throw new Error(result.message ?? 'We could not confirm your payment.');

@@ -89,6 +89,22 @@ test.describe('Checkout loading escalation', () => {
     await expect(page.getByRole('alert')).toHaveText(/booking is still being prepared/i);
   });
 
+  test('shows a friendly error when payment confirmation returns a non-JSON response', async ({ page }) => {
+    await authenticateCheckout(page);
+    await page.route('**/api/bookings/payment/confirm', async (route) => {
+      await route.fulfill({
+        status: 502,
+        contentType: 'text/html',
+        body: '<html><body>Bad Gateway</body></html>',
+      });
+    });
+
+    await openAuthenticatedCheckout(page);
+    await page.getByRole('button', { name: 'Confirm payment' }).click();
+
+    await expect(page.getByRole('alert')).toHaveText('We could not confirm your payment.');
+  });
+
   test('reuses the booking id and idempotency key after an ambiguous request failure', async ({ page }) => {
     const confirmRequests: Array<{ bookingId: unknown; idempotencyKey: string | undefined }> = [];
 
