@@ -113,7 +113,7 @@ export class BookingService {
           if (existing.userId !== userId) {
             throw new ForbiddenException('You do not have access to this booking intent');
           }
-          if (paymentId && existing.paymentId !== paymentId) {
+          if (paymentId && existing.paymentId !== paymentId && existing.status === BookingStatus.PROCESSING) {
             return await this.prisma.booking.update({
               where: { id: existing.id },
               data: { paymentId },
