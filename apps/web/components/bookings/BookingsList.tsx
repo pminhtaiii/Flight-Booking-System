@@ -21,24 +21,6 @@ export type BookingsResponse = {
   };
 };
 
-const compareBookings = (tab: BookingTab) => (left: BookingListItem, right: BookingListItem): number => {
-  if (tab === 'past') {
-    return new Date(right.departureAt ?? 0).getTime() - new Date(left.departureAt ?? 0).getTime();
-  }
-
-  const priority: Record<BookingListItem['status'], number> = {
-    PROCESSING: 0,
-    FAILED: 1,
-    CONFIRMED: 2,
-    COMPLETED: 3,
-  };
-  const priorityDifference = priority[left.status] - priority[right.status];
-  if (priorityDifference !== 0) {
-    return priorityDifference;
-  }
-  return new Date(left.departureAt ?? Number.MAX_SAFE_INTEGER).getTime() - new Date(right.departureAt ?? Number.MAX_SAFE_INTEGER).getTime();
-};
-
 type BookingsListProps = {
   data?: BookingsResponse;
   tab: BookingTab;
@@ -57,7 +39,7 @@ export function BookingsList({ data, tab, error }: BookingsListProps) {
     router.push(`/bookings?${nextSearchParams.toString()}`);
   };
 
-  const bookings = data?.bookings ? [...data.bookings].sort(compareBookings(tab)) : [];
+  const bookings = data?.bookings ?? [];
 
   return (
     <section aria-labelledby="my-bookings-title" className="space-y-6">
