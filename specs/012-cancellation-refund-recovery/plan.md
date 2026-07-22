@@ -2,7 +2,7 @@
 
 **Feature Branch**: `012-cancellation-refund-recovery`  
 **Input**: [CONTEXT.md](../../CONTEXT.md) and [cancellation/refund ADR](../../docs/adr/research-cancellation-and-refund-failure-handling.md)  
-**Status**: Planned
+**Status**: Completed
 
 ## Summary
 
