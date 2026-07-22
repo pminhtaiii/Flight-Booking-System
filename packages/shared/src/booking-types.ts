@@ -153,7 +153,7 @@ export interface CancellationQuoteResponseDto {
 /** Durable response for a supplier-first cancellation request. */
 export interface CancellationResponseDto {
   bookingId: string;
-  bookingStatus: BookingStatus;
+  bookingStatus: string;
   cancellationStatus: string;
   refundStatus: string;
   refundAmount: string;

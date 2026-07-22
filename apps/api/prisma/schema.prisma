@@ -496,6 +496,7 @@ model Refund {
 
   @@index([paymentId])
   @@index([status])
+  @@unique([idempotencyKeyId])
   @@map("refunds")
 }
 
