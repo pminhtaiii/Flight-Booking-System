@@ -721,13 +721,13 @@ export function SearchPageClient({ allAirports }: Props) {
   };
 
   return (
-    <div className={cn("search-page-wrapper flex w-full min-h-[calc(100vh-120px)] relative overflow-hidden transition-all duration-700 ease-in-out", isSplitActive ? "split" : "flex-col items-center")}>
+    <div className={cn("search-page-wrapper flex w-full min-h-[calc(100vh-120px)] relative overflow-hidden transition-all duration-700 ease-in-out", isSplitActive ? "split flex-col lg:flex-row" : "flex-col items-center")}>
       
       {/* ── Chat Container (Centred to Left slide transition) ── */}
       <div
         className={cn(
           "search-panel flex flex-col flex-shrink-0 z-10 transition-all duration-800 ease-in-out",
-          isSplitActive ? "w-[40%] max-w-[480px] h-[calc(100vh-160px)] mr-6" : "w-full max-w-[720px] h-[75vh]"
+          isSplitActive ? "w-full lg:w-[40%] lg:max-w-[480px] h-[50vh] lg:h-[calc(100vh-160px)] mb-6 lg:mb-0 lg:mr-6" : "w-full max-w-[720px] h-[75vh]"
         )}
       >
         {/* Chat Header */}
