@@ -47,11 +47,11 @@ describe('Cancellation and refund recovery (E2E)', () => {
     app.useGlobalFilters(new HttpExceptionFilter());
     app.setGlobalPrefix('api', { exclude: ['health'] });
 
+    await app.init();
+
     // Stop all cron jobs registered with the SchedulerRegistry to avoid background scheduler races
     const schedulerRegistry = moduleFixture.get<SchedulerRegistry>(SchedulerRegistry);
     schedulerRegistry.getCronJobs().forEach((job) => job.stop());
-
-    await app.init();
 
     prisma = moduleFixture.get<PrismaService>(PrismaService);
     jwtService = moduleFixture.get<JwtService>(JwtService);

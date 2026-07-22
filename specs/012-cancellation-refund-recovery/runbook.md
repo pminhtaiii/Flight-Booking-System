@@ -86,9 +86,51 @@ Because the database migrations added nullable columns (`cancellationId`, `cance
 - **Do not roll back database migrations** immediately if customer data has already been written.
 - If data cleanup is required, run targeted SQL queries to clear stuck claims:
   ```sql
+  -- 1. Reset bookings in CANCELLATION_PENDING back to CONFIRMED (since supplier cancellation was not triggered yet)
   UPDATE "bookings"
   SET "status" = 'CONFIRMED'
   WHERE "status" = 'CANCELLATION_PENDING';
+
+  -- 2. Transition completed refunds: set payment status to REFUNDED and refund status to SUCCEEDED
+  UPDATE "payments"
+  SET "status" = 'REFUNDED'
+  WHERE "id" IN (
+    SELECT "paymentId" FROM "bookings" WHERE "status" = 'CANCELLED_AND_REFUNDED'
+  );
+  
+  UPDATE "refunds"
+  SET "status" = 'SUCCEEDED'
+  WHERE "bookingId" IN (
+    SELECT "id" FROM "bookings" WHERE "status" = 'CANCELLED_AND_REFUNDED'
+  );
+
+  -- 3. Transition pending/failed refund cancellations: set payment status to REFUND_PENDING and refund status to REFUND_PENDING
+  UPDATE "payments"
+  SET "status" = 'REFUND_PENDING'
+  WHERE "id" IN (
+    SELECT "paymentId" FROM "bookings" 
+    WHERE "status" IN ('CANCELLED_PENDING_REFUND', 'REFUND_FAILED_NEEDS_ATTENTION')
+  );
+
+  UPDATE "refunds"
+  SET "status" = 'REFUND_PENDING'
+  WHERE "bookingId" IN (
+    SELECT "id" FROM "bookings" 
+    WHERE "status" IN ('CANCELLED_PENDING_REFUND', 'REFUND_FAILED_NEEDS_ATTENTION')
+  );
+
+  -- 4. Transition no-refund cancellations: set refund status to FAILED
+  UPDATE "refunds"
+  SET "status" = 'FAILED'
+  WHERE "bookingId" IN (
+    SELECT "id" FROM "bookings" 
+    WHERE "status" = 'CANCELLED_NO_REFUND'
+  );
+
+  -- 5. Transition all supplier-cancelled bookings to FAILED status so the old client generated code can parse them cleanly
+  UPDATE "bookings"
+  SET "status" = 'FAILED'
+  WHERE "status" IN ('CANCELLED_PENDING_REFUND', 'CANCELLED_AND_REFUNDED', 'CANCELLED_NO_REFUND', 'REFUND_FAILED_NEEDS_ATTENTION');
   ```
 
 ---
