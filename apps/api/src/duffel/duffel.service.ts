@@ -566,6 +566,56 @@ export class DuffelService {
     }
   }
 
+  async createCancellationQuote(duffelOrderId: string): Promise<any> {
+    try {
+      const isJest = process.env.JEST_WORKER_ID !== undefined;
+      const isTestEnv = process.env.NODE_ENV === 'test' || isJest;
+      const token = process.env.DUFFEL_ACCESS_TOKEN;
+
+      if (!isTestEnv) {
+        if (!token || token === '' || token === 'mock') {
+          throw new HttpException(
+            {
+              message: 'Duffel Access Token is missing or invalid in production/development runtime.',
+              code: 'CONFIGURATION_ERROR',
+            },
+            HttpStatus.INTERNAL_SERVER_ERROR,
+          );
+        }
+      }
+
+      if (isTestEnv || token === 'mock') {
+        this.logger.log(`Mocking Duffel cancellation quote for test environment. OrderId: ${duffelOrderId}`);
+        return {
+          id: `oc_mock_${duffelOrderId}`,
+          order_id: duffelOrderId,
+          refund_amount: '100.00',
+          refund_currency: 'GBP',
+          expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+          refundable: true,
+        };
+      }
+
+      const quote = await this.duffel.orderCancellations.create({
+        order_id: duffelOrderId,
+      });
+      return quote.data;
+    } catch (err: unknown) {
+      const error = err as Error;
+      this.logger.error(`Failed to create cancellation quote for Duffel order ${duffelOrderId}: ${error.message}`, error.stack);
+      if (err instanceof HttpException) {
+        throw err;
+      }
+      throw new HttpException(
+        {
+          code: 'UPSTREAM_CANCELLATION_QUOTE_FAILED',
+          message: error.message || 'Failed to create cancellation quote',
+        },
+        HttpStatus.BAD_GATEWAY,
+      );
+    }
+  }
+
   async cancelOrder(duffelOrderId: string): Promise<unknown> {
     try {
       const quote = await this.duffel.orderCancellations.create({

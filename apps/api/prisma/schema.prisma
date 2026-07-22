@@ -138,6 +138,10 @@ model TravelerProfile {
   @@map("traveler_profiles")
 }
 
+/// Stores flight booking records.
+/// NOTE: Booking stores currency amounts (totalAmount, airlineRefundAmount, customerRefundAmount) in major currency units (DECIMAL(10,2), e.g. 100.50).
+/// In contrast, Refund stores currency amounts in minor currency units (integer cents, e.g. 10050).
+/// Always use explicit unit conversions (Math.round(amount * 100) when converting major to minor units, or amount / 100 when converting minor to major units) when mapping between Booking and Refund.
 model Booking {
   id                String               @id @default(uuid())
   userId            String
@@ -152,6 +156,11 @@ model Booking {
   totalAmount       Decimal              @db.Decimal(10, 2)
   currency          String               @default("GBP")
   departureAt       DateTime?
+  cancellationDeadline DateTime?
+  cancellationRefundable Boolean @default(false)
+  airlineRefundAmount Decimal? @db.Decimal(10, 2)
+  customerRefundAmount Decimal? @db.Decimal(10, 2)
+  duffelCancellationQuoteId String?
   createdAt         DateTime             @default(now())
   updatedAt         DateTime             @updatedAt
 
@@ -235,6 +244,10 @@ enum BookingStatus {
   CONFIRMED
   FAILED
   COMPLETED
+  CANCELLATION_PENDING
+  CANCELLED_PENDING_REFUND
+  CANCELLED_AND_REFUNDED
+  CANCELLED_NO_REFUND
 }
 
 enum BookingFailureReason {
@@ -348,6 +361,7 @@ enum RefundStatus {
   REFUND_PENDING
   SUCCEEDED
   FAILED
+  REFUND_FAILED_NEEDS_ATTENTION
 }
 
 enum RefundTriggerType {
@@ -456,6 +470,10 @@ model LedgerEntry {
   @@map("ledger_entries")
 }
 
+/// Stores payment refund transactions.
+/// NOTE: Refund stores currency amounts (amount, airlineRefundAmount, customerRefundAmount) in minor currency units (integer cents, e.g. 10050).
+/// In contrast, Booking stores currency amounts in major currency units (DECIMAL(10,2), e.g. 100.50).
+/// Always use explicit unit conversions (Math.round(amount * 100) when converting major to minor units, or amount / 100 when converting minor to major units) when mapping between Booking and Refund.
 model Refund {
   id                  String            @id @default(uuid())
   paymentId           String
@@ -471,6 +489,8 @@ model Refund {
   triggeredByUser     User?             @relation(fields: [triggeredByUserId], references: [id])
   requiresReview      Boolean           @default(false) // flags automated refunds for 24h human check
   status              RefundStatus      @default(REFUND_PENDING)
+  airlineRefundAmount Int?
+  customerRefundAmount Int?
   createdAt           DateTime          @default(now())
   updatedAt           DateTime          @updatedAt
 

@@ -229,5 +229,205 @@ describe('BookingService', () => {
         service.updateToConfirmed('booking-1', 'PNR1', 'order-1', flightSnapshot as any, {} as any),
       ).rejects.toBeInstanceOf(BadRequestException);
     });
+
+    describe('getCancellationQuote', () => {
+      beforeEach(() => {
+        jest.spyOn(global, 'setTimeout').mockImplementation((fn: any) => {
+          if (typeof fn === 'function') fn();
+          return 0 as any;
+        });
+      });
+
+      afterEach(() => {
+        jest.restoreAllMocks();
+      });
+
+      it('returns existing cached quote if non-expired', async () => {
+        const futureDate = new Date(Date.now() + 3600000);
+        const booking = {
+          id: 'b-1',
+          userId: 'u-1',
+          status: 'CONFIRMED',
+          duffelOrderId: 'ord-1',
+          duffelCancellationQuoteId: 'quote-cached',
+          cancellationDeadline: futureDate,
+          customerRefundAmount: '100.00',
+          currency: 'GBP',
+          cancellationRefundable: true,
+        };
+        const prisma = {
+          booking: {
+            findUnique: jest.fn().mockResolvedValue(booking),
+          },
+        };
+        const service = new BookingService(prisma as never, {} as never, {} as never, {} as never);
+
+        const result = await service.getCancellationQuote('b-1', 'u-1');
+        expect(result.quoteId).toBe('quote-cached');
+      });
+
+      it('creates new quote and updates booking when no quote exists', async () => {
+        const booking = {
+          id: 'b-1',
+          userId: 'u-1',
+          status: 'CONFIRMED',
+          duffelOrderId: 'ord-1',
+          duffelCancellationQuoteId: null,
+          cancellationDeadline: null,
+          currency: 'GBP',
+        };
+        const prisma = {
+          booking: {
+            findUnique: jest.fn().mockResolvedValue(booking),
+            updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+          },
+        };
+        const duffelService = {
+          createCancellationQuote: jest.fn().mockResolvedValue({
+            id: 'quote-new',
+            refund_amount: '100.00',
+            refund_currency: 'GBP',
+            expires_at: new Date(Date.now() + 3600000).toISOString(),
+            refundable: true,
+          }),
+        };
+        const service = new BookingService(prisma as never, {} as never, duffelService as never, {} as never);
+
+        const result = await service.getCancellationQuote('b-1', 'u-1');
+        expect(result.quoteId).toBe('quote-new');
+        expect(prisma.booking.updateMany).toHaveBeenNthCalledWith(1, {
+          where: {
+            id: 'b-1',
+            status: 'CONFIRMED',
+            OR: [
+              { duffelCancellationQuoteId: null },
+              {
+                cancellationDeadline: { lte: expect.any(Date) },
+                duffelCancellationQuoteId: { not: 'PENDING_QUOTE' },
+              },
+            ],
+          },
+          data: {
+            duffelCancellationQuoteId: 'PENDING_QUOTE',
+          },
+        });
+        expect(prisma.booking.updateMany).toHaveBeenNthCalledWith(2, {
+          where: {
+            id: 'b-1',
+            status: 'CONFIRMED',
+            duffelCancellationQuoteId: 'PENDING_QUOTE',
+          },
+          data: expect.objectContaining({
+            duffelCancellationQuoteId: 'quote-new',
+          }),
+        });
+      });
+
+      it('reverts PENDING_QUOTE to null on Duffel API failure', async () => {
+        const booking = {
+          id: 'b-1',
+          userId: 'u-1',
+          status: 'CONFIRMED',
+          duffelOrderId: 'ord-1',
+          duffelCancellationQuoteId: null,
+          cancellationDeadline: null,
+          currency: 'GBP',
+        };
+        const prisma = {
+          booking: {
+            findUnique: jest.fn().mockResolvedValue(booking),
+            updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+          },
+        };
+        const duffelService = {
+          createCancellationQuote: jest.fn().mockRejectedValue(new Error('Duffel API error')),
+        };
+        const service = new BookingService(prisma as never, {} as never, duffelService as never, {} as never);
+
+        await expect(service.getCancellationQuote('b-1', 'u-1')).rejects.toThrow('Duffel API error');
+        expect(prisma.booking.updateMany).toHaveBeenNthCalledWith(2, {
+          where: {
+            id: 'b-1',
+            duffelCancellationQuoteId: 'PENDING_QUOTE',
+          },
+          data: {
+            duffelCancellationQuoteId: null,
+          },
+        });
+      });
+
+      it('returns updated booking quote if updateMany count is 0 but concurrent request populated valid quote', async () => {
+        const booking = {
+          id: 'b-1',
+          userId: 'u-1',
+          status: 'CONFIRMED',
+          duffelOrderId: 'ord-1',
+          duffelCancellationQuoteId: null,
+          cancellationDeadline: null,
+          currency: 'GBP',
+        };
+        const futureDate = new Date(Date.now() + 3600000);
+        const concurrentBooking = {
+          id: 'b-1',
+          duffelOrderId: 'ord-1',
+          duffelCancellationQuoteId: 'quote-concurrent',
+          cancellationDeadline: futureDate,
+          customerRefundAmount: '100.00',
+          currency: 'GBP',
+          cancellationRefundable: true,
+        };
+        const prisma = {
+          booking: {
+            findUnique: jest
+              .fn()
+              .mockResolvedValueOnce(booking)
+              .mockResolvedValueOnce(concurrentBooking),
+            updateMany: jest.fn().mockResolvedValue({ count: 0 }),
+          },
+        };
+        const duffelService = {
+          createCancellationQuote: jest.fn(),
+        };
+        const service = new BookingService(prisma as never, {} as never, duffelService as never, {} as never);
+
+        const result = await service.getCancellationQuote('b-1', 'u-1');
+        expect(result.quoteId).toBe('quote-concurrent');
+      });
+
+      it('throws BadRequestException if updateMany count is 0 and no valid quote in updated booking', async () => {
+        const booking = {
+          id: 'b-1',
+          userId: 'u-1',
+          status: 'CONFIRMED',
+          duffelOrderId: 'ord-1',
+          duffelCancellationQuoteId: null,
+          cancellationDeadline: null,
+          currency: 'GBP',
+        };
+        const cancelledBooking = {
+          id: 'b-1',
+          status: 'CANCELLED_AND_REFUNDED',
+          duffelCancellationQuoteId: null,
+        };
+        const prisma = {
+          booking: {
+            findUnique: jest
+              .fn()
+              .mockResolvedValueOnce(booking)
+              .mockResolvedValue(cancelledBooking),
+            updateMany: jest.fn().mockResolvedValue({ count: 0 }),
+          },
+        };
+
+        const duffelService = {
+          createCancellationQuote: jest.fn(),
+        };
+        const service = new BookingService(prisma as never, {} as never, duffelService as never, {} as never);
+
+        await expect(service.getCancellationQuote('b-1', 'u-1')).rejects.toThrow(
+          'Booking state changed or quote creation in progress',
+        );
+      });
+    });
   });
 });

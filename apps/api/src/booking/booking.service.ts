@@ -2,7 +2,7 @@ import { BadRequestException, ForbiddenException, Injectable, NotFoundException,
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { Booking, BookingFailureReason, BookingStatus, Prisma } from '@prisma/client';
 import { PrismaService } from '@/prisma/prisma.service';
-import { FlightSnapshot, PassengerSnapshot } from '@shared/booking-types';
+import { FlightSnapshot, PassengerSnapshot, CancellationQuoteResponseDto } from '@shared/booking-types';
 import { BookingDetailResponseDto, BookingListItemResponseDto, BookingListResponseDto, BookingTab } from './dto';
 
 type BookingWithRelations = Prisma.BookingGetPayload<{
@@ -335,17 +335,30 @@ export class BookingService {
 
   async listBookings(userId: string, tab: BookingTab, page: number, limit: number): Promise<BookingListResponseDto> {
     const now = new Date();
+    const activeStatuses: BookingStatus[] = [
+      BookingStatus.PROCESSING,
+      BookingStatus.CONFIRMED,
+      BookingStatus.CANCELLATION_PENDING,
+      BookingStatus.CANCELLED_PENDING_REFUND,
+      BookingStatus.FAILED,
+    ];
+    const pastTerminalStatuses: BookingStatus[] = [
+      BookingStatus.COMPLETED,
+      BookingStatus.CANCELLED_AND_REFUNDED,
+      BookingStatus.CANCELLED_NO_REFUND,
+    ];
+
     const where = tab === 'past'
       ? {
           userId,
           OR: [
-            { status: BookingStatus.COMPLETED },
-            { status: { in: [BookingStatus.CONFIRMED, BookingStatus.FAILED] }, departureAt: { lte: now } },
+            { status: { in: pastTerminalStatuses } },
+            { status: { in: activeStatuses }, departureAt: { lte: now } },
           ],
         }
       : {
           userId,
-          status: { in: [BookingStatus.PROCESSING, BookingStatus.CONFIRMED, BookingStatus.FAILED] },
+          status: { in: activeStatuses },
           OR: [{ departureAt: null }, { departureAt: { gt: now } }],
         };
 
@@ -412,6 +425,11 @@ export class BookingService {
       passengerSnapshot: booking.passengerSnapshot,
       payment: booking.payment ? { id: booking.payment.id, status: booking.payment.status as any, stripePaymentIntentId: booking.payment.stripePaymentIntentId } : null,
       bookingIntent: { id: booking.bookingIntent.id, offerId: booking.bookingIntent.duffelOfferId },
+      cancellationDeadline: booking.cancellationDeadline?.toISOString() ?? null,
+      cancellationRefundable: booking.cancellationRefundable ?? null,
+      airlineRefundAmount: booking.airlineRefundAmount ? booking.airlineRefundAmount.toString() : null,
+      customerRefundAmount: booking.customerRefundAmount ? booking.customerRefundAmount.toString() : null,
+      duffelCancellationQuoteId: booking.duffelCancellationQuoteId ?? null,
       createdAt: booking.createdAt.toISOString(),
       updatedAt: booking.updatedAt.toISOString(),
     };
@@ -422,7 +440,16 @@ export class BookingService {
       if (tab === 'past') {
         return (right.departureAt?.getTime() ?? 0) - (left.departureAt?.getTime() ?? 0);
       }
-      const priority: Record<BookingStatus, number> = { PROCESSING: 0, FAILED: 1, CONFIRMED: 2, COMPLETED: 3 };
+      const priority: Record<BookingStatus, number> = {
+        PROCESSING: 0,
+        FAILED: 1,
+        CONFIRMED: 2,
+        CANCELLATION_PENDING: 3,
+        CANCELLED_PENDING_REFUND: 4,
+        CANCELLED_AND_REFUNDED: 5,
+        CANCELLED_NO_REFUND: 6,
+        COMPLETED: 7,
+      };
       const priorityDifference = priority[left.status] - priority[right.status];
       if (priorityDifference !== 0) return priorityDifference;
       return (left.departureAt?.getTime() ?? Number.MAX_SAFE_INTEGER) - (right.departureAt?.getTime() ?? Number.MAX_SAFE_INTEGER);
@@ -443,4 +470,144 @@ export class BookingService {
     };
   }
 
+  async getCancellationQuote(bookingId: string, userId: string): Promise<CancellationQuoteResponseDto> {
+    const booking = await this.prisma.booking.findUnique({
+      where: { id: bookingId },
+    });
+
+    if (!booking) {
+      throw new NotFoundException('Booking not found');
+    }
+    if (booking.userId !== userId) {
+      throw new ForbiddenException('You do not have access to this booking');
+    }
+
+    if (booking.status !== BookingStatus.CONFIRMED || (booking.departureAt && booking.departureAt <= new Date())) {
+      throw new BadRequestException('Booking is not eligible for cancellation quote');
+    }
+
+    if (!booking.duffelOrderId) {
+      throw new BadRequestException('No Duffel order associated with booking');
+    }
+
+    const now = new Date();
+
+    if (
+      booking.duffelCancellationQuoteId &&
+      booking.duffelCancellationQuoteId !== 'PENDING_QUOTE' &&
+      booking.cancellationDeadline &&
+      booking.cancellationDeadline > now
+    ) {
+      return {
+        quoteId: booking.duffelCancellationQuoteId,
+        bookingId: booking.id,
+        duffelOrderId: booking.duffelOrderId,
+        refundAmount: booking.customerRefundAmount ? booking.customerRefundAmount.toString() : '0.00',
+        currency: booking.currency,
+        expiresAt: booking.cancellationDeadline.toISOString(),
+        refundable: booking.cancellationRefundable ?? false,
+        cancellationDeadline: booking.cancellationDeadline.toISOString(),
+      };
+    }
+
+    let claimed = false;
+
+    if (booking.duffelCancellationQuoteId !== 'PENDING_QUOTE') {
+      const claimResult = await this.prisma.booking.updateMany({
+        where: {
+          id: booking.id,
+          status: BookingStatus.CONFIRMED,
+          OR: [
+            { duffelCancellationQuoteId: null },
+            {
+              cancellationDeadline: { lte: now },
+              duffelCancellationQuoteId: { not: 'PENDING_QUOTE' },
+            },
+          ],
+        },
+        data: {
+          duffelCancellationQuoteId: 'PENDING_QUOTE',
+        },
+      });
+      claimed = claimResult.count > 0;
+    }
+
+    if (!claimed) {
+      for (let attempt = 0; attempt < 25; attempt++) {
+        await new Promise((resolve) => setTimeout(resolve, 200));
+        const updatedBooking = await this.prisma.booking.findUnique({ where: { id: booking.id } });
+        if (
+          updatedBooking &&
+          updatedBooking.duffelCancellationQuoteId &&
+          updatedBooking.duffelCancellationQuoteId !== 'PENDING_QUOTE' &&
+          updatedBooking.cancellationDeadline &&
+          updatedBooking.cancellationDeadline > new Date()
+        ) {
+          return {
+            quoteId: updatedBooking.duffelCancellationQuoteId,
+            bookingId: updatedBooking.id,
+            duffelOrderId: updatedBooking.duffelOrderId || booking.duffelOrderId,
+            refundAmount: updatedBooking.customerRefundAmount ? updatedBooking.customerRefundAmount.toString() : '0.00',
+            currency: updatedBooking.currency,
+            expiresAt: updatedBooking.cancellationDeadline.toISOString(),
+            refundable: updatedBooking.cancellationRefundable ?? false,
+            cancellationDeadline: updatedBooking.cancellationDeadline.toISOString(),
+          };
+        }
+      }
+      throw new BadRequestException('Booking state changed or quote creation in progress');
+    }
+
+    try {
+      const quote = await this.duffelService.createCancellationQuote(booking.duffelOrderId);
+
+      const quoteId = quote.id;
+      const duffelOrderId = quote.order_id || booking.duffelOrderId;
+      const refundAmount = quote.refund_amount ?? quote.total_refund_amount ?? '0.00';
+      const currency = quote.refund_currency ?? quote.currency ?? booking.currency ?? 'GBP';
+      const expiresAt = quote.expires_at ?? quote.expiresAt ?? new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+      const refundable = quote.refundable !== undefined ? Boolean(quote.refundable) : parseFloat(String(refundAmount)) > 0;
+      const cancellationDeadline = expiresAt;
+
+      const finalizeResult = await this.prisma.booking.updateMany({
+        where: {
+          id: booking.id,
+          status: BookingStatus.CONFIRMED,
+          duffelCancellationQuoteId: 'PENDING_QUOTE',
+        },
+        data: {
+          duffelCancellationQuoteId: quoteId,
+          customerRefundAmount: refundAmount,
+          cancellationRefundable: refundable,
+          cancellationDeadline: cancellationDeadline ? new Date(cancellationDeadline) : null,
+        },
+      });
+
+      if (finalizeResult.count === 0) {
+        throw new BadRequestException('Booking status changed while generating cancellation quote');
+      }
+
+      return {
+        quoteId,
+        bookingId: booking.id,
+        duffelOrderId,
+        refundAmount: String(refundAmount),
+        currency,
+        expiresAt,
+        refundable,
+        cancellationDeadline,
+      };
+    } catch (error) {
+      await this.prisma.booking.updateMany({
+        where: {
+          id: booking.id,
+          duffelCancellationQuoteId: 'PENDING_QUOTE',
+        },
+        data: {
+          duffelCancellationQuoteId: null,
+        },
+      });
+      throw error;
+    }
+  }
 }
