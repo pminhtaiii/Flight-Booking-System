@@ -27,17 +27,24 @@ export class PaymentCronService {
   @Cron('*/1 * * * *')
   async handleCancellationRefundRecovery(): Promise<void> {
     const now = new Date();
+    const processingLeaseExpiresAt = new Date(now.getTime() + 5 * 60_000);
     try {
       const dueRefunds = await this.prisma.refund.findMany({
-        where: { status: 'REFUND_RETRY_SCHEDULED', nextRetryAt: { lte: now } },
+        where: {
+          OR: [
+            { status: 'REFUND_RETRY_SCHEDULED', nextRetryAt: { lte: now } },
+            { status: 'REFUND_PROCESSING', nextRetryAt: { lte: now } },
+            { status: 'REFUND_PROCESSING', nextRetryAt: null },
+          ],
+        },
         orderBy: { nextRetryAt: 'asc' },
         take: 100,
       });
       for (const refund of dueRefunds) {
         try {
           const claim = await this.prisma.refund.updateMany({
-            where: { id: refund.id, status: 'REFUND_RETRY_SCHEDULED', nextRetryAt: refund.nextRetryAt },
-            data: { status: 'REFUND_PROCESSING', nextRetryAt: null },
+            where: { id: refund.id, status: refund.status, nextRetryAt: refund.nextRetryAt },
+            data: { status: 'REFUND_PROCESSING', nextRetryAt: processingLeaseExpiresAt },
           });
           if (claim.count === 1) {
             await this.paymentRefundService.recoverScheduledCancellationRefund(refund.id);

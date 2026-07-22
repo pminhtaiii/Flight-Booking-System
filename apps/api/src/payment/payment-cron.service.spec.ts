@@ -200,8 +200,11 @@ describe('PaymentCronService', () => {
 
     expect(prisma.refund.findMany).toHaveBeenCalledWith({
       where: {
-        status: 'REFUND_RETRY_SCHEDULED',
-        nextRetryAt: { lte: expect.any(Date) },
+        OR: [
+          { status: 'REFUND_RETRY_SCHEDULED', nextRetryAt: { lte: expect.any(Date) } },
+          { status: 'REFUND_PROCESSING', nextRetryAt: { lte: expect.any(Date) } },
+          { status: 'REFUND_PROCESSING', nextRetryAt: null },
+        ],
       },
       orderBy: { nextRetryAt: 'asc' },
       take: 100,
@@ -209,11 +212,45 @@ describe('PaymentCronService', () => {
     expect(prisma.refund.updateMany).toHaveBeenCalledWith({
       where: {
         id: dueRefund.id,
-        status: 'REFUND_RETRY_SCHEDULED',
+        status: dueRefund.status,
         nextRetryAt: dueRefund.nextRetryAt,
       },
-      data: { status: 'REFUND_PROCESSING', nextRetryAt: null },
+      data: { status: 'REFUND_PROCESSING', nextRetryAt: expect.any(Date) },
     });
     expect(paymentRefundService.recoverScheduledCancellationRefund).toHaveBeenCalledWith(dueRefund.id);
+  });
+
+  it('reclaims a cancellation refund whose processing lease has expired', async () => {
+    const expiredLease = new Date('2026-07-22T00:00:00.000Z');
+    const processingRefund = {
+      id: 'refund-1',
+      status: 'REFUND_PROCESSING',
+      nextRetryAt: expiredLease,
+    };
+    prisma.refund.findMany.mockResolvedValue([processingRefund]);
+    prisma.refund.updateMany.mockResolvedValue({ count: 1 });
+
+    await service.handleCancellationRefundRecovery();
+
+    expect(prisma.refund.findMany).toHaveBeenCalledWith({
+      where: {
+        OR: [
+          { status: 'REFUND_RETRY_SCHEDULED', nextRetryAt: { lte: expect.any(Date) } },
+          { status: 'REFUND_PROCESSING', nextRetryAt: { lte: expect.any(Date) } },
+          { status: 'REFUND_PROCESSING', nextRetryAt: null },
+        ],
+      },
+      orderBy: { nextRetryAt: 'asc' },
+      take: 100,
+    });
+    expect(prisma.refund.updateMany).toHaveBeenCalledWith({
+      where: {
+        id: processingRefund.id,
+        status: 'REFUND_PROCESSING',
+        nextRetryAt: expiredLease,
+      },
+      data: { status: 'REFUND_PROCESSING', nextRetryAt: expect.any(Date) },
+    });
+    expect(paymentRefundService.recoverScheduledCancellationRefund).toHaveBeenCalledWith(processingRefund.id);
   });
 });

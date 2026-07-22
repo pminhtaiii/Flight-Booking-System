@@ -955,15 +955,12 @@ export class PaymentRefundService {
   ): Promise<{ refundId: string; refundStatus: string; bookingStatus: string }> {
     const refund = await this.prisma.refund.findUnique({
       where: { id: refundId },
-      select: { id: true, bookingId: true, paymentId: true, status: true },
+      select: { id: true, bookingId: true, paymentId: true, status: true, amount: true, currency: true },
     });
     if (!refund?.bookingId) {
       throw new NotFoundException('Escalated cancellation refund not found');
     }
     const bookingId = refund.bookingId;
-    if (refund.status !== RefundStatus.REFUND_FAILED_NEEDS_ATTENTION) {
-      throw new ConflictException('Refund is not awaiting manual resolution');
-    }
 
     const result = await this.prisma.$transaction(async (tx) => {
       if (action === 'RETRY_WITH_FRESH_KEY') {
@@ -979,8 +976,8 @@ export class PaymentRefundService {
             expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
           },
         });
-        await tx.refund.update({
-          where: { id: refund.id },
+        const claim = await tx.refund.updateMany({
+          where: { id: refund.id, status: RefundStatus.REFUND_FAILED_NEEDS_ATTENTION },
           data: {
             idempotencyKeyId: key.id,
             idempotencyKeyCreatedAt: new Date(),
@@ -991,6 +988,9 @@ export class PaymentRefundService {
             lastErrorAt: null,
           },
         });
+        if (claim.count !== 1) {
+          throw new ConflictException('Refund is not awaiting manual resolution');
+        }
         await tx.booking.update({
           where: { id: bookingId },
           data: { status: BookingStatus.CANCELLED_PENDING_REFUND },
@@ -998,10 +998,13 @@ export class PaymentRefundService {
         return { refundStatus: RefundStatus.REFUND_RETRY_SCHEDULED, bookingStatus: BookingStatus.CANCELLED_PENDING_REFUND };
       }
 
-      await tx.refund.update({
-        where: { id: refund.id },
+      const claim = await tx.refund.updateMany({
+        where: { id: refund.id, status: RefundStatus.REFUND_FAILED_NEEDS_ATTENTION },
         data: { status: RefundStatus.SUCCEEDED, nextRetryAt: null },
       });
+      if (claim.count !== 1) {
+        throw new ConflictException('Refund is not awaiting manual resolution');
+      }
       await tx.payment.update({
         where: { id: refund.paymentId },
         data: { status: PaymentStatus.REFUNDED },
@@ -1009,6 +1012,38 @@ export class PaymentRefundService {
       await tx.booking.update({
         where: { id: bookingId },
         data: { status: BookingStatus.CANCELLED_AND_REFUNDED },
+      });
+      const transactionId = crypto.randomUUID();
+      await tx.ledgerEntry.createMany({
+        data: [
+          {
+            paymentId: refund.paymentId,
+            transactionId,
+            accountId: 'PLATFORM_REVENUE',
+            entryType: 'DEBIT',
+            amount: refund.amount,
+            currency: refund.currency,
+          },
+          {
+            paymentId: refund.paymentId,
+            transactionId,
+            accountId: 'CUSTOMER_RECEIVABLE',
+            entryType: 'CREDIT',
+            amount: refund.amount,
+            currency: refund.currency,
+          },
+        ],
+      });
+      await tx.paymentEvent.create({
+        data: {
+          paymentId: refund.paymentId,
+          eventType: 'cancellation_refund_manually_resolved',
+          previousStatus: PaymentStatus.SUCCEEDED,
+          newStatus: PaymentStatus.REFUNDED,
+          amount: refund.amount,
+          source: PaymentEventSource.API,
+          createdBy: 'admin_refund_resolution',
+        },
       });
       return { refundStatus: RefundStatus.SUCCEEDED, bookingStatus: BookingStatus.CANCELLED_AND_REFUNDED };
     });
