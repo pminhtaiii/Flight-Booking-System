@@ -87,9 +87,7 @@ Because the database migrations added nullable columns (`cancellationId`, `cance
 - If data cleanup is required, run targeted SQL queries to clear stuck claims:
   ```sql
   UPDATE "bookings"
-  SET "status" = 'CONFIRMED',
-      "cancellation_claim_token" = NULL,
-      "cancellation_claimed_at" = NULL
+  SET "status" = 'CONFIRMED'
   WHERE "status" = 'CANCELLATION_PENDING';
   ```
 

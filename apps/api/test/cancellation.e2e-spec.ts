@@ -13,6 +13,7 @@ import { HttpExceptionFilter } from '@/common/filters/http-exception.filter';
 import { StripeService } from '@/common/stripe.service';
 import { DuffelService } from '@/duffel/duffel.service';
 import { PaymentCronService } from '@/payment/payment-cron.service';
+import { SchedulerRegistry } from '@nestjs/schedule';
 import { PrismaService } from '@/prisma/prisma.service';
 
 type TestUser = {
@@ -45,6 +46,11 @@ describe('Cancellation and refund recovery (E2E)', () => {
     app.useGlobalPipes(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, transform: true }));
     app.useGlobalFilters(new HttpExceptionFilter());
     app.setGlobalPrefix('api', { exclude: ['health'] });
+
+    // Stop all cron jobs registered with the SchedulerRegistry to avoid background scheduler races
+    const schedulerRegistry = moduleFixture.get<SchedulerRegistry>(SchedulerRegistry);
+    schedulerRegistry.getCronJobs().forEach((job) => job.stop());
+
     await app.init();
 
     prisma = moduleFixture.get<PrismaService>(PrismaService);
@@ -232,6 +238,12 @@ describe('Cancellation and refund recovery (E2E)', () => {
     ]);
 
     expect(responses.map((response) => response.status).sort()).toEqual([201, 201]);
+    for (const res of responses) {
+      expect([BookingStatus.CANCELLED_PENDING_REFUND, BookingStatus.CANCELLED_AND_REFUNDED]).toContain(res.body.bookingStatus);
+      expect([BookingStatus.CANCELLED_PENDING_REFUND, BookingStatus.CANCELLED_AND_REFUNDED]).toContain(res.body.cancellationStatus);
+      expect(['PENDING', 'SUCCEEDED']).toContain(res.body.refundStatus);
+      expect(Number(res.body.refundAmount)).toBe(100);
+    }
     expect(confirmSpy).toHaveBeenCalledTimes(1);
     expect(retrieveSpy).toHaveBeenCalledTimes(1);
     expect(stripeSpy).toHaveBeenCalledTimes(1);
