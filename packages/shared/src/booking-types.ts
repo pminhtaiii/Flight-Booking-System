@@ -127,11 +127,11 @@ export interface BookingDetailDto {
   /** Payment status joined for charge message derivation */
   paymentStatus?: string;
   stripePaymentIntentId?: string;
-  cancellationDeadline?: string;
-  cancellationRefundable?: boolean;
-  airlineRefundAmount?: string;
-  customerRefundAmount?: string;
-  duffelCancellationQuoteId?: string;
+  cancellationDeadline?: string | null;
+  cancellationRefundable?: boolean | null;
+  airlineRefundAmount?: string | null;
+  customerRefundAmount?: string | null;
+  duffelCancellationQuoteId?: string | null;
   createdAt: string;
   updatedAt: string;
 }

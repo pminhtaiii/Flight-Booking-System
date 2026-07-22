@@ -335,17 +335,30 @@ export class BookingService {
 
   async listBookings(userId: string, tab: BookingTab, page: number, limit: number): Promise<BookingListResponseDto> {
     const now = new Date();
+    const activeStatuses: BookingStatus[] = [
+      BookingStatus.PROCESSING,
+      BookingStatus.CONFIRMED,
+      BookingStatus.CANCELLATION_PENDING,
+      BookingStatus.CANCELLED_PENDING_REFUND,
+      BookingStatus.FAILED,
+    ];
+    const pastTerminalStatuses: BookingStatus[] = [
+      BookingStatus.COMPLETED,
+      BookingStatus.CANCELLED_AND_REFUNDED,
+      BookingStatus.CANCELLED_NO_REFUND,
+    ];
+
     const where = tab === 'past'
       ? {
           userId,
           OR: [
-            { status: BookingStatus.COMPLETED },
-            { status: { in: [BookingStatus.CONFIRMED, BookingStatus.FAILED] }, departureAt: { lte: now } },
+            { status: { in: pastTerminalStatuses } },
+            { status: { in: activeStatuses }, departureAt: { lte: now } },
           ],
         }
       : {
           userId,
-          status: { in: [BookingStatus.PROCESSING, BookingStatus.CONFIRMED, BookingStatus.FAILED] },
+          status: { in: activeStatuses },
           OR: [{ departureAt: null }, { departureAt: { gt: now } }],
         };
 
@@ -412,6 +425,11 @@ export class BookingService {
       passengerSnapshot: booking.passengerSnapshot,
       payment: booking.payment ? { id: booking.payment.id, status: booking.payment.status as any, stripePaymentIntentId: booking.payment.stripePaymentIntentId } : null,
       bookingIntent: { id: booking.bookingIntent.id, offerId: booking.bookingIntent.duffelOfferId },
+      cancellationDeadline: booking.cancellationDeadline?.toISOString() ?? null,
+      cancellationRefundable: booking.cancellationRefundable ?? null,
+      airlineRefundAmount: booking.airlineRefundAmount ? booking.airlineRefundAmount.toString() : null,
+      customerRefundAmount: booking.customerRefundAmount ? booking.customerRefundAmount.toString() : null,
+      duffelCancellationQuoteId: booking.duffelCancellationQuoteId ?? null,
       createdAt: booking.createdAt.toISOString(),
       updatedAt: booking.updatedAt.toISOString(),
     };
@@ -464,12 +482,29 @@ export class BookingService {
       throw new ForbiddenException('You do not have access to this booking');
     }
 
-    if (booking.status !== BookingStatus.CONFIRMED && booking.status !== BookingStatus.COMPLETED) {
+    if (booking.status !== BookingStatus.CONFIRMED || (booking.departureAt && booking.departureAt <= new Date())) {
       throw new BadRequestException('Booking is not eligible for cancellation quote');
     }
 
     if (!booking.duffelOrderId) {
       throw new BadRequestException('No Duffel order associated with booking');
+    }
+
+    if (
+      booking.duffelCancellationQuoteId &&
+      booking.cancellationDeadline &&
+      booking.cancellationDeadline > new Date()
+    ) {
+      return {
+        quoteId: booking.duffelCancellationQuoteId,
+        bookingId: booking.id,
+        duffelOrderId: booking.duffelOrderId,
+        refundAmount: booking.customerRefundAmount ? booking.customerRefundAmount.toString() : '0.00',
+        currency: booking.currency,
+        expiresAt: booking.cancellationDeadline.toISOString(),
+        refundable: booking.cancellationRefundable ?? false,
+        cancellationDeadline: booking.cancellationDeadline.toISOString(),
+      };
     }
 
     const quote = await this.duffelService.createCancellationQuote(booking.duffelOrderId);
@@ -482,8 +517,8 @@ export class BookingService {
     const refundable = quote.refundable !== undefined ? Boolean(quote.refundable) : parseFloat(String(refundAmount)) > 0;
     const cancellationDeadline = expiresAt;
 
-    await this.prisma.booking.update({
-      where: { id: booking.id },
+    const updateResult = await this.prisma.booking.updateMany({
+      where: { id: booking.id, status: BookingStatus.CONFIRMED },
       data: {
         duffelCancellationQuoteId: quoteId,
         customerRefundAmount: refundAmount,
@@ -491,6 +526,10 @@ export class BookingService {
         cancellationDeadline: cancellationDeadline ? new Date(cancellationDeadline) : null,
       },
     });
+
+    if (updateResult.count === 0) {
+      throw new BadRequestException('Booking state changed while generating cancellation quote');
+    }
 
     return {
       quoteId,

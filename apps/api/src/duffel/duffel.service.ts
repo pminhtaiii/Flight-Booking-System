@@ -572,7 +572,7 @@ export class DuffelService {
       const isTestEnv = process.env.NODE_ENV === 'test' || isJest;
       const token = process.env.DUFFEL_ACCESS_TOKEN;
 
-      if (!isJest && (process.env.NODE_ENV === 'test' || token === 'mock')) {
+      if (isTestEnv || token === 'mock' || !token) {
         this.logger.log(`Mocking Duffel cancellation quote for test environment. OrderId: ${duffelOrderId}`);
         return {
           id: `oc_mock_${duffelOrderId}`,

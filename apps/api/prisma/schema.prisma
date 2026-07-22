@@ -138,6 +138,10 @@ model TravelerProfile {
   @@map("traveler_profiles")
 }
 
+/// Stores flight booking records.
+/// NOTE: Booking stores currency amounts (totalAmount, airlineRefundAmount, customerRefundAmount) in major currency units (DECIMAL(10,2), e.g. 100.50).
+/// In contrast, Refund stores currency amounts in minor currency units (integer cents, e.g. 10050).
+/// Always use explicit unit conversions (Math.round(amount * 100) when converting major to minor units, or amount / 100 when converting minor to major units) when mapping between Booking and Refund.
 model Booking {
   id                String               @id @default(uuid())
   userId            String
@@ -466,6 +470,10 @@ model LedgerEntry {
   @@map("ledger_entries")
 }
 
+/// Stores payment refund transactions.
+/// NOTE: Refund stores currency amounts (amount, airlineRefundAmount, customerRefundAmount) in minor currency units (integer cents, e.g. 10050).
+/// In contrast, Booking stores currency amounts in major currency units (DECIMAL(10,2), e.g. 100.50).
+/// Always use explicit unit conversions (Math.round(amount * 100) when converting major to minor units, or amount / 100 when converting minor to major units) when mapping between Booking and Refund.
 model Refund {
   id                  String            @id @default(uuid())
   paymentId           String
