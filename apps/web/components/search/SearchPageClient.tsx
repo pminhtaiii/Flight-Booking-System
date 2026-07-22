@@ -721,63 +721,69 @@ export function SearchPageClient({ allAirports }: Props) {
   };
 
   return (
-    <div className="main-workspace flex flex-col lg:flex-row gap-6 w-full min-h-[calc(100vh-120px)] relative overflow-hidden">
+    <div className={cn("search-page-wrapper flex w-full min-h-[calc(100vh-120px)] relative overflow-hidden transition-all duration-700 ease-in-out", isSplitActive ? "split flex-col lg:flex-row" : "flex-col items-center")}>
       
       {/* ── Chat Container (Centred to Left slide transition) ── */}
       <div
         className={cn(
-          "chat-card-container flex flex-col overflow-hidden",
-          isSplitActive ? "w-full lg:w-[38%] lg:max-w-[420px] h-[calc(100vh-140px)] rounded-[20px]" : "w-full max-w-[680px] mx-auto h-[600px] rounded-[24px]"
+          "search-panel flex flex-col flex-shrink-0 z-10 transition-all duration-800 ease-in-out",
+          isSplitActive ? "w-full lg:w-[40%] lg:max-w-[480px] h-[50vh] lg:h-[calc(100vh-160px)] mb-6 lg:mb-0 lg:mr-6" : "w-full max-w-[720px] h-[75vh]"
         )}
       >
         {/* Chat Header */}
-        <div className="bg-card border-b border-card-border px-6 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-lg bg-accent/10 flex items-center justify-center text-accent">
-              <Sparkles className="w-4 h-4" />
+        <div className="px-6 py-5 flex items-center justify-between border-b border-white/20 dark:border-white/5 bg-white/40 dark:bg-black/20 backdrop-blur-md">
+          <div className="flex items-center gap-4">
+            <div className="relative">
+              <div className="w-10 h-10 rounded-full overflow-hidden border-2 border-white shadow-sm flex items-center justify-center bg-white text-accent">
+                <Sparkles className="w-5 h-5" />
+              </div>
+              <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-400 border-2 border-white rounded-full"></div>
             </div>
             <div>
-              <h3 className="font-semibold text-text-primary text-sm">SkyBook AI Assistant</h3>
-              <span className="text-[10px] text-text-confirmed font-bold uppercase tracking-wider flex items-center gap-1">
-                <span className="w-1.5 h-1.5 rounded-full bg-bg-confirmed animate-pulse" /> Online
-              </span>
+              <h3 className="font-bold text-gray-900 dark:text-white text-sm">SkyBook Assistant</h3>
+              <span className="text-[11px] text-gray-500 font-medium">Ready to help you fly</span>
             </div>
           </div>
           <button
             onClick={clearChatHistory}
             title="Reset conversation"
-            className="p-1.5 text-text-muted hover:text-danger-foreground hover:bg-bg-cancelled rounded-lg transition"
+            className="w-8 h-8 flex items-center justify-center rounded-full bg-black/5 hover:bg-black/10 text-gray-600 transition"
           >
             <Trash2 className="w-4 h-4" />
           </button>
         </div>
 
         {/* Messages Feed */}
-        <div className="flex-1 overflow-y-auto p-6 space-y-4 bg-background/5">
+        <div className="flex-1 overflow-y-auto p-6 space-y-6">
           {messages.map((msg) => (
             <div
               key={msg.id}
               className={cn(
-                "flex flex-col max-w-[85%] animate-fade-in",
-                msg.sender === 'USER' ? "self-end items-end ml-auto" : "self-start items-start"
+                "flex max-w-[85%] animate-fade-in",
+                msg.sender === 'USER' ? "self-end ml-auto justify-end" : "self-start justify-start"
               )}
             >
-              <span className="text-[10px] text-text-muted font-bold uppercase tracking-wider mb-1 px-1">
-                {msg.sender === 'USER' ? 'You' : 'SkyBook AI'}
-              </span>
               <div
                 className={cn(
-                  "px-4 py-3 text-sm leading-relaxed",
+                  "px-5 py-4 text-[15px] leading-relaxed relative group",
                   msg.sender === 'USER' ? "bubble-user" : "bubble-agent"
                 )}
               >
-                {msg.content || (msg.isStreaming && (
-                  <span className="flex items-center gap-1 py-1">
-                    <span className="w-1 h-1 rounded-full bg-text-primary animate-bounce" style={{ animationDelay: '0s' }} />
-                    <span className="w-1 h-1 rounded-full bg-text-primary animate-bounce" style={{ animationDelay: '0.2s' }} />
-                    <span className="w-1 h-1 rounded-full bg-text-primary animate-bounce" style={{ animationDelay: '0.4s' }} />
-                  </span>
-                ))}
+                {msg.sender === 'USER' ? null : (
+                   <div className="bubble-badge">
+                     <Sparkles className="w-3 h-3 inline-block mr-1" />
+                     SkyBook AI
+                   </div>
+                )}
+                <div className="text-gray-800 dark:text-gray-200">
+                  {msg.content || (msg.isStreaming && (
+                    <span className="flex items-center gap-1 py-1">
+                      <span className="w-1.5 h-1.5 rounded-full bg-gray-400 animate-bounce" style={{ animationDelay: '0s' }} />
+                      <span className="w-1.5 h-1.5 rounded-full bg-gray-400 animate-bounce" style={{ animationDelay: '0.15s' }} />
+                      <span className="w-1.5 h-1.5 rounded-full bg-gray-400 animate-bounce" style={{ animationDelay: '0.3s' }} />
+                    </span>
+                  ))}
+                </div>
               </div>
             </div>
           ))}
@@ -838,27 +844,27 @@ export function SearchPageClient({ allAirports }: Props) {
         </div>
 
         {/* Input & Quick Actions Area */}
-        <div className="border-t border-card-border p-4 bg-card">
+        <div className="p-6 bg-white/40 dark:bg-black/20 backdrop-blur-md border-t border-white/20 dark:border-white/5">
           {/* Quick Actions */}
           {!isSplitActive && !isStreaming && messages.length <= 1 && (
-            <div className="flex gap-2 flex-wrap mb-3">
+            <div className="flex gap-2 flex-wrap mb-4 justify-center">
               <button
                 onClick={() => sendChatMessage('Find flights from SFO to Tokyo next week')}
                 className="quick-action"
               >
-                Find flights to Tokyo
+                ✈️ Find flights to Tokyo
               </button>
               <button
                 onClick={() => sendChatMessage('What are my traveler preferences?')}
                 className="quick-action"
               >
-                My preferences
+                ⚙️ My preferences
               </button>
               <button
                 onClick={() => sendChatMessage('List my upcoming bookings')}
                 className="quick-action"
               >
-                Show bookings
+                📅 Show bookings
               </button>
             </div>
           )}
@@ -874,7 +880,7 @@ export function SearchPageClient({ allAirports }: Props) {
                   sendChatMessage(chatInput);
                 }
               }}
-              placeholder="Ask anything about flights or bookings..."
+              placeholder="Tell me where you'd like to go..."
               className="chat-input"
               rows={1}
               disabled={isStreaming}
@@ -884,17 +890,17 @@ export function SearchPageClient({ allAirports }: Props) {
               disabled={isStreaming || !chatInput.trim()}
               className="chat-send disabled:opacity-40 disabled:cursor-not-allowed"
             >
-              <Send className="w-4 h-4" />
+              <Send className="w-4 h-4 ml-0.5" />
             </button>
           </div>
         </div>
       </div>
 
       {/* ── Results & Map Column (Sliding in / hidden initially) ── */}
-      <div className={cn("results-area w-full lg:w-[62%]", isSplitActive && "results-area-active")}>
+      <div className={cn("results-area flex-1 min-w-0 transition-all duration-800 ease-in-out", isSplitActive && "results-area-active")}>
         
         {/* Search Controls Card */}
-        <div className="card">
+        <div className="search-panel p-6 mb-6">
           <h3 className="text-sm font-semibold text-text-primary mb-4 flex items-center gap-2">
             Traditional Search Form
           </h3>
@@ -1193,7 +1199,7 @@ export function SearchPageClient({ allAirports }: Props) {
         </div>
 
         {/* Map Container */}
-        <div className="h-[350px] min-h-[300px] w-full rounded-2xl overflow-hidden border border-card-border shadow-md relative">
+        <div className="h-[350px] min-h-[300px] w-full rounded-2xl overflow-hidden border-2 border-white/40 shadow-xl relative mb-6">
           <MapContainer
             origin={mapOrigin}
             destination={mapDest}
@@ -1206,16 +1212,16 @@ export function SearchPageClient({ allAirports }: Props) {
         </div>
 
         {/* Results List */}
-        <div className="flex-1 flex flex-col gap-4">
+        <div className="flex-1 flex flex-col gap-6">
           {isSearching && (
-            <div className="card flex items-center justify-center p-12">
+            <div className="search-panel flex items-center justify-center p-12">
               <div className="w-8 h-8 border-4 border-accent border-t-transparent rounded-full animate-spin mr-3" />
               <span className="text-sm font-medium text-text-secondary">Fetching flight schedules...</span>
             </div>
           )}
 
           {!isSearching && !hasSearched && (
-            <div className="card flex flex-col items-center justify-center p-12 text-center text-text-muted bg-card">
+            <div className="search-panel flex flex-col items-center justify-center p-12 text-center text-text-muted">
               <AlertCircle className="w-12 h-12 mb-3 text-text-muted/45" />
               <p className="text-sm font-medium">Select origin and destination to search flights manually, or converse with the AI.</p>
             </div>
