@@ -6,7 +6,7 @@ export default defineConfig({
   workers: 1,
   reporter: [['html', { open: 'never' }]],
   use: {
-    baseURL: 'http://localhost:3000',
+    baseURL: 'http://127.0.0.1:3000',
     trace: 'on-first-retry',
     actionTimeout: 10000,
   },
@@ -18,9 +18,11 @@ export default defineConfig({
   ],
   webServer: [
     {
-      command: 'pnpm --filter @api/backend start:prod',
-      url: 'http://localhost:3001/health',
+      command: 'pnpm start:prod',
+      url: 'http://127.0.0.1:3001/health',
       reuseExistingServer: !process.env.CI,
+      timeout: 180000,
+      cwd: 'C:/Booking Systems/apps/api',
       env: {
         NODE_ENV: 'test',
         DATABASE_URL: 'postgresql://postgres:postgres@127.0.0.1:5432/test_db',
@@ -28,9 +30,11 @@ export default defineConfig({
       },
     },
     {
-      command: 'pnpm --filter @web/frontend dev',
-      url: 'http://localhost:3000',
+      command: 'pnpm start',
+      url: 'http://127.0.0.1:3000',
       reuseExistingServer: !process.env.CI,
+      timeout: 180000,
+      cwd: 'C:/Booking Systems/apps/web',
       env: {
         CI: 'true',
         NEXT_PUBLIC_API_URL: 'http://127.0.0.1:3001',

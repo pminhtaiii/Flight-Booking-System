@@ -8,7 +8,7 @@
     "start": "nest start",
     "start:dev": "pnpm --filter @shared/types build && nest start --watch",
     "start:debug": "pnpm --filter @shared/types build && nest start --debug --watch",
-    "start:prod": "node dist/main",
+    "start:prod": "node dist/apps/api/src/main",
     "test": "jest",
     "test:watch": "jest --watch",
     "test:cov": "jest --coverage",
