@@ -449,6 +449,7 @@ export class BookingService {
         CANCELLED_AND_REFUNDED: 5,
         CANCELLED_NO_REFUND: 6,
         COMPLETED: 7,
+        REFUND_FAILED_NEEDS_ATTENTION: 8,
       };
       const priorityDifference = priority[left.status] - priority[right.status];
       if (priorityDifference !== 0) return priorityDifference;
@@ -742,6 +743,46 @@ export class BookingService {
       cancellationStatus: booking.status,
       refundStatus,
       refundAmount: booking.customerRefundAmount?.toString() ?? '0.00',
+    };
+  }
+
+  async getCancellationStatus(bookingId: string, userId: string): Promise<any> {
+    const booking = await this.prisma.booking.findUnique({
+      where: { id: bookingId },
+      include: { cancellationRefund: true },
+    });
+
+    if (!booking) {
+      throw new NotFoundException('Booking not found');
+    }
+    if (booking.userId !== userId) {
+      throw new ForbiddenException('You do not have access to this booking');
+    }
+
+    let escalationMessage = null;
+    if (booking.status === BookingStatus.REFUND_FAILED_NEEDS_ATTENTION) {
+      const hoursElapsed = (Date.now() - booking.updatedAt.getTime()) / (1000 * 60 * 60);
+      if (hoursElapsed < 48) {
+        escalationMessage = "Refund is taking longer than expected. Our team is reviewing \u2014 no action needed.";
+      } else {
+        escalationMessage = "Refund requires attention. Please contact support.";
+      }
+    }
+
+    const refund = booking.cancellationRefund;
+
+    return {
+      bookingId: booking.id,
+      bookingStatus: booking.status,
+      cancellationDeadline: booking.cancellationDeadline?.toISOString() ?? null,
+      airlineRefundAmount: booking.airlineRefundAmount?.toString() ?? null,
+      customerRefundAmount: booking.customerRefundAmount?.toString() ?? null,
+      duffelCancellationQuoteId: booking.duffelCancellationQuoteId ?? null,
+      refundStatus: refund?.status ?? null,
+      retryCount: refund?.retryCount ?? null,
+      nextRetryAt: refund?.nextRetryAt?.toISOString() ?? null,
+      lastErrorCode: refund?.lastErrorCode ?? null,
+      escalationMessage,
     };
   }
 }

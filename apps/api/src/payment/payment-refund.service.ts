@@ -1057,6 +1057,21 @@ export class PaymentRefundService {
     return { refundId: refund.id, ...result };
   }
 
+  async listEscalatedRefunds(): Promise<any> {
+    return this.prisma.refund.findMany({
+      where: { status: RefundStatus.REFUND_FAILED_NEEDS_ATTENTION },
+      include: {
+        booking: {
+          select: { id: true, status: true, pnrReference: true, duffelOrderId: true },
+        },
+        payment: {
+          select: { id: true, status: true, stripePaymentIntentId: true, amount: true, currency: true },
+        },
+      },
+      orderBy: { updatedAt: 'desc' },
+    });
+  }
+
   private async finalizeScheduledCancellationRefundSuccess(
     refund: { id: string; paymentId: string; bookingId: string; amount: number; currency: string },
     stripeRefundId: string,

@@ -214,6 +214,10 @@ Deterministic errors, retry exhaustion, or a 22-hour-old key move the refund and
 An ADMIN may schedule a retry with a fresh key or record an externally completed manual resolution through POST /api/admin/refunds/:refundId/resolve.
 ```
 
+- **Frontend User Experience**: The booking detail page dynamically renders cancellation/refund alerts and provides an inline "Cancel Booking" quote review and confirmation modal, gated by the fare-specific cutoff deadline. Stale pending states are automatically polled every 5s.
+- **Operator Dashboard**: Admins use the `/admin/refunds` view to inspect PII-safe escalated refund states and trigger the manual resolution pipeline.
+
+
 ### AI Chatbot Agent Flow (SSE Streaming)
 
 ```
