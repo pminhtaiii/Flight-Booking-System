@@ -731,11 +731,16 @@ export class BookingService {
   }
 
   private toCancellationResponse(booking: Booking): CancellationResponseDto {
+    const refundStatus = booking.status === BookingStatus.CANCELLED_AND_REFUNDED
+      ? 'SUCCEEDED'
+      : booking.status === BookingStatus.FAILED && booking.failureReason === BookingFailureReason.SYSTEM_ERROR
+        ? 'REFUND_FAILED_NEEDS_ATTENTION'
+        : 'PENDING';
     return {
       bookingId: booking.id,
       bookingStatus: booking.status,
       cancellationStatus: booking.status,
-      refundStatus: booking.status === BookingStatus.CANCELLED_AND_REFUNDED ? 'SUCCEEDED' : 'PENDING',
+      refundStatus,
       refundAmount: booking.customerRefundAmount?.toString() ?? '0.00',
     };
   }

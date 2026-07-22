@@ -79,6 +79,34 @@ describe('BookingService', () => {
     await expect(service.getBookingDetail('missing', 'user-1')).rejects.toBeInstanceOf(NotFoundException);
   });
 
+  it('reports a permanent cancellation refund failure without claiming it is pending', async () => {
+    const failedBooking = {
+      id: 'booking-1',
+      userId: 'user-1',
+      status: 'FAILED',
+      failureReason: 'SYSTEM_ERROR',
+      duffelOrderId: 'ord-1',
+      duffelCancellationQuoteId: 'quote-1',
+      cancellationDeadline: new Date(Date.now() + 60_000),
+      customerRefundAmount: { toString: () => '125.00' },
+    };
+    const prisma = {
+      booking: {
+        findUnique: jest.fn().mockResolvedValue(failedBooking),
+        updateMany: jest.fn().mockResolvedValue({ count: 0 }),
+      },
+    };
+    const service = new BookingService(prisma as never, {} as never, {} as never, {} as never);
+
+    await expect(service.cancelBooking('booking-1', 'user-1', 'quote-1')).resolves.toEqual({
+      bookingId: 'booking-1',
+      bookingStatus: 'FAILED',
+      cancellationStatus: 'FAILED',
+      refundStatus: 'REFUND_FAILED_NEEDS_ATTENTION',
+      refundAmount: '125.00',
+    });
+  });
+
   describe('concurrency and validation', () => {
     it('recovers a failed booking when the capture path has authoritative order data', async () => {
       const prisma = {

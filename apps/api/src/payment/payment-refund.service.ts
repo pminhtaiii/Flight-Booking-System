@@ -807,7 +807,12 @@ export class PaymentRefundService {
         idempotencyKey,
       );
     } catch (error) {
-      const failureFinalized = await this.finalizeCancellationRefundFailure(refund.id, input.paymentId, input.amount);
+      const failureFinalized = await this.finalizeCancellationRefundFailure(
+        refund.id,
+        input.paymentId,
+        input.bookingId,
+        input.amount,
+      );
       if (!failureFinalized) {
         return { refundStatus: 'SUCCEEDED', refundAmount };
       }
@@ -833,6 +838,10 @@ export class PaymentRefundService {
         data: { status: 'SUCCEEDED', stripeRefundId: stripeRefund.id },
       });
       if (refundClaim.count === 0) {
+        await tx.booking.updateMany({
+          where: { id: input.bookingId, status: 'CANCELLED_PENDING_REFUND' },
+          data: { status: 'CANCELLED_AND_REFUNDED' },
+        });
         return false;
       }
       await tx.payment.update({
@@ -883,7 +892,12 @@ export class PaymentRefundService {
     return finalized ? response : { refundStatus: 'SUCCEEDED', refundAmount };
   }
 
-  private async finalizeCancellationRefundFailure(refundId: string, paymentId: string, amount: number): Promise<boolean> {
+  private async finalizeCancellationRefundFailure(
+    refundId: string,
+    paymentId: string,
+    bookingId: string,
+    amount: number,
+  ): Promise<boolean> {
     return this.prisma.$transaction(async (tx) => {
       const refundClaim = await tx.refund.updateMany({
         where: { id: refundId, status: 'REFUND_PENDING' },
@@ -895,6 +909,10 @@ export class PaymentRefundService {
       await tx.payment.updateMany({
         where: { id: paymentId, status: PaymentStatus.REFUND_PENDING },
         data: { status: PaymentStatus.SUCCEEDED },
+      });
+      await tx.booking.updateMany({
+        where: { id: bookingId, status: 'CANCELLED_PENDING_REFUND' },
+        data: { status: 'FAILED', failureReason: 'SYSTEM_ERROR' },
       });
       await tx.paymentEvent.create({
         data: {

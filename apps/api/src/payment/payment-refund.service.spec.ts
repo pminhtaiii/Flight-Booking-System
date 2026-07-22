@@ -11,7 +11,7 @@ describe('PaymentRefundService cancellation refunds', () => {
   let service: PaymentRefundService;
   const prisma = {
     payment: { findUnique: jest.fn(), update: jest.fn(), updateMany: jest.fn() },
-    booking: { findUnique: jest.fn(), update: jest.fn() },
+    booking: { findUnique: jest.fn(), update: jest.fn(), updateMany: jest.fn() },
     refund: { findFirst: jest.fn(), create: jest.fn(), update: jest.fn(), updateMany: jest.fn() },
     idempotencyKey: { findUnique: jest.fn() },
     paymentEvent: { create: jest.fn() },
@@ -139,6 +139,10 @@ describe('PaymentRefundService cancellation refunds', () => {
     expect(prisma.paymentEvent.create).toHaveBeenCalledWith(expect.objectContaining({
       data: expect.objectContaining({ eventType: 'cancellation_refund_failed' }),
     }));
+    expect(prisma.booking.updateMany).toHaveBeenCalledWith({
+      where: { id: 'booking-1', status: 'CANCELLED_PENDING_REFUND' },
+      data: { status: 'FAILED', failureReason: 'SYSTEM_ERROR' },
+    });
   });
 
   it('does not write ledger entries or events when a webhook already finalized the refund', async () => {
@@ -154,6 +158,10 @@ describe('PaymentRefundService cancellation refunds', () => {
 
     expect(prisma.payment.update).not.toHaveBeenCalled();
     expect(prisma.booking.update).not.toHaveBeenCalled();
+    expect(prisma.booking.updateMany).toHaveBeenCalledWith({
+      where: { id: 'booking-1', status: 'CANCELLED_PENDING_REFUND' },
+      data: { status: 'CANCELLED_AND_REFUNDED' },
+    });
     expect(prisma.ledgerEntry.createMany).not.toHaveBeenCalled();
     expect(prisma.paymentEvent.create).toHaveBeenCalledTimes(1);
   });
