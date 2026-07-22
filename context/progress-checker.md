@@ -7,8 +7,8 @@ Update this file after every completed feature. Any AI agent reading this should
 ### Current Status
 
 **Feature:** Flight Cancellation & Automated Refund System (Feature 12)
-**Last completed:** Feature 12 PR 1 / Issue #62: Schema Migration & Cancellation Quote API.
-**Next:** Feature 12 PR 2 / Issue #63: Duffel Order Cancellation & Refund Processing Pipeline.
+**Last completed:** Feature 12 PR 3 / Issue #64: Background Refund Recovery Worker & Admin Escalation.
+**Next:** Feature 12 PR 4 / Issue #65: Frontend Cancellation Experience & Time-Aware UX.
 
 ---
 
@@ -17,8 +17,8 @@ Update this file after every completed feature. Any AI agent reading this should
 ### [ ] Feature: Flight Cancellation & Automated Refund System (Feature 12)
 
 - [x] PR 1 (Issue #62): Schema Migration & Cancellation Quote API (Prisma schema update, DB sync, shared DTOs & enums, DuffelService quote creation, BookingService & Controller getCancellationQuote endpoint with atomic claim concurrency protection, resolved CodeRabbit review issues: concurrent quote overwrite prevention, missing Duffel token configuration guard, strict pending claim isolation, and status-guarded finalization)
-- [ ] PR 2 (Issue #63): Duffel Order Cancellation & Refund Processing Pipeline
-- [ ] PR 3 (Issue #64): Cancellation & Refund Webhook / Cron Sweepers
+- [x] PR 2 (Issue #63): Duffel Order Cancellation & Refund Processing Pipeline (supplier-first CAS cancellation, remote Duffel recovery, bounded inline Stripe retries, and atomic refund finalization)
+- [x] PR 3 (Issue #64): Background Refund Recovery Worker & Admin Escalation (durable retry scheduling, one-minute CAS worker, stable Stripe keys, 22-hour escalation guard, and ADMIN-only manual resolution endpoint)
 - [ ] PR 4 (Issue #65): Cancellation & Refund User Interface (Frontend)
 
 ### [x] Feature: Booking Management & Confirmation (Feature 11)

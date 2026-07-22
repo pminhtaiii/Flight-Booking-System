@@ -34,24 +34,24 @@ enum UserRole {
 }
 
 model User {
-  id              String             @id @default(uuid())
-  email           String             @unique
-  password        String
-  role            UserRole           @default(USER)
-  status          UserStatus         @default(ACTIVE)
-  createdAt       DateTime           @default(now())
-  updatedAt       DateTime           @updatedAt
-  lastLogin       DateTime?
-  auditLogs       AuditLog[]
-  chatSessions    ChatSession[]
-  travelerProfile TravelerProfile?
-  bookings        Booking[]
-  bookingIntents  BookingIntent[]
-  searchHistory   SearchHistory[]
-  stripeCustomerId    String?           @unique
-  idempotencyKeys     IdempotencyKey[]
-  refundsTriggered    Refund[]
-  paymentMethods      PaymentMethod[]
+  id               String           @id @default(uuid())
+  email            String           @unique
+  password         String
+  role             UserRole         @default(USER)
+  status           UserStatus       @default(ACTIVE)
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+  lastLogin        DateTime?
+  auditLogs        AuditLog[]
+  chatSessions     ChatSession[]
+  travelerProfile  TravelerProfile?
+  bookings         Booking[]
+  bookingIntents   BookingIntent[]
+  searchHistory    SearchHistory[]
+  stripeCustomerId String?          @unique
+  idempotencyKeys  IdempotencyKey[]
+  refundsTriggered Refund[]
+  paymentMethods   PaymentMethod[]
 
   @@map("users")
 }
@@ -83,14 +83,14 @@ enum MessageType {
 }
 
 model ChatSession {
-  id            String        @id @default(uuid())
-  userId        String
-  title         String?
-  createdAt     DateTime      @default(now())
-  updatedAt     DateTime      @updatedAt
-  lastActiveAt  DateTime      @default(now())
-  messages      ChatMessage[]
-  user          User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id           String        @id @default(uuid())
+  userId       String
+  title        String?
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  lastActiveAt DateTime      @default(now())
+  messages     ChatMessage[]
+  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
   @@index([userId, lastActiveAt])
@@ -98,13 +98,13 @@ model ChatSession {
 }
 
 model ChatMessage {
-  id          String        @id @default(uuid())
-  sessionId   String
-  sender      MessageSender
-  type        MessageType   @default(STANDARD)
-  content     String
-  createdAt   DateTime      @default(now())
-  session     ChatSession   @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  id        String        @id @default(uuid())
+  sessionId String
+  sender    MessageSender
+  type      MessageType   @default(STANDARD)
+  content   String
+  createdAt DateTime      @default(now())
+  session   ChatSession   @relation(fields: [sessionId], references: [id], onDelete: Cascade)
 
   @@index([sessionId])
   @@index([sessionId, createdAt])
@@ -116,23 +116,23 @@ model ChatMessage {
 /// All sensitive PII fields (like passportNumber and passportExpiry) are encrypted
 /// at the application level using AES-256-GCM before storage to comply with GDPR requirements.
 model TravelerProfile {
-  id                  String   @id @default(uuid())
-  userId              String   @unique
-  seatPreference      String?
-  classPreference     String?
-  preferredAirlines   String[]
-  blacklistedAirlines String[]
-  dietaryNeeds        String?
-  nationality         String?
+  id                      String                   @id @default(uuid())
+  userId                  String                   @unique
+  seatPreference          String?
+  classPreference         String?
+  preferredAirlines       String[]
+  blacklistedAirlines     String[]
+  dietaryNeeds            String?
+  nationality             String?
   /// @encrypted
   /// Sensitive PII. Encrypted at the application layer using AES-256-GCM before database insertion.
-  passportNumber      String?
+  passportNumber          String?
   /// @encrypted
   /// Sensitive PII. Encrypted/tokenized at the application layer to comply with GDPR data protection requirements.
-  passportExpiry      DateTime?
-  createdAt           DateTime @default(now())
-  updatedAt           DateTime @updatedAt
-  user                User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  passportExpiry          DateTime?
+  createdAt               DateTime                 @default(now())
+  updatedAt               DateTime                 @updatedAt
+  user                    User                     @relation(fields: [userId], references: [id], onDelete: Cascade)
   bookingIntentPassengers BookingIntentPassenger[]
 
   @@map("traveler_profiles")
@@ -143,30 +143,31 @@ model TravelerProfile {
 /// In contrast, Refund stores currency amounts in minor currency units (integer cents, e.g. 10050).
 /// Always use explicit unit conversions (Math.round(amount * 100) when converting major to minor units, or amount / 100 when converting minor to major units) when mapping between Booking and Refund.
 model Booking {
-  id                String               @id @default(uuid())
-  userId            String
-  bookingIntentId   String               @unique
-  paymentId         String?              @unique
-  status            BookingStatus        @default(PROCESSING)
-  failureReason     BookingFailureReason?
-  pnrReference      String?
-  duffelOrderId     String?
-  flightSnapshot    Json?
-  passengerSnapshot Json?
-  totalAmount       Decimal              @db.Decimal(10, 2)
-  currency          String               @default("GBP")
-  departureAt       DateTime?
-  cancellationDeadline DateTime?
-  cancellationRefundable Boolean @default(false)
-  airlineRefundAmount Decimal? @db.Decimal(10, 2)
-  customerRefundAmount Decimal? @db.Decimal(10, 2)
+  id                        String                @id @default(uuid())
+  userId                    String
+  bookingIntentId           String                @unique
+  paymentId                 String?               @unique
+  status                    BookingStatus         @default(PROCESSING)
+  failureReason             BookingFailureReason?
+  pnrReference              String?
+  duffelOrderId             String?
+  flightSnapshot            Json?
+  passengerSnapshot         Json?
+  totalAmount               Decimal               @db.Decimal(10, 2)
+  currency                  String                @default("GBP")
+  departureAt               DateTime?
+  cancellationDeadline      DateTime?
+  cancellationRefundable    Boolean               @default(false)
+  airlineRefundAmount       Decimal?              @db.Decimal(10, 2)
+  customerRefundAmount      Decimal?              @db.Decimal(10, 2)
   duffelCancellationQuoteId String?
-  createdAt         DateTime             @default(now())
-  updatedAt         DateTime             @updatedAt
+  createdAt                 DateTime              @default(now())
+  updatedAt                 DateTime              @updatedAt
 
-  user              User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
-  bookingIntent     BookingIntent        @relation(fields: [bookingIntentId], references: [id], onDelete: Cascade)
-  payment           Payment?             @relation(fields: [paymentId], references: [id], onDelete: SetNull)
+  user               User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  bookingIntent      BookingIntent @relation(fields: [bookingIntentId], references: [id], onDelete: Cascade)
+  payment            Payment?      @relation(fields: [paymentId], references: [id], onDelete: SetNull)
+  cancellationRefund Refund?       @relation("CancellationBookingRefund")
 
   @@index([userId])
   @@index([userId, status])
@@ -177,35 +178,35 @@ model Booking {
 }
 
 model BookingIntent {
-  id               String                @id @default(uuid())
-  userId           String
-  flightOfferId    String?
-  duffelOfferId    String
-  status           BookingIntentStatus   @default(PENDING)
-  originalPrice    Decimal               @db.Decimal(10, 2)
-  confirmedPrice   Decimal               @db.Decimal(10, 2)
-  currency         String                @default("USD")
-  priceChanged     Boolean               @default(false)
-  pricedAt         DateTime
-  origin           String                @db.VarChar(3)
-  destination      String                @db.VarChar(3)
-  departureDate    DateTime              @db.Date
-  returnDate       DateTime?             @db.Date
-  cabinClass       String                @default("economy")
-  adults           Int
-  children         Int                   @default(0)
-  infants          Int                   @default(0)
-  rawOfferSnapshot Json
-  intentExpiresAt  DateTime
-  offerExpiresAt   DateTime?
-  createdAt        DateTime              @default(now())
-  updatedAt        DateTime              @updatedAt
-  user             User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
-  flightOffer      FlightOffer?          @relation(fields: [flightOfferId], references: [id], onDelete: SetNull)
-  passengers       BookingIntentPassenger[]
-  paymentAttemptCount Int                 @default(0)
-  payments         Payment[]
-  booking          Booking?
+  id                  String                   @id @default(uuid())
+  userId              String
+  flightOfferId       String?
+  duffelOfferId       String
+  status              BookingIntentStatus      @default(PENDING)
+  originalPrice       Decimal                  @db.Decimal(10, 2)
+  confirmedPrice      Decimal                  @db.Decimal(10, 2)
+  currency            String                   @default("USD")
+  priceChanged        Boolean                  @default(false)
+  pricedAt            DateTime
+  origin              String                   @db.VarChar(3)
+  destination         String                   @db.VarChar(3)
+  departureDate       DateTime                 @db.Date
+  returnDate          DateTime?                @db.Date
+  cabinClass          String                   @default("economy")
+  adults              Int
+  children            Int                      @default(0)
+  infants             Int                      @default(0)
+  rawOfferSnapshot    Json
+  intentExpiresAt     DateTime
+  offerExpiresAt      DateTime?
+  createdAt           DateTime                 @default(now())
+  updatedAt           DateTime                 @updatedAt
+  user                User                     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  flightOffer         FlightOffer?             @relation(fields: [flightOfferId], references: [id], onDelete: SetNull)
+  passengers          BookingIntentPassenger[]
+  paymentAttemptCount Int                      @default(0)
+  payments            Payment[]
+  booking             Booking?
 
   @@index([userId])
   @@index([userId, status])
@@ -228,14 +229,14 @@ model BookingIntentPassenger {
   passportNumber    String?
   /// @encrypted
   passportExpiry    String?
-  travelerProfileId  String?
+  travelerProfileId String?
   createdAt         DateTime         @default(now())
   intent            BookingIntent    @relation(fields: [intentId], references: [id], onDelete: Cascade)
   travelerProfile   TravelerProfile? @relation(fields: [travelerProfileId], references: [id], onDelete: SetNull)
 
+  @@unique([intentId, position])
   @@index([intentId])
   @@index([travelerProfileId])
-  @@unique([intentId, position])
   @@map("booking_intent_passengers")
 }
 
@@ -248,6 +249,7 @@ enum BookingStatus {
   CANCELLED_PENDING_REFUND
   CANCELLED_AND_REFUNDED
   CANCELLED_NO_REFUND
+  REFUND_FAILED_NEEDS_ATTENTION
 }
 
 enum BookingFailureReason {
@@ -287,22 +289,22 @@ model Airport {
 }
 
 model FlightOffer {
-  id              String   @id @default(uuid())
-  searchHash      String
-  duffelOfferId   String
-  rawOffer        Json
-  origin          String   @db.VarChar(3)
-  destination     String   @db.VarChar(3)
-  departureDate   DateTime @db.Date
-  returnDate      DateTime? @db.Date
-  adults          Int
-  children        Int      @default(0)
-  infants         Int      @default(0)
-  cabinClass      String   @default("economy") @map("cabin_class")
-  price           Decimal  @db.Decimal(10, 2)
-  currency        String   @default("USD")
-  createdAt       DateTime @default(now())
-  bookingIntents  BookingIntent[]
+  id             String          @id @default(uuid())
+  searchHash     String
+  duffelOfferId  String
+  rawOffer       Json
+  origin         String          @db.VarChar(3)
+  destination    String          @db.VarChar(3)
+  departureDate  DateTime        @db.Date
+  returnDate     DateTime?       @db.Date
+  adults         Int
+  children       Int             @default(0)
+  infants        Int             @default(0)
+  cabinClass     String          @default("economy") @map("cabin_class")
+  price          Decimal         @db.Decimal(10, 2)
+  currency       String          @default("USD")
+  createdAt      DateTime        @default(now())
+  bookingIntents BookingIntent[]
 
   @@index([searchHash])
   @@index([createdAt])
@@ -310,23 +312,23 @@ model FlightOffer {
 }
 
 model SearchHistory {
-  id              String   @id @default(uuid())
-  userId          String
-  origin          String   @db.VarChar(3)
-  destination     String   @db.VarChar(3)
-  departureDate   DateTime @db.Date
-  returnDate      DateTime? @db.Date
-  adults          Int
-  children        Int      @default(0)
-  infants         Int      @default(0)
-  cabinClass      String   @default("economy") @map("cabin_class")
-  resultCount     Int
-  minPrice        Decimal? @db.Decimal(10, 2)
-  maxPrice        Decimal? @db.Decimal(10, 2)
-  currency        String   @default("USD")
-  searchHash      String
-  createdAt       DateTime @default(now())
-  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id            String    @id @default(uuid())
+  userId        String
+  origin        String    @db.VarChar(3)
+  destination   String    @db.VarChar(3)
+  departureDate DateTime  @db.Date
+  returnDate    DateTime? @db.Date
+  adults        Int
+  children      Int       @default(0)
+  infants       Int       @default(0)
+  cabinClass    String    @default("economy") @map("cabin_class")
+  resultCount   Int
+  minPrice      Decimal?  @db.Decimal(10, 2)
+  maxPrice      Decimal?  @db.Decimal(10, 2)
+  currency      String    @default("USD")
+  searchHash    String
+  createdAt     DateTime  @default(now())
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
   @@index([createdAt])
@@ -335,9 +337,9 @@ model SearchHistory {
 }
 
 model OfferRecovery {
-  id          String   @id // The offer UUID
-  searchHash  String
-  createdAt   DateTime @default(now())
+  id         String   @id // The offer UUID
+  searchHash String
+  createdAt  DateTime @default(now())
 
   @@index([createdAt])
   @@map("offer_recoveries")
@@ -359,6 +361,8 @@ enum PaymentStatus {
 
 enum RefundStatus {
   REFUND_PENDING
+  REFUND_PROCESSING
+  REFUND_RETRY_SCHEDULED
   SUCCEEDED
   FAILED
   REFUND_FAILED_NEEDS_ATTENTION
@@ -383,27 +387,27 @@ enum PaymentEventSource {
 }
 
 model Payment {
-  id                     String         @id @default(uuid())
-  bookingIntentId        String
-  bookingIntent          BookingIntent  @relation(fields: [bookingIntentId], references: [id])
-  attemptNumber          Int            // 1 or 2 (Database-level CHECK constraint attemptNumber IN (1, 2) enforced in migration)
-  idempotencyKeyId       String
-  idempotencyKey         IdempotencyKey @relation(fields: [idempotencyKeyId], references: [id])
-  stripePaymentIntentId  String         @unique
-  stripeCustomerId       String?
-  amount                 Int            // smallest currency unit (cents)
-  currency               String         // ISO 4217 (e.g., "usd")
-  paymentMethodType      String?        // e.g., "card"
-  status                 PaymentStatus  @default(CREATED)
-  preDisputeStatus       PaymentStatus? // populated when entering DISPUTED
-  version                Int            @default(0) // optimistic locking
-  createdAt              DateTime       @default(now())
-  updatedAt              DateTime       @updatedAt
+  id                    String         @id @default(uuid())
+  bookingIntentId       String
+  bookingIntent         BookingIntent  @relation(fields: [bookingIntentId], references: [id])
+  attemptNumber         Int // 1 or 2 (Database-level CHECK constraint attemptNumber IN (1, 2) enforced in migration)
+  idempotencyKeyId      String
+  idempotencyKey        IdempotencyKey @relation(fields: [idempotencyKeyId], references: [id])
+  stripePaymentIntentId String         @unique
+  stripeCustomerId      String?
+  amount                Int // smallest currency unit (cents)
+  currency              String // ISO 4217 (e.g., "usd")
+  paymentMethodType     String? // e.g., "card"
+  status                PaymentStatus  @default(CREATED)
+  preDisputeStatus      PaymentStatus? // populated when entering DISPUTED
+  version               Int            @default(0) // optimistic locking
+  createdAt             DateTime       @default(now())
+  updatedAt             DateTime       @updatedAt
 
-  paymentEvents          PaymentEvent[]
-  ledgerEntries          LedgerEntry[]
-  refunds                Refund[]
-  booking                Booking?
+  paymentEvents PaymentEvent[]
+  ledgerEntries LedgerEntry[]
+  refunds       Refund[]
+  booking       Booking?
 
   @@unique([bookingIntentId, attemptNumber])
   @@index([stripeCustomerId])
@@ -412,22 +416,22 @@ model Payment {
 }
 
 model IdempotencyKey {
-  id             String    @id @default(uuid())
-  key            String    @unique
-  requestHash    String    // SHA-256 of request body — catches key reuse with different payload
-  customerId     String
-  customer       User      @relation(fields: [customerId], references: [id])
-  requestPath    String    // API endpoint path
-  requestParams  Json?     // request body snapshot
-  responseCode   Int?      // HTTP status code of cached response
-  responseBody   Json?     // cached response for replay
-  recoveryPoint  String    @default("started") // started → stripe_authorized → duffel_order_created → captured → completed
-  lockedAt       DateTime? // claim mechanism for pessimistic lock
-  createdAt      DateTime  @default(now())
-  expiresAt      DateTime
+  id            String    @id @default(uuid())
+  key           String    @unique
+  requestHash   String // SHA-256 of request body — catches key reuse with different payload
+  customerId    String
+  customer      User      @relation(fields: [customerId], references: [id])
+  requestPath   String // API endpoint path
+  requestParams Json? // request body snapshot
+  responseCode  Int? // HTTP status code of cached response
+  responseBody  Json? // cached response for replay
+  recoveryPoint String    @default("started") // started → stripe_authorized → duffel_order_created → captured → completed
+  lockedAt      DateTime? // claim mechanism for pessimistic lock
+  createdAt     DateTime  @default(now())
+  expiresAt     DateTime
 
-  payments       Payment[]
-  refunds        Refund[]
+  payments Payment[]
+  refunds  Refund[]
 
   @@index([customerId])
   @@index([expiresAt])
@@ -435,18 +439,18 @@ model IdempotencyKey {
 }
 
 model PaymentEvent {
-  id              BigInt             @id @default(autoincrement())
-  paymentId       String
-  payment         Payment            @relation(fields: [paymentId], references: [id])
-  eventType       String             // e.g., "payment_intent.succeeded", "refund.created"
-  previousStatus  PaymentStatus
-  newStatus       PaymentStatus
-  amount          Int?               // amount involved in this event
-  source          PaymentEventSource // WEBHOOK, API, CRON, SYSTEM
-  stripeEventId   String?            @unique // webhook deduplication — nullable for non-webhook events
-  metadata        Json?              // raw payload
-  createdAt       DateTime           @default(now())
-  createdBy       String             // user ID, "system", or service name
+  id             BigInt             @id @default(autoincrement())
+  paymentId      String
+  payment        Payment            @relation(fields: [paymentId], references: [id])
+  eventType      String // e.g., "payment_intent.succeeded", "refund.created"
+  previousStatus PaymentStatus
+  newStatus      PaymentStatus
+  amount         Int? // amount involved in this event
+  source         PaymentEventSource // WEBHOOK, API, CRON, SYSTEM
+  stripeEventId  String?            @unique // webhook deduplication — nullable for non-webhook events
+  metadata       Json? // raw payload
+  createdAt      DateTime           @default(now())
+  createdBy      String // user ID, "system", or service name
 
   @@index([paymentId, createdAt])
   @@index([eventType])
@@ -454,15 +458,15 @@ model PaymentEvent {
 }
 
 model LedgerEntry {
-  id              String          @id @default(uuid())
-  paymentId       String
-  payment         Payment         @relation(fields: [paymentId], references: [id])
-  transactionId   String          // groups paired debit/credit rows
-  accountId       String          // CUSTOMER_RECEIVABLE | PLATFORM_REVENUE | DUFFEL_COST
-  entryType       LedgerEntryType // DEBIT or CREDIT
-  amount          Int             // smallest currency unit
-  currency        String          // ISO 4217
-  createdAt       DateTime        @default(now())
+  id            String          @id @default(uuid())
+  paymentId     String
+  payment       Payment         @relation(fields: [paymentId], references: [id])
+  transactionId String // groups paired debit/credit rows
+  accountId     String // CUSTOMER_RECEIVABLE | PLATFORM_REVENUE | DUFFEL_COST
+  entryType     LedgerEntryType // DEBIT or CREDIT
+  amount        Int // smallest currency unit
+  currency      String // ISO 4217
+  createdAt     DateTime        @default(now())
 
   @@index([paymentId])
   @@index([transactionId])
@@ -475,46 +479,52 @@ model LedgerEntry {
 /// In contrast, Booking stores currency amounts in major currency units (DECIMAL(10,2), e.g. 100.50).
 /// Always use explicit unit conversions (Math.round(amount * 100) when converting major to minor units, or amount / 100 when converting minor to major units) when mapping between Booking and Refund.
 model Refund {
-  id                  String            @id @default(uuid())
-  paymentId           String
-  payment             Payment           @relation(fields: [paymentId], references: [id])
-  idempotencyKeyId    String
-  idempotencyKey      IdempotencyKey    @relation(fields: [idempotencyKeyId], references: [id])
-  stripeRefundId      String?           @unique
-  amount              Int               // smallest currency unit
-  currency            String            // ISO 4217
-  reason              String?
-  triggerType         RefundTriggerType // USER, ADMIN, or SYSTEM_AUTOMATED
-  triggeredByUserId   String?           // NULL for automated refunds
-  triggeredByUser     User?             @relation(fields: [triggeredByUserId], references: [id])
-  requiresReview      Boolean           @default(false) // flags automated refunds for 24h human check
-  status              RefundStatus      @default(REFUND_PENDING)
-  airlineRefundAmount Int?
-  customerRefundAmount Int?
-  createdAt           DateTime          @default(now())
-  updatedAt           DateTime          @updatedAt
+  id                      String            @id @default(uuid())
+  paymentId               String
+  payment                 Payment           @relation(fields: [paymentId], references: [id])
+  idempotencyKeyId        String
+  idempotencyKey          IdempotencyKey    @relation(fields: [idempotencyKeyId], references: [id])
+  stripeRefundId          String?           @unique
+  amount                  Int // smallest currency unit
+  currency                String // ISO 4217
+  reason                  String?
+  triggerType             RefundTriggerType // USER, ADMIN, or SYSTEM_AUTOMATED
+  triggeredByUserId       String? // NULL for automated refunds
+  triggeredByUser         User?             @relation(fields: [triggeredByUserId], references: [id])
+  requiresReview          Boolean           @default(false) // flags automated refunds for 24h human check
+  status                  RefundStatus      @default(REFUND_PENDING)
+  airlineRefundAmount     Int?
+  customerRefundAmount    Int?
+  bookingId               String?           @unique
+  booking                 Booking?          @relation("CancellationBookingRefund", fields: [bookingId], references: [id], onDelete: SetNull)
+  retryCount              Int               @default(0)
+  nextRetryAt             DateTime?
+  idempotencyKeyCreatedAt DateTime?
+  lastErrorCode           String?
+  lastErrorAt             DateTime?
+  createdAt               DateTime          @default(now())
+  updatedAt               DateTime          @updatedAt
 
+  @@unique([idempotencyKeyId])
   @@index([paymentId])
   @@index([status])
-  @@unique([idempotencyKeyId])
+  @@index([status, nextRetryAt])
   @@map("refunds")
 }
 
 model PaymentMethod {
-  id                     String   @id @default(uuid())
-  stripeCustomerId       String
-  stripePaymentMethodId  String   @unique
-  cardBrand              String?  // visa, mastercard, etc.
-  cardLast4              String?  // last 4 digits for display
-  userId                 String
-  user                   User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  isDefault              Boolean  @default(false)
-  savedWithConsent       Boolean  @default(false) // only set to true through validated saveCard opt-in path
-  createdAt              DateTime @default(now())
+  id                    String   @id @default(uuid())
+  stripeCustomerId      String
+  stripePaymentMethodId String   @unique
+  cardBrand             String? // visa, mastercard, etc.
+  cardLast4             String? // last 4 digits for display
+  userId                String
+  user                  User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  isDefault             Boolean  @default(false)
+  savedWithConsent      Boolean  @default(false) // only set to true through validated saveCard opt-in path
+  createdAt             DateTime @default(now())
 
   @@index([stripeCustomerId])
   @@index([userId])
   @@map("payment_methods")
 }
-
-

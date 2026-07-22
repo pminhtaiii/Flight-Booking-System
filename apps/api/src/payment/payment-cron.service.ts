@@ -10,6 +10,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { StripeService } from '../common/stripe.service';
 import { enforceTransition } from './payment-state-machine';
 import { PaymentMethodService } from './payment-method.service';
+import { PaymentRefundService } from './payment-refund.service';
 
 @Injectable()
 export class PaymentCronService {
@@ -20,7 +21,35 @@ export class PaymentCronService {
     private readonly stripeService: StripeService,
     private readonly configService: ConfigService,
     private readonly paymentMethodService: PaymentMethodService,
+    private readonly paymentRefundService: PaymentRefundService,
   ) {}
+
+  @Cron('*/1 * * * *')
+  async handleCancellationRefundRecovery(): Promise<void> {
+    const now = new Date();
+    try {
+      const dueRefunds = await this.prisma.refund.findMany({
+        where: { status: 'REFUND_RETRY_SCHEDULED', nextRetryAt: { lte: now } },
+        orderBy: { nextRetryAt: 'asc' },
+        take: 100,
+      });
+      for (const refund of dueRefunds) {
+        try {
+          const claim = await this.prisma.refund.updateMany({
+            where: { id: refund.id, status: 'REFUND_RETRY_SCHEDULED', nextRetryAt: refund.nextRetryAt },
+            data: { status: 'REFUND_PROCESSING', nextRetryAt: null },
+          });
+          if (claim.count === 1) {
+            await this.paymentRefundService.recoverScheduledCancellationRefund(refund.id);
+          }
+        } catch (error: unknown) {
+          this.logger.error(`Cancellation refund recovery failed for ${refund.id}: ${error instanceof Error ? error.message : String(error)}`, error instanceof Error ? error.stack : undefined);
+        }
+      }
+    } catch (error: unknown) {
+      this.logger.error(`Cancellation refund recovery sweep failed: ${error instanceof Error ? error.message : String(error)}`, error instanceof Error ? error.stack : undefined);
+    }
+  }
 
   @Cron('*/5 * * * *')
   async handleAuthorizationExpiry(): Promise<void> {

@@ -25,8 +25,8 @@ Tracking map for the Cancellation & Refund Management feature implementation acr
 |---|---|---|---|---|---|---|
 | **PR 0** | `012a-cancellation-refund-specs` | Documentation & Design Specs for Cancellation & Refund Management | [#67](https://github.com/pminhtaiii/Flight-Booking-System/issues/67) | [#68](https://github.com/pminhtaiii/Flight-Booking-System/pull/68) | None | Reviewing (`@coderabbitai`) |
 | **PR 1** | `012b-schema-and-quote-api` | Schema Migration & Cancellation Quote API | [#62](https://github.com/pminhtaiii/Flight-Booking-System/issues/62) | Pending | #67 | Open |
-| **PR 2** | `012c-cancellation-transaction` | Supplier-First Cancellation & Inline Refund Transaction | [#63](https://github.com/pminhtaiii/Flight-Booking-System/issues/63) | Pending | #62 | Open |
-| **PR 3** | `012d-refund-recovery-worker` | Background Refund Recovery Worker & Admin Escalation | [#64](https://github.com/pminhtaiii/Flight-Booking-System/issues/64) | Pending | #63 | Open |
+| **PR 2** | `012c-cancellation-transaction` | Supplier-First Cancellation & Inline Refund Transaction | [#63](https://github.com/pminhtaiii/Flight-Booking-System/issues/63) | Pending | #62 | Complete |
+| **PR 3** | `012d-refund-recovery-worker` | Background Refund Recovery Worker & Admin Escalation | [#64](https://github.com/pminhtaiii/Flight-Booking-System/issues/64) | Pending | #63 | Complete |
 | **PR 4** | `012e-frontend-cancellation-ux` | Frontend Cancellation Experience & Time-Aware UX | [#65](https://github.com/pminhtaiii/Flight-Booking-System/issues/65) | Pending | #63 | Open |
 | **PR 5** | `012f-e2e-test-suite` | End-to-End Verification & Test Suite | [#66](https://github.com/pminhtaiii/Flight-Booking-System/issues/66) | Pending | #64, #65 | Open |
 

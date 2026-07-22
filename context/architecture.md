@@ -198,6 +198,22 @@ PaymentIdempotencyService completes key, clears lock, and caches response
 Results returned to frontend
 ```
 
+### Cancellation Refund Recovery (Deterministic Path)
+
+```
+Supplier-confirmed cancellation persists CANCELLED_PENDING_REFUND with one booking-owned Refund.
+        ↓
+Inline Stripe retries reuse the refund's idempotency key; transient exhaustion schedules the next durable retry.
+        ↓
+PaymentCronService runs each minute, CAS-claims only due REFUND_RETRY_SCHEDULED records, and retries Stripe with the same key.
+        ↓
+Success atomically settles Refund, Payment, Booking, ledger entries, and a PaymentEvent.
+        ↓
+Deterministic errors, retry exhaustion, or a 22-hour-old key move the refund and booking to REFUND_FAILED_NEEDS_ATTENTION without another Stripe call.
+        ↓
+An ADMIN may schedule a retry with a fresh key or record an externally completed manual resolution through POST /api/admin/refunds/:refundId/resolve.
+```
+
 ### AI Chatbot Agent Flow (SSE Streaming)
 
 ```
