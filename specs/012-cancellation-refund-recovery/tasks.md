@@ -1,10 +1,13 @@
 # Feature 012 Tasks & GitHub Issue Mapping
 
-Tracking map for the Cancellation & Refund Management feature implementation across 5 sequential PRs / GitHub issues.
+Tracking map for the Cancellation & Refund Management feature implementation across 6 sequential PRs / GitHub issues.
 
 ## PR / Issue Dependency Pipeline
 
 ```
+#67 [PR 0] Specs & Documentation
+  │
+  ▼
 #62 [PR 1] Schema & Quote API
   │
   ▼
@@ -20,7 +23,8 @@ Tracking map for the Cancellation & Refund Management feature implementation acr
 
 | PR / Issue | Title | Status | GitHub Link | Blocked By |
 |---|---|---|---|---|
-| **PR 1** | Schema Migration & Cancellation Quote API | Open | [#62](https://github.com/pminhtaiii/Flight-Booking-System/issues/62) | None |
+| **PR 0** | Documentation & Design Specs for Cancellation & Refund Management | Open | [#67](https://github.com/pminhtaiii/Flight-Booking-System/issues/67) | None |
+| **PR 1** | Schema Migration & Cancellation Quote API | Open | [#62](https://github.com/pminhtaiii/Flight-Booking-System/issues/62) | #67 |
 | **PR 2** | Supplier-First Cancellation & Inline Refund Transaction | Open | [#63](https://github.com/pminhtaiii/Flight-Booking-System/issues/63) | #62 |
 | **PR 3** | Background Refund Recovery Worker & Admin Escalation | Open | [#64](https://github.com/pminhtaiii/Flight-Booking-System/issues/64) | #63 |
 | **PR 4** | Frontend Cancellation Experience & Time-Aware UX | Open | [#65](https://github.com/pminhtaiii/Flight-Booking-System/issues/65) | #63 |
@@ -30,8 +34,15 @@ Tracking map for the Cancellation & Refund Management feature implementation acr
 
 ## PR Specifications
 
+### [PR 0 / Issue #67] Documentation & Design Specs for Cancellation & Refund Management
+- **Branch**: `docs/012-cancellation-refund-specs`
+- **Target Branch**: `development`
+- **Scope**:
+  - Update `CONTEXT.md` with domain glossary terms: `Cancellation`, `Cancellation Pending`, `Refund Pending`, `Refund Escalation`, `Cancellation Deadline`.
+  - Update `docs/adr/0001-cancellation-and-refund-failure-handling.md` and relocated research docs in `docs/adr/`.
+  - Add `specs/012-cancellation-refund-recovery/` design specifications (`PRD.md`, `plan.md`, `data-model.md`, `contracts/api.md`, `quickstart.md`, `tasks.md`).
+
 ### [PR 1 / Issue #62] Schema Migration & Cancellation Quote API
-- **Repository**: `pminhtaiii/Flight-Booking-System`
 - **Target Branch**: `development`
 - **Scope**:
   - Update `BookingStatus` and `RefundStatus` enums in `apps/api/prisma/schema.prisma`.
