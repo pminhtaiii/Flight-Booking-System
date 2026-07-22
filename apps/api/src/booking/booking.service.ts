@@ -518,7 +518,11 @@ export class BookingService {
     const cancellationDeadline = expiresAt;
 
     const updateResult = await this.prisma.booking.updateMany({
-      where: { id: booking.id, status: BookingStatus.CONFIRMED },
+      where: {
+        id: booking.id,
+        status: BookingStatus.CONFIRMED,
+        duffelCancellationQuoteId: booking.duffelCancellationQuoteId,
+      },
       data: {
         duffelCancellationQuoteId: quoteId,
         customerRefundAmount: refundAmount,
@@ -528,6 +532,24 @@ export class BookingService {
     });
 
     if (updateResult.count === 0) {
+      const updatedBooking = await this.prisma.booking.findUnique({ where: { id: booking.id } });
+      if (
+        updatedBooking &&
+        updatedBooking.duffelCancellationQuoteId &&
+        updatedBooking.cancellationDeadline &&
+        updatedBooking.cancellationDeadline > new Date()
+      ) {
+        return {
+          quoteId: updatedBooking.duffelCancellationQuoteId,
+          bookingId: updatedBooking.id,
+          duffelOrderId: updatedBooking.duffelOrderId || duffelOrderId,
+          refundAmount: updatedBooking.customerRefundAmount ? updatedBooking.customerRefundAmount.toString() : '0.00',
+          currency: updatedBooking.currency,
+          expiresAt: updatedBooking.cancellationDeadline.toISOString(),
+          refundable: updatedBooking.cancellationRefundable ?? false,
+          cancellationDeadline: updatedBooking.cancellationDeadline.toISOString(),
+        };
+      }
       throw new BadRequestException('Booking state changed while generating cancellation quote');
     }
 

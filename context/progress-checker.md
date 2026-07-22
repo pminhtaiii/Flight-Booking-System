@@ -16,7 +16,7 @@ Update this file after every completed feature. Any AI agent reading this should
 
 ### [ ] Feature: Flight Cancellation & Automated Refund System (Feature 12)
 
-- [x] PR 1 (Issue #62): Schema Migration & Cancellation Quote API (Prisma schema update, DB sync, shared DTOs & enums, DuffelService quote creation, BookingService & Controller getCancellationQuote endpoint, resolved 7 CodeRabbit code review issues)
+- [x] PR 1 (Issue #62): Schema Migration & Cancellation Quote API (Prisma schema update, DB sync, shared DTOs & enums, DuffelService quote creation, BookingService & Controller getCancellationQuote endpoint, resolved CodeRabbit review issues: concurrent quote overwrite prevention and missing Duffel token configuration guard)
 - [ ] PR 2 (Issue #63): Duffel Order Cancellation & Refund Processing Pipeline
 - [ ] PR 3 (Issue #64): Cancellation & Refund Webhook / Cron Sweepers
 - [ ] PR 4 (Issue #65): Cancellation & Refund User Interface (Frontend)

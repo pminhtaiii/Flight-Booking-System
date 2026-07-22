@@ -572,7 +572,19 @@ export class DuffelService {
       const isTestEnv = process.env.NODE_ENV === 'test' || isJest;
       const token = process.env.DUFFEL_ACCESS_TOKEN;
 
-      if (isTestEnv || token === 'mock' || !token) {
+      if (!isTestEnv) {
+        if (!token || token === '' || token === 'mock') {
+          throw new HttpException(
+            {
+              message: 'Duffel Access Token is missing or invalid in production/development runtime.',
+              code: 'CONFIGURATION_ERROR',
+            },
+            HttpStatus.INTERNAL_SERVER_ERROR,
+          );
+        }
+      }
+
+      if (isTestEnv || token === 'mock') {
         this.logger.log(`Mocking Duffel cancellation quote for test environment. OrderId: ${duffelOrderId}`);
         return {
           id: `oc_mock_${duffelOrderId}`,
