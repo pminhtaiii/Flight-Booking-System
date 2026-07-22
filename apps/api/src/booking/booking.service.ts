@@ -490,10 +490,13 @@ export class BookingService {
       throw new BadRequestException('No Duffel order associated with booking');
     }
 
+    const now = new Date();
+
     if (
       booking.duffelCancellationQuoteId &&
+      booking.duffelCancellationQuoteId !== 'PENDING_QUOTE' &&
       booking.cancellationDeadline &&
-      booking.cancellationDeadline > new Date()
+      booking.cancellationDeadline > now
     ) {
       return {
         quoteId: booking.duffelCancellationQuoteId,
@@ -507,61 +510,93 @@ export class BookingService {
       };
     }
 
-    const quote = await this.duffelService.createCancellationQuote(booking.duffelOrderId);
-
-    const quoteId = quote.id;
-    const duffelOrderId = quote.order_id || booking.duffelOrderId;
-    const refundAmount = quote.refund_amount ?? quote.total_refund_amount ?? '0.00';
-    const currency = quote.refund_currency ?? quote.currency ?? booking.currency ?? 'GBP';
-    const expiresAt = quote.expires_at ?? quote.expiresAt ?? new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
-    const refundable = quote.refundable !== undefined ? Boolean(quote.refundable) : parseFloat(String(refundAmount)) > 0;
-    const cancellationDeadline = expiresAt;
-
-    const updateResult = await this.prisma.booking.updateMany({
+    const claimResult = await this.prisma.booking.updateMany({
       where: {
         id: booking.id,
         status: BookingStatus.CONFIRMED,
-        duffelCancellationQuoteId: booking.duffelCancellationQuoteId,
+        OR: [
+          { duffelCancellationQuoteId: null },
+          { duffelCancellationQuoteId: 'PENDING_QUOTE' },
+          { cancellationDeadline: null },
+          { cancellationDeadline: { lte: now } },
+        ],
       },
       data: {
-        duffelCancellationQuoteId: quoteId,
-        customerRefundAmount: refundAmount,
-        cancellationRefundable: refundable,
-        cancellationDeadline: cancellationDeadline ? new Date(cancellationDeadline) : null,
+        duffelCancellationQuoteId: 'PENDING_QUOTE',
       },
     });
 
-    if (updateResult.count === 0) {
-      const updatedBooking = await this.prisma.booking.findUnique({ where: { id: booking.id } });
-      if (
-        updatedBooking &&
-        updatedBooking.duffelCancellationQuoteId &&
-        updatedBooking.cancellationDeadline &&
-        updatedBooking.cancellationDeadline > new Date()
-      ) {
-        return {
-          quoteId: updatedBooking.duffelCancellationQuoteId,
-          bookingId: updatedBooking.id,
-          duffelOrderId: updatedBooking.duffelOrderId || duffelOrderId,
-          refundAmount: updatedBooking.customerRefundAmount ? updatedBooking.customerRefundAmount.toString() : '0.00',
-          currency: updatedBooking.currency,
-          expiresAt: updatedBooking.cancellationDeadline.toISOString(),
-          refundable: updatedBooking.cancellationRefundable ?? false,
-          cancellationDeadline: updatedBooking.cancellationDeadline.toISOString(),
-        };
+    if (claimResult.count === 0) {
+      for (let attempt = 0; attempt < 25; attempt++) {
+        await new Promise((resolve) => setTimeout(resolve, 200));
+        const updatedBooking = await this.prisma.booking.findUnique({ where: { id: booking.id } });
+        if (
+          updatedBooking &&
+          updatedBooking.duffelCancellationQuoteId &&
+          updatedBooking.duffelCancellationQuoteId !== 'PENDING_QUOTE' &&
+          updatedBooking.cancellationDeadline &&
+          updatedBooking.cancellationDeadline > new Date()
+        ) {
+          return {
+            quoteId: updatedBooking.duffelCancellationQuoteId,
+            bookingId: updatedBooking.id,
+            duffelOrderId: updatedBooking.duffelOrderId || booking.duffelOrderId,
+            refundAmount: updatedBooking.customerRefundAmount ? updatedBooking.customerRefundAmount.toString() : '0.00',
+            currency: updatedBooking.currency,
+            expiresAt: updatedBooking.cancellationDeadline.toISOString(),
+            refundable: updatedBooking.cancellationRefundable ?? false,
+            cancellationDeadline: updatedBooking.cancellationDeadline.toISOString(),
+          };
+        }
       }
-      throw new BadRequestException('Booking state changed while generating cancellation quote');
+      throw new BadRequestException('Booking state changed or quote creation in progress');
     }
 
-    return {
-      quoteId,
-      bookingId: booking.id,
-      duffelOrderId,
-      refundAmount: String(refundAmount),
-      currency,
-      expiresAt,
-      refundable,
-      cancellationDeadline,
-    };
+    try {
+      const quote = await this.duffelService.createCancellationQuote(booking.duffelOrderId);
+
+      const quoteId = quote.id;
+      const duffelOrderId = quote.order_id || booking.duffelOrderId;
+      const refundAmount = quote.refund_amount ?? quote.total_refund_amount ?? '0.00';
+      const currency = quote.refund_currency ?? quote.currency ?? booking.currency ?? 'GBP';
+      const expiresAt = quote.expires_at ?? quote.expiresAt ?? new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+      const refundable = quote.refundable !== undefined ? Boolean(quote.refundable) : parseFloat(String(refundAmount)) > 0;
+      const cancellationDeadline = expiresAt;
+
+      await this.prisma.booking.updateMany({
+        where: {
+          id: booking.id,
+          duffelCancellationQuoteId: 'PENDING_QUOTE',
+        },
+        data: {
+          duffelCancellationQuoteId: quoteId,
+          customerRefundAmount: refundAmount,
+          cancellationRefundable: refundable,
+          cancellationDeadline: cancellationDeadline ? new Date(cancellationDeadline) : null,
+        },
+      });
+
+      return {
+        quoteId,
+        bookingId: booking.id,
+        duffelOrderId,
+        refundAmount: String(refundAmount),
+        currency,
+        expiresAt,
+        refundable,
+        cancellationDeadline,
+      };
+    } catch (error) {
+      await this.prisma.booking.updateMany({
+        where: {
+          id: booking.id,
+          duffelCancellationQuoteId: 'PENDING_QUOTE',
+        },
+        data: {
+          duffelCancellationQuoteId: null,
+        },
+      });
+      throw error;
+    }
   }
 }
