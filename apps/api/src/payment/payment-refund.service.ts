@@ -686,4 +686,295 @@ export class PaymentRefundService {
       throw error;
     }
   }
+
+  async processCancellationRefund(input: {
+    bookingId: string;
+    paymentId: string;
+    amount: number;
+    currency: string;
+  }): Promise<{
+    refundStatus: string;
+    refundAmount: string;
+    nextRetryAt?: string;
+  }> {
+    if (!Number.isInteger(input.amount) || input.amount <= 0) {
+      throw new BadRequestException('Cancellation refund amount must be a positive integer');
+    }
+
+    const payment = await this.prisma.payment.findUnique({
+      where: { id: input.paymentId },
+      include: { bookingIntent: { select: { userId: true } } },
+    });
+    if (!payment) {
+      throw new NotFoundException('Payment not found');
+    }
+
+    const booking = await this.prisma.booking.findUnique({
+      where: { id: input.bookingId },
+      select: { id: true, paymentId: true, status: true },
+    });
+    if (!booking || booking.paymentId !== payment.id) {
+      throw new NotFoundException('Cancellation booking not found for payment');
+    }
+
+    const refundAmount = this.toMajorCurrency(input.amount);
+    if (booking.status === 'CANCELLED_AND_REFUNDED') {
+      return { refundStatus: 'SUCCEEDED', refundAmount };
+    }
+
+    const idempotencyKey = `cancellation-refund:${input.bookingId}`;
+    const refundReason = `cancellation:${input.bookingId}`;
+    const requestHash = crypto
+      .createHash('sha256')
+      .update(`${input.paymentId}:${input.amount}:${input.currency}`)
+      .digest('hex');
+    const lock = await this.idempotencyService.acquireOrReplay(
+      idempotencyKey,
+      requestHash,
+      payment.bookingIntent.userId,
+      `/api/bookings/${input.bookingId}/cancel`,
+    );
+    if (lock.status === 'replay') {
+      return JSON.parse(lock.responseBody) as { refundStatus: string; refundAmount: string; nextRetryAt?: string };
+    }
+    const idempotencyRecord = await this.prisma.idempotencyKey.findUnique({
+      where: { key: idempotencyKey },
+      select: { id: true },
+    });
+    if (!idempotencyRecord) {
+      throw new InternalServerErrorException('Cancellation refund idempotency record not found');
+    }
+
+    let refund = await this.prisma.refund.findFirst({
+      where: { idempotencyKeyId: idempotencyRecord.id },
+    });
+    if (refund?.status === 'SUCCEEDED') {
+      return { refundStatus: 'SUCCEEDED', refundAmount };
+    }
+
+    if (!refund) {
+      try {
+        refund = await this.prisma.$transaction(async (tx) => {
+          const paymentClaim = await tx.payment.updateMany({
+            where: { id: input.paymentId, status: PaymentStatus.SUCCEEDED },
+            data: { status: PaymentStatus.REFUND_PENDING },
+          });
+          if (paymentClaim.count === 1) {
+            await tx.paymentEvent.create({
+              data: {
+                paymentId: input.paymentId,
+                eventType: 'cancellation_refund_processing',
+                previousStatus: PaymentStatus.SUCCEEDED,
+                newStatus: PaymentStatus.REFUND_PENDING,
+                amount: input.amount,
+                source: PaymentEventSource.SYSTEM,
+                createdBy: 'cancellation_service',
+              },
+            });
+          }
+          return tx.refund.create({
+            data: {
+              paymentId: input.paymentId,
+              idempotencyKeyId: idempotencyRecord.id,
+              amount: input.amount,
+              currency: input.currency,
+              reason: refundReason,
+              triggerType: RefundTriggerType.SYSTEM_AUTOMATED,
+              status: 'REFUND_PENDING',
+              airlineRefundAmount: input.amount,
+              customerRefundAmount: input.amount,
+            },
+          });
+        });
+      } catch (error) {
+        if (!(error instanceof Prisma.PrismaClientKnownRequestError) || error.code !== 'P2002') {
+          throw error;
+        }
+        refund = await this.prisma.refund.findFirst({
+          where: { idempotencyKeyId: idempotencyRecord.id },
+        });
+        if (!refund) {
+          throw error;
+        }
+      }
+    }
+
+    let stripeRefund: { id: string } | null;
+    try {
+      stripeRefund = await this.createCancellationRefundWithRetries(
+        payment.stripePaymentIntentId,
+        input.amount,
+        idempotencyKey,
+      );
+    } catch (error) {
+      const failureFinalized = await this.finalizeCancellationRefundFailure(
+        refund.id,
+        input.paymentId,
+        input.bookingId,
+        input.amount,
+      );
+      if (!failureFinalized) {
+        return { refundStatus: 'SUCCEEDED', refundAmount };
+      }
+      await this.idempotencyService.completeKey(idempotencyKey, HttpStatus.BAD_GATEWAY, {
+        refundStatus: 'REFUND_FAILED_NEEDS_ATTENTION',
+        refundAmount,
+      });
+      throw error;
+    }
+    if (!stripeRefund) {
+      const pending = {
+        refundStatus: 'REFUND_PENDING',
+        refundAmount,
+        nextRetryAt: new Date(Date.now() + 60_000).toISOString(),
+      };
+      await this.idempotencyService.completeKey(idempotencyKey, HttpStatus.ACCEPTED, pending);
+      return pending;
+    }
+
+    const finalized = await this.prisma.$transaction(async (tx) => {
+      const refundClaim = await tx.refund.updateMany({
+        where: { id: refund.id, status: 'REFUND_PENDING' },
+        data: { status: 'SUCCEEDED', stripeRefundId: stripeRefund.id },
+      });
+      if (refundClaim.count === 0) {
+        await tx.booking.updateMany({
+          where: { id: input.bookingId, status: 'CANCELLED_PENDING_REFUND' },
+          data: { status: 'CANCELLED_AND_REFUNDED' },
+        });
+        return false;
+      }
+      await tx.payment.update({
+        where: { id: input.paymentId },
+        data: { status: PaymentStatus.REFUNDED },
+      });
+      await tx.booking.update({
+        where: { id: input.bookingId },
+        data: { status: 'CANCELLED_AND_REFUNDED' },
+      });
+      const transactionId = crypto.randomUUID();
+      await tx.ledgerEntry.createMany({
+        data: [
+          {
+            paymentId: input.paymentId,
+            transactionId,
+            accountId: 'PLATFORM_REVENUE',
+            entryType: 'DEBIT',
+            amount: input.amount,
+            currency: input.currency,
+          },
+          {
+            paymentId: input.paymentId,
+            transactionId,
+            accountId: 'CUSTOMER_RECEIVABLE',
+            entryType: 'CREDIT',
+            amount: input.amount,
+            currency: input.currency,
+          },
+        ],
+      });
+      await tx.paymentEvent.create({
+        data: {
+          paymentId: input.paymentId,
+          eventType: 'cancellation_refund_succeeded',
+          previousStatus: PaymentStatus.REFUND_PENDING,
+          newStatus: PaymentStatus.REFUNDED,
+          amount: input.amount,
+          source: PaymentEventSource.SYSTEM,
+          createdBy: 'cancellation_service',
+        },
+      });
+      return true;
+    });
+
+    const response = { refundStatus: 'SUCCEEDED', refundAmount };
+    await this.idempotencyService.completeKey(idempotencyKey, HttpStatus.OK, response);
+    return finalized ? response : { refundStatus: 'SUCCEEDED', refundAmount };
+  }
+
+  private async finalizeCancellationRefundFailure(
+    refundId: string,
+    paymentId: string,
+    bookingId: string,
+    amount: number,
+  ): Promise<boolean> {
+    return this.prisma.$transaction(async (tx) => {
+      const refundClaim = await tx.refund.updateMany({
+        where: { id: refundId, status: 'REFUND_PENDING' },
+        data: { status: 'REFUND_FAILED_NEEDS_ATTENTION' },
+      });
+      if (refundClaim.count === 0) {
+        return false;
+      }
+      await tx.payment.updateMany({
+        where: { id: paymentId, status: PaymentStatus.REFUND_PENDING },
+        data: { status: PaymentStatus.SUCCEEDED },
+      });
+      await tx.booking.updateMany({
+        where: { id: bookingId, status: 'CANCELLED_PENDING_REFUND' },
+        data: { status: 'FAILED', failureReason: 'SYSTEM_ERROR' },
+      });
+      await tx.paymentEvent.create({
+        data: {
+          paymentId,
+          eventType: 'cancellation_refund_failed',
+          previousStatus: PaymentStatus.REFUND_PENDING,
+          newStatus: PaymentStatus.SUCCEEDED,
+          amount,
+          source: PaymentEventSource.SYSTEM,
+          createdBy: 'cancellation_service',
+        },
+      });
+      return true;
+    });
+  }
+
+  private async createCancellationRefundWithRetries(
+    paymentIntentId: string,
+    amount: number,
+    idempotencyKey: string,
+  ): Promise<{ id: string } | null> {
+    const retryDelays = [1_000, 3_000, 5_000];
+    for (let attempt = 0; attempt <= retryDelays.length; attempt++) {
+      try {
+        const refund = await this.stripeService.createRefund(
+          paymentIntentId,
+          amount,
+          'requested_by_customer',
+          idempotencyKey,
+        );
+        return { id: refund.id };
+      } catch (error) {
+        if (!this.isTransientStripeError(error)) {
+          throw error;
+        }
+        if (attempt < retryDelays.length) {
+          await this.delay(retryDelays[attempt]);
+        }
+      }
+    }
+    return null;
+  }
+
+  private isTransientStripeError(error: unknown): boolean {
+    if (typeof error !== 'object' || error === null) {
+      return false;
+    }
+    const candidate = error as { statusCode?: unknown; code?: unknown; message?: unknown };
+    const statusCode = candidate.statusCode;
+    if (typeof statusCode === 'number' && (statusCode === 429 || statusCode >= 500)) {
+      return true;
+    }
+    const code = typeof candidate.code === 'string' ? candidate.code : '';
+    const message = typeof candidate.message === 'string' ? candidate.message : '';
+    return /ECONNRESET|ECONNREFUSED|ETIMEDOUT|timeout|connection/i.test(`${code} ${message}`);
+  }
+
+  private delay(milliseconds: number): Promise<void> {
+    return new Promise((resolve) => setTimeout(resolve, milliseconds));
+  }
+
+  private toMajorCurrency(amount: number): string {
+    return (amount / 100).toFixed(2);
+  }
 }

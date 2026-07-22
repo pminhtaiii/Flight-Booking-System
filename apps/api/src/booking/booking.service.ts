@@ -1,8 +1,8 @@
-import { BadRequestException, ForbiddenException, Injectable, NotFoundException, Logger } from '@nestjs/common';
+import { BadGatewayException, BadRequestException, ForbiddenException, Injectable, NotFoundException, Logger } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { Booking, BookingFailureReason, BookingStatus, Prisma } from '@prisma/client';
 import { PrismaService } from '@/prisma/prisma.service';
-import { FlightSnapshot, PassengerSnapshot, CancellationQuoteResponseDto } from '@shared/booking-types';
+import { CancellationQuoteResponseDto, CancellationResponseDto, FlightSnapshot, PassengerSnapshot } from '@shared/booking-types';
 import { BookingDetailResponseDto, BookingListItemResponseDto, BookingListResponseDto, BookingTab } from './dto';
 
 type BookingWithRelations = Prisma.BookingGetPayload<{
@@ -609,5 +609,139 @@ export class BookingService {
       });
       throw error;
     }
+  }
+
+  async cancelBooking(bookingId: string, userId: string, quoteId: string): Promise<CancellationResponseDto> {
+    const booking = await this.prisma.booking.findUnique({
+      where: { id: bookingId },
+      include: { payment: { select: { id: true } } },
+    });
+    if (!booking) {
+      throw new NotFoundException('Booking not found');
+    }
+    if (booking.userId !== userId) {
+      throw new ForbiddenException('You do not have access to this booking');
+    }
+    if (!booking.duffelOrderId || booking.duffelCancellationQuoteId !== quoteId) {
+      throw new BadRequestException('Cancellation quote is invalid');
+    }
+    if (booking.cancellationDeadline && booking.cancellationDeadline <= new Date()) {
+      throw new BadRequestException('Cancellation quote has expired');
+    }
+
+    const staleClaimThreshold = new Date(Date.now() - 2 * 60 * 1000);
+    const claim = await this.prisma.booking.updateMany({
+      where: {
+        id: bookingId,
+        userId,
+        OR: [
+          { status: { in: [BookingStatus.CONFIRMED, BookingStatus.COMPLETED] } },
+          { status: BookingStatus.CANCELLATION_PENDING, updatedAt: { lte: staleClaimThreshold } },
+        ],
+      },
+      data: { status: BookingStatus.CANCELLATION_PENDING },
+    });
+    if (claim.count === 0) {
+      const canonical = await this.prisma.booking.findUnique({ where: { id: bookingId } });
+      if (!canonical) {
+        throw new NotFoundException('Booking not found');
+      }
+      return this.toCancellationResponse(canonical);
+    }
+
+    const recoveredOrder = await this.duffelService.retrieveOrder(booking.duffelOrderId);
+    let refundAmount = booking.customerRefundAmount?.toString() ?? '0.00';
+    let refundable = booking.cancellationRefundable;
+    if (recoveredOrder.status !== 'CANCELLED') {
+      const confirmation = await this.confirmCancellationWithRetries(quoteId);
+      if (confirmation.status !== 'CONFIRMED') {
+        throw new BadGatewayException('Supplier cancellation could not be confirmed');
+      }
+      refundAmount = confirmation.refund_amount ?? refundAmount;
+      refundable = confirmation.refundable;
+    }
+
+    const amountInMinorUnits = Math.round(Number(refundAmount) * 100);
+    const cancellationStatus = refundable && amountInMinorUnits > 0
+      ? BookingStatus.CANCELLED_PENDING_REFUND
+      : BookingStatus.CANCELLED_NO_REFUND;
+    const persisted = await this.prisma.booking.updateMany({
+      where: { id: bookingId, status: BookingStatus.CANCELLATION_PENDING },
+      data: {
+        status: cancellationStatus,
+        airlineRefundAmount: refundAmount,
+        customerRefundAmount: refundAmount,
+      },
+    });
+    if (persisted.count === 0) {
+      const canonical = await this.prisma.booking.findUnique({ where: { id: bookingId } });
+      if (!canonical) {
+        throw new NotFoundException('Booking not found');
+      }
+      return this.toCancellationResponse(canonical);
+    }
+    if (cancellationStatus === BookingStatus.CANCELLED_NO_REFUND || !booking.payment) {
+      return {
+        bookingId,
+        bookingStatus: cancellationStatus,
+        cancellationStatus,
+        refundStatus: 'NOT_REQUIRED',
+        refundAmount,
+      };
+    }
+
+    const refund = await this.paymentRefundService.processCancellationRefund({
+      bookingId,
+      paymentId: booking.payment.id,
+      amount: amountInMinorUnits,
+      currency: booking.currency,
+    });
+    return {
+      bookingId,
+      bookingStatus: refund.refundStatus === 'SUCCEEDED' ? BookingStatus.CANCELLED_AND_REFUNDED : cancellationStatus,
+      cancellationStatus,
+      refundStatus: refund.refundStatus,
+      refundAmount: refund.refundAmount,
+      nextRetryAt: refund.nextRetryAt,
+    };
+  }
+
+  private async confirmCancellationWithRetries(quoteId: string): Promise<Awaited<ReturnType<DuffelService['confirmCancellationQuote']>>> {
+    const retryDelays = [1_000, 3_000, 5_000, 10_000];
+    for (let attempt = 0; attempt <= retryDelays.length; attempt += 1) {
+      try {
+        return await this.duffelService.confirmCancellationQuote(quoteId);
+      } catch (error) {
+        if (!this.isRetryableSupplierError(error) || attempt === retryDelays.length) {
+          throw new BadGatewayException('Supplier cancellation could not be confirmed');
+        }
+        await new Promise<void>((resolve) => setTimeout(resolve, retryDelays[attempt]));
+      }
+    }
+    throw new BadGatewayException('Supplier cancellation could not be confirmed');
+  }
+
+  private isRetryableSupplierError(error: unknown): boolean {
+    if (typeof error !== 'object' || error === null) {
+      return false;
+    }
+    const candidate = error as { status?: unknown; statusCode?: unknown };
+    const status = typeof candidate.status === 'number' ? candidate.status : candidate.statusCode;
+    return typeof status === 'number' && (status === 429 || status >= 500);
+  }
+
+  private toCancellationResponse(booking: Booking): CancellationResponseDto {
+    const refundStatus = booking.status === BookingStatus.CANCELLED_AND_REFUNDED
+      ? 'SUCCEEDED'
+      : booking.status === BookingStatus.FAILED && booking.failureReason === BookingFailureReason.SYSTEM_ERROR
+        ? 'REFUND_FAILED_NEEDS_ATTENTION'
+        : 'PENDING';
+    return {
+      bookingId: booking.id,
+      bookingStatus: booking.status,
+      cancellationStatus: booking.status,
+      refundStatus,
+      refundAmount: booking.customerRefundAmount?.toString() ?? '0.00',
+    };
   }
 }

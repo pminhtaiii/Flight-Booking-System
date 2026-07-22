@@ -150,3 +150,13 @@ export interface CancellationQuoteResponseDto {
   cancellationDeadline?: string;
 }
 
+/** Durable response for a supplier-first cancellation request. */
+export interface CancellationResponseDto {
+  bookingId: string;
+  bookingStatus: string;
+  cancellationStatus: string;
+  refundStatus: string;
+  refundAmount: string;
+  nextRetryAt?: string;
+}
+
