@@ -152,6 +152,11 @@ model Booking {
   totalAmount       Decimal              @db.Decimal(10, 2)
   currency          String               @default("GBP")
   departureAt       DateTime?
+  cancellationDeadline DateTime?
+  cancellationRefundable Boolean @default(false)
+  airlineRefundAmount Decimal? @db.Decimal(10, 2)
+  customerRefundAmount Decimal? @db.Decimal(10, 2)
+  duffelCancellationQuoteId String?
   createdAt         DateTime             @default(now())
   updatedAt         DateTime             @updatedAt
 
@@ -235,6 +240,10 @@ enum BookingStatus {
   CONFIRMED
   FAILED
   COMPLETED
+  CANCELLATION_PENDING
+  CANCELLED_PENDING_REFUND
+  CANCELLED_AND_REFUNDED
+  CANCELLED_NO_REFUND
 }
 
 enum BookingFailureReason {
@@ -348,6 +357,7 @@ enum RefundStatus {
   REFUND_PENDING
   SUCCEEDED
   FAILED
+  REFUND_FAILED_NEEDS_ATTENTION
 }
 
 enum RefundTriggerType {
@@ -471,6 +481,8 @@ model Refund {
   triggeredByUser     User?             @relation(fields: [triggeredByUserId], references: [id])
   requiresReview      Boolean           @default(false) // flags automated refunds for 24h human check
   status              RefundStatus      @default(REFUND_PENDING)
+  airlineRefundAmount Int?
+  customerRefundAmount Int?
   createdAt           DateTime          @default(now())
   updatedAt           DateTime          @updatedAt
 

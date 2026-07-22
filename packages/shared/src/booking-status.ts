@@ -11,4 +11,12 @@ export enum BookingStatus {
   FAILED = 'FAILED',
   /** Flight departure date has passed */
   COMPLETED = 'COMPLETED',
+  /** Cancellation quote or request is in progress */
+  CANCELLATION_PENDING = 'CANCELLATION_PENDING',
+  /** Cancelled with Duffel/airline, pending refund processing */
+  CANCELLED_PENDING_REFUND = 'CANCELLED_PENDING_REFUND',
+  /** Cancelled and refund successfully issued */
+  CANCELLED_AND_REFUNDED = 'CANCELLED_AND_REFUNDED',
+  /** Cancelled without refund (non-refundable or zero refund) */
+  CANCELLED_NO_REFUND = 'CANCELLED_NO_REFUND',
 }

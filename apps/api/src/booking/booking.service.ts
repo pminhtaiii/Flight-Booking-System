@@ -2,7 +2,7 @@ import { BadRequestException, ForbiddenException, Injectable, NotFoundException,
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { Booking, BookingFailureReason, BookingStatus, Prisma } from '@prisma/client';
 import { PrismaService } from '@/prisma/prisma.service';
-import { FlightSnapshot, PassengerSnapshot } from '@shared/booking-types';
+import { FlightSnapshot, PassengerSnapshot, CancellationQuoteResponseDto } from '@shared/booking-types';
 import { BookingDetailResponseDto, BookingListItemResponseDto, BookingListResponseDto, BookingTab } from './dto';
 
 type BookingWithRelations = Prisma.BookingGetPayload<{
@@ -422,7 +422,16 @@ export class BookingService {
       if (tab === 'past') {
         return (right.departureAt?.getTime() ?? 0) - (left.departureAt?.getTime() ?? 0);
       }
-      const priority: Record<BookingStatus, number> = { PROCESSING: 0, FAILED: 1, CONFIRMED: 2, COMPLETED: 3 };
+      const priority: Record<BookingStatus, number> = {
+        PROCESSING: 0,
+        FAILED: 1,
+        CONFIRMED: 2,
+        CANCELLATION_PENDING: 3,
+        CANCELLED_PENDING_REFUND: 4,
+        CANCELLED_AND_REFUNDED: 5,
+        CANCELLED_NO_REFUND: 6,
+        COMPLETED: 7,
+      };
       const priorityDifference = priority[left.status] - priority[right.status];
       if (priorityDifference !== 0) return priorityDifference;
       return (left.departureAt?.getTime() ?? Number.MAX_SAFE_INTEGER) - (right.departureAt?.getTime() ?? Number.MAX_SAFE_INTEGER);
@@ -443,4 +452,55 @@ export class BookingService {
     };
   }
 
+  async getCancellationQuote(bookingId: string, userId: string): Promise<CancellationQuoteResponseDto> {
+    const booking = await this.prisma.booking.findUnique({
+      where: { id: bookingId },
+    });
+
+    if (!booking) {
+      throw new NotFoundException('Booking not found');
+    }
+    if (booking.userId !== userId) {
+      throw new ForbiddenException('You do not have access to this booking');
+    }
+
+    if (booking.status !== BookingStatus.CONFIRMED && booking.status !== BookingStatus.COMPLETED) {
+      throw new BadRequestException('Booking is not eligible for cancellation quote');
+    }
+
+    if (!booking.duffelOrderId) {
+      throw new BadRequestException('No Duffel order associated with booking');
+    }
+
+    const quote = await this.duffelService.createCancellationQuote(booking.duffelOrderId);
+
+    const quoteId = quote.id;
+    const duffelOrderId = quote.order_id || booking.duffelOrderId;
+    const refundAmount = quote.refund_amount ?? quote.total_refund_amount ?? '0.00';
+    const currency = quote.refund_currency ?? quote.currency ?? booking.currency ?? 'GBP';
+    const expiresAt = quote.expires_at ?? quote.expiresAt ?? new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+    const refundable = quote.refundable !== undefined ? Boolean(quote.refundable) : parseFloat(String(refundAmount)) > 0;
+    const cancellationDeadline = expiresAt;
+
+    await this.prisma.booking.update({
+      where: { id: booking.id },
+      data: {
+        duffelCancellationQuoteId: quoteId,
+        customerRefundAmount: refundAmount,
+        cancellationRefundable: refundable,
+        cancellationDeadline: cancellationDeadline ? new Date(cancellationDeadline) : null,
+      },
+    });
+
+    return {
+      quoteId,
+      bookingId: booking.id,
+      duffelOrderId,
+      refundAmount: String(refundAmount),
+      currency,
+      expiresAt,
+      refundable,
+      cancellationDeadline,
+    };
+  }
 }
