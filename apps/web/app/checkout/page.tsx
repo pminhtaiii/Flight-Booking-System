@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useSession } from 'next-auth/react';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { CheckoutLoadingEscalation } from '@/components/checkout/CheckoutLoadingEscalation';
 
@@ -16,7 +16,7 @@ type ConfirmPaymentResponse = {
 
 const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? '';
 
-export default function CheckoutPage() {
+function CheckoutContent() {
   const router = useRouter();
   const { data: session, status: sessionStatus } = useSession();
   const searchParams = useSearchParams();
@@ -167,5 +167,13 @@ export default function CheckoutPage() {
         </section>
       )}
     </main>
+  );
+}
+
+export default function CheckoutPage() {
+  return (
+    <Suspense fallback={<div className="mx-auto max-w-xl py-12 text-center text-text-secondary">Loading...</div>}>
+      <CheckoutContent />
+    </Suspense>
   );
 }

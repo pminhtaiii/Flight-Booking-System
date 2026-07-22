@@ -19,4 +19,6 @@ export enum BookingStatus {
   CANCELLED_AND_REFUNDED = 'CANCELLED_AND_REFUNDED',
   /** Cancelled without refund (non-refundable or zero refund) */
   CANCELLED_NO_REFUND = 'CANCELLED_NO_REFUND',
+  /** Cancellation succeeded but Stripe refund failed */
+  REFUND_FAILED_NEEDS_ATTENTION = 'REFUND_FAILED_NEEDS_ATTENTION',
 }

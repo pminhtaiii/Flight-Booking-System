@@ -21,6 +21,7 @@ interface AuthenticatedRequest extends Request {
   user: {
     id: string;
     email: string;
+    role: string;
   };
 }
 
@@ -110,6 +111,7 @@ export class AuthController {
     return {
       id: req.user.id,
       email: req.user.email,
+      role: req.user.role,
     };
   }
 
