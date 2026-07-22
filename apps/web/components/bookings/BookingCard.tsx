@@ -1,3 +1,4 @@
+/* eslint-disable @next/next/no-img-element */
 import Link from 'next/link';
 import type { BookingListItemDto, FlightSnapshot } from '@shared/booking-types';
 import { BookingStatusBadge } from '@/components/bookings/BookingStatusBadge';

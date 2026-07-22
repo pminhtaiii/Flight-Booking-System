@@ -6,13 +6,21 @@ Update this file after every completed feature. Any AI agent reading this should
 
 ### Current Status
 
-**Feature:** Booking Management & Confirmation (Feature 11)
-**Last completed:** Feature 11 Phase 7: E2E Testing & Verification.
-**Next:** Select and plan the next feature.
+**Feature:** Flight Cancellation & Automated Refund System (Feature 12)
+**Last completed:** Feature 12 PR 5 / Issue #66: End-to-End Verification & Test Suite.
+**Next:** Rollout runbook and documentation update.
 
 ---
 
 ## Progress by Feature
+
+### [x] Feature: Flight Cancellation & Automated Refund System (Feature 12)
+
+- [x] PR 1 (Issue #62): Schema Migration & Cancellation Quote API (Prisma schema update, DB sync, shared DTOs & enums, DuffelService quote creation, BookingService & Controller getCancellationQuote endpoint with atomic claim concurrency protection, resolved CodeRabbit review issues: concurrent quote overwrite prevention, missing Duffel token configuration guard, strict pending claim isolation, and status-guarded finalization)
+- [x] PR 2 (Issue #63): Duffel Order Cancellation & Refund Processing Pipeline (supplier-first CAS cancellation, remote Duffel recovery, bounded inline Stripe retries, and atomic refund finalization)
+- [x] PR 3 (Issue #64): Background Refund Recovery Worker & Admin Escalation (durable retry scheduling, one-minute CAS worker, stable Stripe keys, 22-hour escalation guard, and ADMIN-only manual resolution endpoint)
+- [x] PR 4 (Issue #65): Cancellation & Refund User Interface (Frontend) (cancellation quote review modal, dynamic alert banners for pending/refund states, 48-hour support escalation logic, and operator manual refund resolution dashboard)
+- [x] PR 5 (Issue #66): End-to-End Resilience Verification (Jest API E2E coverage for quote expiry, concurrency races, remote Duffel recovery, background worker recovery, and Playwright journeys for quote review, confirm, pending refund, support escalation, and manual refund resolution; validated and passing both test suites)
 
 ### [x] Feature: Booking Management & Confirmation (Feature 11)
 

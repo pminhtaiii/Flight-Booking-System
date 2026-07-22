@@ -1,4 +1,5 @@
 import { defineConfig, devices } from '@playwright/test';
+import path from 'path';
 
 export default defineConfig({
   testDir: './',
@@ -6,7 +7,7 @@ export default defineConfig({
   workers: 1,
   reporter: [['html', { open: 'never' }]],
   use: {
-    baseURL: 'http://localhost:3000',
+    baseURL: 'http://127.0.0.1:3000',
     trace: 'on-first-retry',
     actionTimeout: 10000,
   },
@@ -18,9 +19,11 @@ export default defineConfig({
   ],
   webServer: [
     {
-      command: 'pnpm --filter @api/backend start:prod',
-      url: 'http://localhost:3001/health',
+      command: 'pnpm build && pnpm start:prod',
+      url: 'http://127.0.0.1:3001/health',
       reuseExistingServer: !process.env.CI,
+      timeout: 300000,
+      cwd: path.resolve(__dirname, '../../api'),
       env: {
         NODE_ENV: 'test',
         DATABASE_URL: 'postgresql://postgres:postgres@127.0.0.1:5432/test_db',
@@ -28,9 +31,11 @@ export default defineConfig({
       },
     },
     {
-      command: 'pnpm --filter @web/frontend dev',
-      url: 'http://localhost:3000',
+      command: 'pnpm build && pnpm start',
+      url: 'http://127.0.0.1:3000',
       reuseExistingServer: !process.env.CI,
+      timeout: 300000,
+      cwd: path.resolve(__dirname, '..'),
       env: {
         CI: 'true',
         NEXT_PUBLIC_API_URL: 'http://127.0.0.1:3001',

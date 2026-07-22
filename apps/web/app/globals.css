@@ -207,44 +207,99 @@
 }
 
 @utility chat-card-container {
-  background-color: var(--color-card);
-  border: 1px solid var(--color-card-border);
-  box-shadow: 0 10px 40px -10px var(--color-chat-card-shadow);
-  transition: all 0.75s cubic-bezier(0.19, 1, 0.22, 1);
+  /* We'll use .search-panel directly in TSX, but keep this for backward compatibility if needed */
+  transition: all 0.8s cubic-bezier(0.16, 1, 0.3, 1);
   will-change: width, max-width, transform, border-radius;
 }
 
+/* Glassmorphism Theme (Search Page Only) */
+.search-page-wrapper {
+  background: linear-gradient(135deg, #F0EDFF 0%, #E0F2FE 100%);
+  padding: 1.5rem;
+  gap: 1.5rem;
+  transition: all 0.8s cubic-bezier(0.16, 1, 0.3, 1);
+  justify-content: center;
+}
+.search-page-wrapper.split {
+  justify-content: flex-start;
+}
+
+:root.dark .search-page-wrapper {
+  background: linear-gradient(135deg, #1A172B 0%, #17243B 100%);
+}
+
+.search-panel {
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  border-radius: 28px;
+  box-shadow: 0 20px 40px rgba(0,0,0,0.04), inset 0 1px 0 rgba(255,255,255,0.6);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  transition: all 0.8s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+:root.dark .search-panel {
+  background: rgba(31, 41, 55, 0.7);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 20px 40px rgba(0,0,0,0.2);
+}
+
 @utility bubble-user {
-  border-radius: 18px 18px 2px 18px;
-  background: linear-gradient(135deg, var(--color-accent), var(--color-gradient-end));
-  color: var(--color-primary-foreground);
-  box-shadow: 0 4px 12px var(--color-user-bubble-shadow);
+  border-radius: 20px 20px 4px 20px;
+  background: var(--theme-text-primary);
+  color: var(--theme-background);
+  box-shadow: 0 8px 16px rgba(0,0,0,0.15);
+  border: none;
+}
+:root.dark .bubble-user {
+  background: var(--color-accent);
+  color: #fff;
 }
 
 @utility bubble-agent {
-  border-radius: 18px 18px 18px 2px;
-  background-color: var(--color-card);
-  border: 1px solid var(--color-agent-bubble-border);
+  border-radius: 20px 20px 20px 4px;
+  background-color: rgba(255,255,255,0.9);
+  border: 1px solid rgba(255,255,255,0.5);
   color: var(--color-text-primary);
-  box-shadow: 0 2px 8px var(--color-chat-card-shadow);
+  box-shadow: 0 8px 16px rgba(0,0,0,0.03);
+}
+:root.dark .bubble-agent {
+  background-color: rgba(31,41,55,0.9);
+  border: 1px solid rgba(255,255,255,0.1);
+}
+
+@utility bubble-badge {
+  display: inline-flex;
+  background: rgba(245, 158, 11, 0.1);
+  color: #D97706;
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 0.25rem 0.75rem;
+  border-radius: 9999px;
+  margin-bottom: 0.75rem;
+  border: 1px solid rgba(245, 158, 11, 0.2);
+}
+@utility bubble-badge-new {
+  background: rgba(124, 92, 252, 0.1);
+  color: var(--color-primary);
+  border-color: rgba(124, 92, 252, 0.2);
 }
 
 @utility results-area {
   display: flex;
   flex-direction: column;
   gap: 24px;
-  height: calc(100vh - 140px);
+  height: calc(100vh - 120px);
   width: 0;
   max-width: 0;
   opacity: 0;
   transform: translateX(40px) scale(0.95);
   pointer-events: none;
   visibility: hidden;
-  transition: width 0.85s cubic-bezier(0.19, 1, 0.22, 1),
-              max-width 0.85s cubic-bezier(0.19, 1, 0.22, 1),
-              opacity 0.85s cubic-bezier(0.19, 1, 0.22, 1),
-              transform 0.85s cubic-bezier(0.19, 1, 0.22, 1),
-              visibility 0.85s cubic-bezier(0.19, 1, 0.22, 1);
+  transition: all 0.8s cubic-bezier(0.16, 1, 0.3, 1);
   will-change: width, max-width, opacity, transform;
 }
 
@@ -261,16 +316,19 @@
   display: flex;
   gap: 8px;
   align-items: center;
-  border: 1px solid var(--color-secondary-border);
-  border-radius: 9999px;
-  padding: 4px 6px 4px 18px;
-  background-color: var(--color-background);
+  border: 1px solid rgba(0,0,0,0.05);
+  border-radius: 24px;
+  padding: 6px 6px 6px 18px;
+  background-color: var(--theme-card);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.03);
   transition: all 0.2s;
   &:focus-within {
     border-color: var(--color-accent);
-    box-shadow: 0 0 0 3px var(--color-user-bubble-shadow);
-    background-color: var(--color-card);
+    box-shadow: 0 0 0 3px rgba(124,92,252,0.15);
   }
+}
+:root.dark .chat-input-wrapper {
+  border-color: rgba(255,255,255,0.1);
 }
 
 @utility chat-input {
@@ -278,56 +336,65 @@
   border: none;
   background-color: transparent;
   padding: 8px 0;
-  height: 36px;
-  font-size: 14px;
+  height: 40px;
+  font-size: 15px;
   outline: none;
   resize: none;
   color: var(--color-text-primary);
 }
 
 @utility chat-send {
-  width: 36px;
-  height: 36px;
-  border-radius: 50%;
-  background-color: var(--color-accent);
-  color: var(--color-primary-foreground);
+  width: 40px;
+  height: 40px;
+  border-radius: 20px;
+  background: linear-gradient(135deg, var(--color-accent), #9B7BFF);
+  color: #fff;
   border: none;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 2px 8px var(--color-user-bubble-shadow);
+  box-shadow: 0 4px 12px rgba(124,92,252,0.3);
   transition: all 0.2s;
   &:hover {
     transform: scale(1.05);
-    opacity: 0.9;
   }
 }
 
 @utility quick-action {
-  background-color: var(--color-card);
-  border: 1px solid var(--color-agent-bubble-border);
+  background-color: var(--theme-card);
+  border: 1px solid rgba(0,0,0,0.05);
   color: var(--color-text-secondary);
   border-radius: 9999px;
-  padding: 6px 14px;
-  font-size: 12px;
+  padding: 8px 16px;
+  font-size: 14px;
   cursor: pointer;
-  box-shadow: 0 2px 4px var(--color-chat-card-shadow);
+  box-shadow: 0 2px 4px rgba(0,0,0,0.02);
   transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
   &:hover {
-    transform: translateY(-1px) scale(1.03);
+    transform: translateY(-1px);
     border-color: var(--color-accent);
-    box-shadow: 0 4px 10px var(--color-chat-card-shadow);
+    color: var(--color-accent);
+    box-shadow: 0 4px 8px rgba(124,92,252,0.15);
   }
 }
 
 @utility chat-flight-card {
-  border-radius: 16px;
-  box-shadow: 0 2px 10px var(--color-chat-card-shadow);
-  padding: 20px;
+  border-radius: 24px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.02);
+  padding: 24px;
   flex-shrink: 0;
-  border: 1px solid var(--color-card-border);
-  background-color: var(--color-card);
+  border: 1px solid rgba(0,0,0,0.03);
+  background-color: var(--theme-card);
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  &:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 20px 40px rgba(0,0,0,0.08);
+    border-color: rgba(124,92,252,0.3);
+  }
+}
+:root.dark .chat-flight-card {
+  border-color: rgba(255,255,255,0.05);
 }
 
 @utility chat-flight-header {
@@ -335,36 +402,36 @@
   justify-content: space-between;
   align-items: center;
   width: 100%;
-  margin-bottom: 12px;
+  margin-bottom: 16px;
 }
 
 @utility chat-flight-airline {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 16px;
 }
 
 @utility airline-logo-placeholder {
-  width: 40px;
-  height: 40px;
-  border-radius: 8px;
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
   display: flex;
   align-items: center;
   justify-content: center;
   font-weight: 700;
-  background-color: var(--color-background);
-  border: 1px solid var(--color-secondary-border);
+  background-color: var(--theme-background);
+  border: 1px solid rgba(0,0,0,0.05);
   color: var(--color-text-secondary);
 }
 
 @utility chat-flight-name {
-  font-size: 14px;
+  font-size: 16px;
   font-weight: 600;
   color: var(--color-text-primary);
 }
 
 @utility chat-flight-num {
-  font-size: 12px;
+  font-size: 14px;
   color: var(--color-text-muted);
 }
 
@@ -375,44 +442,25 @@
 }
 
 @utility match-pill-badge {
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 600;
-  padding: 2px 8px;
-  border-radius: 9999px;
+  padding: 4px 12px;
+  border-radius: 8px;
+  border: 1px solid transparent;
   &.strong {
-    background-color: var(--color-bg-match-strong);
-    color: var(--color-text-match-strong);
+    background: rgba(16, 185, 129, 0.1);
+    color: #059669;
+    border-color: rgba(16, 185, 129, 0.2);
   }
   &.fair {
-    background-color: var(--color-bg-match-fair);
-    color: var(--color-text-match-fair);
+    background: rgba(14, 165, 233, 0.1);
+    color: #0284C7;
+    border-color: rgba(14, 165, 233, 0.2);
   }
   &.weak {
-    background-color: var(--color-bg-match-weak);
-    color: var(--color-text-match-weak);
-  }
-}
-
-@utility match-bar-bg {
-  width: 64px;
-  height: 4px;
-  background-color: var(--color-secondary-border);
-  border-radius: 9999px;
-  overflow: hidden;
-  margin-top: 4px;
-}
-
-@utility match-bar-fill {
-  height: 100%;
-  border-radius: 9999px;
-  &.strong {
-    background-color: var(--color-match-bar-strong);
-  }
-  &.fair {
-    background-color: var(--color-match-bar-fair);
-  }
-  &.weak {
-    background-color: var(--color-match-bar-weak);
+    background: rgba(245, 158, 11, 0.1);
+    color: #D97706;
+    border-color: rgba(245, 158, 11, 0.2);
   }
 }
 
@@ -430,7 +478,7 @@
   width: 100%;
   margin-top: 4px;
   color: var(--color-text-secondary);
-  font-size: 12px;
+  font-size: 14px;
   font-weight: 600;
 }
 
@@ -439,4 +487,5 @@
     zoom: 0.9;
   }
 }
+
 

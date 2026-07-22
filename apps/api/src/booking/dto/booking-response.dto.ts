@@ -22,5 +22,10 @@ export class BookingDetailResponseDto extends BookingListItemResponseDto {
   passengerSnapshot!: Prisma.JsonValue | null;
   payment!: { id: string; status: string; stripePaymentIntentId: string } | null;
   bookingIntent!: { id: string; offerId: string };
+  cancellationDeadline!: string | null;
+  cancellationRefundable!: boolean | null;
+  airlineRefundAmount!: string | null;
+  customerRefundAmount!: string | null;
+  duffelCancellationQuoteId!: string | null;
   updatedAt!: string;
 }

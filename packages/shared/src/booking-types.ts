@@ -127,6 +127,36 @@ export interface BookingDetailDto {
   /** Payment status joined for charge message derivation */
   paymentStatus?: string;
   stripePaymentIntentId?: string;
+  cancellationDeadline?: string | null;
+  cancellationRefundable?: boolean | null;
+  airlineRefundAmount?: string | null;
+  customerRefundAmount?: string | null;
+  duffelCancellationQuoteId?: string | null;
   createdAt: string;
   updatedAt: string;
 }
+
+/**
+ * DTO returned when creating/retrieving a cancellation quote.
+ */
+export interface CancellationQuoteResponseDto {
+  quoteId: string;
+  bookingId: string;
+  duffelOrderId: string;
+  refundAmount: string;
+  currency: string;
+  expiresAt: string;
+  refundable: boolean;
+  cancellationDeadline?: string;
+}
+
+/** Durable response for a supplier-first cancellation request. */
+export interface CancellationResponseDto {
+  bookingId: string;
+  bookingStatus: string;
+  cancellationStatus: string;
+  refundStatus: string;
+  refundAmount: string;
+  nextRetryAt?: string;
+}
+
