@@ -510,23 +510,29 @@ export class BookingService {
       };
     }
 
-    const claimResult = await this.prisma.booking.updateMany({
-      where: {
-        id: booking.id,
-        status: BookingStatus.CONFIRMED,
-        OR: [
-          { duffelCancellationQuoteId: null },
-          { duffelCancellationQuoteId: 'PENDING_QUOTE' },
-          { cancellationDeadline: null },
-          { cancellationDeadline: { lte: now } },
-        ],
-      },
-      data: {
-        duffelCancellationQuoteId: 'PENDING_QUOTE',
-      },
-    });
+    let claimed = false;
 
-    if (claimResult.count === 0) {
+    if (booking.duffelCancellationQuoteId !== 'PENDING_QUOTE') {
+      const claimResult = await this.prisma.booking.updateMany({
+        where: {
+          id: booking.id,
+          status: BookingStatus.CONFIRMED,
+          OR: [
+            { duffelCancellationQuoteId: null },
+            {
+              cancellationDeadline: { lte: now },
+              duffelCancellationQuoteId: { not: 'PENDING_QUOTE' },
+            },
+          ],
+        },
+        data: {
+          duffelCancellationQuoteId: 'PENDING_QUOTE',
+        },
+      });
+      claimed = claimResult.count > 0;
+    }
+
+    if (!claimed) {
       for (let attempt = 0; attempt < 25; attempt++) {
         await new Promise((resolve) => setTimeout(resolve, 200));
         const updatedBooking = await this.prisma.booking.findUnique({ where: { id: booking.id } });
@@ -563,9 +569,10 @@ export class BookingService {
       const refundable = quote.refundable !== undefined ? Boolean(quote.refundable) : parseFloat(String(refundAmount)) > 0;
       const cancellationDeadline = expiresAt;
 
-      await this.prisma.booking.updateMany({
+      const finalizeResult = await this.prisma.booking.updateMany({
         where: {
           id: booking.id,
+          status: BookingStatus.CONFIRMED,
           duffelCancellationQuoteId: 'PENDING_QUOTE',
         },
         data: {
@@ -575,6 +582,10 @@ export class BookingService {
           cancellationDeadline: cancellationDeadline ? new Date(cancellationDeadline) : null,
         },
       });
+
+      if (finalizeResult.count === 0) {
+        throw new BadRequestException('Booking status changed while generating cancellation quote');
+      }
 
       return {
         quoteId,
