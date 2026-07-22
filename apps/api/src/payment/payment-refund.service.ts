@@ -686,4 +686,217 @@ export class PaymentRefundService {
       throw error;
     }
   }
+
+  async processCancellationRefund(input: {
+    bookingId: string;
+    paymentId: string;
+    amount: number;
+    currency: string;
+  }): Promise<{
+    refundStatus: string;
+    refundAmount: string;
+    nextRetryAt?: string;
+  }> {
+    if (!Number.isInteger(input.amount) || input.amount <= 0) {
+      throw new BadRequestException('Cancellation refund amount must be a positive integer');
+    }
+
+    const payment = await this.prisma.payment.findUnique({
+      where: { id: input.paymentId },
+      include: { bookingIntent: { select: { userId: true } } },
+    });
+    if (!payment) {
+      throw new NotFoundException('Payment not found');
+    }
+
+    const booking = await this.prisma.booking.findUnique({
+      where: { id: input.bookingId },
+      select: { id: true, paymentId: true, status: true },
+    });
+    if (!booking || booking.paymentId !== payment.id) {
+      throw new NotFoundException('Cancellation booking not found for payment');
+    }
+
+    const refundAmount = this.toMajorCurrency(input.amount);
+    if (booking.status === 'CANCELLED_AND_REFUNDED') {
+      return { refundStatus: 'SUCCEEDED', refundAmount };
+    }
+
+    const idempotencyKey = `cancellation-refund:${input.bookingId}`;
+    const refundReason = `cancellation:${input.bookingId}`;
+    const idempotencyRecord = await this.prisma.idempotencyKey.upsert({
+      where: { key: idempotencyKey },
+      create: {
+        key: idempotencyKey,
+        requestHash: crypto
+          .createHash('sha256')
+          .update(`${input.paymentId}:${input.amount}:${input.currency}`)
+          .digest('hex'),
+        customerId: payment.bookingIntent.userId,
+        requestPath: `/api/bookings/${input.bookingId}/cancel`,
+        expiresAt: new Date(Date.now() + 23 * 60 * 60 * 1000),
+      },
+      update: {},
+    });
+
+    let refund = await this.prisma.refund.findFirst({
+      where: { paymentId: input.paymentId, reason: refundReason },
+    });
+    if (refund?.status === 'SUCCEEDED') {
+      return { refundStatus: 'SUCCEEDED', refundAmount };
+    }
+
+    if (!refund) {
+      refund = await this.prisma.$transaction(async (tx) => {
+        const currentPayment = await tx.payment.findUnique({
+          where: { id: input.paymentId },
+          select: { status: true },
+        });
+        if (!currentPayment) {
+          throw new NotFoundException('Payment not found');
+        }
+        if (currentPayment.status === PaymentStatus.SUCCEEDED) {
+          await tx.payment.update({
+            where: { id: input.paymentId },
+            data: { status: PaymentStatus.REFUND_PENDING },
+          });
+          await tx.paymentEvent.create({
+            data: {
+              paymentId: input.paymentId,
+              eventType: 'cancellation_refund_processing',
+              previousStatus: PaymentStatus.SUCCEEDED,
+              newStatus: PaymentStatus.REFUND_PENDING,
+              amount: input.amount,
+              source: PaymentEventSource.SYSTEM,
+              createdBy: 'cancellation_service',
+            },
+          });
+        }
+        return tx.refund.create({
+          data: {
+            paymentId: input.paymentId,
+            idempotencyKeyId: idempotencyRecord.id,
+            amount: input.amount,
+            currency: input.currency,
+            reason: refundReason,
+            triggerType: RefundTriggerType.SYSTEM_AUTOMATED,
+            status: 'REFUND_PENDING',
+            airlineRefundAmount: input.amount,
+            customerRefundAmount: input.amount,
+          },
+        });
+      });
+    }
+
+    const stripeRefund = await this.createCancellationRefundWithRetries(
+      payment.stripePaymentIntentId,
+      input.amount,
+      idempotencyKey,
+    );
+    if (!stripeRefund) {
+      return {
+        refundStatus: 'REFUND_PENDING',
+        refundAmount,
+        nextRetryAt: new Date(Date.now() + 60_000).toISOString(),
+      };
+    }
+
+    await this.prisma.$transaction(async (tx) => {
+      await tx.refund.update({
+        where: { id: refund.id },
+        data: { status: 'SUCCEEDED', stripeRefundId: stripeRefund.id },
+      });
+      await tx.payment.update({
+        where: { id: input.paymentId },
+        data: { status: PaymentStatus.REFUNDED },
+      });
+      await tx.booking.update({
+        where: { id: input.bookingId },
+        data: { status: 'CANCELLED_AND_REFUNDED' },
+      });
+      const transactionId = crypto.randomUUID();
+      await tx.ledgerEntry.createMany({
+        data: [
+          {
+            paymentId: input.paymentId,
+            transactionId,
+            accountId: 'PLATFORM_REVENUE',
+            entryType: 'DEBIT',
+            amount: input.amount,
+            currency: input.currency,
+          },
+          {
+            paymentId: input.paymentId,
+            transactionId,
+            accountId: 'CUSTOMER_RECEIVABLE',
+            entryType: 'CREDIT',
+            amount: input.amount,
+            currency: input.currency,
+          },
+        ],
+      });
+      await tx.paymentEvent.create({
+        data: {
+          paymentId: input.paymentId,
+          eventType: 'cancellation_refund_succeeded',
+          previousStatus: PaymentStatus.REFUND_PENDING,
+          newStatus: PaymentStatus.REFUNDED,
+          amount: input.amount,
+          source: PaymentEventSource.SYSTEM,
+          createdBy: 'cancellation_service',
+        },
+      });
+    });
+
+    return { refundStatus: 'SUCCEEDED', refundAmount };
+  }
+
+  private async createCancellationRefundWithRetries(
+    paymentIntentId: string,
+    amount: number,
+    idempotencyKey: string,
+  ): Promise<{ id: string } | null> {
+    const retryDelays = [1_000, 3_000, 5_000];
+    for (let attempt = 0; attempt <= retryDelays.length; attempt++) {
+      try {
+        const refund = await this.stripeService.createRefund(
+          paymentIntentId,
+          amount,
+          'requested_by_customer',
+          idempotencyKey,
+        );
+        return { id: refund.id };
+      } catch (error) {
+        if (!this.isTransientStripeError(error)) {
+          throw error;
+        }
+        if (attempt < retryDelays.length) {
+          await this.delay(retryDelays[attempt]);
+        }
+      }
+    }
+    return null;
+  }
+
+  private isTransientStripeError(error: unknown): boolean {
+    if (typeof error !== 'object' || error === null) {
+      return false;
+    }
+    const candidate = error as { statusCode?: unknown; code?: unknown; message?: unknown };
+    const statusCode = candidate.statusCode;
+    if (typeof statusCode === 'number' && (statusCode === 429 || statusCode >= 500)) {
+      return true;
+    }
+    const code = typeof candidate.code === 'string' ? candidate.code : '';
+    const message = typeof candidate.message === 'string' ? candidate.message : '';
+    return /ECONNRESET|ECONNREFUSED|ETIMEDOUT|timeout|connection/i.test(`${code} ${message}`);
+  }
+
+  private delay(milliseconds: number): Promise<void> {
+    return new Promise((resolve) => setTimeout(resolve, milliseconds));
+  }
+
+  private toMajorCurrency(amount: number): string {
+    return (amount / 100).toFixed(2);
+  }
 }
