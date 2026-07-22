@@ -5,6 +5,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { StripeService } from '../common/stripe.service';
 import { PaymentCronService } from './payment-cron.service';
 import { PaymentMethodService } from './payment-method.service';
+import { PaymentRefundService } from './payment-refund.service';
 
 describe('PaymentCronService', () => {
   let service: PaymentCronService;
@@ -14,6 +15,7 @@ describe('PaymentCronService', () => {
     paymentEvent: { create: jest.Mock };
     bookingIntent: { findUnique: jest.Mock; update: jest.Mock };
     ledgerEntry: { findFirst: jest.Mock; createMany: jest.Mock };
+    refund: { findMany: jest.Mock; updateMany: jest.Mock };
     $transaction: jest.Mock;
   };
   let transaction: {
@@ -24,6 +26,7 @@ describe('PaymentCronService', () => {
   };
   let stripeService: { cancelPaymentIntent: jest.Mock; retrievePaymentIntent: jest.Mock };
   let paymentMethodService: { saveMethod: jest.Mock };
+  let paymentRefundService: { recoverScheduledCancellationRefund: jest.Mock };
 
   const payment = {
     id: 'payment-1',
@@ -43,6 +46,7 @@ describe('PaymentCronService', () => {
       paymentEvent: { create: jest.fn() },
       bookingIntent: { findUnique: jest.fn(), update: jest.fn() },
       ledgerEntry: { findFirst: jest.fn(), createMany: jest.fn() },
+      refund: { findMany: jest.fn(), updateMany: jest.fn() },
       $transaction: jest.fn(),
     };
     transaction = {
@@ -55,6 +59,7 @@ describe('PaymentCronService', () => {
     transaction.bookingIntent.findUnique.mockResolvedValue({ paymentAttemptCount: 1 });
     stripeService = { cancelPaymentIntent: jest.fn(), retrievePaymentIntent: jest.fn() };
     paymentMethodService = { saveMethod: jest.fn() };
+    paymentRefundService = { recoverScheduledCancellationRefund: jest.fn() };
     const configService = { get: jest.fn((_key: string, defaultValue: number) => defaultValue) };
 
     service = new PaymentCronService(
@@ -62,6 +67,7 @@ describe('PaymentCronService', () => {
       stripeService as unknown as StripeService,
       configService as unknown as ConfigService,
       paymentMethodService as unknown as PaymentMethodService,
+      paymentRefundService as unknown as PaymentRefundService,
     );
   });
 
@@ -178,5 +184,73 @@ describe('PaymentCronService', () => {
       where: { id: payment.bookingIntentId },
       data: { status: BookingIntentStatus.AWAITING_PAYMENT },
     });
+  });
+
+  it('CAS-claims only due cancellation refunds before delegating recovery', async () => {
+    const dueRefund = {
+      id: 'refund-1',
+      status: 'REFUND_RETRY_SCHEDULED',
+      nextRetryAt: new Date('2026-07-22T00:00:00.000Z'),
+    };
+    prisma.refund.findMany.mockResolvedValue([dueRefund]);
+    prisma.refund.updateMany.mockResolvedValueOnce({ count: 1 });
+    prisma.refund.updateMany.mockResolvedValueOnce({ count: 0 });
+
+    await service.handleCancellationRefundRecovery();
+
+    expect(prisma.refund.findMany).toHaveBeenCalledWith({
+      where: {
+        OR: [
+          { status: 'REFUND_RETRY_SCHEDULED', nextRetryAt: { lte: expect.any(Date) } },
+          { status: 'REFUND_PROCESSING', nextRetryAt: { lte: expect.any(Date) } },
+          { status: 'REFUND_PROCESSING', nextRetryAt: null },
+        ],
+      },
+      orderBy: { nextRetryAt: 'asc' },
+      take: 100,
+    });
+    expect(prisma.refund.updateMany).toHaveBeenCalledWith({
+      where: {
+        id: dueRefund.id,
+        status: dueRefund.status,
+        nextRetryAt: dueRefund.nextRetryAt,
+      },
+      data: { status: 'REFUND_PROCESSING', nextRetryAt: expect.any(Date) },
+    });
+    expect(paymentRefundService.recoverScheduledCancellationRefund).toHaveBeenCalledWith(dueRefund.id);
+  });
+
+  it('reclaims a cancellation refund whose processing lease has expired', async () => {
+    const expiredLease = new Date('2026-07-22T00:00:00.000Z');
+    const processingRefund = {
+      id: 'refund-1',
+      status: 'REFUND_PROCESSING',
+      nextRetryAt: expiredLease,
+    };
+    prisma.refund.findMany.mockResolvedValue([processingRefund]);
+    prisma.refund.updateMany.mockResolvedValue({ count: 1 });
+
+    await service.handleCancellationRefundRecovery();
+
+    expect(prisma.refund.findMany).toHaveBeenCalledWith({
+      where: {
+        OR: [
+          { status: 'REFUND_RETRY_SCHEDULED', nextRetryAt: { lte: expect.any(Date) } },
+          { status: 'REFUND_PROCESSING', nextRetryAt: { lte: expect.any(Date) } },
+          { status: 'REFUND_PROCESSING', nextRetryAt: null },
+        ],
+      },
+      orderBy: { nextRetryAt: 'asc' },
+      take: 100,
+    });
+    expect(prisma.refund.updateMany).toHaveBeenCalledWith({
+      where: {
+        id: processingRefund.id,
+        status: 'REFUND_PROCESSING',
+        nextRetryAt: expiredLease,
+      },
+      data: { status: 'REFUND_PROCESSING', nextRetryAt: expect.any(Date) },
+    });
+    expect(paymentRefundService.recoverScheduledCancellationRefund).toHaveBeenCalledWith(processingRefund.id);
   });
 });

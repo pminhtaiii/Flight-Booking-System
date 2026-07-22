@@ -13,9 +13,10 @@ import { StripeService } from '@/common/stripe.service';
 import { PaymentIdempotencyService } from '@/payment/payment-idempotency.service';
 import { AuditService } from '@/audit/audit.service';
 import { RefundPaymentDto } from '@/payment/dto/refund-payment.dto';
+import { RefundResolutionAction } from '@/payment/dto/resolve-refund.dto';
 import { RefundResponse } from '@shared/types/payment.types';
 import { enforceTransition } from '@/payment/payment-state-machine';
-import { PaymentStatus, PaymentEventSource, RefundTriggerType, Prisma } from '@prisma/client';
+import { BookingStatus, PaymentStatus, PaymentEventSource, RefundStatus, RefundTriggerType, Prisma } from '@prisma/client';
 import * as crypto from 'crypto';
 
 @Injectable()
@@ -783,6 +784,9 @@ export class PaymentRefundService {
               status: 'REFUND_PENDING',
               airlineRefundAmount: input.amount,
               customerRefundAmount: input.amount,
+              bookingId: input.bookingId,
+              retryCount: 0,
+              idempotencyKeyCreatedAt: new Date(),
             },
           });
         });
@@ -823,10 +827,15 @@ export class PaymentRefundService {
       throw error;
     }
     if (!stripeRefund) {
+      const nextRetryAt = new Date(Date.now() + 60_000);
+      await this.prisma.refund.updateMany({
+        where: { id: refund.id, status: RefundStatus.REFUND_PENDING },
+        data: { status: RefundStatus.REFUND_RETRY_SCHEDULED, nextRetryAt },
+      });
       const pending = {
-        refundStatus: 'REFUND_PENDING',
+        refundStatus: RefundStatus.REFUND_RETRY_SCHEDULED,
         refundAmount,
-        nextRetryAt: new Date(Date.now() + 60_000).toISOString(),
+        nextRetryAt: nextRetryAt.toISOString(),
       };
       await this.idempotencyService.completeKey(idempotencyKey, HttpStatus.ACCEPTED, pending);
       return pending;
@@ -834,7 +843,7 @@ export class PaymentRefundService {
 
     const finalized = await this.prisma.$transaction(async (tx) => {
       const refundClaim = await tx.refund.updateMany({
-        where: { id: refund.id, status: 'REFUND_PENDING' },
+        where: { id: refund.id, status: RefundStatus.REFUND_PENDING },
         data: { status: 'SUCCEEDED', stripeRefundId: stripeRefund.id },
       });
       if (refundClaim.count === 0) {
@@ -892,6 +901,266 @@ export class PaymentRefundService {
     return finalized ? response : { refundStatus: 'SUCCEEDED', refundAmount };
   }
 
+  /** Called only after the cron worker has CAS-claimed a due cancellation refund. */
+  async recoverScheduledCancellationRefund(refundId: string): Promise<void> {
+    const refund = await this.prisma.refund.findUnique({
+      where: { id: refundId },
+      include: {
+        payment: { select: { id: true, stripePaymentIntentId: true } },
+        idempotencyKey: { select: { key: true } },
+      },
+    });
+    if (!refund || refund.status !== RefundStatus.REFUND_PROCESSING || !refund.bookingId) {
+      return;
+    }
+    const cancellationRefund = { ...refund, bookingId: refund.bookingId };
+
+    if (!cancellationRefund.idempotencyKeyCreatedAt || this.isIdempotencyKeyUnsafe(cancellationRefund.idempotencyKeyCreatedAt)) {
+      await this.escalateScheduledCancellationRefund(cancellationRefund, 'IDEMPOTENCY_KEY_SAFETY_WINDOW');
+      return;
+    }
+
+    try {
+      const stripeRefund = await this.stripeService.createRefund(
+        cancellationRefund.payment.stripePaymentIntentId,
+        cancellationRefund.amount,
+        'requested_by_customer',
+        cancellationRefund.idempotencyKey.key,
+      );
+      await this.finalizeScheduledCancellationRefundSuccess(cancellationRefund, stripeRefund.id);
+    } catch (error: unknown) {
+      const errorCode = this.toSafeStripeErrorCode(error);
+      if (!this.isTransientStripeError(error) || cancellationRefund.retryCount >= 3) {
+        await this.escalateScheduledCancellationRefund(cancellationRefund, errorCode);
+        return;
+      }
+
+      const delay = [5 * 60_000, 30 * 60_000, 2 * 60 * 60_000][cancellationRefund.retryCount];
+      await this.prisma.refund.updateMany({
+        where: { id: cancellationRefund.id, status: RefundStatus.REFUND_PROCESSING },
+        data: {
+          status: RefundStatus.REFUND_RETRY_SCHEDULED,
+          retryCount: { increment: 1 },
+          nextRetryAt: new Date(Date.now() + delay),
+          lastErrorCode: errorCode,
+          lastErrorAt: new Date(),
+        },
+      });
+    }
+  }
+
+  async resolveEscalatedCancellationRefund(
+    refundId: string,
+    action: RefundResolutionAction,
+  ): Promise<{ refundId: string; refundStatus: string; bookingStatus: string }> {
+    const refund = await this.prisma.refund.findUnique({
+      where: { id: refundId },
+      select: { id: true, bookingId: true, paymentId: true, status: true, amount: true, currency: true },
+    });
+    if (!refund?.bookingId) {
+      throw new NotFoundException('Escalated cancellation refund not found');
+    }
+    const bookingId = refund.bookingId;
+
+    const result = await this.prisma.$transaction(async (tx) => {
+      if (action === 'RETRY_WITH_FRESH_KEY') {
+        const key = await tx.idempotencyKey.create({
+          data: {
+            key: `cancellation-refund:${bookingId}:${crypto.randomUUID()}`,
+            requestHash: crypto.randomUUID(),
+            customerId: (await tx.booking.findUniqueOrThrow({
+              where: { id: bookingId },
+              select: { userId: true },
+            })).userId,
+            requestPath: `/api/admin/refunds/${refund.id}/resolve`,
+            expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
+          },
+        });
+        const claim = await tx.refund.updateMany({
+          where: { id: refund.id, status: RefundStatus.REFUND_FAILED_NEEDS_ATTENTION },
+          data: {
+            idempotencyKeyId: key.id,
+            idempotencyKeyCreatedAt: new Date(),
+            status: RefundStatus.REFUND_RETRY_SCHEDULED,
+            retryCount: 0,
+            nextRetryAt: new Date(),
+            lastErrorCode: null,
+            lastErrorAt: null,
+          },
+        });
+        if (claim.count !== 1) {
+          throw new ConflictException('Refund is not awaiting manual resolution');
+        }
+        await tx.booking.update({
+          where: { id: bookingId },
+          data: { status: BookingStatus.CANCELLED_PENDING_REFUND },
+        });
+        return { refundStatus: RefundStatus.REFUND_RETRY_SCHEDULED, bookingStatus: BookingStatus.CANCELLED_PENDING_REFUND };
+      }
+
+      const claim = await tx.refund.updateMany({
+        where: { id: refund.id, status: RefundStatus.REFUND_FAILED_NEEDS_ATTENTION },
+        data: { status: RefundStatus.SUCCEEDED, nextRetryAt: null },
+      });
+      if (claim.count !== 1) {
+        throw new ConflictException('Refund is not awaiting manual resolution');
+      }
+      await tx.payment.update({
+        where: { id: refund.paymentId },
+        data: { status: PaymentStatus.REFUNDED },
+      });
+      await tx.booking.update({
+        where: { id: bookingId },
+        data: { status: BookingStatus.CANCELLED_AND_REFUNDED },
+      });
+      const transactionId = crypto.randomUUID();
+      await tx.ledgerEntry.createMany({
+        data: [
+          {
+            paymentId: refund.paymentId,
+            transactionId,
+            accountId: 'PLATFORM_REVENUE',
+            entryType: 'DEBIT',
+            amount: refund.amount,
+            currency: refund.currency,
+          },
+          {
+            paymentId: refund.paymentId,
+            transactionId,
+            accountId: 'CUSTOMER_RECEIVABLE',
+            entryType: 'CREDIT',
+            amount: refund.amount,
+            currency: refund.currency,
+          },
+        ],
+      });
+      await tx.paymentEvent.create({
+        data: {
+          paymentId: refund.paymentId,
+          eventType: 'cancellation_refund_manually_resolved',
+          previousStatus: PaymentStatus.SUCCEEDED,
+          newStatus: PaymentStatus.REFUNDED,
+          amount: refund.amount,
+          source: PaymentEventSource.API,
+          createdBy: 'admin_refund_resolution',
+        },
+      });
+      return { refundStatus: RefundStatus.SUCCEEDED, bookingStatus: BookingStatus.CANCELLED_AND_REFUNDED };
+    });
+
+    await this.auditService.createLog(null, {
+      action: 'CANCELLATION_REFUND_MANUALLY_RESOLVED',
+      resourceType: 'Refund',
+      resourceId: refund.id,
+      metadata: { action },
+    });
+    return { refundId: refund.id, ...result };
+  }
+
+  private async finalizeScheduledCancellationRefundSuccess(
+    refund: { id: string; paymentId: string; bookingId: string; amount: number; currency: string },
+    stripeRefundId: string,
+  ): Promise<void> {
+    await this.prisma.$transaction(async (tx) => {
+      const claim = await tx.refund.updateMany({
+        where: { id: refund.id, status: RefundStatus.REFUND_PROCESSING },
+        data: { status: RefundStatus.SUCCEEDED, stripeRefundId, nextRetryAt: null },
+      });
+      if (claim.count !== 1) return;
+      await tx.payment.updateMany({
+        where: { id: refund.paymentId, status: PaymentStatus.REFUND_PENDING },
+        data: { status: PaymentStatus.REFUNDED },
+      });
+      await tx.booking.updateMany({
+        where: { id: refund.bookingId, status: BookingStatus.CANCELLED_PENDING_REFUND },
+        data: { status: BookingStatus.CANCELLED_AND_REFUNDED },
+      });
+      const transactionId = crypto.randomUUID();
+      await tx.ledgerEntry.createMany({
+        data: [
+          {
+            paymentId: refund.paymentId,
+            transactionId,
+            accountId: 'PLATFORM_REVENUE',
+            entryType: 'DEBIT',
+            amount: refund.amount,
+            currency: refund.currency,
+          },
+          {
+            paymentId: refund.paymentId,
+            transactionId,
+            accountId: 'CUSTOMER_RECEIVABLE',
+            entryType: 'CREDIT',
+            amount: refund.amount,
+            currency: refund.currency,
+          },
+        ],
+      });
+      await tx.paymentEvent.create({
+        data: {
+          paymentId: refund.paymentId,
+          eventType: 'cancellation_refund_recovered',
+          previousStatus: PaymentStatus.REFUND_PENDING,
+          newStatus: PaymentStatus.REFUNDED,
+          amount: refund.amount,
+          source: PaymentEventSource.CRON,
+          createdBy: 'refund_recovery_worker',
+        },
+      });
+    });
+  }
+
+  private async escalateScheduledCancellationRefund(
+    refund: { id: string; paymentId: string; bookingId: string; amount: number },
+    errorCode: string,
+  ): Promise<void> {
+    await this.prisma.$transaction(async (tx) => {
+      const claim = await tx.refund.updateMany({
+        where: { id: refund.id, status: RefundStatus.REFUND_PROCESSING },
+        data: {
+          status: RefundStatus.REFUND_FAILED_NEEDS_ATTENTION,
+          nextRetryAt: null,
+          lastErrorCode: errorCode,
+          lastErrorAt: new Date(),
+        },
+      });
+      if (claim.count !== 1) return;
+      await tx.payment.updateMany({
+        where: { id: refund.paymentId, status: PaymentStatus.REFUND_PENDING },
+        data: { status: PaymentStatus.SUCCEEDED },
+      });
+      await tx.booking.updateMany({
+        where: { id: refund.bookingId, status: BookingStatus.CANCELLED_PENDING_REFUND },
+        data: { status: BookingStatus.REFUND_FAILED_NEEDS_ATTENTION },
+      });
+      await tx.paymentEvent.create({
+        data: {
+          paymentId: refund.paymentId,
+          eventType: 'cancellation_refund_escalated',
+          previousStatus: PaymentStatus.REFUND_PENDING,
+          newStatus: PaymentStatus.SUCCEEDED,
+          amount: refund.amount,
+          source: PaymentEventSource.CRON,
+          createdBy: 'refund_recovery_worker',
+          metadata: { errorCode },
+        },
+      });
+    });
+    this.logger.error(`Cancellation refund ${refund.id} requires manual attention: ${errorCode}`);
+  }
+
+  private isIdempotencyKeyUnsafe(createdAt: Date): boolean {
+    return Date.now() - createdAt.getTime() >= 22 * 60 * 60 * 1000;
+  }
+
+  private toSafeStripeErrorCode(error: unknown): string {
+    if (typeof error !== 'object' || error === null) return 'STRIPE_UNKNOWN_ERROR';
+    const candidate = error as { statusCode?: unknown; code?: unknown };
+    if (typeof candidate.code === 'string' && /^[A-Z0-9_:-]{1,80}$/.test(candidate.code)) return candidate.code;
+    if (typeof candidate.statusCode === 'number') return `HTTP_${candidate.statusCode}`;
+    return 'STRIPE_UNKNOWN_ERROR';
+  }
+
   private async finalizeCancellationRefundFailure(
     refundId: string,
     paymentId: string,
@@ -900,7 +1169,7 @@ export class PaymentRefundService {
   ): Promise<boolean> {
     return this.prisma.$transaction(async (tx) => {
       const refundClaim = await tx.refund.updateMany({
-        where: { id: refundId, status: 'REFUND_PENDING' },
+        where: { id: refundId, status: RefundStatus.REFUND_PENDING },
         data: { status: 'REFUND_FAILED_NEEDS_ATTENTION' },
       });
       if (refundClaim.count === 0) {
@@ -911,8 +1180,8 @@ export class PaymentRefundService {
         data: { status: PaymentStatus.SUCCEEDED },
       });
       await tx.booking.updateMany({
-        where: { id: bookingId, status: 'CANCELLED_PENDING_REFUND' },
-        data: { status: 'FAILED', failureReason: 'SYSTEM_ERROR' },
+        where: { id: bookingId, status: BookingStatus.CANCELLED_PENDING_REFUND },
+        data: { status: BookingStatus.REFUND_FAILED_NEEDS_ATTENTION },
       });
       await tx.paymentEvent.create({
         data: {

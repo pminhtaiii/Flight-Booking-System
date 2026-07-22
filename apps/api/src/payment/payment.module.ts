@@ -12,10 +12,11 @@ import { DuffelModule } from '../duffel/duffel.module';
 import { AuditModule } from '../audit/audit.module';
 import { PaymentCronService } from './payment-cron.service';
 import { BookingModule } from '../booking/booking.module';
+import { AdminRefundController } from './admin-refund.controller';
 
 @Module({
   imports: [PrismaModule, DuffelModule, AuditModule, forwardRef(() => BookingModule)],
-  controllers: [PaymentController, PaymentWebhookController],
+  controllers: [PaymentController, PaymentWebhookController, AdminRefundController],
   providers: [StripeService, PaymentIdempotencyService, PaymentService, PaymentRefundService, PaymentMethodService, PaymentWebhookService, PaymentCronService],
   exports: [StripeService, PaymentIdempotencyService, PaymentService, PaymentRefundService, PaymentMethodService, PaymentWebhookService],
 })

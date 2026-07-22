@@ -12,7 +12,7 @@ describe('PaymentRefundService cancellation refunds', () => {
   const prisma = {
     payment: { findUnique: jest.fn(), update: jest.fn(), updateMany: jest.fn() },
     booking: { findUnique: jest.fn(), update: jest.fn(), updateMany: jest.fn() },
-    refund: { findFirst: jest.fn(), create: jest.fn(), update: jest.fn(), updateMany: jest.fn() },
+    refund: { findFirst: jest.fn(), findUnique: jest.fn(), create: jest.fn(), update: jest.fn(), updateMany: jest.fn() },
     idempotencyKey: { findUnique: jest.fn() },
     paymentEvent: { create: jest.fn() },
     ledgerEntry: { createMany: jest.fn() },
@@ -23,6 +23,7 @@ describe('PaymentRefundService cancellation refunds', () => {
     acquireOrReplay: jest.fn(),
     completeKey: jest.fn(),
   };
+  const audit = { createLog: jest.fn() };
 
   beforeEach(async () => {
     jest.resetAllMocks();
@@ -52,7 +53,7 @@ describe('PaymentRefundService cancellation refunds', () => {
         { provide: PrismaService, useValue: prisma },
         { provide: StripeService, useValue: stripe },
         { provide: PaymentIdempotencyService, useValue: idempotency },
-        { provide: AuditService, useValue: {} },
+        { provide: AuditService, useValue: audit },
       ],
     }).compile();
     service = module.get(PaymentRefundService);
@@ -105,7 +106,7 @@ describe('PaymentRefundService cancellation refunds', () => {
       currency: 'usd',
     });
 
-    expect(result.refundStatus).toBe('REFUND_PENDING');
+    expect(result.refundStatus).toBe('REFUND_RETRY_SCHEDULED');
     expect(result.nextRetryAt).toEqual(expect.any(String));
     expect(stripe.createRefund).toHaveBeenCalledTimes(4);
     expect(stripe.createRefund.mock.calls.map((call) => call[3])).toEqual([
@@ -141,7 +142,7 @@ describe('PaymentRefundService cancellation refunds', () => {
     }));
     expect(prisma.booking.updateMany).toHaveBeenCalledWith({
       where: { id: 'booking-1', status: 'CANCELLED_PENDING_REFUND' },
-      data: { status: 'FAILED', failureReason: 'SYSTEM_ERROR' },
+      data: { status: 'REFUND_FAILED_NEEDS_ATTENTION' },
     });
   });
 
@@ -164,5 +165,167 @@ describe('PaymentRefundService cancellation refunds', () => {
     });
     expect(prisma.ledgerEntry.createMany).not.toHaveBeenCalled();
     expect(prisma.paymentEvent.create).toHaveBeenCalledTimes(1);
+  });
+
+  it('escalates a stale cancellation refund before calling Stripe again', async () => {
+    prisma.refund.findUnique.mockResolvedValue({
+      id: 'refund-1',
+      status: 'REFUND_PROCESSING',
+      bookingId: 'booking-1',
+      paymentId: 'payment-1',
+      retryCount: 0,
+      amount: 12_500,
+      currency: 'usd',
+      idempotencyKeyCreatedAt: new Date(Date.now() - 22 * 60 * 60 * 1000),
+      payment: { id: 'payment-1', stripePaymentIntentId: 'pi_1' },
+      idempotencyKey: { key: 'cancellation-refund:booking-1' },
+    });
+    prisma.refund.updateMany.mockResolvedValue({ count: 1 });
+
+    await service.recoverScheduledCancellationRefund('refund-1');
+
+    expect(stripe.createRefund).not.toHaveBeenCalled();
+    expect(prisma.refund.updateMany).toHaveBeenCalledWith(expect.objectContaining({
+      where: { id: 'refund-1', status: 'REFUND_PROCESSING' },
+      data: expect.objectContaining({
+        status: 'REFUND_FAILED_NEEDS_ATTENTION',
+        lastErrorCode: 'IDEMPOTENCY_KEY_SAFETY_WINDOW',
+      }),
+    }));
+    expect(prisma.booking.updateMany).toHaveBeenCalledWith({
+      where: { id: 'booking-1', status: 'CANCELLED_PENDING_REFUND' },
+      data: { status: 'REFUND_FAILED_NEEDS_ATTENTION' },
+    });
+  });
+
+  it('requeues a transient worker failure for the next retry window without changing its Stripe key', async () => {
+    prisma.refund.findUnique.mockResolvedValue({
+      id: 'refund-1',
+      status: 'REFUND_PROCESSING',
+      bookingId: 'booking-1',
+      paymentId: 'payment-1',
+      retryCount: 0,
+      amount: 12_500,
+      currency: 'usd',
+      idempotencyKeyCreatedAt: new Date(),
+      payment: { id: 'payment-1', stripePaymentIntentId: 'pi_1' },
+      idempotencyKey: { key: 'cancellation-refund:booking-1' },
+    });
+    stripe.createRefund.mockRejectedValue({ statusCode: 503, message: 'unavailable' });
+    prisma.refund.updateMany.mockResolvedValue({ count: 1 });
+
+    await service.recoverScheduledCancellationRefund('refund-1');
+
+    expect(stripe.createRefund).toHaveBeenCalledWith(
+      'pi_1', 12_500, 'requested_by_customer', 'cancellation-refund:booking-1',
+    );
+    expect(prisma.refund.updateMany).toHaveBeenCalledWith(expect.objectContaining({
+      where: { id: 'refund-1', status: 'REFUND_PROCESSING' },
+      data: expect.objectContaining({
+        status: 'REFUND_RETRY_SCHEDULED',
+        retryCount: { increment: 1 },
+        nextRetryAt: expect.any(Date),
+        lastErrorCode: 'HTTP_503',
+      }),
+    }));
+  });
+
+  it('finalizes a CAS-claimed scheduled refund exactly once after Stripe succeeds', async () => {
+    prisma.refund.findUnique.mockResolvedValue({
+      id: 'refund-1',
+      status: 'REFUND_PROCESSING',
+      bookingId: 'booking-1',
+      paymentId: 'payment-1',
+      retryCount: 1,
+      amount: 12_500,
+      currency: 'usd',
+      idempotencyKeyCreatedAt: new Date(),
+      payment: { id: 'payment-1', stripePaymentIntentId: 'pi_1' },
+      idempotencyKey: { key: 'cancellation-refund:booking-1' },
+    });
+    stripe.createRefund.mockResolvedValue({ id: 're_1' });
+    prisma.refund.updateMany.mockResolvedValue({ count: 1 });
+
+    await service.recoverScheduledCancellationRefund('refund-1');
+
+    expect(prisma.refund.updateMany).toHaveBeenCalledWith({
+      where: { id: 'refund-1', status: 'REFUND_PROCESSING' },
+      data: { status: 'SUCCEEDED', stripeRefundId: 're_1', nextRetryAt: null },
+    });
+    expect(prisma.booking.updateMany).toHaveBeenCalledWith({
+      where: { id: 'booking-1', status: 'CANCELLED_PENDING_REFUND' },
+      data: { status: 'CANCELLED_AND_REFUNDED' },
+    });
+    expect(prisma.ledgerEntry.createMany).toHaveBeenCalledWith(expect.objectContaining({
+      data: [
+        expect.objectContaining({ accountId: 'PLATFORM_REVENUE', entryType: 'DEBIT', amount: 12_500 }),
+        expect.objectContaining({ accountId: 'CUSTOMER_RECEIVABLE', entryType: 'CREDIT', amount: 12_500 }),
+      ],
+    }));
+  });
+
+  it('records balanced accounting entries and a payment event when an admin confirms an external refund', async () => {
+    prisma.refund.findUnique.mockResolvedValue({
+      id: 'refund-1',
+      bookingId: 'booking-1',
+      paymentId: 'payment-1',
+      status: 'REFUND_FAILED_NEEDS_ATTENTION',
+      amount: 12_500,
+      currency: 'usd',
+    });
+
+    await service.resolveEscalatedCancellationRefund('refund-1', 'MARK_RESOLVED_MANUALLY');
+
+    expect(prisma.ledgerEntry.createMany).toHaveBeenCalledWith(expect.objectContaining({
+      data: [
+        expect.objectContaining({
+          paymentId: 'payment-1',
+          accountId: 'PLATFORM_REVENUE',
+          entryType: 'DEBIT',
+          amount: 12_500,
+          currency: 'usd',
+        }),
+        expect.objectContaining({
+          paymentId: 'payment-1',
+          accountId: 'CUSTOMER_RECEIVABLE',
+          entryType: 'CREDIT',
+          amount: 12_500,
+          currency: 'usd',
+        }),
+      ],
+    }));
+    expect(prisma.paymentEvent.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        paymentId: 'payment-1',
+        eventType: 'cancellation_refund_manually_resolved',
+        previousStatus: PaymentStatus.SUCCEEDED,
+        newStatus: PaymentStatus.REFUNDED,
+        amount: 12_500,
+        source: 'API',
+        createdBy: 'admin_refund_resolution',
+      }),
+    });
+  });
+
+  it('does not apply a manual resolution when another admin already claimed the refund', async () => {
+    prisma.refund.findUnique.mockResolvedValue({
+      id: 'refund-1',
+      bookingId: 'booking-1',
+      paymentId: 'payment-1',
+      status: 'REFUND_FAILED_NEEDS_ATTENTION',
+      amount: 12_500,
+      currency: 'usd',
+    });
+    prisma.refund.updateMany.mockResolvedValueOnce({ count: 0 });
+
+    await expect(
+      service.resolveEscalatedCancellationRefund('refund-1', 'MARK_RESOLVED_MANUALLY'),
+    ).rejects.toThrow('Refund is not awaiting manual resolution');
+
+    expect(prisma.payment.update).not.toHaveBeenCalled();
+    expect(prisma.booking.update).not.toHaveBeenCalled();
+    expect(prisma.ledgerEntry.createMany).not.toHaveBeenCalled();
+    expect(prisma.paymentEvent.create).not.toHaveBeenCalled();
+    expect(audit.createLog).not.toHaveBeenCalled();
   });
 });
