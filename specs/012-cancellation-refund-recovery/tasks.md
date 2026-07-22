@@ -55,8 +55,8 @@ Tracking map for the Cancellation & Refund Management feature implementation acr
 ### [PR 2 / Issue #63] Supplier-First Cancellation & Inline Refund Transaction
 - **Branch**: `012c-cancellation-transaction`
 - **Scope**:
-  - `POST /api/bookings/:bookingId/cancel` endpoint using CAS update (`UPDATE ... WHERE status = 'CONFIRMED'`).
-  - Remote-first Duffel crash recovery check.
+  - `POST /api/bookings/:bookingId/cancel` endpoint using CAS update (`UPDATE ... WHERE status = 'CONFIRMED' OR (status = 'CANCELLATION_PENDING' AND updatedAt < NOW() - INTERVAL '2 minutes')`).
+  - Remote-first Duffel crash recovery check (queries Duffel order state before attempting quote creation/confirmation to safely resolve crashed or retried `CANCELLATION_PENDING` attempts).
   - Layer 1 inline Stripe retries (1s, 3s, 5s).
   - Atomic `finalizeRefundSuccess()` transaction for `Refund`, `Payment`, `Booking`, and reverse ledger.
 

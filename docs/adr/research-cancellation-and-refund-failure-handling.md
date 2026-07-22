@@ -8,7 +8,7 @@ For Stripe refund failures (after a successful Duffel cancellation): The system 
 
 ## Concurrency Control
 
-Both user-initiated cancellation and the stale-booking cron sweep use an atomic conditional update (CAS) as a claim mechanism instead of pessimistic row-level locking. This avoids holding database locks during long-running HTTP calls to Duffel or Stripe. Whichever process executes the CAS first wins; the loser gets zero rows and skips. The same CAS pattern applies to refund processing — the cron worker claims refund rows atomically before retrying Stripe.
+Both user-initiated cancellation and the stale-booking cron sweep use an atomic conditional update (CAS) as a claim mechanism (`WHERE status = 'CONFIRMED' OR (status = 'CANCELLATION_PENDING' AND updatedAt < NOW() - INTERVAL '2 minutes')`) instead of pessimistic row-level locking. This avoids holding database locks during long-running HTTP calls to Duffel or Stripe, while allowing retries to reclaim orphaned `CANCELLATION_PENDING` claims if a process crashed mid-flight. Whichever process executes the CAS first wins; the loser gets zero rows and skips. The same CAS pattern applies to refund processing — the cron worker claims refund rows atomically before retrying Stripe.
 
 ## Duffel Crash Recovery
 
