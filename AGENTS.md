@@ -73,8 +73,8 @@ To run the full stack locally (Next.js frontend, NestJS backend, and Python agen
    ```
 2. **Database Setup**: Run migrations and seeding from the workspace root (or using local `prisma` package in `apps/api`):
    ```bash
-   npx prisma migrate dev --schema=apps/api/prisma/schema.prisma
-   npx prisma db seed --schema=apps/api/prisma/schema.prisma
+   pnpm --filter @api/backend exec prisma migrate dev
+   pnpm --filter @api/backend exec prisma db seed
    ```
 3. **Shared Secrets (.env)**: Ensure both `apps/api/.env` and `apps/agent/.env` contain matching secret configuration variables:
    - `JWT_SECRET` (NextAuth token generation)
