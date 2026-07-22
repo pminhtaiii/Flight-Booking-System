@@ -2,8 +2,11 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import { useSession } from 'next-auth/react';
 import type { BookingDetailDto } from '@shared/booking-types';
 import { BookingStatusBadge } from '@/components/bookings/BookingStatusBadge';
+
+const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001';
 
 type BookingDetailProps = {
   booking: BookingDetailDto;
@@ -11,7 +14,7 @@ type BookingDetailProps = {
 };
 
 const currencyFormatter = (amount: string, currency: string): string =>
-  new Intl.NumberFormat('en-GB', { style: 'currency', currency }).format(Number(amount) / 100);
+  new Intl.NumberFormat('en-GB', { style: 'currency', currency }).format(Number(amount));
 
 export function BookingDetail({ booking, onRefresh }: BookingDetailProps) {
   const [cancellationStatus, setCancellationStatus] = useState<any>(null);
@@ -22,9 +25,15 @@ export function BookingDetail({ booking, onRefresh }: BookingDetailProps) {
   const [cancelling, setCancelling] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const { data: session } = useSession();
+  const accessToken = (session as any)?.accessToken;
+
   const fetchCancellationStatus = useCallback(async () => {
     try {
-      const res = await fetch(`/api/bookings/${booking.id}/cancellation`);
+      if (!accessToken) return;
+      const res = await fetch(`${apiUrl}/api/bookings/${booking.id}/cancellation`, {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      });
       if (res.ok) {
         const data = await res.json();
         setCancellationStatus(data);
@@ -41,7 +50,7 @@ export function BookingDetail({ booking, onRefresh }: BookingDetailProps) {
     } catch (e) {
       // Ignore error to avoid console noise
     }
-  }, [booking.id, booking.status, onRefresh]);
+  }, [booking.id, booking.status, onRefresh, accessToken]);
 
   useEffect(() => {
     let interval: NodeJS.Timeout;
@@ -61,8 +70,10 @@ export function BookingDetail({ booking, onRefresh }: BookingDetailProps) {
     setLoadingQuote(true);
     setError(null);
     try {
-      const res = await fetch(`/api/bookings/${booking.id}/cancellation-quote`, {
+      if (!accessToken) throw new Error('Not authenticated');
+      const res = await fetch(`${apiUrl}/api/bookings/${booking.id}/cancellation-quote`, {
         method: 'POST',
+        headers: { Authorization: `Bearer ${accessToken}` },
       });
       if (!res.ok) throw new Error('Failed to fetch cancellation quote');
       const data = await res.json();
@@ -79,9 +90,13 @@ export function BookingDetail({ booking, onRefresh }: BookingDetailProps) {
     setCancelling(true);
     setError(null);
     try {
-      const res = await fetch(`/api/bookings/${booking.id}/cancel`, {
+      if (!accessToken) throw new Error('Not authenticated');
+      const res = await fetch(`${apiUrl}/api/bookings/${booking.id}/cancel`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${accessToken}`,
+        },
         body: JSON.stringify({ quoteId: quote.quoteId }),
       });
       if (!res.ok) throw new Error('Failed to confirm cancellation');
@@ -97,7 +112,7 @@ export function BookingDetail({ booking, onRefresh }: BookingDetailProps) {
   const segments = booking.flightSnapshot?.segments ?? [];
   const passengers = booking.passengerSnapshot?.passengers ?? [];
 
-  const isCancellable = (booking.status === 'CONFIRMED' || booking.status === 'COMPLETED') && 
+  const isCancellable = booking.status === 'CONFIRMED' && 
     booking.cancellationDeadline && new Date(booking.cancellationDeadline) > new Date();
 
   return (

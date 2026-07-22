@@ -4,6 +4,8 @@
 import { useState, useEffect } from 'react';
 import { useSession } from 'next-auth/react';
 
+const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001';
+
 export default function AdminRefundsPage() {
   const { data: session, status } = useSession();
   const [isAdmin, setIsAdmin] = useState<boolean | null>(null);
@@ -18,7 +20,7 @@ export default function AdminRefundsPage() {
       const currentSession = session as any;
       if (status === 'authenticated' && currentSession?.accessToken) {
         try {
-          const res = await fetch('/api/auth/me', {
+          const res = await fetch(`${apiUrl}/api/auth/me`, {
             headers: {
               Authorization: `Bearer ${currentSession.accessToken}`,
             },
@@ -44,7 +46,7 @@ export default function AdminRefundsPage() {
     if (!currentSession?.accessToken) return;
     setLoading(true);
     try {
-      const res = await fetch('/api/admin/refunds', {
+      const res = await fetch(`${apiUrl}/api/admin/refunds`, {
         headers: {
           Authorization: `Bearer ${currentSession.accessToken}`,
         },
@@ -74,7 +76,7 @@ export default function AdminRefundsPage() {
     setActionLoading(refundId);
     setMessage(null);
     try {
-      const res = await fetch(`/api/admin/refunds/${refundId}/resolve`, {
+      const res = await fetch(`${apiUrl}/api/admin/refunds/${refundId}/resolve`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
