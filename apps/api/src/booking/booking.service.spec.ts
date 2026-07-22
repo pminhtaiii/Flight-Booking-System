@@ -301,9 +301,10 @@ describe('BookingService', () => {
             status: 'CONFIRMED',
             OR: [
               { duffelCancellationQuoteId: null },
-              { duffelCancellationQuoteId: 'PENDING_QUOTE' },
-              { cancellationDeadline: null },
-              { cancellationDeadline: { lte: expect.any(Date) } },
+              {
+                cancellationDeadline: { lte: expect.any(Date) },
+                duffelCancellationQuoteId: { not: 'PENDING_QUOTE' },
+              },
             ],
           },
           data: {
@@ -313,6 +314,7 @@ describe('BookingService', () => {
         expect(prisma.booking.updateMany).toHaveBeenNthCalledWith(2, {
           where: {
             id: 'b-1',
+            status: 'CONFIRMED',
             duffelCancellationQuoteId: 'PENDING_QUOTE',
           },
           data: expect.objectContaining({
