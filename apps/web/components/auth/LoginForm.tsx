@@ -1,97 +1,90 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { FormEvent, useEffect, useState } from 'react';
 import { signIn } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
+import styles from './auth-form.module.css';
 
-export function LoginForm() {
+type LockoutError = {
+  code?: string;
+  message?: string;
+  retryAfterSeconds?: number;
+};
+
+function parseLockoutError(error: string): LockoutError | null {
+  try {
+    const parsed: unknown = JSON.parse(error);
+    if (typeof parsed === 'object' && parsed !== null && (parsed as LockoutError).code === 'auth_locked') {
+      return parsed as LockoutError;
+    }
+  } catch {
+    // Credential failures are normally a plain message.
+  }
+
+  return null;
+}
+
+export function LoginForm(): JSX.Element {
   const router = useRouter();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [lockoutTime, setLockoutTime] = useState(0);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [lockoutSeconds, setLockoutSeconds] = useState(0);
 
   useEffect(() => {
-    if (lockoutTime <= 0) return;
-    const timer = setInterval(() => {
-      setLockoutTime((prev) => prev - 1);
-    }, 1000);
-    return () => clearInterval(timer);
-  }, [lockoutTime]);
+    if (lockoutSeconds <= 0) return;
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+    const timer = window.setInterval(() => {
+      setLockoutSeconds((seconds) => Math.max(0, seconds - 1));
+    }, 1000);
+
+    return () => window.clearInterval(timer);
+  }, [lockoutSeconds]);
+
+  async function handleSubmit(event: FormEvent<HTMLFormElement>): Promise<void> {
+    event.preventDefault();
     setError('');
-    setLoading(true);
+    setIsSubmitting(true);
 
     try {
-      const res = await signIn('credentials', {
-        redirect: false,
-        email,
-        password,
-      });
-
-      if (res?.error) {
-        try {
-          const parsed = JSON.parse(res.error);
-          if (parsed.code === 'auth_locked') {
-            setError(parsed.message || 'Too many login attempts. Please wait.');
-            setLockoutTime(parsed.retryAfterSeconds || 60);
-            return;
-          }
-        } catch {
-          // Keep standard fallback
+      const result = await signIn('credentials', { redirect: false, email, password });
+      if (result?.error) {
+        const lockout = parseLockoutError(result.error);
+        if (lockout) {
+          setError(lockout.message ?? 'Too many login attempts. Please wait before trying again.');
+          setLockoutSeconds(lockout.retryAfterSeconds ?? 60);
+          return;
         }
-        setError('Invalid email or password');
-      } else {
-        router.push('/dashboard');
-        router.refresh();
-      }
-    } catch {
-      setError('An unexpected error occurred');
-    } finally {
-      setLoading(false);
-    }
-  };
 
-  const isLocked = lockoutTime > 0;
+        setError('Invalid email or password.');
+        return;
+      }
+
+      router.push('/');
+      router.refresh();
+    } catch {
+      setError('We could not sign you in. Please try again.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
+  const isLocked = lockoutSeconds > 0;
 
   return (
-    <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-      {error && (
-        <div className="error-message text-danger-foreground text-sm font-medium" role="alert">
-          {error}
-        </div>
-      )}
-      <div className="flex flex-col gap-1">
-        <label className="text-sm font-medium text-text-primary">Email</label>
-        <input
-          type="email"
-          name="email"
-          className="form-input"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          placeholder="you@example.com"
-          required
-          disabled={isLocked}
-        />
+    <form className={styles.form} onSubmit={handleSubmit} noValidate>
+      {error ? <p className={styles.message} role="alert">{error}</p> : null}
+      <div className={styles.field}>
+        <label className={styles.label} htmlFor="login-email">Email address</label>
+        <input className={styles.input} disabled={isLocked} id="login-email" name="email" onChange={(event) => setEmail(event.target.value)} required type="email" value={email} />
       </div>
-      <div className="flex flex-col gap-1">
-        <label className="text-sm font-medium text-text-primary">Password</label>
-        <input
-          type="password"
-          name="password"
-          className="form-input"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          placeholder="••••••••"
-          required
-          disabled={isLocked}
-        />
+      <div className={styles.field}>
+        <label className={styles.label} htmlFor="login-password">Password</label>
+        <input className={styles.input} disabled={isLocked} id="login-password" name="password" onChange={(event) => setPassword(event.target.value)} required type="password" value={password} />
       </div>
-      <button type="submit" className="btn-primary w-full mt-2" disabled={loading || isLocked}>
-        {isLocked ? `Please wait (${lockoutTime}s)` : loading ? 'Signing in...' : 'Sign In'}
+      <button className={styles.submit} disabled={isSubmitting || isLocked} type="submit">
+        {isLocked ? `Try again in ${lockoutSeconds}s` : isSubmitting ? 'Signing in…' : 'Sign in'}
       </button>
     </form>
   );

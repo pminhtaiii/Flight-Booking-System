@@ -101,5 +101,5 @@ When a task involves creating a pull request or requesting CodeRabbit reviews:
 <!-- SPECKIT START -->
 For additional context about technologies to be used, project structure,
 shell commands, and other important information, read the current plan
-at specs/011-booking-management/plan.md
+at specs/014-disruption-flight-change-management/plan.md
 <!-- SPECKIT END -->
