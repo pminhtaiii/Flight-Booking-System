@@ -90,15 +90,15 @@ async function run() {
     }
 
     // Check if backfill updates are needed
+    const currentNextTime = booking.nextUnflownDepartureAt?.getTime() ?? null;
+    const derivedNextTime = nextUnflownDepartureAt?.getTime() ?? null;
+
     const needsUpdate =
       !booking.currentDepartureAt ||
       !booking.currentFinalArrivalAt ||
-      (nextUnflownDepartureAt && !booking.nextUnflownDepartureAt) ||
       booking.currentDepartureAt.getTime() !== currentDepartureAt.getTime() ||
       booking.currentFinalArrivalAt.getTime() !== currentFinalArrivalAt.getTime() ||
-      (nextUnflownDepartureAt &&
-        booking.nextUnflownDepartureAt &&
-        booking.nextUnflownDepartureAt.getTime() !== nextUnflownDepartureAt.getTime());
+      currentNextTime !== derivedNextTime;
 
     if (needsUpdate) {
       await prisma.booking.update({
