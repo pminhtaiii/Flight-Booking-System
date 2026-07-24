@@ -169,11 +169,38 @@ model Booking {
   payment            Payment?      @relation(fields: [paymentId], references: [id], onDelete: SetNull)
   cancellationRefund Refund?       @relation("CancellationBookingRefund")
 
+  disruptionStatus           DisruptionStatus          @default(NONE)
+  activeDisruptionRevisionId String?                   @unique
+  syncLockedAt               DateTime?
+  syncLockToken              String?
+  lastDuffelSyncedAt         DateTime?
+  nextDuffelSyncAt           DateTime?
+  currentDepartureAt         DateTime?
+  nextUnflownDepartureAt     DateTime?
+  currentFinalArrivalAt      DateTime?
+  disruptionResolvedReason   DisruptionResolvedReason?
+  disruptionResolvedAt       DateTime?
+  disruptionResolvedByType   DisruptionActorType?
+  disruptionResolvedById     String?
+  disruptionNeedsAttention   Boolean                   @default(false)
+  disruptionAttentionReason  DisruptionAttentionReason?
+  disruptionAttentionAt      DateTime?
+
+  itineraryRevisions         ItineraryRevision[]       @relation("BookingItineraryRevisions")
+  activeDisruptionRevision   ItineraryRevision?        @relation("BookingActiveDisruptionRevision", fields: [activeDisruptionRevisionId], references: [id], onDelete: SetNull)
+  notificationOutbox         NotificationOutbox[]      @relation("BookingNotificationOutbox")
+  disruptionAuditEvents      DisruptionAuditEvent[]    @relation("BookingDisruptionAuditEvents")
+
   @@index([userId])
   @@index([userId, status])
   @@index([departureAt])
   @@index([status, createdAt])
   @@index([status, departureAt])
+  @@index([duffelOrderId])
+  @@index([status, nextUnflownDepartureAt, lastDuffelSyncedAt])
+  @@index([disruptionStatus, disruptionResolvedAt])
+  @@index([disruptionNeedsAttention, disruptionAttentionAt])
+  @@index([syncLockedAt])
   @@map("bookings")
 }
 
@@ -527,4 +554,223 @@ model PaymentMethod {
   @@index([stripeCustomerId])
   @@index([userId])
   @@map("payment_methods")
+}
+
+enum DisruptionStatus {
+  NONE
+  DETECTED
+  ACKNOWLEDGED
+  RESOLVED
+}
+
+enum DisruptionResolvedReason {
+  TRAVELLER_ACCEPTED
+  DEPARTURE_PASSED
+  ADMIN_RESOLVED
+  BOOKING_CANCELLED
+}
+
+enum DisruptionActorType {
+  TRAVELLER
+  SYSTEM
+  ADMIN
+}
+
+enum DisruptionAttentionReason {
+  NOTIFICATION_THROTTLED
+  AGED_UNRESOLVED
+  DATA_QUALITY
+}
+
+enum ItineraryRevisionSource {
+  WEBHOOK
+  RECONCILIATION
+  BOOTSTRAP
+}
+
+enum MaterialBaseline {
+  INCREMENTAL
+  CUMULATIVE
+}
+
+enum MaterialDisruptionReason {
+  SEGMENT_REMOVED
+  SEGMENT_ADDED
+  DEPARTURE_AIRPORT_CHANGED
+  ARRIVAL_AIRPORT_CHANGED
+  DEPARTURE_LOCAL_DATE_CHANGED
+  ARRIVAL_LOCAL_DATE_CHANGED
+  DEPARTURE_MOVED_EARLIER
+  DEPARTURE_MOVED_LATER
+  FINAL_ARRIVAL_MOVED_EARLIER
+  FINAL_ARRIVAL_MOVED_LATER
+  OVERNIGHT_CONNECTION_INTRODUCED
+  CONNECTION_BELOW_MCT
+  INVALID_CONNECTION_OVERLAP
+}
+
+enum DuffelWebhookEventStatus {
+  PENDING
+  PROCESSING
+  RETRY_SCHEDULED
+  PROCESSED
+  SKIPPED
+  FAILED_NEEDS_ATTENTION
+}
+
+enum NotificationOutboxType {
+  MATERIAL_DISRUPTION
+}
+
+enum NotificationOutboxStatus {
+  PENDING
+  PROCESSING
+  DELIVERED
+  FAILED
+}
+
+enum DisruptionAuditEventAction {
+  DETECTED
+  ACKNOWLEDGED
+  TRAVELLER_ACCEPTED
+  DEPARTURE_RESOLVED
+  BOOKING_CANCELLED
+  ADMIN_RESOLVED
+  EVENT_RETRIED
+  ATTENTION_RAISED
+  ATTENTION_CLEARED
+}
+
+model ItineraryRevision {
+  id                 String                     @id @default(uuid())
+  bookingId          String
+  version            Int
+  source             ItineraryRevisionSource
+  sourceEventId      String?
+  supplierObservedAt DateTime?
+  fingerprint        String
+  isMaterial         Boolean
+  materialReasons    MaterialDisruptionReason[]
+  materialBaselines  MaterialBaseline[]
+  incrementalDiff    Json
+  cumulativeDiff     Json
+  rulesetVersion     String                     @default("disruption-v1")
+  createdAt          DateTime                   @default(now())
+
+  booking            Booking                    @relation("BookingItineraryRevisions", fields: [bookingId], references: [id], onDelete: Cascade)
+  activeForBooking   Booking?                   @relation("BookingActiveDisruptionRevision")
+  segments           ItineraryRevisionSegment[] @relation("RevisionSegments")
+  notificationOutbox NotificationOutbox?        @relation("RevisionNotificationOutbox")
+  disruptionAuditEvents DisruptionAuditEvent[]   @relation("RevisionDisruptionAuditEvents")
+
+  @@unique([bookingId, version])
+  @@index([bookingId, createdAt(sort: Desc)])
+  @@index([bookingId, isMaterial, createdAt(sort: Desc)])
+  @@index([sourceEventId])
+  @@map("itinerary_revisions")
+}
+
+model ItineraryRevisionSegment {
+  id                   String            @id @default(uuid())
+  revisionId           String
+  sliceOrder           Int
+  segmentOrder         Int
+  globalOrder          Int
+  duffelSegmentId      String?
+  marketingCarrierIata String
+  operatingCarrierIata String?
+  airlineName          String
+  flightNumber         String
+  departureAirportIata String
+  departureAirportName String
+  departureCity        String
+  departureTerminal    String?
+  departureAt          DateTime
+  departureLocalDate   DateTime          @db.Date
+  arrivalAirportIata   String
+  arrivalAirportName   String
+  arrivalCity          String
+  arrivalTerminal      String?
+  arrivalAt            DateTime
+  arrivalLocalDate     DateTime          @db.Date
+  durationMinutes      Int
+  aircraftType         String?
+  createdAt            DateTime          @default(now())
+
+  revision             ItineraryRevision @relation("RevisionSegments", fields: [revisionId], references: [id], onDelete: Cascade)
+
+  @@unique([revisionId, globalOrder])
+  @@index([revisionId, sliceOrder, segmentOrder])
+  @@index([duffelSegmentId])
+  @@map("itinerary_revision_segments")
+}
+
+model DuffelWebhookEvent {
+  id                  String                   @id @default(uuid())
+  supplierEventId     String                   @unique
+  idempotencyKey      String?
+  duffelOrderId       String?
+  eventType           String
+  status              DuffelWebhookEventStatus
+  attempts            Int                      @default(0)
+  nextAttemptAt       DateTime?
+  processingStartedAt DateTime?
+  processingToken     String?
+  rawPayload          Json?
+  payloadRedactedAt   DateTime?
+  lastErrorCode       String?
+  lastErrorAt         DateTime?
+  processedAt         DateTime?
+  createdAt           DateTime                 @default(now())
+  updatedAt           DateTime                 @updatedAt
+
+  @@index([status, nextAttemptAt, createdAt])
+  @@index([processingStartedAt])
+  @@index([duffelOrderId, createdAt(sort: Desc)])
+  @@index([payloadRedactedAt, createdAt])
+  @@map("duffel_webhook_events")
+}
+
+model NotificationOutbox {
+  id                   String                   @id @default(uuid())
+  bookingId            String
+  revisionId           String                   @unique
+  type                 NotificationOutboxType
+  status               NotificationOutboxStatus @default(PENDING)
+  payload              Json
+  stabilizationWarning Boolean                  @default(false)
+  attempts             Int                      @default(0)
+  deliveredAt          DateTime?
+  createdAt            DateTime                 @default(now())
+  updatedAt            DateTime                 @updatedAt
+
+  booking              Booking                  @relation("BookingNotificationOutbox", fields: [bookingId], references: [id], onDelete: Cascade)
+  revision             ItineraryRevision        @relation("RevisionNotificationOutbox", fields: [revisionId], references: [id], onDelete: Cascade)
+
+  @@index([bookingId, createdAt])
+  @@index([status, createdAt])
+  @@map("notification_outbox")
+}
+
+model DisruptionAuditEvent {
+  id            String                      @id @default(uuid())
+  bookingId     String
+  revisionId    String?
+  action        DisruptionAuditEventAction
+  fromStatus    DisruptionStatus?
+  toStatus      DisruptionStatus?
+  actorType     DisruptionActorType
+  actorId       String?
+  safeNote      String?
+  correlationId String
+  traceId       String
+  createdAt     DateTime                    @default(now())
+
+  booking       Booking                     @relation("BookingDisruptionAuditEvents", fields: [bookingId], references: [id], onDelete: Cascade)
+  revision      ItineraryRevision?          @relation("RevisionDisruptionAuditEvents", fields: [revisionId], references: [id], onDelete: SetNull)
+
+  @@index([bookingId, createdAt(sort: Desc)])
+  @@index([revisionId])
+  @@index([action, createdAt])
+  @@map("disruption_audit_events")
 }

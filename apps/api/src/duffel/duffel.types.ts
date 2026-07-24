@@ -76,3 +76,26 @@ export interface DuffelOfferRequest {
   slices: DuffelSlice[];
   passengers: DuffelPassenger[];
 }
+
+export interface DuffelOrder {
+  id: string;
+  slices: DuffelSlice[];
+  passengers: {
+    id: string;
+    type: string;
+    title?: string | null;
+    given_name?: string | null;
+    family_name?: string | null;
+    born_on?: string | null;
+    email?: string | null;
+    phone_number?: string | null;
+  }[];
+  cancelled_at?: string | null;
+  cancellation?: {
+    id: string;
+    confirmed_at: string | null;
+  } | null;
+  booking_reference?: string;
+  metadata?: Record<string, unknown>;
+}
+
