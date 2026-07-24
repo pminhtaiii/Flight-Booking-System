@@ -70,12 +70,8 @@ async function run() {
     const firstSegment = segments[0];
     const lastSegment = segments[segments.length - 1];
 
-    if (!firstSegment.departureAt || !lastSegment.arrivalAt) {
-      continue;
-    }
-
-    const currentDepartureAt = new Date(firstSegment.departureAt);
-    const currentFinalArrivalAt = new Date(lastSegment.arrivalAt);
+    const currentDepartureAt = firstSegment.departureAt ? new Date(firstSegment.departureAt) : null;
+    const currentFinalArrivalAt = lastSegment.arrivalAt ? new Date(lastSegment.arrivalAt) : null;
 
     // Find next unflown departure
     let nextUnflownDepartureAt: Date | null = null;
@@ -90,14 +86,18 @@ async function run() {
     }
 
     // Check if backfill updates are needed
+    const currentDepTime = booking.currentDepartureAt?.getTime() ?? null;
+    const derivedDepTime = currentDepartureAt?.getTime() ?? null;
+
+    const currentArrTime = booking.currentFinalArrivalAt?.getTime() ?? null;
+    const derivedArrTime = currentFinalArrivalAt?.getTime() ?? null;
+
     const currentNextTime = booking.nextUnflownDepartureAt?.getTime() ?? null;
     const derivedNextTime = nextUnflownDepartureAt?.getTime() ?? null;
 
     const needsUpdate =
-      !booking.currentDepartureAt ||
-      !booking.currentFinalArrivalAt ||
-      booking.currentDepartureAt.getTime() !== currentDepartureAt.getTime() ||
-      booking.currentFinalArrivalAt.getTime() !== currentFinalArrivalAt.getTime() ||
+      currentDepTime !== derivedDepTime ||
+      currentArrTime !== derivedArrTime ||
       currentNextTime !== derivedNextTime;
 
     if (needsUpdate) {
