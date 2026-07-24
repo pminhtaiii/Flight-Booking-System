@@ -171,4 +171,3 @@ If fallback candidates are equally plausible or outside tolerance, keep them unm
 | Scale | Batch 20 inbox/reconciliation work; 30-minute reconciliation; no new queue infrastructure |
 | Performance | webhook ack p95 <500 ms; processed change visible p95 <2 min; local booking reads p95 <200 ms |
 | Security | raw-body HMAC, replay tolerance, JWT ownership, ADMIN RBAC, PII-safe logging/API, 30-day raw payload retention |
-

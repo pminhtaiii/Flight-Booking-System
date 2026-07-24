@@ -498,4 +498,3 @@ All complexity maps to deterministic auditability, API-budget discipline, operat
 - **Security:** raw HMAC/replay protection, ownership/RBAC, validation, PII-safe contracts/logs, retention — PASS.
 
 Post-design gate result: PASS. Implementation may proceed phase-by-phase after plan approval.
-
