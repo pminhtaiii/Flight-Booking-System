@@ -1,35 +1,26 @@
-import { getServerSession } from 'next-auth';
-import { redirect } from 'next/navigation';
-import { authOptions } from '@/lib/auth';
+import Link from 'next/link';
 import { LoginForm } from '@/components/auth/LoginForm';
+import styles from '@/components/auth/auth-form.module.css';
 
-interface LoginPageProps {
-  searchParams: {
-    message?: string;
-  };
-}
-
-export default async function LoginPage({ searchParams }: LoginPageProps) {
-  const session = await getServerSession(authOptions);
-  if (session) {
-    redirect('/dashboard');
-  }
-
-  const isExpired = searchParams?.message === 'session_expired';
-
+export default function LoginPage(): JSX.Element {
   return (
-    <div className="flex min-h-screen items-center justify-center p-8 bg-background">
-      <div className="card w-full max-w-md">
-        <h2 className="text-lg font-semibold text-text-primary mb-6">Sign In</h2>
-
-        {isExpired && (
-          <div className="mb-4 p-3 bg-bg-cancelled border border-danger-border rounded-lg text-sm text-danger-foreground font-medium">
-            Your session has expired. Please log in again.
+    <main className={styles.shell}>
+      <section className={styles.card} aria-labelledby="login-title">
+        <div className={styles.loginPanel}>
+          <Link className={styles.brand} href="/">wayfinder<span>°</span></Link>
+          <div className={styles.loginContent}>
+            <p className={styles.kicker}>Flight workspace</p>
+            <h1 className={styles.title} id="login-title">Plan the next move.</h1>
+            <p className={styles.subtitle}>Your routes, preferences, and travel intelligence in one place.</p>
+            <LoginForm />
+            <p className={styles.footer}>New to Wayfinder? <Link className={styles.footerLink} href="/register">Create an account</Link></p>
           </div>
-        )}
-
-        <LoginForm />
-      </div>
-    </div>
+        </div>
+        <aside className={styles.workspacePanel} aria-hidden="true">
+          <div className={styles.workspaceOrb} />
+          <div className={styles.workspaceCard}><span>Live route board</span><strong>Three trips, one clear view.</strong><p>Personalized planning, always in context.</p></div>
+        </aside>
+      </section>
+    </main>
   );
 }

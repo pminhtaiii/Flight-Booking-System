@@ -1,0 +1,196 @@
+.shell {
+  --auth-ink: oklch(18% 0.03 260);
+  --auth-muted: oklch(45% 0.035 260);
+  --auth-paper: oklch(98% 0.015 95);
+  --auth-panel: oklch(100% 0 0 / 0.86);
+  --auth-line: oklch(85% 0.03 260 / 0.7);
+  --auth-focus: oklch(61% 0.18 256);
+  --auth-error: oklch(52% 0.18 25);
+  --auth-success: oklch(50% 0.14 150);
+  display: grid;
+  min-height: 100vh;
+  place-items: center;
+  padding: clamp(1.25rem, 5vw, 3rem);
+  background: var(--auth-paper);
+  color: var(--auth-ink);
+  font-family: Arial, sans-serif;
+}
+
+.card {
+  width: min(100%, 28rem);
+  padding: clamp(1.5rem, 5vw, 2.5rem);
+  border: 1px solid var(--auth-line);
+  border-radius: 1.5rem;
+  background: var(--auth-panel);
+  box-shadow: 0 1rem 3rem oklch(25% 0.08 260 / 0.1);
+}
+
+.brand {
+  color: inherit;
+  font-size: 1.2rem;
+  font-weight: 800;
+  letter-spacing: -0.07em;
+  text-decoration: none;
+}
+
+.brand span { color: var(--auth-focus); }
+
+.title { margin: 2rem 0 0.5rem; font-family: Georgia, serif; font-size: clamp(2rem, 8vw, 2.75rem); font-weight: 400; letter-spacing: -0.06em; line-height: 1; }
+.subtitle { margin: 0 0 1.75rem; color: var(--auth-muted); line-height: 1.5; }
+.form { display: grid; gap: 1rem; }
+.field { display: grid; gap: 0.45rem; }
+.label { font-size: 0.92rem; font-weight: 700; }
+.input { box-sizing: border-box; width: 100%; min-height: 2.9rem; padding: 0.7rem 0.85rem; border: 1px solid var(--auth-line); border-radius: 0.7rem; background: var(--auth-panel); color: var(--auth-ink); font: inherit; }
+.input[aria-invalid='true'] { border-color: var(--auth-error); }
+.input:focus-visible, .submit:focus-visible, .brand:focus-visible, .footerLink:focus-visible { outline: 0.16rem solid var(--auth-focus); outline-offset: 0.18rem; }
+.message { margin: 0; padding: 0.8rem 0.9rem; border: 1px solid var(--auth-error); border-radius: 0.7rem; color: var(--auth-error); font-size: 0.92rem; line-height: 1.4; }
+.fieldMessage { margin: 0; color: var(--auth-error); font-size: 0.82rem; }
+.requirements { margin: 0; padding-left: 1.2rem; color: var(--auth-muted); font-size: 0.82rem; line-height: 1.55; }
+.requirementMet { color: var(--auth-success); }
+.submit { min-height: 2.9rem; border: 0; border-radius: 999px; background: var(--auth-focus); color: var(--auth-paper); cursor: pointer; font: inherit; font-weight: 700; }
+.submit:disabled { cursor: not-allowed; opacity: 0.65; }
+.footer { margin: 1.5rem 0 0; color: var(--auth-muted); font-size: 0.92rem; }
+.footerLink { color: var(--auth-ink); font-weight: 700; }
+
+.shell { --auth-workspace: oklch(49% .13 210); box-sizing: border-box; height: 100dvh; min-height: 0; overflow: hidden; padding: clamp(.75rem, 2vw, 1.5rem); background: oklch(95% .018 220); }
+.card { display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(18rem, .95fr); width: min(100%, 76rem); height: 100%; max-width: none; padding: 0; overflow: hidden; border-radius: 1rem; background: oklch(100% 0 0 / .55); }
+.loginPanel { position: relative; display: flex; flex-direction: column; min-height: 0; padding: clamp(1.5rem, 4vw, 3rem); }.loginPanel .brand { position: relative; z-index: 1; }.loginContent { display: flex; flex: 1; flex-direction: column; justify-content: center; max-width: 28rem; margin-inline: auto; }.kicker { margin: 0; color: var(--auth-workspace); font-size: .72rem; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; }.loginContent .title { margin: .7rem 0 .6rem; font-family: Arial, sans-serif; font-size: clamp(2.4rem, 5vw, 4.5rem); letter-spacing: -.07em; }.loginContent .subtitle { margin-bottom: 1.5rem; }.workspacePanel { position: relative; display: grid; place-items: center; overflow: hidden; background: repeating-linear-gradient(90deg, oklch(40% .08 210 / .1) 0 1px, transparent 1px 3rem), repeating-linear-gradient(0deg, oklch(40% .08 210 / .1) 0 1px, transparent 1px 3rem), oklch(95% .018 220); }.workspaceOrb { width: min(65%, 23rem); aspect-ratio: 1; border-radius: 1rem; background: linear-gradient(135deg, var(--auth-workspace), oklch(74% .1 165)); transform: rotate(-8deg); }.workspaceCard { position: absolute; right: 10%; bottom: 12%; left: 10%; display: grid; gap: .7rem; padding: 1.5rem; border: 1px solid oklch(100% 0 0 / .6); border-radius: .6rem; background: oklch(100% 0 0 / .8); box-shadow: 0 1.5rem 3rem oklch(25% .08 210 / .14); backdrop-filter: blur(1rem); }.workspaceCard span { color: var(--auth-workspace); font-size: .7rem; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; }.workspaceCard strong { font-family: Arial, sans-serif; font-size: 1.5rem; letter-spacing: -.05em; }.workspaceCard p { margin: 0; color: var(--auth-muted); font-size: .85rem; }
+@media (max-width: 48rem) { .card { grid-template-columns: 1fr; }.workspacePanel { display: none; }.loginPanel { padding: 1.5rem; }.loginContent { justify-content: flex-start; padding-top: clamp(1.5rem, 7vh, 4rem); }.loginContent .title { font-size: clamp(2.3rem, 11vw, 3.4rem); }.loginContent .subtitle { margin-bottom: 1rem; }.form { gap: .75rem; }.footer { margin-top: 1rem; } }
+
+.registerShell { --register-ink: oklch(24% .05 30); --register-paper: oklch(94% .035 75); --register-muted: oklch(45% .035 30); --register-signal: oklch(52% .15 35); --register-line: oklch(72% .06 55 / .5); display: grid; min-height: 100dvh; padding: clamp(.75rem, 2vw, 1.5rem); box-sizing: border-box; place-items: center; background: var(--register-paper); color: var(--register-ink); font-family: Arial, sans-serif; }.registerCard { display: grid; grid-template-columns: minmax(0, .85fr) minmax(20rem, 1.15fr); width: min(100%, 76rem); min-height: min(48rem, calc(100dvh - 3rem)); overflow: hidden; background: oklch(100% 0 0 / .45); }.registerContent { display: flex; flex-direction: column; padding: clamp(1.5rem, 4vw, 3rem); }.registerContent .brand { color: var(--register-ink); }.registerContent .brand span { color: var(--register-signal); }.registerCopy { display: flex; flex: 1; flex-direction: column; justify-content: center; max-width: 28rem; margin-inline: auto; }.registerKicker { margin: 0; color: var(--register-signal); font-size: .72rem; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; }.registerCopy .title { margin: .7rem 0 .6rem; font-family: Arial, sans-serif; font-size: clamp(2.4rem, 5vw, 4.5rem); letter-spacing: -.07em; }.registerCopy .subtitle { margin-bottom: 1.4rem; color: var(--register-muted); }.registerCopy .input { border-color: var(--register-line); color: var(--register-ink); }.registerCopy .submit { border-radius: .6rem; background: var(--register-signal); }.registerCopy .footer, .registerCopy .requirements { color: var(--register-muted); }.registerCopy .footerLink { color: var(--register-ink); }.passportPanel { position: relative; display: grid; place-items: center; overflow: hidden; background: linear-gradient(145deg, oklch(72% .13 52), oklch(38% .1 35)); }.passportMarker { width: min(68%, 25rem); aspect-ratio: 1; border-radius: 50% 50% 8% 8%; background: linear-gradient(145deg, oklch(86% .1 75), oklch(48% .12 48)); }.passportCard { position: absolute; right: 9%; bottom: 11%; left: auto; display: grid; gap: .7rem; width: min(20rem, 70%); padding: 1.5rem; border: 1px solid oklch(100% 0 0 / .6); background: oklch(95% .03 75 / .8); box-shadow: 0 1.5rem 3rem oklch(25% .08 35 / .16); }.passportCard span { color: var(--register-signal); font-size: .7rem; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; }.passportCard strong { font-size: 1.5rem; letter-spacing: -.05em; }.passportCard p { margin: 0; color: var(--register-muted); font-size: .85rem; }
+@media (max-width: 48rem) { .registerCard { grid-template-columns: 1fr; min-height: auto; }.registerContent { padding: 1.5rem; }.registerCopy { padding-top: 3rem; }.registerCopy .title { font-size: clamp(2.3rem, 11vw, 3.4rem); }.passportPanel { min-height: 15rem; }.passportCard { right: 10%; left: 10%; width: auto; } }
+.loginContent .title,
+.registerCopy .title {
+  font-family: Georgia, serif;
+  max-inline-size: 8ch;
+  font-size: clamp(3.5rem, 7.5vw, 6.5rem);
+  font-weight: 700;
+  letter-spacing: -.055em;
+  line-height: .84;
+}
+
+.card,
+.registerCard {
+  inline-size: min(100%, 75rem);
+  block-size: auto;
+  min-block-size: calc(100dvh - 5rem);
+  max-inline-size: 75rem;
+}
+
+.shell,
+.registerShell {
+  min-block-size: 100dvh;
+  padding: 1.5rem;
+}
+
+.shell .card,
+.registerShell .registerCard {
+  border-radius: 1rem;
+}
+
+/* Production auth pages intentionally mirror their selected disposable prototypes. */
+.shell {
+  block-size: auto;
+  min-block-size: 100dvh;
+  overflow: hidden;
+  padding: 1.5rem;
+}
+
+.shell .card {
+  grid-template-columns: 45% 55%;
+  min-block-size: calc(100dvh - 5rem);
+}
+
+.loginContent .title {
+  max-inline-size: none;
+  font-family: Georgia, serif;
+  font-size: clamp(3rem, 6vw, 5.5rem);
+  font-weight: 700;
+  letter-spacing: -.07em;
+  line-height: .92;
+}
+
+.loginPanel {
+  padding: 6rem clamp(2rem, 8vw, 7rem);
+}
+
+.workspaceOrb {
+  transform: translateY(-1.5rem) rotate(-8deg);
+}
+
+.workspaceCard {
+  right: 7%;
+  left: 7%;
+}
+
+.registerShell {
+  padding: 1.5rem;
+}
+
+.registerShell .registerCard {
+  grid-template-columns: .9fr 1.1fr;
+  min-block-size: calc(100dvh - 5rem);
+  border: 1px solid var(--register-line);
+  border-radius: 0;
+}
+
+.registerContent {
+  padding: 6rem clamp(2rem, 8vw, 7rem);
+}
+
+.passportMarker {
+  inline-size: min(68%, 25rem);
+  aspect-ratio: 1;
+  border-radius: 50% 50% 8% 8%;
+  transform: translateY(-1.5rem) rotate(-8deg);
+}
+
+.passportCard {
+  right: 7%;
+  left: 7%;
+  width: auto;
+}
+
+.registerCopy .title {
+  max-inline-size: none;
+  font-family: Georgia, serif;
+  font-size: clamp(3rem, 6vw, 5.5rem);
+  font-weight: 700;
+  letter-spacing: -.07em;
+  line-height: .92;
+}
+
+@media (max-width: 48rem) {
+  .shell,
+  .registerShell {
+    block-size: auto;
+    min-block-size: 100dvh;
+    overflow: visible;
+    padding: 1rem;
+  }
+
+  .shell .card,
+  .registerShell .registerCard {
+    inline-size: 100%;
+    grid-template-columns: 1fr;
+  }
+
+  .shell .card {
+    min-block-size: 62rem;
+  }
+
+  .registerShell .registerCard {
+    min-block-size: 59rem;
+  }
+
+  .shell .workspacePanel,
+  .registerShell .passportPanel {
+    display: grid;
+    min-block-size: 18rem;
+  }
+
+  .shell .loginPanel,
+  .registerShell .registerContent {
+    min-block-size: 35rem;
+  }
+}
