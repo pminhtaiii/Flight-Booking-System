@@ -6,13 +6,17 @@ Update this file after every completed feature. Any AI agent reading this should
 
 ### Current Status
 
-**Feature:** Flight Cancellation & Automated Refund System (Feature 12)
-**Last completed:** Feature 12 PR 5 / Issue #66: End-to-End Verification & Test Suite.
-**Next:** Rollout runbook and documentation update.
+**Feature:** Disruption & Flight-Change Management (Feature 14)
+**Last completed:** Feature 14 Phase 1: Contracts, Additive Schema, Migration, and Shared Types.
+**Next:** Phase 2: Deterministic itinerary normalization, matching, diff, and classification.
 
 ---
 
 ## Progress by Feature
+
+### [/] Feature: Disruption & Flight-Change Management (Feature 14)
+
+- [x] Phase 1 / PR 2: Contracts, Additive Schema, Migration, and Shared Types (implemented additive schema, generated and applied migration cleanly, extended segment snapshots and DTO definitions in shared packages, updated Duffel service with segment ID extraction mapping and complete order retrieval, added config validation, and passed all schema and unit/E2E verification tests)
 
 ### [x] Feature: Flight Cancellation & Automated Refund System (Feature 12)
 

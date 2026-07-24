@@ -17,7 +17,7 @@ import { PaymentModule } from './payment/payment.module';
 
 import { z } from 'zod';
 
-const envSchema = z.object({
+export const envSchema = z.object({
   PORT: z.string().optional(),
   DATABASE_URL: z.string().optional(),
   REDIS_URL: z.string().optional(),
@@ -29,6 +29,12 @@ const envSchema = z.object({
   }),
   JWT_SECRET: z.string().optional(),
   ENCRYPTION_KEY: z.string().optional(),
+  DUFFEL_WEBHOOK_SECRET: z.string().optional(),
+  FEATURE_FLAG_DISRUPTION_INGRESS: z.string().optional().default('false'),
+  FEATURE_FLAG_DISRUPTION_PROCESSOR: z.string().optional().default('false'),
+  FEATURE_FLAG_DISRUPTION_RECONCILIATION: z.string().optional().default('false'),
+  FEATURE_FLAG_DISRUPTION_SURFACING: z.string().optional().default('false'),
+  FEATURE_FLAG_DISRUPTION_OUTBOX: z.string().optional().default('false'),
 }).passthrough();
 
 @Module({

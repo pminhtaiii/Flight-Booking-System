@@ -34,6 +34,10 @@ export interface FlightSegmentSnapshot {
   /** ISO 8601 duration, e.g. "PT5H30M" */
   duration: string;
   aircraftType?: string;
+  duffelSegmentId?: string;
+  sliceOrder?: number;
+  segmentOrder?: number;
+  globalOrder?: number;
 }
 
 /**
