@@ -7,8 +7,8 @@ Update this file after every completed feature. Any AI agent reading this should
 ### Current Status
 
 **Feature:** Disruption & Flight-Change Management (Feature 14)
-**Last completed:** Feature 14 Phase 1: Contracts, Additive Schema, Migration, and Shared Types.
-**Next:** Phase 2: Deterministic itinerary normalization, matching, diff, and classification.
+**Last completed:** Feature 14 Phase 2: Deterministic itinerary normalization, matching, diff, and classification.
+**Next:** Phase 3: Supplier synchronization transaction and concurrency.
 
 ---
 
@@ -16,6 +16,7 @@ Update this file after every completed feature. Any AI agent reading this should
 
 ### [/] Feature: Disruption & Flight-Change Management (Feature 14)
 
+- [x] Phase 2 / PR 3: Pure Itinerary Normalization, Matching, Diff, and Classification (implemented framework-independent domain core: itinerary normalizer, canonical serialization and fingerprint, cascade one-to-one segment matcher, diff generator with slice/connection details, and disruption-v1 materiality classifier with threshold rules; verified with 42 tests passing with zero lint issues)
 - [x] Phase 1 / PR 2: Contracts, Additive Schema, Migration, and Shared Types (implemented additive schema, generated and applied migration cleanly, extended segment snapshots and DTO definitions in shared packages, updated Duffel service with segment ID extraction mapping and complete order retrieval, added config validation, and passed all schema and unit/E2E verification tests)
 
 ### [x] Feature: Flight Cancellation & Automated Refund System (Feature 12)

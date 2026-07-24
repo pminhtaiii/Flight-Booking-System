@@ -218,6 +218,25 @@ An ADMIN may schedule a retry with a fresh key or record an externally completed
 - **Operator Dashboard**: Admins use the `/admin/refunds` view to inspect PII-safe escalated refund states and trigger the manual resolution pipeline.
 
 
+### Disruption Core Domain (Deterministic Path)
+
+```
+Authoritative Duffel Order Payload or Local Snapshot Array
+        ↓
+ItineraryNormalizer maps raw structures to Ordered Canonical NormalizedSegment list (resolving timezones, local dates, durations)
+        ↓
+ItineraryFingerprint hashes NormalizedSegment list to versioned SHA-256 fingerprint (stable under key/segment ordering, excludes volatile data)
+        ↓
+SegmentMatcher matches old to new segments using 4-tier confidence cascade (Duffel ID, Flight Key, Route & Time, Position Tie-Breaker)
+        ↓
+ItineraryDiff compares matched segments, connections, final arrival times to produce segment, connection, and slice shifts
+        ↓
+MaterialityClassifier checks incremental/cumulative diff against disruption-v1 ruleset (binary & strict threshold checks)
+```
+
+- **Functional Decoupling**: Pure core domain functions contain no framework, DB, or external API references. Inputs are fully typed structures; outputs are deterministic diff, fingerprint, and classification results.
+
+
 ### AI Chatbot Agent Flow (SSE Streaming)
 
 ```
