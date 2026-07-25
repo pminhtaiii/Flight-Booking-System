@@ -8,6 +8,7 @@ import { computeItineraryDiff } from '../domain/itinerary-diff';
 import { classifyMateriality } from '../domain/materiality-classifier';
 import { ItineraryRevisionSource, DisruptionStatus, Prisma } from '@prisma/client';
 import { FlightSegmentSnapshot } from '@shared/booking-types';
+import { MaterialDisruptionReason, MaterialBaseline } from '@shared/disruption-types';
 import * as crypto from 'crypto';
 
 export type SyncResult =
@@ -221,16 +222,18 @@ export class SupplierSyncService {
             // Fingerprint collision / same fingerprint convergence
             const dbLatestRev = dbBooking.itineraryRevisions[0];
             if (dbLatestRev && dbLatestRev.fingerprint === newFingerprint) {
-              this.logger.log(`Safe convergence: fingerprint already match latest revision for booking ${bookingId}. Correlation: ${correlationId}`);
-              await tx.booking.update({
-                where: { id: bookingId },
-                data: {
-                  lastDuffelSyncedAt: new Date(),
-                  syncLockedAt: null,
-                  syncLockToken: null,
-                },
-              });
-              return { status: 'CONVERGED_DUPLICATE' };
+              if (!isDuffelCancelled || dbLatestRev.isMaterial) {
+                this.logger.log(`Safe convergence: fingerprint already match latest revision for booking ${bookingId}. Correlation: ${correlationId}`);
+                await tx.booking.update({
+                  where: { id: bookingId },
+                  data: {
+                    lastDuffelSyncedAt: new Date(),
+                    syncLockedAt: null,
+                    syncLockToken: null,
+                  },
+                });
+                return { status: 'CONVERGED_DUPLICATE' };
+              }
             }
 
             const nextVersion = dbLatestRev ? dbLatestRev.version + 1 : 1;
@@ -256,11 +259,19 @@ export class SupplierSyncService {
             const cumulativeDiff = computeItineraryDiff(originalNormalized, normalizedSegments);
 
             // Materiality and classifications
-            const classification = classifyMateriality(incrementalDiff, cumulativeDiff);
+            let classification = classifyMateriality(incrementalDiff, cumulativeDiff);
+            if (isDuffelCancelled) {
+              classification = {
+                isMaterial: true,
+                reasons: [MaterialDisruptionReason.SEGMENT_REMOVED],
+                baselines: [MaterialBaseline.INCREMENTAL, MaterialBaseline.CUMULATIVE],
+                rulesetVersion: classification.rulesetVersion,
+              };
+            }
 
             const now = new Date();
             const timingFields = calculateTimingFields(normalizedSegments);
-            const bookingData: Prisma.BookingUpdateInput = {
+            const bookingData: Prisma.BookingUpdateManyMutationInput = {
               lastDuffelSyncedAt: now,
               syncLockedAt: null,
               syncLockToken: null,
@@ -353,12 +364,6 @@ export class SupplierSyncService {
               });
             }
 
-            if (classification.isMaterial) {
-              bookingData.activeDisruptionRevision = {
-                connect: { id: newRevision.id },
-              };
-            }
-
             // Outbox write
             if (outboxCreated) {
               await tx.notificationOutbox.create({
@@ -410,11 +415,26 @@ export class SupplierSyncService {
               });
             }
 
-            // Commit Booking updates
-            await tx.booking.update({
-              where: { id: bookingId },
+            // Commit Booking updates conditionally to close cancellation race
+            const updateResult = await tx.booking.updateMany({
+              where: { id: bookingId, status: 'CONFIRMED', syncLockToken: token },
               data: bookingData,
             });
+
+            if (updateResult.count === 0) {
+              throw new Error('Booking status changed concurrently or lock was lost');
+            }
+
+            if (classification.isMaterial) {
+              await tx.booking.update({
+                where: { id: bookingId },
+                data: {
+                  activeDisruptionRevision: {
+                    connect: { id: newRevision.id },
+                  },
+                },
+              });
+            }
 
             this.logger.log(`Successfully completed sync for booking ${bookingId}. Created revision ${newRevision.id}. Correlation: ${correlationId}`);
             return { status: 'REVISION_CREATED', revisionId: newRevision.id };
