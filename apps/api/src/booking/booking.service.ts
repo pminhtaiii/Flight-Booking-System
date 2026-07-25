@@ -4,17 +4,30 @@ import { Booking, BookingFailureReason, BookingStatus, Prisma, DisruptionStatus,
 import { PrismaService } from '@/prisma/prisma.service';
 import { CancellationQuoteResponseDto, CancellationResponseDto, FlightSnapshot, PassengerSnapshot } from '@shared/booking-types';
 import { BookingDetailResponseDto, BookingListItemResponseDto, BookingListResponseDto, BookingTab } from './dto';
+import { CurrentItineraryDto, BookingDisruptionDto, DisruptionResolvedReason, MaterialDisruptionReason, DisruptionStatus as SharedDisruptionStatus } from '@shared/disruption-types';
 
 export type BookingWithRelations = Prisma.BookingGetPayload<{
   include: {
     payment: { select: { id: true; status: true; stripePaymentIntentId: true } };
     bookingIntent: { select: { id: true; duffelOfferId: true } };
+    activeDisruptionRevision: {
+      include: {
+        segments: { orderBy: { globalOrder: 'asc' } };
+        notificationOutbox: true;
+      };
+    };
+    itineraryRevisions: {
+      orderBy: { version: 'desc' };
+      take: 1;
+      include: { segments: { orderBy: { globalOrder: 'asc' } } };
+    };
   };
 }>;
 
 import { StripeService } from '@/common/stripe.service';
 import { DuffelService } from '@/duffel/duffel.service';
 import { PaymentRefundService } from '@/payment/payment-refund.service';
+
 
 @Injectable()
 export class BookingService {
@@ -440,7 +453,21 @@ export class BookingService {
 
     const bookings = await this.prisma.booking.findMany({
       where,
-      include: { payment: { select: { id: true, status: true, stripePaymentIntentId: true } }, bookingIntent: { select: { id: true, duffelOfferId: true } } },
+      include: {
+        payment: { select: { id: true, status: true, stripePaymentIntentId: true } },
+        bookingIntent: { select: { id: true, duffelOfferId: true } },
+        activeDisruptionRevision: {
+          include: {
+            segments: { orderBy: { globalOrder: 'asc' } },
+            notificationOutbox: true,
+          },
+        },
+        itineraryRevisions: {
+          orderBy: { version: 'desc' },
+          take: 1,
+          include: { segments: { orderBy: { globalOrder: 'asc' } } },
+        },
+      },
     });
     
     const staleThreshold = new Date(Date.now() - 15 * 60 * 1000);
@@ -471,7 +498,21 @@ export class BookingService {
   async getBookingDetail(bookingId: string, userId: string): Promise<BookingDetailResponseDto> {
     const initialBooking = await this.prisma.booking.findUnique({
       where: { id: bookingId },
-      include: { payment: { select: { id: true, status: true, stripePaymentIntentId: true } }, bookingIntent: { select: { id: true, duffelOfferId: true } } },
+      include: {
+        payment: { select: { id: true, status: true, stripePaymentIntentId: true } },
+        bookingIntent: { select: { id: true, duffelOfferId: true } },
+        activeDisruptionRevision: {
+          include: {
+            segments: { orderBy: { globalOrder: 'asc' } },
+            notificationOutbox: true,
+          },
+        },
+        itineraryRevisions: {
+          orderBy: { version: 'desc' },
+          take: 1,
+          include: { segments: { orderBy: { globalOrder: 'asc' } } },
+        },
+      },
     });
     if (!initialBooking) {
       throw new NotFoundException('Booking not found');
@@ -508,7 +549,130 @@ export class BookingService {
       duffelCancellationQuoteId: booking.duffelCancellationQuoteId ?? null,
       createdAt: booking.createdAt.toISOString(),
       updatedAt: booking.updatedAt.toISOString(),
+      ...this.mapDisruptionAndItinerary(booking),
     };
+  }
+
+  private mapDisruptionAndItinerary(booking: BookingWithRelations): { currentItinerary: CurrentItineraryDto; disruption: BookingDisruptionDto } {
+    const isSurfacing = process.env.FEATURE_FLAG_DISRUPTION_SURFACING === 'true';
+
+    // 1. Build original itinerary data from flightSnapshot as fallback
+    const flightSnapshot = booking.flightSnapshot as unknown as FlightSnapshot;
+    const originalSegments = flightSnapshot?.segments || [];
+    
+    // Default/fallback currentItinerary (which represents the original or when surfacing is disabled)
+    let currentItinerary: CurrentItineraryDto = {
+      source: 'ORIGINAL',
+      revisionId: null,
+      version: 0,
+      segments: originalSegments,
+      nextUnflownDepartureAt: booking.nextUnflownDepartureAt?.toISOString() ?? null,
+      finalArrivalAt: booking.currentFinalArrivalAt?.toISOString() ?? null,
+    };
+
+    // Calculate timings from original segments if not present in DB
+    if (!currentItinerary.nextUnflownDepartureAt || !currentItinerary.finalArrivalAt) {
+      const sorted = [...originalSegments].sort((a, b) => (a.globalOrder ?? 0) - (b.globalOrder ?? 0));
+      if (sorted.length > 0) {
+        if (!currentItinerary.finalArrivalAt) {
+          currentItinerary.finalArrivalAt = sorted[sorted.length - 1].arrivalAt;
+        }
+        if (!currentItinerary.nextUnflownDepartureAt) {
+          const now = new Date();
+          const next = sorted.find(s => new Date(s.departureAt) > now);
+          currentItinerary.nextUnflownDepartureAt = next ? next.departureAt : null;
+        }
+      }
+    }
+
+    // Default disruption status
+    let disruption: BookingDisruptionDto = {
+      status: SharedDisruptionStatus.NONE,
+      activeRevisionId: null,
+      isMaterial: false,
+      materialReasons: [],
+      incrementalSummary: {},
+      cumulativeSummary: {},
+      stabilizationWarning: false,
+      resolvedReason: null,
+      resolvedAt: null,
+    };
+
+    if (isSurfacing) {
+      // Latest revision is used for current itinerary
+      const latestRevision = booking.itineraryRevisions?.[0];
+      if (latestRevision) {
+        currentItinerary = {
+          source: 'REVISION',
+          revisionId: latestRevision.id,
+          version: latestRevision.version,
+          segments: latestRevision.segments.map(seg => ({
+            airline: {
+              name: seg.airlineName,
+              iataCode: seg.marketingCarrierIata,
+            },
+            flightNumber: seg.flightNumber,
+            departureAirport: {
+              iataCode: seg.departureAirportIata,
+              name: seg.departureAirportName,
+              city: seg.departureCity,
+              terminal: seg.departureTerminal ?? undefined,
+            },
+            arrivalAirport: {
+              iataCode: seg.arrivalAirportIata,
+              name: seg.arrivalAirportName,
+              city: seg.arrivalCity,
+              terminal: seg.arrivalTerminal ?? undefined,
+            },
+            departureAt: seg.departureAt.toISOString(),
+            arrivalAt: seg.arrivalAt.toISOString(),
+            duration: `PT${seg.durationMinutes}M`,
+            aircraftType: seg.aircraftType ?? undefined,
+            duffelSegmentId: seg.duffelSegmentId ?? undefined,
+            sliceOrder: seg.sliceOrder,
+            segmentOrder: seg.segmentOrder,
+            globalOrder: seg.globalOrder,
+          })),
+          nextUnflownDepartureAt: booking.nextUnflownDepartureAt?.toISOString() ?? null,
+          finalArrivalAt: booking.currentFinalArrivalAt?.toISOString() ?? null,
+        };
+
+        // Re-calculate timings from revision segments if not present in DB
+        if (!currentItinerary.nextUnflownDepartureAt || !currentItinerary.finalArrivalAt) {
+          const sorted = [...latestRevision.segments].sort((a, b) => a.globalOrder - b.globalOrder);
+          if (sorted.length > 0) {
+            if (!currentItinerary.finalArrivalAt) {
+              currentItinerary.finalArrivalAt = sorted[sorted.length - 1].arrivalAt.toISOString();
+            }
+            if (!currentItinerary.nextUnflownDepartureAt) {
+              const now = new Date();
+              const next = sorted.find(s => s.departureAt > now);
+              currentItinerary.nextUnflownDepartureAt = next ? next.departureAt.toISOString() : null;
+            }
+          }
+        }
+      }
+
+      // If booking disruption status is not NONE, fill in disruption details
+      if (booking.disruptionStatus && booking.disruptionStatus !== 'NONE') {
+        const activeRevision = booking.activeDisruptionRevision;
+        const incDiff = activeRevision?.incrementalDiff as unknown as { presentationSummary?: Record<string, unknown> };
+        const cumDiff = activeRevision?.cumulativeDiff as unknown as { presentationSummary?: Record<string, unknown> };
+        disruption = {
+          status: booking.disruptionStatus as unknown as SharedDisruptionStatus,
+          activeRevisionId: booking.activeDisruptionRevisionId,
+          isMaterial: activeRevision ? activeRevision.isMaterial : false,
+          materialReasons: activeRevision ? (activeRevision.materialReasons as unknown as MaterialDisruptionReason[]) : [],
+          incrementalSummary: incDiff?.presentationSummary || {},
+          cumulativeSummary: cumDiff?.presentationSummary || {},
+          stabilizationWarning: activeRevision?.notificationOutbox?.stabilizationWarning ?? false,
+          resolvedReason: booking.disruptionResolvedReason as unknown as DisruptionResolvedReason | null,
+          resolvedAt: booking.disruptionResolvedAt?.toISOString() ?? null,
+        };
+      }
+    }
+
+    return { currentItinerary, disruption };
   }
 
   private sortBookings(bookings: BookingWithRelations[], tab: BookingTab): BookingWithRelations[] {
@@ -543,6 +707,7 @@ export class BookingService {
       currency: booking.currency,
       departureAt: booking.departureAt?.toISOString() ?? null,
       flightSnapshot: booking.flightSnapshot,
+      ...this.mapDisruptionAndItinerary(booking),
       createdAt: booking.createdAt.toISOString(),
     };
   }
@@ -742,15 +907,56 @@ export class BookingService {
     const cancellationStatus = refundable && amountInMinorUnits > 0
       ? BookingStatus.CANCELLED_PENDING_REFUND
       : BookingStatus.CANCELLED_NO_REFUND;
-    const persisted = await this.prisma.booking.updateMany({
-      where: { id: bookingId, status: BookingStatus.CANCELLATION_PENDING },
-      data: {
+    const persistedCount = await this.prisma.$transaction(async (tx) => {
+      const dbBooking = await tx.booking.findUnique({
+        where: { id: bookingId },
+        select: { status: true, disruptionStatus: true, activeDisruptionRevisionId: true },
+      });
+      if (dbBooking?.status !== BookingStatus.CANCELLATION_PENDING) {
+        return 0;
+      }
+
+      const updateData: Prisma.BookingUpdateInput = {
         status: cancellationStatus,
         airlineRefundAmount: refundAmount,
         customerRefundAmount: refundAmount,
-      },
+      };
+
+      const hasActiveDisruption = dbBooking.disruptionStatus === 'DETECTED' || dbBooking.disruptionStatus === 'ACKNOWLEDGED';
+      
+      if (hasActiveDisruption) {
+        updateData.disruptionStatus = 'RESOLVED';
+        updateData.disruptionResolvedReason = 'BOOKING_CANCELLED';
+        updateData.disruptionResolvedAt = new Date();
+        updateData.disruptionResolvedByType = 'TRAVELLER';
+        updateData.disruptionResolvedById = userId;
+      }
+
+      const result = await tx.booking.updateMany({
+        where: { id: bookingId, status: BookingStatus.CANCELLATION_PENDING },
+        data: updateData,
+      });
+
+      if (result.count > 0 && hasActiveDisruption) {
+        await tx.disruptionAuditEvent.create({
+          data: {
+            bookingId,
+            revisionId: dbBooking.activeDisruptionRevisionId,
+            action: 'BOOKING_CANCELLED',
+            fromStatus: dbBooking.disruptionStatus,
+            toStatus: 'RESOLVED',
+            actorType: 'TRAVELLER',
+            actorId: userId,
+            correlationId: `cancel-${bookingId}-${Date.now()}`,
+            traceId: `cancel-${bookingId}-${Date.now()}`,
+            createdAt: new Date(),
+          },
+        });
+      }
+      return result.count;
     });
-    if (persisted.count === 0) {
+
+    if (persistedCount === 0) {
       const canonical = await this.prisma.booking.findUnique({ where: { id: bookingId } });
       if (!canonical) {
         throw new NotFoundException('Booking not found');

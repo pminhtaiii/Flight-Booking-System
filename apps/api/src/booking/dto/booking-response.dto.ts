@@ -1,4 +1,5 @@
 import { BookingFailureReason, BookingStatus, Prisma } from '@prisma/client';
+import { CurrentItineraryDto, BookingDisruptionDto } from '@shared/disruption-types';
 
 export class BookingListItemResponseDto {
   id!: string;
@@ -9,6 +10,8 @@ export class BookingListItemResponseDto {
   currency!: string;
   departureAt!: string | null;
   flightSnapshot!: Prisma.JsonValue | null;
+  currentItinerary!: CurrentItineraryDto;
+  disruption!: BookingDisruptionDto;
   createdAt!: string;
 }
 
@@ -29,3 +32,4 @@ export class BookingDetailResponseDto extends BookingListItemResponseDto {
   duffelCancellationQuoteId!: string | null;
   updatedAt!: string;
 }
+
