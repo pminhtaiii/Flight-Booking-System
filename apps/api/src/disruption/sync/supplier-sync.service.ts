@@ -191,8 +191,12 @@ export class SupplierSyncService {
       while (attempts < 3) {
         try {
           return await this.prisma.$transaction(async (tx) => {
-            const dbBooking = await tx.booking.findUnique({
+            const now = new Date();
+
+            // Lock the booking row immediately to serialize concurrent syncs and cancellations
+            const dbBooking = await tx.booking.update({
               where: { id: bookingId },
+              data: { lastDuffelSyncedAt: now },
               include: {
                 itineraryRevisions: {
                   orderBy: { version: 'desc' },
@@ -203,9 +207,9 @@ export class SupplierSyncService {
             });
 
             // Cancellation wins races
-            if (!dbBooking || dbBooking.status !== 'CONFIRMED') {
-              this.logger.warn(`Cancellation race won: booking ${bookingId} status is no longer CONFIRMED. Aborting sync writes. Correlation: ${correlationId}`);
-              if (dbBooking && dbBooking.syncLockToken === token) {
+            if (dbBooking.status !== 'CONFIRMED') {
+              this.logger.warn(`Cancellation race won: booking ${bookingId} status is ${dbBooking.status}. Aborting sync writes. Correlation: ${correlationId}`);
+              if (dbBooking.syncLockToken === token) {
                 await tx.booking.update({
                   where: { id: bookingId },
                   data: { syncLockedAt: null, syncLockToken: null },
@@ -270,7 +274,6 @@ export class SupplierSyncService {
               };
             }
 
-            const now = new Date();
             const timingFields = calculateTimingFields(normalizedSegments);
             const bookingData: Prisma.BookingUpdateManyMutationInput = {
               lastDuffelSyncedAt: now,
@@ -420,7 +423,7 @@ export class SupplierSyncService {
               });
             }
 
-            // Commit Booking updates conditionally to close cancellation race
+            // Commit Booking updates conditionally (status is confirmed)
             const updateResult = await tx.booking.updateMany({
               where: { id: bookingId, status: 'CONFIRMED', syncLockToken: token },
               data: bookingData,
