@@ -62,6 +62,12 @@ When the task involves writing, running, or verifying E2E tests:
 4. **Mocking & Test Strategy**:
    - Follow the opaque-box verification strategies defined in [TEST_INFRA.md](file:///c:/Booking%20Systems/TEST_INFRA.md).
    - Use time acceleration (`POST /auth/test/reset-lockout` when `NODE_ENV === 'test'`) and database assertions.
+5. **Playwright Integration Guidelines**:
+   - **Environment Configuration**: Ensure the Playwright webServer environment defines `NEXT_PUBLIC_API_URL` (defaults to `http://127.0.0.1:3001` in `playwright.config.ts`) to prevent compilation crashes during page loads.
+   - **Bypass Strategy**: Inject `mock-scenario` cookies (such as `'disruption-detected'`) to bypass backend fetches in Server Components, prompting them to render static mocks directly.
+   - **Strict Mode Bypass**: Avoid strict mode failures caused by the default Next.js route announcer (`role="alert"`) by appending `.first()` to alert locators (e.g., `page.getByRole('alert').first()`).
+   - **Prevent Login Races**: After submitting registration or login forms, always wait for the browser to load the landing page (e.g., `await expect(page).toHaveURL(/.*localhost:3000\/$/)`) before attempting to navigate to authenticated/protected pages.
+   - **Mocking Client Settings**: To verify behavior with missing configuration flags without starting another server instance, inject runtime mock variables onto the browser's `window` object (e.g., `window.__MOCK_MISSING_API_URL__ = true`) during the test run.
 
 ### Local Development Startup
 
