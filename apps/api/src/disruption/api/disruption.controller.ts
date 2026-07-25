@@ -1,4 +1,4 @@
-import { Controller, Post, Get, Param, HttpCode, HttpStatus, UseGuards, Req, NotFoundException, ForbiddenException, ParseUUIDPipe, Query } from '@nestjs/common';
+import { Controller, Post, Get, Param, HttpCode, HttpStatus, UseGuards, Req, NotFoundException, ForbiddenException, ParseUUIDPipe, Query, BadRequestException } from '@nestjs/common';
 import { Request } from 'express';
 import { JwtAuthGuard } from '@/auth/guards/jwt-auth.guard';
 import { PrismaService } from '@/prisma/prisma.service';
@@ -52,8 +52,25 @@ export class TravellerDisruptionController {
     @Query('page') pageQuery?: string,
     @Query('limit') limitQuery?: string,
   ) {
-    const page = pageQuery ? Math.max(1, parseInt(pageQuery, 10)) : 1;
-    const limit = limitQuery ? Math.min(50, Math.max(1, parseInt(limitQuery, 10))) : 20;
+    let page = 1;
+    let limit = 20;
+
+    if (pageQuery !== undefined) {
+      const parsedPage = parseInt(pageQuery, 10);
+      if (isNaN(parsedPage) || parsedPage < 1 || String(parsedPage) !== pageQuery.trim()) {
+        throw new BadRequestException('Invalid page parameter');
+      }
+      page = parsedPage;
+    }
+
+    if (limitQuery !== undefined) {
+      const parsedLimit = parseInt(limitQuery, 10);
+      if (isNaN(parsedLimit) || parsedLimit < 1 || parsedLimit > 50 || String(parsedLimit) !== limitQuery.trim()) {
+        throw new BadRequestException('Invalid limit parameter');
+      }
+      limit = parsedLimit;
+    }
+
     return this.disruptionService.getDisruptionHistory(bookingId, req.user.id, page, limit);
   }
 

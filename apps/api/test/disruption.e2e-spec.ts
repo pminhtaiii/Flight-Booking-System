@@ -518,6 +518,28 @@ describe('Disruption & Flight-Change Management (Webhook & Processor E2E)', () =
       expect(res.body.items[0].incrementalSummary).toEqual({ details: 'inc-2' });
     });
 
+    it('rejects invalid pagination parameters with 400 BadRequest', async () => {
+      await request(app.getHttpServer())
+        .get(`/api/bookings/${bookingId}/disruptions?page=abc`)
+        .set('Authorization', `Bearer ${userToken}`)
+        .expect(400);
+
+      await request(app.getHttpServer())
+        .get(`/api/bookings/${bookingId}/disruptions?limit=xyz`)
+        .set('Authorization', `Bearer ${userToken}`)
+        .expect(400);
+
+      await request(app.getHttpServer())
+        .get(`/api/bookings/${bookingId}/disruptions?page=-1`)
+        .set('Authorization', `Bearer ${userToken}`)
+        .expect(400);
+
+      await request(app.getHttpServer())
+        .get(`/api/bookings/${bookingId}/disruptions?limit=100`)
+        .set('Authorization', `Bearer ${userToken}`)
+        .expect(400);
+    });
+
     it('enforces ownership and missing-booking boundaries for history and actions', async () => {
       const rev = await prisma.itineraryRevision.create({
         data: {

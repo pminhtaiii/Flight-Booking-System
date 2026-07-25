@@ -136,10 +136,24 @@ export class DisruptionService {
     const now = new Date();
 
     const updatedBooking = await this.prisma.$transaction(async (tx) => {
-      const updated = await tx.booking.update({
-        where: { id: bookingId },
+      const result = await tx.booking.updateMany({
+        where: { id: bookingId, activeDisruptionRevisionId: revisionId },
         data: { disruptionStatus: 'ACKNOWLEDGED' },
       });
+
+      if (result.count === 0) {
+        const current = await tx.booking.findUnique({ where: { id: bookingId } });
+        throw new ConflictException({
+          code: 'STALE_DISRUPTION_REVISION',
+          activeRevisionId: current?.activeDisruptionRevisionId ?? null,
+          disruptionStatus: current?.disruptionStatus ?? null,
+        });
+      }
+
+      const updated = await tx.booking.findUnique({ where: { id: bookingId } });
+      if (!updated) {
+        throw new NotFoundException('Booking not found');
+      }
 
       await tx.disruptionAuditEvent.create({
         data: {
@@ -215,8 +229,8 @@ export class DisruptionService {
     const now = new Date();
 
     const updatedBooking = await this.prisma.$transaction(async (tx) => {
-      const updated = await tx.booking.update({
-        where: { id: bookingId },
+      const result = await tx.booking.updateMany({
+        where: { id: bookingId, activeDisruptionRevisionId: revisionId },
         data: {
           disruptionStatus: 'RESOLVED',
           disruptionResolvedReason: 'TRAVELLER_ACCEPTED',
@@ -225,6 +239,20 @@ export class DisruptionService {
           disruptionResolvedById: userId,
         },
       });
+
+      if (result.count === 0) {
+        const current = await tx.booking.findUnique({ where: { id: bookingId } });
+        throw new ConflictException({
+          code: 'STALE_DISRUPTION_REVISION',
+          activeRevisionId: current?.activeDisruptionRevisionId ?? null,
+          disruptionStatus: current?.disruptionStatus ?? null,
+        });
+      }
+
+      const updated = await tx.booking.findUnique({ where: { id: bookingId } });
+      if (!updated) {
+        throw new NotFoundException('Booking not found');
+      }
 
       await tx.disruptionAuditEvent.create({
         data: {
