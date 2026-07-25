@@ -12,6 +12,17 @@ test('keeps the session active when the public API URL is not configured', async
   await page.getByRole('textbox', { name: 'Password' }).fill('Password123!');
   await page.getByRole('button', { name: 'Create account' }).click();
 
+  await expect(page).toHaveURL(/.*localhost:3000\/$/, { timeout: 30000 });
+
+  // Intercept configuration endpoint to return missing API URL
+  await page.route('**/api/config', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ apiUrl: undefined }),
+    });
+  });
+
   await page.goto('http://localhost:3000/bookings');
   const localhostLogoutRequest = page
     .waitForRequest('http://localhost:3001/api/auth/logout', { timeout: 1000 })
@@ -19,7 +30,7 @@ test('keeps the session active when the public API URL is not configured', async
     .catch(() => false);
   await page.getByRole('button', { name: 'Sign Out' }).click();
 
-  await expect(page.getByRole('alert')).toHaveText('We could not securely sign you out. Please try again.');
+  await expect(page.getByRole('alert').first()).toHaveText('We could not securely sign you out. Please try again.');
   await expect(page).toHaveURL(/\/bookings$/);
   expect(await localhostLogoutRequest).toBe(false);
 });
