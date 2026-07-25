@@ -14,10 +14,16 @@ test('keeps the session active when the public API URL is not configured', async
 
   await expect(page).toHaveURL(/.*localhost:3000\/$/, { timeout: 30000 });
 
+  await context.addCookies([
+    {
+      name: 'mock-scenario',
+      value: 'missing-api-url',
+      domain: 'localhost',
+      path: '/',
+    },
+  ]);
+
   await page.goto('http://localhost:3000/bookings');
-  await page.evaluate(() => {
-    (window as unknown as { __MOCK_MISSING_API_URL__?: boolean }).__MOCK_MISSING_API_URL__ = true;
-  });
   const localhostLogoutRequest = page
     .waitForRequest('http://localhost:3001/api/auth/logout', { timeout: 1000 })
     .then(() => true)

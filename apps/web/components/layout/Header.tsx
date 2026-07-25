@@ -1,8 +1,13 @@
 import Link from 'next/link';
+import { headers } from 'next/headers';
 import { LogoutButton } from '@/components/auth/LogoutButton';
 import { ThemeToggle } from './ThemeToggle';
 
 export function Header() {
+  const cookieHeader = headers().get('cookie') ?? '';
+  const isMissingUrlScenario = /mock-scenario=missing-api-url/.test(cookieHeader);
+  const apiUrl = isMissingUrlScenario ? undefined : process.env.NEXT_PUBLIC_API_URL;
+
   return (
     <header className="h-16 w-full bg-card border-b border-card-border px-6 flex items-center justify-between">
       <div className="flex items-center gap-8">
@@ -33,7 +38,7 @@ export function Header() {
       </div>
       <div className="flex items-center gap-4">
         <ThemeToggle />
-        <LogoutButton />
+        <LogoutButton apiUrl={apiUrl} />
       </div>
     </header>
   );

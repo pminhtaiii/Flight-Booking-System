@@ -3,16 +3,12 @@
 import { useState } from 'react';
 import { signOut, useSession } from 'next-auth/react';
 
-export function LogoutButton() {
+export function LogoutButton({ apiUrl }: { apiUrl?: string }) {
   const { data: session } = useSession();
   const [logoutError, setLogoutError] = useState<string | null>(null);
 
   const handleLogout = async () => {
     setLogoutError(null);
-    const apiUrl = typeof window !== 'undefined' && (window as unknown as { __MOCK_MISSING_API_URL__?: boolean }).__MOCK_MISSING_API_URL__
-      ? undefined
-      : process.env.NEXT_PUBLIC_API_URL;
-
     const token = (session as { accessToken?: string })?.accessToken;
     if (!apiUrl || !token) {
       setLogoutError('We could not securely sign you out. Please try again.');
