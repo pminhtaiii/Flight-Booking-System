@@ -9,13 +9,15 @@ export function LogoutButton() {
     const token = (session as { accessToken?: string })?.accessToken;
     if (token) {
       try {
-        const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
-        await fetch(`${apiUrl}/api/auth/logout`, {
-          method: 'POST',
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        });
+        const apiUrl = process.env.NEXT_PUBLIC_API_URL;
+        if (apiUrl) {
+          await fetch(`${apiUrl}/api/auth/logout`, {
+            method: 'POST',
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          });
+        }
       } catch (err) {
         // eslint-disable-next-line no-console
         console.error('Backend logout failed:', err);
