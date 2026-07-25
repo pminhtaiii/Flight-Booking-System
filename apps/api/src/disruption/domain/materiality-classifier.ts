@@ -24,11 +24,12 @@ function evaluateDiffForReasons(diff: ItineraryDiffResult): MaterialDisruptionRe
   if (diff.segmentDiffs.some(d => d.arrivalAirportChanged)) {
     reasons.push(MaterialDisruptionReason.ARRIVAL_AIRPORT_CHANGED);
   }
-  if (diff.sliceDiffs.some(d => d.isRoutingChanged)) {
-    // If routing changed at the slice level, ensure we have both airport changed reasons represented
+  if (diff.sliceDiffs.some(d => d.departureAirportChanged)) {
     if (!reasons.includes(MaterialDisruptionReason.DEPARTURE_AIRPORT_CHANGED)) {
       reasons.push(MaterialDisruptionReason.DEPARTURE_AIRPORT_CHANGED);
     }
+  }
+  if (diff.sliceDiffs.some(d => d.arrivalAirportChanged)) {
     if (!reasons.includes(MaterialDisruptionReason.ARRIVAL_AIRPORT_CHANGED)) {
       reasons.push(MaterialDisruptionReason.ARRIVAL_AIRPORT_CHANGED);
     }

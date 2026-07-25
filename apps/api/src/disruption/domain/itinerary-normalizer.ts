@@ -1,5 +1,5 @@
 import { FlightSegmentSnapshot } from '@shared/booking-types';
-import { DuffelOrder } from '../../duffel/duffel.types';
+import { DuffelOrder, DuffelPlace } from '../../duffel/duffel.types';
 
 export interface NormalizedSegment {
   sliceOrder: number;

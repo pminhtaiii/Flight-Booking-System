@@ -67,11 +67,12 @@ describe('SegmentMatcher', () => {
   });
 
   it('should leave unmatched if time shift is outside the 6-hour tolerance', () => {
-    const prev = [{ ...baseSegment, duffelSegmentId: null }];
+    const prev = [{ ...baseSegment, duffelSegmentId: null, globalOrder: 0 }];
     const curr = [{
       ...baseSegment,
       duffelSegmentId: 'seg_new',
       flightNumber: '999',
+      globalOrder: 1, // different globalOrder to prevent position match
       departureAt: '2026-10-01T17:00:00+01:00' // moved by 7 hours
     }];
     const result = matchSegments(prev, curr);
@@ -206,5 +207,22 @@ describe('SegmentMatcher', () => {
     expect(resultAmbiguous.matches).toHaveLength(0);
     expect(resultAmbiguous.removed).toHaveLength(1);
     expect(resultAmbiguous.added).toHaveLength(2);
+  });
+
+  it('should match using Position (Tier 4) when same-route segments are ambiguous', () => {
+    const prev = [
+      { ...baseSegment, duffelSegmentId: null, flightNumber: '111', globalOrder: 0, departureAt: '2026-10-01T10:00:00+01:00' },
+      { ...baseSegment, duffelSegmentId: null, flightNumber: '222', globalOrder: 1, departureAt: '2026-10-01T14:00:00+01:00' }
+    ];
+    const curr = [
+      { ...baseSegment, duffelSegmentId: null, flightNumber: '333', globalOrder: 0, departureAt: '2026-10-01T12:00:00+01:00' },
+      { ...baseSegment, duffelSegmentId: null, flightNumber: '443', globalOrder: 1, departureAt: '2026-10-01T12:00:00+01:00' }
+    ];
+
+    const result = matchSegments(prev, curr);
+
+    expect(result.matches).toHaveLength(2);
+    expect(result.matches[0].method).toBe('POSITION_MATCH');
+    expect(result.matches[1].method).toBe('POSITION_MATCH');
   });
 });

@@ -29,6 +29,8 @@ export interface SliceDiff {
   finalArrivalShiftMinutes: number | null;
   segmentCountDelta: number;
   isRoutingChanged: boolean;
+  departureAirportChanged: boolean;
+  arrivalAirportChanged: boolean;
 }
 
 export interface ItineraryDiffResult {
@@ -92,11 +94,16 @@ export function computeItineraryDiff(prevSegments: NormalizedSegment[], currSegm
     const currLast = currInSlice[currInSlice.length - 1];
 
     let isSliceRoutingChanged = false;
+    let departureAirportChanged = false;
+    let arrivalAirportChanged = false;
     if (prevFirst && currFirst && prevLast && currLast) {
-      isSliceRoutingChanged = prevFirst.departureAirportIata !== currFirst.departureAirportIata ||
-                             prevLast.arrivalAirportIata !== currLast.arrivalAirportIata;
+      departureAirportChanged = prevFirst.departureAirportIata !== currFirst.departureAirportIata;
+      arrivalAirportChanged = prevLast.arrivalAirportIata !== currLast.arrivalAirportIata;
+      isSliceRoutingChanged = departureAirportChanged || arrivalAirportChanged;
     } else if (prevFirst || currFirst) {
       isSliceRoutingChanged = true;
+      departureAirportChanged = true;
+      arrivalAirportChanged = true;
     }
 
     if (isSliceRoutingChanged) {
@@ -112,7 +119,9 @@ export function computeItineraryDiff(prevSegments: NormalizedSegment[], currSegm
       sliceOrder,
       finalArrivalShiftMinutes,
       segmentCountDelta: currInSlice.length - prevInSlice.length,
-      isRoutingChanged: isSliceRoutingChanged
+      isRoutingChanged: isSliceRoutingChanged,
+      departureAirportChanged,
+      arrivalAirportChanged
     });
   }
 

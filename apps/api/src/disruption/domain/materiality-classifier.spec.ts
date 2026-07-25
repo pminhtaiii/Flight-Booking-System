@@ -122,6 +122,26 @@ describe('MaterialityClassifier', () => {
       expect(result.isMaterial).toBe(true);
       expect(result.reasons).toContain(MaterialDisruptionReason.INVALID_CONNECTION_OVERLAP);
     });
+
+    it('should classify slice departure airport changes separately from arrival airport changes', () => {
+      const departureOnlyDiff: ItineraryDiffResult = {
+        ...emptyDiff,
+        sliceDiffs: [{ departureAirportChanged: true, arrivalAirportChanged: false } as unknown as SliceDiff]
+      };
+      const departureOnlyResult = classifyMateriality(departureOnlyDiff, departureOnlyDiff);
+      expect(departureOnlyResult.isMaterial).toBe(true);
+      expect(departureOnlyResult.reasons).toContain(MaterialDisruptionReason.DEPARTURE_AIRPORT_CHANGED);
+      expect(departureOnlyResult.reasons).not.toContain(MaterialDisruptionReason.ARRIVAL_AIRPORT_CHANGED);
+
+      const arrivalOnlyDiff: ItineraryDiffResult = {
+        ...emptyDiff,
+        sliceDiffs: [{ departureAirportChanged: false, arrivalAirportChanged: true } as unknown as SliceDiff]
+      };
+      const arrivalOnlyResult = classifyMateriality(arrivalOnlyDiff, arrivalOnlyDiff);
+      expect(arrivalOnlyResult.isMaterial).toBe(true);
+      expect(arrivalOnlyResult.reasons).toContain(MaterialDisruptionReason.ARRIVAL_AIRPORT_CHANGED);
+      expect(arrivalOnlyResult.reasons).not.toContain(MaterialDisruptionReason.DEPARTURE_AIRPORT_CHANGED);
+    });
   });
 
   describe('Threshold and Boundary Rules', () => {
