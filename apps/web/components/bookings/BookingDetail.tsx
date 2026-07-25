@@ -36,10 +36,6 @@ export function BookingDetail({ booking: initialBooking, isMockEnabled, bookingI
   }
   const [booking, setBooking] = useState<any>(initialBooking);
 
-  useEffect(() => {
-    setBooking(initialBooking);
-  }, [initialBooking]);
-
   const [loadingMock, setLoadingMock] = useState(!!isMockEnabled);
   const [mockError, setMockError] = useState<string | null>(null);
 
@@ -47,6 +43,12 @@ export function BookingDetail({ booking: initialBooking, isMockEnabled, bookingI
   const [loadingAction, setLoadingAction] = useState(false);
   const [conflictError, setConflictError] = useState<string | null>(null);
   const [actionSuccess, setActionSuccess] = useState<string | null>(null);
+
+  useEffect(() => {
+    setBooking(initialBooking);
+    setConflictError(null);
+    setActionSuccess(null);
+  }, [initialBooking]);
 
   const [cancellationStatus, setCancellationStatus] = useState<any>(null);
   const [showCancelModal, setShowCancelModal] = useState(false);

@@ -196,6 +196,7 @@ Update this file after every completed feature. Any AI agent reading this should
 
 ## Notes
 
+- Booking-detail refreshes now clear action-specific success and conflict feedback before rendering a new itinerary revision.
 - Logout now always attempts the backend token-revocation endpoint before clearing NextAuth, using the established local API fallback when `NEXT_PUBLIC_API_URL` is absent. The frontend Playwright configuration can omit that public URL to exercise the regression path.
 - The test environment does not run PostgreSQL or Redis services locally. E2E tests use Jest spies on the PrismaClient instance to mock database states, keeping the API source code clean and genuine.
 - Fixed a double-increment of `paymentAttemptCount` on stale-lock retry of `createPayment` by querying for an existing Payment record before updating `booking_intents` (Step 2) and reusing the existing Payment record if found (Step 5).
