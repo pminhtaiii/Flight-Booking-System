@@ -15,6 +15,7 @@ export type SyncResult =
   | { status: 'NO_CHANGE' }
   | { status: 'REVISION_CREATED'; revisionId: string }
   | { status: 'SKIPPED_INELIGIBLE' }
+  | { status: 'SKIPPED_LOCKED' }
   | { status: 'CONVERGED_DUPLICATE' };
 
 interface DbSegment {
@@ -122,7 +123,7 @@ export class SupplierSyncService {
     const token = await this.syncClaimService.acquireClaim(bookingId);
     if (!token) {
       this.logger.warn(`Failed to acquire lock for booking ${bookingId} (ineligible status or active sync exists). Correlation: ${correlationId}`);
-      return { status: 'SKIPPED_INELIGIBLE' };
+      return { status: 'SKIPPED_LOCKED' };
     }
 
     try {

@@ -69,8 +69,9 @@ export class DuffelEventProcessor {
             event.supplierEventId,
           );
 
-          if (result.status === 'SKIPPED_INELIGIBLE') {
-            throw new Error(`Sync skipped or locked for booking ${booking.id}`);
+          if (result.status === 'SKIPPED_LOCKED') {
+            await this.handleLockConflict(event.id, token);
+            return;
           }
 
           await this.handleSuccess(event.id, token);
@@ -167,6 +168,20 @@ export class DuffelEventProcessor {
     }
 
     return claimed;
+  }
+
+  async handleLockConflict(eventId: string, token: string): Promise<void> {
+    const now = new Date();
+    await this.prisma.duffelWebhookEvent.updateMany({
+      where: { id: eventId, processingToken: token },
+      data: {
+        status: 'RETRY_SCHEDULED',
+        nextAttemptAt: new Date(now.getTime() + 1 * 60 * 1000),
+        processingToken: null,
+        processingStartedAt: null,
+        attempts: { decrement: 1 },
+      },
+    });
   }
 
   async handleSuccess(eventId: string, token: string): Promise<void> {
