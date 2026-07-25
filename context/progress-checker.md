@@ -7,14 +7,16 @@ Update this file after every completed feature. Any AI agent reading this should
 ### Current Status
 
 **Feature:** Disruption & Flight-Change Management (Feature 14)
-**Last completed:** Feature 14 Phase 4: Signed Duffel Webhook receiver, durable inbox, and async processor.
-**Next:** Feature 14 Phase 5: Re-trigger matching and schedule re-notification.
+**Last completed:** Feature 14 Phase 5: Budget-aware reconciliation and correct booking-completion lifecycle.
+**Next:** Feature 14 Phase 6: Re-trigger matching and schedule re-notification.
 
 ---
 
 ## Progress by Feature
 
 ### [/] Feature: Disruption & Flight-Change Management (Feature 14)
+
+- [x] Phase 5 / PR 6: Budget-aware reconciliation and correct booking-completion lifecycle (implemented ReconciliationService with 30-minute cron wrapper, exact 72-hour window and stable ordering, Duffel budget limits tracking/concurrency controls, exponential backoff failure handling, and stale final-arrival completion sweep resolving active disruptions; verified with unit/E2E test coverage and lint checks passing cleanly)
 
 - [x] Phase 4 / PR 5: Signed Duffel Webhook receiver, durable inbox, and async processor (implemented HMAC-SHA256 signature verification with 5-minute replay tolerance, fast-ack response, durable inbox insertion, duplicate delivery convergence, async leasing using compare-and-swap token claims, stale lease recovery, independent batch processing, exponential retry backoff, 5th-attempt escalation, and 30-day raw payload PII redaction; verified with 100% unit and E2E coverage passing cleanly)
 

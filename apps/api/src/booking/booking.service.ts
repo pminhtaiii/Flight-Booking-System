@@ -1,11 +1,11 @@
 import { BadGatewayException, BadRequestException, ForbiddenException, Injectable, NotFoundException, Logger } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
-import { Booking, BookingFailureReason, BookingStatus, Prisma } from '@prisma/client';
+import { Booking, BookingFailureReason, BookingStatus, Prisma, DisruptionStatus, DisruptionResolvedByType } from '@prisma/client';
 import { PrismaService } from '@/prisma/prisma.service';
 import { CancellationQuoteResponseDto, CancellationResponseDto, FlightSnapshot, PassengerSnapshot } from '@shared/booking-types';
 import { BookingDetailResponseDto, BookingListItemResponseDto, BookingListResponseDto, BookingTab } from './dto';
 
-type BookingWithRelations = Prisma.BookingGetPayload<{
+export type BookingWithRelations = Prisma.BookingGetPayload<{
   include: {
     payment: { select: { id: true; status: true; stripePaymentIntentId: true } };
     bookingIntent: { select: { id: true; duffelOfferId: true } };
@@ -317,17 +317,68 @@ export class BookingService {
   }
 
   async checkAndCompleteBooking(booking: BookingWithRelations): Promise<BookingWithRelations> {
-    if (booking.status === 'CONFIRMED' && booking.departureAt && booking.departureAt < new Date()) {
+    const now = new Date();
+    const targetTime = booking.currentFinalArrivalAt || booking.departureAt;
+    if (booking.status === 'CONFIRMED' && targetTime && targetTime <= now) {
       try {
-        const res = await this.prisma.booking.updateMany({
-          where: { id: booking.id, status: 'CONFIRMED' },
-          data: { status: 'COMPLETED' }
+        await this.prisma.$transaction(async (tx) => {
+          // Re-fetch the booking inside transaction to make it safe and atomic
+          const dbBooking = await tx.booking.findUnique({
+            where: { id: booking.id },
+            select: { status: true, disruptionStatus: true, activeDisruptionRevisionId: true },
+          });
+
+          if (!dbBooking || dbBooking.status !== 'CONFIRMED') {
+            return;
+          }
+
+          const hasActiveDisruption = dbBooking.disruptionStatus === 'DETECTED' || dbBooking.disruptionStatus === 'ACKNOWLEDGED';
+
+          const updateData: Prisma.BookingUpdateInput = {
+            status: 'COMPLETED',
+          };
+
+          if (hasActiveDisruption) {
+            updateData.disruptionStatus = 'RESOLVED';
+            updateData.disruptionResolvedReason = 'DEPARTURE_PASSED';
+            updateData.disruptionResolvedAt = now;
+            updateData.disruptionResolvedByType = 'SYSTEM';
+          }
+
+          await tx.booking.update({
+            where: { id: booking.id },
+            data: updateData,
+          });
+
+          if (hasActiveDisruption) {
+            await tx.disruptionAuditEvent.create({
+              data: {
+                bookingId: booking.id,
+                revisionId: dbBooking.activeDisruptionRevisionId,
+                action: 'DEPARTURE_RESOLVED',
+                fromStatus: dbBooking.disruptionStatus,
+                toStatus: 'RESOLVED',
+                actorType: 'SYSTEM',
+                actorId: null,
+                correlationId: `passed-${booking.id}-${now.getTime()}`,
+                traceId: `passed-${booking.id}-${now.getTime()}`,
+                createdAt: now,
+              },
+            });
+          }
         });
-        if (res.count > 0) {
-          booking.status = 'COMPLETED';
+
+        // Sync local object fields
+        booking.status = 'COMPLETED';
+        if (booking.disruptionStatus === 'DETECTED' || booking.disruptionStatus === 'ACKNOWLEDGED') {
+          booking.disruptionStatus = DisruptionStatus.RESOLVED;
+          booking.disruptionResolvedReason = 'DEPARTURE_PASSED';
+          booking.disruptionResolvedAt = now;
+          booking.disruptionResolvedByType = DisruptionResolvedByType.SYSTEM;
         }
-      } catch (e: any) {
-        this.logger.error(`Failed to update booking ${booking.id} to COMPLETED: ${e.message}`, e.stack);
+      } catch (error: unknown) {
+        const err = error instanceof Error ? error : new Error(String(error));
+        this.logger.error(`Failed to update booking ${booking.id} to COMPLETED: ${err.message}`, err.stack);
       }
     }
     return booking;

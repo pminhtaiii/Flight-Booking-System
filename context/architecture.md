@@ -303,6 +303,35 @@ DuffelEventProcessor Cron (Every 10s via @Cron)
 - **PII-Safe Retention**: Redacts raw webhook payloads after 30 days to adhere to strict user privacy standards.
 
 
+### Budget-Aware Reconciliation & Booking Completion (Phase 5)
+
+```
+Reconciliation Cron (Every 30m via @Cron or DUFFEL_RECONCILIATION_CRON)
+  ├─ Verify Feature Flag (FEATURE_FLAG_DISRUPTION_RECONCILIATION)
+  ├─ Complete stale bookings that have passed their final arrival
+  │     └─ Fetch CONFIRMED bookings past currentFinalArrivalAt or departureAt
+  │     └─ Transition status to COMPLETED and resolve active disruptions as RESOLVED with DEPARTURE_PASSED
+  ├─ Fetch eligible bookings for synchronization (up to batch size DUFFEL_RECONCILIATION_BATCH_SIZE)
+  │     ├─ Status CONFIRMED, non-null duffelOrderId
+  │     ├─ nextUnflownDepartureAt in (now, now + 72 hours]
+  │     ├─ nextDuffelSyncAt due (null or <= now)
+  │     └─ syncLockedAt not active (null or < 5 minutes ago)
+  ├─ Sort: lastDuffelSyncedAt ASC NULLS FIRST, nextUnflownDepartureAt ASC, id ASC
+  ├─ For each booking:
+  │     ├─ Enforce Monthly API Budget limits (Redis key `budget:duffel:YYYY-MM` vs DUFFEL_BUDGET_LIMIT_TOTAL)
+  │     │     ├─ If budget exceeded: defer, record budgetBlocked metric
+  │     │     └─ If budget OK: increment counter, call SupplierSyncService.syncBooking
+  │     ├─ If SKIPPED_LOCKED or SKIPPED_INELIGIBLE: decrement budget counter back
+  │     └─ If Sync Fails: increment failed counter, apply exponential backoff (15 * 2^(failures-1) minutes)
+  └─ Return structured results: selected, processed, changed, unchanged, failed, deferred, stale, budgetBlocked
+```
+
+- **Stale Completion Sweep**: Resolves active disruptions and marks bookings completed atomically in database transactions after flights have landed.
+- **Fair Batch Selection & Ordering**: Reconciliation order ensures bookings closer to departure or not synced recently are synchronized first.
+- **API Budget Control**: Protects supplier integration limits by checking monthly API budget before processing each booking, preventing excessive charges.
+- **Exponential Retry Backoff**: Prevents starve-out from repeating synchronization failures by scaling retry backoff exponentially.
+
+
 ### AI Chatbot Agent Flow (SSE Streaming)
 
 ```
