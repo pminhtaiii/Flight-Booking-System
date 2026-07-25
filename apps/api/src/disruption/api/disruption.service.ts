@@ -91,69 +91,58 @@ export class DisruptionService {
   }
 
   async acknowledgeDisruption(bookingId: string, revisionId: string, userId: string): Promise<AcknowledgeDisruptionResponseDto> {
-    const booking = await this.prisma.booking.findUnique({
-      where: { id: bookingId },
-    });
-
-    if (!booking) {
-      throw new NotFoundException('Booking not found');
-    }
-
-    if (booking.userId !== userId) {
-      throw new ForbiddenException('Insufficient permissions');
-    }
-
-    if (booking.activeDisruptionRevisionId !== revisionId) {
-      throw new ConflictException({
-        code: 'STALE_DISRUPTION_REVISION',
-        activeRevisionId: booking.activeDisruptionRevisionId,
-        disruptionStatus: booking.disruptionStatus,
-      });
-    }
-
-    if (
-      booking.disruptionStatus !== 'DETECTED' &&
-      booking.disruptionStatus !== 'ACKNOWLEDGED' &&
-      booking.disruptionStatus !== 'RESOLVED'
-    ) {
-      throw new ConflictException({
-        code: 'DISRUPTION_TRANSITION_INVALID',
-        message: `Cannot acknowledge disruption in state: ${booking.disruptionStatus}`,
-      });
-    }
-
-    if (booking.disruptionStatus === 'ACKNOWLEDGED' || booking.disruptionStatus === 'RESOLVED') {
-      return {
-        bookingId: booking.id,
-        activeRevisionId: booking.activeDisruptionRevisionId!,
-        disruptionStatus: booking.disruptionStatus as DisruptionStatus,
-        resolvedReason: booking.disruptionResolvedReason as DisruptionResolvedReason | null,
-        updatedAt: booking.updatedAt.toISOString(),
-      };
-    }
-
-    const previousStatus = booking.disruptionStatus;
     const now = new Date();
 
     const updatedBooking = await this.prisma.$transaction(async (tx) => {
+      const current = await tx.booking.findUnique({
+        where: { id: bookingId },
+      });
+
+      if (!current) {
+        throw new NotFoundException('Booking not found');
+      }
+
+      if (current.userId !== userId) {
+        throw new ForbiddenException('Insufficient permissions');
+      }
+
+      if (current.activeDisruptionRevisionId !== revisionId) {
+        throw new ConflictException({
+          code: 'STALE_DISRUPTION_REVISION',
+          activeRevisionId: current.activeDisruptionRevisionId ?? null,
+          disruptionStatus: current.disruptionStatus ?? null,
+        });
+      }
+
+      if (current.disruptionStatus === 'ACKNOWLEDGED' || current.disruptionStatus === 'RESOLVED') {
+        return current;
+      }
+
+      if (current.disruptionStatus !== 'DETECTED') {
+        throw new ConflictException({
+          code: 'DISRUPTION_TRANSITION_INVALID',
+          message: `Cannot acknowledge disruption in state: ${current.disruptionStatus}`,
+        });
+      }
+
       const result = await tx.booking.updateMany({
-        where: { 
-          id: bookingId, 
+        where: {
+          id: bookingId,
           activeDisruptionRevisionId: revisionId,
-          disruptionStatus: 'DETECTED'
+          disruptionStatus: current.disruptionStatus,
         },
         data: { disruptionStatus: 'ACKNOWLEDGED' },
       });
 
       if (result.count === 0) {
-        const current = await tx.booking.findUnique({ where: { id: bookingId } });
-        if (current && current.activeDisruptionRevisionId === revisionId) {
-          return current;
+        const reloaded = await tx.booking.findUnique({ where: { id: bookingId } });
+        if (reloaded && reloaded.activeDisruptionRevisionId === revisionId) {
+          return reloaded;
         }
         throw new ConflictException({
           code: 'STALE_DISRUPTION_REVISION',
-          activeRevisionId: current?.activeDisruptionRevisionId ?? null,
-          disruptionStatus: current?.disruptionStatus ?? null,
+          activeRevisionId: reloaded?.activeDisruptionRevisionId ?? null,
+          disruptionStatus: reloaded?.disruptionStatus ?? null,
         });
       }
 
@@ -167,7 +156,7 @@ export class DisruptionService {
           bookingId,
           revisionId,
           action: 'ACKNOWLEDGED',
-          fromStatus: previousStatus,
+          fromStatus: current.disruptionStatus,
           toStatus: 'ACKNOWLEDGED',
           actorType: 'TRAVELLER',
           actorId: userId,
@@ -190,57 +179,45 @@ export class DisruptionService {
   }
 
   async acceptDisruption(bookingId: string, revisionId: string, userId: string): Promise<AcceptDisruptionResponseDto> {
-    const booking = await this.prisma.booking.findUnique({
-      where: { id: bookingId },
-    });
-
-    if (!booking) {
-      throw new NotFoundException('Booking not found');
-    }
-
-    if (booking.userId !== userId) {
-      throw new ForbiddenException('Insufficient permissions');
-    }
-
-    if (booking.activeDisruptionRevisionId !== revisionId) {
-      throw new ConflictException({
-        code: 'STALE_DISRUPTION_REVISION',
-        activeRevisionId: booking.activeDisruptionRevisionId,
-        disruptionStatus: booking.disruptionStatus,
-      });
-    }
-
-    if (
-      booking.disruptionStatus !== 'DETECTED' &&
-      booking.disruptionStatus !== 'ACKNOWLEDGED' &&
-      booking.disruptionStatus !== 'RESOLVED'
-    ) {
-      throw new ConflictException({
-        code: 'DISRUPTION_TRANSITION_INVALID',
-        message: `Cannot accept disruption in state: ${booking.disruptionStatus}`,
-      });
-    }
-
-    if (booking.disruptionStatus === 'RESOLVED') {
-      return {
-        bookingId: booking.id,
-        activeRevisionId: booking.activeDisruptionRevisionId!,
-        disruptionStatus: 'RESOLVED' as DisruptionStatus,
-        resolvedReason: booking.disruptionResolvedReason as DisruptionResolvedReason | null,
-        resolvedAt: booking.disruptionResolvedAt?.toISOString() ?? null,
-        updatedAt: booking.updatedAt.toISOString(),
-      };
-    }
-
-    const previousStatus = booking.disruptionStatus;
     const now = new Date();
 
     const updatedBooking = await this.prisma.$transaction(async (tx) => {
+      const current = await tx.booking.findUnique({
+        where: { id: bookingId },
+      });
+
+      if (!current) {
+        throw new NotFoundException('Booking not found');
+      }
+
+      if (current.userId !== userId) {
+        throw new ForbiddenException('Insufficient permissions');
+      }
+
+      if (current.activeDisruptionRevisionId !== revisionId) {
+        throw new ConflictException({
+          code: 'STALE_DISRUPTION_REVISION',
+          activeRevisionId: current.activeDisruptionRevisionId ?? null,
+          disruptionStatus: current.disruptionStatus ?? null,
+        });
+      }
+
+      if (current.disruptionStatus === 'RESOLVED') {
+        return current;
+      }
+
+      if (current.disruptionStatus !== 'DETECTED' && current.disruptionStatus !== 'ACKNOWLEDGED') {
+        throw new ConflictException({
+          code: 'DISRUPTION_TRANSITION_INVALID',
+          message: `Cannot accept disruption in state: ${current.disruptionStatus}`,
+        });
+      }
+
       const result = await tx.booking.updateMany({
-        where: { 
-          id: bookingId, 
+        where: {
+          id: bookingId,
           activeDisruptionRevisionId: revisionId,
-          disruptionStatus: { in: ['DETECTED', 'ACKNOWLEDGED'] }
+          disruptionStatus: current.disruptionStatus,
         },
         data: {
           disruptionStatus: 'RESOLVED',
@@ -252,14 +229,14 @@ export class DisruptionService {
       });
 
       if (result.count === 0) {
-        const current = await tx.booking.findUnique({ where: { id: bookingId } });
-        if (current && current.activeDisruptionRevisionId === revisionId && current.disruptionStatus === 'RESOLVED') {
-          return current;
+        const reloaded = await tx.booking.findUnique({ where: { id: bookingId } });
+        if (reloaded && reloaded.activeDisruptionRevisionId === revisionId && reloaded.disruptionStatus === 'RESOLVED') {
+          return reloaded;
         }
         throw new ConflictException({
           code: 'STALE_DISRUPTION_REVISION',
-          activeRevisionId: current?.activeDisruptionRevisionId ?? null,
-          disruptionStatus: current?.disruptionStatus ?? null,
+          activeRevisionId: reloaded?.activeDisruptionRevisionId ?? null,
+          disruptionStatus: reloaded?.disruptionStatus ?? null,
         });
       }
 
@@ -273,7 +250,7 @@ export class DisruptionService {
           bookingId,
           revisionId,
           action: 'TRAVELLER_ACCEPTED',
-          fromStatus: updated.disruptionStatus === 'RESOLVED' && previousStatus === 'DETECTED' ? 'ACKNOWLEDGED' : previousStatus, // wait: fromStatus should be whatever status we transitioned from, which is either previousStatus or if it was concurrently changed, it's captured in previousStatus
+          fromStatus: current.disruptionStatus,
           toStatus: 'RESOLVED',
           actorType: 'TRAVELLER',
           actorId: userId,
