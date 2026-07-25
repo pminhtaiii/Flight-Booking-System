@@ -1,8 +1,10 @@
-import { Controller, Post, Param, HttpCode, HttpStatus, UseGuards, Req, NotFoundException, ForbiddenException, ParseUUIDPipe } from '@nestjs/common';
+import { Controller, Post, Get, Param, HttpCode, HttpStatus, UseGuards, Req, NotFoundException, ForbiddenException, ParseUUIDPipe, Query } from '@nestjs/common';
 import { Request } from 'express';
 import { JwtAuthGuard } from '@/auth/guards/jwt-auth.guard';
 import { PrismaService } from '@/prisma/prisma.service';
 import { SupplierSyncService, SyncResult } from '../sync/supplier-sync.service';
+
+import { DisruptionService } from './disruption.service';
 
 export interface AuthenticatedRequest extends Request {
   user: { id: string; role: string };
@@ -37,3 +39,42 @@ export class DisruptionController {
     return this.supplierSyncService.syncBooking(bookingId, 'WEBHOOK');
   }
 }
+
+@Controller('bookings')
+@UseGuards(JwtAuthGuard)
+export class TravellerDisruptionController {
+  constructor(private readonly disruptionService: DisruptionService) {}
+
+  @Get(':bookingId/disruptions')
+  async getDisruptions(
+    @Req() req: AuthenticatedRequest,
+    @Param('bookingId', new ParseUUIDPipe({ version: '4' })) bookingId: string,
+    @Query('page') pageQuery?: string,
+    @Query('limit') limitQuery?: string,
+  ) {
+    const page = pageQuery ? Math.max(1, parseInt(pageQuery, 10)) : 1;
+    const limit = limitQuery ? Math.min(50, Math.max(1, parseInt(limitQuery, 10))) : 20;
+    return this.disruptionService.getDisruptionHistory(bookingId, req.user.id, page, limit);
+  }
+
+  @Post(':bookingId/disruptions/:revisionId/acknowledge')
+  @HttpCode(HttpStatus.OK)
+  async acknowledgeDisruption(
+    @Req() req: AuthenticatedRequest,
+    @Param('bookingId', new ParseUUIDPipe({ version: '4' })) bookingId: string,
+    @Param('revisionId', new ParseUUIDPipe({ version: '4' })) revisionId: string,
+  ) {
+    return this.disruptionService.acknowledgeDisruption(bookingId, revisionId, req.user.id);
+  }
+
+  @Post(':bookingId/disruptions/:revisionId/accept')
+  @HttpCode(HttpStatus.OK)
+  async acceptDisruption(
+    @Req() req: AuthenticatedRequest,
+    @Param('bookingId', new ParseUUIDPipe({ version: '4' })) bookingId: string,
+    @Param('revisionId', new ParseUUIDPipe({ version: '4' })) revisionId: string,
+  ) {
+    return this.disruptionService.acceptDisruption(bookingId, revisionId, req.user.id);
+  }
+}
+

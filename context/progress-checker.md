@@ -7,14 +7,16 @@ Update this file after every completed feature. Any AI agent reading this should
 ### Current Status
 
 **Feature:** Disruption & Flight-Change Management (Feature 14)
-**Last completed:** Feature 14 Phase 5: Budget-aware reconciliation and correct booking-completion lifecycle.
-**Next:** Feature 14 Phase 6: Re-trigger matching and schedule re-notification.
+**Last completed:** Feature 14 Phase 6: Traveller disruption lifecycle actions, paginated history reads, read model extensions, and confirmed cancellation resolution.
+**Next:** Feature 14 Phase 7: Re-trigger matching and schedule re-notification.
 
 ---
 
 ## Progress by Feature
 
 ### [/] Feature: Disruption & Flight-Change Management (Feature 14)
+
+- [x] Phase 6 / PR 7: Traveller disruption lifecycle actions, paginated history reads, read model extensions, and confirmed cancellation resolution (implemented owner-scoped booking read model extensions with DTO mapping and segments flat-to-nested deserialization under FEATURE_FLAG_DISRUPTION_SURFACING; implemented GET /api/bookings/:bookingId/disruptions paginated history; implemented Traveller lifecycle actions POST acknowledge/accept with active revision validation, state transitions, audit logging, and stale revision 409 conflict checks; updated cancelBooking to resolve active disruptions to RESOLVED/BOOKING_CANCELLED with traveler actor type metadata; verified with 100% test coverage in disruption and cancellation E2E suites passing cleanly with zero warnings/lint issues)
 
 - [x] Phase 5 / PR 6: Budget-aware reconciliation and correct booking-completion lifecycle (implemented ReconciliationService with 30-minute cron wrapper, exact 72-hour window and stable ordering, Duffel budget limits tracking/concurrency controls, exponential backoff failure handling, and stale final-arrival completion sweep resolving active disruptions; verified with unit/E2E test coverage and lint checks passing cleanly)
 

@@ -332,6 +332,35 @@ Reconciliation Cron (Every 30m via @Cron or DUFFEL_RECONCILIATION_CRON)
 - **Exponential Retry Backoff**: Prevents starve-out from repeating synchronization failures by scaling retry backoff exponentially.
 
 
+### Traveller Disruption APIs & Lifecycle (Phase 6)
+
+```
+Booking List/Detail Read (GET /api/bookings and GET /api/bookings/:id)
+  ├─ Verify Feature Flag (FEATURE_FLAG_DISRUPTION_SURFACING === 'true')
+  ├─ Map:
+  │    ├─ currentItinerary: Maps active itinerary revision segments (deserializes flat database columns to nested objects) or falls back to ORIGINAL flightSnapshot.
+  │    └─ disruption: Maps active disruption revision diffs (isMaterial, incrementalSummary, cumulativeSummary, stabilizationWarning) or falls back to NONE status.
+  └─ Return safe, PII-stripped response payload.
+
+Traveller Disruption Actions (Acknowledge and Accept)
+  ├─ POST /api/bookings/:bookingId/disruptions/:revisionId/acknowledge -> Transition DETECTED → ACKNOWLEDGED
+  ├─ POST /api/bookings/:bookingId/disruptions/:revisionId/accept -> Transition DETECTED/ACKNOWLEDGED → RESOLVED (TRAVELLER_ACCEPTED)
+  ├─ Validations:
+  │    ├─ Owner validation (ensures only the booking traveler can execute actions)
+  │    ├─ Active revision validation (checks that revisionId matches booking.activeDisruptionRevisionId)
+  │    │     └─ Mismatch returns 409 Conflict with code 'STALE_DISRUPTION_REVISION'
+  │    └─ Idempotency (same-revision retries return success status without re-transitioning)
+  └─ Side Effects: Write safe DisruptionAuditEvent with TRAVELLER actor type and userId.
+
+Booking Cancellation Disruption Resolution
+  └─ Upon client cancel request, active disruption is resolved atomically to RESOLVED with reason BOOKING_CANCELLED.
+```
+
+- **Flat-to-Nested Mapping**: Decoupled database storage (flat columns in segment snapshots) from the customer-facing API contract (fully nested and clean representation).
+- **Concurrency & Conflict Safeguard**: Rejects stale revision commands with `409 STALE_DISRUPTION_REVISION` to prevent users from accepting out-of-date flight changes when a newer change is available.
+- **Traceable Audit Logging**: Writes audit events for all traveler-initiated lifecycle transitions capturing actor and trace details.
+
+
 ### AI Chatbot Agent Flow (SSE Streaming)
 
 ```

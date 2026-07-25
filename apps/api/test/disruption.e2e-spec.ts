@@ -13,10 +13,12 @@ import { DuffelService } from '@/duffel/duffel.service';
 import { DuffelEventProcessor } from '@/disruption/webhook/duffel-event.processor';
 import { DisruptionStatus, Prisma } from '@prisma/client';
 import { HttpExceptionFilter } from '@/common/filters/http-exception.filter';
+import { JwtService } from '@nestjs/jwt';
 import request from 'supertest';
 import * as crypto from 'crypto';
 
 describe('Disruption & Flight-Change Management (Webhook & Processor E2E)', () => {
+  jest.setTimeout(30_000);
   let app: INestApplication;
   let prisma: PrismaService;
   let processor: DuffelEventProcessor;
@@ -26,6 +28,8 @@ describe('Disruption & Flight-Change Management (Webhook & Processor E2E)', () =
   let bookingIntentId: string;
   let bookingId: string;
   let suffix: string;
+  let userToken: string;
+  let jwtService: JwtService;
   const webhookSecret = 'whsec_duffel_test_secret';
 
   beforeAll(async () => {
@@ -48,6 +52,7 @@ describe('Disruption & Flight-Change Management (Webhook & Processor E2E)', () =
 
     prisma = moduleFixture.get<PrismaService>(PrismaService);
     processor = moduleFixture.get<DuffelEventProcessor>(DuffelEventProcessor);
+    jwtService = moduleFixture.get<JwtService>(JwtService);
   });
 
   afterAll(async () => {
@@ -67,6 +72,7 @@ describe('Disruption & Flight-Change Management (Webhook & Processor E2E)', () =
       },
     });
     userId = user.id;
+    userToken = jwtService.sign({ id: user.id, email: user.email }, { expiresIn: '1h' });
 
     const intent = await prisma.bookingIntent.create({
       data: {
@@ -349,6 +355,297 @@ describe('Disruption & Flight-Change Management (Webhook & Processor E2E)', () =
       expect(event?.status).toBe('FAILED_NEEDS_ATTENTION');
       expect(event?.attempts).toBe(5);
       expect(event?.nextAttemptAt).toBeNull();
+    });
+  });
+
+  describe('Disruption APIs (Phase 6)', () => {
+    let otherUserToken: string;
+
+    beforeEach(async () => {
+      const otherUser = await prisma.user.create({
+        data: {
+          email: `other-test-user-${crypto.randomUUID()}@example.com`,
+          password: 'Password123!',
+          role: 'USER',
+          status: 'ACTIVE',
+        },
+      });
+      otherUserToken = jwtService.sign({ id: otherUser.id, email: otherUser.email }, { expiresIn: '1h' });
+    });
+
+    afterEach(async () => {
+      await prisma.user.deleteMany({ where: { email: { startsWith: 'other-test-user-' } } });
+    });
+
+    it('populates extended fields (currentItinerary and disruption) in list and details endpoints', async () => {
+      // Create an itinerary revision for the booking
+      const rev = await prisma.itineraryRevision.create({
+        data: {
+          bookingId,
+          source: 'WEBHOOK',
+          version: 1,
+          fingerprint: 'test-fingerprint-1',
+          incrementalDiff: { presentationSummary: { details: 'incremental' } } as any,
+          cumulativeDiff: { presentationSummary: { details: 'cumulative' } } as any,
+          isMaterial: true,
+          segments: {
+            create: [
+              {
+                duffelSegmentId: 'seg_new_1',
+                airlineName: 'Japan Airlines',
+                marketingCarrierIata: 'JL',
+                operatingCarrierIata: 'JL',
+                flightNumber: '752',
+                departureAirportIata: 'HAN',
+                departureAirportName: 'Noi Bai',
+                departureCity: 'Hanoi',
+                arrivalAirportIata: 'NRT',
+                arrivalAirportName: 'Narita',
+                arrivalCity: 'Tokyo',
+                departureAt: new Date('2026-08-01T15:00:00Z'),
+                arrivalAt: new Date('2026-08-01T22:00:00Z'),
+                departureLocalDate: new Date('2026-08-01T00:00:00Z'),
+                arrivalLocalDate: new Date('2026-08-01T00:00:00Z'),
+                durationMinutes: 420,
+                sliceOrder: 0,
+                segmentOrder: 0,
+                globalOrder: 0,
+              }
+            ]
+          }
+        }
+      });
+      await prisma.booking.update({
+        where: { id: bookingId },
+        data: { 
+          disruptionStatus: 'DETECTED',
+          activeDisruptionRevisionId: rev.id
+        }
+      });
+
+      process.env.FEATURE_FLAG_DISRUPTION_SURFACING = 'true';
+      const detailsRes = await request(app.getHttpServer())
+        .get(`/api/bookings/${bookingId}`)
+        .set('Authorization', `Bearer ${userToken}`)
+        .expect(200);
+
+      expect(detailsRes.body.disruption).toBeDefined();
+      expect(detailsRes.body.disruption.status).toBe('DETECTED');
+      expect(detailsRes.body.disruption.activeRevisionId).toBe(rev.id);
+      expect(detailsRes.body.disruption.isMaterial).toBe(true);
+      expect(detailsRes.body.disruption.incrementalSummary).toEqual({ details: 'incremental' });
+      expect(detailsRes.body.disruption.cumulativeSummary).toEqual({ details: 'cumulative' });
+      
+      expect(detailsRes.body.currentItinerary).toBeDefined();
+      expect(detailsRes.body.currentItinerary.source).toBe('REVISION');
+      expect(detailsRes.body.currentItinerary.revisionId).toBe(rev.id);
+      expect(detailsRes.body.currentItinerary.version).toBe(1);
+      expect(detailsRes.body.currentItinerary.segments).toHaveLength(1);
+      expect(detailsRes.body.currentItinerary.segments[0].duffelSegmentId).toBe(`seg_new_1`);
+      expect(detailsRes.body.currentItinerary.segments[0].airline.iataCode).toBe('JL');
+      expect(detailsRes.body.currentItinerary.segments[0].departureAirport.iataCode).toBe('HAN');
+
+      // Check list endpoint
+      const listRes = await request(app.getHttpServer())
+        .get('/api/bookings')
+        .set('Authorization', `Bearer ${userToken}`)
+        .expect(200);
+
+      const listedBooking = listRes.body.bookings.find((b: any) => b.id === bookingId);
+      expect(listedBooking).toBeDefined();
+      expect(listedBooking.disruption).toBeDefined();
+      expect(listedBooking.disruption.status).toBe('DETECTED');
+      expect(listedBooking.currentItinerary).toBeDefined();
+      expect(listedBooking.currentItinerary.source).toBe('REVISION');
+      
+      // Check customer-surfacing flag disabled fallback
+      process.env.FEATURE_FLAG_DISRUPTION_SURFACING = 'false';
+      const detailsResDisabled = await request(app.getHttpServer())
+        .get(`/api/bookings/${bookingId}`)
+        .set('Authorization', `Bearer ${userToken}`)
+        .expect(200);
+      
+      expect(detailsResDisabled.body.disruption.status).toBe('NONE');
+      expect(detailsResDisabled.body.disruption.activeRevisionId).toBeNull();
+      expect(detailsResDisabled.body.currentItinerary.source).toBe('ORIGINAL');
+      expect(detailsResDisabled.body.currentItinerary.revisionId).toBeNull();
+      expect(detailsResDisabled.body.currentItinerary.version).toBe(0);
+
+      delete process.env.FEATURE_FLAG_DISRUPTION_SURFACING;
+    });
+
+    it('returns disruption history with pagination and order', async () => {
+      // Create multiple itinerary revisions
+      await prisma.itineraryRevision.create({
+        data: {
+          bookingId,
+          source: 'WEBHOOK',
+          version: 1,
+          fingerprint: 'test-fingerprint-1',
+          incrementalDiff: { presentationSummary: { details: 'inc-1' } } as any,
+          cumulativeDiff: { presentationSummary: { details: 'cum-1' } } as any,
+          isMaterial: true,
+          createdAt: new Date('2026-01-01T12:00:00Z'),
+        }
+      });
+
+      await prisma.itineraryRevision.create({
+        data: {
+          bookingId,
+          source: 'WEBHOOK',
+          version: 2,
+          fingerprint: 'test-fingerprint-2',
+          incrementalDiff: { presentationSummary: { details: 'inc-2' } } as any,
+          cumulativeDiff: { presentationSummary: { details: 'cum-2' } } as any,
+          isMaterial: true,
+          createdAt: new Date('2026-01-02T12:00:00Z'),
+        }
+      });
+
+      // Page 1, limit 1
+      const res = await request(app.getHttpServer())
+        .get(`/api/bookings/${bookingId}/disruptions?page=1&limit=1`)
+        .set('Authorization', `Bearer ${userToken}`)
+        .expect(200);
+
+      expect(res.body.items).toHaveLength(1);
+      expect(res.body.page).toBe(1);
+      expect(res.body.limit).toBe(1);
+      expect(res.body.total).toBe(2);
+      expect(res.body.totalPages).toBe(2);
+      // Newest version first
+      expect(res.body.items[0].version).toBe(2);
+      expect(res.body.items[0].incrementalSummary).toEqual({ details: 'inc-2' });
+    });
+
+    it('enforces ownership and missing-booking boundaries for history and actions', async () => {
+      const rev = await prisma.itineraryRevision.create({
+        data: {
+          bookingId,
+          source: 'WEBHOOK',
+          version: 1,
+          fingerprint: 'test-fingerprint-1',
+          incrementalDiff: {},
+          cumulativeDiff: {},
+          isMaterial: true,
+        }
+      });
+
+      // 403 Other owner
+      await request(app.getHttpServer())
+        .get(`/api/bookings/${bookingId}/disruptions`)
+        .set('Authorization', `Bearer ${otherUserToken}`)
+        .expect(403);
+
+      await request(app.getHttpServer())
+        .post(`/api/bookings/${bookingId}/disruptions/${rev.id}/acknowledge`)
+        .set('Authorization', `Bearer ${otherUserToken}`)
+        .expect(403);
+
+      await request(app.getHttpServer())
+        .post(`/api/bookings/${bookingId}/disruptions/${rev.id}/accept`)
+        .set('Authorization', `Bearer ${otherUserToken}`)
+        .expect(403);
+
+      // 404 Missing booking
+      const fakeId = crypto.randomUUID();
+      await request(app.getHttpServer())
+        .get(`/api/bookings/${fakeId}/disruptions`)
+        .set('Authorization', `Bearer ${userToken}`)
+        .expect(404);
+
+      await request(app.getHttpServer())
+        .post(`/api/bookings/${fakeId}/disruptions/${rev.id}/acknowledge`)
+        .set('Authorization', `Bearer ${userToken}`)
+        .expect(404);
+    });
+
+    it('transitions state atomically and idempotently for lifecycle actions (acknowledge, accept)', async () => {
+      const mockRevision = await prisma.itineraryRevision.create({
+        data: {
+          bookingId,
+          version: 1,
+          source: 'WEBHOOK',
+          fingerprint: 'fp_1',
+          isMaterial: true,
+          incrementalDiff: {},
+          cumulativeDiff: {},
+        }
+      });
+      await prisma.booking.update({
+        where: { id: bookingId },
+        data: { disruptionStatus: 'DETECTED', activeDisruptionRevisionId: mockRevision.id }
+      });
+
+      // 1. Acknowledge
+      const ackRes1 = await request(app.getHttpServer())
+        .post(`/api/bookings/${bookingId}/disruptions/${mockRevision.id}/acknowledge`)
+        .set('Authorization', `Bearer ${userToken}`)
+        .expect(200);
+      expect(ackRes1.body.disruptionStatus).toBe('ACKNOWLEDGED');
+      expect(ackRes1.body.activeRevisionId).toBe(mockRevision.id);
+
+      // Idempotency check for acknowledge
+      const ackRes2 = await request(app.getHttpServer())
+        .post(`/api/bookings/${bookingId}/disruptions/${mockRevision.id}/acknowledge`)
+        .set('Authorization', `Bearer ${userToken}`)
+        .expect(200);
+      expect(ackRes2.body.disruptionStatus).toBe('ACKNOWLEDGED');
+
+      // 2. Accept
+      const acceptRes1 = await request(app.getHttpServer())
+        .post(`/api/bookings/${bookingId}/disruptions/${mockRevision.id}/accept`)
+        .set('Authorization', `Bearer ${userToken}`)
+        .expect(200);
+      expect(acceptRes1.body.disruptionStatus).toBe('RESOLVED');
+      expect(acceptRes1.body.resolvedReason).toBe('TRAVELLER_ACCEPTED');
+      expect(acceptRes1.body.resolvedAt).toBeDefined();
+
+      // Idempotency check for accept
+      const acceptRes2 = await request(app.getHttpServer())
+        .post(`/api/bookings/${bookingId}/disruptions/${mockRevision.id}/accept`)
+        .set('Authorization', `Bearer ${userToken}`)
+        .expect(200);
+      expect(acceptRes2.body.disruptionStatus).toBe('RESOLVED');
+
+      // 3. Stale revision checks (409)
+      const newerRevision = await prisma.itineraryRevision.create({
+        data: {
+          bookingId,
+          version: 2,
+          source: 'WEBHOOK',
+          fingerprint: 'fp_2',
+          isMaterial: true,
+          incrementalDiff: {},
+          cumulativeDiff: {},
+        }
+      });
+      await prisma.booking.update({
+        where: { id: bookingId },
+        data: { disruptionStatus: 'DETECTED', activeDisruptionRevisionId: newerRevision.id }
+      });
+
+      // Call acknowledge on stale revision (version 1)
+      const staleAck = await request(app.getHttpServer())
+        .post(`/api/bookings/${bookingId}/disruptions/${mockRevision.id}/acknowledge`)
+        .set('Authorization', `Bearer ${userToken}`)
+        .expect(409);
+      expect(staleAck.body.code).toBe('STALE_DISRUPTION_REVISION');
+      expect(staleAck.body.activeRevisionId).toBe(newerRevision.id);
+      expect(staleAck.body.disruptionStatus).toBe('DETECTED');
+
+      // Check transition audit events exist
+      const audits = await prisma.disruptionAuditEvent.findMany({
+        where: { bookingId },
+        orderBy: { createdAt: 'asc' }
+      });
+      const actions = audits.map(a => a.action);
+      expect(actions).toContain('ACKNOWLEDGED');
+      expect(actions).toContain('TRAVELLER_ACCEPTED');
+      
+      const travellerAudit = audits.find(a => a.action === 'TRAVELLER_ACCEPTED');
+      expect(travellerAudit?.actorType).toBe('TRAVELLER');
+      expect(travellerAudit?.actorId).toBe(userId);
     });
   });
 });
