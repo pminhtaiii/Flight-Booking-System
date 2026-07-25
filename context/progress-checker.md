@@ -7,14 +7,16 @@ Update this file after every completed feature. Any AI agent reading this should
 ### Current Status
 
 **Feature:** Disruption & Flight-Change Management (Feature 14)
-**Last completed:** Feature 14 Phase 6: Traveller disruption lifecycle actions, paginated history reads, read model extensions, and confirmed cancellation resolution.
-**Next:** Feature 14 Phase 7: Re-trigger matching and schedule re-notification.
+**Last completed:** Feature 14 Phase 7: Traveller booking disruption experience on the Next.js frontend.
+**Next:** Feature 14 Phase 8: Admin operations, observability, retention, and rollout controls.
 
 ---
 
 ## Progress by Feature
 
 ### [/] Feature: Disruption & Flight-Change Management (Feature 14)
+
+- [x] Phase 7 / PR 8: Traveller booking disruption experience on the Next.js frontend (refactored app/bookings/[bookingId]/page.tsx to Next.js Server Component; implemented BookingDetailClient container; added semantic DisruptionAlert with plain-language reasons and warnings; implemented ItineraryChangeSummary displaying latest revision changes vs original booking; added ItineraryRevisionHistory timeline; supported Acknowledge and Accept actions with pending states, router refresh, and stale conflict handling; added disruption status badges to list cards; updated Playwright E2E tests, resolving CORS origin domain isolation and strict selector conflicts; verified all tests passing with 100% success rate)
 
 - [x] Phase 6 / PR 7: Traveller disruption lifecycle actions, paginated history reads, read model extensions, and confirmed cancellation resolution (implemented owner-scoped booking read model extensions with DTO mapping and segments flat-to-nested deserialization under FEATURE_FLAG_DISRUPTION_SURFACING; implemented GET /api/bookings/:bookingId/disruptions paginated history; implemented Traveller lifecycle actions POST acknowledge/accept with active revision validation, state transitions, audit logging, and stale revision 409 conflict checks; updated cancelBooking to resolve active disruptions to RESOLVED/BOOKING_CANCELLED with traveler actor type metadata; verified with 100% test coverage in disruption and cancellation E2E suites passing cleanly with zero warnings/lint issues)
 
