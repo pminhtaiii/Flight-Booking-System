@@ -356,9 +356,14 @@ export class BookingService {
             updateData.disruptionResolvedByType = 'SYSTEM';
           }
 
-          // Guard against concurrent status changes by including status check in the update filter
+          // Guard against concurrent status or date changes by including status and date checks in the update filter
           const updated = await tx.booking.updateMany({
-            where: { id: booking.id, status: 'CONFIRMED' },
+            where: {
+              id: booking.id,
+              status: 'CONFIRMED',
+              currentFinalArrivalAt: dbBooking.currentFinalArrivalAt,
+              departureAt: dbBooking.departureAt,
+            },
             data: updateData,
           });
 

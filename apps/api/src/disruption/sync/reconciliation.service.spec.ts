@@ -344,7 +344,12 @@ describe('ReconciliationService & Booking Completion', () => {
 
       expect(mockPrisma.$transaction).toHaveBeenCalled();
       expect(mockPrisma.booking.updateMany).toHaveBeenCalledWith({
-        where: { id: 'booking-passed', status: 'CONFIRMED' },
+        where: {
+          id: 'booking-passed',
+          status: 'CONFIRMED',
+          currentFinalArrivalAt: null,
+          departureAt: departureTime,
+        },
         data: {
           status: 'COMPLETED',
           disruptionStatus: DisruptionStatus.RESOLVED,
@@ -427,7 +432,12 @@ describe('ReconciliationService & Booking Completion', () => {
       const result = await bookingService.checkAndCompleteBooking(booking);
 
       expect(mockPrisma.booking.updateMany).toHaveBeenCalledWith({
-        where: { id: 'booking-none-disruption', status: 'CONFIRMED' },
+        where: {
+          id: 'booking-none-disruption',
+          status: 'CONFIRMED',
+          currentFinalArrivalAt: null,
+          departureAt: departureTime,
+        },
         data: {
           status: 'COMPLETED',
         },
