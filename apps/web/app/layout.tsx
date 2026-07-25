@@ -1,5 +1,5 @@
 import { Providers } from '@/components/providers';
-import './base.css';
+import './globals.css';
 
 export const metadata = {
   title: 'Flight Booking System',
