@@ -30,7 +30,7 @@ const formatDate = (value?: string): string => {
 };
 
 const formatCurrency = (amount: string, currency: string): string =>
-  new Intl.NumberFormat('en-GB', { style: 'currency', currency }).format(Number(amount) / 100);
+  new Intl.NumberFormat('en-GB', { style: 'currency', currency }).format(Number(amount));
 
 export function BookingCard({ booking }: BookingCardProps) {
   const firstSegment = booking.flightSnapshot?.segments[0];

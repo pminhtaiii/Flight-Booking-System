@@ -5,7 +5,7 @@ import { Clock, ChevronDown, ChevronUp, ChevronLeft, ChevronRight } from 'lucide
 import type { DisruptionHistoryResponseDto, DisruptionHistoryItemDto } from '@shared/disruption-types';
 import { REASON_LABELS } from './DisruptionAlert';
 
-const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001';
+const apiUrl = process.env.NEXT_PUBLIC_API_URL;
 
 type ItineraryRevisionHistoryProps = {
   bookingId: string;
@@ -13,6 +13,9 @@ type ItineraryRevisionHistoryProps = {
 };
 
 export function ItineraryRevisionHistory({ bookingId, accessToken }: ItineraryRevisionHistoryProps) {
+  if (!apiUrl) {
+    throw new Error('NEXT_PUBLIC_API_URL is required but not configured.');
+  }
   const [data, setData] = useState<DisruptionHistoryResponseDto | null>(null);
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(false);

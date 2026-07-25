@@ -13,7 +13,7 @@ import { ItineraryRevisionHistory } from '@/components/bookings/ItineraryRevisio
 import { BookingProcessingState } from '@/components/bookings/BookingProcessingState';
 import { BookingFailureState } from '@/components/bookings/BookingFailureState';
 
-const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001';
+const apiUrl = process.env.NEXT_PUBLIC_API_URL;
 
 type BookingDetailProps = {
   booking: BookingDetailDto & {
@@ -31,7 +31,15 @@ const currencyFormatter = (amount: string, currency: string): string =>
   new Intl.NumberFormat('en-GB', { style: 'currency', currency }).format(Number(amount));
 
 export function BookingDetail({ booking: initialBooking, isMockEnabled, bookingId }: BookingDetailProps) {
+  if (!apiUrl) {
+    throw new Error('NEXT_PUBLIC_API_URL is required but not configured.');
+  }
   const [booking, setBooking] = useState<any>(initialBooking);
+
+  useEffect(() => {
+    setBooking(initialBooking);
+  }, [initialBooking]);
+
   const [loadingMock, setLoadingMock] = useState(!!isMockEnabled);
   const [mockError, setMockError] = useState<string | null>(null);
 
