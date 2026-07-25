@@ -143,6 +143,17 @@ export function matchSegments(prevSegments: NormalizedSegment[], currSegments: N
     for (const curr of currRemainingAfterT3) {
       if (matchedCurr.has(curr)) continue;
       if (prev.globalOrder === curr.globalOrder) {
+        const sameSlice = prev.sliceOrder === curr.sliceOrder;
+        const shareDeparture = prev.departureAirportIata === curr.departureAirportIata ||
+                               prev.departureCity === curr.departureCity;
+        const shareArrival = prev.arrivalAirportIata === curr.arrivalAirportIata ||
+                             prev.arrivalCity === curr.arrivalCity;
+        const relatedRoute = shareDeparture || shareArrival;
+
+        if (!sameSlice || !relatedRoute) {
+          continue;
+        }
+
         matches.push({
           prevSegment: prev,
           currSegment: curr,

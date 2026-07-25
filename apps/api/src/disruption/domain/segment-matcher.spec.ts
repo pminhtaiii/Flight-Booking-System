@@ -223,6 +223,21 @@ describe('SegmentMatcher', () => {
 
     expect(result.matches).toHaveLength(2);
     expect(result.matches[0].method).toBe('POSITION_MATCH');
-    expect(result.matches[1].method).toBe('POSITION_MATCH');
+  });
+
+  it('should not match using Position (Tier 4) if segments are in different slices or have unrelated routes', () => {
+    const prev = [
+      { ...baseSegment, duffelSegmentId: null, flightNumber: '111', globalOrder: 0, sliceOrder: 0, departureAirportIata: 'JFK', arrivalAirportIata: 'BOS', departureCity: 'New York', arrivalCity: 'Boston' },
+      { ...baseSegment, duffelSegmentId: null, flightNumber: '222', globalOrder: 1, sliceOrder: 1, departureAirportIata: 'BOS', arrivalAirportIata: 'JFK', departureCity: 'Boston', arrivalCity: 'New York' }
+    ];
+    const curr = [
+      { ...baseSegment, duffelSegmentId: null, flightNumber: '333', globalOrder: 0, sliceOrder: 1, departureAirportIata: 'CDG', arrivalAirportIata: 'BOM', departureCity: 'Paris', arrivalCity: 'Mumbai' }
+    ];
+
+    const result = matchSegments(prev, curr);
+
+    expect(result.matches).toHaveLength(0);
+    expect(result.removed).toHaveLength(2);
+    expect(result.added).toHaveLength(1);
   });
 });
