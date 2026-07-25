@@ -14,14 +14,14 @@ test('keeps the session active when the public API URL is not configured', async
 
   await expect(page).toHaveURL(/.*localhost:3000\/$/, { timeout: 30000 });
 
-  await context.addCookies([
-    {
-      name: 'mock-scenario',
-      value: 'missing-api-url',
-      domain: 'localhost',
-      path: '/',
-    },
-  ]);
+  // Intercept configuration endpoint to return missing API URL
+  await page.route('**/api/config', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ apiUrl: undefined }),
+    });
+  });
 
   await page.goto('http://localhost:3000/bookings');
   const localhostLogoutRequest = page
