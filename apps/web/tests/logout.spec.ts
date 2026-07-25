@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 
-test('does not send the bearer token to localhost when the public API URL is not configured', async ({ page, request, context }) => {
+test('keeps the session active when the public API URL is not configured', async ({ page, request, context }) => {
   await request.post('http://127.0.0.1:3001/api/auth/test/reset-lockout', {
     data: { clearAll: true },
   });
@@ -19,6 +19,7 @@ test('does not send the bearer token to localhost when the public API URL is not
     .catch(() => false);
   await page.getByRole('button', { name: 'Sign Out' }).click();
 
-  await expect(page).toHaveURL(/\/login$/);
+  await expect(page.getByRole('alert')).toHaveText('We could not securely sign you out. Please try again.');
+  await expect(page).toHaveURL(/\/bookings$/);
   expect(await localhostLogoutRequest).toBe(false);
 });
