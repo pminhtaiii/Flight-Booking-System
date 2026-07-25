@@ -222,7 +222,8 @@ export class SupplierSyncService {
             // Fingerprint collision / same fingerprint convergence
             const dbLatestRev = dbBooking.itineraryRevisions[0];
             if (dbLatestRev && dbLatestRev.fingerprint === newFingerprint) {
-              if (!isDuffelCancelled || dbLatestRev.isMaterial) {
+              const wasLatestCancelled = dbLatestRev.sourceEventId === 'supplier-cancellation';
+              if (!isDuffelCancelled || wasLatestCancelled) {
                 this.logger.log(`Safe convergence: fingerprint already match latest revision for booking ${bookingId}. Correlation: ${correlationId}`);
                 await tx.booking.update({
                   where: { id: bookingId },
@@ -315,13 +316,17 @@ export class SupplierSyncService {
               }
             }
 
+            const revisionSourceEventId = isDuffelCancelled
+              ? 'supplier-cancellation'
+              : sourceEventId;
+
             // Create revision
             const newRevision = await tx.itineraryRevision.create({
               data: {
                 bookingId,
                 version: nextVersion,
                 source,
-                sourceEventId,
+                sourceEventId: revisionSourceEventId,
                 fingerprint: newFingerprint,
                 isMaterial: classification.isMaterial,
                 materialReasons: classification.reasons,

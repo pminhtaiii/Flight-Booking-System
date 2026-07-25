@@ -761,4 +761,81 @@ describe('SupplierSyncService unit/integration tests', () => {
       expect(revision?.isMaterial).toBe(false); // correctly paired as minor change, rather than deleted/added mismatch which would be material
     });
   });
+
+  describe('SupplierSyncService Cancellation Masking Prevention', () => {
+    it('should create a cancellation revision even if segments fingerprint matches previous material revision', async () => {
+      // 1. First sync: material schedule change (shifted by 180 mins)
+      mockDuffelService.retrieveCompleteOrder.mockResolvedValue({
+        id: `ord_fake_${suffix}`,
+        slices: [
+          {
+            id: 'sli_1',
+            segments: [
+              {
+                id: `seg_orig_${suffix}`,
+                departing_at: '2026-08-01T15:00:00Z', // +180m
+                arriving_at: '2026-08-01T22:00:00Z',
+                origin: { iata_code: 'HAN' },
+                destination: { iata_code: 'NRT' },
+                operating_carrier: { iata_code: 'JL' },
+                marketing_carrier_flight_number: '752',
+              },
+            ],
+          },
+        ],
+        passengers: [],
+      });
+
+      let result = await supplierSyncService.syncBooking(bookingId, 'WEBHOOK');
+      expect(result.status).toBe('REVISION_CREATED');
+
+      const dbBooking = await prisma.booking.findUnique({
+        where: { id: bookingId },
+        include: { itineraryRevisions: true },
+      });
+      expect(dbBooking?.itineraryRevisions.length).toBe(1);
+      expect(dbBooking?.itineraryRevisions[0].isMaterial).toBe(true);
+
+      // Acknowledge the disruption so we are eligible for further processing
+      await prisma.booking.update({
+        where: { id: bookingId },
+        data: { disruptionStatus: 'ACKNOWLEDGED' },
+      });
+
+      // 2. Second sync: order is cancelled but retains same segment times (masking scenario)
+      mockDuffelService.retrieveCompleteOrder.mockResolvedValue({
+        id: `ord_fake_${suffix}`,
+        cancelled_at: '2026-08-01T16:00:00Z', // Cancelled!
+        slices: [
+          {
+            id: 'sli_1',
+            segments: [
+              {
+                id: `seg_orig_${suffix}`,
+                departing_at: '2026-08-01T15:00:00Z', // Same fingerprint!
+                arriving_at: '2026-08-01T22:00:00Z',
+                origin: { iata_code: 'HAN' },
+                destination: { iata_code: 'NRT' },
+                operating_carrier: { iata_code: 'JL' },
+                marketing_carrier_flight_number: '752',
+              },
+            ],
+          },
+        ],
+        passengers: [],
+      });
+
+      result = await supplierSyncService.syncBooking(bookingId, 'WEBHOOK');
+      expect(result.status).toBe('REVISION_CREATED'); // Should NOT converge as duplicate!
+
+      const dbBookingAfter = await prisma.booking.findUnique({
+        where: { id: bookingId },
+        include: { itineraryRevisions: { orderBy: { version: 'desc' } }, notificationOutbox: true },
+      });
+      expect(dbBookingAfter?.itineraryRevisions.length).toBe(2);
+      expect(dbBookingAfter?.itineraryRevisions[0].sourceEventId).toBe('supplier-cancellation');
+      expect(dbBookingAfter?.disruptionStatus).toBe(DisruptionStatus.DETECTED);
+      expect(dbBookingAfter?.notificationOutbox.length).toBe(2); // One from schedule change, one from cancellation
+    });
+  });
 });
