@@ -2,6 +2,7 @@ import { Controller, Post, Req, Headers, HttpCode, HttpStatus, Logger, BadReques
 import { Request } from 'express';
 import { DuffelSignatureService } from './duffel-signature.service';
 import { DuffelInboxService } from './duffel-inbox.service';
+import { Prisma } from '@prisma/client';
 
 interface RequestWithRawBody extends Request {
   rawBody?: Buffer;
@@ -98,13 +99,12 @@ export class DuffelWebhookController {
       duffelOrderId = orderId;
     }
 
-    // 6. Fast acknowledgement: durable insert & return immediately
     await this.inboxService.createEvent(
       id,
       idempotencyKey || null,
       duffelOrderId,
       type,
-      payload as Record<string, unknown>,
+      payload as unknown as Prisma.InputJsonValue,
     );
 
     return { received: true };

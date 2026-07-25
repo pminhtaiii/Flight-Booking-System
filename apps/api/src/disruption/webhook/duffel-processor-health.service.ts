@@ -26,25 +26,34 @@ export class DuffelProcessorHealthService {
       retryScheduledCount,
       staleProcessingCount,
       failedNeedsAttentionCount,
-    ] = await Promise.all([
-      this.prisma.duffelWebhookEvent.count({
-        where: { status: 'PENDING' },
-      }),
-      this.prisma.duffelWebhookEvent.count({
-        where: { status: 'RETRY_SCHEDULED' },
-      }),
-      this.prisma.duffelWebhookEvent.count({
-        where: {
-          status: 'PROCESSING',
-          processingStartedAt: { lt: staleCutoff },
-        },
-      }),
-      this.prisma.duffelWebhookEvent.count({
-        where: { status: 'FAILED_NEEDS_ATTENTION' },
-      }),
-    ]);
+    ] = await this.prisma.$transaction(
+      async (tx) => {
+        await tx.$executeRawUnsafe('SET LOCAL statement_timeout = 150');
+        return Promise.all([
+          tx.duffelWebhookEvent.count({
+            where: { status: 'PENDING' },
+          }),
+          tx.duffelWebhookEvent.count({
+            where: { status: 'RETRY_SCHEDULED' },
+          }),
+          tx.duffelWebhookEvent.count({
+            where: {
+              status: 'PROCESSING',
+              processingStartedAt: { lt: staleCutoff },
+            },
+          }),
+          tx.duffelWebhookEvent.count({
+            where: { status: 'FAILED_NEEDS_ATTENTION' },
+          }),
+        ]);
+      },
+      {
+        maxWait: 200,
+        timeout: 200,
+      },
+    );
 
-    const isProcessorEnabled = process.env.ENABLE_DUFFEL_WEBHOOK_PROCESSOR === 'true';
+    const isProcessorEnabled = process.env.FEATURE_FLAG_DISRUPTION_PROCESSOR === 'true';
 
     return {
       lastHeartbeat: this.lastHeartbeat ? this.lastHeartbeat.toISOString() : null,

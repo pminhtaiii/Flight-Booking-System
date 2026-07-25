@@ -63,11 +63,15 @@ export class DuffelEventProcessor {
             throw new Error(`No booking found with duffelOrderId ${event.duffelOrderId}`);
           }
 
-          await this.supplierSyncService.syncBooking(
+          const result = await this.supplierSyncService.syncBooking(
             booking.id,
             'WEBHOOK',
             event.supplierEventId,
           );
+
+          if (result.status === 'SKIPPED_INELIGIBLE') {
+            throw new Error(`Sync skipped or locked for booking ${booking.id}`);
+          }
 
           await this.handleSuccess(event.id, token);
           this.healthService.recordSuccess();
