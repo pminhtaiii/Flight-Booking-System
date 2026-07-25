@@ -7,14 +7,16 @@ Update this file after every completed feature. Any AI agent reading this should
 ### Current Status
 
 **Feature:** Disruption & Flight-Change Management (Feature 14)
-**Last completed:** Feature 14 Phase 3: Supplier synchronization transaction and concurrency.
-**Next:** Phase 4: Webhook Ingress and Webhook Inbox Processing.
+**Last completed:** Feature 14 Phase 4: Signed Duffel Webhook receiver, durable inbox, and async processor.
+**Next:** Feature 14 Phase 5: Re-trigger matching and schedule re-notification.
 
 ---
 
 ## Progress by Feature
 
 ### [/] Feature: Disruption & Flight-Change Management (Feature 14)
+
+- [x] Phase 4 / PR 5: Signed Duffel Webhook receiver, durable inbox, and async processor (implemented HMAC-SHA256 signature verification with 5-minute replay tolerance, fast-ack response, durable inbox insertion, duplicate delivery convergence, async leasing using compare-and-swap token claims, stale lease recovery, independent batch processing, exponential retry backoff, 5th-attempt escalation, and 30-day raw payload PII redaction; verified with 100% unit and E2E coverage passing cleanly)
 
 - [x] Phase 3 / PR 4: Supplier synchronization transaction and concurrency (implemented pessimism-based concurrency lock using syncLockedAt and a CAS random token, Duffel complete order retrieval outside transactions, normalization & fingerprint validation, short transactional write re-checking status and versioning with loop retries for unique constraint collision, and daily outbox throttling. Resolved code review items: created REST controller trigger secured by JwtAuthGuard with caller ownership checks, prevented cancellation masking by using sourceEventId-based verification, and serialized concurrent syncs/cancellations with an early dummy update row lock in the transaction; verified with unit/integration/E2E coverage passing cleanly)
 - [x] Phase 2 / PR 3: Pure Itinerary Normalization, Matching, Diff, and Classification (implemented framework-independent domain core: itinerary normalizer, canonical serialization and fingerprint, cascade one-to-one segment matcher, diff generator with slice/connection details, and disruption-v1 materiality classifier with threshold rules; verified with 42 tests passing with zero lint issues)

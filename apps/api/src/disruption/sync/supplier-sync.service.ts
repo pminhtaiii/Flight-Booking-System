@@ -15,6 +15,7 @@ export type SyncResult =
   | { status: 'NO_CHANGE' }
   | { status: 'REVISION_CREATED'; revisionId: string }
   | { status: 'SKIPPED_INELIGIBLE' }
+  | { status: 'SKIPPED_LOCKED' }
   | { status: 'CONVERGED_DUPLICATE' };
 
 interface DbSegment {
@@ -121,8 +122,18 @@ export class SupplierSyncService {
     // 1. Acquire Claim Lock
     const token = await this.syncClaimService.acquireClaim(bookingId);
     if (!token) {
-      this.logger.warn(`Failed to acquire lock for booking ${bookingId} (ineligible status or active sync exists). Correlation: ${correlationId}`);
-      return { status: 'SKIPPED_INELIGIBLE' };
+      const booking = await this.prisma.booking.findUnique({
+        where: { id: bookingId },
+        select: { status: true, duffelOrderId: true },
+      });
+
+      if (!booking || booking.status !== 'CONFIRMED' || !booking.duffelOrderId) {
+        this.logger.warn(`Failed to acquire lock for booking ${bookingId} (permanently ineligible: status=${booking?.status}). Correlation: ${correlationId}`);
+        return { status: 'SKIPPED_INELIGIBLE' };
+      }
+
+      this.logger.warn(`Failed to acquire lock for booking ${bookingId} (transient lock conflict). Correlation: ${correlationId}`);
+      return { status: 'SKIPPED_LOCKED' };
     }
 
     try {

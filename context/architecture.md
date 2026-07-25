@@ -263,6 +263,46 @@ Conditional claim release (clears lock only if token matches)
 - **Race and Collision Safety**: Ensures concurrent cancellations always win, and dynamic version collisions resolve gracefully by automatic retrying.
 
 
+### Disruption Webhook Ingestion & Webhook Inbox Processing (Phase 4)
+
+```
+Duffel HTTP Webhook Request
+        ↓
+DuffelWebhookController receives POST /api/duffel/webhook
+  ├─ Verify Feature Flag (FEATURE_FLAG_DISRUPTION_INGRESS)
+  ├─ Verify Webhook Secret configured (DUFFEL_WEBHOOK_SECRET)
+  ├─ Validate Signature (HMAC-SHA256 of timestamp + '.' + rawBody matches X-Duffel-Signature)
+  ├─ Enforce Timestamp Tolerance (replays rejected if older than 5 minutes)
+  ├─ Validate minimal envelope (id and type present)
+  └─ Call DuffelInboxService.createEvent (Durable insert to DB)
+        ↓
+DuffelInboxService inserts event:
+  ├─ Deduplicate: return existing event if supplierEventId matches (safe convergence)
+  ├─ Catch unique constraint violation (P2002) for race condition safety
+  ├─ SKIPPED: unsupported event types marked skipped immediately
+  └─ PENDING: supported events marked pending (returns 200 fast-ack to Duffel without sync/external calls)
+
+---
+
+DuffelEventProcessor Cron (Every 10s via @Cron)
+  ├─ Verify Feature Flag (FEATURE_FLAG_DISRUPTION_PROCESSOR)
+  ├─ Claim Batch (leases up to N pending/retry-scheduled events)
+  │     └─ CAS update using random token & status PROCESSING on duffelWebhookEvent
+  ├─ Recover Stale Claims (PROCESSING events older than 5 minutes reverted and claimed)
+  ├─ Process claimed batch concurrently and independently:
+  │     ├─ Lookup local booking mapping by duffelOrderId
+  │     ├─ If booking exists: invoke SupplierSyncService.syncBooking (runs Phase 3 sync transaction)
+  │     ├─ Success: update event status to PROCESSED and clear payload
+  │     └─ Failure: compute next retry backoff (1m, 5m, 15m, 15m) or escalate to FAILED_NEEDS_ATTENTION after 5th attempt
+  └─ Retention job (runs daily): redact raw payloads older than 30 days to strip PII
+```
+
+- **Fast Webhook Acks**: Fast-acks immediately after durable DB insertion, avoiding slow sync operations and external API requests inline to prevent Duffel timeouts.
+- **Asynchronous Leasing**: Employs compare-and-swap (CAS) logic with random tokens and status verification to safely lease events across multiple API instances.
+- **Independent Processor Boundaries**: Batch failures are isolated; errors processing one webhook event do not impact or stall the execution of other events in the same batch.
+- **PII-Safe Retention**: Redacts raw webhook payloads after 30 days to adhere to strict user privacy standards.
+
+
 ### AI Chatbot Agent Flow (SSE Streaming)
 
 ```
