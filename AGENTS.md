@@ -67,7 +67,7 @@ When the task involves writing, running, or verifying E2E tests:
    - **Bypass Strategy**: Inject `mock-scenario` cookies (such as `'disruption-detected'`) to bypass backend fetches in Server Components, prompting them to render static mocks directly.
    - **Strict Mode Bypass**: Avoid strict mode failures caused by the default Next.js route announcer (`role="alert"`) by appending `.first()` to alert locators (e.g., `page.getByRole('alert').first()`).
    - **Prevent Login Races**: After submitting registration or login forms, always wait for the browser to load the landing page (e.g., `await expect(page).toHaveURL(/.*localhost:3000\/$/)`) before attempting to navigate to authenticated/protected pages.
-   - **Mocking Client Settings**: To verify behavior with missing configuration flags without starting another server instance, inject runtime mock variables onto the browser's `window` object (e.g., `window.__MOCK_MISSING_API_URL__ = true`) during the test run.
+   - **Mocking Client Settings**: To verify behavior with missing or altered environment configurations without leaving mutable test hooks in production client bundles, fetch configuration options dynamically from a Next.js Server Route (e.g., `/api/config`) and use Playwright's `page.route` network interception in the test to mock the JSON response.
 
 ### Local Development Startup
 
