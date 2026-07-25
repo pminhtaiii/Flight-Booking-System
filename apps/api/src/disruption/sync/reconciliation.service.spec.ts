@@ -336,6 +336,8 @@ describe('ReconciliationService & Booking Completion', () => {
         status: 'CONFIRMED',
         disruptionStatus: DisruptionStatus.DETECTED,
         activeDisruptionRevisionId: 'rev-abc',
+        departureAt: departureTime,
+        currentFinalArrivalAt: null,
       });
 
       const result = await bookingService.checkAndCompleteBooking(booking);
@@ -418,6 +420,8 @@ describe('ReconciliationService & Booking Completion', () => {
         status: 'CONFIRMED',
         disruptionStatus: DisruptionStatus.NONE,
         activeDisruptionRevisionId: null,
+        departureAt: departureTime,
+        currentFinalArrivalAt: null,
       });
 
       const result = await bookingService.checkAndCompleteBooking(booking);
@@ -430,6 +434,30 @@ describe('ReconciliationService & Booking Completion', () => {
       });
       expect(mockPrisma.disruptionAuditEvent.create).not.toHaveBeenCalled();
       expect(result.status).toBe('COMPLETED');
+    });
+
+    it('should abort completion if target time was rescheduled to the future concurrently', async () => {
+      const departureTime = new Date(Date.now() - 3600000); // 1 hour ago
+      const booking = {
+        id: 'booking-rescheduled',
+        status: 'CONFIRMED',
+        departureAt: departureTime,
+        currentFinalArrivalAt: null,
+        disruptionStatus: DisruptionStatus.NONE,
+      } as unknown as BookingWithRelations;
+
+      mockPrisma.booking.findUnique.mockResolvedValue({
+        status: 'CONFIRMED',
+        disruptionStatus: DisruptionStatus.NONE,
+        activeDisruptionRevisionId: null,
+        currentFinalArrivalAt: new Date(Date.now() + 3600000), // Rescheduled 1 hr in future
+        departureAt: departureTime,
+      });
+
+      const result = await bookingService.checkAndCompleteBooking(booking);
+
+      expect(mockPrisma.booking.updateMany).not.toHaveBeenCalled();
+      expect(result.status).toBe('CONFIRMED');
     });
   });
 });

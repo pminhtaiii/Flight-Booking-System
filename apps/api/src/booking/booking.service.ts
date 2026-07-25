@@ -325,10 +325,21 @@ export class BookingService {
           // Re-fetch the booking inside transaction to make it safe and atomic
           const dbBooking = await tx.booking.findUnique({
             where: { id: booking.id },
-            select: { status: true, disruptionStatus: true, activeDisruptionRevisionId: true },
+            select: {
+              status: true,
+              disruptionStatus: true,
+              activeDisruptionRevisionId: true,
+              currentFinalArrivalAt: true,
+              departureAt: true,
+            },
           });
 
           if (!dbBooking || dbBooking.status !== 'CONFIRMED') {
+            return false;
+          }
+
+          const dbTargetTime = dbBooking.currentFinalArrivalAt || dbBooking.departureAt;
+          if (!dbTargetTime || dbTargetTime > now) {
             return false;
           }
 
