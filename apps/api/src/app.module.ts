@@ -14,6 +14,7 @@ import { FlightsModule } from './flights/flights.module';
 import { BookingIntentModule } from './booking-intent/booking-intent.module';
 import { BookingModule } from './booking/booking.module';
 import { PaymentModule } from './payment/payment.module';
+import { DisruptionModule } from './disruption/disruption.module';
 
 import { z } from 'zod';
 
@@ -57,6 +58,7 @@ export const envSchema = z.object({
     BookingIntentModule,
     BookingModule,
     PaymentModule,
+    DisruptionModule,
   ],
   controllers: [],
   providers: [],

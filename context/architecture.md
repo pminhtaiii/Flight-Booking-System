@@ -237,6 +237,32 @@ MaterialityClassifier checks incremental/cumulative diff against disruption-v1 r
 - **Functional Decoupling**: Pure core domain functions contain no framework, DB, or external API references. Inputs are fully typed structures; outputs are deterministic diff, fingerprint, and classification results.
 
 
+### Disruption Synchronization & Concurrency (Phase 3)
+
+```
+Supplier Synchronization Run (Webhook or Cron trigger)
+        ↓
+SyncClaimService acquires claim lock (CAS write on syncLockedAt/syncLockToken; 5-min lease limit)
+        ↓
+DuffelService retrieves complete order (Remote API call executed OUTSIDE DB transactions)
+        ↓
+Prisma Transaction starts:
+  ├─ Re-verify booking status (race handler: abort if no longer CONFIRMED)
+  ├─ Re-verify lock token matches (prevent expired lease takeover issues)
+  ├─ Compute Diff & Materiality (using Phase 2 domain core)
+  ├─ Version check: if version exists & fingerprint matches → Converge Duplicate
+  ├─ Version collision check: if version unique violation is thrown → Retry transaction with incremented version
+  ├─ Daily outbox check: count sent notifications today (1st/2nd normal, 3rd with warning, 4th+ throttled & raises attention)
+  └─ Save new revision/segments, update booking timing & status, create audit event & outbox row
+        ↓
+Conditional claim release (clears lock only if token matches)
+```
+
+- **Pessimistic Concurrency**: Prevents concurrent execution of sync tasks on the same booking using atomic DB updates.
+- **Atomic Operations**: Guarantees database consistency by performing all writes, state transitions, and audit logging in a single, short database transaction.
+- **Race and Collision Safety**: Ensures concurrent cancellations always win, and dynamic version collisions resolve gracefully by automatic retrying.
+
+
 ### AI Chatbot Agent Flow (SSE Streaming)
 
 ```
