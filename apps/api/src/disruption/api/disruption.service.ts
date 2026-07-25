@@ -137,12 +137,19 @@ export class DisruptionService {
 
     const updatedBooking = await this.prisma.$transaction(async (tx) => {
       const result = await tx.booking.updateMany({
-        where: { id: bookingId, activeDisruptionRevisionId: revisionId },
+        where: { 
+          id: bookingId, 
+          activeDisruptionRevisionId: revisionId,
+          disruptionStatus: 'DETECTED'
+        },
         data: { disruptionStatus: 'ACKNOWLEDGED' },
       });
 
       if (result.count === 0) {
         const current = await tx.booking.findUnique({ where: { id: bookingId } });
+        if (current && current.activeDisruptionRevisionId === revisionId) {
+          return current;
+        }
         throw new ConflictException({
           code: 'STALE_DISRUPTION_REVISION',
           activeRevisionId: current?.activeDisruptionRevisionId ?? null,
@@ -176,8 +183,8 @@ export class DisruptionService {
     return {
       bookingId: updatedBooking.id,
       activeRevisionId: updatedBooking.activeDisruptionRevisionId!,
-      disruptionStatus: 'ACKNOWLEDGED' as DisruptionStatus,
-      resolvedReason: null,
+      disruptionStatus: updatedBooking.disruptionStatus as DisruptionStatus,
+      resolvedReason: updatedBooking.disruptionResolvedReason as DisruptionResolvedReason | null,
       updatedAt: updatedBooking.updatedAt.toISOString(),
     };
   }
@@ -230,7 +237,11 @@ export class DisruptionService {
 
     const updatedBooking = await this.prisma.$transaction(async (tx) => {
       const result = await tx.booking.updateMany({
-        where: { id: bookingId, activeDisruptionRevisionId: revisionId },
+        where: { 
+          id: bookingId, 
+          activeDisruptionRevisionId: revisionId,
+          disruptionStatus: { in: ['DETECTED', 'ACKNOWLEDGED'] }
+        },
         data: {
           disruptionStatus: 'RESOLVED',
           disruptionResolvedReason: 'TRAVELLER_ACCEPTED',
@@ -242,6 +253,9 @@ export class DisruptionService {
 
       if (result.count === 0) {
         const current = await tx.booking.findUnique({ where: { id: bookingId } });
+        if (current && current.activeDisruptionRevisionId === revisionId && current.disruptionStatus === 'RESOLVED') {
+          return current;
+        }
         throw new ConflictException({
           code: 'STALE_DISRUPTION_REVISION',
           activeRevisionId: current?.activeDisruptionRevisionId ?? null,
@@ -259,7 +273,7 @@ export class DisruptionService {
           bookingId,
           revisionId,
           action: 'TRAVELLER_ACCEPTED',
-          fromStatus: previousStatus,
+          fromStatus: updated.disruptionStatus === 'RESOLVED' && previousStatus === 'DETECTED' ? 'ACKNOWLEDGED' : previousStatus, // wait: fromStatus should be whatever status we transitioned from, which is either previousStatus or if it was concurrently changed, it's captured in previousStatus
           toStatus: 'RESOLVED',
           actorType: 'TRAVELLER',
           actorId: userId,

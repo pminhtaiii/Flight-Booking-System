@@ -49,9 +49,21 @@ export class TravellerDisruptionController {
   async getDisruptions(
     @Req() req: AuthenticatedRequest,
     @Param('bookingId', new ParseUUIDPipe({ version: '4' })) bookingId: string,
-    @Query('page') pageQuery?: string,
-    @Query('limit') limitQuery?: string,
+    @Query() query: Record<string, unknown>,
   ) {
+    for (const key of Object.keys(query)) {
+      if (key.includes('[') || key.includes(']')) {
+        throw new BadRequestException('Invalid query parameter format');
+      }
+      const val = query[key];
+      if (typeof val !== 'string' && val !== undefined) {
+        throw new BadRequestException(`Query parameter ${key} must be a single string`);
+      }
+    }
+
+    const pageQuery = query.page as string | undefined;
+    const limitQuery = query.limit as string | undefined;
+
     let page = 1;
     let limit = 20;
 

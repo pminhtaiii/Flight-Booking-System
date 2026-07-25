@@ -538,6 +538,16 @@ describe('Disruption & Flight-Change Management (Webhook & Processor E2E)', () =
         .get(`/api/bookings/${bookingId}/disruptions?limit=100`)
         .set('Authorization', `Bearer ${userToken}`)
         .expect(400);
+
+      await request(app.getHttpServer())
+        .get(`/api/bookings/${bookingId}/disruptions?page=1&page=2`)
+        .set('Authorization', `Bearer ${userToken}`)
+        .expect(400);
+
+      await request(app.getHttpServer())
+        .get(`/api/bookings/${bookingId}/disruptions?limit[]=20`)
+        .set('Authorization', `Bearer ${userToken}`)
+        .expect(400);
     });
 
     it('enforces ownership and missing-booking boundaries for history and actions', async () => {
@@ -668,6 +678,42 @@ describe('Disruption & Flight-Change Management (Webhook & Processor E2E)', () =
       const travellerAudit = audits.find(a => a.action === 'TRAVELLER_ACCEPTED');
       expect(travellerAudit?.actorType).toBe('TRAVELLER');
       expect(travellerAudit?.actorId).toBe(userId);
+    });
+
+    it('handles concurrent acknowledge and accept transitions without status regression', async () => {
+      const mockRevision = await prisma.itineraryRevision.create({
+        data: {
+          bookingId,
+          version: 1,
+          source: 'WEBHOOK',
+          fingerprint: `fp_${crypto.randomUUID()}`,
+          isMaterial: true,
+          incrementalDiff: {},
+          cumulativeDiff: {},
+        }
+      });
+      await prisma.booking.update({
+        where: { id: bookingId },
+        data: { disruptionStatus: 'DETECTED', activeDisruptionRevisionId: mockRevision.id }
+      });
+
+      // Send both concurrently
+      const [resAck, resAccept] = await Promise.all([
+        request(app.getHttpServer())
+          .post(`/api/bookings/${bookingId}/disruptions/${mockRevision.id}/acknowledge`)
+          .set('Authorization', `Bearer ${userToken}`),
+        request(app.getHttpServer())
+          .post(`/api/bookings/${bookingId}/disruptions/${mockRevision.id}/accept`)
+          .set('Authorization', `Bearer ${userToken}`)
+      ]);
+
+      // Both should succeed
+      expect(resAck.status).toBe(200);
+      expect(resAccept.status).toBe(200);
+
+      // The final status in the database must be RESOLVED (no regression to ACKNOWLEDGED)
+      const finalBooking = await prisma.booking.findUnique({ where: { id: bookingId } });
+      expect(finalBooking?.disruptionStatus).toBe('RESOLVED');
     });
   });
 });
