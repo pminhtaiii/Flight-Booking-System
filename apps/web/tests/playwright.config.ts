@@ -1,6 +1,14 @@
 import { defineConfig, devices } from '@playwright/test';
 import path from 'path';
 
+const frontendEnv = {
+  CI: 'true',
+  NEXTAUTH_SECRET: 'test_secret',
+  ...(process.env.NEXT_PUBLIC_API_URL
+    ? { NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL }
+    : {}),
+};
+
 export default defineConfig({
   testDir: './',
   fullyParallel: false,
@@ -36,11 +44,7 @@ export default defineConfig({
       reuseExistingServer: !process.env.CI,
       timeout: 300000,
       cwd: path.resolve(__dirname, '..'),
-      env: {
-        CI: 'true',
-        NEXT_PUBLIC_API_URL: 'http://127.0.0.1:3001',
-        NEXTAUTH_SECRET: 'test_secret',
-      },
+      env: frontendEnv,
     },
   ],
 });
