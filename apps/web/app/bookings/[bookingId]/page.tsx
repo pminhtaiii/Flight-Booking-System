@@ -56,7 +56,10 @@ export default async function BookingDetailPage({ params, searchParams }: Props)
   const { bookingId } = params;
   const showConfirmation = searchParams.confirmed === 'true';
   const accessToken = (session as { accessToken?: string }).accessToken;
-  const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001';
+  const apiUrl = process.env.NEXT_PUBLIC_API_URL;
+  if (!apiUrl) {
+    throw new Error('NEXT_PUBLIC_API_URL is required but not configured.');
+  }
   const isTest = process.env.NODE_ENV === 'test';
 
   let booking: BookingDetailResponse | null = null;
