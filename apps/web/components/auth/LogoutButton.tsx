@@ -9,9 +9,10 @@ export function LogoutButton() {
     let apiUrl = process.env.NEXT_PUBLIC_API_URL;
     if (!apiUrl) {
       if (process.env.NODE_ENV !== 'development') {
-        throw new Error('NEXT_PUBLIC_API_URL is missing');
+        apiUrl = typeof window !== 'undefined' ? window.location.origin : '';
+      } else {
+        apiUrl = 'http://localhost:3001';
       }
-      apiUrl = 'http://localhost:3001';
     }
 
     const token = (session as { accessToken?: string })?.accessToken;
