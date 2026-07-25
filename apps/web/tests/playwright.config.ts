@@ -4,9 +4,7 @@ import path from 'path';
 const frontendEnv = {
   CI: 'true',
   NEXTAUTH_SECRET: 'test_secret',
-  ...(process.env.NEXT_PUBLIC_API_URL
-    ? { NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL }
-    : {}),
+  NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:3001',
 };
 
 export default defineConfig({

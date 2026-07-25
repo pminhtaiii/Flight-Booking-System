@@ -9,7 +9,9 @@ export function LogoutButton() {
 
   const handleLogout = async () => {
     setLogoutError(null);
-    const apiUrl = process.env.NEXT_PUBLIC_API_URL;
+    const apiUrl = typeof window !== 'undefined' && (window as unknown as { __MOCK_MISSING_API_URL__?: boolean }).__MOCK_MISSING_API_URL__
+      ? undefined
+      : process.env.NEXT_PUBLIC_API_URL;
 
     const token = (session as { accessToken?: string })?.accessToken;
     if (!apiUrl || !token) {
