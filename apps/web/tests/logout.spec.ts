@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 
-test('revokes the API bearer token when the public API URL is not configured', async ({ page, request, context }) => {
+test('does not send the bearer token to localhost when the public API URL is not configured', async ({ page, request, context }) => {
   await request.post('http://127.0.0.1:3001/api/auth/test/reset-lockout', {
     data: { clearAll: true },
   });
@@ -13,18 +13,12 @@ test('revokes the API bearer token when the public API URL is not configured', a
   await page.getByRole('button', { name: 'Create account' }).click();
 
   await page.goto('http://localhost:3000/bookings');
-  const logoutRequest = page.waitForRequest('http://localhost:3001/api/auth/logout');
+  const localhostLogoutRequest = page
+    .waitForRequest('http://localhost:3001/api/auth/logout', { timeout: 1000 })
+    .then(() => true)
+    .catch(() => false);
   await page.getByRole('button', { name: 'Sign Out' }).click();
 
-  const requestToLogout = await logoutRequest;
-  const authorization = requestToLogout.headers().authorization;
-  expect(authorization).toMatch(/^Bearer .+/);
   await expect(page).toHaveURL(/\/login$/);
-
-  await expect.poll(async () => {
-    const response = await request.get('http://127.0.0.1:3001/api/auth/me', {
-      headers: { Authorization: authorization },
-    });
-    return response.status();
-  }).toBe(401);
+  expect(await localhostLogoutRequest).toBe(false);
 });

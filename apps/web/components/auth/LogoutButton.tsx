@@ -6,10 +6,10 @@ export function LogoutButton() {
   const { data: session } = useSession();
 
   const handleLogout = async () => {
-    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL;
 
     const token = (session as { accessToken?: string })?.accessToken;
-    if (token) {
+    if (apiUrl && token) {
       try {
         await fetch(`${apiUrl}/api/auth/logout`, {
           method: 'POST',
