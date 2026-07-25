@@ -307,6 +307,7 @@
   "305": "Phase 6: SSE Integration — Wire Pipeline Into Streaming",
   "306": "Data Model: LLM Output Guardrails",
   "307": "Phase 8: Pipeline Parallelism — Latency Optimization",
+  "308": "PaymentMethodService",
   "309": "Decision 9: Recovery Points and Dual State Tracking",
   "310": "Findings",
   "311": "New Enums",
@@ -379,5 +380,9 @@
   "378": "quickstart.md",
   "379": "booking-intent.service.spec.ts",
   "380": "flights.controller.ts",
-  "381": "booking-intent.e2e-spec.ts"
+  "381": "booking-intent.e2e-spec.ts",
+  "382": "test_guardrail_logging.py",
+  "383": "paths",
+  "384": "Phase 4 / PR 5 — Signed webhook receiver, durable inbox, and processor",
+  "385": "Project Structure"
 }

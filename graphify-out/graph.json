@@ -940,7 +940,7 @@
       "source_location": "L41",
       "_origin": "ast",
       "id": "apps_agent_src_agent_guardrails_output_pipeline_outputguardrailpipeline_log_sync_check",
-      "community": 154,
+      "community": 172,
       "norm_label": "._log_sync_check()"
     },
     {
@@ -950,7 +950,7 @@
       "source_location": "L52",
       "_origin": "ast",
       "id": "apps_agent_src_agent_guardrails_output_pipeline_outputguardrailpipeline_validate_chunk_async_wrapper",
-      "community": 154,
+      "community": 172,
       "norm_label": "._validate_chunk_async_wrapper()"
     },
     {
@@ -960,7 +960,7 @@
       "source_location": "L75",
       "_origin": "ast",
       "id": "apps_agent_src_agent_guardrails_output_pipeline_outputguardrailpipeline_check_boundary_pii",
-      "community": 154,
+      "community": 172,
       "norm_label": "._check_boundary_pii()"
     },
     {
@@ -970,7 +970,7 @@
       "source_location": "L119",
       "_origin": "ast",
       "id": "apps_agent_src_agent_guardrails_output_pipeline_outputguardrailpipeline_process_token",
-      "community": 154,
+      "community": 172,
       "norm_label": ".process_token()"
     },
     {
@@ -980,7 +980,7 @@
       "source_location": "L239",
       "_origin": "ast",
       "id": "apps_agent_src_agent_guardrails_output_pipeline_outputguardrailpipeline_flush",
-      "community": 154,
+      "community": 172,
       "norm_label": ".flush()"
     },
     {
@@ -1020,7 +1020,7 @@
       "source_location": "L76",
       "_origin": "ast",
       "id": "apps_agent_src_agent_guardrails_output_pipeline_rationale_76",
-      "community": 154,
+      "community": 172,
       "norm_label": "maintains a sliding window of the last n tokens from the previous chunk"
     },
     {
@@ -1030,7 +1030,7 @@
       "source_location": "L120",
       "_origin": "ast",
       "id": "apps_agent_src_agent_guardrails_output_pipeline_rationale_120",
-      "community": 154,
+      "community": 172,
       "norm_label": "feeds a token into the pipeline, yielding any safe completed chunks."
     },
     {
@@ -1040,7 +1040,7 @@
       "source_location": "L240",
       "_origin": "ast",
       "id": "apps_agent_src_agent_guardrails_output_pipeline_rationale_240",
-      "community": 154,
+      "community": 172,
       "norm_label": "flushes the remaining buffered tokens and validates the final chunk."
     },
     {
@@ -1070,7 +1070,7 @@
       "source_location": "L20",
       "_origin": "ast",
       "id": "apps_agent_src_agent_main_lifespan",
-      "community": 315,
+      "community": 173,
       "norm_label": "lifespan()"
     },
     {
@@ -1080,7 +1080,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "fastapi",
-      "community": 315,
+      "community": 173,
       "norm_label": "fastapi"
     },
     {
@@ -1110,7 +1110,7 @@
       "source_location": "L21",
       "_origin": "ast",
       "id": "apps_agent_src_agent_main_rationale_21",
-      "community": 315,
+      "community": 173,
       "norm_label": "lifespan context manager that initializes nemo guardrails configuration,     me"
     },
     {
@@ -1350,7 +1350,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "apps_agent_src_agent_middleware_rate_limit",
-      "community": 268,
+      "community": 380,
       "norm_label": "rate_limit.py"
     },
     {
@@ -1360,7 +1360,7 @@
       "source_location": "L8",
       "_origin": "ast",
       "id": "apps_agent_src_agent_middleware_rate_limit_ratelimitmiddleware",
-      "community": 268,
+      "community": 380,
       "norm_label": "ratelimitmiddleware"
     },
     {
@@ -1370,7 +1370,7 @@
       "source_location": "L9",
       "_origin": "ast",
       "id": "apps_agent_src_agent_middleware_rate_limit_ratelimitmiddleware_init",
-      "community": 268,
+      "community": 380,
       "norm_label": ".__init__()"
     },
     {
@@ -1380,7 +1380,7 @@
       "source_location": "L15",
       "_origin": "ast",
       "id": "apps_agent_src_agent_middleware_rate_limit_ratelimitmiddleware_dispatch",
-      "community": 268,
+      "community": 380,
       "norm_label": ".dispatch()"
     },
     {
@@ -1390,7 +1390,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "apps_agent_src_agent_middleware_rate_limit_py_request",
-      "community": 268,
+      "community": 380,
       "norm_label": "request"
     },
     {
@@ -1400,7 +1400,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "apps_agent_src_agent_middleware_rate_limit_py_response",
-      "community": 268,
+      "community": 380,
       "norm_label": "response"
     },
     {
@@ -1470,7 +1470,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "apps_agent_src_agent_queue_message_queue",
-      "community": 315,
+      "community": 173,
       "norm_label": "message_queue.py"
     },
     {
@@ -1790,7 +1790,7 @@
       "source_location": "L50",
       "_origin": "ast",
       "id": "apps_agent_src_agent_streaming_sse_chat_stream",
-      "community": 126,
+      "community": 159,
       "norm_label": "chat_stream()"
     },
     {
@@ -1800,7 +1800,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "apps_agent_src_agent_streaming_sse_py_request",
-      "community": 126,
+      "community": 159,
       "norm_label": "request"
     },
     {
@@ -1830,7 +1830,7 @@
       "source_location": "L55",
       "_origin": "ast",
       "id": "apps_agent_src_agent_streaming_sse_rationale_55",
-      "community": 126,
+      "community": 159,
       "norm_label": "handle post /chat/stream requests, performing validation, checking guardrails,"
     },
     {
@@ -2620,7 +2620,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "apps_agent_tests_test_e2e_output_guardrails",
-      "community": 258,
+      "community": 315,
       "norm_label": "test_e2e_output_guardrails.py"
     },
     {
@@ -2630,7 +2630,7 @@
       "source_location": "L12",
       "_origin": "ast",
       "id": "apps_agent_tests_test_e2e_output_guardrails_mock_nestjs_client",
-      "community": 258,
+      "community": 315,
       "norm_label": "mock_nestjs_client()"
     },
     {
@@ -2640,7 +2640,7 @@
       "source_location": "L24",
       "_origin": "ast",
       "id": "apps_agent_tests_test_e2e_output_guardrails_test_e2e_output_guardrail_pipeline_validation",
-      "community": 258,
+      "community": 315,
       "norm_label": "test_e2e_output_guardrail_pipeline_validation()"
     },
     {
@@ -2750,7 +2750,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "apps_agent_tests_test_guardrail_logging",
-      "community": 0,
+      "community": 382,
       "norm_label": "test_guardrail_logging.py"
     },
     {
@@ -2760,7 +2760,7 @@
       "source_location": "L9",
       "_origin": "ast",
       "id": "apps_agent_tests_test_guardrail_logging_mock_nemo_service",
-      "community": 0,
+      "community": 382,
       "norm_label": "mock_nemo_service()"
     },
     {
@@ -2770,7 +2770,7 @@
       "source_location": "L15",
       "_origin": "ast",
       "id": "apps_agent_tests_test_guardrail_logging_enabled_config",
-      "community": 0,
+      "community": 382,
       "norm_label": "enabled_config()"
     },
     {
@@ -2780,7 +2780,7 @@
       "source_location": "L24",
       "_origin": "ast",
       "id": "apps_agent_tests_test_guardrail_logging_test_guardrail_logging_safe_chunks",
-      "community": 0,
+      "community": 382,
       "norm_label": "test_guardrail_logging_safe_chunks()"
     },
     {
@@ -2810,7 +2810,7 @@
       "source_location": "L9",
       "_origin": "ast",
       "id": "apps_agent_tests_test_guardrails_guardrail_service",
-      "community": 30,
+      "community": 357,
       "norm_label": "guardrail_service()"
     },
     {
@@ -4880,7 +4880,7 @@
       "source_location": "L60",
       "_origin": "ast",
       "id": "apps_api_package_devdependencies_tsconfig_paths",
-      "community": 8,
+      "community": 383,
       "norm_label": "tsconfig-paths"
     },
     {
@@ -5240,7 +5240,7 @@
       "source_location": "L65",
       "_origin": "ast",
       "id": "apps_api_src_agent_gateway_agent_gateway_service_agentgatewayservice_constructor",
-      "community": 327,
+      "community": 29,
       "norm_label": ".constructor()"
     },
     {
@@ -5440,7 +5440,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "apps_api_src_airports_airports_constants",
-      "community": 152,
+      "community": 285,
       "norm_label": "airports.constants.ts"
     },
     {
@@ -5450,7 +5450,7 @@
       "source_location": "L3",
       "_origin": "ast",
       "id": "apps_api_src_airports_airports_constants_sha256",
-      "community": 152,
+      "community": 285,
       "norm_label": "sha256()"
     },
     {
@@ -5460,7 +5460,7 @@
       "source_location": "L7",
       "_origin": "ast",
       "id": "apps_api_src_airports_airports_constants_cache_ttls",
-      "community": 152,
+      "community": 285,
       "norm_label": "cache_ttls"
     },
     {
@@ -5470,7 +5470,7 @@
       "source_location": "L14",
       "_origin": "ast",
       "id": "apps_api_src_airports_airports_constants_cache_keys",
-      "community": 152,
+      "community": 285,
       "norm_label": "cache_keys"
     },
     {
@@ -5480,7 +5480,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "apps_api_src_airports_airports_controller",
-      "community": 152,
+      "community": 285,
       "norm_label": "airports.controller.ts"
     },
     {
@@ -5490,7 +5490,7 @@
       "source_location": "L9",
       "_origin": "ast",
       "id": "apps_api_src_airports_airports_controller_airportscontroller",
-      "community": 152,
+      "community": 285,
       "norm_label": "airportscontroller"
     },
     {
@@ -5500,7 +5500,7 @@
       "source_location": "L12",
       "_origin": "ast",
       "id": "apps_api_src_airports_airports_controller_airportscontroller_constructor",
-      "community": 152,
+      "community": 285,
       "norm_label": ".constructor()"
     },
     {
@@ -5510,7 +5510,7 @@
       "source_location": "L18",
       "_origin": "ast",
       "id": "apps_api_src_airports_airports_controller_airportscontroller_search",
-      "community": 152,
+      "community": 285,
       "norm_label": ".search()"
     },
     {
@@ -5520,7 +5520,7 @@
       "source_location": "L39",
       "_origin": "ast",
       "id": "apps_api_src_airports_airports_controller_airportscontroller_findnearby",
-      "community": 152,
+      "community": 285,
       "norm_label": ".findnearby()"
     },
     {
@@ -5530,7 +5530,7 @@
       "source_location": "L65",
       "_origin": "ast",
       "id": "apps_api_src_airports_airports_controller_airportscontroller_findall",
-      "community": 152,
+      "community": 285,
       "norm_label": ".findall()"
     },
     {
@@ -5540,7 +5540,7 @@
       "source_location": "L86",
       "_origin": "ast",
       "id": "apps_api_src_airports_airports_controller_airportscontroller_findbyiatacode",
-      "community": 152,
+      "community": 285,
       "norm_label": ".findbyiatacode()"
     },
     {
@@ -5550,7 +5550,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "apps_api_src_airports_airports_module",
-      "community": 152,
+      "community": 285,
       "norm_label": "airports.module.ts"
     },
     {
@@ -5560,7 +5560,7 @@
       "source_location": "L10",
       "_origin": "ast",
       "id": "apps_api_src_airports_airports_module_airportsmodule",
-      "community": 152,
+      "community": 285,
       "norm_label": "airportsmodule"
     },
     {
@@ -5570,7 +5570,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "apps_api_src_airports_airports_service",
-      "community": 152,
+      "community": 285,
       "norm_label": "airports.service.ts"
     },
     {
@@ -5580,7 +5580,7 @@
       "source_location": "L6",
       "_origin": "ast",
       "id": "apps_api_src_airports_airports_service_airportsservice",
-      "community": 152,
+      "community": 285,
       "norm_label": "airportsservice"
     },
     {
@@ -5590,7 +5590,7 @@
       "source_location": "L9",
       "_origin": "ast",
       "id": "apps_api_src_airports_airports_service_airportsservice_constructor",
-      "community": 152,
+      "community": 285,
       "norm_label": ".constructor()"
     },
     {
@@ -5600,7 +5600,7 @@
       "source_location": "L14",
       "_origin": "ast",
       "id": "apps_api_src_airports_airports_service_airportsservice_search",
-      "community": 152,
+      "community": 285,
       "norm_label": ".search()"
     },
     {
@@ -5610,7 +5610,7 @@
       "source_location": "L41",
       "_origin": "ast",
       "id": "apps_api_src_airports_airports_service_airportsservice_findbyiatacode",
-      "community": 152,
+      "community": 285,
       "norm_label": ".findbyiatacode()"
     },
     {
@@ -5620,7 +5620,7 @@
       "source_location": "L59",
       "_origin": "ast",
       "id": "apps_api_src_airports_airports_service_airportsservice_findnearby",
-      "community": 152,
+      "community": 285,
       "norm_label": ".findnearby()"
     },
     {
@@ -5630,7 +5630,7 @@
       "source_location": "L88",
       "_origin": "ast",
       "id": "apps_api_src_airports_airports_service_airportsservice_findall",
-      "community": 152,
+      "community": 285,
       "norm_label": ".findall()"
     },
     {
@@ -5640,7 +5640,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "apps_api_src_airports_dto_nearby_airports_dto",
-      "community": 152,
+      "community": 285,
       "norm_label": "nearby-airports.dto.ts"
     },
     {
@@ -5650,7 +5650,7 @@
       "source_location": "L4",
       "_origin": "ast",
       "id": "apps_api_src_airports_dto_nearby_airports_dto_nearbyairportsdto",
-      "community": 152,
+      "community": 285,
       "norm_label": "nearbyairportsdto"
     },
     {
@@ -5660,7 +5660,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "apps_api_src_airports_dto_search_airports_dto",
-      "community": 152,
+      "community": 285,
       "norm_label": "search-airports.dto.ts"
     },
     {
@@ -5670,7 +5670,7 @@
       "source_location": "L4",
       "_origin": "ast",
       "id": "apps_api_src_airports_dto_search_airports_dto_searchairportsdto",
-      "community": 152,
+      "community": 285,
       "norm_label": "searchairportsdto"
     },
     {
@@ -5680,7 +5680,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "apps_api_src_app_module",
-      "community": 29,
+      "community": 254,
       "norm_label": "app.module.ts"
     },
     {
@@ -5690,7 +5690,7 @@
       "source_location": "L21",
       "_origin": "ast",
       "id": "apps_api_src_app_module_envschema",
-      "community": 29,
+      "community": 254,
       "norm_label": "envschema"
     },
     {
@@ -5740,7 +5740,7 @@
       "source_location": "L7",
       "_origin": "ast",
       "id": "apps_api_src_audit_audit_service_auditservice",
-      "community": 256,
+      "community": 115,
       "norm_label": "auditservice"
     },
     {
@@ -5750,7 +5750,7 @@
       "source_location": "L8",
       "_origin": "ast",
       "id": "apps_api_src_audit_audit_service_auditservice_constructor",
-      "community": 29,
+      "community": 115,
       "norm_label": ".constructor()"
     },
     {
@@ -6060,7 +6060,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "apps_api_src_auth_guards_jwt_auth_guard",
-      "community": 273,
+      "community": 2,
       "norm_label": "jwt-auth.guard.ts"
     },
     {
@@ -6070,7 +6070,7 @@
       "source_location": "L5",
       "_origin": "ast",
       "id": "apps_api_src_auth_guards_jwt_auth_guard_jwtauthguard",
-      "community": 273,
+      "community": 2,
       "norm_label": "jwtauthguard"
     },
     {
@@ -6260,7 +6260,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "apps_api_src_booking_intent_booking_intent_controller_spec",
-      "community": 328,
+      "community": 277,
       "norm_label": "booking-intent.controller.spec.ts"
     },
     {
@@ -6270,7 +6270,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "apps_api_src_booking_intent_booking_intent_controller",
-      "community": 328,
+      "community": 277,
       "norm_label": "booking-intent.controller.ts"
     },
     {
@@ -6280,7 +6280,7 @@
       "source_location": "L7",
       "_origin": "ast",
       "id": "apps_api_src_booking_intent_booking_intent_controller_authenticatedrequest",
-      "community": 328,
+      "community": 277,
       "norm_label": "authenticatedrequest"
     },
     {
@@ -6290,7 +6290,7 @@
       "source_location": "L16",
       "_origin": "ast",
       "id": "apps_api_src_booking_intent_booking_intent_controller_bookingintentcontroller",
-      "community": 328,
+      "community": 277,
       "norm_label": "bookingintentcontroller"
     },
     {
@@ -6300,7 +6300,7 @@
       "source_location": "L17",
       "_origin": "ast",
       "id": "apps_api_src_booking_intent_booking_intent_controller_bookingintentcontroller_constructor",
-      "community": 328,
+      "community": 277,
       "norm_label": ".constructor()"
     },
     {
@@ -6310,7 +6310,7 @@
       "source_location": "L20",
       "_origin": "ast",
       "id": "apps_api_src_booking_intent_booking_intent_controller_bookingintentcontroller_createintent",
-      "community": 328,
+      "community": 277,
       "norm_label": ".createintent()"
     },
     {
@@ -6330,7 +6330,7 @@
       "source_location": "L41",
       "_origin": "ast",
       "id": "apps_api_src_booking_intent_booking_intent_controller_bookingintentcontroller_getintent",
-      "community": 328,
+      "community": 277,
       "norm_label": ".getintent()"
     },
     {
@@ -6420,7 +6420,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "apps_api_src_booking_intent_booking_intent_service_spec",
-      "community": 379,
+      "community": 277,
       "norm_label": "booking-intent.service.spec.ts"
     },
     {
@@ -6430,7 +6430,7 @@
       "source_location": "L6",
       "_origin": "ast",
       "id": "apps_api_src_booking_intent_booking_intent_service_spec_mockencryptionservice",
-      "community": 379,
+      "community": 277,
       "norm_label": "mockencryptionservice"
     },
     {
@@ -6440,7 +6440,7 @@
       "source_location": "L11",
       "_origin": "ast",
       "id": "apps_api_src_booking_intent_booking_intent_service_spec_mockduffelservice",
-      "community": 379,
+      "community": 277,
       "norm_label": "mockduffelservice"
     },
     {
@@ -6450,7 +6450,7 @@
       "source_location": "L15",
       "_origin": "ast",
       "id": "apps_api_src_booking_intent_booking_intent_service_spec_mockprismaservice",
-      "community": 379,
+      "community": 277,
       "norm_label": "mockprismaservice"
     },
     {
@@ -6460,7 +6460,7 @@
       "source_location": "L24",
       "_origin": "ast",
       "id": "apps_api_src_booking_intent_booking_intent_service_spec_mockauditservice",
-      "community": 379,
+      "community": 277,
       "norm_label": "mockauditservice"
     },
     {
@@ -6470,7 +6470,7 @@
       "source_location": "L28",
       "_origin": "ast",
       "id": "apps_api_src_booking_intent_booking_intent_service_spec_testableservice",
-      "community": 379,
+      "community": 277,
       "norm_label": "testableservice"
     },
     {
@@ -6510,7 +6510,7 @@
       "source_location": "L27",
       "_origin": "ast",
       "id": "apps_api_src_booking_intent_booking_intent_service_bookingintentservice_constructor",
-      "community": 327,
+      "community": 29,
       "norm_label": ".constructor()"
     },
     {
@@ -6650,7 +6650,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "apps_api_src_booking_intent_dto_create_intent_dto",
-      "community": 328,
+      "community": 277,
       "norm_label": "create-intent.dto.ts"
     },
     {
@@ -6660,7 +6660,7 @@
       "source_location": "L21",
       "_origin": "ast",
       "id": "apps_api_src_booking_intent_dto_create_intent_dto_countpassengertypes",
-      "community": 328,
+      "community": 277,
       "norm_label": "countpassengertypes()"
     },
     {
@@ -6670,7 +6670,7 @@
       "source_location": "L34",
       "_origin": "ast",
       "id": "apps_api_src_booking_intent_dto_create_intent_dto_hasvalidpassengermatrix",
-      "community": 328,
+      "community": 277,
       "norm_label": "hasvalidpassengermatrix()"
     },
     {
@@ -6690,7 +6690,7 @@
       "source_location": "L147",
       "_origin": "ast",
       "id": "apps_api_src_booking_intent_dto_create_intent_dto_createintentdto",
-      "community": 328,
+      "community": 277,
       "norm_label": "createintentdto"
     },
     {
@@ -6890,7 +6890,7 @@
       "source_location": "L14",
       "_origin": "ast",
       "id": "apps_api_src_booking_booking_module_bookingmodule",
-      "community": 326,
+      "community": 254,
       "norm_label": "bookingmodule"
     },
     {
@@ -6900,7 +6900,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "apps_api_src_booking_booking_service_spec",
-      "community": 327,
+      "community": 273,
       "norm_label": "booking.service.spec.ts"
     },
     {
@@ -6910,114 +6910,114 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "apps_api_src_booking_booking_service",
-      "community": 327,
+      "community": 255,
       "norm_label": "booking.service.ts"
     },
     {
       "label": "BookingWithRelations",
       "file_type": "code",
       "source_file": "apps/api/src/booking/booking.service.ts",
-      "source_location": "L8",
+      "source_location": "L9",
       "_origin": "ast",
       "id": "apps_api_src_booking_booking_service_bookingwithrelations",
-      "community": 327,
+      "community": 255,
       "norm_label": "bookingwithrelations"
     },
     {
       "label": "BookingService",
       "file_type": "code",
       "source_file": "apps/api/src/booking/booking.service.ts",
-      "source_location": "L20",
+      "source_location": "L33",
       "_origin": "ast",
       "id": "apps_api_src_booking_booking_service_bookingservice",
-      "community": 327,
+      "community": 273,
       "norm_label": "bookingservice"
     },
     {
       "label": ".constructor()",
       "file_type": "code",
       "source_file": "apps/api/src/booking/booking.service.ts",
-      "source_location": "L23",
+      "source_location": "L36",
       "_origin": "ast",
       "id": "apps_api_src_booking_booking_service_bookingservice_constructor",
-      "community": 327,
+      "community": 151,
       "norm_label": ".constructor()"
     },
     {
       "label": ".handleStaleProcessingBookings()",
       "file_type": "code",
       "source_file": "apps/api/src/booking/booking.service.ts",
-      "source_location": "L31",
+      "source_location": "L44",
       "_origin": "ast",
       "id": "apps_api_src_booking_booking_service_bookingservice_handlestaleprocessingbookings",
-      "community": 115,
+      "community": 273,
       "norm_label": ".handlestaleprocessingbookings()"
     },
     {
       "label": ".handleCompletedBookings()",
       "file_type": "code",
       "source_file": "apps/api/src/booking/booking.service.ts",
-      "source_location": "L55",
+      "source_location": "L68",
       "_origin": "ast",
       "id": "apps_api_src_booking_booking_service_bookingservice_handlecompletedbookings",
-      "community": 327,
+      "community": 273,
       "norm_label": ".handlecompletedbookings()"
     },
     {
       "label": ".createBooking()",
       "file_type": "code",
       "source_file": "apps/api/src/booking/booking.service.ts",
-      "source_location": "L77",
+      "source_location": "L90",
       "_origin": "ast",
       "id": "apps_api_src_booking_booking_service_bookingservice_createbooking",
-      "community": 327,
+      "community": 273,
       "norm_label": ".createbooking()"
     },
     {
       "label": ".updateToConfirmed()",
       "file_type": "code",
       "source_file": "apps/api/src/booking/booking.service.ts",
-      "source_location": "L129",
+      "source_location": "L142",
       "_origin": "ast",
       "id": "apps_api_src_booking_booking_service_bookingservice_updatetoconfirmed",
-      "community": 327,
+      "community": 273,
       "norm_label": ".updatetoconfirmed()"
     },
     {
       "label": ".updateToFailed()",
       "file_type": "code",
       "source_file": "apps/api/src/booking/booking.service.ts",
-      "source_location": "L162",
+      "source_location": "L175",
       "_origin": "ast",
       "id": "apps_api_src_booking_booking_service_bookingservice_updatetofailed",
-      "community": 327,
+      "community": 273,
       "norm_label": ".updatetofailed()"
     },
     {
       "label": ".reconcileBookingIfStale()",
       "file_type": "code",
       "source_file": "apps/api/src/booking/booking.service.ts",
-      "source_location": "L188",
+      "source_location": "L201",
       "_origin": "ast",
       "id": "apps_api_src_booking_booking_service_bookingservice_reconcilebookingifstale",
-      "community": 115,
+      "community": 327,
       "norm_label": ".reconcilebookingifstale()"
     },
     {
       "label": ".checkAndCompleteBooking()",
       "file_type": "code",
       "source_file": "apps/api/src/booking/booking.service.ts",
-      "source_location": "L319",
+      "source_location": "L332",
       "_origin": "ast",
       "id": "apps_api_src_booking_booking_service_bookingservice_checkandcompletebooking",
-      "community": 327,
+      "community": 273,
       "norm_label": ".checkandcompletebooking()"
     },
     {
       "label": ".listBookings()",
       "file_type": "code",
       "source_file": "apps/api/src/booking/booking.service.ts",
-      "source_location": "L412",
+      "source_location": "L425",
       "_origin": "ast",
       "id": "apps_api_src_booking_booking_service_bookingservice_listbookings",
       "community": 273,
@@ -7027,17 +7027,27 @@
       "label": ".getBookingDetail()",
       "file_type": "code",
       "source_file": "apps/api/src/booking/booking.service.ts",
-      "source_location": "L471",
+      "source_location": "L498",
       "_origin": "ast",
       "id": "apps_api_src_booking_booking_service_bookingservice_getbookingdetail",
       "community": 273,
       "norm_label": ".getbookingdetail()"
     },
     {
+      "label": ".mapDisruptionAndItinerary()",
+      "file_type": "code",
+      "source_file": "apps/api/src/booking/booking.service.ts",
+      "source_location": "L556",
+      "_origin": "ast",
+      "id": "apps_api_src_booking_booking_service_bookingservice_mapdisruptionanditinerary",
+      "community": 273,
+      "norm_label": ".mapdisruptionanditinerary()"
+    },
+    {
       "label": ".sortBookings()",
       "file_type": "code",
       "source_file": "apps/api/src/booking/booking.service.ts",
-      "source_location": "L514",
+      "source_location": "L678",
       "_origin": "ast",
       "id": "apps_api_src_booking_booking_service_bookingservice_sortbookings",
       "community": 273,
@@ -7047,7 +7057,7 @@
       "label": ".toListItem()",
       "file_type": "code",
       "source_file": "apps/api/src/booking/booking.service.ts",
-      "source_location": "L536",
+      "source_location": "L700",
       "_origin": "ast",
       "id": "apps_api_src_booking_booking_service_bookingservice_tolistitem",
       "community": 273,
@@ -7057,7 +7067,7 @@
       "label": ".getCancellationQuote()",
       "file_type": "code",
       "source_file": "apps/api/src/booking/booking.service.ts",
-      "source_location": "L550",
+      "source_location": "L715",
       "_origin": "ast",
       "id": "apps_api_src_booking_booking_service_bookingservice_getcancellationquote",
       "community": 273,
@@ -7067,47 +7077,47 @@
       "label": ".cancelBooking()",
       "file_type": "code",
       "source_file": "apps/api/src/booking/booking.service.ts",
-      "source_location": "L691",
+      "source_location": "L856",
       "_origin": "ast",
       "id": "apps_api_src_booking_booking_service_bookingservice_cancelbooking",
-      "community": 327,
+      "community": 273,
       "norm_label": ".cancelbooking()"
     },
     {
       "label": ".confirmCancellationWithRetries()",
       "file_type": "code",
       "source_file": "apps/api/src/booking/booking.service.ts",
-      "source_location": "L786",
+      "source_location": "L992",
       "_origin": "ast",
       "id": "apps_api_src_booking_booking_service_bookingservice_confirmcancellationwithretries",
-      "community": 327,
+      "community": 273,
       "norm_label": ".confirmcancellationwithretries()"
     },
     {
       "label": ".isRetryableSupplierError()",
       "file_type": "code",
       "source_file": "apps/api/src/booking/booking.service.ts",
-      "source_location": "L801",
+      "source_location": "L1007",
       "_origin": "ast",
       "id": "apps_api_src_booking_booking_service_bookingservice_isretryablesuppliererror",
-      "community": 327,
+      "community": 273,
       "norm_label": ".isretryablesuppliererror()"
     },
     {
       "label": ".toCancellationResponse()",
       "file_type": "code",
       "source_file": "apps/api/src/booking/booking.service.ts",
-      "source_location": "L810",
+      "source_location": "L1016",
       "_origin": "ast",
       "id": "apps_api_src_booking_booking_service_bookingservice_tocancellationresponse",
-      "community": 327,
+      "community": 273,
       "norm_label": ".tocancellationresponse()"
     },
     {
       "label": ".getCancellationStatus()",
       "file_type": "code",
       "source_file": "apps/api/src/booking/booking.service.ts",
-      "source_location": "L825",
+      "source_location": "L1031",
       "_origin": "ast",
       "id": "apps_api_src_booking_booking_service_bookingservice_getcancellationstatus",
       "community": 273,
@@ -7157,7 +7167,7 @@
       "label": "BookingListItemResponseDto",
       "file_type": "code",
       "source_file": "apps/api/src/booking/dto/booking-response.dto.ts",
-      "source_location": "L3",
+      "source_location": "L4",
       "_origin": "ast",
       "id": "apps_api_src_booking_dto_booking_response_dto_bookinglistitemresponsedto",
       "community": 273,
@@ -7167,7 +7177,7 @@
       "label": "BookingListResponseDto",
       "file_type": "code",
       "source_file": "apps/api/src/booking/dto/booking-response.dto.ts",
-      "source_location": "L15",
+      "source_location": "L18",
       "_origin": "ast",
       "id": "apps_api_src_booking_dto_booking_response_dto_bookinglistresponsedto",
       "community": 273,
@@ -7177,7 +7187,7 @@
       "label": "BookingDetailResponseDto",
       "file_type": "code",
       "source_file": "apps/api/src/booking/dto/booking-response.dto.ts",
-      "source_location": "L20",
+      "source_location": "L23",
       "_origin": "ast",
       "id": "apps_api_src_booking_dto_booking_response_dto_bookingdetailresponsedto",
       "community": 273,
@@ -7300,7 +7310,7 @@
       "source_location": "L46",
       "_origin": "ast",
       "id": "apps_api_src_cache_cache_service_cacheservice_get",
-      "community": 152,
+      "community": 285,
       "norm_label": ".get()"
     },
     {
@@ -7330,7 +7340,7 @@
       "source_location": "L114",
       "_origin": "ast",
       "id": "apps_api_src_cache_cache_service_cacheservice_decr",
-      "community": 152,
+      "community": 285,
       "norm_label": ".decr()"
     },
     {
@@ -7790,7 +7800,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "apps_api_src_common_encryption_service_spec",
-      "community": 381,
+      "community": 277,
       "norm_label": "encryption.service.spec.ts"
     },
     {
@@ -7800,7 +7810,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "apps_api_src_common_encryption_service",
-      "community": 381,
+      "community": 277,
       "norm_label": "encryption.service.ts"
     },
     {
@@ -7810,7 +7820,7 @@
       "source_location": "L5",
       "_origin": "ast",
       "id": "apps_api_src_common_encryption_service_encryptionservice",
-      "community": 381,
+      "community": 277,
       "norm_label": "encryptionservice"
     },
     {
@@ -7820,7 +7830,7 @@
       "source_location": "L9",
       "_origin": "ast",
       "id": "apps_api_src_common_encryption_service_encryptionservice_constructor",
-      "community": 381,
+      "community": 277,
       "norm_label": ".constructor()"
     },
     {
@@ -7830,7 +7840,7 @@
       "source_location": "L13",
       "_origin": "ast",
       "id": "apps_api_src_common_encryption_service_encryptionservice_encrypt",
-      "community": 381,
+      "community": 277,
       "norm_label": ".encrypt()"
     },
     {
@@ -7850,7 +7860,7 @@
       "source_location": "L51",
       "_origin": "ast",
       "id": "apps_api_src_common_encryption_service_encryptionservice_loadkey",
-      "community": 381,
+      "community": 277,
       "norm_label": ".loadkey()"
     },
     {
@@ -7940,7 +7950,7 @@
       "source_location": "L68",
       "_origin": "ast",
       "id": "apps_api_src_common_stripe_service_stripeservice_capturepaymentintent",
-      "community": 115,
+      "community": 327,
       "norm_label": ".capturepaymentintent()"
     },
     {
@@ -7950,7 +7960,7 @@
       "source_location": "L92",
       "_origin": "ast",
       "id": "apps_api_src_common_stripe_service_stripeservice_cancelpaymentintent",
-      "community": 115,
+      "community": 327,
       "norm_label": ".cancelpaymentintent()"
     },
     {
@@ -7970,7 +7980,7 @@
       "source_location": "L136",
       "_origin": "ast",
       "id": "apps_api_src_common_stripe_service_stripeservice_retrievepaymentintent",
-      "community": 115,
+      "community": 327,
       "norm_label": ".retrievepaymentintent()"
     },
     {
@@ -7990,7 +8000,7 @@
       "source_location": "L178",
       "_origin": "ast",
       "id": "apps_api_src_common_stripe_service_stripeservice_detachpaymentmethod",
-      "community": 70,
+      "community": 308,
       "norm_label": ".detachpaymentmethod()"
     },
     {
@@ -8027,7 +8037,7 @@
       "label": "AuthenticatedRequest",
       "file_type": "code",
       "source_file": "apps/api/src/disruption/api/disruption.controller.ts",
-      "source_location": "L7",
+      "source_location": "L9",
       "_origin": "ast",
       "id": "apps_api_src_disruption_api_disruption_controller_authenticatedrequest",
       "community": 255,
@@ -8037,7 +8047,7 @@
       "label": "DisruptionController",
       "file_type": "code",
       "source_file": "apps/api/src/disruption/api/disruption.controller.ts",
-      "source_location": "L13",
+      "source_location": "L15",
       "_origin": "ast",
       "id": "apps_api_src_disruption_api_disruption_controller_disruptioncontroller",
       "community": 255,
@@ -8047,7 +8057,7 @@
       "label": ".constructor()",
       "file_type": "code",
       "source_file": "apps/api/src/disruption/api/disruption.controller.ts",
-      "source_location": "L14",
+      "source_location": "L16",
       "_origin": "ast",
       "id": "apps_api_src_disruption_api_disruption_controller_disruptioncontroller_constructor",
       "community": 255,
@@ -8057,11 +8067,121 @@
       "label": ".syncBooking()",
       "file_type": "code",
       "source_file": "apps/api/src/disruption/api/disruption.controller.ts",
-      "source_location": "L21",
+      "source_location": "L23",
       "_origin": "ast",
       "id": "apps_api_src_disruption_api_disruption_controller_disruptioncontroller_syncbooking",
       "community": 255,
       "norm_label": ".syncbooking()"
+    },
+    {
+      "label": "TravellerDisruptionController",
+      "file_type": "code",
+      "source_file": "apps/api/src/disruption/api/disruption.controller.ts",
+      "source_location": "L45",
+      "_origin": "ast",
+      "id": "apps_api_src_disruption_api_disruption_controller_travellerdisruptioncontroller",
+      "community": 255,
+      "norm_label": "travellerdisruptioncontroller"
+    },
+    {
+      "label": ".constructor()",
+      "file_type": "code",
+      "source_file": "apps/api/src/disruption/api/disruption.controller.ts",
+      "source_location": "L46",
+      "_origin": "ast",
+      "id": "apps_api_src_disruption_api_disruption_controller_travellerdisruptioncontroller_constructor",
+      "community": 255,
+      "norm_label": ".constructor()"
+    },
+    {
+      "label": ".getDisruptions()",
+      "file_type": "code",
+      "source_file": "apps/api/src/disruption/api/disruption.controller.ts",
+      "source_location": "L49",
+      "_origin": "ast",
+      "id": "apps_api_src_disruption_api_disruption_controller_travellerdisruptioncontroller_getdisruptions",
+      "community": 255,
+      "norm_label": ".getdisruptions()"
+    },
+    {
+      "label": ".acknowledgeDisruption()",
+      "file_type": "code",
+      "source_file": "apps/api/src/disruption/api/disruption.controller.ts",
+      "source_location": "L62",
+      "_origin": "ast",
+      "id": "apps_api_src_disruption_api_disruption_controller_travellerdisruptioncontroller_acknowledgedisruption",
+      "community": 255,
+      "norm_label": ".acknowledgedisruption()"
+    },
+    {
+      "label": ".acceptDisruption()",
+      "file_type": "code",
+      "source_file": "apps/api/src/disruption/api/disruption.controller.ts",
+      "source_location": "L72",
+      "_origin": "ast",
+      "id": "apps_api_src_disruption_api_disruption_controller_travellerdisruptioncontroller_acceptdisruption",
+      "community": 255,
+      "norm_label": ".acceptdisruption()"
+    },
+    {
+      "label": "disruption.service.ts",
+      "file_type": "code",
+      "source_file": "apps/api/src/disruption/api/disruption.service.ts",
+      "source_location": "L1",
+      "_origin": "ast",
+      "id": "apps_api_src_disruption_api_disruption_service",
+      "community": 255,
+      "norm_label": "disruption.service.ts"
+    },
+    {
+      "label": "DisruptionService",
+      "file_type": "code",
+      "source_file": "apps/api/src/disruption/api/disruption.service.ts",
+      "source_location": "L12",
+      "_origin": "ast",
+      "id": "apps_api_src_disruption_api_disruption_service_disruptionservice",
+      "community": 255,
+      "norm_label": "disruptionservice"
+    },
+    {
+      "label": ".constructor()",
+      "file_type": "code",
+      "source_file": "apps/api/src/disruption/api/disruption.service.ts",
+      "source_location": "L13",
+      "_origin": "ast",
+      "id": "apps_api_src_disruption_api_disruption_service_disruptionservice_constructor",
+      "community": 255,
+      "norm_label": ".constructor()"
+    },
+    {
+      "label": ".getDisruptionHistory()",
+      "file_type": "code",
+      "source_file": "apps/api/src/disruption/api/disruption.service.ts",
+      "source_location": "L15",
+      "_origin": "ast",
+      "id": "apps_api_src_disruption_api_disruption_service_disruptionservice_getdisruptionhistory",
+      "community": 255,
+      "norm_label": ".getdisruptionhistory()"
+    },
+    {
+      "label": ".acknowledgeDisruption()",
+      "file_type": "code",
+      "source_file": "apps/api/src/disruption/api/disruption.service.ts",
+      "source_location": "L93",
+      "_origin": "ast",
+      "id": "apps_api_src_disruption_api_disruption_service_disruptionservice_acknowledgedisruption",
+      "community": 255,
+      "norm_label": ".acknowledgedisruption()"
+    },
+    {
+      "label": ".acceptDisruption()",
+      "file_type": "code",
+      "source_file": "apps/api/src/disruption/api/disruption.service.ts",
+      "source_location": "L171",
+      "_origin": "ast",
+      "id": "apps_api_src_disruption_api_disruption_service_disruptionservice_acceptdisruption",
+      "community": 255,
+      "norm_label": ".acceptdisruption()"
     },
     {
       "label": "disruption.module.ts",
@@ -8070,17 +8190,17 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "apps_api_src_disruption_disruption_module",
-      "community": 326,
+      "community": 254,
       "norm_label": "disruption.module.ts"
     },
     {
       "label": "DisruptionModule",
       "file_type": "code",
       "source_file": "apps/api/src/disruption/disruption.module.ts",
-      "source_location": "L37",
+      "source_location": "L40",
       "_origin": "ast",
       "id": "apps_api_src_disruption_disruption_module_disruptionmodule",
-      "community": 37,
+      "community": 254,
       "norm_label": "disruptionmodule"
     },
     {
@@ -8160,7 +8280,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "apps_api_src_disruption_domain_itinerary_fingerprint_spec",
-      "community": 380,
+      "community": 276,
       "norm_label": "itinerary-fingerprint.spec.ts"
     },
     {
@@ -8170,7 +8290,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "apps_api_src_disruption_domain_itinerary_fingerprint",
-      "community": 380,
+      "community": 276,
       "norm_label": "itinerary-fingerprint.ts"
     },
     {
@@ -8180,7 +8300,7 @@
       "source_location": "L4",
       "_origin": "ast",
       "id": "apps_api_src_disruption_domain_itinerary_fingerprint_serializesegmentcanonical",
-      "community": 380,
+      "community": 276,
       "norm_label": "serializesegmentcanonical()"
     },
     {
@@ -8190,7 +8310,7 @@
       "source_location": "L24",
       "_origin": "ast",
       "id": "apps_api_src_disruption_domain_itinerary_fingerprint_generateitineraryfingerprint",
-      "community": 380,
+      "community": 276,
       "norm_label": "generateitineraryfingerprint()"
     },
     {
@@ -8200,7 +8320,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "apps_api_src_disruption_domain_itinerary_normalizer_spec",
-      "community": 285,
+      "community": 276,
       "norm_label": "itinerary-normalizer.spec.ts"
     },
     {
@@ -8210,7 +8330,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "apps_api_src_disruption_domain_itinerary_normalizer",
-      "community": 285,
+      "community": 276,
       "norm_label": "itinerary-normalizer.ts"
     },
     {
@@ -8230,7 +8350,7 @@
       "source_location": "L29",
       "_origin": "ast",
       "id": "apps_api_src_disruption_domain_itinerary_normalizer_parseisodurationtominutes",
-      "community": 285,
+      "community": 276,
       "norm_label": "parseisodurationtominutes()"
     },
     {
@@ -8240,7 +8360,7 @@
       "source_location": "L39",
       "_origin": "ast",
       "id": "apps_api_src_disruption_domain_itinerary_normalizer_extractlocaldate",
-      "community": 285,
+      "community": 276,
       "norm_label": "extractlocaldate()"
     },
     {
@@ -8250,7 +8370,7 @@
       "source_location": "L44",
       "_origin": "ast",
       "id": "apps_api_src_disruption_domain_itinerary_normalizer_normalizeduffelorder",
-      "community": 285,
+      "community": 276,
       "norm_label": "normalizeduffelorder()"
     },
     {
@@ -8260,7 +8380,7 @@
       "source_location": "L96",
       "_origin": "ast",
       "id": "apps_api_src_disruption_domain_itinerary_normalizer_normalizeflightsegments",
-      "community": 285,
+      "community": 276,
       "norm_label": "normalizeflightsegments()"
     },
     {
@@ -8370,7 +8490,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "apps_api_src_disruption_sync_reconciliation_service_spec",
-      "community": 327,
+      "community": 255,
       "norm_label": "reconciliation.service.spec.ts"
     },
     {
@@ -8380,7 +8500,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "apps_api_src_disruption_sync_reconciliation_service",
-      "community": 327,
+      "community": 255,
       "norm_label": "reconciliation.service.ts"
     },
     {
@@ -8390,7 +8510,7 @@
       "source_location": "L8",
       "_origin": "ast",
       "id": "apps_api_src_disruption_sync_reconciliation_service_reconciliationresult",
-      "community": 327,
+      "community": 255,
       "norm_label": "reconciliationresult"
     },
     {
@@ -8400,7 +8520,7 @@
       "source_location": "L20",
       "_origin": "ast",
       "id": "apps_api_src_disruption_sync_reconciliation_service_reconciliationservice",
-      "community": 152,
+      "community": 255,
       "norm_label": "reconciliationservice"
     },
     {
@@ -8410,7 +8530,7 @@
       "source_location": "L23",
       "_origin": "ast",
       "id": "apps_api_src_disruption_sync_reconciliation_service_reconciliationservice_constructor",
-      "community": 152,
+      "community": 255,
       "norm_label": ".constructor()"
     },
     {
@@ -8420,7 +8540,7 @@
       "source_location": "L31",
       "_origin": "ast",
       "id": "apps_api_src_disruption_sync_reconciliation_service_reconciliationservice_handlecron",
-      "community": 152,
+      "community": 255,
       "norm_label": ".handlecron()"
     },
     {
@@ -8430,7 +8550,7 @@
       "source_location": "L49",
       "_origin": "ast",
       "id": "apps_api_src_disruption_sync_reconciliation_service_reconciliationservice_reconcile",
-      "community": 152,
+      "community": 255,
       "norm_label": ".reconcile()"
     },
     {
@@ -8440,7 +8560,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "apps_api_src_disruption_sync_supplier_sync_service_spec",
-      "community": 29,
+      "community": 255,
       "norm_label": "supplier-sync.service.spec.ts"
     },
     {
@@ -8450,7 +8570,7 @@
       "source_location": "L448",
       "_origin": "ast",
       "id": "apps_api_src_disruption_sync_supplier_sync_service_spec_prismaerror",
-      "community": 29,
+      "community": 255,
       "norm_label": "prismaerror"
     },
     {
@@ -8520,7 +8640,7 @@
       "source_location": "L104",
       "_origin": "ast",
       "id": "apps_api_src_disruption_sync_supplier_sync_service_suppliersyncservice_constructor",
-      "community": 29,
+      "community": 255,
       "norm_label": ".constructor()"
     },
     {
@@ -8530,7 +8650,7 @@
       "source_location": "L114",
       "_origin": "ast",
       "id": "apps_api_src_disruption_sync_supplier_sync_service_suppliersyncservice_syncbooking",
-      "community": 285,
+      "community": 255,
       "norm_label": ".syncbooking()"
     },
     {
@@ -8540,7 +8660,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "apps_api_src_disruption_sync_sync_claim_service",
-      "community": 29,
+      "community": 255,
       "norm_label": "sync-claim.service.ts"
     },
     {
@@ -8550,7 +8670,7 @@
       "source_location": "L6",
       "_origin": "ast",
       "id": "apps_api_src_disruption_sync_sync_claim_service_syncclaimservice",
-      "community": 29,
+      "community": 255,
       "norm_label": "syncclaimservice"
     },
     {
@@ -8560,7 +8680,7 @@
       "source_location": "L9",
       "_origin": "ast",
       "id": "apps_api_src_disruption_sync_sync_claim_service_syncclaimservice_constructor",
-      "community": 29,
+      "community": 255,
       "norm_label": ".constructor()"
     },
     {
@@ -8570,7 +8690,7 @@
       "source_location": "L18",
       "_origin": "ast",
       "id": "apps_api_src_disruption_sync_sync_claim_service_syncclaimservice_acquireclaim",
-      "community": 285,
+      "community": 255,
       "norm_label": ".acquireclaim()"
     },
     {
@@ -8580,7 +8700,7 @@
       "source_location": "L55",
       "_origin": "ast",
       "id": "apps_api_src_disruption_sync_sync_claim_service_syncclaimservice_releaseclaim",
-      "community": 285,
+      "community": 255,
       "norm_label": ".releaseclaim()"
     },
     {
@@ -8610,7 +8730,7 @@
       "source_location": "L10",
       "_origin": "ast",
       "id": "apps_api_src_disruption_webhook_duffel_event_processor_duffeleventprocessor",
-      "community": 342,
+      "community": 37,
       "norm_label": "duffeleventprocessor"
     },
     {
@@ -8620,7 +8740,7 @@
       "source_location": "L14",
       "_origin": "ast",
       "id": "apps_api_src_disruption_webhook_duffel_event_processor_duffeleventprocessor_constructor",
-      "community": 342,
+      "community": 37,
       "norm_label": ".constructor()"
     },
     {
@@ -8630,7 +8750,7 @@
       "source_location": "L21",
       "_origin": "ast",
       "id": "apps_api_src_disruption_webhook_duffel_event_processor_duffeleventprocessor_handlecron",
-      "community": 342,
+      "community": 37,
       "norm_label": ".handlecron()"
     },
     {
@@ -8640,7 +8760,7 @@
       "source_location": "L45",
       "_origin": "ast",
       "id": "apps_api_src_disruption_webhook_duffel_event_processor_duffeleventprocessor_processinboxbatch",
-      "community": 342,
+      "community": 37,
       "norm_label": ".processinboxbatch()"
     },
     {
@@ -8650,7 +8770,7 @@
       "source_location": "L102",
       "_origin": "ast",
       "id": "apps_api_src_disruption_webhook_duffel_event_processor_duffeleventprocessor_claimevents",
-      "community": 342,
+      "community": 37,
       "norm_label": ".claimevents()"
     },
     {
@@ -8660,7 +8780,7 @@
       "source_location": "L173",
       "_origin": "ast",
       "id": "apps_api_src_disruption_webhook_duffel_event_processor_duffeleventprocessor_handlelockconflict",
-      "community": 342,
+      "community": 37,
       "norm_label": ".handlelockconflict()"
     },
     {
@@ -8670,7 +8790,7 @@
       "source_location": "L187",
       "_origin": "ast",
       "id": "apps_api_src_disruption_webhook_duffel_event_processor_duffeleventprocessor_handlesuccess",
-      "community": 342,
+      "community": 37,
       "norm_label": ".handlesuccess()"
     },
     {
@@ -8680,7 +8800,7 @@
       "source_location": "L216",
       "_origin": "ast",
       "id": "apps_api_src_disruption_webhook_duffel_event_processor_duffeleventprocessor_handlefailure",
-      "community": 342,
+      "community": 37,
       "norm_label": ".handlefailure()"
     },
     {
@@ -8690,7 +8810,7 @@
       "source_location": "L281",
       "_origin": "ast",
       "id": "apps_api_src_disruption_webhook_duffel_event_processor_duffeleventprocessor_getretrydelayminutes",
-      "community": 342,
+      "community": 37,
       "norm_label": ".getretrydelayminutes()"
     },
     {
@@ -8700,7 +8820,7 @@
       "source_location": "L290",
       "_origin": "ast",
       "id": "apps_api_src_disruption_webhook_duffel_event_processor_duffeleventprocessor_handleretentionredaction",
-      "community": 342,
+      "community": 37,
       "norm_label": ".handleretentionredaction()"
     },
     {
@@ -8790,7 +8910,7 @@
       "source_location": "L11",
       "_origin": "ast",
       "id": "apps_api_src_disruption_webhook_duffel_processor_health_service_duffelprocessorhealthservice_recordheartbeat",
-      "community": 342,
+      "community": 37,
       "norm_label": ".recordheartbeat()"
     },
     {
@@ -9050,7 +9170,7 @@
       "source_location": "L26",
       "_origin": "ast",
       "id": "apps_api_src_duffel_duffel_service_duffeltimeouterror",
-      "community": 379,
+      "community": 277,
       "norm_label": "duffeltimeouterror"
     },
     {
@@ -9060,7 +9180,7 @@
       "source_location": "L28",
       "_origin": "ast",
       "id": "apps_api_src_duffel_duffel_service_duffeltimeouterror_constructor",
-      "community": 379,
+      "community": 277,
       "norm_label": ".constructor()"
     },
     {
@@ -9070,7 +9190,7 @@
       "source_location": "L36",
       "_origin": "ast",
       "id": "apps_api_src_duffel_duffel_service_duffelservice",
-      "community": 327,
+      "community": 29,
       "norm_label": "duffelservice"
     },
     {
@@ -9080,7 +9200,7 @@
       "source_location": "L43",
       "_origin": "ast",
       "id": "apps_api_src_duffel_duffel_service_duffelservice_constructor",
-      "community": 152,
+      "community": 29,
       "norm_label": ".constructor()"
     },
     {
@@ -9090,7 +9210,7 @@
       "source_location": "L58",
       "_origin": "ast",
       "id": "apps_api_src_duffel_duffel_service_duffelservice_mappassengerstoduffel",
-      "community": 327,
+      "community": 285,
       "norm_label": ".mappassengerstoduffel()"
     },
     {
@@ -9100,7 +9220,7 @@
       "source_location": "L72",
       "_origin": "ast",
       "id": "apps_api_src_duffel_duffel_service_duffelservice_searchflights",
-      "community": 327,
+      "community": 285,
       "norm_label": ".searchflights()"
     },
     {
@@ -9110,7 +9230,7 @@
       "source_location": "L341",
       "_origin": "ast",
       "id": "apps_api_src_duffel_duffel_service_duffelservice_getofferbyid",
-      "community": 277,
+      "community": 29,
       "norm_label": ".getofferbyid()"
     },
     {
@@ -9120,7 +9240,7 @@
       "source_location": "L360",
       "_origin": "ast",
       "id": "apps_api_src_duffel_duffel_service_duffelservice_createorder",
-      "community": 277,
+      "community": 29,
       "norm_label": ".createorder()"
     },
     {
@@ -9140,7 +9260,7 @@
       "source_location": "L637",
       "_origin": "ast",
       "id": "apps_api_src_duffel_duffel_service_duffelservice_retrieveorder",
-      "community": 327,
+      "community": 273,
       "norm_label": ".retrieveorder()"
     },
     {
@@ -9150,7 +9270,7 @@
       "source_location": "L666",
       "_origin": "ast",
       "id": "apps_api_src_duffel_duffel_service_duffelservice_retrievecompleteorder",
-      "community": 285,
+      "community": 255,
       "norm_label": ".retrievecompleteorder()"
     },
     {
@@ -9160,7 +9280,7 @@
       "source_location": "L686",
       "_origin": "ast",
       "id": "apps_api_src_duffel_duffel_service_duffelservice_confirmcancellationquote",
-      "community": 327,
+      "community": 273,
       "norm_label": ".confirmcancellationquote()"
     },
     {
@@ -9170,7 +9290,7 @@
       "source_location": "L716",
       "_origin": "ast",
       "id": "apps_api_src_duffel_duffel_service_duffelservice_cancelorder",
-      "community": 115,
+      "community": 327,
       "norm_label": ".cancelorder()"
     },
     {
@@ -9210,7 +9330,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "apps_api_src_duffel_duffel_types",
-      "community": 285,
+      "community": 276,
       "norm_label": "duffel.types.ts"
     },
     {
@@ -9220,7 +9340,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "apps_api_src_duffel_duffel_types_duffelbaggage",
-      "community": 285,
+      "community": 276,
       "norm_label": "duffelbaggage"
     },
     {
@@ -9230,7 +9350,7 @@
       "source_location": "L8",
       "_origin": "ast",
       "id": "apps_api_src_duffel_duffel_types_duffelpassenger",
-      "community": 285,
+      "community": 276,
       "norm_label": "duffelpassenger"
     },
     {
@@ -9240,7 +9360,7 @@
       "source_location": "L14",
       "_origin": "ast",
       "id": "apps_api_src_duffel_duffel_types_duffelsegmentpassenger",
-      "community": 285,
+      "community": 276,
       "norm_label": "duffelsegmentpassenger"
     },
     {
@@ -9250,7 +9370,7 @@
       "source_location": "L20",
       "_origin": "ast",
       "id": "apps_api_src_duffel_duffel_types_duffelplace",
-      "community": 285,
+      "community": 276,
       "norm_label": "duffelplace"
     },
     {
@@ -9260,7 +9380,7 @@
       "source_location": "L27",
       "_origin": "ast",
       "id": "apps_api_src_duffel_duffel_types_duffelairline",
-      "community": 285,
+      "community": 276,
       "norm_label": "duffelairline"
     },
     {
@@ -9270,7 +9390,7 @@
       "source_location": "L33",
       "_origin": "ast",
       "id": "apps_api_src_duffel_duffel_types_duffelaircraft",
-      "community": 285,
+      "community": 276,
       "norm_label": "duffelaircraft"
     },
     {
@@ -9280,7 +9400,7 @@
       "source_location": "L39",
       "_origin": "ast",
       "id": "apps_api_src_duffel_duffel_types_duffelsegment",
-      "community": 285,
+      "community": 276,
       "norm_label": "duffelsegment"
     },
     {
@@ -9290,7 +9410,7 @@
       "source_location": "L55",
       "_origin": "ast",
       "id": "apps_api_src_duffel_duffel_types_duffelslice",
-      "community": 285,
+      "community": 276,
       "norm_label": "duffelslice"
     },
     {
@@ -9300,7 +9420,7 @@
       "source_location": "L64",
       "_origin": "ast",
       "id": "apps_api_src_duffel_duffel_types_duffeloffer",
-      "community": 285,
+      "community": 276,
       "norm_label": "duffeloffer"
     },
     {
@@ -9320,7 +9440,7 @@
       "source_location": "L80",
       "_origin": "ast",
       "id": "apps_api_src_duffel_duffel_types_duffelorder",
-      "community": 285,
+      "community": 276,
       "norm_label": "duffelorder"
     },
     {
@@ -9640,7 +9760,7 @@
       "source_location": "L185",
       "_origin": "ast",
       "id": "apps_api_src_flights_flights_service_flightsservice_constructor",
-      "community": 327,
+      "community": 29,
       "norm_label": ".constructor()"
     },
     {
@@ -9770,7 +9890,7 @@
       "source_location": "L11",
       "_origin": "ast",
       "id": "apps_api_src_payment_admin_refund_controller_adminrefundcontroller",
-      "community": 151,
+      "community": 342,
       "norm_label": "adminrefundcontroller"
     },
     {
@@ -9780,7 +9900,7 @@
       "source_location": "L12",
       "_origin": "ast",
       "id": "apps_api_src_payment_admin_refund_controller_adminrefundcontroller_constructor",
-      "community": 151,
+      "community": 342,
       "norm_label": ".constructor()"
     },
     {
@@ -9790,7 +9910,7 @@
       "source_location": "L15",
       "_origin": "ast",
       "id": "apps_api_src_payment_admin_refund_controller_adminrefundcontroller_resolverefund",
-      "community": 70,
+      "community": 342,
       "norm_label": ".resolverefund()"
     },
     {
@@ -9800,7 +9920,7 @@
       "source_location": "L23",
       "_origin": "ast",
       "id": "apps_api_src_payment_admin_refund_controller_adminrefundcontroller_getescalatedrefunds",
-      "community": 151,
+      "community": 342,
       "norm_label": ".getescalatedrefunds()"
     },
     {
@@ -9870,7 +9990,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "apps_api_src_payment_dto_refund_payment_dto",
-      "community": 151,
+      "community": 327,
       "norm_label": "refund-payment.dto.ts"
     },
     {
@@ -9880,7 +10000,7 @@
       "source_location": "L3",
       "_origin": "ast",
       "id": "apps_api_src_payment_dto_refund_payment_dto_refundpaymentdto",
-      "community": 151,
+      "community": 327,
       "norm_label": "refundpaymentdto"
     },
     {
@@ -9890,7 +10010,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "apps_api_src_payment_dto_resolve_refund_dto",
-      "community": 70,
+      "community": 342,
       "norm_label": "resolve-refund.dto.ts"
     },
     {
@@ -9900,7 +10020,7 @@
       "source_location": "L3",
       "_origin": "ast",
       "id": "apps_api_src_payment_dto_resolve_refund_dto_refundresolutionactions",
-      "community": 70,
+      "community": 342,
       "norm_label": "refundresolutionactions"
     },
     {
@@ -9910,7 +10030,7 @@
       "source_location": "L8",
       "_origin": "ast",
       "id": "apps_api_src_payment_dto_resolve_refund_dto_refundresolutionaction",
-      "community": 70,
+      "community": 342,
       "norm_label": "refundresolutionaction"
     },
     {
@@ -9920,7 +10040,7 @@
       "source_location": "L10",
       "_origin": "ast",
       "id": "apps_api_src_payment_dto_resolve_refund_dto_resolverefunddto",
-      "community": 70,
+      "community": 342,
       "norm_label": "resolverefunddto"
     },
     {
@@ -9950,7 +10070,7 @@
       "source_location": "L16",
       "_origin": "ast",
       "id": "apps_api_src_payment_payment_cron_service_paymentcronservice",
-      "community": 115,
+      "community": 151,
       "norm_label": "paymentcronservice"
     },
     {
@@ -9960,7 +10080,7 @@
       "source_location": "L19",
       "_origin": "ast",
       "id": "apps_api_src_payment_payment_cron_service_paymentcronservice_constructor",
-      "community": 115,
+      "community": 151,
       "norm_label": ".constructor()"
     },
     {
@@ -9970,7 +10090,7 @@
       "source_location": "L28",
       "_origin": "ast",
       "id": "apps_api_src_payment_payment_cron_service_paymentcronservice_handlecancellationrefundrecovery",
-      "community": 115,
+      "community": 151,
       "norm_label": ".handlecancellationrefundrecovery()"
     },
     {
@@ -9980,7 +10100,7 @@
       "source_location": "L62",
       "_origin": "ast",
       "id": "apps_api_src_payment_payment_cron_service_paymentcronservice_handleauthorizationexpiry",
-      "community": 115,
+      "community": 327,
       "norm_label": ".handleauthorizationexpiry()"
     },
     {
@@ -9990,7 +10110,7 @@
       "source_location": "L139",
       "_origin": "ast",
       "id": "apps_api_src_payment_payment_cron_service_paymentcronservice_handleidempotencykeycleanup",
-      "community": 115,
+      "community": 151,
       "norm_label": ".handleidempotencykeycleanup()"
     },
     {
@@ -10000,7 +10120,7 @@
       "source_location": "L163",
       "_origin": "ast",
       "id": "apps_api_src_payment_payment_cron_service_paymentcronservice_handlestalelockdetection",
-      "community": 115,
+      "community": 151,
       "norm_label": ".handlestalelockdetection()"
     },
     {
@@ -10010,7 +10130,7 @@
       "source_location": "L195",
       "_origin": "ast",
       "id": "apps_api_src_payment_payment_cron_service_paymentcronservice_expireauthorization",
-      "community": 115,
+      "community": 151,
       "norm_label": ".expireauthorization()"
     },
     {
@@ -10020,7 +10140,7 @@
       "source_location": "L254",
       "_origin": "ast",
       "id": "apps_api_src_payment_payment_cron_service_paymentcronservice_reconcilesucceededauthorization",
-      "community": 115,
+      "community": 327,
       "norm_label": ".reconcilesucceededauthorization()"
     },
     {
@@ -10030,7 +10150,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "apps_api_src_payment_payment_idempotency_service_spec",
-      "community": 256,
+      "community": 70,
       "norm_label": "payment-idempotency.service.spec.ts"
     },
     {
@@ -10040,7 +10160,7 @@
       "source_location": "L6",
       "_origin": "ast",
       "id": "apps_api_src_payment_payment_idempotency_service_spec_mockidempotencykey",
-      "community": 256,
+      "community": 70,
       "norm_label": "mockidempotencykey"
     },
     {
@@ -10050,7 +10170,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "apps_api_src_payment_payment_idempotency_service",
-      "community": 256,
+      "community": 70,
       "norm_label": "payment-idempotency.service.ts"
     },
     {
@@ -10060,7 +10180,7 @@
       "source_location": "L14",
       "_origin": "ast",
       "id": "apps_api_src_payment_payment_idempotency_service_paymentidempotencyservice",
-      "community": 256,
+      "community": 327,
       "norm_label": "paymentidempotencyservice"
     },
     {
@@ -10070,7 +10190,7 @@
       "source_location": "L17",
       "_origin": "ast",
       "id": "apps_api_src_payment_payment_idempotency_service_paymentidempotencyservice_constructor",
-      "community": 29,
+      "community": 327,
       "norm_label": ".constructor()"
     },
     {
@@ -10080,7 +10200,7 @@
       "source_location": "L22",
       "_origin": "ast",
       "id": "apps_api_src_payment_payment_idempotency_service_paymentidempotencyservice_acquireorreplay",
-      "community": 151,
+      "community": 327,
       "norm_label": ".acquireorreplay()"
     },
     {
@@ -10090,7 +10210,7 @@
       "source_location": "L105",
       "_origin": "ast",
       "id": "apps_api_src_payment_payment_idempotency_service_paymentidempotencyservice_handleexistingkeyafterrace",
-      "community": 151,
+      "community": 327,
       "norm_label": ".handleexistingkeyafterrace()"
     },
     {
@@ -10100,7 +10220,7 @@
       "source_location": "L160",
       "_origin": "ast",
       "id": "apps_api_src_payment_payment_idempotency_service_paymentidempotencyservice_updaterecoverypoint",
-      "community": 70,
+      "community": 327,
       "norm_label": ".updaterecoverypoint()"
     },
     {
@@ -10110,7 +10230,7 @@
       "source_location": "L170",
       "_origin": "ast",
       "id": "apps_api_src_payment_payment_idempotency_service_paymentidempotencyservice_completekey",
-      "community": 151,
+      "community": 327,
       "norm_label": ".completekey()"
     },
     {
@@ -10120,7 +10240,7 @@
       "source_location": "L184",
       "_origin": "ast",
       "id": "apps_api_src_payment_payment_idempotency_service_paymentidempotencyservice_getresumepoint",
-      "community": 115,
+      "community": 327,
       "norm_label": ".getresumepoint()"
     },
     {
@@ -10130,7 +10250,7 @@
       "source_location": "L194",
       "_origin": "ast",
       "id": "apps_api_src_payment_payment_idempotency_service_paymentidempotencyservice_islocked",
-      "community": 256,
+      "community": 327,
       "norm_label": ".islocked()"
     },
     {
@@ -10140,7 +10260,7 @@
       "source_location": "L209",
       "_origin": "ast",
       "id": "apps_api_src_payment_payment_idempotency_service_paymentidempotencyservice_sortkeys",
-      "community": 151,
+      "community": 327,
       "norm_label": ".sortkeys()"
     },
     {
@@ -10150,7 +10270,7 @@
       "source_location": "L228",
       "_origin": "ast",
       "id": "apps_api_src_payment_payment_idempotency_service_paymentidempotencyservice_computehash",
-      "community": 151,
+      "community": 327,
       "norm_label": ".computehash()"
     },
     {
@@ -10190,7 +10310,7 @@
       "source_location": "L11",
       "_origin": "ast",
       "id": "apps_api_src_payment_payment_method_service_paymentmethodservice",
-      "community": 256,
+      "community": 308,
       "norm_label": "paymentmethodservice"
     },
     {
@@ -10200,7 +10320,7 @@
       "source_location": "L14",
       "_origin": "ast",
       "id": "apps_api_src_payment_payment_method_service_paymentmethodservice_constructor",
-      "community": 256,
+      "community": 308,
       "norm_label": ".constructor()"
     },
     {
@@ -10210,7 +10330,7 @@
       "source_location": "L19",
       "_origin": "ast",
       "id": "apps_api_src_payment_payment_method_service_paymentmethodservice_listmethods",
-      "community": 70,
+      "community": 308,
       "norm_label": ".listmethods()"
     },
     {
@@ -10220,7 +10340,7 @@
       "source_location": "L43",
       "_origin": "ast",
       "id": "apps_api_src_payment_payment_method_service_paymentmethodservice_savemethod",
-      "community": 115,
+      "community": 327,
       "norm_label": ".savemethod()"
     },
     {
@@ -10230,7 +10350,7 @@
       "source_location": "L102",
       "_origin": "ast",
       "id": "apps_api_src_payment_payment_method_service_paymentmethodservice_deletemethod",
-      "community": 70,
+      "community": 308,
       "norm_label": ".deletemethod()"
     },
     {
@@ -10240,7 +10360,7 @@
       "source_location": "L122",
       "_origin": "ast",
       "id": "apps_api_src_payment_payment_method_service_paymentmethodservice_setdefault",
-      "community": 29,
+      "community": 308,
       "norm_label": ".setdefault()"
     },
     {
@@ -10280,7 +10400,7 @@
       "source_location": "L26",
       "_origin": "ast",
       "id": "apps_api_src_payment_payment_refund_service_paymentrefundservice_constructor",
-      "community": 256,
+      "community": 327,
       "norm_label": ".constructor()"
     },
     {
@@ -10290,7 +10410,7 @@
       "source_location": "L36",
       "_origin": "ast",
       "id": "apps_api_src_payment_payment_refund_service_paymentrefundservice_initiaterefund",
-      "community": 151,
+      "community": 327,
       "norm_label": ".initiaterefund()"
     },
     {
@@ -10310,7 +10430,7 @@
       "source_location": "L481",
       "_origin": "ast",
       "id": "apps_api_src_payment_payment_refund_service_paymentrefundservice_triggerautomatedrefund",
-      "community": 151,
+      "community": 327,
       "norm_label": ".triggerautomatedrefund()"
     },
     {
@@ -10340,7 +10460,7 @@
       "source_location": "L952",
       "_origin": "ast",
       "id": "apps_api_src_payment_payment_refund_service_paymentrefundservice_resolveescalatedcancellationrefund",
-      "community": 70,
+      "community": 342,
       "norm_label": ".resolveescalatedcancellationrefund()"
     },
     {
@@ -10350,7 +10470,7 @@
       "source_location": "L1060",
       "_origin": "ast",
       "id": "apps_api_src_payment_payment_refund_service_paymentrefundservice_listescalatedrefunds",
-      "community": 151,
+      "community": 342,
       "norm_label": ".listescalatedrefunds()"
     },
     {
@@ -10490,7 +10610,7 @@
       "source_location": "L54",
       "_origin": "ast",
       "id": "apps_api_src_payment_payment_state_machine_enforcetransition",
-      "community": 115,
+      "community": 327,
       "norm_label": "enforcetransition()"
     },
     {
@@ -10590,7 +10710,7 @@
       "source_location": "L11",
       "_origin": "ast",
       "id": "apps_api_src_payment_payment_webhook_service_paymentwebhookservice",
-      "community": 256,
+      "community": 115,
       "norm_label": "paymentwebhookservice"
     },
     {
@@ -10600,7 +10720,7 @@
       "source_location": "L14",
       "_origin": "ast",
       "id": "apps_api_src_payment_payment_webhook_service_paymentwebhookservice_constructor",
-      "community": 256,
+      "community": 115,
       "norm_label": ".constructor()"
     },
     {
@@ -10680,7 +10800,7 @@
       "source_location": "L38",
       "_origin": "ast",
       "id": "apps_api_src_payment_payment_controller_paymentcontroller",
-      "community": 70,
+      "community": 308,
       "norm_label": "paymentcontroller"
     },
     {
@@ -10690,7 +10810,7 @@
       "source_location": "L39",
       "_origin": "ast",
       "id": "apps_api_src_payment_payment_controller_paymentcontroller_constructor",
-      "community": 256,
+      "community": 308,
       "norm_label": ".constructor()"
     },
     {
@@ -10720,7 +10840,7 @@
       "source_location": "L82",
       "_origin": "ast",
       "id": "apps_api_src_payment_payment_controller_paymentcontroller_getpaymentstatus",
-      "community": 70,
+      "community": 308,
       "norm_label": ".getpaymentstatus()"
     },
     {
@@ -10730,7 +10850,7 @@
       "source_location": "L93",
       "_origin": "ast",
       "id": "apps_api_src_payment_payment_controller_paymentcontroller_refundpayment",
-      "community": 151,
+      "community": 327,
       "norm_label": ".refundpayment()"
     },
     {
@@ -10740,7 +10860,7 @@
       "source_location": "L106",
       "_origin": "ast",
       "id": "apps_api_src_payment_payment_controller_paymentcontroller_listpaymentmethods",
-      "community": 70,
+      "community": 308,
       "norm_label": ".listpaymentmethods()"
     },
     {
@@ -10750,7 +10870,7 @@
       "source_location": "L112",
       "_origin": "ast",
       "id": "apps_api_src_payment_payment_controller_paymentcontroller_deletepaymentmethod",
-      "community": 70,
+      "community": 308,
       "norm_label": ".deletepaymentmethod()"
     },
     {
@@ -10780,7 +10900,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "apps_api_src_payment_payment_service_spec",
-      "community": 256,
+      "community": 70,
       "norm_label": "payment.service.spec.ts"
     },
     {
@@ -10790,7 +10910,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "apps_api_src_payment_payment_service",
-      "community": 256,
+      "community": 70,
       "norm_label": "payment.service.ts"
     },
     {
@@ -10800,7 +10920,7 @@
       "source_location": "L29",
       "_origin": "ast",
       "id": "apps_api_src_payment_payment_service_paymentservice",
-      "community": 256,
+      "community": 70,
       "norm_label": "paymentservice"
     },
     {
@@ -10810,7 +10930,7 @@
       "source_location": "L32",
       "_origin": "ast",
       "id": "apps_api_src_payment_payment_service_paymentservice_constructor",
-      "community": 256,
+      "community": 308,
       "norm_label": ".constructor()"
     },
     {
@@ -10840,7 +10960,7 @@
       "source_location": "L310",
       "_origin": "ast",
       "id": "apps_api_src_payment_payment_service_paymentservice_executeconfirmpayment",
-      "community": 115,
+      "community": 327,
       "norm_label": ".executeconfirmpayment()"
     },
     {
@@ -10850,7 +10970,7 @@
       "source_location": "L814",
       "_origin": "ast",
       "id": "apps_api_src_payment_payment_service_paymentservice_getpaymentstatus",
-      "community": 70,
+      "community": 308,
       "norm_label": ".getpaymentstatus()"
     },
     {
@@ -10860,7 +10980,7 @@
       "source_location": "L843",
       "_origin": "ast",
       "id": "apps_api_src_payment_payment_service_paymentservice_handlebackgrounderror",
-      "community": 115,
+      "community": 327,
       "norm_label": ".handlebackgrounderror()"
     },
     {
@@ -10940,7 +11060,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "apps_api_test_adversarial_e2e_spec",
-      "community": 29,
+      "community": 152,
       "norm_label": "adversarial.e2e-spec.ts"
     },
     {
@@ -10950,7 +11070,7 @@
       "source_location": "L11",
       "_origin": "ast",
       "id": "apps_api_test_adversarial_e2e_spec_cacheservicewithinternal",
-      "community": 29,
+      "community": 152,
       "norm_label": "cacheservicewithinternal"
     },
     {
@@ -10960,7 +11080,7 @@
       "source_location": "L15",
       "_origin": "ast",
       "id": "apps_api_test_adversarial_e2e_spec_sanitizedusermetadata",
-      "community": 29,
+      "community": 152,
       "norm_label": "sanitizedusermetadata"
     },
     {
@@ -10970,7 +11090,7 @@
       "source_location": "L26",
       "_origin": "ast",
       "id": "apps_api_test_adversarial_e2e_spec_sanitizedvariantsmetadata",
-      "community": 29,
+      "community": 152,
       "norm_label": "sanitizedvariantsmetadata"
     },
     {
@@ -10980,7 +11100,7 @@
       "source_location": "L33",
       "_origin": "ast",
       "id": "apps_api_test_adversarial_e2e_spec_circularmetadata",
-      "community": 29,
+      "community": 152,
       "norm_label": "circularmetadata"
     },
     {
@@ -11120,7 +11240,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "apps_api_test_cancellation_e2e_spec",
-      "community": 327,
+      "community": 29,
       "norm_label": "cancellation.e2e-spec.ts"
     },
     {
@@ -11130,7 +11250,7 @@
       "source_location": "L19",
       "_origin": "ast",
       "id": "apps_api_test_cancellation_e2e_spec_testuser",
-      "community": 327,
+      "community": 29,
       "norm_label": "testuser"
     },
     {
@@ -11140,7 +11260,7 @@
       "source_location": "L25",
       "_origin": "ast",
       "id": "apps_api_test_cancellation_e2e_spec_cancellationbooking",
-      "community": 327,
+      "community": 29,
       "norm_label": "cancellationbooking"
     },
     {
@@ -11150,7 +11270,7 @@
       "source_location": "L86",
       "_origin": "ast",
       "id": "apps_api_test_cancellation_e2e_spec_createuser",
-      "community": 327,
+      "community": 29,
       "norm_label": "createuser()"
     },
     {
@@ -11160,7 +11280,7 @@
       "source_location": "L91",
       "_origin": "ast",
       "id": "apps_api_test_cancellation_e2e_spec_createcancellationbooking",
-      "community": 327,
+      "community": 29,
       "norm_label": "createcancellationbooking()"
     },
     {
@@ -11170,7 +11290,7 @@
       "source_location": "L156",
       "_origin": "ast",
       "id": "apps_api_test_cancellation_e2e_spec_createscheduledrefund",
-      "community": 327,
+      "community": 29,
       "norm_label": "createscheduledrefund()"
     },
     {
@@ -11200,7 +11320,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "apps_api_test_disruption_phase1_e2e_spec",
-      "community": 29,
+      "community": 254,
       "norm_label": "disruption-phase1.e2e-spec.ts"
     },
     {
@@ -11410,7 +11530,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "apps_api_test_payment_webhook_e2e_spec",
-      "community": 29,
+      "community": 381,
       "norm_label": "payment-webhook.e2e-spec.ts"
     },
     {
@@ -11420,7 +11540,7 @@
       "source_location": "L62",
       "_origin": "ast",
       "id": "apps_api_test_payment_webhook_e2e_spec_createtestuser",
-      "community": 29,
+      "community": 381,
       "norm_label": "createtestuser()"
     },
     {
@@ -11430,7 +11550,7 @@
       "source_location": "L74",
       "_origin": "ast",
       "id": "apps_api_test_payment_webhook_e2e_spec_createflightoffer",
-      "community": 29,
+      "community": 381,
       "norm_label": "createflightoffer()"
     },
     {
@@ -11440,7 +11560,7 @@
       "source_location": "L92",
       "_origin": "ast",
       "id": "apps_api_test_payment_webhook_e2e_spec_createbookingintent",
-      "community": 29,
+      "community": 381,
       "norm_label": "createbookingintent()"
     },
     {
@@ -11450,7 +11570,7 @@
       "source_location": "L118",
       "_origin": "ast",
       "id": "apps_api_test_payment_webhook_e2e_spec_createidempotencykey",
-      "community": 29,
+      "community": 381,
       "norm_label": "createidempotencykey()"
     },
     {
@@ -11460,7 +11580,7 @@
       "source_location": "L130",
       "_origin": "ast",
       "id": "apps_api_test_payment_webhook_e2e_spec_createpayment",
-      "community": 29,
+      "community": 381,
       "norm_label": "createpayment()"
     },
     {
@@ -12840,7 +12960,7 @@
       "source_location": "L21",
       "_origin": "ast",
       "id": "apps_web_tsconfig_compileroptions_paths",
-      "community": 11,
+      "community": 383,
       "norm_label": "paths"
     },
     {
@@ -12850,7 +12970,7 @@
       "source_location": "L22",
       "_origin": "ast",
       "id": "apps_web_tsconfig_paths",
-      "community": 11,
+      "community": 383,
       "norm_label": "@/*"
     },
     {
@@ -12860,7 +12980,7 @@
       "source_location": "L23",
       "_origin": "ast",
       "id": "apps_web_tsconfig_paths_shared",
-      "community": 11,
+      "community": 383,
       "norm_label": "@shared/*"
     },
     {
@@ -14924,10 +15044,20 @@
       "norm_label": "budget-aware reconciliation & booking completion (phase 5)"
     },
     {
-      "label": "AI Chatbot Agent Flow (SSE Streaming)",
+      "label": "Traveller Disruption APIs & Lifecycle (Phase 6)",
       "file_type": "document",
       "source_file": "context/architecture.md",
       "source_location": "L335",
+      "_origin": "ast",
+      "id": "context_architecture_traveller_disruption_apis_lifecycle_phase_6",
+      "community": 133,
+      "norm_label": "traveller disruption apis & lifecycle (phase 6)"
+    },
+    {
+      "label": "AI Chatbot Agent Flow (SSE Streaming)",
+      "file_type": "document",
+      "source_file": "context/architecture.md",
+      "source_location": "L364",
       "_origin": "ast",
       "id": "context_architecture_ai_chatbot_agent_flow_sse_streaming",
       "community": 133,
@@ -14937,7 +15067,7 @@
       "label": "Containerization",
       "file_type": "document",
       "source_file": "context/architecture.md",
-      "source_location": "L361",
+      "source_location": "L390",
       "_origin": "ast",
       "id": "context_architecture_containerization",
       "community": 133,
@@ -14947,7 +15077,7 @@
       "label": "Invariants",
       "file_type": "document",
       "source_file": "context/architecture.md",
-      "source_location": "L373",
+      "source_location": "L402",
       "_origin": "ast",
       "id": "context_architecture_invariants",
       "community": 133,
@@ -15727,7 +15857,7 @@
       "label": "[x] Feature: Flight Cancellation & Automated Refund System (Feature 12)",
       "file_type": "document",
       "source_file": "context/progress-checker.md",
-      "source_location": "L27",
+      "source_location": "L29",
       "_origin": "ast",
       "id": "context_progress_checker_x_feature_flight_cancellation_automated_refund_system_feature_12",
       "community": 133,
@@ -15737,7 +15867,7 @@
       "label": "[x] Feature: Booking Management & Confirmation (Feature 11)",
       "file_type": "document",
       "source_file": "context/progress-checker.md",
-      "source_location": "L35",
+      "source_location": "L37",
       "_origin": "ast",
       "id": "context_progress_checker_x_feature_booking_management_confirmation_feature_11",
       "community": 133,
@@ -15747,7 +15877,7 @@
       "label": "[x] Feature: Stripe Payment System (Feature 10)",
       "file_type": "document",
       "source_file": "context/progress-checker.md",
-      "source_location": "L45",
+      "source_location": "L47",
       "_origin": "ast",
       "id": "context_progress_checker_x_feature_stripe_payment_system_feature_10",
       "community": 133,
@@ -15757,7 +15887,7 @@
       "label": "[x] Feature: Booking Intent Foundation (Feature 9)",
       "file_type": "document",
       "source_file": "context/progress-checker.md",
-      "source_location": "L56",
+      "source_location": "L58",
       "_origin": "ast",
       "id": "context_progress_checker_x_feature_booking_intent_foundation_feature_9",
       "community": 133,
@@ -15767,7 +15897,7 @@
       "label": "[x] Feature: Cabin Class & Passenger Type Enhancement (Feature 8)",
       "file_type": "document",
       "source_file": "context/progress-checker.md",
-      "source_location": "L63",
+      "source_location": "L65",
       "_origin": "ast",
       "id": "context_progress_checker_x_feature_cabin_class_passenger_type_enhancement_feature_8",
       "community": 133,
@@ -15777,7 +15907,7 @@
       "label": "[x] Feature: Duffel Flight Search Service Setup & Agent Gateway Refactoring (Feature 6)",
       "file_type": "document",
       "source_file": "context/progress-checker.md",
-      "source_location": "L73",
+      "source_location": "L75",
       "_origin": "ast",
       "id": "context_progress_checker_x_feature_duffel_flight_search_service_setup_agent_gateway_refactoring_feature_6",
       "community": 133,
@@ -15787,7 +15917,7 @@
       "label": "[x] Feature: LLM Output Guardrails",
       "file_type": "document",
       "source_file": "context/progress-checker.md",
-      "source_location": "L82",
+      "source_location": "L84",
       "_origin": "ast",
       "id": "context_progress_checker_x_feature_llm_output_guardrails",
       "community": 133,
@@ -15797,7 +15927,7 @@
       "label": "[x] Feature: Agent Tool-Calling & Data Access",
       "file_type": "document",
       "source_file": "context/progress-checker.md",
-      "source_location": "L95",
+      "source_location": "L97",
       "_origin": "ast",
       "id": "context_progress_checker_x_feature_agent_tool_calling_data_access",
       "community": 133,
@@ -15807,7 +15937,7 @@
       "label": "[x] Feature: Chatbot Agent Service",
       "file_type": "document",
       "source_file": "context/progress-checker.md",
-      "source_location": "L105",
+      "source_location": "L107",
       "_origin": "ast",
       "id": "context_progress_checker_x_feature_chatbot_agent_service",
       "community": 133,
@@ -15817,7 +15947,7 @@
       "label": "[x] Feature: Agent Gateway & Tool Execution (NestJS/LangGraph)",
       "file_type": "document",
       "source_file": "context/progress-checker.md",
-      "source_location": "L118",
+      "source_location": "L120",
       "_origin": "ast",
       "id": "context_progress_checker_x_feature_agent_gateway_tool_execution_nestjs_langgraph",
       "community": 133,
@@ -15827,7 +15957,7 @@
       "label": "[x] Feature: Monorepo Scaffold & Shared Infrastructure",
       "file_type": "document",
       "source_file": "context/progress-checker.md",
-      "source_location": "L128",
+      "source_location": "L130",
       "_origin": "ast",
       "id": "context_progress_checker_x_feature_monorepo_scaffold_shared_infrastructure",
       "community": 133,
@@ -15837,7 +15967,7 @@
       "label": "[x] Feature: Database & Health Endpoint",
       "file_type": "document",
       "source_file": "context/progress-checker.md",
-      "source_location": "L134",
+      "source_location": "L136",
       "_origin": "ast",
       "id": "context_progress_checker_x_feature_database_health_endpoint",
       "community": 133,
@@ -15847,7 +15977,7 @@
       "label": "[x] Feature: User Registration",
       "file_type": "document",
       "source_file": "context/progress-checker.md",
-      "source_location": "L140",
+      "source_location": "L142",
       "_origin": "ast",
       "id": "context_progress_checker_x_feature_user_registration",
       "community": 133,
@@ -15857,7 +15987,7 @@
       "label": "[x] Feature: User Login & Rate-Limited Lockout",
       "file_type": "document",
       "source_file": "context/progress-checker.md",
-      "source_location": "L147",
+      "source_location": "L149",
       "_origin": "ast",
       "id": "context_progress_checker_x_feature_user_login_rate_limited_lockout",
       "community": 133,
@@ -15867,7 +15997,7 @@
       "label": "[x] Feature: JWT Session Handshake",
       "file_type": "document",
       "source_file": "context/progress-checker.md",
-      "source_location": "L154",
+      "source_location": "L156",
       "_origin": "ast",
       "id": "context_progress_checker_x_feature_jwt_session_handshake",
       "community": 133,
@@ -15877,7 +16007,7 @@
       "label": "[x] Feature: User Logout",
       "file_type": "document",
       "source_file": "context/progress-checker.md",
-      "source_location": "L161",
+      "source_location": "L163",
       "_origin": "ast",
       "id": "context_progress_checker_x_feature_user_logout",
       "community": 133,
@@ -15887,7 +16017,7 @@
       "label": "[x] Feature: E2E Polish & Verification",
       "file_type": "document",
       "source_file": "context/progress-checker.md",
-      "source_location": "L166",
+      "source_location": "L168",
       "_origin": "ast",
       "id": "context_progress_checker_x_feature_e2e_polish_verification",
       "community": 133,
@@ -15897,7 +16027,7 @@
       "label": "[x] Feature: Map Integration",
       "file_type": "document",
       "source_file": "context/progress-checker.md",
-      "source_location": "L172",
+      "source_location": "L174",
       "_origin": "ast",
       "id": "context_progress_checker_x_feature_map_integration",
       "community": 133,
@@ -15907,7 +16037,7 @@
       "label": "Decisions Made During Build",
       "file_type": "document",
       "source_file": "context/progress-checker.md",
-      "source_location": "L184",
+      "source_location": "L186",
       "_origin": "ast",
       "id": "context_progress_checker_decisions_made_during_build",
       "community": 133,
@@ -15917,7 +16047,7 @@
       "label": "Notes",
       "file_type": "document",
       "source_file": "context/progress-checker.md",
-      "source_location": "L193",
+      "source_location": "L195",
       "_origin": "ast",
       "id": "context_progress_checker_notes",
       "community": 133,
@@ -17630,7 +17760,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "docs_adr_research_disruption_flight_change_grilling_session_grilling_session_feature_14_disruption_flight_change_management",
-      "community": 286,
+      "community": 379,
       "norm_label": "grilling session \u2014 feature 14: disruption & flight-change management"
     },
     {
@@ -17780,7 +17910,7 @@
       "source_location": "L143",
       "_origin": "ast",
       "id": "docs_adr_research_disruption_flight_change_grilling_session_disruption_status_state_machine",
-      "community": 286,
+      "community": 379,
       "norm_label": "disruption status state machine"
     },
     {
@@ -17790,7 +17920,7 @@
       "source_location": "L169",
       "_origin": "ast",
       "id": "docs_adr_research_disruption_flight_change_grilling_session_sync_pipeline_architecture",
-      "community": 286,
+      "community": 379,
       "norm_label": "sync pipeline architecture"
     },
     {
@@ -17800,7 +17930,7 @@
       "source_location": "L212",
       "_origin": "ast",
       "id": "docs_adr_research_disruption_flight_change_grilling_session_feature_14_scope_boundary",
-      "community": 286,
+      "community": 379,
       "norm_label": "feature 14 scope boundary"
     },
     {
@@ -17810,7 +17940,7 @@
       "source_location": "L214",
       "_origin": "ast",
       "id": "docs_adr_research_disruption_flight_change_grilling_session_in_scope",
-      "community": 286,
+      "community": 379,
       "norm_label": "in scope"
     },
     {
@@ -17820,7 +17950,7 @@
       "source_location": "L226",
       "_origin": "ast",
       "id": "docs_adr_research_disruption_flight_change_grilling_session_deferred",
-      "community": 286,
+      "community": 379,
       "norm_label": "deferred"
     },
     {
@@ -17830,7 +17960,7 @@
       "source_location": "L234",
       "_origin": "ast",
       "id": "docs_adr_research_disruption_flight_change_grilling_session_artifacts_updated",
-      "community": 286,
+      "community": 379,
       "norm_label": "artifacts updated"
     },
     {
@@ -17840,7 +17970,7 @@
       "source_location": "L240",
       "_origin": "ast",
       "id": "docs_adr_research_disruption_flight_change_grilling_session_next_steps",
-      "community": 286,
+      "community": 379,
       "norm_label": "next steps"
     },
     {
@@ -33690,7 +33820,7 @@
       "source_location": "L47",
       "_origin": "ast",
       "id": "specs_014_disruption_flight_change_management_plan_project_structure",
-      "community": 341,
+      "community": 385,
       "norm_label": "project structure"
     },
     {
@@ -33700,7 +33830,7 @@
       "source_location": "L49",
       "_origin": "ast",
       "id": "specs_014_disruption_flight_change_management_plan_feature_documentation",
-      "community": 341,
+      "community": 385,
       "norm_label": "feature documentation"
     },
     {
@@ -33710,7 +33840,7 @@
       "source_location": "L64",
       "_origin": "ast",
       "id": "specs_014_disruption_flight_change_management_plan_planned_source_layout",
-      "community": 341,
+      "community": 385,
       "norm_label": "planned source layout"
     },
     {
@@ -33890,7 +34020,7 @@
       "source_location": "L272",
       "_origin": "ast",
       "id": "specs_014_disruption_flight_change_management_plan_phase_4_pr_5_signed_webhook_receiver_durable_inbox_and_processor",
-      "community": 341,
+      "community": 384,
       "norm_label": "phase 4 / pr 5 \u2014 signed webhook receiver, durable inbox, and processor"
     },
     {
@@ -33900,7 +34030,7 @@
       "source_location": "L276",
       "_origin": "ast",
       "id": "specs_014_disruption_flight_change_management_plan_work_276",
-      "community": 341,
+      "community": 384,
       "norm_label": "work"
     },
     {
@@ -33910,7 +34040,7 @@
       "source_location": "L287",
       "_origin": "ast",
       "id": "specs_014_disruption_flight_change_management_plan_tests_287",
-      "community": 341,
+      "community": 384,
       "norm_label": "tests"
     },
     {
@@ -33920,7 +34050,7 @@
       "source_location": "L294",
       "_origin": "ast",
       "id": "specs_014_disruption_flight_change_management_plan_exit_criteria_294",
-      "community": 341,
+      "community": 384,
       "norm_label": "exit criteria"
     },
     {
@@ -34662,6 +34792,136 @@
       "id": "specs_014_disruption_flight_change_management_spec_assumptions",
       "community": 344,
       "norm_label": "assumptions"
+    },
+    {
+      "label": "tasks.md",
+      "file_type": "document",
+      "source_file": "specs/014-disruption-flight-change-management/tasks.md",
+      "source_location": "L1",
+      "_origin": "ast",
+      "id": "specs_014_disruption_flight_change_management_tasks",
+      "community": 328,
+      "norm_label": "tasks.md"
+    },
+    {
+      "label": "Tasks: Disruption & Flight-Change Management Phase 6",
+      "file_type": "document",
+      "source_file": "specs/014-disruption-flight-change-management/tasks.md",
+      "source_location": "L1",
+      "_origin": "ast",
+      "id": "specs_014_disruption_flight_change_management_tasks_tasks_disruption_flight_change_management_phase_6",
+      "community": 328,
+      "norm_label": "tasks: disruption & flight-change management phase 6"
+    },
+    {
+      "label": "Format: `[ID] [P?] [Story] Description`",
+      "file_type": "document",
+      "source_file": "specs/014-disruption-flight-change-management/tasks.md",
+      "source_location": "L7",
+      "_origin": "ast",
+      "id": "specs_014_disruption_flight_change_management_tasks_format_id_p_story_description",
+      "community": 328,
+      "norm_label": "format: `[id] [p?] [story] description`"
+    },
+    {
+      "label": "Path Conventions",
+      "file_type": "document",
+      "source_file": "specs/014-disruption-flight-change-management/tasks.md",
+      "source_location": "L13",
+      "_origin": "ast",
+      "id": "specs_014_disruption_flight_change_management_tasks_path_conventions",
+      "community": 328,
+      "norm_label": "path conventions"
+    },
+    {
+      "label": "Phase 1: Setup (Shared Infrastructure)",
+      "file_type": "document",
+      "source_file": "specs/014-disruption-flight-change-management/tasks.md",
+      "source_location": "L18",
+      "_origin": "ast",
+      "id": "specs_014_disruption_flight_change_management_tasks_phase_1_setup_shared_infrastructure",
+      "community": 328,
+      "norm_label": "phase 1: setup (shared infrastructure)"
+    },
+    {
+      "label": "Phase 2: Foundational (Blocking Prerequisites)",
+      "file_type": "document",
+      "source_file": "specs/014-disruption-flight-change-management/tasks.md",
+      "source_location": "L25",
+      "_origin": "ast",
+      "id": "specs_014_disruption_flight_change_management_tasks_phase_2_foundational_blocking_prerequisites",
+      "community": 328,
+      "norm_label": "phase 2: foundational (blocking prerequisites)"
+    },
+    {
+      "label": "Phase 3: User Story 3 - Traveller Disruption APIs & Local Read Model (Priority: P1)",
+      "file_type": "document",
+      "source_file": "specs/014-disruption-flight-change-management/tasks.md",
+      "source_location": "L28",
+      "_origin": "ast",
+      "id": "specs_014_disruption_flight_change_management_tasks_phase_3_user_story_3_traveller_disruption_apis_local_read_model_priority_p1",
+      "community": 328,
+      "norm_label": "phase 3: user story 3 - traveller disruption apis & local read model (priority: p1)"
+    },
+    {
+      "label": "Tests for User Story 3",
+      "file_type": "document",
+      "source_file": "specs/014-disruption-flight-change-management/tasks.md",
+      "source_location": "L33",
+      "_origin": "ast",
+      "id": "specs_014_disruption_flight_change_management_tasks_tests_for_user_story_3",
+      "community": 328,
+      "norm_label": "tests for user story 3"
+    },
+    {
+      "label": "Implementation for User Story 3",
+      "file_type": "document",
+      "source_file": "specs/014-disruption-flight-change-management/tasks.md",
+      "source_location": "L36",
+      "_origin": "ast",
+      "id": "specs_014_disruption_flight_change_management_tasks_implementation_for_user_story_3",
+      "community": 328,
+      "norm_label": "implementation for user story 3"
+    },
+    {
+      "label": "Phase 4: User Story 4 - Cancellation Integration (Priority: P1)",
+      "file_type": "document",
+      "source_file": "specs/014-disruption-flight-change-management/tasks.md",
+      "source_location": "L44",
+      "_origin": "ast",
+      "id": "specs_014_disruption_flight_change_management_tasks_phase_4_user_story_4_cancellation_integration_priority_p1",
+      "community": 328,
+      "norm_label": "phase 4: user story 4 - cancellation integration (priority: p1)"
+    },
+    {
+      "label": "Tests for User Story 4",
+      "file_type": "document",
+      "source_file": "specs/014-disruption-flight-change-management/tasks.md",
+      "source_location": "L49",
+      "_origin": "ast",
+      "id": "specs_014_disruption_flight_change_management_tasks_tests_for_user_story_4",
+      "community": 328,
+      "norm_label": "tests for user story 4"
+    },
+    {
+      "label": "Implementation for User Story 4",
+      "file_type": "document",
+      "source_file": "specs/014-disruption-flight-change-management/tasks.md",
+      "source_location": "L52",
+      "_origin": "ast",
+      "id": "specs_014_disruption_flight_change_management_tasks_implementation_for_user_story_4",
+      "community": 328,
+      "norm_label": "implementation for user story 4"
+    },
+    {
+      "label": "Phase 5: Polish & Cross-Cutting Concerns",
+      "file_type": "document",
+      "source_file": "specs/014-disruption-flight-change-management/tasks.md",
+      "source_location": "L56",
+      "_origin": "ast",
+      "id": "specs_014_disruption_flight_change_management_tasks_phase_5_polish_cross_cutting_concerns",
+      "community": 328,
+      "norm_label": "phase 5: polish & cross-cutting concerns"
     },
     {
       "label": "task.md",
@@ -43001,7 +43261,7 @@
       "weight": 1.0,
       "context": "import",
       "source": "apps_api_package_devdependencies_tsconfig_paths",
-      "target": "apps_api_tsconfig_paths",
+      "target": "apps_web_tsconfig_paths",
       "confidence_score": 1.0
     },
     {
@@ -49676,7 +49936,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "apps/api/src/booking/booking.service.ts",
-      "source_location": "L20",
+      "source_location": "L33",
       "weight": 1.0,
       "source": "apps_api_src_booking_booking_service",
       "target": "apps_api_src_booking_booking_service_bookingservice",
@@ -49686,7 +49946,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "apps/api/src/booking/booking.service.ts",
-      "source_location": "L8",
+      "source_location": "L9",
       "weight": 1.0,
       "source": "apps_api_src_booking_booking_service",
       "target": "apps_api_src_booking_booking_service_bookingwithrelations",
@@ -49752,7 +50012,7 @@
       "context": "import",
       "confidence": "EXTRACTED",
       "source_file": "apps/api/src/booking/booking.service.ts",
-      "source_location": "L15",
+      "source_location": "L27",
       "weight": 1.0,
       "source": "apps_api_src_booking_booking_service",
       "target": "apps_api_src_common_stripe_service",
@@ -49763,7 +50023,7 @@
       "context": "import",
       "confidence": "EXTRACTED",
       "source_file": "apps/api/src/booking/booking.service.ts",
-      "source_location": "L15",
+      "source_location": "L27",
       "weight": 1.0,
       "source": "apps_api_src_booking_booking_service",
       "target": "apps_api_src_common_stripe_service_stripeservice",
@@ -49774,7 +50034,7 @@
       "context": "import",
       "confidence": "EXTRACTED",
       "source_file": "apps/api/src/booking/booking.service.ts",
-      "source_location": "L16",
+      "source_location": "L28",
       "weight": 1.0,
       "source": "apps_api_src_booking_booking_service",
       "target": "apps_api_src_duffel_duffel_service",
@@ -49785,7 +50045,7 @@
       "context": "import",
       "confidence": "EXTRACTED",
       "source_file": "apps/api/src/booking/booking.service.ts",
-      "source_location": "L16",
+      "source_location": "L28",
       "weight": 1.0,
       "source": "apps_api_src_booking_booking_service",
       "target": "apps_api_src_duffel_duffel_service_duffelservice",
@@ -49796,7 +50056,7 @@
       "context": "import",
       "confidence": "EXTRACTED",
       "source_file": "apps/api/src/booking/booking.service.ts",
-      "source_location": "L17",
+      "source_location": "L29",
       "weight": 1.0,
       "source": "apps_api_src_booking_booking_service",
       "target": "apps_api_src_payment_payment_refund_service",
@@ -49807,7 +50067,7 @@
       "context": "import",
       "confidence": "EXTRACTED",
       "source_file": "apps/api/src/booking/booking.service.ts",
-      "source_location": "L17",
+      "source_location": "L29",
       "weight": 1.0,
       "source": "apps_api_src_booking_booking_service",
       "target": "apps_api_src_payment_payment_refund_service_paymentrefundservice",
@@ -49905,7 +50165,7 @@
       "relation": "method",
       "confidence": "EXTRACTED",
       "source_file": "apps/api/src/booking/booking.service.ts",
-      "source_location": "L691",
+      "source_location": "L856",
       "weight": 1.0,
       "source": "apps_api_src_booking_booking_service_bookingservice",
       "target": "apps_api_src_booking_booking_service_bookingservice_cancelbooking",
@@ -49915,7 +50175,7 @@
       "relation": "method",
       "confidence": "EXTRACTED",
       "source_file": "apps/api/src/booking/booking.service.ts",
-      "source_location": "L319",
+      "source_location": "L332",
       "weight": 1.0,
       "source": "apps_api_src_booking_booking_service_bookingservice",
       "target": "apps_api_src_booking_booking_service_bookingservice_checkandcompletebooking",
@@ -49925,7 +50185,7 @@
       "relation": "method",
       "confidence": "EXTRACTED",
       "source_file": "apps/api/src/booking/booking.service.ts",
-      "source_location": "L786",
+      "source_location": "L992",
       "weight": 1.0,
       "source": "apps_api_src_booking_booking_service_bookingservice",
       "target": "apps_api_src_booking_booking_service_bookingservice_confirmcancellationwithretries",
@@ -49935,7 +50195,7 @@
       "relation": "method",
       "confidence": "EXTRACTED",
       "source_file": "apps/api/src/booking/booking.service.ts",
-      "source_location": "L23",
+      "source_location": "L36",
       "weight": 1.0,
       "source": "apps_api_src_booking_booking_service_bookingservice",
       "target": "apps_api_src_booking_booking_service_bookingservice_constructor",
@@ -49945,7 +50205,7 @@
       "relation": "method",
       "confidence": "EXTRACTED",
       "source_file": "apps/api/src/booking/booking.service.ts",
-      "source_location": "L77",
+      "source_location": "L90",
       "weight": 1.0,
       "source": "apps_api_src_booking_booking_service_bookingservice",
       "target": "apps_api_src_booking_booking_service_bookingservice_createbooking",
@@ -49955,7 +50215,7 @@
       "relation": "method",
       "confidence": "EXTRACTED",
       "source_file": "apps/api/src/booking/booking.service.ts",
-      "source_location": "L471",
+      "source_location": "L498",
       "weight": 1.0,
       "source": "apps_api_src_booking_booking_service_bookingservice",
       "target": "apps_api_src_booking_booking_service_bookingservice_getbookingdetail",
@@ -49965,7 +50225,7 @@
       "relation": "method",
       "confidence": "EXTRACTED",
       "source_file": "apps/api/src/booking/booking.service.ts",
-      "source_location": "L550",
+      "source_location": "L715",
       "weight": 1.0,
       "source": "apps_api_src_booking_booking_service_bookingservice",
       "target": "apps_api_src_booking_booking_service_bookingservice_getcancellationquote",
@@ -49975,7 +50235,7 @@
       "relation": "method",
       "confidence": "EXTRACTED",
       "source_file": "apps/api/src/booking/booking.service.ts",
-      "source_location": "L825",
+      "source_location": "L1031",
       "weight": 1.0,
       "source": "apps_api_src_booking_booking_service_bookingservice",
       "target": "apps_api_src_booking_booking_service_bookingservice_getcancellationstatus",
@@ -49985,7 +50245,7 @@
       "relation": "method",
       "confidence": "EXTRACTED",
       "source_file": "apps/api/src/booking/booking.service.ts",
-      "source_location": "L55",
+      "source_location": "L68",
       "weight": 1.0,
       "source": "apps_api_src_booking_booking_service_bookingservice",
       "target": "apps_api_src_booking_booking_service_bookingservice_handlecompletedbookings",
@@ -49995,7 +50255,7 @@
       "relation": "method",
       "confidence": "EXTRACTED",
       "source_file": "apps/api/src/booking/booking.service.ts",
-      "source_location": "L31",
+      "source_location": "L44",
       "weight": 1.0,
       "source": "apps_api_src_booking_booking_service_bookingservice",
       "target": "apps_api_src_booking_booking_service_bookingservice_handlestaleprocessingbookings",
@@ -50005,7 +50265,7 @@
       "relation": "method",
       "confidence": "EXTRACTED",
       "source_file": "apps/api/src/booking/booking.service.ts",
-      "source_location": "L801",
+      "source_location": "L1007",
       "weight": 1.0,
       "source": "apps_api_src_booking_booking_service_bookingservice",
       "target": "apps_api_src_booking_booking_service_bookingservice_isretryablesuppliererror",
@@ -50015,7 +50275,7 @@
       "relation": "method",
       "confidence": "EXTRACTED",
       "source_file": "apps/api/src/booking/booking.service.ts",
-      "source_location": "L412",
+      "source_location": "L425",
       "weight": 1.0,
       "source": "apps_api_src_booking_booking_service_bookingservice",
       "target": "apps_api_src_booking_booking_service_bookingservice_listbookings",
@@ -50025,7 +50285,17 @@
       "relation": "method",
       "confidence": "EXTRACTED",
       "source_file": "apps/api/src/booking/booking.service.ts",
-      "source_location": "L188",
+      "source_location": "L556",
+      "weight": 1.0,
+      "source": "apps_api_src_booking_booking_service_bookingservice",
+      "target": "apps_api_src_booking_booking_service_bookingservice_mapdisruptionanditinerary",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "method",
+      "confidence": "EXTRACTED",
+      "source_file": "apps/api/src/booking/booking.service.ts",
+      "source_location": "L201",
       "weight": 1.0,
       "source": "apps_api_src_booking_booking_service_bookingservice",
       "target": "apps_api_src_booking_booking_service_bookingservice_reconcilebookingifstale",
@@ -50035,7 +50305,7 @@
       "relation": "method",
       "confidence": "EXTRACTED",
       "source_file": "apps/api/src/booking/booking.service.ts",
-      "source_location": "L514",
+      "source_location": "L678",
       "weight": 1.0,
       "source": "apps_api_src_booking_booking_service_bookingservice",
       "target": "apps_api_src_booking_booking_service_bookingservice_sortbookings",
@@ -50045,7 +50315,7 @@
       "relation": "method",
       "confidence": "EXTRACTED",
       "source_file": "apps/api/src/booking/booking.service.ts",
-      "source_location": "L810",
+      "source_location": "L1016",
       "weight": 1.0,
       "source": "apps_api_src_booking_booking_service_bookingservice",
       "target": "apps_api_src_booking_booking_service_bookingservice_tocancellationresponse",
@@ -50055,7 +50325,7 @@
       "relation": "method",
       "confidence": "EXTRACTED",
       "source_file": "apps/api/src/booking/booking.service.ts",
-      "source_location": "L536",
+      "source_location": "L700",
       "weight": 1.0,
       "source": "apps_api_src_booking_booking_service_bookingservice",
       "target": "apps_api_src_booking_booking_service_bookingservice_tolistitem",
@@ -50065,7 +50335,7 @@
       "relation": "method",
       "confidence": "EXTRACTED",
       "source_file": "apps/api/src/booking/booking.service.ts",
-      "source_location": "L129",
+      "source_location": "L142",
       "weight": 1.0,
       "source": "apps_api_src_booking_booking_service_bookingservice",
       "target": "apps_api_src_booking_booking_service_bookingservice_updatetoconfirmed",
@@ -50075,7 +50345,7 @@
       "relation": "method",
       "confidence": "EXTRACTED",
       "source_file": "apps/api/src/booking/booking.service.ts",
-      "source_location": "L162",
+      "source_location": "L175",
       "weight": 1.0,
       "source": "apps_api_src_booking_booking_service_bookingservice",
       "target": "apps_api_src_booking_booking_service_bookingservice_updatetofailed",
@@ -50152,7 +50422,7 @@
       "context": "parameter_type",
       "confidence": "EXTRACTED",
       "source_file": "apps/api/src/booking/booking.service.ts",
-      "source_location": "L23",
+      "source_location": "L36",
       "weight": 1.0,
       "source": "apps_api_src_booking_booking_service_bookingservice_constructor",
       "target": "apps_api_src_common_stripe_service_stripeservice",
@@ -50163,7 +50433,7 @@
       "context": "parameter_type",
       "confidence": "EXTRACTED",
       "source_file": "apps/api/src/booking/booking.service.ts",
-      "source_location": "L23",
+      "source_location": "L36",
       "weight": 1.0,
       "source": "apps_api_src_booking_booking_service_bookingservice_constructor",
       "target": "apps_api_src_duffel_duffel_service_duffelservice",
@@ -50174,7 +50444,7 @@
       "context": "parameter_type",
       "confidence": "EXTRACTED",
       "source_file": "apps/api/src/booking/booking.service.ts",
-      "source_location": "L23",
+      "source_location": "L36",
       "weight": 1.0,
       "source": "apps_api_src_booking_booking_service_bookingservice_constructor",
       "target": "apps_api_src_payment_payment_refund_service_paymentrefundservice",
@@ -50185,7 +50455,7 @@
       "context": "parameter_type",
       "confidence": "EXTRACTED",
       "source_file": "apps/api/src/booking/booking.service.ts",
-      "source_location": "L23",
+      "source_location": "L36",
       "weight": 1.0,
       "source": "apps_api_src_booking_booking_service_bookingservice_constructor",
       "target": "apps_api_src_prisma_prisma_service_prismaservice",
@@ -50196,7 +50466,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "apps/api/src/booking/booking.service.ts",
-      "source_location": "L47",
+      "source_location": "L60",
       "weight": 1.0,
       "source": "apps_api_src_booking_booking_service_bookingservice_handlestaleprocessingbookings",
       "target": "apps_api_src_booking_booking_service_bookingservice_reconcilebookingifstale",
@@ -50207,7 +50477,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "apps/api/src/booking/booking.service.ts",
-      "source_location": "L70",
+      "source_location": "L83",
       "weight": 1.0,
       "source": "apps_api_src_booking_booking_service_bookingservice_handlecompletedbookings",
       "target": "apps_api_src_booking_booking_service_bookingservice_checkandcompletebooking",
@@ -50229,7 +50499,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "apps/api/src/booking/booking.service.ts",
-      "source_location": "L485",
+      "source_location": "L526",
       "weight": 1.0,
       "source": "apps_api_src_booking_booking_service_bookingservice_getbookingdetail",
       "target": "apps_api_src_booking_booking_service_bookingservice_reconcilebookingifstale",
@@ -50241,7 +50511,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "apps/api/src/booking/booking.service.ts",
-      "source_location": "L234",
+      "source_location": "L247",
       "weight": 1.0,
       "source": "apps_api_src_booking_booking_service_bookingservice_reconcilebookingifstale",
       "target": "apps_api_src_common_stripe_service_stripeservice_cancelpaymentintent"
@@ -50252,7 +50522,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "apps/api/src/booking/booking.service.ts",
-      "source_location": "L216",
+      "source_location": "L229",
       "weight": 1.0,
       "source": "apps_api_src_booking_booking_service_bookingservice_reconcilebookingifstale",
       "target": "apps_api_src_common_stripe_service_stripeservice_retrievepaymentintent"
@@ -50263,7 +50533,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "apps/api/src/booking/booking.service.ts",
-      "source_location": "L225",
+      "source_location": "L238",
       "weight": 1.0,
       "source": "apps_api_src_booking_booking_service_bookingservice_reconcilebookingifstale",
       "target": "apps_api_src_duffel_duffel_service_duffelservice_cancelorder"
@@ -50274,7 +50544,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "apps/api/src/booking/booking.service.ts",
-      "source_location": "L263",
+      "source_location": "L276",
       "weight": 1.0,
       "source": "apps_api_src_booking_booking_service_bookingservice_reconcilebookingifstale",
       "target": "apps_api_src_duffel_duffel_service_duffelservice_mapduffelordertosnapshots"
@@ -50285,7 +50555,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "apps/api/src/booking/booking.service.ts",
-      "source_location": "L302",
+      "source_location": "L315",
       "weight": 1.0,
       "source": "apps_api_src_booking_booking_service_bookingservice_reconcilebookingifstale",
       "target": "apps_api_src_payment_payment_refund_service_paymentrefundservice_triggerautomatedrefund"
@@ -50296,7 +50566,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "apps/api/src/booking/booking.service.ts",
-      "source_location": "L324",
+      "source_location": "L337",
       "weight": 1.0,
       "source": "apps_api_src_booking_booking_service_bookingservice_checkandcompletebooking",
       "target": "apps_api_src_prisma_prisma_service_prismaservice"
@@ -50306,7 +50576,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "apps/api/src/booking/booking.service.ts",
-      "source_location": "L489",
+      "source_location": "L530",
       "weight": 1.0,
       "source": "apps_api_src_booking_booking_service_bookingservice_getbookingdetail",
       "target": "apps_api_src_booking_booking_service_bookingservice_checkandcompletebooking",
@@ -50328,7 +50598,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "apps/api/src/booking/booking.service.ts",
-      "source_location": "L464",
+      "source_location": "L491",
       "weight": 1.0,
       "source": "apps_api_src_booking_booking_service_bookingservice_listbookings",
       "target": "apps_api_src_booking_booking_service_bookingservice_sortbookings",
@@ -50339,7 +50609,7 @@
       "context": "parameter_type",
       "confidence": "EXTRACTED",
       "source_file": "apps/api/src/booking/booking.service.ts",
-      "source_location": "L412",
+      "source_location": "L425",
       "weight": 1.0,
       "source": "apps_api_src_booking_booking_service_bookingservice_listbookings",
       "target": "apps_api_src_booking_dto_booking_list_query_dto_bookingtab",
@@ -50350,10 +50620,21 @@
       "context": "generic_arg",
       "confidence": "EXTRACTED",
       "source_file": "apps/api/src/booking/booking.service.ts",
-      "source_location": "L412",
+      "source_location": "L425",
       "weight": 1.0,
       "source": "apps_api_src_booking_booking_service_bookingservice_listbookings",
       "target": "apps_api_src_booking_dto_booking_response_dto_bookinglistresponsedto",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "apps/api/src/booking/booking.service.ts",
+      "source_location": "L552",
+      "weight": 1.0,
+      "source": "apps_api_src_booking_booking_service_bookingservice_getbookingdetail",
+      "target": "apps_api_src_booking_booking_service_bookingservice_mapdisruptionanditinerary",
       "confidence_score": 1.0
     },
     {
@@ -50361,10 +50642,21 @@
       "context": "generic_arg",
       "confidence": "EXTRACTED",
       "source_file": "apps/api/src/booking/booking.service.ts",
-      "source_location": "L471",
+      "source_location": "L498",
       "weight": 1.0,
       "source": "apps_api_src_booking_booking_service_bookingservice_getbookingdetail",
       "target": "apps_api_src_booking_dto_booking_response_dto_bookingdetailresponsedto",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "apps/api/src/booking/booking.service.ts",
+      "source_location": "L710",
+      "weight": 1.0,
+      "source": "apps_api_src_booking_booking_service_bookingservice_tolistitem",
+      "target": "apps_api_src_booking_booking_service_bookingservice_mapdisruptionanditinerary",
       "confidence_score": 1.0
     },
     {
@@ -50372,7 +50664,7 @@
       "context": "parameter_type",
       "confidence": "EXTRACTED",
       "source_file": "apps/api/src/booking/booking.service.ts",
-      "source_location": "L514",
+      "source_location": "L678",
       "weight": 1.0,
       "source": "apps_api_src_booking_booking_service_bookingservice_sortbookings",
       "target": "apps_api_src_booking_dto_booking_list_query_dto_bookingtab",
@@ -50383,7 +50675,7 @@
       "context": "return_type",
       "confidence": "EXTRACTED",
       "source_file": "apps/api/src/booking/booking.service.ts",
-      "source_location": "L536",
+      "source_location": "L700",
       "weight": 1.0,
       "source": "apps_api_src_booking_booking_service_bookingservice_tolistitem",
       "target": "apps_api_src_booking_dto_booking_response_dto_bookinglistitemresponsedto",
@@ -50395,7 +50687,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "apps/api/src/booking/booking.service.ts",
-      "source_location": "L639",
+      "source_location": "L804",
       "weight": 1.0,
       "source": "apps_api_src_booking_booking_service_bookingservice_getcancellationquote",
       "target": "apps_api_src_duffel_duffel_service_duffelservice_createcancellationquote"
@@ -50405,7 +50697,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "apps/api/src/booking/booking.service.ts",
-      "source_location": "L733",
+      "source_location": "L898",
       "weight": 1.0,
       "source": "apps_api_src_booking_booking_service_bookingservice_cancelbooking",
       "target": "apps_api_src_booking_booking_service_bookingservice_confirmcancellationwithretries",
@@ -50416,7 +50708,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "apps/api/src/booking/booking.service.ts",
-      "source_location": "L726",
+      "source_location": "L891",
       "weight": 1.0,
       "source": "apps_api_src_booking_booking_service_bookingservice_cancelbooking",
       "target": "apps_api_src_booking_booking_service_bookingservice_tocancellationresponse",
@@ -50428,7 +50720,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "apps/api/src/booking/booking.service.ts",
-      "source_location": "L729",
+      "source_location": "L894",
       "weight": 1.0,
       "source": "apps_api_src_booking_booking_service_bookingservice_cancelbooking",
       "target": "apps_api_src_duffel_duffel_service_duffelservice_retrieveorder"
@@ -50439,17 +50731,28 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "apps/api/src/booking/booking.service.ts",
-      "source_location": "L770",
+      "source_location": "L976",
       "weight": 1.0,
       "source": "apps_api_src_booking_booking_service_bookingservice_cancelbooking",
       "target": "apps_api_src_payment_payment_refund_service_paymentrefundservice_processcancellationrefund"
+    },
+    {
+      "relation": "references",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "apps/api/src/booking/booking.service.ts",
+      "source_location": "L910",
+      "weight": 1.0,
+      "source": "apps_api_src_booking_booking_service_bookingservice_cancelbooking",
+      "target": "apps_api_src_prisma_prisma_service_prismaservice"
     },
     {
       "relation": "calls",
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "apps/api/src/booking/booking.service.ts",
-      "source_location": "L792",
+      "source_location": "L998",
       "weight": 1.0,
       "source": "apps_api_src_booking_booking_service_bookingservice_confirmcancellationwithretries",
       "target": "apps_api_src_booking_booking_service_bookingservice_isretryablesuppliererror",
@@ -50460,7 +50763,7 @@
       "context": "generic_arg",
       "confidence": "EXTRACTED",
       "source_file": "apps/api/src/booking/booking.service.ts",
-      "source_location": "L786",
+      "source_location": "L992",
       "weight": 1.0,
       "source": "apps_api_src_booking_booking_service_bookingservice_confirmcancellationwithretries",
       "target": "apps_api_src_duffel_duffel_service_duffelservice",
@@ -50472,7 +50775,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "apps/api/src/booking/booking.service.ts",
-      "source_location": "L790",
+      "source_location": "L996",
       "weight": 1.0,
       "source": "apps_api_src_booking_booking_service_bookingservice_confirmcancellationwithretries",
       "target": "apps_api_src_duffel_duffel_service_duffelservice_confirmcancellationquote"
@@ -50512,7 +50815,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "apps/api/src/booking/dto/booking-response.dto.ts",
-      "source_location": "L20",
+      "source_location": "L23",
       "weight": 1.0,
       "source": "apps_api_src_booking_dto_booking_response_dto",
       "target": "apps_api_src_booking_dto_booking_response_dto_bookingdetailresponsedto",
@@ -50522,7 +50825,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "apps/api/src/booking/dto/booking-response.dto.ts",
-      "source_location": "L3",
+      "source_location": "L4",
       "weight": 1.0,
       "source": "apps_api_src_booking_dto_booking_response_dto",
       "target": "apps_api_src_booking_dto_booking_response_dto_bookinglistitemresponsedto",
@@ -50532,7 +50835,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "apps/api/src/booking/dto/booking-response.dto.ts",
-      "source_location": "L15",
+      "source_location": "L18",
       "weight": 1.0,
       "source": "apps_api_src_booking_dto_booking_response_dto",
       "target": "apps_api_src_booking_dto_booking_response_dto_bookinglistresponsedto",
@@ -50554,7 +50857,7 @@
       "context": "type",
       "confidence": "EXTRACTED",
       "source_file": "apps/api/src/booking/dto/booking-response.dto.ts",
-      "source_location": "L20",
+      "source_location": "L23",
       "weight": 1.0,
       "source": "apps_api_src_booking_dto_booking_response_dto_bookingdetailresponsedto",
       "target": "apps_api_src_booking_dto_booking_response_dto_bookinglistitemresponsedto",
@@ -53681,7 +53984,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "apps/api/src/disruption/api/disruption.controller.ts",
-      "source_location": "L7",
+      "source_location": "L9",
       "weight": 1.0,
       "source": "apps_api_src_disruption_api_disruption_controller",
       "target": "apps_api_src_disruption_api_disruption_controller_authenticatedrequest",
@@ -53691,10 +53994,42 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "apps/api/src/disruption/api/disruption.controller.ts",
-      "source_location": "L13",
+      "source_location": "L15",
       "weight": 1.0,
       "source": "apps_api_src_disruption_api_disruption_controller",
       "target": "apps_api_src_disruption_api_disruption_controller_disruptioncontroller",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "apps/api/src/disruption/api/disruption.controller.ts",
+      "source_location": "L45",
+      "weight": 1.0,
+      "source": "apps_api_src_disruption_api_disruption_controller",
+      "target": "apps_api_src_disruption_api_disruption_controller_travellerdisruptioncontroller",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports_from",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "apps/api/src/disruption/api/disruption.controller.ts",
+      "source_location": "L7",
+      "weight": 1.0,
+      "source": "apps_api_src_disruption_api_disruption_controller",
+      "target": "apps_api_src_disruption_api_disruption_service",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "apps/api/src/disruption/api/disruption.controller.ts",
+      "source_location": "L7",
+      "weight": 1.0,
+      "source": "apps_api_src_disruption_api_disruption_controller",
+      "target": "apps_api_src_disruption_api_disruption_service_disruptionservice",
       "confidence_score": 1.0
     },
     {
@@ -53767,7 +54102,7 @@
       "relation": "method",
       "confidence": "EXTRACTED",
       "source_file": "apps/api/src/disruption/api/disruption.controller.ts",
-      "source_location": "L14",
+      "source_location": "L16",
       "weight": 1.0,
       "source": "apps_api_src_disruption_api_disruption_controller_disruptioncontroller",
       "target": "apps_api_src_disruption_api_disruption_controller_disruptioncontroller_constructor",
@@ -53777,7 +54112,7 @@
       "relation": "method",
       "confidence": "EXTRACTED",
       "source_file": "apps/api/src/disruption/api/disruption.controller.ts",
-      "source_location": "L21",
+      "source_location": "L23",
       "weight": 1.0,
       "source": "apps_api_src_disruption_api_disruption_controller_disruptioncontroller",
       "target": "apps_api_src_disruption_api_disruption_controller_disruptioncontroller_syncbooking",
@@ -53799,7 +54134,7 @@
       "context": "parameter_type",
       "confidence": "EXTRACTED",
       "source_file": "apps/api/src/disruption/api/disruption.controller.ts",
-      "source_location": "L14",
+      "source_location": "L16",
       "weight": 1.0,
       "source": "apps_api_src_disruption_api_disruption_controller_disruptioncontroller_constructor",
       "target": "apps_api_src_disruption_sync_supplier_sync_service_suppliersyncservice",
@@ -53810,7 +54145,7 @@
       "context": "parameter_type",
       "confidence": "EXTRACTED",
       "source_file": "apps/api/src/disruption/api/disruption.controller.ts",
-      "source_location": "L14",
+      "source_location": "L16",
       "weight": 1.0,
       "source": "apps_api_src_disruption_api_disruption_controller_disruptioncontroller_constructor",
       "target": "apps_api_src_prisma_prisma_service_prismaservice",
@@ -53822,7 +54157,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "apps/api/src/disruption/api/disruption.controller.ts",
-      "source_location": "L37",
+      "source_location": "L39",
       "weight": 1.0,
       "source": "apps_api_src_disruption_api_disruption_controller_disruptioncontroller_syncbooking",
       "target": "apps_api_src_disruption_sync_supplier_sync_service_suppliersyncservice_syncbooking"
@@ -53832,17 +54167,239 @@
       "context": "generic_arg",
       "confidence": "EXTRACTED",
       "source_file": "apps/api/src/disruption/api/disruption.controller.ts",
-      "source_location": "L21",
+      "source_location": "L23",
       "weight": 1.0,
       "source": "apps_api_src_disruption_api_disruption_controller_disruptioncontroller_syncbooking",
       "target": "apps_api_src_disruption_sync_supplier_sync_service_syncresult",
       "confidence_score": 1.0
     },
     {
+      "relation": "method",
+      "confidence": "EXTRACTED",
+      "source_file": "apps/api/src/disruption/api/disruption.controller.ts",
+      "source_location": "L72",
+      "weight": 1.0,
+      "source": "apps_api_src_disruption_api_disruption_controller_travellerdisruptioncontroller",
+      "target": "apps_api_src_disruption_api_disruption_controller_travellerdisruptioncontroller_acceptdisruption",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "method",
+      "confidence": "EXTRACTED",
+      "source_file": "apps/api/src/disruption/api/disruption.controller.ts",
+      "source_location": "L62",
+      "weight": 1.0,
+      "source": "apps_api_src_disruption_api_disruption_controller_travellerdisruptioncontroller",
+      "target": "apps_api_src_disruption_api_disruption_controller_travellerdisruptioncontroller_acknowledgedisruption",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "method",
+      "confidence": "EXTRACTED",
+      "source_file": "apps/api/src/disruption/api/disruption.controller.ts",
+      "source_location": "L46",
+      "weight": 1.0,
+      "source": "apps_api_src_disruption_api_disruption_controller_travellerdisruptioncontroller",
+      "target": "apps_api_src_disruption_api_disruption_controller_travellerdisruptioncontroller_constructor",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "method",
+      "confidence": "EXTRACTED",
+      "source_file": "apps/api/src/disruption/api/disruption.controller.ts",
+      "source_location": "L49",
+      "weight": 1.0,
+      "source": "apps_api_src_disruption_api_disruption_controller_travellerdisruptioncontroller",
+      "target": "apps_api_src_disruption_api_disruption_controller_travellerdisruptioncontroller_getdisruptions",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "apps/api/src/disruption/disruption.module.ts",
+      "source_location": "L8",
+      "weight": 1.0,
+      "source": "apps_api_src_disruption_disruption_module",
+      "target": "apps_api_src_disruption_api_disruption_controller_travellerdisruptioncontroller",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "references",
+      "context": "parameter_type",
+      "confidence": "EXTRACTED",
+      "source_file": "apps/api/src/disruption/api/disruption.controller.ts",
+      "source_location": "L46",
+      "weight": 1.0,
+      "source": "apps_api_src_disruption_api_disruption_controller_travellerdisruptioncontroller_constructor",
+      "target": "apps_api_src_disruption_api_disruption_service_disruptionservice",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "apps/api/src/disruption/api/disruption.controller.ts",
+      "source_location": "L57",
+      "weight": 1.0,
+      "source": "apps_api_src_disruption_api_disruption_controller_travellerdisruptioncontroller_getdisruptions",
+      "target": "apps_api_src_disruption_api_disruption_service_disruptionservice_getdisruptionhistory"
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "apps/api/src/disruption/api/disruption.controller.ts",
+      "source_location": "L67",
+      "weight": 1.0,
+      "source": "apps_api_src_disruption_api_disruption_controller_travellerdisruptioncontroller_acknowledgedisruption",
+      "target": "apps_api_src_disruption_api_disruption_service_disruptionservice_acknowledgedisruption"
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "apps/api/src/disruption/api/disruption.controller.ts",
+      "source_location": "L77",
+      "weight": 1.0,
+      "source": "apps_api_src_disruption_api_disruption_controller_travellerdisruptioncontroller_acceptdisruption",
+      "target": "apps_api_src_disruption_api_disruption_service_disruptionservice_acceptdisruption"
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "apps/api/src/disruption/api/disruption.service.ts",
+      "source_location": "L12",
+      "weight": 1.0,
+      "source": "apps_api_src_disruption_api_disruption_service",
+      "target": "apps_api_src_disruption_api_disruption_service_disruptionservice",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports_from",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "apps/api/src/disruption/api/disruption.service.ts",
+      "source_location": "L2",
+      "weight": 1.0,
+      "source": "apps_api_src_disruption_api_disruption_service",
+      "target": "apps_api_src_prisma_prisma_service",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "apps/api/src/disruption/api/disruption.service.ts",
+      "source_location": "L2",
+      "weight": 1.0,
+      "source": "apps_api_src_disruption_api_disruption_service",
+      "target": "apps_api_src_prisma_prisma_service_prismaservice",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports_from",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "apps/api/src/disruption/disruption.module.ts",
+      "source_location": "L9",
+      "weight": 1.0,
+      "source": "apps_api_src_disruption_disruption_module",
+      "target": "apps_api_src_disruption_api_disruption_service",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "method",
+      "confidence": "EXTRACTED",
+      "source_file": "apps/api/src/disruption/api/disruption.service.ts",
+      "source_location": "L171",
+      "weight": 1.0,
+      "source": "apps_api_src_disruption_api_disruption_service_disruptionservice",
+      "target": "apps_api_src_disruption_api_disruption_service_disruptionservice_acceptdisruption",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "method",
+      "confidence": "EXTRACTED",
+      "source_file": "apps/api/src/disruption/api/disruption.service.ts",
+      "source_location": "L93",
+      "weight": 1.0,
+      "source": "apps_api_src_disruption_api_disruption_service_disruptionservice",
+      "target": "apps_api_src_disruption_api_disruption_service_disruptionservice_acknowledgedisruption",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "method",
+      "confidence": "EXTRACTED",
+      "source_file": "apps/api/src/disruption/api/disruption.service.ts",
+      "source_location": "L13",
+      "weight": 1.0,
+      "source": "apps_api_src_disruption_api_disruption_service_disruptionservice",
+      "target": "apps_api_src_disruption_api_disruption_service_disruptionservice_constructor",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "method",
+      "confidence": "EXTRACTED",
+      "source_file": "apps/api/src/disruption/api/disruption.service.ts",
+      "source_location": "L15",
+      "weight": 1.0,
+      "source": "apps_api_src_disruption_api_disruption_service_disruptionservice",
+      "target": "apps_api_src_disruption_api_disruption_service_disruptionservice_getdisruptionhistory",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "apps/api/src/disruption/disruption.module.ts",
+      "source_location": "L9",
+      "weight": 1.0,
+      "source": "apps_api_src_disruption_disruption_module",
+      "target": "apps_api_src_disruption_api_disruption_service_disruptionservice",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "references",
+      "context": "parameter_type",
+      "confidence": "EXTRACTED",
+      "source_file": "apps/api/src/disruption/api/disruption.service.ts",
+      "source_location": "L13",
+      "weight": 1.0,
+      "source": "apps_api_src_disruption_api_disruption_service_disruptionservice_constructor",
+      "target": "apps_api_src_prisma_prisma_service_prismaservice",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "references",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "apps/api/src/disruption/api/disruption.service.ts",
+      "source_location": "L138",
+      "weight": 1.0,
+      "source": "apps_api_src_disruption_api_disruption_service_disruptionservice_acknowledgedisruption",
+      "target": "apps_api_src_prisma_prisma_service_prismaservice"
+    },
+    {
+      "relation": "references",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "apps/api/src/disruption/api/disruption.service.ts",
+      "source_location": "L217",
+      "weight": 1.0,
+      "source": "apps_api_src_disruption_api_disruption_service_disruptionservice_acceptdisruption",
+      "target": "apps_api_src_prisma_prisma_service_prismaservice"
+    },
+    {
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "apps/api/src/disruption/disruption.module.ts",
-      "source_location": "L37",
+      "source_location": "L40",
       "weight": 1.0,
       "source": "apps_api_src_disruption_disruption_module",
       "target": "apps_api_src_disruption_disruption_module_disruptionmodule",
@@ -53919,7 +54476,7 @@
       "context": "import",
       "confidence": "EXTRACTED",
       "source_file": "apps/api/src/disruption/disruption.module.ts",
-      "source_location": "L13",
+      "source_location": "L14",
       "weight": 1.0,
       "source": "apps_api_src_disruption_disruption_module",
       "target": "apps_api_src_disruption_webhook_duffel_event_processor",
@@ -53930,7 +54487,7 @@
       "context": "import",
       "confidence": "EXTRACTED",
       "source_file": "apps/api/src/disruption/disruption.module.ts",
-      "source_location": "L13",
+      "source_location": "L14",
       "weight": 1.0,
       "source": "apps_api_src_disruption_disruption_module",
       "target": "apps_api_src_disruption_webhook_duffel_event_processor_duffeleventprocessor",
@@ -53941,7 +54498,7 @@
       "context": "import",
       "confidence": "EXTRACTED",
       "source_file": "apps/api/src/disruption/disruption.module.ts",
-      "source_location": "L11",
+      "source_location": "L12",
       "weight": 1.0,
       "source": "apps_api_src_disruption_disruption_module",
       "target": "apps_api_src_disruption_webhook_duffel_inbox_service",
@@ -53952,7 +54509,7 @@
       "context": "import",
       "confidence": "EXTRACTED",
       "source_file": "apps/api/src/disruption/disruption.module.ts",
-      "source_location": "L11",
+      "source_location": "L12",
       "weight": 1.0,
       "source": "apps_api_src_disruption_disruption_module",
       "target": "apps_api_src_disruption_webhook_duffel_inbox_service_duffelinboxservice",
@@ -53963,7 +54520,7 @@
       "context": "import",
       "confidence": "EXTRACTED",
       "source_file": "apps/api/src/disruption/disruption.module.ts",
-      "source_location": "L12",
+      "source_location": "L13",
       "weight": 1.0,
       "source": "apps_api_src_disruption_disruption_module",
       "target": "apps_api_src_disruption_webhook_duffel_processor_health_service",
@@ -53974,7 +54531,7 @@
       "context": "import",
       "confidence": "EXTRACTED",
       "source_file": "apps/api/src/disruption/disruption.module.ts",
-      "source_location": "L12",
+      "source_location": "L13",
       "weight": 1.0,
       "source": "apps_api_src_disruption_disruption_module",
       "target": "apps_api_src_disruption_webhook_duffel_processor_health_service_duffelprocessorhealthservice",
@@ -53985,7 +54542,7 @@
       "context": "import",
       "confidence": "EXTRACTED",
       "source_file": "apps/api/src/disruption/disruption.module.ts",
-      "source_location": "L10",
+      "source_location": "L11",
       "weight": 1.0,
       "source": "apps_api_src_disruption_disruption_module",
       "target": "apps_api_src_disruption_webhook_duffel_signature_service",
@@ -53996,7 +54553,7 @@
       "context": "import",
       "confidence": "EXTRACTED",
       "source_file": "apps/api/src/disruption/disruption.module.ts",
-      "source_location": "L10",
+      "source_location": "L11",
       "weight": 1.0,
       "source": "apps_api_src_disruption_disruption_module",
       "target": "apps_api_src_disruption_webhook_duffel_signature_service_duffelsignatureservice",
@@ -54007,7 +54564,7 @@
       "context": "import",
       "confidence": "EXTRACTED",
       "source_file": "apps/api/src/disruption/disruption.module.ts",
-      "source_location": "L9",
+      "source_location": "L10",
       "weight": 1.0,
       "source": "apps_api_src_disruption_disruption_module",
       "target": "apps_api_src_disruption_webhook_duffel_webhook_controller",
@@ -54018,7 +54575,7 @@
       "context": "import",
       "confidence": "EXTRACTED",
       "source_file": "apps/api/src/disruption/disruption.module.ts",
-      "source_location": "L9",
+      "source_location": "L10",
       "weight": 1.0,
       "source": "apps_api_src_disruption_disruption_module",
       "target": "apps_api_src_disruption_webhook_duffel_webhook_controller_duffelwebhookcontroller",
@@ -66352,7 +66909,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "context/architecture.md",
-      "source_location": "L361",
+      "source_location": "L390",
       "weight": 1.0,
       "source": "context_architecture_architecture",
       "target": "context_architecture_containerization",
@@ -66372,7 +66929,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "context/architecture.md",
-      "source_location": "L373",
+      "source_location": "L402",
       "weight": 1.0,
       "source": "context_architecture_architecture",
       "target": "context_architecture_invariants",
@@ -66402,7 +66959,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "context/architecture.md",
-      "source_location": "L335",
+      "source_location": "L364",
       "weight": 1.0,
       "source": "context_architecture_data_flow",
       "target": "context_architecture_ai_chatbot_agent_flow_sse_streaming",
@@ -66506,6 +67063,16 @@
       "weight": 1.0,
       "source": "context_architecture_data_flow",
       "target": "context_architecture_payment_flow_deterministic_path_no_ai",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "context/architecture.md",
+      "source_location": "L335",
+      "weight": 1.0,
+      "source": "context_architecture_data_flow",
+      "target": "context_architecture_traveller_disruption_apis_lifecycle_phase_6",
       "confidence_score": 1.0
     },
     {
@@ -67242,7 +67809,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "context/progress-checker.md",
-      "source_location": "L184",
+      "source_location": "L186",
       "weight": 1.0,
       "source": "context_progress_checker_progress_tracker",
       "target": "context_progress_checker_decisions_made_during_build",
@@ -67252,7 +67819,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "context/progress-checker.md",
-      "source_location": "L193",
+      "source_location": "L195",
       "weight": 1.0,
       "source": "context_progress_checker_progress_tracker",
       "target": "context_progress_checker_notes",
@@ -67282,7 +67849,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "context/progress-checker.md",
-      "source_location": "L118",
+      "source_location": "L120",
       "weight": 1.0,
       "source": "context_progress_checker_progress_by_feature",
       "target": "context_progress_checker_x_feature_agent_gateway_tool_execution_nestjs_langgraph",
@@ -67292,7 +67859,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "context/progress-checker.md",
-      "source_location": "L95",
+      "source_location": "L97",
       "weight": 1.0,
       "source": "context_progress_checker_progress_by_feature",
       "target": "context_progress_checker_x_feature_agent_tool_calling_data_access",
@@ -67302,7 +67869,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "context/progress-checker.md",
-      "source_location": "L56",
+      "source_location": "L58",
       "weight": 1.0,
       "source": "context_progress_checker_progress_by_feature",
       "target": "context_progress_checker_x_feature_booking_intent_foundation_feature_9",
@@ -67312,7 +67879,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "context/progress-checker.md",
-      "source_location": "L35",
+      "source_location": "L37",
       "weight": 1.0,
       "source": "context_progress_checker_progress_by_feature",
       "target": "context_progress_checker_x_feature_booking_management_confirmation_feature_11",
@@ -67322,7 +67889,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "context/progress-checker.md",
-      "source_location": "L63",
+      "source_location": "L65",
       "weight": 1.0,
       "source": "context_progress_checker_progress_by_feature",
       "target": "context_progress_checker_x_feature_cabin_class_passenger_type_enhancement_feature_8",
@@ -67332,7 +67899,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "context/progress-checker.md",
-      "source_location": "L105",
+      "source_location": "L107",
       "weight": 1.0,
       "source": "context_progress_checker_progress_by_feature",
       "target": "context_progress_checker_x_feature_chatbot_agent_service",
@@ -67342,7 +67909,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "context/progress-checker.md",
-      "source_location": "L134",
+      "source_location": "L136",
       "weight": 1.0,
       "source": "context_progress_checker_progress_by_feature",
       "target": "context_progress_checker_x_feature_database_health_endpoint",
@@ -67352,7 +67919,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "context/progress-checker.md",
-      "source_location": "L73",
+      "source_location": "L75",
       "weight": 1.0,
       "source": "context_progress_checker_progress_by_feature",
       "target": "context_progress_checker_x_feature_duffel_flight_search_service_setup_agent_gateway_refactoring_feature_6",
@@ -67362,7 +67929,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "context/progress-checker.md",
-      "source_location": "L166",
+      "source_location": "L168",
       "weight": 1.0,
       "source": "context_progress_checker_progress_by_feature",
       "target": "context_progress_checker_x_feature_e2e_polish_verification",
@@ -67372,7 +67939,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "context/progress-checker.md",
-      "source_location": "L27",
+      "source_location": "L29",
       "weight": 1.0,
       "source": "context_progress_checker_progress_by_feature",
       "target": "context_progress_checker_x_feature_flight_cancellation_automated_refund_system_feature_12",
@@ -67382,7 +67949,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "context/progress-checker.md",
-      "source_location": "L154",
+      "source_location": "L156",
       "weight": 1.0,
       "source": "context_progress_checker_progress_by_feature",
       "target": "context_progress_checker_x_feature_jwt_session_handshake",
@@ -67392,7 +67959,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "context/progress-checker.md",
-      "source_location": "L82",
+      "source_location": "L84",
       "weight": 1.0,
       "source": "context_progress_checker_progress_by_feature",
       "target": "context_progress_checker_x_feature_llm_output_guardrails",
@@ -67402,7 +67969,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "context/progress-checker.md",
-      "source_location": "L172",
+      "source_location": "L174",
       "weight": 1.0,
       "source": "context_progress_checker_progress_by_feature",
       "target": "context_progress_checker_x_feature_map_integration",
@@ -67412,7 +67979,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "context/progress-checker.md",
-      "source_location": "L128",
+      "source_location": "L130",
       "weight": 1.0,
       "source": "context_progress_checker_progress_by_feature",
       "target": "context_progress_checker_x_feature_monorepo_scaffold_shared_infrastructure",
@@ -67422,7 +67989,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "context/progress-checker.md",
-      "source_location": "L45",
+      "source_location": "L47",
       "weight": 1.0,
       "source": "context_progress_checker_progress_by_feature",
       "target": "context_progress_checker_x_feature_stripe_payment_system_feature_10",
@@ -67432,7 +67999,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "context/progress-checker.md",
-      "source_location": "L147",
+      "source_location": "L149",
       "weight": 1.0,
       "source": "context_progress_checker_progress_by_feature",
       "target": "context_progress_checker_x_feature_user_login_rate_limited_lockout",
@@ -67442,7 +68009,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "context/progress-checker.md",
-      "source_location": "L161",
+      "source_location": "L163",
       "weight": 1.0,
       "source": "context_progress_checker_progress_by_feature",
       "target": "context_progress_checker_x_feature_user_logout",
@@ -67452,7 +68019,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "context/progress-checker.md",
-      "source_location": "L140",
+      "source_location": "L142",
       "weight": 1.0,
       "source": "context_progress_checker_progress_by_feature",
       "target": "context_progress_checker_x_feature_user_registration",
@@ -85301,6 +85868,126 @@
     {
       "relation": "contains",
       "confidence": "EXTRACTED",
+      "source_file": "specs/014-disruption-flight-change-management/tasks.md",
+      "source_location": "L1",
+      "weight": 1.0,
+      "source": "specs_014_disruption_flight_change_management_tasks",
+      "target": "specs_014_disruption_flight_change_management_tasks_tasks_disruption_flight_change_management_phase_6",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "specs/014-disruption-flight-change-management/tasks.md",
+      "source_location": "L7",
+      "weight": 1.0,
+      "source": "specs_014_disruption_flight_change_management_tasks_tasks_disruption_flight_change_management_phase_6",
+      "target": "specs_014_disruption_flight_change_management_tasks_format_id_p_story_description",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "specs/014-disruption-flight-change-management/tasks.md",
+      "source_location": "L13",
+      "weight": 1.0,
+      "source": "specs_014_disruption_flight_change_management_tasks_tasks_disruption_flight_change_management_phase_6",
+      "target": "specs_014_disruption_flight_change_management_tasks_path_conventions",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "specs/014-disruption-flight-change-management/tasks.md",
+      "source_location": "L18",
+      "weight": 1.0,
+      "source": "specs_014_disruption_flight_change_management_tasks_tasks_disruption_flight_change_management_phase_6",
+      "target": "specs_014_disruption_flight_change_management_tasks_phase_1_setup_shared_infrastructure",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "specs/014-disruption-flight-change-management/tasks.md",
+      "source_location": "L25",
+      "weight": 1.0,
+      "source": "specs_014_disruption_flight_change_management_tasks_tasks_disruption_flight_change_management_phase_6",
+      "target": "specs_014_disruption_flight_change_management_tasks_phase_2_foundational_blocking_prerequisites",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "specs/014-disruption-flight-change-management/tasks.md",
+      "source_location": "L28",
+      "weight": 1.0,
+      "source": "specs_014_disruption_flight_change_management_tasks_tasks_disruption_flight_change_management_phase_6",
+      "target": "specs_014_disruption_flight_change_management_tasks_phase_3_user_story_3_traveller_disruption_apis_local_read_model_priority_p1",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "specs/014-disruption-flight-change-management/tasks.md",
+      "source_location": "L44",
+      "weight": 1.0,
+      "source": "specs_014_disruption_flight_change_management_tasks_tasks_disruption_flight_change_management_phase_6",
+      "target": "specs_014_disruption_flight_change_management_tasks_phase_4_user_story_4_cancellation_integration_priority_p1",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "specs/014-disruption-flight-change-management/tasks.md",
+      "source_location": "L56",
+      "weight": 1.0,
+      "source": "specs_014_disruption_flight_change_management_tasks_tasks_disruption_flight_change_management_phase_6",
+      "target": "specs_014_disruption_flight_change_management_tasks_phase_5_polish_cross_cutting_concerns",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "specs/014-disruption-flight-change-management/tasks.md",
+      "source_location": "L36",
+      "weight": 1.0,
+      "source": "specs_014_disruption_flight_change_management_tasks_phase_3_user_story_3_traveller_disruption_apis_local_read_model_priority_p1",
+      "target": "specs_014_disruption_flight_change_management_tasks_implementation_for_user_story_3",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "specs/014-disruption-flight-change-management/tasks.md",
+      "source_location": "L33",
+      "weight": 1.0,
+      "source": "specs_014_disruption_flight_change_management_tasks_phase_3_user_story_3_traveller_disruption_apis_local_read_model_priority_p1",
+      "target": "specs_014_disruption_flight_change_management_tasks_tests_for_user_story_3",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "specs/014-disruption-flight-change-management/tasks.md",
+      "source_location": "L52",
+      "weight": 1.0,
+      "source": "specs_014_disruption_flight_change_management_tasks_phase_4_user_story_4_cancellation_integration_priority_p1",
+      "target": "specs_014_disruption_flight_change_management_tasks_implementation_for_user_story_4",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "specs/014-disruption-flight-change-management/tasks.md",
+      "source_location": "L49",
+      "weight": 1.0,
+      "source": "specs_014_disruption_flight_change_management_tasks_phase_4_user_story_4_cancellation_integration_priority_p1",
+      "target": "specs_014_disruption_flight_change_management_tasks_tests_for_user_story_4",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
       "source_file": "task.md",
       "source_location": "L1",
       "weight": 1.0,
@@ -85395,5 +86082,5 @@
       "source_file": "specs/004-output-guardrails/data-model.md"
     }
   ],
-  "built_at_commit": "c2dcb69b4ffef82015088cff0a23dd1b2ed7ef0f"
+  "built_at_commit": "5bc3ac91ddab02aed220a3a9f6ca878906aec36e"
 }
