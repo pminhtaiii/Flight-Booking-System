@@ -7,12 +7,15 @@ export function LogoutButton() {
 
   const handleLogout = async () => {
     let apiUrl = process.env.NEXT_PUBLIC_API_URL;
+    if (!apiUrl && process.env.NODE_ENV === 'development') {
+      apiUrl = 'http://localhost:3001';
+    }
+
     if (!apiUrl) {
-      if (process.env.NODE_ENV !== 'development') {
-        apiUrl = typeof window !== 'undefined' ? window.location.origin : '';
-      } else {
-        apiUrl = 'http://localhost:3001';
-      }
+      // eslint-disable-next-line no-console
+      console.warn('API URL is missing. Skipping backend logout to prevent token leakage.');
+      await signOut({ callbackUrl: '/login' });
+      return;
     }
 
     const token = (session as { accessToken?: string })?.accessToken;
