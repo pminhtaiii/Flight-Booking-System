@@ -3,7 +3,7 @@ import { BookingService, BookingWithRelations } from '@/booking/booking.service'
 import { PrismaService } from '@/prisma/prisma.service';
 import { SupplierSyncService } from './supplier-sync.service';
 import { CacheService } from '@/cache/cache.service';
-import { DisruptionStatus, DisruptionResolvedByType } from '@prisma/client';
+import { DisruptionStatus, DisruptionActorType } from '@prisma/client';
 import { StripeService } from '@/common/stripe.service';
 import { DuffelService } from '@/duffel/duffel.service';
 import { PaymentRefundService } from '@/payment/payment-refund.service';
@@ -305,7 +305,7 @@ describe('ReconciliationService & Booking Completion', () => {
         booking: {
           findUnique: jest.fn(),
           update: jest.fn(),
-          updateMany: jest.fn(),
+          updateMany: jest.fn().mockResolvedValue({ count: 1 }),
         },
         disruptionAuditEvent: {
           create: jest.fn(),
@@ -341,14 +341,14 @@ describe('ReconciliationService & Booking Completion', () => {
       const result = await bookingService.checkAndCompleteBooking(booking);
 
       expect(mockPrisma.$transaction).toHaveBeenCalled();
-      expect(mockPrisma.booking.update).toHaveBeenCalledWith({
-        where: { id: 'booking-passed' },
+      expect(mockPrisma.booking.updateMany).toHaveBeenCalledWith({
+        where: { id: 'booking-passed', status: 'CONFIRMED' },
         data: {
           status: 'COMPLETED',
           disruptionStatus: DisruptionStatus.RESOLVED,
           disruptionResolvedReason: 'DEPARTURE_PASSED',
           disruptionResolvedAt: expect.any(Date),
-          disruptionResolvedByType: DisruptionResolvedByType.SYSTEM,
+          disruptionResolvedByType: DisruptionActorType.SYSTEM,
         },
       });
 
@@ -422,8 +422,8 @@ describe('ReconciliationService & Booking Completion', () => {
 
       const result = await bookingService.checkAndCompleteBooking(booking);
 
-      expect(mockPrisma.booking.update).toHaveBeenCalledWith({
-        where: { id: 'booking-none-disruption' },
+      expect(mockPrisma.booking.updateMany).toHaveBeenCalledWith({
+        where: { id: 'booking-none-disruption', status: 'CONFIRMED' },
         data: {
           status: 'COMPLETED',
         },

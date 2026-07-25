@@ -1,6 +1,6 @@
 import { BadGatewayException, BadRequestException, ForbiddenException, Injectable, NotFoundException, Logger } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
-import { Booking, BookingFailureReason, BookingStatus, Prisma, DisruptionStatus, DisruptionResolvedByType } from '@prisma/client';
+import { Booking, BookingFailureReason, BookingStatus, Prisma, DisruptionStatus, DisruptionActorType } from '@prisma/client';
 import { PrismaService } from '@/prisma/prisma.service';
 import { CancellationQuoteResponseDto, CancellationResponseDto, FlightSnapshot, PassengerSnapshot } from '@shared/booking-types';
 import { BookingDetailResponseDto, BookingListItemResponseDto, BookingListResponseDto, BookingTab } from './dto';
@@ -321,7 +321,7 @@ export class BookingService {
     const targetTime = booking.currentFinalArrivalAt || booking.departureAt;
     if (booking.status === 'CONFIRMED' && targetTime && targetTime <= now) {
       try {
-        await this.prisma.$transaction(async (tx) => {
+        const didUpdate = await this.prisma.$transaction(async (tx) => {
           // Re-fetch the booking inside transaction to make it safe and atomic
           const dbBooking = await tx.booking.findUnique({
             where: { id: booking.id },
@@ -329,7 +329,7 @@ export class BookingService {
           });
 
           if (!dbBooking || dbBooking.status !== 'CONFIRMED') {
-            return;
+            return false;
           }
 
           const hasActiveDisruption = dbBooking.disruptionStatus === 'DETECTED' || dbBooking.disruptionStatus === 'ACKNOWLEDGED';
@@ -345,10 +345,15 @@ export class BookingService {
             updateData.disruptionResolvedByType = 'SYSTEM';
           }
 
-          await tx.booking.update({
-            where: { id: booking.id },
+          // Guard against concurrent status changes by including status check in the update filter
+          const updated = await tx.booking.updateMany({
+            where: { id: booking.id, status: 'CONFIRMED' },
             data: updateData,
           });
+
+          if (updated.count === 0) {
+            return false;
+          }
 
           if (hasActiveDisruption) {
             await tx.disruptionAuditEvent.create({
@@ -366,15 +371,19 @@ export class BookingService {
               },
             });
           }
+
+          return true;
         });
 
-        // Sync local object fields
-        booking.status = 'COMPLETED';
-        if (booking.disruptionStatus === 'DETECTED' || booking.disruptionStatus === 'ACKNOWLEDGED') {
-          booking.disruptionStatus = DisruptionStatus.RESOLVED;
-          booking.disruptionResolvedReason = 'DEPARTURE_PASSED';
-          booking.disruptionResolvedAt = now;
-          booking.disruptionResolvedByType = DisruptionResolvedByType.SYSTEM;
+        // Sync local object fields only if transaction successfully updated the record
+        if (didUpdate) {
+          booking.status = 'COMPLETED';
+          if (booking.disruptionStatus === 'DETECTED' || booking.disruptionStatus === 'ACKNOWLEDGED') {
+            booking.disruptionStatus = DisruptionStatus.RESOLVED;
+            booking.disruptionResolvedReason = 'DEPARTURE_PASSED';
+            booking.disruptionResolvedAt = now;
+            booking.disruptionResolvedByType = DisruptionActorType.SYSTEM;
+          }
         }
       } catch (error: unknown) {
         const err = error instanceof Error ? error : new Error(String(error));
