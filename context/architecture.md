@@ -218,6 +218,149 @@ An ADMIN may schedule a retry with a fresh key or record an externally completed
 - **Operator Dashboard**: Admins use the `/admin/refunds` view to inspect PII-safe escalated refund states and trigger the manual resolution pipeline.
 
 
+### Disruption Core Domain (Deterministic Path)
+
+```
+Authoritative Duffel Order Payload or Local Snapshot Array
+        ↓
+ItineraryNormalizer maps raw structures to Ordered Canonical NormalizedSegment list (resolving timezones, local dates, durations)
+        ↓
+ItineraryFingerprint hashes NormalizedSegment list to versioned SHA-256 fingerprint (stable under key/segment ordering, excludes volatile data)
+        ↓
+SegmentMatcher matches old to new segments using 4-tier confidence cascade (Duffel ID, Flight Key, Route & Time, Position Tie-Breaker)
+        ↓
+ItineraryDiff compares matched segments, connections, final arrival times to produce segment, connection, and slice shifts
+        ↓
+MaterialityClassifier checks incremental/cumulative diff against disruption-v1 ruleset (binary & strict threshold checks)
+```
+
+- **Functional Decoupling**: Pure core domain functions contain no framework, DB, or external API references. Inputs are fully typed structures; outputs are deterministic diff, fingerprint, and classification results.
+
+
+### Disruption Synchronization & Concurrency (Phase 3)
+
+```
+Supplier Synchronization Run (Webhook or Cron trigger)
+        ↓
+SyncClaimService acquires claim lock (CAS write on syncLockedAt/syncLockToken; 5-min lease limit)
+        ↓
+DuffelService retrieves complete order (Remote API call executed OUTSIDE DB transactions)
+        ↓
+Prisma Transaction starts:
+  ├─ Re-verify booking status (race handler: abort if no longer CONFIRMED)
+  ├─ Re-verify lock token matches (prevent expired lease takeover issues)
+  ├─ Compute Diff & Materiality (using Phase 2 domain core)
+  ├─ Version check: if version exists & fingerprint matches → Converge Duplicate
+  ├─ Version collision check: if version unique violation is thrown → Retry transaction with incremented version
+  ├─ Daily outbox check: count sent notifications today (1st/2nd normal, 3rd with warning, 4th+ throttled & raises attention)
+  └─ Save new revision/segments, update booking timing & status, create audit event & outbox row
+        ↓
+Conditional claim release (clears lock only if token matches)
+```
+
+- **Pessimistic Concurrency**: Prevents concurrent execution of sync tasks on the same booking using atomic DB updates.
+- **Atomic Operations**: Guarantees database consistency by performing all writes, state transitions, and audit logging in a single, short database transaction.
+- **Race and Collision Safety**: Ensures concurrent cancellations always win, and dynamic version collisions resolve gracefully by automatic retrying.
+
+
+### Disruption Webhook Ingestion & Webhook Inbox Processing (Phase 4)
+
+```
+Duffel HTTP Webhook Request
+        ↓
+DuffelWebhookController receives POST /api/duffel/webhook
+  ├─ Verify Feature Flag (FEATURE_FLAG_DISRUPTION_INGRESS)
+  ├─ Verify Webhook Secret configured (DUFFEL_WEBHOOK_SECRET)
+  ├─ Validate Signature (HMAC-SHA256 of timestamp + '.' + rawBody matches X-Duffel-Signature)
+  ├─ Enforce Timestamp Tolerance (replays rejected if older than 5 minutes)
+  ├─ Validate minimal envelope (id and type present)
+  └─ Call DuffelInboxService.createEvent (Durable insert to DB)
+        ↓
+DuffelInboxService inserts event:
+  ├─ Deduplicate: return existing event if supplierEventId matches (safe convergence)
+  ├─ Catch unique constraint violation (P2002) for race condition safety
+  ├─ SKIPPED: unsupported event types marked skipped immediately
+  └─ PENDING: supported events marked pending (returns 200 fast-ack to Duffel without sync/external calls)
+
+---
+
+DuffelEventProcessor Cron (Every 10s via @Cron)
+  ├─ Verify Feature Flag (FEATURE_FLAG_DISRUPTION_PROCESSOR)
+  ├─ Claim Batch (leases up to N pending/retry-scheduled events)
+  │     └─ CAS update using random token & status PROCESSING on duffelWebhookEvent
+  ├─ Recover Stale Claims (PROCESSING events older than 5 minutes reverted and claimed)
+  ├─ Process claimed batch concurrently and independently:
+  │     ├─ Lookup local booking mapping by duffelOrderId
+  │     ├─ If booking exists: invoke SupplierSyncService.syncBooking (runs Phase 3 sync transaction)
+  │     ├─ Success: update event status to PROCESSED and clear payload
+  │     └─ Failure: compute next retry backoff (1m, 5m, 15m, 15m) or escalate to FAILED_NEEDS_ATTENTION after 5th attempt
+  └─ Retention job (runs daily): redact raw payloads older than 30 days to strip PII
+```
+
+- **Fast Webhook Acks**: Fast-acks immediately after durable DB insertion, avoiding slow sync operations and external API requests inline to prevent Duffel timeouts.
+- **Asynchronous Leasing**: Employs compare-and-swap (CAS) logic with random tokens and status verification to safely lease events across multiple API instances.
+- **Independent Processor Boundaries**: Batch failures are isolated; errors processing one webhook event do not impact or stall the execution of other events in the same batch.
+- **PII-Safe Retention**: Redacts raw webhook payloads after 30 days to adhere to strict user privacy standards.
+
+
+### Budget-Aware Reconciliation & Booking Completion (Phase 5)
+
+```
+Reconciliation Cron (Every 30m via @Cron or DUFFEL_RECONCILIATION_CRON)
+  ├─ Verify Feature Flag (FEATURE_FLAG_DISRUPTION_RECONCILIATION)
+  ├─ Complete stale bookings that have passed their final arrival
+  │     └─ Fetch CONFIRMED bookings past currentFinalArrivalAt or departureAt
+  │     └─ Transition status to COMPLETED and resolve active disruptions as RESOLVED with DEPARTURE_PASSED
+  ├─ Fetch eligible bookings for synchronization (up to batch size DUFFEL_RECONCILIATION_BATCH_SIZE)
+  │     ├─ Status CONFIRMED, non-null duffelOrderId
+  │     ├─ nextUnflownDepartureAt in (now, now + 72 hours]
+  │     ├─ nextDuffelSyncAt due (null or <= now)
+  │     └─ syncLockedAt not active (null or < 5 minutes ago)
+  ├─ Sort: lastDuffelSyncedAt ASC NULLS FIRST, nextUnflownDepartureAt ASC, id ASC
+  ├─ For each booking:
+  │     ├─ Enforce Monthly API Budget limits (Redis key `budget:duffel:YYYY-MM` vs DUFFEL_BUDGET_LIMIT_TOTAL)
+  │     │     ├─ If budget exceeded: defer, record budgetBlocked metric
+  │     │     └─ If budget OK: increment counter, call SupplierSyncService.syncBooking
+  │     ├─ If SKIPPED_LOCKED or SKIPPED_INELIGIBLE: decrement budget counter back
+  │     └─ If Sync Fails: increment failed counter, apply exponential backoff (15 * 2^(failures-1) minutes)
+  └─ Return structured results: selected, processed, changed, unchanged, failed, deferred, stale, budgetBlocked
+```
+
+- **Stale Completion Sweep**: Resolves active disruptions and marks bookings completed atomically in database transactions after flights have landed.
+- **Fair Batch Selection & Ordering**: Reconciliation order ensures bookings closer to departure or not synced recently are synchronized first.
+- **API Budget Control**: Protects supplier integration limits by checking monthly API budget before processing each booking, preventing excessive charges.
+- **Exponential Retry Backoff**: Prevents starve-out from repeating synchronization failures by scaling retry backoff exponentially.
+
+
+### Traveller Disruption APIs & Lifecycle (Phase 6)
+
+```
+Booking List/Detail Read (GET /api/bookings and GET /api/bookings/:id)
+  ├─ Verify Feature Flag (FEATURE_FLAG_DISRUPTION_SURFACING === 'true')
+  ├─ Map:
+  │    ├─ currentItinerary: Maps active itinerary revision segments (deserializes flat database columns to nested objects) or falls back to ORIGINAL flightSnapshot.
+  │    └─ disruption: Maps active disruption revision diffs (isMaterial, incrementalSummary, cumulativeSummary, stabilizationWarning) or falls back to NONE status.
+  └─ Return safe, PII-stripped response payload.
+
+Traveller Disruption Actions (Acknowledge and Accept)
+  ├─ POST /api/bookings/:bookingId/disruptions/:revisionId/acknowledge -> Transition DETECTED → ACKNOWLEDGED
+  ├─ POST /api/bookings/:bookingId/disruptions/:revisionId/accept -> Transition DETECTED/ACKNOWLEDGED → RESOLVED (TRAVELLER_ACCEPTED)
+  ├─ Validations:
+  │    ├─ Owner validation (ensures only the booking traveler can execute actions)
+  │    ├─ Active revision validation (checks that revisionId matches booking.activeDisruptionRevisionId)
+  │    │     └─ Mismatch returns 409 Conflict with code 'STALE_DISRUPTION_REVISION'
+  │    └─ Idempotency (same-revision retries return success status without re-transitioning)
+  └─ Side Effects: Write safe DisruptionAuditEvent with TRAVELLER actor type and userId.
+
+Booking Cancellation Disruption Resolution
+  └─ Upon client cancel request, active disruption is resolved atomically to RESOLVED with reason BOOKING_CANCELLED.
+```
+
+- **Flat-to-Nested Mapping**: Decoupled database storage (flat columns in segment snapshots) from the customer-facing API contract (fully nested and clean representation).
+- **Concurrency & Conflict Safeguard**: Rejects stale revision commands with `409 STALE_DISRUPTION_REVISION` to prevent users from accepting out-of-date flight changes when a newer change is available.
+- **Traceable Audit Logging**: Writes audit events for all traveler-initiated lifecycle transitions capturing actor and trace details.
+
+
 ### AI Chatbot Agent Flow (SSE Streaming)
 
 ```

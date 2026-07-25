@@ -1,7 +1,7 @@
 import { Injectable, HttpException, HttpStatus, Logger } from '@nestjs/common';
 import { CacheService } from '@/cache/cache.service';
 import { Duffel } from '@duffel/api';
-import { DuffelOfferRequest } from './duffel.types';
+import { DuffelOfferRequest, DuffelOrder } from './duffel.types';
 import * as crypto from 'crypto';
 import { FlightSnapshot, PassengerSnapshot } from '@shared/booking-types';
 
@@ -663,6 +663,26 @@ export class DuffelService {
     }
   }
 
+  async retrieveCompleteOrder(duffelOrderId: string): Promise<DuffelOrder> {
+    try {
+      const order = (await this.duffel.orders.get(duffelOrderId)).data as unknown as DuffelOrder;
+      return order;
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
+      this.logger.error(`Failed to retrieve complete Duffel order ${duffelOrderId}: ${message}`, err instanceof Error ? err.stack : undefined);
+      if (err instanceof HttpException) {
+        throw err;
+      }
+      throw new HttpException(
+        {
+          code: 'UPSTREAM_ORDER_RETRIEVAL_FAILED',
+          message: 'Failed to retrieve Duffel order',
+        },
+        HttpStatus.BAD_GATEWAY,
+      );
+    }
+  }
+
   async confirmCancellationQuote(quoteId: string): Promise<DuffelConfirmedCancellation> {
     try {
       const cancellation = (await this.duffel.orderCancellations.confirm(quoteId)).data;
@@ -741,13 +761,16 @@ export class DuffelService {
     
     if (duffelOrder.slices && Array.isArray(duffelOrder.slices)) {
       let totalMinutes = 0;
-      for (const slice of duffelOrder.slices) {
+      let globalOrder = 0;
+      for (let sliceOrder = 0; sliceOrder < duffelOrder.slices.length; sliceOrder++) {
+        const slice = duffelOrder.slices[sliceOrder];
         if (slice?.duration) {
           totalMinutes += this.parseIsoDurationToMinutes(slice.duration);
         }
         if (slice.segments && Array.isArray(slice.segments)) {
           stops += Math.max(0, slice.segments.length - 1);
-          for (const seg of slice.segments) {
+          for (let segmentOrder = 0; segmentOrder < slice.segments.length; segmentOrder++) {
+             const seg = slice.segments[segmentOrder];
              cabinClass = seg.passengers?.[0]?.cabin_class || cabinClass;
              segments.push({
                airline: {
@@ -771,6 +794,10 @@ export class DuffelService {
                arrivalAt: seg.arriving_at,
                duration: seg.duration,
                aircraftType: seg.aircraft?.name,
+               duffelSegmentId: seg.id,
+               sliceOrder,
+               segmentOrder,
+               globalOrder: globalOrder++,
              });
           }
         }

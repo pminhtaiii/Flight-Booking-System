@@ -1,11 +1,5 @@
-import { getServerSession } from 'next-auth';
-import { redirect } from 'next/navigation';
+import { LandingPage } from '@/components/landing/LandingPage';
 
-export default async function IndexPage() {
-  const session = await getServerSession();
-  if (session) {
-    redirect('/dashboard');
-  } else {
-    redirect('/login');
-  }
+export default function IndexPage(): JSX.Element {
+  return <LandingPage />;
 }

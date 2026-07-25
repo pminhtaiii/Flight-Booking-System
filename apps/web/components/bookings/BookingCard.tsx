@@ -1,10 +1,14 @@
 /* eslint-disable @next/next/no-img-element */
 import Link from 'next/link';
 import type { BookingListItemDto, FlightSnapshot } from '@shared/booking-types';
+import type { BookingDisruptionDto } from '@shared/disruption-types';
+import { DisruptionStatus } from '@shared/disruption-types';
 import { BookingStatusBadge } from '@/components/bookings/BookingStatusBadge';
+import { AlertTriangle } from 'lucide-react';
 
 type BookingCardBooking = BookingListItemDto & {
   flightSnapshot?: FlightSnapshot | null;
+  disruption?: BookingDisruptionDto;
 };
 
 type BookingCardProps = {
@@ -26,7 +30,7 @@ const formatDate = (value?: string): string => {
 };
 
 const formatCurrency = (amount: string, currency: string): string =>
-  new Intl.NumberFormat('en-GB', { style: 'currency', currency }).format(Number(amount) / 100);
+  new Intl.NumberFormat('en-GB', { style: 'currency', currency }).format(Number(amount));
 
 export function BookingCard({ booking }: BookingCardProps) {
   const firstSegment = booking.flightSnapshot?.segments[0];
@@ -61,6 +65,23 @@ export function BookingCard({ booking }: BookingCardProps) {
             </p>
           </div>
           <BookingStatusBadge status={booking.status} />
+          {booking.disruption && 
+            (booking.disruption.status === DisruptionStatus.DETECTED || 
+             booking.disruption.status === DisruptionStatus.ACKNOWLEDGED) && (
+            <Link 
+              href={`/bookings/${booking.id}`}
+              className={`inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full border ${
+                booking.disruption.status === DisruptionStatus.DETECTED
+                  ? 'bg-bg-pending text-text-pending border-color-text-pending/30 hover:bg-bg-pending/80'
+                  : 'bg-bg-match-fair text-text-match-fair border-color-text-match-fair/30 hover:bg-bg-match-fair/80'
+              }`}
+            >
+              <AlertTriangle className="h-3 w-3" />
+              <span>
+                {booking.disruption.status === DisruptionStatus.DETECTED ? 'Schedule Action Needed' : 'Change Under Review'}
+              </span>
+            </Link>
+          )}
         </div>
 
         <div className="grid gap-2 text-sm text-text-secondary sm:grid-cols-2">

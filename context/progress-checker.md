@@ -6,13 +6,27 @@ Update this file after every completed feature. Any AI agent reading this should
 
 ### Current Status
 
-**Feature:** Flight Cancellation & Automated Refund System (Feature 12)
-**Last completed:** Feature 12 PR 5 / Issue #66: End-to-End Verification & Test Suite.
-**Next:** Rollout runbook and documentation update.
+**Feature:** Disruption & Flight-Change Management (Feature 14)
+**Last completed:** Feature 14 Phase 7: Traveller booking disruption experience on the Next.js frontend.
+**Next:** Feature 14 Phase 8: Admin operations, observability, retention, and rollout controls.
 
 ---
 
 ## Progress by Feature
+
+### [/] Feature: Disruption & Flight-Change Management (Feature 14)
+
+- [x] Phase 7 / PR 8: Traveller booking disruption experience on the Next.js frontend (refactored app/bookings/[bookingId]/page.tsx to Next.js Server Component; implemented BookingDetailClient container; added semantic DisruptionAlert with plain-language reasons and warnings; implemented ItineraryChangeSummary displaying latest revision changes vs original booking; added ItineraryRevisionHistory timeline; supported Acknowledge and Accept actions with pending states, router refresh, and stale conflict handling; added disruption status badges to list cards; updated Playwright E2E tests, resolving CORS origin domain isolation and strict selector conflicts; verified all tests passing with 100% success rate)
+
+- [x] Phase 6 / PR 7: Traveller disruption lifecycle actions, paginated history reads, read model extensions, and confirmed cancellation resolution (implemented owner-scoped booking read model extensions with DTO mapping and segments flat-to-nested deserialization under FEATURE_FLAG_DISRUPTION_SURFACING; implemented GET /api/bookings/:bookingId/disruptions paginated history; implemented Traveller lifecycle actions POST acknowledge/accept with active revision validation, state transitions, audit logging, and stale revision 409 conflict checks; updated cancelBooking to resolve active disruptions to RESOLVED/BOOKING_CANCELLED with traveler actor type metadata; verified with 100% test coverage in disruption and cancellation E2E suites passing cleanly with zero warnings/lint issues)
+
+- [x] Phase 5 / PR 6: Budget-aware reconciliation and correct booking-completion lifecycle (implemented ReconciliationService with 30-minute cron wrapper, exact 72-hour window and stable ordering, Duffel budget limits tracking/concurrency controls, exponential backoff failure handling, and stale final-arrival completion sweep resolving active disruptions; verified with unit/E2E test coverage and lint checks passing cleanly)
+
+- [x] Phase 4 / PR 5: Signed Duffel Webhook receiver, durable inbox, and async processor (implemented HMAC-SHA256 signature verification with 5-minute replay tolerance, fast-ack response, durable inbox insertion, duplicate delivery convergence, async leasing using compare-and-swap token claims, stale lease recovery, independent batch processing, exponential retry backoff, 5th-attempt escalation, and 30-day raw payload PII redaction; verified with 100% unit and E2E coverage passing cleanly)
+
+- [x] Phase 3 / PR 4: Supplier synchronization transaction and concurrency (implemented pessimism-based concurrency lock using syncLockedAt and a CAS random token, Duffel complete order retrieval outside transactions, normalization & fingerprint validation, short transactional write re-checking status and versioning with loop retries for unique constraint collision, and daily outbox throttling. Resolved code review items: created REST controller trigger secured by JwtAuthGuard with caller ownership checks, prevented cancellation masking by using sourceEventId-based verification, and serialized concurrent syncs/cancellations with an early dummy update row lock in the transaction; verified with unit/integration/E2E coverage passing cleanly)
+- [x] Phase 2 / PR 3: Pure Itinerary Normalization, Matching, Diff, and Classification (implemented framework-independent domain core: itinerary normalizer, canonical serialization and fingerprint, cascade one-to-one segment matcher, diff generator with slice/connection details, and disruption-v1 materiality classifier with threshold rules; verified with 42 tests passing with zero lint issues)
+- [x] Phase 1 / PR 2: Contracts, Additive Schema, Migration, and Shared Types (implemented additive schema, generated and applied migration cleanly, extended segment snapshots and DTO definitions in shared packages, updated Duffel service with segment ID extraction mapping and complete order retrieval, added config validation, and passed all schema and unit/E2E verification tests)
 
 ### [x] Feature: Flight Cancellation & Automated Refund System (Feature 12)
 
@@ -182,6 +196,8 @@ Update this file after every completed feature. Any AI agent reading this should
 
 ## Notes
 
+- Booking-detail refreshes now clear action-specific success and conflict feedback before rendering a new itinerary revision.
+- Logout requires a successful backend token-revocation request before clearing NextAuth. Missing API configuration or revocation failures leave the session active and display a safe error instead of leaving a live bearer token behind. Fixed the Playwright E2E configuration to default `NEXT_PUBLIC_API_URL` to `http://127.0.0.1:3001`, resolving test build crashes while keeping the logout configuration-omission scenario exercisable via a runtime window override.
 - The test environment does not run PostgreSQL or Redis services locally. E2E tests use Jest spies on the PrismaClient instance to mock database states, keeping the API source code clean and genuine.
 - Fixed a double-increment of `paymentAttemptCount` on stale-lock retry of `createPayment` by querying for an existing Payment record before updating `booking_intents` (Step 2) and reusing the existing Payment record if found (Step 5).
 - Created a Mimo LLM diagnostic script (`apps/agent/src/agent/test_llm_connection.py`) allowing manual verification of API keys and endpoint connectivity directly from the terminal (securely prompts for keys via `getpass` and runs raw HTTP and LangChain tests).

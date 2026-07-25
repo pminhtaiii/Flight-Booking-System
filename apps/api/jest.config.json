@@ -10,6 +10,6 @@
   "testEnvironment": "node",
   "moduleNameMapper": {
     "^@/(.*)$": "<rootDir>/$1",
-    "^@shared/(.*)$": "<rootDir>/../../packages/shared/src/$1"
+    "^@shared/(.*)$": "<rootDir>/../../../packages/shared/src/$1"
   }
 }

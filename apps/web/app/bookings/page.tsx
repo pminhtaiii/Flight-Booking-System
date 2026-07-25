@@ -26,7 +26,10 @@ export default async function BookingsPage({ searchParams }: BookingsPageProps) 
   const requestedPage = Number(searchParams.page);
   const page = Number.isInteger(requestedPage) && requestedPage > 0 ? requestedPage : 1;
   const accessToken = (session as { accessToken?: string }).accessToken;
-  const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001';
+  const apiUrl = process.env.NEXT_PUBLIC_API_URL;
+  if (!apiUrl) {
+    throw new Error('NEXT_PUBLIC_API_URL is required but not configured.');
+  }
   let data: BookingsResponse | undefined;
   let error: string | undefined;
 

@@ -14,10 +14,11 @@ import { FlightsModule } from './flights/flights.module';
 import { BookingIntentModule } from './booking-intent/booking-intent.module';
 import { BookingModule } from './booking/booking.module';
 import { PaymentModule } from './payment/payment.module';
+import { DisruptionModule } from './disruption/disruption.module';
 
 import { z } from 'zod';
 
-const envSchema = z.object({
+export const envSchema = z.object({
   PORT: z.string().optional(),
   DATABASE_URL: z.string().optional(),
   REDIS_URL: z.string().optional(),
@@ -29,6 +30,12 @@ const envSchema = z.object({
   }),
   JWT_SECRET: z.string().optional(),
   ENCRYPTION_KEY: z.string().optional(),
+  DUFFEL_WEBHOOK_SECRET: z.string().optional(),
+  FEATURE_FLAG_DISRUPTION_INGRESS: z.string().optional().default('false'),
+  FEATURE_FLAG_DISRUPTION_PROCESSOR: z.string().optional().default('false'),
+  FEATURE_FLAG_DISRUPTION_RECONCILIATION: z.string().optional().default('false'),
+  FEATURE_FLAG_DISRUPTION_SURFACING: z.string().optional().default('false'),
+  FEATURE_FLAG_DISRUPTION_OUTBOX: z.string().optional().default('false'),
 }).passthrough();
 
 @Module({
@@ -51,6 +58,7 @@ const envSchema = z.object({
     BookingIntentModule,
     BookingModule,
     PaymentModule,
+    DisruptionModule,
   ],
   controllers: [],
   providers: [],

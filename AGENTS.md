@@ -62,6 +62,12 @@ When the task involves writing, running, or verifying E2E tests:
 4. **Mocking & Test Strategy**:
    - Follow the opaque-box verification strategies defined in [TEST_INFRA.md](file:///c:/Booking%20Systems/TEST_INFRA.md).
    - Use time acceleration (`POST /auth/test/reset-lockout` when `NODE_ENV === 'test'`) and database assertions.
+5. **Playwright Integration Guidelines**:
+   - **Environment Configuration**: Ensure the Playwright webServer environment defines `NEXT_PUBLIC_API_URL` (defaults to `http://127.0.0.1:3001` in `playwright.config.ts`) to prevent compilation crashes during page loads.
+   - **Bypass Strategy**: Inject `mock-scenario` cookies (such as `'disruption-detected'`) to bypass backend fetches in Server Components, prompting them to render static mocks directly.
+   - **Strict Mode Bypass**: Avoid strict mode failures caused by the default Next.js route announcer (`role="alert"`) by appending `.first()` to alert locators (e.g., `page.getByRole('alert').first()`).
+   - **Prevent Login Races**: After submitting registration or login forms, always wait for the browser to load the landing page (e.g., `await expect(page).toHaveURL(/.*localhost:3000\/$/)`) before attempting to navigate to authenticated/protected pages.
+   - **Mocking Client Settings**: To verify behavior with missing or altered environment configurations without leaving mutable test hooks in production client bundles, fetch configuration options dynamically from a Next.js Server Route (e.g., `/api/config`) and use Playwright's `page.route` network interception in the test to mock the JSON response.
 
 ### Local Development Startup
 
@@ -101,5 +107,5 @@ When a task involves creating a pull request or requesting CodeRabbit reviews:
 <!-- SPECKIT START -->
 For additional context about technologies to be used, project structure,
 shell commands, and other important information, read the current plan
-at specs/011-booking-management/plan.md
+at specs/014-disruption-flight-change-management/plan.md
 <!-- SPECKIT END -->

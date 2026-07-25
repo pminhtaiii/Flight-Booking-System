@@ -3,20 +3,53 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useSession } from 'next-auth/react';
+import { useRouter } from 'next/navigation';
 import type { BookingDetailDto } from '@shared/booking-types';
+import { DisruptionStatus } from '@shared/disruption-types';
 import { BookingStatusBadge } from '@/components/bookings/BookingStatusBadge';
+import { DisruptionAlert } from '@/components/bookings/DisruptionAlert';
+import { ItineraryChangeSummary } from '@/components/bookings/ItineraryChangeSummary';
+import { ItineraryRevisionHistory } from '@/components/bookings/ItineraryRevisionHistory';
+import { BookingProcessingState } from '@/components/bookings/BookingProcessingState';
+import { BookingFailureState } from '@/components/bookings/BookingFailureState';
 
-const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001';
+const apiUrl = process.env.NEXT_PUBLIC_API_URL;
 
 type BookingDetailProps = {
-  booking: BookingDetailDto;
-  onRefresh?: () => void;
+  booking: BookingDetailDto & {
+    currentItinerary?: any;
+    disruption?: any;
+    payment?: { status: string } | null;
+    bookingIntent?: { id: string; offerId: string };
+  } | null;
+  showConfirmation?: boolean;
+  isMockEnabled?: boolean;
+  bookingId?: string;
 };
 
 const currencyFormatter = (amount: string, currency: string): string =>
   new Intl.NumberFormat('en-GB', { style: 'currency', currency }).format(Number(amount));
 
-export function BookingDetail({ booking, onRefresh }: BookingDetailProps) {
+export function BookingDetail({ booking: initialBooking, isMockEnabled, bookingId }: BookingDetailProps) {
+  if (!apiUrl) {
+    throw new Error('NEXT_PUBLIC_API_URL is required but not configured.');
+  }
+  const [booking, setBooking] = useState<any>(initialBooking);
+
+  const [loadingMock, setLoadingMock] = useState(!!isMockEnabled);
+  const [mockError, setMockError] = useState<string | null>(null);
+
+  // Disruption state
+  const [loadingAction, setLoadingAction] = useState(false);
+  const [conflictError, setConflictError] = useState<string | null>(null);
+  const [actionSuccess, setActionSuccess] = useState<string | null>(null);
+
+  useEffect(() => {
+    setBooking(initialBooking);
+    setConflictError(null);
+    setActionSuccess(null);
+  }, [initialBooking]);
+
   const [cancellationStatus, setCancellationStatus] = useState<any>(null);
   const [showCancelModal, setShowCancelModal] = useState(false);
   const [quote, setQuote] = useState<any>(null);
@@ -27,10 +60,35 @@ export function BookingDetail({ booking, onRefresh }: BookingDetailProps) {
 
   const { data: session } = useSession();
   const accessToken = (session as any)?.accessToken;
+  const router = useRouter();
+
+  // Client-side fallback fetch for Playwright routing mocks
+  useEffect(() => {
+    if (isMockEnabled && bookingId && accessToken) {
+      setLoadingMock(true);
+      fetch(`${apiUrl}/api/bookings/${bookingId}`, {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      })
+        .then((res) => {
+          if (!res.ok) {
+            throw new Error(res.status === 403 ? 'You do not have access to this booking.' : 'We could not find this booking.');
+          }
+          return res.json();
+        })
+        .then((data) => {
+          setBooking(data);
+          setLoadingMock(false);
+        })
+        .catch((err) => {
+          setMockError(err.message);
+          setLoadingMock(false);
+        });
+    }
+  }, [isMockEnabled, bookingId, accessToken]);
 
   const fetchCancellationStatus = useCallback(async () => {
     try {
-      if (!accessToken) return;
+      if (!accessToken || !booking) return;
       const res = await fetch(`${apiUrl}/api/bookings/${booking.id}/cancellation`, {
         headers: { Authorization: `Bearer ${accessToken}` },
       });
@@ -44,15 +102,16 @@ export function BookingDetail({ booking, onRefresh }: BookingDetailProps) {
           data.bookingStatus !== 'CANCELLATION_PENDING' && 
           data.bookingStatus !== 'CANCELLED_PENDING_REFUND'
         ) {
-          onRefresh?.();
+          router.refresh();
         }
       }
     } catch (e) {
       // Ignore error to avoid console noise
     }
-  }, [booking.id, booking.status, onRefresh, accessToken]);
+  }, [booking, router, accessToken]);
 
   useEffect(() => {
+    if (!booking) return;
     let interval: NodeJS.Timeout;
     if (booking.status === 'CANCELLATION_PENDING' || booking.status === 'CANCELLED_PENDING_REFUND') {
       fetchCancellationStatus();
@@ -63,9 +122,11 @@ export function BookingDetail({ booking, onRefresh }: BookingDetailProps) {
     return () => {
       if (interval) clearInterval(interval);
     };
-  }, [booking.status, fetchCancellationStatus]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [booking?.status, fetchCancellationStatus]);
 
   const handleOpenCancelModal = async () => {
+    if (!booking) return;
     setShowCancelModal(true);
     setLoadingQuote(true);
     setError(null);
@@ -86,7 +147,7 @@ export function BookingDetail({ booking, onRefresh }: BookingDetailProps) {
   };
 
   const handleConfirmCancellation = async () => {
-    if (!quote?.quoteId) return;
+    if (!quote?.quoteId || !booking) return;
     setCancelling(true);
     setError(null);
     try {
@@ -101,7 +162,7 @@ export function BookingDetail({ booking, onRefresh }: BookingDetailProps) {
       });
       if (!res.ok) throw new Error('Failed to confirm cancellation');
       setShowCancelModal(false);
-      onRefresh?.();
+      router.refresh();
     } catch (err: any) {
       setError(err.message || 'An error occurred during cancellation.');
     } finally {
@@ -109,11 +170,87 @@ export function BookingDetail({ booking, onRefresh }: BookingDetailProps) {
     }
   };
 
-  const segments = booking.flightSnapshot?.segments ?? [];
+  const handleDisruptionAction = async (action: 'acknowledge' | 'accept') => {
+    if (!booking) return;
+    const activeRevisionId = booking.disruption?.activeRevisionId;
+    if (!activeRevisionId || !accessToken) return;
+
+    setLoadingAction(true);
+    setConflictError(null);
+    setActionSuccess(null);
+
+    try {
+      const res = await fetch(`${apiUrl}/api/bookings/${booking.id}/disruptions/${activeRevisionId}/${action}`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${accessToken}` },
+      });
+
+      if (res.status === 409) {
+        setConflictError('A newer change exists and must be reviewed.');
+        router.refresh();
+        return;
+      }
+
+      if (!res.ok) {
+        throw new Error(`Failed to ${action} disruption`);
+      }
+
+      setActionSuccess(`Successfully ${action === 'acknowledge' ? 'acknowledged' : 'accepted'} the changes.`);
+      router.refresh();
+    } catch (err: any) {
+      setConflictError(err.message || 'An error occurred. Please try again.');
+    } finally {
+      setLoadingAction(false);
+    }
+  };
+
+  if (loadingMock) {
+    return (
+      <section className="card space-y-6">
+        <p className="text-text-secondary text-sm">Loading your booking details…</p>
+      </section>
+    );
+  }
+
+  if (mockError) {
+    return (
+      <section className="card space-y-6">
+        <p role="alert" className="text-text-cancelled text-sm font-semibold">{mockError}</p>
+      </section>
+    );
+  }
+
+  if (!booking) {
+    return (
+      <section className="card space-y-6">
+        <p className="text-text-secondary text-sm">Booking details not available.</p>
+      </section>
+    );
+  }
+
+  if (booking.status === 'PROCESSING') {
+    return <BookingProcessingState />;
+  }
+
+  if (booking.status === 'FAILED') {
+    return (
+      <BookingFailureState
+        failureReason={booking.failureReason}
+        flightSnapshot={booking.flightSnapshot}
+        paymentStatus={booking.payment?.status ?? booking.paymentStatus}
+        offerId={booking.bookingIntent?.offerId}
+      />
+    );
+  }
+
+  const segments = booking.currentItinerary?.segments ?? booking.flightSnapshot?.segments ?? [];
   const passengers = booking.passengerSnapshot?.passengers ?? [];
 
   const isCancellable = booking.status === 'CONFIRMED' && 
     booking.cancellationDeadline && new Date(booking.cancellationDeadline) > new Date();
+
+  const activeDisruptionStatus = booking.disruption?.status ?? DisruptionStatus.NONE;
+  const isDisrupted = activeDisruptionStatus !== DisruptionStatus.NONE;
 
   return (
     <section aria-labelledby="booking-detail-title" className="card space-y-6 relative">
@@ -134,6 +271,66 @@ export function BookingDetail({ booking, onRefresh }: BookingDetailProps) {
           )}
         </div>
       </div>
+
+      {/* Disruption Alert */}
+      {isDisrupted && (
+        <DisruptionAlert
+          status={activeDisruptionStatus}
+          isMaterial={booking.disruption.isMaterial}
+          materialReasons={booking.disruption.materialReasons}
+          stabilizationWarning={booking.disruption.stabilizationWarning}
+          resolvedReason={booking.disruption.resolvedReason}
+        />
+      )}
+
+      {/* Itinerary Change Summary */}
+      {isDisrupted && (
+        <ItineraryChangeSummary
+          incrementalSummary={booking.disruption.incrementalSummary}
+          cumulativeSummary={booking.disruption.cumulativeSummary}
+        />
+      )}
+
+      {/* Traveller Disruption Actions */}
+      {(activeDisruptionStatus === DisruptionStatus.DETECTED || activeDisruptionStatus === DisruptionStatus.ACKNOWLEDGED) && (
+        <div className="bg-bg-secondary p-5 rounded-xl border border-card-border space-y-4">
+          <h3 className="font-bold text-text-primary text-sm">Review Required</h3>
+          <p className="text-xs text-text-secondary">
+            Please confirm your preference regarding the schedule changes proposed by the airline.
+          </p>
+
+          {conflictError && (
+            <div className="p-3 bg-bg-cancelled border border-danger-border text-text-cancelled rounded-lg text-xs font-semibold">
+              {conflictError}
+            </div>
+          )}
+
+          {actionSuccess && (
+            <div className="p-3 bg-bg-confirmed border border-color-text-confirmed/30 text-text-confirmed rounded-lg text-xs font-semibold">
+              {actionSuccess}
+            </div>
+          )}
+
+          <div className="flex flex-wrap gap-3">
+            {activeDisruptionStatus === DisruptionStatus.DETECTED && (
+              <button
+                onClick={() => handleDisruptionAction('acknowledge')}
+                disabled={loadingAction}
+                className="btn-secondary text-xs py-1.5 px-3 disabled:opacity-50"
+              >
+                {loadingAction ? 'Processing...' : 'I understand'}
+              </button>
+            )}
+            <button
+              onClick={() => handleDisruptionAction('accept')}
+              disabled={loadingAction}
+              className="btn-primary text-xs py-1.5 px-3 disabled:opacity-50"
+            >
+              {loadingAction ? 'Processing...' : 'Accept current itinerary'}
+            </button>
+          </div>
+        </div>
+      )}
 
       {cancellationStatus && (booking.status === 'CANCELLATION_PENDING' || booking.status === 'CANCELLED_PENDING_REFUND' || booking.status === 'REFUND_FAILED_NEEDS_ATTENTION' || booking.status === 'CANCELLED_AND_REFUNDED' || booking.status === 'CANCELLED_NO_REFUND') && (
         <div className="bg-bg-secondary p-4 rounded-lg border border-border-primary">
@@ -189,6 +386,13 @@ export function BookingDetail({ booking, onRefresh }: BookingDetailProps) {
         <h3 className="font-semibold text-text-primary">Payment summary</h3>
         <p className="mt-1 text-sm text-text-secondary">Total paid: {currencyFormatter(booking.totalAmount, booking.currency)}</p>
       </div>
+
+      {/* Itinerary Revision History */}
+      {accessToken && (
+        <div className="mt-8 border-t border-card-border pt-6">
+          <ItineraryRevisionHistory bookingId={booking.id} accessToken={accessToken} />
+        </div>
+      )}
 
       {showCancelModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">

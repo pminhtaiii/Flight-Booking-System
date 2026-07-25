@@ -333,4 +333,60 @@ describe('Cancellation and refund recovery (E2E)', () => {
     expect(refund.lastErrorCode).toBe('IDEMPOTENCY_KEY_SAFETY_WINDOW');
     expect(persistedBooking.status).toBe(BookingStatus.REFUND_FAILED_NEEDS_ATTENTION);
   });
+
+  it('resolves disruption and writes audit log when cancellation completes successfully', async (): Promise<void> => {
+    const booking = await createCancellationBooking(owner.id);
+    
+    // Set disruption status on the booking to verify it gets resolved
+    await prisma.booking.update({
+      where: { id: booking.id },
+      data: { disruptionStatus: 'DETECTED' }
+    });
+
+    jest.spyOn(duffelService, 'retrieveOrder').mockResolvedValue({ id: 'ord-id', order_id: 'ord-id', status: 'ACTIVE', cancelled_at: null, cancellation_id: null });
+    jest.spyOn(duffelService, 'confirmCancellationQuote').mockResolvedValue({
+      id: `cancel-${crypto.randomUUID()}`,
+      order_id: `order-${crypto.randomUUID()}`,
+      status: 'CONFIRMED',
+      refund_amount: '100.00',
+      refund_currency: 'USD',
+      refundable: true,
+      confirmed_at: new Date().toISOString(),
+    });
+    jest.spyOn(stripeService, 'createRefund').mockResolvedValue({ id: `re-${crypto.randomUUID()}` } as never);
+
+    await request(app.getHttpServer())
+      .post(`/api/bookings/${booking.id}/cancel`)
+      .set('Authorization', `Bearer ${owner.token}`)
+      .send({ quoteId: booking.quoteId })
+      .expect(201);
+
+    const persisted = await prisma.booking.findUniqueOrThrow({ where: { id: booking.id } });
+    expect(persisted.status).toBe(BookingStatus.CANCELLED_AND_REFUNDED);
+    expect(persisted.disruptionStatus).toBe('RESOLVED');
+    expect(persisted.disruptionResolvedReason).toBe('BOOKING_CANCELLED');
+    expect(persisted.disruptionResolvedByType).toBe('TRAVELLER');
+    expect(persisted.disruptionResolvedById).toBe(owner.id);
+
+    const auditEvent = await prisma.disruptionAuditEvent.findFirst({
+      where: { bookingId: booking.id, action: 'BOOKING_CANCELLED' },
+    });
+    expect(auditEvent).toBeDefined();
+    expect(auditEvent?.actorType).toBe('TRAVELLER');
+    expect(auditEvent?.actorId).toBe(owner.id);
+  });
+
+  it('does not allow a post-cancellation sync to modify/create revisions or change state', async (): Promise<void> => {
+    const booking = await createCancellationBooking(owner.id, { status: BookingStatus.CANCELLED_AND_REFUNDED });
+    
+    const response = await request(app.getHttpServer())
+      .post(`/api/disruptions/sync/${booking.id}`)
+      .set('Authorization', `Bearer ${owner.token}`)
+      .expect(200);
+    
+    expect(response.body.status).toBe('SKIPPED_INELIGIBLE');
+    
+    const revisionsCount = await prisma.itineraryRevision.count({ where: { bookingId: booking.id } });
+    expect(revisionsCount).toBe(0);
+  });
 });
