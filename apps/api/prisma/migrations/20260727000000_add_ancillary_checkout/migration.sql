@@ -78,6 +78,7 @@ ALTER TABLE "payments"
   ADD COLUMN "ancillarySelectionVersion" INTEGER;
 
 CREATE UNIQUE INDEX "ancillary_selections_bookingIntentId_version_key" ON "ancillary_selections"("bookingIntentId", "version");
+CREATE UNIQUE INDEX "ancillary_selections_id_bookingIntentId_version_key" ON "ancillary_selections"("id", "bookingIntentId", "version");
 CREATE INDEX "ancillary_selections_bookingIntentId_idx" ON "ancillary_selections"("bookingIntentId");
 CREATE UNIQUE INDEX "booking_intents_currentAncillarySelectionId_key" ON "booking_intents"("currentAncillarySelectionId");
 CREATE INDEX "booking_intent_passengers_intentId_duffelPassengerId_idx" ON "booking_intent_passengers"("intentId", "duffelPassengerId");
@@ -91,7 +92,7 @@ ALTER TABLE "ancillary_selections" ADD CONSTRAINT "ancillary_selections_bookingI
 ALTER TABLE "seat_selections" ADD CONSTRAINT "seat_selections_ancillarySelectionId_fkey" FOREIGN KEY ("ancillarySelectionId") REFERENCES "ancillary_selections"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 ALTER TABLE "baggage_selections" ADD CONSTRAINT "baggage_selections_ancillarySelectionId_fkey" FOREIGN KEY ("ancillarySelectionId") REFERENCES "ancillary_selections"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 ALTER TABLE "baggage_selection_segments" ADD CONSTRAINT "baggage_selection_segments_baggageSelectionId_fkey" FOREIGN KEY ("baggageSelectionId") REFERENCES "baggage_selections"("id") ON DELETE CASCADE ON UPDATE CASCADE;
-ALTER TABLE "payments" ADD CONSTRAINT "payments_ancillarySelectionId_fkey" FOREIGN KEY ("ancillarySelectionId") REFERENCES "ancillary_selections"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "payments" ADD CONSTRAINT "payments_ancillary_selection_binding_fkey" FOREIGN KEY ("ancillarySelectionId", "bookingIntentId", "ancillarySelectionVersion") REFERENCES "ancillary_selections"("id", "bookingIntentId", "version") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 ALTER TABLE "booking_intents" ADD CONSTRAINT "booking_intents_ancillaryVersion_check" CHECK ("ancillaryVersion" >= 0);
 ALTER TABLE "booking_intents" ADD CONSTRAINT "booking_intents_ancillaryCurrency_check" CHECK ("ancillaryCurrency" IS NULL OR "ancillaryCurrency" ~ '^[A-Z]{3}$');

@@ -324,9 +324,10 @@ model AncillarySelection {
   currentForIntent     BookingIntent?           @relation("BookingIntentCurrentAncillarySelection")
   seatSelections       SeatSelection[]
   baggageSelections    BaggageSelection[]
-  payments             Payment[]
+  payments             Payment[]                 @relation("PaymentAncillarySelection")
 
   @@unique([bookingIntentId, version])
+  @@unique([id, bookingIntentId, version])
   @@index([bookingIntentId])
   @@map("ancillary_selections")
 }
@@ -532,7 +533,7 @@ model Payment {
   bookingIntent         BookingIntent  @relation(fields: [bookingIntentId], references: [id])
   ancillarySelectionId      String?
   ancillarySelectionVersion Int?
-  ancillarySelection        AncillarySelection? @relation(fields: [ancillarySelectionId], references: [id], onDelete: Restrict)
+  ancillarySelection        AncillarySelection? @relation("PaymentAncillarySelection", fields: [ancillarySelectionId, bookingIntentId, ancillarySelectionVersion], references: [id, bookingIntentId, version], onDelete: Restrict)
   attemptNumber         Int // 1 or 2 (Database-level CHECK constraint attemptNumber IN (1, 2) enforced in migration)
   idempotencyKeyId      String
   idempotencyKey        IdempotencyKey @relation(fields: [idempotencyKeyId], references: [id])
