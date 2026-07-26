@@ -82,7 +82,9 @@ export function SearchFormClient({ accessToken }: SearchFormClientProps) {
 
   const handleBook = async (offerId: string) => {
     setBookingOfferId(offerId);
+    setError(null);
     const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+    let success = false;
 
     try {
       for (let attempt = 1; attempt <= 5; attempt++) {
@@ -93,6 +95,7 @@ export function SearchFormClient({ accessToken }: SearchFormClientProps) {
             },
           });
           if (response.ok) {
+            success = true;
             break;
           }
         } catch (err) {
@@ -102,7 +105,12 @@ export function SearchFormClient({ accessToken }: SearchFormClientProps) {
           await new Promise((resolve) => setTimeout(resolve, 150));
         }
       }
-      router.push('/checkout/passengers?offerId=' + offerId);
+
+      if (success) {
+        router.push('/checkout/passengers?offerId=' + offerId);
+      } else {
+        setError('Flight offer is temporarily unavailable. Please try again in a few moments.');
+      }
     } finally {
       setBookingOfferId(null);
     }
