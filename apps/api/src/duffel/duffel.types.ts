@@ -99,3 +99,76 @@ export interface DuffelOrder {
   metadata?: Record<string, unknown>;
 }
 
+export interface DuffelSeatMapService {
+  id: string;
+  passenger_id: string;
+  total_amount: string;
+  total_currency: string;
+}
+
+export interface DuffelSeatElement {
+  type: string;
+  designator?: string;
+  name?: string;
+  available_services?: DuffelSeatMapService[];
+  disclosures?: string[];
+}
+
+export interface DuffelSeatMapSection {
+  elements: DuffelSeatElement[];
+}
+
+export interface DuffelSeatMapRow {
+  row_number: number;
+  sections: DuffelSeatMapSection[];
+}
+
+export interface DuffelSeatMapCabin {
+  cabin_class: string;
+  rows: DuffelSeatMapRow[];
+}
+
+export interface DuffelSeatMap {
+  id: string;
+  slice_id: string;
+  segment_id: string;
+  cabins: DuffelSeatMapCabin[];
+}
+
+export interface DuffelBaggageMetadata {
+  type: string;
+  weight?: number;
+  weight_unit?: string;
+  maximum_quantity?: number;
+}
+
+export interface DuffelOfferAvailableService {
+  id: string;
+  type: string;
+  passenger_ids: string[];
+  segment_ids: string[];
+  total_amount: string;
+  total_currency: string;
+  metadata?: DuffelBaggageMetadata;
+}
+
+export interface DuffelOfferWithServices extends DuffelOffer {
+  available_services?: DuffelOfferAvailableService[];
+}
+
+export interface DuffelServiceLine {
+  id: string;
+  total_amount: string;
+  total_currency: string;
+  quantity: number;
+  service_id: string;
+}
+
+export interface DuffelPricedOffer {
+  id: string;
+  total_amount: string;
+  total_currency: string;
+  base_amount: string;
+  base_currency: string;
+  service_lines: DuffelServiceLine[];
+}
