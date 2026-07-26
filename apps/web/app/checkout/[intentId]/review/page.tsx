@@ -103,8 +103,8 @@ export default async function ReviewPage({ params }: Props) {
               <p className="capitalize">{intent.flight.cabinClass}</p>
             </div>
             <div>
-              <p className="font-semibold text-text-primary">Stops</p>
-              <p>{intent.flight.adults} Adult(s) | {intent.flight.children || 0} Child(ren)</p>
+              <p className="font-semibold text-text-primary">Passengers</p>
+              <p>{intent.flight.adults} Adult(s){intent.flight.children ? ` | ${intent.flight.children} Child(ren)` : ''}{intent.flight.infants ? ` | ${intent.flight.infants} Infant(s)` : ''}</p>
             </div>
           </div>
         </div>
