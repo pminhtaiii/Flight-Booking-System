@@ -80,7 +80,7 @@ While choosing extras, a traveller sees an instant price tracker containing the 
 
 - **FR-001**: The system MUST insert an independently skippable Ancillaries step between passenger details and review, with switchable Seats and Baggage sections.
 - **FR-002**: The system MUST retrieve seat maps and available ancillary services only for an authenticated traveller's unexpired BookingIntent and offer.
-- **FR-003**: The system MUST cache seat maps in Redis for 60 seconds using offer-scoped keys and MUST bypass entries with three seconds or less remaining TTL.
+- **FR-003**: The system MUST cache supplier-native seat maps in Redis for 60 seconds using offer-scoped keys and MUST bypass entries with three seconds or less remaining TTL. Cached values MUST NOT contain local BookingIntent/passenger IDs, traveller names, or an intent-specific passenger projection; the server MUST derive that mapping per authenticated request after reading the cache.
 - **FR-004**: The system MUST provide an explicit seat-map force refresh that bypasses the cache without mutating committed selections.
 - **FR-005**: The system MUST key seat selections by segment ID and passenger ID and use Duffel service ID as the authoritative identifier; seat designators are display-only.
 - **FR-006**: The system MUST allow at most one seat per eligible passenger per segment and MUST exclude lap infants from seat assignment.
@@ -91,23 +91,23 @@ While choosing extras, a traveller sees an instant price tracker containing the 
 - **FR-011**: The system MUST calculate displayed savings only from supplier-provided prices for equivalent coverage and weight tiers.
 - **FR-012**: The client MUST calculate the browsing total instantly as base offer price plus selected service amounts and MUST NOT reprice on each interaction.
 - **FR-013**: All amounts in one selection MUST use the offer currency; unsupported mixed-currency submissions MUST fail validation.
-- **FR-014**: On Continue, the server MUST validate JWT identity, BookingIntent ownership/expiry/version, and each service's offer, passenger, segment coverage, availability, amount, and currency before persisting the snapshot.
-- **FR-015**: The system MUST persist normalized ancillary selections on BookingIntent and MAY retain the supplier response needed for audit/recovery without storing PII in Redis or client storage.
+- **FR-014**: On Continue, the server MUST validate JWT identity, BookingIntent ownership/expiry/version, derive each Duffel-to-local passenger mapping from that owned intent, and validate each service's offer, passenger, segment coverage, availability, amount, and currency before persisting the snapshot. A mapping that is absent, ambiguous, or belongs to another intent MUST be rejected.
+- **FR-015**: The system MUST persist each committed ancillary snapshot as a new append-only BookingIntent-owned version, atomically advance the intent's current snapshot pointer, and retain older snapshot/service rows while any Payment or recovery path references them. A later commit MUST NOT replace or mutate an older version.
 - **FR-016**: The client MUST retain only the minimum recovery snapshot in localStorage with intent-bound expiry and MUST reconcile it against server state before hydration.
 - **FR-017**: The review page MUST be read-only and MUST expose targeted edit links for seats and baggage while preserving the untouched section.
 - **FR-018**: At checkout commitment, the server MUST reprice the exact offer and selected services with Duffel and MUST return an actionable conflict before payment authorization when the selection is stale or invalid.
 - **FR-019**: The system MUST create one Stripe PaymentIntent in manual-capture mode for the authoritative base-plus-ancillary amount, then create one Duffel order containing only validated service IDs.
 - **FR-020**: The system MUST capture Stripe only after Duffel confirms the order and MUST cancel the authorization when supplier order creation fails.
-- **FR-021**: Ancillary confirmation and checkout MUST use the existing idempotency mechanism so retries cannot duplicate snapshots, payments, or orders.
+- **FR-021**: Ancillary confirmation and checkout MUST use the existing idempotency mechanism so retries cannot duplicate snapshots, payments, or orders. Payment MUST store and recover from the exact immutable snapshot ID/version it priced rather than the BookingIntent's mutable current pointer.
 - **FR-022**: Existing cancellation/refund recovery MUST continue using Duffel's authoritative cancellation quote; the feature MUST disclose excluded non-refundable ancillaries without introducing a second refund calculation.
-- **FR-023**: Expired BookingIntent cleanup MUST remove server snapshots through the existing cleanup lifecycle, and stale local snapshots MUST self-discard.
+- **FR-023**: Expired BookingIntent cleanup MUST remove only snapshots not protected by retained Payment/recovery references; database constraints MUST prevent deletion of referenced snapshots. Stale local snapshots MUST self-discard.
 - **FR-024**: Supplier calls, validation conflicts, cache behavior, checkout compensation, and idempotent replays MUST emit structured PII-safe logs, traces, metrics, and audit events consistent with project standards.
 - **FR-025**: The feature MUST remain deterministic and MUST NOT involve an AI agent in selection validation, pricing, payment, or order creation.
 - **FR-026**: The first release MUST support desktop ancillary interaction and accessible keyboard operation; a dedicated small-screen seat-map layout is deferred.
 
 ### Key Entities
 
-- **Ancillary Selection Snapshot**: Versioned BookingIntent-owned commitment containing normalized seat and baggage selections, totals, validation metadata, and expiry.
+- **Ancillary Selection Snapshot**: Append-only, versioned BookingIntent-owned commitment containing normalized seat and baggage selections, authoritative validated totals, validation metadata, and expiry. BookingIntent points to the current snapshot while Payment retains the exact immutable snapshot it priced.
 - **Seat Selection**: One Duffel seat service assigned to one eligible passenger on one flight segment, with a display-only designator and supplier amount/currency.
 - **Baggage Selection**: A quantified Duffel baggage service for one passenger covering one or more segments, including type and weight tier.
 - **Ancillary Catalog**: Short-lived supplier-derived seat-map and available-service data used for browsing and server validation.
@@ -120,13 +120,14 @@ While choosing extras, a traveller sees an instant price tracker containing the 
 
 - **SC-001**: A traveller can select or skip seats and baggage for a two-passenger, two-segment itinerary and reach review without any selection appearing under the wrong passenger or segment.
 - **SC-002**: Price tracker updates complete within 100 ms of a local selection interaction and generate zero repricing requests during browsing.
-- **SC-003**: At checkout, 100% of submitted service IDs are validated against the owned offer/passenger/segment before a payment authorization or Duffel order is created.
+- **SC-003**: At checkout, 100% of submitted service IDs are validated against the owned offer/passenger/segment through the current BookingIntent's request-scoped passenger mapping before a payment authorization or Duffel order is created.
 - **SC-004**: Repeated requests with one idempotency key produce at most one committed selection snapshot, one PaymentIntent, and one Duffel order.
 - **SC-005**: Seat-map requests served from cache avoid supplier calls while entries have more than three seconds remaining; stale-window and force-refresh requests obtain fresh supplier data.
 - **SC-006**: Supplier-order failures after payment authorization result in zero captured charges and a cancelled or safely recoverable authorization.
 - **SC-007**: Keyboard-only users can navigate segment and passenger controls, identify seat states without color alone, select services, skip sections, and continue to review.
 - **SC-008**: Existing booking, payment, cancellation, and refund tests remain green, including cancellation quotes containing refundable ancillary amounts.
 - **SC-009**: End-to-end tests demonstrate recovery after tab close/reopen for an unexpired committed snapshot and safe discard after expiry or ownership mismatch.
+- **SC-010**: When Payment recovery is bound to ancillary version N and version N+1 later becomes current, recovery uses exactly version N's totals and service lines and neither snapshot is deleted or rewritten.
 
 ## Assumptions
 

@@ -28,9 +28,9 @@ All technical unknowns are resolved for planning. The approved product decisions
 
 ## 5. Persistence model
 
-- **Decision**: Add normalized `AncillarySelection`, `SeatSelection`, and `BaggageSelection` records owned by `BookingIntent`, plus an optimistic `ancillaryVersion`/validated timestamp and aggregate totals on the intent. Keep the short-lived supplier catalog in Redis rather than PostgreSQL.
-- **Rationale**: Normalized rows enforce uniqueness and coverage constraints, allow auditable server reconciliation, and avoid repeatedly rewriting a large JSON blob. BookingIntent expiry/cascade semantics naturally clean selections.
-- **Alternatives considered**: One opaque JSON snapshot only; final Booking-only persistence; dedicated reservation service/database. JSON-only weakens constraints/queryability, final-only loses crash recovery, and a new service is unjustified.
+- **Decision**: Add append-only normalized `AncillarySelection`, `SeatSelection`, and `BaggageSelection` versions owned by `BookingIntent`, plus an optimistic `ancillaryVersion`, current-snapshot pointer, validated timestamp, and aggregate current totals. Payment stores a restrictive foreign-key reference to the exact snapshot it priced. Keep the short-lived supplier catalog in Redis rather than PostgreSQL.
+- **Rationale**: Normalized rows enforce uniqueness and coverage constraints, allow auditable server reconciliation, and preserve the exact service rows needed by payment recovery after a later selection becomes current. BookingIntent identifies the editable current version, while Payment recovery never follows that mutable pointer.
+- **Alternatives considered**: Replacing one active snapshot; one opaque JSON snapshot only; final Booking-only persistence; dedicated reservation service/database. Replacement erases recovery inputs, JSON-only weakens constraints/queryability, final-only loses crash recovery, and a new service is unjustified.
 
 ## 6. Client state and recovery
 
@@ -46,7 +46,7 @@ All technical unknowns are resolved for planning. The approved product decisions
 
 ## 8. Seat-map caching
 
-- **Decision**: Use the approved `seatmap:{offerId}` key with a 60-second TTL, treat TTL `<=3` seconds as a miss, and provide a force-refresh bypass through the existing CacheService `get`/`getTtl`/`set` seam.
+- **Decision**: Use the approved `seatmap:{offerId}` key with a 60-second TTL, treat TTL `<=3` seconds as a miss, and provide a force-refresh bypass through the existing CacheService `get`/`getTtl`/`set` seam. Cache only supplier-native offer/segment/service data and Duffel passenger IDs. Derive Duffel-to-local passenger mappings per authenticated BookingIntent after each cache read; never cache the intent-specific projection.
 - **Rationale**: Existing `CacheService` already provides `get`, `set`, `del`, and `getTtl` with Redis/in-memory fallback. The short TTL absorbs bursts without making checkout correctness depend on cache freshness.
 - **Alternatives considered**: No cache; 2-3 minute cache; caching selected state. Rejected for supplier cost, volatility, and privacy/state correctness.
 

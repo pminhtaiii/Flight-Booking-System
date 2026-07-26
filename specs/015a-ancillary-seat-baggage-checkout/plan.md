@@ -200,19 +200,19 @@ PR 1 and PR 2 may be prepared in parallel only after their route/type contract i
 ### Work
 
 1. Add shared normalized catalog, seat, baggage, selection, price-breakdown, error, and API types in `packages/shared/src/types/ancillary.types.ts`; export them without frontend/backend redefinition.
-2. Extend BookingIntent with optimistic `ancillaryVersion`, explicit ancillary status/totals/currency/validated total/timestamps, and one active normalized selection relationship from [data-model.md](./data-model.md).
+2. Extend BookingIntent with optimistic `ancillaryVersion`, current read projections for status/totals/currency/validation time, an append-only collection of normalized selection versions, and `currentAncillarySelectionId` pointing to the latest version from [data-model.md](./data-model.md). Store authoritative validated base/grand totals on each snapshot so recovery never reads mutable intent projections.
 3. Add `duffelPassengerId` to BookingIntentPassenger. Populate it at new intent creation from the fetched offer; define a deterministic type+ordinal fallback only for legacy active intents and record mismatch as a validation conflict.
 4. Add AncillarySelection, SeatSelection, BaggageSelection, and BaggageSelectionSegment constraints. Enforce one seat per passenger/segment and non-duplicated supplier service identities. Keep overlap rules in deterministic validation because they span coverage rows.
-5. Bind Payment to the immutable `ancillarySelectionVersion` used for its amount and order. Do not overload `confirmedPrice`; preserve separate base, ancillary, and authoritative grand totals.
+5. Bind Payment through an `ON DELETE RESTRICT` foreign key to the immutable AncillarySelection row plus its denormalized version used for amount/order recovery. Do not overload `confirmedPrice`; preserve separate base, ancillary, and authoritative grand totals.
 6. Resolve the existing BookingIntent status mismatch: freshly created intents are `PENDING`, while PaymentService currently checks a non-enum `CREATED` path. Specify and implement legal `PENDING -> AWAITING_PAYMENT -> CONFIRMED/terminal` transitions before ancillary integration.
 7. Create and inspect an additive Prisma migration, including existing-row defaults/backfill behavior, indexes, check constraints where Prisma cannot express them, and rollback compatibility.
-8. Keep expired-intent cascade cleanup; add regression proof rather than a parallel ancillary cleanup worker.
+8. Keep expired-intent cascade cleanup for unreferenced snapshots, but skip intents/snapshots protected by retained Payment or recovery references. Add regression proof rather than a parallel ancillary cleanup worker.
 
 ### Tests
 
 - Shared contract compile tests and serialization fixtures.
 - Migration against current Feature 14 data plus an empty database.
-- Database constraint tests for passenger/segment seat uniqueness, selection version, coverage join uniqueness, currency/quantity bounds, and cascade cleanup.
+- Database constraint tests for passenger/segment seat uniqueness, `(bookingIntentId, version)`, current-pointer integrity, Payment snapshot foreign-key restriction, coverage join uniqueness, currency/quantity bounds, and safe cascade cleanup.
 - BookingIntent state transition and legacy passenger-mapping tests.
 
 ### Exit criteria
@@ -229,7 +229,7 @@ PR 1 and PR 2 may be prepared in parallel only after their route/type contract i
 1. Read the installed Duffel SDK/version documentation available in the package before coding; verify exact Seat Maps, available-services, price-action, order `services[]`, quantity, and error response shapes against `@duffel/api` 4.28 rather than training-memory syntax.
 2. Extend `duffel.types.ts` with narrow raw adapter types and project normalized types. Controllers/services outside the adapter never consume raw SDK objects.
 3. Add `getSeatMaps(duffelOfferId)` and available-services retrieval with existing timeout, rate-limit, trace/correlation, and safe error normalization patterns.
-4. Normalize segment IDs, passenger bindings, cabins/rows/elements, seat services, baggage scope/weight/quantity, currency/amount, and missing-map status. Reject or quarantine incomplete supplier associations instead of guessing.
+4. Normalize segment IDs, supplier passenger bindings, cabins/rows/elements, seat services, baggage scope/weight/quantity, currency/amount, and missing-map status. The offer-scoped cached value contains Duffel IDs only—never local BookingIntent/passenger IDs or names. Reject or quarantine incomplete supplier associations instead of guessing.
 5. Add exact offer+service repricing through installed-SDK `offers.getPriced(offerId, { intended_payment_methods, intended_services })`. The adapter returns authoritative base, service lines, grand total, currency, and invalid/unavailable service identities.
 6. Extend `createOrder()` to accept only validated normalized service ID/quantity input and include it in the current idempotent raw REST request.
 7. Implement catalog caching via CacheService: `seatmap:{offerId}`, 60 seconds, `getTtl() > 3` hit, missing/`-2`/`-1`/`<=3` miss, force-refresh bypass and overwrite. Avoid caching passenger PII or committed selection state.
@@ -238,7 +238,7 @@ PR 1 and PR 2 may be prepared in parallel only after their route/type contract i
 ### Tests
 
 - Golden redacted fixtures for multi-cabin maps, aisles/exit rows, unavailable seats, no map, multiple passengers, segment/journey baggage, unknown fields, and supplier error shapes.
-- Cache hit/miss, TTL boundaries 4/3/0/-1/-2, force refresh, Redis fallback, and concurrent request deduplication if the existing cache seam supports it.
+- Cache hit/miss, TTL boundaries 4/3/0/-1/-2, force refresh, Redis fallback, concurrent request deduplication if the existing cache seam supports it, and proof that cached values contain no intent-local identifiers.
 - Repricing exact totals/currency and unavailable/tampered service mapping.
 - Order payload includes each validated service exactly once with stable idempotency key.
 
@@ -254,10 +254,10 @@ PR 1 and PR 2 may be prepared in parallel only after their route/type contract i
 ### Work
 
 1. Add `AncillariesModule`, protected controller, catalog service, selection validator, pricing utility, and DTOs implementing [contracts/api.md](./contracts/api.md).
-2. For every read/mutation: validate UUID, fetch the intent, enforce user ownership, active status, intent/offer expiry, and supplier/local passenger mapping before catalog access.
-3. Implement catalog read with `refresh=true`, current canonical selection, cache metadata, named non-PII passenger view, and no raw supplier payload.
+2. For every read/mutation: validate UUID, fetch the intent, and enforce user ownership, active status, and intent/offer expiry before catalog access. After reading the supplier-native cached catalog, derive the Duffel-to-local passenger mapping from that authenticated intent in request scope.
+3. Implement catalog read with `refresh=true`, current canonical selection, cache metadata, named non-PII passenger view, and no raw supplier payload. Never persist the intent-specific passenger projection in the shared offer cache.
 4. Implement pure validation for service membership, passenger/segment scope, infant exclusion, duplicate group seat, baggage quantity, journey/segment overlap, equivalent tier, and single currency.
-5. Implement idempotent selection commit with `Idempotency-Key`, request hash/replay, expected-version CAS, short transaction, normalized row replacement/upsert, server-derived totals, version increment, status invalidation, and audit event.
+5. Implement idempotent selection commit with `Idempotency-Key`, request hash/replay, and expected-version CAS. In one short transaction, insert a new immutable snapshot and child rows, atomically advance the BookingIntent current pointer/version/totals, invalidate current validation status, and write the audit event. Never replace, upsert, mutate, or delete older snapshot service rows.
 6. Reuse exported PaymentIdempotencyService through the module graph if it remains acyclic; extract a narrowly scoped IdempotencyModule only if an actual dependency cycle appears. Before reuse, require existing idempotency rows to match both `customerId` and `requestPath` as well as request hash so a globally unique key cannot replay another user's or endpoint's response; cover the same checks in the race path.
 7. Return structured 409 conflicts containing the canonical version and targeted invalid selections. Do not silently overwrite server state or clear unrelated valid selections.
 8. Lock edits once the exact version enters payment processing; define safe resume behavior for failed/pre-authorization attempts.
@@ -265,8 +265,9 @@ PR 1 and PR 2 may be prepared in parallel only after their route/type contract i
 ### Tests
 
 - Controller/service ownership 403, missing 404, expired 410, invalid UUID, and zero supplier call on rejected access.
+- Two BookingIntents sharing one Duffel offer reuse the same supplier catalog while each response and validation uses only its own local passenger mapping.
 - Every tampering/overlap/currency/infant/duplicate invariant with table-driven pure tests.
-- Real-database atomic commit/rollback, CAS race between two tabs, idempotent replay/different-body conflict, and audit attribution.
+- Real-database atomic commit/rollback, CAS race between two tabs, idempotent replay/different-body conflict, append-only N-to-N+1 history, and audit attribution.
 - Empty selection commit remains a valid skip path.
 
 ### Exit criteria
@@ -310,10 +311,10 @@ PR 1 and PR 2 may be prepared in parallel only after their route/type contract i
 1. Implement an internal validate/freeze command invoked by `POST /bookings/payment/create`: verify active owned intent/version, mark/freeze the candidate in a short CAS transaction, release DB locks, call Duffel repricing outside the transaction, then conditionally persist validated totals/status only if the same version remains frozen.
 2. Return targeted unavailable/service/price conflicts. Preserve valid selections, invalidate the snapshot for payment, and require traveller acknowledgement/revalidation after a price change.
 3. Move authoritative repricing before Payment attempt consumption/`AWAITING_PAYMENT` mutation so supplier failures do not burn one of the existing attempt limits.
-4. Extend CreatePaymentDto with `ancillarySelectionVersion`; only after the CAS/reprice succeeds, compute Payment amount from the authoritative server grand total in minor units. Empty selections keep base-fare behavior. A separate preview endpoint must never be the sole checkout validation.
+4. Extend CreatePaymentDto with `ancillarySelectionId` and `ancillarySelectionVersion`; only after the CAS/reprice succeeds, persist the authoritative base/grand totals on that snapshot, store its ID/version on Payment, transition it to `PAYMENT_BOUND`, and compute the Payment amount from `validatedGrandTotal` in minor units. Empty selections keep base-fare behavior. A separate preview endpoint must never be the sole checkout validation.
 5. Bind Payment/event/recovery metadata to intent ID, snapshot version, service counts, and safe totals. Never store seat-map or passenger payload in PaymentEvent/log metadata.
 6. Pass exact validated `{serviceId, quantity}` values to Duffel order creation. Re-check intent/version freeze immediately before supplier order if retry recovery can span edits; edits are rejected once payment begins.
-7. Preserve current saga: verify `requires_capture`, create Duffel order with stable idempotency key, capture Stripe, or cancel authorization/compensate supplier order on failures. Extend recovery reads so retries reconstruct the same selection version.
+7. Preserve current saga: verify `requires_capture`, create Duffel order with stable idempotency key, capture Stripe, or cancel authorization/compensate supplier order on failures. Recovery always loads service rows through the Payment-bound snapshot ID, never the BookingIntent current pointer, even after a newer selection version is committed.
 8. Exercise status/recovery behavior at every existing recovery point; a captured charge must never be paired with a silently different ancillary snapshot.
 
 ### Tests
@@ -322,7 +323,7 @@ PR 1 and PR 2 may be prepared in parallel only after their route/type contract i
 - Price/service/version changes before and after freeze produce zero premature Stripe calls.
 - Exact major-to-minor conversion for base + seat + baggage; mixed currency rejected.
 - Success creates one PaymentIntent, one Duffel order containing exact services, one capture, one Booking.
-- Supplier failure cancels authorization; capture failure uses existing supplier/payment compensation; crash/retry resumes at every recovery point without duplication.
+- Supplier failure cancels authorization; capture failure uses existing supplier/payment compensation; crash/retry resumes at every recovery point without duplication. A failed Payment bound to version N still reconstructs N after version N+1 becomes current.
 - Existing payment/idempotency/ledger/booking tests remain green for empty ancillary selection.
 
 ### Exit criteria
@@ -423,14 +424,14 @@ Rollback disables financial integration first, then selection commit/UI, then ca
 
 ## Complexity Tracking
 
-| Complexity                                                | Why needed                                                                                   | Simpler alternative rejected because                                                       |
-| --------------------------------------------------------- | -------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
-| Normalized selection rows plus versioned parent           | enforce passenger/segment/service invariants and bind payment to an auditable snapshot       | opaque JSON alone cannot enforce uniqueness/coverage and is difficult to recover safely    |
-| Custom seat renderer                                      | approved group/passenger/segment UX, brand integration, exact price state, and accessibility | drop-in Duffel component cannot meet the approved interaction/design contract              |
-| CAS freeze around external repricing                      | avoid long DB locks while preventing payment from using a changed snapshot                   | external calls inside transactions harm concurrency; last-write-wins permits wrong charges |
-| Short-lived supplier catalog cache                        | API-budget discipline under volatile seat availability                                       | no cache wastes budget; longer cache gives misleading browsing state                       |
-| Minimal localStorage recovery plus server canonical state | survives tab close after explicit Continue                                                   | sessionStorage does not survive; local-only authority is tamperable/stale                  |
-| Checkout frontend foundation phase                        | live development tree lacks navigable real passenger/review/payment routes                   | planning ancillary components against deleted demo code is not executable                  |
+| Complexity                                                  | Why needed                                                                                       | Simpler alternative rejected because                                                       |
+| ----------------------------------------------------------- | ------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------ |
+| Append-only normalized selection versions + current pointer | enforce passenger/segment/service invariants and preserve the exact Payment-bound recovery input | replacing one active row erases in-flight recovery data; opaque JSON weakens constraints   |
+| Custom seat renderer                                        | approved group/passenger/segment UX, brand integration, exact price state, and accessibility     | drop-in Duffel component cannot meet the approved interaction/design contract              |
+| CAS freeze around external repricing                        | avoid long DB locks while preventing payment from using a changed snapshot                       | external calls inside transactions harm concurrency; last-write-wins permits wrong charges |
+| Short-lived supplier catalog cache                          | API-budget discipline under volatile seat availability                                           | no cache wastes budget; longer cache gives misleading browsing state                       |
+| Minimal localStorage recovery plus server canonical state   | survives tab close after explicit Continue                                                       | sessionStorage does not survive; local-only authority is tamperable/stale                  |
+| Checkout frontend foundation phase                          | live development tree lacks navigable real passenger/review/payment routes                       | planning ancillary components against deleted demo code is not executable                  |
 
 All complexity maps to deterministic financial correctness, API-budget discipline, accessibility, operational visibility, or a verified repository prerequisite. No new deployable service, queue, or global client state framework is introduced.
 

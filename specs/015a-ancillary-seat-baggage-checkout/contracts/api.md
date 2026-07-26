@@ -6,6 +6,8 @@ All routes are NestJS backend routes under `/api` (or the repository's configure
 
 Returns the normalized ancillary catalog plus the current committed selection snapshot.
 
+The offer-scoped cache stores only supplier-native catalog data and Duffel passenger IDs. The `passengers` array below is projected for the authenticated BookingIntent after the cache read and is never part of the cached value.
+
 Query:
 
 - `refresh=true` bypasses the seat-map cache and fetches fresh supplier data.
@@ -15,6 +17,7 @@ Response `200`:
 ```json
 {
   "intentId": "uuid",
+  "selectionId": "uuid",
   "selectionVersion": 2,
   "selectionStatus": "DRAFT_COMMITTED",
   "currency": "USD",
@@ -89,6 +92,7 @@ Response `200`:
 ```json
 {
   "intentId": "uuid",
+  "selectionId": "uuid",
   "selectionVersion": 3,
   "selectionStatus": "DRAFT_COMMITTED",
   "intentExpiresAt": "2026-07-26T10:30:00.000Z",
@@ -109,7 +113,8 @@ Response `200`:
 Rules:
 
 - Empty arrays explicitly skip/remove selections.
-- Submitted service IDs are looked up in a fresh-enough server catalog; request amounts/designators/coverage are never trusted.
+- Every successful commit inserts a new snapshot ID/version and advances the intent's current pointer; it never replaces an older snapshot that may be referenced by Payment recovery.
+- Submitted service IDs are looked up in a fresh-enough supplier catalog and joined through the current owned intent's request-scoped Duffel-to-local passenger mapping; request amounts/designators/coverage and mappings from any other intent are never trusted.
 - Same key + same body replays the response; same key + different body returns idempotency conflict.
 - Version mismatch returns current canonical selection without overwriting it.
 
@@ -122,6 +127,7 @@ Extend request:
 ```json
 {
   "bookingIntentId": "uuid",
+  "ancillarySelectionId": "uuid",
   "ancillarySelectionVersion": 3,
   "paymentMethodId": "pm_...",
   "saveCard": false
@@ -131,7 +137,7 @@ Extend request:
 Additional preconditions:
 
 - the intent is owned, active, and unexpired;
-- the supplied version equals the current BookingIntent version;
+- the supplied selection ID/version equals the current BookingIntent pointer/version;
 - the server CAS-freezes that exact snapshot so edits cannot race checkout;
 - the server calls Duffel `offers.getPriced` with canonical deduplicated intended services outside the database transaction and before consuming a payment attempt or creating Stripe;
 - the authoritative result is persisted only if the same frozen version still owns checkout;
@@ -144,6 +150,8 @@ A separate repricing preview, if added later, can improve review UX but never re
 ### `POST /bookings/payment/confirm`
 
 Request remains compatible. `PaymentService` passes the validated selection's service IDs to the extended Duffel order adapter, verifies Stripe `requires_capture`, creates the supplier order, then captures or compensates using the existing recovery-point state machine.
+
+Payment persists the exact ancillary selection ID/version used during creation. Confirmation and every recovery path load services through that Payment relationship rather than the BookingIntent current pointer, so committing a later selection cannot change an in-flight or recovering order.
 
 ## Error envelope
 

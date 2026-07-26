@@ -39,14 +39,15 @@ Required scenarios:
 
 1. Owner can fetch catalog; another user receives the existing protected-resource behavior.
 2. Cache miss calls Duffel once, normal hit calls zero times, `TTL <= 3` and force refresh call once.
-3. Snapshot commit enforces passenger/segment/service/currency rules and atomically increments version.
+3. Snapshot commit enforces passenger/segment/service/currency rules, inserts an append-only version, and atomically advances the current pointer without altering earlier versions.
 4. Same idempotency key/body replays; key reuse with different body conflicts.
 5. Concurrent expected-version updates produce one winner and one canonical version conflict.
 6. Payment creation freezes and reprices the exact version before Stripe; a concurrent mutation conflicts and creates no PaymentIntent.
 7. Payment amount equals authoritative base + services in minor units and is bound to the frozen/validated version.
 8. Confirmation passes exact service IDs to Duffel, captures only after order success, and cancels authorization on order failure.
-9. Duplicate confirmation/recovery creates at most one PaymentIntent/order/capture.
+9. Duplicate confirmation/recovery creates at most one PaymentIntent/order/capture, and a Payment bound to version N still reconstructs N after the traveller commits version N+1.
 10. Existing cancellation quote/refund recovery tests prove ancillary-inclusive/excluded supplier amounts are not recalculated locally.
+11. Cleanup cannot delete a snapshot referenced by Payment; after the retention lifecycle releases that reference, normal parent cleanup can cascade unreferenced versions.
 
 ## Browser E2E verification
 
