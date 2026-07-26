@@ -1,7 +1,7 @@
 import 'reflect-metadata';
 import { BookingIntentService } from './booking-intent.service';
 import { DuffelTimeoutError } from '@/duffel/duffel.service';
-import { HttpException, HttpStatus } from '@nestjs/common';
+import { HttpException, HttpStatus, NotFoundException, ForbiddenException, GoneException } from '@nestjs/common';
 
 type MockEncryptionService = {
   encrypt: jest.Mock;
@@ -17,6 +17,7 @@ type MockPrismaService = {
     findMany: jest.Mock;
     updateMany: jest.Mock;
     deleteMany: jest.Mock;
+    findUnique: jest.Mock;
   };
   $transaction: jest.Mock;
 };
@@ -183,6 +184,7 @@ describe('BookingIntentService Refinements', () => {
           findMany: jest.fn(),
           updateMany: jest.fn(),
           deleteMany: jest.fn(),
+          findUnique: jest.fn(),
         },
         $transaction: jest.fn(async (cb) => cb(mockPrisma)),
       } as unknown as MockPrismaService;
@@ -191,11 +193,15 @@ describe('BookingIntentService Refinements', () => {
         createLog: jest.fn(),
       } as unknown as MockAuditService;
 
+      const mockEncryption = {
+        decrypt: jest.fn((val: string) => `decrypted-${val}`),
+      };
+
       service = new BookingIntentService(
         mockPrisma as unknown as import('../prisma/prisma.service').PrismaService,
         {} as import('../duffel/duffel.service').DuffelService,
         mockAudit as unknown as import('../audit/audit.service').AuditService,
-        {} as import('../common/encryption.service').EncryptionService,
+        mockEncryption as unknown as import('../common/encryption.service').EncryptionService,
       );
     });
 
@@ -306,6 +312,122 @@ describe('BookingIntentService Refinements', () => {
           where: {
             status: 'EXPIRED',
             updatedAt: { lt: expectedCutoff },
+          },
+        });
+      });
+    });
+
+    describe('getIntent', () => {
+      it('throws NotFoundException if intent does not exist', async () => {
+        mockPrisma.bookingIntent.findUnique.mockResolvedValueOnce(null);
+
+        await expect(service.getIntent('user-1', 'intent-1')).rejects.toThrow(
+          NotFoundException,
+        );
+      });
+
+      it('throws ForbiddenException if intent does not belong to the user', async () => {
+        mockPrisma.bookingIntent.findUnique.mockResolvedValueOnce({
+          id: 'intent-1',
+          userId: 'user-2',
+          status: 'PENDING',
+        });
+
+        await expect(service.getIntent('user-1', 'intent-1')).rejects.toThrow(
+          ForbiddenException,
+        );
+      });
+
+      it('throws GoneException if intent status is EXPIRED', async () => {
+        mockPrisma.bookingIntent.findUnique.mockResolvedValueOnce({
+          id: 'intent-1',
+          userId: 'user-1',
+          status: 'EXPIRED',
+        });
+
+        await expect(service.getIntent('user-1', 'intent-1')).rejects.toThrow(
+          GoneException,
+        );
+      });
+
+      it('returns mapped intent DTO on success', async () => {
+        const mockPricedAt = new Date('2026-07-26T10:00:00Z');
+        const mockExpiresAt = new Date('2026-07-26T10:30:00Z');
+        const mockCreatedAt = new Date('2026-07-26T09:50:00Z');
+        const mockDob = new Date('1990-01-01');
+
+        mockPrisma.bookingIntent.findUnique.mockResolvedValueOnce({
+          id: 'intent-1',
+          userId: 'user-1',
+          status: 'PENDING',
+          originalPrice: 150.00,
+          confirmedPrice: 160.00,
+          priceChanged: true,
+          currency: 'USD',
+          pricedAt: mockPricedAt,
+          intentExpiresAt: mockExpiresAt,
+          offerExpiresAt: null,
+          createdAt: mockCreatedAt,
+          passengers: [
+            {
+              id: 'p1',
+              type: 'ADULT',
+              givenName: 'John',
+              familyName: 'Doe',
+              dateOfBirth: mockDob,
+              gender: 'male',
+              nationality: 'US',
+              passportNumber: 'v1:encrypted-passport',
+              passportExpiry: 'v1:encrypted-expiry',
+              travelerProfileId: 'profile-1',
+            }
+          ],
+          origin: 'SGN',
+          destination: 'HAN',
+          departureDate: new Date('2026-08-01'),
+          returnDate: null,
+          cabinClass: 'economy',
+          adults: 1,
+          children: 0,
+          infants: 0,
+        });
+
+        const result = await service.getIntent('user-1', 'intent-1');
+
+        expect(result).toEqual({
+          intentId: 'intent-1',
+          status: 'PENDING',
+          originalPrice: 150,
+          confirmedPrice: 160,
+          priceChanged: true,
+          currency: 'USD',
+          pricedAt: mockPricedAt.toISOString(),
+          intentExpiresAt: mockExpiresAt.toISOString(),
+          offerExpiresAt: null,
+          createdAt: mockCreatedAt.toISOString(),
+          passengers: [
+            {
+              id: 'p1',
+              type: 'ADULT',
+              givenName: 'John',
+              familyName: 'Doe',
+              dateOfBirth: '1990-01-01',
+              gender: 'male',
+              nationality: 'US',
+              passportNumber: 'decrypted-v1:encrypted-passport',
+              passportExpiry: 'decrypted-v1:encrypted-expiry',
+              preFilledFromProfile: true,
+            }
+          ],
+          flight: {
+            origin: 'SGN',
+            destination: 'HAN',
+            departureDate: '2026-08-01',
+            returnDate: null,
+            cabinClass: 'economy',
+            adults: 1,
+            children: 0,
+            infants: 0,
           },
         });
       });

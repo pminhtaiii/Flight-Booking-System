@@ -545,6 +545,9 @@ export class FlightsService {
       returnSegments,
       expiresAt: liveOffer.expires_at,
       conditions,
+      adults: flightOffer.adults,
+      children: flightOffer.children,
+      infants: flightOffer.infants,
     };
   }
 }

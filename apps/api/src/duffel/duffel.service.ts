@@ -1,9 +1,25 @@
 import { Injectable, HttpException, HttpStatus, Logger } from '@nestjs/common';
 import { CacheService } from '@/cache/cache.service';
 import { Duffel } from '@duffel/api';
-import { DuffelOfferRequest, DuffelOrder } from './duffel.types';
+import {
+  DuffelOfferRequest,
+  DuffelOrder,
+  DuffelSeatMap,
+  DuffelOfferWithServices,
+  DuffelPricedOffer,
+} from './duffel.types';
 import * as crypto from 'crypto';
 import { FlightSnapshot, PassengerSnapshot } from '@shared/booking-types';
+import {
+  AncillaryCatalog,
+  AncillarySegment,
+  AncillarySeatMap,
+  AncillaryRowElement,
+  AncillarySeatService,
+  AncillaryBaggageService,
+  AncillaryRepriceOutput,
+} from '@shared/types';
+
 
 export type DuffelRecoveredOrder = {
   id: string;
@@ -338,6 +354,424 @@ export class DuffelService {
     }
   }
 
+  async getSeatMapsAndServices(offerId: string, forceRefresh = false): Promise<AncillaryCatalog> {
+    const startTime = Date.now();
+    const cacheKey = `seatmap:${offerId}`;
+
+    if (!forceRefresh) {
+      try {
+        const ttl = await this.cacheService.getTtl(cacheKey);
+        if (ttl > 3) {
+          const cachedVal = await this.cacheService.get(cacheKey);
+          if (cachedVal) {
+            const catalog = JSON.parse(cachedVal) as AncillaryCatalog;
+            catalog.cache = {
+              status: 'HIT',
+              ttlSeconds: ttl,
+            };
+            this.logger.log(`Ancillary catalog cache HIT for offer ${offerId} (TTL: ${ttl}s)`);
+            return catalog;
+          }
+        } else {
+          this.logger.log(`Ancillary catalog cache MISS/STALE for offer ${offerId} (TTL: ${ttl}s)`);
+        }
+      } catch (cacheErr: unknown) {
+        this.logger.warn(`Failed to read cache for offer ${offerId}: ${cacheErr instanceof Error ? cacheErr.message : String(cacheErr)}. Falling back to supplier fetch.`);
+      }
+    } else {
+      this.logger.log(`Ancillary catalog force refresh requested for offer ${offerId}`);
+    }
+
+    const isJest = process.env.JEST_WORKER_ID !== undefined;
+    const token = this.duffelToken;
+
+    let catalog: AncillaryCatalog;
+
+    if (!isJest && (process.env.NODE_ENV === 'test' || token === 'mock')) {
+      this.logger.log(`Mocking Duffel Seatmaps/Services for test environment. Offer: ${offerId}`);
+      catalog = {
+        fetchedAt: new Date().toISOString(),
+        cache: {
+          status: 'MISS',
+          ttlSeconds: 60,
+        },
+        segments: [
+          {
+            segmentId: 'seg_mock_1',
+            origin: 'SGN',
+            destination: 'SIN',
+            seatMapAvailable: true,
+            seatMap: {
+              cabins: [
+                {
+                  cabinClass: 'economy',
+                  rows: [
+                    {
+                      rowNumber: 1,
+                      elements: [
+                        {
+                          type: 'seat',
+                          designator: '1A',
+                          availableServices: [
+                            {
+                              serviceId: 'ase_mock_seat_1',
+                              passengerId: 'pas_mock_1',
+                              amount: '15.00',
+                              currency: 'USD',
+                            },
+                          ],
+                          restricted: false,
+                        },
+                        {
+                          type: 'aisle',
+                        },
+                        {
+                          type: 'seat',
+                          designator: '1B',
+                          availableServices: [
+                            {
+                              serviceId: 'ase_mock_seat_2',
+                              passengerId: 'pas_mock_1',
+                              amount: '15.00',
+                              currency: 'USD',
+                            },
+                          ],
+                          restricted: false,
+                        },
+                      ],
+                    },
+                  ],
+                },
+              ],
+            },
+          },
+        ],
+        baggageServices: [
+          {
+            serviceId: 'ase_mock_bag_1',
+            passengerId: 'pas_mock_1',
+            segmentIds: ['seg_mock_1'],
+            type: 'checked',
+            weightValue: 23,
+            weightUnit: 'kg',
+            maxQuantity: 2,
+            amount: '30.00',
+            currency: 'USD',
+          },
+        ],
+      };
+    } else {
+      const timeoutMs = 4500;
+      const timeoutError = new DuffelTimeoutError();
+      let timeoutHandle: NodeJS.Timeout | undefined;
+
+      const timeoutPromise = new Promise<never>((_, reject) => {
+        timeoutHandle = setTimeout(() => reject(timeoutError), timeoutMs);
+      });
+
+      try {
+        const seatMapsPromise = this.duffel.seatMaps.get({ offer_id: offerId });
+        const offerPromise = this.duffel.offers.get(offerId, { return_available_services: true });
+
+        const [seatMapsRes, offerRes] = await Promise.race([
+          Promise.all([seatMapsPromise, offerPromise]),
+          timeoutPromise,
+        ]);
+
+        const rawSeatMaps = (seatMapsRes.data || []) as unknown as DuffelSeatMap[];
+        const rawOffer = offerRes.data as unknown as DuffelOfferWithServices;
+
+        const segments: AncillarySegment[] = [];
+        if (rawOffer.slices) {
+          for (const slice of rawOffer.slices) {
+            if (slice.segments) {
+              for (const segment of slice.segments) {
+                const rawMap = rawSeatMaps.find((m) => m.segment_id === segment.id);
+                segments.push({
+                  segmentId: segment.id,
+                  origin: segment.origin.iata_code,
+                  destination: segment.destination.iata_code,
+                  seatMapAvailable: !!rawMap,
+                  seatMap: rawMap ? this.normalizeSeatMap(rawMap) : null,
+                });
+              }
+            }
+          }
+        }
+
+        const baggageServices: AncillaryBaggageService[] = [];
+        if (rawOffer.available_services) {
+          for (const service of rawOffer.available_services) {
+            if (service.type === 'baggage') {
+              if (
+                !service.id ||
+                !service.total_amount ||
+                !service.total_currency ||
+                !service.passenger_ids ||
+                service.passenger_ids.length === 0 ||
+                !service.segment_ids ||
+                service.segment_ids.length === 0 ||
+                !service.metadata ||
+                !service.metadata.type
+              ) {
+                this.logger.warn(`Quarantined incomplete baggage service: ${service.id || 'missing-id'}`);
+                continue;
+              }
+
+              for (const passengerId of service.passenger_ids) {
+                baggageServices.push({
+                  serviceId: service.id,
+                  passengerId,
+                  segmentIds: service.segment_ids,
+                  type: service.metadata.type,
+                  weightValue: service.metadata.weight ?? null,
+                  weightUnit: service.metadata.weight_unit ?? null,
+                  maxQuantity: service.metadata.maximum_quantity ?? 1,
+                  amount: service.total_amount,
+                  currency: service.total_currency,
+                });
+              }
+            }
+          }
+        }
+
+        catalog = {
+          fetchedAt: new Date().toISOString(),
+          cache: {
+            status: 'MISS',
+            ttlSeconds: 60,
+          },
+          segments,
+          baggageServices,
+        };
+
+        const latency = Date.now() - startTime;
+        this.logger.log(`Successfully fetched seatmaps/services for offer ${offerId} from supplier. Latency: ${latency}ms`);
+      } catch (err: unknown) {
+        if (err instanceof DuffelTimeoutError) {
+          this.logger.error(`Fetch timed out for offer ${offerId} (timeout: ${timeoutMs}ms)`);
+          throw new HttpException(
+            {
+              code: 'UPSTREAM_UNAVAILABLE',
+              message: 'Duffel seatmaps lookup timed out.',
+            },
+            HttpStatus.GATEWAY_TIMEOUT,
+          );
+        }
+
+        const error = err as unknown as { message?: string; status?: number; stack?: string };
+        this.logger.error(`Failed to fetch seatmaps/services for offer ${offerId}: ${error.message || String(error)}`, error.stack);
+
+        if (error.status === 429) {
+          throw new HttpException(
+            {
+              code: 'UPSTREAM_RATE_LIMITED',
+              message: 'Duffel API rate limit exceeded',
+            },
+            HttpStatus.TOO_MANY_REQUESTS,
+          );
+        }
+
+        throw new HttpException(
+          {
+            code: 'UPSTREAM_UNAVAILABLE',
+            message: error.message || 'Failed to fetch seatmaps/services',
+          },
+          HttpStatus.BAD_GATEWAY,
+        );
+      } finally {
+        if (timeoutHandle) {
+          clearTimeout(timeoutHandle);
+        }
+      }
+    }
+
+    try {
+      await this.cacheService.set(cacheKey, JSON.stringify(catalog), 60);
+    } catch (cacheErr: unknown) {
+      this.logger.warn(`Failed to write cache for offer ${offerId}: ${cacheErr instanceof Error ? cacheErr.message : String(cacheErr)}`);
+    }
+
+    return catalog;
+  }
+
+  private normalizeSeatMap(rawMap: DuffelSeatMap): AncillarySeatMap {
+    return {
+      cabins: (rawMap.cabins || []).map((cabin) => ({
+        cabinClass: cabin.cabin_class,
+        rows: (cabin.rows || []).map((row) => ({
+          rowNumber: row.row_number,
+          elements: (row.sections || []).flatMap((section) =>
+            (section.elements || []).map((element) => {
+              const normalizedElement: AncillaryRowElement = {
+                type: element.type,
+              };
+              if (element.type === 'seat') {
+                normalizedElement.designator = element.designator;
+                normalizedElement.restricted = element.disclosures?.includes('restricted') || false;
+
+                const rawServices = element.available_services || [];
+                const validServices: AncillarySeatService[] = [];
+                for (const srv of rawServices) {
+                  if (srv.id && srv.passenger_id && srv.total_amount && srv.total_currency) {
+                    validServices.push({
+                      serviceId: srv.id,
+                      passengerId: srv.passenger_id,
+                      amount: srv.total_amount,
+                      currency: srv.total_currency,
+                    });
+                  } else {
+                    this.logger.warn(`Quarantined incomplete seat service: ${srv.id || 'missing-id'} in seat ${element.designator}`);
+                  }
+                }
+                normalizedElement.availableServices = validServices;
+              }
+              return normalizedElement;
+            })
+          ),
+        })),
+      })),
+    };
+  }
+
+  async repriceOffer(
+    offerId: string,
+    intendedServices: { serviceId: string; quantity: number }[],
+  ): Promise<AncillaryRepriceOutput> {
+    const isJest = process.env.JEST_WORKER_ID !== undefined;
+    const token = this.duffelToken;
+
+    const serviceMap = new Map<string, number>();
+    for (const service of intendedServices) {
+      const currentQty = serviceMap.get(service.serviceId) || 0;
+      serviceMap.set(service.serviceId, currentQty + service.quantity);
+    }
+    const deduplicatedServices = Array.from(serviceMap.entries()).map(([serviceId, quantity]) => ({
+      id: serviceId,
+      quantity,
+    }));
+
+    try {
+      if (!isJest && (process.env.NODE_ENV === 'test' || token === 'mock')) {
+        const invalidServiceIdentities = deduplicatedServices
+          .filter((s) => s.id.toLowerCase().includes('invalid'))
+          .map((s) => s.id);
+
+        if (invalidServiceIdentities.length > 0) {
+          return {
+            totalAmount: '0.00',
+            baseAmount: '0.00',
+            serviceLines: [],
+            currency: 'USD',
+            invalidServiceIdentities,
+          };
+        }
+
+        let servicesTotal = 0;
+        const serviceLines = deduplicatedServices.map((s) => {
+          const price = s.id.includes('bag') ? 35 : 18;
+          servicesTotal += price * s.quantity;
+          return {
+            serviceId: s.id,
+            amount: price.toFixed(2),
+            quantity: s.quantity,
+          };
+        });
+
+        const base = 420.00;
+        const grand = base + servicesTotal;
+
+        return {
+          totalAmount: grand.toFixed(2),
+          baseAmount: base.toFixed(2),
+          serviceLines,
+          currency: 'USD',
+          invalidServiceIdentities: [],
+        };
+      }
+
+      const response = await this.duffel.offers.getPriced(offerId, {
+        intended_payment_methods: [{ type: 'card', card_id: 'mock_card' }],
+        intended_services: deduplicatedServices,
+      } as any);
+
+      const pricedOffer = response.data as unknown as DuffelPricedOffer;
+
+      const delta = Number(pricedOffer.total_amount) - Number(pricedOffer.base_amount);
+      this.logger.log(`Priced offer ${offerId} successfully. Base: ${pricedOffer.base_amount}, Grand: ${pricedOffer.total_amount}, Currency: ${pricedOffer.total_currency}, Service line delta: ${delta.toFixed(2)}`);
+
+      return {
+        totalAmount: pricedOffer.total_amount,
+        baseAmount: pricedOffer.base_amount,
+        serviceLines: (pricedOffer.service_lines || []).map((line) => ({
+          serviceId: line.service_id,
+          amount: line.total_amount,
+          quantity: line.quantity,
+        })),
+        currency: pricedOffer.total_currency,
+        invalidServiceIdentities: [],
+      };
+    } catch (err: unknown) {
+      const error = err as unknown as { message?: string; status?: number; statusCode?: number; stack?: string; errors?: Array<{ message?: string; detail?: string }> };
+      this.logger.error(`Error repricing offer ${offerId}: ${error.message || String(error)}`, error.stack);
+
+      if (error.status === 400 || error.statusCode === 400 || error.message?.includes('400')) {
+        const errorMsg = error.message || '';
+        const errorsList = error.errors || [];
+
+        const invalidServiceIdentities: string[] = [];
+        const allIntendedIds = deduplicatedServices.map((s) => s.id);
+
+        for (const serviceId of allIntendedIds) {
+          if (errorMsg.includes(serviceId)) {
+            invalidServiceIdentities.push(serviceId);
+          }
+        }
+
+        for (const errObj of errorsList) {
+          const detail = errObj.message || errObj.detail || '';
+          for (const serviceId of allIntendedIds) {
+            if (detail.includes(serviceId) && !invalidServiceIdentities.includes(serviceId)) {
+              invalidServiceIdentities.push(serviceId);
+            }
+          }
+        }
+
+        if (invalidServiceIdentities.length === 0) {
+          invalidServiceIdentities.push(...allIntendedIds);
+        }
+
+        this.logger.warn(`Repricing failed for offer ${offerId} with invalid services: ${invalidServiceIdentities.join(', ')}`);
+
+        return {
+          totalAmount: '0.00',
+          baseAmount: '0.00',
+          serviceLines: [],
+          currency: 'USD',
+          invalidServiceIdentities,
+        };
+      }
+
+      if (error.status === 429) {
+        throw new HttpException(
+          {
+            code: 'UPSTREAM_RATE_LIMITED',
+            message: 'Duffel API rate limit exceeded',
+          },
+          HttpStatus.TOO_MANY_REQUESTS,
+        );
+      }
+
+      throw new HttpException(
+        {
+          code: 'UPSTREAM_UNAVAILABLE',
+          message: error.message || 'Failed to reprice Duffel offer',
+        },
+        HttpStatus.BAD_GATEWAY,
+      );
+    }
+  }
+
   async getOfferById(duffelOfferId: string, timeoutMs = 4500): Promise<unknown> {
     const timeoutError = new DuffelTimeoutError();
     let timeoutHandle: NodeJS.Timeout | undefined;
@@ -372,9 +806,25 @@ export class DuffelService {
       phone_number?: string;
       email?: string;
     }[],
-    metadata?: Record<string, unknown>,
+    services?: { id: string; quantity: number }[] | Record<string, unknown>,
+    metadata?: Record<string, unknown> | string,
     idempotencyKey?: string,
   ): Promise<unknown> {
+    let finalServices: { id: string; quantity: number }[] | undefined = undefined;
+    let finalMetadata: Record<string, unknown> | undefined = undefined;
+    let finalIdempotencyKey: string | undefined = undefined;
+
+    if (Array.isArray(services)) {
+      finalServices = services;
+      finalMetadata = metadata as Record<string, unknown> | undefined;
+      finalIdempotencyKey = idempotencyKey;
+    } else if (services && typeof services === 'object') {
+      finalMetadata = services as Record<string, unknown>;
+      finalIdempotencyKey = metadata as string | undefined;
+    } else {
+      finalIdempotencyKey = idempotencyKey;
+    }
+
     try {
       const rawOffer = await this.getOfferById(duffelOfferId);
       const offer = rawOffer as {
@@ -518,7 +968,9 @@ export class DuffelService {
         const token = this.duffelToken;
         const apiVersion = this.apiVersion;
         const basePath = this.basePath;
-        const key = idempotencyKey || crypto.randomUUID();
+        const key = finalIdempotencyKey || crypto.randomUUID();
+
+        this.logger.log(`Creating Duffel order with ${finalServices?.length || 0} services, offer ID ${duffelOfferId}`);
 
         const orderPromise = (async () => {
           const res = await fetch(`${basePath}/air/orders`, {
@@ -535,7 +987,8 @@ export class DuffelService {
                 type: 'instant',
                 selected_offers: [duffelOfferId],
                 passengers: duffelPassengers,
-                metadata,
+                services: finalServices && finalServices.length > 0 ? finalServices : undefined,
+                metadata: finalMetadata,
               },
             }),
           });
@@ -753,17 +1206,48 @@ export class DuffelService {
     return result;
   }
 
-  mapDuffelOrderToSnapshots(duffelOrder: any): { flightSnapshot: FlightSnapshot; passengerSnapshot: PassengerSnapshot } {
+  mapDuffelOrderToSnapshots(duffelOrder: unknown): { flightSnapshot: FlightSnapshot; passengerSnapshot: PassengerSnapshot } {
+    const order = duffelOrder as {
+      slices?: Array<{
+        duration?: string;
+        segments?: Array<{
+          id?: string;
+          duration?: string;
+          departing_at?: string;
+          arriving_at?: string;
+          origin?: { name?: string; iata_code?: string; city_name?: string; city?: { name?: string } };
+          destination?: { name?: string; iata_code?: string; city_name?: string; city?: { name?: string } };
+          origin_terminal?: string | null;
+          destination_terminal?: string | null;
+          operating_carrier?: { name?: string; iata_code?: string };
+          marketing_carrier?: { name?: string; iata_code?: string };
+          marketing_carrier_flight_number?: string;
+          aircraft?: { name?: string };
+          passengers?: Array<{ cabin_class?: string }>;
+        }>;
+      }>;
+      passengers?: Array<{
+        id: string;
+        type?: string;
+        title?: string | null;
+        given_name?: string | null;
+        family_name?: string | null;
+        born_on?: string | null;
+        email?: string | null;
+        phone_number?: string | null;
+      }>;
+    };
+
     let totalDuration = 'PT0H';
     let stops = 0;
     let cabinClass = 'economy';
-    const segments: any[] = [];
+    const segments: Array<FlightSnapshot['segments'][number]> = [];
     
-    if (duffelOrder.slices && Array.isArray(duffelOrder.slices)) {
+    if (order.slices && Array.isArray(order.slices)) {
       let totalMinutes = 0;
       let globalOrder = 0;
-      for (let sliceOrder = 0; sliceOrder < duffelOrder.slices.length; sliceOrder++) {
-        const slice = duffelOrder.slices[sliceOrder];
+      for (let sliceOrder = 0; sliceOrder < order.slices.length; sliceOrder++) {
+        const slice = order.slices[sliceOrder];
         if (slice?.duration) {
           totalMinutes += this.parseIsoDurationToMinutes(slice.duration);
         }
@@ -782,17 +1266,17 @@ export class DuffelService {
                  iataCode: seg.origin?.iata_code || '',
                  name: seg.origin?.name || '',
                  city: seg.origin?.city_name || seg.origin?.city?.name || seg.origin?.name || '',
-                 terminal: seg.origin_terminal,
+                 terminal: seg.origin_terminal ?? undefined,
                },
                arrivalAirport: {
                  iataCode: seg.destination?.iata_code || '',
                  name: seg.destination?.name || '',
                  city: seg.destination?.city_name || seg.destination?.city?.name || seg.destination?.name || '',
-                 terminal: seg.destination_terminal,
+                 terminal: seg.destination_terminal ?? undefined,
                },
-               departureAt: seg.departing_at,
-               arrivalAt: seg.arriving_at,
-               duration: seg.duration,
+               departureAt: seg.departing_at || '',
+               arrivalAt: seg.arriving_at || '',
+               duration: seg.duration || '',
                aircraftType: seg.aircraft?.name,
                duffelSegmentId: seg.id,
                sliceOrder,
@@ -804,28 +1288,28 @@ export class DuffelService {
       }
       totalDuration = this.formatMinutesToIsoDuration(totalMinutes);
     }
-
+ 
     const flightSnapshot: FlightSnapshot = {
       segments,
       totalDuration,
       stops,
       cabinClass,
     };
-
-    const passengers = [];
-    if (duffelOrder.passengers && Array.isArray(duffelOrder.passengers)) {
-      for (const p of duffelOrder.passengers) {
+ 
+    const passengers: PassengerSnapshot['passengers'] = [];
+    if (order.passengers && Array.isArray(order.passengers)) {
+      for (const p of order.passengers) {
         passengers.push({
-          type: (p.type === 'infant_without_seat' ? 'infant' : p.type || 'adult') as any,
-          title: p.title,
+          type: (p.type === 'infant_without_seat' || p.type === 'infant' ? 'INFANT' : (p.type === 'child' ? 'CHILD' : 'ADULT')),
+          title: p.title || undefined,
           firstName: p.given_name || 'Unknown',
           lastName: p.family_name || 'Unknown',
-          dateOfBirth: p.born_on,
+          dateOfBirth: p.born_on || '1990-01-01',
         });
       }
     }
     
-    const firstPassenger = duffelOrder.passengers?.[0];
+    const firstPassenger = order.passengers?.[0];
     const passengerSnapshot: PassengerSnapshot = {
       passengers,
       contactEmail: firstPassenger?.email || null,
