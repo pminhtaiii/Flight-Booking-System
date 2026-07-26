@@ -16,7 +16,7 @@ Update this file after every completed feature. Any AI agent reading this should
 
 ### [ ] Feature: Ancillary Services — Seat Selection, Baggage & Price Tracker (Feature 15)
 
-- [ ] Phase 0 / PR 1: Checkout Foundation (In Progress: branch `015b-checkout-foundation` contains backend adjustments, tasks checklist, and context updates; frontend routes, forms, components, and tests are currently local-only and unstaged)
+- [x] Phase 0 / PR 1: Checkout Foundation (implemented `NEXT_PUBLIC_FEATURE_FLAG_CHECKOUT` feature flag; created `protectCheckoutRoute` and `fetchBookingIntent` in `apps/web/lib/checkout.ts` to enforce authentication, feature flag presence, and booking intent ownership/expiration; created page shells for `/checkout/passengers`, `/checkout/[intentId]/ancillaries`, `/checkout/[intentId]/review`, and `/checkout/[intentId]/payment` mapping out flight/traveler contexts and dynamic placeholders; implemented search page `/search` and client form `SearchFormClient` using JWT tokens; implemented passenger details form component `PassengerFormClient` with dynamic guest counts, profile prefilling, DOB format checks, and conditional passport validations for international routes; set up cookie-driven mock scenarios for unit/E2E test pipelines)
 
 ### [x] Feature: Disruption & Flight-Change Management (Feature 14)
 
