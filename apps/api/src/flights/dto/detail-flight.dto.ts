@@ -35,4 +35,7 @@ export class FlightDetailResponseDto {
   returnSegments!: FlightSegmentDto[] | null;
   expiresAt!: string;
   conditions!: FlightConditionsDto;
+  adults!: number;
+  children!: number;
+  infants!: number;
 }

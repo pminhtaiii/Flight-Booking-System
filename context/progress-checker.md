@@ -14,6 +14,10 @@ Update this file after every completed feature. Any AI agent reading this should
 
 ## Progress by Feature
 
+### [ ] Feature: Ancillary Services — Seat Selection, Baggage & Price Tracker (Feature 15)
+
+- [x] Phase 0 / PR 1: Checkout Foundation (implemented `NEXT_PUBLIC_FEATURE_FLAG_CHECKOUT` feature flag; created `protectCheckoutRoute` and `fetchBookingIntent` in `apps/web/lib/checkout.ts` to enforce authentication, feature flag presence, and booking intent ownership/expiration; created page shells for `/checkout/passengers`, `/checkout/[intentId]/ancillaries`, `/checkout/[intentId]/review`, and `/checkout/[intentId]/payment` mapping out flight/traveler contexts and dynamic placeholders; implemented search page `/search` and client form `SearchFormClient` using JWT tokens; implemented passenger details form component `PassengerFormClient` with dynamic guest counts, profile prefilling, DOB format checks, and conditional passport validations for international routes; set up cookie-driven mock scenarios for unit/E2E test pipelines)
+
 ### [x] Feature: Disruption & Flight-Change Management (Feature 14)
 
 - [x] Phase 7 / PR 8: Traveller booking disruption experience on the Next.js frontend (refactored app/bookings/[bookingId]/page.tsx to Next.js Server Component; implemented BookingDetailClient container; added semantic DisruptionAlert with plain-language reasons and warnings; implemented ItineraryChangeSummary displaying latest revision changes vs original booking; added ItineraryRevisionHistory timeline; supported Acknowledge and Accept actions with pending states, router refresh, and stale conflict handling; added disruption status badges to list cards; updated Playwright E2E tests, resolving CORS origin domain isolation and strict selector conflicts; verified all tests passing with 100% success rate)
