@@ -4,10 +4,7 @@ import { headers } from 'next/headers';
 import { authOptions } from './auth';
 
 export async function protectCheckoutRoute() {
-  const isEnabled =
-    process.env.NEXT_PUBLIC_FEATURE_FLAG_CHECKOUT === 'true' ||
-    process.env.NODE_ENV === 'development' ||
-    process.env.NODE_ENV === 'test';
+  const isEnabled = process.env.NEXT_PUBLIC_FEATURE_FLAG_CHECKOUT !== 'false';
 
   if (!isEnabled) {
     notFound();

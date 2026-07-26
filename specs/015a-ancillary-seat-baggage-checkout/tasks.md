@@ -6,7 +6,7 @@
 
 ## Phase 1: Setup
 
-- [x] T001 Configure checkout feature flag `NEXT_PUBLIC_FEATURE_FLAG_CHECKOUT` in `apps/web/.env.local`
+- [x] T001 Define checkout feature flag `NEXT_PUBLIC_FEATURE_FLAG_CHECKOUT` defaulting to enabled (true) unless set to false
 
 ## Phase 2: Foundational (Next.js Protected Shells)
 
