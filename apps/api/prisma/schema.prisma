@@ -22,6 +22,30 @@ enum BookingIntentStatus {
   CANCELLED
 }
 
+enum AncillaryStatus {
+  EMPTY
+  DRAFT_COMMITTED
+  VALIDATED
+  STALE
+}
+
+enum AncillarySelectionStatus {
+  DRAFT_COMMITTED
+  VALIDATED
+  STALE
+  PAYMENT_BOUND
+}
+
+enum BaggageType {
+  CHECKED
+  CARRY_ON
+}
+
+enum WeightUnit {
+  KG
+  LB
+}
+
 enum PassengerType {
   ADULT
   CHILD
@@ -234,6 +258,17 @@ model BookingIntent {
   paymentAttemptCount Int                      @default(0)
   payments            Payment[]
   booking             Booking?
+  ancillaryVersion    Int                      @default(0)
+  currentAncillarySelectionId String?                   @unique
+  currentAncillarySelection   AncillarySelection?       @relation("BookingIntentCurrentAncillarySelection", fields: [currentAncillarySelectionId], references: [id], onDelete: SetNull)
+  ancillarySelections         AncillarySelection[]      @relation("BookingIntentAncillarySelections")
+  ancillaryStatus     AncillaryStatus          @default(EMPTY)
+  ancillaryCurrency   String?                  @db.VarChar(3)
+  seatTotal           Decimal                  @default(0) @db.Decimal(10, 2)
+  baggageTotal        Decimal                  @default(0) @db.Decimal(10, 2)
+  ancillaryTotal      Decimal                  @default(0) @db.Decimal(10, 2)
+  validatedTotal      Decimal?                 @db.Decimal(10, 2)
+  ancillariesValidatedAt DateTime?
 
   @@index([userId])
   @@index([userId, status])
@@ -257,6 +292,7 @@ model BookingIntentPassenger {
   /// @encrypted
   passportExpiry    String?
   travelerProfileId String?
+  duffelPassengerId String?
   createdAt         DateTime         @default(now())
   intent            BookingIntent    @relation(fields: [intentId], references: [id], onDelete: Cascade)
   travelerProfile   TravelerProfile? @relation(fields: [travelerProfileId], references: [id], onDelete: SetNull)
@@ -264,7 +300,84 @@ model BookingIntentPassenger {
   @@unique([intentId, position])
   @@index([intentId])
   @@index([travelerProfileId])
+  @@index([intentId, duffelPassengerId])
   @@map("booking_intent_passengers")
+}
+
+model AncillarySelection {
+  id                   String                   @id @default(uuid())
+  bookingIntentId      String
+  version              Int
+  status               AncillarySelectionStatus @default(DRAFT_COMMITTED)
+  currency             String                   @db.VarChar(3)
+  seatTotal            Decimal                  @db.Decimal(10, 2)
+  baggageTotal         Decimal                  @db.Decimal(10, 2)
+  total                Decimal                  @db.Decimal(10, 2)
+  catalogFingerprint   String
+  committedAt          DateTime                 @default(now())
+  validatedBaseAmount  Decimal?                 @db.Decimal(10, 2)
+  validatedGrandTotal  Decimal?                 @db.Decimal(10, 2)
+  validatedAt          DateTime?
+  createdAt            DateTime                 @default(now())
+  updatedAt            DateTime                 @updatedAt
+  bookingIntent        BookingIntent            @relation("BookingIntentAncillarySelections", fields: [bookingIntentId], references: [id], onDelete: Cascade)
+  currentForIntent     BookingIntent?           @relation("BookingIntentCurrentAncillarySelection")
+  seatSelections       SeatSelection[]
+  baggageSelections    BaggageSelection[]
+  payments             Payment[]
+
+  @@unique([bookingIntentId, version])
+  @@index([bookingIntentId])
+  @@map("ancillary_selections")
+}
+
+model SeatSelection {
+  id                   String             @id @default(uuid())
+  ancillarySelectionId String
+  intentPassengerId    String
+  duffelPassengerId    String
+  segmentId            String
+  serviceId            String
+  seatDesignator       String
+  amount               Decimal            @db.Decimal(10, 2)
+  currency             String             @db.VarChar(3)
+  createdAt            DateTime           @default(now())
+  updatedAt            DateTime           @updatedAt
+  ancillarySelection   AncillarySelection @relation(fields: [ancillarySelectionId], references: [id], onDelete: Cascade)
+
+  @@unique([ancillarySelectionId, intentPassengerId, segmentId])
+  @@unique([ancillarySelectionId, segmentId, serviceId])
+  @@map("seat_selections")
+}
+
+model BaggageSelection {
+  id                   String             @id @default(uuid())
+  ancillarySelectionId String
+  intentPassengerId    String
+  duffelPassengerId    String
+  serviceId            String
+  type                 BaggageType
+  weightValue          Int?
+  weightUnit           WeightUnit?
+  quantity             Int
+  amount               Decimal            @db.Decimal(10, 2)
+  currency             String             @db.VarChar(3)
+  createdAt            DateTime           @default(now())
+  updatedAt            DateTime           @updatedAt
+  ancillarySelection   AncillarySelection @relation(fields: [ancillarySelectionId], references: [id], onDelete: Cascade)
+  segments             BaggageSelectionSegment[]
+
+  @@unique([ancillarySelectionId, intentPassengerId, serviceId])
+  @@map("baggage_selections")
+}
+
+model BaggageSelectionSegment {
+  baggageSelectionId String
+  segmentId          String
+  baggageSelection   BaggageSelection @relation(fields: [baggageSelectionId], references: [id], onDelete: Cascade)
+
+  @@id([baggageSelectionId, segmentId])
+  @@map("baggage_selection_segments")
 }
 
 enum BookingStatus {
@@ -417,6 +530,9 @@ model Payment {
   id                    String         @id @default(uuid())
   bookingIntentId       String
   bookingIntent         BookingIntent  @relation(fields: [bookingIntentId], references: [id])
+  ancillarySelectionId      String?
+  ancillarySelectionVersion Int?
+  ancillarySelection        AncillarySelection? @relation(fields: [ancillarySelectionId], references: [id], onDelete: Restrict)
   attemptNumber         Int // 1 or 2 (Database-level CHECK constraint attemptNumber IN (1, 2) enforced in migration)
   idempotencyKeyId      String
   idempotencyKey        IdempotencyKey @relation(fields: [idempotencyKeyId], references: [id])
@@ -439,6 +555,7 @@ model Payment {
   @@unique([bookingIntentId, attemptNumber])
   @@index([stripeCustomerId])
   @@index([status])
+  @@index([ancillarySelectionId])
   @@map("payments")
 }
 

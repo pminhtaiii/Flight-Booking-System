@@ -7,8 +7,8 @@ Update this file after every completed feature. Any AI agent reading this should
 ### Current Status
 
 **Feature:** Ancillary Services — Seat Selection, Baggage & Price Tracker (Feature 15)
-**Last completed:** Feature 14 (Disruption & Flight-Change Management) fully complete. Grilling session #4 completed for Feature 15.
-**Next:** Review the approved Feature 15 specification, PRD, implementation plan, and review fixes; generate implementation tasks before coding. See [ADR](file:///c:/Booking%20Systems/docs/adr/research-ancillary-services-grilling-session.md) for all architectural decisions.
+**Last completed:** Feature 15 Phase 1 / PR 2 code and additive migration: shared ancillary contracts, versioned selection persistence, payment snapshot binding, and BookingIntent state repair.
+**Next:** Restore this branch's workspace dependency links, run the pending focused Jest/type-check verification, then start Feature 15 Phase 2 / PR 3 (Duffel catalog normalization and cache discipline). See [ADR](file:///c:/Booking%20Systems/docs/adr/research-ancillary-services-grilling-session.md) for all architectural decisions.
 
 ---
 
@@ -17,6 +17,8 @@ Update this file after every completed feature. Any AI agent reading this should
 ### [ ] Feature: Ancillary Services — Seat Selection, Baggage & Price Tracker (Feature 15)
 
 - [x] Phase 0 / PR 1: Checkout Foundation (implemented `NEXT_PUBLIC_FEATURE_FLAG_CHECKOUT` feature flag defaulting to enabled/true unless set to false; created `protectCheckoutRoute` and `fetchBookingIntent` in `apps/web/lib/checkout.ts` to enforce authentication, feature flag presence, and booking intent ownership/expiration; created page shells for `/checkout/passengers`, `/checkout/[intentId]/ancillaries`, `/checkout/[intentId]/review`, and `/checkout/[intentId]/payment` mapping out flight/traveler contexts and dynamic placeholders; implemented search page `/search` and client form `SearchFormClient` using JWT tokens; implemented passenger details form component `PassengerFormClient` with dynamic guest counts, profile prefilling, DOB format checks, and conditional passport validations for international routes; set up cookie-driven mock scenarios for unit/E2E test pipelines)
+
+- [/] Phase 1 / PR 2: Shared Contracts, State Repair, Additive Schema, and Migration (implemented shared ancillary catalog/selection/pricing/error types; append-only selection, seat, baggage, coverage, and payment snapshot-binding Prisma models with an additive migration; persisted Duffel passenger IDs at BookingIntent creation; and repaired payment eligibility to use `PENDING`. Prisma schema validation and whitespace checks pass; focused Jest/type-check verification is pending restoration of workspace dependency links.)
 
 ### [x] Feature: Disruption & Flight-Change Management (Feature 14)
 

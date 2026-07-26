@@ -90,7 +90,7 @@ export class PaymentService {
           throw new ForbiddenException('You do not own this booking intent');
         }
 
-        if (intent.status !== 'CREATED' && intent.status !== 'AWAITING_PAYMENT') {
+        if (intent.status !== 'PENDING' && intent.status !== 'AWAITING_PAYMENT') {
           throw new BadRequestException('Booking intent is not in an allowed status for payment');
         }
 

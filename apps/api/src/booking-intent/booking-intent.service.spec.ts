@@ -33,6 +33,10 @@ type TestableService = {
     offerExpiresAt: Date | null;
     raw: unknown;
   }>;
+  extractDuffelPassengerIds(
+    rawOffer: unknown,
+    passengers: Array<{ type: import('@prisma/client').PassengerType }>,
+  ): string[];
 };
 
 describe('BookingIntentService Refinements', () => {
@@ -168,6 +172,32 @@ describe('BookingIntentService Refinements', () => {
           HttpStatus.BAD_GATEWAY,
         ),
       );
+    });
+  });
+
+  describe('extractDuffelPassengerIds', () => {
+    it('maps supplier passengers by type and ordinal for new booking intents', () => {
+      const result = testable.extractDuffelPassengerIds(
+        {
+          passengers: [
+            { id: 'pas_adult_1', type: 'adult' },
+            { id: 'pas_child_1', type: 'child' },
+            { id: 'pas_adult_2', type: 'adult' },
+          ],
+        },
+        [{ type: 'ADULT' }, { type: 'CHILD' }, { type: 'ADULT' }],
+      );
+
+      expect(result).toEqual(['pas_adult_1', 'pas_child_1', 'pas_adult_2']);
+    });
+
+    it('rejects a supplier passenger list that cannot map every local passenger', () => {
+      expect(() =>
+        testable.extractDuffelPassengerIds(
+          { passengers: [{ id: 'pas_adult_1', type: 'adult' }] },
+          [{ type: 'ADULT' }, { type: 'CHILD' }],
+        ),
+      ).toThrow(HttpException);
     });
   });
 
