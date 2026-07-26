@@ -65,3 +65,27 @@ _Avoid_: Distributed lock, Queue-based serialization
 **Notification Throttle**:
 A per-booking daily cap (3 material notifications/day) on outbox writes. The 3rd notification carries a stabilization warning informing the traveller that frequent changes are being monitored. Beyond the cap, no further outbox records are created and the booking is flagged for manual admin review. Revisions and materiality classification continue unconditionally regardless of the throttle.
 _Avoid_: Silent suppression, Batched digest
+
+**Ancillary Services**:
+Paid travel add-ons (specifically seat selection and baggage in Feature 15) that travellers can purchase to customize their booking. These are additive to the base fare and are retrieved/booked dynamically via the Duffel Services and Seat Maps APIs.
+_Avoid_: Upgrades, Options
+
+**Price Tracker**:
+An optimistic, instant-updating client-side price summary that aggregates the base fare and all selected ancillary fees in real-time. Final price validation is performed on the server via Duffel's price verification API (`POST /air/offers/{id}/actions/price`) at the checkout commitment point before authorizing Stripe.
+_Avoid_: Dynamic re-pricing, Server-side polling tracker
+
+**Tab-Based Passenger Stepper**:
+A user-interface pattern for seat and baggage selection where only one passenger's selection is active at a time to minimize cognitive load, allowing free navigation between passenger tabs while displaying existing group assignments with unique indicators.
+_Avoid_: Multi-cursor selection, Color-only mapping
+
+**Segment-Scoped Selection**:
+The strict isolation of seat maps, seat designators, and segment-specific baggage to their corresponding flight segments. Selections never carry over or leak state to adjacent segments.
+_Avoid_: Cross-segment selection, Global designators
+
+**Early Expiry Cache Buffer**:
+A caching strategy for volatile seat maps (60s Redis TTL) where requests arriving with very little time remaining before expiration (e.g., < 3 seconds) bypass the cache to fetch fresh supplier data. This prevents users from initiating a booking flow with near-stale seat maps.
+_Avoid_: Hard expiry check
+
+**Journey-Wide Baggage**:
+A baggage service defined by the supplier as covering multiple segments (`segment_ids.length > 1`). Displayed on all relevant segment tabs with mutual exclusion logic (selecting it disables individual segment-scoped baggage of the same weight class) to prevent double-purchasing.
+_Avoid_: Through-checked bag, Global bag

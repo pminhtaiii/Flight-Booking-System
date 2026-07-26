@@ -105,7 +105,9 @@ When a task involves creating a pull request or requesting CodeRabbit reviews:
    - Address all findings, push changes, and post `@coderabbitai review` again to confirm convergence. Do not consider a planning or implementation phase complete until all CodeRabbit comments are resolved.
 
 <!-- SPECKIT START -->
+
 For additional context about technologies to be used, project structure,
 shell commands, and other important information, read the current plan
-at specs/014-disruption-flight-change-management/plan.md
+at specs/015a-ancillary-seat-baggage-checkout/plan.md
+
 <!-- SPECKIT END -->

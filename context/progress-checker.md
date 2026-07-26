@@ -6,15 +6,15 @@ Update this file after every completed feature. Any AI agent reading this should
 
 ### Current Status
 
-**Feature:** Disruption & Flight-Change Management (Feature 14)
-**Last completed:** Feature 14 Phase 7: Traveller booking disruption experience on the Next.js frontend.
-**Next:** Feature 14 Phase 8: Admin operations, observability, retention, and rollout controls.
+**Feature:** Ancillary Services — Seat Selection, Baggage & Price Tracker (Feature 15)
+**Last completed:** Feature 14 (Disruption & Flight-Change Management) fully complete. Grilling session #4 completed for Feature 15.
+**Next:** Review the approved Feature 15 specification, PRD, implementation plan, and review fixes; generate implementation tasks before coding. See [ADR](file:///c:/Booking%20Systems/docs/adr/research-ancillary-services-grilling-session.md) for all architectural decisions.
 
 ---
 
 ## Progress by Feature
 
-### [/] Feature: Disruption & Flight-Change Management (Feature 14)
+### [x] Feature: Disruption & Flight-Change Management (Feature 14)
 
 - [x] Phase 7 / PR 8: Traveller booking disruption experience on the Next.js frontend (refactored app/bookings/[bookingId]/page.tsx to Next.js Server Component; implemented BookingDetailClient container; added semantic DisruptionAlert with plain-language reasons and warnings; implemented ItineraryChangeSummary displaying latest revision changes vs original booking; added ItineraryRevisionHistory timeline; supported Acknowledge and Accept actions with pending states, router refresh, and stale conflict handling; added disruption status badges to list cards; updated Playwright E2E tests, resolving CORS origin domain isolation and strict selector conflicts; verified all tests passing with 100% success rate)
 
@@ -107,7 +107,6 @@ Update this file after every completed feature. Any AI agent reading this should
 - [x] T029–T031: Polish & Cross-Cutting Concerns (Phase 7)
 
 ### [x] Feature: Chatbot Agent Service
-
 
 - [x] Define ChatSession and ChatMessage database schema
 - [x] Implement NestJS ChatModule endpoints (CRUD, batch, memory)
