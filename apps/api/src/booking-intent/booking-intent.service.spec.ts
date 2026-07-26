@@ -17,6 +17,7 @@ type MockPrismaService = {
     findMany: jest.Mock;
     updateMany: jest.Mock;
     deleteMany: jest.Mock;
+    findUnique: jest.Mock;
   };
   $transaction: jest.Mock;
 };

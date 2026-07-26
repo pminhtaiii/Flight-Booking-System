@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 
 interface FlightOffer {
   id: string;
@@ -36,6 +36,8 @@ export function SearchFormClient({ accessToken }: SearchFormClientProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [offers, setOffers] = useState<FlightOffer[]>([]);
+  const [bookingOfferId, setBookingOfferId] = useState<string | null>(null);
+  const router = useRouter();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -75,6 +77,42 @@ export function SearchFormClient({ accessToken }: SearchFormClientProps) {
       setError(message);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleBook = async (offerId: string) => {
+    setBookingOfferId(offerId);
+    setError(null);
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+    let success = false;
+
+    try {
+      for (let attempt = 1; attempt <= 5; attempt++) {
+        try {
+          const response = await fetch(`${apiUrl}/api/flights/${offerId}`, {
+            headers: {
+              Authorization: `Bearer ${accessToken}`,
+            },
+          });
+          if (response.ok) {
+            success = true;
+            break;
+          }
+        } catch (err) {
+          console.error(`[SearchFormClient/handleBook] Attempt ${attempt} failed:`, err);
+        }
+        if (attempt < 5) {
+          await new Promise((resolve) => setTimeout(resolve, 150));
+        }
+      }
+
+      if (success) {
+        router.push('/checkout/passengers?offerId=' + offerId);
+      } else {
+        setError('Flight offer is temporarily unavailable. Please try again in a few moments.');
+      }
+    } finally {
+      setBookingOfferId(null);
     }
   };
 
@@ -247,12 +285,13 @@ export function SearchFormClient({ accessToken }: SearchFormClientProps) {
                       {offer.price} {offer.currency}
                     </span>
                   </div>
-                  <Link
-                    href={`/checkout/passengers?offerId=${offer.id}`}
+                  <button
+                    onClick={() => handleBook(offer.id)}
+                    disabled={bookingOfferId !== null}
                     className="btn-primary"
                   >
-                    Book
-                  </Link>
+                    {bookingOfferId === offer.id ? 'Loading...' : 'Book'}
+                  </button>
                 </div>
               </div>
             ))}

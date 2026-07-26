@@ -209,6 +209,8 @@ export default async function PassengersPage({ searchParams }: Props) {
 
       if (originAirport && destinationAirport) {
         isInternational = originAirport.country.toLowerCase() !== destinationAirport.country.toLowerCase();
+      } else {
+        isInternational = true;
       }
     }
   }
