@@ -4,7 +4,12 @@ import { headers } from 'next/headers';
 import { authOptions } from './auth';
 
 export async function protectCheckoutRoute() {
-  if (process.env.NEXT_PUBLIC_FEATURE_FLAG_CHECKOUT !== 'true') {
+  const isEnabled =
+    process.env.NEXT_PUBLIC_FEATURE_FLAG_CHECKOUT === 'true' ||
+    process.env.NODE_ENV === 'development' ||
+    process.env.NODE_ENV === 'test';
+
+  if (!isEnabled) {
     notFound();
   }
 
