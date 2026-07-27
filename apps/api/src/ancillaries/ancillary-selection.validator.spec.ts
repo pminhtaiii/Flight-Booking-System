@@ -84,6 +84,10 @@ describe('validateAncillarySelection', () => {
       { intentPassengerId: 'local-adult', segmentId: 'seg-out', serviceId: 'seat-adult' },
       { intentPassengerId: 'local-child', segmentId: 'seg-out', serviceId: 'seat-adult' },
     ] })],
+    ['same physical seat with passenger-scoped services', selection({ seats: [
+      { intentPassengerId: 'local-adult', segmentId: 'seg-out', serviceId: 'seat-adult' },
+      { intentPassengerId: 'local-child', segmentId: 'seg-out', serviceId: 'seat-child' },
+    ] })],
   ])('rejects duplicate seats by %s', (_name: string, request: CommitAncillarySelectionRequest) => {
     expect(() => validateAncillarySelection({ catalog, passengers, ...request })).toThrow(
       AncillarySelectionValidationError,

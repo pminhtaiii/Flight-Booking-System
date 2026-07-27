@@ -24,7 +24,7 @@ export class PaymentIdempotencyService {
     requestHash: string,
     userId: string,
     requestPath: string,
-  ): Promise<{ status: 'acquired' } | { status: 'replay'; responseCode: number; responseBody: string }> {
+  ): Promise<{ status: 'acquired'; lockedAt: Date } | { status: 'replay'; responseCode: number; responseBody: string }> {
     const now = new Date();
     const existing = await this.prisma.idempotencyKey.findUnique({
       where: { key },
@@ -70,7 +70,7 @@ export class PaymentIdempotencyService {
         throw new ConflictException('Request is already in progress');
       }
 
-      return { status: 'acquired' };
+      return { status: 'acquired', lockedAt: now };
     }
 
     try {
@@ -89,7 +89,7 @@ export class PaymentIdempotencyService {
         },
       });
 
-      return { status: 'acquired' };
+      return { status: 'acquired', lockedAt: now };
     } catch (error) {
       const err = error as { code?: string };
       // Handle race condition on duplicate key check
@@ -110,7 +110,7 @@ export class PaymentIdempotencyService {
     userId: string,
     requestPath: string,
     now: Date,
-  ): Promise<{ status: 'acquired' } | { status: 'replay'; responseCode: number; responseBody: string }> {
+  ): Promise<{ status: 'acquired'; lockedAt: Date } | { status: 'replay'; responseCode: number; responseBody: string }> {
     const existing = await this.prisma.idempotencyKey.findUnique({
       where: { key },
     });
@@ -157,7 +157,29 @@ export class PaymentIdempotencyService {
       throw new ConflictException('Request is already in progress');
     }
 
-    return { status: 'acquired' };
+    return { status: 'acquired', lockedAt: now };
+  }
+
+  /**
+   * Removes a failed, still-owned acquisition so a corrected request can reuse its key.
+   */
+  async abandonAcquiredKey(
+    key: string,
+    requestHash: string,
+    userId: string,
+    requestPath: string,
+    lockedAt: Date,
+  ): Promise<void> {
+    await this.prisma.idempotencyKey.deleteMany({
+      where: {
+        key,
+        requestHash,
+        customerId: userId,
+        requestPath,
+        lockedAt,
+        responseBody: { equals: Prisma.DbNull },
+      },
+    });
   }
 
   /**

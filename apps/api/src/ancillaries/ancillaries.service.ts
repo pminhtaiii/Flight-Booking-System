@@ -39,27 +39,27 @@ export class AncillariesService {
 
   async commit(userId: string, intentId: string, key: string, dto: CommitAncillarySelectionDto) {
     const requestPath = `/bookings/intent/${intentId}/ancillaries`;
-    const acquired = await this.idempotency.acquireOrReplay(key, this.idempotency.computeHash(dto), userId, requestPath);
+    const requestHash = this.idempotency.computeHash(dto);
+    const acquired = await this.idempotency.acquireOrReplay(key, requestHash, userId, requestPath);
     if (acquired.status === 'replay') return JSON.parse(acquired.responseBody);
-    const intent = await this.loadOwned(userId, intentId);
+    try {
+      const intent = await this.loadOwned(userId, intentId);
 
-    const catalog = await this.catalogService.getCatalog(intent.duffelOfferId);
-    if (dto.catalogFingerprint !== this.catalogService.fingerprint(catalog)) {
-      throw new ConflictException({ code: 'ANCILLARY_SELECTION_STALE', intentId, currentVersion: intent.ancillaryVersion, invalidSelections: [] });
-    }
-    let valid;
-    try {
-      valid = validateAncillarySelection({ catalog, passengers: this.passengers(intent), seats: dto.seats, baggage: dto.baggage, expectedCurrency: intent.currency });
-    } catch (error) {
-      if (error instanceof AncillarySelectionValidationError) {
-        throw new BadRequestException({ code: error.code, intentId, invalidSelections: error.invalidSelections });
+      const catalog = await this.catalogService.getCatalog(intent.duffelOfferId);
+      if (dto.catalogFingerprint !== this.catalogService.fingerprint(catalog)) {
+        throw new ConflictException({ code: 'ANCILLARY_SELECTION_STALE', intentId, currentVersion: intent.ancillaryVersion, invalidSelections: [] });
       }
-      throw error;
-    }
-    const totals = calculateAncillaryTotals({ baseAmount: String(intent.confirmedPrice), currency: intent.currency, seats: valid.seats, baggage: valid.baggage });
-    let result: unknown;
-    try {
-      result = await this.prisma.$transaction(async (tx) => {
+      let valid;
+      try {
+        valid = validateAncillarySelection({ catalog, passengers: this.passengers(intent), seats: dto.seats, baggage: dto.baggage, expectedCurrency: intent.currency });
+      } catch (error) {
+        if (error instanceof AncillarySelectionValidationError) {
+          throw new BadRequestException({ code: error.code, intentId, invalidSelections: error.invalidSelections });
+        }
+        throw error;
+      }
+      const totals = calculateAncillaryTotals({ baseAmount: String(intent.confirmedPrice), currency: intent.currency, seats: valid.seats, baggage: valid.baggage });
+      return await this.prisma.$transaction(async (tx) => {
       const selection = await tx.ancillarySelection.create({
         data: {
           bookingIntentId: intentId, version: dto.expectedVersion + 1, status: 'DRAFT_COMMITTED', currency: intent.currency,
@@ -76,11 +76,11 @@ export class AncillariesService {
       return response;
       });
     } catch (error) {
+      await this.idempotency.abandonAcquiredKey(key, requestHash, userId, requestPath, acquired.lockedAt);
       if (!(error instanceof ConflictException) || (error.getResponse() as { code?: string }).code !== 'ANCILLARY_VERSION_CONFLICT') throw error;
       const current = await this.loadOwned(userId, intentId);
       throw new ConflictException({ code: 'ANCILLARY_VERSION_CONFLICT', intentId, currentVersion: current.ancillaryVersion, selection: this.snapshot(current.currentAncillarySelection, current.confirmedPrice, current.currency) });
     }
-    return result;
   }
 
   private async loadOwned(userId: string, id: string): Promise<OwnedIntent> {

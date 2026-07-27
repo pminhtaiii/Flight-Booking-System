@@ -79,13 +79,13 @@ export const validateAncillarySelection = (input: ValidationInput): ValidatedAnc
   const seats: NormalizedSeatSelection[] = [];
   const baggage: NormalizedBaggageSelection[] = [];
   const occupiedPassengerSeats = new Set<string>();
-  const occupiedGroupSeats = new Set<string>();
+  const occupiedPhysicalSeats = new Set<string>();
 
   for (const selection of input.seats) {
     const passenger = passengers.get(selection.intentPassengerId);
     const seat = findSeatService(input.catalog, selection.segmentId, selection.serviceId);
     const passengerSeatKey = `${selection.intentPassengerId}:${selection.segmentId}`;
-    const groupSeatKey = `${selection.segmentId}:${selection.serviceId}`;
+    const physicalSeatKey = `${selection.segmentId}:${seat?.designator}`;
 
     if (!passenger || passenger.type === 'INFANT' || !passenger.seatEligible) {
       invalidSelections.push(invalid('SEAT', selection.serviceId, selection.intentPassengerId, [selection.segmentId], 'PASSENGER_INELIGIBLE'));
@@ -93,11 +93,11 @@ export const validateAncillarySelection = (input: ValidationInput): ValidatedAnc
       invalidSelections.push(invalid('SEAT', selection.serviceId, selection.intentPassengerId, [selection.segmentId], 'SERVICE_SCOPE_INVALID'));
     } else if (occupiedPassengerSeats.has(passengerSeatKey)) {
       invalidSelections.push(invalid('SEAT', selection.serviceId, selection.intentPassengerId, [selection.segmentId], 'DUPLICATE_PASSENGER_SEAT'));
-    } else if (occupiedGroupSeats.has(groupSeatKey)) {
+    } else if (occupiedPhysicalSeats.has(physicalSeatKey)) {
       invalidSelections.push(invalid('SEAT', selection.serviceId, selection.intentPassengerId, [selection.segmentId], 'DUPLICATE_GROUP_SEAT'));
     } else {
       occupiedPassengerSeats.add(passengerSeatKey);
-      occupiedGroupSeats.add(groupSeatKey);
+      occupiedPhysicalSeats.add(physicalSeatKey);
       seats.push({
         intentPassengerId: selection.intentPassengerId,
         segmentId: selection.segmentId,

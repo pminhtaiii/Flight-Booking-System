@@ -1,4 +1,5 @@
 import { ConflictException, UnprocessableEntityException } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PaymentIdempotencyService } from './payment-idempotency.service';
 import { PrismaService } from '../prisma/prisma.service';
 
@@ -8,6 +9,7 @@ describe('PaymentIdempotencyService', () => {
     create: jest.Mock;
     update: jest.Mock;
     updateMany: jest.Mock;
+    deleteMany: jest.Mock;
   };
 
   let service: PaymentIdempotencyService;
@@ -22,6 +24,7 @@ describe('PaymentIdempotencyService', () => {
         create: jest.fn(),
         update: jest.fn(),
         updateMany: jest.fn(),
+        deleteMany: jest.fn(),
       },
     };
     service = new PaymentIdempotencyService(mockPrisma as unknown as PrismaService);
@@ -76,7 +79,7 @@ describe('PaymentIdempotencyService', () => {
 
       const result = await service.acquireOrReplay(key, hash, userId, path);
 
-      expect(result).toEqual({ status: 'acquired' });
+      expect(result).toEqual({ status: 'acquired', lockedAt: expect.any(Date) });
       expect(mockPrisma.idempotencyKey.create).toHaveBeenCalledWith(
         expect.objectContaining({
           data: expect.objectContaining({
@@ -148,7 +151,7 @@ describe('PaymentIdempotencyService', () => {
 
       const result = await service.acquireOrReplay(key, hash, userId, path);
 
-      expect(result).toEqual({ status: 'acquired' });
+      expect(result).toEqual({ status: 'acquired', lockedAt: expect.any(Date) });
       expect(mockPrisma.idempotencyKey.updateMany).toHaveBeenCalledWith({
         where: {
           id: 'existing-id',
@@ -168,7 +171,7 @@ describe('PaymentIdempotencyService', () => {
 
       const result = await service.acquireOrReplay(key, hash, userId, path);
 
-      expect(result).toEqual({ status: 'acquired' });
+      expect(result).toEqual({ status: 'acquired', lockedAt: expect.any(Date) });
       expect(mockPrisma.idempotencyKey.updateMany).toHaveBeenCalledWith({
         where: {
           id: 'existing-id',
@@ -281,6 +284,30 @@ describe('PaymentIdempotencyService', () => {
           responseCode: 200,
           responseBody: { success: true },
           lockedAt: null,
+        },
+      });
+    });
+  });
+
+  describe('abandonAcquiredKey', () => {
+    it('deletes only the still-pending acquisition owned by the same request scope', async () => {
+      const key = 'key-1';
+      const hash = 'hash-1';
+      const userId = 'user-1';
+      const path = '/api/bookings/intent/intent-1/ancillaries';
+      const lockedAt = new Date('2026-07-27T00:00:00.000Z');
+      mockPrisma.idempotencyKey.deleteMany.mockResolvedValueOnce({ count: 1 });
+
+      await service.abandonAcquiredKey(key, hash, userId, path, lockedAt);
+
+      expect(mockPrisma.idempotencyKey.deleteMany).toHaveBeenCalledWith({
+        where: {
+          key,
+          requestHash: hash,
+          customerId: userId,
+          requestPath: path,
+          lockedAt,
+          responseBody: { equals: Prisma.DbNull },
         },
       });
     });
