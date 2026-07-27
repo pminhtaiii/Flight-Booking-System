@@ -24,13 +24,15 @@ export class PaymentIdempotencyService {
     requestHash: string,
     userId: string,
     requestPath: string,
-  ): Promise<{ status: 'acquired' } | { status: 'replay'; responseCode: number; responseBody: string }> {
+  ): Promise<{ status: 'acquired'; lockedAt: Date } | { status: 'replay'; responseCode: number; responseBody: string }> {
     const now = new Date();
     const existing = await this.prisma.idempotencyKey.findUnique({
       where: { key },
     });
 
     if (existing) {
+      this.ensureKeyScope(existing, userId, requestPath);
+
       if (existing.requestHash !== requestHash) {
         throw new UnprocessableEntityException('Idempotency key reuse with different payload');
       }
@@ -68,7 +70,7 @@ export class PaymentIdempotencyService {
         throw new ConflictException('Request is already in progress');
       }
 
-      return { status: 'acquired' };
+      return { status: 'acquired', lockedAt: now };
     }
 
     try {
@@ -87,13 +89,13 @@ export class PaymentIdempotencyService {
         },
       });
 
-      return { status: 'acquired' };
+      return { status: 'acquired', lockedAt: now };
     } catch (error) {
       const err = error as { code?: string };
       // Handle race condition on duplicate key check
       if (err.code === 'P2002') {
         this.logger.warn(`Race condition met for key creation: ${key}. Re-evaluating existing key logic.`);
-        return this.handleExistingKeyAfterRace(key, requestHash, now);
+        return this.handleExistingKeyAfterRace(key, requestHash, userId, requestPath, now);
       }
       throw error;
     }
@@ -105,8 +107,10 @@ export class PaymentIdempotencyService {
   private async handleExistingKeyAfterRace(
     key: string,
     requestHash: string,
+    userId: string,
+    requestPath: string,
     now: Date,
-  ): Promise<{ status: 'acquired' } | { status: 'replay'; responseCode: number; responseBody: string }> {
+  ): Promise<{ status: 'acquired'; lockedAt: Date } | { status: 'replay'; responseCode: number; responseBody: string }> {
     const existing = await this.prisma.idempotencyKey.findUnique({
       where: { key },
     });
@@ -114,6 +118,8 @@ export class PaymentIdempotencyService {
     if (!existing) {
       throw new ConflictException('Idempotency key conflict');
     }
+
+    this.ensureKeyScope(existing, userId, requestPath);
 
     if (existing.requestHash !== requestHash) {
       throw new UnprocessableEntityException('Idempotency key reuse with different payload');
@@ -151,7 +157,42 @@ export class PaymentIdempotencyService {
       throw new ConflictException('Request is already in progress');
     }
 
-    return { status: 'acquired' };
+    return { status: 'acquired', lockedAt: now };
+  }
+
+  /**
+   * Removes a failed, still-owned acquisition so a corrected request can reuse its key.
+   */
+  async abandonAcquiredKey(
+    key: string,
+    requestHash: string,
+    userId: string,
+    requestPath: string,
+    lockedAt: Date,
+  ): Promise<void> {
+    await this.prisma.idempotencyKey.deleteMany({
+      where: {
+        key,
+        requestHash,
+        customerId: userId,
+        requestPath,
+        lockedAt,
+        responseBody: { equals: Prisma.DbNull },
+      },
+    });
+  }
+
+  /**
+   * Ensures a key can only be used by the customer and route that created it.
+   */
+  private ensureKeyScope(
+    existing: { customerId: string; requestPath: string },
+    userId: string,
+    requestPath: string,
+  ): void {
+    if (existing.customerId !== userId || existing.requestPath !== requestPath) {
+      throw new ConflictException('Idempotency key is not valid for this request');
+    }
   }
 
   /**
