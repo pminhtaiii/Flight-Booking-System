@@ -34,6 +34,8 @@ export type PaymentEventSource =
 export type Payment = {
   id: string;
   bookingIntentId: string;
+  ancillarySelectionId?: string | null;
+  ancillarySelectionVersion?: number | null;
   attemptNumber: number;
   idempotencyKeyId: string;
   stripePaymentIntentId: string;

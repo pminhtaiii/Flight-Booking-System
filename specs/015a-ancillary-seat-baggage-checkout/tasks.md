@@ -50,3 +50,15 @@
 - [x] T021 Run `graphify update .` to keep graph current
 - [x] T022 Clean git status and ensure no `graphify-out` files are staged/committed
 - [x] T023 Update context files `context/architecture.md` and `context/progress-checker.md`
+
+## Phase 7: Phase 1 / PR 2 — Shared Contracts, State Repair, Additive Schema, and Migration
+
+- [x] T024 Define and export normalized ancillary catalog, selection, pricing, and error contracts in `packages/shared/src/types/ancillary.types.ts`
+- [x] T025 Add append-only ancillary snapshot, seat, baggage, coverage, and payment-binding models to `apps/api/prisma/schema.prisma`
+- [x] T026 Add the additive ancillary checkout Prisma migration with snapshot/payment constraints and foreign keys
+- [x] T027 Persist Duffel passenger IDs on newly created BookingIntent passengers using deterministic type-and-ordinal matching
+- [x] T028 Repair PaymentService eligibility to use the persisted `PENDING` BookingIntent status rather than the nonexistent `CREATED` status
+- [x] T029 Add focused regression coverage for supplier passenger mapping and the repaired payment eligibility path
+- [x] T030 Validate the Prisma schema and whitespace correctness with the local toolchain
+- [ ] T031 Run focused Jest/type-check verification after workspace dependency links are restored
+- [x] T032 Update Feature 15 architecture and progress documentation

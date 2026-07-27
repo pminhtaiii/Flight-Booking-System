@@ -69,6 +69,8 @@ export class BookingIntentService {
     const ttlMinutes = isNaN(parsedTtl) || !process.env.BOOKING_INTENT_TTL_MINUTES ? 30 : parsedTtl;
     const intentExpiresAt = new Date(now.getTime() + ttlMinutes * 60 * 1000);
 
+    const duffelPassengerIds = this.extractDuffelPassengerIds(liveOffer.raw, mergedPassengers);
+
     const created = await this.prisma.$transaction(async (tx) => {
       const intent = await tx.bookingIntent.create({
         data: {
@@ -113,6 +115,7 @@ export class BookingIntentService {
                 ? this.encryptionService.encrypt(passenger.passportExpiry)
                 : null,
               travelerProfileId: passenger.travelerProfileId || null,
+              duffelPassengerId: duffelPassengerIds[index],
             },
           }),
         ),
@@ -432,6 +435,61 @@ export class BookingIntentService {
         HttpStatus.BAD_GATEWAY,
       );
     }
+  }
+
+  private extractDuffelPassengerIds(
+    rawOffer: unknown,
+    passengers: readonly ResolvedIntentPassenger[],
+  ): string[] {
+    if (!rawOffer || typeof rawOffer !== 'object') {
+      throw new HttpException(
+        { code: 'UPSTREAM_UNAVAILABLE', message: 'Offer passenger identities are unavailable' },
+        HttpStatus.BAD_GATEWAY,
+      );
+    }
+
+    const rawPassengers = (rawOffer as { passengers?: unknown }).passengers;
+    if (!Array.isArray(rawPassengers)) {
+      throw new HttpException(
+        { code: 'UPSTREAM_UNAVAILABLE', message: 'Offer passenger identities are unavailable' },
+        HttpStatus.BAD_GATEWAY,
+      );
+    }
+
+    const supplierPassengers = rawPassengers.map((passenger) => {
+      if (!passenger || typeof passenger !== 'object') {
+        return null;
+      }
+      const candidate = passenger as { id?: unknown; type?: unknown };
+      if (typeof candidate.id !== 'string' || typeof candidate.type !== 'string') {
+        return null;
+      }
+      return { id: candidate.id, type: candidate.type.toUpperCase() };
+    });
+
+    if (supplierPassengers.some((passenger) => passenger === null)) {
+      throw new HttpException(
+        { code: 'UPSTREAM_UNAVAILABLE', message: 'Offer passenger identities are unavailable' },
+        HttpStatus.BAD_GATEWAY,
+      );
+    }
+
+    const remaining = supplierPassengers.filter(
+      (passenger): passenger is { id: string; type: string } => passenger !== null,
+    );
+    const mappedPassengerIds: string[] = [];
+    for (const passenger of passengers) {
+      const index = remaining.findIndex((supplier) => supplier.type === passenger.type);
+      if (index < 0) {
+        throw new HttpException(
+          { code: 'UPSTREAM_UNAVAILABLE', message: 'Offer passenger identities do not match the booking intent' },
+          HttpStatus.BAD_GATEWAY,
+        );
+      }
+      mappedPassengerIds.push(remaining.splice(index, 1)[0].id);
+    }
+
+    return mappedPassengerIds;
   }
 
   async expireExpiredIntents(now: Date = new Date()): Promise<{ expiredCount: number }> {
