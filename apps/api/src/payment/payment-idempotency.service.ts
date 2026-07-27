@@ -31,6 +31,8 @@ export class PaymentIdempotencyService {
     });
 
     if (existing) {
+      this.ensureKeyScope(existing, userId, requestPath);
+
       if (existing.requestHash !== requestHash) {
         throw new UnprocessableEntityException('Idempotency key reuse with different payload');
       }
@@ -93,7 +95,7 @@ export class PaymentIdempotencyService {
       // Handle race condition on duplicate key check
       if (err.code === 'P2002') {
         this.logger.warn(`Race condition met for key creation: ${key}. Re-evaluating existing key logic.`);
-        return this.handleExistingKeyAfterRace(key, requestHash, now);
+        return this.handleExistingKeyAfterRace(key, requestHash, userId, requestPath, now);
       }
       throw error;
     }
@@ -105,6 +107,8 @@ export class PaymentIdempotencyService {
   private async handleExistingKeyAfterRace(
     key: string,
     requestHash: string,
+    userId: string,
+    requestPath: string,
     now: Date,
   ): Promise<{ status: 'acquired' } | { status: 'replay'; responseCode: number; responseBody: string }> {
     const existing = await this.prisma.idempotencyKey.findUnique({
@@ -114,6 +118,8 @@ export class PaymentIdempotencyService {
     if (!existing) {
       throw new ConflictException('Idempotency key conflict');
     }
+
+    this.ensureKeyScope(existing, userId, requestPath);
 
     if (existing.requestHash !== requestHash) {
       throw new UnprocessableEntityException('Idempotency key reuse with different payload');
@@ -152,6 +158,19 @@ export class PaymentIdempotencyService {
     }
 
     return { status: 'acquired' };
+  }
+
+  /**
+   * Ensures a key can only be used by the customer and route that created it.
+   */
+  private ensureKeyScope(
+    existing: { customerId: string; requestPath: string },
+    userId: string,
+    requestPath: string,
+  ): void {
+    if (existing.customerId !== userId || existing.requestPath !== requestPath) {
+      throw new ConflictException('Idempotency key is not valid for this request');
+    }
   }
 
   /**
