@@ -1,3 +1,31 @@
+import type { PassengerType } from './booking-intent.types';
+
+export type AncillaryStatus = 'EMPTY' | 'DRAFT_COMMITTED' | 'VALIDATED' | 'STALE';
+export type AncillarySelectionStatus = 'DRAFT_COMMITTED' | 'VALIDATED' | 'STALE' | 'PAYMENT_BOUND';
+export type AncillaryCacheStatus = 'HIT' | 'MISS' | 'REFRESHED';
+export type BaggageType = 'CHECKED' | 'CARRY_ON';
+export type WeightUnit = 'KG' | 'LB';
+export type AncillaryErrorCode =
+  | 'ANCILLARY_VERSION_CONFLICT'
+  | 'ANCILLARY_SELECTION_STALE'
+  | 'ANCILLARY_PRICE_CHANGED'
+  | 'ANCILLARY_SCOPE_INVALID'
+  | 'ANCILLARY_CURRENCY_MISMATCH';
+
+export type MoneyAmount = {
+  amount: string;
+  currency: string;
+};
+
+export type AncillaryPriceBreakdown = {
+  seats: string;
+  baggage: string;
+  ancillaries: string;
+  estimatedGrandTotal: string;
+  currency?: string;
+};
+
+// Catalog types (Phase 2 Duffel integration)
 export type AncillaryCabinClass = 'economy' | 'premium_economy' | 'business' | 'first' | string;
 
 export type AncillaryRowElementType =
@@ -72,6 +100,45 @@ export type AncillaryCatalog = {
   baggageServices: AncillaryBaggageService[];
 };
 
+// Selection persistence types (Phase 1 schema)
+export type AncillaryPassenger = {
+  intentPassengerId: string;
+  duffelPassengerId: string;
+  displayName: string;
+  type: PassengerType;
+  seatEligible: boolean;
+};
+
+export type AncillarySeatSelection = {
+  intentPassengerId: string;
+  duffelPassengerId: string;
+  segmentId: string;
+  serviceId: string;
+  seatDesignator: string;
+  amount: string;
+  currency: string;
+};
+
+export type AncillaryBaggageSelection = {
+  intentPassengerId: string;
+  duffelPassengerId: string;
+  serviceId: string;
+  type: BaggageType;
+  quantity: number;
+  segmentIds: string[];
+  amount: string;
+  currency: string;
+};
+
+export type AncillarySelection = {
+  id: string;
+  version: number;
+  status: AncillarySelectionStatus;
+  seats: AncillarySeatSelection[];
+  baggage: AncillaryBaggageSelection[];
+  totals: AncillaryPriceBreakdown;
+};
+
 export type NormalizedSeatSelection = {
   intentPassengerId: string;
   segmentId: string;
@@ -107,14 +174,6 @@ export type AncillarySelectionSnapshot = {
   totals: AncillaryTotals;
 };
 
-export type AncillaryPassenger = {
-  intentPassengerId: string;
-  duffelPassengerId: string;
-  displayName: string;
-  type: 'ADULT' | 'CHILD' | 'INFANT';
-  seatEligible: boolean;
-};
-
 export type AncillaryCatalogResponse = {
   intentId: string;
   selectionId: string | null;
@@ -125,6 +184,44 @@ export type AncillaryCatalogResponse = {
   catalog: AncillaryCatalog;
   passengers: AncillaryPassenger[];
   selection: AncillarySelectionSnapshot;
+};
+
+export type CommitAncillarySelectionRequest = {
+  expectedVersion: number;
+  catalogFingerprint: string;
+  seats: Array<Pick<AncillarySeatSelection, 'intentPassengerId' | 'segmentId' | 'serviceId'>>;
+  baggage: Array<Pick<AncillaryBaggageSelection, 'intentPassengerId' | 'serviceId' | 'quantity'>>;
+};
+
+export type CommitAncillarySelectionResponse = {
+  intentId: string;
+  selectionId: string;
+  selectionVersion: number;
+  selectionStatus: 'DRAFT_COMMITTED';
+  intentExpiresAt: string;
+  selection: Omit<AncillarySelection, 'id' | 'version' | 'status'>;
+};
+
+export type AncillaryInvalidSelection = {
+  kind: 'SEAT' | 'BAGGAGE';
+  serviceId: string;
+  intentPassengerId: string;
+  segmentIds: string[];
+  reason: string;
+};
+
+export type AncillaryErrorResponse = {
+  statusCode: number;
+  code: AncillaryErrorCode;
+  message: string;
+  intentId: string;
+  currentVersion?: number;
+  invalidSelections?: AncillaryInvalidSelection[];
+  pricing?: {
+    previousGrandTotal: string;
+    currentGrandTotal: string;
+    currency: string;
+  };
 };
 
 export type AncillaryRepriceInput = {
