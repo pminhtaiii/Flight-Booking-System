@@ -406,7 +406,7 @@ describe('PaymentService - recoveryPoint === completed', () => {
       mockPrisma.$queryRaw = jest.fn().mockResolvedValue([
         {
           id: 'intent-123',
-          status: 'CREATED',
+          status: 'PENDING',
           paymentAttemptCount: 1,
           confirmedPrice: 100,
           currency: 'USD',
@@ -486,7 +486,7 @@ describe('PaymentService - recoveryPoint === completed', () => {
       mockPrisma.$queryRaw.mockResolvedValueOnce([
         {
           id: 'intent-123',
-          status: 'CREATED',
+          status: 'PENDING',
           paymentAttemptCount: 2,
           confirmedPrice: 100,
           currency: 'USD',
