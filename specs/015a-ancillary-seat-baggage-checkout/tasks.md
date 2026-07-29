@@ -70,8 +70,8 @@
 - [x] T044 Acquire the exact owned active current selection ID/version through a short CAS lease, reprice once outside database transactions, and conditionally persist authoritative `VALIDATED` totals only while the same lease still owns the snapshot
 - [x] T045 Return targeted version/service/price/currency conflicts and mark only the lease-owned unbound current snapshot `STALE` when supplier validation invalidates it
 - [x] T046 Reject ancillary commits while the current snapshot has an active validation lease; expired leases cease blocking edits
-- [ ] T047 Extend payment creation with optional-together ancillary selection identity while preserving empty-selection/base-fare compatibility
-- [ ] T048 Bind Payment and `PAYMENT_BOUND` snapshot atomically, convert authoritative major units to minor units exactly, and persist PII-safe selection metadata
+- [x] T047 Extend payment creation with optional-together ancillary selection identity while preserving empty-selection/base-fare compatibility
+- [x] T048 Bind Payment and `PAYMENT_BOUND` snapshot atomically, convert authoritative major units to minor units exactly, and persist PII-safe selection metadata
 - [ ] T049 Load exact canonical services through the Payment-bound snapshot for Duffel order creation and every recovery point
 - [ ] T050 Preserve authorization, supplier-order, capture, cancellation, compensation, and idempotent recovery behavior for ancillary-bound payments
 - [ ] T051 Add focused unit/integration/E2E coverage for validation races, targeted conflicts, exact amounts/services, retries, and empty-selection regressions

@@ -1,14 +1,20 @@
-import { IsBoolean, IsInt, IsOptional, IsString, Min } from 'class-validator';
+import { IsBoolean, IsInt, IsOptional, IsString, IsUUID, Min, ValidateIf } from 'class-validator';
 
 export class CreatePaymentDto {
   @IsString()
   bookingIntentId!: string;
 
-  @IsOptional()
-  @IsString()
+  @ValidateIf(
+    (dto: CreatePaymentDto) =>
+      dto.ancillarySelectionId !== undefined || dto.ancillarySelectionVersion !== undefined,
+  )
+  @IsUUID()
   ancillarySelectionId?: string;
 
-  @IsOptional()
+  @ValidateIf(
+    (dto: CreatePaymentDto) =>
+      dto.ancillarySelectionId !== undefined || dto.ancillarySelectionVersion !== undefined,
+  )
   @IsInt()
   @Min(1)
   ancillarySelectionVersion?: number;
