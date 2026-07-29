@@ -42,8 +42,7 @@ test.describe('Checkout Foundation Flow', () => {
     await context.addCookies([{
       name: 'mock-scenario',
       value: 'domestic-offer',
-      domain: 'localhost',
-      path: '/',
+      url: 'http://localhost:3000',
     }]);
 
     // Go to search
@@ -269,8 +268,7 @@ test.describe('Checkout Foundation Flow', () => {
     await context.addCookies([{
       name: 'mock-scenario',
       value: 'intent-not-found',
-      domain: 'localhost',
-      path: '/',
+      url: 'http://localhost:3000',
     }]);
     await page.goto('http://localhost:3000/checkout/some-id/ancillaries');
     await expect(page.getByRole('heading', { name: 'Booking Intent Not Found' })).toBeVisible();
@@ -279,8 +277,7 @@ test.describe('Checkout Foundation Flow', () => {
     await context.addCookies([{
       name: 'mock-scenario',
       value: 'intent-forbidden',
-      domain: 'localhost',
-      path: '/',
+      url: 'http://localhost:3000',
     }]);
     await page.goto('http://localhost:3000/checkout/some-id/ancillaries');
     await expect(page.getByRole('heading', { name: 'Forbidden' })).toBeVisible();
@@ -289,8 +286,7 @@ test.describe('Checkout Foundation Flow', () => {
     await context.addCookies([{
       name: 'mock-scenario',
       value: 'intent-expired',
-      domain: 'localhost',
-      path: '/',
+      url: 'http://localhost:3000',
     }]);
     await page.goto('http://localhost:3000/checkout/some-id/ancillaries');
     await expect(page.getByRole('heading', { name: 'Booking Intent Expired' })).toBeVisible();
@@ -300,8 +296,7 @@ test.describe('Checkout Foundation Flow', () => {
     await context.addCookies([{
       name: 'mock-scenario',
       value: 'intent-unavailable',
-      domain: 'localhost',
-      path: '/',
+      url: 'http://localhost:3000',
     }]);
     await page.goto('http://localhost:3000/checkout/some-id/ancillaries');
     await expect(page.getByRole('heading', { name: 'Service Unavailable' })).toBeVisible();
