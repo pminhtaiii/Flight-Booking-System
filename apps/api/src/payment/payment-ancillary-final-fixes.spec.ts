@@ -8,7 +8,7 @@ import { PaymentMethodService } from '@/payment/payment-method.service';
 import { PaymentService } from '@/payment/payment.service';
 import { PrismaService } from '@/prisma/prisma.service';
 import { Prisma, BookingFailureReason } from '@prisma/client';
-import { BadRequestException, GoneException } from '@nestjs/common';
+import { BadRequestException, ConflictException, GoneException, InternalServerErrorException } from '@nestjs/common';
 
 describe('PaymentService - Final Fixes Spec', () => {
   let prisma: any;
@@ -62,6 +62,14 @@ describe('PaymentService - Final Fixes Spec', () => {
       },
       ancillarySelection: {
         updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+      },
+      bookingIntentPassenger: {
+        findMany: jest.fn(),
+      },
+      auditLog: {
+        create: jest.fn(),
+        findMany: jest.fn(),
+        update: jest.fn(),
       },
     };
     stripe = {
@@ -411,6 +419,644 @@ describe('PaymentService - Final Fixes Spec', () => {
       await expect(
         service.createPayment(dto, 'ikey-123', 'user-1', '127.0.0.1'),
       ).rejects.toThrow(BadRequestException);
+    });
+  });
+
+  describe('Additional fixes (Issue 1, 2, 3)', () => {
+    it('Issue 1: enrichPassengerSnapshot should retrieve original passenger PII, email from User table, and contactPhone from Duffel Order', async () => {
+      // Stub passenger snapshot
+      const rawSnapshot = {
+        passengers: [
+          {
+            type: 'ADULT',
+            firstName: 'REDACTED',
+            lastName: 'REDACTED',
+            dateOfBirth: '1990-01-01',
+          },
+        ],
+        contactEmail: null,
+        contactPhone: null,
+      };
+
+      prisma.bookingIntentPassenger.findMany.mockResolvedValue([
+        {
+          position: 0,
+          givenName: 'John',
+          familyName: 'Doe',
+          dateOfBirth: new Date('1990-05-15'),
+        },
+      ]);
+
+      prisma.bookingIntent.findUnique.mockResolvedValue({
+        userId: 'user-123',
+      });
+
+      prisma.user.findUnique.mockResolvedValue({
+        email: 'realuser@example.com',
+      });
+
+      // Mock database lookup for payment & booking to find duffelOrderId
+      prisma.payment.findFirst.mockResolvedValue({
+        id: 'pay-123',
+        booking: {
+          duffelOrderId: 'duffel-order-123',
+        },
+      });
+
+      // Mock Duffel retrieveCompleteOrder to return contact phone
+      duffel.retrieveCompleteOrder = jest.fn().mockResolvedValue({
+        passengers: [
+          {
+            phone_number: '+1999999999',
+          },
+        ],
+      });
+
+      const enriched = await service['enrichPassengerSnapshot']('intent-123', rawSnapshot as any);
+
+      expect(enriched.passengers[0].firstName).toBe('John');
+      expect(enriched.passengers[0].lastName).toBe('Doe');
+      expect(enriched.passengers[0].dateOfBirth).toBe('1990-05-15');
+      expect(enriched.contactEmail).toBe('realuser@example.com');
+      expect(enriched.contactPhone).toBe('+1999999999');
+    });
+
+    it('Issue 2: stale reservation should accept booking intent in AWAITING_PAYMENT state and bypass attempts exhausted check if reuseAttemptNumber is defined', async () => {
+      const staleParams = {
+        paymentReservation: {
+          bookingIntentId: 'intent-1',
+          ancillarySelectionId: 'sel-1',
+          ancillarySelectionVersion: 1,
+          attemptNumber: 2,
+          amount: 1000,
+          currency: 'USD',
+          intentExpiresAt: new Date(Date.now() + 600000).toISOString(),
+          offerExpiresAt: new Date(Date.now() + 600000).toISOString(),
+          validatedAt: new Date(Date.now() - 70000).toISOString(), // stale (> 60s)
+          validatedAncillary: {
+            selectionId: 'sel-1',
+            selectionVersion: 1,
+            baseAmount: '10.00',
+            grandTotal: '10.00',
+            currency: 'USD',
+            services: [{ serviceId: 'seat-1', quantity: 1 }],
+          },
+        },
+      };
+
+      prisma.idempotencyKey.findUnique.mockResolvedValue({
+        requestHash: 'hash-123',
+        customerId: 'user-1',
+        requestPath: '/api/bookings/payment/create',
+        requestParams: staleParams,
+      });
+
+      validation.validateForPayment.mockResolvedValue({
+        selectionId: 'sel-1',
+        selectionVersion: 1,
+        baseAmount: '10.00',
+        grandTotal: '10.00',
+        currency: 'USD',
+        services: [{ serviceId: 'seat-1', quantity: 1 }],
+      });
+
+      prisma.user.findUnique.mockResolvedValue({ email: 'john@example.com', stripeCustomerId: 'cus-1' });
+      stripe.createPaymentIntent.mockResolvedValue({ id: 'pi-1', client_secret: 'secret-1' });
+
+      // Mock booking intent to have AWAITING_PAYMENT status and paymentAttemptCount = 2 (meaning 2nd attempt is being retried)
+      prisma.$queryRaw
+        .mockResolvedValueOnce([
+          {
+            id: 'intent-1',
+            userId: 'user-1',
+            status: 'AWAITING_PAYMENT',
+            paymentAttemptCount: 2,
+            currency: 'USD',
+            intentExpiresAt: new Date(Date.now() + 600000),
+            offerExpiresAt: new Date(Date.now() + 600000),
+            currentAncillarySelectionId: 'sel-1',
+            ancillaryVersion: 1,
+          },
+        ])
+        .mockResolvedValueOnce([
+          {
+            id: 'sel-1',
+            status: 'VALIDATED',
+            currency: 'USD',
+            validatedBaseAmount: new Prisma.Decimal('10.00'),
+            validatedGrandTotal: new Prisma.Decimal('10.00'),
+            validationLeaseToken: null,
+            validationLeaseExpiresAt: null,
+            validatedAt: new Date(),
+          },
+        ]);
+      prisma.$executeRaw.mockResolvedValue(1);
+
+      const dto = {
+        bookingIntentId: 'intent-1',
+        ancillarySelectionId: 'sel-1',
+        ancillarySelectionVersion: 1,
+      };
+
+      // Should complete successfully without throwing allowed status or attempt exhaustion error
+      await expect(
+        service.createPayment(dto, 'ikey-123', 'user-1', '127.0.0.1')
+      ).resolves.toBeDefined();
+    });
+
+    it('Issue 3: should cancel the Stripe PaymentIntent if DB transaction fails during createPayment', async () => {
+      prisma.idempotencyKey.findUnique.mockResolvedValue(null);
+      validation.validateForPayment.mockResolvedValue({
+        selectionId: 'sel-1',
+        selectionVersion: 1,
+        baseAmount: '10.00',
+        grandTotal: '10.00',
+        currency: 'USD',
+        services: [{ serviceId: 'seat-1', quantity: 1 }],
+      });
+      prisma.user.findUnique.mockResolvedValue({ email: 'john@example.com', stripeCustomerId: 'cus-1' });
+      stripe.createPaymentIntent.mockResolvedValue({ id: 'pi-failed-rollback', client_secret: 'secret-1' });
+
+      prisma.$queryRaw
+        .mockResolvedValueOnce([
+          {
+            id: 'intent-1',
+            userId: 'user-1',
+            status: 'PENDING',
+            paymentAttemptCount: 0,
+            currency: 'USD',
+            intentExpiresAt: new Date(Date.now() + 600000),
+            offerExpiresAt: new Date(Date.now() + 600000),
+            currentAncillarySelectionId: 'sel-1',
+            ancillaryVersion: 1,
+          },
+        ])
+        .mockResolvedValueOnce([
+          {
+            id: 'sel-1',
+            status: 'VALIDATED',
+            currency: 'USD',
+            validatedBaseAmount: new Prisma.Decimal('10.00'),
+            validatedGrandTotal: new Prisma.Decimal('10.00'),
+            validationLeaseToken: null,
+            validationLeaseExpiresAt: null,
+            validatedAt: new Date(),
+          },
+        ]);
+
+      // Force second transaction (Step 5) to throw error, while first transaction (Step 2) succeeds
+      prisma.$transaction
+        .mockResolvedValueOnce({
+          attemptNumber: 1,
+          amount: 1000,
+          currency: 'USD',
+        })
+        .mockRejectedValueOnce(new Error('Prisma transaction deadlock'));
+
+      const dto = {
+        bookingIntentId: 'intent-1',
+        ancillarySelectionId: 'sel-1',
+        ancillarySelectionVersion: 1,
+      };
+
+      await expect(
+        service.createPayment(dto, 'ikey-123', 'user-1', '127.0.0.1')
+      ).rejects.toThrow('Prisma transaction deadlock');
+
+      // Verify that Stripe PaymentIntent cancellation was triggered to release the hold
+      expect(stripe.cancelPaymentIntent).toHaveBeenCalledWith('pi-failed-rollback');
+    });
+
+    it('Issue 4: should save backupPaymentIntentId to idempotency key requestParams immediately and handle failed cancel rollback', async () => {
+      prisma.idempotencyKey.findUnique.mockResolvedValue({
+        requestParams: { originalField: 'value' },
+      });
+      validation.validateForPayment.mockResolvedValue({
+        selectionId: 'sel-1',
+        selectionVersion: 1,
+        baseAmount: '10.00',
+        grandTotal: '10.00',
+        currency: 'USD',
+        services: [{ serviceId: 'seat-1', quantity: 1 }],
+      });
+      prisma.user.findUnique.mockResolvedValue({ email: 'john@example.com', stripeCustomerId: 'cus-1' });
+      stripe.createPaymentIntent.mockResolvedValue({ id: 'pi-unrollable', client_secret: 'secret-1' });
+
+      prisma.$queryRaw
+        .mockResolvedValueOnce([
+          {
+            id: 'intent-1',
+            userId: 'user-1',
+            status: 'PENDING',
+            paymentAttemptCount: 0,
+            currency: 'USD',
+            intentExpiresAt: new Date(Date.now() + 600000),
+            offerExpiresAt: new Date(Date.now() + 600000),
+            currentAncillarySelectionId: 'sel-1',
+            ancillaryVersion: 1,
+          },
+        ])
+        .mockResolvedValueOnce([
+          {
+            id: 'sel-1',
+            status: 'VALIDATED',
+            currency: 'USD',
+            validatedBaseAmount: new Prisma.Decimal('10.00'),
+            validatedGrandTotal: new Prisma.Decimal('10.00'),
+            validationLeaseToken: null,
+            validationLeaseExpiresAt: null,
+            validatedAt: new Date(),
+          },
+        ]);
+
+      prisma.$transaction
+        .mockResolvedValueOnce({
+          attemptNumber: 1,
+          amount: 1000,
+          currency: 'USD',
+        })
+        .mockRejectedValueOnce(new Error('Transaction failure'));
+
+      // Stripe cancellation fails
+      stripe.cancelPaymentIntent.mockRejectedValueOnce(new Error('Stripe API error'));
+
+      const dto = {
+        bookingIntentId: 'intent-1',
+        ancillarySelectionId: 'sel-1',
+        ancillarySelectionVersion: 1,
+      };
+
+      await expect(
+        service.createPayment(dto, 'ikey-123', 'user-1', '127.0.0.1')
+      ).rejects.toThrow('Transaction failure');
+
+      // Verify that the idempotency key was updated with backupPaymentIntentId immediately after intent creation
+      expect(prisma.idempotencyKey.update).toHaveBeenCalledWith({
+        where: { key: 'ikey-123' },
+        data: {
+          requestParams: {
+            originalField: 'value',
+            backupPaymentIntentId: 'pi-unrollable',
+          },
+        },
+      });
+    });
+
+    it('Issue 4: should attempt to cancel backupPaymentIntentId and throw ConflictException on retry if Stripe cancellation fails again', async () => {
+      // Setup mock key record with backupPaymentIntentId
+      prisma.idempotencyKey.findUnique.mockResolvedValue({
+        key: 'ikey-123',
+        requestParams: {
+          backupPaymentIntentId: 'pi-unrollable',
+          originalField: 'value',
+        },
+      });
+
+      // Stripe cancel fails again
+      stripe.cancelPaymentIntent.mockRejectedValueOnce(new Error('Stripe still down'));
+
+      const dto = {
+        bookingIntentId: 'intent-1',
+        ancillarySelectionId: 'sel-1',
+        ancillarySelectionVersion: 1,
+      };
+
+      await expect(
+        service.createPayment(dto, 'ikey-123', 'user-1', '127.0.0.1')
+      ).rejects.toThrow(ConflictException);
+
+      expect(stripe.cancelPaymentIntent).toHaveBeenCalledWith('pi-unrollable');
+    });
+
+    it('Issue 4: should cancel backupPaymentIntentId, clear it from requestParams, and proceed on retry if Stripe cancellation succeeds', async () => {
+      // Setup mock key record with backupPaymentIntentId
+      prisma.idempotencyKey.findUnique
+        .mockResolvedValueOnce({
+          id: 'ikey-id-123',
+          key: 'ikey-123',
+          requestParams: {
+            backupPaymentIntentId: 'pi-unrollable',
+            originalField: 'value',
+          },
+        })
+        .mockResolvedValueOnce({
+          id: 'ikey-id-123',
+          key: 'ikey-123',
+          requestParams: {
+            backupPaymentIntentId: 'pi-unrollable',
+            originalField: 'value',
+          },
+        })
+        .mockResolvedValueOnce({
+          id: 'ikey-id-123',
+          key: 'ikey-123',
+          requestParams: {
+            originalField: 'value',
+          },
+        })
+        .mockResolvedValueOnce({
+          id: 'ikey-id-123',
+          key: 'ikey-123',
+          requestParams: {
+            originalField: 'value',
+          },
+        });
+
+      // Stripe cancel succeeds
+      stripe.cancelPaymentIntent.mockResolvedValueOnce({ status: 'canceled' });
+
+      // Mock normal createPayment operations
+      validation.validateForPayment.mockResolvedValue({
+        selectionId: 'sel-1',
+        selectionVersion: 1,
+        baseAmount: '10.00',
+        grandTotal: '10.00',
+        currency: 'USD',
+        services: [{ serviceId: 'seat-1', quantity: 1 }],
+      });
+      prisma.user.findUnique.mockResolvedValue({ email: 'john@example.com', stripeCustomerId: 'cus-1' });
+      stripe.createPaymentIntent.mockResolvedValue({ id: 'pi-new', client_secret: 'secret-new' });
+
+      prisma.$queryRaw
+        .mockResolvedValueOnce([
+          {
+            id: 'intent-1',
+            userId: 'user-1',
+            status: 'PENDING',
+            paymentAttemptCount: 0,
+            currency: 'USD',
+            intentExpiresAt: new Date(Date.now() + 600000),
+            offerExpiresAt: new Date(Date.now() + 600000),
+            currentAncillarySelectionId: 'sel-1',
+            ancillaryVersion: 1,
+          },
+        ])
+        .mockResolvedValueOnce([
+          {
+            id: 'sel-1',
+            status: 'VALIDATED',
+            currency: 'USD',
+            validatedBaseAmount: new Prisma.Decimal('10.00'),
+            validatedGrandTotal: new Prisma.Decimal('10.00'),
+            validationLeaseToken: null,
+            validationLeaseExpiresAt: null,
+            validatedAt: new Date(),
+          },
+        ]);
+
+      prisma.$transaction.mockResolvedValueOnce({
+        attemptNumber: 1,
+        amount: 1000,
+        currency: 'USD',
+      });
+
+      const dto = {
+        bookingIntentId: 'intent-1',
+        ancillarySelectionId: 'sel-1',
+        ancillarySelectionVersion: 1,
+      };
+
+      await expect(
+        service.createPayment(dto, 'ikey-123', 'user-1', '127.0.0.1')
+      ).resolves.toBeDefined();
+
+      // Expect old PaymentIntent to be cancelled
+      expect(stripe.cancelPaymentIntent).toHaveBeenCalledWith('pi-unrollable');
+
+      // Expect idempotency key requestParams to be updated/cleared of backupPaymentIntentId
+      expect(prisma.idempotencyKey.update).toHaveBeenCalledWith({
+        where: { key: 'ikey-123' },
+        data: {
+          requestParams: {
+            originalField: 'value',
+          },
+        },
+      });
+    });
+
+    it('Issue 5: should replay response and NOT cancel PaymentIntent if Payment record already exists in database despite backupPaymentIntentId being set', async () => {
+      // Mock existing payment in DB
+      prisma.payment.findFirst.mockResolvedValue({
+        id: 'pay-existing-123',
+        status: 'CREATED',
+        stripePaymentIntentId: 'pi-valid-and-active',
+      });
+
+      // Mock idempotency Key lookup
+      prisma.idempotencyKey.findUnique.mockResolvedValue({
+        key: 'ikey-123',
+        requestParams: {
+          backupPaymentIntentId: 'pi-valid-and-active',
+          originalField: 'value',
+        },
+      });
+
+      stripe.retrievePaymentIntent.mockResolvedValue({
+        id: 'pi-valid-and-active',
+        client_secret: 'secret-active',
+      });
+
+      const dto = {
+        bookingIntentId: 'intent-1',
+        ancillarySelectionId: 'sel-1',
+        ancillarySelectionVersion: 1,
+      };
+
+      const res = await service.createPayment(dto, 'ikey-123', 'user-1', '127.0.0.1');
+
+      expect(res).toEqual({
+        paymentId: 'pay-existing-123',
+        clientSecret: 'secret-active',
+        status: 'CREATED',
+      });
+
+      // Verification: cancelPaymentIntent should NEVER be called on the valid PaymentIntent
+      expect(stripe.cancelPaymentIntent).not.toHaveBeenCalled();
+    });
+
+    it('Issue 6: should cancel Stripe PaymentIntent and throw InternalServerErrorException if saving backupPaymentIntentId to database fails', async () => {
+      // Mock db save of backupPaymentIntentId to throw
+      prisma.idempotencyKey.findUnique.mockResolvedValue({
+        requestParams: { originalField: 'value' },
+      });
+      prisma.idempotencyKey.update.mockRejectedValueOnce(new Error('DB connection lost'));
+
+      validation.validateForPayment.mockResolvedValue({
+        selectionId: 'sel-1',
+        selectionVersion: 1,
+        baseAmount: '10.00',
+        grandTotal: '10.00',
+        currency: 'USD',
+        services: [{ serviceId: 'seat-1', quantity: 1 }],
+      });
+      prisma.user.findUnique.mockResolvedValue({ email: 'john@example.com', stripeCustomerId: 'cus-1' });
+      stripe.createPaymentIntent.mockResolvedValue({ id: 'pi-immediate-rollback', client_secret: 'secret-1' });
+
+      stripe.cancelPaymentIntent.mockResolvedValueOnce({ status: 'canceled' });
+
+      // Mock Step 2 transaction operations
+      prisma.$queryRaw
+        .mockResolvedValueOnce([
+          {
+            id: 'intent-1',
+            userId: 'user-1',
+            status: 'PENDING',
+            paymentAttemptCount: 0,
+            currency: 'USD',
+            intentExpiresAt: new Date(Date.now() + 600000),
+            offerExpiresAt: new Date(Date.now() + 600000),
+            currentAncillarySelectionId: 'sel-1',
+            ancillaryVersion: 1,
+          },
+        ])
+        .mockResolvedValueOnce([
+          {
+            id: 'sel-1',
+            status: 'VALIDATED',
+            currency: 'USD',
+            validatedBaseAmount: new Prisma.Decimal('10.00'),
+            validatedGrandTotal: new Prisma.Decimal('10.00'),
+            validationLeaseToken: null,
+            validationLeaseExpiresAt: null,
+            validatedAt: new Date(),
+          },
+        ]);
+
+      prisma.$transaction.mockResolvedValueOnce({
+        attemptNumber: 1,
+        amount: 1000,
+        currency: 'USD',
+      });
+
+      const dto = {
+        bookingIntentId: 'intent-1',
+        ancillarySelectionId: 'sel-1',
+        ancillarySelectionVersion: 1,
+      };
+
+      await expect(
+        service.createPayment(dto, 'ikey-123', 'user-1', '127.0.0.1')
+      ).rejects.toThrow(InternalServerErrorException);
+
+      // Verify that stripe.cancelPaymentIntent was called on the new PaymentIntent
+      expect(stripe.cancelPaymentIntent).toHaveBeenCalledWith('pi-immediate-rollback');
+    });
+
+    it('Issue 7: should log to fallback database AuditLog when both backup ID save and Stripe cancellation fail, and sweep should process it on startup', async () => {
+      // Mock db save of backupPaymentIntentId to throw
+      prisma.idempotencyKey.findUnique.mockResolvedValue({
+        requestParams: { originalField: 'value' },
+      });
+      prisma.idempotencyKey.update.mockRejectedValueOnce(new Error('DB connection lost'));
+
+      validation.validateForPayment.mockResolvedValue({
+        selectionId: 'sel-1',
+        selectionVersion: 1,
+        baseAmount: '10.00',
+        grandTotal: '10.00',
+        currency: 'USD',
+        services: [{ serviceId: 'seat-1', quantity: 1 }],
+      });
+      prisma.user.findUnique.mockResolvedValue({ email: 'john@example.com', stripeCustomerId: 'cus-1' });
+      stripe.createPaymentIntent.mockResolvedValue({ id: 'pi-unrollable-immediate', client_secret: 'secret-1' });
+
+      // Mock Stripe cancel to throw (so cancellation fails)
+      stripe.cancelPaymentIntent.mockRejectedValueOnce(new Error('Stripe API error'));
+
+      // Mock audit log creation
+      prisma.auditLog.create.mockResolvedValueOnce({ id: 'audit-log-123' });
+
+      // Mock Step 2 transaction operations
+      prisma.$queryRaw
+        .mockResolvedValueOnce([
+          {
+            id: 'intent-1',
+            userId: 'user-1',
+            status: 'PENDING',
+            paymentAttemptCount: 0,
+            currency: 'USD',
+            intentExpiresAt: new Date(Date.now() + 600000),
+            offerExpiresAt: new Date(Date.now() + 600000),
+            currentAncillarySelectionId: 'sel-1',
+            ancillaryVersion: 1,
+          },
+        ])
+        .mockResolvedValueOnce([
+          {
+            id: 'sel-1',
+            status: 'VALIDATED',
+            currency: 'USD',
+            validatedBaseAmount: new Prisma.Decimal('10.00'),
+            validatedGrandTotal: new Prisma.Decimal('10.00'),
+            validationLeaseToken: null,
+            validationLeaseExpiresAt: null,
+            validatedAt: new Date(),
+          },
+        ]);
+
+      prisma.$transaction.mockResolvedValueOnce({
+        attemptNumber: 1,
+        amount: 1000,
+        currency: 'USD',
+      });
+
+      const dto = {
+        bookingIntentId: 'intent-1',
+        ancillarySelectionId: 'sel-1',
+        ancillarySelectionVersion: 1,
+      };
+
+      // Call createPayment and expect failure
+      await expect(
+        service.createPayment(dto, 'ikey-failed-log', 'user-1', '127.0.0.1')
+      ).rejects.toThrow(InternalServerErrorException);
+
+      // Verify that prisma.auditLog.create was called with the rollback info
+      expect(prisma.auditLog.create).toHaveBeenCalledWith({
+        data: {
+          userId: 'user-1',
+          action: 'failed_stripe_rollback',
+          resourceType: 'PaymentIntent',
+          resourceId: 'pi-unrollable-immediate',
+          metadata: {
+            idempotencyKey: 'ikey-failed-log',
+            reason: 'Immediate save rollback failed: Stripe API error',
+          },
+          traceId: '',
+          correlationId: '',
+        },
+      });
+
+      // Now test the startup sweep: mock Stripe cancel to succeed this time
+      stripe.cancelPaymentIntent.mockResolvedValueOnce({ status: 'canceled' });
+
+      prisma.auditLog.findMany.mockResolvedValueOnce([
+        {
+          id: 'audit-log-123',
+          resourceId: 'pi-unrollable-immediate',
+          metadata: {
+            idempotencyKey: 'ikey-failed-log',
+          },
+        },
+      ]);
+
+      prisma.idempotencyKey.findUnique.mockResolvedValueOnce({
+        requestParams: { backupPaymentIntentId: 'pi-unrollable-immediate' },
+      });
+      prisma.idempotencyKey.update.mockResolvedValueOnce({});
+      prisma.auditLog.update.mockResolvedValueOnce({});
+
+      // Execute sweep
+      await service['sweepStripeRollbackFailures']();
+
+      // Verify cancelPaymentIntent was retried
+      expect(stripe.cancelPaymentIntent).toHaveBeenCalledWith('pi-unrollable-immediate');
+
+      // Verify audit log record was updated to resolved status
+      expect(prisma.auditLog.update).toHaveBeenCalledWith({
+        where: { id: 'audit-log-123' },
+        data: { action: 'resolved_failed_stripe_rollback' },
+      });
     });
   });
 });

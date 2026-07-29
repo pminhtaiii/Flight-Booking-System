@@ -10,7 +10,10 @@ import {
   HttpStatus,
   HttpException,
   Optional,
+  OnModuleInit,
 } from '@nestjs/common';
+import * as fs from 'fs';
+import * as path from 'path';
 import { PrismaService } from '@/prisma/prisma.service';
 import { StripeService } from '@/common/stripe.service';
 import { PaymentIdempotencyService } from '@/payment/payment-idempotency.service';
@@ -199,7 +202,7 @@ function redactDuffelOrder(duffelOrder: any): any {
 }
 
 @Injectable()
-export class PaymentService {
+export class PaymentService implements OnModuleInit {
   private readonly logger = new Logger(PaymentService.name);
 
   constructor(
@@ -215,6 +218,175 @@ export class PaymentService {
     private readonly ancillaryPaymentValidation?: AncillaryPaymentValidationService,
   ) {}
 
+  async onModuleInit() {
+    this.sweepStripeRollbackFailures().catch((err) => {
+      this.logger.error(`Failed to run startup Stripe rollback sweep: ${err.message}`);
+    });
+  }
+
+  private async logStripeRollbackFailure(
+    paymentIntentId: string,
+    idempotencyKey: string,
+    reason: string,
+    userId?: string,
+  ) {
+    try {
+      await this.prisma.auditLog.create({
+        data: {
+          userId: userId || null,
+          action: 'failed_stripe_rollback',
+          resourceType: 'PaymentIntent',
+          resourceId: paymentIntentId,
+          metadata: {
+            idempotencyKey,
+            reason,
+          },
+          traceId: '',
+          correlationId: '',
+        },
+      });
+      this.logger.error(`CRITICAL: Logged failed Stripe rollback to database: ${paymentIntentId}`);
+    } catch (dbError: any) {
+      this.logger.error(
+        `CRITICAL FAILURE: Could not write to fallback database AuditLog: ${dbError.message}. Stripe PaymentIntent: ${paymentIntentId}, IdempotencyKey: ${idempotencyKey}`,
+        dbError.stack,
+      );
+    }
+  }
+
+  private async sweepStripeRollbackFailures() {
+    try {
+      const pendingRollbacks = await this.prisma.auditLog.findMany({
+        where: { action: 'failed_stripe_rollback' },
+      });
+
+      for (const rollback of pendingRollbacks) {
+        const metadata = rollback.metadata as any || {};
+        const piId = rollback.resourceId;
+        const ikey = metadata.idempotencyKey;
+
+        if (piId) {
+          this.logger.log(`Startup sweep: Attempting to cancel dangling Stripe PaymentIntent ${piId}...`);
+          try {
+            await this.stripeService.cancelPaymentIntent(piId);
+            this.logger.log(`Startup sweep: Successfully cancelled dangling PaymentIntent ${piId}`);
+
+            // Mark as resolved in audit logs
+            await this.prisma.auditLog.update({
+              where: { id: rollback.id },
+              data: { action: 'resolved_failed_stripe_rollback' },
+            });
+
+            // Try to clear from DB idempotency key if possible
+            if (ikey) {
+              try {
+                const keyRecord = await this.prisma.idempotencyKey.findUnique({
+                  where: { key: ikey },
+                });
+                if (keyRecord) {
+                  const updatedParams = { ...(keyRecord.requestParams as any || {}) };
+                  delete updatedParams.backupPaymentIntentId;
+                  await this.prisma.idempotencyKey.update({
+                    where: { key: ikey },
+                    data: { requestParams: updatedParams },
+                  });
+                }
+              } catch (dbErr: any) {
+                // Ignore DB error
+              }
+            }
+          } catch (stripeErr: any) {
+            this.logger.error(`Startup sweep: Failed to cancel dangling PaymentIntent ${piId}: ${stripeErr.message}`);
+          }
+        }
+      }
+    } catch (err: any) {
+      this.logger.error(`Failed to sweep Stripe rollback failures: ${err.message}`, err.stack);
+    }
+  }
+
+  private async enrichPassengerSnapshot(
+    bookingIntentId: string,
+    passengerSnapshot: PassengerSnapshot,
+  ): Promise<PassengerSnapshot> {
+    if (!passengerSnapshot || !Array.isArray(passengerSnapshot.passengers)) {
+      return passengerSnapshot;
+    }
+    if (!this.prisma.bookingIntentPassenger) {
+      return passengerSnapshot;
+    }
+    const passengers = await this.prisma.bookingIntentPassenger.findMany({
+      where: { intentId: bookingIntentId },
+      orderBy: { position: 'asc' },
+    });
+
+    const intent = await this.prisma.bookingIntent.findUnique({
+      where: { id: bookingIntentId },
+      select: { userId: true },
+    });
+
+    let contactEmail = passengerSnapshot.contactEmail;
+    if (intent?.userId) {
+      const user = await this.prisma.user.findUnique({
+        where: { id: intent.userId },
+        select: { email: true },
+      });
+      if (user?.email) {
+        contactEmail = user.email;
+      }
+    }
+
+    let contactPhone = passengerSnapshot.contactPhone;
+    const payment = await this.prisma.payment.findFirst({
+      where: { bookingIntentId },
+      include: { booking: true },
+    });
+    let duffelOrderId = payment?.booking?.duffelOrderId;
+    if (!duffelOrderId && payment?.id) {
+      const duffelEvent = await this.prisma.paymentEvent.findFirst({
+        where: {
+          paymentId: payment.id,
+          eventType: 'duffel_order_created',
+        },
+        orderBy: { createdAt: 'desc' },
+      });
+      const dOrder = duffelEvent?.metadata as any;
+      duffelOrderId = dOrder?.id;
+    }
+    if (duffelOrderId && !contactPhone) {
+      try {
+        const liveOrder = await this.duffelService.retrieveCompleteOrder(duffelOrderId);
+        if (liveOrder?.passengers?.[0]?.phone_number) {
+          contactPhone = liveOrder.passengers[0].phone_number;
+        }
+      } catch (err: any) {
+        this.logger.warn(`Failed to retrieve phone number from Duffel for order ${duffelOrderId}: ${err.message}`);
+      }
+    }
+
+    const enrichedPassengers = passengerSnapshot.passengers.map((p, index) => {
+      const original = passengers[index];
+      if (!original) {
+        return p;
+      }
+      return {
+        ...p,
+        firstName: original.givenName || p.firstName,
+        lastName: original.familyName || p.lastName,
+        dateOfBirth: original.dateOfBirth
+          ? original.dateOfBirth.toISOString().split('T')[0]
+          : p.dateOfBirth,
+      };
+    });
+
+    return {
+      ...passengerSnapshot,
+      passengers: enrichedPassengers,
+      contactEmail,
+      contactPhone,
+    };
+  }
+
   /**
    * Core Payment Pipeline: Create & Authorize
    */
@@ -224,6 +396,7 @@ export class PaymentService {
     userId: string,
     ipAddress: string,
   ): Promise<PaymentResponseDto> {
+    let paymentIntentIdToRollback: string | undefined;
     try {
       const requestHash = this.idempotencyService.computeHash(dto);
       const requestPath = '/api/bookings/payment/create';
@@ -317,6 +490,59 @@ export class PaymentService {
         return JSON.parse(idempotency.responseBody);
       }
 
+      // Check if a Payment record was already created for this idempotency key
+      const existingPayment = await this.prisma.payment.findFirst({
+        where: {
+          idempotencyKey: {
+            key: idempotencyKey,
+          },
+        },
+      });
+
+      if (existingPayment) {
+        this.logger.log(`Found existing Payment record ${existingPayment.id} for idempotency key ${idempotencyKey}. Replaying success response.`);
+        let clientSecret = '';
+        try {
+          const pi = await this.stripeService.retrievePaymentIntent(existingPayment.stripePaymentIntentId);
+          clientSecret = pi.client_secret || '';
+        } catch (err: any) {
+          this.logger.error(`Failed to retrieve client_secret for existing PaymentIntent ${existingPayment.stripePaymentIntentId}: ${err.message}`);
+        }
+
+        const responseBody = {
+          paymentId: existingPayment.id,
+          clientSecret,
+          status: existingPayment.status,
+        };
+
+        await this.idempotencyService.completeKey(idempotencyKey, HttpStatus.CREATED, responseBody);
+        return responseBody;
+      }
+
+      const keyRecord = await this.prisma.idempotencyKey.findUnique({
+        where: { key: idempotencyKey },
+      });
+      const requestParams = keyRecord?.requestParams as any;
+      if (requestParams?.backupPaymentIntentId) {
+        const failedId = requestParams.backupPaymentIntentId;
+        this.logger.warn(`Found backup PaymentIntent ${failedId} on idempotency key ${idempotencyKey}. Attempting retry cancellation...`);
+        try {
+          await this.stripeService.cancelPaymentIntent(failedId);
+          this.logger.log(`Successfully completed deferred rollback of backup PaymentIntent ${failedId}`);
+
+          // Clear it
+          const updatedParams = { ...requestParams };
+          delete updatedParams.backupPaymentIntentId;
+          await this.prisma.idempotencyKey.update({
+            where: { key: idempotencyKey },
+            data: { requestParams: updatedParams },
+          });
+        } catch (cancelError: any) {
+          this.logger.error(`Deferred rollback of backup PaymentIntent ${failedId} failed again: ${cancelError.message}`, cancelError.stack);
+          throw new ConflictException(`Deferred rollback of previous PaymentIntent ${failedId} failed. Please try again later.`);
+        }
+      }
+
       if (recoveredReservation) {
         const acquiredKey = await this.prisma.idempotencyKey.findUnique({
           where: { key: idempotencyKey },
@@ -390,7 +616,8 @@ export class PaymentService {
         if (
           (validatedAncillary &&
             intent.status !== 'PENDING' &&
-            !(recoveredReservation && intent.status === 'AWAITING_PAYMENT')) ||
+            !(recoveredReservation && intent.status === 'AWAITING_PAYMENT') &&
+            !(reuseAttemptNumber !== undefined && intent.status === 'AWAITING_PAYMENT')) ||
           (!validatedAncillary &&
             intent.status !== 'PENDING' &&
             intent.status !== 'AWAITING_PAYMENT')
@@ -415,7 +642,7 @@ export class PaymentService {
           };
         }
 
-        if (!recoveredReservation && intent.paymentAttemptCount >= 2) {
+        if (!recoveredReservation && reuseAttemptNumber === undefined && intent.paymentAttemptCount >= 2) {
           throw new BadRequestException('Payment attempts exhausted');
         }
 
@@ -599,6 +826,32 @@ export class PaymentService {
         dto.paymentMethodId,
         dto.saveCard ? 'off_session' : undefined,
       );
+      paymentIntentIdToRollback = paymentIntent.id;
+
+      // Save Stripe PaymentIntent ID immediately to idempotency key as a backup before proceeding to Step 5
+      try {
+        const keyRecord = await this.prisma.idempotencyKey.findUnique({
+          where: { key: idempotencyKey },
+        });
+        await this.prisma.idempotencyKey.update({
+          where: { key: idempotencyKey },
+          data: {
+            requestParams: {
+              ...(keyRecord?.requestParams as any || {}),
+              backupPaymentIntentId: paymentIntent.id,
+            },
+          },
+        });
+      } catch (dbError: any) {
+        this.logger.error(`Critical: Failed to durably save backupPaymentIntentId to idempotency key: ${dbError.message}. Attempting immediate Stripe rollback.`, dbError.stack);
+        try {
+          await this.stripeService.cancelPaymentIntent(paymentIntent.id);
+        } catch (stripeCancelError: any) {
+          this.logger.error(`Failed to cancel Stripe PaymentIntent ${paymentIntent.id} during immediate database save rollback: ${stripeCancelError.message}`);
+          await this.logStripeRollbackFailure(paymentIntent.id, idempotencyKey, `Immediate save rollback failed: ${stripeCancelError.message}`, userId);
+        }
+        throw new InternalServerErrorException('System error occurred during payment processing. Please try again.');
+      }
 
       // 5. Create Payment record in DB
       let payment;
@@ -778,6 +1031,23 @@ export class PaymentService {
         });
       }
 
+      // Clear backupPaymentIntentId from idempotency key requestParams since it is now durably stored in the Payment table
+      try {
+        const keyRecord = await this.prisma.idempotencyKey.findUnique({
+          where: { key: idempotencyKey },
+        });
+        const updatedParams = { ...(keyRecord?.requestParams as any || {}) };
+        delete updatedParams.backupPaymentIntentId;
+        await this.prisma.idempotencyKey.update({
+          where: { key: idempotencyKey },
+          data: { requestParams: updatedParams },
+        });
+      } catch (dbClearError: any) {
+        this.logger.error(`Failed to clear backupPaymentIntentId: ${dbClearError.message}`);
+      }
+
+      paymentIntentIdToRollback = undefined;
+
       // 7. Update recovery point and complete idempotency key
       await this.idempotencyService.updateRecoveryPoint(idempotencyKey, 'started');
 
@@ -791,6 +1061,31 @@ export class PaymentService {
 
       return responseBody;
     } catch (error) {
+      if (paymentIntentIdToRollback) {
+        try {
+          await this.stripeService.cancelPaymentIntent(paymentIntentIdToRollback);
+          this.logger.warn(`Successfully rolled back/cancelled Stripe PaymentIntent ${paymentIntentIdToRollback} after database transaction failure`);
+
+          // Clear backupPaymentIntentId since rollback succeeded
+          try {
+            const keyRecord = await this.prisma.idempotencyKey.findUnique({
+              where: { key: idempotencyKey },
+            });
+            const updatedParams = { ...(keyRecord?.requestParams as any || {}) };
+            delete updatedParams.backupPaymentIntentId;
+            await this.prisma.idempotencyKey.update({
+              where: { key: idempotencyKey },
+              data: { requestParams: updatedParams },
+            });
+          } catch (dbClearError: any) {
+            this.logger.error(`Failed to clear backupPaymentIntentId: ${dbClearError.message}`);
+          }
+        } catch (stripeError: any) {
+          this.logger.error(`Failed to rollback Stripe PaymentIntent ${paymentIntentIdToRollback}: ${stripeError.message}`, stripeError.stack);
+          // Keep backupPaymentIntentId in the idempotency key so we can retry/recover it later
+          await this.logStripeRollbackFailure(paymentIntentIdToRollback, idempotencyKey, `Transaction rollback failed: ${stripeError.message}`, userId);
+        }
+      }
       this.logger.error(`Error in createPayment: ${error instanceof Error ? error.message : String(error)}`, error instanceof Error ? error.stack : undefined);
       throw error;
     }
@@ -1245,7 +1540,7 @@ export class PaymentService {
             if (dOrder) {
               const snaps = this.duffelService.mapDuffelOrderToSnapshots(dOrder);
               flightSnap = snaps.flightSnapshot;
-              passSnap = snaps.passengerSnapshot;
+              passSnap = await this.enrichPassengerSnapshot(payment.bookingIntentId, snaps.passengerSnapshot);
               if (flightSnap?.segments?.[0]?.departureAt) {
                 departAt = new Date(flightSnap.segments[0].departureAt);
               }
@@ -1348,7 +1643,8 @@ export class PaymentService {
               data: { status: 'CONFIRMED' },
             });
 
-            const { flightSnapshot, passengerSnapshot } = this.duffelService.mapDuffelOrderToSnapshots(duffelOrder);
+            const { flightSnapshot, passengerSnapshot: rawPassengerSnapshot } = this.duffelService.mapDuffelOrderToSnapshots(duffelOrder);
+            const passengerSnapshot = await this.enrichPassengerSnapshot(payment.bookingIntentId, rawPassengerSnapshot);
             await this.bookingService.updateToConfirmed(
               canonicalBooking.id,
               duffelOrder.booking_reference as string,
@@ -1590,7 +1886,7 @@ export class PaymentService {
             if (dOrder) {
               const snaps = this.duffelService.mapDuffelOrderToSnapshots(dOrder);
               flightSnap = snaps.flightSnapshot;
-              passSnap = snaps.passengerSnapshot;
+              passSnap = await this.enrichPassengerSnapshot(payment.bookingIntentId, snaps.passengerSnapshot);
               if (flightSnap?.segments?.[0]?.departureAt) {
                 departAt = new Date(flightSnap.segments[0].departureAt);
               }

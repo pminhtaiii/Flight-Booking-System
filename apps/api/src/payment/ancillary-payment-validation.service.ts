@@ -226,7 +226,7 @@ export class AncillaryPaymentValidationService {
           id: input.bookingIntentId,
           currentAncillarySelectionId: input.ancillarySelectionId,
           ancillaryVersion: input.ancillarySelectionVersion,
-          status: 'PENDING',
+          status: { in: ['PENDING', 'AWAITING_PAYMENT'] },
           intentExpiresAt: { gt: now },
           currency: pricing.currency,
           OR: [
@@ -283,7 +283,7 @@ export class AncillaryPaymentValidationService {
           id: input.bookingIntentId,
           currentAncillarySelectionId: input.ancillarySelectionId,
           ancillaryVersion: input.ancillarySelectionVersion,
-          status: 'PENDING',
+          status: { in: ['PENDING', 'AWAITING_PAYMENT'] },
           intentExpiresAt: { gt: now },
           OR: [
             { offerExpiresAt: null },
@@ -337,7 +337,7 @@ export class AncillaryPaymentValidationService {
     if (intent.offerExpiresAt && intent.offerExpiresAt <= now) {
       throw new GoneException({ code: 'OFFER_EXPIRED' });
     }
-    if (intent.status !== 'PENDING') {
+    if (intent.status !== 'PENDING' && intent.status !== 'AWAITING_PAYMENT') {
       throw new ConflictException({
         code: 'ANCILLARY_SELECTION_STALE',
         intentId: input.bookingIntentId,
