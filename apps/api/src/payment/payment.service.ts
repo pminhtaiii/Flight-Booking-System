@@ -63,6 +63,27 @@ function authoritativeAmountsEqual(
   }
 }
 
+function canonicalOrderServices(selection: {
+  seatSelections: Array<{ serviceId: string }>;
+  baggageSelections: Array<{ serviceId: string; quantity: number }>;
+}): Array<{ id: string; quantity: number }> {
+  const quantities = new Map<string, number>();
+
+  for (const seat of selection.seatSelections) {
+    quantities.set(seat.serviceId, (quantities.get(seat.serviceId) ?? 0) + 1);
+  }
+  for (const baggage of selection.baggageSelections) {
+    quantities.set(
+      baggage.serviceId,
+      (quantities.get(baggage.serviceId) ?? 0) + baggage.quantity,
+    );
+  }
+
+  return [...quantities.entries()]
+    .sort(([left], [right]) => left.localeCompare(right))
+    .map(([id, quantity]) => ({ id, quantity }));
+}
+
 type PaymentReservation = {
   bookingIntentId: string;
   ancillarySelectionId: string;
@@ -753,7 +774,15 @@ export class PaymentService {
       // 2. Query payment
       let payment = await this.prisma.payment.findUnique({
         where: { id: dto.paymentId },
-        include: { bookingIntent: true },
+        include: {
+          bookingIntent: true,
+          ancillarySelection: {
+            include: {
+              seatSelections: true,
+              baggageSelections: true,
+            },
+          },
+        },
       });
 
       if (!payment) {
@@ -894,9 +923,47 @@ export class PaymentService {
 
         let duffelOrder: unknown;
         try {
+          const recheckedPayment = await this.prisma.payment.findUnique({
+            where: { id: payment.id },
+            include: {
+              bookingIntent: true,
+              ancillarySelection: {
+                include: {
+                  seatSelections: true,
+                  baggageSelections: true,
+                },
+              },
+            },
+          });
+          if (!recheckedPayment) {
+            throw new InternalServerErrorException(
+              'Payment-bound ancillary selection could not be recovered',
+            );
+          }
+          const orderPayment = recheckedPayment;
+          const hasAncillaryBinding = payment.ancillarySelectionId !== null;
+          const hasExactBoundSelection =
+            orderPayment.ancillarySelectionId === payment.ancillarySelectionId &&
+            orderPayment.ancillarySelectionVersion ===
+              payment.ancillarySelectionVersion &&
+            (hasAncillaryBinding
+              ? orderPayment.ancillarySelection?.id ===
+                  payment.ancillarySelectionId &&
+                orderPayment.ancillarySelection.version ===
+                  payment.ancillarySelectionVersion &&
+                orderPayment.ancillarySelection.status === 'PAYMENT_BOUND'
+              : orderPayment.ancillarySelection === null);
+          if (!hasExactBoundSelection) {
+            throw new InternalServerErrorException(
+              'Payment-bound ancillary selection could not be recovered',
+            );
+          }
           duffelOrder = await this.duffelService.createOrder(
             bookingIntent.duffelOfferId,
             bookingIntent.passengers,
+            orderPayment.ancillarySelection
+              ? canonicalOrderServices(orderPayment.ancillarySelection)
+              : [],
             { bookingIntentId: bookingIntent.id, paymentId: payment.id },
             idempotencyKey,
           );
@@ -1273,6 +1340,14 @@ export class PaymentService {
     try {
       const payment = await this.prisma.payment.findUnique({
         where: { id: paymentId },
+        include: {
+          ancillarySelection: {
+            include: {
+              seatSelections: true,
+              baggageSelections: true,
+            },
+          },
+        },
       });
 
       if (!payment || payment.status === 'SUCCEEDED' || payment.status === 'CANCELLED' || payment.status === 'FAILED' || payment.status === 'EXPIRED') {

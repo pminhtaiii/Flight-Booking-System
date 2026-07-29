@@ -13,6 +13,14 @@ describe('PaymentService ancillary validation boundary', () => {
   it('rejects a stale selection version before acquiring idempotency or consuming payment side effects', async () => {
     const prisma = {
       $transaction: jest.fn(),
+      idempotencyKey: {
+        findUnique: jest.fn().mockResolvedValue({
+          requestHash: 'different-request-hash',
+          customerId: 'user-1',
+          requestPath: '/api/bookings/payment/create',
+          requestParams: null,
+        }),
+      },
     };
     const stripe = {
       createCustomer: jest.fn(),
