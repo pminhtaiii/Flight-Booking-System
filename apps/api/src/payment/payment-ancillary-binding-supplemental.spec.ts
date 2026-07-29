@@ -255,7 +255,7 @@ describe('PaymentService ancillary snapshot binding supplemental coverage', () =
       data: expect.objectContaining({ metadata: expectedMetadata }),
     });
     expect(fixture.audit.createLog).toHaveBeenCalledWith(
-      fixture.prisma,
+      expect.any(Object),
       expect.objectContaining({
         metadata: { ...expectedMetadata, amount: 12345, attemptNumber: 1 },
       }),

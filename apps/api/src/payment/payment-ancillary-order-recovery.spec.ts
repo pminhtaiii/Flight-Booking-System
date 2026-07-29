@@ -233,6 +233,57 @@ describe('PaymentService ancillary order recovery', () => {
     expect(harness.booking.updateToFailed).toHaveBeenCalledTimes(1);
   });
 
+  it('recovers when capture times out after Stripe authoritatively reports success', async () => {
+    const harness = buildHarness({
+      recoveryPoint: 'duffel_order_created',
+      captureError: new Error('capture request timed out'),
+    });
+    harness.stripe.retrievePaymentIntent.mockResolvedValue({ status: 'succeeded' });
+
+    await expect(
+      harness.service.executeConfirmPayment(
+        { paymentId: 'payment-1', bookingId: 'booking-1' },
+        'confirm-key-1',
+        'user-1',
+      ),
+    ).resolves.toMatchObject({ success: true, duffelOrderId: 'order-1' });
+
+    expect(harness.stripe.capturePaymentIntent).toHaveBeenCalledWith(
+      'pi-1',
+      undefined,
+      'confirm-key-1-stripe-capture',
+    );
+    expect(harness.stripe.retrievePaymentIntent).toHaveBeenCalledWith('pi-1');
+    expect(harness.duffel.cancelOrder).not.toHaveBeenCalled();
+    expect(harness.stripe.cancelPaymentIntent).not.toHaveBeenCalled();
+    expect(harness.booking.updateToFailed).not.toHaveBeenCalled();
+  });
+
+  it('keeps the supplier order and payment recoverable when Stripe capture reconciliation is unavailable', async () => {
+    const harness = buildHarness({
+      recoveryPoint: 'duffel_order_created',
+      captureError: new Error('capture request timed out'),
+    });
+    harness.stripe.retrievePaymentIntent.mockRejectedValue(
+      new Error('Stripe retrieval outage'),
+    );
+
+    await expect(
+      harness.service.executeConfirmPayment(
+        { paymentId: 'payment-1', bookingId: 'booking-1' },
+        'confirm-key-1',
+        'user-1',
+      ),
+    ).rejects.toMatchObject({ status: 502 });
+
+    expect(harness.duffel.cancelOrder).not.toHaveBeenCalled();
+    expect(harness.stripe.cancelPaymentIntent).not.toHaveBeenCalled();
+    expect(harness.booking.updateToFailed).not.toHaveBeenCalled();
+    expect(harness.prisma.payment.update).not.toHaveBeenCalled();
+    expect(harness.idempotency.updateRecoveryPoint).not.toHaveBeenCalled();
+    expect(harness.idempotency.completeKey).not.toHaveBeenCalled();
+  });
+
   it.each([
     {
       checkpoint: 'started',

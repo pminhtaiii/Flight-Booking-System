@@ -360,7 +360,7 @@ describe('PaymentService - recoveryPoint === completed', () => {
       );
     });
 
-    it('when Stripe retrieval fails (throws), it logs the error but still proceeds with compensation', async () => {
+    it('when Stripe retrieval fails (throws), it logs the error and returns early (recoverable)', async () => {
       // Setup payment
       mockPrisma.payment.findUnique.mockResolvedValueOnce({
         id: paymentId,
@@ -373,21 +373,12 @@ describe('PaymentService - recoveryPoint === completed', () => {
       // Stripe retrieve throws
       mockStripe.retrievePaymentIntent.mockRejectedValueOnce(new Error('Stripe API error'));
 
-      // Resume point is null
-      mockIdempotency.getResumePoint.mockResolvedValueOnce(null);
-
-      mockPrisma.paymentEvent.findFirst.mockResolvedValueOnce(null);
-      mockPrisma.bookingIntent.findUnique.mockResolvedValueOnce({
-        id: 'intent-123',
-        paymentAttemptCount: 1,
-      });
-
       // Call handleBackgroundError
       await (service as any).handleBackgroundError(paymentId, idempotencyKey, userId, error);
 
-      // Verify compensation methods are called
-      expect(mockStripe.cancelPaymentIntent).toHaveBeenCalledWith('pi_123');
-      expect(mockPrisma.payment.update).toHaveBeenCalled();
+      // Verify compensation methods are NOT called and return is early/recoverable
+      expect(mockStripe.cancelPaymentIntent).not.toHaveBeenCalled();
+      expect(mockPrisma.payment.update).not.toHaveBeenCalled();
     });
   });
 

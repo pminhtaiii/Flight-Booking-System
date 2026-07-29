@@ -5,6 +5,7 @@ import {
   BadRequestException,
   ForbiddenException,
   ConflictException,
+  GoneException,
   InternalServerErrorException,
   HttpStatus,
   HttpException,
@@ -92,6 +93,9 @@ type PaymentReservation = {
   amount: number;
   currency: string;
   validatedAncillary: ValidatedAncillaryPayment;
+  intentExpiresAt: string;
+  offerExpiresAt: string | null;
+  validatedAt: string;
 };
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -127,6 +131,9 @@ function readPaymentReservation(
     typeof reservation.attemptNumber !== 'number' ||
     typeof reservation.amount !== 'number' ||
     typeof reservation.currency !== 'string' ||
+    typeof reservation.intentExpiresAt !== 'string' ||
+    (reservation.offerExpiresAt !== null && typeof reservation.offerExpiresAt !== 'string') ||
+    typeof reservation.validatedAt !== 'string' ||
     !isRecord(validated) ||
     typeof validated.selectionId !== 'string' ||
     validated.selectionId !== dto.ancillarySelectionId ||
@@ -148,6 +155,9 @@ function readPaymentReservation(
     attemptNumber: reservation.attemptNumber,
     amount: reservation.amount,
     currency: reservation.currency,
+    intentExpiresAt: reservation.intentExpiresAt,
+    offerExpiresAt: reservation.offerExpiresAt,
+    validatedAt: reservation.validatedAt,
     validatedAncillary: {
       selectionId: validated.selectionId,
       selectionVersion: validated.selectionVersion,
@@ -160,6 +170,32 @@ function readPaymentReservation(
       })),
     },
   };
+}
+
+function redactDuffelOrder(duffelOrder: any): any {
+  if (!duffelOrder || typeof duffelOrder !== 'object') {
+    return duffelOrder;
+  }
+  const cloned = JSON.parse(JSON.stringify(duffelOrder));
+  const redactObject = (obj: any) => {
+    if (!obj || typeof obj !== 'object') return;
+    if (Array.isArray(obj)) {
+      obj.forEach(redactObject);
+      return;
+    }
+    for (const key of Object.keys(obj)) {
+      if (key === 'email') obj[key] = null;
+      else if (key === 'phone_number') obj[key] = null;
+      else if (key === 'born_on') obj[key] = null;
+      else if (key === 'given_name') obj[key] = 'REDACTED';
+      else if (key === 'family_name') obj[key] = 'REDACTED';
+      else if (typeof obj[key] === 'object') {
+        redactObject(obj[key]);
+      }
+    }
+  };
+  redactObject(cloned);
+  return cloned;
 }
 
 @Injectable()
@@ -193,6 +229,7 @@ export class PaymentService {
       const requestPath = '/api/bookings/payment/create';
       let validatedAncillary: ValidatedAncillaryPayment | undefined;
       let recoveredReservation: PaymentReservation | undefined;
+      let reuseAttemptNumber: number | undefined;
       let boundPaymentReplay = false;
       if (
         dto.ancillarySelectionId !== undefined ||
@@ -241,6 +278,21 @@ export class PaymentService {
             existingKey.requestPath === requestPath
           ) {
             recoveredReservation = readPaymentReservation(existingKey.requestParams, dto);
+          }
+          if (recoveredReservation) {
+            const nowTime = Date.now();
+            const validatedTime = new Date(recoveredReservation.validatedAt).getTime();
+            const intentExpiresTime = new Date(recoveredReservation.intentExpiresAt).getTime();
+            const offerExpiresTime = recoveredReservation.offerExpiresAt ? new Date(recoveredReservation.offerExpiresAt).getTime() : null;
+
+            const isStale = (nowTime - validatedTime > 60_000) ||
+                            (intentExpiresTime <= nowTime) ||
+                            (offerExpiresTime !== null && offerExpiresTime <= nowTime);
+
+            if (isStale) {
+              reuseAttemptNumber = recoveredReservation.attemptNumber;
+              recoveredReservation = undefined;
+            }
           }
           if (!recoveredReservation) {
             validatedAncillary = await this.ancillaryPaymentValidation.validateForPayment({
@@ -294,11 +346,13 @@ export class PaymentService {
           userId: string;
           currentAncillarySelectionId: string | null;
           ancillaryVersion: number;
+          intentExpiresAt: Date;
+          offerExpiresAt: Date | null;
         }
 
         const intents = await tx.$queryRaw<RawBookingIntent[]>`
           SELECT id, status, "paymentAttemptCount", "confirmedPrice", currency, "userId",
-                 "currentAncillarySelectionId", "ancillaryVersion"
+                 "currentAncillarySelectionId", "ancillaryVersion", "intentExpiresAt", "offerExpiresAt"
           FROM booking_intents
           WHERE id = ${dto.bookingIntentId}
           FOR UPDATE
@@ -311,6 +365,26 @@ export class PaymentService {
         const intent = intents[0];
         if (intent.userId !== userId) {
           throw new ForbiddenException('You do not own this booking intent');
+        }
+
+        const now = new Date();
+        if (intent.intentExpiresAt && new Date(intent.intentExpiresAt) <= now) {
+          throw new GoneException('Booking intent has expired');
+        }
+        if (intent.offerExpiresAt && new Date(intent.offerExpiresAt) <= now) {
+          throw new GoneException('Offer has expired');
+        }
+
+        if (!dto.ancillarySelectionId && intent.currentAncillarySelectionId) {
+          const seatCount = await tx.seatSelection.count({
+            where: { ancillarySelectionId: intent.currentAncillarySelectionId },
+          });
+          const baggageCount = await tx.baggageSelection.count({
+            where: { ancillarySelectionId: intent.currentAncillarySelectionId },
+          });
+          if (seatCount > 0 || baggageCount > 0) {
+            throw new BadRequestException('Ancillary selections exist but were not included in the payment request');
+          }
         }
 
         if (
@@ -346,7 +420,7 @@ export class PaymentService {
         }
 
         const nextAttemptCount =
-          recoveredReservation?.attemptNumber ?? intent.paymentAttemptCount + 1;
+          recoveredReservation?.attemptNumber ?? reuseAttemptNumber ?? intent.paymentAttemptCount + 1;
         const amount =
           recoveredReservation?.amount ??
           (validatedAncillary
@@ -379,10 +453,11 @@ export class PaymentService {
             validatedGrandTotal: Prisma.Decimal | string | null;
             validationLeaseToken: string | null;
             validationLeaseExpiresAt: Date | null;
+            validatedAt: Date | null;
           }
           const selections = await tx.$queryRaw<RawAncillarySelection[]>`
             SELECT id, status, currency, "validatedBaseAmount", "validatedGrandTotal",
-                   "validationLeaseToken", "validationLeaseExpiresAt"
+                   "validationLeaseToken", "validationLeaseExpiresAt", "validatedAt"
             FROM ancillary_selections
             WHERE id = ${validatedAncillary.selectionId}
               AND "bookingIntentId" = ${dto.bookingIntentId}
@@ -411,10 +486,8 @@ export class PaymentService {
               currentVersion: intent.ancillaryVersion,
             });
           }
-        }
 
-        if (!recoveredReservation) {
-          if (validatedAncillary) {
+          if (!recoveredReservation) {
             const reservation: PaymentReservation = {
               bookingIntentId: dto.bookingIntentId,
               ancillarySelectionId: validatedAncillary.selectionId,
@@ -423,6 +496,9 @@ export class PaymentService {
               amount,
               currency,
               validatedAncillary,
+              intentExpiresAt: intent.intentExpiresAt ? new Date(intent.intentExpiresAt).toISOString() : new Date(Date.now() + 600000).toISOString(),
+              offerExpiresAt: intent.offerExpiresAt ? new Date(intent.offerExpiresAt).toISOString() : null,
+              validatedAt: selection.validatedAt ? new Date(selection.validatedAt).toISOString() : new Date().toISOString(),
             };
             const reserved = await tx.$executeRaw`
               WITH reserved_key AS (
@@ -446,7 +522,9 @@ export class PaymentService {
             if (reserved !== 1) {
               throw new ConflictException('Payment reservation ownership was lost');
             }
-          } else {
+          }
+        } else {
+          if (!recoveredReservation) {
             await tx.$executeRaw`
               UPDATE booking_intents
               SET "paymentAttemptCount" = ${nextAttemptCount}, status = 'AWAITING_PAYMENT'
@@ -524,9 +602,8 @@ export class PaymentService {
 
       // 5. Create Payment record in DB
       let payment;
-      let createdPayment = false;
       if (validatedAncillary) {
-        const binding = await this.prisma.$transaction(async (tx) => {
+        payment = await this.prisma.$transaction(async (tx) => {
           await tx.$queryRaw`
             SELECT id
             FROM booking_intents
@@ -539,7 +616,7 @@ export class PaymentService {
             },
           });
           if (existingPayment) {
-            return { payment: existingPayment, created: false };
+            return existingPayment;
           }
 
           const bound = await tx.ancillarySelection.updateMany({
@@ -584,29 +661,81 @@ export class PaymentService {
               status: 'CREATED',
             },
           });
-          return { payment: created, created: true };
+
+          const eventTx = tx.paymentEvent ? tx : this.prisma;
+          await eventTx.paymentEvent.create({
+            data: {
+              paymentId: created.id,
+              eventType: 'payment_created',
+              previousStatus: 'CREATED',
+              newStatus: 'CREATED',
+              amount: amountInCents,
+              source: 'API',
+              createdBy: userId,
+              metadata: {
+                bookingIntentId: dto.bookingIntentId,
+                ancillarySelectionId: validatedAncillary.selectionId,
+                ancillarySelectionVersion: validatedAncillary.selectionVersion,
+                serviceCount: validatedAncillary.services.length,
+                serviceQuantity: validatedAncillary.services.reduce(
+                  (total, service) => total + service.quantity,
+                  0,
+                ),
+                baseAmount: validatedAncillary.baseAmount,
+                grandTotal: validatedAncillary.grandTotal,
+                currency: validatedAncillary.currency,
+              },
+            },
+          });
+
+          await this.auditService.createLog(tx, {
+            userId,
+            action: 'payment_created',
+            resourceType: 'Payment',
+            resourceId: created.id,
+            ipAddress,
+            metadata: {
+              bookingIntentId: dto.bookingIntentId,
+              amount: amountInCents,
+              attemptNumber: result.attemptNumber,
+              ancillarySelectionId: validatedAncillary.selectionId,
+              ancillarySelectionVersion: validatedAncillary.selectionVersion,
+              serviceCount: validatedAncillary.services.length,
+              serviceQuantity: validatedAncillary.services.reduce(
+                (total, service) => total + service.quantity,
+                0,
+              ),
+              baseAmount: validatedAncillary.baseAmount,
+              grandTotal: validatedAncillary.grandTotal,
+              currency: validatedAncillary.currency,
+            },
+          });
+
+          return created;
         });
-        payment = binding.payment;
-        createdPayment = binding.created;
       } else if ('payment' in result && result.payment) {
         payment = result.payment;
       } else {
-        const keyRecord = await this.prisma.idempotencyKey.findUnique({
-          where: { key: idempotencyKey },
-          select: { id: true },
-        });
-        if (!keyRecord) {
-          throw new InternalServerErrorException('Idempotency key record not found');
-        }
+        payment = await this.prisma.$transaction(async (tx) => {
+          const keyRecord = await tx.idempotencyKey.findUnique({
+            where: { key: idempotencyKey },
+            select: { id: true },
+          });
+          if (!keyRecord) {
+            throw new InternalServerErrorException('Idempotency key record not found');
+          }
 
-        payment = await this.prisma.payment.findFirst({
-          where: {
-            idempotencyKeyId: keyRecord.id,
-          },
-        });
+          const existingPayment = await tx.payment.findFirst({
+            where: {
+              idempotencyKeyId: keyRecord.id,
+            },
+          });
 
-        if (!payment) {
-          payment = await this.prisma.payment.create({
+          if (existingPayment) {
+            return existingPayment;
+          }
+
+          const created = await tx.payment.create({
             data: {
               bookingIntentId: dto.bookingIntentId,
               attemptNumber: result.attemptNumber,
@@ -618,64 +747,34 @@ export class PaymentService {
               status: 'CREATED',
             },
           });
-          createdPayment = true;
-        }
-      }
 
-      // 6. Log event and audit
-      if (createdPayment) {
-        await this.prisma.paymentEvent.create({
-          data: {
-            paymentId: payment.id,
-            eventType: 'payment_created',
-            previousStatus: 'CREATED',
-            newStatus: 'CREATED',
-            amount: amountInCents,
-            source: 'API',
-            createdBy: userId,
-            metadata: validatedAncillary
-              ? {
-                  bookingIntentId: dto.bookingIntentId,
-                  ancillarySelectionId: validatedAncillary.selectionId,
-                  ancillarySelectionVersion: validatedAncillary.selectionVersion,
-                  serviceCount: validatedAncillary.services.length,
-                  serviceQuantity: validatedAncillary.services.reduce(
-                    (total, service) => total + service.quantity,
-                    0,
-                  ),
-                  baseAmount: validatedAncillary.baseAmount,
-                  grandTotal: validatedAncillary.grandTotal,
-                  currency: validatedAncillary.currency,
-                }
-              : undefined,
-          },
-        });
+          const eventTx = tx.paymentEvent ? tx : this.prisma;
+          await eventTx.paymentEvent.create({
+            data: {
+              paymentId: created.id,
+              eventType: 'payment_created',
+              previousStatus: 'CREATED',
+              newStatus: 'CREATED',
+              amount: amountInCents,
+              source: 'API',
+              createdBy: userId,
+            },
+          });
 
-        await this.auditService.createLog(this.prisma, {
-          userId,
-          action: 'payment_created',
-          resourceType: 'Payment',
-          resourceId: payment.id,
-          ipAddress,
-          metadata: {
-            bookingIntentId: dto.bookingIntentId,
-            amount: amountInCents,
-            attemptNumber: result.attemptNumber,
-            ...(validatedAncillary
-              ? {
-                  ancillarySelectionId: validatedAncillary.selectionId,
-                  ancillarySelectionVersion: validatedAncillary.selectionVersion,
-                  serviceCount: validatedAncillary.services.length,
-                  serviceQuantity: validatedAncillary.services.reduce(
-                    (total, service) => total + service.quantity,
-                    0,
-                  ),
-                  baseAmount: validatedAncillary.baseAmount,
-                  grandTotal: validatedAncillary.grandTotal,
-                  currency: validatedAncillary.currency,
-                }
-              : {}),
-          },
+          await this.auditService.createLog(tx, {
+            userId,
+            action: 'payment_created',
+            resourceType: 'Payment',
+            resourceId: created.id,
+            ipAddress,
+            metadata: {
+              bookingIntentId: dto.bookingIntentId,
+              amount: amountInCents,
+              attemptNumber: result.attemptNumber,
+            },
+          });
+
+          return created;
         });
       }
 
@@ -1033,7 +1132,7 @@ export class PaymentService {
             newStatus: 'AUTHORIZED',
             amount: payment.amount,
             source: 'API',
-            metadata: duffelOrder as Prisma.InputJsonValue,
+            metadata: redactDuffelOrder(duffelOrder) as Prisma.InputJsonValue,
             createdBy: userId,
           },
         });
@@ -1053,6 +1152,47 @@ export class PaymentService {
         } catch (captureError: unknown) {
           const error = captureError as Error;
           this.logger.error(`Stripe capture failed: ${error.message}`, error.stack);
+
+          let reconciledStatus: string;
+          try {
+            const reconciledIntent = await this.stripeService.retrievePaymentIntent(
+              payment.stripePaymentIntentId,
+            );
+            reconciledStatus = reconciledIntent.status;
+          } catch (reconciliationError: unknown) {
+            const reconciliationMessage =
+              reconciliationError instanceof Error
+                ? reconciliationError.message
+                : String(reconciliationError);
+            this.logger.error(
+              `Stripe capture outcome remains unknown for payment ${payment.id}: ${reconciliationMessage}`,
+            );
+            throw new HttpException(
+              {
+                success: false,
+                error: 'Stripe capture outcome is unknown. Retry payment confirmation.',
+                bookingStatus: 'PROCESSING',
+              },
+              HttpStatus.BAD_GATEWAY,
+            );
+          }
+
+          if (
+            reconciledStatus !== 'succeeded' &&
+            reconciledStatus !== 'requires_capture' &&
+            reconciledStatus !== 'canceled'
+          ) {
+            throw new HttpException(
+              {
+                success: false,
+                error: `Stripe capture outcome is not final (${reconciledStatus}). Retry payment confirmation.`,
+                bookingStatus: 'PROCESSING',
+              },
+              HttpStatus.BAD_GATEWAY,
+            );
+          }
+
+          if (reconciledStatus !== 'succeeded') {
 
           // Duffel order cancellation compensation
           let duffelOrderId: string | undefined;
@@ -1156,6 +1296,7 @@ export class PaymentService {
           await this.idempotencyService.completeKey(idempotencyKey, HttpStatus.BAD_GATEWAY, failureResponse);
 
           throw new HttpException(failureResponse, HttpStatus.BAD_GATEWAY);
+          }
         }
 
         await this.idempotencyService.updateRecoveryPoint(idempotencyKey, 'captured');
@@ -1330,6 +1471,8 @@ export class PaymentService {
 
   /**
    * Cleans up state and resolves background errors to prevent unhandled rejections
+  /**
+   * Cleans up state and resolves background errors to prevent unhandled rejections
    */
   private async handleBackgroundError(
     paymentId: string,
@@ -1354,21 +1497,27 @@ export class PaymentService {
         return;
       }
 
-      let isStripeCaptured = false;
+      let paymentIntent;
       try {
-        const paymentIntent = await this.stripeService.retrievePaymentIntent(payment.stripePaymentIntentId);
-        if (paymentIntent?.status === 'succeeded') {
-          isStripeCaptured = true;
-        }
+        paymentIntent = await this.stripeService.retrievePaymentIntent(payment.stripePaymentIntentId);
       } catch (stripeErr: unknown) {
-        this.logger.error(
+        this.logger.warn(
           `Failed to retrieve Stripe PaymentIntent for payment ${paymentId}: ${stripeErr instanceof Error ? stripeErr.message : String(stripeErr)}`
         );
+        return; // warn & return early (recoverable)
       }
 
-      const recoveryPoint = await this.idempotencyService.getResumePoint(idempotencyKey);
-      if (recoveryPoint === 'captured' || recoveryPoint === 'completed' || isStripeCaptured) {
-        if (isStripeCaptured && recoveryPoint !== 'captured' && recoveryPoint !== 'completed') {
+      const finalStatuses = ['succeeded', 'requires_capture', 'canceled'];
+      if (!paymentIntent || !finalStatuses.includes(paymentIntent.status)) {
+        this.logger.warn(
+          `Stripe PaymentIntent for payment ${paymentId} is in non-final status: ${paymentIntent?.status}. Warning & returning early.`
+        );
+        return; // warn & return early (recoverable)
+      }
+
+      if (paymentIntent.status === 'succeeded') {
+        const recoveryPoint = await this.idempotencyService.getResumePoint(idempotencyKey);
+        if (recoveryPoint !== 'captured' && recoveryPoint !== 'completed') {
           try {
             await this.idempotencyService.updateRecoveryPoint(idempotencyKey, 'captured');
           } catch (updateErr: unknown) {
@@ -1379,10 +1528,10 @@ export class PaymentService {
         }
 
         this.logger.error(
-          `CRITICAL: Background confirmation failed after Stripe capture for payment ${paymentId}. Customer has been charged. Recovery point is '${recoveryPoint}'. Retries will attempt to resume post-capture updates.`,
+          `CRITICAL: Background confirmation failed after Stripe capture for payment ${paymentId}. Customer has been charged. Recovery point is '${recoveryPoint || 'started'}'. Retries will attempt to resume post-capture updates.`,
           error instanceof Error ? error.stack : undefined
         );
-        return;
+        return; // mark captured & return
       }
 
       // Check if Duffel order was created
@@ -1394,25 +1543,29 @@ export class PaymentService {
         orderBy: { createdAt: 'desc' },
       });
 
-      if (duffelEvent) {
-        const duffelOrder = duffelEvent.metadata as Record<string, unknown> | null;
-        const duffelOrderId = duffelOrder?.id as string | undefined;
-        if (duffelOrderId) {
-          try {
-            await this.duffelService.cancelOrder(duffelOrderId);
-          } catch (cancelError: unknown) {
-            const err = cancelError as Error;
-            this.logger.error(`Background cancelOrder failed: ${err.message}`);
+      if (paymentIntent.status === 'requires_capture' || paymentIntent.status === 'canceled') {
+        if (duffelEvent) {
+          const duffelOrder = duffelEvent.metadata as Record<string, unknown> | null;
+          const duffelOrderId = duffelOrder?.id as string | undefined;
+          if (duffelOrderId) {
+            try {
+              await this.duffelService.cancelOrder(duffelOrderId);
+            } catch (cancelError: unknown) {
+              const err = cancelError as Error;
+              this.logger.error(`Background cancelOrder failed: ${err.message}`);
+            }
           }
         }
-      }
 
-      // Release hold if authorized
-      try {
-        await this.stripeService.cancelPaymentIntent(payment.stripePaymentIntentId);
-      } catch (stripeError: unknown) {
-        const err = stripeError as Error;
-        this.logger.error(`Background cancelPaymentIntent failed: ${err.message}`);
+        if (paymentIntent.status === 'requires_capture') {
+          // Release hold if authorized
+          try {
+            await this.stripeService.cancelPaymentIntent(payment.stripePaymentIntentId);
+          } catch (stripeError: unknown) {
+            const err = stripeError as Error;
+            this.logger.error(`Background cancelPaymentIntent failed: ${err.message}`);
+          }
+        }
       }
 
       // 1. Fetch BookingIntent and calculate next status
