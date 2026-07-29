@@ -62,3 +62,18 @@
 - [x] T030 Validate the Prisma schema and whitespace correctness with the local toolchain
 - [ ] T031 Run focused Jest/type-check verification after workspace dependency links are restored
 - [x] T032 Update Feature 15 architecture and progress documentation
+
+## Phase 11: Phase 5 / PR 6 — Authoritative Validation, Payment Amount, and Duffel Order Services
+
+- [x] T042 Add an additive short-lived validation lease token/expiry to ancillary snapshots without changing the four durable selection states
+- [x] T043 Invoke authoritative ancillary validation at the public payment-create boundary before idempotency acquisition, payment-attempt mutation, `AWAITING_PAYMENT`, customer creation, or Stripe
+- [x] T044 Acquire the exact owned active current selection ID/version through a short CAS lease, reprice once outside database transactions, and conditionally persist authoritative `VALIDATED` totals only while the same lease still owns the snapshot
+- [x] T045 Return targeted version/service/price/currency conflicts and mark only the lease-owned unbound current snapshot `STALE` when supplier validation invalidates it
+- [x] T046 Reject ancillary commits while the current snapshot has an active validation lease; expired leases cease blocking edits
+- [ ] T047 Extend payment creation with optional-together ancillary selection identity while preserving empty-selection/base-fare compatibility
+- [ ] T048 Bind Payment and `PAYMENT_BOUND` snapshot atomically, convert authoritative major units to minor units exactly, and persist PII-safe selection metadata
+- [ ] T049 Load exact canonical services through the Payment-bound snapshot for Duffel order creation and every recovery point
+- [ ] T050 Preserve authorization, supplier-order, capture, cancellation, compensation, and idempotent recovery behavior for ancillary-bound payments
+- [ ] T051 Add focused unit/integration/E2E coverage for validation races, targeted conflicts, exact amounts/services, retries, and empty-selection regressions
+- [ ] T052 Run Prisma validation, API typecheck/lint/build, focused and regression payment suites, and migration verification
+- [ ] T053 Synchronize Phase 5 implementation facts in architecture and progress documentation after verification
