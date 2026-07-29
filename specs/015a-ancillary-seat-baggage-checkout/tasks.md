@@ -72,8 +72,8 @@
 - [x] T046 Reject ancillary commits while the current snapshot has an active validation lease; expired leases cease blocking edits
 - [x] T047 Extend payment creation with optional-together ancillary selection identity while preserving empty-selection/base-fare compatibility
 - [x] T048 Bind Payment and `PAYMENT_BOUND` snapshot atomically, convert authoritative major units to minor units exactly, and persist PII-safe selection metadata
-- [ ] T049 Load exact canonical services through the Payment-bound snapshot for Duffel order creation and every recovery point
-- [ ] T050 Preserve authorization, supplier-order, capture, cancellation, compensation, and idempotent recovery behavior for ancillary-bound payments
+- [x] T049 Load exact canonical services through the Payment-bound snapshot for Duffel order creation and every recovery point
+- [x] T050 Preserve authorization, supplier-order, capture, cancellation, compensation, and idempotent recovery behavior for ancillary-bound payments
 - [ ] T051 Add focused unit/integration/E2E coverage for validation races, targeted conflicts, exact amounts/services, retries, and empty-selection regressions
 - [ ] T052 Run Prisma validation, API typecheck/lint/build, focused and regression payment suites, and migration verification
-- [ ] T053 Synchronize Phase 5 implementation facts in architecture and progress documentation after verification
+- [x] T053 Synchronize Phase 5 implementation facts in architecture and progress documentation after verification
