@@ -29,19 +29,116 @@ import { FlightSnapshot, PassengerSnapshot } from '@shared/booking-types';
 import { AncillaryPaymentValidationService } from '@/payment/ancillary-payment-validation.service';
 import type { ValidatedAncillaryPayment } from '@/payment/ancillary-payment-validation.service';
 
-function majorUnitsToMinor(amount: string): number {
+function majorUnitsToMinorBigInt(amount: string): bigint {
   const match = /^(\d+)(?:\.(\d{1,2}))?$/.exec(amount);
   if (!match) {
     throw new BadRequestException('Invalid authoritative payment amount');
   }
 
   const fractional = (match[2] ?? '').padEnd(2, '0');
-  const minor = BigInt(match[1]) * 100n + BigInt(fractional || '0');
+  return BigInt(match[1]) * 100n + BigInt(fractional || '0');
+}
+
+function majorUnitsToMinor(amount: string): number {
+  const minor = majorUnitsToMinorBigInt(amount);
   if (minor > 2_147_483_647n) {
     throw new BadRequestException('Authoritative payment amount is too large');
   }
 
   return parseInt(minor.toString(), 10);
+}
+
+function authoritativeAmountsEqual(
+  persisted: Prisma.Decimal | string | null,
+  validated: string,
+): boolean {
+  if (persisted === null) {
+    return false;
+  }
+
+  try {
+    return majorUnitsToMinorBigInt(String(persisted)) === majorUnitsToMinorBigInt(validated);
+  } catch {
+    return false;
+  }
+}
+
+type PaymentReservation = {
+  bookingIntentId: string;
+  ancillarySelectionId: string;
+  ancillarySelectionVersion: number;
+  attemptNumber: number;
+  amount: number;
+  currency: string;
+  validatedAncillary: ValidatedAncillaryPayment;
+};
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function isValidatedService(
+  value: unknown,
+): value is { serviceId: string; quantity: number } {
+  return (
+    isRecord(value) &&
+    typeof value.serviceId === 'string' &&
+    typeof value.quantity === 'number'
+  );
+}
+
+function readPaymentReservation(
+  value: unknown,
+  dto: CreatePaymentDto,
+): PaymentReservation | undefined {
+  if (!isRecord(value) || !isRecord(value.paymentReservation)) {
+    return undefined;
+  }
+  const reservation = value.paymentReservation;
+  const validated = reservation.validatedAncillary;
+  if (
+    typeof reservation.bookingIntentId !== 'string' ||
+    reservation.bookingIntentId !== dto.bookingIntentId ||
+    typeof reservation.ancillarySelectionId !== 'string' ||
+    reservation.ancillarySelectionId !== dto.ancillarySelectionId ||
+    typeof reservation.ancillarySelectionVersion !== 'number' ||
+    reservation.ancillarySelectionVersion !== dto.ancillarySelectionVersion ||
+    typeof reservation.attemptNumber !== 'number' ||
+    typeof reservation.amount !== 'number' ||
+    typeof reservation.currency !== 'string' ||
+    !isRecord(validated) ||
+    typeof validated.selectionId !== 'string' ||
+    validated.selectionId !== dto.ancillarySelectionId ||
+    typeof validated.selectionVersion !== 'number' ||
+    validated.selectionVersion !== dto.ancillarySelectionVersion ||
+    typeof validated.baseAmount !== 'string' ||
+    typeof validated.grandTotal !== 'string' ||
+    typeof validated.currency !== 'string' ||
+    !Array.isArray(validated.services) ||
+    !validated.services.every(isValidatedService)
+  ) {
+    return undefined;
+  }
+
+  return {
+    bookingIntentId: reservation.bookingIntentId,
+    ancillarySelectionId: reservation.ancillarySelectionId,
+    ancillarySelectionVersion: reservation.ancillarySelectionVersion,
+    attemptNumber: reservation.attemptNumber,
+    amount: reservation.amount,
+    currency: reservation.currency,
+    validatedAncillary: {
+      selectionId: validated.selectionId,
+      selectionVersion: validated.selectionVersion,
+      baseAmount: validated.baseAmount,
+      grandTotal: validated.grandTotal,
+      currency: validated.currency,
+      services: validated.services.map((service) => ({
+        serviceId: service.serviceId,
+        quantity: service.quantity,
+      })),
+    },
+  };
 }
 
 @Injectable()
@@ -71,7 +168,10 @@ export class PaymentService {
     ipAddress: string,
   ): Promise<PaymentResponseDto> {
     try {
+      const requestHash = this.idempotencyService.computeHash(dto);
+      const requestPath = '/api/bookings/payment/create';
       let validatedAncillary: ValidatedAncillaryPayment | undefined;
+      let recoveredReservation: PaymentReservation | undefined;
       let boundPaymentReplay = false;
       if (
         dto.ancillarySelectionId !== undefined ||
@@ -111,26 +211,55 @@ export class PaymentService {
           boundPayment.ancillarySelectionId === dto.ancillarySelectionId &&
           boundPayment.ancillarySelectionVersion === dto.ancillarySelectionVersion;
         if (!boundPaymentReplay) {
-          validatedAncillary = await this.ancillaryPaymentValidation.validateForPayment({
-            userId,
-            bookingIntentId: dto.bookingIntentId,
-            ancillarySelectionId: dto.ancillarySelectionId,
-            ancillarySelectionVersion: dto.ancillarySelectionVersion,
+          const existingKey = await this.prisma.idempotencyKey?.findUnique({
+            where: { key: idempotencyKey },
           });
+          if (
+            existingKey?.requestHash === requestHash &&
+            existingKey.customerId === userId &&
+            existingKey.requestPath === requestPath
+          ) {
+            recoveredReservation = readPaymentReservation(existingKey.requestParams, dto);
+          }
+          if (!recoveredReservation) {
+            validatedAncillary = await this.ancillaryPaymentValidation.validateForPayment({
+              userId,
+              bookingIntentId: dto.bookingIntentId,
+              ancillarySelectionId: dto.ancillarySelectionId,
+              ancillarySelectionVersion: dto.ancillarySelectionVersion,
+            });
+          }
         }
       }
 
       // 1. Check/acquire the request idempotency key
-      const requestHash = this.idempotencyService.computeHash(dto);
       const idempotency = await this.idempotencyService.acquireOrReplay(
         idempotencyKey,
         requestHash,
         userId,
-        '/api/bookings/payment/create',
+        requestPath,
       );
 
       if (idempotency.status === 'replay') {
         return JSON.parse(idempotency.responseBody);
+      }
+
+      if (recoveredReservation) {
+        const acquiredKey = await this.prisma.idempotencyKey.findUnique({
+          where: { key: idempotencyKey },
+        });
+        if (
+          acquiredKey?.requestHash !== requestHash ||
+          acquiredKey.customerId !== userId ||
+          acquiredKey.requestPath !== requestPath
+        ) {
+          throw new ConflictException('Payment reservation is no longer available');
+        }
+        recoveredReservation = readPaymentReservation(acquiredKey.requestParams, dto);
+        if (!recoveredReservation) {
+          throw new ConflictException('Payment reservation is no longer available');
+        }
+        validatedAncillary = recoveredReservation.validatedAncillary;
       }
 
       // 2. Lock & update BookingIntent paymentAttemptCount inside transaction
@@ -164,7 +293,9 @@ export class PaymentService {
         }
 
         if (
-          (validatedAncillary && intent.status !== 'PENDING') ||
+          (validatedAncillary &&
+            intent.status !== 'PENDING' &&
+            !(recoveredReservation && intent.status === 'AWAITING_PAYMENT')) ||
           (!validatedAncillary &&
             intent.status !== 'PENDING' &&
             intent.status !== 'AWAITING_PAYMENT')
@@ -189,15 +320,19 @@ export class PaymentService {
           };
         }
 
-        if (intent.paymentAttemptCount >= 2) {
+        if (!recoveredReservation && intent.paymentAttemptCount >= 2) {
           throw new BadRequestException('Payment attempts exhausted');
         }
 
-        const nextAttemptCount = intent.paymentAttemptCount + 1;
-        const amount = validatedAncillary
-          ? majorUnitsToMinor(validatedAncillary.grandTotal)
-          : majorUnitsToMinor(String(intent.confirmedPrice));
-        const currency = validatedAncillary?.currency ?? intent.currency;
+        const nextAttemptCount =
+          recoveredReservation?.attemptNumber ?? intent.paymentAttemptCount + 1;
+        const amount =
+          recoveredReservation?.amount ??
+          (validatedAncillary
+            ? majorUnitsToMinor(validatedAncillary.grandTotal)
+            : majorUnitsToMinor(String(intent.confirmedPrice)));
+        const currency =
+          recoveredReservation?.currency ?? validatedAncillary?.currency ?? intent.currency;
         if (validatedAncillary) {
           if (
             intent.currentAncillarySelectionId !== validatedAncillary.selectionId ||
@@ -238,8 +373,14 @@ export class PaymentService {
             selections.length !== 1 ||
             selection.status !== 'VALIDATED' ||
             selection.currency.toUpperCase() !== validatedAncillary.currency.toUpperCase() ||
-            String(selection.validatedBaseAmount) !== validatedAncillary.baseAmount ||
-            String(selection.validatedGrandTotal) !== validatedAncillary.grandTotal ||
+            !authoritativeAmountsEqual(
+              selection.validatedBaseAmount,
+              validatedAncillary.baseAmount,
+            ) ||
+            !authoritativeAmountsEqual(
+              selection.validatedGrandTotal,
+              validatedAncillary.grandTotal,
+            ) ||
             selection.validationLeaseToken !== null ||
             selection.validationLeaseExpiresAt !== null
           ) {
@@ -251,11 +392,47 @@ export class PaymentService {
           }
         }
 
-        await tx.$executeRaw`
-          UPDATE booking_intents
-          SET "paymentAttemptCount" = ${nextAttemptCount}, status = 'AWAITING_PAYMENT'
-          WHERE id = ${dto.bookingIntentId}
-        `;
+        if (!recoveredReservation) {
+          if (validatedAncillary) {
+            const reservation: PaymentReservation = {
+              bookingIntentId: dto.bookingIntentId,
+              ancillarySelectionId: validatedAncillary.selectionId,
+              ancillarySelectionVersion: validatedAncillary.selectionVersion,
+              attemptNumber: nextAttemptCount,
+              amount,
+              currency,
+              validatedAncillary,
+            };
+            const reserved = await tx.$executeRaw`
+              WITH reserved_key AS (
+                UPDATE idempotency_keys
+                SET "requestParams" = jsonb_build_object(
+                  'paymentReservation',
+                  ${reservation}::jsonb
+                )
+                WHERE "key" = ${idempotencyKey}
+                  AND "requestHash" = ${requestHash}
+                  AND "customerId" = ${userId}
+                  AND "requestPath" = ${requestPath}
+                  AND "lockedAt" = ${idempotency.lockedAt}
+                RETURNING id
+              )
+              UPDATE booking_intents
+              SET "paymentAttemptCount" = ${nextAttemptCount}, status = 'AWAITING_PAYMENT'
+              WHERE id = ${dto.bookingIntentId}
+                AND EXISTS (SELECT 1 FROM reserved_key)
+            `;
+            if (reserved !== 1) {
+              throw new ConflictException('Payment reservation ownership was lost');
+            }
+          } else {
+            await tx.$executeRaw`
+              UPDATE booking_intents
+              SET "paymentAttemptCount" = ${nextAttemptCount}, status = 'AWAITING_PAYMENT'
+              WHERE id = ${dto.bookingIntentId}
+            `;
+          }
+        }
 
         return {
           amount,
