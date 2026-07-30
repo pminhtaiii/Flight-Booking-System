@@ -558,9 +558,9 @@ export class PaymentService implements OnModuleInit {
         return metadata.idempotencyKey === idempotencyKey;
       });
 
+      const canceledIntentIds = new Set<string>();
       if (matchingRollbacks.length > 0) {
         this.logger.warn(`Found ${matchingRollbacks.length} unresolved failed stripe rollbacks for idempotency key ${idempotencyKey}. Resolving...`);
-        const canceledIntentIds = new Set<string>();
         for (const rollback of matchingRollbacks) {
           const piId = rollback.resourceId;
           if (piId) {
@@ -638,14 +638,22 @@ export class PaymentService implements OnModuleInit {
         const failedId = requestParams.backupPaymentIntentId;
         this.logger.warn(`Found backup PaymentIntent ${failedId} on idempotency key ${idempotencyKey}. Attempting retry cancellation...`);
         try {
-          await this.stripeService.cancelPaymentIntent(failedId);
-          this.logger.log(`Successfully completed deferred rollback of backup PaymentIntent ${failedId}`);
+          if (!canceledIntentIds.has(failedId)) {
+            await this.stripeService.cancelPaymentIntent(failedId);
+            this.logger.log(`Successfully completed deferred rollback of backup PaymentIntent ${failedId}`);
+          } else {
+            this.logger.log(`Backup PaymentIntent ${failedId} was already cancelled via AuditLog processing. Skipping redundant cancellation.`);
+          }
 
           // Clear it
           const updatedParams = { ...requestParams };
           delete updatedParams.backupPaymentIntentId;
-          updatedParams.stripeRetryCount = (requestParams.stripeRetryCount || 0) + 1;
-          stripeRetryCount = updatedParams.stripeRetryCount;
+          
+          if (!canceledIntentIds.has(failedId)) {
+            updatedParams.stripeRetryCount = (requestParams.stripeRetryCount || 0) + 1;
+          }
+          stripeRetryCount = updatedParams.stripeRetryCount || requestParams.stripeRetryCount || 0;
+          
           await this.prisma.idempotencyKey.update({
             where: { key: idempotencyKey },
             data: { requestParams: updatedParams },
