@@ -32,6 +32,7 @@ import { forwardRef, Inject } from '@nestjs/common';
 import { FlightSnapshot, PassengerSnapshot } from '@shared/booking-types';
 import { AncillaryPaymentValidationService } from '@/payment/ancillary-payment-validation.service';
 import type { ValidatedAncillaryPayment } from '@/payment/ancillary-payment-validation.service';
+import { CacheService } from '@/cache/cache.service';
 
 function majorUnitsToMinorBigInt(amount: string): bigint {
   const match = /^(\d+)(?:\.(\d{1,2}))?$/.exec(amount);
@@ -215,6 +216,8 @@ export class PaymentService implements OnModuleInit {
     @Inject(forwardRef(() => BookingService))
     private readonly bookingService: BookingService,
     @Optional()
+    private readonly cacheService?: CacheService,
+    @Optional()
     private readonly ancillaryPaymentValidation?: AncillaryPaymentValidationService,
   ) {}
 
@@ -260,18 +263,26 @@ export class PaymentService implements OnModuleInit {
           userId: userId || null,
           dbError: dbError.message,
         };
-        fs.appendFileSync(
-          path.join(process.cwd(), 'stripe_rollback_failures.log'),
-          JSON.stringify(fallbackLog) + '\n',
-          'utf8',
-        );
+        const logStr = JSON.stringify(fallbackLog);
+
+        if (this.cacheService) {
+          const redisKey = `stripe_rollback_failure:${paymentIntentId}:${Date.now()}`;
+          await this.cacheService.set(redisKey, logStr);
+          this.logger.error(`CRITICAL FAILURE: Wrote fallback log to Redis: ${paymentIntentId}`);
+        } else {
+          fs.appendFileSync(
+            path.join(process.cwd(), 'stripe_rollback_failures.log'),
+            logStr + '\n',
+            'utf8',
+          );
+          this.logger.error(
+            `CRITICAL FAILURE: Wrote fallback log to local file: ${paymentIntentId}`,
+          );
+        }
+      } catch (fallbackError: any) {
         this.logger.error(
-          `CRITICAL FAILURE: Wrote fallback log to local file: ${paymentIntentId}`,
-        );
-      } catch (fileError: any) {
-        this.logger.error(
-          `CRITICAL FAILURE: Could not write to local fallback file either: ${fileError.message}`,
-          fileError.stack,
+          `CRITICAL FAILURE: Could not write to fallback store (Redis or File): ${fallbackError.message}`,
+          fallbackError.stack,
         );
       }
     }
@@ -321,6 +332,53 @@ export class PaymentService implements OnModuleInit {
           } catch (stripeErr: any) {
             this.logger.error(`Startup sweep: Failed to cancel dangling PaymentIntent ${piId}: ${stripeErr.message}`);
           }
+        }
+      }
+
+      // Sweep Redis fallbacks
+      if (this.cacheService) {
+        try {
+          const keys = await this.cacheService.keys('stripe_rollback_failure:*');
+          for (const key of keys) {
+            const val = await this.cacheService.get(key);
+            if (val) {
+              const fallbackLog = JSON.parse(val);
+              const piId = fallbackLog.paymentIntentId;
+              const ikey = fallbackLog.idempotencyKey;
+              if (piId) {
+                this.logger.log(`Startup sweep (Redis fallback): Attempting to cancel dangling Stripe PaymentIntent ${piId}...`);
+                try {
+                  await this.stripeService.cancelPaymentIntent(piId);
+                  this.logger.log(`Startup sweep (Redis fallback): Successfully cancelled dangling PaymentIntent ${piId}`);
+                  await this.cacheService.del(key);
+                  
+                  if (ikey) {
+                    try {
+                      const keyRecord = await this.prisma.idempotencyKey.findUnique({
+                        where: { key: ikey },
+                      });
+                      if (keyRecord) {
+                        const updatedParams = { ...(keyRecord.requestParams as any || {}) };
+                        delete updatedParams.backupPaymentIntentId;
+                        await this.prisma.idempotencyKey.update({
+                          where: { key: ikey },
+                          data: { requestParams: updatedParams },
+                        });
+                      }
+                    } catch (dbErr: any) {
+                      // Ignore DB error
+                    }
+                  }
+                } catch (stripeErr: any) {
+                  this.logger.error(`Startup sweep (Redis fallback): Failed to cancel dangling PaymentIntent ${piId}: ${stripeErr.message}`);
+                }
+              } else {
+                await this.cacheService.del(key);
+              }
+            }
+          }
+        } catch (redisErr: any) {
+           this.logger.error(`Failed to sweep Redis rollback failures: ${redisErr.message}`);
         }
       }
     } catch (err: any) {
