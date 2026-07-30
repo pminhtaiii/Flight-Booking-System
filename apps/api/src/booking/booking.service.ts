@@ -1129,9 +1129,12 @@ export class BookingService {
         const liveOrder = await this.duffelService.retrieveCompleteOrder(duffelOrderId);
         if (liveOrder?.passengers?.[0]?.phone_number) {
           contactPhone = liveOrder.passengers[0].phone_number;
+        } else {
+          throw new Error('Missing phone number');
         }
       } catch (err: any) {
-        this.logger.warn(`Failed to retrieve phone number from Duffel for order ${duffelOrderId}: ${err.message}`);
+        this.logger.error(`Failed to retrieve phone number from Duffel for order ${duffelOrderId}: ${err.message}`);
+        throw err;
       }
     }
 

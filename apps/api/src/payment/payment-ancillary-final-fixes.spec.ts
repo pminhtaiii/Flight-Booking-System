@@ -1130,6 +1130,42 @@ describe('PaymentService - Final Fixes Spec', () => {
       expect(enriched.contactPhone).toBe('+12223334444');
       expect(duffel.retrieveCompleteOrder).toHaveBeenCalledWith('event-order-id');
     });
+
+    it('should propagate error if retrieveCompleteOrder fails', async () => {
+      const rawSnapshot = {
+        passengers: [{ type: 'ADULT', firstName: 'REDACTED', lastName: 'REDACTED', dateOfBirth: '1990-01-01' }],
+        contactEmail: null,
+        contactPhone: null,
+      };
+
+      prisma.bookingIntentPassenger.findMany.mockResolvedValue([]);
+      prisma.bookingIntent.findUnique.mockResolvedValue({ userId: 'user-1' });
+      prisma.user.findUnique.mockResolvedValue({ email: 'user@example.com' });
+      duffel.retrieveCompleteOrder = jest.fn().mockRejectedValue(new Error('Duffel API error'));
+
+      await expect(
+        service['enrichPassengerSnapshot']('intent-123', rawSnapshot as any, 'passed-order-id')
+      ).rejects.toThrow('Duffel API error');
+    });
+
+    it('should propagate error if passenger phone number is missing in retrieved Duffel order', async () => {
+      const rawSnapshot = {
+        passengers: [{ type: 'ADULT', firstName: 'REDACTED', lastName: 'REDACTED', dateOfBirth: '1990-01-01' }],
+        contactEmail: null,
+        contactPhone: null,
+      };
+
+      prisma.bookingIntentPassenger.findMany.mockResolvedValue([]);
+      prisma.bookingIntent.findUnique.mockResolvedValue({ userId: 'user-1' });
+      prisma.user.findUnique.mockResolvedValue({ email: 'user@example.com' });
+      duffel.retrieveCompleteOrder = jest.fn().mockResolvedValue({
+        passengers: [{ phone_number: null }],
+      });
+
+      await expect(
+        service['enrichPassengerSnapshot']('intent-123', rawSnapshot as any, 'passed-order-id')
+      ).rejects.toThrow('Missing phone number');
+    });
   });
 
   describe('Issue 2: createPayment failed_stripe_rollback cancellation', () => {
@@ -1262,6 +1298,91 @@ describe('PaymentService - Final Fixes Spec', () => {
       await expect(
         service.createPayment(dto, 'ikey-match', 'user-1', '127.0.0.1')
       ).rejects.toThrow(ConflictException);
+    });
+  });
+
+  describe('Step 5 rollback logging to AuditLog', () => {
+    it('should correctly log a durable rollback reference to AuditLog if Step 5 database transaction fails and Stripe cancel fails', async () => {
+      // 1. Setup mocks
+      prisma.idempotencyKey.findUnique.mockResolvedValue({
+        key: 'ikey-step5-fail',
+        requestParams: {},
+      });
+      validation.validateForPayment.mockResolvedValue({
+        selectionId: 'sel-1',
+        selectionVersion: 1,
+        baseAmount: '10.00',
+        grandTotal: '10.00',
+        currency: 'USD',
+        services: [{ serviceId: 'seat-1', quantity: 1 }],
+      });
+      prisma.user.findUnique.mockResolvedValue({ email: 'john@example.com', stripeCustomerId: 'cus-1' });
+      stripe.createPaymentIntent.mockResolvedValue({ id: 'pi-step5-fail', client_secret: 'secret-1' });
+
+      prisma.$queryRaw
+        .mockResolvedValueOnce([
+          {
+            id: 'intent-1',
+            userId: 'user-1',
+            status: 'PENDING',
+            paymentAttemptCount: 0,
+            currency: 'USD',
+            intentExpiresAt: new Date(Date.now() + 600000),
+            offerExpiresAt: new Date(Date.now() + 600000),
+            currentAncillarySelectionId: 'sel-1',
+            ancillaryVersion: 1,
+          },
+        ])
+        .mockResolvedValueOnce([
+          {
+            id: 'sel-1',
+            status: 'VALIDATED',
+            currency: 'USD',
+            validatedBaseAmount: new Prisma.Decimal('10.00'),
+            validatedGrandTotal: new Prisma.Decimal('10.00'),
+            validationLeaseToken: null,
+            validationLeaseExpiresAt: null,
+            validatedAt: new Date(),
+          },
+        ]);
+
+      // Force Step 5 transaction to throw error
+      prisma.$transaction
+        .mockResolvedValueOnce({
+          attemptNumber: 1,
+          amount: 1000,
+          currency: 'USD',
+        })
+        .mockRejectedValueOnce(new Error('Step 5 DB Failure'));
+
+      // Stripe cancellation fails (rollback failure)
+      stripe.cancelPaymentIntent.mockRejectedValueOnce(new Error('Stripe cancel failed'));
+
+      const dto = {
+        bookingIntentId: 'intent-1',
+        ancillarySelectionId: 'sel-1',
+        ancillarySelectionVersion: 1,
+      };
+
+      await expect(
+        service.createPayment(dto, 'ikey-step5-fail', 'user-1', '127.0.0.1')
+      ).rejects.toThrow('Step 5 DB Failure');
+
+      // Verify AuditLog record was created with the correct info
+      expect(prisma.auditLog.create).toHaveBeenCalledWith({
+        data: {
+          userId: 'user-1',
+          action: 'failed_stripe_rollback',
+          resourceType: 'PaymentIntent',
+          resourceId: 'pi-step5-fail',
+          metadata: {
+            idempotencyKey: 'ikey-step5-fail',
+            reason: 'Transaction rollback failed: Stripe cancel failed',
+          },
+          traceId: '',
+          correlationId: '',
+        },
+      });
     });
   });
 });

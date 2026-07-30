@@ -377,9 +377,12 @@ export class PaymentService implements OnModuleInit {
         const liveOrder = await this.duffelService.retrieveCompleteOrder(duffelOrderId);
         if (liveOrder?.passengers?.[0]?.phone_number) {
           contactPhone = liveOrder.passengers[0].phone_number;
+        } else {
+          throw new Error('Missing phone number');
         }
       } catch (err: any) {
-        this.logger.warn(`Failed to retrieve phone number from Duffel for order ${duffelOrderId}: ${err.message}`);
+        this.logger.error(`Failed to retrieve phone number from Duffel for order ${duffelOrderId}: ${err.message}`);
+        throw err;
       }
     }
 
@@ -1601,6 +1604,7 @@ export class PaymentService implements OnModuleInit {
             }
           } catch (e: any) {
             this.logger.warn(`Failed to recover Duffel order snapshots for booking ${canonicalBooking.id}: ${e.message}`, e.stack);
+            throw e;
           }
 
           // Update Payment status, BookingIntent, and Booking status to FAILED atomically
@@ -1948,6 +1952,7 @@ export class PaymentService implements OnModuleInit {
           }
         } catch (e: any) {
           this.logger.warn(`Failed to recover Duffel order snapshots in background handler: ${e.message}`, e.stack);
+          throw e;
         }
       }
 
