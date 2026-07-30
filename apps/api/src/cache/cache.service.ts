@@ -202,4 +202,36 @@ export class CacheService implements OnModuleInit, OnModuleDestroy {
     }
     return matched;
   }
+
+  async getDurable(key: string): Promise<string | null> {
+    if (!this.redisClient || this.redisClient.status !== 'ready') {
+      throw new Error('Redis is not available for durable operations');
+    }
+    return await this.redisClient.get(key);
+  }
+
+  async setDurable(key: string, value: string, ttlSeconds?: number): Promise<void> {
+    if (!this.redisClient || this.redisClient.status !== 'ready') {
+      throw new Error('Redis is not available for durable operations');
+    }
+    if (ttlSeconds) {
+      await this.redisClient.set(key, value, 'EX', ttlSeconds);
+    } else {
+      await this.redisClient.set(key, value);
+    }
+  }
+
+  async delDurable(key: string): Promise<void> {
+    if (!this.redisClient || this.redisClient.status !== 'ready') {
+      throw new Error('Redis is not available for durable operations');
+    }
+    await this.redisClient.del(key);
+  }
+
+  async keysDurable(pattern: string): Promise<string[]> {
+    if (!this.redisClient || this.redisClient.status !== 'ready') {
+      throw new Error('Redis is not available for durable operations');
+    }
+    return await this.redisClient.keys(pattern);
+  }
 }

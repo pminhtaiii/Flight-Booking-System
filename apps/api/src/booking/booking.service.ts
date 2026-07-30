@@ -1145,7 +1145,8 @@ export class BookingService {
       }
 
       if (!contactPhone) {
-        this.logger.warn(`Failed to retrieve contact phone from Duffel or traveler profile for booking intent ${bookingIntentId}. Continuing with null contact phone.`);
+        this.logger.error(`CRITICAL: Failed to retrieve contact phone from Duffel or traveler profile for booking intent ${bookingIntentId}. Cannot finalize booking.`);
+        throw new InternalServerErrorException('Booking cannot be finalized due to missing contact phone.');
       }
     }
 

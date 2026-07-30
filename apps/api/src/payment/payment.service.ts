@@ -266,11 +266,15 @@ export class PaymentService implements OnModuleInit {
         const logStr = JSON.stringify(fallbackLog);
 
         let redisSuccess = false;
-        if (this.cacheService && (this.cacheService as any).redisClient?.status === 'ready') {
+        if (this.cacheService) {
           const redisKey = `stripe_rollback_failure:${paymentIntentId}:${Date.now()}`;
-          await this.cacheService.set(redisKey, logStr);
-          this.logger.error(`CRITICAL FAILURE: Wrote fallback log to Redis: ${paymentIntentId}`);
-          redisSuccess = true;
+          try {
+            await this.cacheService.setDurable(redisKey, logStr);
+            this.logger.error(`CRITICAL FAILURE: Wrote fallback log to Redis: ${paymentIntentId}`);
+            redisSuccess = true;
+          } catch (redisErr: any) {
+            this.logger.error(`CRITICAL FAILURE: Could not write fallback log to Redis: ${redisErr.message}`);
+          }
         }
         
         if (!redisSuccess) {
@@ -343,9 +347,9 @@ export class PaymentService implements OnModuleInit {
       // Sweep Redis fallbacks
       if (this.cacheService) {
         try {
-          const keys = await this.cacheService.keys('stripe_rollback_failure:*');
+          const keys = await this.cacheService.keysDurable('stripe_rollback_failure:*');
           for (const key of keys) {
-            const val = await this.cacheService.get(key);
+            const val = await this.cacheService.getDurable(key);
             if (val) {
               const fallbackLog = JSON.parse(val);
               const piId = fallbackLog.paymentIntentId;
@@ -355,7 +359,7 @@ export class PaymentService implements OnModuleInit {
                 try {
                   await this.stripeService.cancelPaymentIntent(piId);
                   this.logger.log(`Startup sweep (Redis fallback): Successfully cancelled dangling PaymentIntent ${piId}`);
-                  await this.cacheService.del(key);
+                  await this.cacheService.delDurable(key);
                   
                   if (ikey) {
                     try {
@@ -379,7 +383,7 @@ export class PaymentService implements OnModuleInit {
                   this.logger.error(`Startup sweep (Redis fallback): Failed to cancel dangling PaymentIntent ${piId}: ${stripeErr.message}`);
                 }
               } else {
-                await this.cacheService.del(key);
+                await this.cacheService.delDurable(key);
               }
             }
           }
@@ -480,7 +484,8 @@ export class PaymentService implements OnModuleInit {
       }
 
       if (!contactPhone) {
-        this.logger.warn(`Failed to retrieve contact phone from Duffel or traveler profile for booking intent ${bookingIntentId}. Continuing with null contact phone.`);
+        this.logger.error(`CRITICAL: Failed to retrieve contact phone from Duffel or traveler profile for booking intent ${bookingIntentId}. Cannot finalize booking.`);
+        throw new InternalServerErrorException('Booking cannot be finalized due to missing contact phone.');
       }
     }
 
