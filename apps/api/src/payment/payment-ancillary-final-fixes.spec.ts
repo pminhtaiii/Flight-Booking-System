@@ -829,6 +829,7 @@ describe('PaymentService - Final Fixes Spec', () => {
         data: {
           requestParams: {
             originalField: 'value',
+            stripeRetryCount: 1,
           },
         },
       });
@@ -1131,40 +1132,60 @@ describe('PaymentService - Final Fixes Spec', () => {
       expect(duffel.retrieveCompleteOrder).toHaveBeenCalledWith('event-order-id');
     });
 
-    it('should propagate error if retrieveCompleteOrder fails', async () => {
+    it('should fall back to travelerProfile.phoneNumber if Duffel retrieval fails', async () => {
       const rawSnapshot = {
         passengers: [{ type: 'ADULT', firstName: 'REDACTED', lastName: 'REDACTED', dateOfBirth: '1990-01-01' }],
         contactEmail: null,
         contactPhone: null,
       };
 
-      prisma.bookingIntentPassenger.findMany.mockResolvedValue([]);
+      prisma.bookingIntentPassenger.findMany.mockResolvedValue([
+        { travelerProfile: { phoneNumber: '+19999999999' } }
+      ]);
       prisma.bookingIntent.findUnique.mockResolvedValue({ userId: 'user-1' });
       prisma.user.findUnique.mockResolvedValue({ email: 'user@example.com' });
       duffel.retrieveCompleteOrder = jest.fn().mockRejectedValue(new Error('Duffel API error'));
 
-      await expect(
-        service['enrichPassengerSnapshot']('intent-123', rawSnapshot as any, 'passed-order-id')
-      ).rejects.toThrow('Duffel API error');
+      const enriched = await service['enrichPassengerSnapshot']('intent-123', rawSnapshot as any, 'passed-order-id');
+      expect(enriched.contactPhone).toBe('+19999999999');
     });
 
-    it('should propagate error if passenger phone number is missing in retrieved Duffel order', async () => {
+    it('should fall back to travelerProfile.phoneNumber if passenger phone number is missing in retrieved Duffel order', async () => {
       const rawSnapshot = {
         passengers: [{ type: 'ADULT', firstName: 'REDACTED', lastName: 'REDACTED', dateOfBirth: '1990-01-01' }],
         contactEmail: null,
         contactPhone: null,
       };
 
-      prisma.bookingIntentPassenger.findMany.mockResolvedValue([]);
+      prisma.bookingIntentPassenger.findMany.mockResolvedValue([
+        { travelerProfile: { phoneNumber: '+18888888888' } }
+      ]);
       prisma.bookingIntent.findUnique.mockResolvedValue({ userId: 'user-1' });
       prisma.user.findUnique.mockResolvedValue({ email: 'user@example.com' });
       duffel.retrieveCompleteOrder = jest.fn().mockResolvedValue({
         passengers: [{ phone_number: null }],
       });
 
-      await expect(
-        service['enrichPassengerSnapshot']('intent-123', rawSnapshot as any, 'passed-order-id')
-      ).rejects.toThrow('Missing phone number');
+      const enriched = await service['enrichPassengerSnapshot']('intent-123', rawSnapshot as any, 'passed-order-id');
+      expect(enriched.contactPhone).toBe('+18888888888');
+    });
+
+    it('should continue with null contact phone and not throw if both Duffel retrieval and travelerProfile phone are missing or fail', async () => {
+      const rawSnapshot = {
+        passengers: [{ type: 'ADULT', firstName: 'REDACTED', lastName: 'REDACTED', dateOfBirth: '1990-01-01' }],
+        contactEmail: null,
+        contactPhone: null,
+      };
+
+      prisma.bookingIntentPassenger.findMany.mockResolvedValue([
+        { travelerProfile: null }
+      ]);
+      prisma.bookingIntent.findUnique.mockResolvedValue({ userId: 'user-1' });
+      prisma.user.findUnique.mockResolvedValue({ email: 'user@example.com' });
+      duffel.retrieveCompleteOrder = jest.fn().mockRejectedValue(new Error('Duffel API error'));
+
+      const enriched = await service['enrichPassengerSnapshot']('intent-123', rawSnapshot as any, 'passed-order-id');
+      expect(enriched.contactPhone).toBeNull();
     });
   });
 
@@ -1381,6 +1402,159 @@ describe('PaymentService - Final Fixes Spec', () => {
           },
           traceId: '',
           correlationId: '',
+        },
+      });
+    });
+  });
+
+  describe('Issue 1: Stripe Retry Count and Idempotency Key Appending', () => {
+    it('should increment stripeRetryCount and append it to Stripe idempotency key on retries', async () => {
+      // First attempt: no params in key
+      const keyObj = {
+        key: 'ikey-retry-test',
+        requestParams: {},
+      };
+      prisma.idempotencyKey.findUnique.mockResolvedValue(keyObj);
+      validation.validateForPayment.mockResolvedValue({
+        selectionId: 'sel-1',
+        selectionVersion: 1,
+        baseAmount: '10.00',
+        grandTotal: '10.00',
+        currency: 'USD',
+        services: [{ serviceId: 'seat-1', quantity: 1 }],
+      });
+      prisma.user.findUnique.mockResolvedValue({ email: 'john@example.com', stripeCustomerId: 'cus-1' });
+      stripe.createPaymentIntent.mockResolvedValue({ id: 'pi-1', client_secret: 'secret-1' });
+
+      prisma.$queryRaw
+        .mockResolvedValueOnce([
+          {
+            id: 'intent-1',
+            userId: 'user-1',
+            status: 'PENDING',
+            paymentAttemptCount: 0,
+            currency: 'USD',
+            intentExpiresAt: new Date(Date.now() + 600000),
+            offerExpiresAt: new Date(Date.now() + 600000),
+            currentAncillarySelectionId: 'sel-1',
+            ancillaryVersion: 1,
+          },
+        ])
+        .mockResolvedValueOnce([
+          {
+            id: 'sel-1',
+            status: 'VALIDATED',
+            currency: 'USD',
+            validatedBaseAmount: new Prisma.Decimal('10.00'),
+            validatedGrandTotal: new Prisma.Decimal('10.00'),
+            validationLeaseToken: null,
+            validationLeaseExpiresAt: null,
+            validatedAt: new Date(),
+          },
+        ]);
+      prisma.$transaction.mockResolvedValueOnce({
+        attemptNumber: 1,
+        amount: 1000,
+        currency: 'USD',
+      });
+
+      const dto = {
+        bookingIntentId: 'intent-1',
+        ancillarySelectionId: 'sel-1',
+        ancillarySelectionVersion: 1,
+      };
+
+      await service.createPayment(dto, 'ikey-retry-test', 'user-1', '127.0.0.1');
+
+      // Verify first call to createPaymentIntent used the base idempotency key
+      expect(stripe.createPaymentIntent).toHaveBeenCalledWith(
+        expect.any(Number),
+        expect.any(String),
+        expect.any(String),
+        expect.any(Object),
+        'ikey-retry-test-stripe-intent',
+        undefined,
+        undefined,
+      );
+
+      // Verify that requestParams was updated to record backupPaymentIntentId
+      expect(prisma.idempotencyKey.update).toHaveBeenCalledWith({
+        where: { key: 'ikey-retry-test' },
+        data: {
+          requestParams: {
+            backupPaymentIntentId: 'pi-1',
+          },
+        },
+      });
+
+      // Second attempt (retry): key already has backupPaymentIntentId: pi-1
+      const retryKeyObj = {
+        key: 'ikey-retry-test',
+        requestParams: {
+          backupPaymentIntentId: 'pi-1',
+        },
+      };
+      prisma.idempotencyKey.findUnique.mockResolvedValue(retryKeyObj);
+      stripe.createPaymentIntent.mockClear().mockResolvedValue({ id: 'pi-2', client_secret: 'secret-2' });
+      prisma.idempotencyKey.update.mockClear();
+      stripe.cancelPaymentIntent.mockResolvedValue({ status: 'canceled' });
+
+      prisma.$queryRaw
+        .mockResolvedValueOnce([
+          {
+            id: 'intent-1',
+            userId: 'user-1',
+            status: 'PENDING',
+            paymentAttemptCount: 0,
+            currency: 'USD',
+            intentExpiresAt: new Date(Date.now() + 600000),
+            offerExpiresAt: new Date(Date.now() + 600000),
+            currentAncillarySelectionId: 'sel-1',
+            ancillaryVersion: 1,
+          },
+        ])
+        .mockResolvedValueOnce([
+          {
+            id: 'sel-1',
+            status: 'VALIDATED',
+            currency: 'USD',
+            validatedBaseAmount: new Prisma.Decimal('10.00'),
+            validatedGrandTotal: new Prisma.Decimal('10.00'),
+            validationLeaseToken: null,
+            validationLeaseExpiresAt: null,
+            validatedAt: new Date(),
+          },
+        ]);
+      prisma.$transaction.mockResolvedValueOnce({
+        attemptNumber: 1,
+        amount: 1000,
+        currency: 'USD',
+      });
+
+      await service.createPayment(dto, 'ikey-retry-test', 'user-1', '127.0.0.1');
+
+      // Verify backup intent pi-1 was cancelled
+      expect(stripe.cancelPaymentIntent).toHaveBeenCalledWith('pi-1');
+
+      // Verify second call to createPaymentIntent appended the retry suffix
+      expect(stripe.createPaymentIntent).toHaveBeenCalledWith(
+        expect.any(Number),
+        expect.any(String),
+        expect.any(String),
+        expect.any(Object),
+        'ikey-retry-test-stripe-intent-1',
+        undefined,
+        undefined,
+      );
+
+      // Verify that requestParams was updated to record backupPaymentIntentId pi-2, preserving stripeRetryCount: 1
+      expect(prisma.idempotencyKey.update).toHaveBeenCalledWith({
+        where: { key: 'ikey-retry-test' },
+        data: {
+          requestParams: {
+            stripeRetryCount: 1,
+            backupPaymentIntentId: 'pi-2',
+          },
         },
       });
     });

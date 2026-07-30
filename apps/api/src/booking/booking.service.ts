@@ -1082,6 +1082,7 @@ export class BookingService {
     }
     const passengers = await this.prisma.bookingIntentPassenger.findMany({
       where: { intentId: bookingIntentId },
+      include: { travelerProfile: true },
       orderBy: { position: 'asc' },
     });
 
@@ -1124,17 +1125,27 @@ export class BookingService {
       }
     }
 
-    if (duffelOrderId && !contactPhone) {
-      try {
-        const liveOrder = await this.duffelService.retrieveCompleteOrder(duffelOrderId);
-        if (liveOrder?.passengers?.[0]?.phone_number) {
-          contactPhone = liveOrder.passengers[0].phone_number;
-        } else {
-          throw new Error('Missing phone number');
+    if (!contactPhone) {
+      if (duffelOrderId) {
+        try {
+          const liveOrder = await this.duffelService.retrieveCompleteOrder(duffelOrderId);
+          if (liveOrder?.passengers?.[0]?.phone_number) {
+            contactPhone = liveOrder.passengers[0].phone_number;
+          }
+        } catch (err: any) {
+          this.logger.warn(`Failed to retrieve phone number from Duffel for order ${duffelOrderId}: ${err.message}`);
         }
-      } catch (err: any) {
-        this.logger.error(`Failed to retrieve phone number from Duffel for order ${duffelOrderId}: ${err.message}`);
-        throw err;
+      }
+
+      if (!contactPhone) {
+        const firstPassengerProfile = passengers?.[0]?.travelerProfile as any;
+        if (firstPassengerProfile?.phoneNumber) {
+          contactPhone = firstPassengerProfile.phoneNumber;
+        }
+      }
+
+      if (!contactPhone) {
+        this.logger.warn(`Failed to retrieve contact phone from Duffel or traveler profile for booking intent ${bookingIntentId}. Continuing with null contact phone.`);
       }
     }
 

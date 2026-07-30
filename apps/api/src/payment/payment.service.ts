@@ -318,6 +318,7 @@ export class PaymentService implements OnModuleInit {
     }
     const passengers = await this.prisma.bookingIntentPassenger.findMany({
       where: { intentId: bookingIntentId },
+      include: { travelerProfile: true },
       orderBy: { position: 'asc' },
     });
 
@@ -372,17 +373,27 @@ export class PaymentService implements OnModuleInit {
       }
     }
 
-    if (duffelOrderId && !contactPhone) {
-      try {
-        const liveOrder = await this.duffelService.retrieveCompleteOrder(duffelOrderId);
-        if (liveOrder?.passengers?.[0]?.phone_number) {
-          contactPhone = liveOrder.passengers[0].phone_number;
-        } else {
-          throw new Error('Missing phone number');
+    if (!contactPhone) {
+      if (duffelOrderId) {
+        try {
+          const liveOrder = await this.duffelService.retrieveCompleteOrder(duffelOrderId);
+          if (liveOrder?.passengers?.[0]?.phone_number) {
+            contactPhone = liveOrder.passengers[0].phone_number;
+          }
+        } catch (err: any) {
+          this.logger.warn(`Failed to retrieve phone number from Duffel for order ${duffelOrderId}: ${err.message}`);
         }
-      } catch (err: any) {
-        this.logger.error(`Failed to retrieve phone number from Duffel for order ${duffelOrderId}: ${err.message}`);
-        throw err;
+      }
+
+      if (!contactPhone) {
+        const firstPassengerProfile = passengers?.[0]?.travelerProfile as any;
+        if (firstPassengerProfile?.phoneNumber) {
+          contactPhone = firstPassengerProfile.phoneNumber;
+        }
+      }
+
+      if (!contactPhone) {
+        this.logger.warn(`Failed to retrieve contact phone from Duffel or traveler profile for booking intent ${bookingIntentId}. Continuing with null contact phone.`);
       }
     }
 
@@ -419,6 +430,7 @@ export class PaymentService implements OnModuleInit {
     ipAddress: string,
   ): Promise<PaymentResponseDto> {
     let paymentIntentIdToRollback: string | undefined;
+    let stripeRetryCount = 0;
     try {
       const requestHash = this.idempotencyService.computeHash(dto);
       const requestPath = '/api/bookings/payment/create';
@@ -580,6 +592,7 @@ export class PaymentService implements OnModuleInit {
         where: { key: idempotencyKey },
       });
       const requestParams = keyRecord?.requestParams as any;
+      stripeRetryCount = requestParams?.stripeRetryCount || 0;
       if (requestParams?.backupPaymentIntentId) {
         const failedId = requestParams.backupPaymentIntentId;
         this.logger.warn(`Found backup PaymentIntent ${failedId} on idempotency key ${idempotencyKey}. Attempting retry cancellation...`);
@@ -590,6 +603,8 @@ export class PaymentService implements OnModuleInit {
           // Clear it
           const updatedParams = { ...requestParams };
           delete updatedParams.backupPaymentIntentId;
+          updatedParams.stripeRetryCount = (requestParams.stripeRetryCount || 0) + 1;
+          stripeRetryCount = updatedParams.stripeRetryCount;
           await this.prisma.idempotencyKey.update({
             where: { key: idempotencyKey },
             data: { requestParams: updatedParams },
@@ -879,7 +894,9 @@ export class PaymentService implements OnModuleInit {
         result.currency,
         stripeCustomerId,
         stripeMetadata,
-        `${idempotencyKey}-stripe-intent`,
+        stripeRetryCount > 0
+          ? `${idempotencyKey}-stripe-intent-${stripeRetryCount}`
+          : `${idempotencyKey}-stripe-intent`,
         dto.paymentMethodId,
         dto.saveCard ? 'off_session' : undefined,
       );
@@ -890,13 +907,17 @@ export class PaymentService implements OnModuleInit {
         const keyRecord = await this.prisma.idempotencyKey.findUnique({
           where: { key: idempotencyKey },
         });
+        const updatedParams = {
+          ...(keyRecord?.requestParams as any || {}),
+          backupPaymentIntentId: paymentIntent.id,
+        };
+        if (stripeRetryCount > 0) {
+          updatedParams.stripeRetryCount = stripeRetryCount;
+        }
         await this.prisma.idempotencyKey.update({
           where: { key: idempotencyKey },
           data: {
-            requestParams: {
-              ...(keyRecord?.requestParams as any || {}),
-              backupPaymentIntentId: paymentIntent.id,
-            },
+            requestParams: updatedParams,
           },
         });
       } catch (dbError: any) {
@@ -1095,6 +1116,9 @@ export class PaymentService implements OnModuleInit {
         });
         const updatedParams = { ...(keyRecord?.requestParams as any || {}) };
         delete updatedParams.backupPaymentIntentId;
+        if (stripeRetryCount > 0) {
+          updatedParams.stripeRetryCount = stripeRetryCount;
+        }
         await this.prisma.idempotencyKey.update({
           where: { key: idempotencyKey },
           data: { requestParams: updatedParams },
@@ -1130,6 +1154,9 @@ export class PaymentService implements OnModuleInit {
             });
             const updatedParams = { ...(keyRecord?.requestParams as any || {}) };
             delete updatedParams.backupPaymentIntentId;
+            if (stripeRetryCount > 0) {
+              updatedParams.stripeRetryCount = stripeRetryCount;
+            }
             await this.prisma.idempotencyKey.update({
               where: { key: idempotencyKey },
               data: { requestParams: updatedParams },
