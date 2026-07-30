@@ -1007,6 +1007,12 @@ export class PaymentService implements OnModuleInit {
             ),
           }
         : { bookingIntentId: dto.bookingIntentId };
+      // Refresh stripeRetryCount before creating PaymentIntent to avoid race conditions with background sweeps
+      const preCreateKeyRecord = await this.prisma.idempotencyKey.findUnique({
+        where: { key: idempotencyKey },
+      });
+      stripeRetryCount = (preCreateKeyRecord?.requestParams as any)?.stripeRetryCount || stripeRetryCount;
+
       const paymentIntent = await this.stripeService.createPaymentIntent(
         amountInCents,
         result.currency,
@@ -1029,9 +1035,6 @@ export class PaymentService implements OnModuleInit {
           ...(keyRecord?.requestParams as any || {}),
           backupPaymentIntentId: paymentIntent.id,
         };
-        if (stripeRetryCount > 0) {
-          updatedParams.stripeRetryCount = stripeRetryCount;
-        }
         await this.prisma.idempotencyKey.update({
           where: { key: idempotencyKey },
           data: {
@@ -1234,9 +1237,6 @@ export class PaymentService implements OnModuleInit {
         });
         const updatedParams = { ...(keyRecord?.requestParams as any || {}) };
         delete updatedParams.backupPaymentIntentId;
-        if (stripeRetryCount > 0) {
-          updatedParams.stripeRetryCount = stripeRetryCount;
-        }
         await this.prisma.idempotencyKey.update({
           where: { key: idempotencyKey },
           data: { requestParams: updatedParams },
@@ -1272,9 +1272,6 @@ export class PaymentService implements OnModuleInit {
             });
             const updatedParams = { ...(keyRecord?.requestParams as any || {}) };
             delete updatedParams.backupPaymentIntentId;
-            if (stripeRetryCount > 0) {
-              updatedParams.stripeRetryCount = stripeRetryCount;
-            }
             await this.prisma.idempotencyKey.update({
               where: { key: idempotencyKey },
               data: { requestParams: updatedParams },
