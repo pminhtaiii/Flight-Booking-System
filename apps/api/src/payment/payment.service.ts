@@ -685,8 +685,14 @@ export class PaymentService implements OnModuleInit {
                 this.logger.log(`Successfully cancelled previously failed rollback PaymentIntent ${piId}`);
               }
             } catch (cancelError: any) {
-              this.logger.error(`Failed to cancel previously failed rollback PaymentIntent ${piId}: ${cancelError.message}`, cancelError.stack);
-              throw new ConflictException(`Deferred rollback of previous PaymentIntent ${piId} failed. Please try again later.`);
+              const msg = (cancelError.message || '').toLowerCase();
+              if (msg.includes('canceled') || msg.includes('cancelled') || msg.includes('missing') || msg.includes('no such payment_intent')) {
+                this.logger.log(`PaymentIntent ${piId} appears to be already cancelled (likely by a concurrent sweep). Proceeding.`);
+                canceledIntentIds.add(piId);
+              } else {
+                this.logger.error(`Failed to cancel previously failed rollback PaymentIntent ${piId}: ${cancelError.message}`, cancelError.stack);
+                throw new ConflictException(`Deferred rollback of previous PaymentIntent ${piId} failed. Please try again later.`);
+              }
             }
           }
           if (rollback.id) {
@@ -786,8 +792,13 @@ export class PaymentService implements OnModuleInit {
             data: { requestParams: updatedParams },
           });
         } catch (cancelError: any) {
-          this.logger.error(`Deferred rollback of backup PaymentIntent ${failedId} failed again: ${cancelError.message}`, cancelError.stack);
-          throw new ConflictException(`Deferred rollback of previous PaymentIntent ${failedId} failed. Please try again later.`);
+          const msg = (cancelError.message || '').toLowerCase();
+          if (msg.includes('canceled') || msg.includes('cancelled') || msg.includes('missing') || msg.includes('no such payment_intent')) {
+            this.logger.log(`Deferred rollback of backup PaymentIntent ${failedId} appears to be already cancelled. Proceeding.`);
+          } else {
+            this.logger.error(`Deferred rollback of backup PaymentIntent ${failedId} failed again: ${cancelError.message}`, cancelError.stack);
+            throw new ConflictException(`Deferred rollback of previous PaymentIntent ${failedId} failed. Please try again later.`);
+          }
         }
       }
 
