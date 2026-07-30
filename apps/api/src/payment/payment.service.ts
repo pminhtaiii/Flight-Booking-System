@@ -308,6 +308,7 @@ export class PaymentService implements OnModuleInit {
   private async enrichPassengerSnapshot(
     bookingIntentId: string,
     passengerSnapshot: PassengerSnapshot,
+    passedDuffelOrderId?: string,
   ): Promise<PassengerSnapshot> {
     if (!passengerSnapshot || !Array.isArray(passengerSnapshot.passengers)) {
       return passengerSnapshot;
@@ -337,22 +338,40 @@ export class PaymentService implements OnModuleInit {
     }
 
     let contactPhone = passengerSnapshot.contactPhone;
-    const payment = await this.prisma.payment.findFirst({
-      where: { bookingIntentId },
-      include: { booking: true },
-    });
-    let duffelOrderId = payment?.booking?.duffelOrderId;
-    if (!duffelOrderId && payment?.id) {
-      const duffelEvent = await this.prisma.paymentEvent.findFirst({
-        where: {
-          paymentId: payment.id,
-          eventType: 'duffel_order_created',
-        },
-        orderBy: { createdAt: 'desc' },
+    let duffelOrderId = passedDuffelOrderId;
+    if (!duffelOrderId) {
+      const booking = await this.prisma.booking.findFirst({
+        where: { bookingIntentId },
+        select: { duffelOrderId: true, paymentId: true }
       });
-      const dOrder = duffelEvent?.metadata as any;
-      duffelOrderId = dOrder?.id;
+      if (booking?.duffelOrderId) {
+        duffelOrderId = booking.duffelOrderId;
+      } else {
+        const payment = await this.prisma.payment.findFirst({
+          where: { bookingIntentId },
+          include: { booking: true }
+        });
+        if (payment?.booking?.duffelOrderId) {
+          duffelOrderId = payment.booking.duffelOrderId;
+        }
+
+        let paymentId = booking?.paymentId || payment?.id;
+        if (!paymentId && payment) {
+          paymentId = payment.id;
+        }
+        if (paymentId) {
+          const duffelEvent = await this.prisma.paymentEvent.findFirst({
+            where: { paymentId, eventType: 'duffel_order_created' },
+            orderBy: { createdAt: 'desc' }
+          });
+          const order = duffelEvent?.metadata as any;
+          if (order?.id) {
+            duffelOrderId = order.id;
+          }
+        }
+      }
     }
+
     if (duffelOrderId && !contactPhone) {
       try {
         const liveOrder = await this.duffelService.retrieveCompleteOrder(duffelOrderId);
@@ -488,6 +507,41 @@ export class PaymentService implements OnModuleInit {
 
       if (idempotency.status === 'replay') {
         return JSON.parse(idempotency.responseBody);
+      }
+
+      // Find all unresolved failed_stripe_rollback entries matching the current idempotencyKey in the AuditLog table
+      const pendingRollbacks = (await this.prisma.auditLog.findMany({
+        where: {
+          action: 'failed_stripe_rollback',
+        },
+      })) || [];
+      const matchingRollbacks = pendingRollbacks.filter((rollback: any) => {
+        const metadata = rollback.metadata as any || {};
+        return metadata.idempotencyKey === idempotencyKey;
+      });
+
+      if (matchingRollbacks.length > 0) {
+        this.logger.warn(`Found ${matchingRollbacks.length} unresolved failed stripe rollbacks for idempotency key ${idempotencyKey}. Resolving...`);
+        const canceledIntentIds = new Set<string>();
+        for (const rollback of matchingRollbacks) {
+          const piId = rollback.resourceId;
+          if (piId) {
+            if (!canceledIntentIds.has(piId)) {
+              try {
+                await this.stripeService.cancelPaymentIntent(piId);
+                canceledIntentIds.add(piId);
+                this.logger.log(`Successfully cancelled previously failed rollback PaymentIntent ${piId}`);
+              } catch (cancelError: any) {
+                this.logger.error(`Failed to cancel previously failed rollback PaymentIntent ${piId}: ${cancelError.message}`, cancelError.stack);
+                throw new ConflictException(`Deferred rollback of previous PaymentIntent ${piId} failed. Please try again later.`);
+              }
+            }
+            await this.prisma.auditLog.update({
+              where: { id: rollback.id },
+              data: { action: 'resolved_failed_stripe_rollback' },
+            });
+          }
+        }
       }
 
       // Check if a Payment record was already created for this idempotency key
@@ -1540,7 +1594,7 @@ export class PaymentService implements OnModuleInit {
             if (dOrder) {
               const snaps = this.duffelService.mapDuffelOrderToSnapshots(dOrder);
               flightSnap = snaps.flightSnapshot;
-              passSnap = await this.enrichPassengerSnapshot(payment.bookingIntentId, snaps.passengerSnapshot);
+              passSnap = await this.enrichPassengerSnapshot(payment.bookingIntentId, snaps.passengerSnapshot, dOrder.id);
               if (flightSnap?.segments?.[0]?.departureAt) {
                 departAt = new Date(flightSnap.segments[0].departureAt);
               }
@@ -1644,7 +1698,7 @@ export class PaymentService implements OnModuleInit {
             });
 
             const { flightSnapshot, passengerSnapshot: rawPassengerSnapshot } = this.duffelService.mapDuffelOrderToSnapshots(duffelOrder);
-            const passengerSnapshot = await this.enrichPassengerSnapshot(payment.bookingIntentId, rawPassengerSnapshot);
+            const passengerSnapshot = await this.enrichPassengerSnapshot(payment.bookingIntentId, rawPassengerSnapshot, duffelOrder.id as string);
             await this.bookingService.updateToConfirmed(
               canonicalBooking.id,
               duffelOrder.booking_reference as string,
@@ -1886,7 +1940,7 @@ export class PaymentService implements OnModuleInit {
             if (dOrder) {
               const snaps = this.duffelService.mapDuffelOrderToSnapshots(dOrder);
               flightSnap = snaps.flightSnapshot;
-              passSnap = await this.enrichPassengerSnapshot(payment.bookingIntentId, snaps.passengerSnapshot);
+              passSnap = await this.enrichPassengerSnapshot(payment.bookingIntentId, snaps.passengerSnapshot, dOrder.id);
               if (flightSnap?.segments?.[0]?.departureAt) {
                 departAt = new Date(flightSnap.segments[0].departureAt);
               }

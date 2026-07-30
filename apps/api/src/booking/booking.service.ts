@@ -274,7 +274,7 @@ export class BookingService {
       const order = duffelEvent?.metadata as any;
       if (order && order.id) {
          const { flightSnapshot, passengerSnapshot: rawPassengerSnapshot } = this.duffelService.mapDuffelOrderToSnapshots(order);
-         const passengerSnapshot = await this.enrichPassengerSnapshot(booking.bookingIntentId, rawPassengerSnapshot);
+         const passengerSnapshot = await this.enrichPassengerSnapshot(booking.bookingIntentId, rawPassengerSnapshot, order.id);
          const departureAt = flightSnapshot.segments?.[0]?.departureAt
            ? new Date(flightSnapshot.segments[0].departureAt)
            : null;
@@ -1072,6 +1072,7 @@ export class BookingService {
   private async enrichPassengerSnapshot(
     bookingIntentId: string,
     passengerSnapshot: PassengerSnapshot,
+    passedDuffelOrderId?: string,
   ): Promise<PassengerSnapshot> {
     if (!passengerSnapshot || !Array.isArray(passengerSnapshot.passengers)) {
       return passengerSnapshot;
@@ -1101,18 +1102,36 @@ export class BookingService {
     }
 
     let contactPhone = passengerSnapshot.contactPhone;
-    const booking = await this.prisma.booking.findFirst({
-      where: { bookingIntentId },
-      select: { duffelOrderId: true },
-    });
-    if (booking?.duffelOrderId && !contactPhone) {
+    let duffelOrderId = passedDuffelOrderId;
+    if (!duffelOrderId) {
+      const booking = await this.prisma.booking.findFirst({
+        where: { bookingIntentId },
+        select: { duffelOrderId: true, paymentId: true },
+      });
+      if (booking) {
+        if (booking.duffelOrderId) {
+          duffelOrderId = booking.duffelOrderId;
+        } else if (booking.paymentId) {
+          const duffelEvent = await this.prisma.paymentEvent.findFirst({
+            where: { paymentId: booking.paymentId, eventType: 'duffel_order_created' },
+            orderBy: { createdAt: 'desc' }
+          });
+          const order = duffelEvent?.metadata as any;
+          if (order?.id) {
+            duffelOrderId = order.id;
+          }
+        }
+      }
+    }
+
+    if (duffelOrderId && !contactPhone) {
       try {
-        const liveOrder = await this.duffelService.retrieveCompleteOrder(booking.duffelOrderId);
+        const liveOrder = await this.duffelService.retrieveCompleteOrder(duffelOrderId);
         if (liveOrder?.passengers?.[0]?.phone_number) {
           contactPhone = liveOrder.passengers[0].phone_number;
         }
       } catch (err: any) {
-        this.logger.warn(`Failed to retrieve phone number from Duffel for order ${booking.duffelOrderId}: ${err.message}`);
+        this.logger.warn(`Failed to retrieve phone number from Duffel for order ${duffelOrderId}: ${err.message}`);
       }
     }
 

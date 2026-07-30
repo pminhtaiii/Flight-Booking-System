@@ -1059,4 +1059,209 @@ describe('PaymentService - Final Fixes Spec', () => {
       });
     });
   });
+
+  describe('Issue 1: enrichPassengerSnapshot fallback resolution', () => {
+    it('should resolve duffelOrderId from passedDuffelOrderId directly', async () => {
+      const rawSnapshot = {
+        passengers: [{ type: 'ADULT', firstName: 'REDACTED', lastName: 'REDACTED', dateOfBirth: '1990-01-01' }],
+        contactEmail: null,
+        contactPhone: null,
+      };
+
+      prisma.bookingIntentPassenger.findMany.mockResolvedValue([]);
+      prisma.bookingIntent.findUnique.mockResolvedValue({ userId: 'user-1' });
+      prisma.user.findUnique.mockResolvedValue({ email: 'user@example.com' });
+      duffel.retrieveCompleteOrder = jest.fn().mockResolvedValue({
+        passengers: [{ phone_number: '+12223334444' }],
+      });
+
+      const enriched = await service['enrichPassengerSnapshot']('intent-123', rawSnapshot as any, 'passed-order-id');
+
+      expect(enriched.contactPhone).toBe('+12223334444');
+      expect(duffel.retrieveCompleteOrder).toHaveBeenCalledWith('passed-order-id');
+    });
+
+    it('should resolve duffelOrderId from booking.duffelOrderId if passedDuffelOrderId is not provided', async () => {
+      const rawSnapshot = {
+        passengers: [{ type: 'ADULT', firstName: 'REDACTED', lastName: 'REDACTED', dateOfBirth: '1990-01-01' }],
+        contactEmail: null,
+        contactPhone: null,
+      };
+
+      prisma.bookingIntentPassenger.findMany.mockResolvedValue([]);
+      prisma.bookingIntent.findUnique.mockResolvedValue({ userId: 'user-1' });
+      prisma.user.findUnique.mockResolvedValue({ email: 'user@example.com' });
+      prisma.booking.findFirst.mockResolvedValue({
+        duffelOrderId: 'booking-order-id',
+      });
+      duffel.retrieveCompleteOrder = jest.fn().mockResolvedValue({
+        passengers: [{ phone_number: '+12223334444' }],
+      });
+
+      const enriched = await service['enrichPassengerSnapshot']('intent-123', rawSnapshot as any);
+
+      expect(enriched.contactPhone).toBe('+12223334444');
+      expect(duffel.retrieveCompleteOrder).toHaveBeenCalledWith('booking-order-id');
+    });
+
+    it('should resolve duffelOrderId from duffel_order_created event if not in booking or passed', async () => {
+      const rawSnapshot = {
+        passengers: [{ type: 'ADULT', firstName: 'REDACTED', lastName: 'REDACTED', dateOfBirth: '1990-01-01' }],
+        contactEmail: null,
+        contactPhone: null,
+      };
+
+      prisma.bookingIntentPassenger.findMany.mockResolvedValue([]);
+      prisma.bookingIntent.findUnique.mockResolvedValue({ userId: 'user-1' });
+      prisma.user.findUnique.mockResolvedValue({ email: 'user@example.com' });
+      prisma.booking.findFirst.mockResolvedValue({
+        duffelOrderId: null,
+        paymentId: 'pay-123',
+      });
+      prisma.paymentEvent.findFirst.mockResolvedValue({
+        metadata: { id: 'event-order-id' },
+      });
+      duffel.retrieveCompleteOrder = jest.fn().mockResolvedValue({
+        passengers: [{ phone_number: '+12223334444' }],
+      });
+
+      const enriched = await service['enrichPassengerSnapshot']('intent-123', rawSnapshot as any);
+
+      expect(enriched.contactPhone).toBe('+12223334444');
+      expect(duffel.retrieveCompleteOrder).toHaveBeenCalledWith('event-order-id');
+    });
+  });
+
+  describe('Issue 2: createPayment failed_stripe_rollback cancellation', () => {
+    it('should query failed_stripe_rollback logs and cancel matching ones only once per unique ID', async () => {
+      prisma.idempotencyKey.findUnique.mockResolvedValue({
+        requestParams: {},
+      });
+      validation.validateForPayment.mockResolvedValue({
+        selectionId: 'sel-1',
+        selectionVersion: 1,
+        baseAmount: '10.00',
+        grandTotal: '10.00',
+        currency: 'USD',
+        services: [{ serviceId: 'seat-1', quantity: 1 }],
+      });
+      prisma.user.findUnique.mockResolvedValue({ email: 'john@example.com', stripeCustomerId: 'cus-1' });
+      stripe.createPaymentIntent.mockResolvedValue({ id: 'pi-new', client_secret: 'secret-new' });
+
+      // Mock audit log query returning duplicate failed_stripe_rollback entries for the same/different intents
+      prisma.auditLog.findMany.mockResolvedValue([
+        {
+          id: 'log-1',
+          resourceId: 'pi-failed-1',
+          metadata: { idempotencyKey: 'ikey-match' },
+        },
+        {
+          id: 'log-2',
+          resourceId: 'pi-failed-1', // duplicate PI ID
+          metadata: { idempotencyKey: 'ikey-match' },
+        },
+        {
+          id: 'log-3',
+          resourceId: 'pi-failed-2',
+          metadata: { idempotencyKey: 'ikey-match' },
+        },
+        {
+          id: 'log-4',
+          resourceId: 'pi-failed-other',
+          metadata: { idempotencyKey: 'ikey-other' },
+        },
+      ]);
+
+      stripe.cancelPaymentIntent.mockResolvedValue({ status: 'canceled' });
+
+      // Mock other prisma operations so createPayment completes
+      prisma.$queryRaw
+        .mockResolvedValueOnce([
+          {
+            id: 'intent-1',
+            userId: 'user-1',
+            status: 'PENDING',
+            paymentAttemptCount: 0,
+            currency: 'USD',
+            intentExpiresAt: new Date(Date.now() + 600000),
+            offerExpiresAt: new Date(Date.now() + 600000),
+            currentAncillarySelectionId: 'sel-1',
+            ancillaryVersion: 1,
+          },
+        ])
+        .mockResolvedValueOnce([
+          {
+            id: 'sel-1',
+            status: 'VALIDATED',
+            currency: 'USD',
+            validatedBaseAmount: new Prisma.Decimal('10.00'),
+            validatedGrandTotal: new Prisma.Decimal('10.00'),
+            validationLeaseToken: null,
+            validationLeaseExpiresAt: null,
+            validatedAt: new Date(),
+          },
+        ]);
+      prisma.$transaction.mockResolvedValueOnce({
+        attemptNumber: 1,
+        amount: 1000,
+        currency: 'USD',
+      });
+
+      const dto = {
+        bookingIntentId: 'intent-1',
+        ancillarySelectionId: 'sel-1',
+        ancillarySelectionVersion: 1,
+      };
+
+      await service.createPayment(dto, 'ikey-match', 'user-1', '127.0.0.1');
+
+      // Verify cancel was called exactly once for each unique matching PI ID
+      expect(stripe.cancelPaymentIntent).toHaveBeenCalledWith('pi-failed-1');
+      expect(stripe.cancelPaymentIntent).toHaveBeenCalledWith('pi-failed-2');
+      expect(stripe.cancelPaymentIntent).not.toHaveBeenCalledWith('pi-failed-other');
+      // Ensure we only canceled 2 times (and not 3) due to tracking duplicate IDs
+      const cancelCalls = stripe.cancelPaymentIntent.mock.calls.filter((c: any) => c[0].startsWith('pi-failed-'));
+      expect(cancelCalls.length).toBe(2);
+
+      // Verify audit logs updated
+      expect(prisma.auditLog.update).toHaveBeenCalledWith({
+        where: { id: 'log-1' },
+        data: { action: 'resolved_failed_stripe_rollback' },
+      });
+      expect(prisma.auditLog.update).toHaveBeenCalledWith({
+        where: { id: 'log-2' },
+        data: { action: 'resolved_failed_stripe_rollback' },
+      });
+      expect(prisma.auditLog.update).toHaveBeenCalledWith({
+        where: { id: 'log-3' },
+        data: { action: 'resolved_failed_stripe_rollback' },
+      });
+      expect(prisma.auditLog.update).not.toHaveBeenCalledWith({
+        where: { id: 'log-4' },
+        data: expect.anything(),
+      });
+    });
+
+    it('should throw ConflictException if cancelPaymentIntent fails on matches', async () => {
+      prisma.auditLog.findMany.mockResolvedValue([
+        {
+          id: 'log-1',
+          resourceId: 'pi-failed-1',
+          metadata: { idempotencyKey: 'ikey-match' },
+        },
+      ]);
+
+      stripe.cancelPaymentIntent.mockRejectedValueOnce(new Error('Stripe API error'));
+
+      const dto = {
+        bookingIntentId: 'intent-1',
+        ancillarySelectionId: 'sel-1',
+        ancillarySelectionVersion: 1,
+      };
+
+      await expect(
+        service.createPayment(dto, 'ikey-match', 'user-1', '127.0.0.1')
+      ).rejects.toThrow(ConflictException);
+    });
+  });
 });
