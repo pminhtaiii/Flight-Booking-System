@@ -296,99 +296,137 @@ export class PaymentService implements OnModuleInit {
     }
   }
 
-  private async sweepStripeRollbackFailures() {
+  private async getUnresolvedRollbacks(idempotencyKey?: string): Promise<{ id?: string, redisKey?: string, fileIndex?: number, piId: string, ikey?: string }[]> {
+    const rollbacks: { id?: string, redisKey?: string, fileIndex?: number, piId: string, ikey?: string }[] = [];
+    
     try {
       const pendingRollbacks = await this.prisma.auditLog.findMany({
         where: { action: 'failed_stripe_rollback' },
       });
-
-      for (const rollback of pendingRollbacks) {
-        const metadata = rollback.metadata as any || {};
-        const piId = rollback.resourceId;
+      for (const r of pendingRollbacks) {
+        const metadata = (r.metadata as any) || {};
         const ikey = metadata.idempotencyKey;
+        if (!idempotencyKey || ikey === idempotencyKey) {
+          if (r.resourceId) {
+            rollbacks.push({ id: r.id, piId: r.resourceId, ikey });
+          }
+        }
+      }
+    } catch (err: any) {
+      this.logger.warn(`Failed to read rollbacks from DB: ${err.message}`);
+    }
 
-        if (piId) {
-          this.logger.log(`Startup sweep: Attempting to cancel dangling Stripe PaymentIntent ${piId}...`);
-          try {
-            await this.stripeService.cancelPaymentIntent(piId);
-            this.logger.log(`Startup sweep: Successfully cancelled dangling PaymentIntent ${piId}`);
+    if (this.cacheService) {
+      try {
+        const keys = await this.cacheService.keysDurable('stripe_rollback_failure:*');
+        for (const key of keys) {
+          const val = await this.cacheService.getDurable(key);
+          if (val) {
+            try {
+              const parsed = JSON.parse(val);
+              if (!idempotencyKey || parsed.idempotencyKey === idempotencyKey) {
+                if (parsed.paymentIntentId) {
+                  rollbacks.push({ redisKey: key, piId: parsed.paymentIntentId, ikey: parsed.idempotencyKey });
+                }
+              }
+            } catch (e) {}
+          }
+        }
+      } catch (err: any) {
+        this.logger.warn(`Failed to sweep Redis rollback failures: ${err.message}`);
+      }
+    }
 
-            // Mark as resolved in audit logs
+    try {
+      const fsModule = require('fs');
+      const pathModule = require('path');
+      const logPath = pathModule.join(process.cwd(), 'stripe_rollback_failures.log');
+      if (fsModule.existsSync(logPath)) {
+        const lines = fsModule.readFileSync(logPath, 'utf8').split('\n');
+        for (let i = 0; i < lines.length; i++) {
+          const line = lines[i].trim();
+          if (line) {
+            try {
+              const parsed = JSON.parse(line);
+              if (!idempotencyKey || parsed.idempotencyKey === idempotencyKey) {
+                if (parsed.paymentIntentId) {
+                  rollbacks.push({ fileIndex: i, piId: parsed.paymentIntentId, ikey: parsed.idempotencyKey });
+                }
+              }
+            } catch(e) {}
+          }
+        }
+      }
+    } catch (err: any) {
+      this.logger.warn(`Failed to sweep local file rollback failures: ${err.message}`);
+    }
+
+    return rollbacks;
+  }
+
+  private async sweepStripeRollbackFailures() {
+    try {
+      const rollbacks = await this.getUnresolvedRollbacks();
+      const resolvedFileIndices = new Set<number>();
+      
+      for (const rollback of rollbacks) {
+        const piId = rollback.piId;
+        const ikey = rollback.ikey;
+        
+        this.logger.log(`Startup sweep: Attempting to cancel dangling Stripe PaymentIntent ${piId}...`);
+        try {
+          await this.stripeService.cancelPaymentIntent(piId);
+          this.logger.log(`Startup sweep: Successfully cancelled dangling PaymentIntent ${piId}`);
+
+          if (rollback.id) {
             await this.prisma.auditLog.update({
               where: { id: rollback.id },
               data: { action: 'resolved_failed_stripe_rollback' },
             });
-
-            // Try to clear from DB idempotency key if possible
-            if (ikey) {
-              try {
-                const keyRecord = await this.prisma.idempotencyKey.findUnique({
-                  where: { key: ikey },
-                });
-                if (keyRecord) {
-                  const updatedParams = { ...(keyRecord.requestParams as any || {}) };
-                  delete updatedParams.backupPaymentIntentId;
-                  updatedParams.stripeRetryCount = (updatedParams.stripeRetryCount || 0) + 1;
-                  await this.prisma.idempotencyKey.update({
-                    where: { key: ikey },
-                    data: { requestParams: updatedParams },
-                  });
-                }
-              } catch (dbErr: any) {
-                // Ignore DB error
-              }
-            }
-          } catch (stripeErr: any) {
-            this.logger.error(`Startup sweep: Failed to cancel dangling PaymentIntent ${piId}: ${stripeErr.message}`);
           }
+          if (rollback.redisKey && this.cacheService) {
+            await this.cacheService.delDurable(rollback.redisKey).catch(() => {});
+          }
+          if (rollback.fileIndex !== undefined) {
+            resolvedFileIndices.add(rollback.fileIndex);
+          }
+
+          if (ikey) {
+            try {
+              const keyRecord = await this.prisma.idempotencyKey.findUnique({
+                where: { key: ikey },
+              });
+              if (keyRecord) {
+                const updatedParams = { ...(keyRecord.requestParams as any || {}) };
+                delete updatedParams.backupPaymentIntentId;
+                updatedParams.stripeRetryCount = (updatedParams.stripeRetryCount || 0) + 1;
+                await this.prisma.idempotencyKey.update({
+                  where: { key: ikey },
+                  data: { requestParams: updatedParams },
+                });
+              }
+            } catch (dbErr: any) {
+              // Ignore DB error
+            }
+          }
+        } catch (stripeErr: any) {
+          this.logger.error(`Startup sweep: Failed to cancel dangling PaymentIntent ${piId}: ${stripeErr.message}`);
         }
       }
-
-      // Sweep Redis fallbacks
-      if (this.cacheService) {
+      
+      if (resolvedFileIndices.size > 0) {
         try {
-          const keys = await this.cacheService.keysDurable('stripe_rollback_failure:*');
-          for (const key of keys) {
-            const val = await this.cacheService.getDurable(key);
-            if (val) {
-              const fallbackLog = JSON.parse(val);
-              const piId = fallbackLog.paymentIntentId;
-              const ikey = fallbackLog.idempotencyKey;
-              if (piId) {
-                this.logger.log(`Startup sweep (Redis fallback): Attempting to cancel dangling Stripe PaymentIntent ${piId}...`);
-                try {
-                  await this.stripeService.cancelPaymentIntent(piId);
-                  this.logger.log(`Startup sweep (Redis fallback): Successfully cancelled dangling PaymentIntent ${piId}`);
-                  await this.cacheService.delDurable(key);
-                  
-                  if (ikey) {
-                    try {
-                      const keyRecord = await this.prisma.idempotencyKey.findUnique({
-                        where: { key: ikey },
-                      });
-                      if (keyRecord) {
-                        const updatedParams = { ...(keyRecord.requestParams as any || {}) };
-                        delete updatedParams.backupPaymentIntentId;
-                        updatedParams.stripeRetryCount = (updatedParams.stripeRetryCount || 0) + 1;
-                        await this.prisma.idempotencyKey.update({
-                          where: { key: ikey },
-                          data: { requestParams: updatedParams },
-                        });
-                      }
-                    } catch (dbErr: any) {
-                      // Ignore DB error
-                    }
-                  }
-                } catch (stripeErr: any) {
-                  this.logger.error(`Startup sweep (Redis fallback): Failed to cancel dangling PaymentIntent ${piId}: ${stripeErr.message}`);
-                }
-              } else {
-                await this.cacheService.delDurable(key);
-              }
-            }
+          const fsModule = require('fs');
+          const pathModule = require('path');
+          const logPath = pathModule.join(process.cwd(), 'stripe_rollback_failures.log');
+          if (fsModule.existsSync(logPath)) {
+            const lines = fsModule.readFileSync(logPath, 'utf8').split('\n');
+            const remainingLines = lines.filter((_, idx) => !resolvedFileIndices.has(idx) && lines[idx].trim() !== '');
+            fsModule.writeFileSync(logPath, remainingLines.join('\n') + (remainingLines.length > 0 ? '\n' : ''), 'utf8');
+            this.logger.log(`Startup sweep: Cleared ${resolvedFileIndices.size} resolved entries from local fallback log.`);
           }
-        } catch (redisErr: any) {
-           this.logger.error(`Failed to sweep Redis rollback failures: ${redisErr.message}`);
+        } catch (err: any) {
+          this.logger.warn(`Startup sweep: Failed to rewrite local fallback log: ${err.message}`);
         }
       }
     } catch (err: any) {
@@ -617,36 +655,31 @@ export class PaymentService implements OnModuleInit {
       }
 
       // Find all unresolved failed_stripe_rollback entries matching the current idempotencyKey in the AuditLog table
-      const pendingRollbacks = (await this.prisma.auditLog.findMany({
-        where: {
-          action: 'failed_stripe_rollback',
-        },
-      })) || [];
-      const matchingRollbacks = pendingRollbacks.filter((rollback: any) => {
-        const metadata = rollback.metadata as any || {};
-        return metadata.idempotencyKey === idempotencyKey;
-      });
+      const matchingRollbacks = await this.getUnresolvedRollbacks(idempotencyKey);
 
       const canceledIntentIds = new Set<string>();
       if (matchingRollbacks.length > 0) {
         this.logger.warn(`Found ${matchingRollbacks.length} unresolved failed stripe rollbacks for idempotency key ${idempotencyKey}. Resolving...`);
         for (const rollback of matchingRollbacks) {
-          const piId = rollback.resourceId;
-          if (piId) {
-            if (!canceledIntentIds.has(piId)) {
-              try {
-                await this.stripeService.cancelPaymentIntent(piId);
-                canceledIntentIds.add(piId);
-                this.logger.log(`Successfully cancelled previously failed rollback PaymentIntent ${piId}`);
-              } catch (cancelError: any) {
-                this.logger.error(`Failed to cancel previously failed rollback PaymentIntent ${piId}: ${cancelError.message}`, cancelError.stack);
-                throw new ConflictException(`Deferred rollback of previous PaymentIntent ${piId} failed. Please try again later.`);
-              }
+          const piId = rollback.piId;
+          if (!canceledIntentIds.has(piId)) {
+            try {
+              await this.stripeService.cancelPaymentIntent(piId);
+              canceledIntentIds.add(piId);
+              this.logger.log(`Successfully cancelled previously failed rollback PaymentIntent ${piId}`);
+            } catch (cancelError: any) {
+              this.logger.error(`Failed to cancel previously failed rollback PaymentIntent ${piId}: ${cancelError.message}`, cancelError.stack);
+              throw new ConflictException(`Deferred rollback of previous PaymentIntent ${piId} failed. Please try again later.`);
             }
+          }
+          if (rollback.id) {
             await this.prisma.auditLog.update({
               where: { id: rollback.id },
               data: { action: 'resolved_failed_stripe_rollback' },
             });
+          }
+          if (rollback.redisKey && this.cacheService) {
+            await this.cacheService.delDurable(rollback.redisKey).catch(() => {});
           }
         }
 
