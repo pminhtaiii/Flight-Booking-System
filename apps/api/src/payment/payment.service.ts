@@ -531,8 +531,7 @@ export class PaymentService implements OnModuleInit {
       }
 
       if (!contactPhone) {
-        this.logger.warn(`Failed to retrieve contact phone from Duffel or traveler profile for booking intent ${bookingIntentId}. Falling back to default dummy number +10000000000.`);
-        contactPhone = '+10000000000';
+        this.logger.warn(`Failed to retrieve contact phone from Duffel or traveler profile for booking intent ${bookingIntentId}. Proceeding without contact phone.`);
       }
     }
 
