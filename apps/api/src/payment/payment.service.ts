@@ -265,11 +265,15 @@ export class PaymentService implements OnModuleInit {
         };
         const logStr = JSON.stringify(fallbackLog);
 
-        if (this.cacheService) {
+        let redisSuccess = false;
+        if (this.cacheService && (this.cacheService as any).redisClient?.status === 'ready') {
           const redisKey = `stripe_rollback_failure:${paymentIntentId}:${Date.now()}`;
           await this.cacheService.set(redisKey, logStr);
           this.logger.error(`CRITICAL FAILURE: Wrote fallback log to Redis: ${paymentIntentId}`);
-        } else {
+          redisSuccess = true;
+        }
+        
+        if (!redisSuccess) {
           fs.appendFileSync(
             path.join(process.cwd(), 'stripe_rollback_failures.log'),
             logStr + '\n',
@@ -320,6 +324,7 @@ export class PaymentService implements OnModuleInit {
                 if (keyRecord) {
                   const updatedParams = { ...(keyRecord.requestParams as any || {}) };
                   delete updatedParams.backupPaymentIntentId;
+                  updatedParams.stripeRetryCount = (updatedParams.stripeRetryCount || 0) + 1;
                   await this.prisma.idempotencyKey.update({
                     where: { key: ikey },
                     data: { requestParams: updatedParams },
@@ -360,6 +365,7 @@ export class PaymentService implements OnModuleInit {
                       if (keyRecord) {
                         const updatedParams = { ...(keyRecord.requestParams as any || {}) };
                         delete updatedParams.backupPaymentIntentId;
+                        updatedParams.stripeRetryCount = (updatedParams.stripeRetryCount || 0) + 1;
                         await this.prisma.idempotencyKey.update({
                           where: { key: ikey },
                           data: { requestParams: updatedParams },
