@@ -402,18 +402,12 @@ export class PaymentService implements OnModuleInit {
 
           if (ikey) {
             try {
-              const keyRecord = await this.prisma.idempotencyKey.findUnique({
-                where: { key: ikey },
-              });
-              if (keyRecord) {
-                const updatedParams = { ...(keyRecord.requestParams as any || {}) };
-                delete updatedParams.backupPaymentIntentId;
-                updatedParams.stripeRetryCount = (updatedParams.stripeRetryCount || 0) + 1;
-                await this.prisma.idempotencyKey.update({
-                  where: { key: ikey },
-                  data: { requestParams: updatedParams },
-                });
-              }
+              await this.prisma.$executeRaw`
+                UPDATE idempotency_keys
+                SET "requestParams" = COALESCE("requestParams", '{}'::jsonb) - 'backupPaymentIntentId'
+                  || jsonb_build_object('stripeRetryCount', COALESCE(("requestParams"->>'stripeRetryCount')::int, 0) + 1)
+                WHERE "key" = ${ikey}
+              `;
             } catch (dbErr: any) {
               // Ignore DB error
             }
@@ -707,21 +701,12 @@ export class PaymentService implements OnModuleInit {
         }
 
         if (canceledIntentIds.size > 0) {
-          const keyRecord = await this.prisma.idempotencyKey.findUnique({
-            where: { key: idempotencyKey },
-          });
-          if (keyRecord) {
-            const currentParams = (keyRecord.requestParams as any) || {};
-            const newRetryCount = (currentParams.stripeRetryCount || 0) + canceledIntentIds.size;
-            const updatedParams = {
-              ...currentParams,
-              stripeRetryCount: newRetryCount,
-            };
-            await this.prisma.idempotencyKey.update({
-              where: { key: idempotencyKey },
-              data: { requestParams: updatedParams },
-            });
-          }
+          await this.prisma.$executeRaw`
+            UPDATE idempotency_keys
+            SET "requestParams" = COALESCE("requestParams", '{}'::jsonb)
+              || jsonb_build_object('stripeRetryCount', COALESCE(("requestParams"->>'stripeRetryCount')::int, 0) + ${canceledIntentIds.size})
+            WHERE "key" = ${idempotencyKey}
+          `;
         }
       }
 
@@ -778,19 +763,19 @@ export class PaymentService implements OnModuleInit {
             this.logger.log(`Backup PaymentIntent ${failedId} was already cancelled via AuditLog processing. Skipping redundant cancellation.`);
           }
 
-          // Clear it
-          const updatedParams = { ...requestParams };
-          delete updatedParams.backupPaymentIntentId;
-          
-          if (!canceledIntentIds.has(failedId)) {
-            updatedParams.stripeRetryCount = (requestParams.stripeRetryCount || 0) + 1;
-          }
-          stripeRetryCount = updatedParams.stripeRetryCount || requestParams.stripeRetryCount || 0;
-          
-          await this.prisma.idempotencyKey.update({
+          // Atomic JSONB update to clear backupPaymentIntentId and optionally increment stripeRetryCount
+          const increment = canceledIntentIds.has(failedId) ? 0 : 1;
+          await this.prisma.$executeRaw`
+            UPDATE idempotency_keys
+            SET "requestParams" = COALESCE("requestParams", '{}'::jsonb) - 'backupPaymentIntentId'
+              || jsonb_build_object('stripeRetryCount', COALESCE(("requestParams"->>'stripeRetryCount')::int, 0) + ${increment})
+            WHERE "key" = ${idempotencyKey}
+          `;
+
+          const updatedKey = await this.prisma.idempotencyKey.findUnique({
             where: { key: idempotencyKey },
-            data: { requestParams: updatedParams },
           });
+          stripeRetryCount = (updatedKey?.requestParams as any)?.stripeRetryCount || 0;
         } catch (cancelError: any) {
           const msg = (cancelError.message || '').toLowerCase();
           if (msg.includes('canceled') || msg.includes('cancelled') || msg.includes('missing') || msg.includes('no such payment_intent')) {
