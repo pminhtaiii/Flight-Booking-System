@@ -251,6 +251,29 @@ export class PaymentService implements OnModuleInit {
         `CRITICAL FAILURE: Could not write to fallback database AuditLog: ${dbError.message}. Stripe PaymentIntent: ${paymentIntentId}, IdempotencyKey: ${idempotencyKey}`,
         dbError.stack,
       );
+      try {
+        const fallbackLog = {
+          timestamp: new Date().toISOString(),
+          paymentIntentId,
+          idempotencyKey,
+          reason,
+          userId: userId || null,
+          dbError: dbError.message,
+        };
+        fs.appendFileSync(
+          path.join(process.cwd(), 'stripe_rollback_failures.log'),
+          JSON.stringify(fallbackLog) + '\n',
+          'utf8',
+        );
+        this.logger.error(
+          `CRITICAL FAILURE: Wrote fallback log to local file: ${paymentIntentId}`,
+        );
+      } catch (fileError: any) {
+        this.logger.error(
+          `CRITICAL FAILURE: Could not write to local fallback file either: ${fileError.message}`,
+          fileError.stack,
+        );
+      }
     }
   }
 
@@ -554,6 +577,24 @@ export class PaymentService implements OnModuleInit {
             await this.prisma.auditLog.update({
               where: { id: rollback.id },
               data: { action: 'resolved_failed_stripe_rollback' },
+            });
+          }
+        }
+
+        if (canceledIntentIds.size > 0) {
+          const keyRecord = await this.prisma.idempotencyKey.findUnique({
+            where: { key: idempotencyKey },
+          });
+          if (keyRecord) {
+            const currentParams = (keyRecord.requestParams as any) || {};
+            const newRetryCount = (currentParams.stripeRetryCount || 0) + canceledIntentIds.size;
+            const updatedParams = {
+              ...currentParams,
+              stripeRetryCount: newRetryCount,
+            };
+            await this.prisma.idempotencyKey.update({
+              where: { key: idempotencyKey },
+              data: { requestParams: updatedParams },
             });
           }
         }

@@ -9,6 +9,11 @@ import { PaymentService } from '@/payment/payment.service';
 import { PrismaService } from '@/prisma/prisma.service';
 import { Prisma, BookingFailureReason } from '@prisma/client';
 import { BadRequestException, ConflictException, GoneException, InternalServerErrorException } from '@nestjs/common';
+import * as fs from 'fs';
+jest.mock('fs', () => ({
+  ...jest.requireActual('fs'),
+  appendFileSync: jest.fn(),
+}));
 
 describe('PaymentService - Final Fixes Spec', () => {
   let prisma: any;
@@ -1556,6 +1561,150 @@ describe('PaymentService - Final Fixes Spec', () => {
             backupPaymentIntentId: 'pi-2',
           },
         },
+      });
+    });
+  });
+
+  describe('logStripeRollbackFailure fallback to local file', () => {
+    it('should append to local file when database write fails', async () => {
+      const appendSpy = fs.appendFileSync as jest.Mock;
+      appendSpy.mockClear().mockImplementationOnce(() => {});
+      prisma.auditLog.create.mockRejectedValueOnce(new Error('Database offline'));
+
+      await service['logStripeRollbackFailure'](
+        'pi-fail-intent',
+        'ikey-fail-rollback',
+        'Stripe cancel timed out',
+        'user-fail-123'
+      );
+
+      expect(prisma.auditLog.create).toHaveBeenCalled();
+      expect(appendSpy).toHaveBeenCalled();
+      const [filePath, content] = appendSpy.mock.calls[0];
+      expect(filePath).toContain('stripe_rollback_failures.log');
+
+      const parsedLog = JSON.parse(content as string);
+      expect(parsedLog.paymentIntentId).toBe('pi-fail-intent');
+      expect(parsedLog.idempotencyKey).toBe('ikey-fail-rollback');
+      expect(parsedLog.reason).toBe('Stripe cancel timed out');
+      expect(parsedLog.userId).toBe('user-fail-123');
+      expect(parsedLog.dbError).toBe('Database offline');
+    });
+  });
+
+  describe('Issue 2: retry suffix counter advancement on AuditLog rollback', () => {
+    it('should increment stripeRetryCount by number of unique cancelled intents and save to idempotencyKey requestParams', async () => {
+      const dto = {
+        bookingIntentId: 'intent-rollback-adv',
+        ancillarySelectionId: 'sel-1',
+        ancillarySelectionVersion: 1,
+      };
+
+      // Mock idempotency key findUnique to return stripeRetryCount: 1
+      prisma.idempotencyKey.findUnique.mockResolvedValue({
+        key: 'ikey-rollback-adv',
+        requestParams: {
+          stripeRetryCount: 1,
+        },
+      });
+
+      // Mock pending rollbacks matching current idempotency key
+      prisma.auditLog.findMany.mockResolvedValueOnce([
+        {
+          id: 'log-1',
+          action: 'failed_stripe_rollback',
+          resourceType: 'PaymentIntent',
+          resourceId: 'pi-old-1',
+          metadata: { idempotencyKey: 'ikey-rollback-adv' },
+        },
+        {
+          id: 'log-2',
+          action: 'failed_stripe_rollback',
+          resourceType: 'PaymentIntent',
+          resourceId: 'pi-old-2',
+          metadata: { idempotencyKey: 'ikey-rollback-adv' },
+        },
+        {
+          id: 'log-3',
+          action: 'failed_stripe_rollback',
+          resourceType: 'PaymentIntent',
+          resourceId: 'pi-old-1', // duplicate PI ID
+          metadata: { idempotencyKey: 'ikey-rollback-adv' },
+        },
+      ]);
+
+      validation.validateForPayment.mockResolvedValue({
+        selectionId: 'sel-1',
+        selectionVersion: 1,
+        baseAmount: '10.00',
+        grandTotal: '10.00',
+        currency: 'USD',
+        services: [{ serviceId: 'seat-1', quantity: 1 }],
+      });
+      prisma.user.findUnique.mockResolvedValue({ email: 'john@example.com', stripeCustomerId: 'cus-1' });
+      stripe.createPaymentIntent.mockResolvedValue({ id: 'pi-new', client_secret: 'secret-new' });
+      stripe.cancelPaymentIntent.mockResolvedValue({ status: 'canceled' });
+
+      prisma.$queryRaw
+        .mockResolvedValueOnce([
+          {
+            id: 'intent-rollback-adv',
+            userId: 'user-1',
+            status: 'PENDING',
+            paymentAttemptCount: 0,
+            currency: 'USD',
+            intentExpiresAt: new Date(Date.now() + 600000),
+            offerExpiresAt: new Date(Date.now() + 600000),
+            currentAncillarySelectionId: 'sel-1',
+            ancillaryVersion: 1,
+          },
+        ])
+        .mockResolvedValueOnce([
+          {
+            id: 'sel-1',
+            status: 'VALIDATED',
+            currency: 'USD',
+            validatedBaseAmount: new Prisma.Decimal('10.00'),
+            validatedGrandTotal: new Prisma.Decimal('10.00'),
+            validationLeaseToken: null,
+            validationLeaseExpiresAt: null,
+            validatedAt: new Date(),
+          },
+        ]);
+      prisma.$transaction.mockResolvedValueOnce({
+        attemptNumber: 1,
+        amount: 1000,
+        currency: 'USD',
+      });
+
+      await service.createPayment(dto, 'ikey-rollback-adv', 'user-1', '127.0.0.1');
+
+      // Verify cancelPaymentIntent called for unique PIs
+      expect(stripe.cancelPaymentIntent).toHaveBeenCalledWith('pi-old-1');
+      expect(stripe.cancelPaymentIntent).toHaveBeenCalledWith('pi-old-2');
+
+      // Verify that idempotencyKey update was called to advance stripeRetryCount (1 + 2 = 3)
+      expect(prisma.idempotencyKey.update).toHaveBeenCalledWith({
+        where: { key: 'ikey-rollback-adv' },
+        data: {
+          requestParams: {
+            stripeRetryCount: 3,
+          },
+        },
+      });
+
+      // Verify all AuditLog entries are marked resolved
+      expect(prisma.auditLog.update).toHaveBeenCalledWith({
+        where: { id: 'log-1' },
+        data: { action: 'resolved_failed_stripe_rollback' },
+      });
+      expect(prisma.auditLog.update).toHaveBeenCalledWith({
+        where: { id: 'log-2' },
+        data: { action: 'resolved_failed_stripe_rollback' },
+      });
+      expect(prisma.auditLog.update).toHaveBeenCalledWith({
+        where: { id: 'log-3' },
+        data: { action: 'resolved_failed_stripe_rollback' },
       });
     });
   });
