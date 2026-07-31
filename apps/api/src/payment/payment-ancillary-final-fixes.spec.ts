@@ -529,6 +529,71 @@ describe('PaymentService - Final Fixes Spec', () => {
 
       expect(validation.validateForPayment).toHaveBeenCalledTimes(1);
     });
+
+    it('should cancel the Stripe PaymentIntent if the database transaction fails after createPaymentIntent', async () => {
+      prisma.idempotencyKey.findUnique.mockResolvedValue(null);
+
+      validation.validateForPayment.mockResolvedValue({
+        selectionId: 'sel-1',
+        selectionVersion: 1,
+        baseAmount: '10.00',
+        grandTotal: '10.00',
+        currency: 'USD',
+        services: [{ serviceId: 'seat-1', quantity: 1 }],
+      });
+
+      prisma.user.findUnique.mockResolvedValue({ email: 'john@example.com', stripeCustomerId: 'cus-1' });
+      stripe.createPaymentIntent.mockResolvedValue({ id: 'pi-1', client_secret: 'secret-1' });
+
+      prisma.$queryRaw
+        .mockResolvedValueOnce([
+          {
+            id: 'intent-1',
+            userId: 'user-1',
+            status: 'PENDING',
+            paymentAttemptCount: 0,
+            currency: 'USD',
+            intentExpiresAt: new Date(Date.now() + 600000),
+            offerExpiresAt: new Date(Date.now() + 600000),
+            currentAncillarySelectionId: 'sel-1',
+            ancillaryVersion: 1,
+          },
+        ])
+        .mockResolvedValueOnce([
+          {
+            id: 'sel-1',
+            status: 'VALIDATED',
+            currency: 'USD',
+            validatedBaseAmount: new Prisma.Decimal('10.00'),
+            validatedGrandTotal: new Prisma.Decimal('10.00'),
+            validationLeaseToken: null,
+            validationLeaseExpiresAt: null,
+            validatedAt: new Date(),
+          },
+        ])
+        .mockResolvedValueOnce([
+          {
+            currentAncillarySelectionId: 'sel-1',
+            ancillaryVersion: 1,
+          }
+        ]);
+
+      prisma.$executeRaw.mockResolvedValue(1);
+
+      prisma.ancillarySelection.updateMany.mockRejectedValue(new Error('Database transaction failed'));
+
+      const dto = {
+        bookingIntentId: 'intent-1',
+        ancillarySelectionId: 'sel-1',
+        ancillarySelectionVersion: 1,
+      };
+
+      await expect(
+        service.createPayment(dto, 'ikey-123', 'user-1', '127.0.0.1'),
+      ).rejects.toThrow('Database transaction failed');
+
+      expect(stripe.cancelPaymentIntent).toHaveBeenCalledWith('pi-1');
+    });
   });
 
   describe('Finding 6: Intent/Offer Expiration and Omitted Ancillary Selection Rejection', () => {

@@ -685,7 +685,7 @@ export class PaymentService {
             ),
           }
         : { bookingIntentId: dto.bookingIntentId };
-      const paymentIntent = await this.stripeService.createPaymentIntent(
+      paymentIntent = await this.stripeService.createPaymentIntent(
         amountInCents,
         result.currency,
         stripeCustomerId,
