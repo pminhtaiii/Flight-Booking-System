@@ -60,6 +60,37 @@ export class AncillariesService {
       }
       const totals = calculateAncillaryTotals({ baseAmount: String(intent.confirmedPrice), currency: intent.currency, seats: valid.seats, baggage: valid.baggage });
       return await this.prisma.$transaction(async (tx) => {
+      await tx.$queryRaw`
+        SELECT id
+        FROM booking_intents
+        WHERE id = ${intentId}
+        FOR UPDATE
+      `;
+      const leaseState = await tx.bookingIntent.findUnique({
+        where: { id: intentId },
+        select: {
+          ancillaryVersion: true,
+          currentAncillarySelection: {
+            select: {
+              validationLeaseToken: true,
+              validationLeaseExpiresAt: true,
+            },
+          },
+        },
+      });
+      const lease = leaseState?.currentAncillarySelection;
+      if (
+        leaseState?.ancillaryVersion !== dto.expectedVersion ||
+        (lease?.validationLeaseToken &&
+          lease.validationLeaseExpiresAt &&
+          lease.validationLeaseExpiresAt > new Date())
+      ) {
+        throw new ConflictException({
+          code: 'ANCILLARY_VERSION_CONFLICT',
+          intentId,
+          currentVersion: leaseState?.ancillaryVersion ?? intent.ancillaryVersion,
+        });
+      }
       const selection = await tx.ancillarySelection.create({
         data: {
           bookingIntentId: intentId, version: dto.expectedVersion + 1, status: 'DRAFT_COMMITTED', currency: intent.currency,

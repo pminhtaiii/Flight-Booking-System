@@ -318,6 +318,8 @@ model AncillarySelection {
   validatedBaseAmount  Decimal?                 @db.Decimal(10, 2)
   validatedGrandTotal  Decimal?                 @db.Decimal(10, 2)
   validatedAt          DateTime?
+  validationLeaseToken String?
+  validationLeaseExpiresAt DateTime?
   createdAt            DateTime                 @default(now())
   updatedAt            DateTime                 @updatedAt
   bookingIntent        BookingIntent            @relation("BookingIntentAncillarySelections", fields: [bookingIntentId], references: [id], onDelete: Cascade)
@@ -329,6 +331,7 @@ model AncillarySelection {
   @@unique([bookingIntentId, version])
   @@unique([id, bookingIntentId, version])
   @@index([bookingIntentId])
+  @@index([validationLeaseExpiresAt])
   @@map("ancillary_selections")
 }
 

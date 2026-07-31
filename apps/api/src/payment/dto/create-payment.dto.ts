@@ -1,4 +1,4 @@
-import { IsString, IsOptional, IsBoolean } from 'class-validator';
+import { IsString, IsOptional, IsBoolean, IsInt } from 'class-validator';
 
 export class CreatePaymentDto {
   @IsString()
@@ -11,4 +11,12 @@ export class CreatePaymentDto {
   @IsOptional()
   @IsBoolean()
   saveCard?: boolean;
+
+  @IsOptional()
+  @IsString()
+  ancillarySelectionId?: string;
+
+  @IsOptional()
+  @IsInt()
+  ancillarySelectionVersion?: number;
 }
