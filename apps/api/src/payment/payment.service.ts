@@ -20,7 +20,7 @@ import { ConfirmPaymentDto } from '@/payment/dto/confirm-payment.dto';
 import { PaymentResponseDto } from '@/payment/dto/payment-response.dto';
 import { enforceTransition } from '@/payment/payment-state-machine';
 import * as crypto from 'crypto';
-import { Prisma, BookingFailureReason } from '@prisma/client';
+import { Prisma, BookingFailureReason, AncillarySelectionStatus } from '@prisma/client';
 
 import { BookingService } from '@/booking/booking.service';
 import { forwardRef, Inject } from '@nestjs/common';
@@ -299,14 +299,24 @@ export class PaymentService {
               });
             }
 
-            await tx.ancillarySelection.updateMany({
+            const selectionUpdate = await tx.ancillarySelection.updateMany({
               where: {
                 id: validated.selectionId,
                 bookingIntentId: dto.bookingIntentId,
                 version: validated.selectionVersion,
+                status: AncillarySelectionStatus.VALIDATED,
               },
-              data: { status: 'PAYMENT_BOUND' },
+              data: { status: AncillarySelectionStatus.PAYMENT_BOUND },
             });
+
+            if (selectionUpdate.count !== 1) {
+              throw new ConflictException({
+                code: 'ANCILLARY_SELECTION_STALE',
+                intentId: dto.bookingIntentId,
+                currentVersion: validated.selectionVersion,
+                message: 'Ancillary selection was marked stale during payment processing. Please revalidate.',
+              });
+            }
           }
 
           const createdPayment = await tx.payment.create({

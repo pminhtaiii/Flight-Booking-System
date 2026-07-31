@@ -40,7 +40,7 @@ describe('PaymentService - Ancillary Pipeline', () => {
         update: jest.fn(),
       },
       ancillarySelection: {
-        updateMany: jest.fn(),
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
       },
       idempotencyKey: {
         findUnique: jest.fn(),
@@ -195,6 +195,7 @@ describe('PaymentService - Ancillary Pipeline', () => {
           id: 'anc-sel-123',
           bookingIntentId: 'intent-123',
           version: 1,
+          status: 'VALIDATED',
         },
         data: { status: 'PAYMENT_BOUND' },
       });
@@ -396,6 +397,81 @@ describe('PaymentService - Ancillary Pipeline', () => {
       // Verify Payment record was NOT created and ancillarySelection was NOT bound
       expect(mockPrisma.payment.create).not.toHaveBeenCalled();
       expect(mockPrisma.ancillarySelection.updateMany).not.toHaveBeenCalled();
+    });
+
+    it('cancels Stripe PaymentIntent and throws ConflictException with ANCILLARY_SELECTION_STALE if selection updateMany returns count 0', async () => {
+      mockPrisma.bookingIntent.findUnique.mockResolvedValueOnce({
+        id: 'intent-123',
+        status: 'PENDING',
+        paymentAttemptCount: 0,
+        confirmedPrice: 200,
+        currency: 'USD',
+        userId: 'user-123',
+        currentAncillarySelectionId: 'anc-sel-123',
+        ancillaryVersion: 1,
+      });
+
+      mockAncillaryValidation.validateForPayment.mockResolvedValueOnce({
+        selectionId: 'anc-sel-123',
+        selectionVersion: 1,
+        baseAmount: '200.00',
+        grandTotal: '250.00',
+        currency: 'USD',
+        services: [{ serviceId: 'srv-bag-1', quantity: 1 }],
+      });
+
+      mockPrisma.$queryRaw
+        .mockResolvedValueOnce([
+          {
+            id: 'intent-123',
+            status: 'PENDING',
+            paymentAttemptCount: 0,
+            confirmedPrice: 200,
+            currency: 'USD',
+            userId: 'user-123',
+            currentAncillarySelectionId: 'anc-sel-123',
+            ancillaryVersion: 1,
+          },
+        ])
+        .mockResolvedValueOnce([
+          {
+            id: 'intent-123',
+            currentAncillarySelectionId: 'anc-sel-123',
+            ancillaryVersion: 1,
+          },
+        ]);
+
+      mockPrisma.payment.findFirst.mockResolvedValueOnce(null);
+      mockPrisma.user.findUnique.mockResolvedValueOnce({
+        email: 'user@example.com',
+        stripeCustomerId: 'cus_123',
+      });
+      mockStripe.createPaymentIntent.mockResolvedValueOnce({
+        id: 'pi_123',
+        client_secret: 'secret_123',
+      });
+      mockPrisma.idempotencyKey.findUnique.mockResolvedValueOnce({ id: 'idem-rec-123' });
+
+      // Simulating selection becoming STALE before Step 5 (updateMany returns { count: 0 })
+      mockPrisma.ancillarySelection.updateMany.mockResolvedValueOnce({ count: 0 });
+
+      await expect(
+        service.createPayment(dto, idempotencyKey, userId, ipAddress),
+      ).rejects.toThrow(
+        expect.objectContaining({
+          response: expect.objectContaining({
+            code: 'ANCILLARY_SELECTION_STALE',
+            intentId: 'intent-123',
+            currentVersion: 1,
+          }),
+        }),
+      );
+
+      // Verify created Stripe PaymentIntent was cancelled
+      expect(mockStripe.cancelPaymentIntent).toHaveBeenCalledWith('pi_123');
+
+      // Verify Payment record was NOT created
+      expect(mockPrisma.payment.create).not.toHaveBeenCalled();
     });
 
     it('does not cancel Stripe PaymentIntent if Step 5 (Payment record creation) succeeds but a post-commit step fails', async () => {
