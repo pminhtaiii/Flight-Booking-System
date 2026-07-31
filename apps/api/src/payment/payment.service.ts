@@ -396,12 +396,20 @@ export class PaymentService {
         targetAncillarySelectionVersion !== undefined &&
         targetAncillarySelectionVersion > 0
       ) {
-        validated = await this.ancillaryPaymentValidation.validateForPayment({
-          userId,
-          bookingIntentId: dto.bookingIntentId,
-          ancillarySelectionId: targetAncillarySelectionId,
-          ancillarySelectionVersion: targetAncillarySelectionVersion,
-        });
+        if (
+          validatedAncillary &&
+          validatedAncillary.selectionId === targetAncillarySelectionId &&
+          validatedAncillary.selectionVersion === targetAncillarySelectionVersion
+        ) {
+          validated = validatedAncillary;
+        } else {
+          validated = await this.ancillaryPaymentValidation.validateForPayment({
+            userId,
+            bookingIntentId: dto.bookingIntentId,
+            ancillarySelectionId: targetAncillarySelectionId,
+            ancillarySelectionVersion: targetAncillarySelectionVersion,
+          });
+        }
         amountInCents = Math.round(Number(validated.grandTotal) * 100);
       } else {
         amountInCents = Math.round(Number(intent.confirmedPrice) * 100);
