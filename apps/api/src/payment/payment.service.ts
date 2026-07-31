@@ -204,6 +204,7 @@ function enrichRedactedDuffelOrder(duffelOrder: any, dbPassengers: any[], userEm
         }
       }
       p.email = userEmail;
+      p.phone_number = null;
     });
   }
   return copy;
@@ -685,12 +686,28 @@ export class PaymentService {
       let payment;
       if (validatedAncillary) {
         payment = await this.prisma.$transaction(async (tx) => {
-          await tx.$queryRaw`
-            SELECT id
+          interface ShortBookingIntent {
+            currentAncillarySelectionId: string | null;
+            ancillaryVersion: number | null;
+          }
+          const lockedIntents = await tx.$queryRaw<ShortBookingIntent[]>`
+            SELECT "currentAncillarySelectionId", "ancillaryVersion"
             FROM booking_intents
             WHERE id = ${dto.bookingIntentId}
             FOR UPDATE
           `;
+          const lockedIntent = lockedIntents[0];
+          if (
+            !lockedIntent ||
+            lockedIntent.currentAncillarySelectionId !== validatedAncillary.selectionId ||
+            lockedIntent.ancillaryVersion !== validatedAncillary.selectionVersion
+          ) {
+            throw new ConflictException({
+              code: 'ANCILLARY_VERSION_CONFLICT',
+              intentId: dto.bookingIntentId,
+              currentVersion: lockedIntent?.ancillaryVersion ?? 0,
+            });
+          }
           const existingPayment = await tx.payment.findFirst({
             where: {
               idempotencyKey: { key: idempotencyKey },

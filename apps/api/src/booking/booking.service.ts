@@ -46,6 +46,7 @@ function enrichRedactedDuffelOrder(duffelOrder: any, dbPassengers: any[], userEm
         }
       }
       p.email = userEmail;
+      p.phone_number = null;
     });
   }
   return copy;
