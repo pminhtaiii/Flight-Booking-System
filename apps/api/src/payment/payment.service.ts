@@ -4,6 +4,7 @@ import {
   NotFoundException,
   BadRequestException,
   ForbiddenException,
+  ConflictException,
   InternalServerErrorException,
   HttpStatus,
   HttpException,
@@ -26,6 +27,22 @@ import { BookingService } from '@/booking/booking.service';
 import { forwardRef, Inject } from '@nestjs/common';
 import { FlightSnapshot, PassengerSnapshot } from '@shared/booking-types';
 import { AncillaryPaymentValidationService } from '@/payment/ancillary-payment-validation.service';
+import type { ValidatedAncillaryPayment } from '@/payment/ancillary-payment-validation.service';
+
+function majorUnitsToMinor(amount: string): number {
+  const match = /^(\d+)(?:\.(\d{1,2}))?$/.exec(amount);
+  if (!match) {
+    throw new BadRequestException('Invalid authoritative payment amount');
+  }
+
+  const fractional = (match[2] ?? '').padEnd(2, '0');
+  const minor = BigInt(match[1]) * 100n + BigInt(fractional || '0');
+  if (minor > 2_147_483_647n) {
+    throw new BadRequestException('Authoritative payment amount is too large');
+  }
+
+  return parseInt(minor.toString(), 10);
+}
 
 @Injectable()
 export class PaymentService {
@@ -54,6 +71,8 @@ export class PaymentService {
     ipAddress: string,
   ): Promise<PaymentResponseDto> {
     try {
+      let validatedAncillary: ValidatedAncillaryPayment | undefined;
+      let boundPaymentReplay = false;
       if (
         dto.ancillarySelectionId !== undefined ||
         dto.ancillarySelectionVersion !== undefined
@@ -71,12 +90,34 @@ export class PaymentService {
             'Ancillary payment validation is unavailable',
           );
         }
-        await this.ancillaryPaymentValidation.validateForPayment({
-          userId,
-          bookingIntentId: dto.bookingIntentId,
-          ancillarySelectionId: dto.ancillarySelectionId,
-          ancillarySelectionVersion: dto.ancillarySelectionVersion,
+        const boundPayment = await this.prisma.payment?.findFirst({
+          where: {
+            bookingIntentId: dto.bookingIntentId,
+            ancillarySelectionId: dto.ancillarySelectionId,
+            ancillarySelectionVersion: dto.ancillarySelectionVersion,
+            idempotencyKey: {
+              key: idempotencyKey,
+              customerId: userId,
+            },
+          },
+          select: {
+            bookingIntentId: true,
+            ancillarySelectionId: true,
+            ancillarySelectionVersion: true,
+          },
         });
+        boundPaymentReplay =
+          boundPayment?.bookingIntentId === dto.bookingIntentId &&
+          boundPayment.ancillarySelectionId === dto.ancillarySelectionId &&
+          boundPayment.ancillarySelectionVersion === dto.ancillarySelectionVersion;
+        if (!boundPaymentReplay) {
+          validatedAncillary = await this.ancillaryPaymentValidation.validateForPayment({
+            userId,
+            bookingIntentId: dto.bookingIntentId,
+            ancillarySelectionId: dto.ancillarySelectionId,
+            ancillarySelectionVersion: dto.ancillarySelectionVersion,
+          });
+        }
       }
 
       // 1. Check/acquire the request idempotency key
@@ -98,13 +139,16 @@ export class PaymentService {
           id: string;
           status: string;
           paymentAttemptCount: number;
-          confirmedPrice: number;
+          confirmedPrice: Prisma.Decimal | string;
           currency: string;
           userId: string;
+          currentAncillarySelectionId: string | null;
+          ancillaryVersion: number;
         }
 
         const intents = await tx.$queryRaw<RawBookingIntent[]>`
-          SELECT id, status, "paymentAttemptCount", "confirmedPrice", currency, "userId"
+          SELECT id, status, "paymentAttemptCount", "confirmedPrice", currency, "userId",
+                 "currentAncillarySelectionId", "ancillaryVersion"
           FROM booking_intents
           WHERE id = ${dto.bookingIntentId}
           FOR UPDATE
@@ -119,7 +163,12 @@ export class PaymentService {
           throw new ForbiddenException('You do not own this booking intent');
         }
 
-        if (intent.status !== 'PENDING' && intent.status !== 'AWAITING_PAYMENT') {
+        if (
+          (validatedAncillary && intent.status !== 'PENDING') ||
+          (!validatedAncillary &&
+            intent.status !== 'PENDING' &&
+            intent.status !== 'AWAITING_PAYMENT')
+        ) {
           throw new BadRequestException('Booking intent is not in an allowed status for payment');
         }
 
@@ -133,9 +182,10 @@ export class PaymentService {
 
         if (existingPayment) {
           return {
-            confirmedPrice: Number(intent.confirmedPrice),
-            currency: intent.currency,
+            amount: existingPayment.amount,
+            currency: existingPayment.currency.toUpperCase(),
             attemptNumber: existingPayment.attemptNumber,
+            payment: existingPayment,
           };
         }
 
@@ -144,6 +194,63 @@ export class PaymentService {
         }
 
         const nextAttemptCount = intent.paymentAttemptCount + 1;
+        const amount = validatedAncillary
+          ? majorUnitsToMinor(validatedAncillary.grandTotal)
+          : majorUnitsToMinor(String(intent.confirmedPrice));
+        const currency = validatedAncillary?.currency ?? intent.currency;
+        if (validatedAncillary) {
+          if (
+            intent.currentAncillarySelectionId !== validatedAncillary.selectionId ||
+            intent.ancillaryVersion !== validatedAncillary.selectionVersion
+          ) {
+            throw new ConflictException({
+              code: 'ANCILLARY_VERSION_CONFLICT',
+              intentId: dto.bookingIntentId,
+              currentVersion: intent.ancillaryVersion,
+            });
+          }
+          if (intent.currency.toUpperCase() !== validatedAncillary.currency.toUpperCase()) {
+            throw new BadRequestException({
+              code: 'ANCILLARY_CURRENCY_MISMATCH',
+              intentId: dto.bookingIntentId,
+            });
+          }
+          interface RawAncillarySelection {
+            id: string;
+            status: string;
+            currency: string;
+            validatedBaseAmount: Prisma.Decimal | string | null;
+            validatedGrandTotal: Prisma.Decimal | string | null;
+            validationLeaseToken: string | null;
+            validationLeaseExpiresAt: Date | null;
+          }
+          const selections = await tx.$queryRaw<RawAncillarySelection[]>`
+            SELECT id, status, currency, "validatedBaseAmount", "validatedGrandTotal",
+                   "validationLeaseToken", "validationLeaseExpiresAt"
+            FROM ancillary_selections
+            WHERE id = ${validatedAncillary.selectionId}
+              AND "bookingIntentId" = ${dto.bookingIntentId}
+              AND version = ${validatedAncillary.selectionVersion}
+            FOR UPDATE
+          `;
+          const selection = selections[0];
+          if (
+            selections.length !== 1 ||
+            selection.status !== 'VALIDATED' ||
+            selection.currency.toUpperCase() !== validatedAncillary.currency.toUpperCase() ||
+            String(selection.validatedBaseAmount) !== validatedAncillary.baseAmount ||
+            String(selection.validatedGrandTotal) !== validatedAncillary.grandTotal ||
+            selection.validationLeaseToken !== null ||
+            selection.validationLeaseExpiresAt !== null
+          ) {
+            throw new ConflictException({
+              code: 'ANCILLARY_VERSION_CONFLICT',
+              intentId: dto.bookingIntentId,
+              currentVersion: intent.ancillaryVersion,
+            });
+          }
+        }
+
         await tx.$executeRaw`
           UPDATE booking_intents
           SET "paymentAttemptCount" = ${nextAttemptCount}, status = 'AWAITING_PAYMENT'
@@ -151,8 +258,8 @@ export class PaymentService {
         `;
 
         return {
-          confirmedPrice: Number(intent.confirmedPrice),
-          currency: intent.currency,
+          amount,
+          currency,
           attemptNumber: nextAttemptCount,
         };
       });
@@ -196,72 +303,183 @@ export class PaymentService {
       }
 
       // 4. Create Stripe PaymentIntent
-      const amountInCents = Math.round(result.confirmedPrice * 100);
+      const amountInCents = result.amount;
+      const stripeMetadata: Record<string, string> = validatedAncillary || boundPaymentReplay
+        ? {
+            bookingIntentId: dto.bookingIntentId,
+            ancillarySelectionId:
+              validatedAncillary?.selectionId ?? dto.ancillarySelectionId!,
+            ancillarySelectionVersion: String(
+              validatedAncillary?.selectionVersion ?? dto.ancillarySelectionVersion,
+            ),
+          }
+        : { bookingIntentId: dto.bookingIntentId };
       const paymentIntent = await this.stripeService.createPaymentIntent(
         amountInCents,
         result.currency,
         stripeCustomerId,
-        { bookingIntentId: dto.bookingIntentId },
+        stripeMetadata,
         `${idempotencyKey}-stripe-intent`,
         dto.paymentMethodId,
         dto.saveCard ? 'off_session' : undefined,
       );
 
       // 5. Create Payment record in DB
-      const keyRecord = await this.prisma.idempotencyKey.findUnique({
-        where: { key: idempotencyKey },
-        select: { id: true },
-      });
-      if (!keyRecord) {
-        throw new InternalServerErrorException('Idempotency key record not found');
-      }
+      let payment;
+      let createdPayment = false;
+      if (validatedAncillary) {
+        const binding = await this.prisma.$transaction(async (tx) => {
+          await tx.$queryRaw`
+            SELECT id
+            FROM booking_intents
+            WHERE id = ${dto.bookingIntentId}
+            FOR UPDATE
+          `;
+          const existingPayment = await tx.payment.findFirst({
+            where: {
+              idempotencyKey: { key: idempotencyKey },
+            },
+          });
+          if (existingPayment) {
+            return { payment: existingPayment, created: false };
+          }
 
-      let payment = await this.prisma.payment.findFirst({
-        where: {
-          idempotencyKeyId: keyRecord.id,
-        },
-      });
+          const bound = await tx.ancillarySelection.updateMany({
+            where: {
+              id: validatedAncillary.selectionId,
+              bookingIntentId: dto.bookingIntentId,
+              version: validatedAncillary.selectionVersion,
+              status: 'VALIDATED',
+              currency: validatedAncillary.currency,
+              validatedBaseAmount: validatedAncillary.baseAmount,
+              validatedGrandTotal: validatedAncillary.grandTotal,
+            },
+            data: { status: 'PAYMENT_BOUND' },
+          });
+          if (bound.count !== 1) {
+            throw new ConflictException({
+              code: 'ANCILLARY_VERSION_CONFLICT',
+              intentId: dto.bookingIntentId,
+              currentVersion: validatedAncillary.selectionVersion,
+            });
+          }
 
-      if (!payment) {
-        payment = await this.prisma.payment.create({
-          data: {
-            bookingIntentId: dto.bookingIntentId,
-            attemptNumber: result.attemptNumber,
+          const keyRecord = await tx.idempotencyKey.findUnique({
+            where: { key: idempotencyKey },
+            select: { id: true },
+          });
+          if (!keyRecord) {
+            throw new InternalServerErrorException('Idempotency key record not found');
+          }
+
+          const created = await tx.payment.create({
+            data: {
+              bookingIntentId: dto.bookingIntentId,
+              ancillarySelectionId: validatedAncillary.selectionId,
+              ancillarySelectionVersion: validatedAncillary.selectionVersion,
+              attemptNumber: result.attemptNumber,
+              idempotencyKeyId: keyRecord.id,
+              stripePaymentIntentId: paymentIntent.id,
+              stripeCustomerId,
+              amount: amountInCents,
+              currency: result.currency.toLowerCase(),
+              status: 'CREATED',
+            },
+          });
+          return { payment: created, created: true };
+        });
+        payment = binding.payment;
+        createdPayment = binding.created;
+      } else if ('payment' in result && result.payment) {
+        payment = result.payment;
+      } else {
+        const keyRecord = await this.prisma.idempotencyKey.findUnique({
+          where: { key: idempotencyKey },
+          select: { id: true },
+        });
+        if (!keyRecord) {
+          throw new InternalServerErrorException('Idempotency key record not found');
+        }
+
+        payment = await this.prisma.payment.findFirst({
+          where: {
             idempotencyKeyId: keyRecord.id,
-            stripePaymentIntentId: paymentIntent.id,
-            stripeCustomerId,
-            amount: amountInCents,
-            currency: result.currency.toLowerCase(),
-            status: 'CREATED',
           },
         });
+
+        if (!payment) {
+          payment = await this.prisma.payment.create({
+            data: {
+              bookingIntentId: dto.bookingIntentId,
+              attemptNumber: result.attemptNumber,
+              idempotencyKeyId: keyRecord.id,
+              stripePaymentIntentId: paymentIntent.id,
+              stripeCustomerId,
+              amount: amountInCents,
+              currency: result.currency.toLowerCase(),
+              status: 'CREATED',
+            },
+          });
+          createdPayment = true;
+        }
       }
 
       // 6. Log event and audit
-      await this.prisma.paymentEvent.create({
-        data: {
-          paymentId: payment.id,
-          eventType: 'payment_created',
-          previousStatus: 'CREATED',
-          newStatus: 'CREATED',
-          amount: amountInCents,
-          source: 'API',
-          createdBy: userId,
-        },
-      });
+      if (createdPayment) {
+        await this.prisma.paymentEvent.create({
+          data: {
+            paymentId: payment.id,
+            eventType: 'payment_created',
+            previousStatus: 'CREATED',
+            newStatus: 'CREATED',
+            amount: amountInCents,
+            source: 'API',
+            createdBy: userId,
+            metadata: validatedAncillary
+              ? {
+                  bookingIntentId: dto.bookingIntentId,
+                  ancillarySelectionId: validatedAncillary.selectionId,
+                  ancillarySelectionVersion: validatedAncillary.selectionVersion,
+                  serviceCount: validatedAncillary.services.length,
+                  serviceQuantity: validatedAncillary.services.reduce(
+                    (total, service) => total + service.quantity,
+                    0,
+                  ),
+                  baseAmount: validatedAncillary.baseAmount,
+                  grandTotal: validatedAncillary.grandTotal,
+                  currency: validatedAncillary.currency,
+                }
+              : undefined,
+          },
+        });
 
-      await this.auditService.createLog(this.prisma, {
-        userId,
-        action: 'payment_created',
-        resourceType: 'Payment',
-        resourceId: payment.id,
-        ipAddress,
-        metadata: {
-          bookingIntentId: dto.bookingIntentId,
-          amount: amountInCents,
-          attemptNumber: result.attemptNumber,
-        },
-      });
+        await this.auditService.createLog(this.prisma, {
+          userId,
+          action: 'payment_created',
+          resourceType: 'Payment',
+          resourceId: payment.id,
+          ipAddress,
+          metadata: {
+            bookingIntentId: dto.bookingIntentId,
+            amount: amountInCents,
+            attemptNumber: result.attemptNumber,
+            ...(validatedAncillary
+              ? {
+                  ancillarySelectionId: validatedAncillary.selectionId,
+                  ancillarySelectionVersion: validatedAncillary.selectionVersion,
+                  serviceCount: validatedAncillary.services.length,
+                  serviceQuantity: validatedAncillary.services.reduce(
+                    (total, service) => total + service.quantity,
+                    0,
+                  ),
+                  baseAmount: validatedAncillary.baseAmount,
+                  grandTotal: validatedAncillary.grandTotal,
+                  currency: validatedAncillary.currency,
+                }
+              : {}),
+          },
+        });
+      }
 
       // 7. Update recovery point and complete idempotency key
       await this.idempotencyService.updateRecoveryPoint(idempotencyKey, 'started');
