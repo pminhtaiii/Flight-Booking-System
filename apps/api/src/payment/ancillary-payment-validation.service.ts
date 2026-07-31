@@ -130,8 +130,6 @@ export class AncillaryPaymentValidationService {
 
   private async acquireLease(input: ValidateAncillaryPaymentInput): Promise<LeasedSnapshot> {
     const leaseToken = randomUUID();
-    const now = new Date();
-    const leaseExpiresAt = new Date(now.getTime() + LEASE_DURATION_MS);
 
     return this.prisma.$transaction(async (transaction) => {
       await transaction.$queryRaw`
@@ -140,6 +138,8 @@ export class AncillaryPaymentValidationService {
         WHERE id = ${input.bookingIntentId}
         FOR UPDATE
       `;
+      const now = new Date();
+      const leaseExpiresAt = new Date(now.getTime() + LEASE_DURATION_MS);
       const intent = await transaction.bookingIntent.findUnique({
         where: { id: input.bookingIntentId },
         include: {
@@ -189,7 +189,6 @@ export class AncillaryPaymentValidationService {
     leaseToken: string,
     pricing: { baseAmount: string; grandTotal: string; currency: string },
   ): Promise<void> {
-    const now = new Date();
     await this.prisma.$transaction(async (transaction) => {
       await transaction.$queryRaw`
         SELECT id
@@ -197,6 +196,7 @@ export class AncillaryPaymentValidationService {
         WHERE id = ${input.bookingIntentId}
         FOR UPDATE
       `;
+      const now = new Date();
       const selection = await transaction.ancillarySelection.updateMany({
         where: {
           id: input.ancillarySelectionId,
@@ -260,6 +260,7 @@ export class AncillaryPaymentValidationService {
             in: [AncillarySelectionStatus.DRAFT_COMMITTED, AncillarySelectionStatus.VALIDATED],
           },
           validationLeaseToken: leaseToken,
+          validationLeaseExpiresAt: { gt: now },
         },
         data: {
           status: AncillarySelectionStatus.STALE,
