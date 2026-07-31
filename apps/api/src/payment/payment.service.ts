@@ -190,15 +190,6 @@ export class PaymentService {
               message: 'Ancillary selection was updated after validation. Please revalidate before payment.',
             });
           }
-
-          await tx.ancillarySelection.updateMany({
-            where: {
-              id: validated.selectionId,
-              bookingIntentId: dto.bookingIntentId,
-              version: validated.selectionVersion,
-            },
-            data: { status: 'PAYMENT_BOUND' },
-          });
         }
 
         return {
@@ -273,19 +264,34 @@ export class PaymentService {
       });
 
       if (!payment) {
-        payment = await this.prisma.payment.create({
-          data: {
-            bookingIntentId: dto.bookingIntentId,
-            attemptNumber: result.attemptNumber,
-            idempotencyKeyId: keyRecord.id,
-            stripePaymentIntentId: paymentIntent.id,
-            stripeCustomerId,
-            amount: amountInCents,
-            currency: result.currency.toLowerCase(),
-            status: 'CREATED',
-            ancillarySelectionId: validated ? validated.selectionId : null,
-            ancillarySelectionVersion: validated ? validated.selectionVersion : null,
-          },
+        payment = await this.prisma.$transaction(async (tx) => {
+          const createdPayment = await tx.payment.create({
+            data: {
+              bookingIntentId: dto.bookingIntentId,
+              attemptNumber: result.attemptNumber,
+              idempotencyKeyId: keyRecord.id,
+              stripePaymentIntentId: paymentIntent.id,
+              stripeCustomerId,
+              amount: amountInCents,
+              currency: result.currency.toLowerCase(),
+              status: 'CREATED',
+              ancillarySelectionId: validated?.selectionId ?? null,
+              ancillarySelectionVersion: validated?.selectionVersion ?? null,
+            },
+          });
+
+          if (validated) {
+            await tx.ancillarySelection.updateMany({
+              where: {
+                id: validated.selectionId,
+                bookingIntentId: dto.bookingIntentId,
+                version: validated.selectionVersion,
+              },
+              data: { status: 'PAYMENT_BOUND' },
+            });
+          }
+
+          return createdPayment;
         });
       }
 

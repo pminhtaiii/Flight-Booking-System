@@ -219,6 +219,54 @@ describe('PaymentService - Ancillary Pipeline', () => {
       });
     });
 
+    it('does not update ancillarySelection to PAYMENT_BOUND if Stripe createPaymentIntent fails', async () => {
+      mockPrisma.bookingIntent.findUnique.mockResolvedValueOnce({
+        id: 'intent-123',
+        status: 'PENDING',
+        paymentAttemptCount: 0,
+        confirmedPrice: 200,
+        currency: 'USD',
+        userId: 'user-123',
+        currentAncillarySelectionId: 'anc-sel-123',
+        ancillaryVersion: 1,
+      });
+
+      mockAncillaryValidation.validateForPayment.mockResolvedValueOnce({
+        selectionId: 'anc-sel-123',
+        selectionVersion: 1,
+        baseAmount: '200.00',
+        grandTotal: '250.00',
+        currency: 'USD',
+        services: [{ serviceId: 'srv-bag-1', quantity: 1 }],
+      });
+
+      mockPrisma.$queryRaw.mockResolvedValueOnce([
+        {
+          id: 'intent-123',
+          status: 'PENDING',
+          paymentAttemptCount: 0,
+          confirmedPrice: 200,
+          currency: 'USD',
+          userId: 'user-123',
+          currentAncillarySelectionId: 'anc-sel-123',
+          ancillaryVersion: 1,
+        },
+      ]);
+
+      mockPrisma.payment.findFirst.mockResolvedValueOnce(null);
+      mockPrisma.user.findUnique.mockResolvedValueOnce({
+        email: 'user@example.com',
+        stripeCustomerId: 'cus_123',
+      });
+      mockStripe.createPaymentIntent.mockRejectedValueOnce(new Error('Stripe API error'));
+
+      await expect(
+        service.createPayment(dto, idempotencyKey, userId, ipAddress),
+      ).rejects.toThrow('Stripe API error');
+
+      expect(mockPrisma.ancillarySelection.updateMany).not.toHaveBeenCalled();
+    });
+
     it('throws ConflictException with ANCILLARY_VERSION_CONFLICT if intent selection or version changes in tx after validation', async () => {
       mockPrisma.bookingIntent.findUnique.mockResolvedValueOnce({
         id: 'intent-123',
