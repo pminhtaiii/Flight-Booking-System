@@ -172,32 +172,6 @@ function readPaymentReservation(
   };
 }
 
-function redactDuffelOrder(duffelOrder: any): any {
-  if (!duffelOrder || typeof duffelOrder !== 'object') {
-    return duffelOrder;
-  }
-  const cloned = JSON.parse(JSON.stringify(duffelOrder));
-  const redactObject = (obj: any) => {
-    if (!obj || typeof obj !== 'object') return;
-    if (Array.isArray(obj)) {
-      obj.forEach(redactObject);
-      return;
-    }
-    for (const key of Object.keys(obj)) {
-      if (key === 'email') obj[key] = null;
-      else if (key === 'phone_number') obj[key] = null;
-      else if (key === 'born_on') obj[key] = null;
-      else if (key === 'given_name') obj[key] = 'REDACTED';
-      else if (key === 'family_name') obj[key] = 'REDACTED';
-      else if (typeof obj[key] === 'object') {
-        redactObject(obj[key]);
-      }
-    }
-  };
-  redactObject(cloned);
-  return cloned;
-}
-
 @Injectable()
 export class PaymentService {
   private readonly logger = new Logger(PaymentService.name);
@@ -519,9 +493,11 @@ export class PaymentService {
             FOR UPDATE
           `;
           const selection = selections[0];
+          const validatedAtTime = selection?.validatedAt ? new Date(selection.validatedAt).getTime() : 0;
           if (
             selections.length !== 1 ||
             selection.status !== 'VALIDATED' ||
+            (Date.now() - validatedAtTime) > 60_000 ||
             selection.currency.toUpperCase() !== validatedAncillary.currency.toUpperCase() ||
             !authoritativeAmountsEqual(
               selection.validatedBaseAmount,
@@ -1227,7 +1203,7 @@ export class PaymentService {
             newStatus: 'AUTHORIZED',
             amount: payment.amount,
             source: 'API',
-            metadata: redactDuffelOrder(duffelOrder) as Prisma.InputJsonValue,
+            metadata: duffelOrder as Prisma.InputJsonValue,
             createdBy: userId,
           },
         });

@@ -8,7 +8,7 @@ import { PaymentMethodService } from '@/payment/payment-method.service';
 import { PaymentService } from '@/payment/payment.service';
 import { PrismaService } from '@/prisma/prisma.service';
 import { Prisma, BookingFailureReason } from '@prisma/client';
-import { BadRequestException, GoneException } from '@nestjs/common';
+import { BadRequestException, GoneException, ConflictException } from '@nestjs/common';
 
 describe('PaymentService - Final Fixes Spec', () => {
   let prisma: any;
@@ -173,16 +173,17 @@ describe('PaymentService - Final Fixes Spec', () => {
             passengers: [
               {
                 id: 'p-1',
-                email: null,
-                phone_number: null,
-                born_on: null,
-                given_name: 'REDACTED',
-                family_name: 'REDACTED',
+                email: 'john@example.com',
+                phone_number: '+123456789',
+                born_on: '1990-01-01',
+                given_name: 'John',
+                family_name: 'Doe',
               },
             ],
           },
         }),
       });
+      expect(duffel.mapDuffelOrderToSnapshots).toHaveBeenCalledWith(duffelOrder);
     });
   });
 
@@ -347,6 +348,52 @@ describe('PaymentService - Final Fixes Spec', () => {
       expect(validation.validateForPayment).toHaveBeenCalled();
       const executeRawCalls = prisma.$executeRaw.mock.calls;
       expect(executeRawCalls[0]).toContain(2);
+    });
+
+    it('should throw ConflictException if selection validatedAt is stale during lock', async () => {
+      validation.validateForPayment.mockResolvedValue({
+        selectionId: 'sel-1',
+        selectionVersion: 1,
+        baseAmount: '10.00',
+        grandTotal: '10.00',
+        currency: 'USD',
+        services: [],
+      });
+
+      prisma.$queryRaw
+        .mockResolvedValueOnce([
+          {
+            id: 'intent-1',
+            userId: 'user-1',
+            status: 'PENDING',
+            paymentAttemptCount: 1,
+            currency: 'USD',
+            currentAncillarySelectionId: 'sel-1',
+            ancillaryVersion: 1,
+          },
+        ])
+        .mockResolvedValueOnce([
+          {
+            id: 'sel-1',
+            status: 'VALIDATED',
+            currency: 'USD',
+            validatedBaseAmount: new Prisma.Decimal('10.00'),
+            validatedGrandTotal: new Prisma.Decimal('10.00'),
+            validationLeaseToken: null,
+            validationLeaseExpiresAt: null,
+            validatedAt: new Date(Date.now() - 65000), // Stale
+          },
+        ]);
+
+      const dto = {
+        bookingIntentId: 'intent-1',
+        ancillarySelectionId: 'sel-1',
+        ancillarySelectionVersion: 1,
+      };
+
+      await expect(
+        service.createPayment(dto, 'ikey-123', 'user-1', '127.0.0.1')
+      ).rejects.toThrow(ConflictException);
     });
   });
 
