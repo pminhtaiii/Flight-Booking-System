@@ -353,7 +353,7 @@ export class PaymentService {
         targetAncillarySelectionVersion !== undefined &&
         targetAncillarySelectionVersion > 0
       ) {
-        validated = await this.ancillaryPaymentValidationService.validateForPayment({
+        validated = await this.ancillaryPaymentValidation.validateForPayment({
           userId,
           bookingIntentId: dto.bookingIntentId,
           ancillarySelectionId: targetAncillarySelectionId,
