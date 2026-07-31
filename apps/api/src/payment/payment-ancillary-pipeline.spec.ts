@@ -141,19 +141,27 @@ describe('PaymentService - Ancillary Pipeline', () => {
         services: [{ serviceId: 'srv-bag-1', quantity: 1 }],
       });
 
-      // 3. Raw query in transaction
-      mockPrisma.$queryRaw.mockResolvedValueOnce([
-        {
-          id: 'intent-123',
-          status: 'PENDING',
-          paymentAttemptCount: 0,
-          confirmedPrice: 200,
-          currency: 'USD',
-          userId: 'user-123',
-          currentAncillarySelectionId: 'anc-sel-123',
-          ancillaryVersion: 1,
-        },
-      ]);
+      // 3. Raw query in transaction (Step 2 and Step 5)
+      mockPrisma.$queryRaw
+        .mockResolvedValueOnce([
+          {
+            id: 'intent-123',
+            status: 'PENDING',
+            paymentAttemptCount: 0,
+            confirmedPrice: 200,
+            currency: 'USD',
+            userId: 'user-123',
+            currentAncillarySelectionId: 'anc-sel-123',
+            ancillaryVersion: 1,
+          },
+        ])
+        .mockResolvedValueOnce([
+          {
+            id: 'intent-123',
+            currentAncillarySelectionId: 'anc-sel-123',
+            ancillaryVersion: 1,
+          },
+        ]);
 
       mockPrisma.payment.findFirst.mockResolvedValueOnce(null);
       mockPrisma.user.findUnique.mockResolvedValueOnce({
@@ -314,6 +322,81 @@ describe('PaymentService - Ancillary Pipeline', () => {
         }),
       );
     });
+
+    it('cancels Stripe PaymentIntent and throws ConflictException if concurrent selection update occurs in Step 5 transaction', async () => {
+      mockPrisma.bookingIntent.findUnique.mockResolvedValueOnce({
+        id: 'intent-123',
+        status: 'PENDING',
+        paymentAttemptCount: 0,
+        confirmedPrice: 200,
+        currency: 'USD',
+        userId: 'user-123',
+        currentAncillarySelectionId: 'anc-sel-123',
+        ancillaryVersion: 1,
+      });
+
+      mockAncillaryValidation.validateForPayment.mockResolvedValueOnce({
+        selectionId: 'anc-sel-123',
+        selectionVersion: 1,
+        baseAmount: '200.00',
+        grandTotal: '250.00',
+        currency: 'USD',
+        services: [{ serviceId: 'srv-bag-1', quantity: 1 }],
+      });
+
+      // Step 2 raw query returns version 1
+      mockPrisma.$queryRaw.mockResolvedValueOnce([
+        {
+          id: 'intent-123',
+          status: 'PENDING',
+          paymentAttemptCount: 0,
+          confirmedPrice: 200,
+          currency: 'USD',
+          userId: 'user-123',
+          currentAncillarySelectionId: 'anc-sel-123',
+          ancillaryVersion: 1,
+        },
+      ]);
+
+      mockPrisma.payment.findFirst.mockResolvedValueOnce(null);
+      mockPrisma.user.findUnique.mockResolvedValueOnce({
+        email: 'user@example.com',
+        stripeCustomerId: 'cus_123',
+      });
+      mockStripe.createPaymentIntent.mockResolvedValueOnce({
+        id: 'pi_123',
+        client_secret: 'secret_123',
+      });
+      mockPrisma.idempotencyKey.findUnique.mockResolvedValueOnce({ id: 'idem-rec-123' });
+
+      // Step 5 raw query returns version 2 (concurrent selection update during Stripe call)
+      mockPrisma.$queryRaw.mockResolvedValueOnce([
+        {
+          id: 'intent-123',
+          currentAncillarySelectionId: 'anc-sel-123',
+          ancillaryVersion: 2,
+        },
+      ]);
+
+      await expect(
+        service.createPayment(dto, idempotencyKey, userId, ipAddress),
+      ).rejects.toThrow(
+        expect.objectContaining({
+          response: expect.objectContaining({
+            code: 'ANCILLARY_VERSION_CONFLICT',
+            intentId: 'intent-123',
+            currentVersion: 2,
+          }),
+        }),
+      );
+
+      // Verify created Stripe PaymentIntent was cancelled
+      expect(mockStripe.cancelPaymentIntent).toHaveBeenCalledWith('pi_123');
+
+      // Verify Payment record was NOT created and ancillarySelection was NOT bound
+      expect(mockPrisma.payment.create).not.toHaveBeenCalled();
+      expect(mockPrisma.ancillarySelection.updateMany).not.toHaveBeenCalled();
+    });
   });
 
   describe('executeConfirmPayment with ancillaries', () => {
@@ -408,16 +491,24 @@ describe('PaymentService - Ancillary Pipeline', () => {
         ancillaryVersion: 0,
       });
 
-      mockPrisma.$queryRaw.mockResolvedValueOnce([
-        {
-          id: 'intent-base-123',
-          status: 'PENDING',
-          paymentAttemptCount: 0,
-          confirmedPrice: 150,
-          currency: 'USD',
-          userId: 'user-123',
-        },
-      ]);
+      mockPrisma.$queryRaw
+        .mockResolvedValueOnce([
+          {
+            id: 'intent-base-123',
+            status: 'PENDING',
+            paymentAttemptCount: 0,
+            confirmedPrice: 150,
+            currency: 'USD',
+            userId: 'user-123',
+          },
+        ])
+        .mockResolvedValueOnce([
+          {
+            id: 'intent-base-123',
+            currentAncillarySelectionId: null,
+            ancillaryVersion: 0,
+          },
+        ]);
 
       mockPrisma.payment.findFirst.mockResolvedValueOnce(null);
       mockPrisma.user.findUnique.mockResolvedValueOnce({

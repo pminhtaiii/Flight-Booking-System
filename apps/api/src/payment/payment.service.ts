@@ -51,6 +51,7 @@ export class PaymentService {
     userId: string,
     ipAddress: string,
   ): Promise<PaymentResponseDto> {
+    let paymentIntent: Awaited<ReturnType<StripeService['createPaymentIntent']>> | undefined = undefined;
     try {
       // 1. Check/acquire the request idempotency key
       const requestHash = this.idempotencyService.computeHash(dto);
@@ -238,7 +239,7 @@ export class PaymentService {
       }
 
       // 4. Create Stripe PaymentIntent
-      const paymentIntent = await this.stripeService.createPaymentIntent(
+      paymentIntent = await this.stripeService.createPaymentIntent(
         amountInCents,
         result.currency,
         stripeCustomerId,
@@ -265,22 +266,38 @@ export class PaymentService {
 
       if (!payment) {
         payment = await this.prisma.$transaction(async (tx) => {
-          const createdPayment = await tx.payment.create({
-            data: {
-              bookingIntentId: dto.bookingIntentId,
-              attemptNumber: result.attemptNumber,
-              idempotencyKeyId: keyRecord.id,
-              stripePaymentIntentId: paymentIntent.id,
-              stripeCustomerId,
-              amount: amountInCents,
-              currency: result.currency.toLowerCase(),
-              status: 'CREATED',
-              ancillarySelectionId: validated?.selectionId ?? null,
-              ancillarySelectionVersion: validated?.selectionVersion ?? null,
-            },
-          });
+          interface RawBookingIntent {
+            id: string;
+            currentAncillarySelectionId: string | null;
+            ancillaryVersion: number;
+          }
+
+          const intents = await tx.$queryRaw<RawBookingIntent[]>`
+            SELECT id, "currentAncillarySelectionId", "ancillaryVersion"
+            FROM booking_intents
+            WHERE id = ${dto.bookingIntentId}
+            FOR UPDATE
+          `;
+
+          if (intents.length === 0) {
+            throw new NotFoundException('Booking intent not found');
+          }
+
+          const txIntent = intents[0];
 
           if (validated) {
+            if (
+              txIntent.currentAncillarySelectionId !== validated.selectionId ||
+              txIntent.ancillaryVersion !== validated.selectionVersion
+            ) {
+              throw new ConflictException({
+                code: 'ANCILLARY_VERSION_CONFLICT',
+                intentId: dto.bookingIntentId,
+                currentVersion: txIntent.ancillaryVersion,
+                message: 'Ancillary selection was updated during payment authorization. Please revalidate before payment.',
+              });
+            }
+
             await tx.ancillarySelection.updateMany({
               where: {
                 id: validated.selectionId,
@@ -290,6 +307,21 @@ export class PaymentService {
               data: { status: 'PAYMENT_BOUND' },
             });
           }
+
+          const createdPayment = await tx.payment.create({
+            data: {
+              bookingIntentId: dto.bookingIntentId,
+              attemptNumber: result.attemptNumber,
+              idempotencyKeyId: keyRecord.id,
+              stripePaymentIntentId: paymentIntent!.id,
+              stripeCustomerId,
+              amount: amountInCents,
+              currency: result.currency.toLowerCase(),
+              status: 'CREATED',
+              ancillarySelectionId: validated?.selectionId ?? null,
+              ancillarySelectionVersion: validated?.selectionVersion ?? null,
+            },
+          });
 
           return createdPayment;
         });
@@ -334,6 +366,15 @@ export class PaymentService {
 
       return responseBody;
     } catch (error) {
+      if (paymentIntent?.id) {
+        try {
+          await this.stripeService.cancelPaymentIntent(paymentIntent.id);
+        } catch (cancelErr) {
+          this.logger.error(
+            `Failed to cancel Stripe PaymentIntent ${paymentIntent.id} after createPayment error: ${cancelErr instanceof Error ? cancelErr.message : String(cancelErr)}`
+          );
+        }
+      }
       this.logger.error(`Error in createPayment: ${error instanceof Error ? error.message : String(error)}`, error instanceof Error ? error.stack : undefined);
       throw error;
     }
