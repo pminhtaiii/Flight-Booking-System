@@ -7,6 +7,7 @@ import {
   InternalServerErrorException,
   HttpStatus,
   HttpException,
+  ConflictException,
 } from '@nestjs/common';
 import { PrismaService } from '@/prisma/prisma.service';
 import { StripeService } from '@/common/stripe.service';
@@ -126,10 +127,12 @@ export class PaymentService {
           confirmedPrice: number;
           currency: string;
           userId: string;
+          currentAncillarySelectionId: string | null;
+          ancillaryVersion: number;
         }
 
         const intents = await tx.$queryRaw<RawBookingIntent[]>`
-          SELECT id, status, "paymentAttemptCount", "confirmedPrice", currency, "userId"
+          SELECT id, status, "paymentAttemptCount", "confirmedPrice", currency, "userId", "currentAncillarySelectionId", "ancillaryVersion"
           FROM booking_intents
           WHERE id = ${dto.bookingIntentId}
           FOR UPDATE
@@ -176,6 +179,18 @@ export class PaymentService {
         `;
 
         if (validated) {
+          if (
+            txIntent.currentAncillarySelectionId !== validated.selectionId ||
+            txIntent.ancillaryVersion !== validated.selectionVersion
+          ) {
+            throw new ConflictException({
+              code: 'ANCILLARY_VERSION_CONFLICT',
+              intentId: dto.bookingIntentId,
+              currentVersion: txIntent.ancillaryVersion,
+              message: 'Ancillary selection was updated after validation. Please revalidate before payment.',
+            });
+          }
+
           await tx.ancillarySelection.updateMany({
             where: {
               id: validated.selectionId,

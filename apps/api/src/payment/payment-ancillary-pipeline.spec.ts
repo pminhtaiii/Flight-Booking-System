@@ -1,4 +1,5 @@
 import 'reflect-metadata';
+import { ConflictException } from '@nestjs/common';
 import { PaymentService } from './payment.service';
 import { PrismaService } from '@/prisma/prisma.service';
 import { StripeService } from '@/common/stripe.service';
@@ -149,6 +150,8 @@ describe('PaymentService - Ancillary Pipeline', () => {
           confirmedPrice: 200,
           currency: 'USD',
           userId: 'user-123',
+          currentAncillarySelectionId: 'anc-sel-123',
+          ancillaryVersion: 1,
         },
       ]);
 
@@ -214,6 +217,54 @@ describe('PaymentService - Ancillary Pipeline', () => {
         clientSecret: 'secret_123',
         status: 'CREATED',
       });
+    });
+
+    it('throws ConflictException with ANCILLARY_VERSION_CONFLICT if intent selection or version changes in tx after validation', async () => {
+      mockPrisma.bookingIntent.findUnique.mockResolvedValueOnce({
+        id: 'intent-123',
+        status: 'PENDING',
+        paymentAttemptCount: 0,
+        confirmedPrice: 200,
+        currency: 'USD',
+        userId: 'user-123',
+        currentAncillarySelectionId: 'anc-sel-123',
+        ancillaryVersion: 1,
+      });
+
+      mockAncillaryValidation.validateForPayment.mockResolvedValueOnce({
+        selectionId: 'anc-sel-123',
+        selectionVersion: 1,
+        baseAmount: '200.00',
+        grandTotal: '250.00',
+        currency: 'USD',
+        services: [{ serviceId: 'srv-bag-1', quantity: 1 }],
+      });
+
+      // Raw query in transaction returns updated version/selection
+      mockPrisma.$queryRaw.mockResolvedValueOnce([
+        {
+          id: 'intent-123',
+          status: 'PENDING',
+          paymentAttemptCount: 0,
+          confirmedPrice: 200,
+          currency: 'USD',
+          userId: 'user-123',
+          currentAncillarySelectionId: 'anc-sel-123',
+          ancillaryVersion: 2,
+        },
+      ]);
+
+      await expect(
+        service.createPayment(dto, idempotencyKey, userId, ipAddress),
+      ).rejects.toThrow(
+        expect.objectContaining({
+          response: expect.objectContaining({
+            code: 'ANCILLARY_VERSION_CONFLICT',
+            intentId: 'intent-123',
+            currentVersion: 2,
+          }),
+        }),
+      );
     });
   });
 
