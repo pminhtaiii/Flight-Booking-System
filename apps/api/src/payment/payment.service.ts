@@ -7,6 +7,7 @@ import {
   InternalServerErrorException,
   HttpStatus,
   HttpException,
+  Optional,
 } from '@nestjs/common';
 import { PrismaService } from '@/prisma/prisma.service';
 import { StripeService } from '@/common/stripe.service';
@@ -24,6 +25,7 @@ import { Prisma, BookingFailureReason } from '@prisma/client';
 import { BookingService } from '@/booking/booking.service';
 import { forwardRef, Inject } from '@nestjs/common';
 import { FlightSnapshot, PassengerSnapshot } from '@shared/booking-types';
+import { AncillaryPaymentValidationService } from '@/payment/ancillary-payment-validation.service';
 
 @Injectable()
 export class PaymentService {
@@ -38,6 +40,8 @@ export class PaymentService {
     private readonly paymentMethodService: PaymentMethodService,
     @Inject(forwardRef(() => BookingService))
     private readonly bookingService: BookingService,
+    @Optional()
+    private readonly ancillaryPaymentValidation?: AncillaryPaymentValidationService,
   ) {}
 
   /**
@@ -50,6 +54,31 @@ export class PaymentService {
     ipAddress: string,
   ): Promise<PaymentResponseDto> {
     try {
+      if (
+        dto.ancillarySelectionId !== undefined ||
+        dto.ancillarySelectionVersion !== undefined
+      ) {
+        if (
+          dto.ancillarySelectionId === undefined ||
+          dto.ancillarySelectionVersion === undefined
+        ) {
+          throw new BadRequestException(
+            'Ancillary selection ID and version must be provided together',
+          );
+        }
+        if (!this.ancillaryPaymentValidation) {
+          throw new InternalServerErrorException(
+            'Ancillary payment validation is unavailable',
+          );
+        }
+        await this.ancillaryPaymentValidation.validateForPayment({
+          userId,
+          bookingIntentId: dto.bookingIntentId,
+          ancillarySelectionId: dto.ancillarySelectionId,
+          ancillarySelectionVersion: dto.ancillarySelectionVersion,
+        });
+      }
+
       // 1. Check/acquire the request idempotency key
       const requestHash = this.idempotencyService.computeHash(dto);
       const idempotency = await this.idempotencyService.acquireOrReplay(

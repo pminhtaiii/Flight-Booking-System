@@ -1,8 +1,17 @@
-import { IsString, IsOptional, IsBoolean } from 'class-validator';
+import { IsBoolean, IsInt, IsOptional, IsString, Min } from 'class-validator';
 
 export class CreatePaymentDto {
   @IsString()
   bookingIntentId!: string;
+
+  @IsOptional()
+  @IsString()
+  ancillarySelectionId?: string;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  ancillarySelectionVersion?: number;
 
   @IsOptional()
   @IsString()
