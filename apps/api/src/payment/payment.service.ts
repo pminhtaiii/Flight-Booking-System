@@ -22,7 +22,7 @@ import { ConfirmPaymentDto } from '@/payment/dto/confirm-payment.dto';
 import { PaymentResponseDto } from '@/payment/dto/payment-response.dto';
 import { enforceTransition } from '@/payment/payment-state-machine';
 import * as crypto from 'crypto';
-import { Prisma, BookingFailureReason } from '@prisma/client';
+import { Prisma, BookingFailureReason, AncillarySelectionStatus } from '@prisma/client';
 
 import { BookingService } from '@/booking/booking.service';
 import { forwardRef, Inject } from '@nestjs/common';
@@ -223,6 +223,8 @@ export class PaymentService {
     userId: string,
     ipAddress: string,
   ): Promise<PaymentResponseDto> {
+    let paymentIntent: Awaited<ReturnType<StripeService['createPaymentIntent']>> | undefined = undefined;
+    let paymentRecord: unknown = null;
     try {
       const requestHash = this.idempotencyService.computeHash(dto);
       const requestPath = '/api/bookings/payment/create';
@@ -335,6 +337,59 @@ export class PaymentService {
       }
 
       // 2. Lock & update BookingIntent paymentAttemptCount inside transaction
+      const intent = await this.prisma.bookingIntent.findUnique({
+        where: { id: dto.bookingIntentId },
+        select: {
+          id: true,
+          status: true,
+          paymentAttemptCount: true,
+          confirmedPrice: true,
+          currency: true,
+          userId: true,
+          currentAncillarySelectionId: true,
+          ancillaryVersion: true,
+        },
+      });
+
+      if (!intent) {
+        throw new NotFoundException('Booking intent not found');
+      }
+
+      if (intent.userId !== userId) {
+        throw new ForbiddenException('You do not own this booking intent');
+      }
+
+      if (intent.status !== 'PENDING' && intent.status !== 'AWAITING_PAYMENT') {
+        throw new BadRequestException('Booking intent is not in an allowed status for payment');
+      }
+
+      if (intent.paymentAttemptCount >= 2) {
+        throw new BadRequestException('Payment attempts exhausted');
+      }
+
+      const targetAncillarySelectionId = dto.ancillarySelectionId || intent.currentAncillarySelectionId;
+      const targetAncillarySelectionVersion = dto.ancillarySelectionVersion ?? intent.ancillaryVersion;
+
+      let validated: Awaited<ReturnType<AncillaryPaymentValidationService['validateForPayment']>> | null = null;
+      let amountInCents: number;
+
+      if (
+        targetAncillarySelectionId &&
+        targetAncillarySelectionVersion !== null &&
+        targetAncillarySelectionVersion !== undefined &&
+        targetAncillarySelectionVersion > 0
+      ) {
+        validated = await this.ancillaryPaymentValidationService.validateForPayment({
+          userId,
+          bookingIntentId: dto.bookingIntentId,
+          ancillarySelectionId: targetAncillarySelectionId,
+          ancillarySelectionVersion: targetAncillarySelectionVersion,
+        });
+        amountInCents = Math.round(Number(validated.grandTotal) * 100);
+      } else {
+        amountInCents = Math.round(Number(intent.confirmedPrice) * 100);
+      }
+
       const result = await this.prisma.$transaction(async (tx) => {
         interface RawBookingIntent {
           id: string;
@@ -361,8 +416,8 @@ export class PaymentService {
           throw new NotFoundException('Booking intent not found');
         }
 
-        const intent = intents[0];
-        if (intent.userId !== userId) {
+        const txIntent = intents[0];
+        if (txIntent.userId !== userId) {
           throw new ForbiddenException('You do not own this booking intent');
         }
 
@@ -529,6 +584,20 @@ export class PaymentService {
               SET "paymentAttemptCount" = ${nextAttemptCount}, status = 'AWAITING_PAYMENT'
               WHERE id = ${dto.bookingIntentId}
             `;
+          }
+        }
+
+        if (validated) {
+          if (
+            txIntent.currentAncillarySelectionId !== validated.selectionId ||
+            txIntent.ancillaryVersion !== validated.selectionVersion
+          ) {
+            throw new ConflictException({
+              code: 'ANCILLARY_VERSION_CONFLICT',
+              intentId: dto.bookingIntentId,
+              currentVersion: txIntent.ancillaryVersion,
+              message: 'Ancillary selection was updated after validation. Please revalidate before payment.',
+            });
           }
         }
 
@@ -790,6 +859,15 @@ export class PaymentService {
 
       return responseBody;
     } catch (error) {
+      if (paymentIntent?.id && !paymentRecord) {
+        try {
+          await this.stripeService.cancelPaymentIntent(paymentIntent.id);
+        } catch (cancelErr) {
+          this.logger.error(
+            `Failed to cancel Stripe PaymentIntent ${paymentIntent.id} after createPayment error: ${cancelErr instanceof Error ? cancelErr.message : String(cancelErr)}`
+          );
+        }
+      }
       this.logger.error(`Error in createPayment: ${error instanceof Error ? error.message : String(error)}`, error instanceof Error ? error.stack : undefined);
       throw error;
     }
@@ -877,7 +955,11 @@ export class PaymentService {
           ancillarySelection: {
             include: {
               seatSelections: true,
-              baggageSelections: true,
+              baggageSelections: {
+                include: {
+                  segments: true,
+                },
+              },
             },
           },
         },
@@ -1019,6 +1101,22 @@ export class PaymentService {
           throw new NotFoundException('Booking intent not found');
         }
 
+        const servicesMap = new Map<string, number>();
+        if (payment.ancillarySelection) {
+          for (const seat of payment.ancillarySelection.seatSelections) {
+            servicesMap.set(seat.serviceId, (servicesMap.get(seat.serviceId) ?? 0) + 1);
+          }
+          for (const baggage of payment.ancillarySelection.baggageSelections) {
+            servicesMap.set(
+              baggage.serviceId,
+              (servicesMap.get(baggage.serviceId) ?? 0) + baggage.quantity,
+            );
+          }
+        }
+        const services: Array<{ id: string; quantity: number }> = Array.from(
+          servicesMap.entries(),
+        ).map(([id, quantity]) => ({ id, quantity }));
+
         let duffelOrder: unknown;
         try {
           const recheckedPayment = await this.prisma.payment.findUnique({
@@ -1059,9 +1157,7 @@ export class PaymentService {
           duffelOrder = await this.duffelService.createOrder(
             bookingIntent.duffelOfferId,
             bookingIntent.passengers,
-            orderPayment.ancillarySelection
-              ? canonicalOrderServices(orderPayment.ancillarySelection)
-              : [],
+            services.length > 0 ? services : undefined,
             { bookingIntentId: bookingIntent.id, paymentId: payment.id },
             idempotencyKey,
           );
