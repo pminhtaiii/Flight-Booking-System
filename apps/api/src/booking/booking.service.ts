@@ -52,9 +52,6 @@ function enrichRedactedDuffelOrder(duffelOrder: any, dbPassengers: any[], userEm
       if (!p.email || p.email === 'REDACTED') {
         p.email = userEmail;
       }
-      if (!p.phone_number || p.phone_number === 'REDACTED') {
-        p.phone_number = null;
-      }
     });
   }
   return copy;

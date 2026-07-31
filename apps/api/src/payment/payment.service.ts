@@ -178,7 +178,6 @@ function redactDuffelOrder(duffelOrder: any): any {
   if (Array.isArray(copy.passengers)) {
     for (const p of copy.passengers) {
       if (p.email !== undefined) p.email = 'REDACTED';
-      if (p.phone_number !== undefined) p.phone_number = 'REDACTED';
       if (p.born_on !== undefined) p.born_on = 'REDACTED';
       if (p.given_name !== undefined) p.given_name = 'REDACTED';
       if (p.family_name !== undefined) p.family_name = 'REDACTED';
@@ -209,9 +208,6 @@ function enrichRedactedDuffelOrder(duffelOrder: any, dbPassengers: any[], userEm
       }
       if (!p.email || p.email === 'REDACTED') {
         p.email = userEmail;
-      }
-      if (!p.phone_number || p.phone_number === 'REDACTED') {
-        p.phone_number = null;
       }
     });
   }

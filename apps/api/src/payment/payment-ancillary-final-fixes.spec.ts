@@ -170,7 +170,7 @@ describe('PaymentService - Final Fixes Spec', () => {
           {
             id: 'p-1',
             email: 'REDACTED',
-            phone_number: 'REDACTED',
+            phone_number: '+123456789',
             born_on: 'REDACTED',
             given_name: 'REDACTED',
             family_name: 'REDACTED',
@@ -185,7 +185,7 @@ describe('PaymentService - Final Fixes Spec', () => {
           {
             id: 'p-1',
             email: 'john@example.com',
-            phone_number: null,
+            phone_number: '+123456789',
             born_on: '1990-01-01',
             given_name: 'John',
             family_name: 'Doe',
