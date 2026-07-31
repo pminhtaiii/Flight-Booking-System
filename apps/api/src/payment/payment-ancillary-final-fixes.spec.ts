@@ -80,6 +80,7 @@ describe('PaymentService - Final Fixes Spec', () => {
     duffel = {
       createOrder: jest.fn(),
       cancelOrder: jest.fn(),
+      retrieveCompleteOrder: jest.fn(),
       mapDuffelOrderToSnapshots: jest.fn().mockReturnValue({
         flightSnapshot: {},
         passengerSnapshot: {},
@@ -162,6 +163,7 @@ describe('PaymentService - Final Fixes Spec', () => {
       });
       stripe.retrievePaymentIntent.mockResolvedValue({ status: 'requires_capture' });
       duffel.createOrder.mockResolvedValue(duffelOrder);
+      duffel.retrieveCompleteOrder.mockResolvedValue(duffelOrder);
 
       const redactedDuffelOrder = {
         id: 'ord-123',
@@ -170,7 +172,7 @@ describe('PaymentService - Final Fixes Spec', () => {
           {
             id: 'p-1',
             email: 'REDACTED',
-            phone_number: '+123456789',
+            phone_number: 'REDACTED',
             born_on: 'REDACTED',
             given_name: 'REDACTED',
             family_name: 'REDACTED',

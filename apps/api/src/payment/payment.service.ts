@@ -181,6 +181,7 @@ function redactDuffelOrder(duffelOrder: any): any {
       if (p.born_on !== undefined) p.born_on = 'REDACTED';
       if (p.given_name !== undefined) p.given_name = 'REDACTED';
       if (p.family_name !== undefined) p.family_name = 'REDACTED';
+      if (p.phone_number !== undefined) p.phone_number = 'REDACTED';
     }
   }
   return copy;
@@ -1378,10 +1379,16 @@ export class PaymentService {
                 where: { id: payment.bookingIntentId },
                 include: { passengers: true, user: true },
               });
-              const enrichedOrder = fullBookingIntent && fullBookingIntent.user 
-                ? enrichRedactedDuffelOrder(rawOrder, fullBookingIntent.passengers, fullBookingIntent.user.email) 
-                : rawOrder;
-              const snaps = this.duffelService.mapDuffelOrderToSnapshots(enrichedOrder);
+              let completeOrder = rawOrder;
+              try {
+                completeOrder = await this.duffelService.retrieveCompleteOrder(rawOrder.id);
+              } catch (err) {
+                this.logger.warn(`Failed to retrieve complete Duffel order ${rawOrder.id}, falling back to enrichment`, err);
+                completeOrder = fullBookingIntent && fullBookingIntent.user 
+                  ? enrichRedactedDuffelOrder(rawOrder, fullBookingIntent.passengers, fullBookingIntent.user.email) 
+                  : rawOrder;
+              }
+              const snaps = this.duffelService.mapDuffelOrderToSnapshots(completeOrder);
               flightSnap = snaps.flightSnapshot;
               passSnap = snaps.passengerSnapshot;
               if (flightSnap?.segments?.[0]?.departureAt) {
@@ -1491,11 +1498,17 @@ export class PaymentService {
               data: { status: 'CONFIRMED' },
             });
 
-            const enrichedOrder = bookingIntent && bookingIntent.user
-              ? enrichRedactedDuffelOrder(duffelOrder, bookingIntent.passengers, bookingIntent.user.email)
-              : duffelOrder;
+            let completeOrder = duffelOrder;
+            try {
+              completeOrder = await this.duffelService.retrieveCompleteOrder(duffelOrder.id as string);
+            } catch (err) {
+              this.logger.warn(`Failed to retrieve complete Duffel order ${duffelOrder.id}, falling back to enrichment`, err);
+              completeOrder = bookingIntent && bookingIntent.user
+                ? enrichRedactedDuffelOrder(duffelOrder, bookingIntent.passengers, bookingIntent.user.email)
+                : duffelOrder;
+            }
 
-            const { flightSnapshot, passengerSnapshot } = this.duffelService.mapDuffelOrderToSnapshots(enrichedOrder);
+            const { flightSnapshot, passengerSnapshot } = this.duffelService.mapDuffelOrderToSnapshots(completeOrder);
             await this.bookingService.updateToConfirmed(
               canonicalBooking.id,
               duffelOrder.booking_reference as string,
@@ -1736,10 +1749,16 @@ export class PaymentService {
           if (duffelEvent) {
             const dOrder = duffelEvent.metadata as any;
             if (dOrder) {
-              const enrichedOrder = bookingIntent?.passengers && bookingIntent.user?.email
-                ? enrichRedactedDuffelOrder(dOrder, bookingIntent.passengers, bookingIntent.user.email)
-                : dOrder;
-              const snaps = this.duffelService.mapDuffelOrderToSnapshots(enrichedOrder);
+              let completeOrder = dOrder;
+              try {
+                completeOrder = await this.duffelService.retrieveCompleteOrder(dOrder.id);
+              } catch (err) {
+                this.logger.warn(`Failed to retrieve complete Duffel order ${dOrder.id}, falling back to enrichment`, err);
+                completeOrder = bookingIntent?.passengers && bookingIntent.user?.email
+                  ? enrichRedactedDuffelOrder(dOrder, bookingIntent.passengers, bookingIntent.user.email)
+                  : dOrder;
+              }
+              const snaps = this.duffelService.mapDuffelOrderToSnapshots(completeOrder);
               flightSnap = snaps.flightSnapshot;
               passSnap = snaps.passengerSnapshot;
               if (flightSnap?.segments?.[0]?.departureAt) {

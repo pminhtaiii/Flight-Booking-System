@@ -109,6 +109,7 @@ function buildHarness(options: HarnessOptions = {}) {
         ? jest.fn().mockRejectedValue(options.supplierError)
         : jest.fn().mockResolvedValue(order)),
     cancelOrder: jest.fn().mockResolvedValue(undefined),
+    retrieveCompleteOrder: jest.fn().mockResolvedValue(order),
     mapDuffelOrderToSnapshots: jest.fn().mockReturnValue({
       flightSnapshot: { segments: [] },
       passengerSnapshot: { passengers: [] },
