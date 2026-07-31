@@ -419,6 +419,60 @@ describe('PaymentService - Final Fixes Spec', () => {
         service.createPayment(dto, 'ikey-123', 'user-1', '127.0.0.1')
       ).rejects.toThrow(ConflictException);
     });
+
+    it('should NOT cancel the Stripe PaymentIntent if the database transaction commits but updateRecoveryPoint throws', async () => {
+      prisma.bookingIntent.findUnique.mockResolvedValue({
+        id: 'intent-1',
+        status: 'PENDING',
+        paymentAttemptCount: 0,
+        confirmedPrice: '100.00',
+        currency: 'USD',
+        userId: 'user-1',
+        currentAncillarySelectionId: null,
+        ancillaryVersion: null,
+      });
+
+      prisma.$queryRaw.mockResolvedValueOnce([
+        {
+          id: 'intent-1',
+          status: 'PENDING',
+          paymentAttemptCount: 0,
+          confirmedPrice: '100.00',
+          currency: 'USD',
+          userId: 'user-1',
+          currentAncillarySelectionId: null,
+          ancillaryVersion: null,
+          intentExpiresAt: new Date(Date.now() + 600000),
+          offerExpiresAt: null,
+        },
+      ]);
+
+      prisma.idempotencyKey.findUnique.mockResolvedValue({
+        id: 'key-1',
+      });
+
+      prisma.user.findUnique.mockResolvedValue({
+        email: 'john@example.com',
+        stripeCustomerId: 'cus-1',
+      });
+
+      stripe.createPaymentIntent.mockResolvedValue({
+        id: 'pi-1',
+        client_secret: 'secret-1',
+      });
+
+      prisma.payment.findFirst.mockResolvedValue(null);
+
+      idempotency.updateRecoveryPoint.mockRejectedValue(new Error('Recovery point update failed'));
+
+      const dto = { bookingIntentId: 'intent-1' };
+
+      await expect(
+        service.createPayment(dto, 'ikey-123', 'user-1', '127.0.0.1'),
+      ).rejects.toThrow('Recovery point update failed');
+
+      expect(stripe.cancelPaymentIntent).not.toHaveBeenCalled();
+    });
   });
 
   describe('Finding 6: Intent/Offer Expiration and Omitted Ancillary Selection Rejection', () => {

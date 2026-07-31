@@ -880,6 +880,8 @@ export class PaymentService {
         });
       }
 
+      paymentRecord = payment;
+
       // 7. Update recovery point and complete idempotency key
       await this.idempotencyService.updateRecoveryPoint(idempotencyKey, 'started');
 
