@@ -52,6 +52,7 @@ export class PaymentService {
     ipAddress: string,
   ): Promise<PaymentResponseDto> {
     let paymentIntent: Awaited<ReturnType<StripeService['createPaymentIntent']>> | undefined = undefined;
+    let paymentRecord: unknown = null;
     try {
       // 1. Check/acquire the request idempotency key
       const requestHash = this.idempotencyService.computeHash(dto);
@@ -326,6 +327,7 @@ export class PaymentService {
           return createdPayment;
         });
       }
+      paymentRecord = payment;
 
       // 6. Log event and audit
       await this.prisma.paymentEvent.create({
@@ -366,7 +368,7 @@ export class PaymentService {
 
       return responseBody;
     } catch (error) {
-      if (paymentIntent?.id) {
+      if (paymentIntent?.id && !paymentRecord) {
         try {
           await this.stripeService.cancelPaymentIntent(paymentIntent.id);
         } catch (cancelErr) {

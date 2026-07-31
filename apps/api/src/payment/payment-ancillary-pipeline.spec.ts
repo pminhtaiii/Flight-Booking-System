@@ -397,6 +397,86 @@ describe('PaymentService - Ancillary Pipeline', () => {
       expect(mockPrisma.payment.create).not.toHaveBeenCalled();
       expect(mockPrisma.ancillarySelection.updateMany).not.toHaveBeenCalled();
     });
+
+    it('does not cancel Stripe PaymentIntent if Step 5 (Payment record creation) succeeds but a post-commit step fails', async () => {
+      mockPrisma.bookingIntent.findUnique.mockResolvedValueOnce({
+        id: 'intent-123',
+        status: 'PENDING',
+        paymentAttemptCount: 0,
+        confirmedPrice: 200,
+        currency: 'USD',
+        userId: 'user-123',
+        currentAncillarySelectionId: 'anc-sel-123',
+        ancillaryVersion: 1,
+      });
+
+      mockAncillaryValidation.validateForPayment.mockResolvedValueOnce({
+        selectionId: 'anc-sel-123',
+        selectionVersion: 1,
+        baseAmount: '200.00',
+        grandTotal: '250.00',
+        currency: 'USD',
+        services: [{ serviceId: 'srv-bag-1', quantity: 1 }],
+      });
+
+      mockPrisma.$queryRaw
+        .mockResolvedValueOnce([
+          {
+            id: 'intent-123',
+            status: 'PENDING',
+            paymentAttemptCount: 0,
+            confirmedPrice: 200,
+            currency: 'USD',
+            userId: 'user-123',
+            currentAncillarySelectionId: 'anc-sel-123',
+            ancillaryVersion: 1,
+          },
+        ])
+        .mockResolvedValueOnce([
+          {
+            id: 'intent-123',
+            currentAncillarySelectionId: 'anc-sel-123',
+            ancillaryVersion: 1,
+          },
+        ]);
+
+      mockPrisma.payment.findFirst.mockResolvedValueOnce(null);
+      mockPrisma.user.findUnique.mockResolvedValueOnce({
+        email: 'user@example.com',
+        stripeCustomerId: 'cus_123',
+      });
+      mockStripe.createPaymentIntent.mockResolvedValueOnce({
+        id: 'pi_123',
+        client_secret: 'secret_123',
+      });
+      mockPrisma.idempotencyKey.findUnique.mockResolvedValueOnce({ id: 'idem-rec-123' });
+      mockPrisma.payment.create.mockResolvedValueOnce({
+        id: 'payment-123',
+        status: 'CREATED',
+        amount: 25000,
+      });
+
+      // Mock post-commit step auditService.createLog throwing error
+      mockAudit.createLog.mockRejectedValueOnce(new Error('Audit log database error'));
+
+      await expect(
+        service.createPayment(dto, idempotencyKey, userId, ipAddress),
+      ).rejects.toThrow('Audit log database error');
+
+      // Verify Payment record was created and ancillary selection updated
+      expect(mockPrisma.payment.create).toHaveBeenCalled();
+      expect(mockPrisma.ancillarySelection.updateMany).toHaveBeenCalledWith({
+        where: {
+          id: 'anc-sel-123',
+          bookingIntentId: 'intent-123',
+          version: 1,
+        },
+        data: { status: 'PAYMENT_BOUND' },
+      });
+
+      // Verify Stripe PaymentIntent was NOT cancelled
+      expect(mockStripe.cancelPaymentIntent).not.toHaveBeenCalled();
+    });
   });
 
   describe('executeConfirmPayment with ancillaries', () => {
