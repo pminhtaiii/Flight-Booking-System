@@ -229,6 +229,10 @@ export class AncillaryPaymentValidationService {
           status: 'PENDING',
           intentExpiresAt: { gt: now },
           currency: pricing.currency,
+          OR: [
+            { offerExpiresAt: null },
+            { offerExpiresAt: { gt: now } },
+          ],
         },
         data: {
           ancillaryStatus: 'VALIDATED',
@@ -281,6 +285,10 @@ export class AncillaryPaymentValidationService {
           ancillaryVersion: input.ancillarySelectionVersion,
           status: 'PENDING',
           intentExpiresAt: { gt: now },
+          OR: [
+            { offerExpiresAt: null },
+            { offerExpiresAt: { gt: now } },
+          ],
         },
         data: {
           ancillaryStatus: 'STALE',
