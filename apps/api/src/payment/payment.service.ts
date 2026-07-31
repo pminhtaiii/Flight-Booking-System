@@ -23,7 +23,7 @@ import { Prisma, BookingFailureReason } from '@prisma/client';
 
 import { BookingService } from '@/booking/booking.service';
 import { forwardRef, Inject } from '@nestjs/common';
-import { FlightSnapshot, PassengerSnapshot } from '@shared/booking-types';
+import { AncillaryPaymentValidationService } from './ancillary-payment-validation.service';
 
 @Injectable()
 export class PaymentService {
@@ -38,6 +38,7 @@ export class PaymentService {
     private readonly paymentMethodService: PaymentMethodService,
     @Inject(forwardRef(() => BookingService))
     private readonly bookingService: BookingService,
+    private readonly ancillaryPaymentValidationService: AncillaryPaymentValidationService,
   ) {}
 
   /**
@@ -64,6 +65,59 @@ export class PaymentService {
       }
 
       // 2. Lock & update BookingIntent paymentAttemptCount inside transaction
+      const intent = await this.prisma.bookingIntent.findUnique({
+        where: { id: dto.bookingIntentId },
+        select: {
+          id: true,
+          status: true,
+          paymentAttemptCount: true,
+          confirmedPrice: true,
+          currency: true,
+          userId: true,
+          currentAncillarySelectionId: true,
+          ancillaryVersion: true,
+        },
+      });
+
+      if (!intent) {
+        throw new NotFoundException('Booking intent not found');
+      }
+
+      if (intent.userId !== userId) {
+        throw new ForbiddenException('You do not own this booking intent');
+      }
+
+      if (intent.status !== 'PENDING' && intent.status !== 'AWAITING_PAYMENT') {
+        throw new BadRequestException('Booking intent is not in an allowed status for payment');
+      }
+
+      if (intent.paymentAttemptCount >= 2) {
+        throw new BadRequestException('Payment attempts exhausted');
+      }
+
+      const targetAncillarySelectionId = dto.ancillarySelectionId || intent.currentAncillarySelectionId;
+      const targetAncillarySelectionVersion = dto.ancillarySelectionVersion ?? intent.ancillaryVersion;
+
+      let validated: Awaited<ReturnType<AncillaryPaymentValidationService['validateForPayment']>> | null = null;
+      let amountInCents: number;
+
+      if (
+        targetAncillarySelectionId &&
+        targetAncillarySelectionVersion !== null &&
+        targetAncillarySelectionVersion !== undefined &&
+        targetAncillarySelectionVersion > 0
+      ) {
+        validated = await this.ancillaryPaymentValidationService.validateForPayment({
+          userId,
+          bookingIntentId: dto.bookingIntentId,
+          ancillarySelectionId: targetAncillarySelectionId,
+          ancillarySelectionVersion: targetAncillarySelectionVersion,
+        });
+        amountInCents = Math.round(Number(validated.grandTotal) * 100);
+      } else {
+        amountInCents = Math.round(Number(intent.confirmedPrice) * 100);
+      }
+
       const result = await this.prisma.$transaction(async (tx) => {
         interface RawBookingIntent {
           id: string;
@@ -85,12 +139,12 @@ export class PaymentService {
           throw new NotFoundException('Booking intent not found');
         }
 
-        const intent = intents[0];
-        if (intent.userId !== userId) {
+        const txIntent = intents[0];
+        if (txIntent.userId !== userId) {
           throw new ForbiddenException('You do not own this booking intent');
         }
 
-        if (intent.status !== 'PENDING' && intent.status !== 'AWAITING_PAYMENT') {
+        if (txIntent.status !== 'PENDING' && txIntent.status !== 'AWAITING_PAYMENT') {
           throw new BadRequestException('Booking intent is not in an allowed status for payment');
         }
 
@@ -104,26 +158,37 @@ export class PaymentService {
 
         if (existingPayment) {
           return {
-            confirmedPrice: Number(intent.confirmedPrice),
-            currency: intent.currency,
+            confirmedPrice: Number(txIntent.confirmedPrice),
+            currency: txIntent.currency,
             attemptNumber: existingPayment.attemptNumber,
           };
         }
 
-        if (intent.paymentAttemptCount >= 2) {
+        if (txIntent.paymentAttemptCount >= 2) {
           throw new BadRequestException('Payment attempts exhausted');
         }
 
-        const nextAttemptCount = intent.paymentAttemptCount + 1;
+        const nextAttemptCount = txIntent.paymentAttemptCount + 1;
         await tx.$executeRaw`
           UPDATE booking_intents
           SET "paymentAttemptCount" = ${nextAttemptCount}, status = 'AWAITING_PAYMENT'
           WHERE id = ${dto.bookingIntentId}
         `;
 
+        if (validated) {
+          await tx.ancillarySelection.updateMany({
+            where: {
+              id: validated.selectionId,
+              bookingIntentId: dto.bookingIntentId,
+              version: validated.selectionVersion,
+            },
+            data: { status: 'PAYMENT_BOUND' },
+          });
+        }
+
         return {
-          confirmedPrice: Number(intent.confirmedPrice),
-          currency: intent.currency,
+          confirmedPrice: Number(txIntent.confirmedPrice),
+          currency: txIntent.currency,
           attemptNumber: nextAttemptCount,
         };
       });
@@ -167,7 +232,6 @@ export class PaymentService {
       }
 
       // 4. Create Stripe PaymentIntent
-      const amountInCents = Math.round(result.confirmedPrice * 100);
       const paymentIntent = await this.stripeService.createPaymentIntent(
         amountInCents,
         result.currency,
@@ -204,6 +268,8 @@ export class PaymentService {
             amount: amountInCents,
             currency: result.currency.toLowerCase(),
             status: 'CREATED',
+            ancillarySelectionId: validated ? validated.selectionId : null,
+            ancillarySelectionVersion: validated ? validated.selectionVersion : null,
           },
         });
       }
@@ -329,7 +395,19 @@ export class PaymentService {
       // 2. Query payment
       let payment = await this.prisma.payment.findUnique({
         where: { id: dto.paymentId },
-        include: { bookingIntent: true },
+        include: {
+          bookingIntent: true,
+          ancillarySelection: {
+            include: {
+              seatSelections: true,
+              baggageSelections: {
+                include: {
+                  segments: true,
+                },
+              },
+            },
+          },
+        },
       });
 
       if (!payment) {
@@ -468,11 +546,28 @@ export class PaymentService {
           throw new NotFoundException('Booking intent not found');
         }
 
+        const servicesMap = new Map<string, number>();
+        if (payment.ancillarySelection) {
+          for (const seat of payment.ancillarySelection.seatSelections) {
+            servicesMap.set(seat.serviceId, (servicesMap.get(seat.serviceId) ?? 0) + 1);
+          }
+          for (const baggage of payment.ancillarySelection.baggageSelections) {
+            servicesMap.set(
+              baggage.serviceId,
+              (servicesMap.get(baggage.serviceId) ?? 0) + baggage.quantity,
+            );
+          }
+        }
+        const services: Array<{ id: string; quantity: number }> = Array.from(
+          servicesMap.entries(),
+        ).map(([id, quantity]) => ({ id, quantity }));
+
         let duffelOrder: unknown;
         try {
           duffelOrder = await this.duffelService.createOrder(
             bookingIntent.duffelOfferId,
             bookingIntent.passengers,
+            services.length > 0 ? services : undefined,
             { bookingIntentId: bookingIntent.id, paymentId: payment.id },
             idempotencyKey,
           );

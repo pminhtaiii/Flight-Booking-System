@@ -35,6 +35,7 @@ import { AncillaryPaymentValidationService } from './ancillary-payment-validatio
     PaymentRefundService,
     PaymentMethodService,
     PaymentWebhookService,
+    AncillaryPaymentValidationService,
   ],
 })
 export class PaymentModule {}
