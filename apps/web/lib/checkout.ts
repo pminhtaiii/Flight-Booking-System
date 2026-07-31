@@ -2,6 +2,11 @@ import { getServerSession } from 'next-auth';
 import { redirect, notFound } from 'next/navigation';
 import { headers } from 'next/headers';
 import { authOptions } from './auth';
+import type { AncillaryCatalogResponse } from '@shared/types/ancillary.types';
+
+export type AncillaryCatalogPayload = Omit<AncillaryCatalogResponse, 'catalog'> & {
+  catalog: AncillaryCatalogResponse['catalog'] & { fingerprint: string };
+};
 
 export async function protectCheckoutRoute() {
   const isEnabled = process.env.NEXT_PUBLIC_FEATURE_FLAG_CHECKOUT !== 'false';
@@ -159,5 +164,103 @@ export async function fetchBookingIntent(intentId: string, accessToken: string):
       intent: null,
       errorStatus: 500,
     };
+  }
+}
+
+export async function fetchAncillaryCatalog(intentId: string, accessToken: string): Promise<{
+  data: AncillaryCatalogPayload | null;
+  errorStatus: number | null;
+}> {
+  const apiUrl = process.env.NEXT_PUBLIC_API_URL;
+  if (!apiUrl) {
+    throw new Error('NEXT_PUBLIC_API_URL is required but not configured.');
+  }
+
+  const cookieHeader = headers().get('cookie') ?? '';
+  const mockScenarioMatch = cookieHeader.match(/mock-scenario=([^;]+)/);
+  const mockScenario = mockScenarioMatch ? mockScenarioMatch[1].trim() : null;
+  if ((process.env.NODE_ENV === 'test' || process.env.CI === 'true') && mockScenario === 'mock-ancillary-phase4') {
+    const seatServices = (designator: string, amount: string): Array<{
+      serviceId: string;
+      passengerId: string;
+      amount: string;
+      currency: string;
+    }> => [
+      { serviceId: `${designator}-alex`, passengerId: 'duffel-alex', amount, currency: 'USD' },
+      { serviceId: `${designator}-blair`, passengerId: 'duffel-blair', amount, currency: 'USD' },
+    ];
+    return {
+      data: {
+        intentId,
+        selectionId: null,
+        selectionVersion: 0,
+        selectionStatus: 'EMPTY',
+        currency: 'USD',
+        baseAmount: '100.05',
+        catalog: {
+          fingerprint: 'phase4-fixture-v1',
+          fetchedAt: '2026-07-29T12:00:00.000Z',
+          cache: { status: 'HIT', ttlSeconds: 42 },
+          segments: [
+            {
+              segmentId: 'segment-1',
+              origin: 'SGN',
+              destination: 'SIN',
+              seatMapAvailable: true,
+              seatMap: {
+                cabins: [{
+                  cabinClass: 'economy',
+                  rows: [
+                    { rowNumber: 1, elements: [{ type: 'seat', designator: '1A', availableServices: seatServices('segment-1-seat-1a', '10.10') }, { type: 'aisle' }, { type: 'seat', designator: '1B', restricted: true }] },
+                    { rowNumber: 2, elements: [{ type: 'seat', designator: '2A', availableServices: seatServices('segment-1-seat-2a', '11.00') }, { type: 'aisle' }, { type: 'seat', designator: '2B', availableServices: seatServices('segment-1-seat-2b', '11.50') }] },
+                  ],
+                }],
+              },
+            },
+            {
+              segmentId: 'segment-2',
+              origin: 'SGN',
+              destination: 'NRT',
+              seatMapAvailable: true,
+              seatMap: {
+                cabins: [{
+                  cabinClass: 'economy',
+                  rows: [{ rowNumber: 2, elements: [{ type: 'seat', designator: '2A', availableServices: seatServices('segment-2-seat-2a', '12.20') }, { type: 'aisle' }, { type: 'seat', designator: '2B', availableServices: seatServices('segment-2-seat-2b', '12.70') }] }],
+                }],
+              },
+            },
+          ],
+          baggageServices: [
+            { serviceId: 'journey-bag-alex', passengerId: 'duffel-alex', segmentIds: ['segment-1', 'segment-2'], type: 'checked', weightValue: 20, weightUnit: 'kg', maxQuantity: 1, amount: '30.00', currency: 'USD' },
+            { serviceId: 'segment-1-bag-alex', passengerId: 'duffel-alex', segmentIds: ['segment-1'], type: 'checked', weightValue: 20, weightUnit: 'kg', maxQuantity: 1, amount: '18.00', currency: 'USD' },
+            { serviceId: 'segment-2-bag-alex', passengerId: 'duffel-alex', segmentIds: ['segment-2'], type: 'checked', weightValue: 20, weightUnit: 'kg', maxQuantity: 1, amount: '18.00', currency: 'USD' },
+            { serviceId: 'journey-bag-blair', passengerId: 'duffel-blair', segmentIds: ['segment-1', 'segment-2'], type: 'checked', weightValue: 20, weightUnit: 'kg', maxQuantity: 1, amount: '30.00', currency: 'USD' },
+          ],
+        },
+        passengers: [
+          { intentPassengerId: 'passenger-alex', duffelPassengerId: 'duffel-alex', displayName: 'Alex', type: 'ADULT', seatEligible: true },
+          { intentPassengerId: 'passenger-blair', duffelPassengerId: 'duffel-blair', displayName: 'Blair', type: 'ADULT', seatEligible: true },
+          { intentPassengerId: 'passenger-infant', duffelPassengerId: 'duffel-infant', displayName: 'Lap Infant', type: 'INFANT', seatEligible: false },
+        ],
+        selection: {
+          seats: [],
+          baggage: [],
+          totals: { seats: '0.00', baggage: '0.00', ancillaries: '0.00', estimatedGrandTotal: '100.05', currency: 'USD' },
+        },
+      },
+      errorStatus: null,
+    };
+  }
+
+  try {
+    const response = await fetch(`${apiUrl}/api/bookings/intent/${intentId}/ancillaries`, {
+      headers: { Authorization: `Bearer ${accessToken}` },
+      cache: 'no-store',
+    });
+
+    if (!response.ok) return { data: null, errorStatus: response.status };
+    return { data: (await response.json()) as AncillaryCatalogPayload, errorStatus: null };
+  } catch {
+    return { data: null, errorStatus: 500 };
   }
 }
