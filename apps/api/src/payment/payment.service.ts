@@ -433,19 +433,19 @@ export class PaymentService {
         }
 
         const now = new Date();
-        if (intent.intentExpiresAt && new Date(intent.intentExpiresAt) <= now) {
+        if (txIntent.intentExpiresAt && new Date(txIntent.intentExpiresAt) <= now) {
           throw new GoneException('Booking intent has expired');
         }
-        if (intent.offerExpiresAt && new Date(intent.offerExpiresAt) <= now) {
+        if (txIntent.offerExpiresAt && new Date(txIntent.offerExpiresAt) <= now) {
           throw new GoneException('Offer has expired');
         }
 
-        if (!dto.ancillarySelectionId && intent.currentAncillarySelectionId) {
+        if (!dto.ancillarySelectionId && txIntent.currentAncillarySelectionId) {
           const seatCount = await tx.seatSelection.count({
-            where: { ancillarySelectionId: intent.currentAncillarySelectionId },
+            where: { ancillarySelectionId: txIntent.currentAncillarySelectionId },
           });
           const baggageCount = await tx.baggageSelection.count({
-            where: { ancillarySelectionId: intent.currentAncillarySelectionId },
+            where: { ancillarySelectionId: txIntent.currentAncillarySelectionId },
           });
           if (seatCount > 0 || baggageCount > 0) {
             throw new BadRequestException('Ancillary selections exist but were not included in the payment request');
@@ -454,11 +454,11 @@ export class PaymentService {
 
         if (
           (validatedAncillary &&
-            intent.status !== 'PENDING' &&
-            !(recoveredReservation && intent.status === 'AWAITING_PAYMENT')) ||
+            txIntent.status !== 'PENDING' &&
+            !(recoveredReservation && txIntent.status === 'AWAITING_PAYMENT')) ||
           (!validatedAncillary &&
-            intent.status !== 'PENDING' &&
-            intent.status !== 'AWAITING_PAYMENT')
+            txIntent.status !== 'PENDING' &&
+            txIntent.status !== 'AWAITING_PAYMENT')
         ) {
           throw new BadRequestException('Booking intent is not in an allowed status for payment');
         }
@@ -480,31 +480,31 @@ export class PaymentService {
           };
         }
 
-        if (!recoveredReservation && intent.paymentAttemptCount >= 2) {
+        if (!recoveredReservation && txIntent.paymentAttemptCount >= 2) {
           throw new BadRequestException('Payment attempts exhausted');
         }
 
         const nextAttemptCount =
-          recoveredReservation?.attemptNumber ?? reuseAttemptNumber ?? intent.paymentAttemptCount + 1;
+          recoveredReservation?.attemptNumber ?? reuseAttemptNumber ?? txIntent.paymentAttemptCount + 1;
         const amount =
           recoveredReservation?.amount ??
           (validatedAncillary
             ? majorUnitsToMinor(validatedAncillary.grandTotal)
-            : majorUnitsToMinor(String(intent.confirmedPrice)));
+            : majorUnitsToMinor(String(txIntent.confirmedPrice)));
         const currency =
-          recoveredReservation?.currency ?? validatedAncillary?.currency ?? intent.currency;
+          recoveredReservation?.currency ?? validatedAncillary?.currency ?? txIntent.currency;
         if (validatedAncillary) {
           if (
-            intent.currentAncillarySelectionId !== validatedAncillary.selectionId ||
-            intent.ancillaryVersion !== validatedAncillary.selectionVersion
+            txIntent.currentAncillarySelectionId !== validatedAncillary.selectionId ||
+            txIntent.ancillaryVersion !== validatedAncillary.selectionVersion
           ) {
             throw new ConflictException({
               code: 'ANCILLARY_VERSION_CONFLICT',
               intentId: dto.bookingIntentId,
-              currentVersion: intent.ancillaryVersion,
+              currentVersion: txIntent.ancillaryVersion,
             });
           }
-          if (intent.currency.toUpperCase() !== validatedAncillary.currency.toUpperCase()) {
+          if (txIntent.currency.toUpperCase() !== validatedAncillary.currency.toUpperCase()) {
             throw new BadRequestException({
               code: 'ANCILLARY_CURRENCY_MISMATCH',
               intentId: dto.bookingIntentId,
@@ -550,7 +550,7 @@ export class PaymentService {
             throw new ConflictException({
               code: 'ANCILLARY_VERSION_CONFLICT',
               intentId: dto.bookingIntentId,
-              currentVersion: intent.ancillaryVersion,
+              currentVersion: txIntent.ancillaryVersion,
             });
           }
 
@@ -563,8 +563,8 @@ export class PaymentService {
               amount,
               currency,
               validatedAncillary,
-              intentExpiresAt: intent.intentExpiresAt ? new Date(intent.intentExpiresAt).toISOString() : new Date(Date.now() + 600000).toISOString(),
-              offerExpiresAt: intent.offerExpiresAt ? new Date(intent.offerExpiresAt).toISOString() : null,
+              intentExpiresAt: txIntent.intentExpiresAt ? new Date(txIntent.intentExpiresAt).toISOString() : new Date(Date.now() + 600000).toISOString(),
+              offerExpiresAt: txIntent.offerExpiresAt ? new Date(txIntent.offerExpiresAt).toISOString() : null,
               validatedAt: selection.validatedAt ? new Date(selection.validatedAt).toISOString() : new Date().toISOString(),
             };
             const reserved = await tx.$executeRaw`
@@ -1695,6 +1695,7 @@ export class PaymentService {
       // 1. Fetch BookingIntent and calculate next status
       const bookingIntent = await this.prisma.bookingIntent.findUnique({
         where: { id: payment.bookingIntentId },
+        include: { passengers: true, user: true },
       });
       const nextBookingStatus = (bookingIntent?.paymentAttemptCount || 0) < 2 ? 'AWAITING_PAYMENT' : 'CANCELLED';
 
@@ -1712,7 +1713,10 @@ export class PaymentService {
           if (duffelEvent) {
             const dOrder = duffelEvent.metadata as any;
             if (dOrder) {
-              const snaps = this.duffelService.mapDuffelOrderToSnapshots(dOrder);
+              const enrichedOrder = bookingIntent?.passengers && bookingIntent.user?.email
+                ? enrichRedactedDuffelOrder(dOrder, bookingIntent.passengers, bookingIntent.user.email)
+                : dOrder;
+              const snaps = this.duffelService.mapDuffelOrderToSnapshots(enrichedOrder);
               flightSnap = snaps.flightSnapshot;
               passSnap = snaps.passengerSnapshot;
               if (flightSnap?.segments?.[0]?.departureAt) {
