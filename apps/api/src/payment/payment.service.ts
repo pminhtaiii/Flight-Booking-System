@@ -172,6 +172,43 @@ function readPaymentReservation(
   };
 }
 
+function redactDuffelOrder(duffelOrder: any): any {
+  if (!duffelOrder) return duffelOrder;
+  const copy = JSON.parse(JSON.stringify(duffelOrder));
+  if (Array.isArray(copy.passengers)) {
+    for (const p of copy.passengers) {
+      if (p.email !== undefined) p.email = 'REDACTED';
+      if (p.phone_number !== undefined) p.phone_number = 'REDACTED';
+      if (p.born_on !== undefined) p.born_on = 'REDACTED';
+      if (p.given_name !== undefined) p.given_name = 'REDACTED';
+      if (p.family_name !== undefined) p.family_name = 'REDACTED';
+    }
+  }
+  return copy;
+}
+
+function enrichRedactedDuffelOrder(duffelOrder: any, dbPassengers: any[], userEmail: string): any {
+  if (!duffelOrder) return duffelOrder;
+  const copy = JSON.parse(JSON.stringify(duffelOrder));
+  if (Array.isArray(copy.passengers)) {
+    copy.passengers.forEach((p: any, i: number) => {
+      const dbPass = dbPassengers.find((dbp: any) => dbp.duffelPassengerId === p.id) || dbPassengers[i];
+      if (dbPass) {
+        p.given_name = dbPass.givenName;
+        p.family_name = dbPass.familyName;
+        if (dbPass.dateOfBirth) {
+          const d = new Date(dbPass.dateOfBirth);
+          if (!isNaN(d.getTime())) {
+            p.born_on = d.toISOString().split('T')[0];
+          }
+        }
+      }
+      p.email = userEmail;
+    });
+  }
+  return copy;
+}
+
 @Injectable()
 export class PaymentService {
   private readonly logger = new Logger(PaymentService.name);
@@ -1203,7 +1240,7 @@ export class PaymentService {
             newStatus: 'AUTHORIZED',
             amount: payment.amount,
             source: 'API',
-            metadata: duffelOrder as Prisma.InputJsonValue,
+            metadata: redactDuffelOrder(duffelOrder) as Prisma.InputJsonValue,
             createdBy: userId,
           },
         });
@@ -1312,9 +1349,16 @@ export class PaymentService {
               },
               orderBy: { createdAt: 'desc' },
             });
-            const dOrder = duffelEvent?.metadata as any;
-            if (dOrder) {
-              const snaps = this.duffelService.mapDuffelOrderToSnapshots(dOrder);
+            const rawOrder = duffelEvent?.metadata as any;
+            if (rawOrder) {
+              const fullBookingIntent = await this.prisma.bookingIntent.findUnique({
+                where: { id: payment.bookingIntentId },
+                include: { passengers: true, user: true },
+              });
+              const enrichedOrder = fullBookingIntent && fullBookingIntent.user 
+                ? enrichRedactedDuffelOrder(rawOrder, fullBookingIntent.passengers, fullBookingIntent.user.email) 
+                : rawOrder;
+              const snaps = this.duffelService.mapDuffelOrderToSnapshots(enrichedOrder);
               flightSnap = snaps.flightSnapshot;
               passSnap = snaps.passengerSnapshot;
               if (flightSnap?.segments?.[0]?.departureAt) {
@@ -1414,12 +1458,21 @@ export class PaymentService {
             });
 
             // Update BookingIntent status to CONFIRMED
+            const bookingIntent = await tx.bookingIntent.findUnique({
+              where: { id: payment.bookingIntentId },
+              include: { passengers: true, user: true },
+            });
+            
             await tx.bookingIntent.update({
               where: { id: payment.bookingIntentId },
               data: { status: 'CONFIRMED' },
             });
 
-            const { flightSnapshot, passengerSnapshot } = this.duffelService.mapDuffelOrderToSnapshots(duffelOrder);
+            const enrichedOrder = bookingIntent && bookingIntent.user
+              ? enrichRedactedDuffelOrder(duffelOrder, bookingIntent.passengers, bookingIntent.user.email)
+              : duffelOrder;
+
+            const { flightSnapshot, passengerSnapshot } = this.duffelService.mapDuffelOrderToSnapshots(enrichedOrder);
             await this.bookingService.updateToConfirmed(
               canonicalBooking.id,
               duffelOrder.booking_reference as string,

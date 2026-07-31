@@ -130,7 +130,13 @@ describe('PaymentService - Final Fixes Spec', () => {
       prisma.bookingIntent.findUnique.mockResolvedValue({
         id: 'intent-1',
         duffelOfferId: 'offer-1',
-        passengers: [{ id: 'p-1' }],
+        passengers: [{ 
+          duffelPassengerId: 'p-1', 
+          givenName: 'John', 
+          familyName: 'Doe', 
+          dateOfBirth: new Date('1990-01-01') 
+        }],
+        user: { email: 'john@example.com' },
         paymentAttemptCount: 1,
       });
       prisma.payment.findUnique.mockResolvedValue({
@@ -156,9 +162,40 @@ describe('PaymentService - Final Fixes Spec', () => {
       });
       stripe.retrievePaymentIntent.mockResolvedValue({ status: 'requires_capture' });
       duffel.createOrder.mockResolvedValue(duffelOrder);
+
+      const redactedDuffelOrder = {
+        id: 'ord-123',
+        booking_reference: 'XYZ123',
+        passengers: [
+          {
+            id: 'p-1',
+            email: 'REDACTED',
+            phone_number: 'REDACTED',
+            born_on: 'REDACTED',
+            given_name: 'REDACTED',
+            family_name: 'REDACTED',
+          },
+        ],
+      };
+
+      const expectedEnrichedOrder = {
+        id: 'ord-123',
+        booking_reference: 'XYZ123',
+        passengers: [
+          {
+            id: 'p-1',
+            email: 'john@example.com',
+            phone_number: 'REDACTED',
+            born_on: '1990-01-01',
+            given_name: 'John',
+            family_name: 'Doe',
+          },
+        ],
+      };
+
       prisma.paymentEvent.findFirst.mockResolvedValue({
         eventType: 'duffel_order_created',
-        metadata: duffelOrder,
+        metadata: redactedDuffelOrder,
       });
 
       const dto = { paymentId: 'pay-1', bookingId: 'book-1' };
@@ -167,23 +204,10 @@ describe('PaymentService - Final Fixes Spec', () => {
       expect(prisma.paymentEvent.create).toHaveBeenCalledWith({
         data: expect.objectContaining({
           eventType: 'duffel_order_created',
-          metadata: {
-            id: 'ord-123',
-            booking_reference: 'XYZ123',
-            passengers: [
-              {
-                id: 'p-1',
-                email: 'john@example.com',
-                phone_number: '+123456789',
-                born_on: '1990-01-01',
-                given_name: 'John',
-                family_name: 'Doe',
-              },
-            ],
-          },
+          metadata: redactedDuffelOrder,
         }),
       });
-      expect(duffel.mapDuffelOrderToSnapshots).toHaveBeenCalledWith(duffelOrder);
+      expect(duffel.mapDuffelOrderToSnapshots).toHaveBeenCalledWith(expectedEnrichedOrder);
     });
   });
 

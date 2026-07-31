@@ -27,6 +27,29 @@ export type BookingWithRelations = Prisma.BookingGetPayload<{
 import { StripeService } from '@/common/stripe.service';
 import { DuffelService } from '@/duffel/duffel.service';
 import { PaymentRefundService } from '@/payment/payment-refund.service';
+import { User, Passenger } from '@prisma/client';
+
+function enrichRedactedDuffelOrder(duffelOrder: any, dbPassengers: any[], userEmail: string): any {
+  if (!duffelOrder) return duffelOrder;
+  const copy = JSON.parse(JSON.stringify(duffelOrder));
+  if (Array.isArray(copy.passengers)) {
+    copy.passengers.forEach((p: any, i: number) => {
+      const dbPass = dbPassengers.find((dbp: any) => dbp.duffelPassengerId === p.id) || dbPassengers[i];
+      if (dbPass) {
+        p.given_name = dbPass.givenName;
+        p.family_name = dbPass.familyName;
+        if (dbPass.dateOfBirth) {
+          const d = new Date(dbPass.dateOfBirth);
+          if (!isNaN(d.getTime())) {
+            p.born_on = d.toISOString().split('T')[0];
+          }
+        }
+      }
+      p.email = userEmail;
+    });
+  }
+  return copy;
+}
 
 
 @Injectable()
@@ -271,8 +294,16 @@ export class BookingService {
         orderBy: { createdAt: 'desc' }
       });
       
-      const order = duffelEvent?.metadata as any;
-      if (order && order.id) {
+      const rawOrder = duffelEvent?.metadata as any;
+      if (rawOrder && rawOrder.id) {
+         const bookingIntent = await this.prisma.bookingIntent.findUnique({
+           where: { id: booking.bookingIntentId },
+           include: { passengers: true, user: true },
+         });
+         const order = bookingIntent && bookingIntent.user
+           ? enrichRedactedDuffelOrder(rawOrder, bookingIntent.passengers, bookingIntent.user.email)
+           : rawOrder;
+
          const { flightSnapshot, passengerSnapshot } = this.duffelService.mapDuffelOrderToSnapshots(order);
          const departureAt = flightSnapshot.segments?.[0]?.departureAt
            ? new Date(flightSnapshot.segments[0].departureAt)
