@@ -211,7 +211,6 @@ export class PaymentService {
     private readonly paymentMethodService: PaymentMethodService,
     @Inject(forwardRef(() => BookingService))
     private readonly bookingService: BookingService,
-    @Optional()
     private readonly ancillaryPaymentValidation?: AncillaryPaymentValidationService,
   ) {}
 

@@ -120,4 +120,92 @@ describe('AncillaryPaymentValidationService', () => {
       }),
     );
   });
+
+  it('fails fast with GatewayTimeoutException and releases the lease when repricing exceeds 15 seconds', async () => {
+    jest.useFakeTimers().setSystemTime(new Date('2026-07-29T10:00:00.000Z'));
+    const selection = {
+      id: 'selection-3',
+      bookingIntentId: 'intent-1',
+      version: 3,
+      status: 'DRAFT_COMMITTED',
+      currency: 'USD',
+      total: '53.00',
+      validationLeaseToken: null,
+      validationLeaseExpiresAt: null,
+      seatSelections: [{ serviceId: 'seat-1' }],
+      baggageSelections: [{ serviceId: 'bag-1', quantity: 1 }],
+    };
+    const intent = {
+      id: 'intent-1',
+      userId: 'user-1',
+      status: 'PENDING',
+      intentExpiresAt: new Date('2026-07-29T11:00:00.000Z'),
+      offerExpiresAt: new Date('2026-07-29T11:00:00.000Z'),
+      duffelOfferId: 'offer-1',
+      confirmedPrice: '420.00',
+      currency: 'USD',
+      ancillaryVersion: 3,
+      currentAncillarySelectionId: 'selection-3',
+      currentAncillarySelection: selection,
+    };
+    const transaction = {
+      $queryRaw: jest.fn().mockResolvedValue([{ id: 'intent-1' }]),
+      bookingIntent: {
+        findUnique: jest.fn().mockResolvedValue(intent),
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+      },
+      ancillarySelection: {
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+      },
+    };
+    const prisma = {
+      $transaction: jest.fn(
+        async (callback: (tx: typeof transaction) => Promise<unknown>): Promise<unknown> => callback(transaction),
+      ),
+      ancillarySelection: {
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+      },
+    };
+
+    // Duffel repricing hangs past 15s timeout
+    const duffel = {
+      repriceOffer: jest.fn().mockImplementation(() => new Promise((resolve) => setTimeout(resolve, 20_000))),
+    };
+    const service = new AncillaryPaymentValidationService(
+      prisma as unknown as PrismaService,
+      duffel as unknown as DuffelService,
+    );
+
+    const validationPromise = service.validateForPayment({
+      userId: 'user-1',
+      bookingIntentId: 'intent-1',
+      ancillarySelectionId: 'selection-3',
+      ancillarySelectionVersion: 3,
+    });
+
+    jest.advanceTimersByTime(15_000);
+
+    await expect(validationPromise).rejects.toMatchObject({
+      response: {
+        code: 'ANCILLARY_REPRICING_TIMEOUT',
+        message: 'External ancillary repricing request timed out',
+      },
+    });
+
+    // Lease must be released
+    expect(prisma.ancillarySelection.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          id: 'selection-3',
+          bookingIntentId: 'intent-1',
+          version: 3,
+          validationLeaseToken: expect.any(String),
+        }),
+        data: expect.objectContaining({
+          validationLeaseToken: null,
+          validationLeaseExpiresAt: null,
+        }),
+      }),
+    );
+  });
 });

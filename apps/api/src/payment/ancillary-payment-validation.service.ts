@@ -2,6 +2,7 @@ import {
   BadRequestException,
   ConflictException,
   ForbiddenException,
+  GatewayTimeoutException,
   GoneException,
   Injectable,
   NotFoundException,
@@ -45,6 +46,7 @@ type LeasedSnapshot = {
 };
 
 const LEASE_DURATION_MS = 30_000;
+const REPRICING_TIMEOUT_MS = 15_000;
 
 @Injectable()
 export class AncillaryPaymentValidationService {
@@ -60,7 +62,10 @@ export class AncillaryPaymentValidationService {
     let pricing: Awaited<ReturnType<DuffelService['repriceOffer']>>;
 
     try {
-      pricing = await this.duffel.repriceOffer(leased.intent.duffelOfferId, leased.services);
+      pricing = await this.withTimeout(
+        this.duffel.repriceOffer(leased.intent.duffelOfferId, leased.services),
+        REPRICING_TIMEOUT_MS,
+      );
     } catch (error) {
       await this.releaseLease(input, leased.leaseToken);
       throw error;
@@ -416,5 +421,27 @@ export class AncillaryPaymentValidationService {
       intentId,
       currentVersion,
     });
+  }
+
+  private async withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {
+    let timer: NodeJS.Timeout;
+    const timeoutPromise = new Promise<never>((_, reject) => {
+      timer = setTimeout(() => {
+        reject(
+          new GatewayTimeoutException({
+            code: 'ANCILLARY_REPRICING_TIMEOUT',
+            message: 'External ancillary repricing request timed out',
+          }),
+        );
+      }, timeoutMs);
+    });
+
+    promise.catch(() => {});
+
+    try {
+      return await Promise.race([promise, timeoutPromise]);
+    } finally {
+      clearTimeout(timer!);
+    }
   }
 }
