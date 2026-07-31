@@ -194,17 +194,25 @@ function enrichRedactedDuffelOrder(duffelOrder: any, dbPassengers: any[], userEm
     copy.passengers.forEach((p: any, i: number) => {
       const dbPass = dbPassengers.find((dbp: any) => dbp.duffelPassengerId === p.id) || dbPassengers[i];
       if (dbPass) {
-        p.given_name = dbPass.givenName;
-        p.family_name = dbPass.familyName;
-        if (dbPass.dateOfBirth) {
+        if (!p.given_name || p.given_name === 'REDACTED') {
+          p.given_name = dbPass.givenName;
+        }
+        if (!p.family_name || p.family_name === 'REDACTED') {
+          p.family_name = dbPass.familyName;
+        }
+        if (dbPass.dateOfBirth && (!p.born_on || p.born_on === 'REDACTED')) {
           const d = new Date(dbPass.dateOfBirth);
           if (!isNaN(d.getTime())) {
             p.born_on = d.toISOString().split('T')[0];
           }
         }
       }
-      p.email = userEmail;
-      p.phone_number = null;
+      if (!p.email || p.email === 'REDACTED') {
+        p.email = userEmail;
+      }
+      if (!p.phone_number || p.phone_number === 'REDACTED') {
+        p.phone_number = null;
+      }
     });
   }
   return copy;
