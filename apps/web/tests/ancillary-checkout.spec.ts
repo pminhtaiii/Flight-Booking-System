@@ -41,7 +41,7 @@ test.describe('Phase 4 ancillary checkout', () => {
     await expect(page.getByRole('tab', { name: 'Blair' })).toHaveAttribute('aria-selected', 'true');
     await expect(page.getByRole('gridcell', { name: /1A.*selected by traveller 1/ })).toBeDisabled();
 
-    await page.getByRole('tab', { name: 'SGN â†’ NRT' }).click();
+    await page.getByRole('tab', { name: 'SGN → NRT' }).click();
     await page.getByRole('gridcell', { name: /2A.*available/ }).click();
     await expect(page.getByText('$122.35').first()).toBeVisible();
     expect(repricingRequests).toEqual([]);

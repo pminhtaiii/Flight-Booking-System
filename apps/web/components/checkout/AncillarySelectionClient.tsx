@@ -225,15 +225,19 @@ export function AncillarySelectionClient({ data, intentId, accessToken }: Props)
         throw new Error(details?.message || 'We could not save your ancillary choices. Please try again.');
       }
       const committed = await response.json() as CommitAncillarySelectionResponse;
-      writeAncillaryRecovery(window.localStorage, {
-        intentId,
-        selectionId: committed.selectionId,
-        selectionVersion: committed.selectionVersion,
-        intentExpiresAt: committed.intentExpiresAt,
-        updatedAt: new Date().toISOString(),
-        seats: seats.map(({ intentPassengerId, segmentId, serviceId, seatDesignator }) => ({ intentPassengerId, segmentId, serviceId, seatDesignator })),
-        baggage: baggage.map(({ intentPassengerId, serviceId, quantity }) => ({ intentPassengerId, serviceId, quantity })),
-      });
+      try {
+        writeAncillaryRecovery(window.localStorage, {
+          intentId,
+          selectionId: committed.selectionId,
+          selectionVersion: committed.selectionVersion,
+          intentExpiresAt: committed.intentExpiresAt,
+          updatedAt: new Date().toISOString(),
+          seats: seats.map(({ intentPassengerId, segmentId, serviceId, seatDesignator }) => ({ intentPassengerId, segmentId, serviceId, seatDesignator })),
+          baggage: baggage.map(({ intentPassengerId, serviceId, quantity }) => ({ intentPassengerId, serviceId, quantity })),
+        });
+      } catch {
+        /* Recovery storage is best-effort; the server commit already succeeded. */
+      }
       router.push(`/checkout/${intentId}/review`);
     } catch (commitError) {
       setError(commitError instanceof Error ? commitError.message : 'We could not save your ancillary choices. Please try again.');
@@ -248,11 +252,11 @@ export function AncillarySelectionClient({ data, intentId, accessToken }: Props)
   return <div className="space-y-6">
     <header className="flex flex-wrap items-end justify-between gap-4">
       <div className="space-y-2">
-        <p className="text-xs font-semibold uppercase tracking-wider text-text-muted">Step 2 of 4 Â· Tailor your journey</p>
+        <p className="text-xs font-semibold uppercase tracking-wider text-text-muted">Step 2 of 4 · Tailor your journey</p>
         <h1 className="text-3xl font-bold text-text-primary">Your flight extras</h1>
         <p className="max-w-2xl text-text-secondary">Seats and baggage are separate views, so you can decide one thing at a time.</p>
       </div>
-      <button type="button" onClick={refreshCatalog} disabled={refreshing} className="btn-secondary disabled:cursor-not-allowed disabled:opacity-60">{refreshing ? 'Refreshing choicesâ€¦' : 'Refresh airline choices'}</button>
+      <button type="button" onClick={refreshCatalog} disabled={refreshing} className="btn-secondary disabled:cursor-not-allowed disabled:opacity-60">{refreshing ? 'Refreshing choices…' : 'Refresh airline choices'}</button>
     </header>
 
     {error && <div role="alert" className="card bg-bg-cancelled text-text-cancelled p-4"><p className="font-semibold">Your changes were not saved</p><p className="mt-1 text-sm">{error}</p>{error.toLowerCase().includes('refresh') && <button type="button" onClick={refreshCatalog} className="btn-secondary mt-3">Refresh choices</button>}</div>}
@@ -266,7 +270,7 @@ export function AncillarySelectionClient({ data, intentId, accessToken }: Props)
 
         <section className="card space-y-5" aria-label="Traveller and flight selection">
           <div><h2 className="font-semibold text-text-primary">Choose for a traveller</h2><p className="mt-1 text-sm text-text-secondary">Seat availability and baggage options are shown for the selected traveller.</p></div>
-          {service === 'seats' && <div className="flex flex-wrap gap-2" role="tablist" aria-label="Flight segments">{catalogData.catalog.segments.map((segment) => <button key={segment.segmentId} type="button" role="tab" aria-selected={segment.segmentId === activeSegment?.segmentId} tabIndex={segment.segmentId === activeSegment?.segmentId ? 0 : -1} onKeyDown={handleTabKeyDown} onClick={() => { setActiveSegmentId(segment.segmentId); setError(null); }} className={`rounded-lg border px-4 py-2 text-sm font-semibold ${segment.segmentId === activeSegment?.segmentId ? 'border-primary bg-secondary text-text-primary' : 'border-card-border text-text-secondary hover:border-primary'}`}>{segment.origin} â†’ {segment.destination}</button>)}</div>}
+          {service === 'seats' && <div className="flex flex-wrap gap-2" role="tablist" aria-label="Flight segments">{catalogData.catalog.segments.map((segment) => <button key={segment.segmentId} type="button" role="tab" aria-selected={segment.segmentId === activeSegment?.segmentId} tabIndex={segment.segmentId === activeSegment?.segmentId ? 0 : -1} onKeyDown={handleTabKeyDown} onClick={() => { setActiveSegmentId(segment.segmentId); setError(null); }} className={`rounded-lg border px-4 py-2 text-sm font-semibold ${segment.segmentId === activeSegment?.segmentId ? 'border-primary bg-secondary text-text-primary' : 'border-card-border text-text-secondary hover:border-primary'}`}>{segment.origin} → {segment.destination}</button>)}</div>}
           <div className="flex flex-wrap gap-2" role="tablist" aria-label="Travellers">
             {visiblePassengers.map((passenger) => <button key={passenger.intentPassengerId} type="button" role="tab" aria-selected={passenger.intentPassengerId === activePassenger?.intentPassengerId} tabIndex={passenger.intentPassengerId === activePassenger?.intentPassengerId ? 0 : -1} onKeyDown={handleTabKeyDown} onClick={() => { setActivePassengerId(passenger.intentPassengerId); setError(null); }} className={`rounded-lg border px-4 py-2 text-sm font-semibold ${passenger.intentPassengerId === activePassenger?.intentPassengerId ? 'border-primary bg-secondary text-text-primary' : 'border-card-border text-text-secondary hover:border-primary'}`}>{passenger.displayName}</button>)}
           </div>
@@ -279,7 +283,7 @@ export function AncillarySelectionClient({ data, intentId, accessToken }: Props)
       <aside className="card h-fit space-y-4 lg:sticky lg:top-6" aria-label="Estimated total">
         <div aria-live="polite" aria-atomic="true"><p className="text-xs font-semibold uppercase tracking-wider text-text-muted">Your estimate</p><p className="mt-1 text-2xl font-bold text-text-primary">{money(total.grand, currency)}</p><span className="sr-only">Estimated total updated to {money(total.grand, currency)}</span></div>
         <dl className="space-y-2 border-t border-card-border pt-4 text-sm text-text-secondary"><div className="flex justify-between gap-4"><dt>Flight</dt><dd>{money(total.base, currency)}</dd></div><div className="flex justify-between gap-4"><dt>Seats</dt><dd>{money(total.seats, currency)}</dd></div><div className="flex justify-between gap-4"><dt>Baggage</dt><dd>{money(total.baggage, currency)}</dd></div></dl>
-        <button type="button" onClick={commit} disabled={submitting || reconciliationIssues.length > 0} className="btn-primary w-full disabled:cursor-not-allowed disabled:opacity-60">{submitting ? 'Saving choicesâ€¦' : 'Continue to review'}</button>
+        <button type="button" onClick={commit} disabled={submitting || reconciliationIssues.length > 0} className="btn-primary w-full disabled:cursor-not-allowed disabled:opacity-60">{submitting ? 'Saving choices…' : 'Continue to review'}</button>
         <p className="text-xs text-text-muted">Your selection is checked against current airline availability before it is saved.</p>
       </aside>
     </div>
@@ -365,7 +369,7 @@ function SeatMap({
   return (
     <section className="card space-y-6" aria-labelledby="seat-map-title">
       <div>
-        <p className="text-xs font-semibold uppercase tracking-wider text-text-muted">{segment.origin} â†’ {segment.destination}</p>
+        <p className="text-xs font-semibold uppercase tracking-wider text-text-muted">{segment.origin} → {segment.destination}</p>
         <h2 id="seat-map-title" className="mt-1 text-2xl font-bold text-text-primary">Choose a seat for {passenger.displayName}</h2>
         <p className="mt-2 text-sm text-text-secondary">Seat colours indicate price bands; each price is listed below.</p>
       </div>
@@ -376,9 +380,9 @@ function SeatMap({
           {seatPrices.slice(0, 5).map((item, index) => {
             const tier = seatTier(item, priceKeys);
             const labels = ['Economy', 'Economy Preferred', 'Premium Economy', 'Business', 'First'];
-            return <li key={priceKey(item)} className="flex items-center gap-3 text-sm"><span className={`h-9 w-9 rounded-lg border ${tierClasses[tier]}`} aria-hidden="true" /><span><span className="block font-semibold text-text-primary">{labels[index]} Â· {money(item.amount, item.currency)}</span><span className="block text-xs text-text-secondary">Supplier fare</span></span></li>;
+            return <li key={priceKey(item)} className="flex items-center gap-3 text-sm"><span className={`h-9 w-9 rounded-lg border ${tierClasses[tier]}`} aria-hidden="true" /><span><span className="block font-semibold text-text-primary">{labels[index]} · {money(item.amount, item.currency)}</span><span className="block text-xs text-text-secondary">Supplier fare</span></span></li>;
           })}
-          <li className="flex items-center gap-3 text-sm"><span className="flex h-9 w-9 items-center justify-center rounded-lg border border-text-secondary/30 bg-text-secondary/40 text-primary-foreground" aria-hidden="true">Ã—</span><span><span className="block font-semibold text-text-primary">Unavailable</span><span className="block text-xs text-text-secondary">Not selectable</span></span></li>
+          <li className="flex items-center gap-3 text-sm"><span className="flex h-9 w-9 items-center justify-center rounded-lg border border-text-secondary/30 bg-text-secondary/40 text-primary-foreground" aria-hidden="true">×</span><span><span className="block font-semibold text-text-primary">Unavailable</span><span className="block text-xs text-text-secondary">Not selectable</span></span></li>
         </ul>
       </section>
 
@@ -429,7 +433,7 @@ function SeatMap({
                       </>
                     ) : selectedByOtherNumber ? (
                       <span className="flex h-7 min-w-7 items-center justify-center rounded-md bg-text-secondary/80 px-2 text-primary-foreground shadow-sm" aria-hidden="true">{selectedByOtherNumber}</span>
-                    ) : available ? null : 'Ã—'}
+                    ) : available ? null : '×'}
                   </button>
                 );
               })}
@@ -437,7 +441,7 @@ function SeatMap({
           ))}
         </div>
       </div>
-      <p className="text-xs text-text-secondary">Column letters sit above the seats; row numbers sit in the aisle. Passenger numbers mark selected seats and the active selection shows its price Â· Ã— unavailable.</p>
+      <p className="text-xs text-text-secondary">Column letters sit above the seats; row numbers sit in the aisle. Passenger numbers mark selected seats and the active selection shows its price · × unavailable.</p>
     </section>
   );
 }
@@ -460,10 +464,10 @@ function BaggageOptions({ services, passengerId, selected, onQuantityChange, cur
         const quantity = selected.find((choice) => choice.intentPassengerId === passengerId && choice.serviceId === item.serviceId)?.quantity ?? 0;
         const conflictingSelection = selectedServices.find((selectedService) => baggageServicesConflict(item, selectedService));
         const blocked = quantity === 0 && Boolean(conflictingSelection);
-        const label = `${item.type.replace('_', ' ')}${item.weightValue ? ` Â· ${item.weightValue} ${item.weightUnit ?? ''}` : ''}`;
+        const label = `${item.type.replace('_', ' ')}${item.weightValue ? ` · ${item.weightValue} ${item.weightUnit ?? ''}` : ''}`;
         const savings = item.segmentIds.length > 1 ? calculateBaggageSavings(item, services) : null;
         return <article key={item.serviceId} className={`card flex flex-wrap items-center justify-between gap-4 ${quantity ? 'border-primary ring-1 ring-primary' : ''}`}>
-          <div><h4 className="font-bold capitalize text-text-primary">{label}</h4><p className="mt-1 text-sm text-text-secondary">{money(item.amount, item.currency)} each Â· applies to {item.segmentIds.length > 1 ? 'the full journey' : 'one flight segment'}{savings ? ` Â· Save ${money(savings, item.currency)}` : ''}</p>{blocked && <p className="mt-1 text-sm font-semibold text-text-pending">Remove the overlapping {conflictingSelection?.segmentIds.length === 1 ? 'flight-only' : 'full-journey'} choice first.</p>}</div>
+          <div><h4 className="font-bold capitalize text-text-primary">{label}</h4><p className="mt-1 text-sm text-text-secondary">{money(item.amount, item.currency)} each · applies to {item.segmentIds.length > 1 ? 'the full journey' : 'one flight segment'}{savings ? ` · Save ${money(savings, item.currency)}` : ''}</p>{blocked && <p className="mt-1 text-sm font-semibold text-text-pending">Remove the overlapping {conflictingSelection?.segmentIds.length === 1 ? 'flight-only' : 'full-journey'} choice first.</p>}</div>
           <label className="flex items-center gap-2 text-sm font-semibold text-text-primary">Quantity<select aria-label={`${label} quantity`} value={quantity} disabled={blocked} onChange={(event) => onQuantityChange(item, Number(event.target.value))} className="rounded-lg border border-card-border bg-background px-3 py-2 text-text-primary disabled:cursor-not-allowed disabled:opacity-60"><option value={0}>0</option>{Array.from({ length: item.maxQuantity }, (_, index) => index + 1).map((value) => <option key={value} value={value}>{value}</option>)}</select></label>
         </article>;
       })}

@@ -86,7 +86,7 @@ export default async function AncillariesPage({ params }: Props) {
         <main className="mx-auto w-full max-w-3xl py-12 px-4">
           <div role="alert" className="card text-text-cancelled bg-bg-cancelled p-6">
             <h1 className="text-xl font-bold">Flight extras are unavailable</h1>
-            <p className="mt-2 text-sm text-text-secondary">We could not load the airlineâ€™s current seat and baggage options. Please return to the previous step or try again shortly.</p>
+            <p className="mt-2 text-sm text-text-secondary">We could not load the airline's current seat and baggage options. Please return to the previous step or try again shortly.</p>
           </div>
         </main>
       </div>
