@@ -108,6 +108,6 @@ When a task involves creating a pull request or requesting CodeRabbit reviews:
 
 For additional context about technologies to be used, project structure,
 shell commands, and other important information, read the current plan
-at specs/015a-ancillary-seat-baggage-checkout/plan.md
+at specs/016a-traveler-profile-booking-readiness/plan.md
 
 <!-- SPECKIT END -->

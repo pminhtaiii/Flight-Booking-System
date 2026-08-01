@@ -1,6 +1,6 @@
 # Traveler Profile & Booking Readiness Architecture
 
-We need a persistent traveler identity layer so users don't re-enter passport, contact, and identity data on every booking — especially when booking through the chatbot. The existing `TravelerProfile` model stores preferences and encrypted passport fields, but is missing 10 of the 13 Duffel-required passenger fields. This ADR records every design decision made during the grilling session.
+We need a persistent traveler identity layer so users don't re-enter passport, contact, and identity data on every booking — especially when booking through the chatbot. The existing `TravelerProfile` model stores preferences, an encrypted `passportNumber`, and a legacy plaintext `passportExpiry` date, but is missing 10 of the 13 Duffel-required passenger fields. This ADR records every design decision made during the grilling session.
 
 ## Status
 
@@ -21,7 +21,7 @@ Additive migration, all `String?` / `DateTime?`, no breaking changes.
 
 - `middleName` remains optional, never required by validation.
 - `email` on the profile is the traveler contact email (can differ from login email).
-- `passportExpiry` kept its existing name (not renamed to `passportExpiresOn`) — the encrypted column already has production data.
+- `passportExpiry` kept its existing name (not renamed to `passportExpiresOn`) — the existing plaintext date column already has production data.
 
 **Rejected:** Renaming `passportExpiry` to align with Duffel's `expires_on` — risky for encrypted data, and domain model should use its own ubiquitous language.
 
