@@ -152,6 +152,11 @@ export interface CancellationQuoteResponseDto {
   expiresAt: string;
   refundable: boolean;
   cancellationDeadline?: string;
+  /** Supplier-provided destination for the quoted refund. */
+  refundTo: string | null;
+  /** Supplier-provided excluded ancillary value; never derived locally. */
+  nonRefundableAncillaryAmount: string | null;
+  nonRefundableAncillaryCurrency: string | null;
 }
 
 /** Durable response for a supplier-first cancellation request. */
@@ -162,5 +167,5 @@ export interface CancellationResponseDto {
   refundStatus: string;
   refundAmount: string;
   nextRetryAt?: string;
+  duffelCancellationQuoteId?: string | null;
 }
-

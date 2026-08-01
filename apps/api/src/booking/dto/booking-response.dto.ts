@@ -31,5 +31,23 @@ export class BookingDetailResponseDto extends BookingListItemResponseDto {
   customerRefundAmount!: string | null;
   duffelCancellationQuoteId!: string | null;
   updatedAt!: string;
+  ancillarySummary?: {
+    seats: {
+      intentPassengerId: string;
+      passengerName: string;
+      segmentId: string;
+      seatDesignator: string;
+      amount: string;
+      currency: string;
+    }[];
+    baggage: {
+      intentPassengerId: string;
+      passengerName: string;
+      type: string;
+      quantity: number;
+      amount: string;
+      currency: string;
+    }[];
+  } | null;
 }
 

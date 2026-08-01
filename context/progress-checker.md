@@ -7,8 +7,8 @@ Update this file after every completed feature. Any AI agent reading this should
 ### Current Status
 
 **Feature:** Ancillary Services — Seat Selection, Baggage & Price Tracker (Feature 15)
-**Last completed:** Phase 3 / PR 4 of Feature 15 (Owned Ancillary Read/Commit API and Optimistic Recovery Boundary) on branch 015d-duffel-ancillary-catalog.
-**Next:** Implement Phase 4 / PR 5: Custom seat map, baggage selection, and instant price tracker. See [ADR](file:///c:/Booking%20Systems/docs/adr/research-ancillary-services-grilling-session.md) for all architectural decisions.
+**Last completed:** Phase 6 / PR 7 of Feature 15 (Read-only review, targeted edits, recovery, and cancellation disclosure) on branch `codex/015h-review-recovery-refunds`.
+**Next:** Implement Phase 7 / PR 8: End-to-end resilience, observability, rollout, and documentation sync. See [ADR](file:///c:/Booking%20Systems/docs/adr/research-ancillary-services-grilling-session.md) for all architectural decisions.
 
 ---
 
@@ -20,6 +20,9 @@ Update this file after every completed feature. Any AI agent reading this should
 - [x] Phase 2 / PR 3: Duffel Ancillary Catalog, Normalization, and Cache Discipline (implemented shared ancillary types, raw SDK mappings, caching adapter under Redis key `seatmap:{duffelOfferId}` with 60s TTL and early-expiry/force-refresh rules, exact price verification, and extended order creation with validated service lines; verified with golden fixtures and unit tests for caching boundaries, normalization, repricing, and order creations)
 - [x] Phase 1 / PR 2: Shared Contracts, State Repair, Additive Schema, and Migration (implemented shared ancillary catalog/selection/pricing/error types; append-only selection, seat, baggage, coverage, and payment snapshot-binding Prisma models with an additive migration; persisted Duffel passenger IDs at BookingIntent creation; and repaired payment eligibility to use `PENDING`. Prisma schema validation and whitespace checks pass.)
 - [x] Phase 3 / PR 4: Owned Ancillary Read/Commit API and Optimistic Recovery Boundary (implemented protected catalog read and optimistic snapshot commit routes, request-scoped passenger projections over supplier-native cache data, pure authoritative selection validation and exact totals, append-only snapshot persistence with CAS and audit logging, and customer/path-scoped idempotency replay hardening; no payment, pricing action, order, or capture side effects.)
+- [x] Phase 4 / PR 5: Custom seat map, baggage selection, and instant price tracker (implemented custom accessible seat grids, roving tabindexes and keyboard navigation, segment tab switching and passenger stepper, journey-wide baggage selection, sticky decimal-safe price breakdowns, catalog refresh reconciliation, and UUID-driven double submit blocks on continue.)
+- [x] Phase 5 / PR 6: Authoritative validation, payment amount, and Duffel order services (implemented pre-payment CAS-freeze and Duffel validation pipeline, pricing delta user acknowledgement block, payment bound snapshots integration with minor-unit conversions, Stripe manual capture saga binding, and idempotent Duffel order creation with compensation fallback.)
+- [x] Phase 6 / PR 7: Read-only review, targeted edits, recovery, and cancellation disclosure (implemented server-rendered read-only review with edit routes, PII-safe versioned localStorage recovery helper, conflict re-routing on payment failure, minimal post-purchase confirmed summary under booking details, and supplier-authoritative cancellation/refund quote fields serialization within the existing quote ID column.)
 
 ### [x] Feature: Disruption & Flight-Change Management (Feature 14)
 
