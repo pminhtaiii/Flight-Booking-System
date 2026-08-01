@@ -39,6 +39,10 @@ export interface BookingIntentDto {
   status: string;
   originalPrice: number;
   confirmedPrice: number;
+  seatTotal?: number;
+  baggageTotal?: number;
+  ancillaryTotal?: number;
+  ancillaryStatus?: string;
   priceChanged: boolean;
   currency: string;
   pricedAt: string;

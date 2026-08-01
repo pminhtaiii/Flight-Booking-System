@@ -80,11 +80,18 @@ export default async function ReviewPage({ params }: Props) {
   const totals = ancillaryCatalog?.selection?.totals;
 
   const basePrice = intent.confirmedPrice;
-  const grandTotal = totals?.estimatedGrandTotal ?? String(basePrice);
+  const seatTotalVal = totals ? parseFloat(totals.seats) : (intent.seatTotal ?? 0);
+  const baggageTotalVal = totals ? parseFloat(totals.baggage) : (intent.baggageTotal ?? 0);
+  const ancillaryTotalVal = totals ? parseFloat(totals.ancillaries) : (intent.ancillaryTotal ?? 0);
+
+  const seatTotalStr = totals?.seats ?? seatTotalVal.toFixed(2);
+  const baggageTotalStr = totals?.baggage ?? baggageTotalVal.toFixed(2);
+  const grandTotalStr = totals?.estimatedGrandTotal ?? (basePrice + ancillaryTotalVal).toFixed(2);
+
   const currency = totals?.currency ?? intent.currency;
-  const hasSeats = totals ? parseFloat(totals.seats) > 0 : false;
-  const hasBaggage = totals ? parseFloat(totals.baggage) > 0 : false;
-  const hasAncillaries = hasSeats || hasBaggage;
+  const hasSeats = seatTotalVal > 0;
+  const hasBaggage = baggageTotalVal > 0;
+  const hasAncillaries = hasSeats || hasBaggage || ancillaryTotalVal > 0;
 
   return (
     <div className="flex min-h-screen flex-col bg-background">
@@ -101,7 +108,7 @@ export default async function ReviewPage({ params }: Props) {
           <div role="alert" className="card text-text-pending bg-bg-pending p-4 space-y-1">
             <h2 className="font-semibold text-text-primary text-sm">Flight extras notice</h2>
             <p className="text-xs text-text-secondary">
-              We could not refresh live seat and baggage options from the airline. Your base fare is displayed below, and you may proceed to payment or return to ancillaries to try again.
+              We could not refresh live seat map options from the airline. Your committed selections and total remain saved below.
             </p>
           </div>
         )}
@@ -233,20 +240,20 @@ export default async function ReviewPage({ params }: Props) {
             {hasSeats && (
               <div className="flex justify-between items-center">
                 <span>Selected Seats</span>
-                <span className="font-medium text-text-primary">{totals?.seats} {currency}</span>
+                <span className="font-medium text-text-primary">{seatTotalStr} {currency}</span>
               </div>
             )}
             {hasBaggage && (
               <div className="flex justify-between items-center">
                 <span>Selected Baggage</span>
-                <span className="font-medium text-text-primary">{totals?.baggage} {currency}</span>
+                <span className="font-medium text-text-primary">{baggageTotalStr} {currency}</span>
               </div>
             )}
           </div>
           <div className="flex justify-between items-center text-sm border-t border-card-border pt-4">
             <span className="font-semibold text-text-primary">Total Price (incl. taxes & fees)</span>
             <span className="text-2xl font-bold text-text-primary">
-              {grandTotal} {currency}
+              {grandTotalStr} {currency}
             </span>
           </div>
         </div>
