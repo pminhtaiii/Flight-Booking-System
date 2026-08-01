@@ -21,6 +21,24 @@ type BookingDetailProps = {
     disruption?: any;
     payment?: { status: string } | null;
     bookingIntent?: { id: string; offerId: string };
+    ancillarySummary?: {
+      seats: {
+        intentPassengerId: string;
+        passengerName: string;
+        segmentId: string;
+        seatDesignator: string;
+        amount: string;
+        currency: string;
+      }[];
+      baggage: {
+        intentPassengerId: string;
+        passengerName: string;
+        type: string;
+        quantity: number;
+        amount: string;
+        currency: string;
+      }[];
+    } | null;
   } | null;
   showConfirmation?: boolean;
   isMockEnabled?: boolean;
@@ -382,6 +400,38 @@ export function BookingDetail({ booking: initialBooking, isMockEnabled, bookingI
         </div>
       )}
 
+      {booking.ancillarySummary && (booking.ancillarySummary.seats?.length > 0 || booking.ancillarySummary.baggage?.length > 0) && (
+        <div className="border-t border-card-border pt-4">
+          <h3 className="font-semibold text-text-primary">Extras Purchased</h3>
+          <div className="mt-2 space-y-3 text-sm text-text-secondary">
+            {booking.ancillarySummary.seats && booking.ancillarySummary.seats.length > 0 && (
+              <div>
+                <h4 className="font-medium text-text-primary text-xs uppercase tracking-wider mb-1">Seats</h4>
+                <ul className="list-disc list-inside space-y-1 pl-1">
+                  {booking.ancillarySummary.seats.map((seat: any, idx: number) => (
+                    <li key={`seat-${idx}`}>
+                      {seat.passengerName || 'Passenger'}: Seat {seat.seatDesignator} ({currencyFormatter(seat.amount, seat.currency)})
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+            {booking.ancillarySummary.baggage && booking.ancillarySummary.baggage.length > 0 && (
+              <div>
+                <h4 className="font-medium text-text-primary text-xs uppercase tracking-wider mb-1">Baggage</h4>
+                <ul className="list-disc list-inside space-y-1 pl-1">
+                  {booking.ancillarySummary.baggage.map((bag: any, idx: number) => (
+                    <li key={`bag-${idx}`}>
+                      {bag.passengerName || 'Passenger'}: {bag.quantity}x {bag.type} ({currencyFormatter(bag.amount, bag.currency)})
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       <div className="border-t border-card-border pt-4">
         <h3 className="font-semibold text-text-primary">Payment summary</h3>
         <p className="mt-1 text-sm text-text-secondary">Total paid: {currencyFormatter(booking.totalAmount, booking.currency)}</p>
@@ -426,6 +476,18 @@ export function BookingDetail({ booking: initialBooking, isMockEnabled, bookingI
                     <span>Penalty / Fees:</span>
                     <span>{currencyFormatter((Number(booking.totalAmount) - Number(quote.refundAmount)).toString(), quote.currency)}</span>
                   </div>
+                  {quote.refundTo && (
+                    <div className="flex justify-between text-sm">
+                      <span className="text-text-secondary">Refund Destination:</span>
+                      <span className="font-medium text-text-primary">{quote.refundTo}</span>
+                    </div>
+                  )}
+                  {quote.nonRefundableAncillaryAmount && (
+                    <div className="flex justify-between text-sm text-text-cancelled">
+                      <span>Non-refundable Extras:</span>
+                      <span>{currencyFormatter(quote.nonRefundableAncillaryAmount, quote.nonRefundableAncillaryCurrency || quote.currency || booking.currency)}</span>
+                    </div>
+                  )}
                 </div>
 
                 <label className="flex items-start gap-2 cursor-pointer mt-4">

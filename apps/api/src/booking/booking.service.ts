@@ -8,8 +8,21 @@ import { CurrentItineraryDto, BookingDisruptionDto, DisruptionResolvedReason, Ma
 
 export type BookingWithRelations = Prisma.BookingGetPayload<{
   include: {
-    payment: { select: { id: true; status: true; stripePaymentIntentId: true } };
-    bookingIntent: { select: { id: true; duffelOfferId: true } };
+    payment: {
+      include: {
+        ancillarySelection: {
+          include: {
+            seatSelections: true;
+            baggageSelections: true;
+          };
+        };
+      };
+    };
+    bookingIntent: {
+      include: {
+        passengers: true;
+      };
+    };
     activeDisruptionRevision: {
       include: {
         segments: { orderBy: { globalOrder: 'asc' } };
@@ -28,6 +41,60 @@ import { StripeService } from '@/common/stripe.service';
 import { DuffelService } from '@/duffel/duffel.service';
 import { PaymentRefundService } from '@/payment/payment-refund.service';
 import { User, Passenger } from '@prisma/client';
+
+function parseDuffelCancellationQuoteId(serialized: string | null | undefined): {
+  quoteId: string | null;
+  refundTo: string | null;
+  nonRefundableAncillaryAmount: string | null;
+  nonRefundableAncillaryCurrency: string | null;
+} {
+  if (!serialized) {
+    return {
+      quoteId: null,
+      refundTo: null,
+      nonRefundableAncillaryAmount: null,
+      nonRefundableAncillaryCurrency: null,
+    };
+  }
+  if (serialized === 'PENDING_QUOTE') {
+    return {
+      quoteId: 'PENDING_QUOTE',
+      refundTo: null,
+      nonRefundableAncillaryAmount: null,
+      nonRefundableAncillaryCurrency: null,
+    };
+  }
+  const parts = serialized.split('|');
+  if (parts.length === 1) {
+    return {
+      quoteId: parts[0],
+      refundTo: null,
+      nonRefundableAncillaryAmount: null,
+      nonRefundableAncillaryCurrency: null,
+    };
+  }
+  return {
+    quoteId: parts[0] || null,
+    refundTo: parts[1] || null,
+    nonRefundableAncillaryAmount: parts[2] || null,
+    nonRefundableAncillaryCurrency: parts[3] || null,
+  };
+}
+
+function serializeDuffelCancellationQuoteId(
+  quoteId: string,
+  refundTo: string | null,
+  nonRefundableAmount: string | null,
+  nonRefundableCurrency: string | null,
+): string {
+  const parts = [
+    quoteId,
+    refundTo || '',
+    nonRefundableAmount || '',
+    nonRefundableCurrency || '',
+  ];
+  return parts.join('|');
+}
 
 function enrichRedactedDuffelOrder(duffelOrder: any, dbPassengers: any[], userEmail: string): any {
   if (!duffelOrder) return duffelOrder;
@@ -536,8 +603,21 @@ export class BookingService {
     const initialBooking = await this.prisma.booking.findUnique({
       where: { id: bookingId },
       include: {
-        payment: { select: { id: true, status: true, stripePaymentIntentId: true } },
-        bookingIntent: { select: { id: true, duffelOfferId: true } },
+        payment: {
+          include: {
+            ancillarySelection: {
+              include: {
+                seatSelections: true,
+                baggageSelections: true,
+              },
+            },
+          },
+        },
+        bookingIntent: {
+          include: {
+            passengers: true,
+          },
+        },
         activeDisruptionRevision: {
           include: {
             segments: { orderBy: { globalOrder: 'asc' } },
@@ -566,6 +646,33 @@ export class BookingService {
     }
     booking = await this.checkAndCompleteBooking(booking as any) as any;
 
+    const passengers = booking.bookingIntent?.passengers || [];
+    const getPassengerName = (intentPassengerId: string) => {
+      const passenger = passengers.find(p => p.id === intentPassengerId);
+      if (!passenger) return '';
+      return `${passenger.givenName} ${passenger.familyName}`.trim();
+    };
+
+    const ancillarySelection = booking.payment?.ancillarySelection;
+    const ancillarySummary = ancillarySelection ? {
+      seats: (ancillarySelection.seatSelections || []).map(seat => ({
+        intentPassengerId: seat.intentPassengerId,
+        passengerName: getPassengerName(seat.intentPassengerId),
+        segmentId: seat.segmentId,
+        seatDesignator: seat.seatDesignator,
+        amount: seat.amount.toString(),
+        currency: seat.currency,
+      })),
+      baggage: (ancillarySelection.baggageSelections || []).map(bag => ({
+        intentPassengerId: bag.intentPassengerId,
+        passengerName: getPassengerName(bag.intentPassengerId),
+        type: bag.type,
+        quantity: bag.quantity,
+        amount: bag.amount.toString(),
+        currency: bag.currency,
+      })),
+    } : null;
+
     return {
       id: booking.id,
       status: booking.status,
@@ -583,10 +690,11 @@ export class BookingService {
       cancellationRefundable: booking.cancellationRefundable ?? null,
       airlineRefundAmount: booking.airlineRefundAmount ? booking.airlineRefundAmount.toString() : null,
       customerRefundAmount: booking.customerRefundAmount ? booking.customerRefundAmount.toString() : null,
-      duffelCancellationQuoteId: booking.duffelCancellationQuoteId ?? null,
+      duffelCancellationQuoteId: parseDuffelCancellationQuoteId(booking.duffelCancellationQuoteId).quoteId,
       createdAt: booking.createdAt.toISOString(),
       updatedAt: booking.updatedAt.toISOString(),
-      ...this.mapDisruptionAndItinerary(booking),
+      ancillarySummary,
+      ...this.mapDisruptionAndItinerary(booking as any),
     };
   }
 
@@ -777,8 +885,9 @@ export class BookingService {
       booking.cancellationDeadline &&
       booking.cancellationDeadline > now
     ) {
+      const parsed = parseDuffelCancellationQuoteId(booking.duffelCancellationQuoteId);
       return {
-        quoteId: booking.duffelCancellationQuoteId,
+        quoteId: parsed.quoteId || '',
         bookingId: booking.id,
         duffelOrderId: booking.duffelOrderId,
         refundAmount: booking.customerRefundAmount ? booking.customerRefundAmount.toString() : '0.00',
@@ -786,6 +895,9 @@ export class BookingService {
         expiresAt: booking.cancellationDeadline.toISOString(),
         refundable: booking.cancellationRefundable ?? false,
         cancellationDeadline: booking.cancellationDeadline.toISOString(),
+        refundTo: parsed.refundTo,
+        nonRefundableAncillaryAmount: parsed.nonRefundableAncillaryAmount,
+        nonRefundableAncillaryCurrency: parsed.nonRefundableAncillaryCurrency,
       };
     }
 
@@ -822,8 +934,9 @@ export class BookingService {
           updatedBooking.cancellationDeadline &&
           updatedBooking.cancellationDeadline > new Date()
         ) {
+          const parsed = parseDuffelCancellationQuoteId(updatedBooking.duffelCancellationQuoteId);
           return {
-            quoteId: updatedBooking.duffelCancellationQuoteId,
+            quoteId: parsed.quoteId || '',
             bookingId: updatedBooking.id,
             duffelOrderId: updatedBooking.duffelOrderId || booking.duffelOrderId,
             refundAmount: updatedBooking.customerRefundAmount ? updatedBooking.customerRefundAmount.toString() : '0.00',
@@ -831,6 +944,9 @@ export class BookingService {
             expiresAt: updatedBooking.cancellationDeadline.toISOString(),
             refundable: updatedBooking.cancellationRefundable ?? false,
             cancellationDeadline: updatedBooking.cancellationDeadline.toISOString(),
+            refundTo: parsed.refundTo,
+            nonRefundableAncillaryAmount: parsed.nonRefundableAncillaryAmount,
+            nonRefundableAncillaryCurrency: parsed.nonRefundableAncillaryCurrency,
           };
         }
       }
@@ -848,6 +964,12 @@ export class BookingService {
       const refundable = quote.refundable !== undefined ? Boolean(quote.refundable) : parseFloat(String(refundAmount)) > 0;
       const cancellationDeadline = expiresAt;
 
+      const refundTo = quote.refund_to || null;
+      const nonRefundableAmount = quote.non_refundable_ancillary_amount || null;
+      const nonRefundableCurrency = quote.non_refundable_ancillary_currency || null;
+
+      const serializedQuoteId = serializeDuffelCancellationQuoteId(quoteId, refundTo, nonRefundableAmount, nonRefundableCurrency);
+
       const finalizeResult = await this.prisma.booking.updateMany({
         where: {
           id: booking.id,
@@ -855,7 +977,7 @@ export class BookingService {
           duffelCancellationQuoteId: 'PENDING_QUOTE',
         },
         data: {
-          duffelCancellationQuoteId: quoteId,
+          duffelCancellationQuoteId: serializedQuoteId,
           customerRefundAmount: refundAmount,
           cancellationRefundable: refundable,
           cancellationDeadline: cancellationDeadline ? new Date(cancellationDeadline) : null,
@@ -875,6 +997,9 @@ export class BookingService {
         expiresAt,
         refundable,
         cancellationDeadline,
+        refundTo,
+        nonRefundableAncillaryAmount: nonRefundableAmount,
+        nonRefundableAncillaryCurrency: nonRefundableCurrency,
       };
     } catch (error) {
       await this.prisma.booking.updateMany({
@@ -901,7 +1026,8 @@ export class BookingService {
     if (booking.userId !== userId) {
       throw new ForbiddenException('You do not have access to this booking');
     }
-    if (!booking.duffelOrderId || booking.duffelCancellationQuoteId !== quoteId) {
+    const parsed = parseDuffelCancellationQuoteId(booking.duffelCancellationQuoteId);
+    if (!booking.duffelOrderId || parsed.quoteId !== quoteId) {
       throw new BadRequestException('Cancellation quote is invalid');
     }
     if (booking.cancellationDeadline && booking.cancellationDeadline <= new Date()) {
@@ -1062,6 +1188,7 @@ export class BookingService {
       cancellationStatus: booking.status,
       refundStatus,
       refundAmount: booking.customerRefundAmount?.toString() ?? '0.00',
+      duffelCancellationQuoteId: parseDuffelCancellationQuoteId(booking.duffelCancellationQuoteId).quoteId,
     };
   }
 
@@ -1096,7 +1223,7 @@ export class BookingService {
       cancellationDeadline: booking.cancellationDeadline?.toISOString() ?? null,
       airlineRefundAmount: booking.airlineRefundAmount?.toString() ?? null,
       customerRefundAmount: booking.customerRefundAmount?.toString() ?? null,
-      duffelCancellationQuoteId: booking.duffelCancellationQuoteId ?? null,
+      duffelCancellationQuoteId: parseDuffelCancellationQuoteId(booking.duffelCancellationQuoteId).quoteId,
       refundStatus: refund?.status ?? null,
       retryCount: refund?.retryCount ?? null,
       nextRetryAt: refund?.nextRetryAt?.toISOString() ?? null,
