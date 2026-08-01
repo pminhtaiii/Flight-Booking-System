@@ -422,7 +422,7 @@ export function BookingDetail({ booking: initialBooking, isMockEnabled, bookingI
                 <ul className="list-disc list-inside space-y-1 pl-1">
                   {booking.ancillarySummary.baggage.map((bag: any, idx: number) => (
                     <li key={`bag-${idx}`}>
-                      {bag.passengerName || 'Passenger'}: {bag.quantity}x {bag.type} ({currencyFormatter(bag.amount, bag.currency)})
+                      {bag.passengerName || 'Passenger'}: {bag.quantity}x {bag.type} ({currencyFormatter((Number(bag.amount) * bag.quantity).toString(), bag.currency)})
                     </li>
                   ))}
                 </ul>
