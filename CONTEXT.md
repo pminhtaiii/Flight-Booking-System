@@ -89,3 +89,24 @@ _Avoid_: Hard expiry check
 **Journey-Wide Baggage**:
 A baggage service defined by the supplier as covering multiple segments (`segment_ids.length > 1`). Displayed on all relevant segment tabs with mutual exclusion logic (selecting it disables individual segment-scoped baggage of the same weight class) to prevent double-purchasing.
 _Avoid_: Through-checked bag, Global bag
+
+**Booking Readiness Evaluator**:
+A shared, pure validation unit used by both the readiness endpoint (`POST /api/bookings/intents/readiness`) and intent creation (`POST /api/bookings/intents`). Determines whether a TravelerProfile satisfies a specific Duffel offer's requirements by checking core identity completeness, contact information, and — for international routes — travel document completeness (passport number, issuing country, expiry treated as one atomic document group). The readiness result is advisory, not a guarantee; intent creation re-runs the same evaluator authoritatively. Returns masked summaries and missing-field names only, never full passport or contact data.
+_Avoid_: Profile validator, Eligibility checker
+
+**Passenger Source**:
+A discriminated union on the intent creation payload that declares where each passenger's data originates. `{ type: "traveler_profile", travelerProfileId: "..." }` resolves from a stored encrypted profile; `{ type: "inline", ... }` accepts per-booking manual entry. Designed so that `BookingIntentPassenger.travelerProfileId` can reference the user's own profile or a future companion profile without schema changes.
+_Avoid_: useProfile flag, Passenger mode
+
+**Passenger Snapshot**:
+A complete, immutable copy of all Duffel-bound passenger fields captured at intent creation time from the resolved Passenger Source. Includes identity (name, DOB, gender, title), contact (email, phone), and — when required — the full passport document group (number, issuing country, expiry) as one atomic unit. Sensitive fields are encrypted at rest (AES-256-GCM) and stripped/masked on API read responses. Decryption occurs only inside the trusted booking service just before Duffel order creation. The snapshot is never partially populated; the Booking Readiness Evaluator ensures completeness before creation.
+_Avoid_: Passenger reference, Live profile lookup
+
+**Readiness Scope**:
+The required-field checklist applied by the Booking Readiness Evaluator, determined by the offer's itinerary. `DOMESTIC`: all segments within the same country — requires identity (givenName, familyName, dateOfBirth, gender, title) and contact (email, phoneCountryCode, phoneNumber); travel documents not evaluated. `INTERNATIONAL`: any segment crossing a country border — requires identity, contact, and the full passport document group (documentType, passportNumber, passportExpiry, issuingCountry, nationality) as one atomic unit. The scope is derived by looking up origin/destination airport country codes from the airports table. Route scope determines field requirements; it does not imply immigration-entry eligibility, which requires destination-specific travel rules.
+_Avoid_: Flight type, Route category
+
+**Document Validation Model**:
+A three-tier passport validation architecture. Hard validation: passport fields present when required, expiry after trip completion date, document type supported by Duffel offer — returns `invalid` and blocks booking. Advisory validation: configurable system-wide `PASSPORT_ADVISORY_BUFFER_DAYS` (default 180) — returns `warning` with reason `PASSPORT_VALIDITY_REQUIRES_VERIFICATION` if passport expires within the buffer period after the trip, but does not block. Destination-specific validation: deferred to a future maintained travel-rules provider (e.g. Timatic) for authoritative itinerary-specific eligibility — returns `unknown` when the system cannot determine eligibility. Statuses: `valid`, `warning`, `invalid`, `unknown`.
+_Avoid_: Universal expiry rule, Hard 180-day blocker
+
