@@ -75,29 +75,15 @@ export default async function ReviewPage({ params }: Props) {
     );
   }
 
-  const { data: ancillaryCatalog, errorStatus: ancillaryErrorStatus } = await fetchAncillaryCatalog(intentId, accessToken);
-
-  if (ancillaryErrorStatus || !ancillaryCatalog) {
-    return (
-      <div className="flex min-h-screen flex-col bg-background">
-        <Header />
-        <main className="mx-auto w-full max-w-3xl py-12 px-4">
-          <div role="alert" className="card text-text-cancelled bg-bg-cancelled p-6">
-            <h1 className="text-xl font-bold">Flight extras are unavailable</h1>
-            <p className="mt-2 text-sm text-text-secondary">We could not load your seat and baggage details. Please return to the previous step or try again shortly.</p>
-          </div>
-        </main>
-      </div>
-    );
-  }
-
-  const totals = ancillaryCatalog.selection.totals;
+  const { data: ancillaryCatalog } = await fetchAncillaryCatalog(intentId, accessToken);
+  const catalogError = !ancillaryCatalog;
+  const totals = ancillaryCatalog?.selection?.totals;
 
   const basePrice = intent.confirmedPrice;
-  const grandTotal = totals.estimatedGrandTotal;
-  const currency = totals.currency ?? intent.currency;
-  const hasSeats = parseFloat(totals.seats) > 0;
-  const hasBaggage = parseFloat(totals.baggage) > 0;
+  const grandTotal = totals?.estimatedGrandTotal ?? String(basePrice);
+  const currency = totals?.currency ?? intent.currency;
+  const hasSeats = totals ? parseFloat(totals.seats) > 0 : false;
+  const hasBaggage = totals ? parseFloat(totals.baggage) > 0 : false;
   const hasAncillaries = hasSeats || hasBaggage;
 
   return (
@@ -110,6 +96,15 @@ export default async function ReviewPage({ params }: Props) {
           <h1 className="text-3xl font-bold text-text-primary">Review Booking</h1>
           <p className="text-text-secondary">Verify flight information and traveler details before making payment.</p>
         </div>
+
+        {catalogError && (
+          <div role="alert" className="card text-text-pending bg-bg-pending p-4 space-y-1">
+            <h2 className="font-semibold text-text-primary text-sm">Flight extras notice</h2>
+            <p className="text-xs text-text-secondary">
+              We could not refresh live seat and baggage options from the airline. Your base fare is displayed below, and you may proceed to payment or return to ancillaries to try again.
+            </p>
+          </div>
+        )}
 
         {/* Flight Details Card */}
         <div className="card space-y-4">
@@ -193,7 +188,9 @@ export default async function ReviewPage({ params }: Props) {
               </Link>
             </div>
           </div>
-          {hasAncillaries ? (
+          {catalogError ? (
+            <p className="text-sm text-text-secondary">Live seat and baggage details are temporarily unavailable.</p>
+          ) : hasAncillaries ? (
             <div className="space-y-3 text-sm text-text-secondary">
               {hasSeats && (
                 <div>
