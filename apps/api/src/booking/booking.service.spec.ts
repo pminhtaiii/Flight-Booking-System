@@ -346,8 +346,34 @@ describe('BookingService', () => {
             duffelCancellationQuoteId: 'PENDING_QUOTE',
           },
           data: expect.objectContaining({
-            duffelCancellationQuoteId: 'quote-new',
+            duffelCancellationQuoteId: 'quote-new|||',
           }),
+        });
+      });
+
+      it('preserves supplier refund destination and disclosed non-refundable ancillary value', async () => {
+        const booking = {
+          id: 'b-1', userId: 'u-1', status: 'CONFIRMED', duffelOrderId: 'ord-1',
+          duffelCancellationQuoteId: null, cancellationDeadline: null, currency: 'GBP',
+        };
+        const prisma = {
+          booking: {
+            findUnique: jest.fn().mockResolvedValue(booking),
+            updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+          },
+        };
+        const duffelService = {
+          createCancellationQuote: jest.fn().mockResolvedValue({
+            id: 'quote-new', refund_amount: '80.00', refund_currency: 'GBP', refund_to: 'airline_credits',
+            non_refundable_ancillary_amount: '20.00', non_refundable_ancillary_currency: 'GBP',
+            expires_at: new Date(Date.now() + 3600000).toISOString(), refundable: true,
+          }),
+        };
+        const service = new BookingService(prisma as never, {} as never, duffelService as never, {} as never);
+
+        await expect(service.getCancellationQuote('b-1', 'u-1')).resolves.toMatchObject({
+          refundAmount: '80.00', currency: 'GBP', refundTo: 'airline_credits',
+          nonRefundableAncillaryAmount: '20.00', nonRefundableAncillaryCurrency: 'GBP',
         });
       });
 

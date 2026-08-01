@@ -2,21 +2,21 @@
 
 ## Stack
 
-| Layer              | Tool                         | Purpose                                                     |
-| ------------------ | ---------------------------- | ----------------------------------------------------------- |
-| Language           | TypeScript & Python 3.11+    | TS for web/API, Python for agent service                    |
-| Backend Framework  | NestJS                       | Deterministic backend services (booking, payments, auth)    |
-| Frontend Framework | Next.js (App Router)         | SSR, SEO, Server Components for the user-facing UI          |
-| Database           | PostgreSQL                   | Primary transactional store (users, bookings, payments)     |
-| ORM                | Prisma                       | Type-safe queries, declarative schema, versioned migrations |
-| Cache / Rate Limit | Redis                        | Search result caching, rate limiting, API budget tracking   |
-| Authentication     | NextAuth.js (Auth.js) + JWT  | Email/password for v1. Social login deferred                |
-| Payment            | Stripe (Payment Intents)     | PCI-DSS compliant payment processing                        |
-| Flight Data        | Duffel API                   | Flight search, pricing, PNR creation, ticketing             |
-| AI Model           | Mimo (OpenAI-compatible URL) | Advisory agents — search assistance, recommendations        |
-| AI Framework       | LangChain (JS/Python)        | Agent chains, tool calling, conversation memory             |
-| AI Observability   | LangSmith                    | Agent run tracing, tool call auditing                       |
-| Code Review        | CodeRabbit                   | Automated PR review for security and code quality           |
+| Layer              | Tool                         | Purpose                                                                               |
+| ------------------ | ---------------------------- | ------------------------------------------------------------------------------------- |
+| Language           | TypeScript & Python 3.11+    | TS for web/API, Python for agent service                                              |
+| Backend Framework  | NestJS                       | Deterministic backend services (booking, payments, auth)                              |
+| Frontend Framework | Next.js (App Router)         | SSR, SEO, Server Components for the user-facing UI                                    |
+| Database           | PostgreSQL                   | Primary transactional store (users, bookings, payments)                               |
+| ORM                | Prisma                       | Type-safe queries, declarative schema, versioned migrations                           |
+| Cache / Rate Limit | Redis                        | Search result caching, seat map caching (60s TTL), rate limiting, API budget tracking |
+| Authentication     | NextAuth.js (Auth.js) + JWT  | Email/password for v1. Social login deferred                                          |
+| Payment            | Stripe (Payment Intents)     | PCI-DSS compliant payment processing                                                  |
+| Flight Data        | Duffel API                   | Flight search, pricing, seat maps, ancillary services, PNR creation, ticketing        |
+| AI Model           | Mimo (OpenAI-compatible URL) | Advisory agents — search assistance, recommendations                                  |
+| AI Framework       | LangChain (JS/Python)        | Agent chains, tool calling, conversation memory                                       |
+| AI Observability   | LangSmith                    | Agent run tracing, tool call auditing                                                 |
+| Code Review        | CodeRabbit                   | Automated PR review for security and code quality                                     |
 
 ---
 
@@ -148,6 +148,55 @@ Returns booking ID + PNR reference to frontend
 User proceeds to payment
 ```
 
+### Ancillary Services Flow (Feature 15; Deterministic Path — No AI)
+
+```
+User completes passenger details → owned BookingIntent → Ancillaries page
+        ↓
+Next.js → GET /api/bookings/intent/:intentId/ancillaries
+        ↓
+API authenticates owner, loads intent, then cache.service checks Redis for seatmap:{offerId}
+        ├── Cache HIT (TTL > 3s remaining) → return supplier-native catalog
+        └── Cache MISS or TTL ≤ 3s (early expiry buffer) ↓
+            duffel.service calls Duffel Seat Maps API (duffel.seatMaps.get)
+                ↓
+            Response cached in Redis (TTL: 60s)
+                ↓
+            Supplier-native catalog returned (cabins, rows, elements, available_services with per-seat pricing)
+        ↓
+API maps Duffel passenger IDs to this intent's passengers in request scope
+        ↓
+Frontend renders custom seat map + baggage selector
+        ↓
+Client-side price tracker aggregates: Total = Base Fare + Σ(Seat Prices) + Σ(Baggage Prices)
+        ↓
+User selects seats (tab-based stepper: one passenger at a time, segment tabs above)
+        ↓
+User selects baggage (same page, switchable section, per-segment with journey-wide options)
+        ↓
+User clicks "Continue" → server appends a versioned snapshot to BookingIntent + client writes minimal localStorage recovery record
+        ↓
+Review page renders read-only summary with [Edit seats] / [Edit baggage] links
+        ↓
+User clicks "Continue to Payment" → server-side validation pipeline:
+    1. CAS-freeze the current snapshot/version, then release DB locks
+    2. Re-price exact offer + services with Duffel
+    3. CAS-persist authoritative totals on that snapshot and bind it to Payment
+    4. Create single Stripe PaymentIntent (manual capture) for full amount
+    5. Customer authorizes → Verify requires_capture
+    6. Create Duffel order with the Payment-bound services[] array
+    7. Duffel confirmed → Capture Stripe | Duffel failed → Cancel authorization
+```
+
+- **Seat Map Rendering**: Custom-built renderer (not Duffel `@duffel/components`). Uses semantic/non-color seat states, distinct "selected by your group" indicators, and automatic exit-row age filtering.
+- **Multi-Segment**: Segment tabs above passenger stepper. Each segment loads its own seat map. Missing seat maps degrade gracefully with airline-assigned message.
+- **Data Schema**: Phase 1 implements additive Prisma models and migration for append-only, versioned `AncillarySelection` snapshots keyed by stable service/passenger/segment identities. `BookingIntent` points to the current version; `Payment` can reference the immutable snapshot it priced for recovery with `ON DELETE RESTRICT`. Newly created intent passengers persist their Duffel passenger ID through deterministic type-and-ordinal matching.
+- **Security**: JWT + BookingIntent ownership validation, intent-scoped supplier-to-local passenger mapping, service ID verification, Duffel as final availability arbiter, and idempotency for double-click/retry prevention.
+- **Owned Ancillary API**: `GET`/`PUT /bookings/intent/:intentId/ancillaries` load the owned active intent before calling the offer-scoped `seatmap:{offerId}` cache. The cache remains supplier-native; passenger projections are derived only per authenticated request. `PUT` validates authoritative service scopes and currency, appends a snapshot plus child rows, and advances the current pointer through an optimistic version CAS without payment or order side effects.
+- **Checkout Foundation**: Protects check-out steps via `protectCheckoutRoute` server helper and `NEXT_PUBLIC_FEATURE_FLAG_CHECKOUT` flag. Resolves owner and active validation for `[intentId]` endpoints, surfacing granular error layouts (Not Found 404, Forbidden 403, Expired 410, Service Unavailable 500). Gathers passengers dynamically, applying profile prefilling, date validations, and conditional passport assertions (mandatory on international segments, optional on domestic). Mocks E2E flows using Playwright route interception and custom `mock-scenario` cookies.
+- **Review, Recovery, and Cancellation**: Phase 6 introduces read-only review with targeted edit routing, versioned and PII-safe localStorage recovery, conflict-based re-routing back to selections on payment failure, minimal post-purchase confirmed summaries, and supplier-authoritative cancellation/refund quote fields (`refundTo`, `nonRefundableAncillaryAmount`, `nonRefundableAncillaryCurrency`) serialized/parsed inside the `duffelCancellationQuoteId` DB column to avoid database schema migrations.
+- **Rollout Flags & Telemetry (Phase 7)**: guarded by `FEATURE_FLAG_ANCILLARY_CATALOG` (read catalog), `FEATURE_FLAG_ANCILLARY_COMMIT` (commit selection), and `FEATURE_FLAG_ANCILLARY_PAYMENT` (pre-payment validation and binding). Disabling flags falls back cleanly to base-fare checkout. End-to-end requests propagate `x-trace-id` and `x-correlation-id` and record PII-sanitized audit events for catalog reads, snapshot commits, and payment validation outcomes.
+
 ### Booking Management Read Model (Deterministic Path — No AI)
 
 ```
@@ -217,7 +266,6 @@ An ADMIN may schedule a retry with a fresh key or record an externally completed
 - **Frontend User Experience**: The booking detail page dynamically renders cancellation/refund alerts and provides an inline "Cancel Booking" quote review and confirmation modal, gated by the fare-specific cutoff deadline. Stale pending states are automatically polled every 5s.
 - **Operator Dashboard**: Admins use the `/admin/refunds` view to inspect PII-safe escalated refund states and trigger the manual resolution pipeline.
 
-
 ### Disruption Core Domain (Deterministic Path)
 
 ```
@@ -235,7 +283,6 @@ MaterialityClassifier checks incremental/cumulative diff against disruption-v1 r
 ```
 
 - **Functional Decoupling**: Pure core domain functions contain no framework, DB, or external API references. Inputs are fully typed structures; outputs are deterministic diff, fingerprint, and classification results.
-
 
 ### Disruption Synchronization & Concurrency (Phase 3)
 
@@ -261,7 +308,6 @@ Conditional claim release (clears lock only if token matches)
 - **Pessimistic Concurrency**: Prevents concurrent execution of sync tasks on the same booking using atomic DB updates.
 - **Atomic Operations**: Guarantees database consistency by performing all writes, state transitions, and audit logging in a single, short database transaction.
 - **Race and Collision Safety**: Ensures concurrent cancellations always win, and dynamic version collisions resolve gracefully by automatic retrying.
-
 
 ### Disruption Webhook Ingestion & Webhook Inbox Processing (Phase 4)
 
@@ -302,7 +348,6 @@ DuffelEventProcessor Cron (Every 10s via @Cron)
 - **Independent Processor Boundaries**: Batch failures are isolated; errors processing one webhook event do not impact or stall the execution of other events in the same batch.
 - **PII-Safe Retention**: Redacts raw webhook payloads after 30 days to adhere to strict user privacy standards.
 
-
 ### Budget-Aware Reconciliation & Booking Completion (Phase 5)
 
 ```
@@ -331,7 +376,6 @@ Reconciliation Cron (Every 30m via @Cron or DUFFEL_RECONCILIATION_CRON)
 - **API Budget Control**: Protects supplier integration limits by checking monthly API budget before processing each booking, preventing excessive charges.
 - **Exponential Retry Backoff**: Prevents starve-out from repeating synchronization failures by scaling retry backoff exponentially.
 
-
 ### Traveller Disruption APIs & Lifecycle (Phase 6)
 
 ```
@@ -359,7 +403,6 @@ Booking Cancellation Disruption Resolution
 - **Flat-to-Nested Mapping**: Decoupled database storage (flat columns in segment snapshots) from the customer-facing API contract (fully nested and clean representation).
 - **Concurrency & Conflict Safeguard**: Rejects stale revision commands with `409 STALE_DISRUPTION_REVISION` to prevent users from accepting out-of-date flight changes when a newer change is available.
 - **Traceable Audit Logging**: Writes audit events for all traveler-initiated lifecycle transitions capturing actor and trace details.
-
 
 ### AI Chatbot Agent Flow (SSE Streaming)
 
@@ -390,10 +433,12 @@ FastAPI NemoGuardrailService runs safety checks (length, regex heuristics, Mimo 
 ## Containerization
 
 A single `docker-compose.yml` file is located at the root of the project to orchestrate the database and cache services for local development:
+
 - **PostgreSQL**: Version 16 (Alpine). Runs on host port `5432` with username `postgres`, password `postgres`, and database `flight_booking`. Persists database files using the `postgres_data` volume.
 - **Redis**: Version 7 (Alpine). Runs on host port `6379`. Persists data using the `redis_data` volume.
 
 To manage the services:
+
 - Start services: `docker compose up -d`
 - Stop services: `docker compose down`
 

@@ -15,6 +15,7 @@ import { BookingIntentModule } from './booking-intent/booking-intent.module';
 import { BookingModule } from './booking/booking.module';
 import { PaymentModule } from './payment/payment.module';
 import { DisruptionModule } from './disruption/disruption.module';
+import { AncillariesModule } from './ancillaries/ancillaries.module';
 
 import { z } from 'zod';
 
@@ -36,6 +37,9 @@ export const envSchema = z.object({
   FEATURE_FLAG_DISRUPTION_RECONCILIATION: z.string().optional().default('false'),
   FEATURE_FLAG_DISRUPTION_SURFACING: z.string().optional().default('false'),
   FEATURE_FLAG_DISRUPTION_OUTBOX: z.string().optional().default('false'),
+  FEATURE_FLAG_ANCILLARY_CATALOG: z.string().optional().default('true'),
+  FEATURE_FLAG_ANCILLARY_COMMIT: z.string().optional().default('true'),
+  FEATURE_FLAG_ANCILLARY_PAYMENT: z.string().optional().default('true'),
 }).passthrough();
 
 @Module({
@@ -59,6 +63,7 @@ export const envSchema = z.object({
     BookingModule,
     PaymentModule,
     DisruptionModule,
+    AncillariesModule,
   ],
   controllers: [],
   providers: [],

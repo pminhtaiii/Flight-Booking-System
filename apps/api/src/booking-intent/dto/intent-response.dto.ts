@@ -50,6 +50,10 @@ export class GetBookingIntentResponseDto {
   intentExpiresAt!: string;
   offerExpiresAt!: string | null;
   createdAt!: string;
+  seatTotal?: number;
+  baggageTotal?: number;
+  ancillaryTotal?: number;
+  ancillaryStatus?: string;
   passengers!: BookingIntentPassengerDetailDto[];
   flight!: BookingIntentFlightDto;
 }

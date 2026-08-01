@@ -61,4 +61,5 @@ export type ChatMessage = {
 export * from './booking-intent.types';
 export * from './airport';
 export * from './payment.types';
+export * from './ancillary.types';
 

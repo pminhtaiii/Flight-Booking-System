@@ -4,9 +4,12 @@ import {
   NotFoundException,
   BadRequestException,
   ForbiddenException,
+  ConflictException,
+  GoneException,
   InternalServerErrorException,
   HttpStatus,
   HttpException,
+  Optional,
 } from '@nestjs/common';
 import { PrismaService } from '@/prisma/prisma.service';
 import { StripeService } from '@/common/stripe.service';
@@ -19,11 +22,198 @@ import { ConfirmPaymentDto } from '@/payment/dto/confirm-payment.dto';
 import { PaymentResponseDto } from '@/payment/dto/payment-response.dto';
 import { enforceTransition } from '@/payment/payment-state-machine';
 import * as crypto from 'crypto';
-import { Prisma, BookingFailureReason } from '@prisma/client';
+import { Prisma, BookingFailureReason, AncillarySelectionStatus } from '@prisma/client';
 
 import { BookingService } from '@/booking/booking.service';
 import { forwardRef, Inject } from '@nestjs/common';
 import { FlightSnapshot, PassengerSnapshot } from '@shared/booking-types';
+import { AncillaryPaymentValidationService } from '@/payment/ancillary-payment-validation.service';
+import type { ValidatedAncillaryPayment } from '@/payment/ancillary-payment-validation.service';
+
+function majorUnitsToMinorBigInt(amount: string): bigint {
+  const match = /^(\d+)(?:\.(\d{1,2}))?$/.exec(amount);
+  if (!match) {
+    throw new BadRequestException('Invalid authoritative payment amount');
+  }
+
+  const fractional = (match[2] ?? '').padEnd(2, '0');
+  return BigInt(match[1]) * 100n + BigInt(fractional || '0');
+}
+
+function majorUnitsToMinor(amount: string): number {
+  const minor = majorUnitsToMinorBigInt(amount);
+  if (minor > 2_147_483_647n) {
+    throw new BadRequestException('Authoritative payment amount is too large');
+  }
+
+  return parseInt(minor.toString(), 10);
+}
+
+function authoritativeAmountsEqual(
+  persisted: Prisma.Decimal | string | null,
+  validated: string,
+): boolean {
+  if (persisted === null) {
+    return false;
+  }
+
+  try {
+    return majorUnitsToMinorBigInt(String(persisted)) === majorUnitsToMinorBigInt(validated);
+  } catch {
+    return false;
+  }
+}
+
+function canonicalOrderServices(selection: {
+  seatSelections: Array<{ serviceId: string }>;
+  baggageSelections: Array<{ serviceId: string; quantity: number }>;
+}): Array<{ id: string; quantity: number }> {
+  const quantities = new Map<string, number>();
+
+  for (const seat of selection.seatSelections) {
+    quantities.set(seat.serviceId, (quantities.get(seat.serviceId) ?? 0) + 1);
+  }
+  for (const baggage of selection.baggageSelections) {
+    quantities.set(
+      baggage.serviceId,
+      (quantities.get(baggage.serviceId) ?? 0) + baggage.quantity,
+    );
+  }
+
+  return [...quantities.entries()]
+    .sort(([left], [right]) => left.localeCompare(right))
+    .map(([id, quantity]) => ({ id, quantity }));
+}
+
+type PaymentReservation = {
+  bookingIntentId: string;
+  ancillarySelectionId: string;
+  ancillarySelectionVersion: number;
+  attemptNumber: number;
+  amount: number;
+  currency: string;
+  validatedAncillary: ValidatedAncillaryPayment;
+  intentExpiresAt: string;
+  offerExpiresAt: string | null;
+  validatedAt: string;
+};
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function isValidatedService(
+  value: unknown,
+): value is { serviceId: string; quantity: number } {
+  return (
+    isRecord(value) &&
+    typeof value.serviceId === 'string' &&
+    typeof value.quantity === 'number'
+  );
+}
+
+function readPaymentReservation(
+  value: unknown,
+  dto: CreatePaymentDto,
+): PaymentReservation | undefined {
+  if (!isRecord(value) || !isRecord(value.paymentReservation)) {
+    return undefined;
+  }
+  const reservation = value.paymentReservation;
+  const validated = reservation.validatedAncillary;
+  if (
+    typeof reservation.bookingIntentId !== 'string' ||
+    reservation.bookingIntentId !== dto.bookingIntentId ||
+    typeof reservation.ancillarySelectionId !== 'string' ||
+    reservation.ancillarySelectionId !== dto.ancillarySelectionId ||
+    typeof reservation.ancillarySelectionVersion !== 'number' ||
+    reservation.ancillarySelectionVersion !== dto.ancillarySelectionVersion ||
+    typeof reservation.attemptNumber !== 'number' ||
+    typeof reservation.amount !== 'number' ||
+    typeof reservation.currency !== 'string' ||
+    typeof reservation.intentExpiresAt !== 'string' ||
+    (reservation.offerExpiresAt !== null && typeof reservation.offerExpiresAt !== 'string') ||
+    typeof reservation.validatedAt !== 'string' ||
+    !isRecord(validated) ||
+    typeof validated.selectionId !== 'string' ||
+    validated.selectionId !== dto.ancillarySelectionId ||
+    typeof validated.selectionVersion !== 'number' ||
+    validated.selectionVersion !== dto.ancillarySelectionVersion ||
+    typeof validated.baseAmount !== 'string' ||
+    typeof validated.grandTotal !== 'string' ||
+    typeof validated.currency !== 'string' ||
+    !Array.isArray(validated.services) ||
+    !validated.services.every(isValidatedService)
+  ) {
+    return undefined;
+  }
+
+  return {
+    bookingIntentId: reservation.bookingIntentId,
+    ancillarySelectionId: reservation.ancillarySelectionId,
+    ancillarySelectionVersion: reservation.ancillarySelectionVersion,
+    attemptNumber: reservation.attemptNumber,
+    amount: reservation.amount,
+    currency: reservation.currency,
+    intentExpiresAt: reservation.intentExpiresAt,
+    offerExpiresAt: reservation.offerExpiresAt,
+    validatedAt: reservation.validatedAt,
+    validatedAncillary: {
+      selectionId: validated.selectionId,
+      selectionVersion: validated.selectionVersion,
+      baseAmount: validated.baseAmount,
+      grandTotal: validated.grandTotal,
+      currency: validated.currency,
+      services: validated.services.map((service) => ({
+        serviceId: service.serviceId,
+        quantity: service.quantity,
+      })),
+    },
+  };
+}
+
+function redactDuffelOrder(duffelOrder: any): any {
+  if (!duffelOrder) return duffelOrder;
+  const copy = JSON.parse(JSON.stringify(duffelOrder));
+  if (Array.isArray(copy.passengers)) {
+    for (const p of copy.passengers) {
+      if (p.email !== undefined) p.email = 'REDACTED';
+      if (p.born_on !== undefined) p.born_on = 'REDACTED';
+      if (p.given_name !== undefined) p.given_name = 'REDACTED';
+      if (p.family_name !== undefined) p.family_name = 'REDACTED';
+      if (p.phone_number !== undefined) p.phone_number = 'REDACTED';
+    }
+  }
+  return copy;
+}
+
+function enrichRedactedDuffelOrder(duffelOrder: any, dbPassengers: any[], userEmail: string): any {
+  if (!duffelOrder) return duffelOrder;
+  const copy = JSON.parse(JSON.stringify(duffelOrder));
+  if (Array.isArray(copy.passengers)) {
+    copy.passengers.forEach((p: any, i: number) => {
+      const dbPass = dbPassengers.find((dbp: any) => dbp.duffelPassengerId === p.id) || dbPassengers[i];
+      if (dbPass) {
+        if (!p.given_name || p.given_name === 'REDACTED') {
+          p.given_name = dbPass.givenName;
+        }
+        if (!p.family_name || p.family_name === 'REDACTED') {
+          p.family_name = dbPass.familyName;
+        }
+        if (dbPass.dateOfBirth && (!p.born_on || p.born_on === 'REDACTED')) {
+          const d = new Date(dbPass.dateOfBirth);
+          if (!isNaN(d.getTime())) {
+            p.born_on = d.toISOString().split('T')[0];
+          }
+        }
+      }
+      if (!p.email || p.email === 'REDACTED') {
+        p.email = userEmail;
+      }
+    });
+  }
+  return copy;
+}
 
 @Injectable()
 export class PaymentService {
@@ -38,6 +228,7 @@ export class PaymentService {
     private readonly paymentMethodService: PaymentMethodService,
     @Inject(forwardRef(() => BookingService))
     private readonly bookingService: BookingService,
+    private readonly ancillaryPaymentValidation?: AncillaryPaymentValidationService,
   ) {}
 
   /**
@@ -48,34 +239,211 @@ export class PaymentService {
     idempotencyKey: string,
     userId: string,
     ipAddress: string,
+    traceId?: string,
+    correlationId?: string,
   ): Promise<PaymentResponseDto> {
+    if (dto.ancillarySelectionId !== undefined && process.env.FEATURE_FLAG_ANCILLARY_PAYMENT === 'false') {
+      throw new BadRequestException({
+        code: 'ANCILLARY_PAYMENT_DISABLED',
+        message: 'Ancillary checkout is currently disabled',
+      });
+    }
+
+    let paymentIntent: Awaited<ReturnType<StripeService['createPaymentIntent']>> | undefined = undefined;
+    let paymentRecord: unknown = null;
     try {
-      // 1. Check/acquire the request idempotency key
       const requestHash = this.idempotencyService.computeHash(dto);
+      const requestPath = '/api/bookings/payment/create';
+      let validatedAncillary: ValidatedAncillaryPayment | undefined;
+      let recoveredReservation: PaymentReservation | undefined;
+      let reuseAttemptNumber: number | undefined;
+      let boundPaymentReplay = false;
+      if (
+        dto.ancillarySelectionId !== undefined ||
+        dto.ancillarySelectionVersion !== undefined
+      ) {
+        if (
+          dto.ancillarySelectionId === undefined ||
+          dto.ancillarySelectionVersion === undefined
+        ) {
+          throw new BadRequestException(
+            'Ancillary selection ID and version must be provided together',
+          );
+        }
+        if (!this.ancillaryPaymentValidation) {
+          throw new InternalServerErrorException(
+            'Ancillary payment validation is unavailable',
+          );
+        }
+        const boundPayment = await this.prisma.payment?.findFirst({
+          where: {
+            bookingIntentId: dto.bookingIntentId,
+            ancillarySelectionId: dto.ancillarySelectionId,
+            ancillarySelectionVersion: dto.ancillarySelectionVersion,
+            idempotencyKey: {
+              key: idempotencyKey,
+              customerId: userId,
+            },
+          },
+          select: {
+            bookingIntentId: true,
+            ancillarySelectionId: true,
+            ancillarySelectionVersion: true,
+          },
+        });
+        boundPaymentReplay =
+          boundPayment?.bookingIntentId === dto.bookingIntentId &&
+          boundPayment.ancillarySelectionId === dto.ancillarySelectionId &&
+          boundPayment.ancillarySelectionVersion === dto.ancillarySelectionVersion;
+        if (!boundPaymentReplay) {
+          const existingKey = await this.prisma.idempotencyKey?.findUnique({
+            where: { key: idempotencyKey },
+          });
+          if (
+            existingKey?.requestHash === requestHash &&
+            existingKey.customerId === userId &&
+            existingKey.requestPath === requestPath
+          ) {
+            recoveredReservation = readPaymentReservation(existingKey.requestParams, dto);
+          }
+          if (recoveredReservation) {
+            const nowTime = Date.now();
+            const validatedTime = new Date(recoveredReservation.validatedAt).getTime();
+            const intentExpiresTime = new Date(recoveredReservation.intentExpiresAt).getTime();
+            const offerExpiresTime = recoveredReservation.offerExpiresAt ? new Date(recoveredReservation.offerExpiresAt).getTime() : null;
+
+            const isStale = (nowTime - validatedTime > 60_000) ||
+                            (intentExpiresTime <= nowTime) ||
+                            (offerExpiresTime !== null && offerExpiresTime <= nowTime);
+
+            if (isStale) {
+              reuseAttemptNumber = recoveredReservation.attemptNumber;
+              recoveredReservation = undefined;
+            }
+          }
+          if (!recoveredReservation) {
+            validatedAncillary = await this.ancillaryPaymentValidation.validateForPayment({
+              userId,
+              bookingIntentId: dto.bookingIntentId,
+              ancillarySelectionId: dto.ancillarySelectionId,
+              ancillarySelectionVersion: dto.ancillarySelectionVersion,
+            }, traceId, correlationId);
+          }
+        }
+      }
+
+      // 1. Check/acquire the request idempotency key
       const idempotency = await this.idempotencyService.acquireOrReplay(
         idempotencyKey,
         requestHash,
         userId,
-        '/api/bookings/payment/create',
+        requestPath,
       );
 
       if (idempotency.status === 'replay') {
         return JSON.parse(idempotency.responseBody);
       }
 
+      if (recoveredReservation) {
+        const acquiredKey = await this.prisma.idempotencyKey.findUnique({
+          where: { key: idempotencyKey },
+        });
+        if (
+          acquiredKey?.requestHash !== requestHash ||
+          acquiredKey.customerId !== userId ||
+          acquiredKey.requestPath !== requestPath
+        ) {
+          throw new ConflictException('Payment reservation is no longer available');
+        }
+        recoveredReservation = readPaymentReservation(acquiredKey.requestParams, dto);
+        if (!recoveredReservation) {
+          throw new ConflictException('Payment reservation is no longer available');
+        }
+        validatedAncillary = recoveredReservation.validatedAncillary;
+      }
+
       // 2. Lock & update BookingIntent paymentAttemptCount inside transaction
+      const intent = await this.prisma.bookingIntent.findUnique({
+        where: { id: dto.bookingIntentId },
+        select: {
+          id: true,
+          status: true,
+          paymentAttemptCount: true,
+          confirmedPrice: true,
+          currency: true,
+          userId: true,
+          currentAncillarySelectionId: true,
+          ancillaryVersion: true,
+        },
+      });
+
+      if (!intent) {
+        throw new NotFoundException('Booking intent not found');
+      }
+
+      if (intent.userId !== userId) {
+        throw new ForbiddenException('You do not own this booking intent');
+      }
+
+      if (intent.status !== 'PENDING' && intent.status !== 'AWAITING_PAYMENT') {
+        throw new BadRequestException('Booking intent is not in an allowed status for payment');
+      }
+
+      if (intent.paymentAttemptCount >= 2) {
+        throw new BadRequestException('Payment attempts exhausted');
+      }
+
+      const targetAncillarySelectionId = dto.ancillarySelectionId || intent.currentAncillarySelectionId;
+      const targetAncillarySelectionVersion = dto.ancillarySelectionVersion ?? intent.ancillaryVersion;
+
+      let validated: Awaited<ReturnType<AncillaryPaymentValidationService['validateForPayment']>> | null = null;
+      let amountInCents: number;
+
+      if (
+        targetAncillarySelectionId &&
+        targetAncillarySelectionVersion !== null &&
+        targetAncillarySelectionVersion !== undefined &&
+        targetAncillarySelectionVersion > 0
+      ) {
+        if (
+          validatedAncillary &&
+          validatedAncillary.selectionId === targetAncillarySelectionId &&
+          validatedAncillary.selectionVersion === targetAncillarySelectionVersion
+        ) {
+          validated = validatedAncillary;
+        } else {
+          if (!this.ancillaryPaymentValidation) {
+            throw new InternalServerErrorException('Ancillary payment validation is unavailable');
+          }
+          validated = await this.ancillaryPaymentValidation.validateForPayment({
+            userId,
+            bookingIntentId: dto.bookingIntentId,
+            ancillarySelectionId: targetAncillarySelectionId,
+            ancillarySelectionVersion: targetAncillarySelectionVersion,
+          }, traceId, correlationId);
+        }
+        amountInCents = Math.round(Number(validated.grandTotal) * 100);
+      } else {
+        amountInCents = Math.round(Number(intent.confirmedPrice) * 100);
+      }
+
       const result = await this.prisma.$transaction(async (tx) => {
         interface RawBookingIntent {
           id: string;
           status: string;
           paymentAttemptCount: number;
-          confirmedPrice: number;
+          confirmedPrice: Prisma.Decimal | string;
           currency: string;
           userId: string;
+          currentAncillarySelectionId: string | null;
+          ancillaryVersion: number;
+          intentExpiresAt: Date;
+          offerExpiresAt: Date | null;
         }
 
         const intents = await tx.$queryRaw<RawBookingIntent[]>`
-          SELECT id, status, "paymentAttemptCount", "confirmedPrice", currency, "userId"
+          SELECT id, status, "paymentAttemptCount", "confirmedPrice", currency, "userId",
+                 "currentAncillarySelectionId", "ancillaryVersion", "intentExpiresAt", "offerExpiresAt"
           FROM booking_intents
           WHERE id = ${dto.bookingIntentId}
           FOR UPDATE
@@ -85,12 +453,39 @@ export class PaymentService {
           throw new NotFoundException('Booking intent not found');
         }
 
-        const intent = intents[0];
-        if (intent.userId !== userId) {
+        const txIntent = intents[0];
+        if (txIntent.userId !== userId) {
           throw new ForbiddenException('You do not own this booking intent');
         }
 
-        if (intent.status !== 'CREATED' && intent.status !== 'AWAITING_PAYMENT') {
+        const now = new Date();
+        if (txIntent.intentExpiresAt && new Date(txIntent.intentExpiresAt) <= now) {
+          throw new GoneException('Booking intent has expired');
+        }
+        if (txIntent.offerExpiresAt && new Date(txIntent.offerExpiresAt) <= now) {
+          throw new GoneException('Offer has expired');
+        }
+
+        if (!dto.ancillarySelectionId && txIntent.currentAncillarySelectionId) {
+          const seatCount = await tx.seatSelection.count({
+            where: { ancillarySelectionId: txIntent.currentAncillarySelectionId },
+          });
+          const baggageCount = await tx.baggageSelection.count({
+            where: { ancillarySelectionId: txIntent.currentAncillarySelectionId },
+          });
+          if (seatCount > 0 || baggageCount > 0) {
+            throw new BadRequestException('Ancillary selections exist but were not included in the payment request');
+          }
+        }
+
+        if (
+          (validatedAncillary &&
+            txIntent.status !== 'PENDING' &&
+            !(recoveredReservation && txIntent.status === 'AWAITING_PAYMENT')) ||
+          (!validatedAncillary &&
+            txIntent.status !== 'PENDING' &&
+            txIntent.status !== 'AWAITING_PAYMENT')
+        ) {
           throw new BadRequestException('Booking intent is not in an allowed status for payment');
         }
 
@@ -104,26 +499,150 @@ export class PaymentService {
 
         if (existingPayment) {
           return {
-            confirmedPrice: Number(intent.confirmedPrice),
-            currency: intent.currency,
+            amount: existingPayment.amount,
+            currency: existingPayment.currency.toUpperCase(),
             attemptNumber: existingPayment.attemptNumber,
+            payment: existingPayment,
           };
         }
 
-        if (intent.paymentAttemptCount >= 2) {
+        if (!recoveredReservation && txIntent.paymentAttemptCount >= 2) {
           throw new BadRequestException('Payment attempts exhausted');
         }
 
-        const nextAttemptCount = intent.paymentAttemptCount + 1;
-        await tx.$executeRaw`
-          UPDATE booking_intents
-          SET "paymentAttemptCount" = ${nextAttemptCount}, status = 'AWAITING_PAYMENT'
-          WHERE id = ${dto.bookingIntentId}
-        `;
+        const nextAttemptCount =
+          recoveredReservation?.attemptNumber ?? reuseAttemptNumber ?? txIntent.paymentAttemptCount + 1;
+        const amount =
+          recoveredReservation?.amount ??
+          (validatedAncillary
+            ? majorUnitsToMinor(validatedAncillary.grandTotal)
+            : majorUnitsToMinor(String(txIntent.confirmedPrice)));
+        const currency =
+          recoveredReservation?.currency ?? validatedAncillary?.currency ?? txIntent.currency;
+        if (validatedAncillary) {
+          if (
+            txIntent.currentAncillarySelectionId !== validatedAncillary.selectionId ||
+            txIntent.ancillaryVersion !== validatedAncillary.selectionVersion
+          ) {
+            throw new ConflictException({
+              code: 'ANCILLARY_VERSION_CONFLICT',
+              intentId: dto.bookingIntentId,
+              currentVersion: txIntent.ancillaryVersion,
+            });
+          }
+          if (txIntent.currency.toUpperCase() !== validatedAncillary.currency.toUpperCase()) {
+            throw new BadRequestException({
+              code: 'ANCILLARY_CURRENCY_MISMATCH',
+              intentId: dto.bookingIntentId,
+            });
+          }
+          interface RawAncillarySelection {
+            id: string;
+            status: string;
+            currency: string;
+            validatedBaseAmount: Prisma.Decimal | string | null;
+            validatedGrandTotal: Prisma.Decimal | string | null;
+            validationLeaseToken: string | null;
+            validationLeaseExpiresAt: Date | null;
+            validatedAt: Date | null;
+          }
+          const selections = await tx.$queryRaw<RawAncillarySelection[]>`
+            SELECT id, status, currency, "validatedBaseAmount", "validatedGrandTotal",
+                   "validationLeaseToken", "validationLeaseExpiresAt", "validatedAt"
+            FROM ancillary_selections
+            WHERE id = ${validatedAncillary.selectionId}
+              AND "bookingIntentId" = ${dto.bookingIntentId}
+              AND version = ${validatedAncillary.selectionVersion}
+            FOR UPDATE
+          `;
+          const selection = selections[0];
+          const validatedAtTime = selection?.validatedAt ? new Date(selection.validatedAt).getTime() : 0;
+          if (
+            selections.length !== 1 ||
+            selection.status !== 'VALIDATED' ||
+            (Date.now() - validatedAtTime) > 60_000 ||
+            selection.currency.toUpperCase() !== validatedAncillary.currency.toUpperCase() ||
+            !authoritativeAmountsEqual(
+              selection.validatedBaseAmount,
+              validatedAncillary.baseAmount,
+            ) ||
+            !authoritativeAmountsEqual(
+              selection.validatedGrandTotal,
+              validatedAncillary.grandTotal,
+            ) ||
+            selection.validationLeaseToken !== null ||
+            selection.validationLeaseExpiresAt !== null
+          ) {
+            throw new ConflictException({
+              code: 'ANCILLARY_VERSION_CONFLICT',
+              intentId: dto.bookingIntentId,
+              currentVersion: txIntent.ancillaryVersion,
+            });
+          }
+
+          if (!recoveredReservation) {
+            const reservation: PaymentReservation = {
+              bookingIntentId: dto.bookingIntentId,
+              ancillarySelectionId: validatedAncillary.selectionId,
+              ancillarySelectionVersion: validatedAncillary.selectionVersion,
+              attemptNumber: nextAttemptCount,
+              amount,
+              currency,
+              validatedAncillary,
+              intentExpiresAt: txIntent.intentExpiresAt ? new Date(txIntent.intentExpiresAt).toISOString() : new Date(Date.now() + 600000).toISOString(),
+              offerExpiresAt: txIntent.offerExpiresAt ? new Date(txIntent.offerExpiresAt).toISOString() : null,
+              validatedAt: selection.validatedAt ? new Date(selection.validatedAt).toISOString() : new Date().toISOString(),
+            };
+            const reserved = await tx.$executeRaw`
+              WITH reserved_key AS (
+                UPDATE idempotency_keys
+                SET "requestParams" = jsonb_build_object(
+                  'paymentReservation',
+                  ${reservation}::jsonb
+                )
+                WHERE "key" = ${idempotencyKey}
+                  AND "requestHash" = ${requestHash}
+                  AND "customerId" = ${userId}
+                  AND "requestPath" = ${requestPath}
+                  AND "lockedAt" = ${idempotency.lockedAt}
+                RETURNING id
+              )
+              UPDATE booking_intents
+              SET "paymentAttemptCount" = ${nextAttemptCount}, status = 'AWAITING_PAYMENT'
+              WHERE id = ${dto.bookingIntentId}
+                AND EXISTS (SELECT 1 FROM reserved_key)
+            `;
+            if (reserved !== 1) {
+              throw new ConflictException('Payment reservation ownership was lost');
+            }
+          }
+        } else {
+          if (!recoveredReservation) {
+            await tx.$executeRaw`
+              UPDATE booking_intents
+              SET "paymentAttemptCount" = ${nextAttemptCount}, status = 'AWAITING_PAYMENT'
+              WHERE id = ${dto.bookingIntentId}
+            `;
+          }
+        }
+
+        if (validated) {
+          if (
+            txIntent.currentAncillarySelectionId !== validated.selectionId ||
+            txIntent.ancillaryVersion !== validated.selectionVersion
+          ) {
+            throw new ConflictException({
+              code: 'ANCILLARY_VERSION_CONFLICT',
+              intentId: dto.bookingIntentId,
+              currentVersion: txIntent.ancillaryVersion,
+              message: 'Ancillary selection was updated after validation. Please revalidate before payment.',
+            });
+          }
+        }
 
         return {
-          confirmedPrice: Number(intent.confirmedPrice),
-          currency: intent.currency,
+          amount,
+          currency,
           attemptNumber: nextAttemptCount,
         };
       });
@@ -167,72 +686,240 @@ export class PaymentService {
       }
 
       // 4. Create Stripe PaymentIntent
-      const amountInCents = Math.round(result.confirmedPrice * 100);
-      const paymentIntent = await this.stripeService.createPaymentIntent(
+      amountInCents = result.amount;
+      const stripeMetadata: Record<string, string> = validatedAncillary || boundPaymentReplay
+        ? {
+            bookingIntentId: dto.bookingIntentId,
+            ancillarySelectionId:
+              validatedAncillary?.selectionId ?? dto.ancillarySelectionId!,
+            ancillarySelectionVersion: String(
+              validatedAncillary?.selectionVersion ?? dto.ancillarySelectionVersion,
+            ),
+          }
+        : { bookingIntentId: dto.bookingIntentId };
+      paymentIntent = await this.stripeService.createPaymentIntent(
         amountInCents,
         result.currency,
         stripeCustomerId,
-        { bookingIntentId: dto.bookingIntentId },
+        stripeMetadata,
         `${idempotencyKey}-stripe-intent`,
         dto.paymentMethodId,
         dto.saveCard ? 'off_session' : undefined,
       );
 
       // 5. Create Payment record in DB
-      const keyRecord = await this.prisma.idempotencyKey.findUnique({
-        where: { key: idempotencyKey },
-        select: { id: true },
-      });
-      if (!keyRecord) {
-        throw new InternalServerErrorException('Idempotency key record not found');
-      }
+      let payment;
+      if (validatedAncillary) {
+        payment = await this.prisma.$transaction(async (tx) => {
+          interface ShortBookingIntent {
+            currentAncillarySelectionId: string | null;
+            ancillaryVersion: number | null;
+          }
+          const lockedIntents = await tx.$queryRaw<ShortBookingIntent[]>`
+            SELECT "currentAncillarySelectionId", "ancillaryVersion"
+            FROM booking_intents
+            WHERE id = ${dto.bookingIntentId}
+            FOR UPDATE
+          `;
+          const lockedIntent = lockedIntents[0];
+          if (
+            !lockedIntent ||
+            lockedIntent.currentAncillarySelectionId !== validatedAncillary.selectionId ||
+            lockedIntent.ancillaryVersion !== validatedAncillary.selectionVersion
+          ) {
+            throw new ConflictException({
+              code: 'ANCILLARY_VERSION_CONFLICT',
+              intentId: dto.bookingIntentId,
+              currentVersion: lockedIntent?.ancillaryVersion ?? 0,
+            });
+          }
+          const existingPayment = await tx.payment.findFirst({
+            where: {
+              idempotencyKey: { key: idempotencyKey },
+            },
+          });
+          if (existingPayment) {
+            return existingPayment;
+          }
 
-      let payment = await this.prisma.payment.findFirst({
-        where: {
-          idempotencyKeyId: keyRecord.id,
-        },
-      });
+          const bound = await tx.ancillarySelection.updateMany({
+            where: {
+              id: validatedAncillary.selectionId,
+              bookingIntentId: dto.bookingIntentId,
+              version: validatedAncillary.selectionVersion,
+              status: 'VALIDATED',
+              currency: validatedAncillary.currency,
+              validatedBaseAmount: validatedAncillary.baseAmount,
+              validatedGrandTotal: validatedAncillary.grandTotal,
+            },
+            data: { status: 'PAYMENT_BOUND' },
+          });
+          if (bound.count !== 1) {
+            throw new ConflictException({
+              code: 'ANCILLARY_VERSION_CONFLICT',
+              intentId: dto.bookingIntentId,
+              currentVersion: validatedAncillary.selectionVersion,
+            });
+          }
 
-      if (!payment) {
-        payment = await this.prisma.payment.create({
-          data: {
-            bookingIntentId: dto.bookingIntentId,
-            attemptNumber: result.attemptNumber,
-            idempotencyKeyId: keyRecord.id,
-            stripePaymentIntentId: paymentIntent.id,
-            stripeCustomerId,
-            amount: amountInCents,
-            currency: result.currency.toLowerCase(),
-            status: 'CREATED',
-          },
+          const keyRecord = await tx.idempotencyKey.findUnique({
+            where: { key: idempotencyKey },
+            select: { id: true },
+          });
+          if (!keyRecord) {
+            throw new InternalServerErrorException('Idempotency key record not found');
+          }
+
+          const created = await tx.payment.create({
+            data: {
+              bookingIntentId: dto.bookingIntentId,
+              ancillarySelectionId: validatedAncillary.selectionId,
+              ancillarySelectionVersion: validatedAncillary.selectionVersion,
+              attemptNumber: result.attemptNumber,
+              idempotencyKeyId: keyRecord.id,
+              stripePaymentIntentId: paymentIntent!.id,
+              stripeCustomerId,
+              amount: amountInCents,
+              currency: result.currency.toLowerCase(),
+              status: 'CREATED',
+            },
+          });
+
+          const eventTx = tx.paymentEvent ? tx : this.prisma;
+          await eventTx.paymentEvent.create({
+            data: {
+              paymentId: created.id,
+              eventType: 'payment_created',
+              previousStatus: 'CREATED',
+              newStatus: 'CREATED',
+              amount: amountInCents,
+              source: 'API',
+              createdBy: userId,
+              metadata: {
+                bookingIntentId: dto.bookingIntentId,
+                ancillarySelectionId: validatedAncillary.selectionId,
+                ancillarySelectionVersion: validatedAncillary.selectionVersion,
+                serviceCount: validatedAncillary.services.length,
+                serviceQuantity: validatedAncillary.services.reduce(
+                  (total, service) => total + service.quantity,
+                  0,
+                ),
+                baseAmount: validatedAncillary.baseAmount,
+                grandTotal: validatedAncillary.grandTotal,
+                currency: validatedAncillary.currency,
+              },
+            },
+          });
+
+          await this.auditService.createLog(tx, {
+            userId,
+            action: 'payment_created',
+            resourceType: 'Payment',
+            resourceId: created.id,
+            ipAddress,
+            metadata: {
+              bookingIntentId: dto.bookingIntentId,
+              amount: amountInCents,
+              attemptNumber: result.attemptNumber,
+              ancillarySelectionId: validatedAncillary.selectionId,
+              ancillarySelectionVersion: validatedAncillary.selectionVersion,
+              serviceCount: validatedAncillary.services.length,
+              serviceQuantity: validatedAncillary.services.reduce(
+                (total, service) => total + service.quantity,
+                0,
+              ),
+              baseAmount: validatedAncillary.baseAmount,
+              grandTotal: validatedAncillary.grandTotal,
+              currency: validatedAncillary.currency,
+            },
+          });
+
+          await this.auditService.createLog(tx, {
+            userId,
+            action: 'ancillary_payment_bound',
+            resourceType: 'Payment',
+            resourceId: created.id,
+            ipAddress,
+            traceId,
+            correlationId,
+            metadata: {
+              bookingIntentId: dto.bookingIntentId,
+              ancillarySelectionId: validatedAncillary.selectionId,
+              ancillarySelectionVersion: validatedAncillary.selectionVersion,
+              paymentId: created.id,
+              amount: amountInCents,
+              currency: result.currency.toLowerCase(),
+            },
+          });
+
+          return created;
+        });
+      } else if ('payment' in result && result.payment) {
+        payment = result.payment;
+      } else {
+        payment = await this.prisma.$transaction(async (tx) => {
+          const keyRecord = await tx.idempotencyKey.findUnique({
+            where: { key: idempotencyKey },
+            select: { id: true },
+          });
+          if (!keyRecord) {
+            throw new InternalServerErrorException('Idempotency key record not found');
+          }
+
+          const existingPayment = await tx.payment.findFirst({
+            where: {
+              idempotencyKeyId: keyRecord.id,
+            },
+          });
+
+          if (existingPayment) {
+            return existingPayment;
+          }
+
+          const created = await tx.payment.create({
+            data: {
+              bookingIntentId: dto.bookingIntentId,
+              attemptNumber: result.attemptNumber,
+              idempotencyKeyId: keyRecord.id,
+              stripePaymentIntentId: paymentIntent!.id,
+              stripeCustomerId,
+              amount: amountInCents,
+              currency: result.currency.toLowerCase(),
+              status: 'CREATED',
+            },
+          });
+
+          const eventTx = tx.paymentEvent ? tx : this.prisma;
+          await eventTx.paymentEvent.create({
+            data: {
+              paymentId: created.id,
+              eventType: 'payment_created',
+              previousStatus: 'CREATED',
+              newStatus: 'CREATED',
+              amount: amountInCents,
+              source: 'API',
+              createdBy: userId,
+            },
+          });
+
+          await this.auditService.createLog(tx, {
+            userId,
+            action: 'payment_created',
+            resourceType: 'Payment',
+            resourceId: created.id,
+            ipAddress,
+            metadata: {
+              bookingIntentId: dto.bookingIntentId,
+              amount: amountInCents,
+              attemptNumber: result.attemptNumber,
+            },
+          });
+
+          return created;
         });
       }
 
-      // 6. Log event and audit
-      await this.prisma.paymentEvent.create({
-        data: {
-          paymentId: payment.id,
-          eventType: 'payment_created',
-          previousStatus: 'CREATED',
-          newStatus: 'CREATED',
-          amount: amountInCents,
-          source: 'API',
-          createdBy: userId,
-        },
-      });
-
-      await this.auditService.createLog(this.prisma, {
-        userId,
-        action: 'payment_created',
-        resourceType: 'Payment',
-        resourceId: payment.id,
-        ipAddress,
-        metadata: {
-          bookingIntentId: dto.bookingIntentId,
-          amount: amountInCents,
-          attemptNumber: result.attemptNumber,
-        },
-      });
+      paymentRecord = payment;
 
       // 7. Update recovery point and complete idempotency key
       await this.idempotencyService.updateRecoveryPoint(idempotencyKey, 'started');
@@ -247,6 +934,15 @@ export class PaymentService {
 
       return responseBody;
     } catch (error) {
+      if (paymentIntent?.id && !paymentRecord) {
+        try {
+          await this.stripeService.cancelPaymentIntent(paymentIntent.id);
+        } catch (cancelErr) {
+          this.logger.error(
+            `Failed to cancel Stripe PaymentIntent ${paymentIntent.id} after createPayment error: ${cancelErr instanceof Error ? cancelErr.message : String(cancelErr)}`
+          );
+        }
+      }
       this.logger.error(`Error in createPayment: ${error instanceof Error ? error.message : String(error)}`, error instanceof Error ? error.stack : undefined);
       throw error;
     }
@@ -329,7 +1025,19 @@ export class PaymentService {
       // 2. Query payment
       let payment = await this.prisma.payment.findUnique({
         where: { id: dto.paymentId },
-        include: { bookingIntent: true },
+        include: {
+          bookingIntent: true,
+          ancillarySelection: {
+            include: {
+              seatSelections: true,
+              baggageSelections: {
+                include: {
+                  segments: true,
+                },
+              },
+            },
+          },
+        },
       });
 
       if (!payment) {
@@ -354,8 +1062,22 @@ export class PaymentService {
 
       // 4. Resume from recovery point
       let recoveryPoint = await this.idempotencyService.getResumePoint(idempotencyKey);
+      const isRecovered = recoveryPoint && recoveryPoint !== 'started';
       if (!recoveryPoint) {
         recoveryPoint = 'started';
+      }
+      if (isRecovered) {
+        await this.auditService.createLog(this.prisma, {
+          userId,
+          action: 'payment_recovery_resumed',
+          resourceType: 'Payment',
+          resourceId: payment.id,
+          metadata: {
+            paymentId: payment.id,
+            recoveryPoint,
+            idempotencyKey,
+          },
+        });
       }
 
       if (recoveryPoint === 'completed') {
@@ -468,11 +1190,65 @@ export class PaymentService {
           throw new NotFoundException('Booking intent not found');
         }
 
+        const servicesMap = new Map<string, number>();
+        if (payment.ancillarySelection) {
+          for (const seat of payment.ancillarySelection.seatSelections) {
+            servicesMap.set(seat.serviceId, (servicesMap.get(seat.serviceId) ?? 0) + 1);
+          }
+          for (const baggage of payment.ancillarySelection.baggageSelections) {
+            servicesMap.set(
+              baggage.serviceId,
+              (servicesMap.get(baggage.serviceId) ?? 0) + baggage.quantity,
+            );
+          }
+        }
+        const services: Array<{ id: string; quantity: number }> = Array.from(
+          servicesMap.entries(),
+        )
+          .sort(([left], [right]) => left.localeCompare(right))
+          .map(([id, quantity]) => ({ id, quantity }));
+
         let duffelOrder: unknown;
         try {
+          const recheckedPayment = await this.prisma.payment.findUnique({
+            where: { id: payment.id },
+            include: {
+              bookingIntent: true,
+              ancillarySelection: {
+                include: {
+                  seatSelections: true,
+                  baggageSelections: true,
+                },
+              },
+            },
+          });
+          if (!recheckedPayment) {
+            throw new InternalServerErrorException(
+              'Payment-bound ancillary selection could not be recovered',
+            );
+          }
+          const orderPayment = recheckedPayment;
+          const hasAncillaryBinding = payment.ancillarySelectionId !== null;
+          const hasExactBoundSelection =
+            orderPayment.ancillarySelectionId === payment.ancillarySelectionId &&
+            orderPayment.ancillarySelectionVersion ===
+              payment.ancillarySelectionVersion &&
+            (hasAncillaryBinding
+              ? orderPayment.ancillarySelection?.id ===
+                  payment.ancillarySelectionId &&
+                orderPayment.ancillarySelection.version ===
+                  payment.ancillarySelectionVersion &&
+                orderPayment.ancillarySelection.status === 'PAYMENT_BOUND'
+              : orderPayment.ancillarySelection === null);
+          if (!hasExactBoundSelection) {
+            throw new InternalServerErrorException(
+              'Payment-bound ancillary selection could not be recovered',
+            );
+          }
           duffelOrder = await this.duffelService.createOrder(
             bookingIntent.duffelOfferId,
             bookingIntent.passengers,
+            services.length > 0 ? services : undefined,
             { bookingIntentId: bookingIntent.id, paymentId: payment.id },
             idempotencyKey,
           );
@@ -542,7 +1318,7 @@ export class PaymentService {
             newStatus: 'AUTHORIZED',
             amount: payment.amount,
             source: 'API',
-            metadata: duffelOrder as Prisma.InputJsonValue,
+            metadata: redactDuffelOrder(duffelOrder) as Prisma.InputJsonValue,
             createdBy: userId,
           },
         });
@@ -563,6 +1339,47 @@ export class PaymentService {
           const error = captureError as Error;
           this.logger.error(`Stripe capture failed: ${error.message}`, error.stack);
 
+          let reconciledStatus: string;
+          try {
+            const reconciledIntent = await this.stripeService.retrievePaymentIntent(
+              payment.stripePaymentIntentId,
+            );
+            reconciledStatus = reconciledIntent.status;
+          } catch (reconciliationError: unknown) {
+            const reconciliationMessage =
+              reconciliationError instanceof Error
+                ? reconciliationError.message
+                : String(reconciliationError);
+            this.logger.error(
+              `Stripe capture outcome remains unknown for payment ${payment.id}: ${reconciliationMessage}`,
+            );
+            throw new HttpException(
+              {
+                success: false,
+                error: 'Stripe capture outcome is unknown. Retry payment confirmation.',
+                bookingStatus: 'PROCESSING',
+              },
+              HttpStatus.BAD_GATEWAY,
+            );
+          }
+
+          if (
+            reconciledStatus !== 'succeeded' &&
+            reconciledStatus !== 'requires_capture' &&
+            reconciledStatus !== 'canceled'
+          ) {
+            throw new HttpException(
+              {
+                success: false,
+                error: `Stripe capture outcome is not final (${reconciledStatus}). Retry payment confirmation.`,
+                bookingStatus: 'PROCESSING',
+              },
+              HttpStatus.BAD_GATEWAY,
+            );
+          }
+
+          if (reconciledStatus !== 'succeeded') {
+
           // Duffel order cancellation compensation
           let duffelOrderId: string | undefined;
           try {
@@ -576,21 +1393,77 @@ export class PaymentService {
             const duffelOrder = duffelEvent?.metadata as Record<string, unknown> | null;
             duffelOrderId = duffelOrder?.id as string | undefined;
 
-            if (duffelOrderId) {
-              await this.duffelService.cancelOrder(duffelOrderId);
-              this.logger.log(`Successfully cancelled Duffel order ${duffelOrderId} as compensation.`);
-            }
-          } catch (cancelError: unknown) {
-            const err = cancelError as Error;
-            this.logger.error(`Duffel order cancellation failed during compensation: ${err.message}`, err.stack);
-          }
+            await this.auditService.createLog(this.prisma, {
+              userId,
+              action: 'payment_compensation_started',
+              resourceType: 'Payment',
+              resourceId: payment.id,
+              metadata: {
+                paymentId: payment.id,
+                bookingIntentId: payment.bookingIntentId,
+                duffelOrderId,
+                stripePaymentIntentId: payment.stripePaymentIntentId,
+              },
+            });
 
-          // Release the Stripe authorization hold (cancel intent)
-          try {
-            await this.stripeService.cancelPaymentIntent(payment.stripePaymentIntentId);
-          } catch (stripeCancelError: unknown) {
-            const stripeError = stripeCancelError as Error;
-            this.logger.error(`Stripe cancelPaymentIntent failed during compensation: ${stripeError.message}`, stripeError.stack);
+            let duffelCancelSuccess = true;
+            let stripeCancelSuccess = true;
+            let duffelCancelErrorMsg: string | undefined;
+            let stripeCancelErrorMsg: string | undefined;
+
+            if (duffelOrderId) {
+              try {
+                await this.duffelService.cancelOrder(duffelOrderId);
+                this.logger.log(`Successfully cancelled Duffel order ${duffelOrderId} as compensation.`);
+              } catch (cancelError: unknown) {
+                duffelCancelSuccess = false;
+                const err = cancelError as Error;
+                duffelCancelErrorMsg = err.message;
+                this.logger.error(`Duffel order cancellation failed during compensation: ${err.message}`, err.stack);
+              }
+            }
+
+            // Release the Stripe authorization hold (cancel intent)
+            try {
+              await this.stripeService.cancelPaymentIntent(payment.stripePaymentIntentId);
+            } catch (stripeCancelError: unknown) {
+              stripeCancelSuccess = false;
+              const stripeError = stripeCancelError as Error;
+              stripeCancelErrorMsg = stripeError.message;
+              this.logger.error(`Stripe cancelPaymentIntent failed during compensation: ${stripeError.message}`, stripeError.stack);
+            }
+
+            if (duffelCancelSuccess && stripeCancelSuccess) {
+              await this.auditService.createLog(this.prisma, {
+                userId,
+                action: 'payment_compensation_succeeded',
+                resourceType: 'Payment',
+                resourceId: payment.id,
+                metadata: {
+                  paymentId: payment.id,
+                  bookingIntentId: payment.bookingIntentId,
+                  duffelOrderId,
+                  stripePaymentIntentId: payment.stripePaymentIntentId,
+                },
+              });
+            } else {
+              await this.auditService.createLog(this.prisma, {
+                userId,
+                action: 'payment_compensation_failed',
+                resourceType: 'Payment',
+                resourceId: payment.id,
+                metadata: {
+                  paymentId: payment.id,
+                  bookingIntentId: payment.bookingIntentId,
+                  duffelOrderId,
+                  stripePaymentIntentId: payment.stripePaymentIntentId,
+                  duffelCancelError: duffelCancelErrorMsg,
+                  stripeCancelError: stripeCancelErrorMsg,
+                },
+              });
+            }
+          } catch (compErr: any) {
+            this.logger.error(`Payment compensation logic failed: ${compErr.message}`, compErr.stack);
           }
 
           // Update BookingIntent status
@@ -610,9 +1483,22 @@ export class PaymentService {
               },
               orderBy: { createdAt: 'desc' },
             });
-            const dOrder = duffelEvent?.metadata as any;
-            if (dOrder) {
-              const snaps = this.duffelService.mapDuffelOrderToSnapshots(dOrder);
+            const rawOrder = duffelEvent?.metadata as any;
+            if (rawOrder) {
+              const fullBookingIntent = await this.prisma.bookingIntent.findUnique({
+                where: { id: payment.bookingIntentId },
+                include: { passengers: true, user: true },
+              });
+              let completeOrder = rawOrder;
+              try {
+                completeOrder = await this.duffelService.retrieveCompleteOrder(rawOrder.id);
+              } catch (err) {
+                this.logger.warn(`Failed to retrieve complete Duffel order ${rawOrder.id}, falling back to enrichment`, err);
+                completeOrder = fullBookingIntent && fullBookingIntent.user 
+                  ? enrichRedactedDuffelOrder(rawOrder, fullBookingIntent.passengers, fullBookingIntent.user.email) 
+                  : rawOrder;
+              }
+              const snaps = this.duffelService.mapDuffelOrderToSnapshots(completeOrder);
               flightSnap = snaps.flightSnapshot;
               passSnap = snaps.passengerSnapshot;
               if (flightSnap?.segments?.[0]?.departureAt) {
@@ -665,6 +1551,7 @@ export class PaymentService {
           await this.idempotencyService.completeKey(idempotencyKey, HttpStatus.BAD_GATEWAY, failureResponse);
 
           throw new HttpException(failureResponse, HttpStatus.BAD_GATEWAY);
+          }
         }
 
         await this.idempotencyService.updateRecoveryPoint(idempotencyKey, 'captured');
@@ -711,12 +1598,27 @@ export class PaymentService {
             });
 
             // Update BookingIntent status to CONFIRMED
+            const bookingIntent = await tx.bookingIntent.findUnique({
+              where: { id: payment.bookingIntentId },
+              include: { passengers: true, user: true },
+            });
+            
             await tx.bookingIntent.update({
               where: { id: payment.bookingIntentId },
               data: { status: 'CONFIRMED' },
             });
 
-            const { flightSnapshot, passengerSnapshot } = this.duffelService.mapDuffelOrderToSnapshots(duffelOrder);
+            let completeOrder: any = duffelOrder;
+            try {
+              completeOrder = await this.duffelService.retrieveCompleteOrder(duffelOrder.id as string);
+            } catch (err) {
+              this.logger.warn(`Failed to retrieve complete Duffel order ${duffelOrder.id}, falling back to enrichment`, err);
+              completeOrder = bookingIntent && bookingIntent.user
+                ? enrichRedactedDuffelOrder(duffelOrder, bookingIntent.passengers, bookingIntent.user.email)
+                : duffelOrder;
+            }
+
+            const { flightSnapshot, passengerSnapshot } = this.duffelService.mapDuffelOrderToSnapshots(completeOrder);
             await this.bookingService.updateToConfirmed(
               canonicalBooking.id,
               duffelOrder.booking_reference as string,
@@ -790,6 +1692,21 @@ export class PaymentService {
 
         await this.idempotencyService.updateRecoveryPoint(idempotencyKey, 'completed');
 
+        if (isRecovered) {
+          await this.auditService.createLog(this.prisma, {
+            userId,
+            action: 'payment_recovery_succeeded',
+            resourceType: 'Payment',
+            resourceId: payment.id,
+            metadata: {
+              paymentId: payment.id,
+              bookingReference: duffelOrder.booking_reference as string,
+              duffelOrderId: duffelOrder.id as string,
+              idempotencyKey,
+            },
+          });
+        }
+
         const successResponse = {
           success: true,
           paymentId: payment.id,
@@ -839,6 +1756,8 @@ export class PaymentService {
 
   /**
    * Cleans up state and resolves background errors to prevent unhandled rejections
+  /**
+   * Cleans up state and resolves background errors to prevent unhandled rejections
    */
   private async handleBackgroundError(
     paymentId: string,
@@ -849,27 +1768,41 @@ export class PaymentService {
     try {
       const payment = await this.prisma.payment.findUnique({
         where: { id: paymentId },
+        include: {
+          ancillarySelection: {
+            include: {
+              seatSelections: true,
+              baggageSelections: true,
+            },
+          },
+        },
       });
 
       if (!payment || payment.status === 'SUCCEEDED' || payment.status === 'CANCELLED' || payment.status === 'FAILED' || payment.status === 'EXPIRED') {
         return;
       }
 
-      let isStripeCaptured = false;
+      let paymentIntent;
       try {
-        const paymentIntent = await this.stripeService.retrievePaymentIntent(payment.stripePaymentIntentId);
-        if (paymentIntent?.status === 'succeeded') {
-          isStripeCaptured = true;
-        }
+        paymentIntent = await this.stripeService.retrievePaymentIntent(payment.stripePaymentIntentId);
       } catch (stripeErr: unknown) {
-        this.logger.error(
+        this.logger.warn(
           `Failed to retrieve Stripe PaymentIntent for payment ${paymentId}: ${stripeErr instanceof Error ? stripeErr.message : String(stripeErr)}`
         );
+        return; // warn & return early (recoverable)
       }
 
-      const recoveryPoint = await this.idempotencyService.getResumePoint(idempotencyKey);
-      if (recoveryPoint === 'captured' || recoveryPoint === 'completed' || isStripeCaptured) {
-        if (isStripeCaptured && recoveryPoint !== 'captured' && recoveryPoint !== 'completed') {
+      const finalStatuses = ['succeeded', 'requires_capture', 'canceled'];
+      if (!paymentIntent || !finalStatuses.includes(paymentIntent.status)) {
+        this.logger.warn(
+          `Stripe PaymentIntent for payment ${paymentId} is in non-final status: ${paymentIntent?.status}. Warning & returning early.`
+        );
+        return; // warn & return early (recoverable)
+      }
+
+      if (paymentIntent.status === 'succeeded') {
+        const recoveryPoint = await this.idempotencyService.getResumePoint(idempotencyKey);
+        if (recoveryPoint !== 'captured' && recoveryPoint !== 'completed') {
           try {
             await this.idempotencyService.updateRecoveryPoint(idempotencyKey, 'captured');
           } catch (updateErr: unknown) {
@@ -880,10 +1813,10 @@ export class PaymentService {
         }
 
         this.logger.error(
-          `CRITICAL: Background confirmation failed after Stripe capture for payment ${paymentId}. Customer has been charged. Recovery point is '${recoveryPoint}'. Retries will attempt to resume post-capture updates.`,
+          `CRITICAL: Background confirmation failed after Stripe capture for payment ${paymentId}. Customer has been charged. Recovery point is '${recoveryPoint || 'started'}'. Retries will attempt to resume post-capture updates.`,
           error instanceof Error ? error.stack : undefined
         );
-        return;
+        return; // mark captured & return
       }
 
       // Check if Duffel order was created
@@ -895,30 +1828,35 @@ export class PaymentService {
         orderBy: { createdAt: 'desc' },
       });
 
-      if (duffelEvent) {
-        const duffelOrder = duffelEvent.metadata as Record<string, unknown> | null;
-        const duffelOrderId = duffelOrder?.id as string | undefined;
-        if (duffelOrderId) {
-          try {
-            await this.duffelService.cancelOrder(duffelOrderId);
-          } catch (cancelError: unknown) {
-            const err = cancelError as Error;
-            this.logger.error(`Background cancelOrder failed: ${err.message}`);
+      if (paymentIntent.status === 'requires_capture' || paymentIntent.status === 'canceled') {
+        if (duffelEvent) {
+          const duffelOrder = duffelEvent.metadata as Record<string, unknown> | null;
+          const duffelOrderId = duffelOrder?.id as string | undefined;
+          if (duffelOrderId) {
+            try {
+              await this.duffelService.cancelOrder(duffelOrderId);
+            } catch (cancelError: unknown) {
+              const err = cancelError as Error;
+              this.logger.error(`Background cancelOrder failed: ${err.message}`);
+            }
           }
         }
-      }
 
-      // Release hold if authorized
-      try {
-        await this.stripeService.cancelPaymentIntent(payment.stripePaymentIntentId);
-      } catch (stripeError: unknown) {
-        const err = stripeError as Error;
-        this.logger.error(`Background cancelPaymentIntent failed: ${err.message}`);
+        if (paymentIntent.status === 'requires_capture') {
+          // Release hold if authorized
+          try {
+            await this.stripeService.cancelPaymentIntent(payment.stripePaymentIntentId);
+          } catch (stripeError: unknown) {
+            const err = stripeError as Error;
+            this.logger.error(`Background cancelPaymentIntent failed: ${err.message}`);
+          }
+        }
       }
 
       // 1. Fetch BookingIntent and calculate next status
       const bookingIntent = await this.prisma.bookingIntent.findUnique({
         where: { id: payment.bookingIntentId },
+        include: { passengers: true, user: true },
       });
       const nextBookingStatus = (bookingIntent?.paymentAttemptCount || 0) < 2 ? 'AWAITING_PAYMENT' : 'CANCELLED';
 
@@ -936,7 +1874,16 @@ export class PaymentService {
           if (duffelEvent) {
             const dOrder = duffelEvent.metadata as any;
             if (dOrder) {
-              const snaps = this.duffelService.mapDuffelOrderToSnapshots(dOrder);
+              let completeOrder = dOrder;
+              try {
+                completeOrder = await this.duffelService.retrieveCompleteOrder(dOrder.id);
+              } catch (err) {
+                this.logger.warn(`Failed to retrieve complete Duffel order ${dOrder.id}, falling back to enrichment`, err);
+                completeOrder = bookingIntent?.passengers && bookingIntent.user?.email
+                  ? enrichRedactedDuffelOrder(dOrder, bookingIntent.passengers, bookingIntent.user.email)
+                  : dOrder;
+              }
+              const snaps = this.duffelService.mapDuffelOrderToSnapshots(completeOrder);
               flightSnap = snaps.flightSnapshot;
               passSnap = snaps.passengerSnapshot;
               if (flightSnap?.segments?.[0]?.departureAt) {

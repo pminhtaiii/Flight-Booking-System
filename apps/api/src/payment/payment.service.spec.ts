@@ -56,7 +56,7 @@ describe('PaymentService - recoveryPoint === completed', () => {
         passengerSnapshot: { passengers: [] }
       })
     };
-    mockAudit = {};
+    mockAudit = { createLog: jest.fn() };
     mockPaymentMethod = { saveMethod: jest.fn() };
     const mockBookingService = { createBooking: jest.fn().mockResolvedValue({ id: '123e4567-e89b-42d3-a456-426614174000', userId: 'user-123' }), updateToConfirmed: jest.fn(), updateToFailed: jest.fn() };
 
@@ -232,7 +232,14 @@ describe('PaymentService - recoveryPoint === completed', () => {
         callback({
           payment: { update: jest.fn() },
           paymentEvent: { create: jest.fn() },
-          bookingIntent: { update: jest.fn() },
+          bookingIntent: {
+            update: jest.fn(),
+            findUnique: jest.fn().mockResolvedValue({
+              id: 'intent-123',
+              passengers: [{ id: 'passenger-1', type: 'adult' }],
+              user: { email: 'john@example.com' },
+            }),
+          },
           ledgerEntry: { createMany: jest.fn() },
         }),
       );
@@ -360,7 +367,7 @@ describe('PaymentService - recoveryPoint === completed', () => {
       );
     });
 
-    it('when Stripe retrieval fails (throws), it logs the error but still proceeds with compensation', async () => {
+    it('when Stripe retrieval fails (throws), it logs the error and returns early (recoverable)', async () => {
       // Setup payment
       mockPrisma.payment.findUnique.mockResolvedValueOnce({
         id: paymentId,
@@ -373,21 +380,12 @@ describe('PaymentService - recoveryPoint === completed', () => {
       // Stripe retrieve throws
       mockStripe.retrievePaymentIntent.mockRejectedValueOnce(new Error('Stripe API error'));
 
-      // Resume point is null
-      mockIdempotency.getResumePoint.mockResolvedValueOnce(null);
-
-      mockPrisma.paymentEvent.findFirst.mockResolvedValueOnce(null);
-      mockPrisma.bookingIntent.findUnique.mockResolvedValueOnce({
-        id: 'intent-123',
-        paymentAttemptCount: 1,
-      });
-
       // Call handleBackgroundError
       await (service as any).handleBackgroundError(paymentId, idempotencyKey, userId, error);
 
-      // Verify compensation methods are called
-      expect(mockStripe.cancelPaymentIntent).toHaveBeenCalledWith('pi_123');
-      expect(mockPrisma.payment.update).toHaveBeenCalled();
+      // Verify compensation methods are NOT called and return is early/recoverable
+      expect(mockStripe.cancelPaymentIntent).not.toHaveBeenCalled();
+      expect(mockPrisma.payment.update).not.toHaveBeenCalled();
     });
   });
 
@@ -406,7 +404,7 @@ describe('PaymentService - recoveryPoint === completed', () => {
       mockPrisma.$queryRaw = jest.fn().mockResolvedValue([
         {
           id: 'intent-123',
-          status: 'CREATED',
+          status: 'PENDING',
           paymentAttemptCount: 1,
           confirmedPrice: 100,
           currency: 'USD',
@@ -486,7 +484,7 @@ describe('PaymentService - recoveryPoint === completed', () => {
       mockPrisma.$queryRaw.mockResolvedValueOnce([
         {
           id: 'intent-123',
-          status: 'CREATED',
+          status: 'PENDING',
           paymentAttemptCount: 2,
           confirmedPrice: 100,
           currency: 'USD',
