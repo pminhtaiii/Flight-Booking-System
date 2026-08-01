@@ -403,6 +403,9 @@ export class PaymentService {
         ) {
           validated = validatedAncillary;
         } else {
+          if (!this.ancillaryPaymentValidation) {
+            throw new BadRequestException('Ancillary payment validation service is not available');
+          }
           validated = await this.ancillaryPaymentValidation.validateForPayment({
             userId,
             bookingIntentId: dto.bookingIntentId,
@@ -674,7 +677,7 @@ export class PaymentService {
       }
 
       // 4. Create Stripe PaymentIntent
-      const amountInCents = result.amount;
+      amountInCents = result.amount;
       const stripeMetadata: Record<string, string> = validatedAncillary || boundPaymentReplay
         ? {
             bookingIntentId: dto.bookingIntentId,
@@ -765,7 +768,7 @@ export class PaymentService {
               ancillarySelectionVersion: validatedAncillary.selectionVersion,
               attemptNumber: result.attemptNumber,
               idempotencyKeyId: keyRecord.id,
-              stripePaymentIntentId: paymentIntent.id,
+              stripePaymentIntentId: paymentIntent!.id,
               stripeCustomerId,
               amount: amountInCents,
               currency: result.currency.toLowerCase(),
@@ -851,7 +854,7 @@ export class PaymentService {
               bookingIntentId: dto.bookingIntentId,
               attemptNumber: result.attemptNumber,
               idempotencyKeyId: keyRecord.id,
-              stripePaymentIntentId: paymentIntent.id,
+              stripePaymentIntentId: paymentIntent!.id,
               stripeCustomerId,
               amount: amountInCents,
               currency: result.currency.toLowerCase(),
@@ -1506,7 +1509,7 @@ export class PaymentService {
               data: { status: 'CONFIRMED' },
             });
 
-            let completeOrder = duffelOrder;
+            let completeOrder: any = duffelOrder;
             try {
               completeOrder = await this.duffelService.retrieveCompleteOrder(duffelOrder.id as string);
             } catch (err) {

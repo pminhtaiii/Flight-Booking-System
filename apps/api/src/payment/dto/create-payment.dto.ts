@@ -26,12 +26,4 @@ export class CreatePaymentDto {
   @IsOptional()
   @IsBoolean()
   saveCard?: boolean;
-
-  @IsOptional()
-  @IsString()
-  ancillarySelectionId?: string;
-
-  @IsOptional()
-  @IsInt()
-  ancillarySelectionVersion?: number;
 }
