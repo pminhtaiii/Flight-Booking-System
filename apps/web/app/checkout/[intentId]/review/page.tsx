@@ -1,4 +1,4 @@
-import { protectCheckoutRoute, fetchBookingIntent } from '@/lib/checkout';
+import { protectCheckoutRoute, fetchBookingIntent, fetchAncillaryCatalog } from '@/lib/checkout';
 import { Header } from '@/components/layout/Header';
 import Link from 'next/link';
 
@@ -74,6 +74,16 @@ export default async function ReviewPage({ params }: Props) {
       </div>
     );
   }
+
+  const { data: ancillaryCatalog } = await fetchAncillaryCatalog(intentId, accessToken);
+  const totals = ancillaryCatalog?.selection?.totals;
+
+  const basePrice = intent.confirmedPrice;
+  const grandTotal = totals?.estimatedGrandTotal ?? String(basePrice);
+  const currency = totals?.currency ?? intent.currency;
+  const hasSeats = totals ? parseFloat(totals.seats) > 0 : false;
+  const hasBaggage = totals ? parseFloat(totals.baggage) > 0 : false;
+  const hasAncillaries = hasSeats || hasBaggage;
 
   return (
     <div className="flex min-h-screen flex-col bg-background">
@@ -154,13 +164,77 @@ export default async function ReviewPage({ params }: Props) {
           </div>
         </div>
 
+        {/* Ancillaries Breakdown Card */}
+        <div className="card space-y-4">
+          <div className="flex justify-between items-center">
+            <h2 className="text-lg font-semibold text-text-primary">Seats & Extra Baggage</h2>
+            <div className="flex gap-3 text-xs font-semibold">
+              <Link href={`/checkout/${intentId}/ancillaries?service=seats`} className="text-primary hover:underline">
+                Edit Seats
+              </Link>
+              <span className="text-text-muted">•</span>
+              <Link href={`/checkout/${intentId}/ancillaries?service=baggage`} className="text-primary hover:underline">
+                Edit Baggage
+              </Link>
+            </div>
+          </div>
+          {hasAncillaries ? (
+            <div className="space-y-3 text-sm text-text-secondary">
+              {hasSeats && (
+                <div>
+                  <p className="font-semibold text-text-primary text-xs uppercase tracking-wider">Seats</p>
+                  <ul className="mt-1 list-disc list-inside space-y-1 text-xs">
+                    {ancillaryCatalog?.selection.seats.map((seat, idx) => (
+                      <li key={seat.serviceId || idx}>
+                        Passenger {seat.intentPassengerId}: Seat {seat.seatDesignator} ({seat.amount} {seat.currency})
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+              {hasBaggage && (
+                <div>
+                  <p className="font-semibold text-text-primary text-xs uppercase tracking-wider">Baggage</p>
+                  <ul className="mt-1 list-disc list-inside space-y-1 text-xs">
+                    {ancillaryCatalog?.selection.baggage.map((bag, idx) => (
+                      <li key={bag.serviceId || idx}>
+                        Passenger {bag.intentPassengerId}: {bag.quantity}x {bag.weightValue}{bag.weightUnit ? bag.weightUnit : ''} ({bag.amount} {bag.currency})
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+          ) : (
+            <p className="text-sm text-text-secondary">No additional seats or baggage selected.</p>
+          )}
+        </div>
+
         {/* Pricing Summary Card */}
         <div className="card space-y-4">
           <h2 className="text-lg font-semibold text-text-primary">Fare Summary</h2>
+          <div className="space-y-2 text-sm text-text-secondary">
+            <div className="flex justify-between items-center">
+              <span>Flight Base Fare</span>
+              <span className="font-medium text-text-primary">{basePrice} {currency}</span>
+            </div>
+            {hasSeats && (
+              <div className="flex justify-between items-center">
+                <span>Selected Seats</span>
+                <span className="font-medium text-text-primary">{totals?.seats} {currency}</span>
+              </div>
+            )}
+            {hasBaggage && (
+              <div className="flex justify-between items-center">
+                <span>Selected Baggage</span>
+                <span className="font-medium text-text-primary">{totals?.baggage} {currency}</span>
+              </div>
+            )}
+          </div>
           <div className="flex justify-between items-center text-sm border-t border-card-border pt-4">
             <span className="font-semibold text-text-primary">Total Price (incl. taxes & fees)</span>
             <span className="text-2xl font-bold text-text-primary">
-              {intent.confirmedPrice} {intent.currency}
+              {grandTotal} {currency}
             </span>
           </div>
         </div>
@@ -178,3 +252,4 @@ export default async function ReviewPage({ params }: Props) {
     </div>
   );
 }
+

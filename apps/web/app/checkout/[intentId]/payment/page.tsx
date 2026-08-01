@@ -1,4 +1,4 @@
-import { protectCheckoutRoute, fetchBookingIntent } from '@/lib/checkout';
+import { protectCheckoutRoute, fetchBookingIntent, fetchAncillaryCatalog } from '@/lib/checkout';
 import { Header } from '@/components/layout/Header';
 import Link from 'next/link';
 
@@ -75,6 +75,16 @@ export default async function PaymentPage({ params }: Props) {
     );
   }
 
+  const { data: ancillaryCatalog } = await fetchAncillaryCatalog(intentId, accessToken);
+  const totals = ancillaryCatalog?.selection?.totals;
+
+  const basePrice = intent.confirmedPrice;
+  const grandTotal = totals?.estimatedGrandTotal ?? String(basePrice);
+  const currency = totals?.currency ?? intent.currency;
+  const hasSeats = totals ? parseFloat(totals.seats) > 0 : false;
+  const hasBaggage = totals ? parseFloat(totals.baggage) > 0 : false;
+  const hasAncillaries = hasSeats || hasBaggage;
+
   return (
     <div className="flex min-h-screen flex-col bg-background">
       <Header />
@@ -90,11 +100,34 @@ export default async function PaymentPage({ params }: Props) {
         <div className="card space-y-4">
           <h2 className="text-lg font-semibold text-text-primary">Amount Due</h2>
           <div className="flex justify-between items-center bg-secondary p-4 rounded-lg">
-            <span className="text-sm text-text-secondary">Flight total ({intent.flight.origin} to {intent.flight.destination})</span>
+            <span className="text-sm text-text-secondary">
+              Total ({intent.flight.origin} to {intent.flight.destination}
+              {hasAncillaries ? ' + extra services' : ''})
+            </span>
             <span className="text-3xl font-extrabold text-text-primary">
-              {intent.confirmedPrice} {intent.currency}
+              {grandTotal} {currency}
             </span>
           </div>
+          {hasAncillaries && (
+            <div className="divide-y divide-card-border text-xs text-text-secondary pt-2 space-y-1">
+              <div className="flex justify-between py-1">
+                <span>Flight Base Fare</span>
+                <span>{basePrice} {currency}</span>
+              </div>
+              {hasSeats && (
+                <div className="flex justify-between py-1">
+                  <span>Seats</span>
+                  <span>{totals?.seats} {currency}</span>
+                </div>
+              )}
+              {hasBaggage && (
+                <div className="flex justify-between py-1">
+                  <span>Baggage</span>
+                  <span>{totals?.baggage} {currency}</span>
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Placeholder Payment Form */}
