@@ -89,6 +89,16 @@ Uses the same request passenger-source shape. Each `traveler_profile` source als
 
 Existing `/api/bookings/intent` routes remain deprecated aliases during this feature. First-party callers must use plural routes. Aliases preserve the same auth, validation, service, and safe response behavior after the staged client migration.
 
+### Legacy `useProfile` compatibility
+
+During the compatibility window, only the singular `POST /api/bookings/intent` alias accepts legacy passenger payloads containing `useProfile` without `source`:
+
+- `useProfile: true` on the primary adult is translated server-side to `source: { "type": "traveler_profile" }`, resolved to the authenticated user's owned profile, and snapshotted with the current profile revision. The profile is never selected by a caller-supplied foreign profile ID.
+- `useProfile: false` or an omitted flag is translated to `source: { "type": "inline" }` using the existing inline passenger fields.
+- A legacy `useProfile: true` on a non-primary passenger is rejected with `400 LEGACY_PROFILE_SOURCE_UNSUPPORTED` rather than silently ignored; multi-passenger callers must migrate to the per-passenger `source` union.
+- A payload containing both `useProfile` and `source` is rejected with `400 PASSENGER_SOURCE_CONFLICT`.
+- Canonical plural endpoints reject `useProfile` and require the discriminated `source` union. First-party callers migrate before the singular alias is removed.
+
 ### `GET /api/bookings/intents/:id`
 
 Returns owned intent data with document/contact summaries only. It MUST NOT return decrypted passport number, passport expiry ciphertext/plaintext, email, or phone number. A secure profile correction always reads `/api/profile`, not this snapshot endpoint.
