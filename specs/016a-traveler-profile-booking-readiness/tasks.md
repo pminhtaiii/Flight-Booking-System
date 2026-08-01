@@ -12,11 +12,11 @@
 
 **Purpose**: Establish compile-time contracts and disabled-by-default rollout controls without changing runtime behavior.
 
-- [ ] T001 [P] Add traveler profile, passenger-source, profile-revision, readiness result, safe reason-code, and masked passenger summary types in `packages/shared/src/types/traveler-profile.types.ts` and `packages/shared/src/types/booking-intent.types.ts`
-- [ ] T002 Export the new shared contracts from `packages/shared/src/types/index.ts` and verify `pnpm --filter @shared/types build` passes
-- [ ] T003 [P] Add `FEATURE_FLAG_BOOKING_READINESS=false` validation/defaults to `apps/api/src/app.module.ts` and `apps/api/.env.example`
-- [ ] T004 [P] Add `NEXT_PUBLIC_FEATURE_FLAG_BOOKING_READINESS=false` to `apps/web/.env.example` and centralize its read in `apps/web/lib/featureFlags.ts`
-- [ ] T005 [P] Define PII-safe operation names, metric names, and allowed metadata keys from `observability.md` in `apps/api/src/common/observability/booking-readiness-observability.types.ts`
+- [x] T001 [P] Add traveler profile, passenger-source, profile-revision, readiness result, safe reason-code, and masked passenger summary types in `packages/shared/src/types/traveler-profile.types.ts` and `packages/shared/src/types/booking-intent.types.ts`
+- [x] T002 Export the new shared contracts from `packages/shared/src/types/index.ts` and verify `pnpm --filter @shared/types build` passes
+- [x] T003 [P] Add `FEATURE_FLAG_BOOKING_READINESS=false` validation/defaults to `apps/api/src/app.module.ts` and `apps/api/.env.example`
+- [x] T004 [P] Add `NEXT_PUBLIC_FEATURE_FLAG_BOOKING_READINESS=false` to `apps/web/.env.example` and centralize its read in `apps/web/lib/featureFlags.ts`
+- [x] T005 [P] Define PII-safe operation names, metric names, and allowed metadata keys from `observability.md` in `apps/api/src/common/observability/booking-readiness-observability.types.ts`
 
 **Checkpoint**: Shared packages compile; both services retain existing behavior with the new feature disabled.
 

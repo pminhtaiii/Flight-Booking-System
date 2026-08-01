@@ -6,13 +6,17 @@ Update this file after every completed feature. Any AI agent reading this should
 
 ### Current Status
 
-**Feature:** Ancillary Services — Seat Selection, Baggage & Price Tracker (Feature 15)
-**Last completed:** Phase 6 / PR 7 of Feature 15 (Read-only review, targeted edits, recovery, and cancellation disclosure) on branch `codex/015h-review-recovery-refunds`.
-**Next:** Implement Phase 7 / PR 8: End-to-end resilience, observability, rollout, and documentation sync. See [ADR](file:///c:/Booking%20Systems/docs/adr/research-ancillary-services-grilling-session.md) for all architectural decisions.
+**Feature:** Traveler Profile & Booking Readiness (Feature 16)
+**Last completed:** Phase 1 / PR 1 (Setup — Shared Contracts, Flags, and Observability Vocabulary) on branch `016b-shared-contracts-observability`.
+**Next:** Implement Phase 2: Additive schema, bound encryption, and migration safety. See [plan.md](file:///c:/Booking%20Systems/specs/016a-traveler-profile-booking-readiness/plan.md) for details.
 
 ---
 
 ## Progress by Feature
+
+### [ ] Feature: Traveler Profile & Booking Readiness (Feature 16)
+
+- [x] Phase 1 / PR 1: Setup — Shared Contracts, Flags, and Observability Vocabulary (implemented shared types for traveler profiles, passenger sources, readiness scopes, results, reason codes, profile sections, and masked summaries; added API and web feature flags `FEATURE_FLAG_BOOKING_READINESS` and `NEXT_PUBLIC_FEATURE_FLAG_BOOKING_READINESS` defaulting to false; created client helper `apps/web/lib/featureFlags.ts`; defined PII-safe operation names, metric names, and allowed metadata keys in `booking-readiness-observability.types.ts`; verified with configuration schema parser tests and contract allowlist validation tests)
 
 ### [ ] Feature: Ancillary Services — Seat Selection, Baggage & Price Tracker (Feature 15)
 

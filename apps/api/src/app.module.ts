@@ -33,6 +33,7 @@ export const envSchema = z.object({
   ENCRYPTION_KEY: z.string().optional(),
   DUFFEL_WEBHOOK_SECRET: z.string().optional(),
   FEATURE_FLAG_DISRUPTION_INGRESS: z.string().optional().default('false'),
+  FEATURE_FLAG_BOOKING_READINESS: z.string().optional().default('false'),
   FEATURE_FLAG_DISRUPTION_PROCESSOR: z.string().optional().default('false'),
   FEATURE_FLAG_DISRUPTION_RECONCILIATION: z.string().optional().default('false'),
   FEATURE_FLAG_DISRUPTION_SURFACING: z.string().optional().default('false'),
