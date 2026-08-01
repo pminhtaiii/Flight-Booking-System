@@ -37,6 +37,9 @@ export const envSchema = z.object({
   FEATURE_FLAG_DISRUPTION_RECONCILIATION: z.string().optional().default('false'),
   FEATURE_FLAG_DISRUPTION_SURFACING: z.string().optional().default('false'),
   FEATURE_FLAG_DISRUPTION_OUTBOX: z.string().optional().default('false'),
+  FEATURE_FLAG_ANCILLARY_CATALOG: z.string().optional().default('true'),
+  FEATURE_FLAG_ANCILLARY_COMMIT: z.string().optional().default('true'),
+  FEATURE_FLAG_ANCILLARY_PAYMENT: z.string().optional().default('true'),
 }).passthrough();
 
 @Module({

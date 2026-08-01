@@ -7,14 +7,14 @@ Update this file after every completed feature. Any AI agent reading this should
 ### Current Status
 
 **Feature:** Ancillary Services — Seat Selection, Baggage & Price Tracker (Feature 15)
-**Last completed:** Phase 6 / PR 7 of Feature 15 (Read-only review, targeted edits, recovery, and cancellation disclosure) on branch `codex/015h-review-recovery-refunds`.
-**Next:** Implement Phase 7 / PR 8: End-to-end resilience, observability, rollout, and documentation sync. See [ADR](file:///c:/Booking%20Systems/docs/adr/research-ancillary-services-grilling-session.md) for all architectural decisions.
+**Last completed:** Phase 7 / PR 8 of Feature 15 (End-to-end resilience, observability, rollout readiness, and documentation sync) on branch `codex/015i-ancillary-resilience-observability`.
+**Next:** Feature 15 is complete!
 
 ---
 
 ## Progress by Feature
 
-### [ ] Feature: Ancillary Services — Seat Selection, Baggage & Price Tracker (Feature 15)
+### [x] Feature: Ancillary Services — Seat Selection, Baggage & Price Tracker (Feature 15)
 
 - [x] Phase 0 / PR 1: Checkout Foundation (implemented `NEXT_PUBLIC_FEATURE_FLAG_CHECKOUT` feature flag defaulting to enabled/true unless set to false; created `protectCheckoutRoute` and `fetchBookingIntent` in `apps/web/lib/checkout.ts` to enforce authentication, feature flag presence, and booking intent ownership/expiration; created page shells for `/checkout/passengers`, `/checkout/[intentId]/ancillaries`, `/checkout/[intentId]/review`, and `/checkout/[intentId]/payment` mapping out flight/traveler contexts and dynamic placeholders; implemented search page `/search` and client form `SearchFormClient` using JWT tokens; implemented passenger details form component `PassengerFormClient` with dynamic guest counts, profile prefilling, DOB format checks, and conditional passport validations for international routes; set up cookie-driven mock scenarios for unit/E2E test pipelines; resolved booking link races persistence in `SearchFormClient`)
 - [x] Phase 2 / PR 3: Duffel Ancillary Catalog, Normalization, and Cache Discipline (implemented shared ancillary types, raw SDK mappings, caching adapter under Redis key `seatmap:{duffelOfferId}` with 60s TTL and early-expiry/force-refresh rules, exact price verification, and extended order creation with validated service lines; verified with golden fixtures and unit tests for caching boundaries, normalization, repricing, and order creations)
@@ -23,6 +23,7 @@ Update this file after every completed feature. Any AI agent reading this should
 - [x] Phase 4 / PR 5: Custom seat map, baggage selection, and instant price tracker (implemented custom accessible seat grids, roving tabindexes and keyboard navigation, segment tab switching and passenger stepper, journey-wide baggage selection, sticky decimal-safe price breakdowns, catalog refresh reconciliation, and UUID-driven double submit blocks on continue.)
 - [x] Phase 5 / PR 6: Authoritative validation, payment amount, and Duffel order services (implemented pre-payment CAS-freeze and Duffel validation pipeline, pricing delta user acknowledgement block, payment bound snapshots integration with minor-unit conversions, Stripe manual capture saga binding, and idempotent Duffel order creation with compensation fallback.)
 - [x] Phase 6 / PR 7: Read-only review, targeted edits, recovery, and cancellation disclosure (implemented server-rendered read-only review with edit routes, PII-safe versioned localStorage recovery helper, conflict re-routing on payment failure, minimal post-purchase confirmed summary under booking details, and supplier-authoritative cancellation/refund quote fields serialization within the existing quote ID column.)
+- [x] Phase 7 / PR 8: End-to-end resilience, observability, rollout, and documentation sync (implemented rollout feature flags `FEATURE_FLAG_ANCILLARY_CATALOG`, `FEATURE_FLAG_ANCILLARY_COMMIT`, and `FEATURE_FLAG_ANCILLARY_PAYMENT` with disabled fallbacks; added request trace/correlation ID propagation and PII-safe telemetry audit logs; added NestJS E2E test suite `apps/api/test/ancillary-checkout.e2e-spec.ts` and updated Playwright test suite `apps/web/tests/ancillary-checkout.spec.ts`; verified typecheck, build, and test suites.)
 
 ### [x] Feature: Disruption & Flight-Change Management (Feature 14)
 

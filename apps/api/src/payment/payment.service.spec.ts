@@ -56,7 +56,7 @@ describe('PaymentService - recoveryPoint === completed', () => {
         passengerSnapshot: { passengers: [] }
       })
     };
-    mockAudit = {};
+    mockAudit = { createLog: jest.fn() };
     mockPaymentMethod = { saveMethod: jest.fn() };
     const mockBookingService = { createBooking: jest.fn().mockResolvedValue({ id: '123e4567-e89b-42d3-a456-426614174000', userId: 'user-123' }), updateToConfirmed: jest.fn(), updateToFailed: jest.fn() };
 
@@ -232,7 +232,14 @@ describe('PaymentService - recoveryPoint === completed', () => {
         callback({
           payment: { update: jest.fn() },
           paymentEvent: { create: jest.fn() },
-          bookingIntent: { update: jest.fn() },
+          bookingIntent: {
+            update: jest.fn(),
+            findUnique: jest.fn().mockResolvedValue({
+              id: 'intent-123',
+              passengers: [{ id: 'passenger-1', type: 'adult' }],
+              user: { email: 'john@example.com' },
+            }),
+          },
           ledgerEntry: { createMany: jest.fn() },
         }),
       );

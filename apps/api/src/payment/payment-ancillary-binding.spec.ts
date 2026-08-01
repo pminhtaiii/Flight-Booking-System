@@ -75,6 +75,20 @@ describe('PaymentService ancillary snapshot binding', () => {
     };
     const prisma = {
       $transaction: jest.fn().mockImplementation(async (callback) => callback(transaction)),
+      bookingIntent: {
+        findUnique: jest.fn().mockResolvedValue({
+          id: 'intent-1',
+          status: 'PENDING',
+          paymentAttemptCount: 0,
+          confirmedPrice: '100.00',
+          currency: 'USD',
+          userId: 'user-1',
+          currentAncillarySelectionId: 'selection-3',
+          ancillaryVersion: 3,
+          intentExpiresAt: new Date(Date.now() + 100000),
+          offerExpiresAt: new Date(Date.now() + 100000),
+        }),
+      },
       user: {
         findUnique: jest.fn().mockResolvedValue({
           email: 'traveller@example.com',
@@ -200,6 +214,20 @@ describe('PaymentService ancillary snapshot binding', () => {
     };
     const prisma = {
       $transaction: jest.fn().mockImplementation(async (callback) => callback(transaction)),
+      bookingIntent: {
+        findUnique: jest.fn().mockResolvedValue({
+          id: 'intent-1',
+          status: 'PENDING',
+          paymentAttemptCount: 0,
+          confirmedPrice: '100.00',
+          currency: 'USD',
+          userId: 'user-1',
+          currentAncillarySelectionId: 'selection-3',
+          ancillaryVersion: 3,
+          intentExpiresAt: new Date(Date.now() + 100000),
+          offerExpiresAt: new Date(Date.now() + 100000),
+        }),
+      },
     };
     const stripe = { createPaymentIntent: jest.fn() };
     const idempotency = {
@@ -250,6 +278,20 @@ describe('PaymentService ancillary snapshot binding', () => {
 
   it('replays a completed bound payment without revalidating the immutable snapshot', async () => {
     const prisma = {
+      bookingIntent: {
+        findUnique: jest.fn().mockResolvedValue({
+          id: 'intent-1',
+          status: 'PENDING',
+          paymentAttemptCount: 0,
+          confirmedPrice: '100.00',
+          currency: 'USD',
+          userId: 'user-1',
+          currentAncillarySelectionId: 'selection-3',
+          ancillaryVersion: 3,
+          intentExpiresAt: new Date(Date.now() + 100000),
+          offerExpiresAt: new Date(Date.now() + 100000),
+        }),
+      },
       payment: {
         findFirst: jest.fn().mockResolvedValue({
           id: 'payment-1',
@@ -337,6 +379,20 @@ describe('PaymentService ancillary snapshot binding', () => {
     };
     const prisma = {
       $transaction: jest.fn().mockImplementation(async (callback) => callback(transaction)),
+      bookingIntent: {
+        findUnique: jest.fn().mockResolvedValue({
+          id: 'intent-1',
+          status: 'PENDING',
+          paymentAttemptCount: 0,
+          confirmedPrice: '100.00',
+          currency: 'USD',
+          userId: 'user-1',
+          currentAncillarySelectionId: 'selection-3',
+          ancillaryVersion: 3,
+          intentExpiresAt: new Date(Date.now() + 100000),
+          offerExpiresAt: new Date(Date.now() + 100000),
+        }),
+      },
     };
     const stripe = { createPaymentIntent: jest.fn() };
     const idempotency = {
@@ -416,6 +472,20 @@ describe('PaymentService ancillary snapshot binding', () => {
     const paymentEvent = { create: jest.fn() };
     const prisma = {
       $transaction: jest.fn().mockImplementation(async (callback) => callback(transaction)),
+      bookingIntent: {
+        findUnique: jest.fn().mockResolvedValue({
+          id: 'intent-1',
+          status: 'PENDING',
+          paymentAttemptCount: 0,
+          confirmedPrice: '100.00',
+          currency: 'USD',
+          userId: 'user-1',
+          currentAncillarySelectionId: 'selection-3',
+          ancillaryVersion: 3,
+          intentExpiresAt: new Date(Date.now() + 100000),
+          offerExpiresAt: new Date(Date.now() + 100000),
+        }),
+      },
       payment: { findFirst: jest.fn().mockResolvedValue(existingPayment) },
       user: {
         findUnique: jest.fn().mockResolvedValue({

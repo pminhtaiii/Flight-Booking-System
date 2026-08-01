@@ -7,6 +7,7 @@ import { PaymentIdempotencyService } from '@/payment/payment-idempotency.service
 import { DuffelService } from '@/duffel/duffel.service';
 import { AuditService } from '@/audit/audit.service';
 import { PaymentMethodService } from '@/payment/payment-method.service';
+import { Prisma } from '@prisma/client';
 import { AncillaryPaymentValidationService } from './ancillary-payment-validation.service';
 
 describe('PaymentService - Ancillary Pipeline', () => {
@@ -23,10 +24,54 @@ describe('PaymentService - Ancillary Pipeline', () => {
   beforeEach(() => {
     mockPrisma = {
       $transaction: jest.fn(async (cb) => cb(mockPrisma)),
-      $queryRaw: jest.fn(),
+      $queryRaw: jest.fn().mockImplementation((strings: TemplateStringsArray) => {
+        const sql = strings.join(' ');
+        if (sql.includes('booking_intents')) {
+          return Promise.resolve([
+            {
+              id: 'intent-123',
+              status: 'PENDING',
+              paymentAttemptCount: 0,
+              confirmedPrice: '200.00',
+              currency: 'USD',
+              userId: 'user-123',
+              currentAncillarySelectionId: 'anc-sel-123',
+              ancillaryVersion: 1,
+              intentExpiresAt: new Date(Date.now() + 600000),
+              offerExpiresAt: null,
+            },
+          ]);
+        }
+        if (sql.includes('ancillary_selections')) {
+          return Promise.resolve([
+            {
+              id: 'anc-sel-123',
+              status: 'VALIDATED',
+              currency: 'USD',
+              validatedBaseAmount: new Prisma.Decimal('200.00'),
+              validatedGrandTotal: new Prisma.Decimal('250.00'),
+              validationLeaseToken: null,
+              validationLeaseExpiresAt: null,
+              validatedAt: new Date(),
+            },
+          ]);
+        }
+        return Promise.resolve([]);
+      }),
       $executeRaw: jest.fn(),
       bookingIntent: {
-        findUnique: jest.fn(),
+        findUnique: jest.fn().mockImplementation(() => Promise.resolve({
+          id: 'intent-123',
+          status: 'PENDING',
+          paymentAttemptCount: 0,
+          confirmedPrice: '200.00',
+          currency: 'USD',
+          userId: 'user-123',
+          currentAncillarySelectionId: 'anc-sel-123',
+          ancillaryVersion: 1,
+          intentExpiresAt: new Date(Date.now() + 600000),
+          offerExpiresAt: null,
+        })),
         update: jest.fn(),
       },
       user: {

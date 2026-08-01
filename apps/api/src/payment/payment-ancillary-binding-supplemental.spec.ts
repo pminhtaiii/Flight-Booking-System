@@ -74,6 +74,20 @@ function createAncillaryFixture(options?: {
   };
   const prisma = {
     $transaction: jest.fn().mockImplementation(async (callback) => callback(transaction)),
+    bookingIntent: {
+      findUnique: jest.fn().mockResolvedValue({
+        id: 'intent-1',
+        status: 'PENDING',
+        paymentAttemptCount: options?.paymentAttemptCount ?? 0,
+        confirmedPrice: '100.00',
+        currency: 'USD',
+        userId: 'user-1',
+        currentAncillarySelectionId: options?.currentSelectionId ?? 'selection-3',
+        ancillaryVersion: options?.currentVersion ?? 3,
+        intentExpiresAt: new Date(Date.now() + 100000),
+        offerExpiresAt: new Date(Date.now() + 100000),
+      }),
+    },
     payment: { findFirst: jest.fn().mockResolvedValue(null) },
     user: {
       findUnique: jest.fn().mockResolvedValue({

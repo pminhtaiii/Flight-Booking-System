@@ -62,7 +62,14 @@ function buildHarness(options: HarnessOptions = {}) {
   const transaction = {
     payment: { update: jest.fn().mockResolvedValue(undefined) },
     paymentEvent: { create: jest.fn().mockResolvedValue(undefined) },
-    bookingIntent: { update: jest.fn().mockResolvedValue(undefined) },
+    bookingIntent: {
+      update: jest.fn().mockResolvedValue(undefined),
+      findUnique: jest.fn().mockResolvedValue({
+        id: 'intent-1',
+        passengers: [{ id: 'passenger-1', type: 'adult' }],
+        user: { email: 'traveller@example.com' },
+      }),
+    },
     ledgerEntry: { createMany: jest.fn().mockResolvedValue(undefined) },
   };
   const prisma = {
@@ -353,7 +360,11 @@ describe('PaymentService ancillary order recovery', () => {
           ancillarySelection: {
             include: {
               seatSelections: true,
-              baggageSelections: true,
+              baggageSelections: {
+                include: {
+                  segments: true,
+                },
+              },
             },
           },
         },

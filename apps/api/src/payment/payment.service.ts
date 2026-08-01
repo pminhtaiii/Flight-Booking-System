@@ -239,7 +239,16 @@ export class PaymentService {
     idempotencyKey: string,
     userId: string,
     ipAddress: string,
+    traceId?: string,
+    correlationId?: string,
   ): Promise<PaymentResponseDto> {
+    if (dto.ancillarySelectionId !== undefined && process.env.FEATURE_FLAG_ANCILLARY_PAYMENT === 'false') {
+      throw new BadRequestException({
+        code: 'ANCILLARY_PAYMENT_DISABLED',
+        message: 'Ancillary checkout is currently disabled',
+      });
+    }
+
     let paymentIntent: Awaited<ReturnType<StripeService['createPaymentIntent']>> | undefined = undefined;
     let paymentRecord: unknown = null;
     try {
@@ -318,7 +327,7 @@ export class PaymentService {
               bookingIntentId: dto.bookingIntentId,
               ancillarySelectionId: dto.ancillarySelectionId,
               ancillarySelectionVersion: dto.ancillarySelectionVersion,
-            });
+            }, traceId, correlationId);
           }
         }
       }
@@ -403,12 +412,15 @@ export class PaymentService {
         ) {
           validated = validatedAncillary;
         } else {
+          if (!this.ancillaryPaymentValidation) {
+            throw new InternalServerErrorException('Ancillary payment validation is unavailable');
+          }
           validated = await this.ancillaryPaymentValidation.validateForPayment({
             userId,
             bookingIntentId: dto.bookingIntentId,
             ancillarySelectionId: targetAncillarySelectionId,
             ancillarySelectionVersion: targetAncillarySelectionVersion,
-          });
+          }, traceId, correlationId);
         }
         amountInCents = Math.round(Number(validated.grandTotal) * 100);
       } else {
@@ -674,7 +686,7 @@ export class PaymentService {
       }
 
       // 4. Create Stripe PaymentIntent
-      const amountInCents = result.amount;
+      amountInCents = result.amount;
       const stripeMetadata: Record<string, string> = validatedAncillary || boundPaymentReplay
         ? {
             bookingIntentId: dto.bookingIntentId,
@@ -765,7 +777,7 @@ export class PaymentService {
               ancillarySelectionVersion: validatedAncillary.selectionVersion,
               attemptNumber: result.attemptNumber,
               idempotencyKeyId: keyRecord.id,
-              stripePaymentIntentId: paymentIntent.id,
+              stripePaymentIntentId: paymentIntent!.id,
               stripeCustomerId,
               amount: amountInCents,
               currency: result.currency.toLowerCase(),
@@ -822,6 +834,24 @@ export class PaymentService {
             },
           });
 
+          await this.auditService.createLog(tx, {
+            userId,
+            action: 'ancillary_payment_bound',
+            resourceType: 'Payment',
+            resourceId: created.id,
+            ipAddress,
+            traceId,
+            correlationId,
+            metadata: {
+              bookingIntentId: dto.bookingIntentId,
+              ancillarySelectionId: validatedAncillary.selectionId,
+              ancillarySelectionVersion: validatedAncillary.selectionVersion,
+              paymentId: created.id,
+              amount: amountInCents,
+              currency: result.currency.toLowerCase(),
+            },
+          });
+
           return created;
         });
       } else if ('payment' in result && result.payment) {
@@ -851,7 +881,7 @@ export class PaymentService {
               bookingIntentId: dto.bookingIntentId,
               attemptNumber: result.attemptNumber,
               idempotencyKeyId: keyRecord.id,
-              stripePaymentIntentId: paymentIntent.id,
+              stripePaymentIntentId: paymentIntent!.id,
               stripeCustomerId,
               amount: amountInCents,
               currency: result.currency.toLowerCase(),
@@ -1032,8 +1062,22 @@ export class PaymentService {
 
       // 4. Resume from recovery point
       let recoveryPoint = await this.idempotencyService.getResumePoint(idempotencyKey);
+      const isRecovered = recoveryPoint && recoveryPoint !== 'started';
       if (!recoveryPoint) {
         recoveryPoint = 'started';
+      }
+      if (isRecovered) {
+        await this.auditService.createLog(this.prisma, {
+          userId,
+          action: 'payment_recovery_resumed',
+          resourceType: 'Payment',
+          resourceId: payment.id,
+          metadata: {
+            paymentId: payment.id,
+            recoveryPoint,
+            idempotencyKey,
+          },
+        });
       }
 
       if (recoveryPoint === 'completed') {
@@ -1160,7 +1204,9 @@ export class PaymentService {
         }
         const services: Array<{ id: string; quantity: number }> = Array.from(
           servicesMap.entries(),
-        ).map(([id, quantity]) => ({ id, quantity }));
+        )
+          .sort(([left], [right]) => left.localeCompare(right))
+          .map(([id, quantity]) => ({ id, quantity }));
 
         let duffelOrder: unknown;
         try {
@@ -1347,21 +1393,77 @@ export class PaymentService {
             const duffelOrder = duffelEvent?.metadata as Record<string, unknown> | null;
             duffelOrderId = duffelOrder?.id as string | undefined;
 
-            if (duffelOrderId) {
-              await this.duffelService.cancelOrder(duffelOrderId);
-              this.logger.log(`Successfully cancelled Duffel order ${duffelOrderId} as compensation.`);
-            }
-          } catch (cancelError: unknown) {
-            const err = cancelError as Error;
-            this.logger.error(`Duffel order cancellation failed during compensation: ${err.message}`, err.stack);
-          }
+            await this.auditService.createLog(this.prisma, {
+              userId,
+              action: 'payment_compensation_started',
+              resourceType: 'Payment',
+              resourceId: payment.id,
+              metadata: {
+                paymentId: payment.id,
+                bookingIntentId: payment.bookingIntentId,
+                duffelOrderId,
+                stripePaymentIntentId: payment.stripePaymentIntentId,
+              },
+            });
 
-          // Release the Stripe authorization hold (cancel intent)
-          try {
-            await this.stripeService.cancelPaymentIntent(payment.stripePaymentIntentId);
-          } catch (stripeCancelError: unknown) {
-            const stripeError = stripeCancelError as Error;
-            this.logger.error(`Stripe cancelPaymentIntent failed during compensation: ${stripeError.message}`, stripeError.stack);
+            let duffelCancelSuccess = true;
+            let stripeCancelSuccess = true;
+            let duffelCancelErrorMsg: string | undefined;
+            let stripeCancelErrorMsg: string | undefined;
+
+            if (duffelOrderId) {
+              try {
+                await this.duffelService.cancelOrder(duffelOrderId);
+                this.logger.log(`Successfully cancelled Duffel order ${duffelOrderId} as compensation.`);
+              } catch (cancelError: unknown) {
+                duffelCancelSuccess = false;
+                const err = cancelError as Error;
+                duffelCancelErrorMsg = err.message;
+                this.logger.error(`Duffel order cancellation failed during compensation: ${err.message}`, err.stack);
+              }
+            }
+
+            // Release the Stripe authorization hold (cancel intent)
+            try {
+              await this.stripeService.cancelPaymentIntent(payment.stripePaymentIntentId);
+            } catch (stripeCancelError: unknown) {
+              stripeCancelSuccess = false;
+              const stripeError = stripeCancelError as Error;
+              stripeCancelErrorMsg = stripeError.message;
+              this.logger.error(`Stripe cancelPaymentIntent failed during compensation: ${stripeError.message}`, stripeError.stack);
+            }
+
+            if (duffelCancelSuccess && stripeCancelSuccess) {
+              await this.auditService.createLog(this.prisma, {
+                userId,
+                action: 'payment_compensation_succeeded',
+                resourceType: 'Payment',
+                resourceId: payment.id,
+                metadata: {
+                  paymentId: payment.id,
+                  bookingIntentId: payment.bookingIntentId,
+                  duffelOrderId,
+                  stripePaymentIntentId: payment.stripePaymentIntentId,
+                },
+              });
+            } else {
+              await this.auditService.createLog(this.prisma, {
+                userId,
+                action: 'payment_compensation_failed',
+                resourceType: 'Payment',
+                resourceId: payment.id,
+                metadata: {
+                  paymentId: payment.id,
+                  bookingIntentId: payment.bookingIntentId,
+                  duffelOrderId,
+                  stripePaymentIntentId: payment.stripePaymentIntentId,
+                  duffelCancelError: duffelCancelErrorMsg,
+                  stripeCancelError: stripeCancelErrorMsg,
+                },
+              });
+            }
+          } catch (compErr: any) {
+            this.logger.error(`Payment compensation logic failed: ${compErr.message}`, compErr.stack);
           }
 
           // Update BookingIntent status
@@ -1506,7 +1608,7 @@ export class PaymentService {
               data: { status: 'CONFIRMED' },
             });
 
-            let completeOrder = duffelOrder;
+            let completeOrder: any = duffelOrder;
             try {
               completeOrder = await this.duffelService.retrieveCompleteOrder(duffelOrder.id as string);
             } catch (err) {
@@ -1589,6 +1691,21 @@ export class PaymentService {
         }
 
         await this.idempotencyService.updateRecoveryPoint(idempotencyKey, 'completed');
+
+        if (isRecovered) {
+          await this.auditService.createLog(this.prisma, {
+            userId,
+            action: 'payment_recovery_succeeded',
+            resourceType: 'Payment',
+            resourceId: payment.id,
+            metadata: {
+              paymentId: payment.id,
+              bookingReference: duffelOrder.booking_reference as string,
+              duffelOrderId: duffelOrder.id as string,
+              idempotencyKey,
+            },
+          });
+        }
 
         const successResponse = {
           success: true,

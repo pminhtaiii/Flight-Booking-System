@@ -3,6 +3,10 @@ import { PrismaService } from '@/prisma/prisma.service';
 import { AncillaryPaymentValidationService } from './ancillary-payment-validation.service';
 
 describe('AncillaryPaymentValidationService', () => {
+  afterEach(() => {
+    jest.useRealTimers();
+  });
+
   it('reprices once outside transactions and validates the leased current snapshot', async () => {
     jest.useFakeTimers().setSystemTime(new Date('2026-07-29T10:00:00.000Z'));
     let inTransaction = false;
@@ -182,6 +186,11 @@ describe('AncillaryPaymentValidationService', () => {
       ancillarySelectionId: 'selection-3',
       ancillarySelectionVersion: 3,
     });
+
+    // Flush microtasks to allow the async validation pipeline to setup timers
+    for (let i = 0; i < 10; i++) {
+      await Promise.resolve();
+    }
 
     jest.advanceTimersByTime(15_000);
 

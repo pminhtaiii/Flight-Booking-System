@@ -27,6 +27,20 @@ const validated = {
 function createDependencies(transaction: Record<string, unknown>) {
   const prisma = {
     $transaction: jest.fn().mockImplementation(async (callback) => callback(transaction)),
+    bookingIntent: {
+      findUnique: jest.fn().mockResolvedValue({
+        id: 'intent-1',
+        status: 'PENDING',
+        paymentAttemptCount: 0,
+        confirmedPrice: '100.00',
+        currency: 'USD',
+        userId: 'user-1',
+        currentAncillarySelectionId: 'selection-3',
+        ancillaryVersion: 3,
+        intentExpiresAt: new Date(Date.now() + 100000),
+        offerExpiresAt: new Date(Date.now() + 100000),
+      }),
+    },
     payment: { findFirst: jest.fn().mockResolvedValue(null) },
     idempotencyKey: { findUnique: jest.fn().mockResolvedValue(null) },
     user: {
@@ -91,6 +105,7 @@ describe('PaymentService ancillary binding review fixes', () => {
             validatedGrandTotal: new Prisma.Decimal('123.45'),
             validationLeaseToken: null,
             validationLeaseExpiresAt: null,
+            validatedAt: new Date(),
           },
         ])
         .mockResolvedValue([]),
@@ -157,6 +172,7 @@ describe('PaymentService ancillary binding review fixes', () => {
               validatedGrandTotal: new Prisma.Decimal('123.45'),
               validationLeaseToken: null,
               validationLeaseExpiresAt: null,
+              validatedAt: new Date(),
             },
           ];
         }

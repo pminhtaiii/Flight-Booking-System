@@ -19,11 +19,28 @@ export class AncillariesService {
     private readonly audit: AuditService,
   ) {}
 
-  async read(userId: string, intentId: string, refresh = false) {
+  async read(userId: string, intentId: string, refresh = false, traceId?: string, correlationId?: string) {
     const intent = await this.loadOwned(userId, intentId);
     const catalog = await this.catalogService.getCatalog(intent.duffelOfferId, refresh);
     const passengers = this.passengers(intent);
     const selection = this.snapshot(intent.currentAncillarySelection, intent.confirmedPrice, intent.currency);
+
+    await this.audit.createLog(this.prisma, {
+      userId,
+      action: 'ancillary_catalog_fetched',
+      resourceType: 'BookingIntent',
+      resourceId: intentId,
+      traceId,
+      correlationId,
+      metadata: {
+        intentId,
+        duffelOfferId: intent.duffelOfferId,
+        cacheStatus: catalog.cache.status,
+        ttlSeconds: catalog.cache.ttlSeconds,
+        segmentCount: catalog.segments.length,
+      },
+    });
+
     return {
       intentId,
       selectionId: intent.currentAncillarySelectionId,
@@ -37,7 +54,7 @@ export class AncillariesService {
     };
   }
 
-  async commit(userId: string, intentId: string, key: string, dto: CommitAncillarySelectionDto) {
+  async commit(userId: string, intentId: string, key: string, dto: CommitAncillarySelectionDto, traceId?: string, correlationId?: string) {
     const requestPath = `/bookings/intent/${intentId}/ancillaries`;
     const requestHash = this.idempotency.computeHash(dto);
     const acquired = await this.idempotency.acquireOrReplay(key, requestHash, userId, requestPath);
@@ -101,7 +118,7 @@ export class AncillariesService {
       });
       const advanced = await tx.bookingIntent.updateMany({ where: { id: intentId, userId, status: 'PENDING', ancillaryVersion: dto.expectedVersion, intentExpiresAt: { gt: new Date() } }, data: { currentAncillarySelectionId: selection.id, ancillaryVersion: dto.expectedVersion + 1, ancillaryStatus: AncillaryStatus.DRAFT_COMMITTED, ancillaryCurrency: intent.currency, seatTotal: new Prisma.Decimal(totals.seats), baggageTotal: new Prisma.Decimal(totals.baggage), ancillaryTotal: new Prisma.Decimal(totals.ancillaries), validatedTotal: null, ancillariesValidatedAt: null } });
       if (advanced.count !== 1) throw new ConflictException({ code: 'ANCILLARY_VERSION_CONFLICT' });
-      await this.audit.createLog(tx, { userId, action: 'ancillary_selection_committed', resourceType: 'BookingIntent', resourceId: intentId, metadata: { intentId, selectionId: selection.id, version: selection.version, seatCount: valid.seats.length, baggageCount: valid.baggage.length, ancillaryTotal: totals.ancillaries, currency: intent.currency } });
+      await this.audit.createLog(tx, { userId, action: 'ancillary_selection_committed', resourceType: 'BookingIntent', resourceId: intentId, metadata: { intentId, selectionId: selection.id, version: selection.version, seatCount: valid.seats.length, baggageCount: valid.baggage.length, ancillaryTotal: totals.ancillaries, currency: intent.currency }, traceId, correlationId });
       const response = { intentId, selectionId: selection.id, selectionVersion: selection.version, selectionStatus: 'DRAFT_COMMITTED', intentExpiresAt: intent.intentExpiresAt.toISOString(), selection: { seats: valid.seats, baggage: valid.baggage, totals } };
       await tx.idempotencyKey.update({ where: { key }, data: { responseCode: 200, responseBody: response as Prisma.InputJsonValue, lockedAt: null } });
       return response;

@@ -40,7 +40,7 @@ export type BookingWithRelations = Prisma.BookingGetPayload<{
 import { StripeService } from '@/common/stripe.service';
 import { DuffelService } from '@/duffel/duffel.service';
 import { PaymentRefundService } from '@/payment/payment-refund.service';
-import { User, Passenger } from '@prisma/client';
+import { User } from '@prisma/client';
 
 function parseDuffelCancellationQuoteId(serialized: string | null | undefined): {
   quoteId: string | null;
@@ -587,12 +587,12 @@ export class BookingService {
             this.logger.error(`Reactive stale booking reconciliation failed for ${b.id}: ${e.message}`, e.stack);
           }
         }
-        updated = await this.checkAndCompleteBooking(updated);
+        updated = await this.checkAndCompleteBooking(updated as any) as any;
         return updated;
       })
     );
 
-    const ordered = this.sortBookings(reconciledBookings, tab);
+    const ordered = this.sortBookings(reconciledBookings as any, tab);
     const total = ordered.length;
     const items = ordered.slice((page - 1) * limit, page * limit).map((booking) => this.toListItem(booking));
 

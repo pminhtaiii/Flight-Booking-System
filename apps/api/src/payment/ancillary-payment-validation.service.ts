@@ -11,6 +11,7 @@ import { AncillarySelectionStatus, Prisma } from '@prisma/client';
 import { randomUUID } from 'crypto';
 import { DuffelService } from '@/duffel/duffel.service';
 import { PrismaService } from '@/prisma/prisma.service';
+import { AuditService } from '@/audit/audit.service';
 
 export type ValidateAncillaryPaymentInput = {
   userId: string;
@@ -53,84 +54,131 @@ export class AncillaryPaymentValidationService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly duffel: DuffelService,
+    private readonly audit?: AuditService,
   ) {}
 
   async validateForPayment(
     input: ValidateAncillaryPaymentInput,
+    traceId?: string,
+    correlationId?: string,
   ): Promise<ValidatedAncillaryPayment> {
-    const leased = await this.acquireLease(input);
-    let pricing: Awaited<ReturnType<DuffelService['repriceOffer']>>;
-
     try {
-      pricing = await this.withTimeout(
-        this.duffel.repriceOffer(leased.intent.duffelOfferId, leased.services),
-        REPRICING_TIMEOUT_MS,
-      );
-    } catch (error) {
-      await this.releaseLease(input, leased.leaseToken);
+      const leased = await this.acquireLease(input);
+      let pricing: Awaited<ReturnType<DuffelService['repriceOffer']>>;
+
+      try {
+        pricing = await this.withTimeout(
+          this.duffel.repriceOffer(leased.intent.duffelOfferId, leased.services),
+          REPRICING_TIMEOUT_MS,
+        );
+      } catch (error) {
+        await this.releaseLease(input, leased.leaseToken);
+        throw error;
+      }
+
+      const selection = leased.intent.currentAncillarySelection;
+      if (!selection) {
+        await this.releaseLease(input, leased.leaseToken);
+        throw this.versionConflict(input.bookingIntentId, leased.intent.ancillaryVersion);
+      }
+
+      if (
+        pricing.invalidServiceIdentities.length > 0 ||
+        !this.sameServices(leased.services, pricing.serviceLines)
+      ) {
+        await this.markStale(input, leased.leaseToken);
+        throw new ConflictException({
+          code: 'ANCILLARY_SELECTION_STALE',
+          intentId: input.bookingIntentId,
+          currentVersion: input.ancillarySelectionVersion,
+          invalidSelections: this.invalidSelections(selection, pricing.invalidServiceIdentities),
+        });
+      }
+
+      const expectedCurrency = selection.currency.toUpperCase();
+      if (pricing.currency.toUpperCase() !== expectedCurrency) {
+        await this.markStale(input, leased.leaseToken);
+        throw new BadRequestException({
+          code: 'ANCILLARY_CURRENCY_MISMATCH',
+          intentId: input.bookingIntentId,
+        });
+      }
+
+      const previousBase = new Prisma.Decimal(leased.intent.confirmedPrice);
+      const previousGrand = previousBase.add(selection.total);
+      const currentBase = new Prisma.Decimal(pricing.baseAmount);
+      const currentGrand = new Prisma.Decimal(pricing.totalAmount);
+      if (!currentBase.equals(previousBase) || !currentGrand.equals(previousGrand)) {
+        await this.markStale(input, leased.leaseToken);
+        throw new ConflictException({
+          code: 'ANCILLARY_PRICE_CHANGED',
+          intentId: input.bookingIntentId,
+          currentVersion: input.ancillarySelectionVersion,
+          pricing: {
+            previousGrandTotal: previousGrand.toFixed(2),
+            currentGrandTotal: currentGrand.toFixed(2),
+            currency: pricing.currency.toUpperCase(),
+          },
+        });
+      }
+
+      await this.persistValidated(input, leased.leaseToken, {
+        baseAmount: currentBase.toFixed(2),
+        grandTotal: currentGrand.toFixed(2),
+        currency: expectedCurrency,
+      });
+
+      if (this.audit) {
+        await this.audit.createLog(this.prisma, {
+          userId: input.userId,
+          action: 'ancillary_validation_succeeded',
+          resourceType: 'BookingIntent',
+          resourceId: input.bookingIntentId,
+          traceId,
+          correlationId,
+          metadata: {
+            selectionId: input.ancillarySelectionId,
+            version: input.ancillarySelectionVersion,
+            baseAmount: currentBase.toFixed(2),
+            grandTotal: currentGrand.toFixed(2),
+            currency: expectedCurrency,
+            servicesCount: leased.services.length,
+          },
+        });
+      }
+
+      return {
+        selectionId: input.ancillarySelectionId,
+        selectionVersion: input.ancillarySelectionVersion,
+        baseAmount: currentBase.toFixed(2),
+        grandTotal: currentGrand.toFixed(2),
+        currency: expectedCurrency,
+        services: leased.services,
+      };
+    } catch (error: any) {
+      const code = error?.response?.code || error?.code || 'UNKNOWN_ERROR';
+      const message = error?.message || 'Unknown error occurred during ancillary validation';
+      const responseMetadata = error?.response || {};
+
+      if (this.audit) {
+        await this.audit.createLog(this.prisma, {
+          userId: input.userId,
+          action: 'ancillary_validation_failed',
+          resourceType: 'BookingIntent',
+          resourceId: input.bookingIntentId,
+          traceId,
+          correlationId,
+          metadata: {
+            selectionId: input.ancillarySelectionId,
+            version: input.ancillarySelectionVersion,
+            errorCode: code,
+            errorMessage: message,
+            errorResponse: responseMetadata,
+          },
+        });
+      }
       throw error;
     }
-
-    const selection = leased.intent.currentAncillarySelection;
-    if (!selection) {
-      await this.releaseLease(input, leased.leaseToken);
-      throw this.versionConflict(input.bookingIntentId, leased.intent.ancillaryVersion);
-    }
-
-    if (
-      pricing.invalidServiceIdentities.length > 0 ||
-      !this.sameServices(leased.services, pricing.serviceLines)
-    ) {
-      await this.markStale(input, leased.leaseToken);
-      throw new ConflictException({
-        code: 'ANCILLARY_SELECTION_STALE',
-        intentId: input.bookingIntentId,
-        currentVersion: input.ancillarySelectionVersion,
-        invalidSelections: this.invalidSelections(selection, pricing.invalidServiceIdentities),
-      });
-    }
-
-    const expectedCurrency = selection.currency.toUpperCase();
-    if (pricing.currency.toUpperCase() !== expectedCurrency) {
-      await this.markStale(input, leased.leaseToken);
-      throw new BadRequestException({
-        code: 'ANCILLARY_CURRENCY_MISMATCH',
-        intentId: input.bookingIntentId,
-      });
-    }
-
-    const previousBase = new Prisma.Decimal(leased.intent.confirmedPrice);
-    const previousGrand = previousBase.add(selection.total);
-    const currentBase = new Prisma.Decimal(pricing.baseAmount);
-    const currentGrand = new Prisma.Decimal(pricing.totalAmount);
-    if (!currentBase.equals(previousBase) || !currentGrand.equals(previousGrand)) {
-      await this.markStale(input, leased.leaseToken);
-      throw new ConflictException({
-        code: 'ANCILLARY_PRICE_CHANGED',
-        intentId: input.bookingIntentId,
-        currentVersion: input.ancillarySelectionVersion,
-        pricing: {
-          previousGrandTotal: previousGrand.toFixed(2),
-          currentGrandTotal: currentGrand.toFixed(2),
-          currency: pricing.currency.toUpperCase(),
-        },
-      });
-    }
-
-    await this.persistValidated(input, leased.leaseToken, {
-      baseAmount: currentBase.toFixed(2),
-      grandTotal: currentGrand.toFixed(2),
-      currency: expectedCurrency,
-    });
-
-    return {
-      selectionId: input.ancillarySelectionId,
-      selectionVersion: input.ancillarySelectionVersion,
-      baseAmount: currentBase.toFixed(2),
-      grandTotal: currentGrand.toFixed(2),
-      currency: expectedCurrency,
-      services: leased.services,
-    };
   }
 
   private async acquireLease(input: ValidateAncillaryPaymentInput): Promise<LeasedSnapshot> {

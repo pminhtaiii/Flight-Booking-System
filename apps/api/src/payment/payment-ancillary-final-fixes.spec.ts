@@ -531,6 +531,14 @@ describe('PaymentService - Final Fixes Spec', () => {
     });
 
     it('should cancel the Stripe PaymentIntent if the database transaction fails after createPaymentIntent', async () => {
+      prisma.bookingIntent.findUnique.mockResolvedValue({
+        id: 'intent-1',
+        userId: 'user-1',
+        status: 'PENDING',
+        paymentAttemptCount: 0,
+        intentExpiresAt: new Date(Date.now() + 600000),
+        offerExpiresAt: null,
+      });
       prisma.idempotencyKey.findUnique.mockResolvedValue(null);
 
       validation.validateForPayment.mockResolvedValue({
@@ -598,6 +606,14 @@ describe('PaymentService - Final Fixes Spec', () => {
 
   describe('Finding 6: Intent/Offer Expiration and Omitted Ancillary Selection Rejection', () => {
     it('should throw GoneException if intentExpiresAt is expired', async () => {
+      prisma.bookingIntent.findUnique.mockResolvedValue({
+        id: 'intent-1',
+        userId: 'user-1',
+        status: 'PENDING',
+        paymentAttemptCount: 0,
+        intentExpiresAt: new Date(Date.now() - 1000),
+        offerExpiresAt: null,
+      });
       prisma.$queryRaw.mockResolvedValueOnce([
         {
           id: 'intent-1',
@@ -616,6 +632,14 @@ describe('PaymentService - Final Fixes Spec', () => {
     });
 
     it('should throw GoneException if offerExpiresAt is expired', async () => {
+      prisma.bookingIntent.findUnique.mockResolvedValue({
+        id: 'intent-1',
+        userId: 'user-1',
+        status: 'PENDING',
+        paymentAttemptCount: 0,
+        intentExpiresAt: new Date(Date.now() + 600000),
+        offerExpiresAt: new Date(Date.now() - 1000),
+      });
       prisma.$queryRaw.mockResolvedValueOnce([
         {
           id: 'intent-1',
@@ -634,6 +658,15 @@ describe('PaymentService - Final Fixes Spec', () => {
     });
 
     it('should throw BadRequestException if dto.ancillarySelectionId is omitted but currentAncillarySelectionId has seat/baggage selections', async () => {
+      prisma.bookingIntent.findUnique.mockResolvedValue({
+        id: 'intent-1',
+        userId: 'user-1',
+        status: 'PENDING',
+        paymentAttemptCount: 0,
+        intentExpiresAt: new Date(Date.now() + 600000),
+        offerExpiresAt: null,
+        currentAncillarySelectionId: 'sel-1',
+      });
       prisma.$queryRaw.mockResolvedValueOnce([
         {
           id: 'intent-1',
