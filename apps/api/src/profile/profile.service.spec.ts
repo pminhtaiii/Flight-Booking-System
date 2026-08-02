@@ -27,6 +27,7 @@ describe('ProfileService', () => {
               update: jest.fn(),
               create: jest.fn(),
             },
+            $transaction: jest.fn((cb: any) => cb(prisma)),
           },
         },
         {
@@ -385,6 +386,60 @@ describe('ProfileService', () => {
       expect(metadataString).not.toContain('1990-01-01');
 
       expect(metadata.changedFields).toContain('identity');
+    });
+
+    it('wraps profile mutation and audit log insertion in a single transaction', async () => {
+      dbProfile = null;
+
+      await service.updateProfile('user-123', {
+        expectedRevision: 0,
+        identity: {
+          givenName: 'John',
+          familyName: 'Doe',
+          dateOfBirth: '1990-01-01',
+          gender: 'male',
+          title: 'Mr',
+        },
+      });
+
+      expect(prisma.$transaction).toHaveBeenCalled();
+      expect(auditService.createLog).toHaveBeenCalledWith(
+        expect.anything(), // tx client passed
+        expect.objectContaining({
+          action: 'create_profile',
+        }),
+      );
+    });
+  });
+
+  describe('Concurrent Create & Decryption Failure Handling', () => {
+    it('throws ConflictException (409) if concurrent create violates unique constraint', async () => {
+      dbProfile = null;
+      jest.spyOn(prisma.travelerProfile, 'create').mockRejectedValueOnce(new Error('Unique constraint failed'));
+
+      await expect(
+        service.updateProfile('user-123', { expectedRevision: 0 }),
+      ).rejects.toThrow(ConflictException);
+    });
+
+    it('returns null for passportNumber when decryption fails', async () => {
+      dbProfile = {
+        id: 'profile-123',
+        userId: 'user-123',
+        revision: 1,
+        documentType: 'passport',
+        passportNumber: 'corrupted-ciphertext',
+      };
+      jest.spyOn(encryptionService, 'decryptBound').mockImplementation(() => {
+        throw new Error('Invalid key');
+      });
+      jest.spyOn(encryptionService, 'decrypt').mockImplementation(() => {
+        throw new Error('Invalid key');
+      });
+
+      const result = await service.getProfile('user-123');
+
+      expect(result.travelDocument?.passportNumber).toBeNull();
     });
   });
 });

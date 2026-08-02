@@ -57,7 +57,7 @@ export class ProfileService {
         try {
           decryptedPassport = this.encryptionService.decrypt(dbProfile.passportNumber);
         } catch {
-          decryptedPassport = dbProfile.passportNumber;
+          decryptedPassport = null;
         }
       }
     }
@@ -241,61 +241,67 @@ export class ProfileService {
 
     let updatedProfile: any;
 
-    if (!currentProfile) {
-      // Upsert: profile doesn't exist
-      if (updateDto.expectedRevision !== 0) {
-        throw new ConflictException('PROFILE_UPDATE_CONFLICT');
-      }
+    await this.prisma.$transaction(async (tx) => {
+      if (!currentProfile) {
+        // Upsert: profile doesn't exist
+        if (updateDto.expectedRevision !== 0) {
+          throw new ConflictException('PROFILE_UPDATE_CONFLICT');
+        }
 
-      data.userId = userId;
-      data.revision = 1;
+        data.userId = userId;
+        data.revision = 1;
 
-      updatedProfile = await this.prisma.travelerProfile.create({
-        data,
-      });
+        try {
+          updatedProfile = await tx.travelerProfile.create({
+            data,
+          });
+        } catch (err) {
+          throw new ConflictException('PROFILE_UPDATE_CONFLICT');
+        }
 
-      await this.auditService.createLog(null, {
-        userId,
-        action: 'create_profile',
-        resourceType: 'TravelerProfile',
-        resourceId: updatedProfile.id,
-        traceId,
-        correlationId,
-        metadata: {
-          changedFields,
-          revision: 1,
-        },
-      });
-    } else {
-      // Exists: CAS revision check
-      if (currentProfile.revision !== updateDto.expectedRevision) {
-        throw new ConflictException('PROFILE_UPDATE_CONFLICT');
-      }
-
-      data.revision = { increment: 1 };
-
-      try {
-        updatedProfile = await this.prisma.travelerProfile.update({
-          where: { userId, revision: updateDto.expectedRevision },
-          data,
+        await this.auditService.createLog(tx, {
+          userId,
+          action: 'create_profile',
+          resourceType: 'TravelerProfile',
+          resourceId: updatedProfile.id,
+          traceId,
+          correlationId,
+          metadata: {
+            changedFields,
+            revision: 1,
+          },
         });
-      } catch (err) {
-        throw new ConflictException('PROFILE_UPDATE_CONFLICT');
-      }
+      } else {
+        // Exists: CAS revision check
+        if (currentProfile.revision !== updateDto.expectedRevision) {
+          throw new ConflictException('PROFILE_UPDATE_CONFLICT');
+        }
 
-      await this.auditService.createLog(null, {
-        userId,
-        action: 'update_profile',
-        resourceType: 'TravelerProfile',
-        resourceId: updatedProfile.id,
-        traceId,
-        correlationId,
-        metadata: {
-          changedFields,
-          revision: updatedProfile.revision,
-        },
-      });
-    }
+        data.revision = { increment: 1 };
+
+        try {
+          updatedProfile = await tx.travelerProfile.update({
+            where: { userId, revision: updateDto.expectedRevision },
+            data,
+          });
+        } catch (err) {
+          throw new ConflictException('PROFILE_UPDATE_CONFLICT');
+        }
+
+        await this.auditService.createLog(tx, {
+          userId,
+          action: 'update_profile',
+          resourceType: 'TravelerProfile',
+          resourceId: updatedProfile.id,
+          traceId,
+          correlationId,
+          metadata: {
+            changedFields,
+            revision: updatedProfile.revision,
+          },
+        });
+      }
+    });
 
     return this.getProfile(userId);
   }
