@@ -1,5 +1,6 @@
 import { Injectable, ConflictException, NotFoundException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '@/prisma/prisma.service';
 import { EncryptionService } from '@/common/encryption.service';
 import { AuditService } from '@/audit/audit.service';
@@ -255,8 +256,14 @@ export class ProfileService {
           updatedProfile = await tx.travelerProfile.create({
             data,
           });
-        } catch (err) {
-          throw new ConflictException('PROFILE_UPDATE_CONFLICT');
+        } catch (err: any) {
+          if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
+            throw new ConflictException('PROFILE_UPDATE_CONFLICT');
+          }
+          if (err?.code === 'P2002') {
+            throw new ConflictException('PROFILE_UPDATE_CONFLICT');
+          }
+          throw err;
         }
 
         await this.auditService.createLog(tx, {

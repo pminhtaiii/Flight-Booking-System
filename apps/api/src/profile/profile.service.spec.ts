@@ -413,13 +413,25 @@ describe('ProfileService', () => {
   });
 
   describe('Concurrent Create & Decryption Failure Handling', () => {
-    it('throws ConflictException (409) if concurrent create violates unique constraint', async () => {
+    it('throws ConflictException (409) if concurrent create violates unique constraint (P2002)', async () => {
       dbProfile = null;
-      jest.spyOn(prisma.travelerProfile, 'create').mockRejectedValueOnce(new Error('Unique constraint failed'));
+      const p2002Err: any = new Error('Unique constraint failed');
+      p2002Err.code = 'P2002';
+      jest.spyOn(prisma.travelerProfile, 'create').mockRejectedValueOnce(p2002Err);
 
       await expect(
         service.updateProfile('user-123', { expectedRevision: 0 }),
       ).rejects.toThrow(ConflictException);
+    });
+
+    it('rethrows generic database errors on create without converting to ConflictException', async () => {
+      dbProfile = null;
+      const genericErr = new Error('Database connection lost');
+      jest.spyOn(prisma.travelerProfile, 'create').mockRejectedValueOnce(genericErr);
+
+      await expect(
+        service.updateProfile('user-123', { expectedRevision: 0 }),
+      ).rejects.toThrow('Database connection lost');
     });
 
     it('returns null for passportNumber when decryption fails', async () => {
