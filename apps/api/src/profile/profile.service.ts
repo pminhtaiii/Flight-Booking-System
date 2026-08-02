@@ -291,8 +291,14 @@ export class ProfileService {
             where: { userId, revision: updateDto.expectedRevision },
             data,
           });
-        } catch (err) {
-          throw new ConflictException('PROFILE_UPDATE_CONFLICT');
+        } catch (err: any) {
+          if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2025') {
+            throw new ConflictException('PROFILE_UPDATE_CONFLICT');
+          }
+          if (err?.code === 'P2025') {
+            throw new ConflictException('PROFILE_UPDATE_CONFLICT');
+          }
+          throw err;
         }
 
         await this.auditService.createLog(tx, {

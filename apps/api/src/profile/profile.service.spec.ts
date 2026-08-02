@@ -89,11 +89,15 @@ describe('ProfileService', () => {
 
     jest.spyOn(prisma.travelerProfile, 'update').mockImplementation((async (args: any) => {
       if (!dbProfile || args.where.userId !== dbProfile.userId) {
-        throw new Error('Record to update not found');
+        const p2025Err: any = new Error('Record to update not found');
+        p2025Err.code = 'P2025';
+        throw p2025Err;
       }
 
       if (args.where.revision !== undefined && args.where.revision !== dbProfile.revision) {
-        throw new Error('Record to update not found'); // Simulate Prisma P2025 mismatch
+        const p2025Err: any = new Error('Record to update not found');
+        p2025Err.code = 'P2025';
+        throw p2025Err; // Simulate Prisma P2025 mismatch
       }
 
       let newRevision = dbProfile.revision;
@@ -432,6 +436,16 @@ describe('ProfileService', () => {
       await expect(
         service.updateProfile('user-123', { expectedRevision: 0 }),
       ).rejects.toThrow('Database connection lost');
+    });
+
+    it('rethrows generic database errors on update without converting to ConflictException', async () => {
+      dbProfile = { id: 'profile-123', userId: 'user-123', revision: 1 };
+      const genericErr = new Error('Database timeout');
+      jest.spyOn(prisma.travelerProfile, 'update').mockRejectedValueOnce(genericErr);
+
+      await expect(
+        service.updateProfile('user-123', { expectedRevision: 1 }),
+      ).rejects.toThrow('Database timeout');
     });
 
     it('returns null for passportNumber when decryption fails', async () => {
