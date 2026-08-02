@@ -28,13 +28,13 @@
 
 **⚠️ CRITICAL**: No profile or snapshot write path starts until this phase is green.
 
-- [ ] T006 [P] Write failing migration compatibility tests for nullable profile/snapshot columns, profile revision default, and preserved legacy expiry data in `apps/api/test/traveler-profile-readiness-migration.e2e-spec.ts`
-- [ ] T007 [P] Write failing AES-GCM version/AAD/cross-record substitution tests in `apps/api/src/common/encryption.service.spec.ts`
-- [ ] T008 Extend `EncryptionService` with backward-compatible versioned bound encrypt/decrypt methods in `apps/api/src/common/encryption.service.ts` until T007 passes
-- [ ] T009 Add the eleven nullable `TravelerProfile` fields, `revision`, expiry ciphertext shadow, complete `BookingIntentPassenger` fields, `snapshotVersion`, and retain `travelerProfile` provenance `onDelete: SetNull` in `apps/api/prisma/schema.prisma`
-- [ ] T010 Create the additive SQL migration without renaming/dropping legacy columns in `apps/api/prisma/migrations/<timestamp>_traveler_profile_readiness/migration.sql` until T006 passes
-- [ ] T011 [P] Write failing bounded-batch, optimistic-predicate, decrypt/compare, checkpoint, quarantine, and abort-threshold tests in `apps/api/src/profile/passport-expiry-backfill.service.spec.ts`
-- [ ] T012 Implement the idempotent dual-write/backfill service with allowlisted structured batch events and processed/skipped/quarantined/abort metrics in `apps/api/src/profile/passport-expiry-backfill.service.ts` until T011 passes
+- [x] T006 [P] Write failing migration compatibility tests for nullable profile/snapshot columns, profile revision default, and preserved legacy expiry data in `apps/api/test/traveler-profile-readiness-migration.e2e-spec.ts`
+- [x] T007 [P] Write failing AES-GCM version/AAD/cross-record substitution tests in `apps/api/src/common/encryption.service.spec.ts`
+- [x] T008 Extend `EncryptionService` with backward-compatible versioned bound encrypt/decrypt methods in `apps/api/src/common/encryption.service.ts` until T007 passes
+- [x] T009 Add the eleven nullable `TravelerProfile` fields, `revision`, expiry ciphertext shadow, complete `BookingIntentPassenger` fields, `snapshotVersion`, and retain `travelerProfile` provenance `onDelete: SetNull` in `apps/api/prisma/schema.prisma`
+- [x] T010 Create the additive SQL migration without renaming/dropping legacy columns in `apps/api/prisma/migrations/<timestamp>_traveler_profile_readiness/migration.sql` until T006 passes
+- [x] T011 [P] Write failing bounded-batch, optimistic-predicate, decrypt/compare, checkpoint, quarantine, and abort-threshold tests in `apps/api/src/profile/passport-expiry-backfill.service.spec.ts`
+- [x] T012 Implement the idempotent dual-write/backfill service with allowlisted structured batch events and processed/skipped/quarantined/abort metrics in `apps/api/src/profile/passport-expiry-backfill.service.ts` until T011 passes
 
 **Checkpoint**: Migration is additive and reversible; old ciphertext still decrypts; new ciphertext is record-bound; backfill never clears legacy data.
 

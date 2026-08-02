@@ -1204,7 +1204,25 @@ export class PaymentService {
           }
           duffelOrder = await this.duffelService.createOrder(
             bookingIntent.duffelOfferId,
-            bookingIntent.passengers,
+            bookingIntent.passengers.map(p => {
+              const mapped: any = { ...p };
+              if (p.title) {
+                mapped.title = p.title;
+              } else {
+                delete mapped.title;
+              }
+              if (p.email) {
+                mapped.email = p.email;
+              } else {
+                delete mapped.email;
+              }
+              if (p.phoneNumber) {
+                mapped.phoneNumber = p.phoneNumber;
+              } else {
+                delete mapped.phoneNumber;
+              }
+              return mapped;
+            }),
             services.length > 0 ? services : undefined,
             { bookingIntentId: bookingIntent.id, paymentId: payment.id },
             idempotencyKey,
