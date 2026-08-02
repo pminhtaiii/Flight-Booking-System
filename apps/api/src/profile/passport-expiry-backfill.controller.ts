@@ -2,7 +2,8 @@ import { Controller, Post, Body, UseGuards, HttpCode, HttpStatus } from '@nestjs
 import { JwtAuthGuard } from '@/auth/guards/jwt-auth.guard';
 import { Roles } from '@/auth/decorators/roles.decorator';
 import { RolesGuard } from '@/auth/guards/roles.guard';
-import { PassportExpiryBackfillService, BackfillOptions, BackfillResult } from './passport-expiry-backfill.service';
+import { PassportExpiryBackfillService, BackfillResult } from './passport-expiry-backfill.service';
+import { BackfillOptionsDto } from './dto/backfill-options.dto';
 
 @Controller('admin/profile/backfill')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -12,7 +13,7 @@ export class PassportExpiryBackfillController {
 
   @Post()
   @HttpCode(HttpStatus.OK)
-  async runBackfill(@Body() options?: BackfillOptions): Promise<BackfillResult> {
+  async runBackfill(@Body() options?: BackfillOptionsDto): Promise<BackfillResult> {
     return this.backfillService.backfill(options);
   }
 }

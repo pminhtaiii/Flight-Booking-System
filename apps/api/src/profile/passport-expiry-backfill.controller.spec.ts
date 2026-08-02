@@ -47,4 +47,54 @@ describe('PassportExpiryBackfillController', () => {
     expect(service.backfill).toHaveBeenCalledWith(undefined);
     expect(result).toEqual(mockBackfillResult);
   });
+
+  describe('BackfillOptionsDto validation', () => {
+    const { validate } = require('class-validator');
+    const { BackfillOptionsDto } = require('./dto/backfill-options.dto');
+
+    it('should pass with valid options', async () => {
+      const dto = new BackfillOptionsDto();
+      dto.batchSize = 100;
+      dto.abortThresholdRatio = 0.15;
+
+      const errors = await validate(dto);
+      expect(errors.length).toBe(0);
+    });
+
+    it('should fail with negative batchSize', async () => {
+      const dto = new BackfillOptionsDto();
+      dto.batchSize = -5;
+
+      const errors = await validate(dto);
+      expect(errors.length).toBeGreaterThan(0);
+      expect(errors[0].property).toBe('batchSize');
+    });
+
+    it('should fail with non-integer batchSize', async () => {
+      const dto = new BackfillOptionsDto();
+      dto.batchSize = 5.5;
+
+      const errors = await validate(dto);
+      expect(errors.length).toBeGreaterThan(0);
+      expect(errors[0].property).toBe('batchSize');
+    });
+
+    it('should fail with abortThresholdRatio less than 0', async () => {
+      const dto = new BackfillOptionsDto();
+      dto.abortThresholdRatio = -0.1;
+
+      const errors = await validate(dto);
+      expect(errors.length).toBeGreaterThan(0);
+      expect(errors[0].property).toBe('abortThresholdRatio');
+    });
+
+    it('should fail with abortThresholdRatio greater than 1', async () => {
+      const dto = new BackfillOptionsDto();
+      dto.abortThresholdRatio = 1.1;
+
+      const errors = await validate(dto);
+      expect(errors.length).toBeGreaterThan(0);
+      expect(errors[0].property).toBe('abortThresholdRatio');
+    });
+  });
 });
