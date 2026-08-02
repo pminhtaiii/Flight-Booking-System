@@ -452,3 +452,5 @@ The following are **architecture-specific** invariants that enforce the system d
 - **Prisma migrations MUST be version-controlled and reviewed.** No ad-hoc schema changes in production.
 - **Frontend components contain no business logic or direct API calls to external services.** All external communication goes through the NestJS backend.
 - **Shared TypeScript types are the single source of truth.** Frontend and backend must use the same type definitions — never redefine them locally.
+- **Traveler Profile PII must be encrypted using record-bound AES-256-GCM encryption.** All sensitive columns (like passport fields) must bind encryption to user/profile identifiers to prevent cross-record decryption or ciphertext substitution attacks.
+- **Data-quality backfills must use optimistic concurrency controls (CAS).** Schema migrations and data backfills must run in additive, non-destructive steps and abort if the validation/quarantine ratio exceeds safe thresholds.
