@@ -1,4 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { Cron, CronExpression } from '@nestjs/schedule';
 import { PrismaService } from '../prisma/prisma.service';
 import { EncryptionService } from '../common/encryption.service';
 
@@ -21,6 +22,19 @@ export class PassportExpiryBackfillService {
     private readonly prisma: PrismaService,
     private readonly encryptionService: EncryptionService,
   ) {}
+
+  @Cron(CronExpression.EVERY_DAY_AT_MIDNIGHT)
+  async handleScheduledBackfill(): Promise<void> {
+    this.logger.log('Starting scheduled passport expiry backfill...');
+    try {
+      const result = await this.backfill({ batchSize: 100 });
+      this.logger.log(
+        `Scheduled backfill completed: processed=${result.processed}, skipped=${result.skipped}, quarantined=${result.quarantined}`,
+      );
+    } catch (error) {
+      this.logger.error('Error in scheduled backfill:', error);
+    }
+  }
 
   async backfill(options?: BackfillOptions): Promise<BackfillResult> {
     const batchSize = options?.batchSize ?? 100;
@@ -58,7 +72,11 @@ export class PassportExpiryBackfillService {
       }
 
       const legacyDateString = profile.passportExpiry.toISOString();
-      const ciphertext = this.encryptionService.encrypt(legacyDateString);
+      const context = {
+        travelerProfileId: profile.id,
+        fieldName: 'passportExpiry',
+      };
+      const ciphertext = this.encryptionService.encryptBound(legacyDateString, context);
 
       const updateResult = await this.prisma.travelerProfile.updateMany({
         where: {
@@ -80,7 +98,7 @@ export class PassportExpiryBackfillService {
       attempted++;
 
       try {
-        const decrypted = this.encryptionService.decrypt(ciphertext);
+        const decrypted = this.encryptionService.decryptBound(ciphertext, context);
         const decryptedDate = new Date(decrypted);
         const legacyTime = new Date(profile.passportExpiry).getTime();
         const decryptedTime = decryptedDate.getTime();

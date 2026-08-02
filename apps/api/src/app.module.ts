@@ -16,6 +16,7 @@ import { BookingModule } from './booking/booking.module';
 import { PaymentModule } from './payment/payment.module';
 import { DisruptionModule } from './disruption/disruption.module';
 import { AncillariesModule } from './ancillaries/ancillaries.module';
+import { ProfileModule } from './profile/profile.module';
 
 import { z } from 'zod';
 
@@ -62,6 +63,7 @@ export const envSchema = z.object({
     PaymentModule,
     DisruptionModule,
     AncillariesModule,
+    ProfileModule,
   ],
   controllers: [],
   providers: [],

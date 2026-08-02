@@ -24,8 +24,8 @@ describe('PassportExpiryBackfillService', () => {
         {
           provide: EncryptionService,
           useValue: {
-            encrypt: jest.fn(),
-            decrypt: jest.fn(),
+            encryptBound: jest.fn(),
+            decryptBound: jest.fn(),
           },
         },
       ],
@@ -46,8 +46,8 @@ describe('PassportExpiryBackfillService', () => {
     ];
     jest.spyOn(prisma.travelerProfile, 'findMany').mockResolvedValue(mockProfiles as any);
     jest.spyOn(prisma.travelerProfile, 'updateMany').mockResolvedValue({ count: 1 });
-    jest.spyOn(encryptionService, 'encrypt').mockReturnValue('v1:encrypted');
-    jest.spyOn(encryptionService, 'decrypt').mockReturnValue('2026-08-01');
+    jest.spyOn(encryptionService, 'encryptBound').mockReturnValue('v1:encrypted');
+    jest.spyOn(encryptionService, 'decryptBound').mockReturnValue('2026-08-01');
 
     const result = await service.backfill({ batchSize: 10 });
 
@@ -67,7 +67,7 @@ describe('PassportExpiryBackfillService', () => {
     jest.spyOn(prisma.travelerProfile, 'findMany').mockResolvedValue([]);
     const result = await service.backfill({ batchSize: 10 });
     expect(result.processed).toBe(0);
-    expect(encryptionService.encrypt).not.toHaveBeenCalled();
+    expect(encryptionService.encryptBound).not.toHaveBeenCalled();
   });
 
   it('handles CAS revision checks and increments skipped when updateMany affects 0 rows', async () => {
@@ -76,7 +76,7 @@ describe('PassportExpiryBackfillService', () => {
     ];
     jest.spyOn(prisma.travelerProfile, 'findMany').mockResolvedValue(mockProfiles as any);
     jest.spyOn(prisma.travelerProfile, 'updateMany').mockResolvedValue({ count: 0 }); // Concurrent change
-    jest.spyOn(encryptionService, 'encrypt').mockReturnValue('v1:encrypted');
+    jest.spyOn(encryptionService, 'encryptBound').mockReturnValue('v1:encrypted');
 
     const result = await service.backfill({ batchSize: 10 });
 
@@ -102,8 +102,8 @@ describe('PassportExpiryBackfillService', () => {
     ];
     jest.spyOn(prisma.travelerProfile, 'findMany').mockResolvedValue(mockProfiles as any);
     jest.spyOn(prisma.travelerProfile, 'updateMany').mockResolvedValue({ count: 1 });
-    jest.spyOn(encryptionService, 'encrypt').mockReturnValue('v1:encrypted');
-    jest.spyOn(encryptionService, 'decrypt').mockReturnValue('2027-08-01'); // Mismatch!
+    jest.spyOn(encryptionService, 'encryptBound').mockReturnValue('v1:encrypted');
+    jest.spyOn(encryptionService, 'decryptBound').mockReturnValue('2027-08-01'); // Mismatch!
 
     const result = await service.backfill({ batchSize: 10, abortThresholdRatio: 1.0 });
 
@@ -118,8 +118,8 @@ describe('PassportExpiryBackfillService', () => {
     ];
     jest.spyOn(prisma.travelerProfile, 'findMany').mockResolvedValue(mockProfiles as any);
     jest.spyOn(prisma.travelerProfile, 'updateMany').mockResolvedValue({ count: 1 });
-    jest.spyOn(encryptionService, 'encrypt').mockReturnValue('v1:encrypted');
-    jest.spyOn(encryptionService, 'decrypt').mockImplementation(() => {
+    jest.spyOn(encryptionService, 'encryptBound').mockReturnValue('v1:encrypted');
+    jest.spyOn(encryptionService, 'decryptBound').mockImplementation(() => {
       throw new Error('Decryption failed');
     });
 
@@ -152,8 +152,8 @@ describe('PassportExpiryBackfillService', () => {
       .mockResolvedValueOnce({ count: 1 })
       .mockResolvedValueOnce({ count: 0 });
 
-    jest.spyOn(encryptionService, 'encrypt').mockReturnValue('v1:encrypted');
-    jest.spyOn(encryptionService, 'decrypt')
+    jest.spyOn(encryptionService, 'encryptBound').mockReturnValue('v1:encrypted');
+    jest.spyOn(encryptionService, 'decryptBound')
       .mockReturnValueOnce('2026-08-01') // matches 1
       .mockReturnValueOnce('2026-08-02') // matches 2
       .mockReturnValueOnce('2027-08-03') // mismatch 3

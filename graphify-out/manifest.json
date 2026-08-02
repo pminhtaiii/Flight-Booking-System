@@ -325,8 +325,8 @@
     "semantic_hash": ""
   },
   "apps/api/src/app.module.ts": {
-    "mtime": 1785600811.5037768,
-    "ast_hash": "d60b2f958b512275946332da31f99506",
+    "mtime": 1785637291.8817348,
+    "ast_hash": "756bcd24cc7b1e6036cae468755c9068",
     "semantic_hash": ""
   },
   "apps/api/src/audit/audit.module.ts": {
@@ -690,7 +690,7 @@
     "semantic_hash": ""
   },
   "context/architecture.md": {
-    "mtime": 1785635883.8104534,
+    "mtime": 1785636382.6844468,
     "ast_hash": "7e4deb470dfae7bfd112d7354115735e",
     "semantic_hash": ""
   },
@@ -705,8 +705,8 @@
     "semantic_hash": ""
   },
   "context/progress-checker.md": {
-    "mtime": 1785635872.20751,
-    "ast_hash": "be5a03d9a1da36e84095128c4c41828b",
+    "mtime": 1785637492.7756135,
+    "ast_hash": "0bef957874af1a7fd800e9667e6cc964",
     "semantic_hash": ""
   },
   "context/project-overview.md": {
@@ -1325,12 +1325,12 @@
     "semantic_hash": ""
   },
   "apps/api/src/common/encryption.service.spec.ts": {
-    "mtime": 1785605427.5072744,
+    "mtime": 1785636382.6654263,
     "ast_hash": "ba305e8930a7e0d46974214004417176",
     "semantic_hash": ""
   },
   "apps/api/src/common/encryption.service.ts": {
-    "mtime": 1785605485.1410205,
+    "mtime": 1785636382.6674495,
     "ast_hash": "49d6409b3ebcb100471d3521dc1cf0c5",
     "semantic_hash": ""
   },
@@ -1480,7 +1480,7 @@
     "semantic_hash": ""
   },
   "apps/api/src/payment/payment.service.ts": {
-    "mtime": 1785635507.7667484,
+    "mtime": 1785636382.675447,
     "ast_hash": "96e72087f46f895c1b040492cfdc9bd8",
     "semantic_hash": ""
   },
@@ -7045,12 +7045,12 @@
     "semantic_hash": ""
   },
   "apps/api/src/payment/payment-ancillary-final-fixes.spec.ts": {
-    "mtime": 1785607724.528589,
+    "mtime": 1785636382.6704457,
     "ast_hash": "7d1127f7d6439a1cd474cfa64387d192",
     "semantic_hash": ""
   },
   "apps/api/src/payment/payment-ancillary-order-recovery.spec.ts": {
-    "mtime": 1785635770.9933703,
+    "mtime": 1785636382.6724465,
     "ast_hash": "65da092c235672c69db3ae9565b97d24",
     "semantic_hash": ""
   },
@@ -10180,28 +10180,43 @@
     "semantic_hash": ""
   },
   "specs/016a-traveler-profile-booking-readiness/tasks.md": {
-    "mtime": 1785635866.210666,
-    "ast_hash": "cb58206b548fbecbb9e94c8d5ed141d0",
+    "mtime": 1785636382.9589374,
+    "ast_hash": "6d0520d76ec930c4ecea484d31d4024a",
     "semantic_hash": ""
   },
   "apps/api/prisma/migrations/20260801174324_traveler_profile_readiness/migration.sql": {
-    "mtime": 1785606204.9103334,
-    "ast_hash": "9f1a51487bce4accf659c568ec19de9a",
+    "mtime": 1785636382.6478536,
+    "ast_hash": "dcff89316bc78b4ae8aa51b14660bcbd",
     "semantic_hash": ""
   },
   "apps/api/src/profile/passport-expiry-backfill.service.spec.ts": {
-    "mtime": 1785606475.3660505,
-    "ast_hash": "ff6fb2d8466cb24a6490d555c9674881",
+    "mtime": 1785637306.5497801,
+    "ast_hash": "c76757bff990f3efcee8632659800e43",
     "semantic_hash": ""
   },
   "apps/api/src/profile/passport-expiry-backfill.service.ts": {
-    "mtime": 1785606412.651592,
-    "ast_hash": "a7ac953c46373602652ed8b3f9263382",
+    "mtime": 1785637300.656894,
+    "ast_hash": "7803b5c11f3c887ead23b24f12e53282",
     "semantic_hash": ""
   },
   "apps/api/test/traveler-profile-readiness-migration.e2e-spec.ts": {
-    "mtime": 1785605341.910809,
-    "ast_hash": "5c5d788c8a518ce71c5739a29d42f64b",
+    "mtime": 1785636382.6814537,
+    "ast_hash": "08c0f9e15a7ebdc4f66cb6d6b8a46f27",
+    "semantic_hash": ""
+  },
+  "apps/api/src/profile/passport-expiry-backfill.controller.spec.ts": {
+    "mtime": 1785637328.7453046,
+    "ast_hash": "2c671855992b60984bcf2dcca96381f2",
+    "semantic_hash": ""
+  },
+  "apps/api/src/profile/passport-expiry-backfill.controller.ts": {
+    "mtime": 1785637296.7479186,
+    "ast_hash": "b7b00e99125792bd9be9be8ee8490959",
+    "semantic_hash": ""
+  },
+  "apps/api/src/profile/profile.module.ts": {
+    "mtime": 1785637288.998181,
+    "ast_hash": "be6481530c694a8ee59b681ee99d7e31",
     "semantic_hash": ""
   }
 }
