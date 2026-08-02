@@ -48,17 +48,17 @@
 
 ### RED tests
 
-- [ ] T013 [P] [US1] Write failing profile service tests for owner scoping, create/update, revision CAS, document atomicity, dual-write expiry, and safe audit metadata in `apps/api/src/profile/profile.service.spec.ts`
-- [ ] T014 [P] [US1] Write failing controller tests for DTO validation, no-store/private headers, sanitized errors, trace propagation, and disabled-flag behavior in `apps/api/src/profile/profile.controller.spec.ts`
-- [ ] T015 [P] [US1] Write failing authenticated profile API E2E tests including stale revision, disallowed origin, cross-user isolation, global log/filter redaction, and plaintext-at-rest assertions in `apps/api/test/profile.e2e-spec.ts`
+- [x] T013 [P] [US1] Write failing profile service tests for owner scoping, create/update, revision CAS, document atomicity, dual-write expiry, and safe audit metadata in `apps/api/src/profile/profile.service.spec.ts`
+- [x] T014 [P] [US1] Write failing controller tests for DTO validation, no-store/private headers, sanitized errors, trace propagation, and disabled-flag behavior in `apps/api/src/profile/profile.controller.spec.ts`
+- [x] T015 [P] [US1] Write failing authenticated profile API E2E tests including stale revision, disallowed origin, cross-user isolation, global log/filter redaction, and plaintext-at-rest assertions in `apps/api/test/profile.e2e-spec.ts`
 
 ### GREEN implementation
 
-- [ ] T016 [P] [US1] Implement nested identity/contact/document/preferences PATCH DTOs with complete-document validation in `apps/api/src/profile/dto/update-profile.dto.ts`
-- [ ] T017 [P] [US1] Implement full-profile and safe completion response DTOs in `apps/api/src/profile/dto/profile-response.dto.ts`
-- [ ] T018 [US1] Implement owned profile reads, revision CAS writes, dual-write protection, atomic document clearing/replacement, safe audits, and allowlisted profile read/update outcome events/metrics in `apps/api/src/profile/profile.service.ts`
-- [ ] T019 [US1] Implement guarded `GET/PATCH /api/profile`, feature behavior, no-store headers, trace context, and sanitized errors in `apps/api/src/profile/profile.controller.ts`
-- [ ] T020 [US1] Register `ProfileModule`, backfill provider, Prisma/audit/encryption dependencies, and app import in `apps/api/src/profile/profile.module.ts` and `apps/api/src/app.module.ts`
+- [x] T016 [P] [US1] Implement nested identity/contact/document/preferences PATCH DTOs with complete-document validation in `apps/api/src/profile/dto/update-profile.dto.ts`
+- [x] T017 [P] [US1] Implement full-profile and safe completion response DTOs in `apps/api/src/profile/dto/profile-response.dto.ts`
+- [x] T018 [US1] Implement owned profile reads, revision CAS writes, dual-write protection, atomic document clearing/replacement, safe audits, and allowlisted profile read/update outcome events/metrics in `apps/api/src/profile/profile.service.ts`
+- [x] T019 [US1] Implement guarded `GET/PATCH /api/profile`, feature behavior, no-store headers, trace context, and sanitized errors in `apps/api/src/profile/profile.controller.ts`
+- [x] T020 [US1] Register `ProfileModule`, backfill provider, Prisma/audit/encryption dependencies, and app import in `apps/api/src/profile/profile.module.ts` and `apps/api/src/app.module.ts`
 
 **Checkpoint**: US1 API acceptance scenarios and SC-001/SC-005 API boundaries pass independently.
 
