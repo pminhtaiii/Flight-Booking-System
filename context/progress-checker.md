@@ -8,7 +8,7 @@ Update this file after every completed feature. Any AI agent reading this should
 
 **Feature:** Traveler Profile & Booking Readiness (Feature 16)
 **Last completed:** Phase 3 / PR 3 (Owned Traveler Profile API) on branch `016d-owned-traveler-profile-api`.
-**Next:** Implement Phase 4: Secure Profile UI (Priority: P1). See [plan.md](file:///c:/Booking%20Systems/specs/016a-traveler-profile-booking-readiness/plan.md) for details.
+**Next:** Finish Phase 4 verification and privacy/contract tests. Phase 5 remains intentionally untouched. See [plan.md](file:///c:/Booking%20Systems/specs/016a-traveler-profile-booking-readiness/plan.md) for details.
 
 ---
 
@@ -19,6 +19,7 @@ Update this file after every completed feature. Any AI agent reading this should
 - [x] Phase 1 / PR 1: Setup — Shared Contracts, Flags, and Observability Vocabulary (implemented shared types for traveler profiles, passenger sources, readiness scopes, results, reason codes, profile sections, and masked summaries; added API and web feature flags `FEATURE_FLAG_BOOKING_READINESS` and `NEXT_PUBLIC_FEATURE_FLAG_BOOKING_READINESS` defaulting to false; created client helper `apps/web/lib/featureFlags.ts`; defined PII-safe operation names, metric names, and allowed metadata keys in `booking-readiness-observability.types.ts`; verified with configuration schema parser tests and contract allowlist validation tests)
 - [x] Phase 2 / PR 2: Additive Schema, Bound Encryption, and Migration Safety (implemented additive traveler profile and passenger snapshot database models and applied SQL migration safely preserving legacy data; added record-bound versioned AES-256-GCM encryption helper methods to EncryptionService with backward-compatibility for legacy unbound ciphertext; created idempotent data-quality backfill service with revision-checking CAS updates, mismatched-date validation quarantine, and abort thresholds; registered ProfileModule, PassportExpiryBackfillController, and a daily scheduled cron task for backfill execution; secured backfill encryption with context-bound AAD keys tied to travelerProfileId and fieldName; verified with a comprehensive migration compatibility E2E test suite, unit tests, and controller integration tests)
 - [x] Phase 3 / PR 3: Owned Traveler Profile API (implemented secure, owner-scoped `GET/PATCH /api/profile` endpoints with optimistic concurrency control (`revision` CAS checks), atomic travel document section replacement, versioned bound AES-256-GCM encryption for passport numbers and shadow expiry ciphertext, disagreement integrity checks for shadow reads, PII-safe audit logging with `changedFields` metadata, `Cache-Control: no-store, private` headers with ETag stripping, and `FEATURE_FLAG_BOOKING_READINESS` 404 behavior; verified with 38 unit tests and 5 E2E API tests all passing cleanly)
+- [ ] Phase 4 / PR 4: Secure Profile UI (protected `/profile`, server-side JWT proxy, one-page accessible form, optional travel-document section, revision conflict recovery, safe return-target allowlist, feature-disabled fallback, and Playwright owner/privacy coverage added; frontend typecheck passes; live E2E execution awaits healthy local services and profile-client contract tests remain)
 
 ### [ ] Feature: Ancillary Services — Seat Selection, Baggage & Price Tracker (Feature 15)
 
