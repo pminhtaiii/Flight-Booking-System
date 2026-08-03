@@ -94,14 +94,14 @@
 
 ### RED tests
 
-- [ ] T027 [P] [US2] Write the complete table-driven evaluator matrix with a fake clock in `apps/api/src/booking-intent/booking-readiness.evaluator.spec.ts`
-- [ ] T028 [P] [US2] Write failing tests that prove missing airport-country data yields blocking `UNKNOWN` while destination eligibility remains non-blocking unknown in `apps/api/src/booking-intent/booking-readiness.evaluator.spec.ts`
+- [x] T027 [P] [US2] Write the complete table-driven evaluator matrix with a fake clock in `apps/api/src/booking-intent/booking-readiness.evaluator.spec.ts`
+- [x] T028 [P] [US2] Write failing tests that prove missing airport-country data yields blocking `UNKNOWN` while destination eligibility remains non-blocking unknown in `apps/api/src/booking-intent/booking-readiness.evaluator.spec.ts`
 
 ### GREEN implementation
 
-- [ ] T029 [P] [US2] Define normalized evaluator inputs, section/field outputs, statuses, and safe reason codes in `apps/api/src/booking-intent/booking-readiness.types.ts`
-- [ ] T030 [US2] Implement the side-effect-free scope, identity, contact, atomic-document, expiry, and warning rules in `apps/api/src/booking-intent/booking-readiness.evaluator.ts`
-- [ ] T031 [US2] Parse and clamp `PASSPORT_ADVISORY_BUFFER_DAYS` with default 180 in `apps/api/src/booking-intent/booking-readiness.config.ts` and add it to `apps/api/.env.example`
+- [x] T029 [P] [US2] Define normalized evaluator inputs, section/field outputs, statuses, and safe reason codes in `apps/api/src/booking-intent/booking-readiness.types.ts`
+- [x] T030 [US2] Implement the side-effect-free scope, identity, contact, atomic-document, expiry, and warning rules in `apps/api/src/booking-intent/booking-readiness.evaluator.ts`
+- [x] T031 [US2] Parse and clamp `PASSPORT_ADVISORY_BUFFER_DAYS` with default 180 in `apps/api/src/booking-intent/booking-readiness.config.ts` and add it to `apps/api/.env.example`
 
 **Checkpoint**: US2 domain rules pass with no Prisma, HTTP, Redis, agent, or Duffel dependency.
 

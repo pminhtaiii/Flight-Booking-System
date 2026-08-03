@@ -8,7 +8,8 @@ Update this file after every completed feature. Any AI agent reading this should
 
 **Feature:** Traveler Profile & Booking Readiness (Feature 16)
 **Last completed:** Phase 3 / PR 3 (Owned Traveler Profile API) on branch `016d-owned-traveler-profile-api`.
-**Next:** Finish Phase 4 verification and privacy/contract tests. Phase 5 remains intentionally untouched. See [plan.md](file:///c:/Booking%20Systems/specs/016a-traveler-profile-booking-readiness/plan.md) for details.
+**In progress:** Phase 5 / `016f-pure-booking-readiness-evaluator` implementation is present and has passed static task review; focused Jest, API build, and booking-intent regression gates remain pending because the local dependency tree is incomplete and `jest` is unavailable on PATH.
+**Next:** Finish Phase 4 verification and Phase 5 runtime verification before marking T027–T031 complete. See [plan.md](file:///c:/Booking%20Systems/specs/016a-traveler-profile-booking-readiness/plan.md) for details.
 
 ---
 
@@ -20,6 +21,7 @@ Update this file after every completed feature. Any AI agent reading this should
 - [x] Phase 2 / PR 2: Additive Schema, Bound Encryption, and Migration Safety (implemented additive traveler profile and passenger snapshot database models and applied SQL migration safely preserving legacy data; added record-bound versioned AES-256-GCM encryption helper methods to EncryptionService with backward-compatibility for legacy unbound ciphertext; created idempotent data-quality backfill service with revision-checking CAS updates, mismatched-date validation quarantine, and abort thresholds; registered ProfileModule, PassportExpiryBackfillController, and a daily scheduled cron task for backfill execution; secured backfill encryption with context-bound AAD keys tied to travelerProfileId and fieldName; verified with a comprehensive migration compatibility E2E test suite, unit tests, and controller integration tests)
 - [x] Phase 3 / PR 3: Owned Traveler Profile API (implemented secure, owner-scoped `GET/PATCH /api/profile` endpoints with optimistic concurrency control (`revision` CAS checks), atomic travel document section replacement, versioned bound AES-256-GCM encryption for passport numbers and shadow expiry ciphertext, disagreement integrity checks for shadow reads, PII-safe audit logging with `changedFields` metadata, `Cache-Control: no-store, private` headers with ETag stripping, and `FEATURE_FLAG_BOOKING_READINESS` 404 behavior; verified with 38 unit tests and 5 E2E API tests all passing cleanly)
 - [ ] Phase 4 / PR 4: Secure Profile UI (protected `/profile`, server-side JWT proxy, one-page accessible form, optional travel-document section, revision conflict recovery, safe return-target allowlist, feature-disabled fallback, and Playwright owner/privacy coverage added; frontend typecheck passes; live E2E execution awaits healthy local services and profile-client contract tests remain)
+- [ ] Phase 5 / `016f-pure-booking-readiness-evaluator`: Pure normalized-input evaluator, deterministic domestic/international/unknown scope, atomic international document checks, date-only expiry warnings, deferred entry-eligibility projection, bounded advisory-buffer parsing, and table-driven boundary/purity tests are implemented. Runtime verification and task completion remain pending until the locked API dependencies are available.
 
 ### [ ] Feature: Ancillary Services — Seat Selection, Baggage & Price Tracker (Feature 15)
 
@@ -217,3 +219,4 @@ Update this file after every completed feature. Any AI agent reading this should
 - The test environment does not run PostgreSQL or Redis services locally. E2E tests use Jest spies on the PrismaClient instance to mock database states, keeping the API source code clean and genuine.
 - Fixed a double-increment of `paymentAttemptCount` on stale-lock retry of `createPayment` by querying for an existing Payment record before updating `booking_intents` (Step 2) and reusing the existing Payment record if found (Step 5).
 - Created a Mimo LLM diagnostic script (`apps/agent/src/agent/test_llm_connection.py`) allowing manual verification of API keys and endpoint connectivity directly from the terminal (securely prompts for keys via `getpass` and runs raw HTTP and LangChain tests).
+- Fixed backend runtime emission after the root type-check configuration enabled `noEmit`: API and shared-package build configs now explicitly emit JavaScript, preserving root type-check-only behavior and ensuring `apps/api/dist/main.js` exists for NestJS startup.
