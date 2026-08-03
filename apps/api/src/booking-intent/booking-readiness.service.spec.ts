@@ -246,6 +246,15 @@ function buildReadinessRequest(overrides: Partial<ReadinessRequest> = {}): Readi
           travelerProfileId: 'profile-owned',
         },
       },
+      {
+        offerPassengerId: 'pas_002',
+        passengerType: PassengerType.CHILD,
+        source: {
+          type: 'inline',
+          givenName: 'Companion',
+          familyName: 'Traveler',
+        },
+      },
     ],
     ...overrides,
   };
@@ -487,6 +496,12 @@ describe('BookingReadinessService RED slice', () => {
             givenName: 'Ada',
             email: 'ada@example.com',
           }),
+          expect.objectContaining({
+            passengerType: PassengerType.CHILD,
+            passengerOrdinal: 2,
+            profileRevision: null,
+            givenName: 'Companion',
+          }),
         ],
       }),
     );
@@ -520,6 +535,35 @@ describe('BookingReadinessService RED slice', () => {
     });
   });
 
+  it('rejects a subset of stored passengers with 422 PASSENGER_MAPPING_INVALID before evaluation', async () => {
+    const { service, mocks } = createServiceHarness();
+    const request = buildReadinessRequest({
+      passengers: [
+        {
+          offerPassengerId: 'pas_001',
+          passengerType: PassengerType.ADULT,
+          source: {
+            type: 'traveler_profile',
+            travelerProfileId: 'profile-owned',
+          },
+        },
+      ],
+    });
+
+    mocks.prisma.flightOffer = { findUnique: jest.fn().mockResolvedValue(buildStoredOffer()) } as unknown as jest.Mock;
+    mocks.profileService.getProfile.mockResolvedValue(buildOwnedProfile());
+
+    await expect(service.getAdvisoryReadiness('user-1', request)).rejects.toMatchObject({
+      response: expect.objectContaining({
+        code: 'PASSENGER_MAPPING_INVALID',
+      }),
+      status: 422,
+    });
+    expect(mocks.profileService.getProfile).not.toHaveBeenCalled();
+    expect(mocks.airportsService.findCountriesByIataCodes).not.toHaveBeenCalled();
+    expect(mocks.evaluator.evaluate).not.toHaveBeenCalled();
+  });
+
   it('evaluates inline passengers without reading a profile and returns null profile revisions', async () => {
     const { service, mocks } = createServiceHarness();
     const request = buildReadinessRequest({
@@ -545,6 +589,15 @@ describe('BookingReadinessService RED slice', () => {
             nationality: 'US',
           },
         },
+        {
+          offerPassengerId: 'pas_002',
+          passengerType: PassengerType.CHILD,
+          source: {
+            type: 'inline',
+            givenName: 'Child',
+            familyName: 'Traveler',
+          },
+        },
       ],
     });
 
@@ -567,6 +620,12 @@ describe('BookingReadinessService RED slice', () => {
           expect.objectContaining({
             profileRevision: null,
             givenName: 'Inline',
+          }),
+          expect.objectContaining({
+            passengerType: PassengerType.CHILD,
+            passengerOrdinal: 2,
+            profileRevision: null,
+            givenName: 'Child',
           }),
         ],
       }),

@@ -385,6 +385,7 @@ export class BookingReadinessService {
     if (
       requestedPassengers.length < 1 ||
       requestedPassengers.length > 9 ||
+      requestedPassengers.length !== storedPassengers.length ||
       adultCount < 1 ||
       infantCount > adultCount ||
       new Set(requestedIds).size !== requestedIds.length
