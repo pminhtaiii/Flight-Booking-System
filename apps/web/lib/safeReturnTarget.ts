@@ -22,7 +22,7 @@ export function getSafeReturnTarget(candidate: string | null | undefined, fallba
       return fallback;
     }
 
-    return target.pathname;
+    return `${target.pathname}${target.search}${target.hash}`;
   } catch {
     return fallback;
   }
