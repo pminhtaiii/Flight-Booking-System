@@ -2,9 +2,10 @@ import 'reflect-metadata';
 import { existsSync } from 'fs';
 import { join } from 'path';
 import { HttpException, NotFoundException } from '@nestjs/common';
+import { METHOD_METADATA, PATH_METADATA } from '@nestjs/common/constants';
 import { PassengerType } from '@prisma/client';
 import { plainToInstance } from 'class-transformer';
-import { validate } from 'class-validator';
+import { ValidationError, validate } from 'class-validator';
 import { BookingIntentController } from './booking-intent.controller';
 
 type ReadinessPassengerSource =
@@ -345,6 +346,48 @@ function collectMockCallPayloads(mockObject: LooseMock): string {
   );
 }
 
+function flattenValidationErrors(errors: ValidationError[], parentPath = ''): Array<{ path: string; constraints: string[] }> {
+  return errors.flatMap((error) => {
+    const currentPath = parentPath ? `${parentPath}.${error.property}` : error.property;
+    const ownConstraints = Object.keys(error.constraints ?? {}).map((constraint) => ({
+      path: currentPath,
+      constraint,
+    }));
+    const childConstraints = flattenValidationErrors(error.children ?? [], currentPath).map((entry) => ({
+      path: entry.path,
+      constraint: entry.constraints[0],
+    }));
+
+    return [...ownConstraints, ...childConstraints].map((entry) => ({
+      path: entry.path,
+      constraints: [entry.constraint],
+    }));
+  });
+}
+
+function requireCanonicalReadinessControllerClass(): new (...args: unknown[]) => object {
+  if (!existsSync(join(__dirname, 'booking-readiness.controller.ts')) && !existsSync(join(__dirname, 'booking-intent.controller.ts'))) {
+    throw missingImplementationError();
+  }
+
+  const controllerModulePath = join(projectRoot(), 'apps', 'api', 'src', 'booking-intent', 'booking-intent.controller');
+  const controllerModule = require(controllerModulePath) as {
+    BookingIntentsReadinessController?: new (...args: unknown[]) => object;
+    BookingReadinessController?: new (...args: unknown[]) => object;
+  };
+
+  const canonicalController =
+    controllerModule.BookingIntentsReadinessController ?? controllerModule.BookingReadinessController;
+
+  if (!canonicalController) {
+    throw new Error(
+      'Canonical plural readiness controller export is missing. Expected BookingIntentsReadinessController or BookingReadinessController.',
+    );
+  }
+
+  return canonicalController;
+}
+
 describe('BookingReadinessService RED slice', () => {
   afterEach(() => {
     jest.restoreAllMocks();
@@ -355,14 +398,16 @@ describe('BookingReadinessService RED slice', () => {
 
     const invalidPayloads = [
       {
-        case: 'missing source type',
+        expectedPath: 'passengers.0.source',
+        expectedConstraint: 'bookingReadinessPassengerSource',
         payload: {
           flightOfferId: '11111111-1111-4111-8111-111111111111',
           passengers: [{ offerPassengerId: 'pas_001', passengerType: PassengerType.ADULT, source: {} }],
         },
       },
       {
-        case: 'mixed source shapes',
+        expectedPath: 'passengers.0.source',
+        expectedConstraint: 'bookingReadinessPassengerSource',
         payload: {
           flightOfferId: '11111111-1111-4111-8111-111111111111',
           passengers: [
@@ -379,7 +424,8 @@ describe('BookingReadinessService RED slice', () => {
         },
       },
       {
-        case: 'infants exceed adults',
+        expectedPath: 'passengers',
+        expectedConstraint: 'hasValidPassengerMatrix',
         payload: {
           flightOfferId: '11111111-1111-4111-8111-111111111111',
           passengers: [
@@ -396,7 +442,16 @@ describe('BookingReadinessService RED slice', () => {
     for (const invalidPayload of invalidPayloads) {
       const dto = plainToInstance(BookingReadinessRequestDto, invalidPayload.payload);
       const errors = await validate(dto);
-      expect(errors.length).toBeGreaterThan(0);
+      const flattenedErrors = flattenValidationErrors(errors);
+
+      expect(flattenedErrors).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            path: invalidPayload.expectedPath,
+            constraints: expect.arrayContaining([invalidPayload.expectedConstraint]),
+          }),
+        ]),
+      );
     }
   });
 
@@ -456,13 +511,12 @@ describe('BookingReadinessService RED slice', () => {
     mocks.prisma.flightOffer = { findUnique: jest.fn().mockResolvedValue(buildStoredOffer()) } as unknown as jest.Mock;
     mocks.profileService.getProfile.mockResolvedValue(buildOwnedProfile({ profileId: 'profile-owned' }));
 
-    await expect(service.getAdvisoryReadiness('user-1', request)).rejects.toThrow(HttpException);
-
-    await service.getAdvisoryReadiness('user-1', request).catch((error: unknown) => {
-      expect(getHttpStatus(error)).toBe(422);
-      expect(getHttpCode(error)).toBe('PASSENGER_MAPPING_INVALID');
-      expect(JSON.stringify(error)).not.toContain('profile-foreign');
-      expect(JSON.stringify(error)).not.toContain('profile-owned');
+    await expect(service.getAdvisoryReadiness('user-1', request)).rejects.toMatchObject({
+      response: expect.objectContaining({
+        code: 'PASSENGER_MAPPING_INVALID',
+      }),
+      status: 422,
+      message: expect.not.stringContaining('profile-foreign'),
     });
   });
 
@@ -695,6 +749,21 @@ describe('BookingReadinessService RED slice', () => {
       expect.objectContaining({
         scope: 'UNKNOWN',
         ready: false,
+        passengers: [
+          expect.objectContaining({
+            sections: [
+              expect.objectContaining({
+                name: 'itinerary',
+                fields: [
+                  expect.objectContaining({
+                    reason: 'AIRPORT_COUNTRY_UNAVAILABLE',
+                    blocking: true,
+                  }),
+                ],
+              }),
+            ],
+          }),
+        ],
       }),
     );
   });
@@ -787,8 +856,15 @@ describe('BookingReadinessService RED slice', () => {
     expect(observabilityPayload).toContain('trace-phase6');
     expect(observabilityPayload).toContain('corr-phase6');
     expect(observabilityPayload).not.toContain('profile-owned');
+    expect(observabilityPayload).not.toContain('Ada');
+    expect(observabilityPayload).not.toContain('Lovelace');
+    expect(observabilityPayload).not.toContain('1990-01-01');
     expect(observabilityPayload).not.toContain('ada@example.com');
+    expect(observabilityPayload).not.toContain('+84');
+    expect(observabilityPayload).not.toContain('987654321');
     expect(observabilityPayload).not.toContain('P1234567');
+    expect(observabilityPayload).not.toContain('2032-02-15');
+    expect(observabilityPayload).not.toContain('VN');
     expect(observabilityPayload).not.toContain('pas_001');
   });
 });
@@ -798,7 +874,7 @@ describe('BookingIntentController advisory readiness RED slice', () => {
     jest.restoreAllMocks();
   });
 
-  it('preserves existing singular intent handlers while adding a readiness handler that forwards auth and trace context', async () => {
+  it('preserves existing singular intent handlers while requiring a canonical plural readiness controller boundary', async () => {
     const bookingIntentService = {
       createIntent: jest.fn(),
       getPrefill: jest.fn(),
@@ -806,7 +882,18 @@ describe('BookingIntentController advisory readiness RED slice', () => {
       getAdvisoryReadiness: jest.fn().mockResolvedValue({ scope: 'DOMESTIC', ready: true, passengers: [] }),
     };
 
-    const controller = new BookingIntentController(bookingIntentService as never) as BookingIntentController & {
+    const singularController = new BookingIntentController(bookingIntentService as never);
+    expect(typeof singularController.createIntent).toBe('function');
+    expect(typeof singularController.getPrefill).toBe('function');
+    expect(typeof singularController.getIntent).toBe('function');
+
+    const CanonicalReadinessController = requireCanonicalReadinessControllerClass();
+    const canonicalControllerPath = Reflect.getMetadata(PATH_METADATA, CanonicalReadinessController);
+    expect(canonicalControllerPath).toBe('bookings/intents');
+
+    const controller = instantiateWithNamedMocks(CanonicalReadinessController, {
+      BookingIntentService: bookingIntentService,
+    }) as {
       createReadiness?: (
         req: { user: { id: string } },
         headers: Record<string, string>,
@@ -814,11 +901,10 @@ describe('BookingIntentController advisory readiness RED slice', () => {
         res: { setHeader: jest.Mock; removeHeader: jest.Mock },
       ) => Promise<unknown>;
     };
-
-    expect(typeof controller.createIntent).toBe('function');
-    expect(typeof controller.getPrefill).toBe('function');
-    expect(typeof controller.getIntent).toBe('function');
     expect(typeof controller.createReadiness).toBe('function');
+
+    expect(Reflect.getMetadata(PATH_METADATA, controller.createReadiness as Function)).toBe('readiness');
+    expect(Reflect.getMetadata(METHOD_METADATA, controller.createReadiness as Function)).toBe(1);
 
     const response = {
       setHeader: jest.fn(),
