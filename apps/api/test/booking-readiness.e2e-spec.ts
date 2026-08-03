@@ -1,7 +1,7 @@
 process.env.ENCRYPTION_KEY = process.env.ENCRYPTION_KEY || 'a'.repeat(64);
 
 import { Test, TestingModule } from '@nestjs/testing';
-import { INestApplication, ValidationPipe } from '@nestjs/common';
+import { INestApplication, Logger, ValidationPipe } from '@nestjs/common';
 import request from 'supertest';
 import { AppModule } from '@/app.module';
 import { PrismaService } from '@/prisma/prisma.service';
@@ -10,6 +10,9 @@ import { ConfigService } from '@nestjs/config';
 import { HttpExceptionFilter } from '@/common/filters/http-exception.filter';
 import { DuffelService } from '@/duffel/duffel.service';
 import { EncryptionService } from '@/common/encryption.service';
+import { ProfileService } from '@/profile/profile.service';
+import { AuditService } from '@/audit/audit.service';
+import { AirportsService } from '@/airports/airports.service';
 import { PassengerType, Prisma } from '@prisma/client';
 
 type BootedApp = {
@@ -18,6 +21,9 @@ type BootedApp = {
   jwtService: JwtService;
   duffelService: DuffelService;
   encryptionService: EncryptionService;
+  profileService: ProfileService;
+  auditService: AuditService;
+  airportsService: AirportsService;
 };
 
 type AuthUser = {
@@ -91,6 +97,9 @@ async function bootstrapReadinessApp(featureFlag: 'true' | 'false'): Promise<Boo
     jwtService: moduleFixture.get(JwtService),
     duffelService: moduleFixture.get(DuffelService),
     encryptionService: moduleFixture.get(EncryptionService),
+    profileService: moduleFixture.get(ProfileService),
+    auditService: moduleFixture.get(AuditService),
+    airportsService: moduleFixture.get(AirportsService),
   };
 }
 
@@ -266,19 +275,84 @@ function inlinePassenger(overrides: Partial<ReadinessPassenger & { source: Recor
   } as ReadinessPassenger;
 }
 
+function extractStructuredLogPayloads(spy: jest.SpyInstance): Array<Record<string, unknown>> {
+  return spy.mock.calls
+    .map((call) => call[1])
+    .filter((payload): payload is string => typeof payload === 'string')
+    .map((payload) => {
+      try {
+        return JSON.parse(payload) as Record<string, unknown>;
+      } catch {
+        return {};
+      }
+    });
+}
+
+function expectNoPiiLeak(surface: string, forbiddenValues: Array<string | null | undefined>): void {
+  for (const forbiddenValue of forbiddenValues) {
+    if (!forbiddenValue) {
+      continue;
+    }
+
+    expect(surface).not.toContain(forbiddenValue);
+  }
+}
+
+async function assertPersistedAuditSurfaceIsPiiSafe(
+  prisma: PrismaService,
+  forbiddenValues: string[],
+  traceId?: string,
+  correlationId?: string,
+): Promise<void> {
+  const auditLogs = await prisma.auditLog.findMany({
+    orderBy: { createdAt: 'asc' },
+  });
+
+  for (const auditLog of auditLogs) {
+    const persistedSurface = JSON.stringify({
+      action: auditLog.action,
+      resourceType: auditLog.resourceType,
+      resourceId: auditLog.resourceId,
+      metadata: auditLog.metadata,
+      traceId: auditLog.traceId,
+      correlationId: auditLog.correlationId,
+    });
+
+    expectNoPiiLeak(persistedSurface, forbiddenValues);
+
+    if (
+      traceId &&
+      correlationId &&
+      (auditLog.action.toLowerCase().includes('readiness') ||
+        auditLog.resourceType.toLowerCase().includes('readiness'))
+    ) {
+      expect(auditLog.traceId).toBe(traceId);
+      expect(auditLog.correlationId).toBe(correlationId);
+      expect((auditLog.metadata as Record<string, unknown>)?.traceId).toBe(traceId);
+      expect((auditLog.metadata as Record<string, unknown>)?.correlationId).toBe(correlationId);
+    }
+  }
+}
+
 describe('Booking Readiness (E2E RED)', () => {
   jest.setTimeout(30000);
+
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
 
   describe('feature disabled', () => {
     let app: INestApplication;
     let prisma: PrismaService;
     let jwtService: JwtService;
+    let profileService: ProfileService;
 
     beforeAll(async () => {
       const booted = await bootstrapReadinessApp('false');
       app = booted.app;
       prisma = booted.prisma;
       jwtService = booted.jwtService;
+      profileService = booted.profileService;
     });
 
     afterAll(async () => {
@@ -291,6 +365,10 @@ describe('Booking Readiness (E2E RED)', () => {
 
     it('returns 404 FEATURE_DISABLED before touching data reads', async () => {
       const user = await createUser(prisma, jwtService, 'disabled-readiness@example.com');
+      const flightOfferFindUniqueSpy = jest.spyOn(prisma.flightOffer, 'findUnique');
+      const airportFindManySpy = jest.spyOn(prisma.airport, 'findMany');
+      const airportFindUniqueSpy = jest.spyOn(prisma.airport, 'findUnique');
+      const profileGetSpy = jest.spyOn(profileService, 'getProfile');
 
       const response = await request(app.getHttpServer())
         .post('/api/bookings/intents/readiness')
@@ -309,6 +387,10 @@ describe('Booking Readiness (E2E RED)', () => {
           code: 'FEATURE_DISABLED',
         }),
       );
+      expect(flightOfferFindUniqueSpy).not.toHaveBeenCalled();
+      expect(airportFindManySpy).not.toHaveBeenCalled();
+      expect(airportFindUniqueSpy).not.toHaveBeenCalled();
+      expect(profileGetSpy).not.toHaveBeenCalled();
       expect(await prisma.bookingIntent.count()).toBe(0);
       expect(await prisma.bookingIntentPassenger.count()).toBe(0);
     });
@@ -320,6 +402,7 @@ describe('Booking Readiness (E2E RED)', () => {
     let jwtService: JwtService;
     let duffelService: DuffelService;
     let encryptionService: EncryptionService;
+    let auditService: AuditService;
     let primaryUser: AuthUser;
     let foreignUser: AuthUser;
 
@@ -330,6 +413,7 @@ describe('Booking Readiness (E2E RED)', () => {
       jwtService = booted.jwtService;
       duffelService = booted.duffelService;
       encryptionService = booted.encryptionService;
+      auditService = booted.auditService;
     });
 
     afterAll(async () => {
@@ -348,12 +432,16 @@ describe('Booking Readiness (E2E RED)', () => {
       const offer = await seedReadinessOffer(prisma);
       const profile = await seedTravelerProfile(prisma, encryptionService, primaryUser.id);
       const duffelSpy = jest.spyOn((duffelService as any).duffel.offers, 'get');
+      const auditCreateLogSpy = jest.spyOn(auditService, 'createLog');
+      const loggerWarnSpy = jest.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
+      const traceId = 'trace-domestic-red';
+      const correlationId = 'corr-domestic-red';
 
       const response = await request(app.getHttpServer())
         .post('/api/bookings/intents/readiness')
         .set('Authorization', `Bearer ${primaryUser.token}`)
-        .set('x-trace-id', 'trace-domestic-red')
-        .set('x-correlation-id', 'corr-domestic-red')
+        .set('x-trace-id', traceId)
+        .set('x-correlation-id', correlationId)
         .send(readinessPayload(offer.id, [ownedProfilePassenger(profile.id)]));
 
       expect(response.status).toBe(200);
@@ -374,9 +462,72 @@ describe('Booking Readiness (E2E RED)', () => {
       );
       expect(JSON.stringify(response.body)).not.toContain(profile.id);
       expect(JSON.stringify(response.body)).not.toContain('Ada');
+      expect(JSON.stringify(response.body)).not.toContain(traceId);
+      expect(JSON.stringify(response.body)).not.toContain(correlationId);
       expect(await prisma.bookingIntent.count()).toBe(0);
       expect(await prisma.bookingIntentPassenger.count()).toBe(0);
       expect(duffelSpy).not.toHaveBeenCalled();
+
+      const auditLogCalls = auditCreateLogSpy.mock.calls;
+      for (const call of auditLogCalls) {
+        const auditPayload = call[1] as {
+          traceId?: string;
+          correlationId?: string;
+          metadata?: unknown;
+          resourceId?: string | null;
+        };
+        expect(auditPayload.traceId).toBe(traceId);
+        expect(auditPayload.correlationId).toBe(correlationId);
+        expectNoPiiLeak(JSON.stringify(auditPayload), [
+          profile.id,
+          offer.id,
+          'Ada',
+          'Lovelace',
+          '1990-01-01',
+          'ada@example.com',
+          '+84',
+          '987654321',
+          'P1234567',
+          '2035-12-31',
+          'VN',
+        ]);
+      }
+
+      const logPayloads = extractStructuredLogPayloads(loggerWarnSpy);
+      for (const logPayload of logPayloads) {
+        if (logPayload.service === 'api' && logPayload.metadata) {
+          expectNoPiiLeak(JSON.stringify(logPayload), [
+            profile.id,
+            offer.id,
+            'Ada',
+            'Lovelace',
+            '1990-01-01',
+            'ada@example.com',
+            '+84',
+            '987654321',
+            'P1234567',
+            '2035-12-31',
+          ]);
+        }
+      }
+
+      await assertPersistedAuditSurfaceIsPiiSafe(
+        prisma,
+        [
+          profile.id,
+          offer.id,
+          'Ada',
+          'Lovelace',
+          '1990-01-01',
+          'ada@example.com',
+          '+84',
+          '987654321',
+          'P1234567',
+          '2035-12-31',
+        ],
+        traceId,
+        correlationId,
+      );
     });
 
     it('returns an international readiness result with blocking document gaps and advisory passport warnings', async () => {
@@ -456,6 +607,13 @@ describe('Booking Readiness (E2E RED)', () => {
           ],
         }),
       );
+      expect(JSON.stringify(response.body)).not.toContain('Inline');
+      expect(JSON.stringify(response.body)).not.toContain('Traveler');
+      expect(JSON.stringify(response.body)).not.toContain('1992-03-04');
+      expect(JSON.stringify(response.body)).not.toContain('inline@example.com');
+      expect(JSON.stringify(response.body)).not.toContain('5551112222');
+      expect(JSON.stringify(response.body)).not.toContain('X1234567');
+      expect(JSON.stringify(response.body)).not.toContain('2030-08-21');
     });
 
     it('returns 200 UNKNOWN when airport-country reference data is missing and still creates no rows', async () => {
@@ -553,9 +711,15 @@ describe('Booking Readiness (E2E RED)', () => {
     });
 
     it('maps missing offers, expired offers, and malformed stored offers to safe HTTP outcomes', async () => {
+      const loggerWarnSpy = jest.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
+      const loggerErrorSpy = jest.spyOn(Logger.prototype, 'error').mockImplementation(() => undefined);
+      const traceId = 'trace-error-red';
+      const correlationId = 'corr-error-red';
       const missingOfferResponse = await request(app.getHttpServer())
         .post('/api/bookings/intents/readiness')
         .set('Authorization', `Bearer ${primaryUser.token}`)
+        .set('x-trace-id', traceId)
+        .set('x-correlation-id', correlationId)
         .send(readinessPayload('11111111-1111-4111-8111-111111111111', [inlinePassenger()]));
 
       expect(missingOfferResponse.status).toBe(404);
@@ -586,6 +750,8 @@ describe('Booking Readiness (E2E RED)', () => {
       const expiredOfferResponse = await request(app.getHttpServer())
         .post('/api/bookings/intents/readiness')
         .set('Authorization', `Bearer ${primaryUser.token}`)
+        .set('x-trace-id', traceId)
+        .set('x-correlation-id', correlationId)
         .send(readinessPayload(expiredOffer.id, [inlinePassenger()]));
 
       expect(expiredOfferResponse.status).toBe(409);
@@ -606,6 +772,8 @@ describe('Booking Readiness (E2E RED)', () => {
       const malformedOfferResponse = await request(app.getHttpServer())
         .post('/api/bookings/intents/readiness')
         .set('Authorization', `Bearer ${primaryUser.token}`)
+        .set('x-trace-id', traceId)
+        .set('x-correlation-id', correlationId)
         .send(readinessPayload(malformedOffer.id, [inlinePassenger()]));
 
       expect(malformedOfferResponse.status).toBe(503);
@@ -614,6 +782,85 @@ describe('Booking Readiness (E2E RED)', () => {
           code: 'READINESS_DEPENDENCY_UNAVAILABLE',
         }),
       );
+
+      const logPayloads = [
+        ...extractStructuredLogPayloads(loggerWarnSpy),
+        ...extractStructuredLogPayloads(loggerErrorSpy),
+      ];
+      expect(logPayloads).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            service: 'api',
+            trace_id: traceId,
+            correlation_id: correlationId,
+          }),
+        ]),
+      );
+
+      for (const logPayload of logPayloads) {
+        expectNoPiiLeak(JSON.stringify(logPayload), [
+          primaryUser.id,
+          'Inline',
+          'Traveler',
+          '1992-03-04',
+          'inline@example.com',
+          '+1',
+          '5551112222',
+          'X1234567',
+          '2034-04-01',
+          'US',
+        ]);
+      }
+
+      await assertPersistedAuditSurfaceIsPiiSafe(prisma, [
+        primaryUser.id,
+        'Inline',
+        'Traveler',
+        '1992-03-04',
+        'inline@example.com',
+        '+1',
+        '5551112222',
+        'X1234567',
+        '2034-04-01',
+      ]);
+    });
+
+    it('evaluates inline passengers without returning profile-backed metadata or echoing inline source payloads', async () => {
+      await seedAirport(prisma, 'SGN', 'VN');
+      await seedAirport(prisma, 'HAN', 'VN');
+      const offer = await seedReadinessOffer(prisma);
+
+      const response = await request(app.getHttpServer())
+        .post('/api/bookings/intents/readiness')
+        .set('Authorization', `Bearer ${primaryUser.token}`)
+        .send(readinessPayload(offer.id, [inlinePassenger()]));
+
+      expect(response.status).toBe(200);
+      expect(response.body).toEqual(
+        expect.objectContaining({
+          passengers: [
+            expect.objectContaining({
+              passengerOrdinal: 1,
+              passengerType: PassengerType.ADULT,
+              profileRevision: null,
+            }),
+          ],
+        }),
+      );
+
+      const responseSurface = JSON.stringify(response.body);
+      expect(response.body.passengers[0]).not.toHaveProperty('source');
+      expect(responseSurface).not.toContain('traveler_profile');
+      expect(responseSurface).not.toContain('inline');
+      expect(responseSurface).not.toContain('Inline');
+      expect(responseSurface).not.toContain('Traveler');
+      expect(responseSurface).not.toContain('1992-03-04');
+      expect(responseSurface).not.toContain('inline@example.com');
+      expect(responseSurface).not.toContain('+1');
+      expect(responseSurface).not.toContain('5551112222');
+      expect(responseSurface).not.toContain('X1234567');
+      expect(responseSurface).not.toContain('2034-04-01');
+      expect(responseSurface).not.toContain('US');
     });
 
     it('keeps existing singular booking intent routes functional while the canonical readiness route is added', async () => {
