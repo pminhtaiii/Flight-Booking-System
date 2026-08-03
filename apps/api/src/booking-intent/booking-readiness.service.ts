@@ -204,7 +204,7 @@ export class BookingReadinessService {
       const normalizedOffer = this.normalizeStoredOffer(flightOffer.rawOffer);
       this.validatePassengerMappings(dto.passengers, normalizedOffer.passengers);
 
-      const passengers = await this.resolvePassengers(dto.passengers, userId);
+      const passengers = await this.resolvePassengers(dto.passengers, normalizedOffer.passengers, userId);
       const countries = await this.airportsService.findCountriesByIataCodes(normalizedOffer.airportCodes);
       if (!(countries instanceof Map)) {
         throw new Error('Airport country lookup returned an invalid result');
@@ -403,15 +403,17 @@ export class BookingReadinessService {
 
   private async resolvePassengers(
     requestedPassengers: readonly BookingReadinessPassengerDto[],
+    storedPassengers: readonly StoredOfferPassenger[],
     userId: string,
   ): Promise<BookingReadinessPassengerInput[]> {
     let profile: RawRecord | null = null;
     const passengers: BookingReadinessPassengerInput[] = [];
 
-    for (const [index, passenger] of requestedPassengers.entries()) {
+    for (const passenger of requestedPassengers) {
+      const passengerOrdinal = storedPassengers.findIndex((p) => p.id === passenger.offerPassengerId) + 1;
       const source = passenger.source;
       if (source.type === 'inline') {
-        passengers.push(inlinePassenger(source, passenger, index + 1));
+        passengers.push(inlinePassenger(source, passenger, passengerOrdinal));
         continue;
       }
 
@@ -430,7 +432,7 @@ export class BookingReadinessService {
         throw httpError('PASSENGER_MAPPING_INVALID', 'Passenger mapping is invalid', HttpStatus.UNPROCESSABLE_ENTITY);
       }
 
-      passengers.push(profilePassenger(source, profile, passenger, index + 1));
+      passengers.push(profilePassenger(source, profile, passenger, passengerOrdinal));
     }
 
     return passengers;
