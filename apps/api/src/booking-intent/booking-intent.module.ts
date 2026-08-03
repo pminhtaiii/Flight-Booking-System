@@ -11,6 +11,8 @@ import { BookingIntentCron } from './booking-intent.cron';
 import { BookingReadinessEvaluator } from './booking-readiness.evaluator';
 import { BookingReadinessObservability } from './booking-readiness.observability';
 import { BookingReadinessService } from './booking-readiness.service';
+import { PassengerSourceResolverService } from './passenger-source-resolver.service';
+import { PassengerSnapshotService } from './passenger-snapshot.service';
 
 @Module({
   imports: [PrismaModule, DuffelModule, AuditModule, AirportsModule, ProfileModule],
@@ -20,9 +22,11 @@ import { BookingReadinessService } from './booking-readiness.service';
     BookingReadinessService,
     BookingReadinessEvaluator,
     BookingReadinessObservability,
+    PassengerSourceResolverService,
+    PassengerSnapshotService,
     EncryptionService,
     BookingIntentCron,
   ],
-  exports: [BookingIntentService],
+  exports: [BookingIntentService, PassengerSourceResolverService, PassengerSnapshotService],
 })
 export class BookingIntentModule {}
