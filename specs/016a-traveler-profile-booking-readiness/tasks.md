@@ -138,16 +138,16 @@
 
 ### RED tests
 
-- [ ] T039 [P] [US3] Write failing DTO tests for `traveler_profile`/`inline`, expected revision, passenger matrix, offer passenger ID, and `useProfile + source` conflict in `apps/api/src/booking-intent/dto/create-intent.dto.spec.ts`
-- [ ] T040 [P] [US3] Write failing source resolver tests for ownership, stale revision, mixed passengers, and no inline/profile value merging in `apps/api/src/booking-intent/passenger-source-resolver.service.spec.ts`
-- [ ] T041 [P] [US3] Write failing snapshot builder tests for completeness, AES AAD, cross-position/intent swaps, masked summaries, immutable provenance, and snapshot survival after source-profile deletion in `apps/api/src/booking-intent/passenger-snapshot.service.spec.ts`
+- [x] T039 [P] [US3] Write failing DTO tests for `traveler_profile`/`inline`, expected revision, passenger matrix, offer passenger ID, and `useProfile + source` conflict in `apps/api/src/booking-intent/dto/create-intent.dto.spec.ts`
+- [x] T040 [P] [US3] Write failing source resolver tests for ownership, stale revision, mixed passengers, and no inline/profile value merging in `apps/api/src/booking-intent/passenger-source-resolver.service.spec.ts`
+- [x] T041 [P] [US3] Write failing snapshot builder tests for completeness, AES AAD, cross-position/intent swaps, masked summaries, immutable provenance, and snapshot survival after source-profile deletion in `apps/api/src/booking-intent/passenger-snapshot.service.spec.ts`
 
 ### GREEN implementation
 
-- [ ] T042 [US3] Replace the legacy passenger DTO with nested discriminated sources and expected revision in `apps/api/src/booking-intent/dto/create-intent.dto.ts`
-- [ ] T043 [US3] Implement owned/revision-checked source normalization in `apps/api/src/booking-intent/passenger-source-resolver.service.ts`
-- [ ] T044 [US3] Implement preallocated-position AAD encryption, complete snapshot persistence data, and masked projections in `apps/api/src/booking-intent/passenger-snapshot.service.ts`
-- [ ] T045 [US3] Register source/snapshot providers without changing current create behavior in `apps/api/src/booking-intent/booking-intent.module.ts`
+- [x] T042 [US3] Replace the legacy passenger DTO with nested discriminated sources and expected revision in `apps/api/src/booking-intent/dto/create-intent.dto.ts`
+- [x] T043 [US3] Implement owned/revision-checked source normalization in `apps/api/src/booking-intent/passenger-source-resolver.service.ts`
+- [x] T044 [US3] Implement preallocated-position AAD encryption, complete snapshot persistence data, and masked projections in `apps/api/src/booking-intent/passenger-snapshot.service.ts`
+- [x] T045 [US3] Register source/snapshot providers without changing current create behavior in `apps/api/src/booking-intent/booking-intent.module.ts`
 
 **Checkpoint**: Source and snapshot components are independently green before they replace legacy intent orchestration.
 

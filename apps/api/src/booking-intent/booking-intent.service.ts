@@ -12,7 +12,7 @@ import { PrismaService } from '@/prisma/prisma.service';
 import { DuffelService, DuffelTimeoutError } from '@/duffel/duffel.service';
 import { AuditService } from '@/audit/audit.service';
 import { EncryptionService } from '@/common/encryption.service';
-import { CreateIntentDto, CreateIntentPassengerDto } from './dto/create-intent.dto';
+import { CreateIntentDto } from './dto/create-intent.dto';
 import { BookingReadinessRequestDto } from './dto/booking-readiness.dto';
 import { BookingReadinessService } from './booking-readiness.service';
 import {
@@ -21,7 +21,25 @@ import {
   GetBookingIntentResponseDto,
 } from './dto/intent-response.dto';
 
-type ResolvedIntentPassenger = CreateIntentPassengerDto & {
+/**
+ * The existing create transaction still consumes the legacy flat shape until
+ * Phase 8 wires the resolver and snapshot builder into it. Keep that internal
+ * shape explicit so the canonical request DTO cannot accidentally re-expose
+ * flat fields through validation.
+ */
+type LegacyIntentPassenger = {
+  type: PassengerType;
+  givenName: string;
+  familyName: string;
+  dateOfBirth: string;
+  gender: string;
+  nationality?: string;
+  passportNumber?: string;
+  passportExpiry?: string;
+  useProfile?: boolean;
+};
+
+type ResolvedIntentPassenger = LegacyIntentPassenger & {
   travelerProfileId?: string;
 };
 
@@ -70,7 +88,10 @@ export class BookingIntentService {
       );
     }
 
-    const mergedPassengers = await this.applyPrimaryPassengerPrefill(userId, dto.passengers);
+    const mergedPassengers = await this.applyPrimaryPassengerPrefill(
+      userId,
+      dto.passengers as unknown as LegacyIntentPassenger[],
+    );
     this.validatePassengerCountAgainstOffer(mergedPassengers, {
       adults: flightOffer.adults,
       children: flightOffer.children,
@@ -314,7 +335,7 @@ export class BookingIntentService {
 
   private async applyPrimaryPassengerPrefill(
     userId: string,
-    passengers: CreateIntentPassengerDto[],
+    passengers: LegacyIntentPassenger[],
   ): Promise<ResolvedIntentPassenger[]> {
     const merged: ResolvedIntentPassenger[] = passengers.map((passenger) => ({ ...passenger }));
 
