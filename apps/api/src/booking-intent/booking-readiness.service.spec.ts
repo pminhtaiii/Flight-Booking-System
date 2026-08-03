@@ -1,0 +1,849 @@
+import 'reflect-metadata';
+import { existsSync } from 'fs';
+import { join } from 'path';
+import { HttpException, NotFoundException } from '@nestjs/common';
+import { PassengerType } from '@prisma/client';
+import { plainToInstance } from 'class-transformer';
+import { validate } from 'class-validator';
+import { BookingIntentController } from './booking-intent.controller';
+
+type ReadinessPassengerSource =
+  | {
+      type: 'traveler_profile';
+      travelerProfileId: string;
+      expectedProfileRevision?: number;
+    }
+  | {
+      type: 'inline';
+      givenName?: string | null;
+      middleName?: string | null;
+      familyName?: string | null;
+      dateOfBirth?: string | null;
+      gender?: string | null;
+      title?: string | null;
+      email?: string | null;
+      phoneCountryCode?: string | null;
+      phoneNumber?: string | null;
+      documentType?: string | null;
+      passportNumber?: string | null;
+      passportExpiry?: string | null;
+      issuingCountry?: string | null;
+      nationality?: string | null;
+    };
+
+type ReadinessPassengerRequest = {
+  offerPassengerId: string;
+  passengerType: PassengerType;
+  source: ReadinessPassengerSource;
+};
+
+type ReadinessRequest = {
+  flightOfferId: string;
+  passengers: ReadinessPassengerRequest[];
+};
+
+type ProfileResponseFixture = {
+  profileId: string | null;
+  revision: number;
+  identity: {
+    givenName: string | null;
+    middleName: string | null;
+    familyName: string | null;
+    dateOfBirth: string | null;
+    gender: string | null;
+    title: string | null;
+  } | null;
+  contact: {
+    email: string | null;
+    phoneCountryCode: string | null;
+    phoneNumber: string | null;
+  } | null;
+  travelDocument: {
+    documentType: string | null;
+    passportNumber: string | null;
+    passportExpiry: string | null;
+    issuingCountry: string | null;
+    nationality: string | null;
+  } | null;
+};
+
+type LooseMock = Record<string, any>;
+
+type ServiceHarness = {
+  service: {
+    getAdvisoryReadiness: (
+      userId: string,
+      dto: ReadinessRequest,
+      context?: { traceId?: string; correlationId?: string },
+    ) => Promise<unknown>;
+  };
+  mocks: {
+    prisma: LooseMock;
+    profileService: LooseMock;
+    airportsService: LooseMock;
+    evaluator: LooseMock;
+    observability: LooseMock;
+    configService: LooseMock;
+    duffelService: LooseMock;
+    auditService: LooseMock;
+  };
+};
+
+function projectRoot(): string {
+  return join(__dirname, '..', '..', '..', '..');
+}
+
+function advisoryImplementationPaths() {
+  return [
+    join(__dirname, 'booking-readiness.service.ts'),
+    join(__dirname, 'dto', 'booking-readiness.dto.ts'),
+    join(__dirname, 'booking-readiness.observability.ts'),
+  ];
+}
+
+function missingImplementationError(): Error {
+  const missingPaths = advisoryImplementationPaths().filter((filePath) => !existsSync(filePath));
+  return new Error(
+    `Phase 6 advisory readiness endpoint is not implemented yet. Missing artifacts: ${missingPaths.join(', ')}`,
+  );
+}
+
+function createLooseMock(): LooseMock {
+  return new Proxy(
+    {} as Record<string, any>,
+    {
+      get(target: Record<string, any>, property: string) {
+        if (!(property in target)) {
+          target[property] = jest.fn();
+        }
+        return target[property];
+      },
+    },
+  ) as LooseMock;
+}
+
+function instantiateWithNamedMocks<T>(ClassRef: new (...args: unknown[]) => T, namedMocks: Record<string, unknown>): T {
+  const constructorParamTypes = (Reflect.getMetadata('design:paramtypes', ClassRef) as Array<{ name?: string }>) ?? [];
+
+  if (constructorParamTypes.length === 0) {
+    throw new Error(`${ClassRef.name} constructor metadata is unavailable for test instantiation`);
+  }
+
+  const constructorArgs = constructorParamTypes.map((paramType) => {
+    const tokenName = paramType?.name;
+    if (tokenName && tokenName in namedMocks) {
+      return namedMocks[tokenName];
+    }
+    return createLooseMock();
+  });
+
+  return new ClassRef(...constructorArgs);
+}
+
+function requireAdvisoryServiceClass(): new (...args: unknown[]) => ServiceHarness['service'] {
+  if (!advisoryImplementationPaths().every((filePath) => existsSync(filePath))) {
+    throw missingImplementationError();
+  }
+
+  const serviceModulePath = join(projectRoot(), 'apps', 'api', 'src', 'booking-intent', 'booking-readiness.service');
+  const serviceModule = require(serviceModulePath) as { BookingReadinessService?: new (...args: unknown[]) => ServiceHarness['service'] };
+  if (!serviceModule.BookingReadinessService) {
+    throw new Error('BookingReadinessService export is missing from booking-readiness.service.ts');
+  }
+  return serviceModule.BookingReadinessService;
+}
+
+function requireReadinessRequestDtoClass(): new () => object {
+  if (!advisoryImplementationPaths().every((filePath) => existsSync(filePath))) {
+    throw missingImplementationError();
+  }
+
+  const dtoModulePath = join(projectRoot(), 'apps', 'api', 'src', 'booking-intent', 'dto', 'booking-readiness.dto');
+  const dtoModule = require(dtoModulePath) as { BookingReadinessRequestDto?: new () => object };
+  if (!dtoModule.BookingReadinessRequestDto) {
+    throw new Error('BookingReadinessRequestDto export is missing from booking-readiness.dto.ts');
+  }
+  return dtoModule.BookingReadinessRequestDto;
+}
+
+function buildOwnedProfile(overrides: Partial<ProfileResponseFixture> = {}): ProfileResponseFixture {
+  return {
+    profileId: 'profile-owned',
+    revision: 3,
+    identity: {
+      givenName: 'Ada',
+      middleName: null,
+      familyName: 'Lovelace',
+      dateOfBirth: '1990-01-01',
+      gender: 'female',
+      title: 'Ms',
+    },
+    contact: {
+      email: 'ada@example.com',
+      phoneCountryCode: '+84',
+      phoneNumber: '987654321',
+    },
+    travelDocument: {
+      documentType: 'passport',
+      passportNumber: 'P1234567',
+      passportExpiry: '2032-02-15',
+      issuingCountry: 'VN',
+      nationality: 'VN',
+    },
+    ...overrides,
+  };
+}
+
+function buildStoredOffer(overrides: Record<string, unknown> = {}): Record<string, unknown> {
+  return {
+    id: 'offer-11111111-1111-4111-8111-111111111111',
+    rawOffer: {
+      expires_at: '2030-08-10T15:45:00Z',
+      passengers: [
+        { id: 'pas_001', type: 'adult' },
+        { id: 'pas_002', type: 'child' },
+      ],
+      slices: [
+        {
+          segments: [
+            {
+              origin: { iata_code: 'sgn' },
+              destination: { iata_code: 'hnl' },
+              arriving_at: '2030-08-15T13:00:00Z',
+            },
+            {
+              origin: { iata_code: 'HNL' },
+              destination: { iata_code: 'LAX' },
+              arriving_at: '2030-08-15T22:30:00Z',
+            },
+          ],
+        },
+        {
+          segments: [
+            {
+              origin: { iata_code: 'LAX' },
+              destination: { iata_code: 'SGN' },
+              arriving_at: '2030-08-20T05:45:00Z',
+            },
+          ],
+        },
+      ],
+    },
+    ...overrides,
+  };
+}
+
+function buildReadinessRequest(overrides: Partial<ReadinessRequest> = {}): ReadinessRequest {
+  return {
+    flightOfferId: '11111111-1111-4111-8111-111111111111',
+    passengers: [
+      {
+        offerPassengerId: 'pas_001',
+        passengerType: PassengerType.ADULT,
+        source: {
+          type: 'traveler_profile',
+          travelerProfileId: 'profile-owned',
+        },
+      },
+    ],
+    ...overrides,
+  };
+}
+
+function createSuccessReadinessResult(profileRevision: number | null) {
+  return {
+    scope: 'INTERNATIONAL',
+    ready: true,
+    passengers: [
+      {
+        passengerType: PassengerType.ADULT,
+        passengerOrdinal: 1,
+        ready: true,
+        profileRevision,
+        sections: [
+          {
+            name: 'identity',
+            fields: [{ name: 'givenName', status: 'filled', reason: null, blocking: false }],
+          },
+        ],
+      },
+    ],
+  };
+}
+
+function createServiceHarness(): ServiceHarness {
+  const ServiceClass = requireAdvisoryServiceClass();
+  const prisma = createLooseMock();
+  const profileService = createLooseMock();
+  const airportsService = createLooseMock();
+  const evaluator = createLooseMock();
+  const observability = createLooseMock();
+  const configService = createLooseMock();
+  const duffelService = createLooseMock();
+  const auditService = createLooseMock();
+
+  configService.get.mockImplementation((key: string) => {
+    if (key === 'FEATURE_FLAG_BOOKING_READINESS') {
+      return 'true';
+    }
+    return undefined;
+  });
+
+  const service = instantiateWithNamedMocks(ServiceClass, {
+    PrismaService: prisma,
+    ProfileService: profileService,
+    AirportsService: airportsService,
+    BookingReadinessEvaluator: evaluator,
+    BookingReadinessObservability: observability,
+    ConfigService: configService,
+    DuffelService: duffelService,
+    AuditService: auditService,
+  });
+
+  if (typeof service.getAdvisoryReadiness !== 'function') {
+    throw new Error('BookingReadinessService.getAdvisoryReadiness is not implemented yet');
+  }
+
+  return {
+    service,
+    mocks: {
+      prisma,
+      profileService,
+      airportsService,
+      evaluator,
+      observability,
+      configService,
+      duffelService,
+      auditService,
+    },
+  };
+}
+
+function getHttpStatus(error: unknown): number | null {
+  if (!(error instanceof HttpException)) {
+    return null;
+  }
+  return error.getStatus();
+}
+
+function getHttpCode(error: unknown): string | null {
+  if (!(error instanceof HttpException)) {
+    return null;
+  }
+  const response = error.getResponse();
+  if (typeof response === 'string') {
+    return response;
+  }
+  return typeof response === 'object' && response !== null && 'code' in response
+    ? String((response as { code: unknown }).code)
+    : null;
+}
+
+function collectMockCallPayloads(mockObject: LooseMock): string {
+  return JSON.stringify(
+    Object.values(mockObject).flatMap((mockFn) => mockFn.mock.calls),
+  );
+}
+
+describe('BookingReadinessService RED slice', () => {
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
+  it('validates the passenger source discriminated union and invalid passenger matrix', async () => {
+    const BookingReadinessRequestDto = requireReadinessRequestDtoClass();
+
+    const invalidPayloads = [
+      {
+        case: 'missing source type',
+        payload: {
+          flightOfferId: '11111111-1111-4111-8111-111111111111',
+          passengers: [{ offerPassengerId: 'pas_001', passengerType: PassengerType.ADULT, source: {} }],
+        },
+      },
+      {
+        case: 'mixed source shapes',
+        payload: {
+          flightOfferId: '11111111-1111-4111-8111-111111111111',
+          passengers: [
+            {
+              offerPassengerId: 'pas_001',
+              passengerType: PassengerType.ADULT,
+              source: {
+                type: 'traveler_profile',
+                travelerProfileId: 'profile-owned',
+                givenName: 'Ada',
+              },
+            },
+          ],
+        },
+      },
+      {
+        case: 'infants exceed adults',
+        payload: {
+          flightOfferId: '11111111-1111-4111-8111-111111111111',
+          passengers: [
+            {
+              offerPassengerId: 'pas_001',
+              passengerType: PassengerType.INFANT,
+              source: { type: 'inline', givenName: 'Baby' },
+            },
+          ],
+        },
+      },
+    ];
+
+    for (const invalidPayload of invalidPayloads) {
+      const dto = plainToInstance(BookingReadinessRequestDto, invalidPayload.payload);
+      const errors = await validate(dto);
+      expect(errors.length).toBeGreaterThan(0);
+    }
+  });
+
+  it('resolves an owned traveler profile source and projects the evaluated profile revision', async () => {
+    const { service, mocks } = createServiceHarness();
+    const request = buildReadinessRequest();
+    const storedOffer = buildStoredOffer();
+
+    mocks.prisma.flightOffer = { findUnique: jest.fn().mockResolvedValue(storedOffer) } as unknown as jest.Mock;
+    mocks.profileService.getProfile.mockResolvedValue(buildOwnedProfile());
+    mocks.airportsService.findCountriesByIataCodes.mockResolvedValue(
+      new Map([
+        ['SGN', 'VN'],
+        ['HNL', 'US'],
+        ['LAX', 'US'],
+      ]),
+    );
+    mocks.evaluator.evaluate.mockReturnValue(createSuccessReadinessResult(3));
+
+    const result = await service.getAdvisoryReadiness('user-1', request, {
+      traceId: 'trace-123',
+      correlationId: 'corr-123',
+    });
+
+    expect(mocks.profileService.getProfile).toHaveBeenCalledWith('user-1');
+    expect(mocks.evaluator.evaluate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        passengers: [
+          expect.objectContaining({
+            passengerType: PassengerType.ADULT,
+            passengerOrdinal: 1,
+            profileRevision: 3,
+            givenName: 'Ada',
+            email: 'ada@example.com',
+          }),
+        ],
+      }),
+    );
+    expect(result).toEqual(createSuccessReadinessResult(3));
+  });
+
+  it('rejects foreign traveler profile ids with a safe passenger-mapping error that does not leak profile ids', async () => {
+    const { service, mocks } = createServiceHarness();
+    const request = buildReadinessRequest({
+      passengers: [
+        {
+          offerPassengerId: 'pas_001',
+          passengerType: PassengerType.ADULT,
+          source: {
+            type: 'traveler_profile',
+            travelerProfileId: 'profile-foreign',
+          },
+        },
+      ],
+    });
+
+    mocks.prisma.flightOffer = { findUnique: jest.fn().mockResolvedValue(buildStoredOffer()) } as unknown as jest.Mock;
+    mocks.profileService.getProfile.mockResolvedValue(buildOwnedProfile({ profileId: 'profile-owned' }));
+
+    await expect(service.getAdvisoryReadiness('user-1', request)).rejects.toThrow(HttpException);
+
+    await service.getAdvisoryReadiness('user-1', request).catch((error: unknown) => {
+      expect(getHttpStatus(error)).toBe(422);
+      expect(getHttpCode(error)).toBe('PASSENGER_MAPPING_INVALID');
+      expect(JSON.stringify(error)).not.toContain('profile-foreign');
+      expect(JSON.stringify(error)).not.toContain('profile-owned');
+    });
+  });
+
+  it('evaluates inline passengers without reading a profile and returns null profile revisions', async () => {
+    const { service, mocks } = createServiceHarness();
+    const request = buildReadinessRequest({
+      passengers: [
+        {
+          offerPassengerId: 'pas_001',
+          passengerType: PassengerType.ADULT,
+          source: {
+            type: 'inline',
+            givenName: 'Inline',
+            middleName: null,
+            familyName: 'Traveler',
+            dateOfBirth: '1992-03-04',
+            gender: 'male',
+            title: 'Mr',
+            email: 'inline@example.com',
+            phoneCountryCode: '+1',
+            phoneNumber: '5551112222',
+            documentType: 'passport',
+            passportNumber: 'X1234567',
+            passportExpiry: '2031-01-01',
+            issuingCountry: 'US',
+            nationality: 'US',
+          },
+        },
+      ],
+    });
+
+    mocks.prisma.flightOffer = { findUnique: jest.fn().mockResolvedValue(buildStoredOffer()) } as unknown as jest.Mock;
+    mocks.airportsService.findCountriesByIataCodes.mockResolvedValue(
+      new Map([
+        ['SGN', 'VN'],
+        ['HNL', 'US'],
+        ['LAX', 'US'],
+      ]),
+    );
+    mocks.evaluator.evaluate.mockReturnValue(createSuccessReadinessResult(null));
+
+    const result = await service.getAdvisoryReadiness('user-1', request);
+
+    expect(mocks.profileService.getProfile).not.toHaveBeenCalled();
+    expect(mocks.evaluator.evaluate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        passengers: [
+          expect.objectContaining({
+            profileRevision: null,
+            givenName: 'Inline',
+          }),
+        ],
+      }),
+    );
+    expect(result).toEqual(createSuccessReadinessResult(null));
+  });
+
+  it('returns a safe incomplete readiness result for an owned profile with missing fields', async () => {
+    const { service, mocks } = createServiceHarness();
+
+    mocks.prisma.flightOffer = { findUnique: jest.fn().mockResolvedValue(buildStoredOffer()) } as unknown as jest.Mock;
+    mocks.profileService.getProfile.mockResolvedValue(
+      buildOwnedProfile({
+        identity: {
+          givenName: null,
+          middleName: null,
+          familyName: null,
+          dateOfBirth: null,
+          gender: null,
+          title: null,
+        },
+        contact: null,
+        travelDocument: null,
+      }),
+    );
+    mocks.airportsService.findCountriesByIataCodes.mockResolvedValue(
+      new Map([
+        ['SGN', 'VN'],
+        ['HNL', 'US'],
+        ['LAX', 'US'],
+      ]),
+    );
+    mocks.evaluator.evaluate.mockReturnValue({
+      scope: 'INTERNATIONAL',
+      ready: false,
+      passengers: [
+        {
+          passengerType: PassengerType.ADULT,
+          passengerOrdinal: 1,
+          ready: false,
+          profileRevision: 3,
+          sections: [
+            {
+              name: 'identity',
+              fields: [{ name: 'givenName', status: 'missing', reason: 'REQUIRED', blocking: true }],
+            },
+          ],
+        },
+      ],
+    });
+
+    const result = await service.getAdvisoryReadiness('user-1', buildReadinessRequest());
+
+    expect(result).toEqual(
+      expect.objectContaining({
+        ready: false,
+        passengers: [expect.objectContaining({ profileRevision: 3, ready: false })],
+      }),
+    );
+  });
+
+  it('rejects duplicate, missing, mismatched, and invalid passenger mappings with 422 PASSENGER_MAPPING_INVALID', async () => {
+    const { service, mocks } = createServiceHarness();
+    mocks.prisma.flightOffer = { findUnique: jest.fn().mockResolvedValue(buildStoredOffer()) } as unknown as jest.Mock;
+    mocks.profileService.getProfile.mockResolvedValue(buildOwnedProfile());
+
+    const invalidRequests: ReadinessRequest[] = [
+      buildReadinessRequest({
+        passengers: [
+          {
+            offerPassengerId: 'pas_001',
+            passengerType: PassengerType.ADULT,
+            source: { type: 'traveler_profile', travelerProfileId: 'profile-owned' },
+          },
+          {
+            offerPassengerId: 'pas_001',
+            passengerType: PassengerType.ADULT,
+            source: { type: 'traveler_profile', travelerProfileId: 'profile-owned' },
+          },
+        ],
+      }),
+      buildReadinessRequest({
+        passengers: [
+          {
+            offerPassengerId: 'pas_missing',
+            passengerType: PassengerType.ADULT,
+            source: { type: 'traveler_profile', travelerProfileId: 'profile-owned' },
+          },
+        ],
+      }),
+      buildReadinessRequest({
+        passengers: [
+          {
+            offerPassengerId: 'pas_001',
+            passengerType: PassengerType.CHILD,
+            source: { type: 'traveler_profile', travelerProfileId: 'profile-owned' },
+          },
+        ],
+      }),
+      buildReadinessRequest({
+        passengers: [
+          {
+            offerPassengerId: 'pas_001',
+            passengerType: PassengerType.INFANT,
+            source: { type: 'traveler_profile', travelerProfileId: 'profile-owned' },
+          },
+        ],
+      }),
+    ];
+
+    for (const invalidRequest of invalidRequests) {
+      await service.getAdvisoryReadiness('user-1', invalidRequest).catch((error: unknown) => {
+        expect(getHttpStatus(error)).toBe(422);
+        expect(getHttpCode(error)).toBe('PASSENGER_MAPPING_INVALID');
+      });
+    }
+  });
+
+  it('normalizes every slice segment, derives trip completion from the latest arrival date, and batches airport-country lookup once', async () => {
+    const { service, mocks } = createServiceHarness();
+    mocks.prisma.flightOffer = { findUnique: jest.fn().mockResolvedValue(buildStoredOffer()) } as unknown as jest.Mock;
+    mocks.profileService.getProfile.mockResolvedValue(buildOwnedProfile());
+    mocks.airportsService.findCountriesByIataCodes.mockResolvedValue(
+      new Map([
+        ['SGN', 'VN'],
+        ['HNL', 'US'],
+        ['LAX', 'US'],
+      ]),
+    );
+    mocks.evaluator.evaluate.mockReturnValue(createSuccessReadinessResult(3));
+
+    await service.getAdvisoryReadiness('user-1', buildReadinessRequest());
+
+    expect(mocks.airportsService.findCountriesByIataCodes).toHaveBeenCalledTimes(1);
+    expect(mocks.airportsService.findCountriesByIataCodes).toHaveBeenCalledWith(['SGN', 'HNL', 'LAX']);
+    expect(mocks.evaluator.evaluate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        tripCompletionDate: '2030-08-20',
+        segments: [
+          expect.objectContaining({ originCountryCode: 'VN', destinationCountryCode: 'US', arrivalDate: '2030-08-15' }),
+          expect.objectContaining({ originCountryCode: 'US', destinationCountryCode: 'US', arrivalDate: '2030-08-15' }),
+          expect.objectContaining({ originCountryCode: 'US', destinationCountryCode: 'VN', arrivalDate: '2030-08-20' }),
+        ],
+      }),
+    );
+  });
+
+  it('maps missing airport-country data to a normal UNKNOWN readiness result instead of a dependency failure', async () => {
+    const { service, mocks } = createServiceHarness();
+    mocks.prisma.flightOffer = { findUnique: jest.fn().mockResolvedValue(buildStoredOffer()) } as unknown as jest.Mock;
+    mocks.profileService.getProfile.mockResolvedValue(buildOwnedProfile());
+    mocks.airportsService.findCountriesByIataCodes.mockResolvedValue(
+      new Map([
+        ['SGN', 'VN'],
+        ['HNL', null],
+        ['LAX', 'US'],
+      ]),
+    );
+    mocks.evaluator.evaluate.mockReturnValue({
+      scope: 'UNKNOWN',
+      ready: false,
+      passengers: [
+        {
+          passengerType: PassengerType.ADULT,
+          passengerOrdinal: 1,
+          ready: false,
+          profileRevision: 3,
+          sections: [
+            {
+              name: 'itinerary',
+              fields: [{ name: 'scope', status: 'unknown', reason: 'AIRPORT_COUNTRY_UNAVAILABLE', blocking: true }],
+            },
+          ],
+        },
+      ],
+    });
+
+    const result = await service.getAdvisoryReadiness('user-1', buildReadinessRequest());
+    expect(result).toEqual(
+      expect.objectContaining({
+        scope: 'UNKNOWN',
+        ready: false,
+      }),
+    );
+  });
+
+  it('maps stored offer expiry from local raw offer metadata to 409 OFFER_EXPIRED without writes or supplier calls', async () => {
+    const { service, mocks } = createServiceHarness();
+    mocks.prisma.flightOffer = {
+      findUnique: jest.fn().mockResolvedValue(
+        buildStoredOffer({
+          rawOffer: {
+            expires_at: '2026-08-02T12:00:00Z',
+            passengers: [{ id: 'pas_001', type: 'adult' }],
+            slices: [{ segments: [] }],
+          },
+        }),
+      ),
+    } as unknown as jest.Mock;
+
+    await service.getAdvisoryReadiness('user-1', buildReadinessRequest()).catch((error: unknown) => {
+      expect(getHttpStatus(error)).toBe(409);
+      expect(getHttpCode(error)).toBe('OFFER_EXPIRED');
+    });
+
+    expect(collectMockCallPayloads(mocks.duffelService)).toBe('[]');
+    expect(collectMockCallPayloads(mocks.auditService)).toBe('[]');
+  });
+
+  it('does not write profiles, intents, or passenger snapshots during advisory readiness', async () => {
+    const { service, mocks } = createServiceHarness();
+    mocks.prisma.flightOffer = { findUnique: jest.fn().mockResolvedValue(buildStoredOffer()) } as unknown as jest.Mock;
+    mocks.prisma.bookingIntent = { create: jest.fn() } as unknown as jest.Mock;
+    mocks.prisma.bookingIntentPassenger = { create: jest.fn() } as unknown as jest.Mock;
+    mocks.profileService.getProfile.mockResolvedValue(buildOwnedProfile());
+    mocks.airportsService.findCountriesByIataCodes.mockResolvedValue(
+      new Map([
+        ['SGN', 'VN'],
+        ['HNL', 'US'],
+        ['LAX', 'US'],
+      ]),
+    );
+    mocks.evaluator.evaluate.mockReturnValue(createSuccessReadinessResult(3));
+
+    await service.getAdvisoryReadiness('user-1', buildReadinessRequest());
+
+    expect(mocks.prisma.$transaction).not.toHaveBeenCalled();
+    expect(mocks.prisma.bookingIntent.create).not.toHaveBeenCalled();
+    expect(mocks.prisma.bookingIntentPassenger.create).not.toHaveBeenCalled();
+    expect(mocks.profileService.updateProfile).not.toHaveBeenCalled();
+    expect(collectMockCallPayloads(mocks.duffelService)).toBe('[]');
+  });
+
+  it('fails feature-disabled requests before reading offers, profiles, or airports', async () => {
+    const { service, mocks } = createServiceHarness();
+    mocks.configService.get.mockImplementation((key: string) => {
+      if (key === 'FEATURE_FLAG_BOOKING_READINESS') {
+        return 'false';
+      }
+      return undefined;
+    });
+
+    await service.getAdvisoryReadiness('user-1', buildReadinessRequest()).catch((error: unknown) => {
+      expect(error).toBeInstanceOf(NotFoundException);
+      expect(getHttpStatus(error)).toBe(404);
+    });
+
+    expect(collectMockCallPayloads(mocks.prisma)).toBe('[]');
+    expect(collectMockCallPayloads(mocks.profileService)).toBe('[]');
+    expect(collectMockCallPayloads(mocks.airportsService)).toBe('[]');
+  });
+
+  it('propagates trace and correlation ids to observability with pii-free metadata', async () => {
+    const { service, mocks } = createServiceHarness();
+    mocks.prisma.flightOffer = { findUnique: jest.fn().mockResolvedValue(buildStoredOffer()) } as unknown as jest.Mock;
+    mocks.profileService.getProfile.mockResolvedValue(buildOwnedProfile());
+    mocks.airportsService.findCountriesByIataCodes.mockResolvedValue(
+      new Map([
+        ['SGN', 'VN'],
+        ['HNL', 'US'],
+        ['LAX', 'US'],
+      ]),
+    );
+    mocks.evaluator.evaluate.mockReturnValue(createSuccessReadinessResult(3));
+
+    await service.getAdvisoryReadiness('user-1', buildReadinessRequest(), {
+      traceId: 'trace-phase6',
+      correlationId: 'corr-phase6',
+    });
+
+    const observabilityPayload = collectMockCallPayloads(mocks.observability);
+    expect(observabilityPayload).toContain('trace-phase6');
+    expect(observabilityPayload).toContain('corr-phase6');
+    expect(observabilityPayload).not.toContain('profile-owned');
+    expect(observabilityPayload).not.toContain('ada@example.com');
+    expect(observabilityPayload).not.toContain('P1234567');
+    expect(observabilityPayload).not.toContain('pas_001');
+  });
+});
+
+describe('BookingIntentController advisory readiness RED slice', () => {
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
+  it('preserves existing singular intent handlers while adding a readiness handler that forwards auth and trace context', async () => {
+    const bookingIntentService = {
+      createIntent: jest.fn(),
+      getPrefill: jest.fn(),
+      getIntent: jest.fn(),
+      getAdvisoryReadiness: jest.fn().mockResolvedValue({ scope: 'DOMESTIC', ready: true, passengers: [] }),
+    };
+
+    const controller = new BookingIntentController(bookingIntentService as never) as BookingIntentController & {
+      createReadiness?: (
+        req: { user: { id: string } },
+        headers: Record<string, string>,
+        dto: ReadinessRequest,
+        res: { setHeader: jest.Mock; removeHeader: jest.Mock },
+      ) => Promise<unknown>;
+    };
+
+    expect(typeof controller.createIntent).toBe('function');
+    expect(typeof controller.getPrefill).toBe('function');
+    expect(typeof controller.getIntent).toBe('function');
+    expect(typeof controller.createReadiness).toBe('function');
+
+    const response = {
+      setHeader: jest.fn(),
+      removeHeader: jest.fn(),
+    };
+
+    await controller.createReadiness?.(
+      { user: { id: 'user-1' } },
+      {
+        'x-trace-id': 'trace-controller',
+        'x-correlation-id': 'corr-controller',
+      },
+      buildReadinessRequest(),
+      response,
+    );
+
+    expect(bookingIntentService.getAdvisoryReadiness).toHaveBeenCalledWith(
+      'user-1',
+      buildReadinessRequest(),
+      {
+        traceId: 'trace-controller',
+        correlationId: 'corr-controller',
+      },
+    );
+    expect(response.setHeader).toHaveBeenCalledWith('Cache-Control', 'no-store, private');
+    expect(response.removeHeader).toHaveBeenCalledWith('ETag');
+  });
+});
