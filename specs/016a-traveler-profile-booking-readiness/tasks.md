@@ -72,15 +72,15 @@
 
 ### RED tests
 
-- [ ] T021 [P] [US1] Write failing Playwright owner flow, validation, revision-conflict, all-fields-visible, and browser-privacy assertions in `apps/web/tests/traveler-profile.spec.ts`
+- [x] T021 [P] [US1] Write failing Playwright owner flow, validation, revision-conflict, all-fields-visible, and browser-privacy assertions in `apps/web/tests/traveler-profile.spec.ts` (test discovery and TypeScript compilation pass; live execution awaits healthy local services)
 - [ ] T022 [P] [US1] Write failing profile client contract tests for no-store requests and safe error mapping in `apps/web/lib/profile.spec.ts`
 
 ### GREEN implementation
 
-- [ ] T023 [US1] Implement authenticated server-side profile fetch and revision-aware PATCH helpers in `apps/web/lib/profile.ts`
-- [ ] T024 [US1] Implement accessible identity, contact, full-document, and preferences form sections with conflict recovery in `apps/web/components/profile/TravelerProfileForm.tsx`
-- [ ] T025 [US1] Implement the protected Server Component profile page and feature-disabled fallback in `apps/web/app/profile/page.tsx`
-- [ ] T026 [US1] Wire the existing Profile navigation entry and return-target allowlist in `apps/web/components/layout/Header.tsx` and `apps/web/lib/safeReturnTarget.ts`
+- [x] T023 [US1] Implement authenticated server-side profile fetch and revision-aware PATCH helpers in `apps/web/lib/profile.ts` (browser writes use the same-origin authenticated proxy in `apps/web/app/api/profile/route.ts`)
+- [x] T024 [US1] Implement accessible identity, contact, full-document, and preferences form sections with conflict recovery in `apps/web/components/profile/TravelerProfileForm.tsx`
+- [x] T025 [US1] Implement the protected Server Component profile page and feature-disabled fallback in `apps/web/app/profile/page.tsx`
+- [x] T026 [US1] Wire the existing Profile navigation entry and return-target allowlist in `apps/web/components/layout/Header.tsx` and `apps/web/lib/safeReturnTarget.ts`
 
 **Checkpoint**: US1 is a deployable MVP behind the web flag; disabling the flag leaves legacy checkout unchanged.
 

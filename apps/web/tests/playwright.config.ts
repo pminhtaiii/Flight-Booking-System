@@ -5,6 +5,7 @@ const frontendEnv = {
   CI: 'true',
   NEXTAUTH_SECRET: 'test_secret',
   NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:3001',
+  NEXT_PUBLIC_FEATURE_FLAG_BOOKING_READINESS: 'true',
 };
 
 export default defineConfig({
@@ -34,6 +35,7 @@ export default defineConfig({
         NODE_ENV: 'test',
         DATABASE_URL: 'postgresql://postgres:postgres@127.0.0.1:5432/test_db',
         REDIS_URL: 'redis://127.0.0.1:6379/1',
+        FEATURE_FLAG_BOOKING_READINESS: 'true',
       },
     },
     {
