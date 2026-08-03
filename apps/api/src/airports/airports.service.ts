@@ -56,6 +56,29 @@ export class AirportsService {
     }
   }
 
+  async findCountriesByIataCodes(codes: readonly string[]): Promise<Map<string, string | null>> {
+    const normalizedCodes = [...new Set(
+      codes
+        .map((code) => code.trim().toUpperCase())
+        .filter((code) => /^[A-Z]{3}$/.test(code)),
+    )];
+
+    const rows = await this.prisma.airport.findMany({
+      where: { iataCode: { in: normalizedCodes } },
+      select: { iataCode: true, country: true },
+    });
+
+    const countries = new Map<string, string | null>(
+      normalizedCodes.map((code) => [code, null]),
+    );
+
+    for (const row of rows) {
+      countries.set(row.iataCode.trim().toUpperCase(), row.country ?? null);
+    }
+
+    return countries;
+  }
+
   async findNearby(lat: number, lng: number, radiusKm: number, limit: number) {
     try {
       // Clamped Haversine formula

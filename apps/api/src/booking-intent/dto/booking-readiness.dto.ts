@@ -26,7 +26,7 @@ import { PassengerType } from '@prisma/client';
 import type { BookingReadinessResult } from '@shared/types';
 
 const DATE_ONLY_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
-const COUNTRY_CODE_PATTERN = /^[A-Z]{2}$/;
+const COUNTRY_CODE_PATTERN = /^(?:[A-Z]{2})?$/;
 const PHONE_COUNTRY_CODE_PATTERN = /^\+\d{1,4}$/;
 const PHONE_NUMBER_PATTERN = /^\d{4,15}$/;
 const PASSPORT_NUMBER_PATTERN = /^[A-Za-z0-9]{3,50}$/;

@@ -249,12 +249,18 @@ function ownedProfilePassenger(travelerProfileId: string): ReadinessPassenger {
   };
 }
 
-function inlinePassenger(overrides: Partial<ReadinessPassenger & { source: Record<string, unknown> }> = {}): ReadinessPassenger {
+type InlineReadinessPassenger = Extract<ReadinessPassenger, { source: { type: 'inline' } }>;
+type InlinePassengerOverrides = Partial<Omit<InlineReadinessPassenger, 'source'>> & {
+  source?: Partial<InlineReadinessPassenger['source']> & Record<string, unknown>;
+};
+
+function inlinePassenger(overrides: InlinePassengerOverrides = {}): InlineReadinessPassenger {
+  const { source: sourceOverrides, ...passengerOverrides } = overrides;
+
   return {
     offerPassengerId: 'pas_001',
     passengerType: PassengerType.ADULT,
     source: {
-      type: 'inline',
       givenName: 'Inline',
       middleName: null,
       familyName: 'Traveler',
@@ -269,10 +275,11 @@ function inlinePassenger(overrides: Partial<ReadinessPassenger & { source: Recor
       passportExpiry: '2034-04-01',
       issuingCountry: 'US',
       nationality: 'US',
-      ...(overrides.source ?? {}),
+      ...(sourceOverrides ?? {}),
+      type: 'inline',
     },
-    ...overrides,
-  } as ReadinessPassenger;
+    ...passengerOverrides,
+  };
 }
 
 function extractStructuredLogPayloads(spy: jest.SpyInstance): Array<Record<string, unknown>> {
@@ -871,6 +878,7 @@ describe('Booking Readiness (E2E RED)', () => {
           total_amount: '120.00',
           total_currency: 'USD',
           expires_at: '2030-08-25T10:00:00Z',
+          passengers: [{ id: 'pas_001', type: 'adult' }],
         },
       });
 

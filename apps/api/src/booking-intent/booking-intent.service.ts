@@ -5,6 +5,7 @@ import {
   HttpStatus,
   Injectable,
   NotFoundException,
+  Optional,
 } from '@nestjs/common';
 import { Prisma, PassengerType } from '@prisma/client';
 import { PrismaService } from '@/prisma/prisma.service';
@@ -12,6 +13,8 @@ import { DuffelService, DuffelTimeoutError } from '@/duffel/duffel.service';
 import { AuditService } from '@/audit/audit.service';
 import { EncryptionService } from '@/common/encryption.service';
 import { CreateIntentDto, CreateIntentPassengerDto } from './dto/create-intent.dto';
+import { BookingReadinessRequestDto } from './dto/booking-readiness.dto';
+import { BookingReadinessService } from './booking-readiness.service';
 import {
   BookingIntentPrefillResponseDto,
   CreateBookingIntentResponseDto,
@@ -29,7 +32,20 @@ export class BookingIntentService {
     private readonly duffelService: DuffelService,
     private readonly auditService: AuditService,
     private readonly encryptionService: EncryptionService,
+    @Optional() private readonly bookingReadinessService?: BookingReadinessService,
   ) {}
+
+  async getAdvisoryReadiness(
+    userId: string,
+    dto: BookingReadinessRequestDto,
+    context?: { traceId?: string; correlationId?: string },
+  ) {
+    if (!this.bookingReadinessService) {
+      throw new Error('Booking readiness service is unavailable');
+    }
+
+    return this.bookingReadinessService.getAdvisoryReadiness(userId, dto, context);
+  }
 
   async createIntent(
     userId: string,
