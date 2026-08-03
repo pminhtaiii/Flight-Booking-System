@@ -1,8 +1,22 @@
-import { Body, Controller, Get, Headers, Param, Post, Req, UseGuards, ParseUUIDPipe } from '@nestjs/common';
-import { Request } from 'express';
+import {
+  Body,
+  Controller,
+  Get,
+  Headers,
+  HttpCode,
+  HttpStatus,
+  Param,
+  ParseUUIDPipe,
+  Post,
+  Req,
+  Res,
+  UseGuards,
+} from '@nestjs/common';
+import { Request, Response } from 'express';
 import { JwtAuthGuard } from '@/auth/guards/jwt-auth.guard';
 import { BookingIntentService } from './booking-intent.service';
 import { CreateIntentDto } from './dto/create-intent.dto';
+import { BookingReadinessRequestDto } from './dto/booking-readiness.dto';
 
 interface AuthenticatedRequest extends Request {
   user: {
@@ -40,5 +54,28 @@ export class BookingIntentController {
   @Get(':id')
   async getIntent(@Req() req: AuthenticatedRequest, @Param('id', new ParseUUIDPipe({ version: '4' })) id: string) {
     return this.bookingIntentService.getIntent(req.user.id, id);
+  }
+}
+
+@Controller('bookings/intents')
+@UseGuards(JwtAuthGuard)
+export class BookingReadinessController {
+  constructor(private readonly bookingIntentService: BookingIntentService) {}
+
+  @Post('readiness')
+  @HttpCode(HttpStatus.OK)
+  async createReadiness(
+    @Req() req: AuthenticatedRequest,
+    @Headers() headers: Record<string, string>,
+    @Body() dto: BookingReadinessRequestDto,
+    @Res({ passthrough: true }) response: Response,
+  ) {
+    response.setHeader('Cache-Control', 'no-store, private');
+    response.removeHeader('ETag');
+
+    return this.bookingIntentService.getAdvisoryReadiness(req.user.id, dto, {
+      traceId: headers['x-trace-id'] || undefined,
+      correlationId: headers['x-correlation-id'] || undefined,
+    });
   }
 }

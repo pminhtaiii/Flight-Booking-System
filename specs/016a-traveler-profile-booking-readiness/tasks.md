@@ -115,16 +115,16 @@
 
 ### RED tests
 
-- [ ] T032 [P] [US2] Write failing controller/service tests for source ownership, all-segment country lookup, revision projection, zero writes, and advisory `UNKNOWN` mapping in `apps/api/src/booking-intent/booking-readiness.service.spec.ts`
-- [ ] T033 [P] [US2] Write failing API E2E tests for `POST /bookings/intents/readiness`, feature-disabled response, trace propagation, PII-safe logs/audits, and zero Duffel calls in `apps/api/test/booking-readiness.e2e-spec.ts`
+- [x] T032 [P] [US2] Write failing controller/service tests for source ownership, all-segment country lookup, revision projection, zero writes, and advisory `UNKNOWN` mapping in `apps/api/src/booking-intent/booking-readiness.service.spec.ts`
+- [x] T033 [P] [US2] Write failing API E2E tests for `POST /bookings/intents/readiness`, feature-disabled response, trace propagation, PII-safe logs/audits, and zero Duffel calls in `apps/api/test/booking-readiness.e2e-spec.ts`
 
 ### GREEN implementation
 
-- [ ] T034 [P] [US2] Implement readiness request/response DTOs and discriminated source validation in `apps/api/src/booking-intent/dto/booking-readiness.dto.ts`
-- [ ] T035 [US2] Implement owned source resolution, stored-offer segment normalization, batched airport-country lookup, evaluator invocation, and safe projection in `apps/api/src/booking-intent/booking-readiness.service.ts`
-- [ ] T036 [US2] Add the canonical advisory action and `200 UNKNOWN`/infrastructure-error mapping in `apps/api/src/booking-intent/booking-intent.controller.ts`
-- [ ] T037 [US2] Import `ProfileModule` and `AirportsModule` and register evaluator/readiness providers in `apps/api/src/booking-intent/booking-intent.module.ts`
-- [ ] T038 [US2] Emit PII-safe readiness metrics/events and trace propagation in `apps/api/src/booking-intent/booking-readiness.observability.ts`
+- [x] T034 [P] [US2] Implement readiness request/response DTOs and discriminated source validation in `apps/api/src/booking-intent/dto/booking-readiness.dto.ts`
+- [x] T035 [US2] Implement owned source resolution, stored-offer segment normalization, batched airport-country lookup, evaluator invocation, and safe projection in `apps/api/src/booking-intent/booking-readiness.service.ts`
+- [x] T036 [US2] Add the canonical advisory action and `200 UNKNOWN`/infrastructure-error mapping in `apps/api/src/booking-intent/booking-intent.controller.ts`
+- [x] T037 [US2] Import `ProfileModule` and `AirportsModule` and register evaluator/readiness providers in `apps/api/src/booking-intent/booking-intent.module.ts`
+- [x] T038 [US2] Emit PII-safe readiness metrics/events and trace propagation in `apps/api/src/booking-intent/booking-readiness.observability.ts`
 
 **Checkpoint**: US2 can be enabled and tested independently; readiness is advisory and has no supplier or persistence side effects.
 
