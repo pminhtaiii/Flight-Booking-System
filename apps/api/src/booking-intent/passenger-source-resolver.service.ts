@@ -81,6 +81,8 @@ type ProfileRecord = {
   passportExpiryCiphertext: string | null;
 };
 
+type EncryptionContext = Record<string, string | number>;
+
 @Injectable()
 export class PassengerSourceResolverService {
   constructor(
@@ -140,10 +142,18 @@ export class PassengerSourceResolverService {
     let passportNumber: string | null = null;
     let passportExpiry: string | null = null;
     try {
-      passportNumber = this.decryptProfileField(profile.passportNumber, userId, 'passportNumber');
-      passportExpiry = profile.passportExpiryCiphertext
-        ? this.decryptProfileField(profile.passportExpiryCiphertext, userId, 'passportExpiry')
-        : this.toDateOnly(profile.passportExpiry);
+      passportNumber = this.decryptProfileField(profile.passportNumber, [
+        { userId, fieldName: 'passportNumber' },
+      ]);
+      if (profile.passportExpiryCiphertext) {
+        const decryptedExpiry = this.decryptProfileField(profile.passportExpiryCiphertext, [
+          { userId, fieldName: 'passportExpiry' },
+          { travelerProfileId: profile.id, fieldName: 'passportExpiry' },
+        ]);
+        passportExpiry = decryptedExpiry === null ? null : this.toDateOnlyString(decryptedExpiry);
+      } else {
+        passportExpiry = this.toDateOnly(profile.passportExpiry);
+      }
     } catch {
       throw this.invalidSource();
     }
@@ -200,12 +210,28 @@ export class PassengerSourceResolverService {
     };
   }
 
-  private decryptProfileField(value: string | null, userId: string, fieldName: string): string | null {
+  private decryptProfileField(value: string | null, contexts: readonly EncryptionContext[]): string | null {
     if (!value) return null;
     if (value.startsWith('v1:')) {
-      return this.encryptionService.decryptBound(value, { userId, fieldName });
+      let lastError: unknown;
+      for (const context of contexts) {
+        try {
+          return this.encryptionService.decryptBound(value, context);
+        } catch (error) {
+          lastError = error;
+        }
+      }
+      throw lastError ?? new Error('Unable to decrypt profile field');
     }
     return this.encryptionService.decrypt(value);
+  }
+
+  private toDateOnlyString(value: string): string {
+    const parsed = new Date(value);
+    if (Number.isNaN(parsed.getTime())) {
+      throw new Error('Invalid passport expiry');
+    }
+    return parsed.toISOString().slice(0, 10);
   }
 
   private toDateOnly(value: Date | null): string | null {

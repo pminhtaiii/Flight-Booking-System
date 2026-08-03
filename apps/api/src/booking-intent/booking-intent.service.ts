@@ -1,4 +1,5 @@
 import {
+  ConflictException,
   ForbiddenException,
   GoneException,
   HttpException,
@@ -16,17 +17,17 @@ import { CreateIntentDto } from './dto/create-intent.dto';
 import { BookingReadinessRequestDto } from './dto/booking-readiness.dto';
 import { BookingReadinessService } from './booking-readiness.service';
 import {
+  PassengerSourceResolverService,
+  type PassengerSourceRequest,
+  type ResolvedPassenger,
+} from './passenger-source-resolver.service';
+import { PassengerSnapshotService } from './passenger-snapshot.service';
+import {
   BookingIntentPrefillResponseDto,
   CreateBookingIntentResponseDto,
   GetBookingIntentResponseDto,
 } from './dto/intent-response.dto';
 
-/**
- * The existing create transaction still consumes the legacy flat shape until
- * Phase 8 wires the resolver and snapshot builder into it. Keep that internal
- * shape explicit so the canonical request DTO cannot accidentally re-expose
- * flat fields through validation.
- */
 type LegacyIntentPassenger = {
   type: PassengerType;
   givenName: string;
@@ -43,6 +44,13 @@ type ResolvedIntentPassenger = LegacyIntentPassenger & {
   travelerProfileId?: string;
 };
 
+type SnapshotDecryptionContext = {
+  snapshotVersion?: number;
+  intentId: string;
+  position?: number;
+  fieldName: 'passportNumber' | 'passportExpiry';
+};
+
 @Injectable()
 export class BookingIntentService {
   constructor(
@@ -51,6 +59,8 @@ export class BookingIntentService {
     private readonly auditService: AuditService,
     private readonly encryptionService: EncryptionService,
     @Optional() private readonly bookingReadinessService?: BookingReadinessService,
+    @Optional() private readonly passengerSourceResolver?: PassengerSourceResolverService,
+    @Optional() private readonly passengerSnapshotService?: PassengerSnapshotService,
   ) {}
 
   async getAdvisoryReadiness(
@@ -88,11 +98,48 @@ export class BookingIntentService {
       );
     }
 
-    const mergedPassengers = await this.applyPrimaryPassengerPrefill(
-      userId,
-      dto.passengers as unknown as LegacyIntentPassenger[],
-    );
-    this.validatePassengerCountAgainstOffer(mergedPassengers, {
+    const canonicalPassengerCount = dto.passengers.filter((passenger) => passenger.source != null).length;
+    if (canonicalPassengerCount > 0 && canonicalPassengerCount < dto.passengers.length) {
+      throw new HttpException(
+        {
+          code: 'PASSENGER_SOURCE_INVALID',
+          message: 'Passenger source is invalid',
+        },
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+    const hasCanonicalSources = canonicalPassengerCount === dto.passengers.length;
+
+    let canonicalPassengers: ResolvedPassenger[] | null = null;
+    let legacyPassengers: ResolvedIntentPassenger[] | null = null;
+    if (hasCanonicalSources) {
+      if (!this.passengerSourceResolver || !this.passengerSnapshotService) {
+        throw new HttpException(
+          {
+            code: 'PASSENGER_SOURCE_INVALID',
+            message: 'Passenger source is invalid',
+          },
+          HttpStatus.UNPROCESSABLE_ENTITY,
+        );
+      }
+
+      canonicalPassengers = await this.passengerSourceResolver.resolve(
+        userId,
+        dto.passengers.map((passenger) => ({
+          offerPassengerId: passenger.offerPassengerId,
+          type: passenger.type,
+          source: passenger.source,
+        })) as PassengerSourceRequest[],
+      );
+    } else {
+      legacyPassengers = await this.applyPrimaryPassengerPrefill(
+        userId,
+        dto.passengers as unknown as LegacyIntentPassenger[],
+      );
+    }
+
+    const passengersForValidation = canonicalPassengers ?? legacyPassengers ?? [];
+    this.validatePassengerCountAgainstOffer(passengersForValidation, {
       adults: flightOffer.adults,
       children: flightOffer.children,
       infants: flightOffer.infants,
@@ -106,9 +153,18 @@ export class BookingIntentService {
     const ttlMinutes = isNaN(parsedTtl) || !process.env.BOOKING_INTENT_TTL_MINUTES ? 30 : parsedTtl;
     const intentExpiresAt = new Date(now.getTime() + ttlMinutes * 60 * 1000);
 
-    const duffelPassengerIds = this.extractDuffelPassengerIds(liveOffer.raw, mergedPassengers);
+    const duffelPassengerIds = this.extractDuffelPassengerIds(liveOffer.raw, passengersForValidation);
+    const canonicalSnapshotPassengers = canonicalPassengers?.map((passenger, index) => ({
+      ...passenger,
+      duffelPassengerId: duffelPassengerIds[index],
+      position: index,
+    }));
 
     const created = await this.prisma.$transaction(async (tx) => {
+      if (canonicalPassengers) {
+        await this.assertCanonicalProfileRevisions(tx, userId, canonicalPassengers);
+      }
+
       const intent = await tx.bookingIntent.create({
         data: {
           userId,
@@ -133,30 +189,36 @@ export class BookingIntentService {
         },
       });
 
-      const passengers = await Promise.all(
-        mergedPassengers.map((passenger, index) =>
-          tx.bookingIntentPassenger.create({
-            data: {
-              intentId: intent.id,
-              position: index,
-              type: passenger.type,
-              givenName: passenger.givenName,
-              familyName: passenger.familyName,
-              dateOfBirth: this.asDate(passenger.dateOfBirth),
-              gender: passenger.gender.toLowerCase(),
-              nationality: passenger.nationality ? passenger.nationality.toUpperCase() : null,
-              passportNumber: passenger.passportNumber
-                ? this.encryptionService.encrypt(passenger.passportNumber)
-                : null,
-              passportExpiry: passenger.passportExpiry
-                ? this.encryptionService.encrypt(passenger.passportExpiry)
-                : null,
-              travelerProfileId: passenger.travelerProfileId || null,
-              duffelPassengerId: duffelPassengerIds[index],
-            },
-          }),
-        ),
-      );
+      const passengers = canonicalSnapshotPassengers
+        ? await Promise.all(
+            this.passengerSnapshotService!
+              .buildSnapshotData({ intentId: intent.id, passengers: canonicalSnapshotPassengers })
+              .persistenceInput.map((data) => tx.bookingIntentPassenger.create({ data })),
+          )
+        : await Promise.all(
+            (legacyPassengers ?? []).map((passenger, index) =>
+              tx.bookingIntentPassenger.create({
+                data: {
+                  intentId: intent.id,
+                  position: index,
+                  type: passenger.type,
+                  givenName: passenger.givenName,
+                  familyName: passenger.familyName,
+                  dateOfBirth: this.asDate(passenger.dateOfBirth),
+                  gender: passenger.gender.toLowerCase(),
+                  nationality: passenger.nationality ? passenger.nationality.toUpperCase() : null,
+                  passportNumber: passenger.passportNumber
+                    ? this.encryptionService.encrypt(passenger.passportNumber)
+                    : null,
+                  passportExpiry: passenger.passportExpiry
+                    ? this.encryptionService.encrypt(passenger.passportExpiry)
+                    : null,
+                  travelerProfileId: passenger.travelerProfileId || null,
+                  duffelPassengerId: duffelPassengerIds[index],
+                },
+              }),
+            ),
+          );
 
       await this.auditService.createLog(tx, {
         userId,
@@ -170,7 +232,7 @@ export class BookingIntentService {
           intentId: intent.id,
           userId,
           offerId: flightOffer.id,
-          passengerCount: mergedPassengers.length,
+          passengerCount: passengersForValidation.length,
           priceChanged: originalPrice !== confirmedPrice,
         },
       });
@@ -264,8 +326,18 @@ export class BookingIntentService {
         dateOfBirth: this.toDateOnly(passenger.dateOfBirth),
         gender: passenger.gender,
         nationality: passenger.nationality,
-        passportNumber: this.decryptOptional(passenger.passportNumber),
-        passportExpiry: this.decryptOptional(passenger.passportExpiry),
+        passportNumber: this.decryptOptional(passenger.passportNumber, {
+          snapshotVersion: passenger.snapshotVersion,
+          intentId: intent.id,
+          position: passenger.position,
+          fieldName: 'passportNumber',
+        }),
+        passportExpiry: this.decryptOptional(passenger.passportExpiry, {
+          snapshotVersion: passenger.snapshotVersion,
+          intentId: intent.id,
+          position: passenger.position,
+          fieldName: 'passportExpiry',
+        }),
         preFilledFromProfile: passenger.travelerProfileId !== null,
       })),
       flight: {
@@ -373,7 +445,7 @@ export class BookingIntentService {
   }
 
   private validatePassengerCountAgainstOffer(
-    passengers: ResolvedIntentPassenger[],
+    passengers: readonly { type: PassengerType }[],
     offerBreakdown: { adults: number; children: number; infants: number },
   ): void {
     const counts = passengers.reduce(
@@ -398,6 +470,37 @@ export class BookingIntentService {
         },
         HttpStatus.BAD_REQUEST,
       );
+    }
+  }
+
+  private async assertCanonicalProfileRevisions(
+    tx: Prisma.TransactionClient,
+    userId: string,
+    passengers: readonly ResolvedPassenger[],
+  ): Promise<void> {
+    const checkedProfiles = new Set<string>();
+
+    for (const passenger of passengers) {
+      if (
+        !passenger.travelerProfileId ||
+        passenger.profileRevision === null ||
+        checkedProfiles.has(passenger.travelerProfileId)
+      ) {
+        continue;
+      }
+
+      checkedProfiles.add(passenger.travelerProfileId);
+      const currentProfile = await tx.travelerProfile.findFirst({
+        where: { id: passenger.travelerProfileId, userId },
+        select: { revision: true },
+      });
+
+      if (!currentProfile || currentProfile.revision !== passenger.profileRevision) {
+        throw new ConflictException({
+          code: 'PROFILE_CHANGED',
+          message: 'Traveler profile changed',
+        });
+      }
     }
   }
 
@@ -476,7 +579,7 @@ export class BookingIntentService {
 
   private extractDuffelPassengerIds(
     rawOffer: unknown,
-    passengers: readonly ResolvedIntentPassenger[],
+    passengers: readonly { type: PassengerType }[],
   ): string[] {
     if (!rawOffer || typeof rawOffer !== 'object') {
       throw new HttpException(
@@ -600,9 +703,22 @@ export class BookingIntentService {
     return { deletedCount: deleteResult.count };
   }
 
-  private decryptOptional(value: string | null): string | null {
+  private decryptOptional(value: string | null, context?: SnapshotDecryptionContext): string | null {
     if (!value) {
       return null;
+    }
+    if (
+      value.startsWith('v1:') &&
+      context &&
+      Number.isInteger(context.snapshotVersion) &&
+      Number.isInteger(context.position)
+    ) {
+      return this.encryptionService.decryptBound(value, {
+        snapshotVersion: context.snapshotVersion as number,
+        intentId: context.intentId,
+        position: context.position as number,
+        fieldName: context.fieldName,
+      });
     }
     return this.encryptionService.decrypt(value);
   }

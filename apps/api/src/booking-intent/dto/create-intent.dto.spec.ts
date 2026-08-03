@@ -164,6 +164,45 @@ describe('CreateIntentDto Phase 7 passenger sources', () => {
     expect(JSON.stringify(errors)).toContain('givenName');
   });
 
+  it('rejects legacy passengers unless every required legacy identity field is present', async () => {
+    const errors = await validationErrors({
+      flightOfferId: offerId,
+      passengers: [
+        {
+          type: PassengerType.ADULT,
+          givenName: 'Ada',
+        },
+      ],
+    });
+
+    expect(errors.length).toBeGreaterThan(0);
+    expect(JSON.stringify(errors)).toContain('PASSENGER_SOURCE_LEGACY_FIELDS');
+    expect(JSON.stringify(errors)).toContain('familyName');
+    expect(JSON.stringify(errors)).toContain('dateOfBirth');
+    expect(JSON.stringify(errors)).toContain('gender');
+    expect(JSON.stringify(errors)).toContain('nationality');
+  });
+
+  it('rejects null legacy core fields at the validation boundary', async () => {
+    const errors = await validationErrors({
+      flightOfferId: offerId,
+      passengers: [
+        {
+          type: PassengerType.ADULT,
+          givenName: 'Ada',
+          familyName: 'Lovelace',
+          dateOfBirth: '1815-12-10',
+          gender: null,
+          nationality: 'GB',
+        },
+      ],
+    });
+
+    expect(errors.length).toBeGreaterThan(0);
+    expect(JSON.stringify(errors)).toContain('PASSENGER_SOURCE_LEGACY_FIELDS');
+    expect(JSON.stringify(errors)).toContain('gender');
+  });
+
   it('rejects useProfile together with source using the safe conflict code', async () => {
     const errors = await validationErrors(
       validPayload({

@@ -165,12 +165,26 @@ const LEGACY_PASSENGER_FIELDS = [
   'passportExpiry',
 ] as const;
 
+const LEGACY_REQUIRED_PASSENGER_FIELDS = [
+  'givenName',
+  'familyName',
+  'dateOfBirth',
+  'gender',
+  'nationality',
+] as const;
+
+function missingLegacyPassengerFields(passenger: Record<string, unknown>): string[] {
+  return LEGACY_REQUIRED_PASSENGER_FIELDS.filter(
+    (field) => passenger[field] === undefined || passenger[field] === null,
+  );
+}
+
 @ValidatorConstraint({ name: 'passengerSource', async: false })
 class PassengerSourceConstraint implements ValidatorConstraintInterface {
   validate(value: unknown, args: ValidationArguments): boolean {
     const passenger = args.object as Record<string, unknown>;
     if (!value || typeof value !== 'object') {
-      return LEGACY_PASSENGER_FIELDS.some((field) => passenger[field] !== undefined);
+      return missingLegacyPassengerFields(passenger).length === 0;
     }
     const source = value as { type?: unknown };
     const passengerWithFlag = args.object as { useProfile?: unknown };
@@ -179,8 +193,12 @@ class PassengerSourceConstraint implements ValidatorConstraintInterface {
   }
 
   defaultMessage(args: ValidationArguments): string {
-    const passenger = args.object as { useProfile?: unknown };
-    return passenger.useProfile !== undefined ? 'PASSENGER_SOURCE_CONFLICT' : 'Passenger source is invalid';
+    const passenger = args.object as Record<string, unknown> & { useProfile?: unknown };
+    if (passenger.useProfile !== undefined) return 'PASSENGER_SOURCE_CONFLICT';
+    const missingFields = missingLegacyPassengerFields(passenger);
+    return missingFields.length > 0
+      ? `PASSENGER_SOURCE_LEGACY_FIELDS: ${missingFields.join(', ')}`
+      : 'Passenger source is invalid';
   }
 }
 
@@ -189,13 +207,17 @@ class CanonicalPassengerShapeConstraint implements ValidatorConstraintInterface 
   validate(value: unknown, args: ValidationArguments): boolean {
     const passenger = args.object as Record<string, unknown>;
     const legacyFields = LEGACY_PASSENGER_FIELDS.filter((field) => passenger[field] !== undefined);
-    if (value === undefined || value === null) return legacyFields.length > 0;
+    if (value === undefined || value === null) return missingLegacyPassengerFields(passenger).length === 0;
     return legacyFields.length === 0;
   }
 
   defaultMessage(args: ValidationArguments): string {
     const passenger = args.object as Record<string, unknown>;
     const legacyFields = LEGACY_PASSENGER_FIELDS.filter((field) => passenger[field] !== undefined);
+    const missingFields = missingLegacyPassengerFields(passenger);
+    if ((args.value === undefined || args.value === null) && missingFields.length > 0) {
+      return `PASSENGER_SOURCE_LEGACY_FIELDS: ${missingFields.join(', ')}`;
+    }
     return legacyFields.length > 0
       ? `PASSENGER_SOURCE_LEGACY_FIELDS: ${legacyFields.join(', ')}`
       : 'source is required';

@@ -8,8 +8,8 @@ Update this file after every completed feature. Any AI agent reading this should
 
 **Feature:** Traveler Profile & Booking Readiness (Feature 16)
 **Last completed:** Phase 7 / Passenger Sources and Immutable Snapshots on branch `016h-passenger-source-snapshot-foundation`.
-**In progress:** Phase 7 foundation is complete and remains transaction-compatible; Phase 4 profile UI work and Phase 8 orchestration/client migration are still pending.
-**Next:** Complete Phase 4 profile UI, then wire the Phase 7 resolver/snapshot foundation into Phase 8 authoritative intent creation. See [plan.md](file:///c:/Booking%20Systems/specs/016a-traveler-profile-booking-readiness/plan.md) for details.
+**In progress:** Phase 7 foundation is complete; review fixes now route canonical nested-source requests through resolution and immutable snapshot persistence while retaining the legacy compatibility path. Phase 4 profile UI work and the remaining Phase 8 authoritative/client migration are still pending.
+**Next:** Complete Phase 4 profile UI, then finish Phase 8 authoritative readiness parity, route/client migration, and response hardening. See [plan.md](file:///c:/Booking%20Systems/specs/016a-traveler-profile-booking-readiness/plan.md) for details.
 
 ---
 
@@ -23,7 +23,7 @@ Update this file after every completed feature. Any AI agent reading this should
 - [ ] Phase 4 / PR 4: Secure Profile UI (protected `/profile`, server-side JWT proxy, one-page accessible form, optional travel-document section, revision conflict recovery, safe return-target allowlist, feature-disabled fallback, and Playwright owner/privacy coverage added; frontend typecheck passes; live E2E execution awaits healthy local services and profile-client contract tests remain)
 - [x] Phase 5 / `016f-pure-booking-readiness-evaluator`: Pure normalized-input evaluator, deterministic domestic/international/unknown scope, atomic international document checks, date-only expiry warnings, deferred entry-eligibility projection, bounded advisory-buffer parsing, and table-driven boundary/purity tests are implemented and verified via runtime test suites.
 - [x] Phase 6 / `016g-advisory-booking-readiness-endpoint`: Added the feature-gated, read-only `POST /api/bookings/intents/readiness` path with discriminated passenger sources, owner-scoped profile projection, local-offer segment normalization, batched airport-country lookup, evaluator delegation, safe error mapping, no-store response headers, and PII-safe structured observability; focused Jest, API build, and endpoint E2E verification pass.
-- [x] Phase 7 / Passenger source and snapshot foundation: Added canonical nested discriminated intent passenger DTO validation with revision and matrix rules, owner/revision-aware detached source normalization, complete immutable passenger snapshot data with zero-based positions and AAD-bound passport encryption, safe masked projections, module providers, and 50 passing focused/regression tests. Current intent creation orchestration remains unchanged for Phase 8 integration.
+- [x] Phase 7 / Passenger source and snapshot foundation: Added canonical nested discriminated intent passenger DTO validation with revision and matrix rules, owner/revision-aware detached source normalization, complete immutable passenger snapshot data with zero-based positions and AAD-bound passport encryption, safe masked projections, module providers, canonical create-path wiring, legacy completeness validation, backfill-context compatibility, bound snapshot reads, transaction-time revision checks, and 80 passing focused/regression tests. Remaining Phase 8 work covers authoritative readiness parity, plural route/client migration, and safe response hardening.
 
 ### [ ] Feature: Ancillary Services — Seat Selection, Baggage & Price Tracker (Feature 15)
 

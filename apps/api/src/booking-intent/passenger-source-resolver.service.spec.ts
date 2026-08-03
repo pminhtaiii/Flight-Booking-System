@@ -197,4 +197,34 @@ describe('PassengerSourceResolverService', () => {
       ]),
     ).rejects.toEqual(expect.objectContaining({ response: expect.objectContaining({ code: 'PASSENGER_SOURCE_INVALID' }) }));
   });
+
+  it('supports passport expiry ciphertext created by the profile backfill context', async () => {
+    prisma.travelerProfile.findFirst.mockResolvedValue(
+      profile({ passportExpiryCiphertext: 'v1:backfilled-expiry' }),
+    );
+    encryption.decryptBound.mockImplementation((_value: string, context: Record<string, string>) => {
+      if (context.userId) {
+        throw new Error('user context does not match backfill ciphertext');
+      }
+      return '2030-01-01T00:00:00.000Z';
+    });
+
+    const [resolved] = await service.resolve(USER_ID, [
+      {
+        offerPassengerId: 'pas_001',
+        type: PassengerType.ADULT,
+        source: { type: 'traveler_profile', travelerProfileId: PROFILE_ID, expectedProfileRevision: 3 },
+      },
+    ]);
+
+    expect(resolved.passportExpiry).toBe('2030-01-01');
+    expect(encryption.decryptBound).toHaveBeenNthCalledWith(1, 'v1:backfilled-expiry', {
+      userId: USER_ID,
+      fieldName: 'passportExpiry',
+    });
+    expect(encryption.decryptBound).toHaveBeenNthCalledWith(2, 'v1:backfilled-expiry', {
+      travelerProfileId: PROFILE_ID,
+      fieldName: 'passportExpiry',
+    });
+  });
 });
