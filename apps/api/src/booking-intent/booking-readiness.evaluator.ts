@@ -299,7 +299,7 @@ function evaluateIdentitySection(
 ): BookingReadinessEvaluationSectionResult {
   return sectionResult('identity', [
     evaluateRequiredStringField('givenName', passenger.givenName),
-    fieldResult('middleName', 'filled', null, false),
+    fieldResult('middleName', toTrimmedString(passenger.middleName) === null ? 'missing' : 'filled', null, false),
     evaluateRequiredStringField('familyName', passenger.familyName),
     evaluateDateOfBirth(passenger.dateOfBirth, currentDate),
     evaluateSupportedStringField('gender', passenger.gender, SUPPORTED_GENDERS, 'INVALID_GENDER'),
@@ -469,7 +469,7 @@ export class BookingReadinessEvaluator {
 
     return {
       scope: scopeResult.scope,
-      ready: scopeResult.scope !== 'UNKNOWN' && passengers.every((passenger) => passenger.ready),
+      ready: scopeResult.scope !== 'UNKNOWN' && passengers.length > 0 && passengers.every((passenger) => passenger.ready),
       passengers,
     };
   }
