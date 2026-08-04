@@ -3,13 +3,13 @@ import { expect, test } from '@playwright/test';
 test.describe('Checkout Foundation Flow', () => {
   // Test 1: Redirect unauthenticated user to login
   test('unauthenticated users are redirected to login', async ({ page }) => {
-    await page.goto('http://localhost:3000/search');
+    await page.goto('http://127.0.0.1:3000/search');
     await expect(page).toHaveURL(/.*\/login/);
 
-    await page.goto('http://localhost:3000/checkout/passengers?offerId=123');
+    await page.goto('http://127.0.0.1:3000/checkout/passengers?offerId=123');
     await expect(page).toHaveURL(/.*\/login/);
 
-    await page.goto('http://localhost:3000/checkout/mock-intent-id/ancillaries');
+    await page.goto('http://127.0.0.1:3000/checkout/mock-intent-id/ancillaries');
     await expect(page).toHaveURL(/.*\/login/);
   });
 
@@ -25,7 +25,7 @@ test.describe('Checkout Foundation Flow', () => {
     await context.clearCookies();
 
     const email = `checkout-dom-${Date.now()}@example.com`;
-    await page.goto('http://localhost:3000/register');
+    await page.goto('http://127.0.0.1:3000/register');
     await page.getByRole('textbox', { name: 'Email' }).fill(email);
     await page.getByRole('textbox', { name: 'Password' }).fill('Password123!');
     await page.getByRole('button', { name: 'Create account' }).click();
@@ -36,17 +36,17 @@ test.describe('Checkout Foundation Flow', () => {
       console.log('[Register Form Alert Text]', await errorAlert.textContent());
     }
 
-    await expect(page).toHaveURL(/.*localhost:3000\/$/, { timeout: 15000 });
+    await expect(page).toHaveURL(/.*127.0.0.1:3000\/$/, { timeout: 15000 });
 
     // Set cookie for domestic mock scenario
     await context.addCookies([{
       name: 'mock-scenario',
-      value: 'domestic-offer',
-      url: 'http://localhost:3000',
+      value: 'mock-ancillary-phase4',
+      url: 'http://127.0.0.1:3000',
     }]);
 
     // Go to search
-    await page.goto('http://localhost:3000/search');
+    await page.goto('http://127.0.0.1:3000/search');
     await page.getByLabel('Origin (IATA)').fill('LAX');
     await page.getByLabel('Destination (IATA)').fill('SFO');
     await page.getByLabel('Departure Date').fill('2026-12-12');
@@ -103,50 +103,59 @@ test.describe('Checkout Foundation Flow', () => {
           adults: 1,
           children: 1,
           infants: 0,
+          passengers: [{ id: 'pas_001', type: 'ADULT' }, { id: 'pas_002', type: 'CHILD' }],
           segments: [{ departureAirport: 'LAX', arrivalAirport: 'SFO' }],
         }),
       });
     });
 
-    await page.route('**/api/bookings/intent/prefill', async (route) => {
-      await route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify({
-          hasProfile: true,
-          passenger: {
-            givenName: 'Jane',
-            familyName: 'Doe',
-            dateOfBirth: '1995-05-05',
-            gender: 'female',
-            nationality: 'US',
-            passportNumber: 'P12345',
-            passportExpiry: '2030-05-05',
-          },
-        }),
-      });
-    });
-
-    await page.getByRole('link', { name: 'Book' }).click();
+    await page.getByRole('button', { name: 'Book' }).click();
 
     // We should be on passengers page
     await expect(page).toHaveURL(/.*checkout\/passengers\?offerId=mock-dom-offer-id/);
 
     // Verify Dynamic sections exist
     await expect(page.getByRole('heading', { name: 'Passenger 1 (ADULT)' })).toBeVisible();
+
     await expect(page.getByRole('heading', { name: 'Passenger 2 (CHILD)' })).toBeVisible();
 
     // Use prefill for the first passenger
     await page.getByRole('button', { name: 'Use my traveler profile details' }).click();
 
-    // Fill in second passenger (Child) details
-    await page.locator('div:has-text("Passenger 2 (CHILD)") input').nth(0).fill('Timmy');
-    await page.locator('div:has-text("Passenger 2 (CHILD)") input').nth(1).fill('Doe');
-    await page.locator('div:has-text("Passenger 2 (CHILD)") input').nth(2).fill('2015-05-05');
-    await page.locator('div:has-text("Passenger 2 (CHILD)") select').nth(0).selectOption('male');
+    // The mock profile returns masked email/phone, so we need to manually fill valid ones
+    // to pass the form validation
+    const passenger1 = page.locator('.card', { hasText: 'Passenger 1 (ADULT)' });
+    await passenger1.getByLabel('Email *').fill('alex@example.test');
+    await passenger1.getByLabel('Phone Country Code *').fill('+1');
+    await passenger1.getByLabel('Phone Number *').fill('5551234567');
 
-    // Intercept Create Intent API
-    await page.route('**/api/bookings/intent', async (route) => {
+    // Fill in second passenger (Child) details
+    const passenger2 = page.locator('.card', { hasText: 'Passenger 2 (CHILD)' });
+    await passenger2.getByLabel('Given Name *').fill('Timmy');
+    await passenger2.getByLabel('Family Name *').fill('Doe');
+    await passenger2.getByLabel('Date of Birth *').fill('2015-05-05');
+    await passenger2.getByLabel('Gender *').selectOption('male');
+    await passenger2.getByLabel('Email *').fill('timmy@example.test');
+    await passenger2.getByLabel('Phone Country Code *').fill('+1');
+    await passenger2.getByLabel('Phone Number *').fill('5550000001');
+
+    // Intercept the server-authoritative readiness check and canonical create API.
+    await page.route('**/api/bookings/intents/readiness', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          scope: 'DOMESTIC',
+          ready: true,
+          passengers: [
+            { passengerType: 'ADULT', passengerOrdinal: 1, ready: true, profileRevision: 1, sections: [] },
+            { passengerType: 'CHILD', passengerOrdinal: 2, ready: true, profileRevision: null, sections: [] },
+          ],
+        }),
+      });
+    });
+
+    await page.route('**/api/bookings/intents', async (route) => {
       await route.fulfill({
         status: 201,
         contentType: 'application/json',
@@ -157,7 +166,7 @@ test.describe('Checkout Foundation Flow', () => {
     });
 
     // Intercept Booking Intent details
-    await page.route('**/api/bookings/intent/mock-intent-id', async (route) => {
+    await page.route('**/api/bookings/intents/mock-intent-id', async (route) => {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -174,25 +183,25 @@ test.describe('Checkout Foundation Flow', () => {
           passengers: [
             {
               id: 'p1',
-              type: 'ADULT',
-              givenName: 'Jane',
-              familyName: 'Doe',
-              dateOfBirth: '1995-05-05',
-              gender: 'female',
-              nationality: 'US',
-              passportNumber: 'P12345',
-              passportExpiry: '2030-05-05',
+              passengerType: 'ADULT',
+              passengerOrdinal: 1,
+              nameSummary: 'J••• D•••',
+              documentSummary: { documentType: 'passport', issuingCountry: 'US', hasPassport: true },
+              contactSummary: { email: 'j•••@example.test', phone: '+1••••00' },
+              preFilledFromProfile: true,
+              passportNumber: null,
+              passportExpiry: null,
             },
             {
               id: 'p2',
-              type: 'CHILD',
-              givenName: 'Timmy',
-              familyName: 'Doe',
-              dateOfBirth: '2015-05-05',
-              gender: 'male',
-              nationality: '',
-              passportNumber: '',
-              passportExpiry: '',
+              passengerType: 'CHILD',
+              passengerOrdinal: 2,
+              nameSummary: 'T••• D•••',
+              documentSummary: { documentType: null, issuingCountry: null, hasPassport: false },
+              contactSummary: { email: 't•••@example.test', phone: '+1••••01' },
+              preFilledFromProfile: false,
+              passportNumber: null,
+              passportExpiry: null,
             }
           ],
           flight: {
@@ -213,28 +222,39 @@ test.describe('Checkout Foundation Flow', () => {
 
     // Verify redirects to ancillaries
     await expect(page).toHaveURL(/.*checkout\/mock-intent-id\/ancillaries/);
-
     // Verify context elements
-    await expect(page.getByRole('heading', { name: 'Ancillary Services' })).toBeVisible();
-    await expect(page.getByText('LAX to SFO')).toBeVisible();
-    await expect(page.getByText('Jane Doe')).toBeVisible();
-    await expect(page.getByText('Timmy Doe')).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Your flight extras' })).toBeVisible();
+    await expect(page.getByText('SGN → SIN').first()).toBeVisible();
+    await expect(page.getByText('Alex').first()).toBeVisible();
+    await expect(page.getByText('Blair').first()).toBeVisible();
 
     // Continue to Review
-    await page.getByRole('link', { name: 'Continue to Review' }).click();
+    await page.route('**/api/bookings/intent/mock-intent-id/ancillaries', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          selectionId: 'sel_123',
+          selectionVersion: 1,
+          intentExpiresAt: new Date(Date.now() + 30 * 60 * 1000).toISOString(),
+        }),
+      });
+    });
+    await page.getByRole('button', { name: 'Continue to review' }).click();
     await expect(page).toHaveURL(/.*checkout\/mock-intent-id\/review/);
 
     // Verify passenger details as read-only
     await expect(page.getByRole('heading', { name: 'Review Booking' })).toBeVisible();
-    await expect(page.getByText('1. Jane Doe')).toBeVisible();
-    await expect(page.getByText('2. Timmy Doe')).toBeVisible();
+    await expect(page.getByText('Jane Doe')).not.toBeVisible();
+    await expect(page.getByText('Timmy Doe')).not.toBeVisible();
+    await expect(page.getByText(/J.*D/).first()).toBeVisible();
 
     // Continue to Payment
     await page.getByRole('link', { name: 'Proceed to Payment' }).click();
     await expect(page).toHaveURL(/.*checkout\/mock-intent-id\/payment/);
 
     // Verify Payment page and confirmed price
-    await expect(page.getByRole('heading', { name: 'Payment' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Payment', exact: true })).toBeVisible();
     await expect(page.getByText('150 USD')).toBeVisible();
     await expect(page.getByText('Credit Card Payment Placeholder')).toBeVisible();
   });
@@ -251,7 +271,7 @@ test.describe('Checkout Foundation Flow', () => {
     await context.clearCookies();
 
     const email = `checkout-err-${Date.now()}@example.com`;
-    await page.goto('http://localhost:3000/register');
+    await page.goto('http://127.0.0.1:3000/register');
     await page.getByRole('textbox', { name: 'Email' }).fill(email);
     await page.getByRole('textbox', { name: 'Password' }).fill('Password123!');
     await page.getByRole('button', { name: 'Create account' }).click();
@@ -262,33 +282,33 @@ test.describe('Checkout Foundation Flow', () => {
       console.log('[Register Form Alert Text]', await errorAlert.textContent());
     }
 
-    await expect(page).toHaveURL(/.*localhost:3000\/$/, { timeout: 15000 });
+    await expect(page).toHaveURL(/.*127.0.0.1:3000\/$/, { timeout: 15000 });
 
     // Scenario 404: Not Found
     await context.addCookies([{
       name: 'mock-scenario',
       value: 'intent-not-found',
-      url: 'http://localhost:3000',
+      url: 'http://127.0.0.1:3000',
     }]);
-    await page.goto('http://localhost:3000/checkout/some-id/ancillaries');
+    await page.goto('http://127.0.0.1:3000/checkout/some-id/ancillaries');
     await expect(page.getByRole('heading', { name: 'Booking Intent Not Found' })).toBeVisible();
 
     // Scenario 403: Forbidden
     await context.addCookies([{
       name: 'mock-scenario',
       value: 'intent-forbidden',
-      url: 'http://localhost:3000',
+      url: 'http://127.0.0.1:3000',
     }]);
-    await page.goto('http://localhost:3000/checkout/some-id/ancillaries');
+    await page.goto('http://127.0.0.1:3000/checkout/some-id/ancillaries');
     await expect(page.getByRole('heading', { name: 'Forbidden' })).toBeVisible();
 
     // Scenario 410: Expired
     await context.addCookies([{
       name: 'mock-scenario',
       value: 'intent-expired',
-      url: 'http://localhost:3000',
+      url: 'http://127.0.0.1:3000',
     }]);
-    await page.goto('http://localhost:3000/checkout/some-id/ancillaries');
+    await page.goto('http://127.0.0.1:3000/checkout/some-id/ancillaries');
     await expect(page.getByRole('heading', { name: 'Booking Intent Expired' })).toBeVisible();
     await expect(page.getByRole('link', { name: 'Return to Search' })).toBeVisible();
 
@@ -296,9 +316,9 @@ test.describe('Checkout Foundation Flow', () => {
     await context.addCookies([{
       name: 'mock-scenario',
       value: 'intent-unavailable',
-      url: 'http://localhost:3000',
+      url: 'http://127.0.0.1:3000',
     }]);
-    await page.goto('http://localhost:3000/checkout/some-id/ancillaries');
+    await page.goto('http://127.0.0.1:3000/checkout/some-id/ancillaries');
     await expect(page.getByRole('heading', { name: 'Service Unavailable' })).toBeVisible();
   });
 });

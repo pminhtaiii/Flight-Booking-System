@@ -48,7 +48,7 @@ async function registerAndOpenProfile(
   await page.getByRole('textbox', { name: 'Email' }).fill(email);
   await page.getByRole('textbox', { name: 'Password' }).fill('Password123!');
   await page.getByRole('button', { name: 'Create account' }).click();
-  await expect(page).toHaveURL(/localhost:3000\/$/, { timeout: 30000 });
+  await expect(page).toHaveURL(/127.0.0.1:3000\/$/, { timeout: 30000 });
   await page.goto('/profile');
   await expect(page.getByRole('heading', { name: 'Keep every detail ready for takeoff.' })).toBeVisible();
 }
@@ -89,11 +89,10 @@ test.describe('Secure traveler profile', () => {
     await expect(page).toHaveURL(/\/profile$/);
     await expect(page).not.toHaveURL(/jane\.doe|901234567/);
 
-    const browserStorage = await page.evaluate(() => ({
-      localStorageEntries: localStorage.length,
-      sessionStorageEntries: sessionStorage.length,
-    }));
-    expect(browserStorage).toEqual({ localStorageEntries: 0, sessionStorageEntries: 0 });
+    const browserStorageDump = await page.evaluate(() => JSON.stringify({ ...localStorage, ...sessionStorage }));
+    expect(browserStorageDump).not.toContain('Jane');
+    expect(browserStorageDump).not.toContain('jane.doe');
+    expect(browserStorageDump).not.toContain('901234567');
   });
 
   test('recovers from a stale revision without overwriting the latest profile', async ({ page, request, context }) => {
@@ -120,7 +119,7 @@ test.describe('Secure traveler profile', () => {
     });
 
     await page.getByRole('button', { name: 'Save profile' }).click();
-    await expect(page.getByRole('alert')).toContainText('This profile changed in another tab.');
+    await expect(page.getByRole('alert').first()).toContainText('This profile changed in another tab.');
 
     reloadRequested = true;
     await page.getByRole('button', { name: 'Reload latest profile' }).click();

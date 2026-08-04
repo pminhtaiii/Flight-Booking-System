@@ -14,7 +14,7 @@ test.describe('My Bookings list', () => {
     await context.clearCookies();
 
     const email = `bookings-${Date.now()}-${Math.random().toString(36).slice(2)}@example.com`;
-    await page.goto('http://localhost:3000/register');
+    await page.goto('http://127.0.0.1:3000/register');
     await page.getByRole('textbox', { name: 'Email' }).fill(email);
     await page.getByRole('textbox', { name: 'Password' }).fill('Password123!');
     await page.getByRole('button', { name: 'Create account' }).click();
@@ -25,9 +25,9 @@ test.describe('My Bookings list', () => {
       console.log('[Register Form Alert Text]', await errorAlert.textContent());
     }
 
-    await expect(page).toHaveURL(/.*localhost:3000\/$/, { timeout: 30000 });
+    await expect(page).toHaveURL(/.*127.0.0.1:3000\/$/, { timeout: 30000 });
 
-    await page.goto('http://localhost:3000/bookings');
+    await page.goto('http://127.0.0.1:3000/bookings');
 
     await expect(page.getByRole('heading', { name: 'My Bookings' })).toBeVisible();
     await expect(page.getByRole('tab', { name: 'Upcoming' })).toHaveAttribute('aria-selected', 'true');

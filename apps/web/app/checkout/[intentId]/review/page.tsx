@@ -117,38 +117,18 @@ export default async function ReviewPage({ params }: Props) {
               <div key={p.id || idx} className="py-4 space-y-2 text-sm">
                 <div className="flex justify-between items-center">
                   <p className="font-bold text-text-primary">
-                    {idx + 1}. {p.givenName} {p.familyName}
+                    {p.passengerOrdinal || idx + 1}. {p.nameSummary}
                   </p>
                   <span className="bg-secondary text-secondary-foreground text-xs px-2 py-0.5 rounded font-medium capitalize">
-                    {p.type.toLowerCase()}
+                    {p.passengerType.toLowerCase()}
                   </span>
                 </div>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-xs text-text-secondary">
-                  <div>
-                    <span className="font-semibold text-text-primary">Date of Birth:</span>
-                    <p>{p.dateOfBirth}</p>
-                  </div>
-                  <div>
-                    <span className="font-semibold text-text-primary">Gender:</span>
-                    <p className="capitalize">{p.gender}</p>
-                  </div>
-                  {p.passportNumber && (
-                    <>
-                      <div>
-                        <span className="font-semibold text-text-primary">Nationality:</span>
-                        <p>{p.nationality}</p>
-                      </div>
-                      <div>
-                        <span className="font-semibold text-text-primary">Passport Number:</span>
-                        <p>{p.passportNumber}</p>
-                      </div>
-                      <div>
-                        <span className="font-semibold text-text-primary">Passport Expiry:</span>
-                        <p>{p.passportExpiry}</p>
-                      </div>
-                    </>
-                  )}
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-xs text-text-secondary">
+                  <div><span className="font-semibold text-text-primary">Document:</span><p>{p.documentSummary.documentType || 'Not provided'}{p.documentSummary.issuingCountry ? ` · ${p.documentSummary.issuingCountry}` : ''}{p.documentSummary.hasPassport ? ' · masked' : ''}</p></div>
+                  <div><span className="font-semibold text-text-primary">Contact:</span><p>{p.contactSummary.email || 'Not provided'}{p.contactSummary.phone ? ` · ${p.contactSummary.phone}` : ''}</p></div>
+                  <div><span className="font-semibold text-text-primary">Source:</span><p>{p.preFilledFromProfile ? 'Traveler profile' : 'Entered for this booking'}</p></div>
                 </div>
+                {p.preFilledFromProfile && <Link href={`/profile?returnTo=/checkout/${intentId}/review`} className="inline-block text-sm text-text-link underline">Edit traveler profile securely</Link>}
               </div>
             ))}
           </div>

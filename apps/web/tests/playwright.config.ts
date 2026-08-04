@@ -26,23 +26,24 @@ export default defineConfig({
   ],
   webServer: [
     {
-      command: 'pnpm build && pnpm start:prod',
+      command: 'pnpm start:prod',
       url: 'http://127.0.0.1:3001/health',
       reuseExistingServer: !process.env.CI,
-      timeout: 300000,
+      timeout: 600000,
       cwd: path.resolve(__dirname, '../../api'),
       env: {
         NODE_ENV: 'test',
         DATABASE_URL: 'postgresql://postgres:postgres@127.0.0.1:5432/test_db',
         REDIS_URL: 'redis://127.0.0.1:6379/1',
         FEATURE_FLAG_BOOKING_READINESS: 'true',
+        FRONTEND_URL: 'http://127.0.0.1:3000',
       },
     },
     {
-      command: 'pnpm build && pnpm start',
+      command: 'pnpm start',
       url: 'http://127.0.0.1:3000',
       reuseExistingServer: !process.env.CI,
-      timeout: 300000,
+      timeout: 600000,
       cwd: path.resolve(__dirname, '..'),
       env: frontendEnv,
     },

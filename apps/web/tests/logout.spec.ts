@@ -7,12 +7,12 @@ test('keeps the session active when the public API URL is not configured', async
   await context.clearCookies();
 
   const email = `logout-${Date.now()}-${Math.random().toString(36).slice(2)}@example.com`;
-  await page.goto('http://localhost:3000/register');
+  await page.goto('http://127.0.0.1:3000/register');
   await page.getByRole('textbox', { name: 'Email' }).fill(email);
   await page.getByRole('textbox', { name: 'Password' }).fill('Password123!');
   await page.getByRole('button', { name: 'Create account' }).click();
 
-  await expect(page).toHaveURL(/.*localhost:3000\/$/, { timeout: 30000 });
+  await expect(page).toHaveURL(/.*127.0.0.1:3000\/$/, { timeout: 30000 });
 
   // Intercept configuration endpoint to return missing API URL
   await page.route('**/api/config', async (route) => {
@@ -23,7 +23,7 @@ test('keeps the session active when the public API URL is not configured', async
     });
   });
 
-  await page.goto('http://localhost:3000/bookings');
+  await page.goto('http://127.0.0.1:3000/bookings');
   const localhostLogoutRequest = page
     .waitForRequest('http://localhost:3001/api/auth/logout', { timeout: 1000 })
     .then(() => true)
