@@ -2,6 +2,8 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import type { TravelerProfileResponse } from '@/lib/profile-contract';
+import type { BookingReadinessResponse, CheckoutPassengerRequest } from '@/lib/checkout';
 
 interface PassengerFormClientProps {
   flight: {
@@ -10,115 +12,122 @@ interface PassengerFormClientProps {
     children: number;
     infants: number;
   };
-  prefill: {
-    hasProfile: boolean;
-    passenger?: {
-      givenName?: string | null;
-      familyName?: string | null;
-      dateOfBirth?: string | null;
-      gender?: string | null;
-      nationality?: string | null;
-      passportNumber?: string | null;
-      passportExpiry?: string | null;
-    } | null;
-  };
-  isInternational: boolean;
+  profile: TravelerProfileResponse | null;
+  offerPassengers: Array<{ id: string; type: 'ADULT' | 'CHILD' | 'INFANT' }>;
   accessToken: string;
   offerId: string;
 }
 
 interface FormPassenger {
+  offerPassengerId: string;
   type: 'ADULT' | 'CHILD' | 'INFANT';
   givenName: string;
   familyName: string;
   dateOfBirth: string;
   gender: string;
+  title: string;
+  email: string;
+  phoneCountryCode: string;
+  phoneNumber: string;
   nationality: string;
+  documentType: string;
   passportNumber: string;
   passportExpiry: string;
-  useProfile?: boolean;
+  issuingCountry: string;
+}
+
+function initialPassengers(
+  flight: PassengerFormClientProps['flight'],
+  offerPassengers: PassengerFormClientProps['offerPassengers'],
+): FormPassenger[] {
+  const source = offerPassengers.length > 0
+    ? offerPassengers
+    : [
+        ...Array.from({ length: flight.adults }, () => ({ id: '', type: 'ADULT' as const })),
+        ...Array.from({ length: flight.children || 0 }, () => ({ id: '', type: 'CHILD' as const })),
+        ...Array.from({ length: flight.infants || 0 }, () => ({ id: '', type: 'INFANT' as const })),
+      ];
+
+  return source.map((passenger) => ({
+    offerPassengerId: passenger.id,
+    type: passenger.type,
+    givenName: '',
+    familyName: '',
+    dateOfBirth: '',
+    gender: 'male',
+    title: 'Mr',
+    email: '',
+    phoneCountryCode: '+1',
+    phoneNumber: '',
+    nationality: '',
+    documentType: '',
+    passportNumber: '',
+    passportExpiry: '',
+    issuingCountry: '',
+  }));
+}
+
+function profileValues(profile: TravelerProfileResponse): Partial<FormPassenger> {
+  return {
+    givenName: profile.identity?.givenName ?? '',
+    familyName: profile.identity?.familyName ?? '',
+    dateOfBirth: profile.identity?.dateOfBirth?.slice(0, 10) ?? '',
+    gender: profile.identity?.gender ?? 'male',
+    title: profile.identity?.title ?? 'Mr',
+    email: profile.contact?.email ?? '',
+    phoneCountryCode: profile.contact?.phoneCountryCode ?? '+1',
+    phoneNumber: profile.contact?.phoneNumber ?? '',
+    nationality: profile.travelDocument?.nationality ?? '',
+    documentType: profile.travelDocument?.documentType ?? '',
+    passportNumber: profile.travelDocument?.passportNumber ?? '',
+    passportExpiry: profile.travelDocument?.passportExpiry?.slice(0, 10) ?? '',
+    issuingCountry: profile.travelDocument?.issuingCountry ?? '',
+  };
+}
+
+function safeErrorMessage(status: number, code: unknown): string {
+  if (status === 409 && code === 'PROFILE_CHANGED') {
+    return 'Your traveler profile changed. Review the passenger details before trying again.';
+  }
+  if (status === 422 && code === 'BOOKING_NOT_READY') {
+    return 'The server needs more passenger details before this booking can continue.';
+  }
+  if (status === 400 && code === 'PASSENGER_SOURCE_CONFLICT') {
+    return 'Passenger details need to be reviewed before this booking can continue.';
+  }
+  return 'We could not continue this booking. Please review the passenger details and try again.';
 }
 
 export function PassengerFormClient({
   flight,
-  prefill,
-  isInternational,
+  profile,
+  offerPassengers,
   accessToken,
   offerId,
 }: PassengerFormClientProps) {
   const router = useRouter();
-
-  // Construct initial passenger array
-  const initialPassengers: FormPassenger[] = [];
-  for (let i = 0; i < flight.adults; i++) {
-    initialPassengers.push({
-      type: 'ADULT',
-      givenName: '',
-      familyName: '',
-      dateOfBirth: '',
-      gender: 'male',
-      nationality: '',
-      passportNumber: '',
-      passportExpiry: '',
-    });
-  }
-  for (let i = 0; i < (flight.children || 0); i++) {
-    initialPassengers.push({
-      type: 'CHILD',
-      givenName: '',
-      familyName: '',
-      dateOfBirth: '',
-      gender: 'male',
-      nationality: '',
-      passportNumber: '',
-      passportExpiry: '',
-    });
-  }
-  for (let i = 0; i < (flight.infants || 0); i++) {
-    initialPassengers.push({
-      type: 'INFANT',
-      givenName: '',
-      familyName: '',
-      dateOfBirth: '',
-      gender: 'male',
-      nationality: '',
-      passportNumber: '',
-      passportExpiry: '',
-    });
-  }
-
-  const [passengers, setPassengers] = useState<FormPassenger[]>(initialPassengers);
+  const [passengers, setPassengers] = useState<FormPassenger[]>(() => initialPassengers(flight, offerPassengers));
+  const [profileSelected, setProfileSelected] = useState(false);
+  const [profileStale, setProfileStale] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
 
-  const handleUsePrefill = () => {
-    if (!prefill.passenger) return;
-    const p = prefill.passenger;
+  const handleUseProfile = () => {
+    if (!profile?.profileId || !passengers[0]) return;
     const updated = [...passengers];
-    updated[0] = {
-      ...updated[0],
-      givenName: p.givenName || '',
-      familyName: p.familyName || '',
-      dateOfBirth: p.dateOfBirth ? p.dateOfBirth.slice(0, 10) : '',
-      gender: p.gender || 'male',
-      nationality: p.nationality || '',
-      passportNumber: p.passportNumber || '',
-      passportExpiry: p.passportExpiry ? p.passportExpiry.slice(0, 10) : '',
-      useProfile: true,
-    };
+    updated[0] = { ...updated[0], ...profileValues(profile) };
     setPassengers(updated);
+    setProfileSelected(true);
+    setError(null);
   };
 
   const handleFieldChange = (index: number, field: keyof FormPassenger, value: string) => {
     const updated = [...passengers];
-    updated[index] = {
-      ...updated[index],
-      [field]: value,
-    };
+    updated[index] = { ...updated[index], [field]: value };
     setPassengers(updated);
+    if (index === 0 && profileSelected) setProfileSelected(false);
 
-    // Clear validation error when field is updated
     const errorKey = `${index}-${field}`;
     if (validationErrors[errorKey]) {
       const copy = { ...validationErrors };
@@ -131,125 +140,139 @@ export function PassengerFormClient({
     const errors: Record<string, string> = {};
     const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
 
-    passengers.forEach((p, index) => {
-
-      if (!p.givenName.trim()) {
-        errors[`${index}-givenName`] = 'Given name is required';
-      }
-      if (!p.familyName.trim()) {
-        errors[`${index}-familyName`] = 'Family name is required';
-      }
-      if (!p.dateOfBirth) {
-        errors[`${index}-dateOfBirth`] = 'Date of birth is required';
-      } else if (!dateRegex.test(p.dateOfBirth)) {
-        errors[`${index}-dateOfBirth`] = 'Use YYYY-MM-DD format';
-      }
-
-      if (isInternational) {
-        if (!p.nationality.trim()) {
-          errors[`${index}-nationality`] = 'Nationality is required';
-        } else if (!/^[A-Za-z]{2}$/.test(p.nationality)) {
-          errors[`${index}-nationality`] = 'Must be a 2-character code';
-        }
-
-        if (!p.passportNumber.trim()) {
-          errors[`${index}-passportNumber`] = 'Passport number is required';
-        }
-
-        if (!p.passportExpiry) {
-          errors[`${index}-passportExpiry`] = 'Passport expiry is required';
-        } else if (!dateRegex.test(p.passportExpiry)) {
-          errors[`${index}-passportExpiry`] = 'Use YYYY-MM-DD format';
-        }
-      }
+    passengers.forEach((passenger, index) => {
+      if (!passenger.givenName.trim()) errors[`${index}-givenName`] = 'Given name is required';
+      if (!passenger.familyName.trim()) errors[`${index}-familyName`] = 'Family name is required';
+      if (!passenger.dateOfBirth || !dateRegex.test(passenger.dateOfBirth)) errors[`${index}-dateOfBirth`] = 'Use YYYY-MM-DD format';
+      if (!passenger.title.trim()) errors[`${index}-title`] = 'Title is required';
+      if (!/^\S+@\S+\.\S+$/.test(passenger.email.trim())) errors[`${index}-email`] = 'Enter a valid email address';
+      if (!/^\+\d{1,4}$/.test(passenger.phoneCountryCode.trim())) errors[`${index}-phoneCountryCode`] = 'Enter a valid country code';
+      if (!/^\d{4,20}$/.test(passenger.phoneNumber.trim())) errors[`${index}-phoneNumber`] = 'Enter a valid phone number';
+      if (passenger.nationality.trim() && passenger.nationality.trim().length !== 2) errors[`${index}-nationality`] = 'Nationality must be a 2-letter country code';
+      if (passenger.issuingCountry.trim() && passenger.issuingCountry.trim().length !== 2) errors[`${index}-issuingCountry`] = 'Issuing Country must be a 2-letter country code';
     });
 
     setValidationErrors(errors);
     return Object.keys(errors).length === 0;
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError(null);
+  const buildSources = (): CheckoutPassengerRequest[] => passengers.map((passenger, index) => ({
+    offerPassengerId: passenger.offerPassengerId || `passenger-${index + 1}`,
+    type: passenger.type,
+    source: profileSelected && index === 0 && profile?.profileId
+      ? {
+          type: 'traveler_profile' as const,
+          travelerProfileId: profile.profileId,
+          expectedProfileRevision: profile.revision,
+        }
+      : {
+          type: 'inline' as const,
+          givenName: passenger.givenName.trim(),
+          familyName: passenger.familyName.trim(),
+          dateOfBirth: passenger.dateOfBirth,
+          gender: passenger.gender,
+          nationality: passenger.nationality.trim().toUpperCase() || undefined,
+          documentType: passenger.documentType.trim() || undefined,
+          passportNumber: passenger.passportNumber.trim() || undefined,
+          passportExpiry: passenger.passportExpiry || undefined,
+          issuingCountry: passenger.issuingCountry.trim().toUpperCase() || undefined,
+          email: passenger.email.trim(),
+          phoneCountryCode: passenger.phoneCountryCode.trim(),
+          phoneNumber: passenger.phoneNumber.trim(),
+          title: passenger.title.trim(),
+        },
+  }));
 
+  const handleSubmit = async (event: React.FormEvent) => {
+    event.preventDefault();
+    setError(null);
     if (!validate()) {
       setError('Please correct the validation errors below.');
       return;
     }
 
     setLoading(true);
-
     const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
-
-    interface SubmitPassenger {
-      type: 'ADULT' | 'CHILD' | 'INFANT';
-      givenName: string;
-      familyName: string;
-      dateOfBirth: string;
-      gender: string;
-      useProfile?: boolean;
-      nationality?: string;
-      passportNumber?: string;
-      passportExpiry?: string;
-    }
-
-    // Format body
-    const formattedPassengers = passengers.map((p) => {
-      const item: SubmitPassenger = {
-        type: p.type,
-        givenName: p.givenName.trim(),
-        familyName: p.familyName.trim(),
-        dateOfBirth: p.dateOfBirth,
-        gender: p.gender,
-      };
-
-      if (p.useProfile) {
-        item.useProfile = true;
-      }
-
-      if (isInternational) {
-        item.nationality = p.nationality.toUpperCase().trim();
-        item.passportNumber = p.passportNumber.trim();
-        item.passportExpiry = p.passportExpiry;
-      } else {
-        // Optionals for domestic
-        if (p.nationality.trim()) {
-          item.nationality = p.nationality.toUpperCase().trim();
-        }
-        if (p.passportNumber.trim()) {
-          item.passportNumber = p.passportNumber.trim();
-        }
-        if (p.passportExpiry) {
-          item.passportExpiry = p.passportExpiry;
-        }
-      }
-
-      return item;
-    });
+    const traceId = globalThis.crypto?.randomUUID?.() ?? `checkout-${Date.now()}`;
+    const correlationId = globalThis.crypto?.randomUUID?.() ?? `booking-${Date.now()}`;
+    const sources = buildSources();
 
     try {
-      const response = await fetch(`${apiUrl}/api/bookings/intent`, {
+      const readinessResponse = await fetch(`${apiUrl}/api/bookings/intents/readiness`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${accessToken}`,
+          'x-trace-id': traceId,
+          'x-correlation-id': correlationId,
         },
+        cache: 'no-store',
         body: JSON.stringify({
           flightOfferId: offerId,
-          passengers: formattedPassengers,
+          passengers: sources.map((passenger) => ({
+            offerPassengerId: passenger.offerPassengerId,
+            passengerType: passenger.type,
+            source: passenger.source,
+          })),
         }),
       });
-
-      if (!response.ok) {
-        const errData = await response.json().catch(() => ({}));
-        throw new Error(errData.message || 'Failed to create booking intent.');
+      const readiness = (await readinessResponse.json().catch(() => null)) as BookingReadinessResponse | { code?: string } | null;
+      if (!readinessResponse.ok) {
+        throw new Error(safeErrorMessage(readinessResponse.status, readiness && 'code' in readiness ? readiness.code : null));
+      }
+      if (!readiness || !('ready' in readiness) || !readiness.ready) {
+        throw new Error('The server needs more passenger details before this booking can continue.');
       }
 
-      const data = await response.json();
-      router.push(`/checkout/${data.intentId}/ancillaries`);
-    } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'An error occurred during submission.';
-      setError(message);
+      const createResponse = await fetch(`${apiUrl}/api/bookings/intents`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${accessToken}`,
+          'x-trace-id': traceId,
+          'x-correlation-id': correlationId,
+        },
+        cache: 'no-store',
+        body: JSON.stringify({
+          flightOfferId: offerId,
+          readinessScope: readiness.scope,
+          passengers: sources,
+        }),
+      });
+      const createBody = await createResponse.json().catch(() => null) as { code?: string; intentId?: string } | null;
+      if (!createResponse.ok || !createBody?.intentId) {
+        if (createResponse.status === 409 && createBody?.code === 'PROFILE_CHANGED') {
+          setProfileSelected(false);
+          setProfileStale(true);
+          setPassengers((prev) => {
+            const updated = [...prev];
+            if (updated[0]) {
+              updated[0] = {
+                ...updated[0],
+                givenName: '',
+                familyName: '',
+                dateOfBirth: '',
+                gender: 'male',
+                title: 'Mr',
+                email: '',
+                phoneCountryCode: '+1',
+                phoneNumber: '',
+                nationality: '',
+                documentType: '',
+                passportNumber: '',
+                passportExpiry: '',
+                issuingCountry: '',
+              };
+            }
+            return updated;
+          });
+        }
+        throw new Error(safeErrorMessage(createResponse.status, createBody?.code));
+      }
+
+      router.push(`/checkout/${createBody.intentId}/ancillaries`);
+    } catch (submissionError: unknown) {
+      setError(submissionError instanceof Error ? submissionError.message : 'We could not continue this booking.');
     } finally {
       setLoading(false);
     }
@@ -265,163 +288,53 @@ export function PassengerFormClient({
       )}
 
       {passengers.map((passenger, index) => (
-        <div key={index} className="card space-y-6">
+        <div key={passenger.offerPassengerId || index} className="card space-y-6">
           <div className="flex justify-between items-center border-b border-card-border pb-4">
-            <h3 className="text-lg font-bold text-text-primary">
-              Passenger {index + 1} ({passenger.type})
-            </h3>
-            {index === 0 && passenger.type === 'ADULT' && prefill.hasProfile && (
-              <button
-                type="button"
-                onClick={handleUsePrefill}
-                className="btn-secondary py-1 text-xs"
-              >
+            <h3 className="text-lg font-bold text-text-primary">Passenger {index + 1} ({passenger.type})</h3>
+            {index === 0 && passenger.type === 'ADULT' && profile?.profileId && !profileStale && (
+              <button type="button" onClick={handleUseProfile} className="btn-secondary py-1 text-xs">
                 Use my traveler profile details
               </button>
             )}
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div>
-              <label className="block text-sm font-medium text-text-secondary mb-1">
-                Given Name *
-              </label>
-              <input
-                type="text"
-                value={passenger.givenName}
-                onChange={(e) => handleFieldChange(index, 'givenName', e.target.value)}
-                className="form-input w-full"
-              />
-              {validationErrors[`${index}-givenName`] && (
-                <p role="alert" className="text-xs text-text-cancelled mt-1">
-                  {validationErrors[`${index}-givenName`]}
-                </p>
-              )}
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-text-secondary mb-1">
-                Family Name *
-              </label>
-              <input
-                type="text"
-                value={passenger.familyName}
-                onChange={(e) => handleFieldChange(index, 'familyName', e.target.value)}
-                className="form-input w-full"
-              />
-              {validationErrors[`${index}-familyName`] && (
-                <p role="alert" className="text-xs text-text-cancelled mt-1">
-                  {validationErrors[`${index}-familyName`]}
-                </p>
-              )}
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div>
-              <label className="block text-sm font-medium text-text-secondary mb-1">
-                Date of Birth *
-              </label>
-              <input
-                type="date"
-                value={passenger.dateOfBirth}
-                onChange={(e) => handleFieldChange(index, 'dateOfBirth', e.target.value)}
-                className="form-input w-full"
-              />
-              {validationErrors[`${index}-dateOfBirth`] && (
-                <p role="alert" className="text-xs text-text-cancelled mt-1">
-                  {validationErrors[`${index}-dateOfBirth`]}
-                </p>
-              )}
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-text-secondary mb-1">
-                Gender *
-              </label>
-              <select
-                value={passenger.gender}
-                onChange={(e) => handleFieldChange(index, 'gender', e.target.value)}
-                className="form-input w-full"
-              >
-                <option value="male">Male</option>
-                <option value="female">Female</option>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <label className="block text-sm font-medium text-text-secondary">Title
+              <select value={passenger.title} onChange={(event) => handleFieldChange(index, 'title', event.target.value)} className="form-input w-full mt-1">
+                <option value="Mr">Mr</option><option value="Mrs">Mrs</option><option value="Ms">Ms</option><option value="Miss">Miss</option><option value="Mx">Mx</option>
               </select>
-            </div>
+            </label>
+            <label className="block text-sm font-medium text-text-secondary">Given Name *<input value={passenger.givenName} onChange={(event) => handleFieldChange(index, 'givenName', event.target.value)} className="form-input w-full mt-1" /></label>
+            <label className="block text-sm font-medium text-text-secondary">Family Name *<input value={passenger.familyName} onChange={(event) => handleFieldChange(index, 'familyName', event.target.value)} className="form-input w-full mt-1" /></label>
           </div>
 
-          {/* Conditional passport fields */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <label className="block text-sm font-medium text-text-secondary">Date of Birth *<input type="date" value={passenger.dateOfBirth} onChange={(event) => handleFieldChange(index, 'dateOfBirth', event.target.value)} className="form-input w-full mt-1" /></label>
+            <label className="block text-sm font-medium text-text-secondary">Gender *<select value={passenger.gender} onChange={(event) => handleFieldChange(index, 'gender', event.target.value)} className="form-input w-full mt-1"><option value="male">Male</option><option value="female">Female</option></select></label>
+            <label className="block text-sm font-medium text-text-secondary">Nationality<input maxLength={2} value={passenger.nationality} onChange={(event) => handleFieldChange(index, 'nationality', event.target.value)} className="form-input w-full mt-1 uppercase" /></label>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <label className="block text-sm font-medium text-text-secondary">Email *<input type="email" value={passenger.email} onChange={(event) => handleFieldChange(index, 'email', event.target.value)} className="form-input w-full mt-1" /></label>
+            <label className="block text-sm font-medium text-text-secondary">Phone Country Code *<input value={passenger.phoneCountryCode} onChange={(event) => handleFieldChange(index, 'phoneCountryCode', event.target.value)} className="form-input w-full mt-1" /></label>
+            <label className="block text-sm font-medium text-text-secondary">Phone Number *<input value={passenger.phoneNumber} onChange={(event) => handleFieldChange(index, 'phoneNumber', event.target.value)} className="form-input w-full mt-1" /></label>
+          </div>
+
           <div className="border-t border-card-border pt-6 space-y-6">
-            <h4 className="font-semibold text-text-primary">
-              Passport Details {isInternational ? '*' : '(Optional)'}
-            </h4>
-
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              <div>
-                <label className="block text-sm font-medium text-text-secondary mb-1">
-                  Nationality {isInternational && '*'}
-                </label>
-                <input
-                  type="text"
-                  maxLength={2}
-                  placeholder="e.g. US"
-                  value={passenger.nationality}
-                  onChange={(e) => handleFieldChange(index, 'nationality', e.target.value)}
-                  className="form-input w-full uppercase"
-                />
-                {validationErrors[`${index}-nationality`] && (
-                  <p role="alert" className="text-xs text-text-cancelled mt-1">
-                    {validationErrors[`${index}-nationality`]}
-                  </p>
-                )}
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-text-secondary mb-1">
-                  Passport Number {isInternational && '*'}
-                </label>
-                <input
-                  type="text"
-                  placeholder="Passport number"
-                  value={passenger.passportNumber}
-                  onChange={(e) => handleFieldChange(index, 'passportNumber', e.target.value)}
-                  className="form-input w-full"
-                />
-                {validationErrors[`${index}-passportNumber`] && (
-                  <p role="alert" className="text-xs text-text-cancelled mt-1">
-                    {validationErrors[`${index}-passportNumber`]}
-                  </p>
-                )}
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-text-secondary mb-1">
-                  Passport Expiry {isInternational && '*'}
-                </label>
-                <input
-                  type="date"
-                  value={passenger.passportExpiry}
-                  onChange={(e) => handleFieldChange(index, 'passportExpiry', e.target.value)}
-                  className="form-input w-full"
-                />
-                {validationErrors[`${index}-passportExpiry`] && (
-                  <p role="alert" className="text-xs text-text-cancelled mt-1">
-                    {validationErrors[`${index}-passportExpiry`]}
-                  </p>
-                )}
-              </div>
+            <h4 className="font-semibold text-text-primary">Travel Document (if required)</h4>
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+              <label className="block text-sm font-medium text-text-secondary">Document Type<input value={passenger.documentType} onChange={(event) => handleFieldChange(index, 'documentType', event.target.value)} className="form-input w-full mt-1" /></label>
+              <label className="block text-sm font-medium text-text-secondary">Passport Number<input value={passenger.passportNumber} onChange={(event) => handleFieldChange(index, 'passportNumber', event.target.value)} className="form-input w-full mt-1" /></label>
+              <label className="block text-sm font-medium text-text-secondary">Passport Expiry<input type="date" value={passenger.passportExpiry} onChange={(event) => handleFieldChange(index, 'passportExpiry', event.target.value)} className="form-input w-full mt-1" /></label>
+              <label className="block text-sm font-medium text-text-secondary">Issuing Country<input maxLength={2} value={passenger.issuingCountry} onChange={(event) => handleFieldChange(index, 'issuingCountry', event.target.value)} className="form-input w-full mt-1 uppercase" /></label>
             </div>
           </div>
         </div>
       ))}
 
       <div className="flex justify-end">
-        <button
-          type="submit"
-          disabled={loading}
-          className="btn-primary px-8 py-3"
-        >
-          {loading ? 'Submitting...' : 'Continue to Ancillaries'}
+        <button type="submit" disabled={loading} className="btn-primary px-8 py-3">
+          {loading ? 'Checking readiness...' : 'Continue to Ancillaries'}
         </button>
       </div>
     </form>

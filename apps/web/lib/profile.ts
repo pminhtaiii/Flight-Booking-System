@@ -1,4 +1,4 @@
-import { getProfileRequestError, ProfileRequestError } from './profile-contract';
+import { getProfileRequestError } from './profile-contract';
 import type { TravelerProfileResponse, UpdateProfilePayload } from './profile-contract';
 
 export { ProfileRequestError } from './profile-contract';

@@ -13,8 +13,8 @@ async function authenticateAncillaryScenario(context: Parameters<typeof test>[0]
     },
   });
   await context.addCookies([
-    { name: 'next-auth.session-token', value: sessionToken, url: 'http://localhost:3000', httpOnly: true, sameSite: 'Lax' },
-    { name: 'mock-scenario', value: 'mock-ancillary-phase4', url: 'http://localhost:3000', sameSite: 'Lax' },
+    { name: 'next-auth.session-token', value: sessionToken, url: 'http://127.0.0.1:3000', httpOnly: true, sameSite: 'Lax' },
+    { name: 'mock-scenario', value: 'mock-ancillary-phase4', url: 'http://127.0.0.1:3000', sameSite: 'Lax' },
   ]);
 }
 

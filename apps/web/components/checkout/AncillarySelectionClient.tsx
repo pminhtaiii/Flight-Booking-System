@@ -277,7 +277,7 @@ export function AncillarySelectionClient({ data, intentId, accessToken }: Props)
           {service === 'seats' && seatEligiblePassengers.length < catalogData.passengers.length && <p className="text-sm text-text-secondary">Lap infants are omitted because they do not have a separate seat entitlement.</p>}
         </section>
 
-        {service === 'seats' ? <SeatMap segment={activeSegment} passenger={activePassenger} passengers={catalogData.passengers} selections={seats} selected={selectedSeat} seatPrices={seatPrices} onSelect={selectSeat} currency={currency} /> : <BaggageOptions services={selectableBags} passengerId={activePassenger?.intentPassengerId ?? ''} selected={baggage} onQuantityChange={setBaggageQuantity} currency={currency} />}
+        {service === 'seats' ? <SeatMap segment={activeSegment} passenger={activePassenger} passengers={catalogData.passengers} selections={seats} selected={selectedSeat} seatPrices={seatPrices} onSelect={selectSeat} currency={currency} /> : <BaggageOptions services={selectableBags} passengerId={activePassenger?.intentPassengerId ?? ''} selected={baggage} onQuantityChange={setBaggageQuantity} />}
       </div>
 
       <aside className="card h-fit space-y-4 lg:sticky lg:top-6" aria-label="Estimated total">
@@ -446,7 +446,7 @@ function SeatMap({
   );
 }
 
-function BaggageOptions({ services, passengerId, selected, onQuantityChange, currency }: { services: AncillaryBaggageService[]; passengerId: string; selected: BaggageChoice[]; onQuantityChange: (service: AncillaryBaggageService, quantity: number) => void; currency: string }): JSX.Element {
+function BaggageOptions({ services, passengerId, selected, onQuantityChange }: { services: AncillaryBaggageService[]; passengerId: string; selected: BaggageChoice[]; onQuantityChange: (service: AncillaryBaggageService, quantity: number) => void; }): JSX.Element {
   if (!services.length) return <section className="card" role="status"><h2 className="text-xl font-bold text-text-primary">No extra baggage is available</h2><p className="mt-2 text-sm text-text-secondary">The airline has not offered additional baggage for this traveller.</p></section>;
   const selectedServices = selected
     .filter((choice) => choice.intentPassengerId === passengerId && choice.quantity > 0)
