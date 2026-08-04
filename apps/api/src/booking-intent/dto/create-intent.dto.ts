@@ -106,9 +106,10 @@ export class InlinePassengerSourceDto {
   @Matches(/^(male|female)$/i)
   gender!: string;
 
+  @IsOptional()
   @IsString()
   @Matches(/^[A-Z]{2}$/)
-  nationality!: string;
+  nationality?: string;
 
   @IsOptional()
   @IsString()

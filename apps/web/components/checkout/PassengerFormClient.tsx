@@ -147,6 +147,8 @@ export function PassengerFormClient({
       if (!/^\S+@\S+\.\S+$/.test(passenger.email.trim())) errors[`${index}-email`] = 'Enter a valid email address';
       if (!/^\+\d{1,4}$/.test(passenger.phoneCountryCode.trim())) errors[`${index}-phoneCountryCode`] = 'Enter a valid country code';
       if (!/^\d{4,20}$/.test(passenger.phoneNumber.trim())) errors[`${index}-phoneNumber`] = 'Enter a valid phone number';
+      if (passenger.nationality.trim() && passenger.nationality.trim().length !== 2) errors[`${index}-nationality`] = 'Nationality must be a 2-letter country code';
+      if (passenger.issuingCountry.trim() && passenger.issuingCountry.trim().length !== 2) errors[`${index}-issuingCountry`] = 'Issuing Country must be a 2-letter country code';
     });
 
     setValidationErrors(errors);
