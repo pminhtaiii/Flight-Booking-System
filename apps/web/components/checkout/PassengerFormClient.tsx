@@ -108,6 +108,7 @@ export function PassengerFormClient({
   const router = useRouter();
   const [passengers, setPassengers] = useState<FormPassenger[]>(() => initialPassengers(flight, offerPassengers));
   const [profileSelected, setProfileSelected] = useState(false);
+  const [profileStale, setProfileStale] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
@@ -242,6 +243,7 @@ export function PassengerFormClient({
       if (!createResponse.ok || !createBody?.intentId) {
         if (createResponse.status === 409 && createBody?.code === 'PROFILE_CHANGED') {
           setProfileSelected(false);
+          setProfileStale(true);
           setPassengers((prev) => {
             const updated = [...prev];
             if (updated[0]) {
@@ -289,7 +291,7 @@ export function PassengerFormClient({
         <div key={passenger.offerPassengerId || index} className="card space-y-6">
           <div className="flex justify-between items-center border-b border-card-border pb-4">
             <h3 className="text-lg font-bold text-text-primary">Passenger {index + 1} ({passenger.type})</h3>
-            {index === 0 && passenger.type === 'ADULT' && profile?.profileId && (
+            {index === 0 && passenger.type === 'ADULT' && profile?.profileId && !profileStale && (
               <button type="button" onClick={handleUseProfile} className="btn-secondary py-1 text-xs">
                 Use my traveler profile details
               </button>

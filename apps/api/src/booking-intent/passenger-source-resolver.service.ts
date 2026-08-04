@@ -15,7 +15,7 @@ export type InlinePassengerSource = {
   familyName: string;
   dateOfBirth: string;
   gender: string;
-  nationality: string;
+  nationality?: string;
   passportNumber?: string;
   passportExpiry?: string;
   email: string;
@@ -193,7 +193,7 @@ export class PassengerSourceResolverService {
       middleName: source.middleName ?? null,
       dateOfBirth: source.dateOfBirth,
       gender: source.gender.toLowerCase(),
-      nationality: source.nationality.toUpperCase(),
+      nationality: source.nationality?.toUpperCase() ?? null,
       title: source.title,
       email: source.email,
       phoneCountryCode: source.phoneCountryCode,
