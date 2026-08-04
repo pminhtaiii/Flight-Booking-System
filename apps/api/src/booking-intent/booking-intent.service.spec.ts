@@ -181,11 +181,23 @@ describe('BookingIntentService Refinements', () => {
       } as never);
 
       expect(result.passengers[0]).toEqual(expect.objectContaining({
-        givenName: 'Grace',
-        familyName: 'Hopper',
-        gender: 'female',
+        passengerType: 'ADULT',
+        passengerOrdinal: 1,
+        nameSummary: expect.stringMatching(/^G/),
+        documentSummary: {
+          documentType: null,
+          issuingCountry: null,
+          hasPassport: false,
+        },
+        contactSummary: {
+          email: expect.stringMatching(/^g/),
+          phone: expect.stringMatching(/^\+1/),
+        },
+        passportNumber: null,
+        passportExpiry: null,
         preFilledFromProfile: false,
       }));
+      expect(result.passengers[0]).not.toHaveProperty('givenName');
       expect(prisma.bookingIntentPassenger.create).toHaveBeenCalledWith({
         data: expect.objectContaining({
           intentId: 'intent-1',
@@ -643,14 +655,26 @@ describe('BookingIntentService Refinements', () => {
           passengers: [
             {
               id: 'p1',
+              passengerType: 'ADULT',
+              passengerOrdinal: 1,
+              nameSummary: expect.stringMatching(/^J/),
+              documentSummary: {
+                documentType: null,
+                issuingCountry: null,
+                hasPassport: true,
+              },
+              contactSummary: {
+                email: null,
+                phone: null,
+              },
               type: 'ADULT',
               givenName: 'John',
               familyName: 'Doe',
               dateOfBirth: '1990-01-01',
               gender: 'male',
               nationality: 'US',
-              passportNumber: 'decrypted-v1:encrypted-passport',
-              passportExpiry: 'decrypted-v1:encrypted-expiry',
+              passportNumber: null,
+              passportExpiry: null,
               preFilledFromProfile: true,
             }
           ],
@@ -667,7 +691,7 @@ describe('BookingIntentService Refinements', () => {
         });
       });
 
-      it('decrypts canonical snapshot documents with intent and position AAD', async () => {
+      it('does not decrypt canonical snapshot documents when returning a safe summary', async () => {
         mockPrisma.bookingIntent.findUnique.mockResolvedValueOnce({
           id: 'intent-1',
           userId: 'user-1',
@@ -708,19 +732,11 @@ describe('BookingIntentService Refinements', () => {
 
         const result = await service.getIntent('user-1', 'intent-1');
 
-        expect(snapshotEncryption.decryptBound).toHaveBeenNthCalledWith(
-          1,
-          'v1:iv:tag:bound-passport',
-          { snapshotVersion: 1, intentId: 'intent-1', position: 0, fieldName: 'passportNumber' },
-        );
-        expect(snapshotEncryption.decryptBound).toHaveBeenNthCalledWith(
-          2,
-          'v1:iv:tag:bound-expiry',
-          { snapshotVersion: 1, intentId: 'intent-1', position: 0, fieldName: 'passportExpiry' },
-        );
+        expect(snapshotEncryption.decryptBound).not.toHaveBeenCalled();
         expect(result.passengers[0]).toEqual(expect.objectContaining({
-          passportNumber: 'bound-decrypted-v1:iv:tag:bound-passport',
-          passportExpiry: 'bound-decrypted-v1:iv:tag:bound-expiry',
+          passportNumber: null,
+          passportExpiry: null,
+          documentSummary: expect.objectContaining({ hasPassport: true }),
         }));
       });
     });

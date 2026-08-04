@@ -3,9 +3,33 @@ import { redirect, notFound } from 'next/navigation';
 import { headers } from 'next/headers';
 import { authOptions } from './auth';
 import type { AncillaryCatalogResponse } from '@shared/types/ancillary.types';
+import type { PassengerSource, PassengerType } from '@shared/types/booking-intent.types';
 
 export type AncillaryCatalogPayload = Omit<AncillaryCatalogResponse, 'catalog'> & {
   catalog: AncillaryCatalogResponse['catalog'] & { fingerprint: string };
+};
+
+export type CheckoutPassengerSource = PassengerSource;
+
+export type CheckoutPassengerRequest = {
+  offerPassengerId: string;
+  type: PassengerType;
+  source: CheckoutPassengerSource;
+};
+
+export type BookingReadinessResponse = {
+  scope: 'DOMESTIC' | 'INTERNATIONAL' | 'UNKNOWN';
+  ready: boolean;
+  passengers: Array<{
+    passengerType: PassengerType;
+    passengerOrdinal: number;
+    ready: boolean;
+    profileRevision: number | null;
+    sections: Array<{
+      name: string;
+      fields: Array<{ name: string; status: string; reason: string | null; blocking: boolean }>;
+    }>;
+  }>;
 };
 
 export async function protectCheckoutRoute() {
@@ -47,15 +71,27 @@ export interface BookingIntentDto {
   createdAt: string;
   passengers: Array<{
     id: string;
+    passengerType: string;
+    passengerOrdinal: number;
+    nameSummary: string;
+    documentSummary: {
+      documentType: string | null;
+      issuingCountry: string | null;
+      hasPassport: boolean;
+    };
+    contactSummary: {
+      email: string | null;
+      phone: string | null;
+    };
+    preFilledFromProfile: boolean;
     type: string;
     givenName: string;
     familyName: string;
     dateOfBirth: string;
     gender: string;
     nationality: string | null;
-    passportNumber: string | null;
-    passportExpiry: string | null;
-    preFilledFromProfile: boolean;
+    passportNumber: null;
+    passportExpiry: null;
   }>;
   flight: {
     origin: string;
@@ -112,15 +148,20 @@ export async function fetchBookingIntent(intentId: string, accessToken: string):
           passengers: [
             {
               id: 'p1',
+              passengerType: 'ADULT',
+              passengerOrdinal: 1,
+              nameSummary: 'J••• D•••',
+              documentSummary: { documentType: 'passport', issuingCountry: 'US', hasPassport: true },
+              contactSummary: { email: 'j•••@example.test', phone: '+1••••00' },
+              preFilledFromProfile: false,
               type: 'ADULT',
               givenName: 'John',
               familyName: 'Doe',
               dateOfBirth: '1990-01-01',
               gender: 'male',
               nationality: 'US',
-              passportNumber: '123456',
-              passportExpiry: '2030-01-01',
-              preFilledFromProfile: false,
+              passportNumber: null,
+              passportExpiry: null,
             }
           ],
           flight: {
@@ -140,9 +181,11 @@ export async function fetchBookingIntent(intentId: string, accessToken: string):
   }
 
   try {
-    const response = await fetch(`${apiUrl}/api/bookings/intent/${intentId}`, {
+    const response = await fetch(`${apiUrl}/api/bookings/intents/${intentId}`, {
       headers: {
         Authorization: `Bearer ${accessToken}`,
+        'x-trace-id': headers().get('x-trace-id') ?? '',
+        'x-correlation-id': headers().get('x-correlation-id') ?? '',
       },
       cache: 'no-store',
     });

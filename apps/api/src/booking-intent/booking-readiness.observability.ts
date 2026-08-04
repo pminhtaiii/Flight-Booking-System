@@ -15,6 +15,7 @@ export type BookingReadinessObservabilityEvent = {
   metadata?: Record<string, unknown>;
   context?: BookingReadinessObservabilityContext;
   error?: boolean;
+  operation?: BookingReadinessOperation;
 };
 
 const ALLOWED_METADATA_KEY_SET = new Set<string>(ALLOWED_METADATA_KEYS);
@@ -71,7 +72,7 @@ export class BookingReadinessObservability {
       service: 'api',
       trace_id: sanitizeIdentifier(event.context?.traceId),
       correlation_id: sanitizeIdentifier(event.context?.correlationId),
-      operation: BookingReadinessOperation.READINESS_ADVISORY,
+      operation: event.operation ?? BookingReadinessOperation.READINESS_ADVISORY,
       status: event.status,
       latency_ms: Math.max(0, Math.round(event.latencyMs)),
       metadata: safeMetadata(event.metadata),

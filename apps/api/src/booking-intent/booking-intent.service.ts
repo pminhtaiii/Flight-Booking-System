@@ -22,6 +22,7 @@ import {
   type ResolvedPassenger,
 } from './passenger-source-resolver.service';
 import { PassengerSnapshotService } from './passenger-snapshot.service';
+import type { MaskedPassengerSummary } from './passenger-snapshot.service';
 import {
   BookingIntentPrefillResponseDto,
   CreateBookingIntentResponseDto,
@@ -42,13 +43,7 @@ type LegacyIntentPassenger = {
 
 type ResolvedIntentPassenger = LegacyIntentPassenger & {
   travelerProfileId?: string;
-};
-
-type SnapshotDecryptionContext = {
-  snapshotVersion?: number;
-  intentId: string;
-  position?: number;
-  fieldName: 'passportNumber' | 'passportExpiry';
+  profileRevision?: number;
 };
 
 @Injectable()
@@ -82,6 +77,7 @@ export class BookingIntentService {
       ipAddress?: string;
       traceId?: string;
       correlationId?: string;
+      allowLegacy?: boolean;
     },
   ): Promise<CreateBookingIntentResponseDto> {
     const flightOffer = await this.prisma.flightOffer.findUnique({
@@ -109,6 +105,27 @@ export class BookingIntentService {
       );
     }
     const hasCanonicalSources = canonicalPassengerCount === dto.passengers.length;
+    const allowLegacy = context?.allowLegacy !== false;
+
+    if (!hasCanonicalSources && !allowLegacy) {
+      throw new HttpException(
+        {
+          code: 'PASSENGER_SOURCE_INVALID',
+          message: 'Canonical passenger sources are required',
+        },
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+
+    if (dto.passengers.some((passenger) => passenger.useProfile !== undefined) && hasCanonicalSources) {
+      throw new HttpException(
+        {
+          code: 'PASSENGER_SOURCE_CONFLICT',
+          message: 'Passenger source conflicts with legacy profile selection',
+        },
+        HttpStatus.BAD_REQUEST,
+      );
+    }
 
     let canonicalPassengers: ResolvedPassenger[] | null = null;
     let legacyPassengers: ResolvedIntentPassenger[] | null = null;
@@ -132,9 +149,19 @@ export class BookingIntentService {
         })) as PassengerSourceRequest[],
       );
     } else {
+      const legacyInputPassengers = dto.passengers as unknown as LegacyIntentPassenger[];
+      if (legacyInputPassengers.some((passenger, index) => passenger.useProfile === true && (index !== 0 || passenger.type !== PassengerType.ADULT))) {
+        throw new HttpException(
+          {
+            code: 'LEGACY_PROFILE_SOURCE_UNSUPPORTED',
+            message: 'Legacy profile selection is supported only for the primary adult',
+          },
+          HttpStatus.BAD_REQUEST,
+        );
+      }
       legacyPassengers = await this.applyPrimaryPassengerPrefill(
         userId,
-        dto.passengers as unknown as LegacyIntentPassenger[],
+        legacyInputPassengers,
       );
     }
 
@@ -154,6 +181,30 @@ export class BookingIntentService {
     const intentExpiresAt = new Date(now.getTime() + ttlMinutes * 60 * 1000);
 
     const duffelPassengerIds = this.extractDuffelPassengerIds(liveOffer.raw, passengersForValidation);
+    let authoritativeReadiness: Awaited<ReturnType<BookingReadinessService['evaluateAuthoritativeReadiness']>> | null = null;
+
+    if (canonicalPassengers && this.bookingReadinessService) {
+      authoritativeReadiness = await this.bookingReadinessService.evaluateAuthoritativeReadiness(
+        flightOffer.rawOffer,
+        canonicalPassengers,
+        {
+          traceId: context?.traceId,
+          correlationId: context?.correlationId,
+        },
+      );
+
+      if (!authoritativeReadiness.ready) {
+        throw new HttpException(
+          {
+            code: 'BOOKING_NOT_READY',
+            message: 'Booking is not ready',
+            ...authoritativeReadiness,
+          },
+          HttpStatus.UNPROCESSABLE_ENTITY,
+        );
+      }
+    }
+
     const canonicalSnapshotPassengers = canonicalPassengers?.map((passenger, index) => ({
       ...passenger,
       duffelPassengerId: duffelPassengerIds[index],
@@ -189,12 +240,17 @@ export class BookingIntentService {
         },
       });
 
+      let maskedPassengers: MaskedPassengerSummary[] | null = null;
       const passengers = canonicalSnapshotPassengers
-        ? await Promise.all(
-            this.passengerSnapshotService!
-              .buildSnapshotData({ intentId: intent.id, passengers: canonicalSnapshotPassengers })
-              .persistenceInput.map((data) => tx.bookingIntentPassenger.create({ data })),
-          )
+        ? await (async () => {
+            const snapshot = this.passengerSnapshotService!.buildSnapshotData({
+              intentId: intent.id,
+              passengers: canonicalSnapshotPassengers,
+              scope: authoritativeReadiness?.scope === 'INTERNATIONAL' ? 'INTERNATIONAL' : 'DOMESTIC',
+            });
+            maskedPassengers = snapshot.maskedPassengers;
+            return Promise.all(snapshot.persistenceInput.map((data) => tx.bookingIntentPassenger.create({ data })));
+          })()
         : await Promise.all(
             (legacyPassengers ?? []).map((passenger, index) =>
               tx.bookingIntentPassenger.create({
@@ -237,7 +293,7 @@ export class BookingIntentService {
         },
       });
 
-      return { intent, passengers };
+      return { intent, passengers, maskedPassengers };
     });
 
     return {
@@ -252,17 +308,14 @@ export class BookingIntentService {
       offerExpiresAt: created.intent.offerExpiresAt
         ? created.intent.offerExpiresAt.toISOString()
         : null,
-      passengers: created.passengers
+      passengers: (created.maskedPassengers ?? created.passengers
         .sort((a, b) => a.position - b.position)
-        .map((passenger) => ({
-          id: passenger.id,
-          type: passenger.type,
-          givenName: passenger.givenName,
-          familyName: passenger.familyName,
-          dateOfBirth: this.toDateOnly(passenger.dateOfBirth),
-          gender: passenger.gender,
-          nationality: passenger.nationality,
-          preFilledFromProfile: passenger.travelerProfileId !== null,
+        .map((passenger, index) => this.toSafePassengerSummary(passenger, index)))
+        .map((passenger, index) => ({
+          ...passenger,
+          id: created.passengers[index]?.id ?? `${created.intent.id}-${passenger.passengerOrdinal}`,
+          passportNumber: null,
+          passportExpiry: null,
         })),
       flight: {
         origin: created.intent.origin,
@@ -318,27 +371,16 @@ export class BookingIntentService {
       intentExpiresAt: intent.intentExpiresAt.toISOString(),
       offerExpiresAt: intent.offerExpiresAt ? intent.offerExpiresAt.toISOString() : null,
       createdAt: intent.createdAt.toISOString(),
-      passengers: intent.passengers.map((passenger) => ({
-        id: passenger.id,
+      passengers: intent.passengers.map((passenger, index) => ({
+        ...this.toSafePassengerSummary(passenger, index),
         type: passenger.type,
         givenName: passenger.givenName,
         familyName: passenger.familyName,
         dateOfBirth: this.toDateOnly(passenger.dateOfBirth),
         gender: passenger.gender,
         nationality: passenger.nationality,
-        passportNumber: this.decryptOptional(passenger.passportNumber, {
-          snapshotVersion: passenger.snapshotVersion,
-          intentId: intent.id,
-          position: passenger.position,
-          fieldName: 'passportNumber',
-        }),
-        passportExpiry: this.decryptOptional(passenger.passportExpiry, {
-          snapshotVersion: passenger.snapshotVersion,
-          intentId: intent.id,
-          position: passenger.position,
-          fieldName: 'passportExpiry',
-        }),
-        preFilledFromProfile: passenger.travelerProfileId !== null,
+        passportNumber: null,
+        passportExpiry: null,
       })),
       flight: {
         origin: intent.origin,
@@ -703,24 +745,56 @@ export class BookingIntentService {
     return { deletedCount: deleteResult.count };
   }
 
-  private decryptOptional(value: string | null, context?: SnapshotDecryptionContext): string | null {
-    if (!value) {
-      return null;
-    }
-    if (
-      value.startsWith('v1:') &&
-      context &&
-      Number.isInteger(context.snapshotVersion) &&
-      Number.isInteger(context.position)
-    ) {
-      return this.encryptionService.decryptBound(value, {
-        snapshotVersion: context.snapshotVersion as number,
-        intentId: context.intentId,
-        position: context.position as number,
-        fieldName: context.fieldName,
-      });
-    }
-    return this.encryptionService.decrypt(value);
+  private toSafePassengerSummary(passenger: {
+    id: string;
+    position?: number;
+    type: PassengerType;
+    givenName: string;
+    familyName: string;
+    documentType?: string | null;
+    issuingCountry?: string | null;
+    passportNumber?: string | null;
+    passportExpiry?: string | null;
+    email?: string | null;
+    phoneCountryCode?: string | null;
+    phoneNumber?: string | null;
+    travelerProfileId?: string | null;
+  }, fallbackPosition = 0): MaskedPassengerSummary & { id: string } {
+    const passengerOrdinal = Number.isFinite(passenger.position)
+      ? (passenger.position as number) + 1
+      : fallbackPosition + 1;
+
+    return {
+      id: passenger.id,
+      passengerType: passenger.type,
+      passengerOrdinal,
+      nameSummary: `${this.maskName(passenger.givenName)} ${this.maskName(passenger.familyName)}`,
+      documentSummary: {
+        documentType: passenger.documentType ?? null,
+        issuingCountry: passenger.issuingCountry ?? null,
+        hasPassport: Boolean(passenger.passportNumber || passenger.passportExpiry),
+      },
+      contactSummary: {
+        email: this.maskEmail(passenger.email ?? null),
+        phone: this.maskPhone(passenger.phoneCountryCode ?? null, passenger.phoneNumber ?? null),
+      },
+      preFilledFromProfile: passenger.travelerProfileId !== null && passenger.travelerProfileId !== undefined,
+    };
+  }
+
+  private maskName(value: string): string {
+    return value.length > 0 ? `${value[0]}•••` : '•••';
+  }
+
+  private maskEmail(value: string | null): string | null {
+    if (!value) return null;
+    const at = value.indexOf('@');
+    return at > 0 ? `${value[0]}•••${value.slice(at)}` : '•••';
+  }
+
+  private maskPhone(countryCode: string | null, value: string | null): string | null {
+    if (!value) return null;
+    return `${countryCode ?? ''}••••${value.slice(-2)}`;
   }
 
   private decryptProfileField(value: string | null): string | null {
