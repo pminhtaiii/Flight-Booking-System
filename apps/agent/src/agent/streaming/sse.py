@@ -5,7 +5,7 @@ from fastapi import APIRouter, Request, HTTPException, Header
 from sse_starlette.sse import EventSourceResponse
 from agent.config import get_settings
 from agent.models.requests import ChatStreamRequest
-from agent.tools.nestjs_client import NestJSClient
+from agent.tools.nestjs_client import NestJSClient, validate_booking_readiness_response
 from agent.agents.chat_agent import get_chat_model, format_messages
 from agent.graph.graph import graph
 from agent.memory.manager import MemoryManager
@@ -25,8 +25,8 @@ async def _resolve_user_message(body, graph, config) -> str:
     try:
         current_state = await graph.aget_state(config)
         for msg in reversed(current_state.values.get("messages", [])):
-            if (isinstance(msg, HumanMessage) or 
-                msg.__class__.__name__ == "HumanMessage" or 
+            if (isinstance(msg, HumanMessage) or
+                msg.__class__.__name__ == "HumanMessage" or
                 getattr(msg, "type", "") == "human"):
                 return msg.content
     except Exception as e:  # noqa: BLE001
@@ -62,7 +62,7 @@ async def chat_stream(
     if not authorization or not authorization.startswith("Bearer "):
         raise HTTPException(status_code=401, detail="Invalid authorization header")
     token = authorization.split(" ", 1)[1]
-    
+
     client = NestJSClient(base_url=settings.NESTJS_API_URL, token=token)
 
     # 2. Message length check
@@ -76,7 +76,7 @@ async def chat_stream(
         if not is_allowed:
             if "unavailable" in reason.lower():
                 raise HTTPException(status_code=503, detail="Safety check unavailable")
-            
+
             async def error_generator():
                 yield {
                     "event": "error",
@@ -143,7 +143,7 @@ async def chat_stream(
                     if not pending:
                         pending = {}
                     pending["confirmed"] = body.confirmed
-                    
+
                     await graph.aupdate_state(config, {"pending_confirmation": pending}, as_node="agent")
                     event_stream = graph.astream_events(None, config=config, version="v2")
                 else:
@@ -154,14 +154,19 @@ async def chat_stream(
                         summary=summary
                     )
                     event_stream = graph.astream_events(
-                        {"messages": messages, "iteration_count": 0, "pending_confirmation": None},
+                        {
+                            "messages": messages,
+                            "iteration_count": 0,
+                            "pending_confirmation": None,
+                            "handoff_required": False,
+                        },
                         config=config,
                         version="v2"
                     )
 
                 async for event in event_stream:
                     kind = event.get("event")
-                    
+
                     if kind == "on_chat_model_stream":
                         chunk = event["data"].get("chunk")
                         if chunk and hasattr(chunk, "content") and chunk.content:
@@ -172,29 +177,86 @@ async def chat_stream(
                                     "event": "token",
                                     "data": json.dumps({"content": safe_chunk})
                                 })
-                            
+
                     elif kind == "on_tool_start":
                         tool_name = event.get("name")
                         tool_input = event["data"].get("input")
-                        await q.put({
-                            "event": "tool_call",
-                            "data": json.dumps({
-                                "name": tool_name,
-                                "inputs": tool_input
+
+                        # Never stream raw readiness tool input
+                        if tool_name == "check_booking_readiness":
+                            safe_input = {"message": "Checking booking readiness..."}
+                            await q.put({
+                                "event": "tool_call",
+                                "data": json.dumps({
+                                    "name": tool_name,
+                                    "inputs": safe_input
+                                })
                             })
-                        })
-                        
+                        else:
+                            await q.put({
+                                "event": "tool_call",
+                                "data": json.dumps({
+                                    "name": tool_name,
+                                    "inputs": tool_input
+                                })
+                            })
+
+
                     elif kind == "on_tool_end":
                         tool_name = event.get("name")
                         tool_output = event["data"].get("output")
+
+                        output_data = None
                         if tool_output:
                             if hasattr(tool_output, "content"):
+                                if isinstance(tool_output.content, dict):
+                                    output_data = tool_output.content
+                                else:
+                                    try:
+                                        output_data = json.loads(str(tool_output.content))
+                                    except Exception:
+                                        pass
                                 output_str = str(tool_output.content)
                             else:
+                                if isinstance(tool_output, dict):
+                                    output_data = tool_output
+                                else:
+                                    try:
+                                        output_data = json.loads(str(tool_output))
+                                    except Exception:
+                                        pass
                                 output_str = str(tool_output)
                             summary_str = output_str.split("\n")[0].strip()
                         else:
                             summary_str = ""
+
+                        safe_readiness = None
+                        # Do not emit arbitrary tool output in tool_result for check_booking_readiness
+                        if tool_name == "check_booking_readiness":
+                            if output_data and "error" in output_data:
+                                await q.put({
+                                    "event": "error",
+                                    "data": json.dumps({
+                                        "code": "READINESS_RESPONSE_INVALID",
+                                        "message": "Booking readiness could not be verified safely.",
+                                        "partialMessageId": None,
+                                    }),
+                                })
+                                return
+                            else:
+                                safe_readiness = validate_booking_readiness_response(output_data)
+                                if safe_readiness is None:
+                                    await q.put({
+                                        "event": "error",
+                                        "data": json.dumps({
+                                            "code": "READINESS_RESPONSE_INVALID",
+                                            "message": "Booking readiness could not be verified safely.",
+                                            "partialMessageId": None,
+                                        }),
+                                    })
+                                    return
+                                summary_str = "Successfully checked booking readiness."
+
                         await q.put({
                             "event": "tool_result",
                             "data": json.dumps({
@@ -202,6 +264,7 @@ async def chat_stream(
                                 "result": summary_str
                             })
                         })
+
                         if tool_name == "search_flights":
                             from agent.tools.search_flights import FLIGHTS_CACHE
                             raw_cache = FLIGHTS_CACHE.pop(session_id, None)
@@ -213,6 +276,47 @@ async def chat_stream(
                                         "results": raw_results
                                     })
                                 })
+                        elif tool_name == "check_booking_readiness" and safe_readiness and safe_readiness["ready"] is False:
+                            action = safe_readiness["nextAction"]
+                            scope = safe_readiness["scope"]
+
+                            safe_passengers = []
+                            for p in safe_readiness["passengers"]:
+                                safe_sections = []
+                                for s in p["sections"]:
+                                    safe_fields = []
+                                    for f in s["fields"]:
+                                        safe_fields.append({
+                                            "name": f["name"],
+                                            "status": f["status"],
+                                            "reason": f["reason"],
+                                        })
+                                    safe_sections.append({
+                                        "name": s["name"],
+                                        "fields": safe_fields
+                                    })
+                                safe_passengers.append({
+                                    "passengerType": p["passengerType"],
+                                    "passengerOrdinal": p["passengerOrdinal"],
+                                    "sections": safe_sections
+                                })
+
+                            target = "/checkout/passengers"
+                            if action == "COMPLETE_PROFILE":
+                                target = "/profile"
+
+                            payload = {
+                                "action": action,
+                                "scope": scope,
+                                "passengers": safe_passengers,
+                                "target": target
+                            }
+
+                            await q.put({
+                                "event": "ACTION_REQUIRED",
+                                "data": json.dumps(payload)
+                            })
+
 
                 # Flush the pipeline and yield any remaining safe chunks
                 async for safe_chunk in pipeline.flush():
@@ -224,6 +328,8 @@ async def chat_stream(
 
                 # Check if the graph is suspended
                 current_state = await graph.aget_state(config)
+                if current_state.values.get("handoff_required"):
+                    return
                 if current_state.next and "confirm" in current_state.next:
                     pending = current_state.values.get("pending_confirmation") or {}
                     await q.put({
@@ -248,12 +354,12 @@ async def chat_stream(
                                 })
                             })
                             return
-                        
+
                         agent_message_id = None
                         for msg in batch_res.get("messages", []):
                             if msg.get("sender") == "AGENT":
                                 agent_message_id = msg.get("id")
-                        
+
                         await q.put({
                             "event": "done",
                             "data": json.dumps({
@@ -290,7 +396,7 @@ async def chat_stream(
                                 partial_message_id = msg.get("id")
                     except Exception as persist_err:  # noqa: BLE001
                         logger.error(f"Failed to persist partial response on guardrail block: {persist_err!s}")
-                
+
                 await q.put({
                     "event": "error",
                     "data": json.dumps({
@@ -322,7 +428,7 @@ async def chat_stream(
                                 partial_message_id = msg.get("id")
                     except Exception as persist_err:  # noqa: BLE001
                         logger.error(f"Failed to persist partial response on LLM error: {persist_err!s}")
-                
+
                 await q.put({
                     "event": "error",
                     "data": json.dumps({

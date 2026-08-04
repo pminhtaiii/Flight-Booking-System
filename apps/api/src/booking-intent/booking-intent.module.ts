@@ -27,6 +27,12 @@ import { PassengerSnapshotService } from './passenger-snapshot.service';
     EncryptionService,
     BookingIntentCron,
   ],
-  exports: [BookingIntentService, PassengerSourceResolverService, PassengerSnapshotService],
+  exports: [
+    BookingIntentService,
+    BookingReadinessService,
+    BookingReadinessObservability,
+    PassengerSourceResolverService,
+    PassengerSnapshotService,
+  ],
 })
 export class BookingIntentModule {}

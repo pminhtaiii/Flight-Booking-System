@@ -11,6 +11,15 @@ import { UserBookingsResponseDto, BookingResultDto } from './dto/user-bookings.d
 import { FlightSnapshot, PassengerSnapshot } from '@shared/booking-types';
 import * as crypto from 'crypto';
 import { CABIN_KEYWORDS, PASSENGER_KEYWORDS } from './agent-gateway.constants';
+import {
+  AgentBookingReadinessRequestDto,
+  AgentBookingReadinessResponseDto,
+} from './dto/booking-readiness.dto';
+import { BookingReadinessService } from '@/booking-intent/booking-readiness.service';
+import { BookingReadinessObservability } from '@/booking-intent/booking-readiness.observability';
+import { BookingReadinessOperation } from '@/common/observability/booking-readiness-observability.types';
+import { ProfileService } from '@/profile/profile.service';
+import { BookingReadinessRequestDto, BookingReadinessPassengerDto } from '@/booking-intent/dto/booking-readiness.dto';
 
 function capitalizeCabinClass(cabinClass: string): string {
   if (!cabinClass) return '';
@@ -67,7 +76,60 @@ export class AgentGatewayService {
     private readonly auditService: AuditService,
     private readonly cacheService: CacheService,
     private readonly duffelService: DuffelService,
+    private readonly profileService: ProfileService,
+    private readonly bookingReadinessService: BookingReadinessService,
+    private readonly bookingReadinessObservability: BookingReadinessObservability,
   ) {}
+
+  private async recordReadinessOutcome(
+    userId: string,
+    status: string,
+    startedAt: number,
+    traceId: string | null | undefined,
+    correlationId: string | null | undefined,
+    passengerCount: number,
+    scope: string | null,
+    error = false,
+  ): Promise<void> {
+    const metadata = { status, scope, passengerCount };
+    this.bookingReadinessObservability.recordOutcome({
+      status,
+      error,
+      operation: BookingReadinessOperation.GATEWAY_READINESS,
+      latencyMs: Date.now() - startedAt,
+      metadata,
+      context: { traceId: traceId ?? undefined, correlationId: correlationId ?? undefined },
+    });
+
+    try {
+      await this.auditService.createLog(null, {
+        userId,
+        action: 'AGENT_GATEWAY_READINESS',
+        resourceType: 'agent-gateway',
+        resourceId: 'bookings/readiness',
+        metadata,
+        traceId,
+        correlationId,
+      });
+    } catch {
+      this.logger.error('Failed to write booking readiness audit log');
+    }
+  }
+
+  private readinessErrorCode(error: unknown): string {
+    if (error instanceof HttpException) {
+      const response = error.getResponse();
+      if (typeof response === 'object' && response !== null && 'code' in response) {
+        const code = (response as { code?: unknown }).code;
+        if (typeof code === 'string' && /^[A-Z_]{1,64}$/.test(code)) {
+          return code;
+        }
+      }
+      return `HTTP_${error.getStatus()}`;
+    }
+
+    return 'READINESS_REQUEST_FAILED';
+  }
 
   private async logToolCall(
     userId: string,
@@ -454,6 +516,149 @@ export class AgentGatewayService {
     } catch (err) {
       await this.logToolCall(userId, 'users/bookings', {}, startTime, traceId, correlationId, false, err, null);
       throw err;
+    }
+  }
+
+  async checkBookingReadiness(
+    userId: string,
+    dto: AgentBookingReadinessRequestDto,
+    traceId?: string | null,
+    correlationId?: string | null,
+  ): Promise<AgentBookingReadinessResponseDto> {
+    const startTime = Date.now();
+    try {
+      // 1. Get primary profile ID if needed
+      let travelerProfileId: string | null = null;
+      if (dto.passengers.some((p) => p.sourceType === 'traveler_profile')) {
+        const profile = await this.profileService.getProfile(userId);
+        if (!profile || !profile.profileId) {
+          throw new NotFoundException({
+            statusCode: 404,
+            message: 'No traveler profile exists for this user',
+            code: 'PROFILE_NOT_FOUND',
+          });
+        }
+        travelerProfileId = profile.profileId;
+      }
+
+      // 2. Map passenger ordinals to offerPassengerId
+      const flightOffer = await this.prisma.flightOffer.findUnique({
+        where: { id: dto.flightOfferId },
+
+      });
+
+      if (!flightOffer) {
+        throw new NotFoundException({
+          statusCode: 404,
+          message: 'Flight offer not found',
+          code: 'OFFER_NOT_FOUND',
+        });
+      }
+
+      const rawOffer = flightOffer.rawOffer as { passengers?: Array<{ id?: string }> } | null;
+      if (!rawOffer || !Array.isArray(rawOffer.passengers)) {
+        throw new HttpException(
+          { code: 'OFFER_MALFORMED', message: 'Stored offer data is malformed' },
+          HttpStatus.UNPROCESSABLE_ENTITY,
+        );
+      }
+
+      const internalDto = new BookingReadinessRequestDto();
+      internalDto.flightOfferId = dto.flightOfferId;
+      internalDto.passengers = dto.passengers.map((p) => {
+        // ordinal is 1-indexed
+        const passengerIndex = p.passengerOrdinal - 1;
+        const offerPassenger = (rawOffer as any)?.passengers?.[passengerIndex];
+        if (!offerPassenger || !offerPassenger.id) {
+          throw new HttpException(
+            { code: 'PASSENGER_MAPPING_INVALID', message: `No passenger found for ordinal ${p.passengerOrdinal}` },
+            HttpStatus.UNPROCESSABLE_ENTITY,
+          );
+        }
+
+        const pdto = new BookingReadinessPassengerDto();
+        pdto.offerPassengerId = offerPassenger.id;
+        pdto.passengerType = p.passengerType;
+
+        if (p.sourceType === 'traveler_profile') {
+          if (!travelerProfileId) {
+             throw new HttpException(
+              { code: 'PROFILE_NOT_FOUND', message: 'Profile not found' },
+              HttpStatus.UNPROCESSABLE_ENTITY,
+            );
+          }
+          pdto.source = {
+            type: 'traveler_profile',
+            travelerProfileId: travelerProfileId,
+          };
+        } else {
+          pdto.source = {
+            type: 'inline',
+          };
+        }
+        return pdto;
+      });
+
+      // 3. Call internal readiness service
+      const result = await this.bookingReadinessService.getAdvisoryReadiness(
+        userId,
+        internalDto,
+        { traceId: traceId || undefined, correlationId: correlationId || undefined },
+      );
+
+      // 4. Extract safe fields for projection
+      // The result is already safe from getAdvisoryReadiness (BookingReadinessResult)
+      // We explicitly map it to ensure no PII leaks.
+      const safeResponse: AgentBookingReadinessResponseDto = {
+        scope: result.scope,
+        ready: result.ready,
+        passengers: result.passengers.map((p) => ({
+          passengerType: p.passengerType as any,
+          passengerOrdinal: p.passengerOrdinal,
+          sections: p.sections.map((s) => ({
+            name: s.name,
+            fields: s.fields.map((f) => ({
+              name: f.name,
+              status: f.status as string,
+              reason: f.reason,
+            })),
+          })),
+        })),
+        nextAction: result.ready ? 'CONTINUE_CHECKOUT' : 'COMPLETE_PROFILE',
+      };
+
+      await this.recordReadinessOutcome(
+        userId,
+        result.ready ? 'ready' : 'not_ready',
+        startTime,
+        traceId,
+        correlationId,
+        dto.passengers.length,
+        result.scope,
+      );
+
+      return safeResponse;
+    } catch (err: unknown) {
+      const status = this.readinessErrorCode(err);
+      await this.recordReadinessOutcome(
+        userId,
+        status,
+        startTime,
+        traceId,
+        correlationId,
+        dto.passengers.length,
+        null,
+        !(err instanceof HttpException) || err.getStatus() >= HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+
+      if (err instanceof HttpException) {
+        throw err;
+      }
+
+      throw new HttpException(
+        { code: 'READINESS_REQUEST_FAILED', message: 'Failed to evaluate booking readiness' },
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
     }
   }
 }

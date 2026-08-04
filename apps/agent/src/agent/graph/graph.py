@@ -3,7 +3,7 @@ from langgraph.checkpoint.memory import MemorySaver
 
 from agent.graph.state import AgentState
 from agent.graph.nodes import agent_node, final_answer_node, custom_tool_node, confirm_node
-from agent.graph.router import should_continue, route_confirm
+from agent.graph.router import should_continue, route_after_tools, route_confirm
 
 # 1. Define the workflow graph
 workflow = StateGraph(AgentState)
@@ -37,7 +37,14 @@ workflow.add_conditional_edges(
     }
 )
 
-workflow.add_edge("tools", "agent")
+workflow.add_conditional_edges(
+    "tools",
+    route_after_tools,
+    {
+        "agent": "agent",
+        END: END,
+    },
+)
 workflow.add_edge("final_answer", END)
 
 # 4. Initialize checkpointer

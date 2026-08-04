@@ -210,7 +210,7 @@ async def test_list_user_bookings_error(mock_client, run_config):
 
 def test_registry():
     tools = get_tools()
-    assert len(tools) == 4
+    assert len(tools) == 5
 
     t1 = get_tool_by_name("search_flights")
     assert t1 == search_flights
@@ -232,3 +232,47 @@ def test_registry():
         get_tool_by_name("non_existent")
 
     assert not requires_confirmation("non_existent")
+
+from agent.tools.check_booking_readiness import check_booking_readiness
+
+@pytest.fixture
+def mock_client_with_readiness(mock_client):
+    mock_client.check_booking_readiness = AsyncMock()
+    return mock_client
+
+@pytest.fixture
+def run_config_with_readiness(mock_client_with_readiness):
+    return RunnableConfig(configurable={"nestjs_client": mock_client_with_readiness})
+
+@pytest.mark.asyncio
+async def test_check_booking_readiness_tool_success(mock_client_with_readiness, run_config_with_readiness):
+    mock_client_with_readiness.check_booking_readiness.return_value = {
+        "ready": False,
+        "scope": "INTERNATIONAL",
+        "nextAction": "COMPLETE_PROFILE",
+        "passengers": []
+    }
+
+    result = await check_booking_readiness.ainvoke(
+        {"flight_offer_id": "offer-123", "passengers": [{"passengerType": "ADULT", "passengerOrdinal": 1, "sourceType": "traveler_profile"}]},
+        config=run_config_with_readiness
+    )
+
+    assert result.get("ready") is False
+    assert result.get("nextAction") == "COMPLETE_PROFILE"
+    mock_client_with_readiness.check_booking_readiness.assert_called_once_with(
+        "offer-123",
+        [{"passengerType": "ADULT", "passengerOrdinal": 1, "sourceType": "traveler_profile"}]
+    )
+
+@pytest.mark.asyncio
+async def test_check_booking_readiness_tool_error(mock_client_with_readiness, run_config_with_readiness):
+    mock_client_with_readiness.check_booking_readiness.side_effect = Exception("DB failed")
+
+    result = await check_booking_readiness.ainvoke(
+        {"flight_offer_id": "offer-123", "passengers": []},
+        config=run_config_with_readiness
+    )
+
+    assert "error" in result
+    assert "Failed to check booking readiness safely" in result["error"]

@@ -186,16 +186,16 @@
 
 ### RED tests
 
-- [ ] T055 [P] [US4] Write failing gateway service/controller and claim-bound safe-projection tests in `apps/api/src/agent-gateway/agent-gateway.service.spec.ts` and `apps/api/test/agent-gateway.e2e-spec.ts`
-- [ ] T056 [P] [US4] Write failing NestJS client/tool registry tests for safe readiness requests/responses in `apps/agent/tests/test_nestjs_client.py` and `apps/agent/tests/test_tools.py`
-- [ ] T057 [P] [US4] Write failing SSE allowlist, unexpected-key fail-closed, and PII corpus tests in `apps/agent/tests/test_sse_integration.py`
+- [x] T055 [P] [US4] Write failing gateway service/controller and claim-bound safe-projection tests in `apps/api/src/agent-gateway/agent-gateway.service.spec.ts` and `apps/api/test/agent-gateway.e2e-spec.ts`
+- [x] T056 [P] [US4] Write failing NestJS client/tool registry tests for safe readiness requests/responses in `apps/agent/tests/test_nestjs_client.py` and `apps/agent/tests/test_tools.py`
+- [x] T057 [P] [US4] Write failing SSE allowlist, unexpected-key fail-closed, and PII corpus tests in `apps/agent/tests/test_sse_integration.py`
 
 ### GREEN implementation
 
-- [ ] T058 [US4] Implement claim-owned readiness input and allowlisted output DTOs in `apps/api/src/agent-gateway/dto/booking-readiness.dto.ts`
-- [ ] T059 [US4] Proxy the shared readiness service without profile IDs/values, propagate traces, and emit allowlisted gateway readiness outcome/latency/error events and metrics in `apps/api/src/agent-gateway/agent-gateway.service.ts` and `apps/api/src/agent-gateway/agent-gateway.controller.ts`
-- [ ] T060 [US4] Add the safe gateway call to `apps/agent/src/agent/tools/nestjs_client.py` and implement/register `apps/agent/src/agent/tools/check_booking_readiness.py` in `apps/agent/src/agent/tools/registry.py`
-- [ ] T061 [US4] Emit schema-allowlisted `ACTION_REQUIRED` and route ready requests through the existing confirmation/write boundary in `apps/agent/src/agent/graph/nodes.py` and `apps/agent/src/agent/streaming/sse.py`
+- [x] T058 [US4] Implement claim-owned readiness input and allowlisted output DTOs in `apps/api/src/agent-gateway/dto/booking-readiness.dto.ts`
+- [x] T059 [US4] Proxy the shared readiness service without profile IDs/values, propagate traces, and emit allowlisted gateway readiness outcome/latency/error events and metrics in `apps/api/src/agent-gateway/agent-gateway.service.ts` and `apps/api/src/agent-gateway/agent-gateway.controller.ts`
+- [x] T060 [US4] Add the safe gateway call to `apps/agent/src/agent/tools/nestjs_client.py` and implement/register `apps/agent/src/agent/tools/check_booking_readiness.py` in `apps/agent/src/agent/tools/registry.py`
+- [x] T061 [US4] Emit schema-allowlisted `ACTION_REQUIRED` and route ready requests through the existing confirmation/write boundary in `apps/agent/src/agent/graph/nodes.py` and `apps/agent/src/agent/streaming/sse.py`
 
 **Checkpoint**: US4 backend/agent boundary passes with zero PII values and no direct agent database access.
 
