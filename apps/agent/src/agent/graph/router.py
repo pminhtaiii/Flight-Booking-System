@@ -35,3 +35,10 @@ def route_confirm(state: AgentState) -> str:
     if pending and pending.get("confirmed") is True:
         return "tools"
     return "agent"
+
+
+def route_after_tools(state: AgentState) -> str:
+    """End the graph after a safe readiness handoff instead of asking the model again."""
+    if state.get("handoff_required"):
+        return END
+    return "agent"

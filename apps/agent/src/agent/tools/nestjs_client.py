@@ -8,6 +8,126 @@ from agent.auth.claim_token import create_claim_token
 
 logger = logging.getLogger(__name__)
 
+_READINESS_SCOPES = {"DOMESTIC", "INTERNATIONAL", "UNKNOWN"}
+_READINESS_ACTIONS = {"COMPLETE_PROFILE", "CONTINUE_CHECKOUT"}
+_PASSENGER_TYPES = {"ADULT", "CHILD", "INFANT"}
+_READINESS_SECTION_NAMES = {
+    "itinerary",
+    "identity",
+    "contact",
+    "travel_document",
+    "entry_eligibility",
+}
+_READINESS_FIELD_NAMES = {
+    "scope",
+    "destinationEntryEligibility",
+    "givenName",
+    "middleName",
+    "familyName",
+    "dateOfBirth",
+    "gender",
+    "title",
+    "nationality",
+    "email",
+    "phoneCountryCode",
+    "phoneNumber",
+    "documentType",
+    "passportNumber",
+    "passportExpiry",
+    "issuingCountry",
+}
+_READINESS_STATUSES = {"filled", "missing", "invalid", "warning", "unknown"}
+_READINESS_REASONS = {
+    "REQUIRED",
+    "PASSPORT_VALIDITY_REQUIRES_VERIFICATION",
+    "UNSUPPORTED_DOCUMENT_TYPE",
+    "EXPIRED",
+    "AIRPORT_COUNTRY_UNAVAILABLE",
+    "PROFILE_CHANGED",
+    "READINESS_DEPENDENCY_UNAVAILABLE",
+    "ENTRY_ELIGIBILITY_UNKNOWN",
+    "INVALID_COUNTRY",
+    "INVALID_DATE",
+    "INVALID_DOCUMENT_NUMBER",
+    "INVALID_EMAIL",
+    "INVALID_GENDER",
+    "INVALID_PHONE",
+    "INVALID_TITLE",
+    "ITINERARY_UNAVAILABLE",
+    "TRIP_COMPLETION_UNAVAILABLE",
+}
+
+
+def _has_exact_keys(value: object, expected: set[str]) -> bool:
+    return isinstance(value, dict) and set(value.keys()) == expected
+
+
+def _is_positive_int(value: object) -> bool:
+    return isinstance(value, int) and not isinstance(value, bool) and value >= 1
+
+
+def validate_booking_readiness_response(data: object) -> Optional[dict]:
+    """Return a copied, PII-safe readiness result or ``None`` for malformed data."""
+    if not _has_exact_keys(data, {"scope", "ready", "passengers", "nextAction"}):
+        return None
+
+    if (
+        data["scope"] not in _READINESS_SCOPES
+        or not isinstance(data["ready"], bool)
+        or data["nextAction"] not in _READINESS_ACTIONS
+        or not isinstance(data["passengers"], list)
+    ):
+        return None
+
+    safe_passengers = []
+    for passenger in data["passengers"]:
+        if not _has_exact_keys(passenger, {"passengerType", "passengerOrdinal", "sections"}):
+            return None
+        if (
+            passenger["passengerType"] not in _PASSENGER_TYPES
+            or not _is_positive_int(passenger["passengerOrdinal"])
+            or not isinstance(passenger["sections"], list)
+        ):
+            return None
+
+        safe_sections = []
+        for section in passenger["sections"]:
+            if not _has_exact_keys(section, {"name", "fields"}):
+                return None
+            if section["name"] not in _READINESS_SECTION_NAMES or not isinstance(section["fields"], list):
+                return None
+
+            safe_fields = []
+            for field in section["fields"]:
+                if not _has_exact_keys(field, {"name", "status", "reason"}):
+                    return None
+                if (
+                    field["name"] not in _READINESS_FIELD_NAMES
+                    or field["status"] not in _READINESS_STATUSES
+                    or (field["reason"] is not None and field["reason"] not in _READINESS_REASONS)
+                ):
+                    return None
+                safe_fields.append({
+                    "name": field["name"],
+                    "status": field["status"],
+                    "reason": field["reason"],
+                })
+
+            safe_sections.append({"name": section["name"], "fields": safe_fields})
+
+        safe_passengers.append({
+            "passengerType": passenger["passengerType"],
+            "passengerOrdinal": passenger["passengerOrdinal"],
+            "sections": safe_sections,
+        })
+
+    return {
+        "scope": data["scope"],
+        "ready": data["ready"],
+        "passengers": safe_passengers,
+        "nextAction": data["nextAction"],
+    }
+
 class NestJSClient:
     def __init__(self, base_url: str, token: str, correlation_id: Optional[str] = None):
         self.base_url = base_url.rstrip("/")
@@ -70,11 +190,11 @@ class NestJSClient:
             payload = jwt.decode(self.token, settings.JWT_SECRET, algorithms=["HS256"])
         except InvalidTokenError as exc:
             raise ValueError("Invalid authentication token") from exc
-        
+
         user_id = payload.get("id") or payload.get("sub")
         if not user_id:
             raise ValueError("Token is missing user identification claims ('id' or 'sub')")
-            
+
         claim_token = create_claim_token(str(user_id), settings.CLAIM_TOKEN_SECRET)
         headers = {
             "X-Agent-API-Key": settings.AGENT_SERVICE_API_KEY,
@@ -121,4 +241,38 @@ class NestJSClient:
             response = await client.get(url, headers=headers)
             response.raise_for_status()
             return response.json()
+
+    async def check_booking_readiness(self, flight_offer_id: str, passengers: List[Dict[str, Any]]) -> dict:
+        url = f"{self.base_url}/agent-gateway/bookings/readiness"
+        headers = self._get_gateway_headers()
+
+        # Validate that no unexpected keys or PII are passed in passengers
+        safe_passengers = []
+        allowed_keys = {"passengerType", "passengerOrdinal", "sourceType"}
+
+        for p in passengers:
+            if not set(p.keys()).issubset(allowed_keys):
+                raise ValueError("Passenger dict contains invalid keys. Only passengerType, passengerOrdinal, and sourceType are allowed.")
+            safe_passengers.append({
+                "passengerType": p.get("passengerType"),
+                "passengerOrdinal": p.get("passengerOrdinal"),
+                "sourceType": p.get("sourceType")
+            })
+
+        payload = {
+            "flightOfferId": flight_offer_id,
+            "passengers": safe_passengers
+        }
+
+        async with httpx.AsyncClient() as client:
+            response = await client.post(url, json=payload, headers=headers)
+
+            if response.status_code != 200 and response.status_code != 201:
+                return {"error": "Booking readiness could not be verified safely."}
+
+            safe_response = validate_booking_readiness_response(response.json())
+            if safe_response is None:
+                return {"error": "Received malformed readiness response from server."}
+
+            return safe_response
 

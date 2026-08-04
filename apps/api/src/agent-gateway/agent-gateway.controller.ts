@@ -7,6 +7,11 @@ import { FlightSearchQueryDto } from './dto/flight-search-query.dto';
 import { FlightSearchResponseDto } from './dto/flight-result.dto';
 import { UserPreferencesDto } from './dto/user-preferences.dto';
 import { UserBookingsResponseDto } from './dto/user-bookings.dto';
+import {
+  AgentBookingReadinessRequestDto,
+  AgentBookingReadinessResponseDto,
+} from './dto/booking-readiness.dto';
+import { Body, Post, HttpCode } from '@nestjs/common';
 
 interface AuthenticatedRequest extends Request {
   user: {
@@ -76,6 +81,25 @@ export class AgentGatewayController {
       const msg = err instanceof Error ? err.message : String(err);
       const stack = err instanceof Error ? err.stack : undefined;
       this.logger.error(`Failed to get user bookings: ${msg}`, stack);
+      throw err;
+    }
+  }
+
+  @Post('bookings/readiness')
+  @HttpCode(200)
+  async checkBookingReadiness(
+    @Body() dto: AgentBookingReadinessRequestDto,
+    @Req() req: AuthenticatedRequest,
+    @Headers() headers: Record<string, string>,
+  ): Promise<AgentBookingReadinessResponseDto> {
+    try {
+      const traceId = headers['x-trace-id'] || null;
+      const correlationId = headers['x-correlation-id'] || null;
+      const userId = req.user.id;
+
+      return await this.agentGatewayService.checkBookingReadiness(userId, dto, traceId, correlationId);
+    } catch (err: unknown) {
+      this.logger.error('Failed to check booking readiness');
       throw err;
     }
   }

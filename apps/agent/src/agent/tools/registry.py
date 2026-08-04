@@ -3,6 +3,7 @@ from langchain_core.tools import BaseTool, tool
 from agent.tools.search_flights import search_flights
 from agent.tools.get_preferences import get_user_preferences
 from agent.tools.list_bookings import list_user_bookings
+from agent.tools.check_booking_readiness import check_booking_readiness
 
 @tool("book_flight")
 async def book_flight(flight_number: str, date: str) -> str:
@@ -20,6 +21,10 @@ TOOL_REGISTRY: Dict[str, Dict[str, Any]] = {
     },
     "list_user_bookings": {
         "tool": list_user_bookings,
+        "requires_confirmation": False,
+    },
+    "check_booking_readiness": {
+        "tool": check_booking_readiness,
         "requires_confirmation": False,
     },
     "book_flight": {

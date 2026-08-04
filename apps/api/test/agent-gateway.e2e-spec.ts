@@ -73,8 +73,8 @@ describe('Agent Gateway (E2E)', () => {
                   {
                     id: 'seg_1',
                     duration: 'PT5H30M',
-                    departing_at: '2026-07-15T08:30:00',
-                    arriving_at: '2026-07-15T15:00:00',
+                    departing_at: '2027-07-15T08:30:00',
+                    arriving_at: '2027-07-15T15:00:00',
                     origin: { id: 'HAN', name: 'Hanoi', iata_code: 'HAN', type: 'airport' },
                     destination: { id: 'NRT', name: 'Narita', iata_code: 'NRT', type: 'airport' },
                     operating_carrier: { id: 'VN', name: 'Vietnam Airlines', iata_code: 'VN' },
@@ -112,8 +112,8 @@ describe('Agent Gateway (E2E)', () => {
                   {
                     id: 'seg_2',
                     duration: 'PT6H30M',
-                    departing_at: '2026-07-15T10:15:00',
-                    arriving_at: '2026-07-15T17:45:00',
+                    departing_at: '2027-07-15T10:15:00',
+                    arriving_at: '2027-07-15T17:45:00',
                     origin: { id: 'HAN', name: 'Hanoi', iata_code: 'HAN', type: 'airport' },
                     destination: { id: 'NRT', name: 'Narita', iata_code: 'NRT', type: 'airport' },
                     operating_carrier: { id: 'NH', name: 'Ana', iata_code: 'NH' },
@@ -151,8 +151,8 @@ describe('Agent Gateway (E2E)', () => {
                   {
                     id: 'seg_3',
                     duration: 'PT5H35M',
-                    departing_at: '2026-07-15T23:55:00',
-                    arriving_at: '2026-07-15T07:30:00',
+                    departing_at: '2027-07-15T23:55:00',
+                    arriving_at: '2027-07-15T07:30:00',
                     origin: { id: 'HAN', name: 'Hanoi', iata_code: 'HAN', type: 'airport' },
                     destination: { id: 'NRT', name: 'Narita', iata_code: 'NRT', type: 'airport' },
                     operating_carrier: { id: 'JL', name: 'Japan Airlines', iata_code: 'JL' },
@@ -190,8 +190,8 @@ describe('Agent Gateway (E2E)', () => {
                   {
                     id: 'seg_4',
                     duration: 'PT5H45M',
-                    departing_at: '2026-07-15T00:15:00',
-                    arriving_at: '2026-07-15T08:00:00',
+                    departing_at: '2027-07-15T00:15:00',
+                    arriving_at: '2027-07-15T08:00:00',
                     origin: { id: 'HAN', name: 'Hanoi', iata_code: 'HAN', type: 'airport' },
                     destination: { id: 'NRT', name: 'Narita', iata_code: 'NRT', type: 'airport' },
                     operating_carrier: { id: 'VJ', name: 'Vietjet Air', iata_code: 'VJ' },
@@ -229,8 +229,8 @@ describe('Agent Gateway (E2E)', () => {
                   {
                     id: 'seg_5',
                     duration: 'PT9H30M',
-                    departing_at: '2026-07-15T12:00:00',
-                    arriving_at: '2026-07-15T21:30:00',
+                    departing_at: '2027-07-15T12:00:00',
+                    arriving_at: '2027-07-15T21:30:00',
                     origin: { id: 'HAN', name: 'Hanoi', iata_code: 'HAN', type: 'airport' },
                     destination: { id: 'NRT', name: 'Narita', iata_code: 'NRT', type: 'airport' },
                     operating_carrier: { id: 'SQ', name: 'Singapore Airlines', iata_code: 'SQ' },
@@ -483,26 +483,71 @@ describe('Agent Gateway (E2E)', () => {
         },
       });
 
+      const flightOffer = await prisma.flightOffer.create({
+        data: {
+          searchHash: 'search_hash_123',
+          duffelOfferId: 'off_123',
+          rawOffer: {},
+          origin: 'HAN',
+          destination: 'NRT',
+          departureDate: new Date('2027-07-15T00:00:00Z'),
+          adults: 1,
+          cabinClass: 'economy',
+          price: 1250.00,
+          currency: 'USD',
+        }
+      });
+      const intent = await prisma.bookingIntent.create({
+        data: {
+          userId: user.id,
+          flightOfferId: flightOffer.id,
+          duffelOfferId: 'off_123',
+          status: 'CONFIRMED',
+          originalPrice: 1250.00,
+          confirmedPrice: 1250.00,
+          pricedAt: new Date(),
+          origin: 'HAN',
+          destination: 'NRT',
+          departureDate: new Date('2027-07-15T00:00:00Z'),
+          adults: 1,
+          rawOfferSnapshot: {},
+          intentExpiresAt: new Date(Date.now() + 100000)
+        }
+      });
+
       await prisma.booking.create({
         data: {
           userId: user.id,
+          bookingIntentId: intent.id,
           pnrReference: 'PNR_SECRET_123', // PII
-          eTicketNumber: 'TKT_SECRET_123', // PII
           status: 'CONFIRMED',
-          airline: 'VN',
-          flightNumber: 'VN310',
-          origin: 'HAN',
-          destination: 'NRT',
-          departureTime: new Date('2026-07-15T08:30:00Z'),
-          arrivalTime: new Date('2026-07-15T15:00:00Z'),
-          duration: 330,
-          stops: 0,
-          fareClass: 'Business',
-          price: 1250.00,
+          totalAmount: 1250.00,
           currency: 'USD',
-          passengers: 1,
-          baggageAllowance: '32kg checked',
-          paymentReference: 'PAY_SECRET_123', // PII
+          departureAt: new Date('2027-07-15T08:30:00Z'),
+          flightSnapshot: {
+            segments: [{
+              airline: { iataCode: 'VN' },
+              flightNumber: 'VN310',
+              departureAirport: { iataCode: 'HAN' },
+              arrivalAirport: { iataCode: 'NRT' },
+              departureAt: '2027-07-15T08:30:00.000Z',
+              arrivalAt: '2027-07-15T15:00:00.000Z'
+            }],
+            totalDuration: 'PT5H30M',
+            stops: 0,
+            fareClass: 'Business',
+            baggageAllowance: '32kg checked'
+          },
+          passengerSnapshot: {
+            passengers: [
+              {
+                id: 'passenger-1',
+                type: 'ADULT',
+                position: 1,
+                baggage: [{ type: 'CHECKED', quantity: 1, unit: 'KG', weight: 32 }]
+              }
+            ]
+          }
         },
       });
 
@@ -522,8 +567,8 @@ describe('Agent Gateway (E2E)', () => {
       expect(booking.flightNumber).toBe('VN310');
       expect(booking.origin).toBe('HAN');
       expect(booking.destination).toBe('NRT');
-      expect(booking.departureTime).toBe('2026-07-15T08:30:00.000Z');
-      expect(booking.arrivalTime).toBe('2026-07-15T15:00:00.000Z');
+      expect(booking.departureTime).toBe('2027-07-15T08:30:00.000Z');
+      expect(booking.arrivalTime).toBe('2027-07-15T15:00:00.000Z');
       expect(booking.duration).toBe(330);
       expect(booking.stops).toBe(0);
       expect(booking.fareClass).toBe('Business');
@@ -560,7 +605,7 @@ describe('Agent Gateway (E2E)', () => {
 
     it('should reject invalid airport origin code format', async () => {
       await request(app.getHttpServer())
-        .get('/agent-gateway/flights/search?origin=HANOI&destination=NRT&date=2026-07-15&adults=2')
+        .get('/agent-gateway/flights/search?origin=HANOI&destination=NRT&date=2027-07-15&adults=2')
         .set('X-Agent-API-Key', apiKey)
         .set('X-User-Claim', token)
         .expect(400);
@@ -576,7 +621,7 @@ describe('Agent Gateway (E2E)', () => {
 
     it('should reject passenger count out of range (e.g. 10)', async () => {
       await request(app.getHttpServer())
-        .get('/agent-gateway/flights/search?origin=HAN&destination=NRT&date=2026-07-15&adults=10')
+        .get('/agent-gateway/flights/search?origin=HAN&destination=NRT&date=2027-07-15&adults=10')
         .set('X-Agent-API-Key', apiKey)
         .set('X-User-Claim', token)
         .expect(400);
@@ -584,7 +629,7 @@ describe('Agent Gateway (E2E)', () => {
 
     it('should successfully search flights and return mock data', async () => {
       const res = await request(app.getHttpServer())
-        .get('/agent-gateway/flights/search?origin=HAN&destination=NRT&date=2026-07-15&adults=2')
+        .get('/agent-gateway/flights/search?origin=HAN&destination=NRT&date=2027-07-15&adults=2')
         .set('X-Agent-API-Key', apiKey)
         .set('X-User-Claim', token)
         .expect(200);
@@ -596,8 +641,8 @@ describe('Agent Gateway (E2E)', () => {
       expect(firstResult.flightNumber).toBe('VN310');
       expect(firstResult.departureAirport).toBe('HAN');
       expect(firstResult.arrivalAirport).toBe('NRT');
-      expect(firstResult.departureTime).toBe('2026-07-15T08:30:00');
-      expect(firstResult.arrivalTime).toBe('2026-07-15T15:00:00');
+      expect(firstResult.departureTime).toBe('2027-07-15T08:30:00');
+      expect(firstResult.arrivalTime).toBe('2027-07-15T15:00:00');
       expect(firstResult.duration).toBe(330);
       expect(firstResult.stops).toBe(0);
       expect(firstResult.price).toBe(452.00 * 2);
@@ -625,7 +670,7 @@ describe('Agent Gateway (E2E)', () => {
 
       // Call search
       await request(app.getHttpServer())
-        .get('/agent-gateway/flights/search?origin=HAN&destination=NRT&date=2026-07-15&adults=1')
+        .get('/agent-gateway/flights/search?origin=HAN&destination=NRT&date=2027-07-15&adults=1')
         .set('X-Agent-API-Key', apiKey)
         .set('X-User-Claim', token)
         .set('X-Trace-Id', traceId)
@@ -659,7 +704,7 @@ describe('Agent Gateway (E2E)', () => {
       expect(metadata.parameters).toEqual({
         origin: 'HAN',
         destination: 'NRT',
-        date: '2026-07-15',
+        date: '2027-07-15',
         adults: 1,
       });
       expect(metadata.durationMs).toBeDefined();
@@ -705,7 +750,7 @@ describe('Agent Gateway (E2E)', () => {
 
       // 3. Perform search
       const res = await request(app.getHttpServer())
-        .get('/agent-gateway/flights/search?origin=SGN&destination=NRT&date=2026-07-20&adults=1')
+        .get('/agent-gateway/flights/search?origin=SGN&destination=NRT&date=2027-07-20&adults=1')
         .set('X-Agent-API-Key', apiKey)
         .set('X-User-Claim', token)
         .expect(400);
@@ -743,7 +788,7 @@ describe('Agent Gateway (E2E)', () => {
 
       // 3. Perform search
       const res = await request(app.getHttpServer())
-        .get('/agent-gateway/flights/search?origin=SGN&destination=NRT&date=2026-07-20&adults=1')
+        .get('/agent-gateway/flights/search?origin=SGN&destination=NRT&date=2027-07-20&adults=1')
         .set('X-Agent-API-Key', apiKey)
         .set('X-User-Claim', token)
         .expect(400);
@@ -762,7 +807,7 @@ describe('Agent Gateway (E2E)', () => {
     });
     it('should throw 400 when neither adults nor passengers query param is provided', async () => {
       const res = await request(app.getHttpServer())
-        .get('/agent-gateway/flights/search?origin=HAN&destination=NRT&date=2026-07-15')
+        .get('/agent-gateway/flights/search?origin=HAN&destination=NRT&date=2027-07-15')
         .set('X-Agent-API-Key', apiKey)
         .set('X-User-Claim', token)
         .expect(400);
@@ -772,13 +817,112 @@ describe('Agent Gateway (E2E)', () => {
 
     it('should successfully search using passengers query param instead of adults (backward compatibility)', async () => {
       const res = await request(app.getHttpServer())
-        .get('/agent-gateway/flights/search?origin=HAN&destination=NRT&date=2026-07-15&passengers=3')
+        .get('/agent-gateway/flights/search?origin=HAN&destination=NRT&date=2027-07-15&passengers=3')
         .set('X-Agent-API-Key', apiKey)
         .set('X-User-Claim', token)
         .expect(200);
 
       expect(res.body.results.length).toBe(5);
       expect(res.body.results[0].price).toBe(452.00 * 3);
+    });
+  });
+
+  describe('Booking Readiness Endpoint (POST /bookings/readiness)', () => {
+    let token: string;
+    let user: User;
+
+    beforeEach(async () => {
+      user = await prisma.user.create({
+        data: {
+          id: crypto.randomUUID(),
+          email: 'readinesstester@example.com',
+          password: 'Password123!',
+          status: 'ACTIVE',
+        },
+      });
+
+      const iat = Math.floor(Date.now() / 1000);
+      token = mintClaimToken(user.id, iat);
+    });
+
+    it('should reject request missing flightOfferId', async () => {
+      const res = await request(app.getHttpServer())
+        .post('/agent-gateway/bookings/readiness')
+        .set('X-Agent-API-Key', apiKey)
+        .set('X-User-Claim', token)
+        .send({
+          passengers: [{ passengerType: 'ADULT', passengerOrdinal: 1, sourceType: 'inline' }]
+        })
+        .expect(400);
+      expect(res.body.message).toContain('flightOfferId must be a UUID');
+    });
+
+    it('should reject request with passenger missing type', async () => {
+      const res = await request(app.getHttpServer())
+        .post('/agent-gateway/bookings/readiness')
+        .set('X-Agent-API-Key', apiKey)
+        .set('X-User-Claim', token)
+        .send({
+          flightOfferId: crypto.randomUUID(),
+          passengers: [{ passengerOrdinal: 1, sourceType: 'inline' }]
+        })
+        .expect(400);
+    });
+
+    it('should reject request containing PII in passenger', async () => {
+      const piiValues = {
+        givenName: 'Ada',
+        familyName: 'Lovelace',
+        dateOfBirth: '1815-12-10',
+        email: 'ada@example.test',
+        phoneNumber: '5551234567',
+        passportNumber: 'P12345678',
+        travelerProfileId: crypto.randomUUID(),
+      };
+      const res = await request(app.getHttpServer())
+        .post('/agent-gateway/bookings/readiness')
+        .set('X-Agent-API-Key', apiKey)
+        .set('X-User-Claim', token)
+        .send({
+          flightOfferId: crypto.randomUUID(),
+          passengers: [{
+            passengerType: 'ADULT',
+            passengerOrdinal: 1,
+            sourceType: 'inline',
+            ...piiValues,
+          }]
+        })
+        .expect(400);
+
+      expect(res.body.message).toEqual(expect.arrayContaining([expect.stringContaining('should not exist')]));
+      const serialized = JSON.stringify(res.body);
+      for (const value of Object.values(piiValues)) {
+        expect(serialized).not.toContain(value);
+      }
+    });
+
+    it('should handle missing profile gracefully when using traveler_profile', async () => {
+      const newUser = await prisma.user.create({
+        data: {
+          id: crypto.randomUUID(),
+          email: 'noprofile@example.com',
+          password: 'Password123!',
+          status: 'ACTIVE',
+        },
+      });
+      const newToken = mintClaimToken(newUser.id, Math.floor(Date.now() / 1000));
+      const offerId = crypto.randomUUID();
+      const res = await request(app.getHttpServer())
+        .post('/agent-gateway/bookings/readiness')
+        .set('X-Agent-API-Key', apiKey)
+        .set('X-User-Claim', newToken)
+        .send({
+          flightOfferId: offerId,
+          passengers: [{ passengerType: 'ADULT', passengerOrdinal: 1, sourceType: 'traveler_profile' }]
+        })
+        .expect(404);
+
+      expect(res.body.code).toBe('PROFILE_NOT_FOUND');
     });
   });
 });
