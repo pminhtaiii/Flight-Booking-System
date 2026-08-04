@@ -609,6 +609,8 @@ export class AgentGatewayService {
       // 4. Extract safe fields for projection
       // The result is already safe from getAdvisoryReadiness (BookingReadinessResult)
       // We explicitly map it to ensure no PII leaks.
+      const hasInlinePassengers = dto.passengers.some((p) => p.sourceType === 'inline');
+      
       const safeResponse: AgentBookingReadinessResponseDto = {
         scope: result.scope,
         ready: result.ready,
@@ -624,7 +626,7 @@ export class AgentGatewayService {
             })),
           })),
         })),
-        nextAction: result.ready ? 'CONTINUE_CHECKOUT' : 'COMPLETE_PROFILE',
+        nextAction: result.ready || hasInlinePassengers ? 'CONTINUE_CHECKOUT' : 'COMPLETE_PROFILE',
       };
 
       await this.recordReadinessOutcome(
