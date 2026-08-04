@@ -4,10 +4,39 @@ const ALLOWED_RETURN_PREFIXES = [
   '/search',
   '/bookings',
   '/checkout/passengers',
+  '/prototype/chat',
 ];
+const OFFER_ID_PATTERN = /^off_[A-Za-z0-9_-]{1,128}$/;
 
 function isAllowedPath(pathname: string): boolean {
   return ALLOWED_RETURN_PREFIXES.some((prefix) => pathname === prefix || (prefix !== '/' && pathname.startsWith(`${prefix}/`)));
+}
+
+function safeSearch(pathname: string, search: string): string {
+  const params = new URLSearchParams(search);
+  const safeParams = new URLSearchParams();
+  
+  const offerId = params.get('offerId');
+  if (offerId && OFFER_ID_PATTERN.test(offerId)) {
+    safeParams.set('offerId', offerId);
+  }
+
+  const sessionId = params.get('sessionId');
+  if (sessionId && /^[A-Za-z0-9_-]{1,128}$/.test(sessionId)) {
+    safeParams.set('sessionId', sessionId);
+  }
+
+  if (params.get('autoResume') === 'true') {
+    safeParams.set('autoResume', 'true');
+  }
+
+  const scenario = params.get('scenario');
+  if (scenario) {
+    safeParams.set('scenario', scenario);
+  }
+
+  const searchStr = safeParams.toString();
+  return searchStr ? `?${searchStr}` : '';
 }
 
 export function getSafeReturnTarget(candidate: string | null | undefined, fallback = '/'): string {
@@ -22,7 +51,7 @@ export function getSafeReturnTarget(candidate: string | null | undefined, fallba
       return fallback;
     }
 
-    return `${target.pathname}${target.search}${target.hash}`;
+    return `${target.pathname}${safeSearch(target.pathname, target.search)}`;
   } catch {
     return fallback;
   }
