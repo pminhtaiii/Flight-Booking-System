@@ -168,7 +168,7 @@ export function PassengerFormClient({
           familyName: passenger.familyName.trim(),
           dateOfBirth: passenger.dateOfBirth,
           gender: passenger.gender,
-          nationality: passenger.nationality.trim().toUpperCase(),
+          nationality: passenger.nationality.trim().toUpperCase() || undefined,
           documentType: passenger.documentType.trim() || undefined,
           passportNumber: passenger.passportNumber.trim() || undefined,
           passportExpiry: passenger.passportExpiry || undefined,
@@ -240,6 +240,28 @@ export function PassengerFormClient({
       if (!createResponse.ok || !createBody?.intentId) {
         if (createResponse.status === 409 && createBody?.code === 'PROFILE_CHANGED') {
           setProfileSelected(false);
+          setPassengers((prev) => {
+            const updated = [...prev];
+            if (updated[0]) {
+              updated[0] = {
+                ...updated[0],
+                givenName: '',
+                familyName: '',
+                dateOfBirth: '',
+                gender: 'male',
+                title: 'Mr',
+                email: '',
+                phoneCountryCode: '+1',
+                phoneNumber: '',
+                nationality: '',
+                documentType: '',
+                passportNumber: '',
+                passportExpiry: '',
+                issuingCountry: '',
+              };
+            }
+            return updated;
+          });
         }
         throw new Error(safeErrorMessage(createResponse.status, createBody?.code));
       }
