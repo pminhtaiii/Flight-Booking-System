@@ -84,7 +84,6 @@ export function ChatWidget(): JSX.Element {
   const offerId = getSafeOfferId(searchParams.get('offerId'));
   const sessionId = getSafeSessionId(searchParams.get('sessionId'));
   const autoResume = searchParams.get('autoResume') === 'true';
-  const scenario = searchParams.get('scenario'); // For E2E tests
 
   const acceptActionRequiredEvent = useCallback((payload: unknown): void => {
     const safeEvent = parseActionRequiredEvent(payload);
@@ -92,15 +91,6 @@ export function ChatWidget(): JSX.Element {
       setActionEvent(safeEvent);
     }
   }, []);
-
-  // E2E test auto-trigger hook
-  useEffect(() => {
-    if (scenario) {
-      const controller = new AbortController();
-      void consumeChatStream(scenario, sessionId ?? 'test-session', controller.signal, acceptActionRequiredEvent);
-      return () => controller.abort();
-    }
-  }, [scenario, sessionId, acceptActionRequiredEvent]);
 
   // Auto-resume hook
   useEffect(() => {
@@ -134,7 +124,7 @@ export function ChatWidget(): JSX.Element {
   const handleSend = () => {
     if (!inputMessage.trim()) return;
     const controller = new AbortController();
-    void consumeChatStream(inputMessage, sessionId ?? 'default-session', controller.signal, acceptActionRequiredEvent);
+    void consumeChatStream(inputMessage, sessionId ?? '', controller.signal, acceptActionRequiredEvent);
     setInputMessage('');
   };
 

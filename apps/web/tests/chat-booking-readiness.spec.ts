@@ -1,36 +1,94 @@
 import { expect, test } from '@playwright/test';
 
 const MOCK_SINGLE_PAYLOAD = {
-  type: 'passenger_details_required',
+  action: 'COMPLETE_PROFILE',
+  scope: 'DOMESTIC',
+  passengers: [
+    {
+      passengerType: 'ADULT',
+      passengerOrdinal: 1,
+      sections: [
+        {
+          name: 'travel_document',
+          fields: [
+            {
+              name: 'passportNumber',
+              status: 'missing',
+              reason: 'REQUIRED',
+            },
+          ],
+        },
+      ],
+    },
+  ],
   target: '/profile',
-  metadata: {
-    title: 'Missing travel document',
-    passenger: 'Passenger 1 (Adult)',
-  },
-  _unsafe_pii: {
-    fullName: 'Jane Doe',
-    documentNumber: 'P12345',
-  },
 };
 
 const MOCK_MULTI_PAYLOAD = {
-  type: 'passenger_details_required',
+  action: 'CONTINUE_CHECKOUT',
+  scope: 'DOMESTIC',
+  passengers: [
+    {
+      passengerType: 'ADULT',
+      passengerOrdinal: 1,
+      sections: [
+        {
+          name: 'identity',
+          fields: [
+            {
+              name: 'givenName',
+              status: 'missing',
+              reason: 'REQUIRED',
+            },
+          ],
+        },
+      ],
+    },
+    {
+      passengerType: 'ADULT',
+      passengerOrdinal: 2,
+      sections: [
+        {
+          name: 'identity',
+          fields: [
+            {
+              name: 'givenName',
+              status: 'missing',
+              reason: 'REQUIRED',
+            },
+          ],
+        },
+      ],
+    },
+  ],
   target: '/checkout/passengers',
-  metadata: {
-    title: 'Missing passenger details',
-    passenger: '2 Passengers',
-  },
-  _unsafe_pii: {
-    passengers: ['Jane Doe', 'John Doe'],
-  },
 };
 
 const MOCK_MALICIOUS_PAYLOAD = {
-  type: 'passenger_details_required',
+  action: 'COMPLETE_PROFILE',
+  scope: 'DOMESTIC',
+  passengers: [
+    {
+      passengerType: 'ADULT',
+      passengerOrdinal: 1,
+      sections: [
+        {
+          name: 'identity',
+          fields: [
+            {
+              name: 'givenName',
+              status: 'missing',
+              reason: 'REQUIRED',
+            },
+          ],
+        },
+      ],
+    },
+  ],
   target: '/profile',
-  metadata: {
-    title: 'Update profile for Jane Doe (P12345)',
-    passenger: 'Passenger 1 (Adult)',
+  _unsafe_pii: {
+    fullName: 'Jane Doe',
+    documentNumber: 'P12345',
   },
 };
 
@@ -88,7 +146,10 @@ test.describe('Booking Readiness Chat Handoff', () => {
 
   test('single-profile action card renders safely and routes to profile correction', async ({ page }) => {
     // Navigate to a realistic path where widget is mounted
-    await page.goto('/?scenario=action-required-single&sessionId=test_sess_1');
+    await page.goto('/?sessionId=test_sess_1');
+    const chatInput = page.getByPlaceholder('Type a message...');
+    await chatInput.fill('action-required-single');
+    await chatInput.press('Enter');
 
     // Action card should be visible
     const card = page.getByTestId('booking-action-card');
@@ -112,7 +173,10 @@ test.describe('Booking Readiness Chat Handoff', () => {
   });
 
   test('inline or multi-passenger action card routes to checkout', async ({ page }) => {
-    await page.goto('/?scenario=action-required-multi&offerId=off_test_123');
+    await page.goto('/?offerId=off_test_123');
+    const chatInput = page.getByPlaceholder('Type a message...');
+    await chatInput.fill('action-required-multi');
+    await chatInput.press('Enter');
 
     const card = page.getByTestId('booking-action-card');
     await expect(card).toBeVisible();
@@ -129,7 +193,10 @@ test.describe('Booking Readiness Chat Handoff', () => {
     const logs: string[] = [];
     page.on('console', (msg) => logs.push(msg.text()));
 
-    await page.goto('/?scenario=action-required-single');
+    await page.goto('/');
+    const chatInput = page.getByPlaceholder('Type a message...');
+    await chatInput.fill('action-required-single');
+    await chatInput.press('Enter');
     await expect(page.getByTestId('booking-action-card')).toBeVisible();
 
     const localStorageData = await page.evaluate(() => JSON.stringify(window.localStorage));
@@ -146,7 +213,12 @@ test.describe('Booking Readiness Chat Handoff', () => {
   });
 
   test('rejects a value-bearing ACTION_REQUIRED payload without rendering it', async ({ page }) => {
-    await page.goto('/?scenario=action-required-malicious');
+    await page.goto('/');
+    const chatInput = page.getByPlaceholder('Type a message...');
+    await chatInput.fill('action-required-malicious');
+    await chatInput.press('Enter');
+
+    await page.waitForTimeout(500);
 
     await expect(page.getByTestId('booking-action-card')).toHaveCount(0);
     await expect(page.locator('body')).not.toContainText('Jane Doe');
