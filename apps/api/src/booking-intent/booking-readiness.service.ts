@@ -16,6 +16,7 @@ import {
   BookingReadinessTravelerProfileSourceDto,
 } from './dto/booking-readiness.dto';
 import { BookingReadinessObservability } from './booking-readiness.observability';
+import { BookingReadinessOperation } from '../common/observability/booking-readiness-observability.types';
 import { parseBookingReadinessConfig } from './booking-readiness.config';
 import { BookingReadinessEvaluator } from './booking-readiness.evaluator';
 import type {
@@ -23,6 +24,7 @@ import type {
   BookingReadinessPassengerInput,
   BookingReadinessSegmentInput,
 } from './booking-readiness.types';
+import type { ResolvedPassenger } from './passenger-source-resolver.service';
 
 type ReadinessContext = {
   traceId?: string;
@@ -266,6 +268,113 @@ export class BookingReadinessService {
     }
   }
 
+  /**
+   * Runs the same deterministic evaluator used by the advisory endpoint after
+   * the authoritative create flow has resolved every passenger source. This
+   * method performs no persistence and intentionally accepts only server-owned
+   * offer data plus detached passenger values.
+   */
+  async evaluateAuthoritativeReadiness(
+    rawOffer: unknown,
+    passengers: readonly ResolvedPassenger[],
+    context?: ReadinessContext,
+  ) {
+    const startedAt = Date.now();
+
+    try {
+      this.assertFeatureEnabled();
+      const normalizedOffer = this.normalizeStoredOffer(rawOffer);
+      const storedById = new Map(normalizedOffer.passengers.map((passenger) => [passenger.id, passenger]));
+
+      const evaluationPassengers: BookingReadinessPassengerInput[] = passengers.map((passenger) => {
+        const storedPassenger = storedById.get(passenger.offerPassengerId);
+        if (!storedPassenger || storedPassenger.type !== passenger.type) {
+          throw httpError('PASSENGER_MAPPING_INVALID', 'Passenger mapping is invalid', HttpStatus.UNPROCESSABLE_ENTITY);
+        }
+
+        return {
+          passengerType: passenger.type,
+          passengerOrdinal: normalizedOffer.passengers.findIndex((item) => item.id === passenger.offerPassengerId) + 1,
+          profileRevision: passenger.profileRevision,
+          givenName: passenger.givenName,
+          middleName: passenger.middleName,
+          familyName: passenger.familyName,
+          dateOfBirth: passenger.dateOfBirth,
+          gender: passenger.gender,
+          title: passenger.title,
+          email: passenger.email,
+          phoneCountryCode: passenger.phoneCountryCode,
+          phoneNumber: passenger.phoneNumber,
+          documentType: passenger.documentType,
+          passportNumber: passenger.passportNumber,
+          passportExpiry: passenger.passportExpiry,
+          issuingCountry: passenger.issuingCountry,
+          nationality: passenger.nationality,
+        };
+      });
+
+      const countries = await this.airportsService.findCountriesByIataCodes(normalizedOffer.airportCodes);
+      if (!(countries instanceof Map)) {
+        throw new Error('Airport country lookup returned an invalid result');
+      }
+
+      const configValue = this.configService.get<string>('PASSPORT_ADVISORY_BUFFER_DAYS');
+      const readinessConfig = parseBookingReadinessConfig({ PASSPORT_ADVISORY_BUFFER_DAYS: configValue });
+      const result = this.bookingReadinessEvaluator.evaluate({
+        passengers: evaluationPassengers,
+        segments: normalizedOffer.segments.map((segment) => ({
+          ...segment,
+          originCountryCode: segment.originCountryCode
+            ? countries.get(segment.originCountryCode) ?? null
+            : null,
+          destinationCountryCode: segment.destinationCountryCode
+            ? countries.get(segment.destinationCountryCode) ?? null
+            : null,
+        })),
+        tripCompletionDate: normalizedOffer.tripCompletionDate,
+        supportedDocumentTypes: ['passport'],
+        advisoryBufferDays: readinessConfig.passportAdvisoryBufferDays,
+        currentDate: currentDateOnly(),
+        entryEligibility: {
+          include: true,
+          result: {
+            status: 'unknown',
+            reason: 'ENTRY_ELIGIBILITY_UNKNOWN',
+            blocking: false,
+          },
+        },
+      });
+
+      this.recordOutcome(
+        {
+          status: result.ready ? 'ready' : 'not_ready',
+          operation: BookingReadinessOperation.INTENT_AUTHORITATIVE_VALIDATION,
+          metadata: {
+            scope: result.scope,
+            passengerCount: result.passengers.length,
+          },
+        },
+        context,
+        startedAt,
+      );
+
+      return result;
+    } catch (error) {
+      const mappedError = this.mapError(error);
+      this.recordOutcome(
+        {
+          status: this.errorCode(mappedError),
+          operation: BookingReadinessOperation.INTENT_AUTHORITATIVE_VALIDATION,
+          error: mappedError.getStatus() >= HttpStatus.INTERNAL_SERVER_ERROR,
+          metadata: { reasonCode: this.errorCode(mappedError) },
+        },
+        context,
+        startedAt,
+      );
+      throw mappedError;
+    }
+  }
+
   private assertFeatureEnabled(): void {
     if (this.configService.get<string>('FEATURE_FLAG_BOOKING_READINESS') !== 'true') {
       throw new NotFoundException({
@@ -463,6 +572,7 @@ export class BookingReadinessService {
       status: string;
       metadata?: Record<string, unknown>;
       error?: boolean;
+      operation?: BookingReadinessOperation;
     },
     context: ReadinessContext | undefined,
     startedAt: number,

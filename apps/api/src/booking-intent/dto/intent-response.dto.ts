@@ -9,21 +9,35 @@ export class BookingIntentFlightDto {
   infants?: number;
 }
 
-export class BookingIntentCreationPassengerDto {
-  id!: string;
-  type!: string;
-  givenName!: string;
-  familyName!: string;
-  dateOfBirth!: string;
-  gender!: string;
-  nationality!: string | null;
-  preFilledFromProfile!: boolean;
+export class BookingIntentDocumentSummaryDto {
+  documentType!: string | null;
+  issuingCountry!: string | null;
+  hasPassport!: boolean;
 }
 
-export class BookingIntentPassengerDetailDto extends BookingIntentCreationPassengerDto {
-  passportNumber!: string | null;
-  passportExpiry!: string | null;
+export class BookingIntentContactSummaryDto {
+  email!: string | null;
+  phone!: string | null;
 }
+
+export class BookingIntentPassengerSummaryDto {
+  id!: string;
+  passengerType!: string;
+  passengerOrdinal!: number;
+  nameSummary!: string;
+  documentSummary!: BookingIntentDocumentSummaryDto;
+  contactSummary!: BookingIntentContactSummaryDto;
+  preFilledFromProfile!: boolean;
+
+  // Kept as null-only compatibility keys for clients that still deserialize
+  // the pre-Phase-8 shape. They must never be populated with sensitive data.
+  passportNumber!: null;
+  passportExpiry!: null;
+}
+
+export class BookingIntentCreationPassengerDto extends BookingIntentPassengerSummaryDto {}
+
+export class BookingIntentPassengerDetailDto extends BookingIntentPassengerSummaryDto {}
 
 export class CreateBookingIntentResponseDto {
   intentId!: string;

@@ -170,7 +170,6 @@ const LEGACY_REQUIRED_PASSENGER_FIELDS = [
   'familyName',
   'dateOfBirth',
   'gender',
-  'nationality',
 ] as const;
 
 function missingLegacyPassengerFields(passenger: Record<string, unknown>): string[] {
@@ -318,4 +317,10 @@ export class CreateIntentDto {
   @Type(() => CreateIntentPassengerDto)
   @HasValidPassengerMatrix()
   passengers!: CreateIntentPassengerDto[];
+
+  // Advisory context is accepted for correlation only; authoritative create
+  // always recomputes scope from server-owned itinerary data.
+  @IsOptional()
+  @IsIn(['DOMESTIC', 'INTERNATIONAL', 'UNKNOWN'])
+  readinessScope?: 'DOMESTIC' | 'INTERNATIONAL' | 'UNKNOWN';
 }

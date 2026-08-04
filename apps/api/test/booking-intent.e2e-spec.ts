@@ -1,4 +1,5 @@
 process.env.ENCRYPTION_KEY = 'a'.repeat(64);
+process.env.FEATURE_FLAG_BOOKING_READINESS = 'true';
 
 import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication, ValidationPipe } from '@nestjs/common';
@@ -12,6 +13,7 @@ import { EncryptionService } from '@/common/encryption.service';
 import { BookingIntentCron } from '@/booking-intent/booking-intent.cron';
 import { PassengerType, Prisma } from '@prisma/client';
 import { HttpExceptionFilter } from '@/common/filters/http-exception.filter';
+import { AirportsService } from '@/airports/airports.service';
 
 describe('Booking Intent (E2E)', () => {
   jest.setTimeout(30000);
@@ -22,6 +24,7 @@ describe('Booking Intent (E2E)', () => {
   let auditService: AuditService;
   let encryptionService: EncryptionService;
   let cron: BookingIntentCron;
+  let airportsService: AirportsService;
 
   let userA: { id: string; email: string };
   let tokenA: string;
@@ -50,6 +53,7 @@ describe('Booking Intent (E2E)', () => {
     auditService = moduleFixture.get<AuditService>(AuditService);
     encryptionService = moduleFixture.get<EncryptionService>(EncryptionService);
     cron = moduleFixture.get<BookingIntentCron>(BookingIntentCron);
+    airportsService = moduleFixture.get<AirportsService>(AirportsService);
   });
 
   afterAll(async () => {
@@ -110,18 +114,39 @@ describe('Booking Intent (E2E)', () => {
     });
   }
 
+  async function createCanonicalFlightOffer() {
+    return createMockFlightOffer({
+      rawOffer: {
+        passengers: [{ id: 'pas_001', type: 'adult' }],
+        slices: [{
+          segments: [{
+            origin: { iata_code: 'SGN' },
+            destination: { iata_code: 'HAN' },
+            arriving_at: '2026-08-01T12:00:00Z',
+          }],
+        }],
+        expires_at: new Date(Date.now() + 3600 * 1000).toISOString(),
+      },
+    });
+  }
+
+  function liveOfferResponse(totalAmount = '100.00') {
+    return {
+      data: {
+        id: 'off_duffel_123',
+        total_amount: totalAmount,
+        total_currency: 'USD',
+        expires_at: new Date(Date.now() + 3600 * 1000).toISOString(),
+        passengers: [{ id: 'duffel-passenger-1', type: 'adult' }],
+      },
+    } as any;
+  }
+
   describe('POST /api/bookings/intent', () => {
     it('creates intent with valid passengers (201), encrypts PII, writes audit log, doesn\'t return passport fields', async () => {
       const offer = await createMockFlightOffer({ adults: 1 });
 
-      const duffelSpy = jest.spyOn(duffelService['duffel'].offers, 'get').mockResolvedValue({
-        data: {
-          id: 'off_duffel_123',
-          total_amount: '125.50',
-          total_currency: 'USD',
-          expires_at: new Date(Date.now() + 3600 * 1000).toISOString(),
-        },
-      } as any);
+      const duffelSpy = jest.spyOn(duffelService['duffel'].offers, 'get').mockResolvedValue(liveOfferResponse('125.50'));
 
       const res = await request(app.getHttpServer())
         .post('/api/bookings/intent')
@@ -152,9 +177,9 @@ describe('Booking Intent (E2E)', () => {
       expect(res.body.confirmedPrice).toBe(125.5);
       expect(res.body.priceChanged).toBe(true);
 
-      // Verify response doesn't return passport number or expiry
-      expect(res.body.passengers[0]).not.toHaveProperty('passportNumber');
-      expect(res.body.passengers[0]).not.toHaveProperty('passportExpiry');
+      // Compatibility keys remain null; encrypted values never cross the API boundary.
+      expect(res.body.passengers[0].passportNumber).toBeNull();
+      expect(res.body.passengers[0].passportExpiry).toBeNull();
       expect(res.body.passengers[0].preFilledFromProfile).toBe(false);
 
       // Verify DB records
@@ -197,14 +222,7 @@ describe('Booking Intent (E2E)', () => {
         },
       });
 
-      const duffelSpy = jest.spyOn(duffelService['duffel'].offers, 'get').mockResolvedValue({
-        data: {
-          id: 'off_duffel_123',
-          total_amount: '100.00',
-          total_currency: 'USD',
-          expires_at: new Date(Date.now() + 3600 * 1000).toISOString(),
-        },
-      } as any);
+      const duffelSpy = jest.spyOn(duffelService['duffel'].offers, 'get').mockResolvedValue(liveOfferResponse());
 
       const res = await request(app.getHttpServer())
         .post('/api/bookings/intent')
@@ -326,14 +344,7 @@ describe('Booking Intent (E2E)', () => {
     it('rolls back intent creation if audit log write fails inside transaction', async () => {
       const offer = await createMockFlightOffer({ adults: 1 });
 
-      const duffelSpy = jest.spyOn(duffelService['duffel'].offers, 'get').mockResolvedValue({
-        data: {
-          id: 'off_duffel_123',
-          total_amount: '100.00',
-          total_currency: 'USD',
-          expires_at: new Date(Date.now() + 3600 * 1000).toISOString(),
-        },
-      } as any);
+      const duffelSpy = jest.spyOn(duffelService['duffel'].offers, 'get').mockResolvedValue(liveOfferResponse());
 
       // Force AuditService.createLog to fail
       const auditSpy = jest.spyOn(auditService, 'createLog').mockRejectedValue(new Error('Audit DB Down'));
@@ -419,17 +430,146 @@ describe('Booking Intent (E2E)', () => {
     });
   });
 
-  describe('GET /api/bookings/intent/:id', () => {
-    it('retrieves own intent (200) and returns decrypted passport fields', async () => {
+  describe('Canonical plural routes', () => {
+    it('evaluates readiness, creates atomically, and returns the same safe shape from plural and singular GETs', async () => {
+      const offer = await createCanonicalFlightOffer();
+      const airportCountrySpy = jest.spyOn(airportsService, 'findCountriesByIataCodes')
+        .mockResolvedValue(new Map([['SGN', 'VN'], ['HAN', 'VN']]));
+      const source = {
+        type: 'inline',
+        givenName: 'Ada',
+        familyName: 'Lovelace',
+        dateOfBirth: '1815-12-10',
+        gender: 'female',
+        nationality: 'US',
+        email: 'ada@example.test',
+        phoneCountryCode: '+1',
+        phoneNumber: '5550000000',
+        title: 'Ms',
+      };
+      const requestPassenger = {
+        offerPassengerId: 'pas_001',
+        type: PassengerType.ADULT,
+        source,
+      };
+
+      const readiness = await request(app.getHttpServer())
+        .post('/api/bookings/intents/readiness')
+        .set('Authorization', `Bearer ${tokenA}`)
+        .set('x-trace-id', 'trace-phase8')
+        .set('x-correlation-id', 'correlation-phase8')
+        .send({
+          flightOfferId: offer.id,
+          passengers: [{
+            offerPassengerId: 'pas_001',
+            passengerType: PassengerType.ADULT,
+            source,
+          }],
+        })
+        .expect(200);
+
+      expect(readiness.body.ready).toBe(true);
+      expect(readiness.body.scope).toBe('DOMESTIC');
+
+      const duffelSpy = jest.spyOn(duffelService['duffel'].offers, 'get').mockResolvedValue(liveOfferResponse());
+      const createRes = await request(app.getHttpServer())
+        .post('/api/bookings/intents')
+        .set('Authorization', `Bearer ${tokenA}`)
+        .set('x-trace-id', 'trace-phase8')
+        .set('x-correlation-id', 'correlation-phase8')
+        .send({ flightOfferId: offer.id, readinessScope: readiness.body.scope, passengers: [requestPassenger] })
+        .expect(201);
+      duffelSpy.mockRestore();
+
+      expect(createRes.headers['cache-control']).toContain('no-store');
+      expect(createRes.headers['x-trace-id']).toBe('trace-phase8');
+      expect(createRes.body.passengers[0]).toEqual(expect.objectContaining({
+        passengerType: 'ADULT',
+        nameSummary: expect.stringMatching(/^A/),
+        passportNumber: null,
+        passportExpiry: null,
+      }));
+      expect(createRes.body.passengers[0]).not.toHaveProperty('givenName');
+
+      const pluralGet = await request(app.getHttpServer())
+        .get(`/api/bookings/intents/${createRes.body.intentId}`)
+        .set('Authorization', `Bearer ${tokenA}`)
+        .expect(200);
+      const singularGet = await request(app.getHttpServer())
+        .get(`/api/bookings/intent/${createRes.body.intentId}`)
+        .set('Authorization', `Bearer ${tokenA}`)
+        .expect(200);
+
+      expect(pluralGet.body.passengers[0].passportNumber).toBeNull();
+      expect(pluralGet.body.passengers[0].documentSummary.hasPassport).toBe(false);
+      expect(singularGet.body.passengers).toEqual(pluralGet.body.passengers);
+      airportCountrySpy.mockRestore();
+    });
+
+    it('rejects legacy profile flags on the canonical plural create route', async () => {
       const offer = await createMockFlightOffer({ adults: 1 });
 
-      const duffelSpy = jest.spyOn(duffelService['duffel'].offers, 'get').mockResolvedValue({
-        data: {
-          id: 'off_duffel_123',
-          total_amount: '100.00',
-          total_currency: 'USD',
-        },
-      } as any);
+      await request(app.getHttpServer())
+        .post('/api/bookings/intents')
+        .set('Authorization', `Bearer ${tokenA}`)
+        .send({
+          flightOfferId: offer.id,
+          passengers: [{
+            type: PassengerType.ADULT,
+            useProfile: true,
+            givenName: 'Primary',
+            familyName: 'User',
+            dateOfBirth: '1995-05-05',
+            gender: 'female',
+            nationality: 'US',
+          }],
+        })
+        .expect(400);
+
+      expect(await prisma.bookingIntent.count()).toBe(0);
+    });
+
+    it('rejects useProfile on a non-primary legacy passenger', async () => {
+      const offer = await createMockFlightOffer({ adults: 1, children: 1 });
+
+      const res = await request(app.getHttpServer())
+        .post('/api/bookings/intent')
+        .set('Authorization', `Bearer ${tokenA}`)
+        .send({
+          flightOfferId: offer.id,
+          passengers: [
+            {
+              type: PassengerType.ADULT,
+              givenName: 'Primary',
+              familyName: 'User',
+              dateOfBirth: '1995-05-05',
+              gender: 'female',
+              nationality: 'US',
+              useProfile: true,
+            },
+            {
+              type: PassengerType.CHILD,
+              givenName: 'Child',
+              familyName: 'User',
+              dateOfBirth: '2015-05-05',
+              gender: 'male',
+              nationality: 'US',
+              useProfile: true,
+            },
+          ],
+        })
+        .expect(400);
+
+      expect(res.body.code).toBe('LEGACY_PROFILE_SOURCE_UNSUPPORTED');
+      expect(await prisma.bookingIntent.count()).toBe(0);
+    });
+  });
+
+  describe('GET /api/bookings/intent/:id', () => {
+    it('retrieves own intent (200) with masked passenger summaries', async () => {
+      const offer = await createMockFlightOffer({ adults: 1 });
+
+      const duffelSpy = jest.spyOn(duffelService['duffel'].offers, 'get').mockResolvedValue(liveOfferResponse());
 
       const createRes = await request(app.getHttpServer())
         .post('/api/bookings/intent')
@@ -457,20 +597,16 @@ describe('Booking Intent (E2E)', () => {
         .set('Authorization', `Bearer ${tokenA}`)
         .expect(200);
 
-      expect(getRes.body.passengers[0].passportNumber).toBe('N123456');
-      expect(getRes.body.passengers[0].passportExpiry).toBe('2030-01-01');
+      expect(getRes.body.passengers[0].passportNumber).toBeNull();
+      expect(getRes.body.passengers[0].passportExpiry).toBeNull();
+      expect(getRes.body.passengers[0].nameSummary).toMatch(/^J/);
+      expect(getRes.body.passengers[0].documentSummary.hasPassport).toBe(true);
     });
 
     it('returns 403 Forbidden when retrieving other user\'s intent', async () => {
       const offer = await createMockFlightOffer({ adults: 1 });
 
-      const duffelSpy = jest.spyOn(duffelService['duffel'].offers, 'get').mockResolvedValue({
-        data: {
-          id: 'off_duffel_123',
-          total_amount: '100.00',
-          total_currency: 'USD',
-        },
-      } as any);
+      const duffelSpy = jest.spyOn(duffelService['duffel'].offers, 'get').mockResolvedValue(liveOfferResponse());
 
       const createRes = await request(app.getHttpServer())
         .post('/api/bookings/intent')
@@ -501,13 +637,7 @@ describe('Booking Intent (E2E)', () => {
     it('returns 410 Gone when retrieving an expired intent', async () => {
       const offer = await createMockFlightOffer({ adults: 1 });
 
-      const duffelSpy = jest.spyOn(duffelService['duffel'].offers, 'get').mockResolvedValue({
-        data: {
-          id: 'off_duffel_123',
-          total_amount: '100.00',
-          total_currency: 'USD',
-        },
-      } as any);
+      const duffelSpy = jest.spyOn(duffelService['duffel'].offers, 'get').mockResolvedValue(liveOfferResponse());
 
       const createRes = await request(app.getHttpServer())
         .post('/api/bookings/intent')
@@ -593,13 +723,7 @@ describe('Booking Intent (E2E)', () => {
     it('Phase 1 cleanup: updates PENDING intents to EXPIRED when expired (default and custom TTL)', async () => {
       const offer = await createMockFlightOffer({ adults: 1 });
 
-      const duffelSpy = jest.spyOn(duffelService['duffel'].offers, 'get').mockResolvedValue({
-        data: {
-          id: 'off_duffel_123',
-          total_amount: '100.00',
-          total_currency: 'USD',
-        },
-      } as any);
+      const duffelSpy = jest.spyOn(duffelService['duffel'].offers, 'get').mockResolvedValue(liveOfferResponse());
 
       // 1. Default TTL path
       const resDefault = await request(app.getHttpServer())
@@ -682,13 +806,7 @@ describe('Booking Intent (E2E)', () => {
     it('Phase 2 cleanup: hard-deletes EXPIRED intents after grace period (default and custom grace)', async () => {
       const offer = await createMockFlightOffer({ adults: 1 });
 
-      const duffelSpy = jest.spyOn(duffelService['duffel'].offers, 'get').mockResolvedValue({
-        data: {
-          id: 'off_duffel_123',
-          total_amount: '100.00',
-          total_currency: 'USD',
-        },
-      } as any);
+      const duffelSpy = jest.spyOn(duffelService['duffel'].offers, 'get').mockResolvedValue(liveOfferResponse());
 
       // Create two intents
       const res1 = await request(app.getHttpServer())

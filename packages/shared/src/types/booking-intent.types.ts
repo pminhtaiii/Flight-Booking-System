@@ -6,22 +6,22 @@ export type PassengerSource =
   | {
       type: 'traveler_profile';
       travelerProfileId: string;
-      expectedProfileRevision?: number;
+      expectedProfileRevision: number;
     }
   | {
       type: 'inline';
-      givenName?: string | null;
-      familyName?: string | null;
-      dateOfBirth?: string | null;
-      gender?: string | null;
-      nationality?: string | null;
+      givenName: string;
+      familyName: string;
+      dateOfBirth: string;
+      gender: string;
+      nationality: string;
       passportNumber?: string | null;
       passportExpiry?: string | null;
-      email?: string | null;
-      phoneCountryCode?: string | null;
-      phoneNumber?: string | null;
-      title?: string | null;
+      email: string;
+      phoneCountryCode: string;
+      phoneNumber: string;
+      title: string;
       middleName?: string | null;
       documentType?: string | null;
       issuingCountry?: string | null;
-    };
+    };

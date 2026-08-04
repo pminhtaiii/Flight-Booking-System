@@ -16,6 +16,10 @@ export type MaskedPassengerSummary = {
     issuingCountry: string | null;
     hasPassport: boolean;
   };
+  contactSummary: {
+    email: string | null;
+    phone: string | null;
+  };
   preFilledFromProfile: boolean;
 };
 
@@ -167,12 +171,29 @@ export class PassengerSnapshotService {
         issuingCountry: passenger.issuingCountry,
         hasPassport: Boolean(passenger.passportNumber || passenger.passportExpiry),
       },
+      contactSummary: {
+        email: this.maskEmail(passenger.email),
+        phone: this.maskPhone(passenger.phoneCountryCode, passenger.phoneNumber),
+      },
       preFilledFromProfile: passenger.travelerProfileId !== null,
     };
   }
 
   private maskName(value: string): string {
     return value.length > 0 ? `${value[0]}•••` : '•••';
+  }
+
+  private maskEmail(value: string | null): string | null {
+    if (!value) return null;
+    const at = value.indexOf('@');
+    if (at <= 0) return '•••';
+    return `${value[0]}•••${value.slice(at)}`;
+  }
+
+  private maskPhone(countryCode: string | null, value: string | null): string | null {
+    if (!value) return null;
+    const suffix = value.slice(-2);
+    return `${countryCode ?? ''}••••${suffix}`;
   }
 
   private requiredValue(value: string | null): string {

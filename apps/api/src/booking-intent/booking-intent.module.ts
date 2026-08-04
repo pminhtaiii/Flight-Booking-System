@@ -5,7 +5,7 @@ import { AuditModule } from '@/audit/audit.module';
 import { AirportsModule } from '@/airports/airports.module';
 import { ProfileModule } from '@/profile/profile.module';
 import { EncryptionService } from '@/common/encryption.service';
-import { BookingIntentController, BookingReadinessController } from './booking-intent.controller';
+import { BookingIntentController, BookingIntentLegacyController } from './booking-intent.controller';
 import { BookingIntentService } from './booking-intent.service';
 import { BookingIntentCron } from './booking-intent.cron';
 import { BookingReadinessEvaluator } from './booking-readiness.evaluator';
@@ -16,7 +16,7 @@ import { PassengerSnapshotService } from './passenger-snapshot.service';
 
 @Module({
   imports: [PrismaModule, DuffelModule, AuditModule, AirportsModule, ProfileModule],
-  controllers: [BookingIntentController, BookingReadinessController],
+  controllers: [BookingIntentController, BookingIntentLegacyController],
   providers: [
     BookingIntentService,
     BookingReadinessService,
