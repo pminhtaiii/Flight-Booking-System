@@ -1,6 +1,7 @@
 'use client';
 
 import { FormEvent, useMemo, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import styles from '@/app/prototype/profile/profile-prototype.module.css';
 import {
   ProfileRequestError,
@@ -205,6 +206,7 @@ export function TravelerProfileForm({
   initialProfile: TravelerProfileResponse;
   returnTarget?: string;
 }): JSX.Element {
+  const router = useRouter();
   const [profile, setProfile] = useState<TravelerProfileResponse>(initialProfile);
   const [draft, setDraft] = useState<ProfileDraft>(() => profileToDraft(initialProfile));
   const [saveState, setSaveState] = useState<SaveState>('idle');
@@ -342,6 +344,10 @@ export function TravelerProfileForm({
       setSaveState('saved');
       setValidationErrors({});
       setShowPassport(false);
+
+      if (returnTarget !== '/') {
+        router.replace(returnTarget);
+      }
     } catch (error: unknown) {
       if (error instanceof ProfileRequestError && (error.status === 401 || error.status === 403)) {
         window.location.assign('/login?message=session_expired');

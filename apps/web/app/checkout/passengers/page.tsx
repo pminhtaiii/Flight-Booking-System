@@ -36,12 +36,22 @@ interface PassengerPageFlightDetail {
 type Props = {
   searchParams: {
     offerId?: string;
+    [key: string]: string | undefined;
   };
 };
 
 export default async function PassengersPage({ searchParams }: Props) {
   const { accessToken } = await protectCheckoutRoute();
   const offerId = searchParams.offerId;
+
+  // Reject any passenger data passed via query string to prevent PII exposure
+  const hasPiiInQuery = Object.keys(searchParams).some(key =>
+    ['name', 'email', 'phone', 'passport', 'dob', 'gender'].some(pii => key.toLowerCase().includes(pii))
+  );
+
+  if (hasPiiInQuery) {
+    redirect(`/checkout/passengers?offerId=${offerId || ''}`);
+  }
 
   if (!offerId) {
     redirect('/search');

@@ -95,6 +95,25 @@ test.describe('Secure traveler profile', () => {
     expect(browserStorageDump).not.toContain('901234567');
   });
 
+  test('returns to the server-validated handoff target after saving', async ({ page, request, context }) => {
+    await registerAndOpenProfile(page, request, context);
+    await page.goto('/profile?returnTo=%2Fprototype%2Fchat');
+
+    await page.route('**/api/profile', async (route) => {
+      if (route.request().method() === 'PATCH') {
+        await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(savedDomesticProfile) });
+        return;
+      }
+      await route.continue();
+    });
+
+    await fillDomesticProfile(page);
+    await page.getByRole('button', { name: 'Save profile' }).click();
+
+    await expect(page).toHaveURL(/\/prototype\/chat$/);
+    await expect(page).not.toHaveURL(/jane\.doe|901234567/);
+  });
+
   test('recovers from a stale revision without overwriting the latest profile', async ({ page, request, context }) => {
     await registerAndOpenProfile(page, request, context);
     await fillDomesticProfile(page);
