@@ -37,7 +37,14 @@ export class BookingIntentPassengerSummaryDto {
 
 export class BookingIntentCreationPassengerDto extends BookingIntentPassengerSummaryDto {}
 
-export class BookingIntentPassengerDetailDto extends BookingIntentPassengerSummaryDto {}
+export class BookingIntentPassengerDetailDto extends BookingIntentPassengerSummaryDto {
+  type!: string;
+  givenName!: string;
+  familyName!: string;
+  dateOfBirth!: string;
+  gender!: string;
+  nationality!: string | null;
+}
 
 export class CreateBookingIntentResponseDto {
   intentId!: string;

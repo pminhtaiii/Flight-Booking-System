@@ -373,6 +373,12 @@ export class BookingIntentService {
       createdAt: intent.createdAt.toISOString(),
       passengers: intent.passengers.map((passenger, index) => ({
         ...this.toSafePassengerSummary(passenger, index),
+        type: passenger.type,
+        givenName: passenger.givenName,
+        familyName: passenger.familyName,
+        dateOfBirth: this.toDateOnly(passenger.dateOfBirth),
+        gender: passenger.gender,
+        nationality: passenger.nationality,
         passportNumber: null,
         passportExpiry: null,
       })),
