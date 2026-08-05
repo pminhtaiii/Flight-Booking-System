@@ -68,15 +68,15 @@ async def test_queue_manager_fifo_order():
         
     # Start worker 1 (acquires lock immediately)
     t1 = asyncio.create_task(worker("worker1", "session-1"))
-    await asyncio.sleep(0.01)
+    await asyncio.sleep(0.05)
     
     # Start worker 2 (waits)
     t2 = asyncio.create_task(worker("worker2", "session-1"))
-    await asyncio.sleep(0.01)
+    await asyncio.sleep(0.05)
     
     # Start worker 3 (waits)
     t3 = asyncio.create_task(worker("worker3", "session-1"))
-    await asyncio.sleep(0.01)
+    await asyncio.sleep(0.05)
     
     await asyncio.gather(t1, t2, t3)
     
@@ -246,4 +246,33 @@ async def test_attached_producer_task_cancelled_on_refresh_loss():
         await p_task
 
     assert producer_cancelled is True
+
+@pytest.mark.asyncio
+async def test_stale_release_ignored():
+    manager = MessageQueueManager(max_depth=3)
+    mock_repo = MagicMock()
+    mock_repo.acquire_lock = AsyncMock(return_value=1)
+    mock_repo.release_lock = AsyncMock()
+    manager.repo = mock_repo
+
+    req_id_1 = await manager.acquire("session-stale-1")
+    assert manager.depths["session-stale-1"] == 1
+
+    # Simulate successor acquiring the active fence
+    req_id_2 = "req-id-successor"
+    manager.active_fences["session-stale-1"].req_id = req_id_2
+
+    # Stale release call from old req_id_1
+    await manager.release("session-stale-1", req_id_1)
+
+    # Depth must NOT be decremented by stale release
+    assert manager.depths["session-stale-1"] == 1
+    assert manager.active_fences["session-stale-1"].req_id == req_id_2
+    mock_repo.release_lock.assert_not_called()
+
+    # Valid release call from req_id_2
+    await manager.release("session-stale-1", req_id_2)
+    assert "session-stale-1" not in manager.depths
+    assert "session-stale-1" not in manager.active_fences
+    mock_repo.release_lock.assert_called_once()
 

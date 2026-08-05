@@ -151,24 +151,29 @@ class MessageQueueManager:
     async def release(self, session_id: str, req_id: str = None) -> None:
         """
         Release the distributed lock for session_id and decrement the local depth.
+        Only decrements depth and releases lock if req_id matches the active fence
+        (or if req_id is None). Stale releases for superseded requests are ignored.
         """
+        active = None
         async with self.manager_lock:
-            if session_id in self.depths:
-                self.depths[session_id] -= 1
-                if self.depths[session_id] <= 0:
-                    self.depths.pop(session_id, None)
-                    
-            active = self.active_fences.get(session_id)
-            if active and (req_id is None or active.req_id == req_id):
-                self.active_fences.pop(session_id, None)
+            current_active = self.active_fences.get(session_id)
+            if current_active and (req_id is None or current_active.req_id == req_id):
+                active = self.active_fences.pop(session_id, None)
+                if session_id in self.depths:
+                    self.depths[session_id] -= 1
+                    if self.depths[session_id] <= 0:
+                        self.depths.pop(session_id, None)
             else:
-                active = None
-            
+                if req_id is not None:
+                    logger.warning(
+                        f"Ignoring stale release for session {session_id} with req_id {req_id} "
+                        f"(active req_id: {current_active.req_id if current_active else None})."
+                    )
+
         if active:
             active.refresh_task.cancel()
             await self.repo.release_lock(active.user_id, session_id, active.req_id, active.fence)
-            
-        logger.info(f"Released lock for session {session_id}")
+            logger.info(f"Released lock for session {session_id} (req_id: {active.req_id})")
         
     async def validate_active_fence(self, session_id: str) -> bool:
         async with self.manager_lock:
