@@ -182,3 +182,33 @@ async def test_endpoint_concurrency_limit(monkeypatch):
         r1_response, r2_response = await asyncio.gather(r1_task, r2_task)
         assert r1_response.status_code == 200
         assert r2_response.status_code == 200
+
+@pytest.mark.asyncio
+async def test_refresher_redis_error_cancels_request(monkeypatch):
+    manager = MessageQueueManager(max_depth=3)
+    manager.refresh_interval = 0.01
+
+    # Mock refresh_lock to raise an exception
+    mock_repo = MagicMock()
+    mock_repo.acquire_lock = AsyncMock(return_value=1)
+    mock_repo.refresh_lock = AsyncMock(side_effect=Exception("Redis connection error"))
+    mock_repo.release_lock = AsyncMock()
+    manager.repo = mock_repo
+
+    cancelled = False
+
+    async def sample_task():
+        nonlocal cancelled
+        try:
+            await manager.acquire("session-err-1")
+            await asyncio.sleep(1.0)
+        except asyncio.CancelledError:
+            cancelled = True
+            raise
+
+    task = asyncio.create_task(sample_task())
+    with pytest.raises(asyncio.CancelledError):
+        await task
+
+    assert cancelled is True
+

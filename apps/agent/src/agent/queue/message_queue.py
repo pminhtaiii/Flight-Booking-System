@@ -76,7 +76,14 @@ class MessageQueueManager:
                 try:
                     while True:
                         await asyncio.sleep(self.refresh_interval)
-                        ok = await self.repo.refresh_lock(user_id, session_id, req_id, fence, ttl_ms=self.lock_ttl_ms)
+                        try:
+                            ok = await self.repo.refresh_lock(user_id, session_id, req_id, fence, ttl_ms=self.lock_ttl_ms)
+                        except Exception as err:
+                            logger.error(f"Redis error during session lock refresh for session {session_id}: {err!s}. Cancelling request.")
+                            if main_task and not main_task.done():
+                                main_task.cancel()
+                            break
+
                         if not ok:
                             logger.warning(f"Lost session lock refresh for session {session_id}. Cancelling request.")
                             if main_task and not main_task.done():
