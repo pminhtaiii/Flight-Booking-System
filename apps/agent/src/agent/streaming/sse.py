@@ -492,6 +492,12 @@ async def chat_stream(
         background_tasks.add(producer_task)
         producer_task.add_done_callback(background_tasks.discard)
 
+        if queue_manager and req_id:
+            attached = await queue_manager.attach_task(session_id, req_id, producer_task)
+            if not attached:
+                logger.warning(f"Lock active fence for session {session_id} is no longer active. Cancelling producer task.")
+                producer_task.cancel()
+
         async def sse_generator():
             nonlocal released
             try:

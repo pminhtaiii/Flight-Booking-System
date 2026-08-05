@@ -2,7 +2,7 @@ import asyncio
 import logging
 import time
 import uuid
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from fastapi import HTTPException
 from agent.repositories.session_lock_repository import SessionLockRepository
 
@@ -16,6 +16,7 @@ class ActiveFence:
     fence: int
     refresh_task: asyncio.Task
     user_id: str
+    monitored_tasks: set[asyncio.Task] = field(default_factory=set)
 
 class MessageQueueManager:
     """
@@ -32,6 +33,31 @@ class MessageQueueManager:
         self.active_fences: dict[str, ActiveFence] = {}
         self.refresh_interval = 3.0
         self.lock_ttl_ms = 10000
+
+    async def _cancel_monitored_tasks(self, session_id: str, req_id: str) -> None:
+        async with self.manager_lock:
+            active = self.active_fences.get(session_id)
+            if not active or active.req_id != req_id:
+                return
+            tasks = list(active.monitored_tasks)
+            
+        for task in tasks:
+            if task and not task.done():
+                logger.warning(f"Cancelling task {task.get_name()} due to lost session lock for session {session_id}.")
+                task.cancel()
+
+    async def attach_task(self, session_id: str, req_id: str, task: asyncio.Task) -> bool:
+        """
+        Attach a worker/producer task to the active fence so that if lock refresh fails,
+        the worker/producer task is also cancelled. Returns True if attached, False if fence is no longer active.
+        """
+        async with self.manager_lock:
+            active = self.active_fences.get(session_id)
+            if active and active.req_id == req_id:
+                active.monitored_tasks.add(task)
+                task.add_done_callback(lambda t: active.monitored_tasks.discard(t))
+                return True
+            return False
 
     async def acquire(self, session_id: str, user_id: str = "default") -> str:
         """
@@ -79,15 +105,13 @@ class MessageQueueManager:
                         try:
                             ok = await self.repo.refresh_lock(user_id, session_id, req_id, fence, ttl_ms=self.lock_ttl_ms)
                         except Exception as err:
-                            logger.error(f"Redis error during session lock refresh for session {session_id}: {err!s}. Cancelling request.")
-                            if main_task and not main_task.done():
-                                main_task.cancel()
+                            logger.error(f"Redis error during session lock refresh for session {session_id}: {err!s}. Cancelling active tasks.")
+                            await self._cancel_monitored_tasks(session_id, req_id)
                             break
 
                         if not ok:
-                            logger.warning(f"Lost session lock refresh for session {session_id}. Cancelling request.")
-                            if main_task and not main_task.done():
-                                main_task.cancel()
+                            logger.warning(f"Lost session lock refresh for session {session_id}. Cancelling active tasks.")
+                            await self._cancel_monitored_tasks(session_id, req_id)
                             break
                 except asyncio.CancelledError:
                     logger.debug(f"Lock refresh task cancelled for session {session_id}.")
@@ -96,13 +120,18 @@ class MessageQueueManager:
             background_tasks.add(refresh_task)
             refresh_task.add_done_callback(background_tasks.discard)
             
+            active_fence = ActiveFence(
+                req_id=req_id,
+                fence=fence,
+                refresh_task=refresh_task,
+                user_id=user_id,
+                monitored_tasks={main_task} if main_task else set()
+            )
+            if main_task:
+                main_task.add_done_callback(lambda t: active_fence.monitored_tasks.discard(t))
+
             async with self.manager_lock:
-                self.active_fences[session_id] = ActiveFence(
-                    req_id=req_id,
-                    fence=fence,
-                    refresh_task=refresh_task,
-                    user_id=user_id
-                )
+                self.active_fences[session_id] = active_fence
 
             return req_id
         except BaseException:

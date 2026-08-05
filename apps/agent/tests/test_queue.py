@@ -212,3 +212,38 @@ async def test_refresher_redis_error_cancels_request(monkeypatch):
 
     assert cancelled is True
 
+@pytest.mark.asyncio
+async def test_attached_producer_task_cancelled_on_refresh_loss():
+    manager = MessageQueueManager(max_depth=3)
+    manager.refresh_interval = 0.01
+
+    mock_repo = MagicMock()
+    mock_repo.acquire_lock = AsyncMock(return_value=1)
+    mock_repo.refresh_lock = AsyncMock(return_value=False)
+    mock_repo.release_lock = AsyncMock()
+    manager.repo = mock_repo
+
+    producer_cancelled = False
+
+    async def producer_work():
+        nonlocal producer_cancelled
+        try:
+            await asyncio.sleep(1.0)
+        except asyncio.CancelledError:
+            producer_cancelled = True
+            raise
+
+    # Handler acquires lock
+    req_id = await manager.acquire("session-producer-1")
+
+    # Producer task is spawned after handler returns
+    p_task = asyncio.create_task(producer_work())
+    attached = await manager.attach_task("session-producer-1", req_id, p_task)
+    assert attached is True
+
+    # Wait for refresher to detect refresh loss and cancel attached producer
+    with pytest.raises(asyncio.CancelledError):
+        await p_task
+
+    assert producer_cancelled is True
+
