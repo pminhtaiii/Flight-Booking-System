@@ -1,0 +1,900 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum UserStatus {
+  ACTIVE
+  INACTIVE
+}
+
+enum BookingIntentStatus {
+  PENDING
+  EXPIRED
+  COMPLETED
+  AWAITING_PAYMENT
+  PAYMENT_EXHAUSTED
+  CONFIRMED
+  CANCELLED
+}
+
+enum AncillaryStatus {
+  EMPTY
+  DRAFT_COMMITTED
+  VALIDATED
+  STALE
+}
+
+enum AncillarySelectionStatus {
+  DRAFT_COMMITTED
+  VALIDATED
+  STALE
+  PAYMENT_BOUND
+}
+
+enum BaggageType {
+  CHECKED
+  CARRY_ON
+}
+
+enum WeightUnit {
+  KG
+  LB
+}
+
+enum PassengerType {
+  ADULT
+  CHILD
+  INFANT
+}
+
+enum UserRole {
+  USER
+  ADMIN
+}
+
+model User {
+  id               String           @id @default(uuid())
+  email            String           @unique
+  password         String
+  role             UserRole         @default(USER)
+  status           UserStatus       @default(ACTIVE)
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+  lastLogin        DateTime?
+  auditLogs        AuditLog[]
+  chatSessions     ChatSession[]
+  travelerProfile  TravelerProfile?
+  bookings         Booking[]
+  bookingIntents   BookingIntent[]
+  searchHistory    SearchHistory[]
+  stripeCustomerId String?          @unique
+  idempotencyKeys  IdempotencyKey[]
+  refundsTriggered Refund[]
+  paymentMethods   PaymentMethod[]
+
+  @@map("users")
+}
+
+model AuditLog {
+  id            String   @id @default(uuid())
+  userId        String?
+  action        String
+  resourceType  String
+  resourceId    String?
+  metadata      Json
+  traceId       String
+  correlationId String
+  createdAt     DateTime @default(now())
+  user          User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@map("audit_logs")
+}
+
+enum MessageSender {
+  USER
+  AGENT
+}
+
+enum MessageType {
+  STANDARD
+  SUMMARY
+}
+
+model ChatSession {
+  id           String        @id @default(uuid())
+  userId       String
+  title        String?
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  lastActiveAt DateTime      @default(now())
+  messages     ChatMessage[]
+  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([userId, lastActiveAt])
+  @@map("chat_sessions")
+}
+
+model ChatMessage {
+  id        String        @id @default(uuid())
+  sessionId String
+  sender    MessageSender
+  type      MessageType   @default(STANDARD)
+  content   String
+  createdAt DateTime      @default(now())
+  session   ChatSession   @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@index([sessionId])
+  @@index([sessionId, createdAt])
+  @@index([sessionId, type])
+  @@map("chat_messages")
+}
+
+/// TravelerProfile holds user travel preferences and sensitive travel identity documents.
+/// All sensitive PII fields (like passportNumber and passportExpiry) are encrypted
+/// at the application level using AES-256-GCM before storage to comply with GDPR requirements.
+model TravelerProfile {
+  id                      String                   @id @default(uuid())
+  userId                  String                   @unique
+  seatPreference          String?
+  classPreference         String?
+  preferredAirlines       String[]
+  blacklistedAirlines     String[]
+  dietaryNeeds            String?
+  nationality             String?
+  /// @encrypted
+  /// Sensitive PII. Encrypted at the application layer using AES-256-GCM before database insertion.
+  passportNumber          String?
+  /// @encrypted
+  /// Sensitive PII. Encrypted at the application layer using AES-256-GCM before database insertion.
+  phoneNumber             String?
+  /// @encrypted
+  /// Sensitive PII. Encrypted/tokenized at the application layer to comply with GDPR data protection requirements.
+  passportExpiry          DateTime?
+  createdAt               DateTime                 @default(now())
+  updatedAt               DateTime                 @updatedAt
+  user                    User                     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  bookingIntentPassengers BookingIntentPassenger[]
+
+  @@map("traveler_profiles")
+}
+
+/// Stores flight booking records.
+/// NOTE: Booking stores currency amounts (totalAmount, airlineRefundAmount, customerRefundAmount) in major currency units (DECIMAL(10,2), e.g. 100.50).
+/// In contrast, Refund stores currency amounts in minor currency units (integer cents, e.g. 10050).
+/// Always use explicit unit conversions (Math.round(amount * 100) when converting major to minor units, or amount / 100 when converting minor to major units) when mapping between Booking and Refund.
+model Booking {
+  id                        String                @id @default(uuid())
+  userId                    String
+  bookingIntentId           String                @unique
+  paymentId                 String?               @unique
+  status                    BookingStatus         @default(PROCESSING)
+  failureReason             BookingFailureReason?
+  pnrReference              String?
+  duffelOrderId             String?
+  flightSnapshot            Json?
+  passengerSnapshot         Json?
+  totalAmount               Decimal               @db.Decimal(10, 2)
+  currency                  String                @default("GBP")
+  departureAt               DateTime?
+  cancellationDeadline      DateTime?
+  cancellationRefundable    Boolean               @default(false)
+  airlineRefundAmount       Decimal?              @db.Decimal(10, 2)
+  customerRefundAmount      Decimal?              @db.Decimal(10, 2)
+  duffelCancellationQuoteId String?
+  createdAt                 DateTime              @default(now())
+  updatedAt                 DateTime              @updatedAt
+
+  user               User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  bookingIntent      BookingIntent @relation(fields: [bookingIntentId], references: [id], onDelete: Cascade)
+  payment            Payment?      @relation(fields: [paymentId], references: [id], onDelete: SetNull)
+  cancellationRefund Refund?       @relation("CancellationBookingRefund")
+
+  disruptionStatus           DisruptionStatus          @default(NONE)
+  activeDisruptionRevisionId String?                   @unique
+  syncLockedAt               DateTime?
+  syncLockToken              String?
+  lastDuffelSyncedAt         DateTime?
+  nextDuffelSyncAt           DateTime?
+  currentDepartureAt         DateTime?
+  nextUnflownDepartureAt     DateTime?
+  currentFinalArrivalAt      DateTime?
+  disruptionResolvedReason   DisruptionResolvedReason?
+  disruptionResolvedAt       DateTime?
+  disruptionResolvedByType   DisruptionActorType?
+  disruptionResolvedById     String?
+  disruptionNeedsAttention   Boolean                   @default(false)
+  disruptionAttentionReason  DisruptionAttentionReason?
+  disruptionAttentionAt      DateTime?
+
+  itineraryRevisions         ItineraryRevision[]       @relation("BookingItineraryRevisions")
+  activeDisruptionRevision   ItineraryRevision?        @relation("BookingActiveDisruptionRevision", fields: [activeDisruptionRevisionId], references: [id], onDelete: SetNull)
+  notificationOutbox         NotificationOutbox[]      @relation("BookingNotificationOutbox")
+  disruptionAuditEvents      DisruptionAuditEvent[]    @relation("BookingDisruptionAuditEvents")
+
+  @@index([userId])
+  @@index([userId, status])
+  @@index([departureAt])
+  @@index([status, createdAt])
+  @@index([status, departureAt])
+  @@index([duffelOrderId])
+  @@index([status, nextUnflownDepartureAt, lastDuffelSyncedAt])
+  @@index([disruptionStatus, disruptionResolvedAt])
+  @@index([disruptionNeedsAttention, disruptionAttentionAt])
+  @@index([syncLockedAt])
+  @@map("bookings")
+}
+
+model BookingIntent {
+  id                  String                   @id @default(uuid())
+  userId              String
+  flightOfferId       String?
+  duffelOfferId       String
+  status              BookingIntentStatus      @default(PENDING)
+  originalPrice       Decimal                  @db.Decimal(10, 2)
+  confirmedPrice      Decimal                  @db.Decimal(10, 2)
+  currency            String                   @default("USD")
+  priceChanged        Boolean                  @default(false)
+  pricedAt            DateTime
+  origin              String                   @db.VarChar(3)
+  destination         String                   @db.VarChar(3)
+  departureDate       DateTime                 @db.Date
+  returnDate          DateTime?                @db.Date
+  cabinClass          String                   @default("economy")
+  adults              Int
+  children            Int                      @default(0)
+  infants             Int                      @default(0)
+  rawOfferSnapshot    Json
+  intentExpiresAt     DateTime
+  offerExpiresAt      DateTime?
+  createdAt           DateTime                 @default(now())
+  updatedAt           DateTime                 @updatedAt
+  user                User                     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  flightOffer         FlightOffer?             @relation(fields: [flightOfferId], references: [id], onDelete: SetNull)
+  passengers          BookingIntentPassenger[]
+  paymentAttemptCount Int                      @default(0)
+  payments            Payment[]
+  booking             Booking?
+  ancillaryVersion    Int                      @default(0)
+  currentAncillarySelectionId String?                   @unique
+  currentAncillarySelection   AncillarySelection?       @relation("BookingIntentCurrentAncillarySelection", fields: [currentAncillarySelectionId], references: [id], onDelete: SetNull)
+  ancillarySelections         AncillarySelection[]      @relation("BookingIntentAncillarySelections")
+  ancillaryStatus     AncillaryStatus          @default(EMPTY)
+  ancillaryCurrency   String?                  @db.VarChar(3)
+  seatTotal           Decimal                  @default(0) @db.Decimal(10, 2)
+  baggageTotal        Decimal                  @default(0) @db.Decimal(10, 2)
+  ancillaryTotal      Decimal                  @default(0) @db.Decimal(10, 2)
+  validatedTotal      Decimal?                 @db.Decimal(10, 2)
+  ancillariesValidatedAt DateTime?
+
+  @@index([userId])
+  @@index([userId, status])
+  @@index([status, intentExpiresAt])
+  @@index([status, updatedAt])
+  @@map("booking_intents")
+}
+
+model BookingIntentPassenger {
+  id                String           @id @default(uuid())
+  intentId          String
+  position          Int
+  type              PassengerType
+  givenName         String
+  familyName        String
+  dateOfBirth       DateTime         @db.Date
+  gender            String
+  nationality       String?          @db.VarChar(2)
+  /// @encrypted
+  passportNumber    String?
+  /// @encrypted
+  passportExpiry    String?
+  travelerProfileId String?
+  duffelPassengerId String?
+  createdAt         DateTime         @default(now())
+  intent            BookingIntent    @relation(fields: [intentId], references: [id], onDelete: Cascade)
+  travelerProfile   TravelerProfile? @relation(fields: [travelerProfileId], references: [id], onDelete: SetNull)
+
+  @@unique([intentId, position])
+  @@index([intentId])
+  @@index([travelerProfileId])
+  @@index([intentId, duffelPassengerId])
+  @@map("booking_intent_passengers")
+}
+
+model AncillarySelection {
+  id                   String                   @id @default(uuid())
+  bookingIntentId      String
+  version              Int
+  status               AncillarySelectionStatus @default(DRAFT_COMMITTED)
+  currency             String                   @db.VarChar(3)
+  seatTotal            Decimal                  @db.Decimal(10, 2)
+  baggageTotal         Decimal                  @db.Decimal(10, 2)
+  total                Decimal                  @db.Decimal(10, 2)
+  catalogFingerprint   String
+  committedAt          DateTime                 @default(now())
+  validatedBaseAmount  Decimal?                 @db.Decimal(10, 2)
+  validatedGrandTotal  Decimal?                 @db.Decimal(10, 2)
+  validatedAt          DateTime?
+  validationLeaseToken String?
+  validationLeaseExpiresAt DateTime?
+  createdAt            DateTime                 @default(now())
+  updatedAt            DateTime                 @updatedAt
+  bookingIntent        BookingIntent            @relation("BookingIntentAncillarySelections", fields: [bookingIntentId], references: [id], onDelete: Cascade)
+  currentForIntent     BookingIntent?           @relation("BookingIntentCurrentAncillarySelection")
+  seatSelections       SeatSelection[]
+  baggageSelections    BaggageSelection[]
+  payments             Payment[]                 @relation("PaymentAncillarySelection")
+
+  @@unique([bookingIntentId, version])
+  @@unique([id, bookingIntentId, version])
+  @@index([bookingIntentId])
+  @@index([validationLeaseExpiresAt])
+  @@map("ancillary_selections")
+}
+
+model SeatSelection {
+  id                   String             @id @default(uuid())
+  ancillarySelectionId String
+  intentPassengerId    String
+  duffelPassengerId    String
+  segmentId            String
+  serviceId            String
+  seatDesignator       String
+  amount               Decimal            @db.Decimal(10, 2)
+  currency             String             @db.VarChar(3)
+  createdAt            DateTime           @default(now())
+  updatedAt            DateTime           @updatedAt
+  ancillarySelection   AncillarySelection @relation(fields: [ancillarySelectionId], references: [id], onDelete: Cascade)
+
+  @@unique([ancillarySelectionId, intentPassengerId, segmentId])
+  @@unique([ancillarySelectionId, segmentId, serviceId])
+  @@map("seat_selections")
+}
+
+model BaggageSelection {
+  id                   String             @id @default(uuid())
+  ancillarySelectionId String
+  intentPassengerId    String
+  duffelPassengerId    String
+  serviceId            String
+  type                 BaggageType
+  weightValue          Int?
+  weightUnit           WeightUnit?
+  quantity             Int
+  amount               Decimal            @db.Decimal(10, 2)
+  currency             String             @db.VarChar(3)
+  createdAt            DateTime           @default(now())
+  updatedAt            DateTime           @updatedAt
+  ancillarySelection   AncillarySelection @relation(fields: [ancillarySelectionId], references: [id], onDelete: Cascade)
+  segments             BaggageSelectionSegment[]
+
+  @@unique([ancillarySelectionId, intentPassengerId, serviceId])
+  @@map("baggage_selections")
+}
+
+model BaggageSelectionSegment {
+  baggageSelectionId String
+  segmentId          String
+  baggageSelection   BaggageSelection @relation(fields: [baggageSelectionId], references: [id], onDelete: Cascade)
+
+  @@id([baggageSelectionId, segmentId])
+  @@map("baggage_selection_segments")
+}
+
+enum BookingStatus {
+  PROCESSING
+  CONFIRMED
+  FAILED
+  COMPLETED
+  CANCELLATION_PENDING
+  CANCELLED_PENDING_REFUND
+  CANCELLED_AND_REFUNDED
+  CANCELLED_NO_REFUND
+  REFUND_FAILED_NEEDS_ATTENTION
+}
+
+enum BookingFailureReason {
+  OFFER_EXPIRED
+  PRICE_CHANGED
+  BOOKING_TIMEOUT
+  CAPTURE_FAILED
+  SYSTEM_ERROR
+}
+
+enum AirportType {
+  LARGE_AIRPORT
+  MEDIUM_AIRPORT
+}
+
+model Airport {
+  id        String      @id @default(cuid())
+  iataCode  String      @unique @db.VarChar(3)
+  icaoCode  String?     @db.VarChar(4)
+  name      String
+  city      String
+  country   String      @db.VarChar(2)
+  region    String?
+  latitude  Float
+  longitude Float
+  elevation Int?
+  type      AirportType
+  timezone  String?
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+
+  @@index([country])
+  @@index([icaoCode])
+  @@index([latitude, longitude])
+  @@index([name])
+  @@map("airports")
+}
+
+model FlightOffer {
+  id             String          @id @default(uuid())
+  searchHash     String
+  duffelOfferId  String
+  rawOffer       Json
+  origin         String          @db.VarChar(3)
+  destination    String          @db.VarChar(3)
+  departureDate  DateTime        @db.Date
+  returnDate     DateTime?       @db.Date
+  adults         Int
+  children       Int             @default(0)
+  infants        Int             @default(0)
+  cabinClass     String          @default("economy") @map("cabin_class")
+  price          Decimal         @db.Decimal(10, 2)
+  currency       String          @default("USD")
+  createdAt      DateTime        @default(now())
+  bookingIntents BookingIntent[]
+
+  @@index([searchHash])
+  @@index([createdAt])
+  @@map("flight_offers")
+}
+
+model SearchHistory {
+  id            String    @id @default(uuid())
+  userId        String
+  origin        String    @db.VarChar(3)
+  destination   String    @db.VarChar(3)
+  departureDate DateTime  @db.Date
+  returnDate    DateTime? @db.Date
+  adults        Int
+  children      Int       @default(0)
+  infants       Int       @default(0)
+  cabinClass    String    @default("economy") @map("cabin_class")
+  resultCount   Int
+  minPrice      Decimal?  @db.Decimal(10, 2)
+  maxPrice      Decimal?  @db.Decimal(10, 2)
+  currency      String    @default("USD")
+  searchHash    String
+  createdAt     DateTime  @default(now())
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([createdAt])
+  @@index([userId, createdAt])
+  @@map("search_history")
+}
+
+model OfferRecovery {
+  id         String   @id // The offer UUID
+  searchHash String
+  createdAt  DateTime @default(now())
+
+  @@index([createdAt])
+  @@map("offer_recoveries")
+}
+
+enum PaymentStatus {
+  CREATED
+  AUTHORIZED
+  SUCCEEDED
+  FAILED
+  EXPIRED
+  CANCELLED
+  REFUND_PENDING
+  PARTIALLY_REFUNDED
+  REFUNDED
+  DISPUTED
+  CHARGEBACK_LOST
+}
+
+enum RefundStatus {
+  REFUND_PENDING
+  REFUND_PROCESSING
+  REFUND_RETRY_SCHEDULED
+  SUCCEEDED
+  FAILED
+  REFUND_FAILED_NEEDS_ATTENTION
+}
+
+enum RefundTriggerType {
+  USER
+  ADMIN
+  SYSTEM_AUTOMATED
+}
+
+enum LedgerEntryType {
+  DEBIT
+  CREDIT
+}
+
+enum PaymentEventSource {
+  WEBHOOK
+  API
+  CRON
+  SYSTEM
+}
+
+model Payment {
+  id                    String         @id @default(uuid())
+  bookingIntentId       String
+  bookingIntent         BookingIntent  @relation(fields: [bookingIntentId], references: [id])
+  ancillarySelectionId      String?
+  ancillarySelectionVersion Int?
+  ancillarySelection        AncillarySelection? @relation("PaymentAncillarySelection", fields: [ancillarySelectionId, bookingIntentId, ancillarySelectionVersion], references: [id, bookingIntentId, version], onDelete: Restrict)
+  attemptNumber         Int // 1 or 2 (Database-level CHECK constraint attemptNumber IN (1, 2) enforced in migration)
+  idempotencyKeyId      String
+  idempotencyKey        IdempotencyKey @relation(fields: [idempotencyKeyId], references: [id])
+  stripePaymentIntentId String         @unique
+  stripeCustomerId      String?
+  amount                Int // smallest currency unit (cents)
+  currency              String // ISO 4217 (e.g., "usd")
+  paymentMethodType     String? // e.g., "card"
+  status                PaymentStatus  @default(CREATED)
+  preDisputeStatus      PaymentStatus? // populated when entering DISPUTED
+  version               Int            @default(0) // optimistic locking
+  createdAt             DateTime       @default(now())
+  updatedAt             DateTime       @updatedAt
+
+  paymentEvents PaymentEvent[]
+  ledgerEntries LedgerEntry[]
+  refunds       Refund[]
+  booking       Booking?
+
+  @@unique([bookingIntentId, attemptNumber])
+  @@index([stripeCustomerId])
+  @@index([status])
+  @@index([ancillarySelectionId])
+  @@map("payments")
+}
+
+model IdempotencyKey {
+  id            String    @id @default(uuid())
+  key           String    @unique
+  requestHash   String // SHA-256 of request body — catches key reuse with different payload
+  customerId    String
+  customer      User      @relation(fields: [customerId], references: [id])
+  requestPath   String // API endpoint path
+  requestParams Json? // request body snapshot
+  responseCode  Int? // HTTP status code of cached response
+  responseBody  Json? // cached response for replay
+  recoveryPoint String    @default("started") // started → stripe_authorized → duffel_order_created → captured → completed
+  lockedAt      DateTime? // claim mechanism for pessimistic lock
+  createdAt     DateTime  @default(now())
+  expiresAt     DateTime
+
+  payments Payment[]
+  refunds  Refund[]
+
+  @@index([customerId])
+  @@index([expiresAt])
+  @@map("idempotency_keys")
+}
+
+model PaymentEvent {
+  id             BigInt             @id @default(autoincrement())
+  paymentId      String
+  payment        Payment            @relation(fields: [paymentId], references: [id])
+  eventType      String // e.g., "payment_intent.succeeded", "refund.created"
+  previousStatus PaymentStatus
+  newStatus      PaymentStatus
+  amount         Int? // amount involved in this event
+  source         PaymentEventSource // WEBHOOK, API, CRON, SYSTEM
+  stripeEventId  String?            @unique // webhook deduplication — nullable for non-webhook events
+  metadata       Json? // raw payload
+  createdAt      DateTime           @default(now())
+  createdBy      String // user ID, "system", or service name
+
+  @@index([paymentId, createdAt])
+  @@index([eventType])
+  @@map("payment_events")
+}
+
+model LedgerEntry {
+  id            String          @id @default(uuid())
+  paymentId     String
+  payment       Payment         @relation(fields: [paymentId], references: [id])
+  transactionId String // groups paired debit/credit rows
+  accountId     String // CUSTOMER_RECEIVABLE | PLATFORM_REVENUE | DUFFEL_COST
+  entryType     LedgerEntryType // DEBIT or CREDIT
+  amount        Int // smallest currency unit
+  currency      String // ISO 4217
+  createdAt     DateTime        @default(now())
+
+  @@index([paymentId])
+  @@index([transactionId])
+  @@index([accountId])
+  @@map("ledger_entries")
+}
+
+/// Stores payment refund transactions.
+/// NOTE: Refund stores currency amounts (amount, airlineRefundAmount, customerRefundAmount) in minor currency units (integer cents, e.g. 10050).
+/// In contrast, Booking stores currency amounts in major currency units (DECIMAL(10,2), e.g. 100.50).
+/// Always use explicit unit conversions (Math.round(amount * 100) when converting major to minor units, or amount / 100 when converting minor to major units) when mapping between Booking and Refund.
+model Refund {
+  id                      String            @id @default(uuid())
+  paymentId               String
+  payment                 Payment           @relation(fields: [paymentId], references: [id])
+  idempotencyKeyId        String
+  idempotencyKey          IdempotencyKey    @relation(fields: [idempotencyKeyId], references: [id])
+  stripeRefundId          String?           @unique
+  amount                  Int // smallest currency unit
+  currency                String // ISO 4217
+  reason                  String?
+  triggerType             RefundTriggerType // USER, ADMIN, or SYSTEM_AUTOMATED
+  triggeredByUserId       String? // NULL for automated refunds
+  triggeredByUser         User?             @relation(fields: [triggeredByUserId], references: [id])
+  requiresReview          Boolean           @default(false) // flags automated refunds for 24h human check
+  status                  RefundStatus      @default(REFUND_PENDING)
+  airlineRefundAmount     Int?
+  customerRefundAmount    Int?
+  bookingId               String?           @unique
+  booking                 Booking?          @relation("CancellationBookingRefund", fields: [bookingId], references: [id], onDelete: SetNull)
+  retryCount              Int               @default(0)
+  nextRetryAt             DateTime?
+  idempotencyKeyCreatedAt DateTime?
+  lastErrorCode           String?
+  lastErrorAt             DateTime?
+  createdAt               DateTime          @default(now())
+  updatedAt               DateTime          @updatedAt
+
+  @@unique([idempotencyKeyId])
+  @@index([paymentId])
+  @@index([status])
+  @@index([status, nextRetryAt])
+  @@map("refunds")
+}
+
+model PaymentMethod {
+  id                    String   @id @default(uuid())
+  stripeCustomerId      String
+  stripePaymentMethodId String   @unique
+  cardBrand             String? // visa, mastercard, etc.
+  cardLast4             String? // last 4 digits for display
+  userId                String
+  user                  User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  isDefault             Boolean  @default(false)
+  savedWithConsent      Boolean  @default(false) // only set to true through validated saveCard opt-in path
+  createdAt             DateTime @default(now())
+
+  @@index([stripeCustomerId])
+  @@index([userId])
+  @@map("payment_methods")
+}
+
+enum DisruptionStatus {
+  NONE
+  DETECTED
+  ACKNOWLEDGED
+  RESOLVED
+}
+
+enum DisruptionResolvedReason {
+  TRAVELLER_ACCEPTED
+  DEPARTURE_PASSED
+  ADMIN_RESOLVED
+  BOOKING_CANCELLED
+}
+
+enum DisruptionActorType {
+  TRAVELLER
+  SYSTEM
+  ADMIN
+}
+
+enum DisruptionAttentionReason {
+  NOTIFICATION_THROTTLED
+  AGED_UNRESOLVED
+  DATA_QUALITY
+}
+
+enum ItineraryRevisionSource {
+  WEBHOOK
+  RECONCILIATION
+  BOOTSTRAP
+}
+
+enum MaterialBaseline {
+  INCREMENTAL
+  CUMULATIVE
+}
+
+enum MaterialDisruptionReason {
+  SEGMENT_REMOVED
+  SEGMENT_ADDED
+  DEPARTURE_AIRPORT_CHANGED
+  ARRIVAL_AIRPORT_CHANGED
+  DEPARTURE_LOCAL_DATE_CHANGED
+  ARRIVAL_LOCAL_DATE_CHANGED
+  DEPARTURE_MOVED_EARLIER
+  DEPARTURE_MOVED_LATER
+  FINAL_ARRIVAL_MOVED_EARLIER
+  FINAL_ARRIVAL_MOVED_LATER
+  OVERNIGHT_CONNECTION_INTRODUCED
+  CONNECTION_BELOW_MCT
+  INVALID_CONNECTION_OVERLAP
+}
+
+enum DuffelWebhookEventStatus {
+  PENDING
+  PROCESSING
+  RETRY_SCHEDULED
+  PROCESSED
+  SKIPPED
+  FAILED_NEEDS_ATTENTION
+}
+
+enum NotificationOutboxType {
+  MATERIAL_DISRUPTION
+}
+
+enum NotificationOutboxStatus {
+  PENDING
+  PROCESSING
+  DELIVERED
+  FAILED
+}
+
+enum DisruptionAuditEventAction {
+  DETECTED
+  ACKNOWLEDGED
+  TRAVELLER_ACCEPTED
+  DEPARTURE_RESOLVED
+  BOOKING_CANCELLED
+  ADMIN_RESOLVED
+  EVENT_RETRIED
+  ATTENTION_RAISED
+  ATTENTION_CLEARED
+}
+
+model ItineraryRevision {
+  id                 String                     @id @default(uuid())
+  bookingId          String
+  version            Int
+  source             ItineraryRevisionSource
+  sourceEventId      String?
+  supplierObservedAt DateTime?
+  fingerprint        String
+  isMaterial         Boolean
+  materialReasons    MaterialDisruptionReason[]
+  materialBaselines  MaterialBaseline[]
+  incrementalDiff    Json
+  cumulativeDiff     Json
+  rulesetVersion     String                     @default("disruption-v1")
+  createdAt          DateTime                   @default(now())
+
+  booking            Booking                    @relation("BookingItineraryRevisions", fields: [bookingId], references: [id], onDelete: Cascade)
+  activeForBooking   Booking?                   @relation("BookingActiveDisruptionRevision")
+  segments           ItineraryRevisionSegment[] @relation("RevisionSegments")
+  notificationOutbox NotificationOutbox?        @relation("RevisionNotificationOutbox")
+  disruptionAuditEvents DisruptionAuditEvent[]   @relation("RevisionDisruptionAuditEvents")
+
+  @@unique([bookingId, version])
+  @@index([bookingId, createdAt(sort: Desc)])
+  @@index([bookingId, isMaterial, createdAt(sort: Desc)])
+  @@index([sourceEventId])
+  @@map("itinerary_revisions")
+}
+
+model ItineraryRevisionSegment {
+  id                   String            @id @default(uuid())
+  revisionId           String
+  sliceOrder           Int
+  segmentOrder         Int
+  globalOrder          Int
+  duffelSegmentId      String?
+  marketingCarrierIata String
+  operatingCarrierIata String?
+  airlineName          String
+  flightNumber         String
+  departureAirportIata String
+  departureAirportName String
+  departureCity        String
+  departureTerminal    String?
+  departureAt          DateTime
+  departureLocalDate   DateTime          @db.Date
+  arrivalAirportIata   String
+  arrivalAirportName   String
+  arrivalCity          String
+  arrivalTerminal      String?
+  arrivalAt            DateTime
+  arrivalLocalDate     DateTime          @db.Date
+  durationMinutes      Int
+  aircraftType         String?
+  createdAt            DateTime          @default(now())
+
+  revision             ItineraryRevision @relation("RevisionSegments", fields: [revisionId], references: [id], onDelete: Cascade)
+
+  @@unique([revisionId, globalOrder])
+  @@index([revisionId, sliceOrder, segmentOrder])
+  @@index([duffelSegmentId])
+  @@map("itinerary_revision_segments")
+}
+
+model DuffelWebhookEvent {
+  id                  String                   @id @default(uuid())
+  supplierEventId     String                   @unique
+  idempotencyKey      String?
+  duffelOrderId       String?
+  eventType           String
+  status              DuffelWebhookEventStatus
+  attempts            Int                      @default(0)
+  nextAttemptAt       DateTime?
+  processingStartedAt DateTime?
+  processingToken     String?
+  rawPayload          Json?
+  payloadRedactedAt   DateTime?
+  lastErrorCode       String?
+  lastErrorAt         DateTime?
+  processedAt         DateTime?
+  createdAt           DateTime                 @default(now())
+  updatedAt           DateTime                 @updatedAt
+
+  @@index([status, nextAttemptAt, createdAt])
+  @@index([processingStartedAt])
+  @@index([duffelOrderId, createdAt(sort: Desc)])
+  @@index([payloadRedactedAt, createdAt])
+  @@map("duffel_webhook_events")
+}
+
+model NotificationOutbox {
+  id                   String                   @id @default(uuid())
+  bookingId            String
+  revisionId           String                   @unique
+  type                 NotificationOutboxType
+  status               NotificationOutboxStatus @default(PENDING)
+  payload              Json
+  stabilizationWarning Boolean                  @default(false)
+  attempts             Int                      @default(0)
+  deliveredAt          DateTime?
+  createdAt            DateTime                 @default(now())
+  updatedAt            DateTime                 @updatedAt
+
+  booking              Booking                  @relation("BookingNotificationOutbox", fields: [bookingId], references: [id], onDelete: Cascade)
+  revision             ItineraryRevision        @relation("RevisionNotificationOutbox", fields: [revisionId], references: [id], onDelete: Cascade)
+
+  @@index([bookingId, createdAt])
+  @@index([status, createdAt])
+  @@map("notification_outbox")
+}
+
+model DisruptionAuditEvent {
+  id            String                      @id @default(uuid())
+  bookingId     String
+  revisionId    String?
+  action        DisruptionAuditEventAction
+  fromStatus    DisruptionStatus?
+  toStatus      DisruptionStatus?
+  actorType     DisruptionActorType
+  actorId       String?
+  safeNote      String?
+  correlationId String
+  traceId       String
+  createdAt     DateTime                    @default(now())
+
+  booking       Booking                     @relation("BookingDisruptionAuditEvents", fields: [bookingId], references: [id], onDelete: Cascade)
+  revision      ItineraryRevision?          @relation("RevisionDisruptionAuditEvents", fields: [revisionId], references: [id], onDelete: SetNull)
+
+  @@index([bookingId, createdAt(sort: Desc)])
+  @@index([revisionId])
+  @@index([action, createdAt])
+  @@map("disruption_audit_events")
+}

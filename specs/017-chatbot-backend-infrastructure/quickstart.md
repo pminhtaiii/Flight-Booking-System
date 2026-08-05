@@ -284,3 +284,16 @@ Record in `docs/runbooks/chatbot-handoff.md` and `context/progress-checker.md` o
 - Defined `events.py` and `requests.py` in `apps/agent/src/agent/models/`.
 - Configured disabled defaults in `.env.example`, `config.py`, `app.module.ts`, and `featureFlags.ts`.
 - Ran shared builds and contract/config tests, confirming all are GREEN with flags defaulted to off.
+
+### Phase 2: Checkpoint 2B (2026-08-05)
+
+- Wrote failing one-Lua daily/burst admission tests covering concurrency, rejected-attempt non-charging, UTC rollover/TTL, and Redis fail-closed behavior.
+- Implemented the versioned combined Lua admission contract and exact key/error semantics in `chat_budget_repository.py`.
+- Tests run to GREEN confirming atomic admission and failure boundaries.
+
+### Phase 2A: Redis Lifecycle Checkpoint (2026-08-05)
+- Wrote failing Redis lifecycle and health tests in `apps/agent/tests/test_redis_infrastructure.py`.
+- Implemented pooled asyncio Redis client in `apps/agent/src/agent/infrastructure/redis.py`.
+- Wired Redis lifecycle and dependency health in `apps/agent/src/agent/main.py`.
+- Ran T009 tests to GREEN, ensuring startup, shutdown, and degraded health are handled correctly.
+

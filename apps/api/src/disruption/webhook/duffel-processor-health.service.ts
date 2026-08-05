@@ -28,7 +28,7 @@ export class DuffelProcessorHealthService {
       failedNeedsAttentionCount,
     ] = await this.prisma.$transaction(
       async (tx) => {
-        await tx.$executeRawUnsafe('SET LOCAL statement_timeout = 150');
+        await tx.$executeRawUnsafe('SET LOCAL statement_timeout = 5000');
         return Promise.all([
           tx.duffelWebhookEvent.count({
             where: { status: 'PENDING' },
@@ -48,8 +48,8 @@ export class DuffelProcessorHealthService {
         ]);
       },
       {
-        maxWait: 200,
-        timeout: 200,
+        maxWait: 5000,
+        timeout: 5000,
       },
     );
 

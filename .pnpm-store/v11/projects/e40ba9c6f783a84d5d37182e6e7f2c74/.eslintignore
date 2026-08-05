@@ -1,0 +1,10 @@
+node_modules
+dist
+build
+.next
+out
+apps/api/prisma/migrations
+coverage
+playwright-report
+test-results
+*.min.js

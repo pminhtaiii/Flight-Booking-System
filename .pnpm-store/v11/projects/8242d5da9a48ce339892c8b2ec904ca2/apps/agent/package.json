@@ -1,0 +1,9 @@
+{
+  "name": "@agent/service",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "test": "uv run pytest",
+    "test:llm": "uv run python -u src/agent/test_llm_connection.py"
+  }
+}

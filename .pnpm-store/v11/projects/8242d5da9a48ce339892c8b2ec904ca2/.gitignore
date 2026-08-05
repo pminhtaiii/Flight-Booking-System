@@ -1,0 +1,31 @@
+.agents/
+.specify/
+node_modules/
+dist/
+.next/
+build/
+coverage/
+*.log
+.env
+.env.*
+!*.example
+
+# Python
+.venv/
+__pycache__/
+.pytest_cache/
+*.pyc
+*.pyo
+*.pyd
+.ipynb_checkpoints/
+
+# Graphify
+graphify-out/
+
+# Universal
+.DS_Store
+Thumbs.db
+*.tmp
+*.swp
+.vscode/
+.idea/
