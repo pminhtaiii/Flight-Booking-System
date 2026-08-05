@@ -11,6 +11,7 @@ import { JwtService } from '@nestjs/jwt';
 import { CacheService } from '@/cache/cache.service';
 import * as bcrypt from 'bcrypt';
 import { Prisma } from '@prisma/client';
+import * as crypto from 'crypto';
 
 @Injectable()
 export class AuthService {
@@ -75,8 +76,17 @@ export class AuthService {
       });
 
       const token = this.jwtService.sign(
-        { id: result.id, email: result.email },
-        { expiresIn: '24h' },
+        { 
+          id: result.id, 
+          email: result.email,
+          sub: result.id,
+          jti: crypto.randomUUID(),
+        },
+        { 
+          expiresIn: '24h',
+          issuer: 'booking-systems-api',
+          audience: 'booking-systems-clients',
+        },
       );
 
       return {
@@ -169,8 +179,17 @@ export class AuthService {
     });
 
     const token = this.jwtService.sign(
-      { id: updatedUser.id, email: updatedUser.email },
-      { expiresIn: '24h' },
+      { 
+        id: updatedUser.id, 
+        email: updatedUser.email,
+        sub: updatedUser.id,
+        jti: crypto.randomUUID(),
+      },
+      { 
+        expiresIn: '24h',
+        issuer: 'booking-systems-api',
+        audience: 'booking-systems-clients',
+      },
     );
 
     return {

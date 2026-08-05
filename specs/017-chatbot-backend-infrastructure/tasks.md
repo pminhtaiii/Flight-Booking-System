@@ -18,14 +18,14 @@
 
 **Purpose**: Add inert contracts, dependency declarations, and disabled-by-default configuration without changing live behavior.
 
-- [ ] T001 Add the direct `langgraph` and asyncio `redis` dependencies and refresh the lockfile in `apps/agent/pyproject.toml` and `apps/agent/uv.lock`
-- [ ] T002 Document the approved Python Redis/LangGraph usage constraints and dependency rationale in `context/library-docs.md`
-- [ ] T003 [P] Write failing cross-language accepted/rejected event contract tests and fixtures in `apps/agent/tests/test_event_contracts.py`, `apps/agent/tests/fixtures/chat_events.json`, and `packages/shared/src/types/chat.types.spec.ts`
-- [ ] T004 [P] Write failing canonical JWT profile and disabled-default/invalid flag, encryption-key, attestation-key, and claim-TTL configuration tests in `apps/api/src/auth/auth.service.spec.ts`, `apps/agent/tests/test_config.py`, `apps/api/src/chat-handoff/chat-handoff.config.spec.ts`, and `apps/web/lib/featureFlags.spec.ts`
-- [ ] T005 [P] Define strict shared Router, booking projection, SSE action, and handoff error types in `packages/shared/src/types/chat.types.ts` and export them from `packages/shared/src/types/index.ts`
-- [ ] T006 [P] Define matching strict Pydantic route and event models in `apps/agent/src/agent/models/events.py` and `apps/agent/src/agent/models/requests.py`
-- [ ] T007 Add agent Redis/quota/router/snapshot/direct-stream settings, NestJS JWT/encryption/attestation/handoff accept/issue/token/claim settings, and web direct-stream/bootstrap settings with disabled defaults in `apps/agent/src/agent/config.py`, `apps/agent/.env.example`, `apps/api/src/app.module.ts`, `apps/api/.env.example`, `apps/web/lib/featureFlags.ts`, and `apps/web/.env.example`
-- [ ] T008 Run the new contract/config tests and shared builds, confirm GREEN with every rollout flag off, and record the contract-freeze checkpoint in `specs/017-chatbot-backend-infrastructure/quickstart.md`
+- [x] T001 Add the direct `langgraph` and asyncio `redis` dependencies and refresh the lockfile in `apps/agent/pyproject.toml` and `apps/agent/uv.lock`
+- [x] T002 Document the approved Python Redis/LangGraph usage constraints and dependency rationale in `context/library-docs.md`
+- [x] T003 [P] Write failing cross-language accepted/rejected event contract tests and fixtures in `apps/agent/tests/test_event_contracts.py`, `apps/agent/tests/fixtures/chat_events.json`, and `packages/shared/src/types/chat.types.spec.ts`
+- [x] T004 [P] Write failing canonical JWT profile and disabled-default/invalid flag, encryption-key, attestation-key, and claim-TTL configuration tests in `apps/api/src/auth/auth.service.spec.ts`, `apps/agent/tests/test_config.py`, `apps/api/src/chat-handoff/chat-handoff.config.spec.ts`, and `apps/web/lib/featureFlags.spec.ts`
+- [x] T005 [P] Define strict shared Router, booking projection, SSE action, and handoff error types in `packages/shared/src/types/chat.types.ts` and export them from `packages/shared/src/types/index.ts`
+- [x] T006 [P] Define matching strict Pydantic route and event models in `apps/agent/src/agent/models/events.py` and `apps/agent/src/agent/models/requests.py`
+- [x] T007 Add agent Redis/quota/router/snapshot/direct-stream settings, NestJS JWT/encryption/attestation/handoff accept/issue/token/claim settings, and web direct-stream/bootstrap settings with disabled defaults in `apps/agent/src/agent/config.py`, `apps/agent/.env.example`, `apps/api/src/app.module.ts`, `apps/api/.env.example`, `apps/web/lib/featureFlags.ts`, and `apps/web/.env.example`
+- [x] T008 Run the new contract/config tests and shared builds, confirm GREEN with every rollout flag off, and record the contract-freeze checkpoint in `specs/017-chatbot-backend-infrastructure/quickstart.md`
 
 **Checkpoint**: Shared contracts compile; all new flags default off; runtime behavior is unchanged.
 

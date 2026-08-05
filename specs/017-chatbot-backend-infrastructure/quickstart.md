@@ -273,3 +273,14 @@ Record in `docs/runbooks/chatbot-handoff.md` and `context/progress-checker.md` o
 - Feature-flag state and rollback rehearsal.
 - Dashboard/alert links or checked-in contracts.
 - Privacy corpus result.
+
+### Phase 1: Contract-Freeze Checkpoint (2026-08-05)
+
+- Added direct `langgraph` and `redis` asyncio dependencies to `apps/agent`.
+- Documented Python Redis/LangGraph usage constraints in `context/library-docs.md`.
+- Wrote failing/passing event contract tests in `packages/shared/src/types/chat.types.spec.ts` and `apps/agent/tests/test_event_contracts.py`.
+- Wrote configuration tests in `apps/api/src/auth/auth.service.spec.ts`, `apps/api/src/chat-handoff/chat-handoff.config.spec.ts`, `apps/web/lib/featureFlags.spec.ts`, and `apps/agent/tests/test_config.py`.
+- Defined strict shared types in `packages/shared/src/types/chat.types.ts` and exported them.
+- Defined `events.py` and `requests.py` in `apps/agent/src/agent/models/`.
+- Configured disabled defaults in `.env.example`, `config.py`, `app.module.ts`, and `featureFlags.ts`.
+- Ran shared builds and contract/config tests, confirming all are GREEN with flags defaulted to off.

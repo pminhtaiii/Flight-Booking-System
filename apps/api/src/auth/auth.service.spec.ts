@@ -97,5 +97,30 @@ describe('AuthService', () => {
         );
       }
     });
+
+    it('should issue canonical JWTs including sub, iss, aud, jti, exp, and legacy id properties', async () => {
+      mockPrismaService.user.findUnique.mockResolvedValue(null);
+      mockPrismaService.user.create.mockResolvedValue({
+        id: 'user-456',
+        email: 'jwt@example.com',
+        status: 'ACTIVE',
+      });
+
+      await service.register({ email: 'jwt@example.com', password: 'Password123!' }, '1.2.3.4');
+      
+      expect(mockJwtService.sign).toHaveBeenCalled();
+      
+      const calls = mockJwtService.sign.mock.calls;
+      const lastCall = calls[calls.length - 1] as any[];
+      const payload = lastCall[0];
+      const options = lastCall[1] || {};
+
+      expect(payload).toHaveProperty('id', 'user-456');
+      expect(payload).toHaveProperty('sub', 'user-456');
+      expect(payload).toHaveProperty('jti');
+      expect(options).toHaveProperty('issuer', 'booking-systems-api');
+      expect(options).toHaveProperty('audience', 'booking-systems-clients');
+      expect(options).toHaveProperty('expiresIn', '24h');
+    });
   });
 });
