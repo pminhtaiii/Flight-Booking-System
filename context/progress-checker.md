@@ -15,7 +15,26 @@ Update this file after every completed feature. Any AI agent reading this should
 
 ## Progress by Feature
 
+### [ ] Feature: Chatbot Backend Infrastructure & Booking Handoff (Feature 17)
+
+- [x] Phase 1 / Contract & Config Freeze (T001–T008): Shared contracts compile, all flags default off, runtime behavior unchanged.
+- [x] Phase 2 / Foundational — Additive Storage & Redis Primitives (T009–T024):
+  - [x] WP 2A: Redis lifecycle/health — 2 tests GREEN
+  - [x] WP 2B: Atomic daily/burst admission Lua — 6 tests GREEN
+  - [x] WP 2C: Fenced session leases + message queue — 4 tests GREEN
+  - [x] WP 2D: Trusted snapshot repository (PII-free) — 10 tests GREEN
+  - [x] WP 2E: Prisma additive schema + migration + backfill scripts
+  - [x] WP 2F: Inert AES-256-GCM crypto service + ChatHandoff module/controller/service/DTO skeletons
+  - **22/22 Redis regression tests PASS; 6/6 E2E migration tests PASS; all routes inert**
+- [ ] Phase 3 / US1: Secure, Budgeted Conversation (T025–T038)
+- [ ] Phase 4 / US2: Correct Specialist Routing (T039–T052)
+- [ ] Phase 5 / US3: Privacy-Minimized Booking Answers (T053–T063)
+- [ ] Phase 6 / US4: Deterministic Checkout Handoff (T064–T084)
+- [ ] Phase 7 / US5: Observable, Reversible Rollout (T085–T093)
+- [ ] Phase 8 / Polish & Cleanup (T094–T102)
+
 ### [ ] Feature: Traveler Profile & Booking Readiness (Feature 16)
+
 
 - [x] Phase 1 / PR 1: Setup — Shared Contracts, Flags, and Observability Vocabulary (implemented shared types for traveler profiles, passenger sources, readiness scopes, results, reason codes, profile sections, and masked summaries; added API and web feature flags `FEATURE_FLAG_BOOKING_READINESS` and `NEXT_PUBLIC_FEATURE_FLAG_BOOKING_READINESS` defaulting to false; created client helper `apps/web/lib/featureFlags.ts`; defined PII-safe operation names, metric names, and allowed metadata keys in `booking-readiness-observability.types.ts`; verified with configuration schema parser tests and contract allowlist validation tests)
 - [x] Phase 2 / PR 2: Additive Schema, Bound Encryption, and Migration Safety (implemented additive traveler profile and passenger snapshot database models and applied SQL migration safely preserving legacy data; added record-bound versioned AES-256-GCM encryption helper methods to EncryptionService with backward-compatibility for legacy unbound ciphertext; created idempotent data-quality backfill service with revision-checking CAS updates, mismatched-date validation quarantine, and abort thresholds; registered ProfileModule, PassportExpiryBackfillController, and a daily scheduled cron task for backfill execution; secured backfill encryption with context-bound AAD keys tied to travelerProfileId and fieldName; verified with a comprehensive migration compatibility E2E test suite, unit tests, and controller integration tests)
