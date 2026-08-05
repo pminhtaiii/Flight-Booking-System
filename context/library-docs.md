@@ -626,3 +626,48 @@ export function FlightSearchForm({ flights }: Props) {
 - Next.js is the frontend only — all API calls go to the NestJS backend, not `app/api/` route handlers
 - Minimal `app/api/` usage — only for NextAuth.js auth routes and Stripe webhook receivers
 - Never put business logic in the Next.js layer — it belongs in NestJS services
+
+---
+
+## Python Redis (redis.asyncio)
+
+### Client Lifecycle
+- Create one `redis.asyncio.Redis` pooled client during FastAPI lifespan and close it on shutdown.
+- Redis is the agent control plane, not conversation storage.
+- Redis unavailability fails closed before inference. Health reports Redis separately.
+
+### Allowed Data
+- No message text, prompt, booking passenger data, token, or payment data is stored in Redis.
+- Only counters, locks, and explicitly PII-free Trusted Search Snapshots are permitted.
+
+### Approved Use Cases
+1. **Budget/Quota Admission**:
+   - Keys: `chat:budget:{userId}:{YYYY-MM-DD}` and `chat:burst:{userId}:{window}`
+   - One versioned Lua admission script increments both only when both admit, uses next-UTC-boundary expiry, and never charges denied attempts.
+2. **Session Fencing**:
+   - Key: `chat:session-lock:{userId}:{sessionId}`
+   - Token-owned lease plus monotonic fencing token. Refresh loss cancels work and NestJS durable writes reject stale fencing owners.
+3. **Trusted Search Snapshot**:
+   - Key: `chat:snapshot:{userId}:{sessionId}`
+   - Versioned PII-free snapshot with TTL no longer than offer freshness.
+
+---
+
+## Python LangGraph
+
+### Graph Architecture
+- The compiled LangGraph remains a single graph containing all agent nodes, but without an interrupt-capable checkpointer (no `MemorySaver`).
+- One graph execution per turn. Durable context is restored at entry from NestJS (decrypted summary/messages) and Redis (snapshot).
+- After execution, the encrypted completed turn is persisted via the service-authenticated gateway.
+- LangGraph is a direct dependency, not just transitive through LangChain.
+
+### Routing and Agents
+- **Stateless Router**: Uses strict Pydantic structured output. No tools, never writes conversational text. A deterministic route function applies configured thresholds.
+- **Explicit Registries**: Tool inventories are constructed per agent, not filtered at runtime.
+  - *General*: no tools
+  - *Travel*: `search_flights`, `get_user_preferences`, `list_user_booking_summaries`, `get_booking_detail`, `check_booking_readiness`
+  - *Checkout*: `signal_checkout_intent` (state-only, no I/O)
+
+### Deterministic Nodes
+- Graph nodes that interact with token issuance or intent lifecycle are deterministic application I/O and must never be exposed as LLM tools.
+- Validation and handoff creation happen in strict graph nodes, never directly in LLM responses.
