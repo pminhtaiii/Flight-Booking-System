@@ -76,6 +76,7 @@ model User {
   idempotencyKeys  IdempotencyKey[]
   refundsTriggered Refund[]
   paymentMethods   PaymentMethod[]
+  chatHandoffs     ChatHandoff[]
 
   @@map("users")
 }
@@ -107,14 +108,20 @@ enum MessageType {
 }
 
 model ChatSession {
-  id           String        @id @default(uuid())
-  userId       String
-  title        String?
-  createdAt    DateTime      @default(now())
-  updatedAt    DateTime      @updatedAt
-  lastActiveAt DateTime      @default(now())
-  messages     ChatMessage[]
-  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id              String        @id @default(uuid())
+  userId          String
+  title           String?
+  titleCiphertext String?
+  titleNonce      String?
+  titleAuthTag    String?
+  titleKeyVersion Int?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  lastActiveAt    DateTime      @default(now())
+  deletedAt       DateTime?
+  messages        ChatMessage[]
+  handoffs        ChatHandoff[]
+  user            User          @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
   @@index([userId, lastActiveAt])
@@ -122,13 +129,17 @@ model ChatSession {
 }
 
 model ChatMessage {
-  id        String        @id @default(uuid())
-  sessionId String
-  sender    MessageSender
-  type      MessageType   @default(STANDARD)
-  content   String
-  createdAt DateTime      @default(now())
-  session   ChatSession   @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  id                String        @id @default(uuid())
+  sessionId         String
+  sender            MessageSender
+  type              MessageType   @default(STANDARD)
+  content           String?
+  contentCiphertext String?
+  contentNonce      String?
+  contentAuthTag    String?
+  contentKeyVersion Int?
+  createdAt         DateTime      @default(now())
+  session           ChatSession   @relation(fields: [sessionId], references: [id], onDelete: Cascade)
 
   @@index([sessionId])
   @@index([sessionId, createdAt])
@@ -140,37 +151,37 @@ model ChatMessage {
 /// All sensitive PII fields (like passportNumber and passportExpiry) are encrypted
 /// at the application level using AES-256-GCM before storage to comply with GDPR requirements.
 model TravelerProfile {
-  id                      String                   @id @default(uuid())
-  userId                  String                   @unique
-  seatPreference          String?
-  classPreference         String?
-  preferredAirlines       String[]
-  blacklistedAirlines     String[]
-  dietaryNeeds            String?
-  nationality             String?
+  id                       String                   @id @default(uuid())
+  userId                   String                   @unique
+  seatPreference           String?
+  classPreference          String?
+  preferredAirlines        String[]
+  blacklistedAirlines      String[]
+  dietaryNeeds             String?
+  nationality              String?
   /// @encrypted
   /// Sensitive PII. Encrypted at the application layer using AES-256-GCM before database insertion.
-  passportNumber          String?
+  passportNumber           String?
   /// @encrypted
   /// Sensitive PII. Encrypted/tokenized at the application layer to comply with GDPR data protection requirements.
-  passportExpiry          DateTime?
-  givenName               String?
-  middleName              String?
-  familyName              String?
-  dateOfBirth             DateTime?                @db.Date
-  gender                  String?
-  title                   String?
-  email                   String?
-  phoneCountryCode        String?
-  phoneNumber             String?
-  documentType            String?
-  issuingCountry          String?                  @db.VarChar(2)
+  passportExpiry           DateTime?
+  givenName                String?
+  middleName               String?
+  familyName               String?
+  dateOfBirth              DateTime?                @db.Date
+  gender                   String?
+  title                    String?
+  email                    String?
+  phoneCountryCode         String?
+  phoneNumber              String?
+  documentType             String?
+  issuingCountry           String?                  @db.VarChar(2)
   passportExpiryCiphertext String?
-  revision                Int                      @default(1)
-  createdAt               DateTime                 @default(now())
-  updatedAt               DateTime                 @updatedAt
-  user                    User                     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  bookingIntentPassengers BookingIntentPassenger[]
+  revision                 Int                      @default(1)
+  createdAt                DateTime                 @default(now())
+  updatedAt                DateTime                 @updatedAt
+  user                     User                     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  bookingIntentPassengers  BookingIntentPassenger[]
 
   @@map("traveler_profiles")
 }
@@ -206,8 +217,8 @@ model Booking {
   payment            Payment?      @relation(fields: [paymentId], references: [id], onDelete: SetNull)
   cancellationRefund Refund?       @relation("CancellationBookingRefund")
 
-  disruptionStatus           DisruptionStatus          @default(NONE)
-  activeDisruptionRevisionId String?                   @unique
+  disruptionStatus           DisruptionStatus           @default(NONE)
+  activeDisruptionRevisionId String?                    @unique
   syncLockedAt               DateTime?
   syncLockToken              String?
   lastDuffelSyncedAt         DateTime?
@@ -219,14 +230,15 @@ model Booking {
   disruptionResolvedAt       DateTime?
   disruptionResolvedByType   DisruptionActorType?
   disruptionResolvedById     String?
-  disruptionNeedsAttention   Boolean                   @default(false)
+  disruptionNeedsAttention   Boolean                    @default(false)
   disruptionAttentionReason  DisruptionAttentionReason?
   disruptionAttentionAt      DateTime?
 
-  itineraryRevisions         ItineraryRevision[]       @relation("BookingItineraryRevisions")
-  activeDisruptionRevision   ItineraryRevision?        @relation("BookingActiveDisruptionRevision", fields: [activeDisruptionRevisionId], references: [id], onDelete: SetNull)
-  notificationOutbox         NotificationOutbox[]      @relation("BookingNotificationOutbox")
-  disruptionAuditEvents      DisruptionAuditEvent[]    @relation("BookingDisruptionAuditEvents")
+  itineraryRevisions       ItineraryRevision[]     @relation("BookingItineraryRevisions")
+  activeDisruptionRevision ItineraryRevision?      @relation("BookingActiveDisruptionRevision", fields: [activeDisruptionRevisionId], references: [id], onDelete: SetNull)
+  notificationOutbox       NotificationOutbox[]    @relation("BookingNotificationOutbox")
+  disruptionAuditEvents    DisruptionAuditEvent[]  @relation("BookingDisruptionAuditEvents")
+  agentProjection          BookingAgentProjection?
 
   @@index([userId])
   @@index([userId, status])
@@ -242,46 +254,47 @@ model Booking {
 }
 
 model BookingIntent {
-  id                  String                   @id @default(uuid())
-  userId              String
-  flightOfferId       String?
-  duffelOfferId       String
-  status              BookingIntentStatus      @default(PENDING)
-  originalPrice       Decimal                  @db.Decimal(10, 2)
-  confirmedPrice      Decimal                  @db.Decimal(10, 2)
-  currency            String                   @default("USD")
-  priceChanged        Boolean                  @default(false)
-  pricedAt            DateTime
-  origin              String                   @db.VarChar(3)
-  destination         String                   @db.VarChar(3)
-  departureDate       DateTime                 @db.Date
-  returnDate          DateTime?                @db.Date
-  cabinClass          String                   @default("economy")
-  adults              Int
-  children            Int                      @default(0)
-  infants             Int                      @default(0)
-  rawOfferSnapshot    Json
-  intentExpiresAt     DateTime
-  offerExpiresAt      DateTime?
-  createdAt           DateTime                 @default(now())
-  updatedAt           DateTime                 @updatedAt
-  user                User                     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  flightOffer         FlightOffer?             @relation(fields: [flightOfferId], references: [id], onDelete: SetNull)
-  passengers          BookingIntentPassenger[]
-  paymentAttemptCount Int                      @default(0)
-  payments            Payment[]
-  booking             Booking?
-  ancillaryVersion    Int                      @default(0)
-  currentAncillarySelectionId String?                   @unique
-  currentAncillarySelection   AncillarySelection?       @relation("BookingIntentCurrentAncillarySelection", fields: [currentAncillarySelectionId], references: [id], onDelete: SetNull)
-  ancillarySelections         AncillarySelection[]      @relation("BookingIntentAncillarySelections")
-  ancillaryStatus     AncillaryStatus          @default(EMPTY)
-  ancillaryCurrency   String?                  @db.VarChar(3)
-  seatTotal           Decimal                  @default(0) @db.Decimal(10, 2)
-  baggageTotal        Decimal                  @default(0) @db.Decimal(10, 2)
-  ancillaryTotal      Decimal                  @default(0) @db.Decimal(10, 2)
-  validatedTotal      Decimal?                 @db.Decimal(10, 2)
-  ancillariesValidatedAt DateTime?
+  id                          String                   @id @default(uuid())
+  userId                      String
+  flightOfferId               String?
+  duffelOfferId               String
+  status                      BookingIntentStatus      @default(PENDING)
+  originalPrice               Decimal                  @db.Decimal(10, 2)
+  confirmedPrice              Decimal                  @db.Decimal(10, 2)
+  currency                    String                   @default("USD")
+  priceChanged                Boolean                  @default(false)
+  pricedAt                    DateTime
+  origin                      String                   @db.VarChar(3)
+  destination                 String                   @db.VarChar(3)
+  departureDate               DateTime                 @db.Date
+  returnDate                  DateTime?                @db.Date
+  cabinClass                  String                   @default("economy")
+  adults                      Int
+  children                    Int                      @default(0)
+  infants                     Int                      @default(0)
+  rawOfferSnapshot            Json
+  intentExpiresAt             DateTime
+  offerExpiresAt              DateTime?
+  createdAt                   DateTime                 @default(now())
+  updatedAt                   DateTime                 @updatedAt
+  user                        User                     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  flightOffer                 FlightOffer?             @relation(fields: [flightOfferId], references: [id], onDelete: SetNull)
+  passengers                  BookingIntentPassenger[]
+  paymentAttemptCount         Int                      @default(0)
+  payments                    Payment[]
+  booking                     Booking?
+  ancillaryVersion            Int                      @default(0)
+  currentAncillarySelectionId String?                  @unique
+  currentAncillarySelection   AncillarySelection?      @relation("BookingIntentCurrentAncillarySelection", fields: [currentAncillarySelectionId], references: [id], onDelete: SetNull)
+  ancillarySelections         AncillarySelection[]     @relation("BookingIntentAncillarySelections")
+  ancillaryStatus             AncillaryStatus          @default(EMPTY)
+  ancillaryCurrency           String?                  @db.VarChar(3)
+  seatTotal                   Decimal                  @default(0) @db.Decimal(10, 2)
+  baggageTotal                Decimal                  @default(0) @db.Decimal(10, 2)
+  ancillaryTotal              Decimal                  @default(0) @db.Decimal(10, 2)
+  validatedTotal              Decimal?                 @db.Decimal(10, 2)
+  ancillariesValidatedAt      DateTime?
+  chatHandoff                 ChatHandoff?
 
   @@index([userId])
   @@index([userId, status])
@@ -326,28 +339,28 @@ model BookingIntentPassenger {
 }
 
 model AncillarySelection {
-  id                   String                   @id @default(uuid())
-  bookingIntentId      String
-  version              Int
-  status               AncillarySelectionStatus @default(DRAFT_COMMITTED)
-  currency             String                   @db.VarChar(3)
-  seatTotal            Decimal                  @db.Decimal(10, 2)
-  baggageTotal         Decimal                  @db.Decimal(10, 2)
-  total                Decimal                  @db.Decimal(10, 2)
-  catalogFingerprint   String
-  committedAt          DateTime                 @default(now())
-  validatedBaseAmount  Decimal?                 @db.Decimal(10, 2)
-  validatedGrandTotal  Decimal?                 @db.Decimal(10, 2)
-  validatedAt          DateTime?
-  validationLeaseToken String?
+  id                       String                   @id @default(uuid())
+  bookingIntentId          String
+  version                  Int
+  status                   AncillarySelectionStatus @default(DRAFT_COMMITTED)
+  currency                 String                   @db.VarChar(3)
+  seatTotal                Decimal                  @db.Decimal(10, 2)
+  baggageTotal             Decimal                  @db.Decimal(10, 2)
+  total                    Decimal                  @db.Decimal(10, 2)
+  catalogFingerprint       String
+  committedAt              DateTime                 @default(now())
+  validatedBaseAmount      Decimal?                 @db.Decimal(10, 2)
+  validatedGrandTotal      Decimal?                 @db.Decimal(10, 2)
+  validatedAt              DateTime?
+  validationLeaseToken     String?
   validationLeaseExpiresAt DateTime?
-  createdAt            DateTime                 @default(now())
-  updatedAt            DateTime                 @updatedAt
-  bookingIntent        BookingIntent            @relation("BookingIntentAncillarySelections", fields: [bookingIntentId], references: [id], onDelete: Cascade)
-  currentForIntent     BookingIntent?           @relation("BookingIntentCurrentAncillarySelection")
-  seatSelections       SeatSelection[]
-  baggageSelections    BaggageSelection[]
-  payments             Payment[]                 @relation("PaymentAncillarySelection")
+  createdAt                DateTime                 @default(now())
+  updatedAt                DateTime                 @updatedAt
+  bookingIntent            BookingIntent            @relation("BookingIntentAncillarySelections", fields: [bookingIntentId], references: [id], onDelete: Cascade)
+  currentForIntent         BookingIntent?           @relation("BookingIntentCurrentAncillarySelection")
+  seatSelections           SeatSelection[]
+  baggageSelections        BaggageSelection[]
+  payments                 Payment[]                @relation("PaymentAncillarySelection")
 
   @@unique([bookingIntentId, version])
   @@unique([id, bookingIntentId, version])
@@ -376,7 +389,7 @@ model SeatSelection {
 }
 
 model BaggageSelection {
-  id                   String             @id @default(uuid())
+  id                   String                    @id @default(uuid())
   ancillarySelectionId String
   intentPassengerId    String
   duffelPassengerId    String
@@ -385,11 +398,11 @@ model BaggageSelection {
   weightValue          Int?
   weightUnit           WeightUnit?
   quantity             Int
-  amount               Decimal            @db.Decimal(10, 2)
-  currency             String             @db.VarChar(3)
-  createdAt            DateTime           @default(now())
-  updatedAt            DateTime           @updatedAt
-  ancillarySelection   AncillarySelection @relation(fields: [ancillarySelectionId], references: [id], onDelete: Cascade)
+  amount               Decimal                   @db.Decimal(10, 2)
+  currency             String                    @db.VarChar(3)
+  createdAt            DateTime                  @default(now())
+  updatedAt            DateTime                  @updatedAt
+  ancillarySelection   AncillarySelection        @relation(fields: [ancillarySelectionId], references: [id], onDelete: Cascade)
   segments             BaggageSelectionSegment[]
 
   @@unique([ancillarySelectionId, intentPassengerId, serviceId])
@@ -470,6 +483,7 @@ model FlightOffer {
   currency       String          @default("USD")
   createdAt      DateTime        @default(now())
   bookingIntents BookingIntent[]
+  chatHandoffs   ChatHandoff[]
 
   @@index([searchHash])
   @@index([createdAt])
@@ -552,25 +566,25 @@ enum PaymentEventSource {
 }
 
 model Payment {
-  id                    String         @id @default(uuid())
-  bookingIntentId       String
-  bookingIntent         BookingIntent  @relation(fields: [bookingIntentId], references: [id])
+  id                        String              @id @default(uuid())
+  bookingIntentId           String
+  bookingIntent             BookingIntent       @relation(fields: [bookingIntentId], references: [id])
   ancillarySelectionId      String?
   ancillarySelectionVersion Int?
   ancillarySelection        AncillarySelection? @relation("PaymentAncillarySelection", fields: [ancillarySelectionId, bookingIntentId, ancillarySelectionVersion], references: [id, bookingIntentId, version], onDelete: Restrict)
-  attemptNumber         Int // 1 or 2 (Database-level CHECK constraint attemptNumber IN (1, 2) enforced in migration)
-  idempotencyKeyId      String
-  idempotencyKey        IdempotencyKey @relation(fields: [idempotencyKeyId], references: [id])
-  stripePaymentIntentId String         @unique
-  stripeCustomerId      String?
-  amount                Int // smallest currency unit (cents)
-  currency              String // ISO 4217 (e.g., "usd")
-  paymentMethodType     String? // e.g., "card"
-  status                PaymentStatus  @default(CREATED)
-  preDisputeStatus      PaymentStatus? // populated when entering DISPUTED
-  version               Int            @default(0) // optimistic locking
-  createdAt             DateTime       @default(now())
-  updatedAt             DateTime       @updatedAt
+  attemptNumber             Int // 1 or 2 (Database-level CHECK constraint attemptNumber IN (1, 2) enforced in migration)
+  idempotencyKeyId          String
+  idempotencyKey            IdempotencyKey      @relation(fields: [idempotencyKeyId], references: [id])
+  stripePaymentIntentId     String              @unique
+  stripeCustomerId          String?
+  amount                    Int // smallest currency unit (cents)
+  currency                  String // ISO 4217 (e.g., "usd")
+  paymentMethodType         String? // e.g., "card"
+  status                    PaymentStatus       @default(CREATED)
+  preDisputeStatus          PaymentStatus? // populated when entering DISPUTED
+  version                   Int                 @default(0) // optimistic locking
+  createdAt                 DateTime            @default(now())
+  updatedAt                 DateTime            @updatedAt
 
   paymentEvents PaymentEvent[]
   ledgerEntries LedgerEntry[]
@@ -799,11 +813,11 @@ model ItineraryRevision {
   rulesetVersion     String                     @default("disruption-v1")
   createdAt          DateTime                   @default(now())
 
-  booking            Booking                    @relation("BookingItineraryRevisions", fields: [bookingId], references: [id], onDelete: Cascade)
-  activeForBooking   Booking?                   @relation("BookingActiveDisruptionRevision")
-  segments           ItineraryRevisionSegment[] @relation("RevisionSegments")
-  notificationOutbox NotificationOutbox?        @relation("RevisionNotificationOutbox")
-  disruptionAuditEvents DisruptionAuditEvent[]   @relation("RevisionDisruptionAuditEvents")
+  booking               Booking                    @relation("BookingItineraryRevisions", fields: [bookingId], references: [id], onDelete: Cascade)
+  activeForBooking      Booking?                   @relation("BookingActiveDisruptionRevision")
+  segments              ItineraryRevisionSegment[] @relation("RevisionSegments")
+  notificationOutbox    NotificationOutbox?        @relation("RevisionNotificationOutbox")
+  disruptionAuditEvents DisruptionAuditEvent[]     @relation("RevisionDisruptionAuditEvents")
 
   @@unique([bookingId, version])
   @@index([bookingId, createdAt(sort: Desc)])
@@ -813,7 +827,7 @@ model ItineraryRevision {
 }
 
 model ItineraryRevisionSegment {
-  id                   String            @id @default(uuid())
+  id                   String   @id @default(uuid())
   revisionId           String
   sliceOrder           Int
   segmentOrder         Int
@@ -828,18 +842,18 @@ model ItineraryRevisionSegment {
   departureCity        String
   departureTerminal    String?
   departureAt          DateTime
-  departureLocalDate   DateTime          @db.Date
+  departureLocalDate   DateTime @db.Date
   arrivalAirportIata   String
   arrivalAirportName   String
   arrivalCity          String
   arrivalTerminal      String?
   arrivalAt            DateTime
-  arrivalLocalDate     DateTime          @db.Date
+  arrivalLocalDate     DateTime @db.Date
   durationMinutes      Int
   aircraftType         String?
-  createdAt            DateTime          @default(now())
+  createdAt            DateTime @default(now())
 
-  revision             ItineraryRevision @relation("RevisionSegments", fields: [revisionId], references: [id], onDelete: Cascade)
+  revision ItineraryRevision @relation("RevisionSegments", fields: [revisionId], references: [id], onDelete: Cascade)
 
   @@unique([revisionId, globalOrder])
   @@index([revisionId, sliceOrder, segmentOrder])
@@ -886,8 +900,8 @@ model NotificationOutbox {
   createdAt            DateTime                 @default(now())
   updatedAt            DateTime                 @updatedAt
 
-  booking              Booking                  @relation("BookingNotificationOutbox", fields: [bookingId], references: [id], onDelete: Cascade)
-  revision             ItineraryRevision        @relation("RevisionNotificationOutbox", fields: [revisionId], references: [id], onDelete: Cascade)
+  booking  Booking           @relation("BookingNotificationOutbox", fields: [bookingId], references: [id], onDelete: Cascade)
+  revision ItineraryRevision @relation("RevisionNotificationOutbox", fields: [revisionId], references: [id], onDelete: Cascade)
 
   @@index([bookingId, createdAt])
   @@index([status, createdAt])
@@ -895,7 +909,7 @@ model NotificationOutbox {
 }
 
 model DisruptionAuditEvent {
-  id            String                      @id @default(uuid())
+  id            String                     @id @default(uuid())
   bookingId     String
   revisionId    String?
   action        DisruptionAuditEventAction
@@ -906,13 +920,71 @@ model DisruptionAuditEvent {
   safeNote      String?
   correlationId String
   traceId       String
-  createdAt     DateTime                    @default(now())
+  createdAt     DateTime                   @default(now())
 
-  booking       Booking                     @relation("BookingDisruptionAuditEvents", fields: [bookingId], references: [id], onDelete: Cascade)
-  revision      ItineraryRevision?          @relation("RevisionDisruptionAuditEvents", fields: [revisionId], references: [id], onDelete: SetNull)
+  booking  Booking            @relation("BookingDisruptionAuditEvents", fields: [bookingId], references: [id], onDelete: Cascade)
+  revision ItineraryRevision? @relation("RevisionDisruptionAuditEvents", fields: [revisionId], references: [id], onDelete: SetNull)
 
   @@index([bookingId, createdAt(sort: Desc)])
   @@index([revisionId])
   @@index([action, createdAt])
   @@map("disruption_audit_events")
+}
+
+model BookingAgentProjection {
+  bookingId       String   @id // Private one-to-one Booking relation
+  agentReference  String   @unique
+  status          String
+  airline         String
+  origin          String
+  destination     String
+  departureAt     DateTime
+  arrivalAt       DateTime
+  durationMinutes Int
+  stopCount       Int
+  flightNumber    String?
+  baggageSummary  String?
+  refundable      Boolean?
+  changeable      Boolean?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  booking Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+
+  @@map("booking_agent_projections")
+}
+
+model ChatHandoff {
+  id                        String    @id @default(uuid())
+  userId                    String
+  chatSessionId             String
+  flightOfferId             String
+  duffelOfferIdHash         String
+  snapshotVersion           Int
+  snapshotFingerprint       String
+  selectionAttestationHash  String
+  selectedOfferIndex        Int
+  tokenHash                 String    @unique
+  tokenKeyVersion           Int
+  idempotencyKeyHash        String    @unique
+  expiresAt                 DateTime
+  claimedAt                 DateTime?
+  claimTokenHash            String?
+  claimExpiresAt            DateTime?
+  claimRecoverAfter         DateTime?
+  consumedAt                DateTime?
+  consumedByBookingIntentId String?   @unique
+  createdAt                 DateTime  @default(now())
+  updatedAt                 DateTime  @updatedAt
+
+  user                    User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  chatSession             ChatSession    @relation(fields: [chatSessionId], references: [id], onDelete: Cascade)
+  flightOffer             FlightOffer    @relation(fields: [flightOfferId], references: [id], onDelete: Restrict)
+  consumedByBookingIntent BookingIntent? @relation(fields: [consumedByBookingIntentId], references: [id], onDelete: Restrict)
+
+  @@index([userId, chatSessionId, expiresAt])
+  @@index([flightOfferId, expiresAt])
+  @@index([expiresAt, consumedAt])
+  @@index([claimExpiresAt, consumedAt])
+  @@map("chat_handoffs")
 }

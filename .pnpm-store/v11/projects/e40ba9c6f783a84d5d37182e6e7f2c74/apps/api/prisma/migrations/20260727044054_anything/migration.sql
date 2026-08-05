@@ -1,0 +1,8 @@
+-- RenameForeignKey
+ALTER TABLE "payments" RENAME CONSTRAINT "payments_ancillary_selection_binding_fkey" TO "payments_ancillarySelectionId_bookingIntentId_ancillarySel_fkey";
+
+-- RenameIndex
+ALTER INDEX "baggage_selections_ancillarySelectionId_intentPassengerId_servi" RENAME TO "baggage_selections_ancillarySelectionId_intentPassengerId_s_key";
+
+-- RenameIndex
+ALTER INDEX "seat_selections_ancillarySelectionId_intentPassengerId_segmentI" RENAME TO "seat_selections_ancillarySelectionId_intentPassengerId_segm_key";

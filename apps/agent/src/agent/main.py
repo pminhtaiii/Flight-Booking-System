@@ -20,8 +20,12 @@ active_streams: Set[asyncio.Queue] = set()
 async def lifespan(app: FastAPI):
     """
     Lifespan context manager that initializes NeMo Guardrails configuration,
-    message queue manager on startup, and flushes active SSE connections on shutdown.
+    message queue manager, and Redis on startup, and flushes active SSE connections on shutdown.
     """
+    from agent.infrastructure.redis import init_redis, close_redis
+    if settings.REDIS_URL:
+        await init_redis(settings.REDIS_URL)
+
     # Pre-load NeMo Guardrails configuration at service startup (M6)
     guardrails = NemoGuardrailService()
     app.state.guardrails = guardrails
@@ -45,6 +49,9 @@ async def lifespan(app: FastAPI):
         active_streams.clear()
         # Allow a short duration for the queues to flush
         await asyncio.sleep(0.5)
+        
+    from agent.infrastructure.redis import close_redis
+    await close_redis()
 
 app = FastAPI(title="AI Chatbot Agent Service", version="0.1.0", lifespan=lifespan)
 app.include_router(sse_router)
@@ -111,8 +118,16 @@ async def health_check(request: Request):
 
     llm_latency = None
 
+    redis_status = "ok"
+    try:
+        from agent.infrastructure.redis import get_redis_client
+        client = get_redis_client()
+        await client.ping()
+    except Exception:
+        redis_status = "down"
+
     overall_status = "ok"
-    if nestjs_status == "down" or not guardrails_configured or not guardrails_healthy:
+    if nestjs_status == "down" or redis_status == "down" or not guardrails_configured or not guardrails_healthy:
         overall_status = "degraded"
 
     return {
@@ -120,7 +135,8 @@ async def health_check(request: Request):
         "dependencies": {
             "llm": {"status": llm_status, "latencyMs": llm_latency},
             "nestjsApi": {"status": nestjs_status, "latencyMs": nestjs_latency},
-            "guardrails": {"status": guardrails_status, "modelLoaded": model_loaded}
+            "guardrails": {"status": guardrails_status, "modelLoaded": model_loaded},
+            "redis": {"status": redis_status}
         },
         "version": "0.1.0"
     }

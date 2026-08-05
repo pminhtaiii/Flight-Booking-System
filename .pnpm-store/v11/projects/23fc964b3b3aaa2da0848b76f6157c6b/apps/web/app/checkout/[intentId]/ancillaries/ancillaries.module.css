@@ -1,0 +1,6 @@
+.airlineBlue {
+  --color-primary: var(--color-text-match-fair);
+  --color-accent: var(--color-text-match-fair);
+  --color-primary-foreground: var(--color-background);
+}
+

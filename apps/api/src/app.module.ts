@@ -17,6 +17,7 @@ import { PaymentModule } from './payment/payment.module';
 import { DisruptionModule } from './disruption/disruption.module';
 import { AncillariesModule } from './ancillaries/ancillaries.module';
 import { ProfileModule } from './profile/profile.module';
+import { ChatHandoffModule } from './chat-handoff/chat-handoff.module';
 
 import { z } from 'zod';
 
@@ -76,6 +77,7 @@ export const envSchema = z.object({
     DisruptionModule,
     AncillariesModule,
     ProfileModule,
+    ChatHandoffModule,
   ],
   controllers: [],
   providers: [],
