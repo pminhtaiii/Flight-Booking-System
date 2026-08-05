@@ -62,8 +62,7 @@ describe('Chat Events Contract', () => {
   });
 
   it('rejects handoff event with extra identifier fields', () => {
-    const StrictHandoffSchema = actionHandoffSchema.strict();
-    const result = StrictHandoffSchema.safeParse(fixtures.invalid_handoff_event_extra_fields);
+    const result = actionHandoffSchema.safeParse(fixtures.invalid_handoff_event_extra_fields);
     expect(result.success).toBe(false);
   });
 });

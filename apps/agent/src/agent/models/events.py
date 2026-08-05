@@ -13,6 +13,8 @@ class DisplayInfo(BaseModel):
     arrivalAt: str
     price: str
     currency: str
+    
+    model_config = ConfigDict(extra="forbid")
 
 class HandoffEvent(BaseSSEEvent):
     action: Literal["begin_checkout"]

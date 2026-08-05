@@ -29,8 +29,8 @@ export const actionHandoffSchema = z.object({
     arrivalAt: z.string(),
     price: z.string(),
     currency: z.string(),
-  }),
-});
+  }).strict(),
+}).strict();
 
 export type HandoffEvent = z.infer<typeof actionHandoffSchema>;
 
