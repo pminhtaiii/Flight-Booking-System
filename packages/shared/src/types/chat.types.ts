@@ -1,3 +1,5 @@
+import { z } from 'zod';
+
 export type RouterIntent = 'GENERAL' | 'SEARCH' | 'BOOKING_INQUIRY' | 'CHECKOUT';
 
 export type RouteDecision = {
@@ -10,20 +12,27 @@ export type RouteDecision = {
 export type SSEActionType = 'begin_checkout' | 'action_required' | 'chat_message' | 'error' | 'agent_state';
 
 export interface BaseSSEEvent {
-  version: string;
+  version: 1;
   action: SSEActionType;
 }
 
-export interface HandoffEvent extends BaseSSEEvent {
-  action: 'begin_checkout';
-  handoffToken: string;
-  expiresAt: string;
-  airline: string;
-  route: string;
-  departure: string;
-  price: number;
-  currency: string;
-}
+export const actionHandoffSchema = z.object({
+  version: z.literal(1),
+  action: z.literal('begin_checkout'),
+  handoffToken: z.string(),
+  expiresAt: z.string(),
+  display: z.object({
+    airline: z.string(),
+    origin: z.string(),
+    destination: z.string(),
+    departureAt: z.string(),
+    arrivalAt: z.string(),
+    price: z.string(),
+    currency: z.string(),
+  }),
+});
+
+export type HandoffEvent = z.infer<typeof actionHandoffSchema>;
 
 export interface ActionRequiredEvent extends BaseSSEEvent {
   action: 'action_required';
