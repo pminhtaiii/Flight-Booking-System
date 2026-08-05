@@ -258,6 +258,8 @@ export class ChatService {
 
     const now = new Date();
     return this.prisma.$transaction(async (tx) => {
+      await this.validateFencingToken(userId, sessionId, fencingToken);
+
       const message = await tx.chatMessage.create({
         data: {
           sessionId,
@@ -423,6 +425,8 @@ export class ChatService {
 
     const now = new Date();
     const createdMessages = await this.prisma.$transaction(async (tx) => {
+      await this.validateFencingToken(userId, sessionId, fencingToken);
+
       const msgs = [];
       for (const [index, msgDto] of dto.messages.entries()) {
         const createdAt = new Date(now.getTime() + index);

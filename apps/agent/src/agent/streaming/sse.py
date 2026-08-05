@@ -125,6 +125,8 @@ async def chat_stream(
     req_id = None
     if queue_manager:
         req_id = await queue_manager.acquire(session_id, user_id=user_id)
+        fence = queue_manager.get_fence(session_id)
+        client.set_fencing_token(fence)
 
     released = False
     pipeline = None

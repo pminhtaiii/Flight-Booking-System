@@ -140,22 +140,26 @@ export class AgentGatewayService {
     }
 
     const now = new Date();
-    const message = await this.prisma.chatMessage.create({
-      data: {
-        sessionId,
-        sender: dto.sender as any,
-        type: (dto.type || 'STANDARD') as any,
-        content: dto.content,
-        createdAt: now,
-      },
-    });
+    return this.prisma.$transaction(async (tx) => {
+      await this.validateFencingToken(userId, sessionId, fencingToken);
 
-    await this.prisma.chatSession.update({
-      where: { id: sessionId },
-      data: { lastActiveAt: now },
-    });
+      const message = await tx.chatMessage.create({
+        data: {
+          sessionId,
+          sender: dto.sender as any,
+          type: (dto.type || 'STANDARD') as any,
+          content: dto.content,
+          createdAt: now,
+        },
+      });
 
-    return message;
+      await tx.chatSession.update({
+        where: { id: sessionId },
+        data: { lastActiveAt: now },
+      });
+
+      return message;
+    });
   }
 
   private async recordReadinessOutcome(

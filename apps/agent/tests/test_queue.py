@@ -60,22 +60,22 @@ async def test_queue_manager_fifo_order():
     manager = MessageQueueManager(max_depth=3)
     order = []
     
-    async def worker(name, session_id):
+    async def worker(name, session_id, hold_time=0.05):
         await manager.acquire(session_id)
         order.append(name)
-        await asyncio.sleep(0.05)
+        await asyncio.sleep(hold_time)
         await manager.release(session_id)
         
-    # Start worker 1 (acquires lock immediately)
-    t1 = asyncio.create_task(worker("worker1", "session-1"))
+    # Start worker 1 (acquires lock immediately and holds for 0.2s)
+    t1 = asyncio.create_task(worker("worker1", "session-fifo-1", hold_time=0.2))
     await asyncio.sleep(0.05)
     
     # Start worker 2 (waits)
-    t2 = asyncio.create_task(worker("worker2", "session-1"))
+    t2 = asyncio.create_task(worker("worker2", "session-fifo-1"))
     await asyncio.sleep(0.05)
     
     # Start worker 3 (waits)
-    t3 = asyncio.create_task(worker("worker3", "session-1"))
+    t3 = asyncio.create_task(worker("worker3", "session-fifo-1"))
     await asyncio.sleep(0.05)
     
     await asyncio.gather(t1, t2, t3)
@@ -275,4 +275,22 @@ async def test_stale_release_ignored():
     assert "session-stale-1" not in manager.depths
     assert "session-stale-1" not in manager.active_fences
     mock_repo.release_lock.assert_called_once()
+
+
+@pytest.mark.asyncio
+async def test_get_fence():
+    manager = MessageQueueManager(max_depth=3)
+    mock_repo = MagicMock()
+    mock_repo.acquire_lock = AsyncMock(return_value=105)
+    mock_repo.release_lock = AsyncMock()
+    manager.repo = mock_repo
+
+    assert manager.get_fence("session-get-fence") is None
+
+    req_id = await manager.acquire("session-get-fence")
+    assert manager.get_fence("session-get-fence") == 105
+
+    await manager.release("session-get-fence", req_id)
+    assert manager.get_fence("session-get-fence") is None
+
 

@@ -3,6 +3,7 @@ import logging
 import time
 import uuid
 from dataclasses import dataclass, field
+from typing import Optional
 from fastapi import HTTPException
 from agent.repositories.session_lock_repository import SessionLockRepository
 
@@ -181,3 +182,9 @@ class MessageQueueManager:
         if active:
             return await self.repo.validate_fence(active.user_id, session_id, active.req_id, active.fence)
         return False
+
+    def get_fence(self, session_id: str) -> Optional[int]:
+        active = self.active_fences.get(session_id)
+        if active:
+            return active.fence
+        return None
