@@ -122,12 +122,12 @@ describe('Chat Persistence Migration (e2e)', () => {
     expect(message!.contentAuthTag).not.toBeNull();
     expect(message!.contentKeyVersion).toBe(1);
     
-    const ENCRYPTION_KEY = process.env.ENCRYPTION_KEY || 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
+    const ENCRYPTION_KEY = process.env.CHAT_ENCRYPTION_KEY || 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
     const KEY_BUFFER = Buffer.from(ENCRYPTION_KEY, 'hex');
-    const decipher = crypto.createDecipheriv('aes-256-gcm', KEY_BUFFER, Buffer.from(message!.contentNonce!, 'base64'));
+    const decipher = crypto.createDecipheriv('aes-256-gcm', KEY_BUFFER, Buffer.from(message!.contentNonce!, 'hex'));
     decipher.setAAD(Buffer.from(`ChatMessage:${message!.id}:${message!.sessionId}:${message!.sender}:${message!.type}:v1`));
-    decipher.setAuthTag(Buffer.from(message!.contentAuthTag!, 'base64'));
-    let decrypted = decipher.update(message!.contentCiphertext!, 'base64', 'utf8');
+    decipher.setAuthTag(Buffer.from(message!.contentAuthTag!, 'hex'));
+    let decrypted = decipher.update(message!.contentCiphertext!, 'hex', 'utf8');
     decrypted += decipher.final('utf8');
     
     expect(decrypted).toEqual('Legacy Content');
