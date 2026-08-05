@@ -11,7 +11,7 @@ import { CreateChatHandoffDto } from './dto/create-chat-handoff.dto';
  *   FEATURE_FLAG_CHAT_HANDOFF_ACCEPT — enables the create() endpoint
  *   FEATURE_FLAG_CHAT_HANDOFF_ISSUE  — enables the resolve() endpoint
  */
-@Controller('api/chat-handoff')
+@Controller('chat-handoff')
 export class ChatHandoffController {
   constructor(
     private readonly chatHandoffService: ChatHandoffService,

@@ -24,7 +24,7 @@ class MessageQueueManager:
         self.refresh_interval = 3.0
         self.lock_ttl_ms = 10000
 
-    async def acquire(self, session_id: str, user_id: str = "default") -> None:
+    async def acquire(self, session_id: str, user_id: str = "default") -> str:
         """
         Increment the depth for a session_id. If the depth is already at or above
         max_depth, raises an HTTPException (429).
@@ -60,7 +60,7 @@ class MessageQueueManager:
                 
             if fence is None:
                 raise HTTPException(status_code=429, detail="Could not acquire session lock.")
-        except asyncio.CancelledError:
+        except BaseException:
             async with self.manager_lock:
                 self.depths[session_id] -= 1
                 if self.depths[session_id] <= 0:
@@ -87,7 +87,9 @@ class MessageQueueManager:
         async with self.manager_lock:
             self.active_fences[session_id] = (req_id, fence, refresh_task, user_id)
 
-    async def release(self, session_id: str) -> None:
+        return req_id
+
+    async def release(self, session_id: str, req_id: str = None) -> None:
         """
         Release the distributed lock for session_id and decrement the local depth.
         """
@@ -97,12 +99,16 @@ class MessageQueueManager:
                 if self.depths[session_id] <= 0:
                     self.depths.pop(session_id, None)
                     
-            active = self.active_fences.pop(session_id, None)
+            active = self.active_fences.get(session_id)
+            if active and (req_id is None or active[0] == req_id):
+                self.active_fences.pop(session_id, None)
+            else:
+                active = None
             
         if active:
-            req_id, fence, refresh_task, user_id = active
+            active_req_id, fence, refresh_task, user_id = active
             refresh_task.cancel()
-            await self.repo.release_lock(user_id, session_id, req_id, fence)
+            await self.repo.release_lock(user_id, session_id, active_req_id, fence)
             
         logger.info(f"Released lock for session {session_id}")
         

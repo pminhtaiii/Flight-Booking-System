@@ -102,8 +102,9 @@ async def chat_stream(
 
     # 4.5. Message Queue Locking
     queue_manager = getattr(request.app.state, "message_queue", None)
+    req_id = None
     if queue_manager:
-        await queue_manager.acquire(session_id)
+        req_id = await queue_manager.acquire(session_id)
 
     released = False
     pipeline = None
@@ -463,12 +464,12 @@ async def chat_stream(
                     await pipeline.aclose()
                 if queue_manager and not released:
                     released = True
-                    await queue_manager.release(session_id)
+                    await queue_manager.release(session_id, req_id)
 
         return EventSourceResponse(sse_generator())
 
     except Exception:
         if queue_manager and not released:
             released = True
-            await queue_manager.release(session_id)
+            await queue_manager.release(session_id, req_id)
         raise

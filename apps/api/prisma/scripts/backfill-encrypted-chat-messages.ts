@@ -3,9 +3,9 @@ import * as crypto from 'crypto';
 
 const prisma = new PrismaClient();
 
-const ENCRYPTION_KEY = process.env.ENCRYPTION_KEY;
+const ENCRYPTION_KEY = process.env.CHAT_ENCRYPTION_KEY;
 if (!ENCRYPTION_KEY || ENCRYPTION_KEY.length !== 64) {
-  throw new Error('ENCRYPTION_KEY must be a 64-character hex string');
+  throw new Error('CHAT_ENCRYPTION_KEY must be a 64-character hex string');
 }
 const KEY_BUFFER = Buffer.from(ENCRYPTION_KEY, 'hex');
 const KEY_VERSION = 1;
@@ -23,15 +23,15 @@ export async function backfillChatMessages() {
     // AAD: bind to record
     cipher.setAAD(Buffer.from(`ChatSession:${session.id}:v${KEY_VERSION}`));
     
-    let ciphertext = cipher.update(session.title, 'utf8', 'base64');
-    ciphertext += cipher.final('base64');
-    const authTag = cipher.getAuthTag().toString('base64');
+    let ciphertext = cipher.update(session.title, 'utf8', 'hex');
+    ciphertext += cipher.final('hex');
+    const authTag = cipher.getAuthTag().toString('hex');
 
     await prisma.chatSession.update({
       where: { id: session.id },
       data: {
         titleCiphertext: ciphertext,
-        titleNonce: nonce.toString('base64'),
+        titleNonce: nonce.toString('hex'),
         titleAuthTag: authTag,
         titleKeyVersion: KEY_VERSION,
       }
@@ -49,15 +49,15 @@ export async function backfillChatMessages() {
     
     cipher.setAAD(Buffer.from(`ChatMessage:${message.id}:${message.sessionId}:${message.sender}:${message.type}:v${KEY_VERSION}`));
     
-    let ciphertext = cipher.update(message.content, 'utf8', 'base64');
-    ciphertext += cipher.final('base64');
-    const authTag = cipher.getAuthTag().toString('base64');
+    let ciphertext = cipher.update(message.content, 'utf8', 'hex');
+    ciphertext += cipher.final('hex');
+    const authTag = cipher.getAuthTag().toString('hex');
 
     await prisma.chatMessage.update({
       where: { id: message.id },
       data: {
         contentCiphertext: ciphertext,
-        contentNonce: nonce.toString('base64'),
+        contentNonce: nonce.toString('hex'),
         contentAuthTag: authTag,
         contentKeyVersion: KEY_VERSION,
       }
