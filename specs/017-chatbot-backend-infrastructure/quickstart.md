@@ -1,0 +1,275 @@
+# Quickstart Validation: Chatbot Backend Infrastructure
+
+This guide proves the feature through public boundaries. It does not replace the task-level RED → GREEN → REFACTOR workflow.
+
+## Prerequisites
+
+- Node/pnpm workspace dependencies installed.
+- Python 3.11+ and `uv` available for `apps/agent`.
+- Docker Desktop running with PostgreSQL and Redis available through `docker compose up -d`.
+- Matching secrets in `apps/api/.env` and `apps/agent/.env`: `JWT_SECRET`, canonical JWT issuer/audience, `AGENT_SERVICE_API_KEY`, and `CLAIM_TOKEN_SECRET`.
+- External versioned key rings configured for ChatMessage AES-GCM, search attestation, and handoff token derivation; never place real values in source, PostgreSQL, backups, or test output.
+- Web public agent URL and agent CORS allowlist point to the actual development origins.
+- Feature 016a canonical plural readiness/intent contracts available for Phase 14 tests.
+
+## Configuration Under Test
+
+Validate defaults first:
+
+```text
+FEATURE_FLAG_CHAT_MULTI_AGENT=false
+FEATURE_FLAG_CHAT_HANDOFF_ACCEPT=false
+FEATURE_FLAG_CHAT_HANDOFF_ISSUE=false
+FEATURE_FLAG_CHAT_DIRECT_STREAM=false
+CHAT_DAILY_MESSAGE_LIMIT=50
+CHAT_BURST_LIMIT=60
+CHAT_BURST_WINDOW_SECONDS=60
+```
+
+Then enable phases in this order:
+
+```text
+CHAT_HANDOFF_ACCEPT → CHAT_MULTI_AGENT → web ACTION_HANDOFF support
+→ CHAT_HANDOFF_ISSUE → CHAT_DIRECT_STREAM
+```
+
+Acceptance should be deployed before issuance. Direct stream is last.
+
+## Build and Static Contract Checks
+
+From repository root:
+
+```powershell
+pnpm --filter @shared/types build
+pnpm --filter @api/backend build
+pnpm --filter @web/frontend build
+```
+
+From `apps/agent`:
+
+```powershell
+uv sync
+uv run pytest tests/test_config.py tests/test_graph.py tests/test_tools.py tests/test_sse_integration.py
+```
+
+Expected:
+
+- Shared strict chat/handoff contracts compile.
+- Python event fixtures match TypeScript/Zod accepted fixtures.
+- The exact six-tool allowlist passes.
+- No confirmation-resume input or `book_flight` path exists in the enabled graph.
+- Existing `ACTION_REQUIRED` fixtures remain valid.
+
+## Phases 1–7: Authentication, Redis Controls, Encryption, Persistence, and CORS
+
+Run focused agent tests:
+
+```powershell
+uv run pytest tests/test_auth.py tests/test_rate_limit.py tests/test_chat_budget.py tests/test_session_lock.py tests/test_trusted_snapshot.py tests/test_health.py
+```
+
+Scenarios:
+
+1. Real NestJS tokens require `sub`/`iss`/`aud`/`jti`; missing/invalid/expired, logged-out/revoked, and deactivated-user tokens return 401 before quota/model/persistence, while the temporary legacy `id` transition is explicit.
+2. Non-allowlisted Origin returns 403 before streaming; allowlisted preflight exposes only exact methods/headers, uses `allow_credentials=false`, and auth errors still carry the correct allowlisted CORS headers.
+3. Fifty default accepted messages succeed; the next returns `CHAT_DAILY_QUOTA_EXCEEDED` before guardrail/router/specialist/tool calls.
+4. One Lua admission decision increments daily and burst only for accepted requests; burst rejection does not charge daily, daily rejection leaves no burst reservation, and UTC rollover/TTL is exact under concurrency.
+5. Redis outage returns `CHAT_CONTROL_PLANE_UNAVAILABLE`; it never bypasses quota.
+6. Two simulated agent instances contend on the same fenced lease; TTL overrun, refresh loss, and disconnect prove the stale worker cannot persist an encrypted turn/summary or emit an action.
+7. `/health` reports Redis independently from NestJS and model/guardrail status.
+8. Seeded passport/card/contact PII is blocked before all model spies and encrypted message persistence; only a value-free security event is recorded.
+9. Agent chat calls use service-authenticated access/session/memory/completed-turn/summary endpoints; browser attempts to write AGENT/SUMMARY fail.
+10. New/migrated ChatMessage rows have complete versioned AES-GCM envelopes and round-trip verification; the legacy column remains only for rollback during observation, has a recovery inventory, and is no longer used by the migrated agent path. Soft-deleted sessions reject access.
+
+Expected: cost control and session ownership are cross-instance, atomic, and fail closed.
+
+## Phases 5, 8–10: Trusted State, Routing, and Signal
+
+```powershell
+uv run pytest tests/test_trusted_snapshot.py tests/test_router.py tests/test_graph.py tests/test_streaming_agent.py
+```
+
+Maintain a deterministic routing fixture table with:
+
+- GENERAL greeting.
+- SEARCH request.
+- BOOKING_INQUIRY logistics question.
+- CHECKOUT explicit commitment with active snapshot/index.
+- High-confidence checkout without snapshot.
+- High-confidence checkout with curiosity but no commitment.
+- Out-of-range and stale result index.
+- Low-confidence checkout-like request.
+- Malformed/unknown Router output.
+- Legacy session after restart with no snapshot.
+
+Expected:
+
+- Only the fully satisfied checkout case reaches Checkout Orchestrator.
+- Partial checkout cases reach Travel Assistant with `possible_checkout` or request a fresh search.
+- General has no tools; Travel and Checkout have only their exact registries.
+- The new graph alone calls opt-in POST v2 search with an owned session/proposed version; it receives a signed ordered-offer attestation, atomically replaces the snapshot, and exposes neither attestation nor identifier. The legacy GET response remains byte-for-byte display-only in rollback tests.
+
+## Phase 9: Booking Projection Boundary
+
+Run API tests:
+
+```powershell
+pnpm --filter @api/backend test -- agent-gateway.service.spec.ts
+npm run test:e2e --workspace=apps/api -- --runTestsByPath test/agent-gateway.e2e-spec.ts
+```
+
+Expected exact keys:
+
+- Summary: bookingReference, airline, origin, destination, departureTime, arrivalTime, status, durationMinutes, stops.
+- Detail: summary plus flightNumber, baggageAllowance, changeable, refundable.
+
+Negative corpus must prove absence of price/currency, fare class, passenger count/details, contact/passport/payment data, PNR, Booking.id, Duffel IDs, and raw snapshots. Query spies prove only BookingAgentProjection is loaded; confirmation, cancellation, supplier-sync, webhook/reconciliation, and existing-row backfill tests keep itinerary/status current. Foreign/stale references return the same safe not-found shape.
+
+## Phases 10–13: Signal, Credential, Dark API, SSE Action, and Bootstrap
+
+Run focused suites:
+
+```powershell
+uv run pytest tests/test_checkout_signal.py tests/test_graph.py tests/test_nestjs_client.py tests/test_sse_integration.py tests/test_sse_output_guardrail.py
+pnpm --filter @api/backend test -- chat-handoff
+npm run test:e2e --workspace=apps/api -- --runTestsByPath test/chat-handoff.e2e-spec.ts
+```
+
+Required scenarios:
+
+1. `signal_checkout_intent` updates typed state and performs zero network/cache/database calls.
+2. Invalid index/snapshot cannot create a handoff.
+3. NestJS verifies the signed ordered-offer attestation, derives idempotency from attestation digest/index, rejects caller IDs/idempotency keys, and returns the same re-derived token/one row for an active retry.
+4. Database contains only token hash/key version, never token plaintext.
+5. Cross-user, client-supplied session, invalid/replaced attestation, malformed, expired, and stale-offer creation/resolve fail with zero supplier calls.
+6. `ACTION_HANDOFF` is emitted only after deterministic create succeeds.
+7. Event payload has exact version/action/display keys and no URL or identifiers.
+8. Unknown action/version/extra fields fail strict Python and TypeScript parsing.
+9. Output guardrails continue to inspect text; strict application events bypass text mutation only after schema validation.
+10. `ISSUE=false` rejects create at both agent node and NestJS direct service-auth endpoint; `ACCEPT` independently controls existing credential resolution.
+11. Card click POSTs the token through Origin/CSRF validation, sets only an HttpOnly/Secure/SameSite=Strict cookie, redirects to clean `/checkout/passengers`, and leaves zero token matches in URL/history/access logs/readable storage.
+
+## Phase 14: Checkout Resolve, Claim, and Atomic Consume
+
+### Blocking Feature 016a preflight
+
+Before writing or enabling consumption, run the existing canonical plural readiness/intent contract tests and verify `POST /api/bookings/intents/readiness`, `POST /api/bookings/intents`, the shared evaluator, source resolution, and singular compatibility aliases are present. If this preflight fails, stop with dark create/resolve acceptance enabled and `FEATURE_FLAG_CHAT_HANDOFF_ISSUE=false`; do not improvise a second intent pipeline.
+
+```powershell
+npm run test:e2e --workspace=apps/api -- --runTestsByPath test/chat-handoff.e2e-spec.ts test/booking-intent.e2e-spec.ts test/booking-readiness.e2e-spec.ts
+```
+
+Run the 100-way concurrent consume test in the dedicated E2E test profile.
+
+Expected:
+
+- Resolve accepts token plus authenticated user only, validates its stored session internally, can repeat while ACTIVE, and never consumes.
+- Readiness by handoff is read-only and uses the same evaluator as offer-ID readiness.
+- Successful canonical intent first CAS-claims before Duffel, owner-refreshes under a watchdog, enforces supplier timeout plus finalization below remaining TTL, and only then atomically creates/consumes after revalidating the active/non-deleted session.
+- Exactly one concurrent request owns the claim/creates the bound intent; every loser returns stable in-progress/consumed behavior before any supplier/payment call.
+- Invalid/not-ready/stale-profile requests release the matching claim; refresh loss cancels and blocks takeover through the uncertainty buffer before bounded recovery.
+- Supplier/payment spies remain zero for resolve, every losing/replayed request, and every DB transaction.
+- Existing non-chat offer-ID and singular compatibility flows remain green.
+
+## Phases 13–15: Browser Action and Direct Stream
+
+Run Playwright with the configured web/API/agent servers:
+
+```powershell
+npx playwright test --config=apps/web/tests/playwright.config.ts apps/web/tests/chat-checkout-handoff.spec.ts
+```
+
+Browser scenarios:
+
+1. Direct browser request includes existing bearer JWT and reaches FastAPI without the Next.js stream proxy.
+2. The `done` event supplies and the widget retains the new ChatSession ID for the next turn.
+3. Search results render without any offer ID in DOM, network-visible SSE payload, URL, storage, or console.
+4. Ambiguous commitment renders clarification and no checkout card.
+5. Explicit commitment renders `CheckoutHandoffCard`; local action performs only the protected bootstrap POST and the browser lands on a clean URL.
+6. Checkout server reads the HttpOnly credential, resolves by token plus user with no-store behavior, and never supplies a session ID.
+7. Expired/consumed/foreign/stale tokens render safe recovery and fresh-search actions.
+8. Existing `ACTION_REQUIRED` profile/readiness card still works.
+9. Unknown event schema/action is ignored safely and records allowlisted telemetry.
+10. Tokens never appear in URLs/history, localStorage, sessionStorage, JavaScript-readable cookies, analytics/access logs, console, nested return URLs, or error UI.
+11. Complete one real three-service flow: direct stream → signed search → explicit selection → `ACTION_HANDOFF` → bootstrap/clean redirect → token-plus-user resolve → readiness → claim → canonical intent/consume; assert exactly one BookingIntent, consumed linkage, session continuity, zero supplier/payment calls by losers, encrypted messages, and no credential/local/provider identifiers in URL/log/SSE/DOM.
+
+## Full Regression
+
+Agent:
+
+```powershell
+uv run pytest
+```
+
+API:
+
+```powershell
+pnpm --filter @api/backend test
+npm run test:e2e --workspace=apps/api
+```
+
+Web:
+
+```powershell
+npx playwright test --config=apps/web/tests/playwright.config.ts
+```
+
+Also run repository lint/type checks defined in `context/workflow.md`.
+
+## Performance and Concurrency Gates
+
+With model, Duffel, Stripe, and email/SMS boundaries stubbed:
+
+- Warm 100 accepted turns; request-to-router application overhead p95 < 100 ms.
+- Warm 100 handoff create and 100 resolve requests; p95 < 300 ms.
+- Submit 100 simultaneous daily-quota increments at limit-1; exactly one additional request is admitted.
+- Submit 100 simultaneous intent creates with one token; exactly one claim reaches Duffel and exactly one BookingIntent is created/bound.
+- Verify handoff issue/resolve adds zero Duffel calls.
+
+## Rollout Matrix
+
+| Multi-agent | Accept | Issue | Direct | Expected |
+|---|---|---|---|---|
+| off | off | off | off | Existing safe graph/proxy rollback behavior |
+| off | on | off | off | Dark server acceptance; no action event |
+| on | on | off | off | New router/tools; checkout disambiguates, no token issuance |
+| on | on | on | off | Handoff enabled through proxy during initial observation |
+| on | on | on | on | Target direct topology with proxy retained for observation rollback |
+| on | on | off | on | Rollback issuance; direct safe chat remains |
+
+Invalid configuration (`Issue=true` while `Accept=false`) must fail startup or force issuance off with a clear health/config error.
+
+After the observation window and explicit approval, archive this rollback matrix, remove the proxy and `Direct=false` configuration, then rerun direct-stream/session/full-flow tests plus a direct-only configuration test that rejects/removes the old false state. The archived proxy matrix is not expected to run after deletion. Before approval, proxy deletion is a failure of the rollback gate.
+
+Phase 17 is a different approval: after live encrypted message/title dual-read/write observation, complete backfill, recovery export, database/backup inventory, and legacy-reader shutdown, apply the cleanup migration and prove decrypt round trips plus zero legacy plaintext. Transport approval does not imply encryption-cleanup approval.
+
+## Privacy Inspection
+
+Search captured logs, traces, audit metadata, SSE fixtures, browser storage, and URLs for the seeded corpus:
+
+```text
+passport number
+email
+phone
+card-like number
+Booking.id
+Duffel offer ID
+PNR
+handoff token and token hash
+```
+
+Expected before Phase 17: zero credential/identifier/PII matches outside protected test inputs, exact `ACTION_HANDOFF.handoffToken`, redacted bootstrap/HttpOnly handling, and the inventoried temporary legacy ChatMessage column with a verified ciphertext twin and recovery export. The token must not appear in any URL/history/access log/text/other event/trace/audit/DOM/readable storage/analytics/error.
+
+After separate Phase 17 approval and cleanup migration, repeat the database/backup scan: ChatMessage content and ChatSession title plaintext must have zero matches and no legacy reader may remain. Any unallowlisted match is blocking.
+
+## Completion Evidence
+
+Record in `docs/runbooks/chatbot-handoff.md` and `context/progress-checker.md` only after implementation:
+
+- Encryption/projection/handoff migration, backfill, plaintext-removal, and backup verification.
+- Exact test commands and green results.
+- Concurrent quota/consume counts.
+- Performance p95 results.
+- Feature-flag state and rollback rehearsal.
+- Dashboard/alert links or checked-in contracts.
+- Privacy corpus result.
