@@ -109,6 +109,7 @@ export class ChatController {
     @Body() dto: CreateMessageDto,
   ) {
     const { ipAddress, traceId, correlationId } = this.getRequestDetails(req, headers);
+    const fencingToken = headers['x-fencing-token'] || headers['X-Fencing-Token'];
     return this.chatService.createMessage(
       req.user.id,
       sessionId,
@@ -116,6 +117,7 @@ export class ChatController {
       ipAddress,
       traceId,
       correlationId,
+      fencingToken,
     );
   }
 
@@ -137,6 +139,7 @@ export class ChatController {
     @Body() dto: BatchMessagesDto,
   ) {
     const { ipAddress, traceId, correlationId } = this.getRequestDetails(req, headers);
+    const fencingToken = headers['x-fencing-token'] || headers['X-Fencing-Token'];
     return this.chatService.createMessageBatch(
       req.user.id,
       sessionId,
@@ -144,6 +147,7 @@ export class ChatController {
       ipAddress,
       traceId,
       correlationId,
+      fencingToken,
     );
   }
 

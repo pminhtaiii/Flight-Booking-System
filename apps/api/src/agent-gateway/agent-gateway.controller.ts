@@ -1,4 +1,4 @@
-import { Controller, Get, Query, Req, UseGuards, Logger, Headers } from '@nestjs/common';
+import { Controller, Get, Query, Req, UseGuards, Logger, Headers, Param, Body, Post, HttpCode } from '@nestjs/common';
 import { Request } from 'express';
 import { AgentApiKeyGuard } from './auth/agent-api-key.guard';
 import { ClaimTokenGuard } from './auth/claim-token.guard';
@@ -11,7 +11,6 @@ import {
   AgentBookingReadinessRequestDto,
   AgentBookingReadinessResponseDto,
 } from './dto/booking-readiness.dto';
-import { Body, Post, HttpCode } from '@nestjs/common';
 
 interface AuthenticatedRequest extends Request {
   user: {
@@ -102,5 +101,29 @@ export class AgentGatewayController {
       this.logger.error('Failed to check booking readiness');
       throw err;
     }
+  }
+
+  @Post('chat/sessions/:sessionId/messages')
+  @HttpCode(201)
+  async createChatMessage(
+    @Param('sessionId') sessionId: string,
+    @Req() req: AuthenticatedRequest,
+    @Headers() headers: Record<string, string>,
+    @Body() dto: { sender: string; content: string; type?: string },
+  ) {
+    const fencingToken = headers['x-fencing-token'] || headers['X-Fencing-Token'];
+    return await this.agentGatewayService.createChatMessage(req.user.id, sessionId, dto, fencingToken);
+  }
+
+  @Post('chat/sessions/:sessionId/turns')
+  @HttpCode(201)
+  async createChatTurn(
+    @Param('sessionId') sessionId: string,
+    @Req() req: AuthenticatedRequest,
+    @Headers() headers: Record<string, string>,
+    @Body() dto: { sender: string; content: string; type?: string },
+  ) {
+    const fencingToken = headers['x-fencing-token'] || headers['X-Fencing-Token'];
+    return await this.agentGatewayService.createChatMessage(req.user.id, sessionId, dto, fencingToken);
   }
 }

@@ -1,4 +1,5 @@
 import asyncio
+import os
 import time
 from datetime import datetime, timezone, timedelta
 import pytest
@@ -9,11 +10,12 @@ from agent.repositories.chat_budget_repository import ChatBudgetRepository, Budg
 
 @pytest.fixture
 async def redis_client():
-    client = redis.Redis(host='localhost', port=6379, db=0, decode_responses=True)
+    redis_url = os.environ.get("REDIS_URL", "redis://localhost:6379/0")
+    client = redis.Redis.from_url(redis_url, decode_responses=True)
     try:
         await client.ping()
         yield client
-    except redis.ConnectionError:
+    except (redis.ConnectionError, OSError):
         pytest.skip("Redis is not available")
     finally:
         await client.aclose()

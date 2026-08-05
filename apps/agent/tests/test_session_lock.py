@@ -1,4 +1,5 @@
 import asyncio
+import os
 import pytest
 import time
 from fastapi import HTTPException
@@ -8,7 +9,8 @@ from agent.infrastructure.redis import init_redis, close_redis
 
 @pytest.fixture(autouse=True)
 async def setup_redis():
-    await init_redis("redis://localhost:6379/0")
+    redis_url = os.environ.get("REDIS_URL", "redis://localhost:6379/0")
+    await init_redis(redis_url)
     yield
     await close_redis()
 

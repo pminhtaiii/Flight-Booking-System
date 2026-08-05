@@ -91,7 +91,5 @@ class ChatBudgetRepository:
                 
             return True
             
-        except BudgetExceededException:
-            raise
         except redis.RedisError as e:
             raise RedisUnavailableException(str(e))

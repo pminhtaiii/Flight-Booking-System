@@ -2,10 +2,20 @@ import asyncio
 import logging
 import time
 import uuid
+from dataclasses import dataclass
 from fastapi import HTTPException
 from agent.repositories.session_lock_repository import SessionLockRepository
 
 logger = logging.getLogger("agent.queue")
+
+background_tasks: set[asyncio.Task] = set()
+
+@dataclass
+class ActiveFence:
+    req_id: str
+    fence: int
+    refresh_task: asyncio.Task
+    user_id: str
 
 class MessageQueueManager:
     """
@@ -19,8 +29,7 @@ class MessageQueueManager:
         self.manager_lock = asyncio.Lock()
         self.repo = SessionLockRepository()
         
-        # Maps session_id to (req_id, fence, refresh_task, user_id)
-        self.active_fences: dict[str, tuple[str, int, asyncio.Task, str]] = {}
+        self.active_fences: dict[str, ActiveFence] = {}
         self.refresh_interval = 3.0
         self.lock_ttl_ms = 10000
 
@@ -74,19 +83,28 @@ class MessageQueueManager:
                                 main_task.cancel()
                             break
                 except asyncio.CancelledError:
-                    pass
+                    logger.debug(f"Lock refresh task cancelled for session {session_id}.")
 
             refresh_task = asyncio.create_task(refresher())
+            background_tasks.add(refresh_task)
+            refresh_task.add_done_callback(background_tasks.discard)
             
             async with self.manager_lock:
-                self.active_fences[session_id] = (req_id, fence, refresh_task, user_id)
+                self.active_fences[session_id] = ActiveFence(
+                    req_id=req_id,
+                    fence=fence,
+                    refresh_task=refresh_task,
+                    user_id=user_id
+                )
 
             return req_id
         except BaseException:
             if 'refresh_task' in locals():
                 locals()['refresh_task'].cancel()
             if fence is not None:
-                asyncio.create_task(self.repo.release_lock(user_id, session_id, req_id, fence))
+                rel_task = asyncio.create_task(self.repo.release_lock(user_id, session_id, req_id, fence))
+                background_tasks.add(rel_task)
+                rel_task.add_done_callback(background_tasks.discard)
                 
             async with self.manager_lock:
                 self.depths[session_id] -= 1
@@ -105,15 +123,14 @@ class MessageQueueManager:
                     self.depths.pop(session_id, None)
                     
             active = self.active_fences.get(session_id)
-            if active and (req_id is None or active[0] == req_id):
+            if active and (req_id is None or active.req_id == req_id):
                 self.active_fences.pop(session_id, None)
             else:
                 active = None
             
         if active:
-            active_req_id, fence, refresh_task, user_id = active
-            refresh_task.cancel()
-            await self.repo.release_lock(user_id, session_id, active_req_id, fence)
+            active.refresh_task.cancel()
+            await self.repo.release_lock(active.user_id, session_id, active.req_id, active.fence)
             
         logger.info(f"Released lock for session {session_id}")
         
@@ -121,6 +138,5 @@ class MessageQueueManager:
         async with self.manager_lock:
             active = self.active_fences.get(session_id)
         if active:
-            req_id, fence, refresh_task, user_id = active
-            return await self.repo.validate_fence(user_id, session_id, req_id, fence)
+            return await self.repo.validate_fence(active.user_id, session_id, active.req_id, active.fence)
         return False

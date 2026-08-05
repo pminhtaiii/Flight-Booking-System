@@ -20,7 +20,12 @@ class SessionLockRepository:
         return f"{self.prefix}fence:{user_id}:{session_id}"
 
     async def acquire_lock(self, user_id: str, session_id: str, req_id: str, ttl_ms: int = 10000) -> Optional[int]:
-        redis = get_redis_client()
+        try:
+            redis = get_redis_client()
+        except RuntimeError:
+            logger.warning("Redis client is not initialized.")
+            return None
+
         script = """
         local lock_key = KEYS[1]
         local fencing_key = KEYS[2]
@@ -48,7 +53,11 @@ class SessionLockRepository:
         return int(fence) if fence is not None else None
 
     async def refresh_lock(self, user_id: str, session_id: str, req_id: str, fence: int, ttl_ms: int = 10000) -> bool:
-        redis = get_redis_client()
+        try:
+            redis = get_redis_client()
+        except RuntimeError:
+            return False
+
         script = """
         local lock_key = KEYS[1]
         local req_id = ARGV[1]
@@ -75,7 +84,11 @@ class SessionLockRepository:
         return bool(res)
 
     async def release_lock(self, user_id: str, session_id: str, req_id: str, fence: int) -> bool:
-        redis = get_redis_client()
+        try:
+            redis = get_redis_client()
+        except RuntimeError:
+            return False
+
         script = """
         local lock_key = KEYS[1]
         local req_id = ARGV[1]
@@ -100,7 +113,11 @@ class SessionLockRepository:
         return bool(res)
 
     async def validate_fence(self, user_id: str, session_id: str, req_id: str, fence: int) -> bool:
-        redis = get_redis_client()
+        try:
+            redis = get_redis_client()
+        except RuntimeError:
+            return False
+
         current_owner = await redis.hget(self._lock_key(user_id, session_id), 'req_id')
         current_fence = await redis.hget(self._lock_key(user_id, session_id), 'fence')
         

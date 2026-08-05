@@ -12,9 +12,15 @@ from agent.memory.manager import MemoryManager
 from langchain_core.messages import HumanMessage
 from agent.guardrails.output_pipeline import OutputGuardrailPipeline, OutputGuardrailBlockedError
 
+import jwt
+from agent.repositories.trusted_snapshot_repository import TrustedSnapshotRepository
+from agent.infrastructure.redis import get_redis_client
+
 logger = logging.getLogger("agent.streaming")
 guardrails_logger = logging.getLogger("agent.guardrails")
 router = APIRouter()
+
+background_tasks: set[asyncio.Task] = set()
 
 async def _resolve_user_message(body, graph, config) -> str:
     """
@@ -33,15 +39,20 @@ async def _resolve_user_message(body, graph, config) -> str:
         logger.warning(f"Failed to retrieve user message from graph state: {e!s}")
     return "Action confirmed"
 
-async def _persist_response(client, session_id: str, user_msg: str, response_text: str, use_shield: bool = False):
+async def _persist_response(client, session_id: str, user_msg: str, response_text: str, user_already_persisted: bool = False, use_shield: bool = False):
     """
     Persists the user and agent messages as a batch.
     Returns the batch result dictionary.
     """
-    payload = [
-        {"sender": "USER", "type": "STANDARD", "content": user_msg},
-        {"sender": "AGENT", "type": "STANDARD", "content": response_text}
-    ]
+    if user_already_persisted:
+        payload = [
+            {"sender": "AGENT", "type": "STANDARD", "content": response_text}
+        ]
+    else:
+        payload = [
+            {"sender": "USER", "type": "STANDARD", "content": user_msg},
+            {"sender": "AGENT", "type": "STANDARD", "content": response_text}
+        ]
     if use_shield:
         return await asyncio.shield(client.create_message_batch(session_id, payload))
     return await client.create_message_batch(session_id, payload)
@@ -100,16 +111,25 @@ async def chat_stream(
 
     client.correlation_id = session_id
 
-    # 4.5. Message Queue Locking
+    # 4.5. Extract user_id from token if available
+    user_id = "default"
+    if token:
+        try:
+            payload = jwt.decode(token, settings.JWT_SECRET, algorithms=["HS256"])
+            user_id = str(payload.get("id") or payload.get("sub") or "default")
+        except Exception:
+            pass
+
+    # Message Queue Locking
     queue_manager = getattr(request.app.state, "message_queue", None)
     req_id = None
     if queue_manager:
-        req_id = await queue_manager.acquire(session_id)
+        req_id = await queue_manager.acquire(session_id, user_id=user_id)
 
     released = False
     pipeline = None
     try:
-        # 5. Fetch memory context from NestJS Client
+        # Fetch memory context from NestJS Client
         try:
             memory_data = await client.get_memory(session_id, recent_count=settings.MEMORY_WINDOW_SIZE)
             history = memory_data.get("recentMessages", [])
@@ -117,6 +137,26 @@ async def chat_stream(
         except Exception as e:
             logger.error(f"Failed to fetch memory from NestJS API: {e!s}")
             raise HTTPException(status_code=503, detail="NestJS API memory service unavailable") from e
+
+        # Read TrustedSearchSnapshot from Redis
+        trusted_snapshot_dict = None
+        try:
+            redis_client = get_redis_client()
+            snapshot_repo = TrustedSnapshotRepository(redis_client)
+            snapshot_obj = await snapshot_repo.get_snapshot(user_id, session_id)
+            if snapshot_obj:
+                trusted_snapshot_dict = snapshot_obj.model_dump(mode="json")
+        except Exception as e:
+            logger.debug(f"Failed to read trusted snapshot from Redis: {e!s}")
+
+        # Persist user message before streaming starts if body.message is provided
+        user_msg_persisted = False
+        if body.message:
+            try:
+                await client.create_message_batch(session_id, [{"sender": "USER", "type": "STANDARD", "content": body.message}])
+                user_msg_persisted = True
+            except Exception as e:
+                logger.error(f"Failed to persist user message before streaming: {e!s}")
 
         # 6. Generator-based SSE streaming with bounded queue (maxsize=100)
         q = asyncio.Queue(maxsize=100)
@@ -133,7 +173,8 @@ async def chat_stream(
             config = {
                 "configurable": {
                     "thread_id": session_id,
-                    "nestjs_client": client
+                    "nestjs_client": client,
+                    "trusted_snapshot": trusted_snapshot_dict
                 }
             }
             try:
@@ -160,6 +201,7 @@ async def chat_stream(
                             "iteration_count": 0,
                             "pending_confirmation": None,
                             "handoff_required": False,
+                            "trusted_snapshot": trusted_snapshot_dict,
                         },
                         config=config,
                         version="v2"
@@ -342,7 +384,7 @@ async def chat_stream(
                     if partial_response.strip():
                         user_msg_content = await _resolve_user_message(body, graph, config)
                         try:
-                            batch_res = await _persist_response(client, session_id, user_msg_content, partial_response)
+                            batch_res = await _persist_response(client, session_id, user_msg_content, partial_response, user_already_persisted=user_msg_persisted)
                             persisted = True
                         except Exception as persist_err:  # noqa: BLE001
                             logger.error(f"Failed to persist completed response: {persist_err!s}")
@@ -375,7 +417,9 @@ async def chat_stream(
                             token_budget=settings.MEMORY_TOKEN_BUDGET
                         )
                         original_total = memory_data.get("totalMessageCount", 0)
-                        asyncio.create_task(memory_mgr.check_and_summarize(session_id, client, total_count=original_total + 2))
+                        mem_task = asyncio.create_task(memory_mgr.check_and_summarize(session_id, client, total_count=original_total + 2))
+                        background_tasks.add(mem_task)
+                        mem_task.add_done_callback(background_tasks.discard)
                     else:
                         logger.warning(f"Empty or whitespace-only response generated for session {session_id}.")
             except OutputGuardrailBlockedError as e:
@@ -390,7 +434,7 @@ async def chat_stream(
                 if not persisted and e.partial_response and e.partial_response.strip():
                     try:
                         user_msg_content = await _resolve_user_message(body, graph, config)
-                        batch_res = await _persist_response(client, session_id, user_msg_content, e.partial_response)
+                        batch_res = await _persist_response(client, session_id, user_msg_content, e.partial_response, user_already_persisted=user_msg_persisted)
                         persisted = True
                         for msg in batch_res.get("messages", []):
                             if msg.get("sender") == "AGENT":
@@ -411,7 +455,7 @@ async def chat_stream(
                 if not persisted and partial_response and partial_response.strip():
                     try:
                         user_msg_content = await _resolve_user_message(body, graph, config)
-                        await _persist_response(client, session_id, user_msg_content, partial_response, use_shield=True)
+                        await _persist_response(client, session_id, user_msg_content, partial_response, user_already_persisted=user_msg_persisted, use_shield=True)
                         persisted = True
                     except Exception as e:  # noqa: BLE001
                         logger.error(f"Failed to persist partial response on connection drop: {e!s}")
@@ -422,7 +466,7 @@ async def chat_stream(
                 if not persisted and partial_response and partial_response.strip():
                     try:
                         user_msg_content = await _resolve_user_message(body, graph, config)
-                        batch_res = await _persist_response(client, session_id, user_msg_content, partial_response)
+                        batch_res = await _persist_response(client, session_id, user_msg_content, partial_response, user_already_persisted=user_msg_persisted)
                         persisted = True
                         for msg in batch_res.get("messages", []):
                             if msg.get("sender") == "AGENT":
@@ -445,6 +489,8 @@ async def chat_stream(
                     pass
 
         producer_task = asyncio.create_task(producer())
+        background_tasks.add(producer_task)
+        producer_task.add_done_callback(background_tasks.discard)
 
         async def sse_generator():
             nonlocal released
@@ -468,7 +514,7 @@ async def chat_stream(
 
         return EventSourceResponse(sse_generator())
 
-    except Exception:
+    except BaseException:
         if queue_manager and not released:
             released = True
             await queue_manager.release(session_id, req_id)

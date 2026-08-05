@@ -4,10 +4,10 @@ import { ChatHandoffService } from './chat-handoff.service';
 import { CreateChatHandoffDto } from './dto/create-chat-handoff.dto';
 
 /**
- * ChatHandoffController — all routes are flag-gated and inert.
+ * ChatHandoffController — all routes are flag-gated.
  *
- * Routes throw ServiceUnavailableException until the corresponding
- * feature flags are enabled:
+ * Routes throw ServiceUnavailableException if their corresponding
+ * feature flags are disabled:
  *   FEATURE_FLAG_CHAT_HANDOFF_ACCEPT — enables the create() endpoint
  *   FEATURE_FLAG_CHAT_HANDOFF_ISSUE  — enables the resolve() endpoint
  */
@@ -24,10 +24,15 @@ export class ChatHandoffController {
    * Inert until FEATURE_FLAG_CHAT_HANDOFF_ACCEPT=true.
    */
   @Post()
-  async create(@Body() _dto: CreateChatHandoffDto): Promise<never> {
-    throw new ServiceUnavailableException(
-      'Chat handoff feature is not enabled',
-    );
+  async create(@Body() dto: CreateChatHandoffDto) {
+    const isEnabled =
+      this.configService.get<string>('FEATURE_FLAG_CHAT_HANDOFF_ACCEPT') === 'true';
+    if (!isEnabled) {
+      throw new ServiceUnavailableException(
+        'Chat handoff feature is not enabled',
+      );
+    }
+    return this.chatHandoffService.create(dto);
   }
 
   /**
@@ -36,9 +41,15 @@ export class ChatHandoffController {
    * Inert until FEATURE_FLAG_CHAT_HANDOFF_ISSUE=true.
    */
   @Get('resolve')
-  async resolve(): Promise<never> {
-    throw new ServiceUnavailableException(
-      'Chat handoff feature is not enabled',
-    );
+  async resolve() {
+    const isEnabled =
+      this.configService.get<string>('FEATURE_FLAG_CHAT_HANDOFF_ISSUE') === 'true';
+    if (!isEnabled) {
+      throw new ServiceUnavailableException(
+        'Chat handoff feature is not enabled',
+      );
+    }
+    return this.chatHandoffService.resolve('', '');
   }
 }
+

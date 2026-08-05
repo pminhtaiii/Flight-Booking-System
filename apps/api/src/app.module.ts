@@ -42,6 +42,7 @@ export const envSchema = z.object({
   FEATURE_FLAG_DISRUPTION_OUTBOX: z.string().optional().default('false'),
   FEATURE_FLAG_CHAT_HANDOFF_ACCEPT: z.string().optional().default('false'),
   FEATURE_FLAG_CHAT_HANDOFF_ISSUE: z.string().optional().default('false'),
+  FEATURE_FLAG_WRITE_FENCE: z.string().optional().default('false'),
   CHAT_ENCRYPTION_KEY: z.string().optional(),
   CHAT_ATTESTATION_KEY: z.string().optional(),
   CHAT_HANDOFF_CLAIM_TTL: z.coerce.number().optional().default(600),

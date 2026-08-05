@@ -1,4 +1,6 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, HttpException, HttpStatus } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import { CacheService } from '@/cache/cache.service';
 import { PrismaService } from '@/prisma/prisma.service';
 import { AuditService } from '@/audit/audit.service';
 import { ListSessionsQueryDto } from './dto/list-sessions-query.dto';
@@ -13,7 +15,39 @@ export class ChatService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly auditService: AuditService,
+    private readonly cacheService: CacheService,
+    private readonly configService: ConfigService,
   ) {}
+
+  async validateFencingToken(
+    userId: string,
+    sessionId: string,
+    fencingToken?: string | null,
+  ): Promise<void> {
+    const isWriteFenceEnabled =
+      this.configService.get<string>('FEATURE_FLAG_WRITE_FENCE') === 'true';
+
+    if (!isWriteFenceEnabled) {
+      return;
+    }
+
+    if (!fencingToken) {
+      throw new HttpException(
+        { code: 'MISSING_FENCING_TOKEN', message: 'Fencing token is required when write fence is enabled' },
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+
+    const lockKey = `chat:session-lock:${userId}:${sessionId}`;
+    const currentFence = await this.cacheService.hget(lockKey, 'fence');
+
+    if (currentFence === null || String(currentFence) !== String(fencingToken)) {
+      throw new HttpException(
+        { code: 'STALE_FENCING_TOKEN', message: 'Fencing token is stale or invalid' },
+        HttpStatus.CONFLICT,
+      );
+    }
+  }
 
   async createSession(
     userId: string,
@@ -207,7 +241,10 @@ export class ChatService {
     ipAddress?: string,
     traceId?: string,
     correlationId?: string,
+    fencingToken?: string,
   ) {
+    await this.validateFencingToken(userId, sessionId, fencingToken);
+
     const session = await this.prisma.chatSession.findFirst({
       where: {
         id: sessionId,
@@ -369,7 +406,10 @@ export class ChatService {
     ipAddress?: string,
     traceId?: string,
     correlationId?: string,
+    fencingToken?: string,
   ) {
+    await this.validateFencingToken(userId, sessionId, fencingToken);
+
     const session = await this.prisma.chatSession.findFirst({
       where: {
         id: sessionId,

@@ -1,4 +1,5 @@
 import pytest
+import os
 import asyncio
 from fastapi.testclient import TestClient
 from agent.infrastructure.redis import init_redis, close_redis, get_redis_client
@@ -6,7 +7,8 @@ from agent.main import app
 
 @pytest.fixture
 def mock_settings(monkeypatch):
-    monkeypatch.setenv("REDIS_URL", "redis://localhost:6379/0")
+    redis_url = os.environ.get("REDIS_URL", "redis://localhost:6379/0")
+    monkeypatch.setenv("REDIS_URL", redis_url)
 
 @pytest.mark.asyncio
 async def test_redis_lifecycle(mock_settings):
@@ -14,7 +16,8 @@ async def test_redis_lifecycle(mock_settings):
     with pytest.raises(RuntimeError):
         get_redis_client()
 
-    await init_redis("redis://localhost:6379/0")
+    redis_url = os.environ.get("REDIS_URL", "redis://localhost:6379/0")
+    await init_redis(redis_url)
     client = get_redis_client()
     assert client is not None
     
