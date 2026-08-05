@@ -8,7 +8,13 @@ import httpx
 from agent.queue.message_queue import MessageQueueManager
 
 from agent.main import app
+from agent.infrastructure.redis import init_redis, close_redis
 
+@pytest.fixture(autouse=True)
+async def setup_redis():
+    await init_redis("redis://localhost:6379/0")
+    yield
+    await close_redis()
 # JWT Secret from conftest / env
 JWT_SECRET = "testsecret_must_be_at_least_32_bytes_long_for_security_reasons"
 
