@@ -27,6 +27,7 @@ Update this file after every completed feature. Any AI agent reading this should
   - [x] WP 2F: Inert AES-256-GCM crypto service + ChatHandoff module/controller/service/DTO skeletons
   - [x] Resolved 15 critical bugs and code smells identified during Phase 2 code review (SSE leaks, NestJS write fence, unpaginated backfills, feature flag handling, task GC risks, dataclass refactoring, and test fixtures).
   - [x] Resolved Issue 1 (write fence validation race condition in NestJS ChatService transaction) and Issue 2 (agent NestJSClient missing X-Fencing-Token header propagation).
+  - [x] Resolved background summarization fencing token race condition in Python agent sse.py.
   - **22/22 Redis regression tests PASS; 157 Python Agent tests PASS; 6/6 E2E migration tests PASS; NestJS backend build compiles cleanly.**
 - [ ] Phase 3 / US1: Secure, Budgeted Conversation (T025–T038)
 - [ ] Phase 4 / US2: Correct Specialist Routing (T039–T052)

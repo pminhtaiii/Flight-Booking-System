@@ -419,9 +419,10 @@ async def chat_stream(
                             token_budget=settings.MEMORY_TOKEN_BUDGET
                         )
                         original_total = memory_data.get("totalMessageCount", 0)
-                        mem_task = asyncio.create_task(memory_mgr.check_and_summarize(session_id, client, total_count=original_total + 2))
-                        background_tasks.add(mem_task)
-                        mem_task.add_done_callback(background_tasks.discard)
+                        try:
+                            await memory_mgr.check_and_summarize(session_id, client, total_count=original_total + 2)
+                        except Exception as mem_err:  # noqa: BLE001
+                            logger.error(f"Failed during memory summarization for session {session_id}: {mem_err!s}")
                     else:
                         logger.warning(f"Empty or whitespace-only response generated for session {session_id}.")
             except OutputGuardrailBlockedError as e:
