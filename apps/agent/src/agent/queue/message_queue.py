@@ -60,34 +60,39 @@ class MessageQueueManager:
                 
             if fence is None:
                 raise HTTPException(status_code=429, detail="Could not acquire session lock.")
+
+            main_task = asyncio.current_task()
+            
+            async def refresher():
+                try:
+                    while True:
+                        await asyncio.sleep(self.refresh_interval)
+                        ok = await self.repo.refresh_lock(user_id, session_id, req_id, fence, ttl_ms=self.lock_ttl_ms)
+                        if not ok:
+                            logger.warning(f"Lost session lock refresh for session {session_id}. Cancelling request.")
+                            if main_task and not main_task.done():
+                                main_task.cancel()
+                            break
+                except asyncio.CancelledError:
+                    pass
+
+            refresh_task = asyncio.create_task(refresher())
+            
+            async with self.manager_lock:
+                self.active_fences[session_id] = (req_id, fence, refresh_task, user_id)
+
+            return req_id
         except BaseException:
+            if 'refresh_task' in locals():
+                locals()['refresh_task'].cancel()
+            if fence is not None:
+                asyncio.create_task(self.repo.release_lock(user_id, session_id, req_id, fence))
+                
             async with self.manager_lock:
                 self.depths[session_id] -= 1
                 if self.depths[session_id] <= 0:
                     self.depths.pop(session_id, None)
             raise
-
-        main_task = asyncio.current_task()
-        
-        async def refresher():
-            try:
-                while True:
-                    await asyncio.sleep(self.refresh_interval)
-                    ok = await self.repo.refresh_lock(user_id, session_id, req_id, fence, ttl_ms=self.lock_ttl_ms)
-                    if not ok:
-                        logger.warning(f"Lost session lock refresh for session {session_id}. Cancelling request.")
-                        if main_task and not main_task.done():
-                            main_task.cancel()
-                        break
-            except asyncio.CancelledError:
-                pass
-
-        refresh_task = asyncio.create_task(refresher())
-        
-        async with self.manager_lock:
-            self.active_fences[session_id] = (req_id, fence, refresh_task, user_id)
-
-        return req_id
 
     async def release(self, session_id: str, req_id: str = None) -> None:
         """
