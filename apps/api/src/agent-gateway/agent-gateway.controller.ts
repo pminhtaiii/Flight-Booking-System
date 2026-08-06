@@ -147,16 +147,18 @@ export class AgentGatewayController {
     @Param('sessionId') sessionId: string,
     @Req() req: AuthenticatedRequest,
     @Headers() headers: Record<string, string>,
-    @Body() dto: { sender?: string; content?: string; type?: string },
+    @Body() dto: { messages: Array<{ sender?: string; content?: string; type?: string }> },
   ) {
     const fencingToken = headers['x-fencing-token'] || headers['X-Fencing-Token'];
-    return await this.agentGatewayService.createChatMessage(
+    return await this.agentGatewayService.createMessageBatch(
       req.user.id,
       sessionId,
       {
-        sender: dto.sender || 'USER',
-        content: dto.content || '',
-        type: dto.type || 'STANDARD',
+        messages: dto.messages.map(m => ({
+          sender: m.sender || 'USER',
+          content: m.content || '',
+          type: m.type || 'STANDARD',
+        })),
       },
       fencingToken,
     );

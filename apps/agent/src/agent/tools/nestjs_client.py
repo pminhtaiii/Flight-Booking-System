@@ -216,18 +216,19 @@ class NestJSClient:
     ) -> Dict[str, Any]:
         url = f"{self.base_url}/agent-gateway/chat/sessions/{session_id}/turns"
         headers = self._get_gateway_headers()
-        created_messages = []
+        
+        payload = {"messages": []}
+        for msg in messages:
+            payload["messages"].append({
+                "sender": msg.get("sender", "USER"),
+                "type": msg.get("type", "STANDARD"),
+                "content": msg.get("content", "")
+            })
+            
         async with httpx.AsyncClient() as client:
-            for msg in messages:
-                payload = {
-                    "sender": msg.get("sender", "USER"),
-                    "type": msg.get("type", "STANDARD"),
-                    "content": msg.get("content", "")
-                }
-                res = await client.post(url, json=payload, headers=headers)
-                res.raise_for_status()
-                created_messages.append(res.json())
-        return {"messages": created_messages}
+            res = await client.post(url, json=payload, headers=headers)
+            res.raise_for_status()
+            return res.json()
 
     async def get_memory(self, session_id: str, recent_count: int = 20, unsummarized_only: bool = False) -> Dict[str, Any]:
         url = f"{self.base_url}/agent-gateway/chat/sessions/{session_id}/memory"

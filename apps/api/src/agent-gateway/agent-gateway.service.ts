@@ -176,6 +176,40 @@ export class AgentGatewayService {
     }
   }
 
+  async createMessageBatch(
+    userId: string,
+    sessionId: string,
+    dto: { messages: Array<{ sender: string; content: string; type?: string }> },
+    fencingToken?: string | null,
+  ) {
+    try {
+      return await this.chatService.createMessageBatch(
+        userId,
+        sessionId,
+        {
+          messages: dto.messages.map((m) => ({
+            sender: m.sender as any,
+            content: m.content,
+            type: (m.type || 'STANDARD') as any,
+          })),
+        },
+        undefined,
+        undefined,
+        undefined,
+        fencingToken || undefined,
+      );
+    } catch (err) {
+      if (err instanceof NotFoundException) {
+        throw new NotFoundException({
+          statusCode: 404,
+          message: 'Session not found',
+          code: 'CHAT_SESSION_NOT_FOUND',
+        });
+      }
+      throw err;
+    }
+  }
+
   /**
    * Soft deletes a chat session.
    */
