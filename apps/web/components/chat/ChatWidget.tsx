@@ -3,7 +3,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { BookingActionCard, parseActionRequiredEvent, type SafeActionRequiredEvent } from './BookingActionCard';
-import { createChatStreamRequest } from '../../lib/chatStream';
+import { createChatStreamRequest } from '@/lib/chatStream';
 
 const OFFER_ID_PATTERN = /^off_[A-Za-z0-9_-]{1,128}$/;
 const SESSION_ID_PATTERN = /^[A-Za-z0-9_-]{1,128}$/;
@@ -128,7 +128,8 @@ export function ChatWidget(): JSX.Element {
 
   const handleNavigate = (target: SafeActionRequiredEvent['target']): void => {
     const params = new URLSearchParams();
-    if (offerId) params.set('offerId', offerId);
+    const targetOfferId = actionEvent?.offerId || offerId;
+    if (targetOfferId) params.set('offerId', targetOfferId);
     if (activeSessionId) params.set('sessionId', activeSessionId);
     params.set('autoResume', 'true');
     
@@ -136,10 +137,10 @@ export function ChatWidget(): JSX.Element {
     const returnTo = `${pathname ?? '/'}${qs ? `?${qs}` : ''}`;
 
     if (target === '/checkout/passengers') {
-      if (!offerId) {
+      if (!targetOfferId) {
         return;
       }
-      router.push(`/checkout/passengers?offerId=${encodeURIComponent(offerId)}`);
+      router.push(`/checkout/passengers?offerId=${encodeURIComponent(targetOfferId)}&returnTo=${encodeURIComponent(returnTo)}`);
       return;
     }
 

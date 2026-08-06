@@ -245,42 +245,33 @@ async def chat_stream(
             pipeline = OutputGuardrailPipeline(config=output_config, nemo_service=guardrails, session_id=session_id)
             partial_response = ""
             persisted = False
+            force_persistence = False
             config = {
                 "configurable": {
                     "thread_id": session_id,
+                    "user_id": user_id,
                     "nestjs_client": client,
                     "trusted_snapshot": trusted_snapshot_dict
                 }
             }
             try:
-                # Check if resume operation
-                if body.confirmed is not None:
-                    current_state = await graph.aget_state(config)
-                    pending = current_state.values.get("pending_confirmation")
-                    if not pending:
-                        pending = {}
-                    pending["confirmed"] = body.confirmed
-
-                    await graph.aupdate_state(config, {"pending_confirmation": pending}, as_node="agent")
-                    event_stream = graph.astream_events(None, config=config, version="v2")
-                else:
-                    # New message
-                    messages = format_messages(
-                        history=history,
-                        current_message=body.message,
-                        summary=summary
-                    )
-                    event_stream = graph.astream_events(
-                        {
-                            "messages": messages,
-                            "iteration_count": 0,
-                            "pending_confirmation": None,
-                            "handoff_required": False,
-                            "trusted_snapshot": trusted_snapshot_dict,
-                        },
-                        config=config,
-                        version="v2"
-                    )
+                # New message
+                messages = format_messages(
+                    history=history,
+                    current_message=body.message,
+                    summary=summary
+                )
+                event_stream = graph.astream_events(
+                    {
+                        "messages": messages,
+                        "iteration_count": 0,
+                        "pending_confirmation": None,
+                        "handoff_required": False,
+                        "trusted_snapshot": trusted_snapshot_dict,
+                    },
+                    config=config,
+                    version="v2"
+                )
 
                 async for event in event_stream:
                     kind = event.get("event")
@@ -299,6 +290,39 @@ async def chat_stream(
                     elif kind == "on_tool_start":
                         tool_name = event.get("name")
                         tool_input = event["data"].get("input")
+                        
+                        if tool_name == "signal_checkout_intent":
+                            selection_index = tool_input.get("selection_index") if isinstance(tool_input, dict) else None
+                            
+                            offer_id = None
+                            if selection_index and trusted_snapshot_dict:
+                                try:
+                                    idx = int(selection_index) - 1
+                                    results = trusted_snapshot_dict.get("results", [])
+                                    if 0 <= idx < len(results):
+                                        offer_id = results[idx].get("flightOfferId")
+                                except (ValueError, TypeError):
+                                    pass
+
+                            payload = {
+                                "action": "CONTINUE_CHECKOUT",
+                                "scope": "UNKNOWN",
+                                "passengers": [{
+                                    "passengerType": "ADULT",
+                                    "passengerOrdinal": 1,
+                                    "sections": []
+                                }],
+                                "target": "/checkout/passengers"
+                            }
+                            if offer_id:
+                                payload["offerId"] = offer_id
+
+                            await q.put({
+                                "event": "ACTION_REQUIRED",
+                                "data": json.dumps(payload)
+                            })
+                            force_persistence = True
+                            continue
 
                         # Never stream raw readiness tool input
                         if tool_name == "check_booking_readiness":
@@ -446,7 +470,7 @@ async def chat_stream(
                                 "event": "ACTION_REQUIRED",
                                 "data": json.dumps(payload)
                             })
-
+                            return
 
                 # Flush the pipeline and yield any remaining safe chunks
                 async for safe_chunk in pipeline.flush():
@@ -456,78 +480,67 @@ async def chat_stream(
                         "data": json.dumps({"content": safe_chunk})
                     })
 
-                # Check if the graph is suspended
-                current_state = await graph.aget_state(config)
-                if current_state.values.get("handoff_required"):
-                    return
-                if current_state.next and "confirm" in current_state.next:
-                    pending = current_state.values.get("pending_confirmation") or {}
-                    await q.put({
-                        "event": "confirmation_required",
-                        "data": json.dumps(pending)
-                    })
-                else:
-                    # Completed turn - Persist message batch and send done event
-                    if partial_response.strip():
-                        if queue_manager and not await queue_manager.validate_active_fence(session_id):
-                            logger.warning(f"Stale fence prior to completed turn persistence for session {session_id}. Aborting.")
-                            await q.put({
-                                "event": "error",
-                                "data": json.dumps({
-                                    "code": "PERSISTENCE_ERROR",
-                                    "message": "The response was generated but could not be saved.",
-                                    "partialMessageId": None
-                                })
-                            })
-                            return
-                        user_msg_content = await _resolve_user_message(body, graph, config)
-                        try:
-                            batch_res = await _persist_response(
-                                client,
-                                session_id,
-                                user_msg_content,
-                                partial_response,
-                                user_already_persisted=user_msg_persisted,
-                                queue_manager=queue_manager,
-                            )
-                            persisted = True
-                        except Exception as persist_err:  # noqa: BLE001
-                            logger.error(f"Failed to persist completed response: {persist_err!s}")
-                            await q.put({
-                                "event": "error",
-                                "data": json.dumps({
-                                    "code": "PERSISTENCE_ERROR",
-                                    "message": "The response was generated but could not be saved.",
-                                    "partialMessageId": None
-                                })
-                            })
-                            return
-
-                        agent_message_id = None
-                        for msg in batch_res.get("messages", []):
-                            if msg.get("sender") == "AGENT":
-                                agent_message_id = msg.get("id")
-
+                # Completed turn - Persist message batch and send done event
+                if partial_response.strip() or force_persistence:
+                    if queue_manager and not await queue_manager.validate_active_fence(session_id):
+                        logger.warning(f"Stale fence prior to completed turn persistence for session {session_id}. Aborting.")
                         await q.put({
-                            "event": "done",
+                            "event": "error",
                             "data": json.dumps({
-                                "messageId": agent_message_id,
-                                "sessionId": session_id
+                                "code": "PERSISTENCE_ERROR",
+                                "message": "The response was generated but could not be saved.",
+                                "partialMessageId": None
                             })
                         })
-
-                        # Trigger token budget check and summarization
-                        memory_mgr = MemoryManager(
-                            window_size=settings.MEMORY_WINDOW_SIZE,
-                            token_budget=settings.MEMORY_TOKEN_BUDGET
+                        return
+                    user_msg_content = await _resolve_user_message(body, graph, config)
+                    try:
+                        batch_res = await _persist_response(
+                            client,
+                            session_id,
+                            user_msg_content,
+                            partial_response,
+                            user_already_persisted=user_msg_persisted,
+                            queue_manager=queue_manager,
                         )
-                        original_total = memory_data.get("totalMessageCount", 0)
-                        try:
-                            await memory_mgr.check_and_summarize(session_id, client, total_count=original_total + 2)
-                        except Exception as mem_err:  # noqa: BLE001
-                            logger.error(f"Failed during memory summarization for session {session_id}: {mem_err!s}")
-                    else:
-                        logger.warning(f"Empty or whitespace-only response generated for session {session_id}.")
+                        persisted = True
+                    except Exception as persist_err:  # noqa: BLE001
+                        logger.error(f"Failed to persist completed response: {persist_err!s}")
+                        await q.put({
+                            "event": "error",
+                            "data": json.dumps({
+                                "code": "PERSISTENCE_ERROR",
+                                "message": "The response was generated but could not be saved.",
+                                "partialMessageId": None
+                            })
+                        })
+                        return
+
+                    agent_message_id = None
+                    for msg in batch_res.get("messages", []):
+                        if msg.get("sender") == "AGENT":
+                            agent_message_id = msg.get("id")
+
+                    await q.put({
+                        "event": "done",
+                        "data": json.dumps({
+                            "messageId": agent_message_id,
+                            "sessionId": session_id
+                        })
+                    })
+
+                    # Trigger token budget check and summarization
+                    memory_mgr = MemoryManager(
+                        window_size=settings.MEMORY_WINDOW_SIZE,
+                        token_budget=settings.MEMORY_TOKEN_BUDGET
+                    )
+                    original_total = memory_data.get("totalMessageCount", 0)
+                    try:
+                        await memory_mgr.check_and_summarize(session_id, client, total_count=original_total + 2)
+                    except Exception as mem_err:  # noqa: BLE001
+                        logger.error(f"Failed during memory summarization for session {session_id}: {mem_err!s}")
+                else:
+                    logger.warning(f"Empty or whitespace-only response generated for session {session_id}.")
             except OutputGuardrailBlockedError as e:
                 guardrails_logger.warning(json.dumps({
                     "event": "security_block",
