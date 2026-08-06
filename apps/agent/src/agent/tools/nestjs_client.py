@@ -129,11 +129,25 @@ def validate_booking_readiness_response(data: object) -> Optional[dict]:
     }
 
 class NestJSClient:
-    def __init__(self, base_url: str, token: str, correlation_id: Optional[str] = None):
+    def __init__(
+        self,
+        base_url: str,
+        token: str,
+        correlation_id: Optional[str] = None,
+        fencing_token: Optional[Any] = None,
+    ):
         self.base_url = base_url.rstrip("/")
         self.token = token
         self.headers = {"Authorization": f"Bearer {token}"}
         self.correlation_id = correlation_id
+        self.set_fencing_token(fencing_token)
+
+    def set_fencing_token(self, fencing_token: Optional[Any]) -> None:
+        self.fencing_token = fencing_token
+        if fencing_token is not None:
+            self.headers["X-Fencing-Token"] = str(fencing_token)
+        else:
+            self.headers.pop("X-Fencing-Token", None)
 
 
     async def create_session(self, title: Optional[str] = None) -> Dict[str, Any]:

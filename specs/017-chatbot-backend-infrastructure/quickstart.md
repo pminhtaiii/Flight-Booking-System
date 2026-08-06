@@ -284,3 +284,48 @@ Record in `docs/runbooks/chatbot-handoff.md` and `context/progress-checker.md` o
 - Defined `events.py` and `requests.py` in `apps/agent/src/agent/models/`.
 - Configured disabled defaults in `.env.example`, `config.py`, `app.module.ts`, and `featureFlags.ts`.
 - Ran shared builds and contract/config tests, confirming all are GREEN with flags defaulted to off.
+
+### Phase 2: Checkpoint 2B (2026-08-05)
+
+- Wrote failing one-Lua daily/burst admission tests covering concurrency, rejected-attempt non-charging, UTC rollover/TTL, and Redis fail-closed behavior.
+- Implemented the versioned combined Lua admission contract and exact key/error semantics in `chat_budget_repository.py`.
+- Tests run to GREEN confirming atomic admission and failure boundaries.
+
+### Phase 2A: Redis Lifecycle Checkpoint (2026-08-05)
+- Wrote failing Redis lifecycle and health tests in `apps/agent/tests/test_redis_infrastructure.py`.
+- Implemented pooled asyncio Redis client in `apps/agent/src/agent/infrastructure/redis.py`.
+- Wired Redis lifecycle and dependency health in `apps/agent/src/agent/main.py`.
+- Ran T009 tests to GREEN, ensuring startup, shutdown, and degraded health are handled correctly.
+
+### Phase 2C: Fenced Session Lease Checkpoint (2026-08-05)
+
+- Wrote failing acquire/refresh/release/takeover tests in `apps/agent/tests/test_session_lock.py`.
+- Implemented monotonic fenced leases, refresh-loss cancellation, bounded wait/depth, and write-fence propagation in `apps/agent/src/agent/repositories/session_lock_repository.py` and `apps/agent/src/agent/queue/message_queue.py`.
+- All 4 session lock tests run to GREEN (acquire/release, TTL overrun/takeover, bounded wait, refresh cancellation).
+- A stale worker cannot perform a durable write or emit `ACTION_HANDOFF`.
+
+### Phase 2D: Trusted Snapshot Checkpoint (2026-08-05)
+
+- Wrote failing attested Trusted Search Snapshot schema, owner/session, overwrite, TTL, fingerprint, and forbidden-field tests in `apps/agent/tests/test_trusted_snapshot.py`.
+- Implemented strict PII-free attested snapshot serialization, atomic replace/load/delete in `apps/agent/src/agent/repositories/trusted_snapshot_repository.py`.
+- Implemented snapshot schema with strict forbidden-field validation in `apps/agent/src/agent/models/snapshot.py`.
+- All 10 trusted snapshot tests run to GREEN.
+- Full Redis regression suite (22 tests: 2A + 2B + 2C + 2D) run to GREEN.
+- Snapshots are PII-free and restore only inside the correct owner/session boundary.
+
+### Phase 2E: Encrypted/Additive Prisma Foundation Checkpoint (2026-08-05)
+
+- Added encrypted `ChatMessage` content fields, `ChatSession` title fields and `deletedAt`, `BookingAgentProjection` model, and `ChatHandoff` model with check constraints to `apps/api/prisma/schema.prisma`.
+- Created additive migration in `apps/api/prisma/migrations/20260805000000_chatbot_handoff/migration.sql`.
+- Created restart-safe backfill scripts: `backfill-encrypted-chat-messages.ts` and `backfill-booking-agent-projections.ts`.
+- Wrote migration/backfill E2E tests in `apps/api/test/chat-persistence-migration.e2e-spec.ts` and `apps/api/test/chat-handoff-migration.e2e-spec.ts`.
+- Migration successfully applied to database; legacy plaintext columns retained for rollback.
+
+### Phase 2F: Inert Domain Skeletons Checkpoint (2026-08-05)
+
+- Created versioned AES-GCM `ChatMessageCryptoService` in `apps/api/src/chat/chat-message-crypto.service.ts`.
+- Created inert `ChatHandoffModule`, `ChatHandoffController`, `ChatHandoffService`, and `CreateChatHandoffDto` in `apps/api/src/chat-handoff/`.
+- Registered `ChatMessageCryptoService` in `ChatModule` as provider and export.
+- Registered `ChatHandoffModule` in `AppModule` imports.
+- All routes are inert (throw `ServiceUnavailableException`); no chatbot path has cut over.
+- Redis primitives are atomic and PII-free; additive schema is valid.

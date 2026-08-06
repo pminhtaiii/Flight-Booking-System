@@ -46,47 +46,47 @@
 
 ### Work Package 2A — Redis Lifecycle and Health
 
-- [ ] T009 [P] Write failing Redis lifecycle and health tests in `apps/agent/tests/test_redis_infrastructure.py`
-- [ ] T010 Implement one pooled asyncio Redis client with startup/close semantics in `apps/agent/src/agent/infrastructure/redis.py`
-- [ ] T011 Wire Redis lifecycle/dependency health in `apps/agent/src/agent/main.py`, run T009 to GREEN, and record Checkpoint 2A in `specs/017-chatbot-backend-infrastructure/quickstart.md`
+- [x] T009 [P] Write failing Redis lifecycle and health tests in `apps/agent/tests/test_redis_infrastructure.py`
+- [x] T010 Implement one pooled asyncio Redis client with startup/close semantics in `apps/agent/src/agent/infrastructure/redis.py`
+- [x] T011 Wire Redis lifecycle/dependency health in `apps/agent/src/agent/main.py`, run T009 to GREEN, and record Checkpoint 2A in `specs/017-chatbot-backend-infrastructure/quickstart.md`
 
 **Checkpoint 2A**: Redis startup, shutdown, and degraded health are green.
 
 ### Work Package 2B — Atomic Daily/Burst Admission
 
-- [ ] T012 [P] Write failing one-Lua daily/burst admission tests covering concurrency, rejected-attempt non-charging, UTC rollover/TTL, and Redis fail-closed behavior in `apps/agent/tests/test_chat_budget.py`
-- [ ] T013 Implement the versioned combined Lua admission contract and exact key/error semantics in `apps/agent/src/agent/repositories/chat_budget_repository.py`, run T012 to GREEN, and record Checkpoint 2B in `specs/017-chatbot-backend-infrastructure/quickstart.md`
+- [x] T012 [P] Write failing one-Lua daily/burst admission tests covering concurrency, rejected-attempt non-charging, UTC rollover/TTL, and Redis fail-closed behavior in `apps/agent/tests/test_chat_budget.py`
+- [x] T013 Implement the versioned combined Lua admission contract and exact key/error semantics in `apps/agent/src/agent/repositories/chat_budget_repository.py`, run T012 to GREEN, and record Checkpoint 2B in `specs/017-chatbot-backend-infrastructure/quickstart.md`
 
 **Checkpoint 2B**: Burst and daily limits form one atomic accepted-only charge.
 
 ### Work Package 2C — Fenced Session Lease
 
-- [ ] T014 [P] Write failing acquire/refresh/release/takeover tests proving TTL overrun, refresh loss, and disconnect cannot let a stale fencing owner persist or emit in `apps/agent/tests/test_session_lock.py`
-- [ ] T015 Implement monotonic fenced leases, refresh-loss cancellation, bounded wait/depth, and write-fence propagation in `apps/agent/src/agent/repositories/session_lock_repository.py` and `apps/agent/src/agent/queue/message_queue.py`, then run T014 to GREEN
+- [x] T014 [P] Write failing acquire/refresh/release/takeover tests proving TTL overrun, refresh loss, and disconnect cannot let a stale fencing owner persist or emit in `apps/agent/tests/test_session_lock.py`
+- [x] T015 Implement monotonic fenced leases, refresh-loss cancellation, bounded wait/depth, and write-fence propagation in `apps/agent/src/agent/repositories/session_lock_repository.py` and `apps/agent/src/agent/queue/message_queue.py`, then run T014 to GREEN
 
 **Checkpoint 2C**: A stale worker cannot perform a durable write or emit `ACTION_HANDOFF`.
 
 ### Work Package 2D — Trusted Snapshot Repository
 
-- [ ] T016 [P] Write failing attested Trusted Search Snapshot schema, owner/session, overwrite, TTL, fingerprint, and forbidden-field tests in `apps/agent/tests/test_trusted_snapshot.py`
-- [ ] T017 Implement strict PII-free attested snapshot serialization, atomic replace/load/delete in `apps/agent/src/agent/repositories/trusted_snapshot_repository.py`
-- [ ] T018 Run T016 plus Redis regressions to GREEN and record Checkpoint 2D in `specs/017-chatbot-backend-infrastructure/quickstart.md`
+- [x] T016 [P] Write failing attested Trusted Search Snapshot schema, owner/session, overwrite, TTL, fingerprint, and forbidden-field tests in `apps/agent/tests/test_trusted_snapshot.py`
+- [x] T017 Implement strict PII-free attested snapshot serialization, atomic replace/load/delete in `apps/agent/src/agent/repositories/trusted_snapshot_repository.py`
+- [x] T018 Run T016 plus Redis regressions to GREEN and record Checkpoint 2D in `specs/017-chatbot-backend-infrastructure/quickstart.md`
 
 **Checkpoint 2D**: The service-only attestation and identifiers restore only inside the correct owner/session boundary.
 
 ### Work Package 2E — Encrypted/Additive Prisma Foundation
 
-- [ ] T019 [P] Write failing migration/backfill tests for AES-GCM ChatMessage/ChatSession-title dual-write completeness and cleanup preconditions, ChatSession soft deletion, BookingAgentProjection, and ChatHandoff claim/attestation constraints in `apps/api/test/chat-persistence-migration.e2e-spec.ts` and `apps/api/test/chat-handoff-migration.e2e-spec.ts`
-- [ ] T020 Add encrypted ChatMessage content and ChatSession title fields, `ChatSession.deletedAt`, `BookingAgentProjection`, and claimed `ChatHandoff` relations/indexes/check constraints in `apps/api/prisma/schema.prisma`
-- [ ] T021 Create the additive dual-write migration and restart-safe encrypted-message/title/projection backfills in `apps/api/prisma/migrations/20260805000000_chatbot_handoff/migration.sql`, `apps/api/prisma/scripts/backfill-encrypted-chat-messages.ts`, and `apps/api/prisma/scripts/backfill-booking-agent-projections.ts`, then run T019 to GREEN while retaining all legacy plaintext
+- [x] T019 [P] Write failing migration/backfill tests for AES-GCM ChatMessage/ChatSession-title dual-write completeness and cleanup preconditions, ChatSession soft deletion, BookingAgentProjection, and ChatHandoff claim/attestation constraints in `apps/api/test/chat-persistence-migration.e2e-spec.ts` and `apps/api/test/chat-handoff-migration.e2e-spec.ts`
+- [x] T020 Add encrypted ChatMessage content and ChatSession title fields, `ChatSession.deletedAt`, `BookingAgentProjection`, and claimed `ChatHandoff` relations/indexes/check constraints in `apps/api/prisma/schema.prisma`
+- [x] T021 Create the additive dual-write migration and restart-safe encrypted-message/title/projection backfills in `apps/api/prisma/migrations/20260805000000_chatbot_handoff/migration.sql`, `apps/api/prisma/scripts/backfill-encrypted-chat-messages.ts`, and `apps/api/prisma/scripts/backfill-booking-agent-projections.ts`, then run T019 to GREEN while retaining all legacy plaintext
 
 **Checkpoint 2E**: Additive schema/backfills are rollback-safe, every migrated message decrypts, and projection rows are complete.
 
 ### Work Package 2F — Inert Domain Skeletons
 
-- [ ] T022 Create the versioned AES-GCM chat crypto service plus handoff module/controller/service/strict DTO skeleton in `apps/api/src/chat/chat-message-crypto.service.ts`, `apps/api/src/chat-handoff/chat-handoff.module.ts`, `apps/api/src/chat-handoff/chat-handoff.controller.ts`, `apps/api/src/chat-handoff/chat-handoff.service.ts`, and `apps/api/src/chat-handoff/dto/create-chat-handoff.dto.ts`
-- [ ] T023 Register the crypto and `ChatHandoffModule` providers with every new route/flag inert in `apps/api/src/chat/chat.module.ts` and `apps/api/src/app.module.ts`
-- [ ] T024 Run dual-read/dual-write-capable crypto, backfill, migration, shared build, database/backup scan fixture, and rollback tests while retaining the legacy plaintext column; record the additive Checkpoint 2F in `specs/017-chatbot-backend-infrastructure/quickstart.md`
+- [x] T022 Create the versioned AES-GCM chat crypto service plus handoff module/controller/service/strict DTO skeleton in `apps/api/src/chat/chat-message-crypto.service.ts`, `apps/api/src/chat-handoff/chat-handoff.module.ts`, `apps/api/src/chat-handoff/chat-handoff.controller.ts`, `apps/api/src/chat-handoff/chat-handoff.service.ts`, and `apps/api/src/chat-handoff/dto/create-chat-handoff.dto.ts`
+- [x] T023 Register the crypto and `ChatHandoffModule` providers with every new route/flag inert in `apps/api/src/chat/chat.module.ts` and `apps/api/src/app.module.ts`
+- [x] T024 Run dual-read/dual-write-capable crypto, backfill, migration, shared build, database/backup scan fixture, and rollback tests while retaining the legacy plaintext column; record the additive Checkpoint 2F in `specs/017-chatbot-backend-infrastructure/quickstart.md`
 
 **Checkpoint**: Redis primitives are atomic and PII-free; additive schema is valid; no chatbot path has cut over.
 

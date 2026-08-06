@@ -1,4 +1,5 @@
 import { Injectable, NotFoundException, Logger, HttpException, HttpStatus } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '@/prisma/prisma.service';
 import { AuditService } from '@/audit/audit.service';
 import { CacheService } from '@/cache/cache.service';
@@ -79,7 +80,87 @@ export class AgentGatewayService {
     private readonly profileService: ProfileService,
     private readonly bookingReadinessService: BookingReadinessService,
     private readonly bookingReadinessObservability: BookingReadinessObservability,
+    private readonly configService: ConfigService,
   ) {}
+
+  /**
+   * Validates fencing token using Redis session lock if Phase 4 write fence is enabled.
+   */
+  async validateFencingToken(
+    userId: string,
+    sessionId: string,
+    fencingToken?: string | null,
+  ): Promise<void> {
+    const isWriteFenceEnabled =
+      this.configService.get<string>('FEATURE_FLAG_WRITE_FENCE') === 'true';
+
+    if (!isWriteFenceEnabled) {
+      return;
+    }
+
+    if (!fencingToken) {
+      throw new HttpException(
+        { code: 'MISSING_FENCING_TOKEN', message: 'Fencing token is required when write fence is enabled' },
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+
+    const lockKey = `chat:session-lock:${userId}:${sessionId}`;
+    const currentFence = await this.cacheService.hget(lockKey, 'fence');
+
+    if (currentFence === null || String(currentFence) !== String(fencingToken)) {
+      throw new HttpException(
+        { code: 'STALE_FENCING_TOKEN', message: 'Fencing token is stale or invalid' },
+        HttpStatus.CONFLICT,
+      );
+    }
+  }
+
+  /**
+   * Creates a chat message in the session with write fence validation.
+   */
+  async createChatMessage(
+    userId: string,
+    sessionId: string,
+    dto: { sender: string; content: string; type?: string },
+    fencingToken?: string | null,
+  ) {
+    await this.validateFencingToken(userId, sessionId, fencingToken);
+
+    const session = await this.prisma.chatSession.findFirst({
+      where: { id: sessionId, userId },
+    });
+
+    if (!session) {
+      throw new NotFoundException({
+        statusCode: 404,
+        message: 'Session not found',
+        code: 'CHAT_SESSION_NOT_FOUND',
+      });
+    }
+
+    const now = new Date();
+    return this.prisma.$transaction(async (tx) => {
+      await this.validateFencingToken(userId, sessionId, fencingToken);
+
+      const message = await tx.chatMessage.create({
+        data: {
+          sessionId,
+          sender: dto.sender as any,
+          type: (dto.type || 'STANDARD') as any,
+          content: dto.content,
+          createdAt: now,
+        },
+      });
+
+      await tx.chatSession.update({
+        where: { id: sessionId },
+        data: { lastActiveAt: now },
+      });
+
+      return message;
+    });
+  }
 
   private async recordReadinessOutcome(
     userId: string,
@@ -218,19 +299,20 @@ export class AgentGatewayService {
         });
       }
 
-      if (lastMessage) {
+      if (lastMessage && lastMessage.content) {
         const matchedKeywords: string[] = [];
+        const content = lastMessage.content;
 
         for (const kw of CABIN_KEYWORDS) {
           const regex = new RegExp(`\\b${kw}\\b`, 'i');
-          if (regex.test(lastMessage.content)) {
+          if (regex.test(content)) {
             matchedKeywords.push(kw);
           }
         }
 
         for (const kw of PASSENGER_KEYWORDS) {
           const regex = new RegExp(`\\b${kw}\\b`, 'i');
-          if (regex.test(lastMessage.content)) {
+          if (regex.test(content)) {
             matchedKeywords.push(kw);
           }
         }

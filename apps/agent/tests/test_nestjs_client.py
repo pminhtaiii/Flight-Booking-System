@@ -14,6 +14,21 @@ def mock_time():
         yield
 
 
+def test_set_fencing_token():
+    client = NestJSClient(base_url="http://localhost:3001/api", token="test-token", fencing_token=42)
+    assert client.fencing_token == 42
+    assert client.headers["X-Fencing-Token"] == "42"
+    assert client.headers["Authorization"] == "Bearer test-token"
+
+    client.set_fencing_token(None)
+    assert client.fencing_token is None
+    assert "X-Fencing-Token" not in client.headers
+
+    client.set_fencing_token(99)
+    assert client.fencing_token == 99
+    assert client.headers["X-Fencing-Token"] == "99"
+
+
 @pytest.mark.asyncio
 async def test_create_session():
     client = NestJSClient(base_url="http://localhost:3001/api", token="test-token")
