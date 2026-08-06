@@ -64,8 +64,6 @@ async def search_flights(
     if not results:
         return f"Found 0 flights from {origin} to {destination} on {date}."
 
-    FLIGHTS_CACHE[thread_id] = data
-
 
     # Strip identifiers before sending to LLM and create trusted snapshot
     safe_results = []
@@ -90,6 +88,8 @@ async def search_flights(
         safe_flight.pop("flightOfferId", None)
         safe_flight.pop("duffelOfferId", None)
         safe_results.append(safe_flight)
+
+    FLIGHTS_CACHE[thread_id] = {"results": safe_results}
 
     # Store Trusted Search Snapshot in Redis
     try:

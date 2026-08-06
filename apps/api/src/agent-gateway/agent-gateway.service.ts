@@ -587,26 +587,13 @@ export class AgentGatewayService {
       }
 
       // Check for user's latest chat message and perform honest degradation keyword validation
-      let lastMessage = null;
-      if (correlationId || dto.chatSessionId) {
-        lastMessage = await this.prisma.chatMessage.findFirst({
-          where: {
-            sender: 'USER',
-            sessionId: correlationId || dto.chatSessionId,
-          },
-          orderBy: { createdAt: 'desc' },
-        });
-      }
-
-      if (!lastMessage) {
-        lastMessage = await this.prisma.chatMessage.findFirst({
-          where: {
-            sender: 'USER',
-            session: { userId },
-          },
-          orderBy: { createdAt: 'desc' },
-        });
-      }
+      const lastMessage = await this.prisma.chatMessage.findFirst({
+        where: {
+          sender: 'USER',
+          sessionId: dto.chatSessionId,
+        },
+        orderBy: { createdAt: 'desc' },
+      });
 
       if (lastMessage && lastMessage.content) {
         const matchedKeywords: string[] = [];
