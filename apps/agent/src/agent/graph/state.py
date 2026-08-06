@@ -8,5 +8,6 @@ class AgentState(TypedDict, total=False):
     route: Literal["general", "travel", "checkout"]
     disambiguation: Literal["none", "possible_checkout"]
     snapshot: Optional[dict]
+    trusted_snapshot: Optional[dict]
     signal: Optional[dict]
     action: Optional[dict]
