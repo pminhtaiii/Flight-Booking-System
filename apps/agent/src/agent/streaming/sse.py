@@ -463,6 +463,14 @@ async def chat_stream(
                     if partial_response.strip():
                         if queue_manager and not await queue_manager.validate_active_fence(session_id):
                             logger.warning(f"Stale fence prior to completed turn persistence for session {session_id}. Aborting.")
+                            await q.put({
+                                "event": "error",
+                                "data": json.dumps({
+                                    "code": "PERSISTENCE_ERROR",
+                                    "message": "The response was generated but could not be saved.",
+                                    "partialMessageId": None
+                                })
+                            })
                             return
                         user_msg_content = await _resolve_user_message(body, graph, config)
                         try:
