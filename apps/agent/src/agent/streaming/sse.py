@@ -151,14 +151,7 @@ async def chat_stream(
         except Exception as e:
             logger.debug(f"Failed to read trusted snapshot from Redis: {e!s}")
 
-        # Persist user message before streaming starts if body.message is provided
         user_msg_persisted = False
-        if body.message:
-            try:
-                await client.create_message_batch(session_id, [{"sender": "USER", "type": "STANDARD", "content": body.message}])
-                user_msg_persisted = True
-            except Exception as e:
-                logger.error(f"Failed to persist user message before streaming: {e!s}")
 
         # 6. Generator-based SSE streaming with bounded queue (maxsize=100)
         q = asyncio.Queue(maxsize=100)

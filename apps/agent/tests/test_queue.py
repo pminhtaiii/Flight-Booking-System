@@ -6,7 +6,7 @@ import time
 from unittest.mock import AsyncMock, MagicMock
 from fastapi import HTTPException
 import httpx
-from agent.queue.message_queue import MessageQueueManager
+from agent.queue.message_queue import ActiveFence, MessageQueueManager
 
 from agent.main import app
 from agent.infrastructure.redis import init_redis, close_redis
@@ -248,7 +248,7 @@ async def test_attached_producer_task_cancelled_on_refresh_loss():
     assert producer_cancelled is True
 
 @pytest.mark.asyncio
-async def test_stale_release_ignored():
+async def test_stale_release_decrements_queue_depth():
     manager = MessageQueueManager(max_depth=3)
     mock_repo = MagicMock()
     mock_repo.acquire_lock = AsyncMock(return_value=1)
@@ -258,23 +258,35 @@ async def test_stale_release_ignored():
     req_id_1 = await manager.acquire("session-stale-1")
     assert manager.depths["session-stale-1"] == 1
 
-    # Simulate successor acquiring the active fence
+    # Simulate successor acquiring the active fence and incrementing depth
     req_id_2 = "req-id-successor"
-    manager.active_fences["session-stale-1"].req_id = req_id_2
+    dummy_task = asyncio.create_task(asyncio.sleep(10))
+    successor_fence = ActiveFence(
+        req_id=req_id_2,
+        fence=2,
+        refresh_task=dummy_task,
+        user_id="default"
+    )
+    manager.active_fences["session-stale-1"] = successor_fence
+    manager.depths["session-stale-1"] = 2
 
-    # Stale release call from old req_id_1
+    # Stale release call from former owner req_id_1
     await manager.release("session-stale-1", req_id_1)
 
-    # Depth must NOT be decremented by stale release
+    # Queue depth must be decremented even for stale release
     assert manager.depths["session-stale-1"] == 1
+
+    # New owner's active fence and lock/refresh task must NOT be released or cancelled
     assert manager.active_fences["session-stale-1"].req_id == req_id_2
+    assert not dummy_task.cancelled()
     mock_repo.release_lock.assert_not_called()
 
-    # Valid release call from req_id_2
+    # Valid release call from new owner req_id_2
+    dummy_task.cancel()
     await manager.release("session-stale-1", req_id_2)
     assert "session-stale-1" not in manager.depths
     assert "session-stale-1" not in manager.active_fences
-    mock_repo.release_lock.assert_called_once()
+    mock_repo.release_lock.assert_called_once_with("default", "session-stale-1", req_id_2, 2)
 
 
 @pytest.mark.asyncio
