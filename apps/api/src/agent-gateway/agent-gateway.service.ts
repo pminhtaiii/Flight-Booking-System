@@ -586,6 +586,72 @@ export class AgentGatewayService {
         );
       }
 
+      // Check for user's latest chat message and perform honest degradation keyword validation
+      let lastMessage = null;
+      if (correlationId || dto.chatSessionId) {
+        lastMessage = await this.prisma.chatMessage.findFirst({
+          where: {
+            sender: 'USER',
+            sessionId: correlationId || dto.chatSessionId,
+          },
+          orderBy: { createdAt: 'desc' },
+        });
+      }
+
+      if (!lastMessage) {
+        lastMessage = await this.prisma.chatMessage.findFirst({
+          where: {
+            sender: 'USER',
+            session: { userId },
+          },
+          orderBy: { createdAt: 'desc' },
+        });
+      }
+
+      if (lastMessage && lastMessage.content) {
+        const matchedKeywords: string[] = [];
+        const content = lastMessage.content;
+
+        for (const kw of CABIN_KEYWORDS) {
+          const regex = new RegExp(`\\b${kw}\\b`, 'i');
+          if (regex.test(content)) {
+            matchedKeywords.push(kw);
+          }
+        }
+
+        for (const kw of PASSENGER_KEYWORDS) {
+          const regex = new RegExp(`\\b${kw}\\b`, 'i');
+          if (regex.test(content)) {
+            matchedKeywords.push(kw);
+          }
+        }
+
+        if (matchedKeywords.length > 0) {
+          this.logger.warn(
+            `Agent gateway keyword trigger matched for user ${userId}. Matched keywords: ${matchedKeywords.join(', ')}`
+          );
+
+          // Write audit log
+          await this.auditService.createLog(null, {
+            userId,
+            action: 'AGENT_KEYWORD_TRIGGER',
+            resourceType: 'agent-gateway',
+            resourceId: lastMessage.id,
+            metadata: {
+              matchedKeywords,
+              messageId: lastMessage.id,
+            },
+            traceId,
+            correlationId: correlationId || dto.chatSessionId,
+          });
+
+          throw new HttpException(
+            'I can currently only search economy class for adult passengers. For other cabin classes or passenger types, please use the search page.',
+            HttpStatus.BAD_REQUEST,
+          );
+        }
+      }
+
       // Call DuffelService
       let rawResponse;
       let createdOffers;

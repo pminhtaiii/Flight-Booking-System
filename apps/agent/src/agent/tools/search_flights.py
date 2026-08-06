@@ -64,6 +64,9 @@ async def search_flights(
     if not results:
         return f"Found 0 flights from {origin} to {destination} on {date}."
 
+    FLIGHTS_CACHE[thread_id] = data
+
+
     # Strip identifiers before sending to LLM and create trusted snapshot
     safe_results = []
     snapshot_results = []
