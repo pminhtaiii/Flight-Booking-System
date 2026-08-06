@@ -58,7 +58,7 @@ async def _persist_response(
         is_valid = await queue_manager.validate_active_fence(session_id)
         if not is_valid:
             logger.warning(f"Stale fence detected for session {session_id}. Aborting persistence.")
-            return {}
+            raise RuntimeError("Session fence is no longer active")
 
     if user_already_persisted:
         payload = [
@@ -119,40 +119,11 @@ async def chat_stream(
     if not access_res.get("allowed"):
         raise HTTPException(status_code=401, detail="User account inactive or token revoked")
 
-    # 3. Rate Limit / Quota check (accepted-only charge) BEFORE session lock / model / persistence
-    try:
-        redis_client = get_redis_client()
-    except Exception:
-        redis_client = None
-
-    if redis_client:
-        from agent.repositories.chat_budget_repository import ChatBudgetRepository, BudgetExceededException, RedisUnavailableException
-        budget_repo = ChatBudgetRepository(redis_client)
-        try:
-            import time
-            burst_window_seconds = getattr(settings, "CHAT_BURST_WINDOW_SECONDS", 60)
-            daily_limit = getattr(settings, "CHAT_DAILY_MESSAGE_LIMIT", getattr(settings, "CHAT_QUOTA_DAILY", 50))
-            burst_limit = getattr(settings, "CHAT_BURST_LIMIT", getattr(settings, "CHAT_QUOTA_BURST", 60))
-            burst_window_id = f"w_{int(time.time()) // burst_window_seconds}"
-            await budget_repo.admit_request(
-                user_id=user_id,
-                burst_window_id=burst_window_id,
-                daily_limit=daily_limit,
-                burst_limit=burst_limit,
-                burst_ttl=burst_window_seconds,
-            )
-        except BudgetExceededException as e:
-            if "daily" in str(e).lower():
-                raise HTTPException(status_code=429, detail="CHAT_DAILY_QUOTA_EXCEEDED") from e
-            raise HTTPException(status_code=429, detail="CHAT_BURST_LIMIT_EXCEEDED") from e
-        except RedisUnavailableException as e:
-            raise HTTPException(status_code=503, detail="CHAT_CONTROL_PLANE_UNAVAILABLE") from e
-
-    # 4. Message length check
+    # 3. Message length check
     if body.message and len(body.message) > settings.MAX_MESSAGE_LENGTH:
         raise HTTPException(status_code=400, detail="Message exceeds maximum length")
 
-    # 5. Guardrails check (input safety & ingress PII detection)
+    # 4. Guardrails check (input safety & ingress PII detection)
     if body.message and detect_pii(body.message):
         guardrails_logger.warning("Ingress PII detected in user message: REDACTED")
         async def pii_error_generator():
@@ -183,6 +154,36 @@ async def chat_stream(
                     })
                 }
             return EventSourceResponse(error_generator())
+
+    # 5. Rate Limit / Quota check (accepted-only charge) BEFORE session lock / model / persistence
+    try:
+        redis_client = get_redis_client()
+        if not redis_client:
+            raise ValueError("Redis client not initialized")
+    except Exception as e:
+        raise HTTPException(status_code=503, detail="CHAT_CONTROL_PLANE_UNAVAILABLE") from e
+
+    from agent.repositories.chat_budget_repository import ChatBudgetRepository, BudgetExceededException, RedisUnavailableException
+    budget_repo = ChatBudgetRepository(redis_client)
+    try:
+        import time
+        burst_window_seconds = getattr(settings, "CHAT_BURST_WINDOW_SECONDS", 60)
+        daily_limit = getattr(settings, "CHAT_DAILY_MESSAGE_LIMIT", getattr(settings, "CHAT_QUOTA_DAILY", 50))
+        burst_limit = getattr(settings, "CHAT_BURST_LIMIT", getattr(settings, "CHAT_QUOTA_BURST", 60))
+        burst_window_id = f"w_{int(time.time()) // burst_window_seconds}"
+        await budget_repo.admit_request(
+            user_id=user_id,
+            burst_window_id=burst_window_id,
+            daily_limit=daily_limit,
+            burst_limit=burst_limit,
+            burst_ttl=burst_window_seconds,
+        )
+    except BudgetExceededException as e:
+        if "daily" in str(e).lower():
+            raise HTTPException(status_code=429, detail="CHAT_DAILY_QUOTA_EXCEEDED") from e
+        raise HTTPException(status_code=429, detail="CHAT_BURST_LIMIT_EXCEEDED") from e
+    except RedisUnavailableException as e:
+        raise HTTPException(status_code=503, detail="CHAT_CONTROL_PLANE_UNAVAILABLE") from e
 
     # 6. Session auto-creation & queue locking
     session_id = body.sessionId
