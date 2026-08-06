@@ -10,6 +10,7 @@ from agent.tools.nestjs_client import NestJSClient
 @pytest.fixture
 def mock_nestjs_client():
     client = MagicMock(spec=NestJSClient)
+    client.check_user_access = AsyncMock(return_value={"allowed": True})
     client.get_gateway_flights_search = AsyncMock()
     client.get_gateway_user_preferences = AsyncMock()
     client.get_gateway_user_bookings = AsyncMock()
