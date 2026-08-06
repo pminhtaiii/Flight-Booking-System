@@ -580,6 +580,17 @@ async def chat_stream(
                         persisted = True
                     except Exception as e:  # noqa: BLE001
                         logger.error(f"Failed to persist partial response on connection drop: {e!s}")
+                        try:
+                            q.put_nowait({
+                                "event": "error",
+                                "data": json.dumps({
+                                    "code": "PERSISTENCE_ERROR",
+                                    "message": "The response was generated but could not be saved.",
+                                    "partialMessageId": None
+                                })
+                            })
+                        except asyncio.QueueFull:
+                            pass
                 raise
             except Exception as e:  # noqa: BLE001
                 logger.exception("LLM error during streaming")
