@@ -245,6 +245,7 @@ async def chat_stream(
             pipeline = OutputGuardrailPipeline(config=output_config, nemo_service=guardrails, session_id=session_id)
             partial_response = ""
             persisted = False
+            force_persistence = False
             config = {
                 "configurable": {
                     "thread_id": session_id,
@@ -320,7 +321,8 @@ async def chat_stream(
                                 "event": "ACTION_REQUIRED",
                                 "data": json.dumps(payload)
                             })
-                            return
+                            force_persistence = True
+                            continue
 
                         # Never stream raw readiness tool input
                         if tool_name == "check_booking_readiness":
@@ -479,7 +481,7 @@ async def chat_stream(
                     })
 
                 # Completed turn - Persist message batch and send done event
-                if partial_response.strip():
+                if partial_response.strip() or force_persistence:
                     if queue_manager and not await queue_manager.validate_active_fence(session_id):
                         logger.warning(f"Stale fence prior to completed turn persistence for session {session_id}. Aborting.")
                         await q.put({
