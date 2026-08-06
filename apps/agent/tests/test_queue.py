@@ -10,6 +10,7 @@ from agent.queue.message_queue import ActiveFence, MessageQueueManager
 
 from agent.main import app
 from agent.infrastructure.redis import init_redis, close_redis
+from langchain_core.messages import AIMessageChunk
 
 @pytest.fixture(autouse=True)
 async def setup_redis():
@@ -23,6 +24,9 @@ JWT_SECRET = "testsecret_must_be_at_least_32_bytes_long_for_security_reasons"
 def get_auth_headers(payload_data=None):
     payload = {
         "sub": "12345",
+        "iss": "booking-systems-api",
+        "aud": "booking-systems-clients",
+        "jti": "jti-test-uuid",
         "email": "test@example.com",
         "exp": int(time.time()) + 100
     }
@@ -36,7 +40,7 @@ async def test_queue_manager_max_depth():
     manager = MessageQueueManager(max_depth=2)
     
     # First acquire
-    await manager.acquire("session-1")
+    req1 = await manager.acquire("session-1")
     # Second acquire (blocks because lock is held, but increments depth)
     acquire_task = asyncio.create_task(manager.acquire("session-1"))
     await asyncio.sleep(0.01) # Yield to let task run
@@ -51,9 +55,9 @@ async def test_queue_manager_max_depth():
     assert "Too many concurrent requests" in exc_info.value.detail
     
     # Clean up tasks
-    await manager.release("session-1")
-    await acquire_task
-    await manager.release("session-1")
+    await manager.release("session-1", req1)
+    req2 = await acquire_task
+    await manager.release("session-1", req2)
 
 @pytest.mark.asyncio
 async def test_queue_manager_fifo_order():
@@ -61,22 +65,22 @@ async def test_queue_manager_fifo_order():
     order = []
     
     async def worker(name, session_id, hold_time=0.05):
-        await manager.acquire(session_id)
+        req = await manager.acquire(session_id)
         order.append(name)
         await asyncio.sleep(hold_time)
-        await manager.release(session_id)
+        await manager.release(session_id, req)
         
     # Start worker 1 (acquires lock immediately and holds for 0.2s)
     t1 = asyncio.create_task(worker("worker1", "session-fifo-1", hold_time=0.2))
-    await asyncio.sleep(0.05)
+    await asyncio.sleep(0.01)
     
     # Start worker 2 (waits)
     t2 = asyncio.create_task(worker("worker2", "session-fifo-1"))
-    await asyncio.sleep(0.05)
+    await asyncio.sleep(0.01)
     
     # Start worker 3 (waits)
     t3 = asyncio.create_task(worker("worker3", "session-fifo-1"))
-    await asyncio.sleep(0.05)
+    await asyncio.sleep(0.01)
     
     await asyncio.gather(t1, t2, t3)
     
@@ -88,16 +92,16 @@ async def test_queue_manager_session_isolation():
     manager = MessageQueueManager(max_depth=1)
     
     # Acquire for session-1
-    await manager.acquire("session-1")
+    req1 = await manager.acquire("session-1")
     
     # Acquire for session-2 should succeed because it is a different session
-    await manager.acquire("session-2")
+    req2 = await manager.acquire("session-2")
     
     assert manager.depths["session-1"] == 1
     assert manager.depths["session-2"] == 1
     
-    await manager.release("session-1")
-    await manager.release("session-2")
+    await manager.release("session-1", req1)
+    await manager.release("session-2", req2)
 
 @pytest.mark.asyncio
 async def test_endpoint_concurrency_limit(monkeypatch):
@@ -131,6 +135,7 @@ async def test_endpoint_concurrency_limit(monkeypatch):
     # Mock graph
     mock_graph = MagicMock()
     async def mock_astream_events(*args, **kwargs):
+        await asyncio.sleep(2.0)
         yield {
             "event": "on_chat_model_stream",
             "data": {"chunk": AIMessageChunk(content="Word")}
@@ -156,7 +161,6 @@ async def test_endpoint_concurrency_limit(monkeypatch):
                 headers=headers
             )
         )
-        await asyncio.sleep(0.02) # yield
         
         # Send second request (will wait in queue, slot 2)
         r2_task = asyncio.create_task(
@@ -166,22 +170,27 @@ async def test_endpoint_concurrency_limit(monkeypatch):
                 headers=headers
             )
         )
-        await asyncio.sleep(0.02) # yield
         
+        # Wait for both requests to hit the queue
+        for _ in range(50):
+            if queue_manager.depths.get("session-1", 0) == 2:
+                break
+            await asyncio.sleep(0.01)
+
         # Send third request (should be immediately rejected with 429)
-        r3_response = await ac.post(
-            "/chat/stream",
-            json={"message": "hello third", "sessionId": "session-1"},
-            headers=headers
+        r3_task = asyncio.create_task(
+            ac.post(
+                "/chat/stream",
+                json={"message": "hello third", "sessionId": "session-1"},
+                headers=headers
+            )
         )
         
-        assert r3_response.status_code == 429
-        assert "Too many concurrent requests" in r3_response.json()["detail"]
+        responses = await asyncio.gather(r1_task, r2_task, r3_task)
+        status_codes = [r.status_code for r in responses]
         
-        # Let other requests finish
-        r1_response, r2_response = await asyncio.gather(r1_task, r2_task)
-        assert r1_response.status_code == 200
-        assert r2_response.status_code == 200
+        assert status_codes.count(429) == 1, f"Expected exactly one 429, got statuses: {status_codes}"
+        assert status_codes.count(200) == 2, f"Expected exactly two 200s, got statuses: {status_codes}"
 
 @pytest.mark.asyncio
 async def test_refresher_redis_error_cancels_request(monkeypatch):

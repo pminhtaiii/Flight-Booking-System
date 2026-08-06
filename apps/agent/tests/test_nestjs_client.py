@@ -33,7 +33,7 @@ def test_set_fencing_token():
 async def test_create_session():
     client = NestJSClient(base_url="http://localhost:3001/api", token="test-token")
 
-    req = httpx.Request("POST", "http://localhost:3001/api/chat/sessions")
+    req = httpx.Request("POST", "http://localhost:3001/api/agent-gateway/chat/sessions")
     mock_response = httpx.Response(201, json={"id": "session-123", "title": "New Session"}, request=req)
 
     with patch("httpx.AsyncClient.post", new_callable=AsyncMock) as mock_post:
@@ -42,16 +42,17 @@ async def test_create_session():
         result = await client.create_session(title="New Session")
 
         assert result == {"id": "session-123", "title": "New Session"}
-        mock_post.assert_called_once_with(
-            "http://localhost:3001/api/chat/sessions",
-            json={"title": "New Session"},
-            headers={"Authorization": "Bearer test-token"}
-        )
+        mock_post.assert_called_once()
+        args, kwargs = mock_post.call_args
+        assert args[0] == "http://localhost:3001/api/agent-gateway/chat/sessions"
+        assert kwargs["json"] == {"title": "New Session"}
+        assert "X-Agent-API-Key" in kwargs["headers"]
+        assert "X-User-Claim" in kwargs["headers"]
 
 @pytest.mark.asyncio
 async def test_create_message():
     client = NestJSClient(base_url="http://localhost:3001/api", token="test-token")
-    req = httpx.Request("POST", "http://localhost:3001/api/chat/sessions/session-123/messages")
+    req = httpx.Request("POST", "http://localhost:3001/api/agent-gateway/chat/sessions/session-123/messages")
     mock_response = httpx.Response(201, json={"id": "msg-123", "content": "hello"}, request=req)
 
     with patch("httpx.AsyncClient.post", new_callable=AsyncMock) as mock_post:
@@ -65,17 +66,18 @@ async def test_create_message():
         )
 
         assert result == {"id": "msg-123", "content": "hello"}
-        mock_post.assert_called_once_with(
-            "http://localhost:3001/api/chat/sessions/session-123/messages",
-            json={"sender": "USER", "type": "STANDARD", "content": "hello"},
-            headers={"Authorization": "Bearer test-token"}
-        )
+        mock_post.assert_called_once()
+        args, kwargs = mock_post.call_args
+        assert args[0] == "http://localhost:3001/api/agent-gateway/chat/sessions/session-123/messages"
+        assert kwargs["json"] == {"sender": "USER", "type": "STANDARD", "content": "hello"}
+        assert "X-Agent-API-Key" in kwargs["headers"]
+        assert "X-User-Claim" in kwargs["headers"]
 
 @pytest.mark.asyncio
 async def test_create_message_batch():
     client = NestJSClient(base_url="http://localhost:3001/api", token="test-token")
-    req = httpx.Request("POST", "http://localhost:3001/api/chat/sessions/session-123/messages/batch")
-    mock_response = httpx.Response(201, json={"messages": [{"id": "msg-123"}]}, request=req)
+    req = httpx.Request("POST", "http://localhost:3001/api/agent-gateway/chat/sessions/session-123/turns")
+    mock_response = httpx.Response(201, json={"id": "msg-123"}, request=req)
 
     messages = [
         {"sender": "USER", "type": "STANDARD", "content": "hello"},
@@ -90,17 +92,19 @@ async def test_create_message_batch():
             messages=messages
         )
 
-        assert result == {"messages": [{"id": "msg-123"}]}
-        mock_post.assert_called_once_with(
-            "http://localhost:3001/api/chat/sessions/session-123/messages/batch",
-            json={"messages": messages},
-            headers={"Authorization": "Bearer test-token"}
-        )
+        assert result == {"messages": [{"id": "msg-123"}, {"id": "msg-123"}]}
+        assert mock_post.call_count == 2
+        args, kwargs = mock_post.call_args
+        assert args[0] == "http://localhost:3001/api/agent-gateway/chat/sessions/session-123/turns"
+        assert "content" in kwargs["json"]
+        assert "sender" in kwargs["json"]
+        assert "X-Agent-API-Key" in kwargs["headers"]
+        assert "X-User-Claim" in kwargs["headers"]
 
 @pytest.mark.asyncio
 async def test_get_memory():
     client = NestJSClient(base_url="http://localhost:3001/api", token="test-token")
-    req = httpx.Request("GET", "http://localhost:3001/api/chat/sessions/session-123/memory")
+    req = httpx.Request("GET", "http://localhost:3001/api/agent-gateway/chat/sessions/session-123/memory")
     mock_response = httpx.Response(200, json={"summary": None, "recentMessages": []}, request=req)
 
     with patch("httpx.AsyncClient.get", new_callable=AsyncMock) as mock_get:
@@ -109,16 +113,17 @@ async def test_get_memory():
         result = await client.get_memory(session_id="session-123", recent_count=20)
 
         assert result == {"summary": None, "recentMessages": []}
-        mock_get.assert_called_once_with(
-            "http://localhost:3001/api/chat/sessions/session-123/memory",
-            params={"recentCount": 20},
-            headers={"Authorization": "Bearer test-token"}
-        )
+        mock_get.assert_called_once()
+        args, kwargs = mock_get.call_args
+        assert args[0] == "http://localhost:3001/api/agent-gateway/chat/sessions/session-123/memory"
+        assert kwargs["params"] == {"recentCount": 20}
+        assert "X-Agent-API-Key" in kwargs["headers"]
+        assert "X-User-Claim" in kwargs["headers"]
 
 @pytest.mark.asyncio
 async def test_get_memory_unsummarized_only():
     client = NestJSClient(base_url="http://localhost:3001/api", token="test-token")
-    req = httpx.Request("GET", "http://localhost:3001/api/chat/sessions/session-123/memory")
+    req = httpx.Request("GET", "http://localhost:3001/api/agent-gateway/chat/sessions/session-123/memory")
     mock_response = httpx.Response(200, json={"summary": None, "recentMessages": []}, request=req)
 
     with patch("httpx.AsyncClient.get", new_callable=AsyncMock) as mock_get:
@@ -127,11 +132,12 @@ async def test_get_memory_unsummarized_only():
         result = await client.get_memory(session_id="session-123", recent_count=20, unsummarized_only=True)
 
         assert result == {"summary": None, "recentMessages": []}
-        mock_get.assert_called_once_with(
-            "http://localhost:3001/api/chat/sessions/session-123/memory",
-            params={"recentCount": 20, "unsummarizedOnly": "true"},
-            headers={"Authorization": "Bearer test-token"}
-        )
+        mock_get.assert_called_once()
+        args, kwargs = mock_get.call_args
+        assert args[0] == "http://localhost:3001/api/agent-gateway/chat/sessions/session-123/memory"
+        assert kwargs["params"] == {"recentCount": 20, "unsummarizedOnly": "true"}
+        assert "X-Agent-API-Key" in kwargs["headers"]
+        assert "X-User-Claim" in kwargs["headers"]
 
 
 @pytest.mark.asyncio

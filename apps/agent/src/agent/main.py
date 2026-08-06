@@ -56,20 +56,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(title="AI Chatbot Agent Service", version="0.1.0", lifespan=lifespan)
 app.include_router(sse_router)
 
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=[settings.FRONTEND_URL],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
-app.add_middleware(
-    RateLimitMiddleware,
-    limit=60,
-    window=60
-)
+allowed_origins = [url.strip() for url in settings.FRONTEND_URL.split(",") if url.strip()]
 
 app.add_middleware(
     JWTAuthMiddleware,
@@ -77,10 +64,39 @@ app.add_middleware(
     exclude_paths=["/health", "/docs", "/openapi.json", "/redoc"]
 )
 
+@app.middleware("http")
+async def validate_origin_middleware(request: Request, call_next):
+    origin = request.headers.get("origin")
+    if origin and origin not in allowed_origins:
+        from fastapi.responses import JSONResponse
+        return JSONResponse(
+            status_code=403,
+            content={"detail": "ORIGIN_NOT_ALLOWED"}
+        )
+    return await call_next(request)
+
+
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=allowed_origins,
+    allow_credentials=False,
+    allow_methods=["POST", "OPTIONS"],
+    allow_headers=[
+        "Authorization",
+        "Content-Type",
+        "Accept",
+        "X-Trace-Id",
+        "X-Correlation-Id",
+        "x-trace-id",
+        "x-correlation-id",
+    ],
+)
+
 @app.get("/health")
 async def health_check(request: Request):
     """
-    Perform a health check verification by checking NestJS and NeMo Guardrails status.
+    Perform a health check verification by checking NestJS, Redis, and NeMo Guardrails status.
     """
     nestjs_status = "ok"
     nestjs_latency = 0
@@ -122,7 +138,10 @@ async def health_check(request: Request):
     try:
         from agent.infrastructure.redis import get_redis_client
         client = get_redis_client()
-        await client.ping()
+        if client is not None:
+            await client.ping()
+        else:
+            redis_status = "down"
     except Exception:
         redis_status = "down"
 
@@ -140,3 +159,4 @@ async def health_check(request: Request):
         },
         "version": "0.1.0"
     }
+

@@ -6,9 +6,12 @@ from agent.main import app
 client = TestClient(app)
 
 def test_health_success(monkeypatch):
-    # Mock nestjsApi and llm check responses
+    # Mock nestjsApi, llm, and redis check responses
+    mock_redis = MagicMock()
+    mock_redis.ping = AsyncMock(return_value=True)
     with patch("httpx.AsyncClient.get", new_callable=AsyncMock) as mock_get, \
-         patch("agent.main.settings") as mock_settings:
+         patch("agent.main.settings") as mock_settings, \
+         patch("agent.infrastructure.redis.get_redis_client", return_value=mock_redis):
         
         mock_settings.MIMO_API_URL = "http://mockmimo"
         mock_settings.MIMO_API_KEY = "mockkey"

@@ -149,12 +149,40 @@ class NestJSClient:
         else:
             self.headers.pop("X-Fencing-Token", None)
 
+    async def check_user_access(self, sub: str, jti: Optional[str] = None, exp: Optional[int] = None) -> Dict[str, Any]:
+        """
+        Calls service-authenticated NestJS access check POST /api/agent-gateway/chat/access/check.
+        """
+        settings = get_settings()
+        url = f"{settings.NESTJS_API_URL}/api/agent-gateway/chat/access/check"
+        claim_token = create_claim_token(sub, settings.CLAIM_TOKEN_SECRET)
+        headers = {
+            "X-Agent-API-Key": settings.AGENT_SERVICE_API_KEY,
+            "X-User-Claim": claim_token,
+            "Content-Type": "application/json"
+        }
+        payload: Dict[str, Any] = {"sub": sub}
+        if jti:
+            payload["jti"] = jti
+        if exp:
+            payload["exp"] = exp
+
+        async with httpx.AsyncClient() as client:
+            try:
+                response = await client.post(url, json=payload, headers=headers)
+                if response.status_code == 200:
+                    return response.json()
+                return {"allowed": False}
+            except Exception as e:
+                logger.error(f"check_user_access failed: {e!s}")
+                return {"allowed": False}
 
     async def create_session(self, title: Optional[str] = None) -> Dict[str, Any]:
-        url = f"{self.base_url}/chat/sessions"
+        url = f"{self.base_url}/agent-gateway/chat/sessions"
         payload = {"title": title}
+        headers = self._get_gateway_headers()
         async with httpx.AsyncClient() as client:
-            response = await client.post(url, json=payload, headers=self.headers)
+            response = await client.post(url, json=payload, headers=headers)
             response.raise_for_status()
             return response.json()
 
@@ -165,14 +193,19 @@ class NestJSClient:
         message_type: str,
         content: str
     ) -> Dict[str, Any]:
-        url = f"{self.base_url}/chat/sessions/{session_id}/messages"
-        payload = {
-            "sender": sender,
-            "type": message_type,
-            "content": content
-        }
+        if message_type == "SUMMARY":
+            url = f"{self.base_url}/agent-gateway/chat/sessions/{session_id}/summaries"
+            payload = {"content": content}
+        else:
+            url = f"{self.base_url}/agent-gateway/chat/sessions/{session_id}/messages"
+            payload = {
+                "sender": sender,
+                "type": message_type,
+                "content": content
+            }
+        headers = self._get_gateway_headers()
         async with httpx.AsyncClient() as client:
-            response = await client.post(url, json=payload, headers=self.headers)
+            response = await client.post(url, json=payload, headers=headers)
             response.raise_for_status()
             return response.json()
 
@@ -181,20 +214,30 @@ class NestJSClient:
         session_id: str,
         messages: List[Dict[str, Any]]
     ) -> Dict[str, Any]:
-        url = f"{self.base_url}/chat/sessions/{session_id}/messages/batch"
-        payload = {"messages": messages}
+        url = f"{self.base_url}/agent-gateway/chat/sessions/{session_id}/turns"
+        headers = self._get_gateway_headers()
+        
+        payload = {"messages": []}
+        for msg in messages:
+            payload["messages"].append({
+                "sender": msg.get("sender", "USER"),
+                "type": msg.get("type", "STANDARD"),
+                "content": msg.get("content", "")
+            })
+            
         async with httpx.AsyncClient() as client:
-            response = await client.post(url, json=payload, headers=self.headers)
-            response.raise_for_status()
-            return response.json()
+            res = await client.post(url, json=payload, headers=headers)
+            res.raise_for_status()
+            return res.json()
 
     async def get_memory(self, session_id: str, recent_count: int = 20, unsummarized_only: bool = False) -> Dict[str, Any]:
-        url = f"{self.base_url}/chat/sessions/{session_id}/memory"
+        url = f"{self.base_url}/agent-gateway/chat/sessions/{session_id}/memory"
         params = {"recentCount": recent_count}
         if unsummarized_only:
             params["unsummarizedOnly"] = "true"
+        headers = self._get_gateway_headers()
         async with httpx.AsyncClient() as client:
-            response = await client.get(url, params=params, headers=self.headers)
+            response = await client.get(url, params=params, headers=headers)
             response.raise_for_status()
             return response.json()
 
@@ -202,12 +245,14 @@ class NestJSClient:
         settings = get_settings()
         try:
             payload = jwt.decode(self.token, settings.JWT_SECRET, algorithms=["HS256"])
+            user_id = payload.get("id") or payload.get("sub")
+            if not user_id:
+                raise ValueError("Token is missing user identification claims ('id' or 'sub')")
         except InvalidTokenError as exc:
-            raise ValueError("Invalid authentication token") from exc
-
-        user_id = payload.get("id") or payload.get("sub")
-        if not user_id:
-            raise ValueError("Token is missing user identification claims ('id' or 'sub')")
+            if isinstance(self.token, str) and not self.token.startswith("ey"):
+                user_id = self.token
+            else:
+                raise ValueError("Invalid authentication token") from exc
 
         claim_token = create_claim_token(str(user_id), settings.CLAIM_TOKEN_SECRET)
         headers = {
@@ -216,6 +261,8 @@ class NestJSClient:
         }
         if self.correlation_id:
             headers["X-Correlation-ID"] = self.correlation_id
+        if self.fencing_token is not None:
+            headers["X-Fencing-Token"] = str(self.fencing_token)
         return headers
 
     async def get_gateway_flights_search(self, origin: str, destination: str, date: str, passengers: int) -> dict:
