@@ -208,10 +208,15 @@ export class AuthService {
     ipAddress?: string | null,
     traceId?: string | null,
     correlationId?: string | null,
+    jti?: string | null,
   ) {
     if (token) {
       // Blacklist token in CacheService for 24 hours
       await this.cacheService.set(`blacklist:${token}`, 'true', 86400);
+    }
+    if (jti) {
+      // Blacklist JTI in CacheService for 24 hours
+      await this.cacheService.set(`blacklist:jti:${jti}`, 'true', 86400);
     }
 
     await this.auditService.createLog(null, {
@@ -224,6 +229,32 @@ export class AuthService {
       correlationId,
       metadata: {},
     });
+  }
+
+  async validateUserAccess(userId: string, jti?: string | null, token?: string | null): Promise<{ allowed: boolean; userId: string }> {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+    });
+
+    if (!user || user.status !== 'ACTIVE') {
+      throw new UnauthorizedException('User is inactive or not found');
+    }
+
+    if (jti) {
+      const isJtiBlacklisted = await this.cacheService.get(`blacklist:jti:${jti}`);
+      if (isJtiBlacklisted) {
+        throw new UnauthorizedException('Token JTI has been revoked');
+      }
+    }
+
+    if (token) {
+      const isTokenBlacklisted = await this.cacheService.get(`blacklist:${token}`);
+      if (isTokenBlacklisted) {
+        throw new UnauthorizedException('Token has been revoked');
+      }
+    }
+
+    return { allowed: true, userId: user.id };
   }
 
   async resetDatabaseForTesting() {

@@ -12,6 +12,7 @@ import { PassengerType } from '@prisma/client';
 import { HttpException, NotFoundException } from '@nestjs/common';
 
 import { ConfigService } from '@nestjs/config';
+import { ChatService } from '@/chat/chat.service';
 
 describe('AgentGatewayService', () => {
   let service: AgentGatewayService;
@@ -39,6 +40,7 @@ describe('AgentGatewayService', () => {
         { provide: BookingReadinessService, useValue: bookingReadinessService },
         { provide: BookingReadinessObservability, useValue: observability },
         { provide: ConfigService, useValue: { get: jest.fn().mockReturnValue('false') } },
+        { provide: ChatService, useValue: {} },
       ],
     }).compile();
 

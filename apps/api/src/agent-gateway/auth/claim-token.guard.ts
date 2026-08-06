@@ -7,6 +7,9 @@ export class ClaimTokenGuard implements CanActivate {
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context.switchToHttp().getRequest();
+    if (request.path && request.path.includes('/chat/access/check')) {
+      return true;
+    }
     const token = request.headers['x-user-claim'];
 
     if (!token || typeof token !== 'string') {
