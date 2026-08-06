@@ -31,7 +31,14 @@ Update this file after every completed feature. Any AI agent reading this should
   - [x] Resolved stale owner queue depth leak in Python agent MessageQueueManager.release.
   - [x] Resolved failed acquisition double-decrement depth bug in Python agent sse.py and MessageQueueManager.release.
   - **22/22 Redis regression tests PASS; 159 Python Agent tests PASS; 6/6 E2E migration tests PASS; NestJS backend build compiles cleanly.**
-- [ ] Phase 3 / US1: Secure, Budgeted Conversation (T025–T038)
+- [x] Phase 3 / US1: Secure, Budgeted Conversation (T025–T038):
+  - [x] WP 3A: Canonical auth/access ordering — real token, revocation, deactivation, and pre-cost denial tests pass (T025, T032)
+  - [x] WP 3B: Atomic admission integration — two-instance accepted-only charge tests pass (T026, T030)
+  - [x] WP 3C: Fenced turn ownership — session lock repository, fence revalidation, refresh-loss cancellation pass (T027, T031)
+  - [x] WP 3D: Encrypted service-auth persistence — record-bound AES-256-GCM dual-write/read, soft-delete, service auth endpoints pass (T028, T033, T034)
+  - [x] WP 3E: Direct-server readiness — strict CORS, direct bearer streaming, health degradation pass (T029, T035, T036)
+  - [x] WP 3F: Session continuity checkpoint — ChatWidget sessionId reuse and full US1 regression suite GREEN (T037, T038)
+  - **All Phase 3 US1 focused test suites (31 Python pytest, 20 NestJS unit/gateway E2E) 100% PASS.**
 - [ ] Phase 4 / US2: Correct Specialist Routing (T039–T052)
 - [ ] Phase 5 / US3: Privacy-Minimized Booking Answers (T053–T063)
 - [ ] Phase 6 / US4: Deterministic Checkout Handoff (T064–T084)
@@ -236,6 +243,7 @@ Update this file after every completed feature. Any AI agent reading this should
 - Refactored `PrismaService` to remove the query interceptor facade. This ensures it behaves as a genuine client and reports health status truthfully based on real database availability.
 - Implemented clean Jest spies and mock lifecycles directly in `test/health.e2e-spec.ts` to manage database connectivity states in local environments where PostgreSQL and Redis are unavailable.
 - Added client warming to E2E setup in `health.e2e-spec.ts` to bypass Express/NestJS router bootstrap cold-start latencies.
+- Chatbot backend infrastructure uses AES-256-GCM dual-write/read for encrypted persistence, soft deletion for preserving relational structure without PII, and X-Fencing-Token alongside X-Service-Auth to protect write operations and backend-to-backend communication.
 
 ---
 

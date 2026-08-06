@@ -27,11 +27,13 @@ function mintClaimToken(userId: string, iat: number, secret = claimSecret): stri
   return `${base64UrlPayload}.${base64UrlSignature}`;
 }
 
+const chatEncryptionKey = crypto.randomBytes(32).toString('hex');
+
 process.env.AGENT_SERVICE_API_KEY = apiKey;
 process.env.CLAIM_TOKEN_SECRET = claimSecret;
 process.env.CLAIM_TOKEN_TTL_SECONDS = '300';
 process.env.FEATURE_FLAG_WRITE_FENCE = 'true';
-process.env.CHAT_ENCRYPTION_KEY = '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef';
+process.env.CHAT_ENCRYPTION_KEY = chatEncryptionKey;
 
 describe('Agent Chat Gateway (E2E)', () => {
   jest.setTimeout(30000);
@@ -45,7 +47,7 @@ describe('Agent Chat Gateway (E2E)', () => {
     process.env.CLAIM_TOKEN_SECRET = claimSecret;
     process.env.CLAIM_TOKEN_TTL_SECONDS = '300';
     process.env.FEATURE_FLAG_WRITE_FENCE = 'true';
-    process.env.CHAT_ENCRYPTION_KEY = '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef';
+    process.env.CHAT_ENCRYPTION_KEY = chatEncryptionKey;
 
     const moduleFixture: TestingModule = await Test.createTestingModule({
       imports: [AppModule],
@@ -78,7 +80,7 @@ describe('Agent Chat Gateway (E2E)', () => {
     process.env.CLAIM_TOKEN_SECRET = claimSecret;
     process.env.CLAIM_TOKEN_TTL_SECONDS = '300';
     process.env.FEATURE_FLAG_WRITE_FENCE = 'true';
-    process.env.CHAT_ENCRYPTION_KEY = '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef';
+    process.env.CHAT_ENCRYPTION_KEY = chatEncryptionKey;
 
     await prisma.chatMessage.deleteMany({});
     await prisma.chatSession.deleteMany({});

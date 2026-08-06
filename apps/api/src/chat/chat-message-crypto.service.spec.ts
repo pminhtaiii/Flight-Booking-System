@@ -1,12 +1,13 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { ConfigService } from '@nestjs/config';
 import { ChatMessageCryptoService } from './chat-message-crypto.service';
+import * as crypto from 'crypto';
 
 describe('ChatMessageCryptoService', () => {
   let service: ChatMessageCryptoService;
   let configService: ConfigService;
 
-  const TEST_KEY_HEX = '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef';
+  const TEST_KEY_HEX = crypto.randomBytes(32).toString('hex');
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
