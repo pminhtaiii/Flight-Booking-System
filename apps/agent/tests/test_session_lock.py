@@ -57,24 +57,23 @@ async def test_message_queue_bounded_wait_and_refresh_cancellation():
     manager.repo = SessionLockRepository(prefix="test:lock:queue:")
 
     # Acquire first lock
-    await manager.acquire("s3", "u1")
+    req1 = await manager.acquire("s3_bounded", "u1")
 
     # Queue second request
     start = time.time()
     
     # We will let the second request wait. It should block.
-    # To avoid waiting 30s, we mock the lock repo for the first request or just release it.
     async def worker():
         await asyncio.sleep(1.0)
-        await manager.release("s3")
+        await manager.release("s3_bounded", req1)
 
     asyncio.create_task(worker())
     
-    await manager.acquire("s3", "u1") # This should take ~1 second
+    req2 = await manager.acquire("s3_bounded", "u1") # This should take ~1 second
     elapsed = time.time() - start
     assert 0.9 < elapsed < 1.5
 
-    await manager.release("s3")
+    await manager.release("s3_bounded", req2)
 
 @pytest.mark.asyncio
 async def test_message_queue_refresh_loss_cancellation():

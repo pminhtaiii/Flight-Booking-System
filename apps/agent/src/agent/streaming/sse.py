@@ -15,6 +15,7 @@ from agent.guardrails.output_pipeline import OutputGuardrailPipeline, OutputGuar
 import jwt
 from agent.repositories.trusted_snapshot_repository import TrustedSnapshotRepository
 from agent.infrastructure.redis import get_redis_client
+from agent.sanitization.pii_scrubber import detect_pii
 
 logger = logging.getLogger("agent.streaming")
 guardrails_logger = logging.getLogger("agent.guardrails")
@@ -39,11 +40,26 @@ async def _resolve_user_message(body, graph, config) -> str:
         logger.warning(f"Failed to retrieve user message from graph state: {e!s}")
     return "Action confirmed"
 
-async def _persist_response(client, session_id: str, user_msg: str, response_text: str, user_already_persisted: bool = False, use_shield: bool = False):
+async def _persist_response(
+    client,
+    session_id: str,
+    user_msg: str,
+    response_text: str,
+    user_already_persisted: bool = False,
+    use_shield: bool = False,
+    queue_manager=None,
+):
     """
     Persists the user and agent messages as a batch.
+    Revalidates active fence if queue_manager is provided before performing persistence.
     Returns the batch result dictionary.
     """
+    if queue_manager:
+        is_valid = await queue_manager.validate_active_fence(session_id)
+        if not is_valid:
+            logger.warning(f"Stale fence detected for session {session_id}. Aborting persistence.")
+            return {}
+
     if user_already_persisted:
         payload = [
             {"sender": "AGENT", "type": "STANDARD", "content": response_text}
@@ -61,7 +77,9 @@ async def _persist_response(client, session_id: str, user_msg: str, response_tex
 async def chat_stream(
     request: Request,
     body: ChatStreamRequest,
-    authorization: str = Header(None)
+    authorization: str = Header(None),
+    x_trace_id: str = Header(None, alias="X-Trace-Id"),
+    x_correlation_id: str = Header(None, alias="X-Correlation-Id")
 ):
     """
     Handle POST /chat/stream requests, performing validation, checking guardrails,
@@ -69,18 +87,85 @@ async def chat_stream(
     """
     settings = get_settings()
 
-    # 1. Authorization validation first (security check)
+    # 1. Authorization validation first (canonical JWT profile: sub, iss, aud, jti)
     if not authorization or not authorization.startswith("Bearer "):
         raise HTTPException(status_code=401, detail="Invalid authorization header")
     token = authorization.split(" ", 1)[1]
 
-    client = NestJSClient(base_url=settings.NESTJS_API_URL, token=token)
+    try:
+        issuer = getattr(settings, "JWT_ISSUER", "booking-systems-api")
+        audience = getattr(settings, "JWT_AUDIENCE", "booking-systems-clients")
+        payload = jwt.decode(
+            token,
+            settings.JWT_SECRET,
+            algorithms=["HS256"],
+            issuer=issuer,
+            audience=audience,
+            options={"verify_iss": True, "verify_aud": True},
+        )
+        user_id = str(payload.get("sub") or payload.get("id") or "")
+        jti = payload.get("jti")
+        if not user_id or not jti:
+            raise HTTPException(status_code=401, detail="Invalid token: missing sub or jti claim")
+    except Exception as err:
+        raise HTTPException(status_code=401, detail="Invalid token") from err
 
-    # 2. Message length check
+    client = NestJSClient(base_url=settings.NESTJS_API_URL, token=token)
+    if x_trace_id:
+        client.trace_id = x_trace_id
+
+    # 2. NestJS access check (active user & revocation check) BEFORE quota or session lock
+    access_res = await client.check_user_access(sub=user_id, jti=jti)
+    if not access_res.get("allowed"):
+        raise HTTPException(status_code=401, detail="User account inactive or token revoked")
+
+    # 3. Rate Limit / Quota check (accepted-only charge) BEFORE session lock / model / persistence
+    try:
+        redis_client = get_redis_client()
+    except Exception:
+        redis_client = None
+
+    if redis_client:
+        from agent.repositories.chat_budget_repository import ChatBudgetRepository, BudgetExceededException, RedisUnavailableException
+        budget_repo = ChatBudgetRepository(redis_client)
+        try:
+            import time
+            burst_window_seconds = getattr(settings, "CHAT_BURST_WINDOW_SECONDS", 60)
+            daily_limit = getattr(settings, "CHAT_DAILY_MESSAGE_LIMIT", getattr(settings, "CHAT_QUOTA_DAILY", 50))
+            burst_limit = getattr(settings, "CHAT_BURST_LIMIT", getattr(settings, "CHAT_QUOTA_BURST", 60))
+            burst_window_id = f"w_{int(time.time()) // burst_window_seconds}"
+            await budget_repo.admit_request(
+                user_id=user_id,
+                burst_window_id=burst_window_id,
+                daily_limit=daily_limit,
+                burst_limit=burst_limit,
+                burst_ttl=burst_window_seconds,
+            )
+        except BudgetExceededException as e:
+            if "daily" in str(e).lower():
+                raise HTTPException(status_code=429, detail="CHAT_DAILY_QUOTA_EXCEEDED") from e
+            raise HTTPException(status_code=429, detail="CHAT_BURST_LIMIT_EXCEEDED") from e
+        except RedisUnavailableException as e:
+            raise HTTPException(status_code=503, detail="CHAT_CONTROL_PLANE_UNAVAILABLE") from e
+
+    # 4. Message length check
     if body.message and len(body.message) > settings.MAX_MESSAGE_LENGTH:
         raise HTTPException(status_code=400, detail="Message exceeds maximum length")
 
-    # 3. Guardrails check
+    # 5. Guardrails check (input safety & ingress PII detection)
+    if body.message and detect_pii(body.message):
+        guardrails_logger.warning("Ingress PII detected in user message: REDACTED")
+        async def pii_error_generator():
+            yield {
+                "event": "error",
+                "data": json.dumps({
+                    "code": "GUARDRAIL_BLOCKED",
+                    "message": "Your message contains protected personal information and cannot be processed.",
+                    "partialMessageId": None
+                })
+            }
+        return EventSourceResponse(pii_error_generator())
+
     guardrails = getattr(request.app.state, "guardrails", None)
     if guardrails and body.message:
         is_allowed, reason = await guardrails.validate_message(body.message)
@@ -99,7 +184,7 @@ async def chat_stream(
                 }
             return EventSourceResponse(error_generator())
 
-    # 4. Session auto-creation if not provided
+    # 6. Session auto-creation & queue locking
     session_id = body.sessionId
     if not session_id:
         try:
@@ -109,18 +194,9 @@ async def chat_stream(
             logger.error(f"Failed to create session on NestJS API: {e!s}")
             raise HTTPException(status_code=503, detail="NestJS API unavailable") from e
 
-    client.correlation_id = session_id
+    client.correlation_id = x_correlation_id or session_id
 
-    # 4.5. Extract user_id from token if available
-    user_id = "default"
-    if token:
-        try:
-            payload = jwt.decode(token, settings.JWT_SECRET, algorithms=["HS256"])
-            user_id = str(payload.get("id") or payload.get("sub") or "default")
-        except Exception:
-            pass
 
-    # Message Queue Locking
     queue_manager = getattr(request.app.state, "message_queue", None)
     req_id = None
     if queue_manager:
@@ -138,6 +214,9 @@ async def chat_stream(
             summary = memory_data.get("summary", None)
         except Exception as e:
             logger.error(f"Failed to fetch memory from NestJS API: {e!s}")
+            err_msg = str(e)
+            if "NOT_FOUND" in err_msg or "owned" in err_msg.lower() or "404" in err_msg:
+                raise HTTPException(status_code=404, detail="CHAT_SESSION_NOT_FOUND") from e
             raise HTTPException(status_code=503, detail="NestJS API memory service unavailable") from e
 
         # Read TrustedSearchSnapshot from Redis
@@ -343,6 +422,10 @@ async def chat_stream(
                             if action == "COMPLETE_PROFILE":
                                 target = "/profile"
 
+                            if queue_manager and not await queue_manager.validate_active_fence(session_id):
+                                logger.warning(f"Stale fence prior to ACTION_REQUIRED emission for session {session_id}. Aborting.")
+                                return
+
                             payload = {
                                 "action": action,
                                 "scope": scope,
@@ -377,9 +460,19 @@ async def chat_stream(
                 else:
                     # Completed turn - Persist message batch and send done event
                     if partial_response.strip():
+                        if queue_manager and not await queue_manager.validate_active_fence(session_id):
+                            logger.warning(f"Stale fence prior to completed turn persistence for session {session_id}. Aborting.")
+                            return
                         user_msg_content = await _resolve_user_message(body, graph, config)
                         try:
-                            batch_res = await _persist_response(client, session_id, user_msg_content, partial_response, user_already_persisted=user_msg_persisted)
+                            batch_res = await _persist_response(
+                                client,
+                                session_id,
+                                user_msg_content,
+                                partial_response,
+                                user_already_persisted=user_msg_persisted,
+                                queue_manager=queue_manager,
+                            )
                             persisted = True
                         except Exception as persist_err:  # noqa: BLE001
                             logger.error(f"Failed to persist completed response: {persist_err!s}")
@@ -430,7 +523,14 @@ async def chat_stream(
                 if not persisted and e.partial_response and e.partial_response.strip():
                     try:
                         user_msg_content = await _resolve_user_message(body, graph, config)
-                        batch_res = await _persist_response(client, session_id, user_msg_content, e.partial_response, user_already_persisted=user_msg_persisted)
+                        batch_res = await _persist_response(
+                            client,
+                            session_id,
+                            user_msg_content,
+                            e.partial_response,
+                            user_already_persisted=user_msg_persisted,
+                            queue_manager=queue_manager,
+                        )
                         persisted = True
                         for msg in batch_res.get("messages", []):
                             if msg.get("sender") == "AGENT":
@@ -451,7 +551,15 @@ async def chat_stream(
                 if not persisted and partial_response and partial_response.strip():
                     try:
                         user_msg_content = await _resolve_user_message(body, graph, config)
-                        await _persist_response(client, session_id, user_msg_content, partial_response, user_already_persisted=user_msg_persisted, use_shield=True)
+                        await _persist_response(
+                            client,
+                            session_id,
+                            user_msg_content,
+                            partial_response,
+                            user_already_persisted=user_msg_persisted,
+                            use_shield=True,
+                            queue_manager=queue_manager,
+                        )
                         persisted = True
                     except Exception as e:  # noqa: BLE001
                         logger.error(f"Failed to persist partial response on connection drop: {e!s}")
@@ -462,7 +570,14 @@ async def chat_stream(
                 if not persisted and partial_response and partial_response.strip():
                     try:
                         user_msg_content = await _resolve_user_message(body, graph, config)
-                        batch_res = await _persist_response(client, session_id, user_msg_content, partial_response, user_already_persisted=user_msg_persisted)
+                        batch_res = await _persist_response(
+                            client,
+                            session_id,
+                            user_msg_content,
+                            partial_response,
+                            user_already_persisted=user_msg_persisted,
+                            queue_manager=queue_manager,
+                        )
                         persisted = True
                         for msg in batch_res.get("messages", []):
                             if msg.get("sender") == "AGENT":
