@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import * as crypto from 'crypto';
 
@@ -9,6 +9,8 @@ const AUTH_TAG_LENGTH = 16; // 128-bit auth tag
 
 @Injectable()
 export class ChatMessageCryptoService {
+  private readonly logger = new Logger(ChatMessageCryptoService.name);
+
   constructor(private readonly configService: ConfigService) {}
 
   /**
@@ -114,4 +116,115 @@ export class ChatMessageCryptoService {
 
     return decrypted.toString('utf8');
   }
+
+  /**
+   * Record-bound encryption for ChatMessage content.
+   */
+  async encryptMessageContent(
+    messageId: string,
+    sessionId: string,
+    sender: string,
+    type: string,
+    content: string,
+  ): Promise<{
+    ciphertext: string;
+    nonce: string;
+    authTag: string;
+    keyVersion: number;
+  }> {
+    const keyVersion = KEY_VERSION;
+    const aad = `ChatMessage:${messageId}:${sessionId}:${sender}:${type}:v${keyVersion}`;
+    return this.encrypt(content, aad);
+  }
+
+  /**
+   * Record-bound decryption for ChatMessage content with fallback to legacy plaintext.
+   */
+  async decryptMessageContent(message: {
+    id: string;
+    sessionId: string;
+    sender: string;
+    type: string;
+    contentCiphertext?: string | null;
+    contentNonce?: string | null;
+    contentAuthTag?: string | null;
+    contentKeyVersion?: number | null;
+    content?: string | null;
+  }): Promise<string> {
+    if (
+      this.isConfigured() &&
+      message.contentCiphertext &&
+      message.contentNonce &&
+      message.contentAuthTag &&
+      message.contentKeyVersion
+    ) {
+      try {
+        const aad = `ChatMessage:${message.id}:${message.sessionId}:${message.sender}:${message.type}:v${message.contentKeyVersion}`;
+        return await this.decrypt(
+          message.contentCiphertext,
+          message.contentNonce,
+          message.contentAuthTag,
+          aad,
+          message.contentKeyVersion,
+        );
+      } catch (error) {
+        this.logger.warn(`Failed to decrypt ChatMessage ${message.id}, falling back to plaintext content: ${error instanceof Error ? error.message : String(error)}`);
+        return message.content || '';
+      }
+    }
+    return message.content || '';
+  }
+
+  /**
+   * Record-bound encryption for ChatSession title.
+   */
+  async encryptSessionTitle(
+    sessionId: string,
+    title: string,
+  ): Promise<{
+    ciphertext: string;
+    nonce: string;
+    authTag: string;
+    keyVersion: number;
+  }> {
+    const keyVersion = KEY_VERSION;
+    const aad = `ChatSession:${sessionId}:v${keyVersion}`;
+    return this.encrypt(title, aad);
+  }
+
+  /**
+   * Record-bound decryption for ChatSession title with fallback to legacy plaintext.
+   */
+  async decryptSessionTitle(session: {
+    id: string;
+    titleCiphertext?: string | null;
+    titleNonce?: string | null;
+    titleAuthTag?: string | null;
+    titleKeyVersion?: number | null;
+    title?: string | null;
+  }): Promise<string | null> {
+    if (
+      this.isConfigured() &&
+      session.titleCiphertext &&
+      session.titleNonce &&
+      session.titleAuthTag &&
+      session.titleKeyVersion
+    ) {
+      try {
+        const aad = `ChatSession:${session.id}:v${session.titleKeyVersion}`;
+        return await this.decrypt(
+          session.titleCiphertext,
+          session.titleNonce,
+          session.titleAuthTag,
+          aad,
+          session.titleKeyVersion,
+        );
+      } catch (error) {
+        this.logger.warn(`Failed to decrypt ChatSession ${session.id} title, falling back to plaintext: ${error instanceof Error ? error.message : String(error)}`);
+        return session.title || null;
+      }
+    }
+    return session.title || null;
+  }
 }
+

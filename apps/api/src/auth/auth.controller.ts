@@ -22,6 +22,7 @@ interface AuthenticatedRequest extends Request {
     id: string;
     email: string;
     role: string;
+    jti?: string;
   };
 }
 
@@ -98,10 +99,11 @@ export class AuthController {
   async logout(@Req() req: AuthenticatedRequest, @Headers() headers: Record<string, string>) {
     const { ipAddress, traceId, correlationId } = this.getRequestDetails(req, headers);
     const userId = req.user.id;
+    const jti = req.user.jti;
     const authHeader = headers['authorization'] || headers['Authorization'];
     const token =
       authHeader && authHeader.toLowerCase().startsWith('bearer ') ? authHeader.substring(7) : null;
-    await this.authService.logout(userId, token, ipAddress, traceId, correlationId);
+    await this.authService.logout(userId, token, ipAddress, traceId, correlationId, jti);
   }
 
   @Get('me')

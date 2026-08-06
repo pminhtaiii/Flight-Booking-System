@@ -25,7 +25,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     });
   }
 
-  async validate(req: Request, payload: { id: string; email: string }) {
+  async validate(req: Request, payload: { id: string; email: string; jti?: string }) {
     const authHeader = req.headers.authorization;
     const token =
       authHeader && authHeader.toLowerCase().startsWith('bearer ') ? authHeader.substring(7) : null;
@@ -45,6 +45,6 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       throw new UnauthorizedException();
     }
 
-    return { id: user.id, email: user.email, role: user.role };
+    return { id: user.id, email: user.email, role: user.role, jti: payload.jti };
   }
 }

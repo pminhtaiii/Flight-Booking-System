@@ -21,6 +21,7 @@ import { BookingReadinessObservability } from '@/booking-intent/booking-readines
 import { BookingReadinessOperation } from '@/common/observability/booking-readiness-observability.types';
 import { ProfileService } from '@/profile/profile.service';
 import { BookingReadinessRequestDto, BookingReadinessPassengerDto } from '@/booking-intent/dto/booking-readiness.dto';
+import { ChatService } from '@/chat/chat.service';
 
 function capitalizeCabinClass(cabinClass: string): string {
   if (!cabinClass) return '';
@@ -81,7 +82,36 @@ export class AgentGatewayService {
     private readonly bookingReadinessService: BookingReadinessService,
     private readonly bookingReadinessObservability: BookingReadinessObservability,
     private readonly configService: ConfigService,
+    private readonly chatService: ChatService,
   ) {}
+
+  /**
+   * Verifies user active status and token non-revocation.
+   */
+  async checkUserAccess(dto: { sub: string; jti?: string; exp?: number }): Promise<{ allowed: boolean }> {
+    const user = await this.prisma.user.findUnique({
+      where: { id: dto.sub },
+    });
+
+    if (!user || user.status !== 'ACTIVE') {
+      throw new HttpException(
+        { code: 'UNAUTHORIZED', message: 'User is inactive or not found' },
+        HttpStatus.UNAUTHORIZED,
+      );
+    }
+
+    if (dto.jti) {
+      const isJtiBlacklisted = await this.cacheService.get(`blacklist:jti:${dto.jti}`);
+      if (isJtiBlacklisted) {
+        throw new HttpException(
+          { code: 'UNAUTHORIZED', message: 'Token JTI has been revoked' },
+          HttpStatus.UNAUTHORIZED,
+        );
+      }
+    }
+
+    return { allowed: true };
+  }
 
   /**
    * Validates fencing token using Redis session lock if Phase 4 write fence is enabled.
@@ -91,29 +121,24 @@ export class AgentGatewayService {
     sessionId: string,
     fencingToken?: string | null,
   ): Promise<void> {
-    const isWriteFenceEnabled =
-      this.configService.get<string>('FEATURE_FLAG_WRITE_FENCE') === 'true';
+    return this.chatService.validateFencingToken(userId, sessionId, fencingToken);
+  }
 
-    if (!isWriteFenceEnabled) {
-      return;
-    }
+  /**
+   * Creates a chat session for a claimed user.
+   */
+  async createSession(userId: string, title?: string) {
+    return this.chatService.createSession(userId, title);
+  }
 
-    if (!fencingToken) {
-      throw new HttpException(
-        { code: 'MISSING_FENCING_TOKEN', message: 'Fencing token is required when write fence is enabled' },
-        HttpStatus.BAD_REQUEST,
-      );
-    }
-
-    const lockKey = `chat:session-lock:${userId}:${sessionId}`;
-    const currentFence = await this.cacheService.hget(lockKey, 'fence');
-
-    if (currentFence === null || String(currentFence) !== String(fencingToken)) {
-      throw new HttpException(
-        { code: 'STALE_FENCING_TOKEN', message: 'Fencing token is stale or invalid' },
-        HttpStatus.CONFLICT,
-      );
-    }
+  /**
+   * Gets memory for a session.
+   */
+  async getMemory(userId: string, sessionId: string, query: { recentCount?: number; unsummarizedOnly?: boolean }) {
+    return this.chatService.getMemory(userId, sessionId, {
+      recentCount: query.recentCount || 20,
+      unsummarizedOnly: query.unsummarizedOnly || false,
+    });
   }
 
   /**
@@ -125,41 +150,37 @@ export class AgentGatewayService {
     dto: { sender: string; content: string; type?: string },
     fencingToken?: string | null,
   ) {
-    await this.validateFencingToken(userId, sessionId, fencingToken);
-
-    const session = await this.prisma.chatSession.findFirst({
-      where: { id: sessionId, userId },
-    });
-
-    if (!session) {
-      throw new NotFoundException({
-        statusCode: 404,
-        message: 'Session not found',
-        code: 'CHAT_SESSION_NOT_FOUND',
-      });
-    }
-
-    const now = new Date();
-    return this.prisma.$transaction(async (tx) => {
-      await this.validateFencingToken(userId, sessionId, fencingToken);
-
-      const message = await tx.chatMessage.create({
-        data: {
-          sessionId,
+    try {
+      return await this.chatService.createMessage(
+        userId,
+        sessionId,
+        {
           sender: dto.sender as any,
-          type: (dto.type || 'STANDARD') as any,
           content: dto.content,
-          createdAt: now,
+          type: (dto.type || 'STANDARD') as any,
         },
-      });
+        undefined,
+        undefined,
+        undefined,
+        fencingToken || undefined,
+      );
+    } catch (err) {
+      if (err instanceof NotFoundException) {
+        throw new NotFoundException({
+          statusCode: 404,
+          message: 'Session not found',
+          code: 'CHAT_SESSION_NOT_FOUND',
+        });
+      }
+      throw err;
+    }
+  }
 
-      await tx.chatSession.update({
-        where: { id: sessionId },
-        data: { lastActiveAt: now },
-      });
-
-      return message;
-    });
+  /**
+   * Soft deletes a chat session.
+   */
+  async deleteSession(userId: string, sessionId: string) {
+    return this.chatService.deleteSession(userId, sessionId);
   }
 
   private async recordReadinessOutcome(

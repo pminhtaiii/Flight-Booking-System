@@ -1,4 +1,4 @@
-import { Controller, Get, Query, Req, UseGuards, Logger, Headers, Param, Body, Post, HttpCode } from '@nestjs/common';
+import { Controller, Get, Query, Req, UseGuards, Logger, Headers, Param, Body, Post, HttpCode, Delete } from '@nestjs/common';
 import { Request } from 'express';
 import { AgentApiKeyGuard } from './auth/agent-api-key.guard';
 import { ClaimTokenGuard } from './auth/claim-token.guard';
@@ -103,6 +103,32 @@ export class AgentGatewayController {
     }
   }
 
+  @Post('chat/access/check')
+  @HttpCode(200)
+  async checkAccess(
+    @Body() dto: { sub: string; jti?: string; exp?: number },
+  ) {
+    return await this.agentGatewayService.checkUserAccess(dto);
+  }
+
+  @Post('chat/sessions')
+  @HttpCode(201)
+  async createSession(
+    @Req() req: AuthenticatedRequest,
+    @Body() dto: { title?: string },
+  ) {
+    return await this.agentGatewayService.createSession(req.user.id, dto.title);
+  }
+
+  @Get('chat/sessions/:sessionId/memory')
+  async getMemory(
+    @Param('sessionId') sessionId: string,
+    @Req() req: AuthenticatedRequest,
+    @Query() query: { recentCount?: number; unsummarizedOnly?: boolean },
+  ) {
+    return await this.agentGatewayService.getMemory(req.user.id, sessionId, query);
+  }
+
   @Post('chat/sessions/:sessionId/messages')
   @HttpCode(201)
   async createChatMessage(
@@ -121,9 +147,48 @@ export class AgentGatewayController {
     @Param('sessionId') sessionId: string,
     @Req() req: AuthenticatedRequest,
     @Headers() headers: Record<string, string>,
-    @Body() dto: { sender: string; content: string; type?: string },
+    @Body() dto: { sender?: string; content?: string; type?: string },
   ) {
     const fencingToken = headers['x-fencing-token'] || headers['X-Fencing-Token'];
-    return await this.agentGatewayService.createChatMessage(req.user.id, sessionId, dto, fencingToken);
+    return await this.agentGatewayService.createChatMessage(
+      req.user.id,
+      sessionId,
+      {
+        sender: dto.sender || 'USER',
+        content: dto.content || '',
+        type: dto.type || 'STANDARD',
+      },
+      fencingToken,
+    );
+  }
+
+  @Post('chat/sessions/:sessionId/summaries')
+  @HttpCode(201)
+  async createChatSummary(
+    @Param('sessionId') sessionId: string,
+    @Req() req: AuthenticatedRequest,
+    @Headers() headers: Record<string, string>,
+    @Body() dto: { content: string },
+  ) {
+    const fencingToken = headers['x-fencing-token'] || headers['X-Fencing-Token'];
+    return await this.agentGatewayService.createChatMessage(
+      req.user.id,
+      sessionId,
+      {
+        sender: 'AGENT',
+        content: dto.content,
+        type: 'SUMMARY',
+      },
+      fencingToken,
+    );
+  }
+
+  @Delete('chat/sessions/:sessionId')
+  @HttpCode(204)
+  async deleteSession(
+    @Param('sessionId') sessionId: string,
+    @Req() req: AuthenticatedRequest,
+  ) {
+    await this.agentGatewayService.deleteSession(req.user.id, sessionId);
   }
 }
