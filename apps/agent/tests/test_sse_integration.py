@@ -105,6 +105,7 @@ def get_auth_headers():
 @pytest.fixture
 def mock_nestjs_client():
     client = MagicMock(spec=NestJSClient)
+    client.check_user_access = AsyncMock(return_value={"allowed": True})
     client.get_memory = AsyncMock(return_value={"recentMessages": [], "summary": None})
     client.create_message_batch = AsyncMock(return_value={
         "messages": [

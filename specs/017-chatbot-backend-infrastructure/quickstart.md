@@ -329,3 +329,13 @@ Record in `docs/runbooks/chatbot-handoff.md` and `context/progress-checker.md` o
 - Registered `ChatHandoffModule` in `AppModule` imports.
 - All routes are inert (throw `ServiceUnavailableException`); no chatbot path has cut over.
 - Redis primitives are atomic and PII-free; additive schema is valid.
+
+### Phase 3: Work Package 3F Checkpoint (2026-08-06)
+
+- **T037 (Session ID Retention in ChatWidget)**: Verified session ID preservation across multi-turn streams in `apps/web/components/chat/ChatWidget.tsx`. `handleDone` callbacks capture `done.sessionId` from completion events, setting `activeSessionId` so subsequent user requests pass `sessionId` in the body and prevent redundant empty-session auto-creation.
+- **T038 (US1 Test Verification & Suite Validation)**:
+  - Ran 31 US1 focused agent Pytest suites in `apps/agent` (`test_stream_auth_budget.py`, `test_rate_limit.py`, `test_stream_session_control.py`, `test_streaming_agent.py`, `test_direct_stream.py`). All 31 tests passed 100% GREEN.
+  - Ran NestJS US1 focused Jest test suites (`auth.service.spec.ts`, `chat-message-crypto.service.spec.ts`, `agent-gateway.service.spec.ts`). All 20 tests passed 100% GREEN.
+  - Built `@shared/types` (`pnpm --filter @shared/types build`) with zero compilation errors.
+  - Verified ingress PII detection & security audit logging in `apps/agent/src/agent/streaming/sse.py`.
+  - Verified canonical JWT claim validation (`sub`, `iss`, `aud`, `jti`), NestJS access checks before quota admission, record-bound AES-256-GCM dual-write encryption, and strict CORS preflight handling.
