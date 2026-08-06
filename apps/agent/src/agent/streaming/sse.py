@@ -425,6 +425,14 @@ async def chat_stream(
 
                             if queue_manager and not await queue_manager.validate_active_fence(session_id):
                                 logger.warning(f"Stale fence prior to ACTION_REQUIRED emission for session {session_id}. Aborting.")
+                                await q.put({
+                                    "event": "error",
+                                    "data": json.dumps({
+                                        "code": "PERSISTENCE_ERROR",
+                                        "message": "The requested action could not be emitted because the session lease was lost.",
+                                        "partialMessageId": None
+                                    })
+                                })
                                 return
 
                             payload = {
