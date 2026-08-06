@@ -67,6 +67,7 @@ export type SafeActionRequiredEvent = {
     }>;
   }>;
   target: '/profile' | '/checkout/passengers';
+  offerId?: string;
 };
 
 type BookingActionCardProps = {
@@ -127,7 +128,9 @@ function parsePassenger(value: unknown): SafeActionRequiredEvent['passengers'][n
 }
 
 export function parseActionRequiredEvent(value: unknown): SafeActionRequiredEvent | null {
-  if (!isExactRecord(value, ['action', 'scope', 'passengers', 'target'])
+  if (
+    (!isExactRecord(value, ['action', 'scope', 'passengers', 'target']) &&
+     !isExactRecord(value, ['action', 'scope', 'passengers', 'target', 'offerId']))
     || !isOneOf(value.action, ACTIONS)
     || !isOneOf(value.scope, SCOPES)
     || !Array.isArray(value.passengers)) {
@@ -144,7 +147,9 @@ export function parseActionRequiredEvent(value: unknown): SafeActionRequiredEven
     return null;
   }
 
-  return { action: value.action, scope: value.scope, passengers, target };
+  const offerId = 'offerId' in value && typeof value.offerId === 'string' ? value.offerId : undefined;
+
+  return { action: value.action, scope: value.scope, passengers, target, ...(offerId && { offerId }) };
 }
 
 export function BookingActionCard({ event, onNavigate }: BookingActionCardProps): JSX.Element {

@@ -291,6 +291,18 @@ async def chat_stream(
                         tool_input = event["data"].get("input")
                         
                         if tool_name == "signal_checkout_intent":
+                            selection_index = tool_input.get("selection_index") if isinstance(tool_input, dict) else None
+                            
+                            offer_id = None
+                            if selection_index and trusted_snapshot_dict:
+                                try:
+                                    idx = int(selection_index) - 1
+                                    results = trusted_snapshot_dict.get("results", [])
+                                    if 0 <= idx < len(results):
+                                        offer_id = results[idx].get("flightOfferId")
+                                except (ValueError, TypeError):
+                                    pass
+
                             payload = {
                                 "action": "CONTINUE_CHECKOUT",
                                 "scope": "UNKNOWN",
@@ -301,6 +313,9 @@ async def chat_stream(
                                 }],
                                 "target": "/checkout/passengers"
                             }
+                            if offer_id:
+                                payload["offerId"] = offer_id
+
                             await q.put({
                                 "event": "ACTION_REQUIRED",
                                 "data": json.dumps(payload)
