@@ -11,10 +11,25 @@ os.environ["OUTPUT_GUARDRAIL_ENABLED"] = "false"
 
 @pytest.fixture(autouse=True)
 def setup_env(monkeypatch):
-    from unittest.mock import AsyncMock
+    from unittest.mock import AsyncMock, MagicMock
     monkeypatch.setattr("agent.tools.nestjs_client.NestJSClient.check_user_access", AsyncMock(return_value={"allowed": True}))
+    
+    import agent.infrastructure.redis
+    mock_redis = MagicMock()
+    mock_redis.get = AsyncMock(return_value=None)
+    mock_redis.set = AsyncMock(return_value=True)
+    mock_redis.eval = AsyncMock(return_value=[1, "ok"])
+    mock_redis.ping = AsyncMock(return_value=True)
+    mock_redis.aclose = AsyncMock()
+    
+    monkeypatch.setattr("agent.infrastructure.redis.init_redis", AsyncMock())
+    monkeypatch.setattr("agent.infrastructure.redis.close_redis", AsyncMock())
+    
+    agent.infrastructure.redis._redis_client = mock_redis
+    
     # Keep variables set, but yield for test duration
     yield
+    agent.infrastructure.redis._redis_client = None
 
 from unittest.mock import AsyncMock, MagicMock
 from agent.queue.message_queue import SessionLockRepository

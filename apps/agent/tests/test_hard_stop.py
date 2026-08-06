@@ -6,6 +6,7 @@ from langchain_core.messages import AIMessage
 from agent.main import app
 from agent.config import get_settings
 from tests.test_sse_integration import MockStreamingLLM, parse_sse, get_auth_headers
+from agent.models.requests import RouteDecision
 
 @pytest.fixture
 def mock_nestjs_client():
@@ -43,7 +44,8 @@ async def test_first_chunk_unsafe(mock_nestjs_client, monkeypatch):
     monkeypatch.setattr(guardrails_logger, "warning", log_spy)
 
     with patch("agent.streaming.sse.NestJSClient", return_value=mock_nestjs_client), \
-         patch("agent.graph.nodes.get_chat_model", return_value=llm):
+         patch("agent.agents.chat_agent.ChatOpenAI", return_value=llm), \
+         patch("agent.graph.graph.invoke_router", return_value=RouteDecision(intent="SEARCH", confidence=1.0, isCommitment=False)):
         
         transport = httpx.ASGITransport(app=app)
         async with httpx.AsyncClient(transport=transport, base_url="http://test") as ac:
@@ -116,7 +118,8 @@ async def test_mid_stream_chunk_unsafe(mock_nestjs_client, monkeypatch):
     monkeypatch.setattr(guardrails_logger, "warning", log_spy)
 
     with patch("agent.streaming.sse.NestJSClient", return_value=mock_nestjs_client), \
-         patch("agent.graph.nodes.get_chat_model", return_value=llm):
+         patch("agent.agents.chat_agent.ChatOpenAI", return_value=llm), \
+         patch("agent.graph.graph.invoke_router", return_value=RouteDecision(intent="SEARCH", confidence=1.0, isCommitment=False)):
         
         transport = httpx.ASGITransport(app=app)
         async with httpx.AsyncClient(transport=transport, base_url="http://test") as ac:
@@ -196,7 +199,8 @@ async def test_nestjs_persistence_fails(mock_nestjs_client, monkeypatch):
     monkeypatch.setattr(guardrails_logger, "warning", log_spy)
 
     with patch("agent.streaming.sse.NestJSClient", return_value=mock_nestjs_client), \
-         patch("agent.graph.nodes.get_chat_model", return_value=llm):
+         patch("agent.agents.chat_agent.ChatOpenAI", return_value=llm), \
+         patch("agent.graph.graph.invoke_router", return_value=RouteDecision(intent="SEARCH", confidence=1.0, isCommitment=False)):
         
         transport = httpx.ASGITransport(app=app)
         async with httpx.AsyncClient(transport=transport, base_url="http://test") as ac:

@@ -92,12 +92,14 @@ async def test_create_message_batch():
             messages=messages
         )
 
-        assert result == {"messages": [{"id": "msg-123"}, {"id": "msg-123"}]}
-        assert mock_post.call_count == 2
+        assert result == {"id": "msg-123"}
+        assert mock_post.call_count == 1
         args, kwargs = mock_post.call_args
         assert args[0] == "http://localhost:3001/api/agent-gateway/chat/sessions/session-123/turns"
-        assert "content" in kwargs["json"]
-        assert "sender" in kwargs["json"]
+        assert "messages" in kwargs["json"]
+        assert len(kwargs["json"]["messages"]) == 2
+        assert kwargs["json"]["messages"][0]["sender"] == "USER"
+        assert kwargs["json"]["messages"][1]["sender"] == "AGENT"
         assert "X-Agent-API-Key" in kwargs["headers"]
         assert "X-User-Claim" in kwargs["headers"]
 

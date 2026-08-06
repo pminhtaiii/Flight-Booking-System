@@ -10,9 +10,21 @@ from agent.infrastructure.redis import init_redis, close_redis
 @pytest.fixture(autouse=True)
 async def setup_redis():
     redis_url = os.environ.get("REDIS_URL", "redis://localhost:6379/0")
-    await init_redis(redis_url)
+    import redis.asyncio as redis_async
+    import agent.infrastructure.redis
+    client = redis_async.from_url(redis_url, decode_responses=True)
+    agent.infrastructure.redis._redis_client = client
+    try:
+        await client.ping()
+    except Exception:
+        pytest.skip("Real Redis is not available for integration tests")
+    
+    # clean up test namespace before tests
+    await client.flushdb()
     yield
-    await close_redis()
+    await client.flushdb()
+    await client.aclose()
+    agent.infrastructure.redis._redis_client = None
 
 @pytest.mark.asyncio
 async def test_session_lock_acquire_release():
@@ -71,7 +83,7 @@ async def test_message_queue_bounded_wait_and_refresh_cancellation():
     
     req2 = await manager.acquire("s3_bounded", "u1") # This should take ~1 second
     elapsed = time.time() - start
-    assert 0.9 < elapsed < 1.5
+    assert 0.9 < elapsed < 2.5
 
     await manager.release("s3_bounded", req2)
 

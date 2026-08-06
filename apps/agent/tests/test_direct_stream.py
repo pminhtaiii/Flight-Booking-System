@@ -121,7 +121,8 @@ def test_direct_bearer_stream_with_correlation_headers(monkeypatch):
     mock_graph.aget_state = AsyncMock(return_value=MagicMock(next=(), values={}))
     monkeypatch.setattr("agent.streaming.sse.graph", mock_graph)
 
-    monkeypatch.setattr("agent.streaming.sse.get_redis_client", lambda: None)
+    monkeypatch.setattr("agent.streaming.sse.get_redis_client", lambda: MagicMock())
+    monkeypatch.setattr("agent.repositories.chat_budget_repository.ChatBudgetRepository.admit_request", AsyncMock())
     monkeypatch.setattr("agent.streaming.sse.NestJSClient", lambda **kwargs: mock_client)
 
     response = client.post(

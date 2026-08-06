@@ -39,7 +39,14 @@ Update this file after every completed feature. Any AI agent reading this should
   - [x] WP 3E: Direct-server readiness — strict CORS, direct bearer streaming, health degradation pass (T029, T035, T036)
   - [x] WP 3F: Session continuity checkpoint — ChatWidget sessionId reuse and full US1 regression suite GREEN (T037, T038)
   - **All Phase 3 US1 focused test suites (31 Python pytest, 20 NestJS unit/gateway E2E) 100% PASS.**
-- [ ] Phase 4 / US2: Correct Specialist Routing (T039–T052)
+- [x] Phase 4 / US2: Correct Specialist Routing (T039–T052)
+  - [x] WP 4A: Router schema/fallback (T039, T047)
+  - [x] WP 4B: Checkout gate/state (T040, T048)
+  - [x] WP 4C: Graph topology/removal (T041, T050, T051)
+  - [x] WP 4D: Signed search split (T042, T049)
+  - [x] WP 4E: General/Travel inventory (T043, T044, T045)
+  - [x] WP 4F: Checkout adapter/integration (T046, T052)
+  - **All tests in apps/agent pass successfully (201/201).**
 - [ ] Phase 5 / US3: Privacy-Minimized Booking Answers (T053–T063)
 - [ ] Phase 6 / US4: Deterministic Checkout Handoff (T064–T084)
 - [ ] Phase 7 / US5: Observable, Reversible Rollout (T085–T093)

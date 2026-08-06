@@ -5,7 +5,9 @@ import { AuditService } from '@/audit/audit.service';
 import { CacheService } from '@/cache/cache.service';
 import { DuffelService } from '@/duffel/duffel.service';
 import { DuffelBaggage } from '@/duffel/duffel.types';
+import { SelectionAttestationService } from './selection-attestation.service';
 import { FlightSearchQueryDto } from './dto/flight-search-query.dto';
+import { AttestedFlightSearchDto } from './dto/attested-flight-search.dto';
 import { FlightSearchResponseDto, FlightResultDto } from './dto/flight-result.dto';
 import { UserPreferencesDto } from './dto/user-preferences.dto';
 import { UserBookingsResponseDto, BookingResultDto } from './dto/user-bookings.dto';
@@ -83,6 +85,7 @@ export class AgentGatewayService {
     private readonly bookingReadinessObservability: BookingReadinessObservability,
     private readonly configService: ConfigService,
     private readonly chatService: ChatService,
+    private readonly selectionAttestationService: SelectionAttestationService,
   ) {}
 
   /**
@@ -551,6 +554,153 @@ export class AgentGatewayService {
         err,
         null,
       );
+      throw err;
+    }
+  }
+
+  async searchFlightsV2(
+    userId: string,
+    dto: AttestedFlightSearchDto,
+    traceId: string | null = null,
+    correlationId: string | null = null,
+  ): Promise<any> {
+    const startTime = Date.now();
+    try {
+      // 1. Verify owned ChatSession
+      const chatSession = await this.prisma.chatSession.findFirst({
+        where: { id: dto.chatSessionId, userId, deletedAt: null },
+      });
+      if (!chatSession) {
+        throw new HttpException('Chat session not found', HttpStatus.NOT_FOUND);
+      }
+
+      // Check degradation triggers
+      let adultsCount = dto.search.adults;
+      if (adultsCount === undefined) {
+        adultsCount = (dto.search as any).passengers;
+      }
+      if (adultsCount === undefined) {
+        throw new HttpException(
+          'At least one of adults or passengers must be provided',
+          HttpStatus.BAD_REQUEST,
+        );
+      }
+
+      // Call DuffelService
+      let rawResponse;
+      let createdOffers;
+      try {
+        const searchResult = await this.duffelService.searchFlights(
+          {
+            origin: dto.search.origin,
+            destination: dto.search.destination,
+            departureDate: dto.search.date,
+            adults: adultsCount,
+            children: 0,
+            infants: 0,
+            cabinClass: 'economy',
+          },
+          'agent',
+        );
+        rawResponse = searchResult.offerRequest;
+        createdOffers = searchResult.flightOffers || [];
+      } catch (err: unknown) {
+        if (err instanceof HttpException) throw err;
+        throw new HttpException(
+          {
+            message: err instanceof Error ? err.message : 'Upstream flight search service is temporarily unavailable',
+            code: 'UPSTREAM_UNAVAILABLE',
+          },
+          HttpStatus.BAD_GATEWAY,
+        );
+      }
+
+      const offers = rawResponse.offers || [];
+      const limitedOffers = offers.slice(0, 5);
+      
+      const results = [];
+      const attestationOffers = [];
+      const expiresAt = new Date(Date.now() + 15 * 60000); // 15 mins
+
+      for (let i = 0; i < limitedOffers.length; i++) {
+        const offer = limitedOffers[i];
+        const slice = offer.slices?.[0];
+        if (!slice || !slice.segments || slice.segments.length === 0) continue;
+        
+        const createdOffer = createdOffers.find((co: any) => co.duffelOfferId === offer.id);
+        if (!createdOffer) continue;
+
+        const segments = slice.segments;
+        const firstSegment = segments[0];
+        const lastSegment = segments[segments.length - 1];
+
+        const airline = firstSegment.operating_carrier?.name || 'Unknown Airline';
+        const flightNumber = `${firstSegment.marketing_carrier?.iata_code || ''}${
+          firstSegment.marketing_carrier_flight_number || ''
+        }`;
+
+        const departureAirport = firstSegment.origin?.iata_code || '';
+        const arrivalAirport = lastSegment.destination?.iata_code || '';
+        const departureTime = cleanIsoTime(firstSegment.departing_at);
+        const arrivalTime = cleanIsoTime(lastSegment.arriving_at);
+
+        let duration = 0;
+        if (slice.duration) {
+          if (slice.duration.startsWith('P')) {
+            duration = parseISODurationToMinutes(slice.duration);
+          } else {
+            duration = parseInt(slice.duration, 10) || 0;
+          }
+        }
+        const stops = segments.length - 1;
+
+        const price = parseFloat(offer.total_amount);
+        const currency = offer.total_currency;
+
+        const segmentPassenger = firstSegment.passengers?.[0];
+        const offerPassenger = offer.passengers?.[0];
+        const cabinClass = segmentPassenger?.cabin_class || '';
+        const fareClass = cabinClass ? capitalizeCabinClass(cabinClass) : null;
+        
+        const baggages = segmentPassenger?.baggages || offerPassenger?.baggages;
+        const baggageAllowance = formatDuffelBaggageAllowance(baggages);
+
+        attestationOffers.push({ flightOfferId: createdOffer.id, duffelOfferId: offer.id });
+        results.push({
+          flightOfferId: createdOffer.id,
+          duffelOfferId: offer.id,
+          offerExpiresAt: expiresAt.toISOString(),
+          airline,
+          flightNumber,
+          departureAirport,
+          arrivalAirport,
+          departureTime,
+          arrivalTime,
+          duration,
+          stops,
+          price,
+          currency,
+          fareClass,
+          baggageAllowance,
+        });
+      }
+
+      const selectionAttestation = await this.selectionAttestationService.signSelectionAttestation(
+        userId,
+        dto.chatSessionId,
+        dto.proposedSnapshotVersion,
+        expiresAt.toISOString(),
+        attestationOffers,
+      );
+
+      return {
+        selectionAttestation,
+        snapshotVersion: dto.proposedSnapshotVersion,
+        snapshotExpiresAt: expiresAt.toISOString(),
+        results,
+      };
+    } catch (err: unknown) {
+      this.logger.error(`Failed to search flights V2: ${err}`);
       throw err;
     }
   }

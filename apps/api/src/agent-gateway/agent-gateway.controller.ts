@@ -5,6 +5,7 @@ import { ClaimTokenGuard } from './auth/claim-token.guard';
 import { AgentGatewayService } from './agent-gateway.service';
 import { FlightSearchQueryDto } from './dto/flight-search-query.dto';
 import { FlightSearchResponseDto } from './dto/flight-result.dto';
+import { AttestedFlightSearchDto } from './dto/attested-flight-search.dto';
 import { UserPreferencesDto } from './dto/user-preferences.dto';
 import { UserBookingsResponseDto } from './dto/user-bookings.dto';
 import {
@@ -42,6 +43,27 @@ export class AgentGatewayController {
       const msg = err instanceof Error ? err.message : String(err);
       const stack = err instanceof Error ? err.stack : undefined;
       this.logger.error(`Failed to search flights: ${msg}`, stack);
+      throw err;
+    }
+  }
+
+  @Post('v2/flights/search')
+  @HttpCode(201)
+  async searchFlightsV2(
+    @Body() dto: AttestedFlightSearchDto,
+    @Req() req: AuthenticatedRequest,
+    @Headers() headers: Record<string, string>,
+  ) {
+    try {
+      const traceId = headers['x-trace-id'] || null;
+      const correlationId = headers['x-correlation-id'] || null;
+      const userId = req.user.id;
+
+      return await this.agentGatewayService.searchFlightsV2(userId, dto, traceId, correlationId);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      const stack = err instanceof Error ? err.stack : undefined;
+      this.logger.error(`Failed to search attested flights: ${msg}`, stack);
       throw err;
     }
   }

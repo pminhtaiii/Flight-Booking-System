@@ -287,6 +287,32 @@ class NestJSClient:
             response.raise_for_status()
             return response.json()
 
+    async def post_gateway_flights_search_v2(self, chat_session_id: str, proposed_snapshot_version: int, origin: str, destination: str, date: str, passengers: int) -> dict:
+        url = f"{self.base_url}/agent-gateway/v2/flights/search"
+        payload = {
+            "chatSessionId": chat_session_id,
+            "proposedSnapshotVersion": proposed_snapshot_version,
+            "search": {
+                "origin": origin,
+                "destination": destination,
+                "date": date,
+                "adults": passengers
+            }
+        }
+        headers = self._get_gateway_headers()
+        async with httpx.AsyncClient() as client:
+            response = await client.post(url, json=payload, headers=headers)
+            if response.status_code == 400:
+                try:
+                    data = response.json()
+                    message = data.get("message")
+                    if message:
+                        return {"error": message}
+                except ValueError as e:
+                    logger.warning("Failed to parse 400 response JSON in post_gateway_flights_search_v2: %s (response: %s)", e, response.text)
+            response.raise_for_status()
+            return response.json()
+
     async def get_gateway_user_preferences(self) -> dict:
         url = f"{self.base_url}/agent-gateway/users/preferences"
         headers = self._get_gateway_headers()
