@@ -89,7 +89,6 @@ async def search_flights(
         safe_flight.pop("duffelOfferId", None)
         safe_results.append(safe_flight)
 
-    FLIGHTS_CACHE[thread_id] = {"results": safe_results}
 
     # Store Trusted Search Snapshot in Redis
     try:
@@ -110,6 +109,8 @@ async def search_flights(
         logging.getLogger(__name__).warning("Failed to save trusted snapshot: %s", str(e))
         # If we can't save snapshot, it's safer to fail the search so we don't present unbookable results
         return "I encountered an error preparing your search results. Please try again."
+
+    FLIGHTS_CACHE[thread_id] = {"results": safe_results}
 
     flight_blocks = []
     for idx, flight in enumerate(safe_results, 1):
