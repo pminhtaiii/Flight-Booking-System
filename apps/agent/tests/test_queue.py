@@ -306,3 +306,26 @@ async def test_get_fence():
     assert manager.get_fence("session-get-fence") is None
 
 
+@pytest.mark.asyncio
+async def test_release_none_req_id_ignored():
+    manager = MessageQueueManager(max_depth=3)
+    mock_repo = MagicMock()
+    mock_repo.acquire_lock = AsyncMock(return_value=1)
+    mock_repo.release_lock = AsyncMock()
+    manager.repo = mock_repo
+
+    req_id = await manager.acquire("session-none-test")
+    assert manager.depths["session-none-test"] == 1
+
+    # Calling release with req_id=None should be ignored (no depth decrement, state unchanged)
+    await manager.release("session-none-test", None)
+    assert manager.depths["session-none-test"] == 1
+    assert manager.active_fences["session-none-test"].req_id == req_id
+    mock_repo.release_lock.assert_not_called()
+
+    # Clean up with valid release
+    await manager.release("session-none-test", req_id)
+    assert "session-none-test" not in manager.depths
+
+
+

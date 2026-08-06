@@ -510,14 +510,14 @@ async def chat_stream(
                     producer_task.cancel()
                 if pipeline:
                     await pipeline.aclose()
-                if queue_manager and not released:
+                if queue_manager and req_id and not released:
                     released = True
                     await queue_manager.release(session_id, req_id)
 
         return EventSourceResponse(sse_generator())
 
     except BaseException:
-        if queue_manager and not released:
+        if queue_manager and req_id and not released:
             released = True
             await queue_manager.release(session_id, req_id)
         raise

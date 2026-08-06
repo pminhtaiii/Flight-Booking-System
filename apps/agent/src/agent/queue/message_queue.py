@@ -149,23 +149,25 @@ class MessageQueueManager:
                     self.depths.pop(session_id, None)
             raise
 
-    async def release(self, session_id: str, req_id: str = None) -> None:
+    async def release(self, session_id: str, req_id: Optional[str] = None) -> None:
         """
         Release the distributed lock for session_id and decrement the local depth.
-        Only releases lock and active fence if req_id matches the active fence
-        (or if req_id is None). Queue depth is always decremented when release is called.
+        Only releases lock and active fence if req_id matches the active fence.
+        If req_id is None, returns immediately without decrementing depth or attempting lock release.
         """
+        if req_id is None:
+            return
+
         active = None
         async with self.manager_lock:
             current_active = self.active_fences.get(session_id)
-            if current_active and (req_id is None or current_active.req_id == req_id):
+            if current_active and current_active.req_id == req_id:
                 active = self.active_fences.pop(session_id, None)
             else:
-                if req_id is not None:
-                    logger.warning(
-                        f"Ignoring stale release for session {session_id} with req_id {req_id} "
-                        f"(active req_id: {current_active.req_id if current_active else None})."
-                    )
+                logger.warning(
+                    f"Ignoring stale release for session {session_id} with req_id {req_id} "
+                    f"(active req_id: {current_active.req_id if current_active else None})."
+                )
 
             if session_id in self.depths:
                 self.depths[session_id] -= 1
