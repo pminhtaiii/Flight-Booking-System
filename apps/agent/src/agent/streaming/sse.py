@@ -291,10 +291,15 @@ async def chat_stream(
                         tool_input = event["data"].get("input")
                         
                         if tool_name == "signal_checkout_intent":
-                            selection_index = tool_input.get("selection_index") if isinstance(tool_input, dict) else None
                             payload = {
-                                "action": "CHECKOUT",
-                                "selectionIndex": selection_index
+                                "action": "CONTINUE_CHECKOUT",
+                                "scope": "UNKNOWN",
+                                "passengers": [{
+                                    "passengerType": "ADULT",
+                                    "passengerOrdinal": 1,
+                                    "sections": []
+                                }],
+                                "target": "/checkout/passengers"
                             }
                             await q.put({
                                 "event": "ACTION_REQUIRED",
