@@ -18,14 +18,14 @@
 
 **Purpose**: Add inert contracts, dependency declarations, and disabled-by-default configuration without changing live behavior.
 
-- [ ] T001 Add the direct `langgraph` and asyncio `redis` dependencies and refresh the lockfile in `apps/agent/pyproject.toml` and `apps/agent/uv.lock`
-- [ ] T002 Document the approved Python Redis/LangGraph usage constraints and dependency rationale in `context/library-docs.md`
-- [ ] T003 [P] Write failing cross-language accepted/rejected event contract tests and fixtures in `apps/agent/tests/test_event_contracts.py`, `apps/agent/tests/fixtures/chat_events.json`, and `packages/shared/src/types/chat.types.spec.ts`
-- [ ] T004 [P] Write failing canonical JWT profile and disabled-default/invalid flag, encryption-key, attestation-key, and claim-TTL configuration tests in `apps/api/src/auth/auth.service.spec.ts`, `apps/agent/tests/test_config.py`, `apps/api/src/chat-handoff/chat-handoff.config.spec.ts`, and `apps/web/lib/featureFlags.spec.ts`
-- [ ] T005 [P] Define strict shared Router, booking projection, SSE action, and handoff error types in `packages/shared/src/types/chat.types.ts` and export them from `packages/shared/src/types/index.ts`
-- [ ] T006 [P] Define matching strict Pydantic route and event models in `apps/agent/src/agent/models/events.py` and `apps/agent/src/agent/models/requests.py`
-- [ ] T007 Add agent Redis/quota/router/snapshot/direct-stream settings, NestJS JWT/encryption/attestation/handoff accept/issue/token/claim settings, and web direct-stream/bootstrap settings with disabled defaults in `apps/agent/src/agent/config.py`, `apps/agent/.env.example`, `apps/api/src/app.module.ts`, `apps/api/.env.example`, `apps/web/lib/featureFlags.ts`, and `apps/web/.env.example`
-- [ ] T008 Run the new contract/config tests and shared builds, confirm GREEN with every rollout flag off, and record the contract-freeze checkpoint in `specs/017-chatbot-backend-infrastructure/quickstart.md`
+- [x] T001 Add the direct `langgraph` and asyncio `redis` dependencies and refresh the lockfile in `apps/agent/pyproject.toml` and `apps/agent/uv.lock`
+- [x] T002 Document the approved Python Redis/LangGraph usage constraints and dependency rationale in `context/library-docs.md`
+- [x] T003 [P] Write failing cross-language accepted/rejected event contract tests and fixtures in `apps/agent/tests/test_event_contracts.py`, `apps/agent/tests/fixtures/chat_events.json`, and `packages/shared/src/types/chat.types.spec.ts`
+- [x] T004 [P] Write failing canonical JWT profile and disabled-default/invalid flag, encryption-key, attestation-key, and claim-TTL configuration tests in `apps/api/src/auth/auth.service.spec.ts`, `apps/agent/tests/test_config.py`, `apps/api/src/chat-handoff/chat-handoff.config.spec.ts`, and `apps/web/lib/featureFlags.spec.ts`
+- [x] T005 [P] Define strict shared Router, booking projection, SSE action, and handoff error types in `packages/shared/src/types/chat.types.ts` and export them from `packages/shared/src/types/index.ts`
+- [x] T006 [P] Define matching strict Pydantic route and event models in `apps/agent/src/agent/models/events.py` and `apps/agent/src/agent/models/requests.py`
+- [x] T007 Add agent Redis/quota/router/snapshot/direct-stream settings, NestJS JWT/encryption/attestation/handoff accept/issue/token/claim settings, and web direct-stream/bootstrap settings with disabled defaults in `apps/agent/src/agent/config.py`, `apps/agent/.env.example`, `apps/api/src/app.module.ts`, `apps/api/.env.example`, `apps/web/lib/featureFlags.ts`, and `apps/web/.env.example`
+- [x] T008 Run the new contract/config tests and shared builds, confirm GREEN with every rollout flag off, and record the contract-freeze checkpoint in `specs/017-chatbot-backend-infrastructure/quickstart.md`
 
 **Checkpoint**: Shared contracts compile; all new flags default off; runtime behavior is unchanged.
 
@@ -46,47 +46,47 @@
 
 ### Work Package 2A — Redis Lifecycle and Health
 
-- [ ] T009 [P] Write failing Redis lifecycle and health tests in `apps/agent/tests/test_redis_infrastructure.py`
-- [ ] T010 Implement one pooled asyncio Redis client with startup/close semantics in `apps/agent/src/agent/infrastructure/redis.py`
-- [ ] T011 Wire Redis lifecycle/dependency health in `apps/agent/src/agent/main.py`, run T009 to GREEN, and record Checkpoint 2A in `specs/017-chatbot-backend-infrastructure/quickstart.md`
+- [x] T009 [P] Write failing Redis lifecycle and health tests in `apps/agent/tests/test_redis_infrastructure.py`
+- [x] T010 Implement one pooled asyncio Redis client with startup/close semantics in `apps/agent/src/agent/infrastructure/redis.py`
+- [x] T011 Wire Redis lifecycle/dependency health in `apps/agent/src/agent/main.py`, run T009 to GREEN, and record Checkpoint 2A in `specs/017-chatbot-backend-infrastructure/quickstart.md`
 
 **Checkpoint 2A**: Redis startup, shutdown, and degraded health are green.
 
 ### Work Package 2B — Atomic Daily/Burst Admission
 
-- [ ] T012 [P] Write failing one-Lua daily/burst admission tests covering concurrency, rejected-attempt non-charging, UTC rollover/TTL, and Redis fail-closed behavior in `apps/agent/tests/test_chat_budget.py`
-- [ ] T013 Implement the versioned combined Lua admission contract and exact key/error semantics in `apps/agent/src/agent/repositories/chat_budget_repository.py`, run T012 to GREEN, and record Checkpoint 2B in `specs/017-chatbot-backend-infrastructure/quickstart.md`
+- [x] T012 [P] Write failing one-Lua daily/burst admission tests covering concurrency, rejected-attempt non-charging, UTC rollover/TTL, and Redis fail-closed behavior in `apps/agent/tests/test_chat_budget.py`
+- [x] T013 Implement the versioned combined Lua admission contract and exact key/error semantics in `apps/agent/src/agent/repositories/chat_budget_repository.py`, run T012 to GREEN, and record Checkpoint 2B in `specs/017-chatbot-backend-infrastructure/quickstart.md`
 
 **Checkpoint 2B**: Burst and daily limits form one atomic accepted-only charge.
 
 ### Work Package 2C — Fenced Session Lease
 
-- [ ] T014 [P] Write failing acquire/refresh/release/takeover tests proving TTL overrun, refresh loss, and disconnect cannot let a stale fencing owner persist or emit in `apps/agent/tests/test_session_lock.py`
-- [ ] T015 Implement monotonic fenced leases, refresh-loss cancellation, bounded wait/depth, and write-fence propagation in `apps/agent/src/agent/repositories/session_lock_repository.py` and `apps/agent/src/agent/queue/message_queue.py`, then run T014 to GREEN
+- [x] T014 [P] Write failing acquire/refresh/release/takeover tests proving TTL overrun, refresh loss, and disconnect cannot let a stale fencing owner persist or emit in `apps/agent/tests/test_session_lock.py`
+- [x] T015 Implement monotonic fenced leases, refresh-loss cancellation, bounded wait/depth, and write-fence propagation in `apps/agent/src/agent/repositories/session_lock_repository.py` and `apps/agent/src/agent/queue/message_queue.py`, then run T014 to GREEN
 
 **Checkpoint 2C**: A stale worker cannot perform a durable write or emit `ACTION_HANDOFF`.
 
 ### Work Package 2D — Trusted Snapshot Repository
 
-- [ ] T016 [P] Write failing attested Trusted Search Snapshot schema, owner/session, overwrite, TTL, fingerprint, and forbidden-field tests in `apps/agent/tests/test_trusted_snapshot.py`
-- [ ] T017 Implement strict PII-free attested snapshot serialization, atomic replace/load/delete in `apps/agent/src/agent/repositories/trusted_snapshot_repository.py`
-- [ ] T018 Run T016 plus Redis regressions to GREEN and record Checkpoint 2D in `specs/017-chatbot-backend-infrastructure/quickstart.md`
+- [x] T016 [P] Write failing attested Trusted Search Snapshot schema, owner/session, overwrite, TTL, fingerprint, and forbidden-field tests in `apps/agent/tests/test_trusted_snapshot.py`
+- [x] T017 Implement strict PII-free attested snapshot serialization, atomic replace/load/delete in `apps/agent/src/agent/repositories/trusted_snapshot_repository.py`
+- [x] T018 Run T016 plus Redis regressions to GREEN and record Checkpoint 2D in `specs/017-chatbot-backend-infrastructure/quickstart.md`
 
 **Checkpoint 2D**: The service-only attestation and identifiers restore only inside the correct owner/session boundary.
 
 ### Work Package 2E — Encrypted/Additive Prisma Foundation
 
-- [ ] T019 [P] Write failing migration/backfill tests for AES-GCM ChatMessage/ChatSession-title dual-write completeness and cleanup preconditions, ChatSession soft deletion, BookingAgentProjection, and ChatHandoff claim/attestation constraints in `apps/api/test/chat-persistence-migration.e2e-spec.ts` and `apps/api/test/chat-handoff-migration.e2e-spec.ts`
-- [ ] T020 Add encrypted ChatMessage content and ChatSession title fields, `ChatSession.deletedAt`, `BookingAgentProjection`, and claimed `ChatHandoff` relations/indexes/check constraints in `apps/api/prisma/schema.prisma`
-- [ ] T021 Create the additive dual-write migration and restart-safe encrypted-message/title/projection backfills in `apps/api/prisma/migrations/20260805000000_chatbot_handoff/migration.sql`, `apps/api/prisma/scripts/backfill-encrypted-chat-messages.ts`, and `apps/api/prisma/scripts/backfill-booking-agent-projections.ts`, then run T019 to GREEN while retaining all legacy plaintext
+- [x] T019 [P] Write failing migration/backfill tests for AES-GCM ChatMessage/ChatSession-title dual-write completeness and cleanup preconditions, ChatSession soft deletion, BookingAgentProjection, and ChatHandoff claim/attestation constraints in `apps/api/test/chat-persistence-migration.e2e-spec.ts` and `apps/api/test/chat-handoff-migration.e2e-spec.ts`
+- [x] T020 Add encrypted ChatMessage content and ChatSession title fields, `ChatSession.deletedAt`, `BookingAgentProjection`, and claimed `ChatHandoff` relations/indexes/check constraints in `apps/api/prisma/schema.prisma`
+- [x] T021 Create the additive dual-write migration and restart-safe encrypted-message/title/projection backfills in `apps/api/prisma/migrations/20260805000000_chatbot_handoff/migration.sql`, `apps/api/prisma/scripts/backfill-encrypted-chat-messages.ts`, and `apps/api/prisma/scripts/backfill-booking-agent-projections.ts`, then run T019 to GREEN while retaining all legacy plaintext
 
 **Checkpoint 2E**: Additive schema/backfills are rollback-safe, every migrated message decrypts, and projection rows are complete.
 
 ### Work Package 2F — Inert Domain Skeletons
 
-- [ ] T022 Create the versioned AES-GCM chat crypto service plus handoff module/controller/service/strict DTO skeleton in `apps/api/src/chat/chat-message-crypto.service.ts`, `apps/api/src/chat-handoff/chat-handoff.module.ts`, `apps/api/src/chat-handoff/chat-handoff.controller.ts`, `apps/api/src/chat-handoff/chat-handoff.service.ts`, and `apps/api/src/chat-handoff/dto/create-chat-handoff.dto.ts`
-- [ ] T023 Register the crypto and `ChatHandoffModule` providers with every new route/flag inert in `apps/api/src/chat/chat.module.ts` and `apps/api/src/app.module.ts`
-- [ ] T024 Run dual-read/dual-write-capable crypto, backfill, migration, shared build, database/backup scan fixture, and rollback tests while retaining the legacy plaintext column; record the additive Checkpoint 2F in `specs/017-chatbot-backend-infrastructure/quickstart.md`
+- [x] T022 Create the versioned AES-GCM chat crypto service plus handoff module/controller/service/strict DTO skeleton in `apps/api/src/chat/chat-message-crypto.service.ts`, `apps/api/src/chat-handoff/chat-handoff.module.ts`, `apps/api/src/chat-handoff/chat-handoff.controller.ts`, `apps/api/src/chat-handoff/chat-handoff.service.ts`, and `apps/api/src/chat-handoff/dto/create-chat-handoff.dto.ts`
+- [x] T023 Register the crypto and `ChatHandoffModule` providers with every new route/flag inert in `apps/api/src/chat/chat.module.ts` and `apps/api/src/app.module.ts`
+- [x] T024 Run dual-read/dual-write-capable crypto, backfill, migration, shared build, database/backup scan fixture, and rollback tests while retaining the legacy plaintext column; record the additive Checkpoint 2F in `specs/017-chatbot-backend-infrastructure/quickstart.md`
 
 **Checkpoint**: Redis primitives are atomic and PII-free; additive schema is valid; no chatbot path has cut over.
 
@@ -100,23 +100,23 @@
 
 ### Tests for User Story 1
 
-- [ ] T025 [P] [US1] Write failing tests using real Nest AuthService tokens for required `sub`/`iss`/`aud`/`jti`, legacy `id` transition, logout revocation, user deactivation, origin/quota ordering, cross-user isolation, and zero-inference/persistence on denial in `apps/api/src/auth/auth.service.spec.ts` and `apps/agent/tests/test_stream_auth_budget.py`
-- [ ] T026 [P] [US1] Write failing two-instance burst and daily-limit integration tests in `apps/agent/tests/test_rate_limit.py`
-- [ ] T027 [P] [US1] Write failing session ownership, distributed serialization, TTL overrun, refresh-loss, disconnect/shielded-persistence, and stale-fence rejection tests in `apps/agent/tests/test_stream_session_control.py` and `apps/api/test/agent-chat-gateway.e2e-spec.ts`
-- [ ] T028 [P] [US1] Write failing encrypted completed-turn/summary/title persistence, browser AGENT/title injection, rotation/backfill, soft-delete, and restart/resume tests in `apps/agent/tests/test_streaming_agent.py`, `apps/api/src/chat/chat-message-crypto.service.spec.ts`, and `apps/api/test/agent-chat-gateway.e2e-spec.ts`
-- [ ] T029 [P] [US1] Write failing FastAPI CORS/preflight and direct bearer-stream contract tests in `apps/agent/tests/test_direct_stream.py`
+- [x] T025 [P] [US1] Write failing tests using real Nest AuthService tokens for required `sub`/`iss`/`aud`/`jti`, legacy `id` transition, logout revocation, user deactivation, origin/quota ordering, cross-user isolation, and zero-inference/persistence on denial in `apps/api/src/auth/auth.service.spec.ts` and `apps/agent/tests/test_stream_auth_budget.py`
+- [x] T026 [P] [US1] Write failing two-instance burst and daily-limit integration tests in `apps/agent/tests/test_rate_limit.py`
+- [x] T027 [P] [US1] Write failing session ownership, distributed serialization, TTL overrun, refresh-loss, disconnect/shielded-persistence, and stale-fence rejection tests in `apps/agent/tests/test_stream_session_control.py` and `apps/api/test/agent-chat-gateway.e2e-spec.ts`
+- [x] T028 [P] [US1] Write failing encrypted completed-turn/summary/title persistence, browser AGENT/title injection, rotation/backfill, soft-delete, and restart/resume tests in `apps/agent/tests/test_streaming_agent.py`, `apps/api/src/chat/chat-message-crypto.service.spec.ts`, and `apps/api/test/agent-chat-gateway.e2e-spec.ts`
+- [x] T029 [P] [US1] Write failing FastAPI CORS/preflight and direct bearer-stream contract tests in `apps/agent/tests/test_direct_stream.py`
 
 ### Implementation for User Story 1
 
-- [ ] T030 [US1] Replace the in-process rate-limit dictionary with the combined accepted-only Redis admission contract and stable errors in `apps/agent/src/agent/middleware/rate_limit.py`
-- [ ] T031 [US1] Replace in-process conversation locking with fenced `SessionLockRepository`, cancel on refresh loss, and revalidate the fence before persistence/action emission in `apps/agent/src/agent/queue/message_queue.py` and `apps/agent/src/agent/streaming/sse.py`
-- [ ] T032 [US1] Issue/validate the canonical JWT profile and enforce JWT → NestJS active/revoked access check → quota → fenced owned session → input safety before inference/persistence in `apps/api/src/auth/auth.service.ts`, `apps/agent/src/agent/middleware/auth.py`, `apps/agent/src/agent/streaming/sse.py`, and `apps/agent/src/agent/sanitization/pii_scrubber.py`
-- [ ] T033 [US1] Add service-authenticated chat access/session/memory/completed-turn/summary endpoints, force browser writes to USER/STANDARD, reject stale fencing tokens, and migrate every agent call off raw browser JWT endpoints in `apps/api/src/agent-gateway/agent-gateway.controller.ts`, `apps/api/src/agent-gateway/agent-gateway.service.ts`, `apps/api/src/chat/chat.controller.ts`, `apps/api/src/chat/chat.service.ts`, and `apps/agent/src/agent/tools/nestjs_client.py`
-- [ ] T034 [US1] Dual-read/dual-write encrypted completed turns, summaries, and session titles with versioned record-bound AES-GCM while retaining legacy rollback columns; preserve controlled summaries and implement soft-delete/revocation/retention in `apps/api/src/chat/chat-message-crypto.service.ts`, `apps/api/src/chat/chat.service.ts`, `apps/agent/src/agent/memory/manager.py`, and `apps/agent/src/agent/main.py`
-- [ ] T035 [US1] Implement strict configured-origin CORS and explicit origin rejection with exact methods/headers, `allow_credentials=False`, CORS headers on auth errors, plus Redis/quota degradation health in `apps/agent/src/agent/main.py` and `apps/agent/src/agent/streaming/sse.py`
-- [ ] T036 [US1] Add strict bearer-token direct-stream support and correlation headers in `apps/web/lib/chatStream.ts` while keeping proxy fallback behind the disabled direct flag
-- [ ] T037 [US1] Retain the `done.sessionId` value across turns and prevent empty-session recreation in `apps/web/components/chat/ChatWidget.tsx`
-- [ ] T038 [US1] Run US1 focused tests and the existing auth/memory/queue/guardrail regression suites, then record the checkpoint in `specs/017-chatbot-backend-infrastructure/quickstart.md`
+- [x] T030 [US1] Replace the in-process rate-limit dictionary with the combined accepted-only Redis admission contract and stable errors in `apps/agent/src/agent/middleware/rate_limit.py`
+- [x] T031 [US1] Replace in-process conversation locking with fenced `SessionLockRepository`, cancel on refresh loss, and revalidate the fence before persistence/action emission in `apps/agent/src/agent/queue/message_queue.py` and `apps/agent/src/agent/streaming/sse.py`
+- [x] T032 [US1] Issue/validate the canonical JWT profile and enforce JWT → NestJS active/revoked access check → quota → fenced owned session → input safety before inference/persistence in `apps/api/src/auth/auth.service.ts`, `apps/agent/src/agent/middleware/auth.py`, `apps/agent/src/agent/streaming/sse.py`, and `apps/agent/src/agent/sanitization/pii_scrubber.py`
+- [x] T033 [US1] Add service-authenticated chat access/session/memory/completed-turn/summary endpoints, force browser writes to USER/STANDARD, reject stale fencing tokens, and migrate every agent call off raw browser JWT endpoints in `apps/api/src/agent-gateway/agent-gateway.controller.ts`, `apps/api/src/agent-gateway/agent-gateway.service.ts`, `apps/api/src/chat/chat.controller.ts`, `apps/api/src/chat/chat.service.ts`, and `apps/agent/src/agent/tools/nestjs_client.py`
+- [x] T034 [US1] Dual-read/dual-write encrypted completed turns, summaries, and session titles with versioned record-bound AES-GCM while retaining legacy rollback columns; preserve controlled summaries and implement soft-delete/revocation/retention in `apps/api/src/chat/chat-message-crypto.service.ts`, `apps/api/src/chat/chat.service.ts`, `apps/agent/src/agent/memory/manager.py`, and `apps/agent/src/agent/main.py`
+- [x] T035 [US1] Implement strict configured-origin CORS and explicit origin rejection with exact methods/headers, `allow_credentials=False`, CORS headers on auth errors, plus Redis/quota degradation health in `apps/agent/src/agent/main.py` and `apps/agent/src/agent/streaming/sse.py`
+- [x] T036 [US1] Add strict bearer-token direct-stream support and correlation headers in `apps/web/lib/chatStream.ts` while keeping proxy fallback behind the disabled direct flag
+- [x] T037 [US1] Retain the `done.sessionId` value across turns and prevent empty-session recreation in `apps/web/components/chat/ChatWidget.tsx`
+- [x] T038 [US1] Run US1 focused tests and the existing auth/memory/queue/guardrail regression suites, then record the checkpoint in `specs/017-chatbot-backend-infrastructure/quickstart.md`
 
 **Checkpoint**: US1 works independently with the existing assistant behavior; quota denial incurs zero model cost and direct-server readiness is proven without client cutover.
 
@@ -139,23 +139,23 @@
 
 ### Tests for User Story 2
 
-- [ ] T039 [P] [US2] Write failing strict Router output and malformed/unknown/confidence-bound tests in `apps/agent/tests/test_router.py`
-- [ ] T040 [P] [US2] Write failing checkout-gate and `possible_checkout` disambiguation matrix tests in `apps/agent/tests/test_checkout_gate.py`
-- [ ] T041 [P] [US2] Replace old confirmation graph tests with failing node/topology/tool-scope tests in `apps/agent/tests/test_graph.py`
-- [ ] T042 [P] [US2] Write failing versioned POST owned-session/proposed-version, signed ordered-offer attestation, legacy-GET non-enrichment, snapshot overwrite/expiry, and identifier/attestation non-exposure tests in `apps/agent/tests/test_search_snapshot.py`, `apps/api/src/agent-gateway/selection-attestation.service.spec.ts`, and `apps/api/test/agent-gateway.e2e-spec.ts`
-- [ ] T043 [P] [US2] Write failing exact General/Travel/Checkout registry tests in `apps/agent/tests/test_tools.py`
+- [x] T039 [P] [US2] Write failing strict Router output and malformed/unknown/confidence-bound tests in `apps/agent/tests/test_router.py`
+- [x] T040 [P] [US2] Write failing checkout-gate and `possible_checkout` disambiguation matrix tests in `apps/agent/tests/test_checkout_gate.py`
+- [x] T041 [P] [US2] Replace old confirmation graph tests with failing node/topology/tool-scope tests in `apps/agent/tests/test_graph.py`
+- [x] T042 [P] [US2] Write failing versioned POST owned-session/proposed-version, signed ordered-offer attestation, legacy-GET non-enrichment, snapshot overwrite/expiry, and identifier/attestation non-exposure tests in `apps/agent/tests/test_search_snapshot.py`, `apps/api/src/agent-gateway/selection-attestation.service.spec.ts`, and `apps/api/test/agent-gateway.e2e-spec.ts`
+- [x] T043 [P] [US2] Write failing exact General/Travel/Checkout registry tests in `apps/agent/tests/test_tools.py`
 
 ### Implementation for User Story 2
 
-- [ ] T044 [P] [US2] Implement the tool-free General-Purpose Agent prompt/model adapter in `apps/agent/src/agent/agents/general_agent.py`
-- [ ] T045 [P] [US2] Implement the five-read-tool Travel Assistant prompt/model adapter with disambiguation metadata in `apps/agent/src/agent/agents/travel_assistant.py`
-- [ ] T046 [P] [US2] Implement the one-signal-tool Checkout Orchestrator prompt/model adapter in `apps/agent/src/agent/agents/checkout_orchestrator.py`
-- [ ] T047 [US2] Implement strict Router model invocation and safe fallback normalization in `apps/agent/src/agent/graph/router.py`
-- [ ] T048 [US2] Replace AgentState confirmation fields with typed route, disambiguation, snapshot, signal, and action fields in `apps/agent/src/agent/graph/state.py`
-- [ ] T049 [US2] Implement opt-in `POST /api/agent-gateway/v2/flights/search` with owned session/proposed version and its stripping consumer, store the signed ordered-offer attestation only in Redis, emit identifier/attestation-free projections, and leave legacy GET byte-for-byte unchanged in `apps/api/src/agent-gateway/dto/attested-flight-search.dto.ts`, `apps/api/src/agent-gateway/agent-gateway.controller.ts`, `apps/api/src/agent-gateway/agent-gateway.service.ts`, `apps/agent/src/agent/tools/search_flights.py`, and `apps/agent/src/agent/tools/nestjs_client.py`
-- [ ] T050 [US2] Replace the global registry with immutable per-agent registries and remove `book_flight` in `apps/agent/src/agent/tools/registry.py`
-- [ ] T051 [US2] Rebuild the single LangGraph topology without `MemorySaver`, confirm node, interrupt, or resume path in `apps/agent/src/agent/graph/graph.py` and `apps/agent/src/agent/graph/nodes.py`
-- [ ] T052 [US2] Integrate Router/specialist event streaming and safe disambiguation into `apps/agent/src/agent/streaming/sse.py`, then run US2 and existing output-guardrail regressions
+- [x] T044 [P] [US2] Implement the tool-free General-Purpose Agent prompt/model adapter in `apps/agent/src/agent/agents/general_agent.py`
+- [x] T045 [P] [US2] Implement the five-read-tool Travel Assistant prompt/model adapter with disambiguation metadata in `apps/agent/src/agent/agents/travel_assistant.py`
+- [x] T046 [P] [US2] Implement the one-signal-tool Checkout Orchestrator prompt/model adapter in `apps/agent/src/agent/agents/checkout_orchestrator.py`
+- [x] T047 [US2] Implement strict Router model invocation and safe fallback normalization in `apps/agent/src/agent/graph/router.py`
+- [x] T048 [US2] Replace AgentState confirmation fields with typed route, disambiguation, snapshot, signal, and action fields in `apps/agent/src/agent/graph/state.py`
+- [x] T049 [US2] Implement opt-in `POST /api/agent-gateway/v2/flights/search` with owned session/proposed version and its stripping consumer, store the signed ordered-offer attestation only in Redis, emit identifier/attestation-free projections, and leave legacy GET byte-for-byte unchanged in `apps/api/src/agent-gateway/dto/attested-flight-search.dto.ts`, `apps/api/src/agent-gateway/agent-gateway.controller.ts`, `apps/api/src/agent-gateway/agent-gateway.service.ts`, `apps/agent/src/agent/tools/search_flights.py`, and `apps/agent/src/agent/tools/nestjs_client.py`
+- [x] T050 [US2] Replace the global registry with immutable per-agent registries and remove `book_flight` in `apps/agent/src/agent/tools/registry.py`
+- [x] T051 [US2] Rebuild the single LangGraph topology without `MemorySaver`, confirm node, interrupt, or resume path in `apps/agent/src/agent/graph/graph.py` and `apps/agent/src/agent/graph/nodes.py`
+- [x] T052 [US2] Integrate Router/specialist event streaming and safe disambiguation into `apps/agent/src/agent/streaming/sse.py`, then run US2 and existing output-guardrail regressions
 
 **Checkpoint**: US2 is independently demonstrable; all messages reach one expected specialist, no LLM has a write tool, and legacy sessions without snapshots safely request a new search.
 

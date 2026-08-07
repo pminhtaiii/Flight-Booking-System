@@ -1,0 +1,59 @@
+{
+  "valid_handoff_event": {
+    "version": 1,
+    "action": "begin_checkout",
+    "handoffToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+    "expiresAt": "2026-08-05T10:00:00Z",
+    "display": {
+      "airline": "Delta Air Lines",
+      "origin": "JFK",
+      "destination": "LAX",
+      "departureAt": "2026-09-01T08:00:00Z",
+      "arrivalAt": "2026-09-01T11:00:00Z",
+      "price": "450.00",
+      "currency": "USD"
+    }
+  },
+  "invalid_handoff_event_missing_token": {
+    "version": 1,
+    "action": "begin_checkout",
+    "expiresAt": "2026-08-05T10:00:00Z",
+    "display": {
+      "airline": "Delta",
+      "origin": "JFK",
+      "destination": "LAX",
+      "departureAt": "2026-09-01T08:00:00Z",
+      "arrivalAt": "2026-09-01T11:00:00Z",
+      "price": "450.00",
+      "currency": "USD"
+    }
+  },
+  "invalid_handoff_event_extra_fields": {
+    "version": 1,
+    "action": "begin_checkout",
+    "handoffToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+    "expiresAt": "2026-08-05T10:00:00Z",
+    "display": {
+      "airline": "Delta Air Lines",
+      "origin": "JFK",
+      "destination": "LAX",
+      "departureAt": "2026-09-01T08:00:00Z",
+      "arrivalAt": "2026-09-01T11:00:00Z",
+      "price": "450.00",
+      "currency": "USD"
+    },
+    "offerId": "offer_12345",
+    "sessionId": "session_67890"
+  },
+  "valid_action_required_event": {
+    "version": 1,
+    "action": "action_required",
+    "message": "Please update your profile to continue."
+  },
+  "valid_chat_message_event": {
+    "version": 1,
+    "action": "chat_message",
+    "content": "Hello, how can I help you?",
+    "role": "assistant"
+  }
+}

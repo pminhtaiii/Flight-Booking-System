@@ -273,3 +273,79 @@ Record in `docs/runbooks/chatbot-handoff.md` and `context/progress-checker.md` o
 - Feature-flag state and rollback rehearsal.
 - Dashboard/alert links or checked-in contracts.
 - Privacy corpus result.
+
+### Phase 1: Contract-Freeze Checkpoint (2026-08-05)
+
+- Added direct `langgraph` and `redis` asyncio dependencies to `apps/agent`.
+- Documented Python Redis/LangGraph usage constraints in `context/library-docs.md`.
+- Wrote failing/passing event contract tests in `packages/shared/src/types/chat.types.spec.ts` and `apps/agent/tests/test_event_contracts.py`.
+- Wrote configuration tests in `apps/api/src/auth/auth.service.spec.ts`, `apps/api/src/chat-handoff/chat-handoff.config.spec.ts`, `apps/web/lib/featureFlags.spec.ts`, and `apps/agent/tests/test_config.py`.
+- Defined strict shared types in `packages/shared/src/types/chat.types.ts` and exported them.
+- Defined `events.py` and `requests.py` in `apps/agent/src/agent/models/`.
+- Configured disabled defaults in `.env.example`, `config.py`, `app.module.ts`, and `featureFlags.ts`.
+- Ran shared builds and contract/config tests, confirming all are GREEN with flags defaulted to off.
+
+### Phase 2: Checkpoint 2B (2026-08-05)
+
+- Wrote failing one-Lua daily/burst admission tests covering concurrency, rejected-attempt non-charging, UTC rollover/TTL, and Redis fail-closed behavior.
+- Implemented the versioned combined Lua admission contract and exact key/error semantics in `chat_budget_repository.py`.
+- Tests run to GREEN confirming atomic admission and failure boundaries.
+
+### Phase 2A: Redis Lifecycle Checkpoint (2026-08-05)
+- Wrote failing Redis lifecycle and health tests in `apps/agent/tests/test_redis_infrastructure.py`.
+- Implemented pooled asyncio Redis client in `apps/agent/src/agent/infrastructure/redis.py`.
+- Wired Redis lifecycle and dependency health in `apps/agent/src/agent/main.py`.
+- Ran T009 tests to GREEN, ensuring startup, shutdown, and degraded health are handled correctly.
+
+### Phase 2C: Fenced Session Lease Checkpoint (2026-08-05)
+
+- Wrote failing acquire/refresh/release/takeover tests in `apps/agent/tests/test_session_lock.py`.
+- Implemented monotonic fenced leases, refresh-loss cancellation, bounded wait/depth, and write-fence propagation in `apps/agent/src/agent/repositories/session_lock_repository.py` and `apps/agent/src/agent/queue/message_queue.py`.
+- All 4 session lock tests run to GREEN (acquire/release, TTL overrun/takeover, bounded wait, refresh cancellation).
+- A stale worker cannot perform a durable write or emit `ACTION_HANDOFF`.
+
+### Phase 2D: Trusted Snapshot Checkpoint (2026-08-05)
+
+- Wrote failing attested Trusted Search Snapshot schema, owner/session, overwrite, TTL, fingerprint, and forbidden-field tests in `apps/agent/tests/test_trusted_snapshot.py`.
+- Implemented strict PII-free attested snapshot serialization, atomic replace/load/delete in `apps/agent/src/agent/repositories/trusted_snapshot_repository.py`.
+- Implemented snapshot schema with strict forbidden-field validation in `apps/agent/src/agent/models/snapshot.py`.
+- All 10 trusted snapshot tests run to GREEN.
+- Full Redis regression suite (22 tests: 2A + 2B + 2C + 2D) run to GREEN.
+- Snapshots are PII-free and restore only inside the correct owner/session boundary.
+
+### Phase 2E: Encrypted/Additive Prisma Foundation Checkpoint (2026-08-05)
+
+- Added encrypted `ChatMessage` content fields, `ChatSession` title fields and `deletedAt`, `BookingAgentProjection` model, and `ChatHandoff` model with check constraints to `apps/api/prisma/schema.prisma`.
+- Created additive migration in `apps/api/prisma/migrations/20260805000000_chatbot_handoff/migration.sql`.
+- Created restart-safe backfill scripts: `backfill-encrypted-chat-messages.ts` and `backfill-booking-agent-projections.ts`.
+- Wrote migration/backfill E2E tests in `apps/api/test/chat-persistence-migration.e2e-spec.ts` and `apps/api/test/chat-handoff-migration.e2e-spec.ts`.
+- Migration successfully applied to database; legacy plaintext columns retained for rollback.
+
+### Phase 2F: Inert Domain Skeletons Checkpoint (2026-08-05)
+
+- Created versioned AES-GCM `ChatMessageCryptoService` in `apps/api/src/chat/chat-message-crypto.service.ts`.
+- Created inert `ChatHandoffModule`, `ChatHandoffController`, `ChatHandoffService`, and `CreateChatHandoffDto` in `apps/api/src/chat-handoff/`.
+- Registered `ChatMessageCryptoService` in `ChatModule` as provider and export.
+- Registered `ChatHandoffModule` in `AppModule` imports.
+- All routes are inert (throw `ServiceUnavailableException`); no chatbot path has cut over.
+- Redis primitives are atomic and PII-free; additive schema is valid.
+
+### Phase 3: Work Package 3F Checkpoint (2026-08-06)
+
+- **T037 (Session ID Retention in ChatWidget)**: Verified session ID preservation across multi-turn streams in `apps/web/components/chat/ChatWidget.tsx`. `handleDone` callbacks capture `done.sessionId` from completion events, setting `activeSessionId` so subsequent user requests pass `sessionId` in the body and prevent redundant empty-session auto-creation.
+- **T038 (US1 Test Verification & Suite Validation)**:
+  - Ran 31 US1 focused agent Pytest suites in `apps/agent` (`test_stream_auth_budget.py`, `test_rate_limit.py`, `test_stream_session_control.py`, `test_streaming_agent.py`, `test_direct_stream.py`). All 31 tests passed 100% GREEN.
+  - Ran NestJS US1 focused Jest test suites (`auth.service.spec.ts`, `chat-message-crypto.service.spec.ts`, `agent-gateway.service.spec.ts`). All 20 tests passed 100% GREEN.
+  - Built `@shared/types` (`pnpm --filter @shared/types build`) with zero compilation errors.
+  - Verified ingress PII detection & security audit logging in `apps/agent/src/agent/streaming/sse.py`.
+  - Verified canonical JWT claim validation (`sub`, `iss`, `aud`, `jti`), NestJS access checks before quota admission, record-bound AES-256-GCM dual-write encryption, and strict CORS preflight handling.
+
+### Phase 4: Work Package 4F Checkpoint (2026-08-06)
+
+- **T039, T047 (Router schema/fallback)**: Implemented strict Router model invocation and safe fallback normalization. Malformed/unknown Router output fails safely and routes to Travel Assistant.
+- **T040, T048 (Checkout gate/state)**: Replaced AgentState confirmation fields with typed route, disambiguation, snapshot, signal, and action fields. Every incomplete checkout gate routes to Travel Assistant with `possible_checkout` metadata.
+- **T041, T050, T051 (Graph topology/removal)**: Replaced global registry with immutable per-agent registries and removed `book_flight`. Rebuilt LangGraph topology without `MemorySaver`, removing fake booking/confirmation/checkpointer paths.
+- **T042, T049 (Signed search split)**: Implemented opt-in `POST /api/agent-gateway/v2/flights/search` with owned session/proposed version and its stripping consumer. Stored signed ordered-offer attestation only in Redis.
+- **T043, T044, T045 (General/Travel inventory)**: Implemented tool-free General-Purpose Agent adapter and five-read-tool Travel Assistant adapter.
+- **T046, T052 (Checkout adapter/integration)**: Implemented Checkout Orchestrator adapter. Integrated Router/specialist event streaming and safe disambiguation.
+- **Test Verification**: Addressed CodeReview findings, fixing snapshot routing keys in the checkout gate and dead code in checkout orchestrator. Run `uv run pytest tests/` in `apps/agent` resulting in 100% tests GREEN (201/201).

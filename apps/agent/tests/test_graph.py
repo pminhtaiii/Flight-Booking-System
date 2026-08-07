@@ -1,5 +1,6 @@
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
+from agent.models.requests import RouteDecision
 from langchain_core.messages import AIMessage, HumanMessage
 from langchain_core.runnables import RunnableConfig
 
@@ -10,6 +11,7 @@ from agent.tools.nestjs_client import NestJSClient
 @pytest.fixture
 def mock_nestjs_client():
     client = MagicMock(spec=NestJSClient)
+    client.check_user_access = AsyncMock(return_value={"allowed": True})
     client.get_gateway_flights_search = AsyncMock()
     client.get_gateway_user_preferences = AsyncMock()
     client.get_gateway_user_bookings = AsyncMock()
@@ -33,15 +35,20 @@ async def test_graph_search_flights_integration(mock_nestjs_client, mock_llm):
     mock_model, mock_model_with_tools = mock_llm
 
     # Setup NestJS client mock response
-    mock_nestjs_client.get_gateway_flights_search.return_value = {
+    mock_nestjs_client.post_gateway_flights_search_v2.return_value = {
+        "snapshotVersion": 1,
+        "snapshotExpiresAt": "2026-08-15T10:00:00Z",
+        "selectionAttestation": "mock_attestation",
         "results": [
             {
+                "flightOfferId": "offer-123",
+                "duffelOfferId": "duffel-123",
                 "airline": "VN",
                 "flightNumber": "VN310",
                 "departureAirport": "HAN",
                 "arrivalAirport": "NRT",
-                "departureTime": "2026-07-15T08:30:00",
-                "arrivalTime": "2026-07-15T15:00:00",
+                "departureTime": "2026-07-15T08:30:00Z",
+                "arrivalTime": "2026-07-15T15:00:00Z",
                 "duration": 330,
                 "stops": 0,
                 "price": 452.00,
@@ -70,11 +77,12 @@ async def test_graph_search_flights_integration(mock_nestjs_client, mock_llm):
     ]
 
     config = RunnableConfig(
-        configurable={"nestjs_client": mock_nestjs_client, "thread_id": "test_thread_1"},
-        configurable_keys=["nestjs_client", "thread_id"]
+        configurable={"nestjs_client": mock_nestjs_client, "thread_id": "test_thread_1", "user_id": "user1"},
+        configurable_keys=["nestjs_client", "thread_id", "user_id"]
     )
 
-    with patch("agent.graph.nodes.get_chat_model", return_value=mock_model):
+    with patch("agent.agents.chat_agent.ChatOpenAI", return_value=mock_model), \
+         patch("agent.graph.graph.invoke_router", return_value=RouteDecision(intent="SEARCH", confidence=1.0, isCommitment=False)):
         initial_state = {
             "messages": [HumanMessage(content="find me flights from Hanoi to Tokyo on July 15")],
             "iteration_count": 0
@@ -84,7 +92,9 @@ async def test_graph_search_flights_integration(mock_nestjs_client, mock_llm):
         # Assertions
         assert len(final_state["messages"]) >= 3
         # Check tool called
-        mock_nestjs_client.get_gateway_flights_search.assert_called_once_with(
+        mock_nestjs_client.post_gateway_flights_search_v2.assert_called_once_with(
+            chat_session_id="test_thread_1",
+            proposed_snapshot_version=1,
             origin="HAN", destination="NRT", date="2026-07-15", passengers=1
         )
         # Check final message content
@@ -123,7 +133,8 @@ async def test_graph_get_user_preferences_integration(mock_nestjs_client, mock_l
         configurable_keys=["nestjs_client", "thread_id"]
     )
 
-    with patch("agent.graph.nodes.get_chat_model", return_value=mock_model):
+    with patch("agent.agents.chat_agent.ChatOpenAI", return_value=mock_model), \
+         patch("agent.graph.graph.invoke_router", return_value=RouteDecision(intent="SEARCH", confidence=1.0, isCommitment=False)):
         initial_state = {
             "messages": [HumanMessage(content="what are my travel preferences?")],
             "iteration_count": 0
@@ -179,7 +190,8 @@ async def test_graph_list_user_bookings_integration(mock_nestjs_client, mock_llm
         configurable_keys=["nestjs_client", "thread_id"]
     )
 
-    with patch("agent.graph.nodes.get_chat_model", return_value=mock_model):
+    with patch("agent.agents.chat_agent.ChatOpenAI", return_value=mock_model), \
+         patch("agent.graph.graph.invoke_router", return_value=RouteDecision(intent="SEARCH", confidence=1.0, isCommitment=False)):
         initial_state = {
             "messages": [HumanMessage(content="show me my bookings")],
             "iteration_count": 0
@@ -205,7 +217,8 @@ async def test_graph_out_of_bounds_query(mock_nestjs_client, mock_llm):
         configurable_keys=["nestjs_client", "thread_id"]
     )
 
-    with patch("agent.graph.nodes.get_chat_model", return_value=mock_model):
+    with patch("agent.agents.chat_agent.ChatOpenAI", return_value=mock_model), \
+         patch("agent.graph.graph.invoke_router", return_value=RouteDecision(intent="SEARCH", confidence=1.0, isCommitment=False)):
         initial_state = {
             "messages": [HumanMessage(content="What is the cancellation policy?")],
             "iteration_count": 0
@@ -259,7 +272,8 @@ async def test_graph_iteration_limit_capping(mock_nestjs_client, mock_llm):
         configurable_keys=["nestjs_client", "thread_id"]
     )
 
-    with patch("agent.graph.nodes.get_chat_model", return_value=mock_model):
+    with patch("agent.agents.chat_agent.ChatOpenAI", return_value=mock_model), \
+         patch("agent.graph.graph.invoke_router", return_value=RouteDecision(intent="SEARCH", confidence=1.0, isCommitment=False)):
         initial_state = {
             "messages": [HumanMessage(content="run loop")],
             "iteration_count": 0
@@ -270,123 +284,16 @@ async def test_graph_iteration_limit_capping(mock_nestjs_client, mock_llm):
 
 
 @pytest.mark.asyncio
-async def test_graph_confirm_gate_approved(mock_nestjs_client, mock_llm):
-    mock_model, mock_model_with_tools = mock_llm
+async def test_graph_topology():
+    from agent.graph.graph import graph, workflow
+    from agent.tools.registry import get_travel_tools
 
-    # Setup LLM trace:
-    # 1. First invoke: returns tool call to book_flight
-    # 2. Second invoke (after confirmation resume): returns final answer
-    mock_model_with_tools.ainvoke.side_effect = [
-        AIMessage(
-            content="",
-            tool_calls=[
-                {
-                    "name": "book_flight",
-                    "args": {"flight_number": "VN310", "date": "2026-07-15"},
-                    "id": "call_book"
-                }
-            ],
-            id="ai_call_1"
-        ),
-        AIMessage(content="I have successfully booked flight VN310 for you on 2026-07-15.")
-    ]
+    nodes = set(workflow.nodes.keys())
+    assert "confirm" not in nodes, "Confirm node should be removed"
+    
+    # Verify the checkpointer is absent
+    assert graph.checkpointer is None, "MemorySaver should be removed"
 
-    config = RunnableConfig(
-        configurable={"nestjs_client": mock_nestjs_client, "thread_id": "test_thread_confirm_approve"},
-        configurable_keys=["nestjs_client", "thread_id"]
-    )
-
-    with patch("agent.graph.nodes.get_chat_model", return_value=mock_model):
-        initial_state = {
-            "messages": [HumanMessage(content="please book flight VN310 on July 15")],
-            "iteration_count": 0
-        }
-        
-        # Run graph until it interrupts before "confirm"
-        final_state = await graph.ainvoke(initial_state, config=config)
-
-        # Assert graph is suspended before "confirm"
-        current_state = await graph.aget_state(config)
-        assert current_state.next == ("confirm",)
-        
-        # Check pending confirmation state details
-        pending = current_state.values.get("pending_confirmation")
-        assert pending is not None
-        assert pending["name"] == "book_flight"
-        assert pending["args"] == {"flight_number": "VN310", "date": "2026-07-15"}
-        assert pending["id"] == "call_book"
-        
-        # Approve the booking: update the state
-        pending["confirmed"] = True
-        await graph.aupdate_state(config, {"pending_confirmation": pending}, as_node="agent")
-
-        # Resume the graph
-        resumed_state = await graph.ainvoke(None, config=config)
-
-        # Assertions after resumption
-        # The tool should have been executed, and final answer returned
-        assert len(resumed_state["messages"]) >= 3
-        # The final message from the LLM should summarize success
-        assert "booked flight VN310" in resumed_state["messages"][-1].content
-        # pending_confirmation should be cleared
-        assert resumed_state.get("pending_confirmation") is None
-
-
-@pytest.mark.asyncio
-async def test_graph_confirm_gate_aborted(mock_nestjs_client, mock_llm):
-    mock_model, mock_model_with_tools = mock_llm
-
-    # Setup LLM trace:
-    # 1. First invoke: returns tool call to book_flight
-    # 2. Second invoke (after cancellation resume): returns final answer
-    mock_model_with_tools.ainvoke.side_effect = [
-        AIMessage(
-            content="",
-            tool_calls=[
-                {
-                    "name": "book_flight",
-                    "args": {"flight_number": "VN310", "date": "2026-07-15"},
-                    "id": "call_book"
-                }
-            ],
-            id="ai_call_1"
-        ),
-        AIMessage(content="I have cancelled the booking of flight VN310 as requested.")
-    ]
-
-    config = RunnableConfig(
-        configurable={"nestjs_client": mock_nestjs_client, "thread_id": "test_thread_confirm_abort"},
-        configurable_keys=["nestjs_client", "thread_id"]
-    )
-
-    with patch("agent.graph.nodes.get_chat_model", return_value=mock_model):
-        initial_state = {
-            "messages": [HumanMessage(content="please book flight VN310 on July 15")],
-            "iteration_count": 0
-        }
-        
-        # Run graph until it interrupts before "confirm"
-        final_state = await graph.ainvoke(initial_state, config=config)
-
-        # Assert graph is suspended before "confirm"
-        current_state = await graph.aget_state(config)
-        assert current_state.next == ("confirm",)
-        
-        # Check pending confirmation state details
-        pending = current_state.values.get("pending_confirmation")
-        assert pending is not None
-        assert pending["name"] == "book_flight"
-        
-        # Abort the booking: update the state
-        pending["confirmed"] = False
-        await graph.aupdate_state(config, {"pending_confirmation": pending}, as_node="agent")
-
-        # Resume the graph
-        resumed_state = await graph.ainvoke(None, config=config)
-
-        # Assertions after resumption
-        assert len(resumed_state["messages"]) >= 3
-        # The final message from the LLM should summarize cancellation
-        assert "cancelled" in resumed_state["messages"][-1].content.lower()
-        # pending_confirmation should be cleared
-        assert resumed_state.get("pending_confirmation") is None
+    # Check book_flight is absent
+    tools = {t.name for t in get_travel_tools()}
+    assert "book_flight" not in tools, "book_flight tool should be removed"

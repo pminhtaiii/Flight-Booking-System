@@ -3,6 +3,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { BookingActionCard, parseActionRequiredEvent, type SafeActionRequiredEvent } from './BookingActionCard';
+import { createChatStreamRequest } from '@/lib/chatStream';
 
 const OFFER_ID_PATTERN = /^off_[A-Za-z0-9_-]{1,128}$/;
 const SESSION_ID_PATTERN = /^[A-Za-z0-9_-]{1,128}$/;
@@ -15,19 +16,33 @@ function getSafeSessionId(candidate: string | null): string | null {
   return candidate && SESSION_ID_PATTERN.test(candidate) ? candidate : null;
 }
 
-function consumeSseBlock(block: string, onActionRequired: (payload: unknown) => void): void {
+function consumeSseBlock(
+  block: string,
+  onActionRequired: (payload: unknown) => void,
+  onDone?: (sessionId: string) => void,
+): void {
   const lines = block.split(/\r?\n/);
   const eventName = lines.find((line) => line.startsWith('event:'))?.slice('event:'.length).trim();
   const data = lines.find((line) => line.startsWith('data:'))?.slice('data:'.length).trim();
 
-  if (eventName !== 'ACTION_REQUIRED' || !data) {
-    return;
-  }
-
-  try {
-    onActionRequired(JSON.parse(data));
-  } catch {
-    // A malformed event is deliberately discarded without logging its content.
+  if (eventName === 'ACTION_REQUIRED' && data) {
+    try {
+      onActionRequired(JSON.parse(data));
+    } catch {
+      // A malformed event is deliberately discarded without logging its content.
+    }
+  } else if (eventName === 'done' && data) {
+    try {
+      const parsed = JSON.parse(data);
+      if (parsed && typeof parsed.sessionId === 'string') {
+        const safeSessionId = getSafeSessionId(parsed.sessionId);
+        if (safeSessionId && onDone) {
+          onDone(safeSessionId);
+        }
+      }
+    } catch {
+      // Discard malformed event
+    }
   }
 }
 
@@ -36,14 +51,12 @@ async function consumeChatStream(
   sessionId: string,
   signal: AbortSignal,
   onActionRequired: (payload: unknown) => void,
+  onDone?: (sessionId: string) => void,
 ): Promise<void> {
   try {
-    const response = await fetch('/api/chat/stream', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ message, sessionId }),
+    const response = await createChatStreamRequest({
+      message,
+      sessionId,
       signal,
     });
 
@@ -60,11 +73,11 @@ async function consumeChatStream(
       buffer += decoder.decode(value, { stream: !done });
       const blocks = buffer.split(/\r?\n\r?\n/);
       buffer = blocks.pop() ?? '';
-      blocks.forEach((block) => consumeSseBlock(block, onActionRequired));
+      blocks.forEach((block) => consumeSseBlock(block, onActionRequired, onDone));
 
       if (done) {
         if (buffer) {
-          consumeSseBlock(buffer, onActionRequired);
+          consumeSseBlock(buffer, onActionRequired, onDone);
         }
         return;
       }
@@ -82,8 +95,16 @@ export function ChatWidget(): JSX.Element {
   const router = useRouter();
   const searchParams = useSearchParams();
   const offerId = getSafeOfferId(searchParams.get('offerId'));
-  const sessionId = getSafeSessionId(searchParams.get('sessionId'));
+  const sessionIdFromUrl = getSafeSessionId(searchParams.get('sessionId'));
   const autoResume = searchParams.get('autoResume') === 'true';
+
+  const [activeSessionId, setActiveSessionId] = useState<string | null>(sessionIdFromUrl);
+
+  useEffect(() => {
+    if (sessionIdFromUrl) {
+      setActiveSessionId(sessionIdFromUrl);
+    }
+  }, [sessionIdFromUrl]);
 
   const acceptActionRequiredEvent = useCallback((payload: unknown): void => {
     const safeEvent = parseActionRequiredEvent(payload);
@@ -92,29 +113,34 @@ export function ChatWidget(): JSX.Element {
     }
   }, []);
 
+  const handleDone = useCallback((doneSessionId: string): void => {
+    setActiveSessionId(doneSessionId);
+  }, []);
+
   // Auto-resume hook
   useEffect(() => {
-    if (autoResume && sessionId) {
+    if (autoResume && activeSessionId) {
       const controller = new AbortController();
-      void consumeChatStream('resume', sessionId, controller.signal, acceptActionRequiredEvent);
+      void consumeChatStream('resume', activeSessionId, controller.signal, acceptActionRequiredEvent, handleDone);
       return () => controller.abort();
     }
-  }, [autoResume, sessionId, acceptActionRequiredEvent]);
+  }, [autoResume, activeSessionId, acceptActionRequiredEvent, handleDone]);
 
   const handleNavigate = (target: SafeActionRequiredEvent['target']): void => {
     const params = new URLSearchParams();
-    if (offerId) params.set('offerId', offerId);
-    if (sessionId) params.set('sessionId', sessionId);
+    const targetOfferId = actionEvent?.offerId || offerId;
+    if (targetOfferId) params.set('offerId', targetOfferId);
+    if (activeSessionId) params.set('sessionId', activeSessionId);
     params.set('autoResume', 'true');
     
     const qs = params.toString();
     const returnTo = `${pathname ?? '/'}${qs ? `?${qs}` : ''}`;
 
     if (target === '/checkout/passengers') {
-      if (!offerId) {
+      if (!targetOfferId) {
         return;
       }
-      router.push(`/checkout/passengers?offerId=${encodeURIComponent(offerId)}`);
+      router.push(`/checkout/passengers?offerId=${encodeURIComponent(targetOfferId)}&returnTo=${encodeURIComponent(returnTo)}`);
       return;
     }
 
@@ -124,7 +150,7 @@ export function ChatWidget(): JSX.Element {
   const handleSend = () => {
     if (!inputMessage.trim()) return;
     const controller = new AbortController();
-    void consumeChatStream(inputMessage, sessionId ?? '', controller.signal, acceptActionRequiredEvent);
+    void consumeChatStream(inputMessage, activeSessionId ?? '', controller.signal, acceptActionRequiredEvent, handleDone);
     setInputMessage('');
   };
 

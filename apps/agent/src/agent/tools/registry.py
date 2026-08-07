@@ -1,50 +1,55 @@
-from typing import Dict, Any, List
-from langchain_core.tools import BaseTool, tool
+from typing import List
+from langchain_core.tools import BaseTool
+
 from agent.tools.search_flights import search_flights
 from agent.tools.get_preferences import get_user_preferences
 from agent.tools.list_bookings import list_user_bookings
 from agent.tools.check_booking_readiness import check_booking_readiness
+from agent.tools.signal_checkout_intent import signal_checkout_intent
 
-@tool("book_flight")
-async def book_flight(flight_number: str, date: str) -> str:
-    """Book a flight with a flight number and date. This action requires confirmation."""
-    return f"Flight {flight_number} on {date} has been successfully booked."
+_GENERAL_TOOLS: tuple[BaseTool, ...] = ()
 
-TOOL_REGISTRY: Dict[str, Dict[str, Any]] = {
-    "search_flights": {
-        "tool": search_flights,
-        "requires_confirmation": False,
-    },
-    "get_user_preferences": {
-        "tool": get_user_preferences,
-        "requires_confirmation": False,
-    },
-    "list_user_bookings": {
-        "tool": list_user_bookings,
-        "requires_confirmation": False,
-    },
-    "check_booking_readiness": {
-        "tool": check_booking_readiness,
-        "requires_confirmation": False,
-    },
-    "book_flight": {
-        "tool": book_flight,
-        "requires_confirmation": True,
-    },
-}
+_TRAVEL_TOOLS: tuple[BaseTool, ...] = (
+    search_flights,
+    get_user_preferences,
+    list_user_bookings,
+    check_booking_readiness,
+)
+
+_CHECKOUT_TOOLS: tuple[BaseTool, ...] = (
+    signal_checkout_intent,
+)
+
+
+def get_general_tools() -> tuple[BaseTool, ...]:
+    return _GENERAL_TOOLS
+
+def get_travel_tools() -> tuple[BaseTool, ...]:
+    return _TRAVEL_TOOLS
+
+def get_checkout_tools() -> tuple[BaseTool, ...]:
+    return _CHECKOUT_TOOLS
 
 def get_tools() -> List[BaseTool]:
     """Get a list of all registered tool instances."""
-    return [info["tool"] for info in TOOL_REGISTRY.values()]
+    all_tools = _GENERAL_TOOLS + _TRAVEL_TOOLS + _CHECKOUT_TOOLS
+    seen = set()
+    unique_tools = []
+    for tool in all_tools:
+        if tool.name not in seen:
+            seen.add(tool.name)
+            unique_tools.append(tool)
+    return unique_tools
 
 def get_tool_by_name(name: str) -> BaseTool:
     """Retrieve a registered tool instance by its name."""
-    if name not in TOOL_REGISTRY:
-        raise ValueError(f"Tool '{name}' is not registered.")
-    return TOOL_REGISTRY[name]["tool"]
+    for tool in get_tools():
+        if tool.name == name:
+            return tool
+    raise ValueError(f"Tool '{name}' is not registered.")
 
 def requires_confirmation(name: str) -> bool:
-    """Check if a tool requires confirmation before execution."""
-    if name not in TOOL_REGISTRY:
-        return False
-    return TOOL_REGISTRY[name]["requires_confirmation"]
+    """Check if a tool requires confirmation before execution.
+    In the new topology, no tools require confirmation via graph interruption.
+    """
+    return False

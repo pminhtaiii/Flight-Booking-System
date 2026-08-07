@@ -14,6 +14,9 @@ def get_auth_headers(payload_data=None):
     payload = {
         "sub": "12345",
         "email": "test@example.com",
+        "iss": "booking-systems-api",
+        "aud": "booking-systems-clients",
+        "jti": "test-jti-12345",
         "exp": int(time.time()) + 100
     }
     if payload_data:
@@ -56,7 +59,27 @@ async def test_stream_success_path(monkeypatch):
     mock_guardrail.validate_message = AsyncMock(return_value=(True, ""))
     monkeypatch.setattr(app.state, "guardrails", mock_guardrail, raising=False)
     
-    # 2. Mock NestJSClient methods
+    # 2. Mock NestJSClient methods and Redis/Budget
+    monkeypatch.setattr(
+        "agent.middleware.rate_limit.get_redis_client",
+        lambda: MagicMock()
+    )
+    monkeypatch.setattr(
+        "agent.middleware.rate_limit.ChatBudgetRepository.admit_request",
+        AsyncMock()
+    )
+    monkeypatch.setattr(
+        "agent.streaming.sse.get_redis_client",
+        lambda: MagicMock()
+    )
+    monkeypatch.setattr(
+        "agent.repositories.chat_budget_repository.ChatBudgetRepository.admit_request",
+        AsyncMock()
+    )
+    monkeypatch.setattr(
+        "agent.tools.nestjs_client.NestJSClient.check_user_access",
+        AsyncMock(return_value={"allowed": True})
+    )
     mock_get_memory = AsyncMock(return_value={
         "recentMessages": [
             {"sender": "USER", "content": "hello agent"},
@@ -154,7 +177,27 @@ async def test_stream_llm_error_path(monkeypatch):
     mock_guardrail.validate_message = AsyncMock(return_value=(True, ""))
     monkeypatch.setattr(app.state, "guardrails", mock_guardrail, raising=False)
     
-    # 2. Mock NestJSClient methods
+    # 2. Mock NestJSClient methods and Redis/Budget
+    monkeypatch.setattr(
+        "agent.middleware.rate_limit.get_redis_client",
+        lambda: MagicMock()
+    )
+    monkeypatch.setattr(
+        "agent.middleware.rate_limit.ChatBudgetRepository.admit_request",
+        AsyncMock()
+    )
+    monkeypatch.setattr(
+        "agent.streaming.sse.get_redis_client",
+        lambda: MagicMock()
+    )
+    monkeypatch.setattr(
+        "agent.repositories.chat_budget_repository.ChatBudgetRepository.admit_request",
+        AsyncMock()
+    )
+    monkeypatch.setattr(
+        "agent.tools.nestjs_client.NestJSClient.check_user_access",
+        AsyncMock(return_value={"allowed": True})
+    )
     mock_get_memory = AsyncMock(return_value={
         "recentMessages": [],
         "summary": None
@@ -235,7 +278,27 @@ async def test_stream_connection_drop_path(monkeypatch):
     mock_guardrail.validate_message = AsyncMock(return_value=(True, ""))
     monkeypatch.setattr(app.state, "guardrails", mock_guardrail, raising=False)
     
-    # 2. Mock NestJSClient methods
+    # 2. Mock NestJSClient methods and Redis/Budget
+    monkeypatch.setattr(
+        "agent.middleware.rate_limit.get_redis_client",
+        lambda: MagicMock()
+    )
+    monkeypatch.setattr(
+        "agent.middleware.rate_limit.ChatBudgetRepository.admit_request",
+        AsyncMock()
+    )
+    monkeypatch.setattr(
+        "agent.streaming.sse.get_redis_client",
+        lambda: MagicMock()
+    )
+    monkeypatch.setattr(
+        "agent.repositories.chat_budget_repository.ChatBudgetRepository.admit_request",
+        AsyncMock()
+    )
+    monkeypatch.setattr(
+        "agent.tools.nestjs_client.NestJSClient.check_user_access",
+        AsyncMock(return_value={"allowed": True})
+    )
     mock_get_memory = AsyncMock(return_value={
         "recentMessages": [],
         "summary": None
@@ -315,3 +378,115 @@ async def test_stream_connection_drop_path(monkeypatch):
             assert messages_sent[0]["content"] == "drop me"
             assert messages_sent[1]["sender"] == "AGENT"
             assert "First chunk" in messages_sent[1]["content"]
+
+
+@pytest.mark.asyncio
+async def test_memory_manager_persists_summary_via_service_auth(monkeypatch):
+    from agent.memory.manager import MemoryManager
+    from agent.tools.nestjs_client import NestJSClient
+
+    client = NestJSClient(base_url="http://localhost:3001/api", token="mock-jwt-token")
+    mock_get_memory = AsyncMock(return_value={
+        "totalMessageCount": 25,
+        "recentMessages": [
+            {"sender": "USER", "content": f"msg {i}"} for i in range(25)
+        ],
+        "summary": "Existing summary"
+    })
+    mock_create_message = AsyncMock(return_value={"id": "summary-msg-123"})
+    monkeypatch.setattr(client, "get_memory", mock_get_memory)
+    monkeypatch.setattr(client, "create_message", mock_create_message)
+
+    # Mock get_chat_model
+    mock_model = MagicMock()
+    mock_model.ainvoke = AsyncMock(return_value=MagicMock(content="New consolidated summary"))
+    monkeypatch.setattr("agent.memory.manager.get_chat_model", lambda: mock_model)
+
+    manager = MemoryManager(window_size=20, token_budget=10) # very low budget to trigger summary
+    await manager.check_and_summarize("session-summary-test", client, total_count=25)
+
+    mock_create_message.assert_called_once_with(
+        session_id="session-summary-test",
+        sender="AGENT",
+        message_type="SUMMARY",
+        content="New consolidated summary"
+    )
+
+
+@pytest.mark.asyncio
+async def test_session_restart_resume_with_decrypted_history(monkeypatch):
+    headers = get_auth_headers()
+    
+    mock_guardrail = MagicMock()
+    mock_guardrail.is_healthy.return_value = True
+    mock_guardrail.validate_message = AsyncMock(return_value=(True, ""))
+    monkeypatch.setattr(app.state, "guardrails", mock_guardrail, raising=False)
+
+    monkeypatch.setattr(
+        "agent.middleware.rate_limit.get_redis_client",
+        lambda: MagicMock()
+    )
+    monkeypatch.setattr(
+        "agent.middleware.rate_limit.ChatBudgetRepository.admit_request",
+        AsyncMock()
+    )
+    monkeypatch.setattr(
+        "agent.streaming.sse.get_redis_client",
+        lambda: MagicMock()
+    )
+    monkeypatch.setattr(
+        "agent.repositories.chat_budget_repository.ChatBudgetRepository.admit_request",
+        AsyncMock()
+    )
+    monkeypatch.setattr(
+        "agent.tools.nestjs_client.NestJSClient.check_user_access",
+        AsyncMock(return_value={"allowed": True})
+    )
+    mock_get_memory = AsyncMock(return_value={
+        "recentMessages": [
+            {"sender": "USER", "content": "Book flight to Tokyo"},
+            {"sender": "AGENT", "content": "I found flight VN300 to Tokyo"}
+        ],
+        "summary": "User requested flight to Tokyo"
+    })
+    mock_create_batch = AsyncMock(return_value={
+        "messages": [
+            {"id": "msg-u2", "sender": "USER"},
+            {"id": "msg-a2", "sender": "AGENT"}
+        ]
+    })
+    monkeypatch.setattr("agent.tools.nestjs_client.NestJSClient.get_memory", mock_get_memory)
+    monkeypatch.setattr("agent.tools.nestjs_client.NestJSClient.create_message_batch", mock_create_batch)
+    monkeypatch.setattr("agent.memory.manager.MemoryManager.check_and_summarize", AsyncMock())
+
+    mock_graph = MagicMock()
+    async def mock_astream_events(*args, **kwargs):
+        yield {
+            "event": "on_chat_model_stream",
+            "data": {"chunk": AIMessageChunk(content="Resuming session for Tokyo flight.")}
+        }
+    mock_graph.astream_events = mock_astream_events
+
+    mock_state = MagicMock()
+    mock_state.next = ()
+    from langchain_core.messages import HumanMessage
+    mock_state.values = {"messages": [HumanMessage(content="What is the price?")]}
+    mock_graph.aget_state = AsyncMock(return_value=mock_state)
+
+    with patch("agent.streaming.sse.graph", mock_graph):
+        transport = httpx.ASGITransport(app=app)
+        async with httpx.AsyncClient(transport=transport, base_url="http://test") as ac:
+            async with ac.stream(
+                "POST",
+                "/chat/stream",
+                json={"message": "What is the price?", "sessionId": "session-resume-123"},
+                headers=headers
+            ) as response:
+                assert response.status_code == 200
+                lines = [line async for line in response.aiter_lines()]
+                events = parse_sse(lines)
+
+                done_events = [e for e in events if e["event"] == "done"]
+                assert len(done_events) == 1
+                assert done_events[0]["data"]["sessionId"] == "session-resume-123"
+

@@ -1,19 +1,56 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, HttpException, HttpStatus } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import { CacheService } from '@/cache/cache.service';
 import { PrismaService } from '@/prisma/prisma.service';
 import { AuditService } from '@/audit/audit.service';
+import { ChatMessageCryptoService } from './chat-message-crypto.service';
 import { ListSessionsQueryDto } from './dto/list-sessions-query.dto';
 import { CreateMessageDto } from './dto/create-message.dto';
 import { BatchMessagesDto } from './dto/batch-messages.dto';
 import { ListMessagesQueryDto } from './dto/list-messages-query.dto';
 import { MemoryQueryDto } from './dto/memory-query.dto';
-import { Prisma, ChatMessage } from '@prisma/client';
+import { Prisma, ChatMessage, MessageSender, MessageType } from '@prisma/client';
+import * as crypto from 'crypto';
 
 @Injectable()
 export class ChatService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly auditService: AuditService,
+    private readonly cacheService: CacheService,
+    private readonly configService: ConfigService,
+    private readonly cryptoService: ChatMessageCryptoService,
   ) {}
+
+  async validateFencingToken(
+    userId: string,
+    sessionId: string,
+    fencingToken?: string | null,
+  ): Promise<void> {
+    const isWriteFenceEnabled =
+      this.configService.get<string>('FEATURE_FLAG_WRITE_FENCE') === 'true';
+
+    if (!isWriteFenceEnabled) {
+      return;
+    }
+
+    if (!fencingToken) {
+      throw new HttpException(
+        { code: 'MISSING_FENCING_TOKEN', message: 'Fencing token is required when write fence is enabled' },
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+
+    const lockKey = `chat:session-lock:${userId}:${sessionId}`;
+    const currentFence = await this.cacheService.hget(lockKey, 'fence');
+
+    if (currentFence === null || String(currentFence) !== String(fencingToken)) {
+      throw new HttpException(
+        { code: 'STALE_FENCING_TOKEN', message: 'Fencing token is stale or invalid' },
+        HttpStatus.CONFLICT,
+      );
+    }
+  }
 
   async createSession(
     userId: string,
@@ -22,11 +59,30 @@ export class ChatService {
     traceId?: string,
     correlationId?: string,
   ) {
+    const sessionId = crypto.randomUUID();
+    let titleCiphertext: string | null = null;
+    let titleNonce: string | null = null;
+    let titleAuthTag: string | null = null;
+    let titleKeyVersion: number | null = null;
+
+    if (title && this.cryptoService.isConfigured()) {
+      const encrypted = await this.cryptoService.encryptSessionTitle(sessionId, title);
+      titleCiphertext = encrypted.ciphertext;
+      titleNonce = encrypted.nonce;
+      titleAuthTag = encrypted.authTag;
+      titleKeyVersion = encrypted.keyVersion;
+    }
+
     return this.prisma.$transaction(async (tx) => {
       const session = await tx.chatSession.create({
         data: {
+          id: sessionId,
           userId,
           title: title || null,
+          titleCiphertext,
+          titleNonce,
+          titleAuthTag,
+          titleKeyVersion,
         },
       });
 
@@ -40,13 +96,19 @@ export class ChatService {
         correlationId,
       });
 
-      return session;
+      const decryptedTitle = await this.cryptoService.decryptSessionTitle(session);
+
+      return {
+        ...session,
+        title: decryptedTitle,
+      };
     });
   }
 
   async listSessions(userId: string, query: ListSessionsQueryDto) {
     const where: Prisma.ChatSessionWhereInput = {
       userId,
+      deletedAt: null,
     };
 
     let cursorDate: Date | undefined;
@@ -84,13 +146,23 @@ export class ChatService {
       nextCursor = `${lastSession.lastActiveAt.toISOString()}_${lastSession.id}`;
     }
 
-    const formattedSessions = sessions.map((session) => ({
-      id: session.id,
-      title: session.title,
-      createdAt: session.createdAt,
-      lastActiveAt: session.lastActiveAt,
-      messagePreview: session.messages[0]?.content || null,
-    }));
+    const formattedSessions = await Promise.all(
+      sessions.map(async (session) => {
+        const decryptedTitle = await this.cryptoService.decryptSessionTitle(session);
+        let preview: string | null = null;
+        if (session.messages[0]) {
+          preview = await this.cryptoService.decryptMessageContent(session.messages[0]);
+        }
+
+        return {
+          id: session.id,
+          title: decryptedTitle,
+          createdAt: session.createdAt,
+          lastActiveAt: session.lastActiveAt,
+          messagePreview: preview,
+        };
+      }),
+    );
 
     return {
       sessions: formattedSessions,
@@ -103,6 +175,7 @@ export class ChatService {
       where: {
         id: sessionId,
         userId,
+        deletedAt: null,
       },
     });
 
@@ -116,8 +189,11 @@ export class ChatService {
       },
     });
 
+    const decryptedTitle = await this.cryptoService.decryptSessionTitle(session);
+
     return {
       ...session,
+      title: decryptedTitle,
       messageCount,
     };
   }
@@ -134,6 +210,7 @@ export class ChatService {
       where: {
         id: sessionId,
         userId,
+        deletedAt: null,
       },
     });
 
@@ -141,12 +218,34 @@ export class ChatService {
       throw new NotFoundException('Session not found');
     }
 
+    let titleCiphertext: string | null = session.titleCiphertext;
+    let titleNonce: string | null = session.titleNonce;
+    let titleAuthTag: string | null = session.titleAuthTag;
+    let titleKeyVersion: number | null = session.titleKeyVersion;
+
+    if (title !== undefined && title !== null && this.cryptoService.isConfigured()) {
+      const encrypted = await this.cryptoService.encryptSessionTitle(sessionId, title);
+      titleCiphertext = encrypted.ciphertext;
+      titleNonce = encrypted.nonce;
+      titleAuthTag = encrypted.authTag;
+      titleKeyVersion = encrypted.keyVersion;
+    }
+
     return this.prisma.$transaction(async (tx) => {
       const updatedSession = await tx.chatSession.update({
         where: {
           id: sessionId,
         },
-        data: title === undefined ? {} : { title },
+        data:
+          title === undefined
+            ? {}
+            : {
+                title,
+                titleCiphertext,
+                titleNonce,
+                titleAuthTag,
+                titleKeyVersion,
+              },
       });
 
       await this.auditService.createLog(tx, {
@@ -159,7 +258,12 @@ export class ChatService {
         correlationId,
       });
 
-      return updatedSession;
+      const decryptedTitle = await this.cryptoService.decryptSessionTitle(updatedSession);
+
+      return {
+        ...updatedSession,
+        title: decryptedTitle,
+      };
     });
   }
 
@@ -174,6 +278,7 @@ export class ChatService {
       where: {
         id: sessionId,
         userId,
+        deletedAt: null,
       },
     });
 
@@ -182,9 +287,12 @@ export class ChatService {
     }
 
     await this.prisma.$transaction(async (tx) => {
-      await tx.chatSession.delete({
+      await tx.chatSession.update({
         where: {
           id: sessionId,
+        },
+        data: {
+          deletedAt: new Date(),
         },
       });
 
@@ -207,11 +315,15 @@ export class ChatService {
     ipAddress?: string,
     traceId?: string,
     correlationId?: string,
+    fencingToken?: string,
   ) {
+    await this.validateFencingToken(userId, sessionId, fencingToken);
+
     const session = await this.prisma.chatSession.findFirst({
       where: {
         id: sessionId,
         userId,
+        deletedAt: null,
       },
     });
 
@@ -220,13 +332,44 @@ export class ChatService {
     }
 
     const now = new Date();
+    const messageId = crypto.randomUUID();
+    const sender = dto.sender;
+    const messageType = dto.type || 'STANDARD';
+    const content = dto.content;
+
+    let contentCiphertext: string | null = null;
+    let contentNonce: string | null = null;
+    let contentAuthTag: string | null = null;
+    let contentKeyVersion: number | null = null;
+
+    if (content && this.cryptoService.isConfigured()) {
+      const encrypted = await this.cryptoService.encryptMessageContent(
+        messageId,
+        sessionId,
+        sender,
+        messageType,
+        content,
+      );
+      contentCiphertext = encrypted.ciphertext;
+      contentNonce = encrypted.nonce;
+      contentAuthTag = encrypted.authTag;
+      contentKeyVersion = encrypted.keyVersion;
+    }
+
     return this.prisma.$transaction(async (tx) => {
+      await this.validateFencingToken(userId, sessionId, fencingToken);
+
       const message = await tx.chatMessage.create({
         data: {
+          id: messageId,
           sessionId,
-          sender: dto.sender,
-          type: dto.type || 'STANDARD',
-          content: dto.content,
+          sender: sender as MessageSender,
+          type: messageType as MessageType,
+          content,
+          contentCiphertext,
+          contentNonce,
+          contentAuthTag,
+          contentKeyVersion,
           createdAt: now,
         },
       });
@@ -250,7 +393,12 @@ export class ChatService {
         correlationId,
       });
 
-      return message;
+      const decryptedContent = await this.cryptoService.decryptMessageContent(message);
+
+      return {
+        ...message,
+        content: decryptedContent,
+      };
     });
   }
 
@@ -259,6 +407,7 @@ export class ChatService {
       where: {
         id: sessionId,
         userId,
+        deletedAt: null,
       },
     });
 
@@ -349,14 +498,21 @@ export class ChatService {
       },
     });
 
+    const decryptedMessages = await Promise.all(
+      messages.map(async (m) => {
+        const decryptedContent = await this.cryptoService.decryptMessageContent(m);
+        return {
+          id: m.id,
+          sender: m.sender,
+          type: m.type,
+          content: decryptedContent,
+          createdAt: m.createdAt,
+        };
+      }),
+    );
+
     return {
-      messages: messages.map((m) => ({
-        id: m.id,
-        sender: m.sender,
-        type: m.type,
-        content: m.content,
-        createdAt: m.createdAt,
-      })),
+      messages: decryptedMessages,
       nextCursor,
       totalCount,
     };
@@ -369,11 +525,15 @@ export class ChatService {
     ipAddress?: string,
     traceId?: string,
     correlationId?: string,
+    fencingToken?: string,
   ) {
+    await this.validateFencingToken(userId, sessionId, fencingToken);
+
     const session = await this.prisma.chatSession.findFirst({
       where: {
         id: sessionId,
         userId,
+        deletedAt: null,
       },
     });
 
@@ -383,15 +543,46 @@ export class ChatService {
 
     const now = new Date();
     const createdMessages = await this.prisma.$transaction(async (tx) => {
+      await this.validateFencingToken(userId, sessionId, fencingToken);
+
       const msgs = [];
       for (const [index, msgDto] of dto.messages.entries()) {
         const createdAt = new Date(now.getTime() + index);
+        const messageId = crypto.randomUUID();
+        const sender = msgDto.sender;
+        const messageType = msgDto.type || 'STANDARD';
+        const content = msgDto.content;
+
+        let contentCiphertext: string | null = null;
+        let contentNonce: string | null = null;
+        let contentAuthTag: string | null = null;
+        let contentKeyVersion: number | null = null;
+
+        if (content && this.cryptoService.isConfigured()) {
+          const encrypted = await this.cryptoService.encryptMessageContent(
+            messageId,
+            sessionId,
+            sender,
+            messageType,
+            content,
+          );
+          contentCiphertext = encrypted.ciphertext;
+          contentNonce = encrypted.nonce;
+          contentAuthTag = encrypted.authTag;
+          contentKeyVersion = encrypted.keyVersion;
+        }
+
         const msg = await tx.chatMessage.create({
           data: {
+            id: messageId,
             sessionId,
-            sender: msgDto.sender,
-            type: msgDto.type || 'STANDARD',
-            content: msgDto.content,
+            sender: sender as any,
+            type: messageType as any,
+            content,
+            contentCiphertext,
+            contentNonce,
+            contentAuthTag,
+            contentKeyVersion,
             createdAt,
           },
         });
@@ -424,15 +615,22 @@ export class ChatService {
       return msgs;
     });
 
+    const decryptedMessages = await Promise.all(
+      createdMessages.map(async (m) => {
+        const decryptedContent = await this.cryptoService.decryptMessageContent(m);
+        return {
+          id: m.id,
+          sessionId: m.sessionId,
+          sender: m.sender,
+          type: m.type,
+          content: decryptedContent,
+          createdAt: m.createdAt,
+        };
+      }),
+    );
+
     return {
-      messages: createdMessages.map((m) => ({
-        id: m.id,
-        sessionId: m.sessionId,
-        sender: m.sender,
-        type: m.type,
-        content: m.content,
-        createdAt: m.createdAt,
-      })),
+      messages: decryptedMessages,
     };
   }
 
@@ -441,6 +639,7 @@ export class ChatService {
       where: {
         id: sessionId,
         userId,
+        deletedAt: null,
       },
     });
 
@@ -477,12 +676,22 @@ export class ChatService {
       orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
     });
 
-    const recentMessages = recentStandardMessages.reverse().map((m) => ({
-      id: m.id,
-      sender: m.sender,
-      content: m.content,
-      createdAt: m.createdAt,
-    }));
+    const decryptedRecentMessages = await Promise.all(
+      recentStandardMessages.reverse().map(async (m) => {
+        const decryptedContent = await this.cryptoService.decryptMessageContent(m);
+        return {
+          id: m.id,
+          sender: m.sender,
+          content: decryptedContent,
+          createdAt: m.createdAt,
+        };
+      }),
+    );
+
+    let decryptedSummary: string | null = null;
+    if (lastSummaryMessage) {
+      decryptedSummary = await this.cryptoService.decryptMessageContent(lastSummaryMessage);
+    }
 
     const totalMessageCount = await this.prisma.chatMessage.count({
       where: {
@@ -491,8 +700,8 @@ export class ChatService {
     });
 
     return {
-      summary: lastSummaryMessage?.content || null,
-      recentMessages,
+      summary: decryptedSummary,
+      recentMessages: decryptedRecentMessages,
       totalMessageCount,
     };
   }

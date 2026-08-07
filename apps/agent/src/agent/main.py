@@ -20,8 +20,12 @@ active_streams: Set[asyncio.Queue] = set()
 async def lifespan(app: FastAPI):
     """
     Lifespan context manager that initializes NeMo Guardrails configuration,
-    message queue manager on startup, and flushes active SSE connections on shutdown.
+    message queue manager, and Redis on startup, and flushes active SSE connections on shutdown.
     """
+    from agent.infrastructure.redis import init_redis, close_redis
+    if settings.REDIS_URL:
+        await init_redis(settings.REDIS_URL)
+
     # Pre-load NeMo Guardrails configuration at service startup (M6)
     guardrails = NemoGuardrailService()
     app.state.guardrails = guardrails
@@ -45,24 +49,14 @@ async def lifespan(app: FastAPI):
         active_streams.clear()
         # Allow a short duration for the queues to flush
         await asyncio.sleep(0.5)
+        
+    from agent.infrastructure.redis import close_redis
+    await close_redis()
 
 app = FastAPI(title="AI Chatbot Agent Service", version="0.1.0", lifespan=lifespan)
 app.include_router(sse_router)
 
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=[settings.FRONTEND_URL],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
-app.add_middleware(
-    RateLimitMiddleware,
-    limit=60,
-    window=60
-)
+allowed_origins = [url.strip() for url in settings.FRONTEND_URL.split(",") if url.strip()]
 
 app.add_middleware(
     JWTAuthMiddleware,
@@ -70,10 +64,39 @@ app.add_middleware(
     exclude_paths=["/health", "/docs", "/openapi.json", "/redoc"]
 )
 
+@app.middleware("http")
+async def validate_origin_middleware(request: Request, call_next):
+    origin = request.headers.get("origin")
+    if origin and origin not in allowed_origins:
+        from fastapi.responses import JSONResponse
+        return JSONResponse(
+            status_code=403,
+            content={"detail": "ORIGIN_NOT_ALLOWED"}
+        )
+    return await call_next(request)
+
+
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=allowed_origins,
+    allow_credentials=False,
+    allow_methods=["POST", "OPTIONS"],
+    allow_headers=[
+        "Authorization",
+        "Content-Type",
+        "Accept",
+        "X-Trace-Id",
+        "X-Correlation-Id",
+        "x-trace-id",
+        "x-correlation-id",
+    ],
+)
+
 @app.get("/health")
 async def health_check(request: Request):
     """
-    Perform a health check verification by checking NestJS and NeMo Guardrails status.
+    Perform a health check verification by checking NestJS, Redis, and NeMo Guardrails status.
     """
     nestjs_status = "ok"
     nestjs_latency = 0
@@ -111,8 +134,19 @@ async def health_check(request: Request):
 
     llm_latency = None
 
+    redis_status = "ok"
+    try:
+        from agent.infrastructure.redis import get_redis_client
+        client = get_redis_client()
+        if client is not None:
+            await client.ping()
+        else:
+            redis_status = "down"
+    except Exception:
+        redis_status = "down"
+
     overall_status = "ok"
-    if nestjs_status == "down" or not guardrails_configured or not guardrails_healthy:
+    if nestjs_status == "down" or redis_status == "down" or not guardrails_configured or not guardrails_healthy:
         overall_status = "degraded"
 
     return {
@@ -120,7 +154,9 @@ async def health_check(request: Request):
         "dependencies": {
             "llm": {"status": llm_status, "latencyMs": llm_latency},
             "nestjsApi": {"status": nestjs_status, "latencyMs": nestjs_latency},
-            "guardrails": {"status": guardrails_status, "modelLoaded": model_loaded}
+            "guardrails": {"status": guardrails_status, "modelLoaded": model_loaded},
+            "redis": {"status": redis_status}
         },
         "version": "0.1.0"
     }
+

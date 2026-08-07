@@ -7,10 +7,12 @@ from langchain_core.messages import AIMessage
 from agent.main import app
 from agent.config import get_settings
 from tests.test_sse_integration import MockStreamingLLM, parse_sse, get_auth_headers
+from agent.models.requests import RouteDecision
 
 @pytest.fixture
 def mock_nestjs_client():
     client = MagicMock()
+    client.check_user_access = AsyncMock(return_value={"allowed": True})
     client.get_memory = AsyncMock(return_value={"recentMessages": [], "summary": None})
     client.create_message_batch = AsyncMock(return_value={
         "messages": [
@@ -44,7 +46,8 @@ async def test_e2e_output_guardrail_pipeline_validation(mock_nestjs_client, monk
 
     # Run the E2E stream request
     with patch("agent.streaming.sse.NestJSClient", return_value=mock_nestjs_client), \
-         patch("agent.graph.nodes.get_chat_model", return_value=llm):
+         patch("agent.agents.chat_agent.ChatOpenAI", return_value=llm), \
+         patch("agent.graph.graph.invoke_router", return_value=RouteDecision(intent="SEARCH", confidence=1.0, isCommitment=False)):
         
         transport = httpx.ASGITransport(app=app)
         async with httpx.AsyncClient(transport=transport, base_url="http://test") as ac:

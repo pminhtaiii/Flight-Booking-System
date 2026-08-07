@@ -431,7 +431,7 @@ FastAPI JWTAuthMiddleware validates JWT token (shared JWT_SECRET)
 FastAPI NemoGuardrailService runs safety checks (length, regex heuristics, Mimo safety classification)
         ├── Safety check FAILS/BLOCKED → Log security event, return error event and close stream
         └── Safety check PASSES ↓
-            Agent checks conversation memory (loads history/summary from NestJS Chat API)
+            Agent checks conversation memory (loads history/summary from NestJS Chat API using X-Service-Auth)
                 ↓
             Orchestrates LangGraph StateGraph agent with Mimo model and read-only tools (search_flights, get_user_preferences, list_user_bookings) via NestJS Agent Gateway
                 ↓
@@ -440,8 +440,13 @@ FastAPI NemoGuardrailService runs safety checks (length, regex heuristics, Mimo 
                 └── Safety check PASSES ↓
                     Safe chunks streamed back to frontend via SSE in real time (structured JSON latency & verdict logged per check)
                 ↓
-            Upon completion, full conversation Turn persisted via NestJS Chat API
+            Upon completion, full conversation Turn persisted via NestJS Chat API (protected by X-Fencing-Token and AES-256-GCM encryption)
 ```
+
+- **Service-Authenticated Endpoints**: The Python Agent authenticates with the NestJS Chat API using a dedicated `X-Service-Auth` token rather than relying on user credentials or unauthenticated paths.
+- **Encrypted Persistence**: Chat messages and summaries are dual-written/read using record-bound AES-256-GCM encryption, ensuring conversation data is encrypted at rest and tied to specific sessions.
+- **Fencing Integration**: Concurrent writes are prevented through strict session ownership. The agent must acquire and propagate an `X-Fencing-Token`, and the NestJS backend enforces this write fence on all mutative chat operations.
+- **Soft Deletion**: Chat sessions and messages are soft-deleted instead of hard-removed, preserving the relational structure and audit trails while stripping PII/ciphertext and hiding them from active queries.
 
 ---
 
