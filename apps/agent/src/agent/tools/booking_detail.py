@@ -10,7 +10,7 @@ logger = logging.getLogger(__name__)
 async def get_booking_detail(agent_reference: str, config: RunnableConfig) -> str:
     """Get explicitly requested details for a specific flight booking.
     Requires the opaque agent_reference obtained from list_user_booking_summaries.
-    Returns flight number, baggage allowance, and refundable/changeable flags.
+    Returns flight number, baggage allowance, and fare policies (if available).
     Does not expose financial data, passenger names, or PNRs.
     """
     try:
@@ -32,8 +32,8 @@ async def get_booking_detail(agent_reference: str, config: RunnableConfig) -> st
         arr = response.get("arrivalAt", "Unknown")
         flight_num = response.get("flightNumber", "Unknown")
         baggage_summary = response.get("baggageSummary", "Not specified")
-        refundable = response.get("refundable", False)
-        changeable = response.get("changeable", False)
+        refundable = response.get("refundable", "Unknown")
+        changeable = response.get("changeable", "Unknown")
         
         result = (
             f"Booking {agent_reference} Detail:\n"
