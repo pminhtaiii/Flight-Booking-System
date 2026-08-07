@@ -1,5 +1,6 @@
 import time
 import jwt
+from unittest.mock import AsyncMock, MagicMock
 from fastapi import FastAPI, Request
 from fastapi.testclient import TestClient
 from agent.middleware.auth import JWTAuthMiddleware
@@ -54,15 +55,26 @@ def test_protected_expired_token():
     assert response.json()["detail"] == "Token has expired"
 
 def test_protected_valid_token():
-    payload = {"sub": "12345", "email": "test@example.com", "exp": int(time.time()) + 100}
+    payload = {
+        "sub": "12345",
+        "id": "12345",
+        "email": "test@example.com",
+        "jti": "jti-123",
+        "iss": "booking-systems-api",
+        "aud": "booking-systems-clients",
+        "exp": int(time.time()) + 100,
+    }
     token = jwt.encode(payload, "testsecret", algorithm="HS256")
     response = client.get("/protected", headers={"Authorization": f"Bearer {token}"})
     assert response.status_code == 200
-    assert response.json()["user"] == {"sub": "12345", "email": "test@example.com", "exp": payload["exp"]}
+    assert response.json()["user"] == payload
 
+
+mock_redis_limiter = MagicMock()
+mock_redis_limiter.eval = AsyncMock(side_effect=[[1, "ok"], [1, "ok"], [0, "burst_quota_exceeded"]])
 
 app_limiter = FastAPI()
-app_limiter.add_middleware(RateLimitMiddleware, limit=2, window=10)
+app_limiter.add_middleware(RateLimitMiddleware, limit=2, window=10, redis_client=mock_redis_limiter)
 
 @app_limiter.get("/health")
 def health_limiter():
@@ -90,5 +102,6 @@ def test_rate_limiting():
 
     response = client_limiter.get("/test")
     assert response.status_code == 429
-    assert response.json()["detail"] == "Too many requests. Please try again later."
+    assert response.json()["code"] == "CHAT_BURST_LIMIT_EXCEEDED"
+
 

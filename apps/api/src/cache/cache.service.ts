@@ -202,4 +202,41 @@ export class CacheService implements OnModuleInit, OnModuleDestroy {
     }
     return matched;
   }
+
+  async hget(key: string, field: string): Promise<string | null> {
+    if (this.redisClient) {
+      try {
+        return await this.redisClient.hget(key, field);
+      } catch (err: unknown) {
+        const errMsg = err instanceof Error ? err.message : String(err);
+        this.logger.warn(`Redis HGET failed for key ${key} field ${field}: ${errMsg}. Using in-memory fallback.`);
+      }
+    }
+
+    const item = this.inMemoryStore.get(`${key}:${field}`);
+    if (!item) return null;
+    if (Date.now() > item.expiry) {
+      this.inMemoryStore.delete(`${key}:${field}`);
+      return null;
+    }
+    return item.value;
+  }
+
+  async hset(key: string, field: string, value: string, ttlSeconds?: number): Promise<void> {
+    if (this.redisClient) {
+      try {
+        await this.redisClient.hset(key, field, value);
+        if (ttlSeconds) {
+          await this.redisClient.expire(key, ttlSeconds);
+        }
+        return;
+      } catch (err: unknown) {
+        const errMsg = err instanceof Error ? err.message : String(err);
+        this.logger.warn(`Redis HSET failed for key ${key} field ${field}: ${errMsg}. Using in-memory fallback.`);
+      }
+    }
+
+    const expiry = ttlSeconds ? Date.now() + ttlSeconds * 1000 : Infinity;
+    this.inMemoryStore.set(`${key}:${field}`, { value, expiry });
+  }
 }

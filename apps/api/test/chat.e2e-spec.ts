@@ -464,16 +464,17 @@ describe('Chat API (E2E)', () => {
         .set('Authorization', `Bearer ${tokenA}`)
         .expect(204);
 
-      // Verify deletion in DB
+      // Verify soft deletion in DB
       const dbSession = await prisma.chatSession.findUnique({
         where: { id: session.id },
       });
-      expect(dbSession).toBeNull();
+      expect(dbSession).toBeDefined();
+      expect(dbSession!.deletedAt).not.toBeNull();
 
       const dbMessages = await prisma.chatMessage.findMany({
         where: { sessionId: session.id },
       });
-      expect(dbMessages).toHaveLength(0);
+      expect(dbMessages.length).toBeGreaterThan(0);
 
       // Verify audit log
       const auditLog = await prisma.auditLog.findFirst({

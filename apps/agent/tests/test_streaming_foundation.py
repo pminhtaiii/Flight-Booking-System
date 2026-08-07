@@ -14,6 +14,9 @@ JWT_SECRET = "testsecret_must_be_at_least_32_bytes_long_for_security_reasons"
 def get_auth_headers(payload_data=None):
     payload = {
         "sub": "12345",
+        "iss": "booking-systems-api",
+        "aud": "booking-systems-clients",
+        "jti": "jti-test-uuid",
         "email": "test@example.com",
         "exp": int(time.time()) + 100
     }

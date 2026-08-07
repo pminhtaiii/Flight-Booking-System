@@ -1,7 +1,10 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from langchain_core.tools import tool
 from langchain_core.runnables import RunnableConfig
 from agent.tools.base import get_nestjs_client
+from agent.repositories.trusted_snapshot_repository import TrustedSnapshotRepository
+from agent.infrastructure.redis import get_redis_client
+from agent.models.snapshot import TrustedSearchSnapshot
 
 AIRLINE_MAP = {
     "VN": "Vietnam Airlines",
@@ -26,8 +29,26 @@ async def search_flights(
     except Exception:
         return "I couldn't search for flights right now. The flight search service is temporarily unavailable. Please try again in a moment."
 
+    thread_id = config.get("configurable", {}).get("thread_id") if config else None
+    user_id = config.get("configurable", {}).get("user_id") if config else None
+    
+    if not thread_id or not user_id:
+        return "I couldn't verify your active session to search flights. Please try again or start a new session."
+
     try:
-        data = await client.get_gateway_flights_search(
+        # For simplicity, using a naive version increment. In a real scenario, this might need more robust concurrency handling.
+        proposed_version = 1 
+        
+        # Import dynamic repository helper or use directly
+        redis_client = get_redis_client()
+        repo = TrustedSnapshotRepository(redis_client)
+        existing = await repo.get_snapshot(user_id, thread_id)
+        if existing:
+            proposed_version = existing.snapshotVersion + 1
+
+        data = await client.post_gateway_flights_search_v2(
+            chat_session_id=thread_id,
+            proposed_snapshot_version=proposed_version,
             origin=origin,
             destination=destination,
             date=date,
@@ -40,33 +61,60 @@ async def search_flights(
         return data["error"]
 
     results = data.get("results", [])
-    # Limit results to top 5
-    results = results[:5]
-
-    if config:
-        thread_id = config.get("configurable", {}).get("thread_id")
-        if thread_id:
-            import time
-            now = time.time()
-            # 1. Clean up stale entries (> 1 hour old)
-            stale_keys = [k for k, v in FLIGHTS_CACHE.items() if now - v.get("timestamp", 0) > 3600]
-            for k in stale_keys:
-                FLIGHTS_CACHE.pop(k, None)
-            # 2. Bounded size (limit to 100 sessions)
-            if len(FLIGHTS_CACHE) > 100:
-                oldest_key = min(FLIGHTS_CACHE.keys(), key=lambda k: FLIGHTS_CACHE[k].get("timestamp", 0))
-                FLIGHTS_CACHE.pop(oldest_key, None)
-            # 3. Cache results
-            FLIGHTS_CACHE[thread_id] = {
-                "results": results,
-                "timestamp": now
-            }
-
     if not results:
         return f"Found 0 flights from {origin} to {destination} on {date}."
 
-    flight_blocks = []
+
+    # Strip identifiers before sending to LLM and create trusted snapshot
+    safe_results = []
+    snapshot_results = []
     for idx, flight in enumerate(results, 1):
+        # build snapshot result mapping index to flightOfferId and duffelOfferId
+        snapshot_results.append({
+            "offerIndex": idx,
+            "flightOfferId": flight["flightOfferId"],
+            "duffelOfferId": flight["duffelOfferId"],
+            "airline": flight["airline"],
+            "origin": flight["departureAirport"],
+            "destination": flight["arrivalAirport"],
+            "departureAt": flight["departureTime"],
+            "arrivalAt": flight["arrivalTime"],
+            "price": flight["price"],
+            "currency": flight["currency"]
+        })
+        
+        # Build safe dictionary for LLM (no identifiers)
+        safe_flight = flight.copy()
+        safe_flight.pop("flightOfferId", None)
+        safe_flight.pop("duffelOfferId", None)
+        safe_results.append(safe_flight)
+
+
+    # Store Trusted Search Snapshot in Redis
+    try:
+        snapshot = TrustedSearchSnapshot.model_validate({
+            "schemaVersion": 1,
+            "snapshotVersion": data.get("snapshotVersion"),
+            "userId": user_id,
+            "sessionId": thread_id,
+            "createdAt": datetime.now(timezone.utc).isoformat(),
+            "expiresAt": data.get("snapshotExpiresAt"),
+            "selectionAttestation": data.get("selectionAttestation"),
+            "fingerprint": "mock_hmac_fingerprint",
+            "results": snapshot_results
+        })
+        await repo.save_snapshot(snapshot)
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).warning("Failed to save trusted snapshot: %s", str(e))
+        # If we can't save snapshot, it's safer to fail the search so we don't present unbookable results
+        FLIGHTS_CACHE.pop(thread_id, None)
+        return "I encountered an error preparing your search results. Please try again."
+
+    FLIGHTS_CACHE[thread_id] = {"results": safe_results}
+
+    flight_blocks = []
+    for idx, flight in enumerate(safe_results, 1):
         airline = flight.get("airline") or ""
         airline_name = AIRLINE_MAP.get(airline, airline)
         flight_number = flight.get("flightNumber") or ""
@@ -106,7 +154,10 @@ async def search_flights(
         else:
             stops_str = f"{stops} stops"
 
-        price = flight.get("price") or 0.0
+        try:
+            price = float(flight.get("price") or 0.0)
+        except ValueError:
+            price = 0.0
         currency = flight.get("currency") or "USD"
         price_formatted = f"${price:,.2f}"
 

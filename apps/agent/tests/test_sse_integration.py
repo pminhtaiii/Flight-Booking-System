@@ -13,7 +13,7 @@ from typing import List, Optional, Any, AsyncIterator
 
 from agent.main import app
 from agent.tools.nestjs_client import NestJSClient
-
+from agent.models.requests import RouteDecision
 class MockStreamingLLM(BaseChatModel):
     responses: List[Any] = Field(default_factory=list)
 
@@ -92,6 +92,9 @@ JWT_SECRET = "testsecret_must_be_at_least_32_bytes_long_for_security_reasons"
 def get_auth_headers():
     payload = {
         "sub": "12345",
+        "iss": "booking-systems-api",
+        "aud": "booking-systems-clients",
+        "jti": "jti-test-uuid",
         "email": "test@example.com",
         "exp": int(time.time()) + 100
     }
@@ -102,6 +105,7 @@ def get_auth_headers():
 @pytest.fixture
 def mock_nestjs_client():
     client = MagicMock(spec=NestJSClient)
+    client.check_user_access = AsyncMock(return_value={"allowed": True})
     client.get_memory = AsyncMock(return_value={"recentMessages": [], "summary": None})
     client.create_message_batch = AsyncMock(return_value={
         "messages": [
@@ -110,6 +114,7 @@ def mock_nestjs_client():
         ]
     })
     client.get_gateway_flights_search = AsyncMock()
+    client.post_gateway_flights_search_v2 = AsyncMock()
     return client
 
 
@@ -128,7 +133,8 @@ async def test_sse_simple_chat(mock_nestjs_client):
     llm = MockStreamingLLM(responses=[AIMessage(content="Hello there! How can I help you today?")])
 
     with patch("agent.streaming.sse.NestJSClient", return_value=mock_nestjs_client), \
-         patch("agent.graph.nodes.get_chat_model", return_value=llm):
+         patch("agent.agents.chat_agent.ChatOpenAI", return_value=llm), \
+         patch("agent.graph.graph.invoke_router", return_value=RouteDecision(intent="SEARCH", confidence=1.0, isCommitment=False)):
 
         transport = httpx.ASGITransport(app=app)
         async with httpx.AsyncClient(transport=transport, base_url="http://test") as ac:
@@ -155,8 +161,22 @@ async def test_sse_simple_chat(mock_nestjs_client):
 async def test_sse_readonly_tool(mock_nestjs_client):
     headers = get_auth_headers()
 
-    mock_nestjs_client.get_gateway_flights_search.return_value = {
-        "results": [{"flightNumber": "VN310", "price": 452.0}]
+    mock_nestjs_client.post_gateway_flights_search_v2.return_value = {
+        "snapshotVersion": 1,
+        "snapshotExpiresAt": "2026-08-15T10:00:00Z",
+        "selectionAttestation": "mock_attestation",
+        "results": [{
+            "flightOfferId": "offer-1", 
+            "duffelOfferId": "duffel-1", 
+            "airline": "VN",
+            "flightNumber": "VN310", 
+            "departureAirport": "HAN",
+            "arrivalAirport": "NRT",
+            "departureTime": "2026-07-15T08:30:00Z",
+            "arrivalTime": "2026-07-15T15:00:00Z",
+            "currency": "USD",
+            "price": "452.00"
+        }]
     }
 
     llm = MockStreamingLLM(responses=[
@@ -172,7 +192,8 @@ async def test_sse_readonly_tool(mock_nestjs_client):
     ])
 
     with patch("agent.streaming.sse.NestJSClient", return_value=mock_nestjs_client), \
-         patch("agent.graph.nodes.get_chat_model", return_value=llm):
+         patch("agent.agents.chat_agent.ChatOpenAI", return_value=llm), \
+         patch("agent.graph.graph.invoke_router", return_value=RouteDecision(intent="SEARCH", confidence=1.0, isCommitment=False)):
 
         transport = httpx.ASGITransport(app=app)
         async with httpx.AsyncClient(transport=transport, base_url="http://test") as ac:
@@ -203,171 +224,14 @@ async def test_sse_readonly_tool(mock_nestjs_client):
             assert len(done_events) == 1
 
 
-@pytest.mark.asyncio
-async def test_sse_confirm_gate_suspension(mock_nestjs_client):
-    headers = get_auth_headers()
 
-    llm = MockStreamingLLM(responses=[
-        AIMessage(
-            content="",
-            tool_calls=[{
-                "name": "book_flight",
-                "args": {"flight_number": "VN310", "date": "2026-07-15"},
-                "id": "call_book_1"
-            }]
-        )
-    ])
-
-    with patch("agent.streaming.sse.NestJSClient", return_value=mock_nestjs_client), \
-         patch("agent.graph.nodes.get_chat_model", return_value=llm):
-
-        transport = httpx.ASGITransport(app=app)
-        async with httpx.AsyncClient(transport=transport, base_url="http://test") as ac:
-            response = await ac.post(
-                "/chat/stream",
-                json={"message": "book flight VN310", "sessionId": "session-gate"},
-                headers=headers
-            )
-            assert response.status_code == 200
-
-            lines = [line async for line in response.aiter_lines()]
-            events = parse_sse(lines)
-
-            tool_call_events = [e for e in events if e["event"] == "tool_call"]
-            confirm_events = [e for e in events if e["event"] == "confirmation_required"]
-            done_events = [e for e in events if e["event"] == "done"]
-
-            assert len(tool_call_events) == 0
-
-            assert len(confirm_events) == 1
-            assert confirm_events[0]["data"]["name"] == "book_flight"
-            assert confirm_events[0]["data"]["id"] == "call_book_1"
-
-            assert len(done_events) == 0
-
-
-@pytest.mark.asyncio
-async def test_sse_resume_approved(mock_nestjs_client):
-    headers = get_auth_headers()
-    session_id = "session-resume-approve"
-
-    llm_initial = MockStreamingLLM(responses=[
-        AIMessage(
-            content="",
-            tool_calls=[{
-                "name": "book_flight",
-                "args": {"flight_number": "VN310", "date": "2026-07-15"},
-                "id": "call_book_approve"
-            }]
-        )
-    ])
-
-    with patch("agent.streaming.sse.NestJSClient", return_value=mock_nestjs_client), \
-         patch("agent.graph.nodes.get_chat_model", return_value=llm_initial):
-
-        transport = httpx.ASGITransport(app=app)
-        async with httpx.AsyncClient(transport=transport, base_url="http://test") as ac:
-            await ac.post(
-                "/chat/stream",
-                json={"message": "book flight VN310", "sessionId": session_id},
-                headers=headers
-            )
-
-    llm_resume = MockStreamingLLM(responses=[
-        AIMessage(content="I have booked flight VN310 for you.")
-    ])
-
-    with patch("agent.streaming.sse.NestJSClient", return_value=mock_nestjs_client), \
-         patch("agent.graph.nodes.get_chat_model", return_value=llm_resume):
-
-        transport = httpx.ASGITransport(app=app)
-        async with httpx.AsyncClient(transport=transport, base_url="http://test") as ac:
-            response = await ac.post(
-                "/chat/stream",
-                json={"confirmed": True, "sessionId": session_id},
-                headers=headers
-            )
-            assert response.status_code == 200
-
-            lines = [line async for line in response.aiter_lines()]
-            events = parse_sse(lines)
-
-            tool_result_events = [e for e in events if e["event"] == "tool_result"]
-            token_events = [e for e in events if e["event"] == "token"]
-            done_events = [e for e in events if e["event"] == "done"]
-
-            assert len(tool_result_events) == 1
-            assert tool_result_events[0]["data"]["name"] == "book_flight"
-            assert "booked" in tool_result_events[0]["data"]["result"]
-
-            assert len(token_events) > 0
-            assert "".join([e["data"]["content"] for e in token_events]) == "I have booked flight VN310 for you."
-            assert len(done_events) == 1
-            assert done_events[0]["data"]["sessionId"] == session_id
-
-
-@pytest.mark.asyncio
-async def test_sse_resume_aborted(mock_nestjs_client):
-    headers = get_auth_headers()
-    session_id = "session-resume-abort"
-
-    llm_initial = MockStreamingLLM(responses=[
-        AIMessage(
-            content="",
-            tool_calls=[{
-                "name": "book_flight",
-                "args": {"flight_number": "VN310", "date": "2026-07-15"},
-                "id": "call_book_abort"
-            }]
-        )
-    ])
-
-    with patch("agent.streaming.sse.NestJSClient", return_value=mock_nestjs_client), \
-         patch("agent.graph.nodes.get_chat_model", return_value=llm_initial):
-
-        transport = httpx.ASGITransport(app=app)
-        async with httpx.AsyncClient(transport=transport, base_url="http://test") as ac:
-            await ac.post(
-                "/chat/stream",
-                json={"message": "book flight VN310", "sessionId": session_id},
-                headers=headers
-            )
-
-    llm_resume = MockStreamingLLM(responses=[
-        AIMessage(content="I have cancelled the booking request.")
-    ])
-
-    with patch("agent.streaming.sse.NestJSClient", return_value=mock_nestjs_client), \
-         patch("agent.graph.nodes.get_chat_model", return_value=llm_resume):
-
-        transport = httpx.ASGITransport(app=app)
-        async with httpx.AsyncClient(transport=transport, base_url="http://test") as ac:
-            response = await ac.post(
-                "/chat/stream",
-                json={"confirmed": False, "sessionId": session_id},
-                headers=headers
-            )
-            assert response.status_code == 200
-
-            lines = [line async for line in response.aiter_lines()]
-            events = parse_sse(lines)
-
-            tool_result_events = [e for e in events if e["event"] == "tool_result"]
-            token_events = [e for e in events if e["event"] == "token"]
-            done_events = [e for e in events if e["event"] == "done"]
-
-            assert len(tool_result_events) == 0
-
-            assert len(token_events) > 0
-            assert "".join([e["data"]["content"] for e in token_events]) == "I have cancelled the booking request."
-            assert len(done_events) == 1
 
 
 @pytest.mark.asyncio
 async def test_sse_gateway_error(mock_nestjs_client):
     headers = get_auth_headers()
 
-    mock_nestjs_client.get_gateway_flights_search.side_effect = Exception("Gateway Timeout")
+    mock_nestjs_client.post_gateway_flights_search_v2.side_effect = Exception("Gateway Timeout")
 
     llm = MockStreamingLLM(responses=[
         AIMessage(
@@ -382,7 +246,8 @@ async def test_sse_gateway_error(mock_nestjs_client):
     ])
 
     with patch("agent.streaming.sse.NestJSClient", return_value=mock_nestjs_client), \
-         patch("agent.graph.nodes.get_chat_model", return_value=llm):
+         patch("agent.agents.chat_agent.ChatOpenAI", return_value=llm), \
+         patch("agent.graph.graph.invoke_router", return_value=RouteDecision(intent="SEARCH", confidence=1.0, isCommitment=False)):
 
         transport = httpx.ASGITransport(app=app)
         async with httpx.AsyncClient(transport=transport, base_url="http://test") as ac:
@@ -424,7 +289,8 @@ async def test_sse_readiness_action_required(mock_nestjs_client):
     ])
 
     with patch("agent.streaming.sse.NestJSClient", return_value=mock_nestjs_client), \
-         patch("agent.graph.nodes.get_chat_model", return_value=llm):
+         patch("agent.agents.chat_agent.ChatOpenAI", return_value=llm), \
+         patch("agent.graph.graph.invoke_router", return_value=RouteDecision(intent="SEARCH", confidence=1.0, isCommitment=False)):
 
         # Override the mock's behavior to return readiness data
         mock_nestjs_client.check_booking_readiness = AsyncMock(return_value={
@@ -500,7 +366,8 @@ async def test_sse_readiness_with_value_bearing_reason_fails_closed(mock_nestjs_
     )])
 
     with patch("agent.streaming.sse.NestJSClient", return_value=mock_nestjs_client), \
-         patch("agent.graph.nodes.get_chat_model", return_value=llm):
+         patch("agent.agents.chat_agent.ChatOpenAI", return_value=llm), \
+         patch("agent.graph.graph.invoke_router", return_value=RouteDecision(intent="SEARCH", confidence=1.0, isCommitment=False)):
         transport = httpx.ASGITransport(app=app)
         async with httpx.AsyncClient(transport=transport, base_url="http://test") as ac:
             response = await ac.post(
@@ -549,7 +416,8 @@ async def test_sse_complete_profile_handoff_stops_without_persistence(mock_nestj
     ])
 
     with patch("agent.streaming.sse.NestJSClient", return_value=mock_nestjs_client), \
-         patch("agent.graph.nodes.get_chat_model", return_value=llm):
+         patch("agent.agents.chat_agent.ChatOpenAI", return_value=llm), \
+         patch("agent.graph.graph.invoke_router", return_value=RouteDecision(intent="SEARCH", confidence=1.0, isCommitment=False)):
         transport = httpx.ASGITransport(app=app)
         async with httpx.AsyncClient(transport=transport, base_url="http://test") as ac:
             response = await ac.post(

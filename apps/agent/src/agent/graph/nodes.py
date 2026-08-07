@@ -7,53 +7,7 @@ from agent.agents.chat_agent import get_chat_model
 from agent.tools.registry import get_tools
 from agent.tools.nestjs_client import validate_booking_readiness_response
 from agent.graph.state import AgentState
-
-CLOSED_WORLD_SYSTEM_PROMPT = (
-    "You are a helpful travel assistant for the Flight Booking System. "
-    "Help the user plan their travel, search for flights, and answer questions. "
-    "Be concise, professional, and friendly.\n\n"
-    "CRITICAL RULES:\n"
-    "1. You have access to tools: 'search_flights', 'get_user_preferences', 'list_user_bookings', and 'check_booking_readiness'.\n"
-    "2. You MUST use only the information returned by these tools. DO NOT guess, fabricate, or assume any details "
-    "not explicitly provided by a tool (e.g. cancellation/refund policies, change policies, airline rules, etc.).\n"
-    "3. If the user asks about details or actions outside of the tools' data, or if you cannot find the information, "
-    "you must clearly and politely state that the information is unavailable or that you cannot help with that request.\n"
-    "4. Readiness is determined by the server. Passenger PII must never be collected in chat. "
-    "Inline and multi-passenger flows go to authenticated checkout. "
-    "A ready result does not authorize a write by itself. Any booking-intent creation must use the existing confirmation/write boundary."
-)
-
-async def agent_node(state: AgentState, config: RunnableConfig) -> dict:
-    """Call the LLM with registered tools bound and closed-world prompt."""
-    model = get_chat_model()
-    tools = get_tools()
-    model_with_tools = model.bind_tools(tools)
-
-    messages = list(state.get("messages", []))
-    has_system = any(isinstance(m, SystemMessage) for m in messages)
-    if not has_system:
-        messages.insert(0, SystemMessage(content=CLOSED_WORLD_SYSTEM_PROMPT))
-
-    response = await model_with_tools.ainvoke(messages, config=config)
-
-    pending = None
-    tool_calls = getattr(response, "tool_calls", None)
-    if tool_calls:
-        from agent.tools.registry import requires_confirmation
-        for tc in tool_calls:
-            if requires_confirmation(tc["name"]):
-                pending = {
-                    "name": tc["name"],
-                    "args": tc["args"],
-                    "id": tc["id"],
-                    "confirmed": None
-                }
-                break
-
-    ret = {"messages": [response]}
-    if pending:
-        ret["pending_confirmation"] = pending
-    return ret
+from agent.agents.travel_assistant import TRAVEL_PROMPT
 
 async def final_answer_node(state: AgentState, config: RunnableConfig) -> dict:
     """Call the LLM without tools bound to provide a final summary answer when iteration limit is reached."""
@@ -62,7 +16,7 @@ async def final_answer_node(state: AgentState, config: RunnableConfig) -> dict:
     messages = list(state.get("messages", []))
     has_system = any(isinstance(m, SystemMessage) for m in messages)
     if not has_system:
-        messages.insert(0, SystemMessage(content=CLOSED_WORLD_SYSTEM_PROMPT))
+        messages.insert(0, SystemMessage(content=TRAVEL_PROMPT))
 
     instruction = (
         "\n[System Note: The tool calling limit has been reached. Please provide a final response summarizing "
@@ -80,47 +34,6 @@ prebuilt_tool_node = ToolNode(get_tools())
 async def custom_tool_node(state: AgentState, config: RunnableConfig) -> dict:
     """Execute prebuilt ToolNode and increment iteration count by 1."""
     result = await prebuilt_tool_node.ainvoke(state, config=config)
-
-    handoff_required = False
-    for message in result.get("messages", []):
-        if getattr(message, "name", None) != "check_booking_readiness":
-            continue
-        content = getattr(message, "content", None)
-        if isinstance(content, str):
-            try:
-                content = json.loads(content)
-            except json.JSONDecodeError:
-                continue
-        safe_readiness = validate_booking_readiness_response(content)
-        if safe_readiness and safe_readiness["ready"] is False:
-            handoff_required = True
-            break
-
     current_iter = state.get("iteration_count") or 0
     result["iteration_count"] = current_iter + 1
-    result["pending_confirmation"] = None
-    result["handoff_required"] = handoff_required
     return result
-
-
-async def confirm_node(state: AgentState, config: RunnableConfig) -> dict:
-    """Handle confirmation gate. If aborted, append a cancellation ToolMessage."""
-    pending = state.get("pending_confirmation")
-    if not pending:
-        return {}
-
-    confirmed = pending.get("confirmed")
-    if confirmed is False:
-        tool_call_id = pending.get("id")
-        tool_name = pending.get("name")
-        cancellation_msg = ToolMessage(
-            content=f"Booking for tool '{tool_name}' was aborted/cancelled by the user.",
-            tool_call_id=tool_call_id,
-            name=tool_name
-        )
-        return {
-            "messages": [cancellation_msg],
-            "pending_confirmation": None
-        }
-
-    return {}

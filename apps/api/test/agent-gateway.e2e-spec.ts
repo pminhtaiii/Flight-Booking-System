@@ -925,4 +925,83 @@ describe('Agent Gateway (E2E)', () => {
       expect(res.body.code).toBe('PROFILE_NOT_FOUND');
     });
   });
+
+  describe('Attested Flight Search Endpoint (POST /v2/flights/search)', () => {
+    let token: string;
+    let user: any; // Using any for simplicity in this generated block
+
+    beforeEach(async () => {
+      user = await prisma.user.create({
+        data: {
+          id: crypto.randomUUID(),
+          email: `attested-search-${crypto.randomUUID()}@example.com`,
+          password: 'Password123!',
+          status: 'ACTIVE',
+        },
+      });
+
+      const iat = Math.floor(Date.now() / 1000);
+      token = mintClaimToken(user.id, iat);
+    });
+
+    it('should return 404 for unowned chatSessionId', async () => {
+      await request(app.getHttpServer())
+        .post('/agent-gateway/v2/flights/search')
+        .set('X-Agent-API-Key', apiKey)
+        .set('X-User-Claim', token)
+        .send({
+          chatSessionId: crypto.randomUUID(),
+          proposedSnapshotVersion: 1,
+          search: { origin: 'SGN', destination: 'NRT', date: '2026-09-20', adults: 1 }
+        })
+        .expect(404);
+    });
+
+    it('should return signed attestation and identifiers to the service', async () => {
+      const session = await prisma.chatSession.create({
+        data: {
+          userId: user.id,
+          title: 'Search Session',
+        },
+      });
+
+      const res = await request(app.getHttpServer())
+        .post('/agent-gateway/v2/flights/search')
+        .set('X-Agent-API-Key', apiKey)
+        .set('X-User-Claim', token)
+        .send({
+          chatSessionId: session.id,
+          proposedSnapshotVersion: 1,
+          search: { origin: 'SGN', destination: 'NRT', date: '2027-07-20', adults: 1 }
+        });
+
+      // The new endpoint should return 201 or 200 depending on framework default for POST, we will accept either for now
+      expect([200, 201]).toContain(res.status);
+
+      expect(res.body.selectionAttestation).toBeDefined();
+      expect(res.body.selectionAttestation).toMatch(/^sel_v1_[A-Za-z0-9_-]+\.[A-Za-z0-9]+$/);
+      expect(res.body.snapshotVersion).toBe(1);
+      
+      const results = res.body.results;
+      expect(results.length).toBeGreaterThan(0);
+      
+      expect(results[0].flightOfferId).toBeDefined();
+      expect(results[0].duffelOfferId).toBeDefined();
+    });
+
+    it('legacy GET /flights/search should remain unenriched', async () => {
+      const res = await request(app.getHttpServer())
+        .get('/agent-gateway/flights/search?origin=SGN&destination=NRT&date=2027-07-20&adults=1')
+        .set('X-Agent-API-Key', apiKey)
+        .set('X-User-Claim', token)
+        .expect(200);
+
+      expect(res.body.selectionAttestation).toBeUndefined();
+      
+      const results = res.body.results;
+      expect(results.length).toBeGreaterThan(0);
+      expect(results[0].flightOfferId).toBeUndefined();
+      expect(results[0].duffelOfferId).toBeUndefined();
+    });
+  });
 });
