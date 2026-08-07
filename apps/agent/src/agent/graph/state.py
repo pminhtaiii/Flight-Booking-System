@@ -11,3 +11,5 @@ class AgentState(TypedDict, total=False):
     trusted_snapshot: Optional[dict]
     signal: Optional[dict]
     action: Optional[dict]
+    pending_confirmation: Optional[dict]
+    handoff_required: bool
