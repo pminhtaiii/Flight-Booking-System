@@ -7,12 +7,16 @@ from agent.tools.base import get_nestjs_client
 from agent.tools.search_flights import search_flights
 from agent.tools.get_preferences import get_user_preferences
 from agent.tools.list_bookings import list_user_bookings
-from agent.tools.registry import get_tools, get_tool_by_name, requires_confirmation
+from agent.tools.registry import (
+    get_tools, get_tool_by_name, requires_confirmation,
+    get_general_tools, get_travel_tools, get_checkout_tools
+)
 
 
 @pytest.fixture
 def mock_client():
     client = MagicMock()
+    client.post_gateway_flights_search_v2 = AsyncMock()
     client.get_gateway_flights_search = AsyncMock()
     client.get_gateway_user_preferences = AsyncMock()
     client.get_gateway_user_bookings = AsyncMock()
@@ -21,7 +25,14 @@ def mock_client():
 
 @pytest.fixture
 def run_config(mock_client):
-    return RunnableConfig(configurable={"nestjs_client": mock_client})
+    return RunnableConfig(configurable={
+        "nestjs_client": mock_client,
+        "thread_id": "test-session",
+        "user_id": "test-user",
+        "chat_budget_repository": MagicMock(),
+        "session_lock_repository": MagicMock(),
+        "trusted_snapshot_repository": AsyncMock()
+    })
 
 
 def test_base_get_nestjs_client(mock_client, run_config):
@@ -38,9 +49,19 @@ def test_base_get_nestjs_client(mock_client, run_config):
         get_nestjs_client(RunnableConfig(configurable={}))
 
 
+@pytest.fixture(autouse=True)
+def mock_repo(monkeypatch):
+    mock = AsyncMock()
+    mock.get_snapshot.return_value = None
+    monkeypatch.setattr("agent.tools.search_flights.TrustedSnapshotRepository", lambda *args, **kwargs: mock)
+    monkeypatch.setattr("agent.tools.search_flights.get_redis_client", lambda *args, **kwargs: MagicMock())
+
 @pytest.mark.asyncio
 async def test_search_flights_success(mock_client, run_config):
-    mock_client.get_gateway_flights_search.return_value = {
+    mock_client.post_gateway_flights_search_v2.return_value = {
+        "snapshotVersion": 1,
+        "snapshotExpiresAt": "2026-07-15T09:30:00Z",
+        "selectionAttestation": "mock_attestation",
         "results": [
             {
                 "airline": "VN",
@@ -51,10 +72,12 @@ async def test_search_flights_success(mock_client, run_config):
                 "arrivalTime": "2026-07-15T15:00:00",
                 "duration": 330,
                 "stops": 0,
-                "price": 452.00,
+                "price": "452.00",
                 "currency": "USD",
                 "fareClass": "economy",
-                "baggageAllowance": "23kg checked"
+                "baggageAllowance": "23kg checked",
+                "flightOfferId": "offer_123",
+                "duffelOfferId": "duffel_456"
             }
         ]
     }
@@ -77,7 +100,7 @@ async def test_search_flights_success(mock_client, run_config):
 
 @pytest.mark.asyncio
 async def test_search_flights_empty(mock_client, run_config):
-    mock_client.get_gateway_flights_search.return_value = {"results": []}
+    mock_client.post_gateway_flights_search_v2.return_value = {"results": []}
 
     result = await search_flights.ainvoke(
         {"origin": "HAN", "destination": "NRT", "date": "2026-07-15"},
@@ -89,7 +112,7 @@ async def test_search_flights_empty(mock_client, run_config):
 
 @pytest.mark.asyncio
 async def test_search_flights_error(mock_client, run_config):
-    mock_client.get_gateway_flights_search.side_effect = Exception("Amadeus service error")
+    mock_client.post_gateway_flights_search_v2.side_effect = Exception("Amadeus service error")
 
     result = await search_flights.ainvoke(
         {"origin": "HAN", "destination": "NRT", "date": "2026-07-15"},
@@ -101,7 +124,7 @@ async def test_search_flights_error(mock_client, run_config):
 
 @pytest.mark.asyncio
 async def test_search_flights_honest_degradation_error(mock_client, run_config):
-    mock_client.get_gateway_flights_search.return_value = {
+    mock_client.post_gateway_flights_search_v2.return_value = {
         "error": "I can currently only search economy class for adult passengers. For other cabin classes or passenger types, please use the search page."
     }
 
@@ -208,25 +231,29 @@ async def test_list_user_bookings_error(mock_client, run_config):
     assert result == "I couldn't retrieve your bookings right now. Please try again in a moment."
 
 
-def test_registry():
-    tools = get_tools()
-    assert len(tools) == 5
+def test_registry_inventories():
+    general = get_general_tools()
+    assert len(general) == 0
 
+    travel = get_travel_tools()
+    # Currently 4 tools before Phase 5 splits list_user_bookings
+    assert len(travel) == 4
+    tool_names = [t.name for t in travel]
+    assert "search_flights" in tool_names
+    assert "get_user_preferences" in tool_names
+    assert "list_user_bookings" in tool_names
+    assert "check_booking_readiness" in tool_names
+
+    checkout = get_checkout_tools()
+    # T046 will add signal_checkout_intent
+    assert len(checkout) == 1
+    tool_names = [t.name for t in checkout]
+    assert "signal_checkout_intent" in tool_names
+
+def test_tool_by_name():
     t1 = get_tool_by_name("search_flights")
     assert t1 == search_flights
     assert not requires_confirmation("search_flights")
-
-    t2 = get_tool_by_name("get_user_preferences")
-    assert t2 == get_user_preferences
-    assert not requires_confirmation("get_user_preferences")
-
-    t3 = get_tool_by_name("list_user_bookings")
-    assert t3 == list_user_bookings
-    assert not requires_confirmation("list_user_bookings")
-
-    t4 = get_tool_by_name("book_flight")
-    assert t4.name == "book_flight"
-    assert requires_confirmation("book_flight")
 
     with pytest.raises(ValueError, match="Tool 'non_existent' is not registered."):
         get_tool_by_name("non_existent")

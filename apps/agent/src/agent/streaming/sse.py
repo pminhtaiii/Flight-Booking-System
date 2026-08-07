@@ -304,6 +304,37 @@ async def chat_stream(
                         config=config,
                         version="v2"
                     )
+                    user_msg_persisted = True
+            except Exception as e:
+                logger.warning(f"Failed to pre-persist user message: {e!s}")
+                await q.put({
+                    "event": "error",
+                    "data": json.dumps({
+                        "code": "PERSISTENCE_ERROR",
+                        "message": "Failed to persist user message before tool execution.",
+                        "partialMessageId": None
+                    })
+                })
+                return
+
+            try:
+                # New message
+                messages = format_messages(
+                    history=history,
+                    current_message=body.message,
+                    summary=summary
+                )
+                event_stream = graph.astream_events(
+                    {
+                        "messages": messages,
+                        "iteration_count": 0,
+                        "pending_confirmation": None,
+                        "handoff_required": False,
+                        "trusted_snapshot": trusted_snapshot_dict,
+                    },
+                    config=config,
+                    version="v2"
+                )
 
                 async for event in event_stream:
                     kind = event.get("event")

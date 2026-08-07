@@ -17,6 +17,7 @@ import { PaymentModule } from './payment/payment.module';
 import { DisruptionModule } from './disruption/disruption.module';
 import { AncillariesModule } from './ancillaries/ancillaries.module';
 import { ProfileModule } from './profile/profile.module';
+import { ChatHandoffModule } from './chat-handoff/chat-handoff.module';
 
 import { z } from 'zod';
 
@@ -39,7 +40,20 @@ export const envSchema = z.object({
   FEATURE_FLAG_DISRUPTION_RECONCILIATION: z.string().optional().default('false'),
   FEATURE_FLAG_DISRUPTION_SURFACING: z.string().optional().default('false'),
   FEATURE_FLAG_DISRUPTION_OUTBOX: z.string().optional().default('false'),
-}).passthrough();
+  FEATURE_FLAG_CHAT_HANDOFF_ACCEPT: z.string().optional().default('false'),
+  FEATURE_FLAG_CHAT_HANDOFF_ISSUE: z.string().optional().default('false'),
+  FEATURE_FLAG_WRITE_FENCE: z.string().optional().default('false'),
+  CHAT_ENCRYPTION_KEY: z.string().optional(),
+  CHAT_ATTESTATION_KEY: z.string().optional(),
+  CHAT_HANDOFF_CLAIM_TTL: z.coerce.number().optional().default(600),
+}).passthrough().refine(data => {
+  if (data.FEATURE_FLAG_CHAT_HANDOFF_ISSUE === 'true' && data.FEATURE_FLAG_CHAT_HANDOFF_ACCEPT !== 'true') {
+    return false;
+  }
+  return true;
+}, {
+  message: "Invalid config: ISSUE=true but ACCEPT=false",
+});
 
 @Module({
   imports: [
@@ -64,6 +78,7 @@ export const envSchema = z.object({
     DisruptionModule,
     AncillariesModule,
     ProfileModule,
+    ChatHandoffModule,
   ],
   controllers: [],
   providers: [],

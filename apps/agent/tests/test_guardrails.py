@@ -105,6 +105,11 @@ def test_health_endpoint_with_guardrails(monkeypatch):
         mock_guardrail.is_healthy.return_value = True
         monkeypatch.setattr(app.state, "guardrails", mock_guardrail, raising=False)
 
+        # Mock Redis client so health check doesn't fail if setup_redis hasn't run globally yet
+        mock_redis_client = AsyncMock()
+        mock_redis_client.ping = AsyncMock(return_value=True)
+        monkeypatch.setattr("agent.infrastructure.redis.get_redis_client", lambda: mock_redis_client)
+
         response = client.get("/health")
         assert response.status_code == 200
         data = response.json()

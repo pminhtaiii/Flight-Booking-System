@@ -11,6 +11,7 @@ import { JwtService } from '@nestjs/jwt';
 import { CacheService } from '@/cache/cache.service';
 import * as bcrypt from 'bcrypt';
 import { Prisma } from '@prisma/client';
+import * as crypto from 'crypto';
 
 @Injectable()
 export class AuthService {
@@ -75,8 +76,17 @@ export class AuthService {
       });
 
       const token = this.jwtService.sign(
-        { id: result.id, email: result.email },
-        { expiresIn: '24h' },
+        { 
+          id: result.id, 
+          email: result.email,
+          sub: result.id,
+          jti: crypto.randomUUID(),
+        },
+        { 
+          expiresIn: '24h',
+          issuer: 'booking-systems-api',
+          audience: 'booking-systems-clients',
+        },
       );
 
       return {
@@ -169,8 +179,17 @@ export class AuthService {
     });
 
     const token = this.jwtService.sign(
-      { id: updatedUser.id, email: updatedUser.email },
-      { expiresIn: '24h' },
+      { 
+        id: updatedUser.id, 
+        email: updatedUser.email,
+        sub: updatedUser.id,
+        jti: crypto.randomUUID(),
+      },
+      { 
+        expiresIn: '24h',
+        issuer: 'booking-systems-api',
+        audience: 'booking-systems-clients',
+      },
     );
 
     return {
@@ -189,10 +208,15 @@ export class AuthService {
     ipAddress?: string | null,
     traceId?: string | null,
     correlationId?: string | null,
+    jti?: string | null,
   ) {
     if (token) {
       // Blacklist token in CacheService for 24 hours
       await this.cacheService.set(`blacklist:${token}`, 'true', 86400);
+    }
+    if (jti) {
+      // Blacklist JTI in CacheService for 24 hours
+      await this.cacheService.set(`blacklist:jti:${jti}`, 'true', 86400);
     }
 
     await this.auditService.createLog(null, {
@@ -205,6 +229,32 @@ export class AuthService {
       correlationId,
       metadata: {},
     });
+  }
+
+  async validateUserAccess(userId: string, jti?: string | null, token?: string | null): Promise<{ allowed: boolean; userId: string }> {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+    });
+
+    if (!user || user.status !== 'ACTIVE') {
+      throw new UnauthorizedException('User is inactive or not found');
+    }
+
+    if (jti) {
+      const isJtiBlacklisted = await this.cacheService.get(`blacklist:jti:${jti}`);
+      if (isJtiBlacklisted) {
+        throw new UnauthorizedException('Token JTI has been revoked');
+      }
+    }
+
+    if (token) {
+      const isTokenBlacklisted = await this.cacheService.get(`blacklist:${token}`);
+      if (isTokenBlacklisted) {
+        throw new UnauthorizedException('Token has been revoked');
+      }
+    }
+
+    return { allowed: true, userId: user.id };
   }
 
   async resetDatabaseForTesting() {
