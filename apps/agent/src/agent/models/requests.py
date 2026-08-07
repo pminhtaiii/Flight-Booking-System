@@ -29,3 +29,11 @@ class ChatStreamRequest(BaseModel):
                 stripped = self.message.strip()
                 self.message = stripped
         return self
+
+from typing import Literal
+class RouteDecision(BaseModel):
+    intent: Literal["GENERAL", "SEARCH", "BOOKING_INQUIRY", "CHECKOUT"]
+    confidence: float = Field(ge=0.0, le=1.0)
+    isCommitment: bool
+    selectionIndex: Optional[int] = None
+

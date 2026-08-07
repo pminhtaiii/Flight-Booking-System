@@ -63,5 +63,6 @@ export * from './airport';
 export * from './payment.types';
 export * from './ancillary.types';
 export * from './traveler-profile.types';
+export * from './chat.types';
 
 

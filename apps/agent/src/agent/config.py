@@ -1,5 +1,5 @@
 from pydantic_settings import BaseSettings, SettingsConfigDict
-from pydantic import Field, BaseModel
+from pydantic import Field, BaseModel, model_validator
 from typing import Optional
 
 DEFAULT_OUTPUT_GUARDRAIL_ENABLED = True
@@ -39,6 +39,16 @@ class Settings(BaseSettings):
     OUTPUT_GUARDRAIL_MAX_CHUNK_TOKENS: int = DEFAULT_OUTPUT_GUARDRAIL_MAX_CHUNK_TOKENS
     OUTPUT_GUARDRAIL_NEMO_TIMEOUT: float = DEFAULT_OUTPUT_GUARDRAIL_NEMO_TIMEOUT
 
+    FEATURE_FLAG_CHAT_MULTI_AGENT: bool = False
+    FEATURE_FLAG_CHAT_HANDOFF_ACCEPT: bool = False
+    FEATURE_FLAG_CHAT_HANDOFF_ISSUE: bool = False
+    FEATURE_FLAG_CHAT_DIRECT_STREAM: bool = False
+    REDIS_URL: Optional[str] = "redis://localhost:6379/0"
+    CHAT_QUOTA_DAILY: int = 50
+    CHAT_QUOTA_BURST: int = 60
+    ROUTER_CONFIDENCE_THRESHOLD: float = 0.7
+    SNAPSHOT_TTL_SECONDS: int = 1800
+
     @property
     def output_guardrail(self) -> OutputGuardrailConfig:
         return OutputGuardrailConfig(
@@ -53,6 +63,12 @@ class Settings(BaseSettings):
         env_file_encoding="utf-8",
         extra="ignore"
     )
+
+    @model_validator(mode="after")
+    def validate_handoff_flags(self) -> 'Settings':
+        if self.FEATURE_FLAG_CHAT_HANDOFF_ISSUE and not self.FEATURE_FLAG_CHAT_HANDOFF_ACCEPT:
+            raise ValueError("Invalid config: ISSUE=true but ACCEPT=false")
+        return self
 
 settings: Optional[Settings] = None
 
