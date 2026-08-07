@@ -75,15 +75,25 @@ export async function backfillBookingAgentProjections() {
           const flightSnapshot: any = booking.flightSnapshot;
           if (flightSnapshot && flightSnapshot.segments && Array.isArray(flightSnapshot.segments) && flightSnapshot.segments.length > 0) {
             const segments = flightSnapshot.segments;
-            origin = segments[0].departureAirport?.iataCode || '';
-            destination = segments[segments.length - 1].arrivalAirport?.iataCode || '';
-            departureAt = new Date(segments[0].departureAt);
-            arrivalAt = new Date(segments[segments.length - 1].arrivalAt);
-            durationMinutes = (arrivalAt.getTime() - departureAt.getTime()) / 60000;
-            stopCount = flightSnapshot.stops ?? Math.max(0, segments.length - 1);
-            airline = segments[0].airline?.name || '';
-            flightNumber = segments[0].airline?.iataCode ? `${segments[0].airline.iataCode} ${segments[0].flightNumber}` : null;
-            hasFlightData = true;
+            const depStr = segments[0].departureAt;
+            const arrStr = segments[segments.length - 1].arrivalAt;
+            
+            if (depStr && arrStr) {
+              const parsedDep = new Date(depStr);
+              const parsedArr = new Date(arrStr);
+              
+              if (!isNaN(parsedDep.getTime()) && !isNaN(parsedArr.getTime())) {
+                origin = segments[0].departureAirport?.iataCode || '';
+                destination = segments[segments.length - 1].arrivalAirport?.iataCode || '';
+                departureAt = parsedDep;
+                arrivalAt = parsedArr;
+                durationMinutes = (arrivalAt.getTime() - departureAt.getTime()) / 60000;
+                stopCount = flightSnapshot.stops ?? Math.max(0, segments.length - 1);
+                airline = segments[0].airline?.name || '';
+                flightNumber = segments[0].airline?.iataCode ? `${segments[0].airline.iataCode} ${segments[0].flightNumber}` : null;
+                hasFlightData = true;
+              }
+            }
           }
         }
 
