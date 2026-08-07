@@ -108,6 +108,7 @@ async def search_flights(
         import logging
         logging.getLogger(__name__).warning("Failed to save trusted snapshot: %s", str(e))
         # If we can't save snapshot, it's safer to fail the search so we don't present unbookable results
+        FLIGHTS_CACHE.pop(thread_id, None)
         return "I encountered an error preparing your search results. Please try again."
 
     FLIGHTS_CACHE[thread_id] = {"results": safe_results}

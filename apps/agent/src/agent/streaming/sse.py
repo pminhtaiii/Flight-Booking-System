@@ -264,6 +264,15 @@ async def chat_stream(
                     user_msg_persisted = True
             except Exception as e:
                 logger.warning(f"Failed to pre-persist user message: {e!s}")
+                await q.put({
+                    "event": "error",
+                    "data": json.dumps({
+                        "code": "PERSISTENCE_ERROR",
+                        "message": "Failed to persist user message before tool execution.",
+                        "partialMessageId": None
+                    })
+                })
+                return
 
             try:
                 # New message
