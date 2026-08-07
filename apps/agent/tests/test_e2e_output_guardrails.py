@@ -76,8 +76,8 @@ async def test_e2e_output_guardrail_pipeline_validation(mock_nestjs_client, monk
             assert len(done_events) == 0
 
             # Verify NestJS Client was called to persist only the safe chunk
-            mock_nestjs_client.create_message_batch.assert_called_once()
-            call_args = mock_nestjs_client.create_message_batch.call_args
-            payload = call_args[0][1]
-            assert payload[0]["content"] == "run e2e guardrail check"
-            assert payload[1]["content"] == "Chunk number one is safe. "
+            assert mock_nestjs_client.create_message_batch.call_count == 2
+            call_args = mock_nestjs_client.create_message_batch.mock_calls[1].args
+            payload = call_args[1]
+            assert len(payload) == 1
+            assert payload[0]["content"] == "Chunk number one is safe. "

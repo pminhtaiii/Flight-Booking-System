@@ -6,7 +6,8 @@ from langchain_core.runnables import RunnableConfig
 from agent.tools.base import get_nestjs_client
 from agent.tools.search_flights import search_flights
 from agent.tools.get_preferences import get_user_preferences
-from agent.tools.list_bookings import list_user_bookings
+from agent.tools.booking_summaries import list_user_booking_summaries
+from agent.tools.booking_detail import get_booking_detail
 from agent.tools.registry import (
     get_tools, get_tool_by_name, requires_confirmation,
     get_general_tools, get_travel_tools, get_checkout_tools
@@ -19,7 +20,8 @@ def mock_client():
     client.post_gateway_flights_search_v2 = AsyncMock()
     client.get_gateway_flights_search = AsyncMock()
     client.get_gateway_user_preferences = AsyncMock()
-    client.get_gateway_user_bookings = AsyncMock()
+    client.get_gateway_user_booking_summaries = AsyncMock()
+    client.get_gateway_booking_detail = AsyncMock()
     return client
 
 
@@ -179,56 +181,66 @@ async def test_get_user_preferences_error(mock_client, run_config):
 
 
 @pytest.mark.asyncio
-async def test_list_user_bookings_success(mock_client, run_config):
-    mock_client.get_gateway_user_bookings.return_value = {
-        "bookings": [
+async def test_list_user_booking_summaries_success(mock_client, run_config):
+    mock_client.get_gateway_user_booking_summaries.return_value = {
+        "summaries": [
             {
                 "airline": "VN",
-                "flightNumber": "VN310",
-                "status": "CONFIRMED",
                 "origin": "HAN",
                 "destination": "NRT",
-                "departureTime": "2026-08-15T08:30:00Z",
-                "arrivalTime": "2026-08-15T15:00:00Z",
-                "duration": 330,
-                "stops": 0,
-                "fareClass": "Business",
-                "price": 1250.00,
-                "currency": "USD",
-                "passengers": 1,
-                "baggageAllowance": "32kg checked + 7kg carry-on"
+                "departureAt": "2026-08-15T08:30:00Z",
+                "arrivalAt": "2026-08-15T15:00:00Z",
+                "durationMinutes": 330,
+                "stopCount": 0,
+                "status": "CONFIRMED",
+                "agentReference": "ref-123"
             }
         ]
     }
 
-    result = await list_user_bookings.ainvoke({}, config=run_config)
+    result = await list_user_booking_summaries.ainvoke({}, config=run_config)
 
     expected = (
-        "You have 1 active bookings:\n\n"
-        "1. Vietnam Airlines VN310 \u2014 CONFIRMED\n"
-        "   HAN \u2192 NRT on Aug 15, 2026\n"
-        "   Departs: 08:30 \u2192 Arrives: 15:00\n"
-        "   Duration: 5h 30m | Direct\n"
-        "   Class: Business | Price: $1,250.00 USD\n"
-        "   Passengers: 1 | Baggage: 32kg checked + 7kg carry-on"
+        "- [CONFIRMED] VN from HAN to NRT. Departs 2026-08-15T08:30:00Z, Arrives 2026-08-15T15:00:00Z. Duration: 330 mins, Stops: 0. (Ref: ref-123)"
     )
     assert result.strip() == expected.strip()
 
 
 @pytest.mark.asyncio
-async def test_list_user_bookings_empty(mock_client, run_config):
-    mock_client.get_gateway_user_bookings.return_value = {"bookings": []}
+async def test_list_user_booking_summaries_empty(mock_client, run_config):
+    mock_client.get_gateway_user_booking_summaries.return_value = {"summaries": []}
 
-    result = await list_user_bookings.ainvoke({}, config=run_config)
-    assert result == "You don't have any active bookings at the moment."
+    result = await list_user_booking_summaries.ainvoke({}, config=run_config)
+    assert result == "No bookings found."
 
 
 @pytest.mark.asyncio
-async def test_list_user_bookings_error(mock_client, run_config):
-    mock_client.get_gateway_user_bookings.side_effect = Exception("Auth failed")
+async def test_list_user_booking_summaries_error(mock_client, run_config):
+    mock_client.get_gateway_user_booking_summaries.side_effect = Exception("Auth failed")
 
-    result = await list_user_bookings.ainvoke({}, config=run_config)
-    assert result == "I couldn't retrieve your bookings right now. Please try again in a moment."
+    result = await list_user_booking_summaries.ainvoke({}, config=run_config)
+    assert result == "Failed to fetch booking summaries."
+
+@pytest.mark.asyncio
+async def test_get_booking_detail_success(mock_client, run_config):
+    mock_client.get_gateway_booking_detail.return_value = {
+        "status": "CONFIRMED",
+        "airline": "VN",
+        "origin": "HAN",
+        "destination": "NRT",
+        "departureAt": "2026-08-15T08:30:00Z",
+        "arrivalAt": "2026-08-15T15:00:00Z",
+        "flightNumber": "VN310",
+        "baggageSummary": "23kg checked",
+        "refundable": False,
+        "changeable": False
+    }
+
+    result = await get_booking_detail.ainvoke({"agent_reference": "ref-123"}, config=run_config)
+
+    assert "Booking ref-123 Detail:" in result
+    assert "VN310 from HAN to NRT" in result
+    assert "Baggage: 23kg checked" in result
 
 
 def test_registry_inventories():
@@ -236,12 +248,13 @@ def test_registry_inventories():
     assert len(general) == 0
 
     travel = get_travel_tools()
-    # Currently 4 tools before Phase 5 splits list_user_bookings
-    assert len(travel) == 4
+    # Phase 5 splits list_user_bookings into summaries and detail
+    assert len(travel) == 5
     tool_names = [t.name for t in travel]
     assert "search_flights" in tool_names
     assert "get_user_preferences" in tool_names
-    assert "list_user_bookings" in tool_names
+    assert "list_user_booking_summaries" in tool_names
+    assert "get_booking_detail" in tool_names
     assert "check_booking_readiness" in tool_names
 
     checkout = get_checkout_tools()

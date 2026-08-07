@@ -162,8 +162,11 @@ async def test_stream_success_path(monkeypatch):
                 settings = get_settings()
                 assert mock_get_memory.call_count == 1
                 mock_get_memory.assert_called_once_with("session-123", recent_count=settings.MEMORY_WINDOW_SIZE)
-                mock_create_batch.assert_called_once_with("session-123", [
-                    {"sender": "USER", "type": "STANDARD", "content": "how are you?"},
+                assert mock_create_batch.call_count == 2
+                mock_create_batch.assert_any_call("session-123", [
+                    {"sender": "USER", "type": "STANDARD", "content": "how are you?"}
+                ])
+                mock_create_batch.assert_any_call("session-123", [
                     {"sender": "AGENT", "type": "STANDARD", "content": "Hello there human!"}
                 ])
 
@@ -263,8 +266,11 @@ async def test_stream_llm_error_path(monkeypatch):
                 # Verify NestJS calls
                 settings = get_settings()
                 mock_get_memory.assert_called_once_with("session-456", recent_count=settings.MEMORY_WINDOW_SIZE)
-                mock_create_batch.assert_called_once_with("session-456", [
-                    {"sender": "USER", "type": "STANDARD", "content": "fail for me"},
+                assert mock_create_batch.call_count == 2
+                mock_create_batch.assert_any_call("session-456", [
+                    {"sender": "USER", "type": "STANDARD", "content": "fail for me"}
+                ])
+                mock_create_batch.assert_any_call("session-456", [
                     {"sender": "AGENT", "type": "STANDARD", "content": "Partial answer..."}
                 ])
 
@@ -369,15 +375,16 @@ async def test_stream_connection_drop_path(monkeypatch):
             await asyncio.wait_for(call_event.wait(), timeout=2.0)
             
             # Assert that create_message_batch was called
-            assert mock_create_batch.call_count == 1
-            call_args = mock_create_batch.call_args
-            assert call_args is not None
-            assert call_args[0][0] == "session-drop"
-            messages_sent = call_args[0][1]
-            assert messages_sent[0]["sender"] == "USER"
-            assert messages_sent[0]["content"] == "drop me"
-            assert messages_sent[1]["sender"] == "AGENT"
-            assert "First chunk" in messages_sent[1]["content"]
+            assert mock_create_batch.call_count == 2
+            user_call_args = mock_create_batch.mock_calls[0].args
+            assert user_call_args[0] == "session-drop"
+            assert user_call_args[1][0]["sender"] == "USER"
+            assert user_call_args[1][0]["content"] == "drop me"
+
+            agent_call_args = mock_create_batch.mock_calls[1].args
+            assert agent_call_args[0] == "session-drop"
+            assert agent_call_args[1][0]["sender"] == "AGENT"
+            assert "First chunk" in agent_call_args[1][0]["content"]
 
 
 @pytest.mark.asyncio

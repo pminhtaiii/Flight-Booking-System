@@ -77,8 +77,9 @@ async def test_first_chunk_unsafe(mock_nestjs_client, monkeypatch):
             # Verify the stream terminates after the error event
             assert events[-1]["event"] == "error"
             
-            # Verify no NestJSClient persistence call is made because there are no safe chunks
-            mock_nestjs_client.create_message_batch.assert_not_called()
+            # Ensure user message is persisted but agent message is not
+            assert mock_nestjs_client.create_message_batch.call_count == 1
+            assert mock_nestjs_client.create_message_batch.mock_calls[0].args[1][0]["sender"] == "USER"
 
             # Verify structured JSON security warning is logged correctly
             log_spy.assert_called_once()
@@ -152,12 +153,12 @@ async def test_mid_stream_chunk_unsafe(mock_nestjs_client, monkeypatch):
             # Verify the stream terminates after the error event
             assert events[-1]["event"] == "error"
             
-            # NestJSClient should have been called to persist the preceding safe chunks
-            mock_nestjs_client.create_message_batch.assert_called_once()
-            call_args = mock_nestjs_client.create_message_batch.call_args
-            payload = call_args[0][1]
-            assert payload[0]["content"] == "trigger mid safety block"
-            assert payload[1]["content"] == "Safe chunk. "
+            # NestJSClient should have been called to persist the preceding safe chunks and user message
+            assert mock_nestjs_client.create_message_batch.call_count == 2
+            call_args = mock_nestjs_client.create_message_batch.mock_calls[1].args
+            payload = call_args[1]
+            assert len(payload) == 1
+            assert payload[0]["content"] == "Safe chunk. "
 
             # Verify structured JSON security warning is logged correctly
             log_spy.assert_called_once()
@@ -174,8 +175,8 @@ async def test_nestjs_persistence_fails(mock_nestjs_client, monkeypatch):
     settings = get_settings()
     monkeypatch.setattr(settings, "OUTPUT_GUARDRAIL_ENABLED", True)
 
-    # Mock NestJS Client to raise an exception on persistence
-    mock_nestjs_client.create_message_batch = AsyncMock(side_effect=Exception("Database connection error"))
+    # Mock NestJS Client to raise an exception on persistence for the agent message
+    mock_nestjs_client.create_message_batch = AsyncMock(side_effect=[{"messages": []}, Exception("Database connection error")])
 
     # Mock guardrail: first chunk is safe, second is UNSAFE
     mock_gr = MagicMock()

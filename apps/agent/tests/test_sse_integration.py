@@ -432,5 +432,6 @@ async def test_sse_complete_profile_handoff_stops_without_persistence(mock_nestj
     assert action_events[0]["data"]["target"] == "/profile"
     assert not [event for event in events if event["event"] == "done"]
     assert not [event for event in events if event["event"] == "token"]
-    mock_nestjs_client.create_message_batch.assert_not_awaited()
+    assert mock_nestjs_client.create_message_batch.call_count == 1
+    assert mock_nestjs_client.create_message_batch.mock_calls[0].args[1][0]["sender"] == "USER"
     assert len(llm.responses) == 1

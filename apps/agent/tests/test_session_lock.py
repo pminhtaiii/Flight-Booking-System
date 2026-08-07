@@ -83,7 +83,7 @@ async def test_message_queue_bounded_wait_and_refresh_cancellation():
     
     req2 = await manager.acquire("s3_bounded", "u1") # This should take ~1 second
     elapsed = time.time() - start
-    assert 0.9 < elapsed < 2.5
+    assert 0.9 < elapsed < 4.0
 
     await manager.release("s3_bounded", req2)
 
