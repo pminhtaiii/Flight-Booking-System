@@ -275,23 +275,28 @@ async def chat_stream(
                 return
 
             try:
-                # New message
-                messages = format_messages(
-                    history=history,
-                    current_message=body.message,
-                    summary=summary
-                )
-                event_stream = graph.astream_events(
-                    {
-                        "messages": messages,
-                        "iteration_count": 0,
-                        "pending_confirmation": None,
-                        "handoff_required": False,
-                        "trusted_snapshot": trusted_snapshot_dict,
-                    },
-                    config=config,
-                    version="v2"
-                )
+                if body.confirmed is not None:
+                    # Resume interrupted session with confirmation
+                    await graph.aupdate_state(config, {"pending_confirmation": body.confirmed})
+                    event_stream = graph.astream_events(None, config=config, version="v2")
+                else:
+                    # New message
+                    messages = format_messages(
+                        history=history,
+                        current_message=body.message,
+                        summary=summary
+                    )
+                    event_stream = graph.astream_events(
+                        {
+                            "messages": messages,
+                            "iteration_count": 0,
+                            "pending_confirmation": None,
+                            "handoff_required": False,
+                            "trusted_snapshot": trusted_snapshot_dict,
+                        },
+                        config=config,
+                        version="v2"
+                    )
 
                 async for event in event_stream:
                     kind = event.get("event")
