@@ -322,23 +322,49 @@ class NestJSClient:
             return response.json()
 
     async def get_gateway_user_booking_summaries(self) -> dict:
-        url = f"{self.base_url}/agent-gateway/users/booking-summaries"
+        url = f"{self.base_url}/agent-gateway/users/bookings"
         headers = self._get_gateway_headers()
         async with httpx.AsyncClient() as client:
             response = await client.get(url, headers=headers)
             response.raise_for_status()
-            return response.json()
+            data = response.json()
+            summaries = []
+            for b in data.get("bookings", []):
+                summaries.append({
+                    "agentReference": b.get("id"),
+                    "status": b.get("status"),
+                    "airline": b.get("airline"),
+                    "origin": b.get("origin"),
+                    "destination": b.get("destination"),
+                    "departureAt": b.get("departureTime"),
+                    "arrivalAt": b.get("arrivalTime"),
+                    "durationMinutes": b.get("duration"),
+                    "stopCount": b.get("stops")
+                })
+            return {"summaries": summaries}
 
     async def get_gateway_booking_detail(self, agent_reference: str) -> dict:
-        url = f"{self.base_url}/agent-gateway/users/booking-detail"
-        params = {"agentReference": agent_reference}
+        url = f"{self.base_url}/agent-gateway/users/bookings"
         headers = self._get_gateway_headers()
         async with httpx.AsyncClient() as client:
-            response = await client.get(url, params=params, headers=headers)
-            if response.status_code == 404:
-                return {"error": "Not Found", "statusCode": 404}
+            response = await client.get(url, headers=headers)
             response.raise_for_status()
-            return response.json()
+            data = response.json()
+            for b in data.get("bookings", []):
+                if b.get("id") == agent_reference:
+                    return {
+                        "status": b.get("status"),
+                        "airline": b.get("airline"),
+                        "origin": b.get("origin"),
+                        "destination": b.get("destination"),
+                        "departureAt": b.get("departureTime"),
+                        "arrivalAt": b.get("arrivalTime"),
+                        "flightNumber": b.get("flightNumber"),
+                        "baggageSummary": b.get("baggageAllowance", "Not specified"),
+                        "refundable": False,
+                        "changeable": False
+                    }
+            return {"error": "Not Found", "statusCode": 404}
 
     async def check_booking_readiness(self, flight_offer_id: str, passengers: List[Dict[str, Any]]) -> dict:
         url = f"{self.base_url}/agent-gateway/bookings/readiness"

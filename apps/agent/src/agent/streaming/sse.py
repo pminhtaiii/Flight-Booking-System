@@ -275,49 +275,6 @@ async def chat_stream(
                 return
 
             try:
-                if body.confirmed is not None:
-                    # Resume interrupted session with confirmation
-                    current_state = await graph.aget_state(config)
-                    pending = current_state.values.get("pending_confirmation") or {}
-                    pending["confirmed"] = body.confirmed
-                    await graph.aupdate_state(
-                        config,
-                        {"pending_confirmation": pending},
-                        as_node="agent",
-                    )
-                    event_stream = graph.astream_events(None, config=config, version="v2")
-                else:
-                    # New message
-                    messages = format_messages(
-                        history=history,
-                        current_message=body.message,
-                        summary=summary
-                    )
-                    event_stream = graph.astream_events(
-                        {
-                            "messages": messages,
-                            "iteration_count": 0,
-                            "pending_confirmation": None,
-                            "handoff_required": False,
-                            "trusted_snapshot": trusted_snapshot_dict,
-                        },
-                        config=config,
-                        version="v2"
-                    )
-                    user_msg_persisted = True
-            except Exception as e:
-                logger.warning(f"Failed to pre-persist user message: {e!s}")
-                await q.put({
-                    "event": "error",
-                    "data": json.dumps({
-                        "code": "PERSISTENCE_ERROR",
-                        "message": "Failed to persist user message before tool execution.",
-                        "partialMessageId": None
-                    })
-                })
-                return
-
-            try:
                 # New message
                 messages = format_messages(
                     history=history,
@@ -542,22 +499,6 @@ async def chat_stream(
                         "event": "token",
                         "data": json.dumps({"content": safe_chunk})
                     })
-                # Check if graph suspended for confirmation
-                current_state = await graph.aget_state(config)
-                if current_state.next:
-                    pending = current_state.values.get("pending_confirmation") or {}
-                    action_name = pending.get("name", "unknown")
-                    action_details = pending.get("args", {})
-
-                    await q.put({
-                        "event": "confirmation_required",
-                        "data": json.dumps({
-                            "type": "confirmation_required",
-                            "action": action_name,
-                            "details": action_details
-                        })
-                    })
-                    return
 
                 # Completed turn - Persist message batch and send done event
                 if partial_response.strip() or force_persistence:

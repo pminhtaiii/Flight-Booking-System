@@ -13,16 +13,8 @@ _GENERAL_TOOLS: tuple[BaseTool, ...] = ()
 _TRAVEL_TOOLS: tuple[BaseTool, ...] = (
     search_flights,
     get_user_preferences,
-<<<<<<< HEAD
-    list_user_bookings,
-=======
-<<<<<<< Updated upstream
-    list_user_bookings,
-=======
     list_user_booking_summaries,
     get_booking_detail,
->>>>>>> Stashed changes
->>>>>>> 8edd15b (feat(agent): implement LangGraph orchestrators and read tools (Phase 5 - Batch 3))
     check_booking_readiness,
 )
 
