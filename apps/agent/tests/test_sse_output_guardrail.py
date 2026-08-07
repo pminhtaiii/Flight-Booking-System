@@ -118,11 +118,11 @@ async def test_sse_output_guardrail_unsafe_blocking(mock_nestjs_client, monkeypa
             assert len(done_events) == 0
             
             # NestJSClient should have been called to persist the partial response
-            mock_nestjs_client.create_message_batch.assert_called_once()
-            call_args = mock_nestjs_client.create_message_batch.call_args
-            payload = call_args[0][1]
-            assert payload[0]["content"] == "trigger safety block"
-            assert payload[1]["content"] == "Safe chunk. "
+            assert mock_nestjs_client.create_message_batch.call_count == 2
+            call_args = mock_nestjs_client.create_message_batch.mock_calls[1].args
+            payload = call_args[1]
+            assert len(payload) == 1
+            assert payload[0]["content"] == "Safe chunk. "
 
 @pytest.mark.asyncio
 async def test_sse_output_guardrail_disabled(mock_nestjs_client, monkeypatch):

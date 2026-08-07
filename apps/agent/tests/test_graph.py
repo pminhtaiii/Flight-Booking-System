@@ -14,7 +14,8 @@ def mock_nestjs_client():
     client.check_user_access = AsyncMock(return_value={"allowed": True})
     client.get_gateway_flights_search = AsyncMock()
     client.get_gateway_user_preferences = AsyncMock()
-    client.get_gateway_user_bookings = AsyncMock()
+    client.get_gateway_user_booking_summaries = AsyncMock()
+    client.get_gateway_booking_detail = AsyncMock()
     return client
 
 
@@ -147,26 +148,21 @@ async def test_graph_get_user_preferences_integration(mock_nestjs_client, mock_l
 
 
 @pytest.mark.asyncio
-async def test_graph_list_user_bookings_integration(mock_nestjs_client, mock_llm):
+async def test_graph_list_user_booking_summaries_integration(mock_nestjs_client, mock_llm):
     mock_model, mock_model_with_tools = mock_llm
 
-    mock_nestjs_client.get_gateway_user_bookings.return_value = {
-        "bookings": [
+    mock_nestjs_client.get_gateway_user_booking_summaries.return_value = {
+        "summaries": [
             {
                 "airline": "VN",
-                "flightNumber": "VN310",
                 "status": "CONFIRMED",
                 "origin": "HAN",
                 "destination": "NRT",
-                "departureTime": "2026-08-15T08:30:00Z",
-                "arrivalTime": "2026-08-15T15:00:00Z",
-                "duration": 330,
-                "stops": 0,
-                "fareClass": "Business",
-                "price": 1250.00,
-                "currency": "USD",
-                "passengers": 1,
-                "baggageAllowance": "32kg checked + 7kg carry-on"
+                "departureAt": "2026-08-15T08:30:00Z",
+                "arrivalAt": "2026-08-15T15:00:00Z",
+                "durationMinutes": 330,
+                "stopCount": 0,
+                "agentReference": "ref-123"
             }
         ]
     }
@@ -176,7 +172,7 @@ async def test_graph_list_user_bookings_integration(mock_nestjs_client, mock_llm
             content="",
             tool_calls=[
                 {
-                    "name": "list_user_bookings",
+                    "name": "list_user_booking_summaries",
                     "args": {},
                     "id": "call_bookings"
                 }
@@ -198,7 +194,7 @@ async def test_graph_list_user_bookings_integration(mock_nestjs_client, mock_llm
         }
         final_state = await graph.ainvoke(initial_state, config=config)
 
-        mock_nestjs_client.get_gateway_user_bookings.assert_called_once()
+        mock_nestjs_client.get_gateway_user_booking_summaries.assert_called_once()
         assert "Vietnam Airlines VN310" in final_state["messages"][-1].content
         assert final_state["iteration_count"] == 1
 
@@ -228,7 +224,7 @@ async def test_graph_out_of_bounds_query(mock_nestjs_client, mock_llm):
         # Ensure no gateway tools were invoked
         mock_nestjs_client.get_gateway_flights_search.assert_not_called()
         mock_nestjs_client.get_gateway_user_preferences.assert_not_called()
-        mock_nestjs_client.get_gateway_user_bookings.assert_not_called()
+        mock_nestjs_client.get_gateway_user_booking_summaries.assert_not_called()
 
         assert "not available" in final_state["messages"][-1].content.lower()
 

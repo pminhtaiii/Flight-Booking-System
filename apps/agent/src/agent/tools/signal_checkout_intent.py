@@ -1,7 +1,5 @@
 from langgraph.types import Command
 from langchain_core.tools import tool
-from agent.graph.state import AgentState
-
 @tool
 def signal_checkout_intent(selection_index: int) -> Command:
     """Signal that the user wants to checkout a specific flight offer from the latest search results.

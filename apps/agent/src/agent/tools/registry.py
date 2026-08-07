@@ -3,7 +3,8 @@ from langchain_core.tools import BaseTool
 
 from agent.tools.search_flights import search_flights
 from agent.tools.get_preferences import get_user_preferences
-from agent.tools.list_bookings import list_user_bookings
+from agent.tools.booking_summaries import list_user_booking_summaries
+from agent.tools.booking_detail import get_booking_detail
 from agent.tools.check_booking_readiness import check_booking_readiness
 from agent.tools.signal_checkout_intent import signal_checkout_intent
 
@@ -12,7 +13,8 @@ _GENERAL_TOOLS: tuple[BaseTool, ...] = ()
 _TRAVEL_TOOLS: tuple[BaseTool, ...] = (
     search_flights,
     get_user_preferences,
-    list_user_bookings,
+    list_user_booking_summaries,
+    get_booking_detail,
     check_booking_readiness,
 )
 

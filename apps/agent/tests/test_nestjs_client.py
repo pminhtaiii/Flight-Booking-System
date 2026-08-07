@@ -237,19 +237,41 @@ async def test_get_gateway_user_preferences():
         )
 
 @pytest.mark.asyncio
-async def test_get_gateway_user_bookings():
+async def test_get_gateway_user_booking_summaries():
     settings = get_settings()
     token = jwt.encode({"id": "user-123"}, settings.JWT_SECRET, algorithm="HS256")
     client = NestJSClient(base_url="http://localhost:3001/api", token=token)
 
     req = httpx.Request("GET", "http://localhost:3001/api/agent-gateway/users/bookings")
-    mock_response = httpx.Response(200, json={"bookings": []}, request=req)
+    mock_response = httpx.Response(200, json={"bookings": [{"id": "abc", "status": "CONFIRMED"}]}, request=req)
 
     with patch("httpx.AsyncClient.get", new_callable=AsyncMock) as mock_get:
         mock_get.return_value = mock_response
 
-        result = await client.get_gateway_user_bookings()
-        assert result == {"bookings": []}
+        result = await client.get_gateway_user_booking_summaries()
+        assert "summaries" in result
+        assert result["summaries"][0]["agentReference"] == "abc"
+
+        headers = client._get_gateway_headers()
+        mock_get.assert_called_once_with(
+            "http://localhost:3001/api/agent-gateway/users/bookings",
+            headers=headers
+        )
+
+@pytest.mark.asyncio
+async def test_get_gateway_booking_detail():
+    settings = get_settings()
+    token = jwt.encode({"id": "user-123"}, settings.JWT_SECRET, algorithm="HS256")
+    client = NestJSClient(base_url="http://localhost:3001/api", token=token)
+
+    req = httpx.Request("GET", "http://localhost:3001/api/agent-gateway/users/bookings")
+    mock_response = httpx.Response(200, json={"bookings": [{"id": "abc", "status": "CONFIRMED"}]}, request=req)
+
+    with patch("httpx.AsyncClient.get", new_callable=AsyncMock) as mock_get:
+        mock_get.return_value = mock_response
+
+        result = await client.get_gateway_booking_detail("abc")
+        assert result["status"] == "CONFIRMED"
 
         headers = client._get_gateway_headers()
         mock_get.assert_called_once_with(
