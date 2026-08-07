@@ -42,7 +42,7 @@ export async function backfillBookingAgentProjections() {
         if (existing) {
           agentReference = existing.agentReference;
         } else {
-          agentReference = crypto.randomBytes(4).toString('hex').toUpperCase();
+          agentReference = `bkref_${crypto.randomBytes(16).toString('hex')}`;
         }
 
         let origin = '';
@@ -53,6 +53,7 @@ export async function backfillBookingAgentProjections() {
         let stopCount = 0;
         let airline = '';
         let flightNumber: string | null = null;
+        let hasFlightData = false;
         
         if (booking.itineraryRevisions && booking.itineraryRevisions.length > 0) {
           const activeRevision = booking.itineraryRevisions[0];
@@ -66,6 +67,7 @@ export async function backfillBookingAgentProjections() {
             stopCount = Math.max(0, segments.length - 1);
             airline = segments[0].airlineName;
             flightNumber = `${segments[0].marketingCarrierIata} ${segments[0].flightNumber}`;
+            hasFlightData = true;
           }
         } else {
           const flightSnapshot: any = booking.flightSnapshot;
@@ -79,38 +81,56 @@ export async function backfillBookingAgentProjections() {
             stopCount = flightSnapshot.stops ?? Math.max(0, segments.length - 1);
             airline = segments[0].airline?.name || '';
             flightNumber = segments[0].airline?.iataCode ? `${segments[0].airline.iataCode} ${segments[0].flightNumber}` : null;
+            hasFlightData = true;
           }
         }
 
-        await prisma.bookingAgentProjection.upsert({
-          where: { bookingId: booking.id },
-          create: {
-            bookingId: booking.id,
-            agentReference,
-            status: booking.status,
-            airline,
-            origin,
-            destination,
-            departureAt,
-            arrivalAt,
-            durationMinutes,
-            stopCount,
-            flightNumber,
-          },
-          update: {
-            status: booking.status,
-            airline,
-            origin,
-            destination,
-            departureAt,
-            arrivalAt,
-            durationMinutes,
-            stopCount,
-            flightNumber,
+        if (!hasFlightData) {
+          console.log(`Skipping booking ${booking.id}: missing flight data`);
+        } else {
+          let attempt = 0;
+          let successUpsert = false;
+          while (attempt < 3 && !successUpsert) {
+            try {
+              await prisma.bookingAgentProjection.upsert({
+                where: { bookingId: booking.id },
+                create: {
+                  bookingId: booking.id,
+                  agentReference,
+                  status: booking.status,
+                  airline,
+                  origin,
+                  destination,
+                  departureAt,
+                  arrivalAt,
+                  durationMinutes,
+                  stopCount,
+                  flightNumber,
+                },
+                update: {
+                  status: booking.status,
+                  airline,
+                  origin,
+                  destination,
+                  departureAt,
+                  arrivalAt,
+                  durationMinutes,
+                  stopCount,
+                  flightNumber,
+                }
+              });
+              successUpsert = true;
+            } catch (error: any) {
+              if (error.code === 'P2002' && attempt < 2) {
+                attempt++;
+                agentReference = `bkref_${crypto.randomBytes(16).toString('hex')}`;
+              } else {
+                throw error;
+              }
+            }
           }
-        });
-        
-        success++;
+          success++;
+        }
       } catch (error: any) {
         failed++;
         console.error(`Failed to backfill booking ${booking.id}: ${error.message}`);
