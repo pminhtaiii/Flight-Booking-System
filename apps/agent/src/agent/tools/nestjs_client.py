@@ -321,11 +321,22 @@ class NestJSClient:
             response.raise_for_status()
             return response.json()
 
-    async def get_gateway_user_bookings(self) -> dict:
-        url = f"{self.base_url}/agent-gateway/users/bookings"
+    async def get_gateway_user_booking_summaries(self) -> dict:
+        url = f"{self.base_url}/agent-gateway/users/booking-summaries"
         headers = self._get_gateway_headers()
         async with httpx.AsyncClient() as client:
             response = await client.get(url, headers=headers)
+            response.raise_for_status()
+            return response.json()
+
+    async def get_gateway_booking_detail(self, agent_reference: str) -> dict:
+        url = f"{self.base_url}/agent-gateway/users/booking-detail"
+        params = {"agentReference": agent_reference}
+        headers = self._get_gateway_headers()
+        async with httpx.AsyncClient() as client:
+            response = await client.get(url, params=params, headers=headers)
+            if response.status_code == 404:
+                return {"error": "Not Found", "statusCode": 404}
             response.raise_for_status()
             return response.json()
 
