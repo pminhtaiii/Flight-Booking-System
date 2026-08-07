@@ -277,7 +277,10 @@ async def chat_stream(
             try:
                 if body.confirmed is not None:
                     # Resume interrupted session with confirmation
-                    await graph.aupdate_state(config, {"pending_confirmation": body.confirmed})
+                    current_state = await graph.aget_state(config)
+                    pending = current_state.values.get("pending_confirmation") or {}
+                    pending["confirmed"] = body.confirmed
+                    await graph.aupdate_state(config, {"pending_confirmation": pending})
                     event_stream = graph.astream_events(None, config=config, version="v2")
                 else:
                     # New message
@@ -504,6 +507,28 @@ async def chat_stream(
                         "event": "token",
                         "data": json.dumps({"content": safe_chunk})
                     })
+                # Check if graph suspended for confirmation
+                current_state = await graph.aget_state(config)
+                if current_state.next:
+                    messages_list = current_state.values.get("messages", [])
+                    action_name = "unknown"
+                    action_details = {}
+                    for msg in reversed(messages_list):
+                        if getattr(msg, "tool_calls", None):
+                            tc = msg.tool_calls[0]
+                            action_name = tc.get("name", "unknown")
+                            action_details = tc.get("args", {})
+                            break
+
+                    await q.put({
+                        "event": "confirmation_required",
+                        "data": json.dumps({
+                            "type": "confirmation_required",
+                            "action": action_name,
+                            "details": action_details
+                        })
+                    })
+                    return
 
                 # Completed turn - Persist message batch and send done event
                 if partial_response.strip() or force_persistence:
