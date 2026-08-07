@@ -360,9 +360,7 @@ class NestJSClient:
                         "departureAt": b.get("departureTime"),
                         "arrivalAt": b.get("arrivalTime"),
                         "flightNumber": b.get("flightNumber"),
-                        "baggageSummary": b.get("baggageAllowance", "Not specified"),
-                        "refundable": False,
-                        "changeable": False
+                        "baggageSummary": b.get("baggageAllowance", "Not specified")
                     }
             return {"error": "Not Found", "statusCode": 404}
 
