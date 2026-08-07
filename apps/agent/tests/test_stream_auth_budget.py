@@ -50,7 +50,6 @@ def test_canonical_jwt_valid_claims_accepted():
     token = make_token()
     headers = {"Authorization": f"Bearer {token}"}
     with patch("agent.streaming.sse.NestJSClient") as MockClient, \
-         patch("agent.streaming.sse.get_redis_client", return_value=None), \
          patch("agent.streaming.sse.graph.astream_events") as mock_events:
         
         mock_nestjs = AsyncMock()
@@ -90,8 +89,7 @@ def test_jwt_invalid_issuer_or_audience_rejected():
 def test_legacy_id_transition_supported():
     # Has both id and sub
     token = make_token(user_id="user-123", sub="user-123")
-    with patch("agent.streaming.sse.NestJSClient") as MockClient, \
-         patch("agent.streaming.sse.get_redis_client", return_value=None):
+    with patch("agent.streaming.sse.NestJSClient") as MockClient:
         mock_nestjs = AsyncMock()
         mock_nestjs.check_user_access.return_value = {"allowed": True}
         mock_nestjs.create_session.return_value = {"id": "sess-1"}

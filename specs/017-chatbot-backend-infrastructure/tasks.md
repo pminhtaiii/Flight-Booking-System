@@ -139,23 +139,23 @@
 
 ### Tests for User Story 2
 
-- [ ] T039 [P] [US2] Write failing strict Router output and malformed/unknown/confidence-bound tests in `apps/agent/tests/test_router.py`
-- [ ] T040 [P] [US2] Write failing checkout-gate and `possible_checkout` disambiguation matrix tests in `apps/agent/tests/test_checkout_gate.py`
-- [ ] T041 [P] [US2] Replace old confirmation graph tests with failing node/topology/tool-scope tests in `apps/agent/tests/test_graph.py`
-- [ ] T042 [P] [US2] Write failing versioned POST owned-session/proposed-version, signed ordered-offer attestation, legacy-GET non-enrichment, snapshot overwrite/expiry, and identifier/attestation non-exposure tests in `apps/agent/tests/test_search_snapshot.py`, `apps/api/src/agent-gateway/selection-attestation.service.spec.ts`, and `apps/api/test/agent-gateway.e2e-spec.ts`
-- [ ] T043 [P] [US2] Write failing exact General/Travel/Checkout registry tests in `apps/agent/tests/test_tools.py`
+- [x] T039 [P] [US2] Write failing strict Router output and malformed/unknown/confidence-bound tests in `apps/agent/tests/test_router.py`
+- [x] T040 [P] [US2] Write failing checkout-gate and `possible_checkout` disambiguation matrix tests in `apps/agent/tests/test_checkout_gate.py`
+- [x] T041 [P] [US2] Replace old confirmation graph tests with failing node/topology/tool-scope tests in `apps/agent/tests/test_graph.py`
+- [x] T042 [P] [US2] Write failing versioned POST owned-session/proposed-version, signed ordered-offer attestation, legacy-GET non-enrichment, snapshot overwrite/expiry, and identifier/attestation non-exposure tests in `apps/agent/tests/test_search_snapshot.py`, `apps/api/src/agent-gateway/selection-attestation.service.spec.ts`, and `apps/api/test/agent-gateway.e2e-spec.ts`
+- [x] T043 [P] [US2] Write failing exact General/Travel/Checkout registry tests in `apps/agent/tests/test_tools.py`
 
 ### Implementation for User Story 2
 
-- [ ] T044 [P] [US2] Implement the tool-free General-Purpose Agent prompt/model adapter in `apps/agent/src/agent/agents/general_agent.py`
-- [ ] T045 [P] [US2] Implement the five-read-tool Travel Assistant prompt/model adapter with disambiguation metadata in `apps/agent/src/agent/agents/travel_assistant.py`
-- [ ] T046 [P] [US2] Implement the one-signal-tool Checkout Orchestrator prompt/model adapter in `apps/agent/src/agent/agents/checkout_orchestrator.py`
-- [ ] T047 [US2] Implement strict Router model invocation and safe fallback normalization in `apps/agent/src/agent/graph/router.py`
-- [ ] T048 [US2] Replace AgentState confirmation fields with typed route, disambiguation, snapshot, signal, and action fields in `apps/agent/src/agent/graph/state.py`
-- [ ] T049 [US2] Implement opt-in `POST /api/agent-gateway/v2/flights/search` with owned session/proposed version and its stripping consumer, store the signed ordered-offer attestation only in Redis, emit identifier/attestation-free projections, and leave legacy GET byte-for-byte unchanged in `apps/api/src/agent-gateway/dto/attested-flight-search.dto.ts`, `apps/api/src/agent-gateway/agent-gateway.controller.ts`, `apps/api/src/agent-gateway/agent-gateway.service.ts`, `apps/agent/src/agent/tools/search_flights.py`, and `apps/agent/src/agent/tools/nestjs_client.py`
-- [ ] T050 [US2] Replace the global registry with immutable per-agent registries and remove `book_flight` in `apps/agent/src/agent/tools/registry.py`
-- [ ] T051 [US2] Rebuild the single LangGraph topology without `MemorySaver`, confirm node, interrupt, or resume path in `apps/agent/src/agent/graph/graph.py` and `apps/agent/src/agent/graph/nodes.py`
-- [ ] T052 [US2] Integrate Router/specialist event streaming and safe disambiguation into `apps/agent/src/agent/streaming/sse.py`, then run US2 and existing output-guardrail regressions
+- [x] T044 [P] [US2] Implement the tool-free General-Purpose Agent prompt/model adapter in `apps/agent/src/agent/agents/general_agent.py`
+- [x] T045 [P] [US2] Implement the five-read-tool Travel Assistant prompt/model adapter with disambiguation metadata in `apps/agent/src/agent/agents/travel_assistant.py`
+- [x] T046 [P] [US2] Implement the one-signal-tool Checkout Orchestrator prompt/model adapter in `apps/agent/src/agent/agents/checkout_orchestrator.py`
+- [x] T047 [US2] Implement strict Router model invocation and safe fallback normalization in `apps/agent/src/agent/graph/router.py`
+- [x] T048 [US2] Replace AgentState confirmation fields with typed route, disambiguation, snapshot, signal, and action fields in `apps/agent/src/agent/graph/state.py`
+- [x] T049 [US2] Implement opt-in `POST /api/agent-gateway/v2/flights/search` with owned session/proposed version and its stripping consumer, store the signed ordered-offer attestation only in Redis, emit identifier/attestation-free projections, and leave legacy GET byte-for-byte unchanged in `apps/api/src/agent-gateway/dto/attested-flight-search.dto.ts`, `apps/api/src/agent-gateway/agent-gateway.controller.ts`, `apps/api/src/agent-gateway/agent-gateway.service.ts`, `apps/agent/src/agent/tools/search_flights.py`, and `apps/agent/src/agent/tools/nestjs_client.py`
+- [x] T050 [US2] Replace the global registry with immutable per-agent registries and remove `book_flight` in `apps/agent/src/agent/tools/registry.py`
+- [x] T051 [US2] Rebuild the single LangGraph topology without `MemorySaver`, confirm node, interrupt, or resume path in `apps/agent/src/agent/graph/graph.py` and `apps/agent/src/agent/graph/nodes.py`
+- [x] T052 [US2] Integrate Router/specialist event streaming and safe disambiguation into `apps/agent/src/agent/streaming/sse.py`, then run US2 and existing output-guardrail regressions
 
 **Checkpoint**: US2 is independently demonstrable; all messages reach one expected specialist, no LLM has a write tool, and legacy sessions without snapshots safely request a new search.
 

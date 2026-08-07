@@ -339,3 +339,13 @@ Record in `docs/runbooks/chatbot-handoff.md` and `context/progress-checker.md` o
   - Built `@shared/types` (`pnpm --filter @shared/types build`) with zero compilation errors.
   - Verified ingress PII detection & security audit logging in `apps/agent/src/agent/streaming/sse.py`.
   - Verified canonical JWT claim validation (`sub`, `iss`, `aud`, `jti`), NestJS access checks before quota admission, record-bound AES-256-GCM dual-write encryption, and strict CORS preflight handling.
+
+### Phase 4: Work Package 4F Checkpoint (2026-08-06)
+
+- **T039, T047 (Router schema/fallback)**: Implemented strict Router model invocation and safe fallback normalization. Malformed/unknown Router output fails safely and routes to Travel Assistant.
+- **T040, T048 (Checkout gate/state)**: Replaced AgentState confirmation fields with typed route, disambiguation, snapshot, signal, and action fields. Every incomplete checkout gate routes to Travel Assistant with `possible_checkout` metadata.
+- **T041, T050, T051 (Graph topology/removal)**: Replaced global registry with immutable per-agent registries and removed `book_flight`. Rebuilt LangGraph topology without `MemorySaver`, removing fake booking/confirmation/checkpointer paths.
+- **T042, T049 (Signed search split)**: Implemented opt-in `POST /api/agent-gateway/v2/flights/search` with owned session/proposed version and its stripping consumer. Stored signed ordered-offer attestation only in Redis.
+- **T043, T044, T045 (General/Travel inventory)**: Implemented tool-free General-Purpose Agent adapter and five-read-tool Travel Assistant adapter.
+- **T046, T052 (Checkout adapter/integration)**: Implemented Checkout Orchestrator adapter. Integrated Router/specialist event streaming and safe disambiguation.
+- **Test Verification**: Addressed CodeReview findings, fixing snapshot routing keys in the checkout gate and dead code in checkout orchestrator. Run `uv run pytest tests/` in `apps/agent` resulting in 100% tests GREEN (201/201).

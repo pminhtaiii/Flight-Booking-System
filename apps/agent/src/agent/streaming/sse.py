@@ -255,6 +255,26 @@ async def chat_stream(
                 }
             }
             try:
+                # Pre-persist user message immediately so that external APIs (like gateway) can access the current message context
+                if body.message:
+                    await client.create_message_batch(
+                        session_id, 
+                        [{"sender": "USER", "type": "STANDARD", "content": body.message}]
+                    )
+                    user_msg_persisted = True
+            except Exception as e:
+                logger.warning(f"Failed to pre-persist user message: {e!s}")
+                await q.put({
+                    "event": "error",
+                    "data": json.dumps({
+                        "code": "PERSISTENCE_ERROR",
+                        "message": "Failed to persist user message before tool execution.",
+                        "partialMessageId": None
+                    })
+                })
+                return
+
+            try:
                 # New message
                 messages = format_messages(
                     history=history,

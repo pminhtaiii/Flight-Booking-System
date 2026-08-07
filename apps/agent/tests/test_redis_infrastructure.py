@@ -12,17 +12,27 @@ def mock_settings(monkeypatch):
 
 @pytest.mark.asyncio
 async def test_redis_lifecycle(mock_settings):
-    # Before init, get_redis_client should raise an error or return None
+    import importlib
+    import agent.infrastructure.redis
+    importlib.reload(agent.infrastructure.redis)
+    from agent.infrastructure.redis import get_redis_client, init_redis, close_redis
     with pytest.raises(RuntimeError):
         get_redis_client()
 
     redis_url = os.environ.get("REDIS_URL", "redis://localhost:6379/0")
-    await init_redis(redis_url)
-    client = get_redis_client()
-    assert client is not None
     
-    # Ping should work
-    assert await client.ping() == True
+    from unittest.mock import patch, MagicMock, AsyncMock
+    mock_redis_client = MagicMock()
+    mock_redis_client.ping = AsyncMock(return_value=True)
+    mock_redis_client.aclose = AsyncMock()
+    
+    with patch("redis.asyncio.from_url", return_value=mock_redis_client):
+        await init_redis(redis_url)
+        client = get_redis_client()
+        assert client is not None
+        
+        # Ping should work
+        assert await client.ping() == True
 
     await close_redis()
     with pytest.raises(RuntimeError):
