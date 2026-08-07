@@ -69,7 +69,9 @@ export async function backfillBookingAgentProjections() {
             flightNumber = `${segments[0].marketingCarrierIata} ${segments[0].flightNumber}`;
             hasFlightData = true;
           }
-        } else {
+        }
+
+        if (!hasFlightData) {
           const flightSnapshot: any = booking.flightSnapshot;
           if (flightSnapshot && flightSnapshot.segments && Array.isArray(flightSnapshot.segments) && flightSnapshot.segments.length > 0) {
             const segments = flightSnapshot.segments;
