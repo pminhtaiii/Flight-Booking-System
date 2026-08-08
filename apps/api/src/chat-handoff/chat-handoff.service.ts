@@ -1,4 +1,4 @@
-import { Injectable, ServiceUnavailableException, ConflictException, NotFoundException, UnauthorizedException } from '@nestjs/common';
+import { Injectable, ServiceUnavailableException, ConflictException, NotFoundException, UnauthorizedException, GoneException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '@/prisma/prisma.service';
 import { CreateChatHandoffDto } from './dto/create-chat-handoff.dto';
@@ -133,6 +133,10 @@ export class ChatHandoffService {
       throw new NotFoundException('Handoff not found');
     }
 
+    if (record.expiresAt < new Date()) {
+      throw new GoneException('Handoff expired');
+    }
+
     if (record.userId !== userId) {
       throw new UnauthorizedException('Not authorized for this handoff');
     }
@@ -160,6 +164,7 @@ export class ChatHandoffService {
         id: handoffId,
         userId: userId,
         consumedAt: null,
+        expiresAt: { gt: now },
         OR: [
           { claimExpiresAt: null },
           { claimExpiresAt: { lte: now } },

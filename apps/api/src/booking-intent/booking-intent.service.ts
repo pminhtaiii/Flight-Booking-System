@@ -348,6 +348,7 @@ export class BookingIntentService {
             claimTokenHash: claimTokenHash,
             consumedAt: null,
             claimExpiresAt: { gt: new Date() },
+            expiresAt: { gt: new Date() },
           },
           data: {
             consumedAt: new Date(),
@@ -413,6 +414,11 @@ export class BookingIntentService {
 
     } finally {
       if (claimWatchdog) clearInterval(claimWatchdog);
+      if (handoff && claimToken && !claimLost && this.chatHandoffService) {
+        this.chatHandoffService.releaseClaim(handoff.id, claimToken).catch(() => {
+          // best-effort release
+        });
+      }
     }
   }
 
