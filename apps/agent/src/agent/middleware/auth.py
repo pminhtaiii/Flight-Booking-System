@@ -37,36 +37,29 @@ class JWTAuthMiddleware(BaseHTTPMiddleware):
 
         token = parts[1]
         from agent.config import get_settings
+        from agent.utils.auth import decode_and_verify_jwt
         settings = get_settings()
         issuer = getattr(settings, "JWT_ISSUER", "booking-systems-api")
         audience = getattr(settings, "JWT_AUDIENCE", "booking-systems-clients")
 
         try:
-            payload = jwt.decode(
-                token,
-                self.secret,
-                algorithms=["HS256"],
+            payload = decode_and_verify_jwt(
+                token=token,
+                secret=self.secret,
                 issuer=issuer,
-                audience=audience,
-                options={"verify_iss": True, "verify_aud": True},
+                audience=audience
             )
-            sub = payload.get("sub") or payload.get("id")
-            jti = payload.get("jti")
-            if not sub or not jti:
-                return JSONResponse(
-                    status_code=401,
-                    content={"detail": "Invalid token"}
-                )
             request.state.user = payload
         except jwt.ExpiredSignatureError:
             return JSONResponse(
                 status_code=401,
                 content={"detail": "Token has expired"}
             )
-        except jwt.InvalidTokenError:
+        except (jwt.InvalidTokenError, ValueError):
             return JSONResponse(
                 status_code=401,
                 content={"detail": "Invalid token"}
             )
 
         return await call_next(request)
+

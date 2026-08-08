@@ -428,6 +428,201 @@ async def test_sse_complete_profile_handoff_stops_without_persistence(mock_nestj
 
     events = parse_sse([line async for line in response.aiter_lines()])
     action_events = [event for event in events if event["event"] == "ACTION_REQUIRED"]
+    llm = MockStreamingLLM(responses=[
+        AIMessage(
+            content="",
+            tool_calls=[{
+                "name": "search_flights",
+                "args": {"origin": "HAN", "destination": "NRT", "date": "2026-07-15"},
+                "id": "call_err_1"
+            }]
+        ),
+        AIMessage(content="I encountered a gateway error.")
+    ])
+
+    with patch("agent.streaming.sse.NestJSClient", return_value=mock_nestjs_client), \
+         patch("agent.agents.chat_agent.ChatOpenAI", return_value=llm), \
+         patch("agent.graph.graph.invoke_router", return_value=RouteDecision(intent="SEARCH", confidence=1.0, isCommitment=False)):
+
+        transport = httpx.ASGITransport(app=app)
+        async with httpx.AsyncClient(transport=transport, base_url="http://test") as ac:
+            response = await ac.post(
+                "/chat/stream",
+                json={"message": "search flights to NRT", "sessionId": "session-error-gate"},
+                headers=headers
+            )
+            assert response.status_code == 200
+
+            lines = [line async for line in response.aiter_lines()]
+            events = parse_sse(lines)
+
+            tool_call_events = [e for e in events if e["event"] == "tool_call"]
+            tool_result_events = [e for e in events if e["event"] == "tool_result"]
+            token_events = [e for e in events if e["event"] == "token"]
+            done_events = [e for e in events if e["event"] == "done"]
+
+            assert len(tool_call_events) == 1
+            assert len(tool_result_events) == 1
+            assert "temporarily unavailable" in tool_result_events[0]["data"]["result"]
+
+            assert len(token_events) > 0
+            assert len(done_events) == 1
+
+@pytest.mark.asyncio
+async def test_sse_readiness_action_required(mock_nestjs_client):
+    headers = get_auth_headers()
+
+    llm = MockStreamingLLM(responses=[
+        AIMessage(
+            content="",
+            tool_calls=[{
+                "name": "check_booking_readiness",
+                "args": {"flight_offer_id": "offer-123", "passengers": [{"passengerType": "ADULT", "passengerOrdinal": 1, "sourceType": "inline"}]},
+                "id": "call_readiness_1"
+            }]
+        )
+    ])
+
+    with patch("agent.streaming.sse.NestJSClient", return_value=mock_nestjs_client), \
+         patch("agent.agents.chat_agent.ChatOpenAI", return_value=llm), \
+         patch("agent.graph.graph.invoke_router", return_value=RouteDecision(intent="SEARCH", confidence=1.0, isCommitment=False)):
+
+        # Override the mock's behavior to return readiness data
+        mock_nestjs_client.check_booking_readiness = AsyncMock(return_value={
+            "ready": False,
+            "scope": "DOMESTIC",
+            "nextAction": "CONTINUE_CHECKOUT",
+            "passengers": [{
+                "passengerType": "ADULT",
+                "passengerOrdinal": 1,
+                "sections": [{
+                    "name": "identity",
+                    "fields": [{
+                        "name": "givenName",
+                        "status": "missing",
+                        "reason": "REQUIRED"
+                    }]
+                }]
+            }]
+        })
+
+        transport = httpx.ASGITransport(app=app)
+        async with httpx.AsyncClient(transport=transport, base_url="http://test") as ac:
+            response = await ac.post(
+                "/chat/stream",
+                json={"message": "check readiness", "sessionId": "session-readiness"},
+                headers=headers
+            )
+            assert response.status_code == 200
+
+            lines = [line async for line in response.aiter_lines()]
+            events = parse_sse(lines)
+
+            action_events = [e for e in events if e["event"] == "ACTION_REQUIRED"]
+
+            assert len(action_events) == 1
+            action_data = action_events[0]["data"]
+            assert action_data["action"] == "CONTINUE_CHECKOUT"
+            assert action_data["target"] == "/checkout/passengers"
+            assert len(action_data["passengers"]) == 1
+            assert action_data["passengers"][0]["sections"][0]["fields"][0]["name"] == "givenName"
+
+
+@pytest.mark.asyncio
+async def test_sse_readiness_with_value_bearing_reason_fails_closed(mock_nestjs_client):
+    headers = get_auth_headers()
+    mock_nestjs_client.check_booking_readiness = AsyncMock(return_value={
+        "ready": False,
+        "scope": "DOMESTIC",
+        "nextAction": "COMPLETE_PROFILE",
+        "passengers": [{
+            "passengerType": "ADULT",
+            "passengerOrdinal": 1,
+            "sections": [{
+                "name": "identity",
+                "fields": [{
+                    "name": "givenName",
+                    "status": "missing",
+                    "reason": "Ada Lovelace",
+                }],
+            }],
+        }],
+    })
+    llm = MockStreamingLLM(responses=[AIMessage(
+        content="",
+        tool_calls=[{
+            "name": "check_booking_readiness",
+            "args": {
+                "flight_offer_id": "offer-123",
+                "passengers": [{"passengerType": "ADULT", "passengerOrdinal": 1, "sourceType": "inline"}],
+            },
+            "id": "call_readiness_invalid",
+        }],
+    )])
+
+    with patch("agent.streaming.sse.NestJSClient", return_value=mock_nestjs_client), \
+         patch("agent.agents.chat_agent.ChatOpenAI", return_value=llm), \
+         patch("agent.graph.graph.invoke_router", return_value=RouteDecision(intent="SEARCH", confidence=1.0, isCommitment=False)):
+        transport = httpx.ASGITransport(app=app)
+        async with httpx.AsyncClient(transport=transport, base_url="http://test") as ac:
+            response = await ac.post(
+                "/chat/stream",
+                json={"message": "check readiness", "sessionId": "session-readiness-invalid"},
+                headers=headers,
+            )
+
+    events = parse_sse([line async for line in response.aiter_lines()])
+    assert not [event for event in events if event["event"] == "ACTION_REQUIRED"]
+    error_events = [event for event in events if event["event"] == "error"]
+    assert len(error_events) == 1
+    assert error_events[0]["data"]["message"] == "Booking readiness could not be verified safely."
+    assert "Ada Lovelace" not in json.dumps(events)
+
+
+@pytest.mark.asyncio
+async def test_sse_complete_profile_handoff_stops_without_persistence(mock_nestjs_client):
+    headers = get_auth_headers()
+    mock_nestjs_client.check_booking_readiness = AsyncMock(return_value={
+        "ready": False,
+        "scope": "INTERNATIONAL",
+        "nextAction": "COMPLETE_PROFILE",
+        "passengers": [{
+            "passengerType": "ADULT",
+            "passengerOrdinal": 1,
+            "sections": [{
+                "name": "travel_document",
+                "fields": [{"name": "passportExpiry", "status": "missing", "reason": "REQUIRED"}],
+            }],
+        }],
+    })
+    llm = MockStreamingLLM(responses=[
+        AIMessage(
+            content="",
+            tool_calls=[{
+                "name": "check_booking_readiness",
+                "args": {
+                    "flight_offer_id": "offer-123",
+                    "passengers": [{"passengerType": "ADULT", "passengerOrdinal": 1, "sourceType": "traveler_profile"}],
+                },
+                "id": "call_readiness_handoff",
+            }],
+        ),
+        AIMessage(content="This response must never be generated."),
+    ])
+
+    with patch("agent.streaming.sse.NestJSClient", return_value=mock_nestjs_client), \
+         patch("agent.agents.chat_agent.ChatOpenAI", return_value=llm), \
+         patch("agent.graph.graph.invoke_router", return_value=RouteDecision(intent="SEARCH", confidence=1.0, isCommitment=False)):
+        transport = httpx.ASGITransport(app=app)
+        async with httpx.AsyncClient(transport=transport, base_url="http://test") as ac:
+            response = await ac.post(
+                "/chat/stream",
+                json={"message": "check readiness", "sessionId": "session-readiness-handoff"},
+                headers=headers,
+            )
+
+    events = parse_sse([line async for line in response.aiter_lines()])
+    action_events = [event for event in events if event["event"] == "ACTION_REQUIRED"]
     assert len(action_events) == 1
     assert action_events[0]["data"]["target"] == "/profile"
     assert not [event for event in events if event["event"] == "done"]
@@ -435,3 +630,136 @@ async def test_sse_complete_profile_handoff_stops_without_persistence(mock_nestj
     assert mock_nestjs_client.create_message_batch.call_count == 1
     assert mock_nestjs_client.create_message_batch.mock_calls[0].args[1][0]["sender"] == "USER"
     assert len(llm.responses) == 1
+
+@pytest.mark.asyncio
+async def test_sse_action_handoff_ordering_and_schema(mock_nestjs_client):
+    headers = get_auth_headers()
+    
+    trusted_snapshot = {
+        "version": 1,
+        "attestation": "test_attestation",
+        "fingerprint": "test_fingerprint",
+        "results": [{
+            "flightOfferId": "offer-123",
+            "airline": "VN",
+            "departureAirport": "HAN",
+            "arrivalAirport": "NRT",
+            "departureTime": "2026-07-15T08:30:00Z",
+            "arrivalTime": "2026-07-15T15:00:00Z",
+            "price": "452.00",
+            "currency": "USD"
+        }]
+    }
+
+    mock_nestjs_client.create_handoff = AsyncMock(return_value={
+        "handoffToken": "test_handoff_token_123",
+        "expiresAt": "2026-08-07T12:00:00Z"
+    })
+
+    llm = MockStreamingLLM(responses=[
+        AIMessage(
+            content="",
+            tool_calls=[{
+                "name": "signal_checkout_intent",
+                "args": {"offer_index": 1},
+                "id": "call_signal_1"
+            }]
+        )
+    ])
+
+    with patch("agent.streaming.sse.NestJSClient", return_value=mock_nestjs_client), \
+         patch("agent.agents.chat_agent.ChatOpenAI", return_value=llm), \
+         patch("agent.graph.graph.invoke_router", return_value=RouteDecision(intent="CHECKOUT", confidence=1.0, isCommitment=True)):
+
+        mock_snapshot_obj = MagicMock()
+        mock_snapshot_obj.model_dump.return_value = trusted_snapshot
+        
+        with patch("agent.streaming.sse.TrustedSnapshotRepository.get_snapshot", new_callable=AsyncMock) as mock_get_snapshot:
+            mock_get_snapshot.return_value = mock_snapshot_obj
+            transport = httpx.ASGITransport(app=app)
+            async with httpx.AsyncClient(transport=transport, base_url="http://test") as ac:
+                response = await ac.post(
+                    "/chat/stream",
+                    json={"message": "I want to book the first flight", "sessionId": "session-handoff"},
+                    headers=headers
+                )
+                assert response.status_code == 200
+
+                lines = [line async for line in response.aiter_lines()]
+                events = parse_sse(lines)
+                
+                action_events = [e for e in events if e["event"] == "ACTION_HANDOFF"]
+                done_events = [e for e in events if e["event"] == "done"]
+                
+                assert len(action_events) == 1
+                assert len(done_events) == 1
+                
+                data = action_events[0]["data"]
+                assert data["action"] == "begin_checkout"
+                assert data["handoffToken"] == "test_handoff_token_123"
+                assert data["expiresAt"] == "2026-08-07T12:00:00Z"
+                assert "display" in data
+                display = data["display"]
+                assert display["airline"] == "VN"
+                assert display["price"] == "452.00"
+                assert "offer-123" not in json.dumps(data)
+                
+                assert mock_nestjs_client.create_message_batch.call_count >= 1
+
+@pytest.mark.asyncio
+async def test_sse_action_handoff_disconnect_retry(mock_nestjs_client):
+    headers = get_auth_headers()
+    
+    trusted_snapshot = {
+        "version": 1,
+        "attestation": "test_attestation",
+        "fingerprint": "test_fingerprint",
+        "results": [{
+            "flightOfferId": "offer-123",
+            "airline": "VN",
+            "departureAirport": "HAN",
+            "arrivalAirport": "NRT",
+            "departureTime": "2026-07-15T08:30:00Z",
+            "arrivalTime": "2026-07-15T15:00:00Z",
+            "price": "452.00",
+            "currency": "USD"
+        }]
+    }
+
+    mock_nestjs_client.create_handoff = AsyncMock(side_effect=Exception("Timeout"))
+
+    llm = MockStreamingLLM(responses=[
+        AIMessage(
+            content="",
+            tool_calls=[{
+                "name": "signal_checkout_intent",
+                "args": {"offer_index": 1},
+                "id": "call_signal_2"
+            }]
+        )
+    ])
+
+    with patch("agent.streaming.sse.NestJSClient", return_value=mock_nestjs_client), \
+         patch("agent.agents.chat_agent.ChatOpenAI", return_value=llm), \
+         patch("agent.graph.graph.invoke_router", return_value=RouteDecision(intent="CHECKOUT", confidence=1.0, isCommitment=True)):
+
+        mock_snapshot_obj = MagicMock()
+        mock_snapshot_obj.model_dump.return_value = trusted_snapshot
+        
+        with patch("agent.streaming.sse.TrustedSnapshotRepository.get_snapshot", new_callable=AsyncMock) as mock_get_snapshot:
+            mock_get_snapshot.return_value = mock_snapshot_obj
+            transport = httpx.ASGITransport(app=app)
+            async with httpx.AsyncClient(transport=transport, base_url="http://test") as ac:
+                response = await ac.post(
+                    "/chat/stream",
+                    json={"message": "book the first one", "sessionId": "session-handoff-retry"},
+                    headers=headers
+                )
+                assert response.status_code == 200
+
+                lines = [line async for line in response.aiter_lines()]
+                events = parse_sse(lines)
+                
+                error_events = [e for e in events if e["event"] == "error"]
+                assert len(error_events) >= 1
+                assert "Timeout" in error_events[0]["data"]["message"] or "failed" in error_events[0]["data"]["message"].lower() or "HANDOFF_ERROR" in error_events[0]["data"].get("code", "")

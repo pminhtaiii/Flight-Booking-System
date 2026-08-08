@@ -20,7 +20,7 @@ async def test_checkout_orchestrator_node_adds_system_prompt(run_config):
 
     mock_model = MagicMock()
     mock_model.bind_tools = MagicMock(return_value=mock_model)
-    mock_model.ainvoke = AsyncMock(return_value=AIMessage(content="Starting checkout for flight 1", tool_calls=[{"name": "signal_checkout_intent", "args": {"selection_index": 1}, "id": "call_123"}]))
+    mock_model.ainvoke = AsyncMock(return_value=AIMessage(content="Starting checkout for flight 1", tool_calls=[{"name": "signal_checkout_intent", "args": {"offer_index": 1}, "id": "call_123"}]))
 
     with patch("agent.agents.checkout_orchestrator.get_chat_model", return_value=mock_model):
         with patch("agent.agents.checkout_orchestrator.get_checkout_tools", return_value=[MagicMock()]):

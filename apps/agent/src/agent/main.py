@@ -142,7 +142,9 @@ async def health_check(request: Request):
             await client.ping()
         else:
             redis_status = "down"
-    except Exception:
+    except Exception as e:
+        import logging
+        logging.getLogger("agent.main").error(f"Redis health check failed: {e!s}")
         redis_status = "down"
 
     overall_status = "ok"
