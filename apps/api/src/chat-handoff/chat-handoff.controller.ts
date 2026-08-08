@@ -1,16 +1,11 @@
-import { Controller, Get, Post, Body, ServiceUnavailableException } from '@nestjs/common';
+import { Controller, Get, Post, Body, ServiceUnavailableException, UseGuards, Request, Query } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { ChatHandoffService } from './chat-handoff.service';
 import { CreateChatHandoffDto } from './dto/create-chat-handoff.dto';
+import { ResolveChatHandoffDto } from './dto/resolve-chat-handoff.dto';
+import { AgentApiKeyGuard } from '@/agent-gateway/auth/agent-api-key.guard';
+import { JwtAuthGuard } from '@/auth/guards/jwt-auth.guard';
 
-/**
- * ChatHandoffController — all routes are flag-gated.
- *
- * Routes throw ServiceUnavailableException if their corresponding
- * feature flags are disabled:
- *   FEATURE_FLAG_CHAT_HANDOFF_ACCEPT — enables the create() endpoint
- *   FEATURE_FLAG_CHAT_HANDOFF_ISSUE  — enables the resolve() endpoint
- */
 @Controller('chat-handoff')
 export class ChatHandoffController {
   constructor(
@@ -18,38 +13,24 @@ export class ChatHandoffController {
     private readonly configService: ConfigService,
   ) {}
 
-  /**
-   * POST /api/chat-handoff
-   * Creates a new handoff claim.
-   * Inert until FEATURE_FLAG_CHAT_HANDOFF_ACCEPT=true.
-   */
   @Post()
+  @UseGuards(AgentApiKeyGuard)
   async create(@Body() dto: CreateChatHandoffDto) {
-    const isEnabled =
-      this.configService.get<string>('FEATURE_FLAG_CHAT_HANDOFF_ACCEPT') === 'true';
+    const isEnabled = this.configService.get<string>('FEATURE_FLAG_CHAT_HANDOFF_ACCEPT') === 'true';
     if (!isEnabled) {
-      throw new ServiceUnavailableException(
-        'Chat handoff feature is not enabled',
-      );
+      throw new ServiceUnavailableException('Chat handoff feature is not enabled');
     }
     return this.chatHandoffService.create(dto);
   }
 
-  /**
-   * GET /api/chat-handoff/resolve
-   * Resolves a handoff token.
-   * Inert until FEATURE_FLAG_CHAT_HANDOFF_ISSUE=true.
-   */
   @Get('resolve')
-  async resolve() {
-    const isEnabled =
-      this.configService.get<string>('FEATURE_FLAG_CHAT_HANDOFF_ISSUE') === 'true';
+  @UseGuards(JwtAuthGuard)
+  async resolve(@Query() query: ResolveChatHandoffDto, @Request() req: any) {
+    const isEnabled = this.configService.get<string>('FEATURE_FLAG_CHAT_HANDOFF_ISSUE') === 'true';
     if (!isEnabled) {
-      throw new ServiceUnavailableException(
-        'Chat handoff feature is not enabled',
-      );
+      throw new ServiceUnavailableException('Chat handoff feature is not enabled');
     }
-    return this.chatHandoffService.resolve('', '');
+    const userId = req.user?.id || req.user?.sub;
+    return this.chatHandoffService.resolve(query.token, userId);
   }
 }
-

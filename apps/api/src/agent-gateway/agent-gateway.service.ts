@@ -642,6 +642,7 @@ export class AgentGatewayService {
       // Call DuffelService
       let rawResponse;
       let createdOffers;
+      let searchHashValue = '';
       try {
         const searchResult = await this.duffelService.searchFlights(
           {
@@ -656,7 +657,7 @@ export class AgentGatewayService {
           'agent',
         );
         rawResponse = searchResult.offerRequest;
-        createdOffers = searchResult.flightOffers || [];
+        searchHashValue = searchResult.searchHash;
       } catch (err: unknown) {
         if (err instanceof HttpException) throw err;
         throw new HttpException(
@@ -670,6 +671,29 @@ export class AgentGatewayService {
 
       const offers = rawResponse.offers || [];
       const limitedOffers = offers.slice(0, 5);
+
+      const flightOffersData = limitedOffers.map(offer => ({
+        searchHash: searchHashValue,
+        duffelOfferId: offer.id,
+        rawOffer: offer as any,
+        origin: dto.search.origin,
+        destination: dto.search.destination,
+        departureDate: new Date(dto.search.date),
+        adults: adultsCount,
+        price: offer.total_amount,
+        currency: offer.total_currency,
+      }));
+
+      if (flightOffersData.length > 0) {
+        await this.prisma.flightOffer.createMany({
+          data: flightOffersData,
+          skipDuplicates: true,
+        });
+      }
+
+      createdOffers = await this.prisma.flightOffer.findMany({
+        where: { searchHash: searchHashValue },
+      });
       
       const results = [];
       const attestationOffers = [];

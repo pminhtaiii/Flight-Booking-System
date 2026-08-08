@@ -93,4 +93,30 @@ describe('SelectionAttestationService', () => {
 
     await expect(service.verifySelectionAttestation(attestation, userId, sessionId, version, offers)).rejects.toThrow();
   });
+
+  it('should verify signature using constant-time comparison', async () => {
+    const crypto = require('crypto');
+    const timingSafeEqualSpy = jest.spyOn(crypto, 'timingSafeEqual');
+    
+    const userId = 'user-123';
+    const sessionId = 'session-456';
+    const version = 3;
+    const expiresAt = new Date(Date.now() + 15 * 60000).toISOString();
+    const offers = [
+      { flightOfferId: 'offer-1', duffelOfferId: 'duff-1' },
+    ];
+
+    const attestation = await service.signSelectionAttestation(
+      userId,
+      sessionId,
+      version,
+      expiresAt,
+      offers,
+    );
+
+    await service.verifySelectionAttestation(attestation, userId, sessionId, version, offers);
+    
+    expect(timingSafeEqualSpy).toHaveBeenCalled();
+    timingSafeEqualSpy.mockRestore();
+  });
 });

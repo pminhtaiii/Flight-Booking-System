@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { AgentGatewayService } from './agent-gateway.service';
 import { AgentGatewayController } from './agent-gateway.controller';
 import { ClaimTokenService } from './auth/claim-token.service';
@@ -11,7 +11,7 @@ import { BookingIntentModule } from '@/booking-intent/booking-intent.module';
 import { ChatModule } from '@/chat/chat.module';
 
 @Module({
-  imports: [PrismaModule, AuditModule, DuffelModule, ProfileModule, BookingIntentModule, ChatModule],
+  imports: [PrismaModule, AuditModule, DuffelModule, ProfileModule, forwardRef(() => BookingIntentModule), ChatModule],
   controllers: [AgentGatewayController],
   providers: [AgentGatewayService, ClaimTokenService, SelectionAttestationService],
   exports: [AgentGatewayService, ClaimTokenService, SelectionAttestationService],

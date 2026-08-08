@@ -24,6 +24,7 @@ import {
   registerDecorator,
 } from 'class-validator';
 import { PassengerType } from '@prisma/client';
+import { HasValidHandoffSource } from './booking-readiness.dto';
 
 type PassengerCounts = {
   adults: number;
@@ -171,11 +172,15 @@ const LEGACY_REQUIRED_PASSENGER_FIELDS = [
   'familyName',
   'dateOfBirth',
   'gender',
+  'nationality',
 ] as const;
 
 function missingLegacyPassengerFields(passenger: Record<string, unknown>): string[] {
   return LEGACY_REQUIRED_PASSENGER_FIELDS.filter(
-    (field) => passenger[field] === undefined || passenger[field] === null,
+    (field) => {
+      if (passenger.useProfile === true && field === 'nationality') return false;
+      return passenger[field] === undefined || passenger[field] === null;
+    }
   );
 }
 
@@ -309,9 +314,15 @@ export class CreateIntentPassengerDto {
 }
 
 export class CreateIntentDto {
+  @IsOptional()
   @IsUUID('4')
-  flightOfferId!: string;
+  flightOfferId?: string;
 
+  @IsOptional()
+  @IsString()
+  handoffToken?: string;
+
+  @HasValidHandoffSource()
   @IsArray()
   @ArrayMinSize(1)
   @ValidateNested({ each: true })

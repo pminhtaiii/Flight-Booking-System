@@ -485,6 +485,7 @@ model FlightOffer {
   bookingIntents BookingIntent[]
   chatHandoffs   ChatHandoff[]
 
+  @@unique([searchHash, duffelOfferId])
   @@index([searchHash])
   @@index([createdAt])
   @@map("flight_offers")

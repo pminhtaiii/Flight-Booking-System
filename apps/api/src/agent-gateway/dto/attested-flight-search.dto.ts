@@ -1,32 +1,31 @@
-import { IsString, IsNumber, IsObject, ValidateNested, IsUUID, IsNotEmpty } from 'class-validator';
+import { IsString, IsInt, Min, ValidateNested, IsObject } from 'class-validator';
 import { Type } from 'class-transformer';
 
 export class FlightSearchQueryDto {
   @IsString()
-  @IsNotEmpty()
-  origin: string;
+  origin!: string;
 
   @IsString()
-  @IsNotEmpty()
-  destination: string;
+  destination!: string;
 
   @IsString()
-  @IsNotEmpty()
-  date: string;
+  date!: string;
 
-  @IsNumber()
-  adults: number;
+  @IsInt()
+  @Min(1)
+  adults!: number;
 }
 
 export class AttestedFlightSearchDto {
-  @IsUUID()
-  chatSessionId: string;
+  @IsString()
+  chatSessionId!: string;
 
-  @IsNumber()
-  proposedSnapshotVersion: number;
+  @IsInt()
+  @Min(1)
+  proposedSnapshotVersion!: number;
 
   @IsObject()
   @ValidateNested()
   @Type(() => FlightSearchQueryDto)
-  search: FlightSearchQueryDto;
+  search!: FlightSearchQueryDto;
 }
