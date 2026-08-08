@@ -3,7 +3,7 @@ WITH CanonicalOffers AS (
   SELECT "searchHash", "duffelOfferId", id AS canonical_id
   FROM (
     SELECT "searchHash", "duffelOfferId", id,
-           ROW_NUMBER() OVER(PARTITION BY "searchHash", "duffelOfferId" ORDER BY "createdAt" ASC) as row_num
+           ROW_NUMBER() OVER(PARTITION BY "searchHash", "duffelOfferId" ORDER BY "createdAt" ASC, id ASC) as row_num
     FROM "flight_offers"
   ) t
   WHERE t.row_num = 1
@@ -18,7 +18,7 @@ WITH CanonicalOffers AS (
   SELECT "searchHash", "duffelOfferId", id AS canonical_id
   FROM (
     SELECT "searchHash", "duffelOfferId", id,
-           ROW_NUMBER() OVER(PARTITION BY "searchHash", "duffelOfferId" ORDER BY "createdAt" ASC) as row_num
+           ROW_NUMBER() OVER(PARTITION BY "searchHash", "duffelOfferId" ORDER BY "createdAt" ASC, id ASC) as row_num
     FROM "flight_offers"
   ) t
   WHERE t.row_num = 1
