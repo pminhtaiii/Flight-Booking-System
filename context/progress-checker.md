@@ -48,7 +48,7 @@ Update this file after every completed feature. Any AI agent reading this should
   - [x] WP 4F: Checkout adapter/integration (T046, T052)
   - **All tests in apps/agent pass successfully (201/201).**
 - [ ] Phase 5 / US3: Privacy-Minimized Booking Answers (T053–T063)
-- [ ] Phase 6 / US4: Deterministic Checkout Handoff (T064–T084)
+- [x] Phase 6 / US4: Deterministic Checkout Handoff (T064–T084)
 - [ ] Phase 7 / US5: Observable, Reversible Rollout (T085–T093)
 - [ ] Phase 8 / Polish & Cleanup (T094–T102)
 

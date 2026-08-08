@@ -6,6 +6,7 @@ const frontendEnv = {
   NEXTAUTH_SECRET: 'test_secret',
   NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:3001',
   NEXT_PUBLIC_FEATURE_FLAG_BOOKING_READINESS: 'true',
+  NEXT_PUBLIC_FEATURE_FLAG_CHAT_HANDOFF: 'true',
 };
 
 export default defineConfig({
@@ -36,6 +37,8 @@ export default defineConfig({
         DATABASE_URL: 'postgresql://postgres:postgres@127.0.0.1:5432/test_db',
         REDIS_URL: 'redis://127.0.0.1:6379/1',
         FEATURE_FLAG_BOOKING_READINESS: 'true',
+        FEATURE_FLAG_CHAT_HANDOFF_ISSUE: 'true',
+        FEATURE_FLAG_CHAT_HANDOFF_ACCEPT: 'true',
         FRONTEND_URL: 'http://127.0.0.1:3000',
       },
     },

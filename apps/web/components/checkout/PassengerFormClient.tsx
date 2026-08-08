@@ -171,7 +171,7 @@ export function PassengerFormClient({
           familyName: passenger.familyName.trim(),
           dateOfBirth: passenger.dateOfBirth,
           gender: passenger.gender,
-          nationality: passenger.nationality.trim().toUpperCase() || undefined,
+          nationality: passenger.nationality.trim().toUpperCase(),
           documentType: passenger.documentType.trim() || null,
           passportNumber: passenger.passportNumber.trim() || null,
           passportExpiry: passenger.passportExpiry || null,

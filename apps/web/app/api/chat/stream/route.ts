@@ -5,14 +5,14 @@ import { authOptions } from '@/lib/auth';
 export async function POST(req: NextRequest) {
   const session = await getServerSession(authOptions);
   
-  if (!session || !(session as any).accessToken) {
+  if (!session || !(session as { accessToken?: string }).accessToken) {
     return new Response(JSON.stringify({ error: 'Unauthorized' }), {
       status: 401,
       headers: { 'Content-Type': 'application/json' },
     });
   }
   
-  const accessToken = (session as any).accessToken;
+  const accessToken = (session as { accessToken?: string }).accessToken;
   const agentUrl = process.env.AGENT_SERVICE_URL || 'http://127.0.0.1:3002';
   
   try {
