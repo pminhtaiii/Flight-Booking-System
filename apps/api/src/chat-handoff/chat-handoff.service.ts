@@ -215,21 +215,29 @@ export class ChatHandoffService {
   /**
    * Releases an existing claim, making the handoff available for others.
    */
-  async releaseClaim(handoffId: string, claimToken: string): Promise<void> {
+  async releaseClaim(handoffId: string, claimToken: string, maxRetries = 3): Promise<void> {
     const claimTokenHash = crypto.createHash('sha256').update(claimToken).digest('hex');
 
-    await this.prisma.chatHandoff.updateMany({
-      where: {
-        id: handoffId,
-        claimTokenHash,
-        consumedAt: null,
-      },
-      data: {
-        claimedAt: null,
-        claimTokenHash: null,
-        claimExpiresAt: null,
-        claimRecoverAfter: null,
-      },
-    });
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        await this.prisma.chatHandoff.updateMany({
+          where: {
+            id: handoffId,
+            claimTokenHash,
+            consumedAt: null,
+          },
+          data: {
+            claimedAt: null,
+            claimTokenHash: null,
+            claimExpiresAt: null,
+            claimRecoverAfter: null,
+          },
+        });
+        return;
+      } catch (error) {
+        if (attempt === maxRetries) throw error;
+        await new Promise((resolve) => setTimeout(resolve, 50 * attempt));
+      }
+    }
   }
 }
