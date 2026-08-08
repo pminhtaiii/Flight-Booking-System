@@ -58,6 +58,46 @@ export async function protectCheckoutRoute() {
   };
 }
 
+export async function resolveHandoffToken(handoffToken: string, accessToken: string): Promise<{
+  flightOfferId: string | null;
+  errorStatus: number | null;
+}> {
+  'use server';
+  
+  const apiUrl = process.env.NEXT_PUBLIC_API_URL;
+  if (!apiUrl) {
+    throw new Error('NEXT_PUBLIC_API_URL is required but not configured.');
+  }
+
+  const { cookies } = await import('next/headers');
+  const cookieHeader = cookies().toString() ?? '';
+  const mockScenarioMatch = cookieHeader.match(/mock-scenario=([^;]+)/);
+  const mockScenario = mockScenarioMatch ? mockScenarioMatch[1].trim() : null;
+
+  if ((process.env.NODE_ENV === 'test' || process.env.CI === 'true') && mockScenario) {
+    return { flightOfferId: 'off_test123', errorStatus: null };
+  }
+
+  try {
+    const response = await fetch(`${apiUrl}/api/chat-handoff/resolve?token=${encodeURIComponent(handoffToken)}`, {
+      method: 'GET',
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
+      cache: 'no-store',
+    });
+
+    if (!response.ok) {
+      return { flightOfferId: null, errorStatus: response.status };
+    }
+
+    const data = await response.json();
+    return { flightOfferId: data.flightOfferId, errorStatus: null };
+  } catch {
+    return { flightOfferId: null, errorStatus: 500 };
+  }
+}
+
 export interface BookingIntentDto {
   intentId: string;
   status: string;

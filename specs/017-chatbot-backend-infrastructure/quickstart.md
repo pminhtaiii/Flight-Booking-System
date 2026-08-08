@@ -349,3 +349,9 @@ Record in `docs/runbooks/chatbot-handoff.md` and `context/progress-checker.md` o
 - **T043, T044, T045 (General/Travel inventory)**: Implemented tool-free General-Purpose Agent adapter and five-read-tool Travel Assistant adapter.
 - **T046, T052 (Checkout adapter/integration)**: Implemented Checkout Orchestrator adapter. Integrated Router/specialist event streaming and safe disambiguation.
 - **Test Verification**: Addressed CodeReview findings, fixing snapshot routing keys in the checkout gate and dead code in checkout orchestrator. Run `uv run pytest tests/` in `apps/agent` resulting in 100% tests GREEN (201/201).
+
+### Phase 6: Work Package 6H Preflight Checkpoint (2026-08-07)
+
+- Run the Feature 016a checkout-readiness preflight tests in `apps/api` using `pnpm --filter @api/backend test`.
+- PASSED: 532/532 tests passed. Preflight is GREEN. (Initial blocking gaps resolved via subagent).
+- Canonical readiness/intent prerequisites are met. Proceeding to WP 6I.

@@ -1,8 +1,8 @@
-import { protectCheckoutRoute } from '@/lib/checkout';
+import { protectCheckoutRoute, resolveHandoffToken } from '@/lib/checkout';
 import { Header } from '@/components/layout/Header';
 import { PassengerFormClient } from '@/components/checkout/PassengerFormClient';
 import { redirect } from 'next/navigation';
-import { headers } from 'next/headers';
+import { headers, cookies } from 'next/headers';
 import type { TravelerProfileResponse } from '@/lib/profile-contract';
 
 interface PassengerPageFlightDetail {
@@ -42,7 +42,15 @@ type Props = {
 
 export default async function PassengersPage({ searchParams }: Props) {
   const { accessToken } = await protectCheckoutRoute();
-  const offerId = searchParams.offerId;
+  let offerId = searchParams.offerId;
+  const cookieStore = cookies();
+  const handoffCookie = cookieStore.get('chat_handoff_token');
+  
+  if (handoffCookie?.value) {
+    const resolved = await resolveHandoffToken(handoffCookie.value, accessToken);
+    const targetOfferId = resolved?.flightOfferId || offerId || '';
+    redirect(`/checkout/handoff/consume?offerId=${targetOfferId}`);
+  }
 
   // Reject any passenger data passed via query string to prevent PII exposure
   const hasPiiInQuery = Object.keys(searchParams).some(key =>
