@@ -24,9 +24,9 @@ export class ChatHandoffService {
    * Creates a new chat handoff claim record.
    */
   async create(dto: CreateChatHandoffDto): Promise<ChatHandoffResponseDto> {
-    const isEnabled = this.configService.get<string>('FEATURE_FLAG_CHAT_HANDOFF_ACCEPT') === 'true';
+    const isEnabled = this.configService.get<string>('FEATURE_FLAG_CHAT_HANDOFF_ISSUE') === 'true';
     if (!isEnabled) {
-      throw new ServiceUnavailableException('Chat handoff feature is not implemented');
+      throw new ServiceUnavailableException('Chat handoff issuance is disabled');
     }
 
     const parts = dto.selectionAttestationHash.split('_v1_');
@@ -118,9 +118,9 @@ export class ChatHandoffService {
    * Resolves a handoff token, binding it to an authenticated user.
    */
   async resolve(token: string, userId: string): Promise<any> {
-    const isEnabled = this.configService.get<string>('FEATURE_FLAG_CHAT_HANDOFF_ISSUE') === 'true';
+    const isEnabled = this.configService.get<string>('FEATURE_FLAG_CHAT_HANDOFF_ACCEPT') === 'true';
     if (!isEnabled) {
-      throw new ServiceUnavailableException('Chat handoff feature is not implemented');
+      throw new ServiceUnavailableException('Chat handoff acceptance is disabled');
     }
 
     const tokenHash = crypto.createHash('sha256').update(token).digest('hex');

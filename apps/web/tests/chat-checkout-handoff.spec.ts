@@ -49,6 +49,30 @@ test.describe('Chat Checkout Handoff', () => {
     await expect(page.locator('text=Test Airlines')).toBeVisible();
   });
 
+  test('keeps the same-origin stream proxy available when direct streaming is disabled', async ({ page }) => {
+    let proxyRequests = 0;
+    let directRequests = 0;
+    await page.route('**/api/chat/stream', async (route) => {
+      proxyRequests += 1;
+      await route.fulfill({
+        status: 200,
+        contentType: 'text/event-stream',
+        body: 'event: done\ndata: {"sessionId":"proxy-session"}\n\n',
+      });
+    });
+    await page.route('http://127.0.0.1:3002/chat/stream', async (route) => {
+      directRequests += 1;
+      await route.abort();
+    });
+
+    await page.goto('http://127.0.0.1:3000/search');
+    await page.fill('input[placeholder="Type a message..."]', 'hello through rollback');
+    await page.keyboard.press('Enter');
+
+    await expect.poll(() => proxyRequests).toBe(1);
+    expect(directRequests).toBe(0);
+  });
+
   test('should submit CSRF/origin-protected POST bootstrap and redirect cleanly', async ({ page }) => {
     await loginAsNewUser(page);
     await setupMockStream(page);

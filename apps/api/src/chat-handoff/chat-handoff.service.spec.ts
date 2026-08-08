@@ -34,6 +34,7 @@ describe('ChatHandoffService', () => {
               findUnique: jest.fn(),
               create: jest.fn(),
               update: jest.fn(),
+              updateMany: jest.fn(),
             },
           },
         },
@@ -93,15 +94,19 @@ describe('ChatHandoffService', () => {
   });
 
   describe('create', () => {
-    it('throws ServiceUnavailableException when ACCEPT flag is off', async () => {
-      jest.spyOn(configService, 'get').mockReturnValue('false');
+    it('throws ServiceUnavailableException without minting when ISSUE flag is off', async () => {
+      jest.spyOn(configService, 'get').mockImplementation((key) =>
+        key === 'FEATURE_FLAG_CHAT_HANDOFF_ACCEPT' ? 'true' : 'false',
+      );
       await expect(service.create({} as any)).rejects.toThrow(
         ServiceUnavailableException,
       );
+      expect(prisma.chatHandoff.create).not.toHaveBeenCalled();
+      expect(tokenService.generateToken).not.toHaveBeenCalled();
     });
 
-    it('creates a handoff when ACCEPT flag is on', async () => {
-      jest.spyOn(configService, 'get').mockImplementation((key) => key === 'FEATURE_FLAG_CHAT_HANDOFF_ACCEPT' ? 'true' : null);
+    it('creates a handoff when ISSUE and ACCEPT flags are on', async () => {
+      jest.spyOn(configService, 'get').mockReturnValue('true');
       jest.spyOn(tokenService, 'deriveIdempotencyHash').mockReturnValue('hash');
       jest.spyOn(tokenService, 'generateToken').mockResolvedValue({
         token: 'token',
@@ -123,7 +128,7 @@ describe('ChatHandoffService', () => {
     });
 
     it('returns existing token on active-retry (Unique constraint violation)', async () => {
-      jest.spyOn(configService, 'get').mockImplementation((key) => key === 'FEATURE_FLAG_CHAT_HANDOFF_ACCEPT' ? 'true' : null);
+      jest.spyOn(configService, 'get').mockReturnValue('true');
       jest.spyOn(tokenService, 'deriveIdempotencyHash').mockReturnValue('hash');
       
       const p2002Error = new Prisma.PrismaClientKnownRequestError('Unique constraint failed', {
@@ -156,15 +161,17 @@ describe('ChatHandoffService', () => {
   });
 
   describe('resolve', () => {
-    it('throws ServiceUnavailableException when ISSUE flag is off', async () => {
-      jest.spyOn(configService, 'get').mockImplementation((key) => key === 'FEATURE_FLAG_CHAT_HANDOFF_ISSUE' ? 'false' : null);
+    it('throws ServiceUnavailableException when ACCEPT flag is off', async () => {
+      jest.spyOn(configService, 'get').mockReturnValue('false');
       await expect(service.resolve('token', 'userId')).rejects.toThrow(
         ServiceUnavailableException,
       );
     });
 
     it('returns handoff data on successful token-only resolve', async () => {
-      jest.spyOn(configService, 'get').mockImplementation((key) => key === 'FEATURE_FLAG_CHAT_HANDOFF_ISSUE' ? 'true' : null);
+      jest.spyOn(configService, 'get').mockImplementation((key) =>
+        key === 'FEATURE_FLAG_CHAT_HANDOFF_ACCEPT' ? 'true' : 'false',
+      );
       // Wait, resolve token-only? resolve just returns the handoff.
       const mockRecord = {
         id: '1',
