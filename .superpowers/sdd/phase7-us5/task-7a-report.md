@@ -187,3 +187,128 @@ $env:UV_CACHE_DIR='C:\Booking Systems\.uv-cache'; uv run pytest tests/test_direc
 ```
 
 These agent suites cover allowlisted/disallowed Origin behavior, exact CORS headers, bearer JWT validation, required canonical claims, and NestJS-backed revoked/deactivated-user rejection. No Playwright command was executed during this review-fix cycle.
+
+## Review Fix Round 2 — Header-Boundary Ownership
+
+The first correlation fix still allowed caller-supplied direct header values after value comparison. That cannot prove those values were not derived from protected state, so it was replaced rather than expanded with more blacklisting.
+
+- `ChatStreamOptions` no longer accepts `traceId` or `correlationId`.
+- The direct request header boundary creates exactly one correlation ID internally with `crypto.randomUUID()`: `chat_` plus 32 lowercase hexadecimal characters.
+- Direct requests never emit an `X-Trace-Id` from the browser caller.
+- The widget now passes only the bearer token, body session ID, message, and abort signal; `sessionId` remains solely a body continuity value.
+- The web unit test injects malicious runtime candidates including `chat_<session>`, user-like, offer-like, token-like, and message-like values, proving none can become direct trace/correlation headers.
+
+### TDD evidence
+
+Focused RED command (same temporary untracked Jest config as above):
+
+```powershell
+.\node_modules\.bin\jest.CMD --config='C:\Booking Systems\apps\web\jest.wp7a.config.cjs' --runInBand
+```
+
+```text
+FAIL chatStream.spec.ts
+expected generated X-Correlation-Id, received undefined
+expected X-Trace-Id undefined, received chat_continued-session
+2 failed, 4 passed
+```
+
+After moving correlation generation into `chatStream.ts` and removing caller inputs:
+
+```text
+PASS chatStream.spec.ts
+Tests: 6 passed, 6 total
+```
+
+No Playwright command was run in this round.
+
+## Review Fix Round 3 — Agent-Side Correlation Boundary
+
+The agent stream endpoint previously used `sessionId` when `X-Correlation-Id` was absent. This was a second telemetry leak path even after the browser stopped sending session-derived headers.
+
+- `agent.streaming.sse` now retains only a caller correlation value matching `chat_<32 lowercase hex>`; absent or malformed values are replaced with a fresh `secrets.token_hex(16)` opaque value.
+- The FastAPI request test supplies `sessionId: session-123` without a correlation header and proves the NestJS client receives a new opaque `chat_` value instead.
+- The web unit fixture now also injects an explicit message-like candidate (`chat_safe-message`) alongside session-, user-, offer-, and token-like candidates; none can influence direct trace/correlation headers.
+
+### TDD evidence
+
+RED:
+
+```powershell
+$env:UV_CACHE_DIR='C:\Booking Systems\.uv-cache'; uv run pytest tests/test_direct_stream.py -q
+```
+
+```text
+FAILED tests/test_direct_stream.py::test_direct_stream_never_derives_correlation_from_session_id
+AssertionError: assert 'session-123' != 'session-123'
+1 failed, 5 passed
+```
+
+GREEN:
+
+```powershell
+$env:UV_CACHE_DIR='C:\Booking Systems\.uv-cache'; uv run pytest tests/test_direct_stream.py::test_direct_stream_never_derives_correlation_from_session_id -q -p no:cacheprovider
+.\node_modules\.bin\jest.CMD --config='C:\Booking Systems\apps\web\jest.wp7a.config.cjs' --runInBand --forceExit
+```
+
+```text
+FastAPI focused test: 1 passed (one upstream TestClient deprecation warning).
+Web chatStream suite: 6 passed; Jest required --forceExit because an existing open handle kept the worker alive after successful completion.
+```
+
+No Playwright command was run. The browser test remains a mocked browser-boundary test and is not claimed as a live FastAPI CORS/JWT/revocation E2E test.
+
+## Review Fix Round 4 — Privacy Boundary Convergence
+
+The final focused review tightened the proof around the recovered Round 2/3 implementation and removed one latent caller-controlled trace assignment.
+
+- The browser direct-stream API has no trace/correlation inputs and creates `X-Correlation-Id` internally with browser cryptographic randomness as `chat_<32 lowercase hex>`.
+- The browser regression now injects derived-looking runtime extras and a valid-shaped opaque candidate, then proves no caller value becomes a trace/correlation header and no message, session, user, token, or offer fragment appears in the generated correlation value.
+- FastAPI accepts only a full-match `chat_<32 lowercase hex>` correlation header. Missing, session-derived, short, uppercase, or suffixed values produce a fresh independent `secrets.token_hex(16)` identifier.
+- FastAPI no longer assigns caller-provided `X-Trace-Id` to its NestJS client object. The direct browser emits no trace header, and a direct caller cannot create a downstream trace value through this endpoint.
+- Body `sessionId` remains the conversation continuity key: the focused endpoint test proves it is used for memory retrieval and that no replacement session is created.
+
+### TDD RED
+
+After adding a public-endpoint assertion that a session-derived `X-Trace-Id` is ignored:
+
+```powershell
+$env:UV_CACHE_DIR='C:\Booking Systems\.uv-cache'; uv run pytest tests/test_direct_stream.py::test_direct_stream_generates_correlation_for_missing_or_invalid_header -q -p no:cacheprovider
+```
+
+```text
+6 failed, 1 warning in 30.16s
+AssertionError: endpoint assigned caller X-Trace-Id to the NestJS client object
+```
+
+The assertion initially used `hasattr` on a `MagicMock`; after the RED run, the parent agent explicitly approved replacing it with the stronger assignment check against `mock_client.__dict__`, because `MagicMock` synthesizes arbitrary attributes on access.
+
+### Focused GREEN
+
+FastAPI direct-stream boundary:
+
+```powershell
+$env:UV_CACHE_DIR='C:\Booking Systems\.uv-cache'; uv run pytest tests/test_direct_stream.py -q -p no:cacheprovider
+```
+
+```text
+12 passed, 1 warning in 23.39s
+```
+
+The warning is the existing upstream Starlette `TestClient`/`httpx` deprecation warning.
+
+Web direct-stream unit boundary (temporary Jest config removed after execution):
+
+```powershell
+.\apps\api\node_modules\.bin\jest.CMD --config='C:\Booking Systems\apps\web\jest.wp7a.config.cjs' --runInBand --forceExit
+```
+
+```text
+PASS apps/web/lib/chatStream.spec.ts
+Test Suites: 1 passed, 1 total
+Tests: 6 passed, 6 total
+Snapshots: 0 total
+Time: 24.39 s
+```
+
+Jest reported the existing forced-exit/open-handle notice after all six tests passed. No Playwright command was run during this fix.

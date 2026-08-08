@@ -1,13 +1,9 @@
 import { getFeatureFlags } from './featureFlags';
 
-const REQUEST_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9_-]{7,127}$/;
-
 export interface ChatStreamOptions {
   message: string;
   sessionId?: string | null;
   token?: string | null;
-  traceId?: string | null;
-  correlationId?: string | null;
   signal?: AbortSignal;
 }
 
@@ -26,22 +22,14 @@ export function getAgentStreamEndpoint(): string {
   return '/api/chat/stream';
 }
 
-function getSafeRequestId(
-  candidate: string | null | undefined,
-  protectedValues: ReadonlyArray<string | null | undefined>,
-): string | null {
-  if (!candidate || !REQUEST_ID_PATTERN.test(candidate)) {
-    return null;
-  }
-  return protectedValues.some((value) => value === candidate) ? null : candidate;
+function createDirectCorrelationId(): string {
+  return `chat_${crypto.randomUUID().replace(/-/g, '')}`;
 }
 
 export async function createChatStreamRequest({
   message,
   sessionId,
   token,
-  traceId,
-  correlationId,
   signal,
 }: ChatStreamOptions): Promise<Response> {
   const isDirect = isDirectAgentStreamEnabled();
@@ -55,15 +43,7 @@ export async function createChatStreamRequest({
     if (token) {
       headers['Authorization'] = `Bearer ${token}`;
     }
-    const protectedValues = [message, sessionId, token];
-    const safeTraceId = getSafeRequestId(traceId, protectedValues);
-    if (safeTraceId) {
-      headers['X-Trace-Id'] = safeTraceId;
-    }
-    const safeCorrelationId = getSafeRequestId(correlationId, protectedValues);
-    if (safeCorrelationId) {
-      headers['X-Correlation-Id'] = safeCorrelationId;
-    }
+    headers['X-Correlation-Id'] = createDirectCorrelationId();
   }
 
   return fetch(endpoint, {

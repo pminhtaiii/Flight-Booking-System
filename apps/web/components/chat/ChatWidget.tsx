@@ -19,10 +19,6 @@ function getSafeSessionId(candidate: string | null): string | null {
   return candidate && SESSION_ID_PATTERN.test(candidate) ? candidate : null;
 }
 
-function createCorrelationId(): string {
-  return `chat_${crypto.randomUUID().replace(/-/g, '')}`;
-}
-
 function consumeSseBlock(
   block: string,
   onActionRequired: (payload: unknown) => void,
@@ -64,7 +60,6 @@ async function consumeChatStream(
   message: string,
   sessionId: string,
   token: string | null,
-  correlationId: string,
   signal: AbortSignal,
   onActionRequired: (payload: unknown) => void,
   onDone?: (sessionId: string) => void,
@@ -75,7 +70,6 @@ async function consumeChatStream(
       message,
       sessionId,
       token,
-      correlationId,
       signal,
     });
 
@@ -152,7 +146,7 @@ function ChatWidgetInner(): JSX.Element {
   useEffect(() => {
     if (autoResume && activeSessionId) {
       const controller = new AbortController();
-      void consumeChatStream('resume', activeSessionId, token, createCorrelationId(), controller.signal, acceptActionRequiredEvent, handleDone, acceptHandoffEvent);
+      void consumeChatStream('resume', activeSessionId, token, controller.signal, acceptActionRequiredEvent, handleDone, acceptHandoffEvent);
       return () => controller.abort();
     }
   }, [autoResume, activeSessionId, token, acceptActionRequiredEvent, handleDone, acceptHandoffEvent]);
@@ -181,7 +175,7 @@ function ChatWidgetInner(): JSX.Element {
   const handleSend = () => {
     if (!inputMessage.trim()) return;
     const controller = new AbortController();
-    void consumeChatStream(inputMessage, activeSessionId ?? '', token, createCorrelationId(), controller.signal, acceptActionRequiredEvent, handleDone, acceptHandoffEvent);
+    void consumeChatStream(inputMessage, activeSessionId ?? '', token, controller.signal, acceptActionRequiredEvent, handleDone, acceptHandoffEvent);
     setInputMessage('');
   };
 
