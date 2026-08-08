@@ -419,12 +419,12 @@ Booking Cancellation Disruption Resolution
 - **Concurrency & Conflict Safeguard**: Rejects stale revision commands with `409 STALE_DISRUPTION_REVISION` to prevent users from accepting out-of-date flight changes when a newer change is available.
 - **Traceable Audit Logging**: Writes audit events for all traveler-initiated lifecycle transitions capturing actor and trace details.
 
-### AI Chatbot Agent Flow (SSE Streaming)
+### AI Chatbot Agent Flow (SSE Streaming & Deterministic Handoff)
 
 ```
 User sends message in chat interface
         ↓
-Next.js UI → POST apps/agent:3002/chat/stream (SSE streaming)
+Next.js UI → POST apps/agent:3002/chat/stream (Direct SSE streaming with correlation handling)
         ↓
 FastAPI JWTAuthMiddleware validates JWT token (shared JWT_SECRET)
         ↓
@@ -433,16 +433,24 @@ FastAPI NemoGuardrailService runs safety checks (length, regex heuristics, Mimo 
         └── Safety check PASSES ↓
             Agent checks conversation memory (loads history/summary from NestJS Chat API using X-Service-Auth)
                 ↓
-            Orchestrates LangGraph StateGraph agent with Mimo model and read-only tools (search_flights, get_user_preferences, list_user_bookings) via NestJS Agent Gateway
+            Orchestrates LangGraph StateGraph agent (Router → Travel Assistant or Checkout Orchestrator)
                 ↓
             Tokens fed into OutputGuardrailPipeline (accumulates tokens to sentences → concurrent lookahead regex scan & NeMo safety check)
                 ├── Safety check FAILS/BLOCKED → Log security event, emit OUTPUT_GUARDRAIL_BLOCKED error, persist partial response, and close stream
                 └── Safety check PASSES ↓
                     Safe chunks streamed back to frontend via SSE in real time (structured JSON latency & verdict logged per check)
                 ↓
+            If Checkout Intent:
+                Checkout Orchestrator validates Trusted Search Snapshot, calls deterministic NestJS handoff service.
+                NestJS issues short-lived handoff token → Agent emits ACTION_HANDOFF SSE event.
+                Frontend parses handoffEvent, POSTs to CSRF-protected Next.js route, sets HttpOnly cookie, and redirects to clean checkout URL.
+                ↓
             Upon completion, full conversation Turn persisted via NestJS Chat API (protected by X-Fencing-Token and AES-256-GCM encryption)
 ```
 
+- **Browser Transport & Correlation**: Chat clients stream directly to the public FastAPI agent endpoint (bypassing the Next.js proxy during the direct transport phase). Trace and correlation IDs propagate across browser, agent, and backend for observable PII-safe telemetry.
+- **Independent Handoff Gates**: The LLM remains read-only and never creates bookings. When users commit to a flight, the Checkout Orchestrator signals a deterministic NestJS handoff service to issue a token.
+- **Secure Handoff Lifecycle**: The `ACTION_HANDOFF` SSE event delivers a hash-only token without URL or offer identifier. The web client POSTs it to a same-origin bootstrap route, which sets it as a short-lived `HttpOnly; Secure; SameSite=Strict` cookie and redirects to `/checkout/passengers`. Tokens are strictly absent from URLs, storage, and telemetry.
 - **Service-Authenticated Endpoints**: The Python Agent authenticates with the NestJS Chat API using a dedicated `X-Service-Auth` token rather than relying on user credentials or unauthenticated paths.
 - **Encrypted Persistence**: Chat messages and summaries are dual-written/read using record-bound AES-256-GCM encryption, ensuring conversation data is encrypted at rest and tied to specific sessions.
 - **Fencing Integration**: Concurrent writes are prevented through strict session ownership. The agent must acquire and propagate an `X-Fencing-Token`, and the NestJS backend enforces this write fence on all mutative chat operations.
