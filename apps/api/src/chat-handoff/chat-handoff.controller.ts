@@ -16,9 +16,9 @@ export class ChatHandoffController {
   @Post()
   @UseGuards(AgentApiKeyGuard)
   async create(@Body() dto: CreateChatHandoffDto) {
-    const isEnabled = this.configService.get<string>('FEATURE_FLAG_CHAT_HANDOFF_ACCEPT') === 'true';
+    const isEnabled = this.configService.get<string>('FEATURE_FLAG_CHAT_HANDOFF_ISSUE') === 'true';
     if (!isEnabled) {
-      throw new ServiceUnavailableException('Chat handoff feature is not enabled');
+      throw new ServiceUnavailableException('Chat handoff issuance is disabled');
     }
     return this.chatHandoffService.create(dto);
   }
@@ -26,9 +26,9 @@ export class ChatHandoffController {
   @Get('resolve')
   @UseGuards(JwtAuthGuard)
   async resolve(@Query() query: ResolveChatHandoffDto, @Request() req: any) {
-    const isEnabled = this.configService.get<string>('FEATURE_FLAG_CHAT_HANDOFF_ISSUE') === 'true';
+    const isEnabled = this.configService.get<string>('FEATURE_FLAG_CHAT_HANDOFF_ACCEPT') === 'true';
     if (!isEnabled) {
-      throw new ServiceUnavailableException('Chat handoff feature is not enabled');
+      throw new ServiceUnavailableException('Chat handoff acceptance is disabled');
     }
     const userId = req.user?.id || req.user?.sub;
     return this.chatHandoffService.resolve(query.token, userId);

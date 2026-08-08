@@ -50,7 +50,11 @@ async def test_create_handoff_token():
         "expiresAt": "2026-08-07T12:00:00Z"
     }
 
-    with patch("agent.graph.nodes.get_nestjs_client", return_value=mock_client):
+    with (
+        patch("agent.graph.nodes.get_settings") as get_settings,
+        patch("agent.graph.nodes.get_nestjs_client", return_value=mock_client),
+    ):
+        get_settings.return_value.FEATURE_FLAG_CHAT_HANDOFF_ISSUE = True
         result = await create_handoff_token(state, None)
         
     assert "action" in result

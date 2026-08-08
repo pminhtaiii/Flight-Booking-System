@@ -1,6 +1,8 @@
 import json
 import asyncio
 import logging
+import re
+import secrets
 from fastapi import APIRouter, Request, HTTPException, Header
 from sse_starlette.sse import EventSourceResponse
 from agent.config import get_settings
@@ -22,6 +24,15 @@ guardrails_logger = logging.getLogger("agent.guardrails")
 router = APIRouter()
 
 background_tasks: set[asyncio.Task] = set()
+
+_OPAQUE_CORRELATION_ID = re.compile(r"chat_[a-f0-9]{32}")
+
+
+def _resolve_correlation_id(value: str | None) -> str:
+    """Return an opaque telemetry identifier, never a request/session identifier."""
+    if value and _OPAQUE_CORRELATION_ID.fullmatch(value):
+        return value
+    return f"chat_{secrets.token_hex(16)}"
 
 async def _resolve_user_message(body, graph, config) -> str:
     """
@@ -78,7 +89,6 @@ async def chat_stream(
     request: Request,
     body: ChatStreamRequest,
     authorization: str = Header(None),
-    x_trace_id: str = Header(None, alias="X-Trace-Id"),
     x_correlation_id: str = Header(None, alias="X-Correlation-Id")
 ):
     """
@@ -108,8 +118,6 @@ async def chat_stream(
         raise HTTPException(status_code=401, detail="Invalid token") from err
 
     client = NestJSClient(base_url=settings.NESTJS_API_URL, token=token)
-    if x_trace_id:
-        client.trace_id = x_trace_id
 
     # 2. NestJS access check (active user & revocation check) BEFORE quota or session lock
     access_res = await client.check_user_access(sub=user_id, jti=jti)
@@ -192,7 +200,7 @@ async def chat_stream(
             logger.error(f"Failed to create session on NestJS API: {e!s}")
             raise HTTPException(status_code=503, detail="NestJS API unavailable") from e
 
-    client.correlation_id = x_correlation_id or session_id
+    client.correlation_id = _resolve_correlation_id(x_correlation_id)
 
 
     queue_manager = getattr(request.app.state, "message_queue", None)

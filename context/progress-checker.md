@@ -6,10 +6,10 @@ Update this file after every completed feature. Any AI agent reading this should
 
 ### Current Status
 
-**Feature:** Traveler Profile & Booking Readiness (Feature 16)
-**Last completed:** Phase 8 / Atomic Intent Creation and Safe Route Migration on branch `016h-passenger-source-snapshot-foundation`.
-**In progress:** Phase 8 implementation is complete locally: canonical plural intent routes, authoritative pre-transaction readiness, immutable transactional snapshots, safe masked responses, singular compatibility aliases, and readiness-driven checkout migration are implemented. The branch is prepared for review.
-**Next:** Review and merge the Phase 8 branch, then address any review findings. See [plan.md](file:///c:/Booking%20Systems/specs/016a-traveler-profile-booking-readiness/plan.md) for details.
+**Feature:** Chatbot Backend Infrastructure & Booking Handoff (Feature 17)
+**Last completed:** Phase 6 / US4: Deterministic Checkout Handoff.
+**In progress:** Phase 7 / US5: Observable, Reversible Rollout (T085–T093).
+**Next:** Implement observable, reversible rollout strategies including flag controls for handoff tokens, and setup telemetry for production observation. See [plan.md](file:///c:/Booking%20Systems/specs/017-chatbot-backend-infrastructure/plan.md) for details.
 
 ---
 
@@ -49,6 +49,11 @@ Update this file after every completed feature. Any AI agent reading this should
   - **All tests in apps/agent pass successfully (201/201).**
 - [ ] Phase 5 / US3: Privacy-Minimized Booking Answers (T053–T063)
 - [x] Phase 6 / US4: Deterministic Checkout Handoff (T064–T084)
+  - [x] WP 6A: Deterministic credential primitive — attestation verifier, server-derived idempotency, HMAC/hash rotation
+  - [x] WP 6B: Dark create/resolve API — service-auth create, user-auth token-only resolve, ISSUE/ACCEPT gates
+  - [x] WP 6C: Deterministic action and clean web bootstrap — ACTION_HANDOFF SSE parsing, strict card, CSRF bootstrap cookie, clean checkout URL
+  - [x] WP 6D: Claimed canonical consume — Token-only readiness, pre-supplier claim, final atomic intent/consume CAS
+  - **All Checkout Handoff tests pass (NestJS create/resolve/consume, agent signal integration, and Playwright UI tests).**
 - [ ] Phase 7 / US5: Observable, Reversible Rollout (T085–T093)
 - [ ] Phase 8 / Polish & Cleanup (T094–T102)
 

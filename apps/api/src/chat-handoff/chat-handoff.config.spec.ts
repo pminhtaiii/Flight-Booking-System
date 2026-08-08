@@ -1,6 +1,16 @@
 import { envSchema } from '../app.module';
+import { ConfigService } from '@nestjs/config';
+import { ServiceUnavailableException } from '@nestjs/common';
+import { ChatHandoffController } from './chat-handoff.controller';
+import { ChatHandoffService } from './chat-handoff.service';
 
 describe('Chat Handoff Config Validation', () => {
+  function configService(values: Record<string, string>): ConfigService {
+    return {
+      get: jest.fn((key: string) => values[key]),
+    } as unknown as ConfigService;
+  }
+
   it('should reject ISSUE=true when ACCEPT=false', () => {
     const invalidConfig = {
       STRIPE_SECRET_KEY: 'sk_test_123',
@@ -26,5 +36,65 @@ describe('Chat Handoff Config Validation', () => {
     
     const result = envSchema.safeParse(validConfig);
     expect(result.success).toBe(true);
+  });
+
+  it('rejects create when ISSUE=false even while ACCEPT honors existing credentials', async () => {
+    const handoffService = {
+      create: jest.fn(),
+      resolve: jest.fn(),
+    };
+    const controller = new ChatHandoffController(
+      handoffService as unknown as ChatHandoffService,
+      configService({
+        FEATURE_FLAG_CHAT_HANDOFF_ISSUE: 'false',
+        FEATURE_FLAG_CHAT_HANDOFF_ACCEPT: 'true',
+      }),
+    );
+
+    await expect(controller.create({} as never)).rejects.toThrow(
+      ServiceUnavailableException,
+    );
+    expect(handoffService.create).not.toHaveBeenCalled();
+  });
+
+  it('honors existing credentials when ACCEPT=true after ISSUE rollback', async () => {
+    const handoffService = {
+      create: jest.fn(),
+      resolve: jest.fn().mockResolvedValue({ status: 'ACTIVE' }),
+    };
+    const controller = new ChatHandoffController(
+      handoffService as unknown as ChatHandoffService,
+      configService({
+        FEATURE_FLAG_CHAT_HANDOFF_ISSUE: 'false',
+        FEATURE_FLAG_CHAT_HANDOFF_ACCEPT: 'true',
+      }),
+    );
+
+    await expect(
+      controller.resolve({ token: 'chk_handoff_v1_test' }, { user: { id: 'user-1' } }),
+    ).resolves.toEqual({ status: 'ACTIVE' });
+    expect(handoffService.resolve).toHaveBeenCalledWith(
+      'chk_handoff_v1_test',
+      'user-1',
+    );
+  });
+
+  it('returns a stable disabled error when ACCEPT=false', async () => {
+    const handoffService = {
+      create: jest.fn(),
+      resolve: jest.fn(),
+    };
+    const controller = new ChatHandoffController(
+      handoffService as unknown as ChatHandoffService,
+      configService({
+        FEATURE_FLAG_CHAT_HANDOFF_ISSUE: 'false',
+        FEATURE_FLAG_CHAT_HANDOFF_ACCEPT: 'false',
+      }),
+    );
+
+    await expect(
+      controller.resolve({ token: 'chk_handoff_v1_test' }, { user: { id: 'user-1' } }),
+    ).rejects.toThrow('Chat handoff acceptance is disabled');
+    expect(handoffService.resolve).not.toHaveBeenCalled();
   });
 });

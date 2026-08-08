@@ -4,6 +4,7 @@ from langchain_core.runnables import RunnableConfig
 from langgraph.prebuilt import ToolNode
 
 from agent.agents.chat_agent import get_chat_model
+from agent.config import get_settings
 from agent.tools.registry import get_tools
 from agent.tools.nestjs_client import validate_booking_readiness_response
 from agent.tools.base import get_nestjs_client
@@ -76,6 +77,9 @@ async def validate_handoff(state: AgentState, config: RunnableConfig) -> dict:
 
 async def create_handoff_token(state: AgentState, config: RunnableConfig) -> dict:
     """Create a handoff token using NestJSClient and emit action."""
+    if not get_settings().FEATURE_FLAG_CHAT_HANDOFF_ISSUE:
+        return {"action": {"error": "Chat handoff issuance is disabled."}}
+
     signal = state.get("signal")
     snapshot = state.get("trusted_snapshot")
     

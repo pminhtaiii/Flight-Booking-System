@@ -2,6 +2,7 @@
 
 import React, { Suspense, useCallback, useEffect, useState } from 'react';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
+import { useSession } from 'next-auth/react';
 import { BookingActionCard, parseActionRequiredEvent, type SafeActionRequiredEvent } from './BookingActionCard';
 import { CheckoutHandoffCard } from './CheckoutHandoffCard';
 import { createChatStreamRequest } from '@/lib/chatStream';
@@ -58,6 +59,7 @@ function consumeSseBlock(
 async function consumeChatStream(
   message: string,
   sessionId: string,
+  token: string | null,
   signal: AbortSignal,
   onActionRequired: (payload: unknown) => void,
   onDone?: (sessionId: string) => void,
@@ -67,6 +69,7 @@ async function consumeChatStream(
     const response = await createChatStreamRequest({
       message,
       sessionId,
+      token,
       signal,
     });
 
@@ -99,6 +102,8 @@ async function consumeChatStream(
 }
 
 function ChatWidgetInner(): JSX.Element {
+  const { data: session } = useSession();
+  const token = (session as { accessToken?: string })?.accessToken ?? null;
   const [actionEvent, setActionEvent] = useState<SafeActionRequiredEvent | null>(null);
   const [handoffEvent, setHandoffEvent] = useState<HandoffEvent | null>(null);
   const [inputMessage, setInputMessage] = useState('');
@@ -141,10 +146,10 @@ function ChatWidgetInner(): JSX.Element {
   useEffect(() => {
     if (autoResume && activeSessionId) {
       const controller = new AbortController();
-      void consumeChatStream('resume', activeSessionId, controller.signal, acceptActionRequiredEvent, handleDone, acceptHandoffEvent);
+      void consumeChatStream('resume', activeSessionId, token, controller.signal, acceptActionRequiredEvent, handleDone, acceptHandoffEvent);
       return () => controller.abort();
     }
-  }, [autoResume, activeSessionId, acceptActionRequiredEvent, handleDone, acceptHandoffEvent]);
+  }, [autoResume, activeSessionId, token, acceptActionRequiredEvent, handleDone, acceptHandoffEvent]);
 
   const handleNavigate = (target: SafeActionRequiredEvent['target']): void => {
     const params = new URLSearchParams();
@@ -170,7 +175,7 @@ function ChatWidgetInner(): JSX.Element {
   const handleSend = () => {
     if (!inputMessage.trim()) return;
     const controller = new AbortController();
-    void consumeChatStream(inputMessage, activeSessionId ?? '', controller.signal, acceptActionRequiredEvent, handleDone, acceptHandoffEvent);
+    void consumeChatStream(inputMessage, activeSessionId ?? '', token, controller.signal, acceptActionRequiredEvent, handleDone, acceptHandoffEvent);
     setInputMessage('');
   };
 
