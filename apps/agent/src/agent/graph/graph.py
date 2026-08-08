@@ -94,7 +94,20 @@ workflow.add_conditional_edges(
     },
 )
 
-workflow.add_edge("validate_handoff", "create_handoff_token")
+def route_after_validate(state: AgentState) -> str:
+    action = state.get("action", {})
+    if action and action.get("error"):
+        return END
+    return "create_handoff_token"
+
+workflow.add_conditional_edges(
+    "validate_handoff",
+    route_after_validate,
+    {
+        "create_handoff_token": "create_handoff_token",
+        END: END,
+    }
+)
 workflow.add_edge("create_handoff_token", END)
 workflow.add_edge("final_answer", END)
 
