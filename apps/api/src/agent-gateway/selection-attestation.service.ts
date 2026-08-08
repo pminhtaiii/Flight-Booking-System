@@ -67,7 +67,17 @@ export class SelectionAttestationService {
       .update(payloadStr)
       .digest('hex');
 
-    if (signature !== expectedSignature) {
+    let isValid = false;
+    try {
+      isValid = crypto.timingSafeEqual(
+        Buffer.from(signature, 'hex'),
+        Buffer.from(expectedSignature, 'hex')
+      );
+    } catch (e) {
+      isValid = false;
+    }
+
+    if (!isValid) {
       throw new UnauthorizedException('Invalid signature');
     }
 

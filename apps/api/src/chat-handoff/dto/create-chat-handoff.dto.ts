@@ -18,17 +18,4 @@ export class CreateChatHandoffDto {
   @IsInt()
   @Min(1)
   selectedOfferIndex!: number;
-
-  /**
-   * Version of the offer snapshot at the time of selection.
-   */
-  @IsInt()
-  @Min(1)
-  snapshotVersion!: number;
-
-  /**
-   * Fingerprint of the offer snapshot contents (e.g. a hash of the snapshot).
-   */
-  @IsString()
-  snapshotFingerprint!: string;
 }

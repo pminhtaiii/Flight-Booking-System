@@ -16,6 +16,7 @@ import { EncryptionService } from '@/common/encryption.service';
 import { CreateIntentDto } from './dto/create-intent.dto';
 import { BookingReadinessRequestDto } from './dto/booking-readiness.dto';
 import { BookingReadinessService } from './booking-readiness.service';
+import { ChatHandoffService } from '@/chat-handoff/chat-handoff.service';
 import {
   PassengerSourceResolverService,
   type PassengerSourceRequest,
@@ -56,6 +57,7 @@ export class BookingIntentService {
     @Optional() private readonly bookingReadinessService?: BookingReadinessService,
     @Optional() private readonly passengerSourceResolver?: PassengerSourceResolverService,
     @Optional() private readonly passengerSnapshotService?: PassengerSnapshotService,
+    @Optional() private readonly chatHandoffService?: ChatHandoffService,
   ) {}
 
   async getAdvisoryReadiness(
@@ -80,8 +82,54 @@ export class BookingIntentService {
       allowLegacy?: boolean;
     },
   ): Promise<CreateBookingIntentResponseDto> {
+    let targetFlightOfferId = dto.flightOfferId;
+    let handoff: any = null;
+    let claimToken: string | null = null;
+    let claimTokenHash: string | null = null;
+    let claimWatchdog: NodeJS.Timeout | null = null;
+    let claimLost = false;
+
+    if (dto.handoffToken) {
+      if (!this.chatHandoffService) {
+        throw new HttpException(
+          { code: 'FEATURE_DISABLED', message: 'Chat handoff is disabled' },
+          HttpStatus.SERVICE_UNAVAILABLE,
+        );
+      }
+      handoff = await this.chatHandoffService.resolve(dto.handoffToken, userId);
+      targetFlightOfferId = handoff.flightOfferId;
+
+      const ttlMs = 30000;
+      claimToken = await this.chatHandoffService.acquireClaim(handoff.id, userId, ttlMs);
+      const crypto = await import('crypto');
+      claimTokenHash = crypto.createHash('sha256').update(claimToken).digest('hex');
+
+      claimWatchdog = setInterval(async () => {
+        try {
+          if (!claimLost) {
+            await this.chatHandoffService!.refreshClaim(handoff.id, claimToken!, ttlMs);
+          }
+        } catch (error) {
+          claimLost = true;
+          if (claimWatchdog) clearInterval(claimWatchdog);
+        }
+      }, 10000);
+    }
+
+    try {
+
+    if (!targetFlightOfferId) {
+      throw new HttpException(
+        {
+          code: 'OFFER_NOT_FOUND',
+          message: 'Flight offer id or handoff token is required',
+        },
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+
     const flightOffer = await this.prisma.flightOffer.findUnique({
-      where: { id: dto.flightOfferId },
+      where: { id: targetFlightOfferId },
     });
 
     if (!flightOffer) {
@@ -172,7 +220,11 @@ export class BookingIntentService {
       infants: flightOffer.infants,
     });
 
-    const liveOffer = await this.fetchLiveOffer(flightOffer.duffelOfferId);
+    if (claimLost) {
+      throw new ConflictException({ code: 'CLAIM_LOST', message: 'Handoff claim was lost' });
+    }
+
+    const liveOffer = await this.fetchLiveOffer(flightOffer.duffelOfferId, 25000);
     const confirmedPrice = Number(liveOffer.totalAmount);
     const originalPrice = Number(flightOffer.price);
     const now = new Date();
@@ -276,6 +328,39 @@ export class BookingIntentService {
             ),
           );
 
+      if (handoff && claimTokenHash) {
+        if (claimLost) {
+          throw new ConflictException({ code: 'CLAIM_LOST', message: 'Handoff claim was lost' });
+        }
+
+        const session = await tx.chatSession.findUnique({
+          where: { id: handoff.chatSessionId },
+          select: { deletedAt: true },
+        });
+        
+        if (!session || session.deletedAt !== null) {
+          throw new ConflictException({ code: 'SESSION_DELETED', message: 'Chat session was deleted' });
+        }
+
+        const updateResult = await tx.chatHandoff.updateMany({
+          where: {
+            id: handoff.id,
+            claimTokenHash: claimTokenHash,
+            consumedAt: null,
+            claimExpiresAt: { gt: new Date() },
+          },
+          data: {
+            consumedAt: new Date(),
+            consumedByBookingIntentId: intent.id,
+            updatedAt: new Date(),
+          },
+        });
+
+        if (updateResult.count === 0) {
+          throw new ConflictException('Claim lost or expired before completion');
+        }
+      }
+
       await this.auditService.createLog(tx, {
         userId,
         action: 'booking_intent_created',
@@ -325,6 +410,10 @@ export class BookingIntentService {
         cabinClass: created.intent.cabinClass,
       },
     };
+
+    } finally {
+      if (claimWatchdog) clearInterval(claimWatchdog);
+    }
   }
 
   async getIntent(userId: string, intentId: string): Promise<GetBookingIntentResponseDto> {
@@ -548,9 +637,10 @@ export class BookingIntentService {
 
   private async fetchLiveOffer(
     duffelOfferId: string,
+    timeoutMs: number = 4500,
   ): Promise<{ totalAmount: string; currency: string; offerExpiresAt: Date | null; raw: unknown }> {
     try {
-      const rawOffer = await this.duffelService.getOfferById(duffelOfferId, 4500);
+      const rawOffer = await this.duffelService.getOfferById(duffelOfferId, timeoutMs);
       const offer = rawOffer as {
         total_amount?: string;
         total_currency?: string;

@@ -15,6 +15,7 @@ import {
   BookingReadinessRequestDto,
   BookingReadinessTravelerProfileSourceDto,
 } from './dto/booking-readiness.dto';
+import { ChatHandoffService } from '@/chat-handoff/chat-handoff.service';
 import { BookingReadinessObservability } from './booking-readiness.observability';
 import { BookingReadinessOperation } from '../common/observability/booking-readiness-observability.types';
 import { parseBookingReadinessConfig } from './booking-readiness.config';
@@ -182,6 +183,7 @@ export class BookingReadinessService {
     private readonly bookingReadinessEvaluator: BookingReadinessEvaluator,
     private readonly bookingReadinessObservability: BookingReadinessObservability,
     private readonly configService: ConfigService,
+    private readonly chatHandoffService: ChatHandoffService,
   ) {}
 
   async getAdvisoryReadiness(
@@ -194,8 +196,14 @@ export class BookingReadinessService {
     try {
       this.assertFeatureEnabled();
 
+      let flightOfferId = dto.flightOfferId;
+      if (dto.handoffToken) {
+        const handoff = await this.chatHandoffService.resolve(dto.handoffToken, userId);
+        flightOfferId = handoff.flightOfferId;
+      }
+
       const flightOffer = await this.prisma.flightOffer.findUnique({
-        where: { id: dto.flightOfferId },
+        where: { id: flightOfferId },
       });
 
       if (!flightOffer) {

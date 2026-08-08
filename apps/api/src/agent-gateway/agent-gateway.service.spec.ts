@@ -13,6 +13,7 @@ import { HttpException, NotFoundException } from '@nestjs/common';
 
 import { ConfigService } from '@nestjs/config';
 import { ChatService } from '@/chat/chat.service';
+import { SelectionAttestationService } from './selection-attestation.service';
 
 describe('AgentGatewayService', () => {
   let service: AgentGatewayService;
@@ -41,6 +42,7 @@ describe('AgentGatewayService', () => {
         { provide: BookingReadinessObservability, useValue: observability },
         { provide: ConfigService, useValue: { get: jest.fn().mockReturnValue('false') } },
         { provide: ChatService, useValue: {} },
+        { provide: SelectionAttestationService, useValue: { verifySelectionAttestation: jest.fn() } },
       ],
     }).compile();
 

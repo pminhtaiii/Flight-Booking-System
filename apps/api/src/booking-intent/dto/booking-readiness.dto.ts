@@ -25,6 +25,32 @@ import {
 import { PassengerType } from '@prisma/client';
 import type { BookingReadinessResult } from '@shared/types';
 
+@ValidatorConstraint({ name: 'handoffSource', async: false })
+export class HandoffSourceConstraint implements ValidatorConstraintInterface {
+  validate(value: unknown, args: ValidationArguments): boolean {
+    const obj = args.object as any;
+    const hasOffer = typeof obj.flightOfferId === 'string' && obj.flightOfferId.trim().length > 0;
+    const hasToken = typeof obj.handoffToken === 'string' && obj.handoffToken.trim().length > 0;
+    return (hasOffer && !hasToken) || (!hasOffer && hasToken);
+  }
+
+  defaultMessage(): string {
+    return 'Exactly one of flightOfferId or handoffToken must be provided';
+  }
+}
+
+export function HasValidHandoffSource(validationOptions?: ValidationOptions): PropertyDecorator {
+  return (target: object, propertyKey: string | symbol): void => {
+    registerDecorator({
+      name: 'hasValidHandoffSource',
+      target: target.constructor,
+      propertyName: propertyKey.toString(),
+      options: validationOptions,
+      validator: HandoffSourceConstraint,
+    });
+  };
+}
+
 const DATE_ONLY_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 const COUNTRY_CODE_PATTERN = /^(?:[A-Z]{2})?$/;
 const PHONE_COUNTRY_CODE_PATTERN = /^\+\d{1,4}$/;
@@ -322,9 +348,15 @@ export class BookingReadinessPassengerDto {
 }
 
 export class BookingReadinessRequestDto {
+  @IsOptional()
   @IsUUID('4')
-  flightOfferId!: string;
+  flightOfferId?: string;
 
+  @IsOptional()
+  @IsString()
+  handoffToken?: string;
+
+  @HasValidHandoffSource()
   @IsArray()
   @ArrayMinSize(1)
   @ArrayMaxSize(9)
