@@ -415,9 +415,11 @@ export class BookingIntentService {
     } finally {
       if (claimWatchdog) clearInterval(claimWatchdog);
       if (handoff && claimToken && !claimLost && this.chatHandoffService) {
-        this.chatHandoffService.releaseClaim(handoff.id, claimToken).catch(() => {
+        try {
+          await this.chatHandoffService.releaseClaim(handoff.id, claimToken);
+        } catch {
           // best-effort release
-        });
+        }
       }
     }
   }
