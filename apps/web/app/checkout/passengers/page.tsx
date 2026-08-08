@@ -48,9 +48,8 @@ export default async function PassengersPage({ searchParams }: Props) {
   
   if (handoffCookie?.value) {
     const resolved = await resolveHandoffToken(handoffCookie.value, accessToken);
-    if (resolved?.flightOfferId) {
-      redirect(`/checkout/handoff/consume?offerId=${resolved.flightOfferId}`);
-    }
+    const targetOfferId = resolved?.flightOfferId || offerId || '';
+    redirect(`/checkout/handoff/consume?offerId=${targetOfferId}`);
   }
 
   // Reject any passenger data passed via query string to prevent PII exposure
