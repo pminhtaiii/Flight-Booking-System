@@ -7,7 +7,6 @@ import {
   Injectable,
   NotFoundException,
   Optional,
-  Logger,
 } from '@nestjs/common';
 import { Prisma, PassengerType } from '@prisma/client';
 import { PrismaService } from '@/prisma/prisma.service';
@@ -416,11 +415,7 @@ export class BookingIntentService {
     } finally {
       if (claimWatchdog) clearInterval(claimWatchdog);
       if (handoff && claimToken && this.chatHandoffService) {
-        try {
-          await this.chatHandoffService.releaseClaim(handoff.id, claimToken);
-        } catch (error) {
-          Logger.error(`Failed to release handoff claim: ${handoff.id}`, error instanceof Error ? error.stack : '', 'BookingIntentService');
-        }
+        await this.chatHandoffService.releaseClaim(handoff.id, claimToken);
       }
     }
   }
