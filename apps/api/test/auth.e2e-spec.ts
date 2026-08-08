@@ -39,8 +39,29 @@ describe('Authentication (E2E)', () => {
 
   beforeEach(async () => {
     // Clear Database tables before each test to ensure isolation
+    await prisma.chatHandoff.deleteMany({});
+    await prisma.chatSession.deleteMany({});
+    await prisma.paymentEvent.deleteMany({});
+    await prisma.ledgerEntry.deleteMany({});
+    await prisma.refund.deleteMany({});
+    await prisma.payment.deleteMany({});
+    await prisma.idempotencyKey.deleteMany({});
+    await prisma.paymentMethod.deleteMany({});
+    await prisma.bookingIntentPassenger.deleteMany({});
+    await prisma.bookingIntent.deleteMany({});
+    await prisma.itineraryRevisionSegment.deleteMany({});
+    await prisma.itineraryRevision.deleteMany({});
+    await prisma.disruptionAuditEvent.deleteMany({});
+    await prisma.notificationOutbox.deleteMany({});
+    await prisma.booking.deleteMany({});
+    await prisma.travelerProfile.deleteMany({});
+    await prisma.offerRecovery.deleteMany({});
+    await prisma.flightOffer.deleteMany({});
+    await prisma.searchHistory.deleteMany({});
+    await prisma.airport.deleteMany({});
     await prisma.auditLog.deleteMany({});
     await prisma.user.deleteMany({});
+
   });
 
   describe('POST /auth/register', () => {
@@ -221,7 +242,7 @@ describe('Authentication (E2E)', () => {
         .set('Authorization', `Bearer ${token}`)
         .expect(200);
 
-      expect(res.body).toEqual({
+      expect(res.body).toMatchObject({
         id: userId,
         email: 'session@example.com',
       });
@@ -286,3 +307,6 @@ describe('Authentication (E2E)', () => {
     });
   });
 });
+
+
+

@@ -73,14 +73,29 @@ describe('Cancellation and refund recovery (E2E)', () => {
   afterEach(async (): Promise<void> => {
     jest.restoreAllMocks();
     const userIds = [owner.id, otherUser.id];
-    await prisma.ledgerEntry.deleteMany({ where: { payment: { bookingIntent: { userId: { in: userIds } } } } });
-    await prisma.paymentEvent.deleteMany({ where: { payment: { bookingIntent: { userId: { in: userIds } } } } });
-    await prisma.refund.deleteMany({ where: { payment: { bookingIntent: { userId: { in: userIds } } } } });
-    await prisma.booking.deleteMany({ where: { userId: { in: userIds } } });
-    await prisma.payment.deleteMany({ where: { bookingIntent: { userId: { in: userIds } } } });
-    await prisma.idempotencyKey.deleteMany({ where: { customerId: { in: userIds } } });
-    await prisma.bookingIntent.deleteMany({ where: { userId: { in: userIds } } });
-    await prisma.user.deleteMany({ where: { id: { in: userIds } } });
+    await prisma.chatHandoff.deleteMany({});
+    await prisma.chatSession.deleteMany({});
+    await prisma.paymentEvent.deleteMany({});
+    await prisma.ledgerEntry.deleteMany({});
+    await prisma.refund.deleteMany({});
+    await prisma.payment.deleteMany({});
+    await prisma.idempotencyKey.deleteMany({});
+    await prisma.paymentMethod.deleteMany({});
+    await prisma.bookingIntentPassenger.deleteMany({});
+    await prisma.bookingIntent.deleteMany({});
+    await prisma.itineraryRevisionSegment.deleteMany({});
+    await prisma.itineraryRevision.deleteMany({});
+    await prisma.disruptionAuditEvent.deleteMany({});
+    await prisma.notificationOutbox.deleteMany({});
+    await prisma.booking.deleteMany({});
+    await prisma.travelerProfile.deleteMany({});
+    await prisma.offerRecovery.deleteMany({});
+    await prisma.flightOffer.deleteMany({});
+    await prisma.searchHistory.deleteMany({});
+    await prisma.airport.deleteMany({});
+    await prisma.auditLog.deleteMany({});
+    await prisma.user.deleteMany({});
+
   });
 
   async function createUser(email: string): Promise<TestUser> {
@@ -390,3 +405,5 @@ describe('Cancellation and refund recovery (E2E)', () => {
     expect(revisionsCount).toBe(0);
   });
 });
+
+

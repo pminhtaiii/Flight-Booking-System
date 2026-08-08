@@ -53,6 +53,8 @@ describe('Payment Idempotency (E2E)', () => {
   });
 
   beforeEach(async () => {
+    await prisma.chatHandoff.deleteMany({});
+    await prisma.chatSession.deleteMany({});
     await prisma.paymentEvent.deleteMany({});
     await prisma.ledgerEntry.deleteMany({});
     await prisma.refund.deleteMany({});
@@ -61,10 +63,19 @@ describe('Payment Idempotency (E2E)', () => {
     await prisma.paymentMethod.deleteMany({});
     await prisma.bookingIntentPassenger.deleteMany({});
     await prisma.bookingIntent.deleteMany({});
+    await prisma.itineraryRevisionSegment.deleteMany({});
+    await prisma.itineraryRevision.deleteMany({});
+    await prisma.disruptionAuditEvent.deleteMany({});
+    await prisma.notificationOutbox.deleteMany({});
+    await prisma.booking.deleteMany({});
     await prisma.travelerProfile.deleteMany({});
+    await prisma.offerRecovery.deleteMany({});
     await prisma.flightOffer.deleteMany({});
+    await prisma.searchHistory.deleteMany({});
+    await prisma.airport.deleteMany({});
     await prisma.auditLog.deleteMany({});
     await prisma.user.deleteMany({});
+
 
     const u = await prisma.user.create({
       data: {
@@ -119,7 +130,22 @@ describe('Payment Idempotency (E2E)', () => {
         adults: 1,
         children: 0,
         infants: 0,
-        rawOfferSnapshot: {},
+        rawOfferSnapshot: {
+          slices: [
+            {
+              segments: [
+                {
+                  origin: { iata_code: 'SGN' },
+                  destination: { iata_code: 'HAN' },
+                  arriving_at: '2026-08-01T12:00:00Z',
+                  operating_carrier: { iata_code: 'VN' },
+                  marketing_carrier: { iata_code: 'VN' },
+                  operating_carrier_flight_number: '123'
+                }
+              ]
+            }
+          ]
+        },
         intentExpiresAt: new Date(now.getTime() + 3600 * 1000),
         paymentAttemptCount: 0,
         passengers: {
@@ -276,7 +302,7 @@ describe('Payment Idempotency (E2E)', () => {
       const idemKeyRecord = await prisma.idempotencyKey.create({
         data: {
           key: 'idem-recovery-resume-003',
-          requestHash: computeHash({ paymentId: 'will-be-set' }),
+          requestHash: computeHash({ paymentId: 'will-be-set', bookingId: 'will-be-set' }),
           customerId: testUser.id,
           requestPath: '/api/bookings/payment/confirm',
           recoveryPoint: 'stripe_authorized',
@@ -300,7 +326,7 @@ describe('Payment Idempotency (E2E)', () => {
       });
 
       // Update idempotency key hash to match the confirm request body
-      const confirmBody = { paymentId: payment.id };
+      const confirmBody = { paymentId: payment.id, bookingId: intent.id };
       await prisma.idempotencyKey.update({
         where: { id: idemKeyRecord.id },
         data: { requestHash: computeHash(confirmBody) },
@@ -315,6 +341,21 @@ describe('Payment Idempotency (E2E)', () => {
       jest.spyOn(duffelService, 'createOrder').mockResolvedValue({
         id: `order_${Date.now()}`,
         booking_reference: 'ABC123',
+        slices: [
+          {
+            segments: [
+              {
+                origin: { iata_code: 'SGN' },
+                destination: { iata_code: 'HAN' },
+                departing_at: '2026-08-01T10:00:00Z',
+                arriving_at: '2026-08-01T12:00:00Z',
+                operating_carrier: { iata_code: 'VN' },
+                marketing_carrier: { iata_code: 'VN' },
+                operating_carrier_flight_number: '123'
+              }
+            ]
+          }
+        ],
       } as any);
 
       const res = await request(app.getHttpServer())
@@ -345,7 +386,7 @@ describe('Payment Idempotency (E2E)', () => {
       const key = 'idem-stale-lock-004';
 
       // Create an idempotency key with a stale lock (10 minutes ago)
-      const staleLockedAt = new Date(Date.now() - 10 * 60 * 1000);
+      const staleLockedAt = new Date(Date.now() - 11 * 60 * 1000);
       const body = { bookingIntentId: intent.id, saveCard: false };
       await prisma.idempotencyKey.create({
         data: {
@@ -387,3 +428,5 @@ describe('Payment Idempotency (E2E)', () => {
     });
   });
 });
+
+

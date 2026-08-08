@@ -1,4 +1,7 @@
 process.env.ENCRYPTION_KEY = process.env.ENCRYPTION_KEY || 'a'.repeat(64);
+process.env.FEATURE_FLAG_BOOKING_READINESS = 'true';
+process.env.FEATURE_FLAG_CHAT_HANDOFF_ISSUE = 'true';
+process.env.FEATURE_FLAG_CHAT_HANDOFF_ACCEPT = 'true';
 
 import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication, Logger, ValidationPipe } from '@nestjs/common';
@@ -104,21 +107,29 @@ async function bootstrapReadinessApp(featureFlag: 'true' | 'false'): Promise<Boo
 }
 
 async function clearApiState(prisma: PrismaService): Promise<void> {
-  await prisma.ledgerEntry.deleteMany({});
-  await prisma.paymentEvent.deleteMany({});
-  await prisma.refund.deleteMany({});
-  await prisma.payment.deleteMany({});
-  await prisma.booking.deleteMany({});
-  await prisma.bookingIntentPassenger.deleteMany({});
-  await prisma.ancillarySelection.deleteMany({});
-  await prisma.bookingIntent.deleteMany({});
-  await prisma.travelerProfile.deleteMany({});
-  await prisma.flightOffer.deleteMany({});
-  await prisma.airport.deleteMany({});
-  await prisma.auditLog.deleteMany({});
-  await prisma.paymentMethod.deleteMany({});
-  await prisma.idempotencyKey.deleteMany({});
-  await prisma.user.deleteMany({});
+    await prisma.chatHandoff.deleteMany({});
+    await prisma.chatSession.deleteMany({});
+    await prisma.paymentEvent.deleteMany({});
+    await prisma.ledgerEntry.deleteMany({});
+    await prisma.refund.deleteMany({});
+    await prisma.payment.deleteMany({});
+    await prisma.idempotencyKey.deleteMany({});
+    await prisma.paymentMethod.deleteMany({});
+    await prisma.bookingIntentPassenger.deleteMany({});
+    await prisma.bookingIntent.deleteMany({});
+    await prisma.itineraryRevisionSegment.deleteMany({});
+    await prisma.itineraryRevision.deleteMany({});
+    await prisma.disruptionAuditEvent.deleteMany({});
+    await prisma.notificationOutbox.deleteMany({});
+    await prisma.booking.deleteMany({});
+    await prisma.travelerProfile.deleteMany({});
+    await prisma.offerRecovery.deleteMany({});
+    await prisma.flightOffer.deleteMany({});
+    await prisma.searchHistory.deleteMany({});
+    await prisma.airport.deleteMany({});
+    await prisma.auditLog.deleteMany({});
+    await prisma.user.deleteMany({});
+
 }
 
 async function createUser(prisma: PrismaService, jwtService: JwtService, email: string): Promise<AuthUser> {
@@ -870,6 +881,67 @@ describe('Booking Readiness (E2E RED)', () => {
       expect(responseSurface).not.toContain('US');
     });
 
+    it('returns a complete domestic readiness result using only a handoff token', async () => {
+      await seedAirport(prisma, 'SGN', 'VN');
+      await seedAirport(prisma, 'HAN', 'VN');
+      const offer = await seedReadinessOffer(prisma);
+      const profile = await seedTravelerProfile(prisma, encryptionService, primaryUser.id);
+      
+      const session = await prisma.chatSession.create({
+        data: { userId: primaryUser.id, title: 'Token Test' },
+      });
+      const validHandoffToken = 'valid-handoff-token-123';
+      const tokenHash = require('crypto').createHash('sha256').update(validHandoffToken).digest('hex');
+      const handoff = await prisma.chatHandoff.create({
+        data: {
+          userId: primaryUser.id,
+          chatSessionId: session.id,
+          flightOfferId: offer.id,
+          duffelOfferIdHash: 'testhash',
+          snapshotVersion: 1,
+          snapshotFingerprint: 'test',
+          selectionAttestationHash: 'test_v1_payload.sig',
+          selectedOfferIndex: 1,
+          tokenHash,
+          tokenKeyVersion: 1,
+          idempotencyKeyHash: 'idemp-hash-1',
+          expiresAt: new Date(Date.now() + 15 * 60 * 1000),
+        },
+      });
+
+      const response = await request(app.getHttpServer())
+        .post('/api/bookings/intents/readiness')
+        .set('Authorization', `Bearer ${primaryUser.token}`)
+        .send({
+          handoffToken: validHandoffToken,
+          passengers: [ownedProfilePassenger(profile.id)],
+        });
+
+      expect(response.status).toBe(200);
+      expect(response.body).toEqual(
+        expect.objectContaining({
+          scope: 'DOMESTIC',
+          ready: true,
+        }),
+      );
+    });
+
+    it('rejects readiness request when both flightOfferId and handoffToken are provided', async () => {
+      const response = await request(app.getHttpServer())
+        .post('/api/bookings/intents/readiness')
+        .set('Authorization', `Bearer ${primaryUser.token}`)
+        .send({
+          flightOfferId: '11111111-1111-4111-8111-111111111111',
+          handoffToken: 'valid-handoff-token-123',
+          passengers: [inlinePassenger()],
+        });
+
+      expect(response.status).toBe(400); // Bad Request from class-validator
+      expect(response.body.message).toEqual(
+        expect.arrayContaining([expect.stringContaining('Exactly one of flightOfferId or handoffToken must be provided')])
+      );
+    });
+
     it('keeps existing singular booking intent routes functional while the canonical readiness route is added', async () => {
       const singularOffer = await seedReadinessOffer(prisma);
       const duffelSpy = jest.spyOn((duffelService as any).duffel.offers, 'get').mockResolvedValue({
@@ -894,10 +966,12 @@ describe('Booking Readiness (E2E RED)', () => {
               familyName: 'Traveler',
               dateOfBirth: '1990-01-01',
               gender: 'male',
+              nationality: 'US',
             },
           ],
         });
 
+      if (createResponse.status !== 201) console.log(createResponse.body);
       expect(createResponse.status).toBe(201);
       expect(createResponse.body).toEqual(
         expect.objectContaining({
@@ -921,3 +995,5 @@ describe('Booking Readiness (E2E RED)', () => {
     });
   });
 });
+
+

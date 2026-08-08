@@ -36,8 +36,29 @@ describe('Rate Limit and Lockout (E2E)', () => {
 
   beforeEach(async () => {
     // Clear databases and reset lockouts
+    await prisma.chatHandoff.deleteMany({});
+    await prisma.chatSession.deleteMany({});
+    await prisma.paymentEvent.deleteMany({});
+    await prisma.ledgerEntry.deleteMany({});
+    await prisma.refund.deleteMany({});
+    await prisma.payment.deleteMany({});
+    await prisma.idempotencyKey.deleteMany({});
+    await prisma.paymentMethod.deleteMany({});
+    await prisma.bookingIntentPassenger.deleteMany({});
+    await prisma.bookingIntent.deleteMany({});
+    await prisma.itineraryRevisionSegment.deleteMany({});
+    await prisma.itineraryRevision.deleteMany({});
+    await prisma.disruptionAuditEvent.deleteMany({});
+    await prisma.notificationOutbox.deleteMany({});
+    await prisma.booking.deleteMany({});
+    await prisma.travelerProfile.deleteMany({});
+    await prisma.offerRecovery.deleteMany({});
+    await prisma.flightOffer.deleteMany({});
+    await prisma.searchHistory.deleteMany({});
+    await prisma.airport.deleteMany({});
     await prisma.auditLog.deleteMany({});
     await prisma.user.deleteMany({});
+
 
     // Clear lockouts for all IPs by calling the test reset endpoint
     await request(app.getHttpServer())
@@ -224,3 +245,6 @@ describe('Rate Limit and Lockout (E2E)', () => {
       .expect(401);
   });
 });
+
+
+

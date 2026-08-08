@@ -6,6 +6,8 @@ import { backfillBookingAgentProjections } from '../prisma/scripts/backfill-book
 
 const prisma = new PrismaClient();
 
+process.env.CHAT_ENCRYPTION_KEY = '0000000000000000000000000000000000000000000000000000000000000000';
+
 describe('Chat Persistence Migration (e2e)', () => {
   let testUser: User;
   let testSession: ChatSession;
@@ -157,3 +159,6 @@ describe('Chat Persistence Migration (e2e)', () => {
     expect(projection!.destination).toBe('JFK');
   });
 });
+
+
+

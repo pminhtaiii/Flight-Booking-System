@@ -217,7 +217,7 @@ export class DisruptionService {
         where: {
           id: bookingId,
           activeDisruptionRevisionId: revisionId,
-          disruptionStatus: current.disruptionStatus,
+          disruptionStatus: { in: ['DETECTED', 'ACKNOWLEDGED'] },
         },
         data: {
           disruptionStatus: 'RESOLVED',

@@ -24,6 +24,9 @@ describe('Health Check (E2E)', () => {
           }
           return Promise.resolve([1]);
         },
+        duffelWebhookEvent: {
+          count: jest.fn().mockResolvedValue(0),
+        },
       };
       const timeoutMs = (options as { timeout?: number })?.timeout ?? 150;
       let timeoutId: NodeJS.Timeout | undefined = undefined;
@@ -89,6 +92,15 @@ describe('Health Check (E2E)', () => {
       dependencies: {
         database: 'up',
       },
+      processor: {
+        lastHeartbeat: null,
+        lastSuccessfulProcessing: null,
+        pendingCount: 0,
+        retryScheduledCount: 0,
+        staleProcessingCount: 0,
+        failedNeedsAttentionCount: 0,
+        processorEnabled: false,
+      },
     });
 
     // Verify response time is less than 250ms
@@ -134,6 +146,15 @@ describe('Health Check (E2E)', () => {
           dependencies: {
             database: 'up',
           },
+          processor: {
+            lastHeartbeat: null,
+            lastSuccessfulProcessing: null,
+            pendingCount: 0,
+            retryScheduledCount: 0,
+            staleProcessingCount: 0,
+            failedNeedsAttentionCount: 0,
+            processorEnabled: false,
+          },
         });
       });
   });
@@ -172,3 +193,6 @@ describe('Health Check (E2E)', () => {
     expect(netDuration).toBeLessThan(250);
   });
 });
+
+
+

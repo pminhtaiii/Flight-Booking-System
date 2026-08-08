@@ -77,12 +77,29 @@ describe('Disruption Phase 1 (Schema & Config E2E)', () => {
     });
 
     afterEach(async () => {
-      await prisma.notificationOutbox.deleteMany({ where: { bookingId } });
-      await prisma.itineraryRevisionSegment.deleteMany({ where: { revision: { bookingId } } });
-      await prisma.itineraryRevision.deleteMany({ where: { bookingId } });
-      await prisma.booking.deleteMany({ where: { id: bookingId } });
-      await prisma.bookingIntent.deleteMany({ where: { id: bookingIntentId } });
-      await prisma.user.deleteMany({ where: { id: userId } });
+    await prisma.chatHandoff.deleteMany({});
+    await prisma.chatSession.deleteMany({});
+    await prisma.paymentEvent.deleteMany({});
+    await prisma.ledgerEntry.deleteMany({});
+    await prisma.refund.deleteMany({});
+    await prisma.payment.deleteMany({});
+    await prisma.idempotencyKey.deleteMany({});
+    await prisma.paymentMethod.deleteMany({});
+    await prisma.bookingIntentPassenger.deleteMany({});
+    await prisma.bookingIntent.deleteMany({});
+    await prisma.itineraryRevisionSegment.deleteMany({});
+    await prisma.itineraryRevision.deleteMany({});
+    await prisma.disruptionAuditEvent.deleteMany({});
+    await prisma.notificationOutbox.deleteMany({});
+    await prisma.booking.deleteMany({});
+    await prisma.travelerProfile.deleteMany({});
+    await prisma.offerRecovery.deleteMany({});
+    await prisma.flightOffer.deleteMany({});
+    await prisma.searchHistory.deleteMany({});
+    await prisma.airport.deleteMany({});
+    await prisma.auditLog.deleteMany({});
+    await prisma.user.deleteMany({});
+
     });
 
     it('should verify disruptionStatus default value is NONE and disruptionNeedsAttention default is false', async () => {
@@ -200,3 +217,5 @@ describe('Disruption Phase 1 (Schema & Config E2E)', () => {
     });
   });
 });
+
+

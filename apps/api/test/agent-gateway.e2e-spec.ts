@@ -36,6 +36,7 @@ describe('Agent Gateway (E2E)', () => {
     process.env.AGENT_SERVICE_API_KEY = apiKey;
     process.env.CLAIM_TOKEN_SECRET = 'test-claim-token-secret';
     process.env.CLAIM_TOKEN_TTL_SECONDS = '300';
+    process.env.ATTESTATION_SECRET = 'test-attestation-secret';
 
     const moduleFixture: TestingModule = await Test.createTestingModule({
       imports: [AppModule],
@@ -272,10 +273,29 @@ describe('Agent Gateway (E2E)', () => {
   });
 
   beforeEach(async () => {
-    await prisma.auditLog.deleteMany({});
+    await prisma.chatHandoff.deleteMany({});
+    await prisma.chatSession.deleteMany({});
+    await prisma.paymentEvent.deleteMany({});
+    await prisma.ledgerEntry.deleteMany({});
+    await prisma.refund.deleteMany({});
+    await prisma.payment.deleteMany({});
+    await prisma.idempotencyKey.deleteMany({});
+    await prisma.paymentMethod.deleteMany({});
+    await prisma.bookingIntentPassenger.deleteMany({});
+    await prisma.bookingIntent.deleteMany({});
+    await prisma.itineraryRevisionSegment.deleteMany({});
+    await prisma.itineraryRevision.deleteMany({});
+    await prisma.disruptionAuditEvent.deleteMany({});
+    await prisma.notificationOutbox.deleteMany({});
     await prisma.booking.deleteMany({});
     await prisma.travelerProfile.deleteMany({});
+    await prisma.offerRecovery.deleteMany({});
+    await prisma.flightOffer.deleteMany({});
+    await prisma.searchHistory.deleteMany({});
+    await prisma.airport.deleteMany({});
+    await prisma.auditLog.deleteMany({});
     await prisma.user.deleteMany({});
+
   });
 
   describe('Authentication and Security (Layer 1 & 2)', () => {
@@ -1005,3 +1025,6 @@ describe('Agent Gateway (E2E)', () => {
     });
   });
 });
+
+
+

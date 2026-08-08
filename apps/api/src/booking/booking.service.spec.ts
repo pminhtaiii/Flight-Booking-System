@@ -102,6 +102,7 @@ describe('BookingService', () => {
       bookingId: 'booking-1',
       bookingStatus: 'FAILED',
       cancellationStatus: 'FAILED',
+      duffelCancellationQuoteId: 'quote-1',
       refundStatus: 'REFUND_FAILED_NEEDS_ATTENTION',
       refundAmount: '125.00',
     });

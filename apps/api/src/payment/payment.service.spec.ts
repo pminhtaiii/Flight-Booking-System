@@ -232,7 +232,7 @@ describe('PaymentService - recoveryPoint === completed', () => {
         callback({
           payment: { update: jest.fn() },
           paymentEvent: { create: jest.fn() },
-          bookingIntent: { update: jest.fn() },
+          bookingIntent: { update: jest.fn(), findUnique: jest.fn().mockResolvedValue({ id: 'intent-123', userId: 'user-123' }) },
           ledgerEntry: { createMany: jest.fn() },
         }),
       );
@@ -405,6 +405,14 @@ describe('PaymentService - recoveryPoint === completed', () => {
         },
       ]);
       mockPrisma.$executeRaw = jest.fn().mockResolvedValue(1);
+      mockPrisma.bookingIntent.findUnique = jest.fn().mockResolvedValue({
+        id: 'intent-123',
+        status: 'PENDING',
+        paymentAttemptCount: 1,
+        confirmedPrice: 100,
+        currency: 'USD',
+        userId: 'user-123',
+      });
       mockPrisma.payment.findFirst = jest.fn();
       mockPrisma.payment.create = jest.fn();
       mockPrisma.user = {
@@ -474,6 +482,14 @@ describe('PaymentService - recoveryPoint === completed', () => {
     });
 
     it('should complete successfully even if paymentAttemptCount is already 2 (exhausted limit) if payment record exists', async () => {
+      mockPrisma.bookingIntent.findUnique.mockResolvedValueOnce({
+        id: 'intent-123',
+        status: 'PENDING',
+        paymentAttemptCount: 2,
+        confirmedPrice: 100,
+        currency: 'USD',
+        userId: 'user-123',
+      });
       mockPrisma.$queryRaw.mockResolvedValueOnce([
         {
           id: 'intent-123',
