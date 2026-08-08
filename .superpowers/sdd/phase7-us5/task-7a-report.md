@@ -132,5 +132,58 @@ User-provided verification: the Work Package 7A Playwright tests passed after th
 
 ## Concerns / Follow-up
 
-- Cross-service trace/correlation header sanitization is owned by T090/Work Package 7C. This package does not add logs or headers; T090 must retain the brief's prohibition against deriving correlation headers from session/user/offer/token values.
+- T090/Work Package 7C still owns end-to-end propagation, but the direct web boundary now rejects protected request values and never derives correlation from the session.
 - Repository-level web typecheck remains affected by the existing Jest-global configuration issue described above.
+
+## Review Fix — Correlation Privacy and Test Topology
+
+### Finding resolution
+
+- Removed the `correlationId || sessionId` fallback from `apps/web/lib/chatStream.ts`.
+- Added bounded request-ID validation (`8..128` allowlisted alphanumeric/underscore/hyphen characters).
+- Trace and correlation IDs are now dropped when absent, malformed, or equal to protected request content (`message`, `sessionId`, or bearer token).
+- `ChatWidget` now creates a fresh opaque correlation ID for every turn using browser cryptographic randomness: `chat_` plus a hyphen-free UUID. It remains independent of user, session, token, offer, and message content while session continuity still uses the request body and strict `done.sessionId` handling.
+- Strengthened `chat-direct-stream.spec.ts` to assert the session value never appears in either trace or correlation headers and that correlation IDs use the opaque generated format.
+
+### Browser-test topology limitation
+
+`chat-direct-stream.spec.ts` is explicitly labeled a **browser client-boundary test with mocked FastAPI**. It intercepts the agent URL to verify browser URL/header/body behavior and SSE session continuity. It does **not** prove a live FastAPI process validates CORS, JWT claims, active users, or revocation. Those real FastAPI behaviors are covered by the agent integration suites below. Playwright was not run for this review fix, per explicit user instruction; the earlier user-provided browser pass remains the browser evidence.
+
+### TDD RED
+
+Command (a temporary untracked Jest config pointed the installed API Jest/ts-jest runtime at the existing web unit spec; the config was deleted after the run):
+
+```powershell
+.\node_modules\.bin\jest.CMD --config='C:\Booking Systems\apps\web\jest.wp7a.config.cjs' --runInBand
+```
+
+Relevant RED:
+
+```text
+FAIL chatStream.spec.ts
+X-Correlation-Id received: continued-session
+X-Trace-Id received: continued-session
+X-Correlation-Id received: jwt-token-xyz
+2 failed, 4 passed
+```
+
+### GREEN
+
+Same focused web-unit command after the fix:
+
+```text
+PASS chatStream.spec.ts
+Tests: 6 passed, 6 total
+```
+
+Real FastAPI boundary regression:
+
+```powershell
+$env:UV_CACHE_DIR='C:\Booking Systems\.uv-cache'; uv run pytest tests/test_direct_stream.py tests/test_stream_auth_budget.py -q
+```
+
+```text
+15 passed, 2 non-failing warnings
+```
+
+These agent suites cover allowlisted/disallowed Origin behavior, exact CORS headers, bearer JWT validation, required canonical claims, and NestJS-backed revoked/deactivated-user rejection. No Playwright command was executed during this review-fix cycle.

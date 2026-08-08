@@ -1,5 +1,7 @@
 import { getFeatureFlags } from './featureFlags';
 
+const REQUEST_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9_-]{7,127}$/;
+
 export interface ChatStreamOptions {
   message: string;
   sessionId?: string | null;
@@ -24,6 +26,16 @@ export function getAgentStreamEndpoint(): string {
   return '/api/chat/stream';
 }
 
+function getSafeRequestId(
+  candidate: string | null | undefined,
+  protectedValues: ReadonlyArray<string | null | undefined>,
+): string | null {
+  if (!candidate || !REQUEST_ID_PATTERN.test(candidate)) {
+    return null;
+  }
+  return protectedValues.some((value) => value === candidate) ? null : candidate;
+}
+
 export async function createChatStreamRequest({
   message,
   sessionId,
@@ -43,12 +55,14 @@ export async function createChatStreamRequest({
     if (token) {
       headers['Authorization'] = `Bearer ${token}`;
     }
-    if (traceId) {
-      headers['X-Trace-Id'] = traceId;
+    const protectedValues = [message, sessionId, token];
+    const safeTraceId = getSafeRequestId(traceId, protectedValues);
+    if (safeTraceId) {
+      headers['X-Trace-Id'] = safeTraceId;
     }
-    const corrId = correlationId || sessionId;
-    if (corrId) {
-      headers['X-Correlation-Id'] = corrId;
+    const safeCorrelationId = getSafeRequestId(correlationId, protectedValues);
+    if (safeCorrelationId) {
+      headers['X-Correlation-Id'] = safeCorrelationId;
     }
   }
 

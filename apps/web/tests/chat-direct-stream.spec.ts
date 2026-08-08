@@ -1,11 +1,15 @@
 import { expect, test } from '@playwright/test';
 
-test.describe('Chat direct stream', () => {
-  test('bypasses the proxy, authenticates FastAPI, and reuses the done session', async ({ page }) => {
+// This verifies the browser client boundary with an intercepted FastAPI response.
+// Real FastAPI CORS, JWT, active-user, and revocation behavior is owned by agent integration tests.
+test.describe('Chat direct stream browser boundary (mocked FastAPI)', () => {
+  test('bypasses the proxy, sends bearer auth to the agent URL, and reuses the done session', async ({ page }) => {
     test.setTimeout(120000);
     const requests: Array<{
       authorization: string | undefined;
       origin: string | undefined;
+      traceId: string | undefined;
+      correlationId: string | undefined;
       body: { message: string; sessionId?: string };
     }> = [];
     let proxyRequests = 0;
@@ -61,6 +65,8 @@ test.describe('Chat direct stream', () => {
       requests.push({
         authorization: request.headers().authorization,
         origin: request.headers().origin,
+        traceId: request.headers()['x-trace-id'],
+        correlationId: request.headers()['x-correlation-id'],
         body: request.postDataJSON(),
       });
       await route.fulfill({
@@ -88,10 +94,15 @@ test.describe('Chat direct stream', () => {
       body: { message: 'first turn' },
     });
     expect(requests[0].body.sessionId).toBeUndefined();
+    expect(requests[0].traceId).toBeUndefined();
+    expect(requests[0].correlationId).toMatch(/^chat_[a-f0-9]{32}$/);
     expect(requests[1]).toMatchObject({
       authorization: 'Bearer browser-jwt',
       origin: 'http://127.0.0.1:3000',
       body: { message: 'second turn', sessionId: 'continued-session' },
     });
+    expect(requests[1].traceId).not.toBe('continued-session');
+    expect(requests[1].correlationId).toMatch(/^chat_[a-f0-9]{32}$/);
+    expect(requests[1].correlationId).not.toBe('continued-session');
   });
 });

@@ -70,4 +70,46 @@ describe('chatStream', () => {
       }),
     );
   });
+
+  it('never derives trace or correlation headers from the chat session', async () => {
+    process.env.NEXT_PUBLIC_FEATURE_FLAG_CHAT_DIRECT_STREAM = 'true';
+    process.env.NEXT_PUBLIC_AGENT_URL = 'http://localhost:3002';
+
+    const mockFetch = jest.fn().mockResolvedValue(new Response('ok'));
+    global.fetch = mockFetch;
+
+    await createChatStreamRequest({
+      message: 'second turn',
+      sessionId: 'continued-session',
+      token: 'jwt-token-xyz',
+    });
+
+    const request = mockFetch.mock.calls[0][1] as RequestInit;
+    expect(request.headers).toEqual({
+      'Content-Type': 'application/json',
+      Authorization: 'Bearer jwt-token-xyz',
+    });
+  });
+
+  it('drops request identifiers that equal protected request content', async () => {
+    process.env.NEXT_PUBLIC_FEATURE_FLAG_CHAT_DIRECT_STREAM = 'true';
+    process.env.NEXT_PUBLIC_AGENT_URL = 'http://localhost:3002';
+
+    const mockFetch = jest.fn().mockResolvedValue(new Response('ok'));
+    global.fetch = mockFetch;
+
+    await createChatStreamRequest({
+      message: 'safe-message',
+      sessionId: 'continued-session',
+      token: 'jwt-token-xyz',
+      traceId: 'continued-session',
+      correlationId: 'jwt-token-xyz',
+    });
+
+    const request = mockFetch.mock.calls[0][1] as RequestInit;
+    expect(request.headers).toEqual({
+      'Content-Type': 'application/json',
+      Authorization: 'Bearer jwt-token-xyz',
+    });
+  });
 });
