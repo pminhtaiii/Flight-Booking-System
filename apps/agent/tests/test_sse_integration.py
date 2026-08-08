@@ -435,3 +435,136 @@ async def test_sse_complete_profile_handoff_stops_without_persistence(mock_nestj
     assert mock_nestjs_client.create_message_batch.call_count == 1
     assert mock_nestjs_client.create_message_batch.mock_calls[0].args[1][0]["sender"] == "USER"
     assert len(llm.responses) == 1
+
+@pytest.mark.asyncio
+async def test_sse_action_handoff_ordering_and_schema(mock_nestjs_client):
+    headers = get_auth_headers()
+    
+    trusted_snapshot = {
+        "version": 1,
+        "attestation": "test_attestation",
+        "fingerprint": "test_fingerprint",
+        "results": [{
+            "flightOfferId": "offer-123",
+            "airline": "VN",
+            "departureAirport": "HAN",
+            "arrivalAirport": "NRT",
+            "departureTime": "2026-07-15T08:30:00Z",
+            "arrivalTime": "2026-07-15T15:00:00Z",
+            "price": "452.00",
+            "currency": "USD"
+        }]
+    }
+
+    mock_nestjs_client.create_handoff = AsyncMock(return_value={
+        "handoffToken": "test_handoff_token_123",
+        "expiresAt": "2026-08-07T12:00:00Z"
+    })
+
+    llm = MockStreamingLLM(responses=[
+        AIMessage(
+            content="",
+            tool_calls=[{
+                "name": "signal_checkout_intent",
+                "args": {"offer_index": 1},
+                "id": "call_signal_1"
+            }]
+        )
+    ])
+
+    with patch("agent.streaming.sse.NestJSClient", return_value=mock_nestjs_client), \
+         patch("agent.agents.chat_agent.ChatOpenAI", return_value=llm), \
+         patch("agent.graph.graph.invoke_router", return_value=RouteDecision(intent="CHECKOUT", confidence=1.0, isCommitment=True)):
+
+        mock_snapshot_obj = MagicMock()
+        mock_snapshot_obj.model_dump.return_value = trusted_snapshot
+        
+        with patch("agent.streaming.sse.TrustedSnapshotRepository.get_snapshot", new_callable=AsyncMock) as mock_get_snapshot:
+            mock_get_snapshot.return_value = mock_snapshot_obj
+            transport = httpx.ASGITransport(app=app)
+            async with httpx.AsyncClient(transport=transport, base_url="http://test") as ac:
+                response = await ac.post(
+                    "/chat/stream",
+                    json={"message": "I want to book the first flight", "sessionId": "session-handoff"},
+                    headers=headers
+                )
+                assert response.status_code == 200
+
+                lines = [line async for line in response.aiter_lines()]
+                events = parse_sse(lines)
+                
+                action_events = [e for e in events if e["event"] == "ACTION_HANDOFF"]
+                done_events = [e for e in events if e["event"] == "done"]
+                
+                assert len(action_events) == 1
+                assert len(done_events) == 1
+                
+                data = action_events[0]["data"]
+                assert data["action"] == "begin_checkout"
+                assert data["handoffToken"] == "test_handoff_token_123"
+                assert data["expiresAt"] == "2026-08-07T12:00:00Z"
+                assert "display" in data
+                display = data["display"]
+                assert display["airline"] == "VN"
+                assert display["price"] == "452.00"
+                assert "offer-123" not in json.dumps(data)
+                
+                assert mock_nestjs_client.create_message_batch.call_count >= 1
+
+@pytest.mark.asyncio
+async def test_sse_action_handoff_disconnect_retry(mock_nestjs_client):
+    headers = get_auth_headers()
+    
+    trusted_snapshot = {
+        "version": 1,
+        "attestation": "test_attestation",
+        "fingerprint": "test_fingerprint",
+        "results": [{
+            "flightOfferId": "offer-123",
+            "airline": "VN",
+            "departureAirport": "HAN",
+            "arrivalAirport": "NRT",
+            "departureTime": "2026-07-15T08:30:00Z",
+            "arrivalTime": "2026-07-15T15:00:00Z",
+            "price": "452.00",
+            "currency": "USD"
+        }]
+    }
+
+    mock_nestjs_client.create_handoff = AsyncMock(side_effect=Exception("Timeout"))
+
+    llm = MockStreamingLLM(responses=[
+        AIMessage(
+            content="",
+            tool_calls=[{
+                "name": "signal_checkout_intent",
+                "args": {"offer_index": 1},
+                "id": "call_signal_2"
+            }]
+        )
+    ])
+
+    with patch("agent.streaming.sse.NestJSClient", return_value=mock_nestjs_client), \
+         patch("agent.agents.chat_agent.ChatOpenAI", return_value=llm), \
+         patch("agent.graph.graph.invoke_router", return_value=RouteDecision(intent="CHECKOUT", confidence=1.0, isCommitment=True)):
+
+        mock_snapshot_obj = MagicMock()
+        mock_snapshot_obj.model_dump.return_value = trusted_snapshot
+        
+        with patch("agent.streaming.sse.TrustedSnapshotRepository.get_snapshot", new_callable=AsyncMock) as mock_get_snapshot:
+            mock_get_snapshot.return_value = mock_snapshot_obj
+            transport = httpx.ASGITransport(app=app)
+            async with httpx.AsyncClient(transport=transport, base_url="http://test") as ac:
+                response = await ac.post(
+                    "/chat/stream",
+                    json={"message": "book the first one", "sessionId": "session-handoff-retry"},
+                    headers=headers
+                )
+                assert response.status_code == 200
+
+                lines = [line async for line in response.aiter_lines()]
+                events = parse_sse(lines)
+                
+                error_events = [e for e in events if e["event"] == "error"]
+                assert len(error_events) >= 1
+                assert "Timeout" in error_events[0]["data"]["message"] or "failed" in error_events[0]["data"]["message"].lower() or "HANDOFF_ERROR" in error_events[0]["data"].get("code", "")

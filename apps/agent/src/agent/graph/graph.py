@@ -40,8 +40,13 @@ def should_continue(state: AgentState) -> str:
     return "tools"
 
 def route_after_tools(state: AgentState) -> str:
+    signal = state.get("signal")
+    if signal and signal.get("intent") == "checkout":
+        return "validate_handoff"
     # After tools, always return to the travel assistant (the only one with tools)
     return "travel"
+
+from agent.graph.nodes import validate_handoff, create_handoff_token
 
 workflow = StateGraph(AgentState)
 
@@ -51,6 +56,8 @@ workflow.add_node("travel", travel_assistant_node)
 workflow.add_node("checkout", checkout_orchestrator_node)
 workflow.add_node("tools", custom_tool_node)
 workflow.add_node("final_answer", final_answer_node)
+workflow.add_node("validate_handoff", validate_handoff)
+workflow.add_node("create_handoff_token", create_handoff_token)
 
 workflow.add_edge(START, "router")
 workflow.add_conditional_edges("router", route_after_router)
@@ -82,9 +89,26 @@ workflow.add_conditional_edges(
     route_after_tools,
     {
         "travel": "travel",
+        "validate_handoff": "validate_handoff",
         END: END,
     },
 )
+
+def route_after_validate(state: AgentState) -> str:
+    action = state.get("action", {})
+    if action and action.get("error"):
+        return END
+    return "create_handoff_token"
+
+workflow.add_conditional_edges(
+    "validate_handoff",
+    route_after_validate,
+    {
+        "create_handoff_token": "create_handoff_token",
+        END: END,
+    }
+)
+workflow.add_edge("create_handoff_token", END)
 workflow.add_edge("final_answer", END)
 
 graph = workflow.compile()

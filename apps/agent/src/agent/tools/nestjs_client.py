@@ -398,3 +398,19 @@ class NestJSClient:
 
             return safe_response
 
+    async def create_handoff(self, attestation: str, offer_index: int, fingerprint: Optional[str] = None) -> dict:
+        url = f"{self.base_url}/chat-handoff"
+        headers = self._get_gateway_headers()
+        
+        payload: dict[str, Any] = {
+            "attestation": attestation,
+            "offerIndex": offer_index
+        }
+        if fingerprint:
+            payload["fingerprint"] = fingerprint
+            
+        async with httpx.AsyncClient() as client:
+            response = await client.post(url, json=payload, headers=headers)
+            response.raise_for_status()
+            return response.json()
+

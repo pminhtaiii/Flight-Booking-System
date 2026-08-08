@@ -92,21 +92,18 @@ async def chat_stream(
         raise HTTPException(status_code=401, detail="Invalid authorization header")
     token = authorization.split(" ", 1)[1]
 
+    from agent.utils.auth import decode_and_verify_jwt
     try:
         issuer = getattr(settings, "JWT_ISSUER", "booking-systems-api")
         audience = getattr(settings, "JWT_AUDIENCE", "booking-systems-clients")
-        payload = jwt.decode(
-            token,
-            settings.JWT_SECRET,
-            algorithms=["HS256"],
+        payload = decode_and_verify_jwt(
+            token=token,
+            secret=settings.JWT_SECRET,
             issuer=issuer,
             audience=audience,
-            options={"verify_iss": True, "verify_aud": True},
         )
         user_id = str(payload.get("sub") or payload.get("id") or "")
         jti = payload.get("jti")
-        if not user_id or not jti:
-            raise HTTPException(status_code=401, detail="Invalid token: missing sub or jti claim")
     except Exception as err:
         raise HTTPException(status_code=401, detail="Invalid token") from err
 
@@ -311,38 +308,8 @@ async def chat_stream(
                         tool_name = event.get("name")
                         tool_input = event["data"].get("input")
                         
-                        if tool_name == "signal_checkout_intent":
-                            selection_index = tool_input.get("selection_index") if isinstance(tool_input, dict) else None
-                            
-                            offer_id = None
-                            if selection_index and trusted_snapshot_dict:
-                                try:
-                                    idx = int(selection_index) - 1
-                                    results = trusted_snapshot_dict.get("results", [])
-                                    if 0 <= idx < len(results):
-                                        offer_id = results[idx].get("flightOfferId")
-                                except (ValueError, TypeError):
-                                    pass
-
-                            payload = {
-                                "action": "CONTINUE_CHECKOUT",
-                                "scope": "UNKNOWN",
-                                "passengers": [{
-                                    "passengerType": "ADULT",
-                                    "passengerOrdinal": 1,
-                                    "sections": []
-                                }],
-                                "target": "/checkout/passengers"
-                            }
-                            if offer_id:
-                                payload["offerId"] = offer_id
-
-                            await q.put({
-                                "event": "ACTION_REQUIRED",
-                                "data": json.dumps(payload)
-                            })
-                            force_persistence = True
-                            continue
+                        # We no longer handle signal_checkout_intent here.
+                        # It is handled by the validate_handoff and create_handoff_token deterministic nodes.
 
                         # Never stream raw readiness tool input
                         if tool_name == "check_booking_readiness":
@@ -362,6 +329,46 @@ async def chat_stream(
                                     "inputs": tool_input
                                 })
                             })
+                    elif kind == "on_chain_end":
+                        node_name = event.get("name")
+                        if node_name == "create_handoff_token":
+                            action_res = event["data"].get("output", {}).get("action", {})
+                            if "error" in action_res:
+                                await q.put({
+                                    "event": "error",
+                                    "data": json.dumps({
+                                        "code": "HANDOFF_ERROR",
+                                        "message": action_res["error"],
+                                        "partialMessageId": None
+                                    })
+                                })
+                                return
+
+                            if queue_manager and not await queue_manager.validate_active_fence(session_id):
+                                logger.warning(f"Stale fence prior to ACTION_HANDOFF emission for session {session_id}. Aborting.")
+                                await q.put({
+                                    "event": "error",
+                                    "data": json.dumps({
+                                        "code": "PERSISTENCE_ERROR",
+                                        "message": "The requested action could not be emitted because the session lease was lost.",
+                                        "partialMessageId": None
+                                    })
+                                })
+                                return
+
+                            payload = {
+                                "version": 1,
+                                "action": "begin_checkout",
+                                "handoffToken": action_res.get("handoffToken"),
+                                "expiresAt": action_res.get("expiresAt"),
+                                "display": action_res.get("display")
+                            }
+
+                            await q.put({
+                                "event": "ACTION_HANDOFF",
+                                "data": json.dumps(payload)
+                            })
+                            force_persistence = True
 
 
                     elif kind == "on_tool_end":
