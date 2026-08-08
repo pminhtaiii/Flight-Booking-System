@@ -20,7 +20,7 @@ export function CheckoutHandoffCard({ event }: CheckoutHandoffCardProps): JSX.El
         <input type="hidden" name="handoffToken" value={event.handoffToken} />
         <button
           type="submit"
-          className="btn-primary w-full text-sm font-medium py-2 px-4 rounded bg-blue-600 text-white hover:bg-blue-700"
+          className="btn-primary w-full rounded px-4 py-2 text-sm font-medium"
         >
           Continue to Checkout
         </button>

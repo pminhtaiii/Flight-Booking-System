@@ -49,7 +49,7 @@ export default async function PassengersPage({ searchParams }: Props) {
   if (handoffCookie?.value) {
     const resolved = await resolveHandoffToken(handoffCookie.value, accessToken);
     if (resolved?.flightOfferId) {
-      offerId = resolved.flightOfferId;
+      redirect(`/checkout/handoff/consume?offerId=${resolved.flightOfferId}`);
     }
   }
 

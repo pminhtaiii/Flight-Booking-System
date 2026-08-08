@@ -75,11 +75,6 @@ export async function resolveHandoffToken(handoffToken: string, accessToken: str
   const mockScenario = mockScenarioMatch ? mockScenarioMatch[1].trim() : null;
 
   if ((process.env.NODE_ENV === 'test' || process.env.CI === 'true') && mockScenario) {
-    try {
-      cookies().delete('chat_handoff_token');
-    } catch (e) {
-      // Ignore if called from Server Component during SSR
-    }
     return { flightOfferId: 'off_test123', errorStatus: null };
   }
 
@@ -91,14 +86,6 @@ export async function resolveHandoffToken(handoffToken: string, accessToken: str
       },
       cache: 'no-store',
     });
-
-    // Clear the credential after resolution attempt
-    const { cookies } = await import('next/headers');
-    try {
-      cookies().delete('chat_handoff_token');
-    } catch (e) {
-      // Ignore if called from Server Component during SSR
-    }
 
     if (!response.ok) {
       return { flightOfferId: null, errorStatus: response.status };
