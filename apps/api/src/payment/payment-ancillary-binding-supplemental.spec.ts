@@ -57,9 +57,15 @@ function createAncillaryFixture(options?: {
           validatedGrandTotal: '123.45',
           validationLeaseToken: null,
           validationLeaseExpiresAt: null,
+          validatedAt: new Date(),
         },
       ])
-      .mockResolvedValue([]),
+      .mockResolvedValueOnce([
+        {
+          currentAncillarySelectionId: options?.currentSelectionId ?? 'selection-3',
+          ancillaryVersion: options?.currentVersion ?? 3,
+        }
+      ]),
     $executeRaw: jest.fn().mockResolvedValue(1),
     ancillarySelection: {
       updateMany: jest.fn().mockResolvedValue({ count: options?.bindCount ?? 1 }),
@@ -73,6 +79,9 @@ function createAncillaryFixture(options?: {
     },
   };
   const prisma = {
+    bookingIntent: {
+      findUnique: jest.fn().mockResolvedValue({ id: 'intent-1', status: 'PENDING', paymentAttemptCount: options?.paymentAttemptCount ?? 0, confirmedPrice: '100.00', currency: 'USD', userId: 'user-1', currentAncillarySelectionId: options?.currentSelectionId ?? 'selection-3', ancillaryVersion: options?.currentVersion ?? 3 }),
+    },
     $transaction: jest.fn().mockImplementation(async (callback) => callback(transaction)),
     payment: { findFirst: jest.fn().mockResolvedValue(null) },
     user: {
@@ -148,6 +157,9 @@ describe('PaymentService ancillary snapshot binding supplemental coverage', () =
   it('converts a decimal-string base fare exactly when ancillary identity is omitted', async () => {
     const payment = { id: 'payment-1', status: 'CREATED' };
     const prisma = {
+      bookingIntent: {
+        findUnique: jest.fn().mockResolvedValue({ id: 'intent-1', status: 'PENDING', paymentAttemptCount: 0, confirmedPrice: '123.45', currency: 'USD', userId: 'user-1', currentAncillarySelectionId: null, ancillaryVersion: 0 }),
+      },
       $transaction: jest.fn().mockImplementation(async (callback) => callback(prisma)),
       $queryRaw: jest.fn().mockResolvedValue([
         {

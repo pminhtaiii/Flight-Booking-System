@@ -49,12 +49,29 @@ describe('Bookings (E2E)', () => {
 
   afterEach(async (): Promise<void> => {
     const userIds = [userA.id, userB.id];
-    await prisma.booking.deleteMany({ where: { userId: { in: userIds } } });
-    await prisma.payment.deleteMany({ where: { bookingIntent: { userId: { in: userIds } } } });
-    await prisma.idempotencyKey.deleteMany({ where: { customerId: { in: userIds } } });
-    await prisma.bookingIntentPassenger.deleteMany({ where: { intent: { userId: { in: userIds } } } });
-    await prisma.bookingIntent.deleteMany({ where: { userId: { in: userIds } } });
-    await prisma.user.deleteMany({ where: { id: { in: userIds } } });
+    await prisma.chatHandoff.deleteMany({});
+    await prisma.chatSession.deleteMany({});
+    await prisma.paymentEvent.deleteMany({});
+    await prisma.ledgerEntry.deleteMany({});
+    await prisma.refund.deleteMany({});
+    await prisma.payment.deleteMany({});
+    await prisma.idempotencyKey.deleteMany({});
+    await prisma.paymentMethod.deleteMany({});
+    await prisma.bookingIntentPassenger.deleteMany({});
+    await prisma.bookingIntent.deleteMany({});
+    await prisma.itineraryRevisionSegment.deleteMany({});
+    await prisma.itineraryRevision.deleteMany({});
+    await prisma.disruptionAuditEvent.deleteMany({});
+    await prisma.notificationOutbox.deleteMany({});
+    await prisma.booking.deleteMany({});
+    await prisma.travelerProfile.deleteMany({});
+    await prisma.offerRecovery.deleteMany({});
+    await prisma.flightOffer.deleteMany({});
+    await prisma.searchHistory.deleteMany({});
+    await prisma.airport.deleteMany({});
+    await prisma.auditLog.deleteMany({});
+    await prisma.user.deleteMany({});
+
   });
 
   async function createBooking(userId: string, overrides: Partial<{
@@ -204,3 +221,5 @@ describe('Bookings (E2E)', () => {
     expect(stored.failureReason).toBe('BOOKING_TIMEOUT');
   });
 });
+
+

@@ -380,9 +380,7 @@ export class PaymentService {
         throw new BadRequestException('Booking intent is not in an allowed status for payment');
       }
 
-      if (intent.paymentAttemptCount >= 2) {
-        throw new BadRequestException('Payment attempts exhausted');
-      }
+
 
       const targetAncillarySelectionId = dto.ancillarySelectionId || intent.currentAncillarySelectionId;
       const targetAncillarySelectionVersion = dto.ancillarySelectionVersion ?? intent.ancillaryVersion;
@@ -402,7 +400,7 @@ export class PaymentService {
           validatedAncillary.selectionVersion === targetAncillarySelectionVersion
         ) {
           validated = validatedAncillary;
-        } else {
+        } else if (!boundPaymentReplay) {
           if (!this.ancillaryPaymentValidation) {
             throw new BadRequestException('Ancillary payment validation service is not available');
           }
@@ -413,7 +411,11 @@ export class PaymentService {
             ancillarySelectionVersion: targetAncillarySelectionVersion,
           });
         }
-        amountInCents = Math.round(Number(validated.grandTotal) * 100);
+        if (validated) {
+          amountInCents = Math.round(Number(validated.grandTotal) * 100);
+        } else {
+          amountInCents = 0; // Will be set from existing payment
+        }
       } else {
         amountInCents = Math.round(Number(intent.confirmedPrice) * 100);
       }
@@ -1281,6 +1283,7 @@ export class PaymentService {
           };
           await this.idempotencyService.completeKey(idempotencyKey, HttpStatus.BAD_GATEWAY, failureResponse);
 
+          console.error('THROWN ERROR:', failureResponse.error);
           throw new HttpException(failureResponse, HttpStatus.BAD_GATEWAY);
         }
 

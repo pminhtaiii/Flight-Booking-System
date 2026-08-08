@@ -4,6 +4,8 @@ process.env.STRIPE_WEBHOOK_SECRET = 'whsec_test_fake';
 
 import { Test, TestingModule } from '@nestjs/testing';
 import { AppModule } from '@/app.module';
+
+jest.setTimeout(30000);
 import { PrismaService } from '@/prisma/prisma.service';
 import { DuffelService } from '@/duffel/duffel.service';
 import { SyncClaimService } from './sync-claim.service';

@@ -68,10 +68,29 @@ describe('Agent Gateway Polish (E2E)', () => {
 
   beforeEach(async () => {
     // Clear databases
-    await prisma.auditLog.deleteMany({});
+    await prisma.chatHandoff.deleteMany({});
+    await prisma.chatSession.deleteMany({});
+    await prisma.paymentEvent.deleteMany({});
+    await prisma.ledgerEntry.deleteMany({});
+    await prisma.refund.deleteMany({});
+    await prisma.payment.deleteMany({});
+    await prisma.idempotencyKey.deleteMany({});
+    await prisma.paymentMethod.deleteMany({});
+    await prisma.bookingIntentPassenger.deleteMany({});
+    await prisma.bookingIntent.deleteMany({});
+    await prisma.itineraryRevisionSegment.deleteMany({});
+    await prisma.itineraryRevision.deleteMany({});
+    await prisma.disruptionAuditEvent.deleteMany({});
+    await prisma.notificationOutbox.deleteMany({});
     await prisma.booking.deleteMany({});
     await prisma.travelerProfile.deleteMany({});
+    await prisma.offerRecovery.deleteMany({});
+    await prisma.flightOffer.deleteMany({});
+    await prisma.searchHistory.deleteMany({});
+    await prisma.airport.deleteMany({});
+    await prisma.auditLog.deleteMany({});
     await prisma.user.deleteMany({});
+
 
     // Reset Redis cache keys
     const keys = await cacheService.keys('*');
@@ -97,7 +116,7 @@ describe('Agent Gateway Polish (E2E)', () => {
     const query = {
       origin: 'HAN',
       destination: 'NRT',
-      date: '2026-07-20',
+      date: '2026-12-20',
       adults: '2',
     };
 
@@ -105,7 +124,7 @@ describe('Agent Gateway Polish (E2E)', () => {
       const normalizedQuery = {
         origin: 'HAN',
         destination: 'NRT',
-        date: '2026-07-20',
+        date: '2026-12-20',
         adults: 2,
         children: 0,
         infants: 0,
@@ -123,8 +142,8 @@ describe('Agent Gateway Polish (E2E)', () => {
             flightNumber: 'VN310',
             departureAirport: 'HAN',
             arrivalAirport: 'NRT',
-            departureTime: '2026-07-20T08:30:00',
-            arrivalTime: '2026-07-20T15:00:00',
+            departureTime: '2026-12-20T08:30:00',
+            arrivalTime: '2026-12-20T15:00:00',
             duration: 330,
             stops: 0,
             price: 904.0,
@@ -327,3 +346,6 @@ describe('Agent Gateway Polish (E2E)', () => {
     });
   });
 });
+
+
+

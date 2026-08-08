@@ -7,6 +7,7 @@ import { PaymentIdempotencyService } from '@/payment/payment-idempotency.service
 import { PaymentMethodService } from '@/payment/payment-method.service';
 import { PaymentService } from '@/payment/payment.service';
 import { PrismaService } from '@/prisma/prisma.service';
+import { Prisma } from '@prisma/client';
 import { CreatePaymentDto } from '@/payment/dto/create-payment.dto';
 import { validateSync } from 'class-validator';
 
@@ -48,13 +49,19 @@ describe('PaymentService ancillary snapshot binding', () => {
             id: 'selection-3',
             status: 'VALIDATED',
             currency: 'USD',
-            validatedBaseAmount: '100.00',
-            validatedGrandTotal: '123.45',
+            validatedBaseAmount: new Prisma.Decimal('100.00'),
+            validatedGrandTotal: new Prisma.Decimal('123.45'),
             validationLeaseToken: null,
             validationLeaseExpiresAt: null,
+            validatedAt: new Date(),
           },
         ])
-        .mockResolvedValue([]),
+        .mockResolvedValueOnce([
+          {
+            currentAncillarySelectionId: 'selection-3',
+            ancillaryVersion: 3,
+          }
+        ]),
       $executeRaw: jest.fn().mockResolvedValue(1),
       ancillarySelection: {
         updateMany: jest.fn().mockResolvedValue({ count: 1 }),
@@ -74,6 +81,9 @@ describe('PaymentService ancillary snapshot binding', () => {
       },
     };
     const prisma = {
+      bookingIntent: {
+        findUnique: jest.fn().mockResolvedValue({ id: 'intent-1', status: 'PENDING', paymentAttemptCount: 0, confirmedPrice: '100.00', currency: 'USD', userId: 'user-1', currentAncillarySelectionId: 'selection-3', ancillaryVersion: 3 }),
+      },
       $transaction: jest.fn().mockImplementation(async (callback) => callback(transaction)),
       user: {
         findUnique: jest.fn().mockResolvedValue({
@@ -199,6 +209,9 @@ describe('PaymentService ancillary snapshot binding', () => {
       payment: { findFirst: jest.fn().mockResolvedValue(null) },
     };
     const prisma = {
+      bookingIntent: {
+        findUnique: jest.fn().mockResolvedValue({ id: 'intent-1', status: 'PENDING', paymentAttemptCount: 0, confirmedPrice: '100.00', currency: 'USD', userId: 'user-1', currentAncillarySelectionId: 'selection-3', ancillaryVersion: 3 }),
+      },
       $transaction: jest.fn().mockImplementation(async (callback) => callback(transaction)),
     };
     const stripe = { createPaymentIntent: jest.fn() };
@@ -250,6 +263,9 @@ describe('PaymentService ancillary snapshot binding', () => {
 
   it('replays a completed bound payment without revalidating the immutable snapshot', async () => {
     const prisma = {
+      bookingIntent: {
+        findUnique: jest.fn().mockResolvedValue({ id: 'intent-1', status: 'PENDING', paymentAttemptCount: 0, confirmedPrice: '100.00', currency: 'USD', userId: 'user-1', currentAncillarySelectionId: 'selection-3', ancillaryVersion: 3 }),
+      },
       payment: {
         findFirst: jest.fn().mockResolvedValue({
           id: 'payment-1',
@@ -326,16 +342,20 @@ describe('PaymentService ancillary snapshot binding', () => {
             id: 'selection-3',
             status: 'VALIDATED',
             currency: 'USD',
-            validatedBaseAmount: '100.00',
-            validatedGrandTotal: '123.45',
-            validationLeaseToken: 'other-validator',
-            validationLeaseExpiresAt: new Date(Date.now() + 10_000),
+            validatedBaseAmount: new Prisma.Decimal('100.00'),
+            validatedGrandTotal: new Prisma.Decimal('123.45'),
+            validationLeaseToken: 'lease-token-123',
+            validationLeaseExpiresAt: new Date(Date.now() + 60000),
+            validatedAt: new Date(),
           },
         ]),
       $executeRaw: jest.fn(),
       payment: { findFirst: jest.fn().mockResolvedValue(null) },
     };
     const prisma = {
+      bookingIntent: {
+        findUnique: jest.fn().mockResolvedValue({ id: 'intent-1', status: 'PENDING', paymentAttemptCount: 0, confirmedPrice: '100.00', currency: 'USD', userId: 'user-1', currentAncillarySelectionId: 'selection-3', ancillaryVersion: 3 }),
+      },
       $transaction: jest.fn().mockImplementation(async (callback) => callback(transaction)),
     };
     const stripe = { createPaymentIntent: jest.fn() };
@@ -415,6 +435,9 @@ describe('PaymentService ancillary snapshot binding', () => {
     };
     const paymentEvent = { create: jest.fn() };
     const prisma = {
+      bookingIntent: {
+        findUnique: jest.fn().mockResolvedValue({ id: 'intent-1', status: 'AWAITING_PAYMENT', paymentAttemptCount: 2, confirmedPrice: '100.00', currency: 'USD', userId: 'user-1', currentAncillarySelectionId: 'selection-3', ancillaryVersion: 3 }),
+      },
       $transaction: jest.fn().mockImplementation(async (callback) => callback(transaction)),
       payment: { findFirst: jest.fn().mockResolvedValue(existingPayment) },
       user: {
@@ -424,7 +447,33 @@ describe('PaymentService ancillary snapshot binding', () => {
         }),
       },
       idempotencyKey: {
-        findUnique: jest.fn().mockResolvedValue({ id: 'idempotency-record-1' }),
+        findUnique: jest.fn().mockResolvedValue({
+          id: 'idempotency-record-1',
+          requestHash: 'request-hash',
+          customerId: 'user-1',
+          requestPath: '/api/bookings/payment/create',
+          requestParams: {
+            paymentReservation: {
+              bookingIntentId: 'intent-1',
+              ancillarySelectionId: 'selection-3',
+              ancillarySelectionVersion: 3,
+              attemptNumber: 1,
+              amount: 12345,
+              currency: 'USD',
+              intentExpiresAt: new Date(Date.now() + 600000).toISOString(),
+              offerExpiresAt: null,
+              validatedAt: new Date().toISOString(),
+              validatedAncillary: {
+                selectionId: 'selection-3',
+                selectionVersion: 3,
+                baseAmount: '100.00',
+                grandTotal: '123.45',
+                currency: 'USD',
+                services: [{ serviceId: 'seat-1', quantity: 1 }],
+              }
+            }
+          }
+        }),
       },
       paymentEvent,
     };

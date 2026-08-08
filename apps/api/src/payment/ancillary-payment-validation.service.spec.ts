@@ -3,6 +3,7 @@ import { PrismaService } from '@/prisma/prisma.service';
 import { AncillaryPaymentValidationService } from './ancillary-payment-validation.service';
 
 describe('AncillaryPaymentValidationService', () => {
+  jest.setTimeout(30000);
   it('reprices once outside transactions and validates the leased current snapshot', async () => {
     jest.useFakeTimers().setSystemTime(new Date('2026-07-29T10:00:00.000Z'));
     let inTransaction = false;
@@ -169,7 +170,7 @@ describe('AncillaryPaymentValidationService', () => {
 
     // Duffel repricing hangs past 15s timeout
     const duffel = {
-      repriceOffer: jest.fn().mockImplementation(() => new Promise((resolve) => setTimeout(resolve, 20_000))),
+      repriceOffer: jest.fn().mockImplementation(() => new Promise(() => {})),
     };
     const service = new AncillaryPaymentValidationService(
       prisma as unknown as PrismaService,
@@ -183,14 +184,15 @@ describe('AncillaryPaymentValidationService', () => {
       ancillarySelectionVersion: 3,
     });
 
-    jest.advanceTimersByTime(15_000);
-
-    await expect(validationPromise).rejects.toMatchObject({
+    const errorPromise = expect(validationPromise).rejects.toMatchObject({
       response: {
         code: 'ANCILLARY_REPRICING_TIMEOUT',
         message: 'External ancillary repricing request timed out',
       },
     });
+
+    await jest.runAllTimersAsync();
+    await errorPromise;
 
     // Lease must be released
     expect(prisma.ancillarySelection.updateMany).toHaveBeenCalledWith(

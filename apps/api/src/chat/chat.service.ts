@@ -28,7 +28,8 @@ export class ChatService {
     fencingToken?: string | null,
   ): Promise<void> {
     const isWriteFenceEnabled =
-      this.configService.get<string>('FEATURE_FLAG_WRITE_FENCE') === 'true';
+      this.configService.get<string>('FEATURE_FLAG_WRITE_FENCE') === 'true' ||
+      process.env.FEATURE_FLAG_WRITE_FENCE === 'true';
 
     if (!isWriteFenceEnabled) {
       return;

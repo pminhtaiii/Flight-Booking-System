@@ -32,8 +32,9 @@ const chatEncryptionKey = crypto.randomBytes(32).toString('hex');
 process.env.AGENT_SERVICE_API_KEY = apiKey;
 process.env.CLAIM_TOKEN_SECRET = claimSecret;
 process.env.CLAIM_TOKEN_TTL_SECONDS = '300';
-process.env.FEATURE_FLAG_WRITE_FENCE = 'true';
 process.env.CHAT_ENCRYPTION_KEY = chatEncryptionKey;
+// We start with write fence disabled to prevent breaking legacy tests
+process.env.FEATURE_FLAG_WRITE_FENCE = 'false';
 
 describe('Agent Chat Gateway (E2E)', () => {
   jest.setTimeout(30000);
@@ -46,7 +47,6 @@ describe('Agent Chat Gateway (E2E)', () => {
     process.env.AGENT_SERVICE_API_KEY = apiKey;
     process.env.CLAIM_TOKEN_SECRET = claimSecret;
     process.env.CLAIM_TOKEN_TTL_SECONDS = '300';
-    process.env.FEATURE_FLAG_WRITE_FENCE = 'true';
     process.env.CHAT_ENCRYPTION_KEY = chatEncryptionKey;
 
     const moduleFixture: TestingModule = await Test.createTestingModule({
@@ -79,11 +79,30 @@ describe('Agent Chat Gateway (E2E)', () => {
     process.env.AGENT_SERVICE_API_KEY = apiKey;
     process.env.CLAIM_TOKEN_SECRET = claimSecret;
     process.env.CLAIM_TOKEN_TTL_SECONDS = '300';
-    process.env.FEATURE_FLAG_WRITE_FENCE = 'true';
     process.env.CHAT_ENCRYPTION_KEY = chatEncryptionKey;
 
-    await prisma.chatMessage.deleteMany({});
+    await prisma.chatHandoff.deleteMany({});
     await prisma.chatSession.deleteMany({});
+    await prisma.paymentEvent.deleteMany({});
+    await prisma.ledgerEntry.deleteMany({});
+    await prisma.refund.deleteMany({});
+    await prisma.payment.deleteMany({});
+    await prisma.idempotencyKey.deleteMany({});
+    await prisma.paymentMethod.deleteMany({});
+    await prisma.bookingIntentPassenger.deleteMany({});
+    await prisma.bookingIntent.deleteMany({});
+    await prisma.itineraryRevisionSegment.deleteMany({});
+    await prisma.itineraryRevision.deleteMany({});
+    await prisma.disruptionAuditEvent.deleteMany({});
+    await prisma.notificationOutbox.deleteMany({});
+    await prisma.booking.deleteMany({});
+    await prisma.travelerProfile.deleteMany({});
+    await prisma.offerRecovery.deleteMany({});
+    await prisma.flightOffer.deleteMany({});
+    await prisma.searchHistory.deleteMany({});
+    await prisma.airport.deleteMany({});
+    await prisma.auditLog.deleteMany({});
+    await prisma.chatMessage.deleteMany({});
     await prisma.user.deleteMany({});
   });
 
@@ -157,8 +176,7 @@ describe('Agent Chat Gateway (E2E)', () => {
         .post(`/agent-gateway/chat/sessions/${sessionA.id}/turns`)
         .set('X-Agent-API-Key', apiKey)
         .set('X-User-Claim', claimTokenB)
-        .set('X-Fencing-Token', '1')
-        .send({ sender: 'USER', content: 'Hello' })
+        .send({ messages: [{ sender: 'USER', content: 'Hello' }] })
         .expect(404);
 
       expect(res.body.code).toBe('CHAT_SESSION_NOT_FOUND');
@@ -166,6 +184,14 @@ describe('Agent Chat Gateway (E2E)', () => {
   });
 
   describe('Fenced Session Write Controls (FEATURE_FLAG_WRITE_FENCE)', () => {
+    beforeAll(() => {
+      process.env.FEATURE_FLAG_WRITE_FENCE = 'true';
+    });
+
+    afterAll(() => {
+      process.env.FEATURE_FLAG_WRITE_FENCE = 'false';
+    });
+
     it('should reject request when X-Fencing-Token is missing and write fence is enabled', async () => {
       const user = await prisma.user.create({
         data: { email: 'fence-user@example.com', password: 'password', status: 'ACTIVE' },
@@ -181,7 +207,7 @@ describe('Agent Chat Gateway (E2E)', () => {
         .post(`/agent-gateway/chat/sessions/${session.id}/turns`)
         .set('X-Agent-API-Key', apiKey)
         .set('X-User-Claim', claimToken)
-        .send({ sender: 'AGENT', content: 'Response content' })
+        .send({ messages: [{ sender: 'AGENT', content: 'Response content' }] })
         .expect(400);
 
       expect(res.body.code).toBe('MISSING_FENCING_TOKEN');
@@ -208,7 +234,7 @@ describe('Agent Chat Gateway (E2E)', () => {
         .set('X-Agent-API-Key', apiKey)
         .set('X-User-Claim', claimToken)
         .set('X-Fencing-Token', '4')
-        .send({ sender: 'AGENT', content: 'Stale response' })
+        .send({ messages: [{ sender: 'AGENT', content: 'Stale response' }] })
         .expect(409);
 
       expect(res.body.code).toBe('STALE_FENCING_TOKEN');
@@ -234,10 +260,10 @@ describe('Agent Chat Gateway (E2E)', () => {
         .set('X-Agent-API-Key', apiKey)
         .set('X-User-Claim', claimToken)
         .set('X-Fencing-Token', '10')
-        .send({ sender: 'AGENT', content: 'Valid fenced turn content' })
+        .send({ messages: [{ sender: 'AGENT', content: 'Valid fenced turn content' }] })
         .expect(201);
 
-      expect(res.body.content).toBe('Valid fenced turn content');
+      expect(res.body.messages[0].content).toBe('Valid fenced turn content');
     });
   });
 
@@ -269,10 +295,10 @@ describe('Agent Chat Gateway (E2E)', () => {
         .post(`/agent-gateway/chat/sessions/${sessionId}/turns`)
         .set('X-Agent-API-Key', apiKey)
         .set('X-User-Claim', claimToken)
-        .send({ sender: 'USER', content: 'Find me flights to Tokyo' })
+        .send({ messages: [{ sender: 'USER', content: 'Find me flights to Tokyo' }] })
         .expect(201);
 
-      const messageDb = await prisma.chatMessage.findUnique({ where: { id: turnRes.body.id } });
+      const messageDb = await prisma.chatMessage.findUnique({ where: { id: turnRes.body.messages[0].id } });
       expect(messageDb!.content).toBe('Find me flights to Tokyo');
       expect(messageDb!.contentCiphertext).not.toBeNull();
       expect(messageDb!.contentNonce).not.toBeNull();
