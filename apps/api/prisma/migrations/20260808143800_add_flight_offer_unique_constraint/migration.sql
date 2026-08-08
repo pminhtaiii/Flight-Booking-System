@@ -33,7 +33,7 @@ DELETE FROM "flight_offers"
 WHERE id IN (
   SELECT id
   FROM (
-    SELECT id, ROW_NUMBER() OVER(PARTITION BY "searchHash", "duffelOfferId" ORDER BY "createdAt" ASC) as row_num
+    SELECT id, ROW_NUMBER() OVER(PARTITION BY "searchHash", "duffelOfferId" ORDER BY "createdAt" ASC, id ASC) as row_num
     FROM "flight_offers"
   ) t
   WHERE t.row_num > 1
