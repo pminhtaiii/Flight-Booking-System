@@ -14,24 +14,7 @@ test.describe('Chat direct stream browser boundary (mocked FastAPI)', () => {
     }> = [];
     let proxyRequests = 0;
 
-    await page.context().addCookies([
-      {
-        name: 'next-auth.session-token',
-        value: 'mock-token',
-        domain: '127.0.0.1',
-        path: '/',
-        httpOnly: true,
-        sameSite: 'Lax',
-      },
-      {
-        name: 'next-auth.session-token',
-        value: 'mock-token',
-        domain: 'localhost',
-        path: '/',
-        httpOnly: true,
-        sameSite: 'Lax',
-      },
-    ]);
+
 
     await page.route('**/api/auth/session', async (route) => {
       await route.fulfill({
@@ -48,7 +31,7 @@ test.describe('Chat direct stream browser boundary (mocked FastAPI)', () => {
       proxyRequests += 1;
       await route.abort();
     });
-    await page.route('http://127.0.0.1:3002/chat/stream', async (route) => {
+    await page.route(/.*:3002\/chat\/stream/, async (route) => {
       const request = route.request();
       if (request.method() === 'OPTIONS') {
         await route.fulfill({
@@ -78,6 +61,7 @@ test.describe('Chat direct stream browser boundary (mocked FastAPI)', () => {
     });
 
     await page.goto('http://127.0.0.1:3000/search');
+    await page.waitForResponse('**/api/auth/session');
     const input = page.locator('input[placeholder="Type a message..."]');
     await input.fill('first turn');
     await input.press('Enter');
