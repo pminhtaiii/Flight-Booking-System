@@ -3,10 +3,20 @@ import jwt
 from jwt import InvalidTokenError
 from typing import Optional, List, Dict, Any
 import logging
+import re
+import secrets
 from agent.config import get_settings
 from agent.auth.claim_token import create_claim_token
 
 logger = logging.getLogger(__name__)
+
+_OPAQUE_TRACE_ID = re.compile(r"chat_[a-f0-9]{32}\Z")
+
+
+def _safe_trace_id(value: Optional[str]) -> str:
+    if value and _OPAQUE_TRACE_ID.fullmatch(value):
+        return value
+    return f"chat_{secrets.token_hex(16)}"
 
 _READINESS_SCOPES = {"DOMESTIC", "INTERNATIONAL", "UNKNOWN"}
 _READINESS_ACTIONS = {"COMPLETE_PROFILE", "CONTINUE_CHECKOUT"}
@@ -133,13 +143,15 @@ class NestJSClient:
         self,
         base_url: str,
         token: str,
+        trace_id: Optional[str] = None,
         correlation_id: Optional[str] = None,
         fencing_token: Optional[Any] = None,
     ):
         self.base_url = base_url.rstrip("/")
         self.token = token
         self.headers = {"Authorization": f"Bearer {token}"}
-        self.correlation_id = correlation_id
+        self.trace_id = _safe_trace_id(trace_id)
+        self.correlation_id = _safe_trace_id(correlation_id)
         self.set_fencing_token(fencing_token)
 
     def set_fencing_token(self, fencing_token: Optional[Any]) -> None:
@@ -161,6 +173,8 @@ class NestJSClient:
             "X-User-Claim": claim_token,
             "Content-Type": "application/json"
         }
+        headers["X-Trace-Id"] = self.trace_id
+        headers["X-Correlation-Id"] = self.correlation_id
         payload: Dict[str, Any] = {"sub": sub}
         if jti:
             payload["jti"] = jti
@@ -173,8 +187,8 @@ class NestJSClient:
                 if response.status_code == 200:
                     return response.json()
                 return {"allowed": False}
-            except Exception as e:
-                logger.error(f"check_user_access failed: {e!s}")
+            except Exception:
+                logger.error("check_user_access_failed")
                 return {"allowed": False}
 
     async def create_session(self, title: Optional[str] = None) -> Dict[str, Any]:
@@ -261,6 +275,8 @@ class NestJSClient:
         }
         if self.correlation_id:
             headers["X-Correlation-ID"] = self.correlation_id
+        if self.trace_id:
+            headers["X-Trace-ID"] = self.trace_id
         if self.fencing_token is not None:
             headers["X-Fencing-Token"] = str(self.fencing_token)
         return headers
@@ -282,8 +298,8 @@ class NestJSClient:
                     message = data.get("message")
                     if message:
                         return {"error": message}
-                except ValueError as e:
-                    logger.warning("Failed to parse 400 response JSON in get_gateway_flights_search: %s (response: %s)", e, response.text)
+                except ValueError:
+                    logger.warning("flights_search_error_response_unparseable")
             response.raise_for_status()
             return response.json()
 
@@ -308,8 +324,8 @@ class NestJSClient:
                     message = data.get("message")
                     if message:
                         return {"error": message}
-                except ValueError as e:
-                    logger.warning("Failed to parse 400 response JSON in post_gateway_flights_search_v2: %s (response: %s)", e, response.text)
+                except ValueError:
+                    logger.warning("flights_search_v2_error_response_unparseable")
             response.raise_for_status()
             return response.json()
 

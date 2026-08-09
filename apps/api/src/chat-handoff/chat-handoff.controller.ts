@@ -1,4 +1,14 @@
-import { Controller, Get, Post, Body, ServiceUnavailableException, UseGuards, Request, Query } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Headers,
+  Post,
+  Query,
+  Request,
+  ServiceUnavailableException,
+  UseGuards,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { ChatHandoffService } from './chat-handoff.service';
 import { CreateChatHandoffDto } from './dto/create-chat-handoff.dto';
@@ -15,22 +25,31 @@ export class ChatHandoffController {
 
   @Post()
   @UseGuards(AgentApiKeyGuard)
-  async create(@Body() dto: CreateChatHandoffDto) {
+  async create(
+    @Body() dto: CreateChatHandoffDto,
+    @Headers('X-Trace-Id') traceId?: string,
+    @Headers('X-Correlation-Id') correlationId?: string,
+  ) {
     const isEnabled = this.configService.get<string>('FEATURE_FLAG_CHAT_HANDOFF_ISSUE') === 'true';
     if (!isEnabled) {
       throw new ServiceUnavailableException('Chat handoff issuance is disabled');
     }
-    return this.chatHandoffService.create(dto);
+    return this.chatHandoffService.create(dto, { traceId, correlationId });
   }
 
   @Get('resolve')
   @UseGuards(JwtAuthGuard)
-  async resolve(@Query() query: ResolveChatHandoffDto, @Request() req: any) {
+  async resolve(
+    @Query() query: ResolveChatHandoffDto,
+    @Request() req: any,
+    @Headers('X-Trace-Id') traceId?: string,
+    @Headers('X-Correlation-Id') correlationId?: string,
+  ) {
     const isEnabled = this.configService.get<string>('FEATURE_FLAG_CHAT_HANDOFF_ACCEPT') === 'true';
     if (!isEnabled) {
       throw new ServiceUnavailableException('Chat handoff acceptance is disabled');
     }
     const userId = req.user?.id || req.user?.sub;
-    return this.chatHandoffService.resolve(query.token, userId);
+    return this.chatHandoffService.resolve(query.token, userId, { traceId, correlationId });
   }
 }

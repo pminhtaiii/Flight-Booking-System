@@ -7,9 +7,9 @@ Update this file after every completed feature. Any AI agent reading this should
 ### Current Status
 
 **Feature:** Chatbot Backend Infrastructure & Booking Handoff (Feature 17)
-**Last completed:** Phase 6 / US4: Deterministic Checkout Handoff.
-**In progress:** Phase 7 / US5: Observable, Reversible Rollout (T085–T093).
-**Next:** Implement observable, reversible rollout strategies including flag controls for handoff tokens, and setup telemetry for production observation. See [plan.md](file:///c:/Booking%20Systems/specs/017-chatbot-backend-infrastructure/plan.md) for details.
+**Last completed:** Phase 7B / US5: PII-safe telemetry and trace-linked audit/metric emission (T086, T088, T089).
+**In progress:** Phase 7 / US5: Observable, Reversible Rollout (T090–T093).
+**Next:** Complete sanitized browser→agent→NestJS propagation, then archive the proxy rollback matrix and run the full-flow observation gate. See [plan.md](file:///c:/Booking%20Systems/specs/017-chatbot-backend-infrastructure/plan.md) for details.
 
 ---
 
@@ -55,6 +55,9 @@ Update this file after every completed feature. Any AI agent reading this should
   - [x] WP 6D: Claimed canonical consume — Token-only readiness, pre-supplier claim, final atomic intent/consume CAS
   - **All Checkout Handoff tests pass (NestJS create/resolve/consume, agent signal integration, and Playwright UI tests).**
 - [ ] Phase 7 / US5: Observable, Reversible Rollout (T085–T093)
+  - [x] WP 7A: Flag/direct-client gate — independent ISSUE/ACCEPT behavior, direct-stream boundary coverage, and ChatWidget direct streaming with proxy fallback (T085, T087, T091)
+  - [x] WP 7B: PII-safe telemetry — closed allowlists, opaque trace/correlation IDs, agent metrics/logs, and NestJS create/resolve/consume/replay audit linkage (T086, T088, T089)
+  - **WP 7B GREEN evidence:** agent focused suites `56 passed`; API focused unit suites `44 passed`; chat-handoff E2E `7 passed`; handoff-consumption E2E `1 passed`. Playwright was not rerun per handoff instruction.
 - [ ] Phase 8 / Polish & Cleanup (T094–T102)
 
 ### [ ] Feature: Traveler Profile & Booking Readiness (Feature 16)

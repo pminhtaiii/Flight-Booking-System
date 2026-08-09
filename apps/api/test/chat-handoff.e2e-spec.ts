@@ -10,6 +10,8 @@ import { HttpExceptionFilter } from '@/common/filters/http-exception.filter';
 
 import { JwtService } from '@nestjs/jwt';
 
+jest.setTimeout(120_000);
+
 function mintClaimToken(userId: string, iat: number, secret = 'test-claim-token-secret'): string {
   const payload = { userId, iat };
   const payloadStr = JSON.stringify(payload);
@@ -209,6 +211,52 @@ describe('ChatHandoff (E2E)', () => {
       expect(record).toBeDefined();
       expect(record?.chatSessionId).toBe(validSession.id);
       expect(record?.flightOfferId).toBe(validFlightOffer.id);
+    });
+
+    it('should persist linked opaque trace telemetry without sensitive metadata', async () => {
+      const expiresAt = new Date(Date.now() + 15 * 60000).toISOString();
+      const offers = [{ flightOfferId: validFlightOffer.id, duffelOfferId: 'off_test123' }];
+      const attestation = await attestationService.signSelectionAttestation(
+        validUser.id, validSession.id, 1, expiresAt, offers,
+      );
+      const traceId = `chat_${'a1'.repeat(16)}`;
+      const correlationId = `chat_${'b2'.repeat(16)}`;
+
+      const created = await request(app.getHttpServer())
+        .post('/chat-handoff')
+        .set('X-Agent-API-Key', apiKey)
+        .set('X-Trace-Id', traceId)
+        .set('X-Correlation-Id', correlationId)
+        .send({ selectionAttestationHash: attestation, selectedOfferIndex: 1 })
+        .expect(201);
+
+      await request(app.getHttpServer())
+        .get(`/chat-handoff/resolve?token=${created.body.token}`)
+        .set('Authorization', `Bearer ${validUserToken}`)
+        .set('X-Trace-Id', traceId)
+        .set('X-Correlation-Id', correlationId)
+        .expect(200);
+
+      const auditRows = await prisma.auditLog.findMany({
+        where: {
+          action: { in: ['chat_handoff_created', 'chat_handoff_resolved'] },
+        },
+        orderBy: { createdAt: 'desc' },
+        take: 2,
+      });
+
+      expect(auditRows).toHaveLength(2);
+      for (const row of auditRows) {
+        expect(row.traceId).toBe(traceId);
+        expect(row.correlationId).toBe(correlationId);
+        const metadata = JSON.stringify(row.metadata);
+        expect(metadata).not.toContain('off_test123');
+        expect(metadata).not.toContain(validUser.id);
+        expect(metadata).not.toContain(validSession.id);
+        expect(metadata).not.toContain(created.body.token);
+        expect(metadata).not.toContain('selectionAttestationHash');
+        expect(metadata).toMatch(/"operation":"handoff_(create|resolve)"/);
+      }
     });
 
     it('should reject stale-offer/attestation', async () => {

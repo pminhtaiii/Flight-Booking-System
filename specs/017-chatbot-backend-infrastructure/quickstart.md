@@ -355,3 +355,11 @@ Record in `docs/runbooks/chatbot-handoff.md` and `context/progress-checker.md` o
 - Run the Feature 016a checkout-readiness preflight tests in `apps/api` using `pnpm --filter @api/backend test`.
 - PASSED: 532/532 tests passed. Preflight is GREEN. (Initial blocking gaps resolved via subagent).
 - Canonical readiness/intent prerequisites are met. Proceeding to WP 6I.
+
+### Phase 7: Work Package 7B GREEN Checkpoint (2026-08-09)
+
+- **T086:** Agent and API telemetry tests enforce closed allowlists, bounded opaque trace/correlation IDs, and absence of message, token, offer, user/session, passenger, payment, passport, URL, and PII values. Sanitized trace and correlation headers are forwarded from FastAPI to NestJS.
+- **T088:** Agent quota, router, tool, snapshot, and handoff runtime events emit through a fail-open structured telemetry facade; runtime logs contain fixed event names only.
+- **T089:** NestJS emits allowlisted create/resolve/consume/replay metrics and audit metadata with linked opaque IDs; booking-intent consume and idempotent/consumed replay paths are covered.
+- **GREEN evidence:** From `apps/agent`, `uv run pytest -q tests/test_chat_observability.py tests/test_direct_stream.py tests/test_router.py tests/test_sse_integration.py tests/test_stream_auth_budget.py` passed `56` tests with the valid `ISSUE=true`/`ACCEPT=true` rollout configuration. From `apps/api`, the focused Jest suites passed `44` tests; `npm run test:e2e -- --runTestsByPath test/chat-handoff.e2e-spec.ts` passed `7` tests; the focused handoff-consumption E2E passed `1` test.
+- Playwright was not rerun; the prior user-provided successful run remains the 7A evidence. Continue only at the WP7C stop point for browser→agent→NestJS propagation verification.

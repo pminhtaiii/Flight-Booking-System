@@ -9,6 +9,7 @@ import { CreateChatHandoffDto } from './dto/create-chat-handoff.dto';
 import { validate } from 'class-validator';
 import { plainToInstance } from 'class-transformer';
 import { Prisma } from '@prisma/client';
+import { AuditService } from '@/audit/audit.service';
 
 describe('ChatHandoffService', () => {
   let service: ChatHandoffService;
@@ -16,6 +17,7 @@ describe('ChatHandoffService', () => {
   let configService: ConfigService;
   let tokenService: ChatHandoffTokenService;
   let attestationService: SelectionAttestationService;
+  let auditService: { createLog: jest.Mock };
 
   function createMockAttestation(userId: string, chatSessionId: string, snapshotVersion: number, offers: any[]) {
     const payload = { userId, sessionId: chatSessionId, version: snapshotVersion, offers };
@@ -58,6 +60,10 @@ describe('ChatHandoffService', () => {
             verifySelectionAttestation: jest.fn(),
           },
         },
+        {
+          provide: AuditService,
+          useValue: { createLog: jest.fn().mockResolvedValue(undefined) },
+        },
       ],
     }).compile();
 
@@ -66,6 +72,7 @@ describe('ChatHandoffService', () => {
     configService = module.get<ConfigService>(ConfigService);
     tokenService = module.get<ChatHandoffTokenService>(ChatHandoffTokenService);
     attestationService = module.get<SelectionAttestationService>(SelectionAttestationService);
+    auditService = module.get(AuditService);
   });
 
   describe('extra field rejection', () => {
@@ -125,6 +132,13 @@ describe('ChatHandoffService', () => {
 
       expect(result.token).toBe('token');
       expect(result.expiresAt).toBeDefined();
+      expect(auditService.createLog).toHaveBeenCalledWith(
+        null,
+        expect.objectContaining({
+          action: 'chat_handoff_created',
+          metadata: expect.objectContaining({ operation: 'handoff_create' }),
+        }),
+      );
     });
 
     it('returns existing token on active-retry (Unique constraint violation)', async () => {
@@ -157,6 +171,13 @@ describe('ChatHandoffService', () => {
 
       expect(result.token).toBe('token2');
       expect(result.expiresAt).toBe(existingRecord.expiresAt.toISOString());
+      expect(auditService.createLog).toHaveBeenCalledWith(
+        null,
+        expect.objectContaining({
+          action: 'chat_handoff_replay',
+          metadata: expect.objectContaining({ operation: 'handoff_replay' }),
+        }),
+      );
     });
   });
 
@@ -194,6 +215,41 @@ describe('ChatHandoffService', () => {
       // What should resolve return?
       const result = await service.resolve('token', 'u1');
       expect(result).toBeDefined();
+      expect(auditService.createLog).toHaveBeenCalledWith(
+        null,
+        expect.objectContaining({
+          action: 'chat_handoff_resolved',
+          metadata: expect.objectContaining({ operation: 'handoff_resolve' }),
+        }),
+      );
+    });
+
+    it('records consumed-token resolve as a replay without sensitive metadata', async () => {
+      jest.spyOn(configService, 'get').mockImplementation((key) =>
+        key === 'FEATURE_FLAG_CHAT_HANDOFF_ACCEPT' ? 'true' : 'false',
+      );
+      jest.spyOn(tokenService, 'verifyToken').mockResolvedValue(true);
+      jest.spyOn(prisma.chatHandoff, 'findUnique').mockResolvedValue({
+        id: '1',
+        userId: 'u1',
+        flightOfferId: 'offer-123',
+        tokenHash: 'thash',
+        tokenKeyVersion: 1,
+        consumedAt: new Date(),
+      } as any);
+
+      await service.resolve('token', 'u1');
+
+      expect(auditService.createLog).toHaveBeenCalledWith(
+        null,
+        expect.objectContaining({
+          action: 'chat_handoff_replay',
+          metadata: expect.objectContaining({ operation: 'handoff_replay' }),
+        }),
+      );
+      const metadata = JSON.stringify(auditService.createLog.mock.calls.at(-1)[1].metadata);
+      expect(metadata).not.toContain('offer-123');
+      expect(metadata).not.toContain('u1');
     });
   });
 

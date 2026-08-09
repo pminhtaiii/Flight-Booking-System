@@ -1001,6 +1001,18 @@ describe('Booking Intent (E2E)', () => {
       const updatedHandoff = await prisma.chatHandoff.findUnique({ where: { id: handoffId } });
       expect(updatedHandoff?.consumedAt).toBeDefined();
       expect(updatedHandoff?.consumedByBookingIntentId).toBe(res.body.intentId);
+
+      const consumeAudit = await prisma.auditLog.findFirst({
+        where: { action: 'chat_handoff_consumed', userId: userA.id },
+        orderBy: { createdAt: 'desc' },
+      });
+      expect(consumeAudit).toBeDefined();
+      expect(consumeAudit?.metadata).toMatchObject({ operation: 'handoff_consume' });
+      const consumeMetadata = JSON.stringify(consumeAudit?.metadata);
+      expect(consumeMetadata).not.toContain(handoffId);
+      expect(consumeMetadata).not.toContain(offer.id);
+      expect(consumeMetadata).not.toContain(userA.id);
+      expect(consumeMetadata).not.toContain(token);
     });
 
     it('fails to consume claim and throws ConflictException if chatSession is soft deleted', async () => {

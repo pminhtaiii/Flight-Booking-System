@@ -1,6 +1,22 @@
-import { Injectable, ServiceUnavailableException, ConflictException, NotFoundException, UnauthorizedException, GoneException } from '@nestjs/common';
+import {
+  ConflictException,
+  GoneException,
+  Injectable,
+  Logger,
+  NotFoundException,
+  Optional,
+  ServiceUnavailableException,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '@/prisma/prisma.service';
+import { AuditService } from '@/audit/audit.service';
+import {
+  createChatTelemetryEvent,
+  emitChatTelemetry,
+  type ChatTelemetryContext,
+  type ChatTelemetryOperation,
+} from '@/common/observability/chat-observability';
 import { CreateChatHandoffDto } from './dto/create-chat-handoff.dto';
 import { ChatHandoffResponseDto } from './dto/chat-handoff-response.dto';
 import { ChatHandoffTokenService } from './chat-handoff-token.service';
@@ -13,17 +29,24 @@ import * as crypto from 'crypto';
  */
 @Injectable()
 export class ChatHandoffService {
+  private readonly logger = new Logger(ChatHandoffService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly configService: ConfigService,
     private readonly tokenService: ChatHandoffTokenService,
     private readonly selectionAttestationService: SelectionAttestationService,
+    @Optional() private readonly auditService?: AuditService,
   ) {}
 
   /**
    * Creates a new chat handoff claim record.
    */
-  async create(dto: CreateChatHandoffDto): Promise<ChatHandoffResponseDto> {
+  async create(
+    dto: CreateChatHandoffDto,
+    context: ChatTelemetryContext = {},
+  ): Promise<ChatHandoffResponseDto> {
+    const startedAt = Date.now();
     const isEnabled = this.configService.get<string>('FEATURE_FLAG_CHAT_HANDOFF_ISSUE') === 'true';
     if (!isEnabled) {
       throw new ServiceUnavailableException('Chat handoff issuance is disabled');
@@ -87,6 +110,15 @@ export class ChatHandoffService {
         },
       });
 
+      await this.recordTelemetry(
+        'handoff_create',
+        'created',
+        Date.now() - startedAt,
+        context,
+        userId,
+        { outcome: 'created' },
+      );
+
       return {
         token,
         expiresAt: record.expiresAt.toISOString(),
@@ -105,6 +137,15 @@ export class ChatHandoffService {
         
         const { token } = await this.tokenService.generateToken(existing.id, existing.idempotencyKeyHash);
         
+        await this.recordTelemetry(
+          'handoff_replay',
+          'replayed',
+          Date.now() - startedAt,
+          context,
+          userId,
+          { outcome: 'idempotent_retry', retry: true },
+        );
+
         return {
           token,
           expiresAt: existing.expiresAt.toISOString(),
@@ -117,7 +158,12 @@ export class ChatHandoffService {
   /**
    * Resolves a handoff token, binding it to an authenticated user.
    */
-  async resolve(token: string, userId: string): Promise<any> {
+  async resolve(
+    token: string,
+    userId: string,
+    context: ChatTelemetryContext = {},
+  ): Promise<any> {
+    const startedAt = Date.now();
     const isEnabled = this.configService.get<string>('FEATURE_FLAG_CHAT_HANDOFF_ACCEPT') === 'true';
     if (!isEnabled) {
       throw new ServiceUnavailableException('Chat handoff acceptance is disabled');
@@ -146,7 +192,64 @@ export class ChatHandoffService {
       throw new UnauthorizedException('Invalid token');
     }
 
+    const operation: ChatTelemetryOperation = record.consumedAt
+      ? 'handoff_replay'
+      : 'handoff_resolve';
+    await this.recordTelemetry(
+      operation,
+      record.consumedAt ? 'replayed' : 'resolved',
+      Date.now() - startedAt,
+      context,
+      userId,
+      { outcome: record.consumedAt ? 'already_consumed' : 'resolved' },
+    );
+
     return record;
+  }
+
+  private async recordTelemetry(
+    operation: ChatTelemetryOperation,
+    status: string,
+    latencyMs: number,
+    context: ChatTelemetryContext,
+    userId: string,
+    metadata: Record<string, unknown>,
+  ): Promise<void> {
+    try {
+      const event = createChatTelemetryEvent(
+        operation,
+        status,
+        latencyMs,
+        context,
+        metadata,
+      );
+      emitChatTelemetry(this.logger, event);
+
+      if (this.auditService) {
+        await this.auditService.createLog(null, {
+          userId,
+          action: operation === 'handoff_create'
+            ? 'chat_handoff_created'
+            : operation === 'handoff_resolve'
+              ? 'chat_handoff_resolved'
+              : 'chat_handoff_replay',
+          resourceType: 'ChatHandoff',
+          resourceId: null,
+          metadata: {
+            operation: event.operation,
+            metric: event.metric,
+            status: event.status,
+            latency_ms: event.latency_ms,
+            ...event.metadata,
+          },
+          traceId: event.trace_id,
+          correlationId: event.correlation_id,
+        });
+      }
+    } catch {
+      // Telemetry must never change the handoff result or expose raw failures.
+      this.logger.warn('chat_handoff_telemetry_failed');
+    }
   }
 
   /**

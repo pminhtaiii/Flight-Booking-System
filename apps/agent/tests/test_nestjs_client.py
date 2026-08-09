@@ -161,6 +161,24 @@ async def test_get_gateway_headers_valid_signature():
     payload = json.loads(base64.urlsafe_b64decode(payload_b64).decode('utf-8'))
     assert payload["userId"] == "user-123"
 
+
+def test_get_gateway_headers_propagates_only_opaque_trace_and_correlation_ids():
+    settings = get_settings()
+    token = jwt.encode({"id": "user-123"}, settings.JWT_SECRET, algorithm="HS256")
+    trace_id = "chat_" + ("a1" * 16)
+    client = NestJSClient(
+        base_url="http://localhost:3001/api",
+        token=token,
+        trace_id=trace_id,
+        correlation_id="session-123",
+    )
+
+    headers = client._get_gateway_headers()
+
+    assert headers["X-Trace-ID"] == trace_id
+    assert headers["X-Correlation-ID"].startswith("chat_")
+    assert headers["X-Correlation-ID"] != "session-123"
+
 @pytest.mark.asyncio
 async def test_get_gateway_headers_invalid_signature_fallback():
     # Sign with a different secret

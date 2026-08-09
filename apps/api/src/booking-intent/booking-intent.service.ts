@@ -26,6 +26,11 @@ import {
 import { PassengerSnapshotService } from './passenger-snapshot.service';
 import type { MaskedPassengerSummary } from './passenger-snapshot.service';
 import {
+  createChatTelemetryEvent,
+  emitChatTelemetry,
+  type ChatTelemetryOperation,
+} from '@/common/observability/chat-observability';
+import {
   BookingIntentPrefillResponseDto,
   CreateBookingIntentResponseDto,
   GetBookingIntentResponseDto,
@@ -50,6 +55,8 @@ type ResolvedIntentPassenger = LegacyIntentPassenger & {
 
 @Injectable()
 export class BookingIntentService {
+  private readonly logger = new Logger(BookingIntentService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly duffelService: DuffelService,
@@ -83,6 +90,7 @@ export class BookingIntentService {
       allowLegacy?: boolean;
     },
   ): Promise<CreateBookingIntentResponseDto> {
+    const startedAt = Date.now();
     let targetFlightOfferId = dto.flightOfferId;
     let handoff: any = null;
     let claimToken: string | null = null;
@@ -97,7 +105,10 @@ export class BookingIntentService {
           HttpStatus.SERVICE_UNAVAILABLE,
         );
       }
-      handoff = await this.chatHandoffService.resolve(dto.handoffToken, userId);
+      handoff = await this.chatHandoffService.resolve(dto.handoffToken, userId, {
+        traceId: context?.traceId,
+        correlationId: context?.correlationId,
+      });
       targetFlightOfferId = handoff.flightOfferId;
 
       const ttlMs = 30000;
@@ -364,20 +375,38 @@ export class BookingIntentService {
         }
       }
 
+      const telemetryOperation: ChatTelemetryOperation = handoff
+        ? 'handoff_consume'
+        : 'intent_create';
+      const telemetryEvent = createChatTelemetryEvent(
+        telemetryOperation,
+        'created',
+        Date.now() - startedAt,
+        {
+          traceId: context?.traceId,
+          correlationId: context?.correlationId,
+        },
+        {
+          outcome: handoff ? 'consumed' : 'created',
+          price_changed: originalPrice !== confirmedPrice,
+        },
+      );
+      emitChatTelemetry(this.logger, telemetryEvent);
+
       await this.auditService.createLog(tx, {
         userId,
-        action: 'booking_intent_created',
-        resourceType: 'BookingIntent',
-        resourceId: intent.id,
+        action: handoff ? 'chat_handoff_consumed' : 'booking_intent_created',
+        resourceType: handoff ? 'ChatHandoff' : 'BookingIntent',
+        resourceId: handoff ? null : intent.id,
         ipAddress: context?.ipAddress,
-        traceId: context?.traceId,
-        correlationId: context?.correlationId,
+        traceId: telemetryEvent.trace_id,
+        correlationId: telemetryEvent.correlation_id,
         metadata: {
-          intentId: intent.id,
-          userId,
-          offerId: flightOffer.id,
-          passengerCount: passengersForValidation.length,
-          priceChanged: originalPrice !== confirmedPrice,
+          operation: telemetryEvent.operation,
+          metric: telemetryEvent.metric,
+          status: telemetryEvent.status,
+          latency_ms: telemetryEvent.latency_ms,
+          ...telemetryEvent.metadata,
         },
       });
 
@@ -421,7 +450,7 @@ export class BookingIntentService {
         try {
           await this.chatHandoffService.releaseClaim(handoff.id, claimToken);
         } catch (releaseError) {
-          Logger.error(`Failed to release handoff claim: ${handoff.id}`, releaseError instanceof Error ? releaseError.stack : '', 'BookingIntentService');
+          this.logger.error('Failed to release handoff claim', releaseError instanceof Error ? releaseError.stack : undefined);
         }
       }
     }

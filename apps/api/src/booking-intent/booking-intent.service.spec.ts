@@ -209,6 +209,12 @@ describe('BookingIntentService Refinements', () => {
           snapshotVersion: 1,
         }),
       });
+
+      const auditMetadata = JSON.stringify(audit.createLog.mock.calls[0][1].metadata);
+      expect(auditMetadata).toContain('intent_create');
+      expect(auditMetadata).not.toContain('user-1');
+      expect(auditMetadata).not.toContain('offer-1');
+      expect(auditMetadata).not.toContain('intent-1');
     });
 
     it('rejects a traveler profile source that changes before the create transaction commits', async () => {

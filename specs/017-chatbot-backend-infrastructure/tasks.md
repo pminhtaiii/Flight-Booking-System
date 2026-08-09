@@ -262,13 +262,13 @@
 ### Tests for User Story 5
 
 - [x] T085 [P] [US5] Write failing startup/flag dependency tests proving agent and NestJS create both reject `ISSUE=false`, `ISSUE=true/ACCEPT=false` is invalid, `ACCEPT` rollback policy is exact, and transport fallback remains available in `apps/agent/tests/test_config.py`, `apps/api/src/chat-handoff/chat-handoff.config.spec.ts`, and `apps/web/tests/chat-checkout-handoff.spec.ts`
-- [ ] T086 [P] [US5] Write failing PII-safe structured telemetry and cross-service trace propagation tests in `apps/agent/tests/test_chat_observability.py` and `apps/api/test/chat-handoff.e2e-spec.ts`
+- [x] T086 [P] [US5] Write failing PII-safe structured telemetry and cross-service trace propagation tests in `apps/agent/tests/test_chat_observability.py` and `apps/api/test/chat-handoff.e2e-spec.ts`
 - [x] T087 [P] [US5] Write failing direct browser→FastAPI session-continuity and proxy-bypass Playwright scenarios in `apps/web/tests/chat-direct-stream.spec.ts`
 
 ### Implementation for User Story 5
 
-- [ ] T088 [P] [US5] Add allowlisted quota/router/tool/snapshot/handoff structured metrics and logs in `apps/agent/src/agent/observability/chat_observability.py`
-- [ ] T089 [P] [US5] Add allowlisted create/resolve/consume/replay audit and metric emission in `apps/api/src/chat-handoff/chat-handoff.service.ts` and `apps/api/src/booking-intent/booking-intent.service.ts`
+- [x] T088 [P] [US5] Add allowlisted quota/router/tool/snapshot/handoff structured metrics and logs in `apps/agent/src/agent/observability/chat_observability.py`
+- [x] T089 [P] [US5] Add allowlisted create/resolve/consume/replay audit and metric emission in `apps/api/src/chat-handoff/chat-handoff.service.ts` and `apps/api/src/booking-intent/booking-intent.service.ts`
 - [ ] T090 [US5] Propagate sanitized trace/correlation headers browser → agent → NestJS in `apps/web/lib/chatStream.ts`, `apps/agent/src/agent/streaming/sse.py`, and `apps/agent/src/agent/tools/nestjs_client.py`
 - [x] T091 [US5] Enable direct ChatWidget streaming with strict origin/auth/session continuity and retain flag-controlled fallback in `apps/web/components/chat/ChatWidget.tsx`
 - [ ] T092 [US5] Retain and exercise the Next.js stream proxy as a tested flag-controlled rollback path through the observation window, and record the direct/proxy rollback matrix in `apps/web/app/api/chat/stream/route.ts` and `specs/017-chatbot-backend-infrastructure/quickstart.md`
