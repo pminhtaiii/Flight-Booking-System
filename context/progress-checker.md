@@ -58,8 +58,8 @@ Update this file after every completed feature. Any AI agent reading this should
   - [x] WP 7A: Flag/direct-client gate — independent ISSUE/ACCEPT behavior, direct-stream boundary coverage, and ChatWidget direct streaming with proxy fallback (T085, T087, T091)
   - [x] WP 7B: PII-safe telemetry — per-field closed schemas, fail-open agent metrics/logs, opaque trace/correlation IDs, real Agent→NestJS trace verification, and NestJS create/resolve/consume/replay audit linkage (T086, T088, T089)
   - **WP 7B GREEN evidence:** agent focused suites `83 passed`; API focused unit suites `51 passed`; chat-handoff E2E `8 passed`; handoff-consumption E2E `1 passed`; Ruff and Python compile checks passed. Playwright was not rerun per handoff instruction.
-  - [x] WP 7C: Correlation propagation — independent bounded opaque browser trace/correlation IDs, Agent sanitization, and NestJS gateway forwarding (T090)
-  - **WP 7C GREEN evidence:** user-provided focused Playwright run passed; Agent direct-stream/client tests `34 passed`; Agent Ruff passed; targeted web TypeScript and ESLint checks passed. The local Playwright command was skipped after pnpm failed its non-interactive modules purge with `ERR_PNPM_ABORTED_REMOVE_MODULES_DIR_NO_TTY`.
+  - [x] WP 7C: Correlation propagation — independent bounded opaque browser trace/correlation IDs, Agent sanitization, NestJS gateway forwarding, and sanitized proxy fallback forwarding (T090)
+  - **WP 7C GREEN evidence:** user-provided focused Playwright run passed; the direct workspace NestJS handoff suite passed `8/8`, and the isolated web `chatStream.spec.ts` passed `7/7` including proxy-mode IDs. Agent direct-stream/client tests `34 passed`, Ruff, targeted web TypeScript, and ESLint checks also passed. The local Playwright command was not rerun.
 - [ ] Phase 8 / Polish & Cleanup (T094–T102)
 
 ### [ ] Feature: Traveler Profile & Booking Readiness (Feature 16)

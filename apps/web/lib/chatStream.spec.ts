@@ -69,6 +69,27 @@ describe('chatStream', () => {
     expect(headers['X-Trace-Id']).not.toBe(headers['X-Correlation-Id']);
   });
 
+  it('generates independent opaque trace and correlation headers for proxy streaming', async () => {
+    process.env.NEXT_PUBLIC_FEATURE_FLAG_CHAT_DIRECT_STREAM = 'false';
+
+    const mockFetch = jest.fn().mockResolvedValue(new Response('ok'));
+    global.fetch = mockFetch;
+
+    await createChatStreamRequest({
+      message: 'proxy turn',
+      sessionId: 'proxy-session',
+      token: 'jwt-token-xyz',
+    });
+
+    const request = mockFetch.mock.calls[0][1];
+    const headers = new Headers(request?.headers);
+    const traceId = headers.get('X-Trace-Id');
+    const correlationId = headers.get('X-Correlation-Id');
+    expect(traceId).toMatch(/^chat_[a-f0-9]{32}$/);
+    expect(correlationId).toMatch(/^chat_[a-f0-9]{32}$/);
+    expect(traceId).not.toBe(correlationId);
+  });
+
   it('never derives trace or correlation headers from the chat session', async () => {
     process.env.NEXT_PUBLIC_FEATURE_FLAG_CHAT_DIRECT_STREAM = 'true';
     process.env.NEXT_PUBLIC_AGENT_URL = 'http://localhost:3002';
