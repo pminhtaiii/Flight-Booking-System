@@ -391,7 +391,11 @@ export class BookingIntentService {
           price_changed: originalPrice !== confirmedPrice,
         },
       );
-      emitChatTelemetry(this.logger, telemetryEvent);
+      try {
+        emitChatTelemetry(this.logger, telemetryEvent);
+      } catch (err) {
+        this.logger.warn('Chat telemetry emission failed', err);
+      }
 
       await this.auditService.createLog(tx, {
         userId,
