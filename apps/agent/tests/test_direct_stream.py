@@ -159,7 +159,8 @@ def test_direct_stream_generates_correlation_for_missing_or_invalid_header(
     assert mock_client.correlation_id != "session-123"
     assert mock_client.correlation_id != correlation_id
     assert re.fullmatch(r"chat_[a-f0-9]{32}", mock_client.correlation_id)
-    assert "trace_id" not in mock_client.__dict__
+    assert mock_client.trace_id != "chat_session-123"
+    assert re.fullmatch(r"chat_[a-f0-9]{32}", mock_client.trace_id)
     mock_client.create_session.assert_not_awaited()
     assert mock_client.get_memory.await_count == 1
     assert mock_client.get_memory.await_args.args[0] == "session-123"

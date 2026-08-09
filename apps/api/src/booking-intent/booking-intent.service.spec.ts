@@ -1,7 +1,7 @@
 import 'reflect-metadata';
 import { BookingIntentService } from './booking-intent.service';
 import { DuffelTimeoutError } from '@/duffel/duffel.service';
-import { HttpException, HttpStatus, NotFoundException, ForbiddenException, GoneException } from '@nestjs/common';
+import { HttpException, HttpStatus, NotFoundException, ForbiddenException, GoneException, Logger } from '@nestjs/common';
 import { PassengerSnapshotService } from './passenger-snapshot.service';
 import { PassengerSourceResolverService } from './passenger-source-resolver.service';
 
@@ -209,6 +209,12 @@ describe('BookingIntentService Refinements', () => {
           snapshotVersion: 1,
         }),
       });
+
+      const auditMetadata = JSON.stringify(audit.createLog.mock.calls[0][1].metadata);
+      expect(auditMetadata).toContain('intent_create');
+      expect(auditMetadata).not.toContain('user-1');
+      expect(auditMetadata).not.toContain('offer-1');
+      expect(auditMetadata).not.toContain('intent-1');
     });
 
     it('rejects a traveler profile source that changes before the create transaction commits', async () => {
@@ -306,6 +312,40 @@ describe('BookingIntentService Refinements', () => {
       ).rejects.toMatchObject({ response: { code: 'PROFILE_CHANGED' } });
       expect(prisma.bookingIntent.create).not.toHaveBeenCalled();
     });
+  });
+
+  it('does not log raw claim-release exceptions', async () => {
+    const prisma = {
+      flightOffer: { findUnique: jest.fn().mockResolvedValue(null) },
+    };
+    const releaseError = new Error('request failed at https://internal.test/handoff?token=secret');
+    const chatHandoff = {
+      resolve: jest.fn().mockResolvedValue({ id: 'handoff-1', flightOfferId: 'offer-1' }),
+      acquireClaim: jest.fn().mockResolvedValue('claim-secret'),
+      refreshClaim: jest.fn(),
+      releaseClaim: jest.fn().mockRejectedValue(releaseError),
+    };
+    const loggerError = jest.spyOn(Logger.prototype, 'error').mockImplementation(() => undefined);
+    const Service = BookingIntentService as unknown as new (...args: unknown[]) => BookingIntentService;
+    const service = new Service(
+      prisma,
+      {},
+      {},
+      {},
+      undefined,
+      undefined,
+      undefined,
+      chatHandoff,
+    );
+
+    await expect(service.createIntent(
+      'user-1',
+      { handoffToken: 'handoff-token', passengers: [] } as never,
+    )).rejects.toMatchObject({ status: HttpStatus.NOT_FOUND });
+
+    expect(loggerError).toHaveBeenCalledWith('chat_handoff_claim_release_failed');
+    expect(JSON.stringify(loggerError.mock.calls)).not.toContain('internal.test');
+    loggerError.mockRestore();
   });
 
   describe('fetchLiveOffer', () => {

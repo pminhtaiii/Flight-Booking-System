@@ -1,38 +1,33 @@
 import json
 import asyncio
 import logging
-import re
-import secrets
+import time
 from fastapi import APIRouter, Request, HTTPException, Header
 from sse_starlette.sse import EventSourceResponse
 from agent.config import get_settings
 from agent.models.requests import ChatStreamRequest
 from agent.tools.nestjs_client import NestJSClient, validate_booking_readiness_response
-from agent.agents.chat_agent import get_chat_model, format_messages
+from agent.agents.chat_agent import format_messages
 from agent.graph.graph import graph
 from agent.memory.manager import MemoryManager
 from langchain_core.messages import HumanMessage
 from agent.guardrails.output_pipeline import OutputGuardrailPipeline, OutputGuardrailBlockedError
 
-import jwt
 from agent.repositories.trusted_snapshot_repository import TrustedSnapshotRepository
 from agent.infrastructure.redis import get_redis_client
 from agent.sanitization.pii_scrubber import detect_pii
+from agent.observability.chat_observability import ChatTelemetry, safe_opaque_id, safe_tool_name
 
 logger = logging.getLogger("agent.streaming")
 guardrails_logger = logging.getLogger("agent.guardrails")
 router = APIRouter()
+chat_telemetry = ChatTelemetry(logger)
 
 background_tasks: set[asyncio.Task] = set()
 
-_OPAQUE_CORRELATION_ID = re.compile(r"chat_[a-f0-9]{32}")
-
-
 def _resolve_correlation_id(value: str | None) -> str:
     """Return an opaque telemetry identifier, never a request/session identifier."""
-    if value and _OPAQUE_CORRELATION_ID.fullmatch(value):
-        return value
-    return f"chat_{secrets.token_hex(16)}"
+    return safe_opaque_id(value)
 
 async def _resolve_user_message(body, graph, config) -> str:
     """
@@ -47,8 +42,8 @@ async def _resolve_user_message(body, graph, config) -> str:
                 msg.__class__.__name__ == "HumanMessage" or
                 getattr(msg, "type", "") == "human"):
                 return msg.content
-    except Exception as e:  # noqa: BLE001
-        logger.warning(f"Failed to retrieve user message from graph state: {e!s}")
+    except Exception:  # noqa: BLE001
+        logger.warning("graph_user_message_unavailable")
     return "Action confirmed"
 
 async def _persist_response(
@@ -68,7 +63,7 @@ async def _persist_response(
     if queue_manager:
         is_valid = await queue_manager.validate_active_fence(session_id)
         if not is_valid:
-            logger.warning(f"Stale fence detected for session {session_id}. Aborting persistence.")
+            logger.warning("stale_fence_persistence_aborted")
             raise RuntimeError("Session fence is no longer active")
 
     if user_already_persisted:
@@ -89,6 +84,7 @@ async def chat_stream(
     request: Request,
     body: ChatStreamRequest,
     authorization: str = Header(None),
+    x_trace_id: str = Header(None, alias="X-Trace-Id"),
     x_correlation_id: str = Header(None, alias="X-Correlation-Id")
 ):
     """
@@ -118,6 +114,10 @@ async def chat_stream(
         raise HTTPException(status_code=401, detail="Invalid token") from err
 
     client = NestJSClient(base_url=settings.NESTJS_API_URL, token=token)
+    trace_id = _resolve_correlation_id(x_trace_id)
+    client.trace_id = trace_id
+    correlation_id = _resolve_correlation_id(x_correlation_id)
+    client.correlation_id = correlation_id
 
     # 2. NestJS access check (active user & revocation check) BEFORE quota or session lock
     access_res = await client.check_user_access(sub=user_id, jti=jti)
@@ -161,6 +161,7 @@ async def chat_stream(
             return EventSourceResponse(error_generator())
 
     # 5. Rate Limit / Quota check (accepted-only charge) BEFORE session lock / model / persistence
+    quota_started = time.perf_counter()
     try:
         redis_client = get_redis_client()
         if not redis_client:
@@ -171,7 +172,6 @@ async def chat_stream(
     from agent.repositories.chat_budget_repository import ChatBudgetRepository, BudgetExceededException, RedisUnavailableException
     budget_repo = ChatBudgetRepository(redis_client)
     try:
-        import time
         burst_window_seconds = getattr(settings, "CHAT_BURST_WINDOW_SECONDS", 60)
         daily_limit = getattr(settings, "CHAT_DAILY_MESSAGE_LIMIT", getattr(settings, "CHAT_QUOTA_DAILY", 50))
         burst_limit = getattr(settings, "CHAT_BURST_LIMIT", getattr(settings, "CHAT_QUOTA_BURST", 60))
@@ -183,11 +183,36 @@ async def chat_stream(
             burst_limit=burst_limit,
             burst_ttl=burst_window_seconds,
         )
+        chat_telemetry.emit_safely(
+            "quota_admission",
+            status="accepted",
+            latency_ms=(time.perf_counter() - quota_started) * 1000,
+            trace_id=trace_id,
+            correlation_id=correlation_id,
+            fields={"outcome": "admitted", "dependency": "redis"},
+        )
     except BudgetExceededException as e:
+        reason = "daily_quota" if "daily" in str(e).lower() else "burst_limit"
+        chat_telemetry.emit_safely(
+            "quota_admission",
+            status="rejected",
+            latency_ms=(time.perf_counter() - quota_started) * 1000,
+            trace_id=trace_id,
+            correlation_id=correlation_id,
+            fields={"outcome": "rejected", "error_class": reason},
+        )
         if "daily" in str(e).lower():
             raise HTTPException(status_code=429, detail="CHAT_DAILY_QUOTA_EXCEEDED") from e
         raise HTTPException(status_code=429, detail="CHAT_BURST_LIMIT_EXCEEDED") from e
     except RedisUnavailableException as e:
+        chat_telemetry.emit_safely(
+            "quota_admission",
+            status="failed",
+            latency_ms=(time.perf_counter() - quota_started) * 1000,
+            trace_id=trace_id,
+            correlation_id=correlation_id,
+            fields={"outcome": "unavailable", "error_class": "control_plane_unavailable"},
+        )
         raise HTTPException(status_code=503, detail="CHAT_CONTROL_PLANE_UNAVAILABLE") from e
 
     # 6. Session auto-creation & queue locking
@@ -197,11 +222,8 @@ async def chat_stream(
             session_data = await client.create_session(title=None)
             session_id = session_data["id"]
         except Exception as e:
-            logger.error(f"Failed to create session on NestJS API: {e!s}")
+            logger.error("nestjs_session_creation_failed")
             raise HTTPException(status_code=503, detail="NestJS API unavailable") from e
-
-    client.correlation_id = _resolve_correlation_id(x_correlation_id)
-
 
     queue_manager = getattr(request.app.state, "message_queue", None)
     req_id = None
@@ -219,7 +241,7 @@ async def chat_stream(
             history = memory_data.get("recentMessages", [])
             summary = memory_data.get("summary", None)
         except Exception as e:
-            logger.error(f"Failed to fetch memory from NestJS API: {e!s}")
+            logger.error("nestjs_memory_fetch_failed")
             err_msg = str(e)
             if "NOT_FOUND" in err_msg or "owned" in err_msg.lower() or "404" in err_msg:
                 raise HTTPException(status_code=404, detail="CHAT_SESSION_NOT_FOUND") from e
@@ -227,16 +249,23 @@ async def chat_stream(
 
         # Read TrustedSearchSnapshot from Redis
         trusted_snapshot_dict = None
+        snapshot_state = "miss"
         try:
             redis_client = get_redis_client()
             snapshot_repo = TrustedSnapshotRepository(redis_client)
             snapshot_obj = await snapshot_repo.get_snapshot(user_id, session_id)
             if snapshot_obj:
                 trusted_snapshot_dict = snapshot_obj.model_dump(mode="json")
-        except Exception as e:
-            logger.debug(f"Failed to read trusted snapshot from Redis: {e!s}")
-
-        user_msg_persisted = False
+                snapshot_state = "hit"
+        except Exception:
+            snapshot_state = "unavailable"
+        chat_telemetry.emit_safely(
+            "snapshot_read",
+            status=snapshot_state,
+            trace_id=trace_id,
+            correlation_id=correlation_id,
+            fields={"outcome": snapshot_state},
+        )
 
         # 6. Generator-based SSE streaming with bounded queue (maxsize=100)
         q = asyncio.Queue(maxsize=100)
@@ -249,6 +278,7 @@ async def chat_stream(
             output_config = settings.output_guardrail
             pipeline = OutputGuardrailPipeline(config=output_config, nemo_service=guardrails, session_id=session_id)
             partial_response = ""
+            user_msg_persisted = False
             persisted = False
             force_persistence = False
             config = {
@@ -267,8 +297,8 @@ async def chat_stream(
                         [{"sender": "USER", "type": "STANDARD", "content": body.message}]
                     )
                     user_msg_persisted = True
-            except Exception as e:
-                logger.warning(f"Failed to pre-persist user message: {e!s}")
+            except Exception:
+                logger.warning("user_message_persistence_failed")
                 await q.put({
                     "event": "error",
                     "data": json.dumps({
@@ -298,6 +328,7 @@ async def chat_stream(
                     version="v2"
                 )
 
+                tool_started_at: dict[str, float] = {}
                 async for event in event_stream:
                     kind = event.get("event")
 
@@ -315,6 +346,8 @@ async def chat_stream(
                     elif kind == "on_tool_start":
                         tool_name = event.get("name")
                         tool_input = event["data"].get("input")
+                        if isinstance(tool_name, str):
+                            tool_started_at[tool_name] = time.perf_counter()
                         
                         # We no longer handle signal_checkout_intent here.
                         # It is handled by the validate_handoff and create_handoff_token deterministic nodes.
@@ -342,6 +375,13 @@ async def chat_stream(
                         if node_name == "create_handoff_token":
                             action_res = event["data"].get("output", {}).get("action", {})
                             if "error" in action_res:
+                                chat_telemetry.emit_safely(
+                                    "handoff_create",
+                                    status="rejected",
+                                    trace_id=trace_id,
+                                    correlation_id=correlation_id,
+                                    fields={"outcome": "rejected", "error_class": "handoff_rejected"},
+                                )
                                 await q.put({
                                     "event": "error",
                                     "data": json.dumps({
@@ -353,7 +393,7 @@ async def chat_stream(
                                 return
 
                             if queue_manager and not await queue_manager.validate_active_fence(session_id):
-                                logger.warning(f"Stale fence prior to ACTION_HANDOFF emission for session {session_id}. Aborting.")
+                                logger.warning("stale_fence_handoff_emission_aborted")
                                 await q.put({
                                     "event": "error",
                                     "data": json.dumps({
@@ -376,12 +416,29 @@ async def chat_stream(
                                 "event": "ACTION_HANDOFF",
                                 "data": json.dumps(payload)
                             })
+                            chat_telemetry.emit_safely(
+                                "handoff_create",
+                                status="created",
+                                trace_id=trace_id,
+                                correlation_id=correlation_id,
+                                fields={"outcome": "created"},
+                            )
                             force_persistence = True
 
 
                     elif kind == "on_tool_end":
                         tool_name = event.get("name")
                         tool_output = event["data"].get("output")
+                        if isinstance(tool_name, str):
+                            started_at = tool_started_at.pop(tool_name, time.perf_counter())
+                            chat_telemetry.emit_safely(
+                                "tool_call",
+                                status="completed",
+                                latency_ms=(time.perf_counter() - started_at) * 1000,
+                                trace_id=trace_id,
+                                correlation_id=correlation_id,
+                                fields={"tool_name": safe_tool_name(tool_name), "outcome": "completed"},
+                            )
 
                         output_data = None
                         if tool_output:
@@ -483,7 +540,7 @@ async def chat_stream(
                                 target = "/profile"
 
                             if queue_manager and not await queue_manager.validate_active_fence(session_id):
-                                logger.warning(f"Stale fence prior to ACTION_REQUIRED emission for session {session_id}. Aborting.")
+                                logger.warning("stale_fence_action_required_emission_aborted")
                                 await q.put({
                                     "event": "error",
                                     "data": json.dumps({
@@ -518,7 +575,7 @@ async def chat_stream(
                 # Completed turn - Persist message batch and send done event
                 if partial_response.strip() or force_persistence:
                     if queue_manager and not await queue_manager.validate_active_fence(session_id):
-                        logger.warning(f"Stale fence prior to completed turn persistence for session {session_id}. Aborting.")
+                        logger.warning("stale_fence_completed_persistence_aborted")
                         await q.put({
                             "event": "error",
                             "data": json.dumps({
@@ -539,8 +596,8 @@ async def chat_stream(
                             queue_manager=queue_manager,
                         )
                         persisted = True
-                    except Exception as persist_err:  # noqa: BLE001
-                        logger.error(f"Failed to persist completed response: {persist_err!s}")
+                    except Exception:  # noqa: BLE001
+                        logger.error("completed_response_persistence_failed")
                         await q.put({
                             "event": "error",
                             "data": json.dumps({
@@ -572,18 +629,12 @@ async def chat_stream(
                     original_total = memory_data.get("totalMessageCount", 0)
                     try:
                         await memory_mgr.check_and_summarize(session_id, client, total_count=original_total + 2)
-                    except Exception as mem_err:  # noqa: BLE001
-                        logger.error(f"Failed during memory summarization for session {session_id}: {mem_err!s}")
+                    except Exception:  # noqa: BLE001
+                        logger.error("memory_summarization_failed")
                 else:
-                    logger.warning(f"Empty or whitespace-only response generated for session {session_id}.")
+                    logger.warning("empty_response_generated")
             except OutputGuardrailBlockedError as e:
-                guardrails_logger.warning(json.dumps({
-                    "event": "security_block",
-                    "session_id": session_id,
-                    "guardrail_layer": e.layer,
-                    "rule_name": e.rule,
-                    "message": "LLM output blocked by guardrail"
-                }))
+                guardrails_logger.warning("security_block")
                 partial_message_id = None
                 if not persisted and e.partial_response and e.partial_response.strip():
                     try:
@@ -600,8 +651,8 @@ async def chat_stream(
                         for msg in batch_res.get("messages", []):
                             if msg.get("sender") == "AGENT":
                                 partial_message_id = msg.get("id")
-                    except Exception as persist_err:  # noqa: BLE001
-                        logger.error(f"Failed to persist partial response on guardrail block: {persist_err!s}")
+                    except Exception:  # noqa: BLE001
+                        logger.error("guardrail_partial_persistence_failed")
 
                 await q.put({
                     "event": "error",
@@ -612,7 +663,7 @@ async def chat_stream(
                     })
                 })
             except asyncio.CancelledError:
-                logger.warning(f"Connection dropped mid-stream for session {session_id}.")
+                logger.warning("stream_connection_dropped")
                 if not persisted and partial_response and partial_response.strip():
                     try:
                         user_msg_content = await _resolve_user_message(body, graph, config)
@@ -626,8 +677,8 @@ async def chat_stream(
                             queue_manager=queue_manager,
                         )
                         persisted = True
-                    except Exception as e:  # noqa: BLE001
-                        logger.error(f"Failed to persist partial response on connection drop: {e!s}")
+                    except Exception:  # noqa: BLE001
+                        logger.error("disconnect_partial_persistence_failed")
                         try:
                             q.put_nowait({
                                 "event": "error",
@@ -640,8 +691,8 @@ async def chat_stream(
                         except asyncio.QueueFull:
                             pass
                 raise
-            except Exception as e:  # noqa: BLE001
-                logger.exception("LLM error during streaming")
+            except Exception:  # noqa: BLE001
+                logger.error("llm_streaming_failed")
                 partial_message_id = None
                 if not persisted and partial_response and partial_response.strip():
                     try:
@@ -658,8 +709,8 @@ async def chat_stream(
                         for msg in batch_res.get("messages", []):
                             if msg.get("sender") == "AGENT":
                                 partial_message_id = msg.get("id")
-                    except Exception as persist_err:  # noqa: BLE001
-                        logger.error(f"Failed to persist partial response on LLM error: {persist_err!s}")
+                    except Exception:  # noqa: BLE001
+                        logger.error("llm_partial_persistence_failed")
 
                 await q.put({
                     "event": "error",
@@ -682,7 +733,7 @@ async def chat_stream(
         if queue_manager and req_id:
             attached = await queue_manager.attach_task(session_id, req_id, producer_task)
             if not attached:
-                logger.warning(f"Lock active fence for session {session_id} is no longer active. Cancelling producer task.")
+                logger.warning("active_fence_lost_cancelling_stream")
                 producer_task.cancel()
 
         async def sse_generator():
