@@ -8,6 +8,11 @@ function isOpaqueChatId(value: string | null): value is string {
   return value !== null && value.length === 37 && OPAQUE_CHAT_ID_PATTERN.test(value);
 }
 
+// Rollback invariant during the direct-stream observation window: when the
+// browser transport flag is disabled, /api/chat/stream remains the same-origin
+// authenticated SSE pass-through. Keep the upstream event names and payloads
+// untouched, including legacy ACTION_REQUIRED, until the direct/proxy matrix
+// has been observed and explicitly archived.
 export async function POST(req: NextRequest) {
   const session = await getServerSession(authOptions);
   

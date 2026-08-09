@@ -1,11 +1,16 @@
 import { defineConfig, devices } from '@playwright/test';
 import path from 'path';
 
-const directStreamE2E = process.env.CHAT_DIRECT_STREAM_E2E === 'true';
+const explicitDirectStreamFlag = process.env.NEXT_PUBLIC_FEATURE_FLAG_CHAT_DIRECT_STREAM;
+const directStreamE2E =
+  explicitDirectStreamFlag !== undefined
+    ? explicitDirectStreamFlag === 'true'
+    : process.env.CHAT_DIRECT_STREAM_E2E === 'true';
 
 const frontendEnv = {
   CI: 'true',
   NEXTAUTH_SECRET: 'test_secret',
+  NEXTAUTH_URL: 'http://127.0.0.1:3000',
   NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:3001',
   NEXT_PUBLIC_FEATURE_FLAG_BOOKING_READINESS: 'true',
   NEXT_PUBLIC_FEATURE_FLAG_CHAT_HANDOFF: 'true',

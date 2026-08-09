@@ -7,9 +7,9 @@ Update this file after every completed feature. Any AI agent reading this should
 ### Current Status
 
 **Feature:** Chatbot Backend Infrastructure & Booking Handoff (Feature 17)
-**Last completed:** Phase 7C / US5: sanitized browser→agent→NestJS trace/correlation propagation (T090).
-**In progress:** Phase 7 / US5: Observable, Reversible Rollout (T092–T093).
-**Next:** Archive the proxy rollback matrix, then run the full-flow observation gate. See [plan.md](file:///c:/Booking%20Systems/specs/017-chatbot-backend-infrastructure/plan.md) for details.
+**Last completed:** Phase 7D / US5: tested proxy rollback matrix (T092).
+**In progress:** Phase 7 / US5: Observable, Reversible Rollout (T093).
+**Next:** Run the full three-service observation gate. See [plan.md](file:///c:/Booking%20Systems/specs/017-chatbot-backend-infrastructure/plan.md) for details.
 
 ---
 
@@ -60,6 +60,8 @@ Update this file after every completed feature. Any AI agent reading this should
   - **WP 7B GREEN evidence:** agent focused suites `83 passed`; API focused unit suites `51 passed`; chat-handoff E2E `8 passed`; handoff-consumption E2E `1 passed`; Ruff and Python compile checks passed. Playwright was not rerun per handoff instruction.
   - [x] WP 7C: Correlation propagation — independent bounded opaque browser trace/correlation IDs, Agent sanitization, NestJS gateway forwarding, and sanitized proxy fallback forwarding (T090)
   - **WP 7C GREEN evidence:** user-provided focused Playwright run passed; the direct workspace NestJS handoff suite passed `8/8`, and the isolated web `chatStream.spec.ts` passed `7/7` including proxy-mode IDs. Agent direct-stream/client tests `34 passed`, Ruff, targeted web TypeScript, and ESLint checks also passed. The local Playwright command was not rerun.
+  - [x] WP 7D/T092: Proxy rollback checkpoint — same-origin proxy retained, explicit direct-stream flag honored, opaque headers filtered, and legacy `ACTION_REQUIRED` SSE passed through unchanged.
+  - **WP 7D/T092 GREEN evidence:** route-level proxy tests `2/2` passed; the user-provided `chat-checkout-handoff.spec.ts` browser run passed. T093 full three-service observation remains next.
 - [ ] Phase 8 / Polish & Cleanup (T094–T102)
 
 ### [ ] Feature: Traveler Profile & Booking Readiness (Feature 16)
