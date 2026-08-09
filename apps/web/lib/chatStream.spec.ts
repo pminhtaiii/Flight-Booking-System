@@ -41,7 +41,7 @@ describe('chatStream', () => {
     expect(getAgentStreamEndpoint()).toBe('http://localhost:3002/chat/stream');
   });
 
-  it('generates an opaque correlation header for direct streaming', async () => {
+  it('generates independent opaque trace and correlation headers for direct streaming', async () => {
     process.env.NEXT_PUBLIC_FEATURE_FLAG_CHAT_DIRECT_STREAM = 'true';
     process.env.NEXT_PUBLIC_AGENT_URL = 'http://localhost:3002';
 
@@ -64,8 +64,9 @@ describe('chatStream', () => {
       Authorization: 'Bearer jwt-token-xyz',
     }));
     const headers = request.headers as Record<string, string>;
-    expect(headers['X-Trace-Id']).toBeUndefined();
+    expect(headers['X-Trace-Id']).toMatch(/^chat_[a-f0-9]{32}$/);
     expect(headers['X-Correlation-Id']).toMatch(/^chat_[a-f0-9]{32}$/);
+    expect(headers['X-Trace-Id']).not.toBe(headers['X-Correlation-Id']);
   });
 
   it('never derives trace or correlation headers from the chat session', async () => {
@@ -87,8 +88,9 @@ describe('chatStream', () => {
       'Content-Type': 'application/json',
       Authorization: 'Bearer jwt-token-xyz',
     }));
-    expect(headers['X-Trace-Id']).toBeUndefined();
+    expect(headers['X-Trace-Id']).toMatch(/^chat_[a-f0-9]{32}$/);
     expect(headers['X-Correlation-Id']).toMatch(/^chat_[a-f0-9]{32}$/);
+    expect(headers['X-Trace-Id']).not.toBe(headers['X-Correlation-Id']);
     expect(headers['X-Correlation-Id']).not.toBe('continued-session');
   });
 
@@ -128,8 +130,9 @@ describe('chatStream', () => {
       'Content-Type': 'application/json',
       Authorization: 'Bearer jwt-token-xyz',
     }));
-    expect(headers['X-Trace-Id']).toBeUndefined();
+    expect(headers['X-Trace-Id']).toMatch(/^chat_[a-f0-9]{32}$/);
     expect(headers['X-Correlation-Id']).toMatch(/^chat_[a-f0-9]{32}$/);
+    expect(headers['X-Trace-Id']).not.toBe(headers['X-Correlation-Id']);
     Object.values(suppliedValues).forEach((value) => {
       expect(headers['X-Correlation-Id']).not.toBe(value);
       expect(headers['X-Trace-Id']).not.toBe(value);

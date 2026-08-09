@@ -22,7 +22,7 @@ export function getAgentStreamEndpoint(): string {
   return '/api/chat/stream';
 }
 
-function createDirectCorrelationId(): string {
+function createDirectOpaqueId(): string {
   return `chat_${crypto.randomUUID().replace(/-/g, '')}`;
 }
 
@@ -43,7 +43,8 @@ export async function createChatStreamRequest({
     if (token) {
       headers['Authorization'] = `Bearer ${token}`;
     }
-    headers['X-Correlation-Id'] = createDirectCorrelationId();
+    headers['X-Trace-Id'] = createDirectOpaqueId();
+    headers['X-Correlation-Id'] = createDirectOpaqueId();
   }
 
   return fetch(endpoint, {

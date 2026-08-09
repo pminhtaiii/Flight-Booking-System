@@ -167,8 +167,9 @@ def test_direct_stream_generates_correlation_for_missing_or_invalid_header(
 
 
 def test_direct_stream_preserves_strictly_valid_opaque_correlation_id(monkeypatch):
-    """A strictly formatted opaque correlation header remains stable downstream."""
+    """Strictly formatted opaque trace and correlation headers remain stable downstream."""
     token = make_valid_jwt(sub="user-direct-bearer-123")
+    opaque_trace_id = f"chat_{'b2' * 16}"
     opaque_correlation_id = f"chat_{'a1' * 16}"
     mock_client = MagicMock()
     mock_client.check_user_access = AsyncMock(return_value={"allowed": True})
@@ -199,6 +200,7 @@ def test_direct_stream_preserves_strictly_valid_opaque_correlation_id(monkeypatc
         headers={
             "Origin": "http://localhost:3000",
             "Authorization": f"Bearer {token}",
+            "X-Trace-Id": opaque_trace_id,
             "X-Correlation-Id": opaque_correlation_id,
             "Content-Type": "application/json",
         },
@@ -206,6 +208,7 @@ def test_direct_stream_preserves_strictly_valid_opaque_correlation_id(monkeypatc
     )
 
     assert response.status_code == 200, f"Expected 200 but got {response.status_code}: {response.text}"
+    assert mock_client.trace_id == opaque_trace_id
     assert mock_client.correlation_id == opaque_correlation_id
 
 def test_health_degraded_when_redis_down(monkeypatch):

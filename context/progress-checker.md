@@ -7,9 +7,9 @@ Update this file after every completed feature. Any AI agent reading this should
 ### Current Status
 
 **Feature:** Chatbot Backend Infrastructure & Booking Handoff (Feature 17)
-**Last completed:** Phase 7B / US5: PII-safe telemetry and trace-linked audit/metric emission (T086, T088, T089).
-**In progress:** Phase 7 / US5: Observable, Reversible Rollout (T090–T093).
-**Next:** Complete sanitized browser→agent→NestJS propagation, then archive the proxy rollback matrix and run the full-flow observation gate. See [plan.md](file:///c:/Booking%20Systems/specs/017-chatbot-backend-infrastructure/plan.md) for details.
+**Last completed:** Phase 7C / US5: sanitized browser→agent→NestJS trace/correlation propagation (T090).
+**In progress:** Phase 7 / US5: Observable, Reversible Rollout (T092–T093).
+**Next:** Archive the proxy rollback matrix, then run the full-flow observation gate. See [plan.md](file:///c:/Booking%20Systems/specs/017-chatbot-backend-infrastructure/plan.md) for details.
 
 ---
 
@@ -58,6 +58,8 @@ Update this file after every completed feature. Any AI agent reading this should
   - [x] WP 7A: Flag/direct-client gate — independent ISSUE/ACCEPT behavior, direct-stream boundary coverage, and ChatWidget direct streaming with proxy fallback (T085, T087, T091)
   - [x] WP 7B: PII-safe telemetry — per-field closed schemas, fail-open agent metrics/logs, opaque trace/correlation IDs, real Agent→NestJS trace verification, and NestJS create/resolve/consume/replay audit linkage (T086, T088, T089)
   - **WP 7B GREEN evidence:** agent focused suites `83 passed`; API focused unit suites `51 passed`; chat-handoff E2E `8 passed`; handoff-consumption E2E `1 passed`; Ruff and Python compile checks passed. Playwright was not rerun per handoff instruction.
+  - [x] WP 7C: Correlation propagation — independent bounded opaque browser trace/correlation IDs, Agent sanitization, and NestJS gateway forwarding (T090)
+  - **WP 7C GREEN evidence:** user-provided focused Playwright run passed; Agent direct-stream/client tests `34 passed`; Agent Ruff passed; targeted web TypeScript and ESLint checks passed. The local Playwright command was skipped after pnpm failed its non-interactive modules purge with `ERR_PNPM_ABORTED_REMOVE_MODULES_DIR_NO_TTY`.
 - [ ] Phase 8 / Polish & Cleanup (T094–T102)
 
 ### [ ] Feature: Traveler Profile & Booking Readiness (Feature 16)
