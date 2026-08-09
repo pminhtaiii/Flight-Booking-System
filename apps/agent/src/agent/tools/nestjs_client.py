@@ -3,20 +3,11 @@ import jwt
 from jwt import InvalidTokenError
 from typing import Optional, List, Dict, Any
 import logging
-import re
-import secrets
 from agent.config import get_settings
 from agent.auth.claim_token import create_claim_token
+from agent.observability.chat_observability import safe_opaque_id
 
 logger = logging.getLogger(__name__)
-
-_OPAQUE_TRACE_ID = re.compile(r"chat_[a-f0-9]{32}\Z")
-
-
-def _safe_trace_id(value: Optional[str]) -> str:
-    if value and _OPAQUE_TRACE_ID.fullmatch(value):
-        return value
-    return f"chat_{secrets.token_hex(16)}"
 
 _READINESS_SCOPES = {"DOMESTIC", "INTERNATIONAL", "UNKNOWN"}
 _READINESS_ACTIONS = {"COMPLETE_PROFILE", "CONTINUE_CHECKOUT"}
@@ -150,8 +141,8 @@ class NestJSClient:
         self.base_url = base_url.rstrip("/")
         self.token = token
         self.headers = {"Authorization": f"Bearer {token}"}
-        self.trace_id = _safe_trace_id(trace_id)
-        self.correlation_id = _safe_trace_id(correlation_id)
+        self.trace_id = safe_opaque_id(trace_id)
+        self.correlation_id = safe_opaque_id(correlation_id)
         self.set_fencing_token(fencing_token)
 
     def set_fencing_token(self, fencing_token: Optional[Any]) -> None:
@@ -417,14 +408,11 @@ class NestJSClient:
     async def create_handoff(self, attestation: str, offer_index: int, fingerprint: Optional[str] = None) -> dict:
         url = f"{self.base_url}/chat-handoff"
         headers = self._get_gateway_headers()
-        
         payload: dict[str, Any] = {
-            "attestation": attestation,
-            "offerIndex": offer_index
+            "selectionAttestationHash": attestation,
+            "selectedOfferIndex": offer_index,
         }
-        if fingerprint:
-            payload["fingerprint"] = fingerprint
-            
+
         async with httpx.AsyncClient() as client:
             response = await client.post(url, json=payload, headers=headers)
             response.raise_for_status()

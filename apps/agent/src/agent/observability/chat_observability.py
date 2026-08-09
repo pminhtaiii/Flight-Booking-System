@@ -69,6 +69,7 @@ _ALLOWED_STRING_VALUES: dict[str, frozenset[str]] = {
             "admitted", "rejected", "unavailable", "empty_state", "non_human_message",
             "malformed_output", "low_confidence", "completed", "created", "handoff_rejected",
             "resolved", "consumed", "already_consumed", "idempotent_retry", "classified",
+            "hit", "miss",
         }
     ),
     "dependency": frozenset({"redis", "nestjs", "llm", "control_plane"}),
@@ -89,6 +90,8 @@ _ALLOWED_STRING_VALUES: dict[str, frozenset[str]] = {
     "specialist": frozenset({"travel_assistant", "checkout", "search", "general"}),
 }
 
+_ALLOWED_INTEGER_FIELDS = frozenset({"result_count", "snapshot_version"})
+
 _SAFE_TOOL_NAMES = frozenset(
     {
         "check_booking_readiness",
@@ -107,7 +110,7 @@ def _new_opaque_id() -> str:
     return f"chat_{secrets.token_hex(16)}"
 
 
-def _safe_opaque_id(value: str | None) -> str:
+def safe_opaque_id(value: str | None) -> str:
     if value is not None and _OPAQUE_ID.fullmatch(value):
         return value
     return _new_opaque_id()
@@ -125,6 +128,12 @@ def _safe_string(field_name: str, value: Any) -> str:
 
 
 def _safe_scalar(field_name: str, value: Any) -> str | int | float | bool | None:
+    if field_name in _ALLOWED_STRING_VALUES:
+        return _safe_string(field_name, value)
+    if field_name in _ALLOWED_INTEGER_FIELDS:
+        if isinstance(value, bool) or not isinstance(value, int) or not 0 <= value <= 1_000_000:
+            raise TelemetryPrivacyError(f"field {field_name!r} must be a bounded non-negative integer")
+        return value
     if value is None or isinstance(value, bool):
         return value
     if isinstance(value, str):
@@ -185,8 +194,8 @@ class ChatTelemetry:
             "operation": operation,
             "status": _safe_string("status", status),
             "latency_ms": max(0, min(600_000, int(round(safe_latency)))),
-            "trace_id": _safe_opaque_id(trace_id),
-            "correlation_id": _safe_opaque_id(correlation_id),
+            "trace_id": safe_opaque_id(trace_id),
+            "correlation_id": safe_opaque_id(correlation_id),
         }
         for field_name, value in fields.items():
             event[field_name] = _safe_scalar(field_name, value)
@@ -221,5 +230,10 @@ class ChatTelemetry:
                 level=level,
             )
         except TelemetryPrivacyError:
-            self._logger.warning("chat_telemetry_rejected")
+            try:
+                self._logger.warning("chat_telemetry_rejected")
+            except Exception:  # noqa: BLE001
+                return None
+            return None
+        except Exception:  # noqa: BLE001
             return None

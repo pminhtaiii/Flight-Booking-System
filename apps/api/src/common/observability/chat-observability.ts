@@ -29,10 +29,7 @@ const ALLOWED_METADATA_KEYS = new Set([
   'outcome',
   'error_class',
   'dependency',
-  'claim_state',
   'retry',
-  'attempt',
-  'status',
   'price_changed',
 ]);
 const FORBIDDEN_VALUE_PATTERN = /(?:https?:\/\/|bearer\s|@|message|token|offer|user|session|passenger|payment|passport|secret|authorization)/i;
@@ -42,6 +39,7 @@ const ALLOWED_STRING_VALUES: Record<string, Set<string>> = {
   error_class: new Set(['dependency_unavailable', 'timeout', 'unknown']),
   dependency: new Set(['redis', 'nestjs', 'llm', 'control_plane']),
 };
+const BOOLEAN_METADATA_KEYS = new Set(['retry', 'price_changed']);
 
 const METRIC_BY_OPERATION: Record<ChatTelemetryOperation, string> = {
   intent_create: 'chat_intent_create_total',
@@ -62,17 +60,17 @@ function safeScalar(
   key: string,
   value: unknown,
 ): string | number | boolean | null {
-  if (value === null || typeof value === 'boolean') {
+  const allowlistedValues = ALLOWED_STRING_VALUES[key];
+  if (
+    allowlistedValues
+    && typeof value === 'string'
+    && SAFE_VALUE_PATTERN.test(value)
+    && !FORBIDDEN_VALUE_PATTERN.test(value)
+    && allowlistedValues.has(value)
+  ) {
     return value;
   }
-  if (typeof value === 'number' && Number.isFinite(value) && Math.abs(value) <= 1_000_000) {
-    return value;
-  }
-  if (typeof value === 'string' && SAFE_VALUE_PATTERN.test(value) && !FORBIDDEN_VALUE_PATTERN.test(value)) {
-    const allowlistedValues = ALLOWED_STRING_VALUES[key];
-    if (allowlistedValues && !allowlistedValues.has(value)) {
-      throw new Error(`Chat telemetry field ${key} is not safe to emit`);
-    }
+  if (BOOLEAN_METADATA_KEYS.has(key) && typeof value === 'boolean') {
     return value;
   }
   throw new Error(`Chat telemetry field ${key} is not safe to emit`);

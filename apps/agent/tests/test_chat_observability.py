@@ -81,6 +81,14 @@ def test_chat_telemetry_rejects_unallowlisted_values_under_known_fields(field_na
         telemetry.emit("tool_call", status="failed", fields={field_name: "opaque_user_value"})
 
 
+@pytest.mark.parametrize("field_value", [123, True])
+def test_chat_telemetry_rejects_non_string_values_for_enum_fields(field_value):
+    telemetry = ChatTelemetry()
+
+    with pytest.raises(TelemetryPrivacyError):
+        telemetry.emit("tool_call", status="failed", fields={"outcome": field_value})
+
+
 def test_chat_telemetry_runtime_emission_is_fail_open():
     telemetry = ChatTelemetry()
 
@@ -89,6 +97,19 @@ def test_chat_telemetry_runtime_emission_is_fail_open():
         status="failed",
         fields={"tool_name": "opaque_user_value"},
     ) is None
+
+
+def test_chat_telemetry_runtime_emission_is_fail_open_when_logger_fails():
+    class FailingLogger(logging.Logger):
+        def log(self, level, msg, *args, **kwargs):
+            raise RuntimeError("logger unavailable")
+
+        def warning(self, msg, *args, **kwargs):
+            raise RuntimeError("logger unavailable")
+
+    telemetry = ChatTelemetry(FailingLogger("failing-chat-telemetry"))
+
+    assert telemetry.emit_safely("tool_call", status="completed") is None
 
 
 def test_chat_telemetry_replaces_malformed_trace_values_with_opaque_ids():
@@ -125,6 +146,19 @@ def test_chat_telemetry_covers_rollout_operation_allowlist():
     ):
         event = telemetry.emit(operation, status="ok")
         assert event["operation"] == operation
+
+
+@pytest.mark.parametrize("snapshot_state", ["hit", "miss"])
+def test_snapshot_telemetry_emits_normal_read_outcomes(snapshot_state):
+    telemetry = ChatTelemetry()
+
+    event = telemetry.emit(
+        "snapshot_read",
+        status=snapshot_state,
+        fields={"outcome": snapshot_state},
+    )
+
+    assert event["outcome"] == snapshot_state
 
 
 def test_safe_tool_name_uses_non_sensitive_allowlisted_labels():

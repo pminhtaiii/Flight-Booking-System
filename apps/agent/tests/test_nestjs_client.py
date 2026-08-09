@@ -179,6 +179,26 @@ def test_get_gateway_headers_propagates_only_opaque_trace_and_correlation_ids():
     assert headers["X-Correlation-ID"].startswith("chat_")
     assert headers["X-Correlation-ID"] != "session-123"
 
+
+@pytest.mark.asyncio
+async def test_create_handoff_uses_the_nestjs_dto_contract():
+    settings = get_settings()
+    token = jwt.encode({"id": "user-123"}, settings.JWT_SECRET, algorithm="HS256")
+    client = NestJSClient(base_url="http://localhost:3001/api", token=token)
+    request = httpx.Request("POST", "http://localhost:3001/api/chat-handoff")
+    response = httpx.Response(201, json={"token": "opaque", "expiresAt": "2026-08-09T00:00:00Z"}, request=request)
+
+    with patch("httpx.AsyncClient.post", new_callable=AsyncMock) as mock_post:
+        mock_post.return_value = response
+
+        await client.create_handoff("signed-attestation", 2, fingerprint="must-not-cross-boundary")
+
+    _, kwargs = mock_post.call_args
+    assert kwargs["json"] == {
+        "selectionAttestationHash": "signed-attestation",
+        "selectedOfferIndex": 2,
+    }
+
 @pytest.mark.asyncio
 async def test_get_gateway_headers_invalid_signature_fallback():
     # Sign with a different secret

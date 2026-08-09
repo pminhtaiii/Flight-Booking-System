@@ -56,8 +56,8 @@ Update this file after every completed feature. Any AI agent reading this should
   - **All Checkout Handoff tests pass (NestJS create/resolve/consume, agent signal integration, and Playwright UI tests).**
 - [ ] Phase 7 / US5: Observable, Reversible Rollout (T085–T093)
   - [x] WP 7A: Flag/direct-client gate — independent ISSUE/ACCEPT behavior, direct-stream boundary coverage, and ChatWidget direct streaming with proxy fallback (T085, T087, T091)
-  - [x] WP 7B: PII-safe telemetry — closed allowlists, opaque trace/correlation IDs, agent metrics/logs, and NestJS create/resolve/consume/replay audit linkage (T086, T088, T089)
-  - **WP 7B GREEN evidence:** agent focused suites `56 passed`; API focused unit suites `44 passed`; chat-handoff E2E `7 passed`; handoff-consumption E2E `1 passed`. Playwright was not rerun per handoff instruction.
+  - [x] WP 7B: PII-safe telemetry — per-field closed schemas, fail-open agent metrics/logs, opaque trace/correlation IDs, real Agent→NestJS trace verification, and NestJS create/resolve/consume/replay audit linkage (T086, T088, T089)
+  - **WP 7B GREEN evidence:** agent focused suites `83 passed`; API focused unit suites `51 passed`; chat-handoff E2E `8 passed`; handoff-consumption E2E `1 passed`; Ruff and Python compile checks passed. Playwright was not rerun per handoff instruction.
 - [ ] Phase 8 / Polish & Cleanup (T094–T102)
 
 ### [ ] Feature: Traveler Profile & Booking Readiness (Feature 16)

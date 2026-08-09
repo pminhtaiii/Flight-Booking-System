@@ -1,6 +1,8 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { INestApplication, ValidationPipe } from '@nestjs/common';
+import { INestApplication, Logger, ValidationPipe } from '@nestjs/common';
 import request from 'supertest';
+import { spawn } from 'child_process';
+import * as path from 'path';
 import { AppModule } from '@/app.module';
 import { PrismaService } from '@/prisma/prisma.service';
 import { ConfigService } from '@nestjs/config';
@@ -11,6 +13,39 @@ import { HttpExceptionFilter } from '@/common/filters/http-exception.filter';
 import { JwtService } from '@nestjs/jwt';
 
 jest.setTimeout(120_000);
+
+type AgentHandoffProbeInput = {
+  baseUrl: string;
+  token: string;
+  attestation: string;
+  offerIndex: number;
+  traceId: string;
+  correlationId: string;
+};
+
+function runAgentHandoffProbe(
+  input: AgentHandoffProbeInput,
+  environment: NodeJS.ProcessEnv,
+): Promise<number> {
+  return new Promise((resolve) => {
+    const child = spawn(
+      process.platform === 'win32' ? 'uv.exe' : 'uv',
+      ['run', '--frozen', 'python', 'tests/helpers/run_nestjs_handoff_probe.py'],
+      {
+        cwd: path.resolve(__dirname, '../../agent'),
+        env: environment,
+        shell: false,
+        windowsHide: true,
+        stdio: ['pipe', 'pipe', 'pipe'],
+      },
+    );
+    child.stdout.resume();
+    child.stderr.resume();
+    child.once('error', () => resolve(-1));
+    child.once('close', (code) => resolve(code ?? -1));
+    child.stdin.end(JSON.stringify(input));
+  });
+}
 
 function mintClaimToken(userId: string, iat: number, secret = 'test-claim-token-secret'): string {
   const payload = { userId, iat };
@@ -24,6 +59,7 @@ describe('ChatHandoff (E2E)', () => {
   let prisma: PrismaService;
   let attestationService: SelectionAttestationService;
   let jwtService: JwtService;
+  let nestjsBaseUrl: string;
   
   let validUser: any;
   let validUserToken: string;
@@ -54,7 +90,12 @@ describe('ChatHandoff (E2E)', () => {
     app = moduleFixture.createNestApplication();
     app.useGlobalPipes(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, transform: true }));
     app.useGlobalFilters(new HttpExceptionFilter());
-    await app.init();
+    await app.listen(0, '127.0.0.1');
+    const address = app.getHttpServer().address();
+    if (!address || typeof address === 'string') {
+      throw new Error('NestJS E2E server did not expose a loopback port');
+    }
+    nestjsBaseUrl = `http://127.0.0.1:${address.port}`;
     
     prisma = moduleFixture.get<PrismaService>(PrismaService);
     attestationService = moduleFixture.get<SelectionAttestationService>(SelectionAttestationService);
@@ -257,6 +298,76 @@ describe('ChatHandoff (E2E)', () => {
         expect(metadata).not.toContain('selectionAttestationHash');
         expect(metadata).toMatch(/"operation":"handoff_(create|resolve)"/);
       }
+    });
+
+    it('propagates agent trace and correlation IDs into NestJS telemetry and audit', async () => {
+      const expiresAt = new Date(Date.now() + 15 * 60000).toISOString();
+      const offers = [{ flightOfferId: validFlightOffer.id, duffelOfferId: 'off_test123' }];
+      const attestation = await attestationService.signSelectionAttestation(
+        validUser.id, validSession.id, 1, expiresAt, offers,
+      );
+      const traceId = `chat_${'c3'.repeat(16)}`;
+      const correlationId = `chat_${'d4'.repeat(16)}`;
+      const loggerLog = jest.spyOn(Logger.prototype, 'log').mockImplementation(() => undefined);
+
+      const exitCode = await runAgentHandoffProbe(
+        {
+          baseUrl: nestjsBaseUrl,
+          token: validUserToken,
+          attestation,
+          offerIndex: 1,
+          traceId,
+          correlationId,
+        },
+        {
+          PATH: process.env.PATH,
+          PATHEXT: process.env.PATHEXT,
+          SystemRoot: process.env.SystemRoot,
+          COMSPEC: process.env.COMSPEC,
+          TEMP: process.env.TEMP,
+          TMP: process.env.TMP,
+          UV_CACHE_DIR: path.resolve(__dirname, '../../../.uv-cache'),
+          PYTHONPATH: path.resolve(__dirname, '../../agent/src'),
+          JWT_SECRET: process.env.JWT_SECRET ?? 'test_secret',
+          NESTJS_API_URL: nestjsBaseUrl,
+          AGENT_SERVICE_API_KEY: apiKey,
+          CLAIM_TOKEN_SECRET: 'test-claim-token-secret',
+          FEATURE_FLAG_CHAT_HANDOFF_ISSUE: 'true',
+          FEATURE_FLAG_CHAT_HANDOFF_ACCEPT: 'true',
+        },
+      );
+
+      expect(exitCode).toBe(0);
+      const telemetryEvent = loggerLog.mock.calls
+        .map(([message]) => {
+          if (typeof message !== 'string' || !message.startsWith('{')) return null;
+          try {
+            const parsed: unknown = JSON.parse(message);
+            return typeof parsed === 'object' && parsed !== null ? parsed : null;
+          } catch {
+            return null;
+          }
+        })
+        .find((event) => event !== null && 'operation' in event && event.operation === 'handoff_create');
+      loggerLog.mockRestore();
+
+      expect(telemetryEvent).toMatchObject({
+        operation: 'handoff_create',
+        trace_id: traceId,
+        correlation_id: correlationId,
+      });
+
+      const auditRow = await prisma.auditLog.findFirst({
+        where: { action: 'chat_handoff_created', traceId, correlationId },
+      });
+      expect(auditRow).toBeDefined();
+      const metadata = JSON.stringify(auditRow?.metadata);
+      expect(metadata).not.toContain(attestation);
+      expect(metadata).not.toContain(validUser.id);
+      expect(metadata).not.toContain(validSession.id);
+      expect(metadata).not.toContain(validFlightOffer.id);
+      expect(metadata).not.toContain('off_test123');
+      expect(metadata).not.toContain('http');
     });
 
     it('should reject stale-offer/attestation', async () => {

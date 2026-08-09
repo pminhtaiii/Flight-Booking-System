@@ -449,8 +449,8 @@ export class BookingIntentService {
       if (!isSuccess && handoff && claimToken && this.chatHandoffService) {
         try {
           await this.chatHandoffService.releaseClaim(handoff.id, claimToken);
-        } catch (releaseError) {
-          this.logger.error('Failed to release handoff claim', releaseError instanceof Error ? releaseError.stack : undefined);
+        } catch {
+          this.logger.error('chat_handoff_claim_release_failed');
         }
       }
     }

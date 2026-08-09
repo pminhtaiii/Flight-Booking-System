@@ -44,4 +44,20 @@ describe('chat telemetry privacy contract', () => {
       { outcome: 'user_reference' },
     )).toThrow();
   });
+
+  it.each([
+    ['outcome', 123],
+    ['dependency', true],
+    ['retry', 'yes'],
+    ['price_changed', 1],
+    ['claim_state', 'opaque_reference'],
+  ])('rejects a value outside the closed schema for %s', (key, value) => {
+    expect(() => createChatTelemetryEvent(
+      'handoff_create',
+      'created',
+      1,
+      {},
+      { [key]: value },
+    )).toThrow();
+  });
 });

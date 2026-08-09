@@ -1,8 +1,6 @@
 import json
 import asyncio
 import logging
-import re
-import secrets
 import time
 from fastapi import APIRouter, Request, HTTPException, Header
 from sse_starlette.sse import EventSourceResponse
@@ -18,7 +16,7 @@ from agent.guardrails.output_pipeline import OutputGuardrailPipeline, OutputGuar
 from agent.repositories.trusted_snapshot_repository import TrustedSnapshotRepository
 from agent.infrastructure.redis import get_redis_client
 from agent.sanitization.pii_scrubber import detect_pii
-from agent.observability.chat_observability import ChatTelemetry, safe_tool_name
+from agent.observability.chat_observability import ChatTelemetry, safe_opaque_id, safe_tool_name
 
 logger = logging.getLogger("agent.streaming")
 guardrails_logger = logging.getLogger("agent.guardrails")
@@ -27,14 +25,9 @@ chat_telemetry = ChatTelemetry(logger)
 
 background_tasks: set[asyncio.Task] = set()
 
-_OPAQUE_CORRELATION_ID = re.compile(r"chat_[a-f0-9]{32}")
-
-
 def _resolve_correlation_id(value: str | None) -> str:
     """Return an opaque telemetry identifier, never a request/session identifier."""
-    if value and _OPAQUE_CORRELATION_ID.fullmatch(value):
-        return value
-    return f"chat_{secrets.token_hex(16)}"
+    return safe_opaque_id(value)
 
 async def _resolve_user_message(body, graph, config) -> str:
     """
