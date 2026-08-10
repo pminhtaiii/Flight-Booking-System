@@ -7,6 +7,57 @@ from unittest.mock import AsyncMock, patch
 from agent.tools.nestjs_client import NestJSClient
 from agent.config import get_settings
 
+_CHECK_USER_ACCESS = NestJSClient.check_user_access
+
+
+@pytest.mark.asyncio
+async def test_check_user_access_uses_configured_api_base_once(monkeypatch):
+    monkeypatch.setattr(NestJSClient, "check_user_access", _CHECK_USER_ACCESS)
+    client = NestJSClient(base_url="http://localhost:3001/api", token="test-token")
+    req = httpx.Request(
+        "POST",
+        "http://localhost:3001/api/agent-gateway/chat/access/check",
+    )
+    mock_response = httpx.Response(200, json={"allowed": True}, request=req)
+
+    with patch("httpx.AsyncClient.post", new_callable=AsyncMock) as mock_post:
+        mock_post.return_value = mock_response
+
+        result = await client.check_user_access(sub="user-123", jti="jti-456")
+
+    assert result == {"allowed": True}
+    assert mock_post.await_args.args[0] == (
+        "http://localhost:3001/api/agent-gateway/chat/access/check"
+    )
+
+
+@pytest.mark.asyncio
+async def test_gateway_request_accepts_canonical_chat_jwt():
+    settings = get_settings()
+    token = jwt.encode(
+        {
+            "sub": "user-123",
+            "jti": "jti-456",
+            "iss": "booking-systems-api",
+            "aud": "booking-systems-clients",
+            "exp": 9999999999,
+        },
+        settings.JWT_SECRET,
+        algorithm="HS256",
+    )
+    client = NestJSClient(base_url="http://localhost:3001/api", token=token)
+    req = httpx.Request("POST", "http://localhost:3001/api/agent-gateway/chat/sessions")
+    mock_response = httpx.Response(201, json={"id": "session-123"}, request=req)
+
+    with patch("httpx.AsyncClient.post", new_callable=AsyncMock) as mock_post:
+        mock_post.return_value = mock_response
+        result = await client.create_session()
+
+    assert result == {"id": "session-123"}
+    headers = mock_post.await_args.kwargs["headers"]
+    assert headers["X-Agent-API-Key"] == settings.AGENT_SERVICE_API_KEY
+    assert headers["X-User-Claim"]
+
 
 @pytest.fixture(autouse=True)
 def mock_time():
@@ -164,7 +215,17 @@ async def test_get_gateway_headers_valid_signature():
 
 def test_get_gateway_headers_propagates_only_opaque_trace_and_correlation_ids():
     settings = get_settings()
-    token = jwt.encode({"id": "user-123"}, settings.JWT_SECRET, algorithm="HS256")
+    token = jwt.encode(
+        {
+            "sub": "user-123",
+            "jti": "jti-456",
+            "iss": "booking-systems-api",
+            "aud": "booking-systems-clients",
+            "exp": 9999999999,
+        },
+        settings.JWT_SECRET,
+        algorithm="HS256",
+    )
     trace_id = "chat_" + ("a1" * 16)
     client = NestJSClient(
         base_url="http://localhost:3001/api",
@@ -183,7 +244,17 @@ def test_get_gateway_headers_propagates_only_opaque_trace_and_correlation_ids():
 @pytest.mark.asyncio
 async def test_create_handoff_uses_the_nestjs_dto_contract():
     settings = get_settings()
-    token = jwt.encode({"id": "user-123"}, settings.JWT_SECRET, algorithm="HS256")
+    token = jwt.encode(
+        {
+            "sub": "user-123",
+            "jti": "jti-456",
+            "iss": "booking-systems-api",
+            "aud": "booking-systems-clients",
+            "exp": 9999999999,
+        },
+        settings.JWT_SECRET,
+        algorithm="HS256",
+    )
     client = NestJSClient(base_url="http://localhost:3001/api", token=token)
     request = httpx.Request("POST", "http://localhost:3001/api/chat-handoff")
     response = httpx.Response(201, json={"token": "opaque", "expiresAt": "2026-08-09T00:00:00Z"}, request=request)
@@ -191,12 +262,16 @@ async def test_create_handoff_uses_the_nestjs_dto_contract():
     with patch("httpx.AsyncClient.post", new_callable=AsyncMock) as mock_post:
         mock_post.return_value = response
 
-        await client.create_handoff("signed-attestation", 2, fingerprint="must-not-cross-boundary")
+        result = await client.create_handoff("signed-attestation", 2, fingerprint="must-not-cross-boundary")
 
     _, kwargs = mock_post.call_args
     assert kwargs["json"] == {
         "selectionAttestationHash": "signed-attestation",
         "selectedOfferIndex": 2,
+    }
+    assert result == {
+        "handoffToken": "opaque",
+        "expiresAt": "2026-08-09T00:00:00Z",
     }
 
 @pytest.mark.asyncio

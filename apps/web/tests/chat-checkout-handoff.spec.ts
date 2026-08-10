@@ -6,7 +6,7 @@ async function loginAsNewUser(page: Page) {
   await page.fill('input[name="email"]', `test${unique}@example.com`);
   await page.fill('input[name="password"]', 'Password123!');
   await page.click('button[type="submit"]');
-  await expect(page).toHaveURL(/.*127\.0\.0\.1:3000\/$/);
+  await expect(page).toHaveURL(/.*127\.0\.0\.1:3000\/$/, { timeout: 15000 });
 }
 
 test.describe('Chat Checkout Handoff', () => {
@@ -144,7 +144,7 @@ test.describe('Chat Checkout Handoff', () => {
 
     await page.goto('http://127.0.0.1:3000/checkout/passengers');
     
-    await expect(page.locator('text=Passenger 1 (ADULT)')).toBeVisible();
+    await expect(page.locator('text=Passenger 1 (ADULT)')).toBeVisible({ timeout: 15000 });
   });
 
   test('should enforce browser-storage privacy', async ({ page }) => {

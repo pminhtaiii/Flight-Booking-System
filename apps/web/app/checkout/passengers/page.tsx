@@ -42,7 +42,7 @@ type Props = {
 
 export default async function PassengersPage({ searchParams }: Props) {
   const { accessToken } = await protectCheckoutRoute();
-  let offerId = searchParams.offerId;
+  const offerId = searchParams.offerId;
   const cookieStore = cookies();
   const handoffCookie = cookieStore.get('chat_handoff_token');
   

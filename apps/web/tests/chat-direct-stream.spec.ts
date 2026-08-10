@@ -13,25 +13,9 @@ test.describe('Chat direct stream browser boundary (mocked FastAPI)', () => {
       body: { message: string; sessionId?: string };
     }> = [];
     let proxyRequests = 0;
+    let preflightRequestHeaders = '';
 
-    await page.context().addCookies([
-      {
-        name: 'next-auth.session-token',
-        value: 'mock-token',
-        domain: '127.0.0.1',
-        path: '/',
-        httpOnly: true,
-        sameSite: 'Lax',
-      },
-      {
-        name: 'next-auth.session-token',
-        value: 'mock-token',
-        domain: 'localhost',
-        path: '/',
-        httpOnly: true,
-        sameSite: 'Lax',
-      },
-    ]);
+
 
     await page.route('**/api/auth/session', async (route) => {
       await route.fulfill({
@@ -48,15 +32,17 @@ test.describe('Chat direct stream browser boundary (mocked FastAPI)', () => {
       proxyRequests += 1;
       await route.abort();
     });
-    await page.route('http://127.0.0.1:3002/chat/stream', async (route) => {
+    await page.route(/.*:3002\/chat\/stream/, async (route) => {
       const request = route.request();
       if (request.method() === 'OPTIONS') {
+        preflightRequestHeaders = request.headers()['access-control-request-headers'] || '';
         await route.fulfill({
           status: 204,
           headers: {
             'Access-Control-Allow-Origin': 'http://127.0.0.1:3000',
             'Access-Control-Allow-Methods': 'POST, OPTIONS',
-            'Access-Control-Allow-Headers': 'Authorization, Content-Type',
+            'Access-Control-Allow-Headers':
+              'Authorization, Content-Type, X-Trace-Id, X-Correlation-Id',
           },
         });
         return;
@@ -78,6 +64,7 @@ test.describe('Chat direct stream browser boundary (mocked FastAPI)', () => {
     });
 
     await page.goto('http://127.0.0.1:3000/search');
+    await page.waitForResponse('**/api/auth/session');
     const input = page.locator('input[placeholder="Type a message..."]');
     await input.fill('first turn');
     await input.press('Enter');
@@ -88,20 +75,25 @@ test.describe('Chat direct stream browser boundary (mocked FastAPI)', () => {
     await expect.poll(() => requests.length).toBe(2);
 
     expect(proxyRequests).toBe(0);
+    expect(preflightRequestHeaders).toContain('x-trace-id');
+    expect(preflightRequestHeaders).toContain('x-correlation-id');
     expect(requests[0]).toMatchObject({
       authorization: 'Bearer browser-jwt',
       origin: 'http://127.0.0.1:3000',
       body: { message: 'first turn' },
     });
     expect(requests[0].body.sessionId).toBeUndefined();
-    expect(requests[0].traceId).toBeUndefined();
+    expect(requests[0].traceId).toMatch(/^chat_[a-f0-9]{32}$/);
     expect(requests[0].correlationId).toMatch(/^chat_[a-f0-9]{32}$/);
+    expect(requests[0].traceId).not.toBe(requests[0].correlationId);
     expect(requests[1]).toMatchObject({
       authorization: 'Bearer browser-jwt',
       origin: 'http://127.0.0.1:3000',
       body: { message: 'second turn', sessionId: 'continued-session' },
     });
+    expect(requests[1].traceId).toMatch(/^chat_[a-f0-9]{32}$/);
     expect(requests[1].traceId).not.toBe('continued-session');
+    expect(requests[1].traceId).not.toBe(requests[1].correlationId);
     expect(requests[1].correlationId).toMatch(/^chat_[a-f0-9]{32}$/);
     expect(requests[1].correlationId).not.toBe('continued-session');
   });

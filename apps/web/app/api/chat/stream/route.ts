@@ -1,7 +1,13 @@
 import { NextRequest } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
+import { isOpaqueChatId } from '@/lib/chatTrace';
 
+// Rollback invariant during the direct-stream observation window: when the
+// browser transport flag is disabled, /api/chat/stream remains the same-origin
+// authenticated SSE pass-through. Keep the upstream event names and payloads
+// untouched, including legacy ACTION_REQUIRED, until the direct/proxy matrix
+// has been observed and explicitly archived.
 export async function POST(req: NextRequest) {
   const session = await getServerSession(authOptions);
   
@@ -17,12 +23,23 @@ export async function POST(req: NextRequest) {
   
   try {
     const body = await req.json();
+    const upstreamHeaders: Record<string, string> = {
+      'Authorization': `Bearer ${accessToken}`,
+      'Content-Type': 'application/json',
+    };
+    const traceId = req.headers.get('X-Trace-Id');
+    const correlationId = req.headers.get('X-Correlation-Id');
+
+    if (isOpaqueChatId(traceId)) {
+      upstreamHeaders['X-Trace-Id'] = traceId;
+    }
+    if (isOpaqueChatId(correlationId)) {
+      upstreamHeaders['X-Correlation-Id'] = correlationId;
+    }
+
     const response = await fetch(`${agentUrl}/chat/stream`, {
       method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${accessToken}`,
-        'Content-Type': 'application/json',
-      },
+      headers: upstreamHeaders,
       body: JSON.stringify(body),
     });
 
