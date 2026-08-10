@@ -1,12 +1,7 @@
 import { NextRequest } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
-
-const OPAQUE_CHAT_ID_PATTERN = /^chat_[a-f0-9]{32}$/;
-
-function isOpaqueChatId(value: string | null): value is string {
-  return value !== null && value.length === 37 && OPAQUE_CHAT_ID_PATTERN.test(value);
-}
+import { isOpaqueChatId } from '@/lib/chatTrace';
 
 // Rollback invariant during the direct-stream observation window: when the
 // browser transport flag is disabled, /api/chat/stream remains the same-origin

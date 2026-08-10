@@ -12,6 +12,7 @@ import {
   AgentBookingReadinessRequestDto,
   AgentBookingReadinessResponseDto,
 } from './dto/booking-readiness.dto';
+import { MemoryQueryDto } from '@/chat/dto/memory-query.dto';
 
 interface AuthenticatedRequest extends Request {
   user: {
@@ -146,7 +147,7 @@ export class AgentGatewayController {
   async getMemory(
     @Param('sessionId') sessionId: string,
     @Req() req: AuthenticatedRequest,
-    @Query() query: { recentCount?: number; unsummarizedOnly?: boolean },
+    @Query() query: MemoryQueryDto,
   ) {
     return await this.agentGatewayService.getMemory(req.user.id, sessionId, query);
   }

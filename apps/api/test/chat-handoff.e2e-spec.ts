@@ -9,6 +9,7 @@ import { ConfigService } from '@nestjs/config';
 import { SelectionAttestationService } from '@/agent-gateway/selection-attestation.service';
 import * as crypto from 'crypto';
 import { HttpExceptionFilter } from '@/common/filters/http-exception.filter';
+import { createChatStreamRequest } from '../../web/lib/chatStream';
 
 import { JwtService } from '@nestjs/jwt';
 
@@ -21,6 +22,16 @@ type AgentHandoffProbeInput = {
   offerIndex: number;
   traceId: string;
   correlationId: string;
+};
+
+type AgentStreamProbeInput = AgentHandoffProbeInput & {
+  sessionId: string;
+};
+
+type ObservedGatewayTrace = {
+  path: string;
+  traceId?: string;
+  correlationId?: string;
 };
 
 function runAgentHandoffProbe(
@@ -47,6 +58,46 @@ function runAgentHandoffProbe(
   });
 }
 
+function runAgentStreamProbe(
+  input: AgentStreamProbeInput,
+  environment: NodeJS.ProcessEnv,
+): Promise<{ exitCode: number; output: string; diagnostic: string }> {
+  return new Promise((resolve) => {
+    const child = spawn(
+      process.platform === 'win32' ? 'uv.exe' : 'uv',
+      ['run', '--frozen', 'python', 'tests/helpers/run_fastapi_nestjs_trace_probe.py'],
+      {
+        cwd: path.resolve(__dirname, '../../agent'),
+        env: environment,
+        shell: false,
+        windowsHide: true,
+        stdio: ['pipe', 'pipe', 'pipe'],
+      },
+    );
+    const stdout: Buffer[] = [];
+    const stderr: Buffer[] = [];
+    child.stdout.on('data', (chunk: Buffer) => stdout.push(chunk));
+    child.stderr.on('data', (chunk: Buffer) => stderr.push(chunk));
+    child.once('error', () =>
+      resolve({ exitCode: -1, output: 'probe_spawn_failed', diagnostic: 'spawn_failed' }),
+    );
+    child.once('close', (code) => {
+      const stderrText = Buffer.concat(stderr).toString('utf8');
+      const diagnostic = [
+        'nestjs_session_creation_failed',
+        'nestjs_memory_fetch_failed',
+        'user_message_persistence_failed',
+      ].find((marker) => stderrText.includes(marker)) ?? 'none';
+      resolve({
+        exitCode: code ?? -1,
+        output: Buffer.concat(stdout).toString('utf8'),
+        diagnostic,
+      });
+    });
+    child.stdin.end(JSON.stringify(input));
+  });
+}
+
 function mintClaimToken(userId: string, iat: number, secret = 'test-claim-token-secret'): string {
   const payload = { userId, iat };
   const payloadStr = JSON.stringify(payload);
@@ -65,6 +116,7 @@ describe('ChatHandoff (E2E)', () => {
   let validUserToken: string;
   let validSession: any;
   let validFlightOffer: any;
+  const observedGatewayTraces: ObservedGatewayTrace[] = [];
   const apiKey = 'test-agent-api-key';
 
   beforeAll(async () => {
@@ -88,6 +140,25 @@ describe('ChatHandoff (E2E)', () => {
       .compile();
 
     app = moduleFixture.createNestApplication();
+    app.use(
+      (
+        req: { originalUrl?: string; headers: Record<string, string | string[] | undefined> },
+        _res: unknown,
+        next: () => void,
+      ) => {
+        const requestPath = req.originalUrl ?? '';
+        if (requestPath.includes('agent-gateway') || requestPath.includes('chat-handoff')) {
+          const traceHeader = req.headers['x-trace-id'];
+          const correlationHeader = req.headers['x-correlation-id'];
+          observedGatewayTraces.push({
+            path: requestPath,
+            traceId: typeof traceHeader === 'string' ? traceHeader : undefined,
+            correlationId: typeof correlationHeader === 'string' ? correlationHeader : undefined,
+          });
+        }
+        next();
+      },
+    );
     app.useGlobalPipes(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, transform: true }));
     app.useGlobalFilters(new HttpExceptionFilter());
     await app.listen(0, '127.0.0.1');
@@ -110,7 +181,10 @@ describe('ChatHandoff (E2E)', () => {
       },
     });
 
-    validUserToken = jwtService.sign({ id: validUser.id, email: validUser.email });
+    validUserToken = jwtService.sign(
+      { sub: validUser.id, id: validUser.id, jti: crypto.randomUUID(), email: validUser.email },
+      { issuer: 'booking-systems-api', audience: 'booking-systems-clients' },
+    );
 
     validSession = await prisma.chatSession.create({
       data: {
@@ -140,6 +214,7 @@ describe('ChatHandoff (E2E)', () => {
   });
 
   beforeEach(async () => {
+    observedGatewayTraces.length = 0;
     await prisma.chatHandoff.deleteMany({});
     await prisma.chatSession.deleteMany({});
     await prisma.paymentEvent.deleteMany({});
@@ -173,7 +248,10 @@ describe('ChatHandoff (E2E)', () => {
       },
     });
 
-    validUserToken = jwtService.sign({ id: validUser.id, email: validUser.email });
+    validUserToken = jwtService.sign(
+      { sub: validUser.id, id: validUser.id, jti: crypto.randomUUID(), email: validUser.email },
+      { issuer: 'booking-systems-api', audience: 'booking-systems-clients' },
+    );
 
     validSession = await prisma.chatSession.create({
       data: {
@@ -368,6 +446,121 @@ describe('ChatHandoff (E2E)', () => {
       expect(metadata).not.toContain(validFlightOffer.id);
       expect(metadata).not.toContain('off_test123');
       expect(metadata).not.toContain('http');
+    });
+
+    it('preserves one browser-generated trace pair through FastAPI and NestJS', async () => {
+      const expiresAt = new Date(Date.now() + 15 * 60000).toISOString();
+      const offers = [{ flightOfferId: validFlightOffer.id, duffelOfferId: 'off_test123' }];
+      const attestation = await attestationService.signSelectionAttestation(
+        validUser.id,
+        validSession.id,
+        1,
+        expiresAt,
+        offers,
+      );
+      const browserToken = jwtService.sign(
+        {
+          sub: validUser.id,
+          id: validUser.id,
+          jti: `trace-probe-${crypto.randomUUID()}`,
+          email: validUser.email,
+        },
+        {
+          issuer: 'booking-systems-api',
+          audience: 'booking-systems-clients',
+        },
+      );
+      const previousDirectFlag = process.env.NEXT_PUBLIC_ENABLE_DIRECT_AGENT_STREAM;
+      const previousAgentUrl = process.env.NEXT_PUBLIC_AGENT_URL;
+      process.env.NEXT_PUBLIC_ENABLE_DIRECT_AGENT_STREAM = 'true';
+      process.env.NEXT_PUBLIC_AGENT_URL = 'http://agent.invalid';
+      const fetchSpy = jest
+        .spyOn(globalThis, 'fetch')
+        .mockResolvedValue(new Response(null, { status: 200 }));
+      let browserHeaders: Headers;
+      try {
+        await createChatStreamRequest({
+          message: 'continue with selected flight',
+          sessionId: validSession.id,
+          token: browserToken,
+        });
+        browserHeaders = new Headers(fetchSpy.mock.calls[0]?.[1]?.headers);
+      } finally {
+        fetchSpy.mockRestore();
+        if (previousDirectFlag === undefined) {
+          delete process.env.NEXT_PUBLIC_ENABLE_DIRECT_AGENT_STREAM;
+        } else {
+          process.env.NEXT_PUBLIC_ENABLE_DIRECT_AGENT_STREAM = previousDirectFlag;
+        }
+        if (previousAgentUrl === undefined) {
+          delete process.env.NEXT_PUBLIC_AGENT_URL;
+        } else {
+          process.env.NEXT_PUBLIC_AGENT_URL = previousAgentUrl;
+        }
+      }
+      const traceId = browserHeaders.get('X-Trace-Id');
+      const correlationId = browserHeaders.get('X-Correlation-Id');
+      expect(traceId).toMatch(/^chat_[a-f0-9]{32}$/);
+      expect(correlationId).toMatch(/^chat_[a-f0-9]{32}$/);
+      expect(traceId).not.toBe(correlationId);
+      if (!traceId || !correlationId) {
+        throw new Error('browser_trace_headers_missing');
+      }
+
+      const probe = await runAgentStreamProbe(
+        {
+          baseUrl: nestjsBaseUrl,
+          token: browserToken,
+          sessionId: validSession.id,
+          attestation,
+          offerIndex: 1,
+          traceId,
+          correlationId,
+        },
+        {
+          PATH: process.env.PATH,
+          PATHEXT: process.env.PATHEXT,
+          SystemRoot: process.env.SystemRoot,
+          COMSPEC: process.env.COMSPEC,
+          TEMP: process.env.TEMP,
+          TMP: process.env.TMP,
+          UV_CACHE_DIR: path.resolve(__dirname, '../../../.uv-cache'),
+          PYTHONPATH: path.resolve(__dirname, '../../agent/src'),
+          JWT_SECRET: process.env.JWT_SECRET ?? 'test_secret',
+          JWT_ISSUER: 'booking-systems-api',
+          JWT_AUDIENCE: 'booking-systems-clients',
+          NESTJS_API_URL: nestjsBaseUrl,
+          AGENT_SERVICE_API_KEY: apiKey,
+          CLAIM_TOKEN_SECRET: 'test-claim-token-secret',
+          FEATURE_FLAG_CHAT_HANDOFF_ISSUE: 'true',
+          FEATURE_FLAG_CHAT_HANDOFF_ACCEPT: 'true',
+        },
+      );
+
+      const observedStages = {
+        access: observedGatewayTraces.some(({ path: requestPath }) => requestPath.includes('chat/access/check')),
+        memory: observedGatewayTraces.some(({ path: requestPath }) => requestPath.includes('/memory')),
+        turn: observedGatewayTraces.some(({ path: requestPath }) => requestPath.includes('/turns')),
+        handoff: observedGatewayTraces.some(({ path: requestPath }) => requestPath.includes('chat-handoff')),
+      };
+      expect({ probe, observedStages }).toEqual({
+        probe: { exitCode: 0, output: '{"ok":true}', diagnostic: 'none' },
+        observedStages: { access: true, memory: true, turn: true, handoff: true },
+      });
+      const tracedRequests = observedGatewayTraces.filter(
+        ({ traceId: observedTraceId, correlationId: observedCorrelationId }) =>
+          observedTraceId === traceId && observedCorrelationId === correlationId,
+      );
+      expect(tracedRequests.length).toBeGreaterThanOrEqual(4);
+      expect(tracedRequests.some(({ path: requestPath }) => requestPath.includes('chat/access/check'))).toBe(true);
+      expect(tracedRequests.some(({ path: requestPath }) => requestPath.includes('/memory'))).toBe(true);
+      expect(tracedRequests.some(({ path: requestPath }) => requestPath.includes('/turns'))).toBe(true);
+      expect(tracedRequests.some(({ path: requestPath }) => requestPath.includes('chat-handoff'))).toBe(true);
+
+      const auditRow = await prisma.auditLog.findFirst({
+        where: { action: 'chat_handoff_created', traceId, correlationId },
+      });
+      expect(auditRow).not.toBeNull();
     });
 
     it('should reject stale-offer/attestation', async () => {

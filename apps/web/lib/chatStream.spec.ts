@@ -3,6 +3,7 @@ import {
   getAgentStreamEndpoint,
   createChatStreamRequest,
 } from './chatStream';
+import { isOpaqueChatId } from './chatTrace';
 
 describe('chatStream', () => {
   const originalEnv = process.env;
@@ -64,8 +65,8 @@ describe('chatStream', () => {
       Authorization: 'Bearer jwt-token-xyz',
     }));
     const headers = request.headers as Record<string, string>;
-    expect(headers['X-Trace-Id']).toMatch(/^chat_[a-f0-9]{32}$/);
-    expect(headers['X-Correlation-Id']).toMatch(/^chat_[a-f0-9]{32}$/);
+    expect(isOpaqueChatId(headers['X-Trace-Id'])).toBe(true);
+    expect(isOpaqueChatId(headers['X-Correlation-Id'])).toBe(true);
     expect(headers['X-Trace-Id']).not.toBe(headers['X-Correlation-Id']);
   });
 
@@ -85,8 +86,8 @@ describe('chatStream', () => {
     const headers = new Headers(request?.headers);
     const traceId = headers.get('X-Trace-Id');
     const correlationId = headers.get('X-Correlation-Id');
-    expect(traceId).toMatch(/^chat_[a-f0-9]{32}$/);
-    expect(correlationId).toMatch(/^chat_[a-f0-9]{32}$/);
+    expect(isOpaqueChatId(traceId)).toBe(true);
+    expect(isOpaqueChatId(correlationId)).toBe(true);
     expect(traceId).not.toBe(correlationId);
   });
 
@@ -109,8 +110,8 @@ describe('chatStream', () => {
       'Content-Type': 'application/json',
       Authorization: 'Bearer jwt-token-xyz',
     }));
-    expect(headers['X-Trace-Id']).toMatch(/^chat_[a-f0-9]{32}$/);
-    expect(headers['X-Correlation-Id']).toMatch(/^chat_[a-f0-9]{32}$/);
+    expect(isOpaqueChatId(headers['X-Trace-Id'])).toBe(true);
+    expect(isOpaqueChatId(headers['X-Correlation-Id'])).toBe(true);
     expect(headers['X-Trace-Id']).not.toBe(headers['X-Correlation-Id']);
     expect(headers['X-Correlation-Id']).not.toBe('continued-session');
   });
@@ -151,8 +152,8 @@ describe('chatStream', () => {
       'Content-Type': 'application/json',
       Authorization: 'Bearer jwt-token-xyz',
     }));
-    expect(headers['X-Trace-Id']).toMatch(/^chat_[a-f0-9]{32}$/);
-    expect(headers['X-Correlation-Id']).toMatch(/^chat_[a-f0-9]{32}$/);
+    expect(isOpaqueChatId(headers['X-Trace-Id'])).toBe(true);
+    expect(isOpaqueChatId(headers['X-Correlation-Id'])).toBe(true);
     expect(headers['X-Trace-Id']).not.toBe(headers['X-Correlation-Id']);
     Object.values(suppliedValues).forEach((value) => {
       expect(headers['X-Correlation-Id']).not.toBe(value);

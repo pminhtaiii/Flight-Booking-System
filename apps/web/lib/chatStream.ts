@@ -1,4 +1,5 @@
 import { getFeatureFlags } from './featureFlags';
+import { createOpaqueChatId } from './chatTrace';
 
 export interface ChatStreamOptions {
   message: string;
@@ -22,10 +23,6 @@ export function getAgentStreamEndpoint(): string {
   return '/api/chat/stream';
 }
 
-function createOpaqueId(): string {
-  return `chat_${crypto.randomUUID().replace(/-/g, '')}`;
-}
-
 export async function createChatStreamRequest({
   message,
   sessionId,
@@ -37,8 +34,8 @@ export async function createChatStreamRequest({
 
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
-    'X-Trace-Id': createOpaqueId(),
-    'X-Correlation-Id': createOpaqueId(),
+    'X-Trace-Id': createOpaqueChatId(),
+    'X-Correlation-Id': createOpaqueChatId(),
   };
 
   if (isDirect) {

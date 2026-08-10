@@ -157,7 +157,7 @@ class NestJSClient:
         Calls service-authenticated NestJS access check POST /api/agent-gateway/chat/access/check.
         """
         settings = get_settings()
-        url = f"{settings.NESTJS_API_URL}/api/agent-gateway/chat/access/check"
+        url = f"{self.base_url}/agent-gateway/chat/access/check"
         claim_token = create_claim_token(sub, settings.CLAIM_TOKEN_SECRET)
         headers = {
             "X-Agent-API-Key": settings.AGENT_SERVICE_API_KEY,
@@ -249,7 +249,28 @@ class NestJSClient:
     def _get_gateway_headers(self) -> dict:
         settings = get_settings()
         try:
-            payload = jwt.decode(self.token, settings.JWT_SECRET, algorithms=["HS256"])
+            unverified = jwt.decode(
+                self.token,
+                options={"verify_signature": False},
+                algorithms=["HS256"],
+            )
+            decode_options = {"verify_aud": "aud" in unverified}
+            decode_kwargs: dict[str, Any] = {}
+            if "aud" in unverified:
+                decode_kwargs["audience"] = getattr(
+                    settings, "JWT_AUDIENCE", "booking-systems-clients"
+                )
+            if "iss" in unverified:
+                decode_kwargs["issuer"] = getattr(
+                    settings, "JWT_ISSUER", "booking-systems-api"
+                )
+            payload = jwt.decode(
+                self.token,
+                settings.JWT_SECRET,
+                algorithms=["HS256"],
+                options=decode_options,
+                **decode_kwargs,
+            )
             user_id = payload.get("id") or payload.get("sub")
             if not user_id:
                 raise ValueError("Token is missing user identification claims ('id' or 'sub')")
@@ -416,5 +437,9 @@ class NestJSClient:
         async with httpx.AsyncClient() as client:
             response = await client.post(url, json=payload, headers=headers)
             response.raise_for_status()
-            return response.json()
+            body = response.json()
+            return {
+                "handoffToken": body["token"],
+                "expiresAt": body["expiresAt"],
+            }
 

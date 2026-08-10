@@ -357,6 +357,24 @@ describe('Agent Chat Gateway (E2E)', () => {
         .set('X-User-Claim', claimToken)
         .expect(404);
     });
+
+    it('should parse recentCount before querying session memory', async () => {
+      const user = await prisma.user.create({
+        data: { email: 'memory-query-user@example.com', password: 'password', status: 'ACTIVE' },
+      });
+      const claimToken = mintClaimToken(user.id, Math.floor(Date.now() / 1000));
+      const session = await prisma.chatSession.create({
+        data: { userId: user.id, title: 'Memory Query Session' },
+      });
+
+      const response = await request(app.getHttpServer())
+        .get(`/agent-gateway/chat/sessions/${session.id}/memory?recentCount=1`)
+        .set('X-Agent-API-Key', apiKey)
+        .set('X-User-Claim', claimToken)
+        .expect(200);
+
+      expect(response.body.recentMessages).toEqual([]);
+    });
   });
 });
 

@@ -1,4 +1,5 @@
 import { NextRequest } from 'next/server';
+import { isOpaqueChatId } from '@/lib/chatTrace';
 import { POST } from './route';
 
 jest.mock('next-auth', () => ({
@@ -30,6 +31,8 @@ describe('POST /api/chat/stream', () => {
   it('forwards valid opaque headers and passes ACTION_REQUIRED SSE through unchanged', async () => {
     const traceId = `chat_${'a'.repeat(32)}`;
     const correlationId = `chat_${'b'.repeat(32)}`;
+    expect(isOpaqueChatId(traceId)).toBe(true);
+    expect(isOpaqueChatId(correlationId)).toBe(true);
     const sseBody =
       'event: ACTION_REQUIRED\n' +
       'data: {"action":"COMPLETE_PROFILE","fields":["passportNumber"]}\n\n';

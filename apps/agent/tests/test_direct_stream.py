@@ -166,7 +166,7 @@ def test_direct_stream_generates_correlation_for_missing_or_invalid_header(
     assert mock_client.get_memory.await_args.args[0] == "session-123"
 
 
-def test_direct_stream_preserves_strictly_valid_opaque_correlation_id(monkeypatch):
+def test_direct_stream_preserves_strictly_valid_opaque_trace_and_correlation_ids(monkeypatch):
     """Strictly formatted opaque trace and correlation headers remain stable downstream."""
     token = make_valid_jwt(sub="user-direct-bearer-123")
     opaque_trace_id = f"chat_{'b2' * 16}"
