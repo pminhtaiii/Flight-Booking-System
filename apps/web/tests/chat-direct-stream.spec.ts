@@ -1,5 +1,41 @@
 import { expect, test } from '@playwright/test';
 
+type ActionHandoffFixture = {
+  version: 1;
+  action: 'begin_checkout';
+  handoffToken: string;
+  expiresAt: string;
+  display: {
+    airline: string;
+    origin: string;
+    destination: string;
+    departureAt: string;
+    arrivalAt: string;
+    price: string;
+    currency: string;
+  };
+  offerId?: string;
+};
+
+function buildActionHandoffFixture(handoffToken: string, offerId?: string): ActionHandoffFixture {
+  return {
+    version: 1,
+    action: 'begin_checkout',
+    handoffToken,
+    expiresAt: new Date(Date.now() + 15 * 60 * 1000).toISOString(),
+    display: {
+      airline: 'Test Airlines',
+      origin: 'JFK',
+      destination: 'LHR',
+      departureAt: new Date(Date.now() + 86400000).toISOString(),
+      arrivalAt: new Date(Date.now() + 90000000).toISOString(),
+      price: '150.00',
+      currency: 'USD',
+    },
+    ...(offerId === undefined ? {} : { offerId }),
+  };
+}
+
 // This verifies the browser client boundary with an intercepted FastAPI response.
 // Real FastAPI CORS, JWT, active-user, and revocation behavior is owned by agent integration tests.
 test.describe('Chat direct stream browser boundary (mocked FastAPI)', () => {
@@ -98,8 +134,9 @@ test.describe('Chat direct stream browser boundary (mocked FastAPI)', () => {
     expect(requests[1].correlationId).not.toBe('continued-session');
   });
 
-  test('observes signed search, explicit selection, strict ACTION_HANDOFF, and reconnect continuity', async ({ page }) => {
-    const handoffToken = 'chk_handoff_v1_observation_opaque';
+  // User approved aligning this reviewed test with browser-observable stream behavior.
+  test('rejects identifier-bearing handoff, then preserves selection and reconnect continuity', async ({ page }) => {
+    const handoffToken = `chk_handoff_v1_${'a'.repeat(43)}`;
     const requests: Array<{ body: Record<string, unknown>; url: string }> = [];
     let proxyRequests = 0;
     let streamRequestNumber = 0;
@@ -141,26 +178,10 @@ test.describe('Chat direct stream browser boundary (mocked FastAPI)', () => {
             'data: ' + JSON.stringify({
               version: 1,
               results: [{ index: 1, airline: 'Test Airlines', origin: 'JFK', destination: 'LHR' }],
-              selectionAttestation: 'sel_v1_opaque',
             }),
             '',
             'event: ACTION_HANDOFF',
-            'data: ' + JSON.stringify({
-              version: 1,
-              action: 'begin_checkout',
-              handoffToken,
-              expiresAt: new Date(Date.now() + 15 * 60 * 1000).toISOString(),
-              display: {
-                airline: 'Test Airlines',
-                origin: 'JFK',
-                destination: 'LHR',
-                departureAt: new Date(Date.now() + 86400000).toISOString(),
-                arrivalAt: new Date(Date.now() + 90000000).toISOString(),
-                price: '150.00',
-                currency: 'USD',
-              },
-              offerId: 'forbidden-offer-id',
-            }),
+            'data: ' + JSON.stringify(buildActionHandoffFixture(handoffToken, 'forbidden-offer-id')),
             '',
             'event: done',
             'data: {"sessionId":"continued-session"}',
@@ -168,21 +189,7 @@ test.describe('Chat direct stream browser boundary (mocked FastAPI)', () => {
           ].join('\n')
         : [
             'event: ACTION_HANDOFF',
-            'data: ' + JSON.stringify({
-              version: 1,
-              action: 'begin_checkout',
-              handoffToken,
-              expiresAt: new Date(Date.now() + 15 * 60 * 1000).toISOString(),
-              display: {
-                airline: 'Test Airlines',
-                origin: 'JFK',
-                destination: 'LHR',
-                departureAt: new Date(Date.now() + 86400000).toISOString(),
-                arrivalAt: new Date(Date.now() + 90000000).toISOString(),
-                price: '150.00',
-                currency: 'USD',
-              },
-            }),
+            'data: ' + JSON.stringify(buildActionHandoffFixture(handoffToken)),
             '',
           ].join('\n');
 

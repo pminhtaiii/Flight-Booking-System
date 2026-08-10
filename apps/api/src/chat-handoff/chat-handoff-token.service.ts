@@ -32,14 +32,11 @@ export class ChatHandoffTokenService {
 
   async generateToken(rowId: string, idempotencyHash: string): Promise<TokenGenerationResult> {
     const tokenPayload = `${rowId}:${idempotencyHash}`;
-    
-    // High-entropy HMAC credential
-    const token = crypto
+    const credential = crypto
       .createHmac('sha256', this.secretKey)
       .update(tokenPayload)
       .digest('base64url');
-
-    // Hash the token for storage (hash-only)
+    const token = `chk_handoff_v${this.CURRENT_KEY_VERSION}_${credential}`;
     const tokenHash = this.hashToken(token);
 
     return {
@@ -55,15 +52,13 @@ export class ChatHandoffTokenService {
     }
 
     const tokenHash = this.hashToken(token);
-    
+
     try {
-      // Constant-time verification
       return crypto.timingSafeEqual(
         Buffer.from(tokenHash, 'hex'),
         Buffer.from(storedTokenHash, 'hex')
       );
-    } catch (e) {
-      // Catch error if lengths are different
+    } catch {
       return false;
     }
   }

@@ -2,15 +2,10 @@ import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 
-const CURRENT_GENERATOR_TOKEN = /^[A-Za-z0-9_-]{43}$/;
-const VERSIONED_HANDOFF_TOKEN = /^chk_handoff_v1_[A-Za-z0-9_-]{1,128}$/;
-
-type SessionWithAccessToken = {
-  accessToken?: unknown;
-};
+const VERSIONED_HANDOFF_TOKEN = /^chk_handoff_v1_[A-Za-z0-9_-]{43}$/;
 
 function isValidHandoffCredential(value: string): boolean {
-  return CURRENT_GENERATOR_TOKEN.test(value) || VERSIONED_HANDOFF_TOKEN.test(value);
+  return VERSIONED_HANDOFF_TOKEN.test(value);
 }
 
 function hasAuthenticatedSession(session: unknown): boolean {
@@ -18,8 +13,9 @@ function hasAuthenticatedSession(session: unknown): boolean {
     return false;
   }
 
-  const accessToken = (session as SessionWithAccessToken).accessToken;
-  return typeof accessToken === 'string' && accessToken.length > 0;
+  return 'accessToken' in session
+    && typeof session.accessToken === 'string'
+    && session.accessToken.length > 0;
 }
 
 function isSameOrigin(request: Request, candidate: string): boolean {
@@ -37,6 +33,22 @@ function hasValidSameOriginHeaders(request: Request): boolean {
   return boundaryValues.length > 0 && boundaryValues.every((value) => isSameOrigin(request, value));
 }
 
+async function readHandoffCredential(request: Request): Promise<string | null> {
+  try {
+    const formEntries = Array.from((await request.formData()).entries());
+    if (formEntries.length !== 1 || formEntries[0][0] !== 'handoffToken') {
+      return null;
+    }
+
+    const handoffToken = formEntries[0][1];
+    return typeof handoffToken === 'string' && isValidHandoffCredential(handoffToken)
+      ? handoffToken
+      : null;
+  } catch {
+    return null;
+  }
+}
+
 export async function POST(request: Request): Promise<NextResponse> {
   const session = await getServerSession(authOptions);
   if (!hasAuthenticatedSession(session)) {
@@ -47,15 +59,8 @@ export async function POST(request: Request): Promise<NextResponse> {
     return new NextResponse('Forbidden', { status: 403 });
   }
 
-  const formData = await request.formData();
-  const formEntries = Array.from(formData.entries());
-  if (formEntries.length !== 1 || formEntries[0][0] !== 'handoffToken') {
-    return new NextResponse('Bad Request', { status: 400 });
-  }
-
-  const handoffToken = formData.get('handoffToken');
-
-  if (!handoffToken || typeof handoffToken !== 'string' || !isValidHandoffCredential(handoffToken)) {
+  const handoffToken = await readHandoffCredential(request);
+  if (handoffToken === null) {
     return new NextResponse('Bad Request', { status: 400 });
   }
 
