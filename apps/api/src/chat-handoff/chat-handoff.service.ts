@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   ConflictException,
   GoneException,
   Injectable,
@@ -23,6 +24,77 @@ import { ChatHandoffTokenService } from './chat-handoff-token.service';
 import { SelectionAttestationService } from '@/agent-gateway/selection-attestation.service';
 import { Prisma } from '@prisma/client';
 import * as crypto from 'crypto';
+
+type JsonRecord = Record<string, unknown>;
+
+type ResolvedChatHandoff = Prisma.ChatHandoffGetPayload<{
+  include: {
+    chatSession: {
+      select: {
+        userId: true;
+        deletedAt: true;
+      };
+    };
+  };
+}>;
+
+export type ChatHandoffSafeResolveResponse = {
+  status: 'ACTIVE' | 'CLAIMED' | 'CONSUMED';
+  expiresAt: string;
+  offer: {
+    airline: string;
+    origin: string;
+    destination: string;
+    departureAt: string;
+    arrivalAt: string;
+    price: string;
+    currency: string;
+    adults: number;
+    children: number;
+    infants: number;
+  };
+};
+
+function isJsonRecord(value: unknown): value is JsonRecord {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function stringValue(value: unknown): string | null {
+  return typeof value === 'string' && value.length > 0 ? value : null;
+}
+
+function isoDateValue(value: unknown): string | null {
+  const date = value instanceof Date ? value : typeof value === 'string' ? new Date(value) : null;
+  return date && !Number.isNaN(date.getTime()) ? date.toISOString() : null;
+}
+
+function firstFlightSegment(rawOffer: unknown): JsonRecord | null {
+  if (!isJsonRecord(rawOffer) || !Array.isArray(rawOffer.slices)) {
+    return null;
+  }
+
+  const firstSlice = rawOffer.slices[0];
+  if (!isJsonRecord(firstSlice) || !Array.isArray(firstSlice.segments)) {
+    return null;
+  }
+
+  const firstSegment = firstSlice.segments[0];
+  return isJsonRecord(firstSegment) ? firstSegment : null;
+}
+
+function lastFlightSegment(rawOffer: unknown): JsonRecord | null {
+  if (!isJsonRecord(rawOffer) || !Array.isArray(rawOffer.slices)) {
+    return null;
+  }
+
+  const lastSlice = rawOffer.slices[rawOffer.slices.length - 1];
+  if (!isJsonRecord(lastSlice) || !Array.isArray(lastSlice.segments)) {
+    return null;
+  }
+
+  const lastSegment = lastSlice.segments[lastSlice.segments.length - 1];
+  return isJsonRecord(lastSegment) ? lastSegment : null;
+}
 
 /**
  * ChatHandoffService — implementation.
@@ -63,8 +135,15 @@ export class ChatHandoffService {
     } catch (e) {
       throw new UnauthorizedException('Invalid attestation payload');
     }
-    const { userId, sessionId: chatSessionId, version: snapshotVersion, offers } = payload;
-    if (!offers || !Array.isArray(offers)) throw new UnauthorizedException('Invalid attestation offers');
+    const {
+      userId,
+      sessionId: chatSessionId,
+      version: snapshotVersion,
+      expiresAt: attestationExpiresAt,
+      offers,
+    } = payload;
+    if (!offers || !Array.isArray(offers))
+      throw new UnauthorizedException('Invalid attestation offers');
     if (dto.selectedOfferIndex < 1 || dto.selectedOfferIndex > offers.length) {
       throw new UnauthorizedException('Selected offer index out of bounds');
     }
@@ -74,23 +153,45 @@ export class ChatHandoffService {
       userId,
       chatSessionId,
       snapshotVersion,
-      offers
+      offers,
     );
 
     const selectedOffer = offers[dto.selectedOfferIndex - 1];
     const flightOfferId = selectedOffer.flightOfferId;
-    const duffelOfferIdHash = crypto.createHash('sha256').update(selectedOffer.duffelOfferId).digest('hex');
-    const snapshotFingerprint = crypto.createHash('sha256').update(JSON.stringify(offers)).digest('hex');
+    const duffelOfferIdHash = crypto
+      .createHash('sha256')
+      .update(selectedOffer.duffelOfferId)
+      .digest('hex');
+    const snapshotFingerprint = crypto
+      .createHash('sha256')
+      .update(JSON.stringify(offers))
+      .digest('hex');
 
     const idempotencyHash = this.tokenService.deriveIdempotencyHash(
       dto.selectionAttestationHash,
-      dto.selectedOfferIndex
+      dto.selectedOfferIndex,
     );
 
     try {
-      const expiresAt = new Date(Date.now() + 15 * 60 * 1000); // 15 mins
+      const attestationExpiry = new Date(attestationExpiresAt);
+      const expiresAt = new Date(
+        Math.min(Date.now() + 15 * 60 * 1000, attestationExpiry.getTime()),
+      );
+      if (!Number.isFinite(expiresAt.getTime()) || expiresAt <= new Date()) {
+        throw new GoneException({
+          code: 'HANDOFF_OFFER_STALE',
+          message: 'Handoff offer is stale',
+        });
+      }
       const id = crypto.randomUUID();
-      const { token, tokenHash, keyVersion } = await this.tokenService.generateToken(id, idempotencyHash);
+      const { token, tokenHash, keyVersion } = await this.tokenService.generateToken(
+        id,
+        idempotencyHash,
+      );
+      const selectionAttestationHash = crypto
+        .createHash('sha256')
+        .update(dto.selectionAttestationHash)
+        .digest('hex');
 
       const record = await this.prisma.chatHandoff.create({
         data: {
@@ -99,7 +200,7 @@ export class ChatHandoffService {
           chatSessionId,
           flightOfferId,
           duffelOfferIdHash,
-          selectionAttestationHash: dto.selectionAttestationHash,
+          selectionAttestationHash,
           selectedOfferIndex: dto.selectedOfferIndex,
           snapshotVersion,
           snapshotFingerprint,
@@ -124,19 +225,19 @@ export class ChatHandoffService {
         expiresAt: record.expiresAt.toISOString(),
       };
     } catch (error) {
-      if (
-        error instanceof Prisma.PrismaClientKnownRequestError &&
-        error.code === 'P2002'
-      ) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
         const existing = await this.prisma.chatHandoff.findUnique({
           where: { idempotencyKeyHash: idempotencyHash },
         });
         if (!existing) {
           throw new ConflictException('Idempotency collision but record not found');
         }
-        
-        const { token } = await this.tokenService.generateToken(existing.id, existing.idempotencyKeyHash);
-        
+
+        const { token } = await this.tokenService.generateToken(
+          existing.id,
+          existing.idempotencyKeyHash,
+        );
+
         await this.recordTelemetry(
           'handoff_replay',
           'replayed',
@@ -162,34 +263,65 @@ export class ChatHandoffService {
     token: string,
     userId: string,
     context: ChatTelemetryContext = {},
-  ): Promise<any> {
+  ): Promise<ResolvedChatHandoff> {
     const startedAt = Date.now();
     const isEnabled = this.configService.get<string>('FEATURE_FLAG_CHAT_HANDOFF_ACCEPT') === 'true';
     if (!isEnabled) {
-      throw new ServiceUnavailableException('Chat handoff acceptance is disabled');
+      throw new ServiceUnavailableException({
+        code: 'CHAT_HANDOFF_DISABLED',
+        message: 'Chat handoff acceptance is disabled',
+      });
     }
 
     const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
 
     const record = await this.prisma.chatHandoff.findUnique({
       where: { tokenHash },
+      include: {
+        chatSession: {
+          select: {
+            userId: true,
+            deletedAt: true,
+          },
+        },
+      },
     });
 
     if (!record) {
-      throw new NotFoundException('Handoff not found');
+      throw new NotFoundException({
+        code: 'HANDOFF_NOT_FOUND',
+        message: 'Handoff not found',
+      });
+    }
+
+    if (
+      record.userId !== userId ||
+      record.chatSession.userId !== userId ||
+      record.chatSession.deletedAt !== null
+    ) {
+      throw new NotFoundException({
+        code: 'HANDOFF_NOT_FOUND',
+        message: 'Handoff not found',
+      });
     }
 
     if (record.expiresAt < new Date()) {
-      throw new GoneException('Handoff expired');
+      throw new GoneException({
+        code: 'HANDOFF_EXPIRED',
+        message: 'Handoff expired',
+      });
     }
 
-    if (record.userId !== userId) {
-      throw new UnauthorizedException('Not authorized for this handoff');
-    }
-    
-    const isValid = await this.tokenService.verifyToken(token, record.tokenHash, record.tokenKeyVersion);
+    const isValid = await this.tokenService.verifyToken(
+      token,
+      record.tokenHash,
+      record.tokenKeyVersion,
+    );
     if (!isValid) {
-      throw new UnauthorizedException('Invalid token');
+      throw new BadRequestException({
+        code: 'HANDOFF_TOKEN_INVALID',
+        message: 'Invalid handoff token',
+      });
     }
 
     const operation: ChatTelemetryOperation = record.consumedAt
@@ -207,6 +339,129 @@ export class ChatHandoffService {
     return record;
   }
 
+  async resolveSafe(
+    token: string,
+    userId: string,
+    context: ChatTelemetryContext = {},
+  ): Promise<ChatHandoffSafeResolveResponse> {
+    const handoff: unknown = await this.resolve(token, userId, context);
+    if (!isJsonRecord(handoff)) {
+      throw new NotFoundException({
+        code: 'HANDOFF_NOT_FOUND',
+        message: 'Handoff not found',
+      });
+    }
+
+    if (handoff.consumedAt !== null && handoff.consumedAt !== undefined) {
+      throw new ConflictException({
+        code: 'HANDOFF_ALREADY_CONSUMED',
+        message: 'Handoff already consumed',
+      });
+    }
+
+    const now = new Date();
+    const claimExpiresAt = isoDateValue(handoff.claimExpiresAt);
+    const claimRecoverAfter = isoDateValue(handoff.claimRecoverAfter);
+    if (
+      (claimExpiresAt && new Date(claimExpiresAt) > now) ||
+      (claimRecoverAfter && new Date(claimRecoverAfter) > now)
+    ) {
+      throw new ConflictException({
+        code: 'HANDOFF_IN_PROGRESS',
+        message: 'Handoff in progress',
+      });
+    }
+
+    const flightOfferId = stringValue(handoff.flightOfferId);
+    const duffelOfferIdHash = stringValue(handoff.duffelOfferIdHash);
+    const expiresAt = isoDateValue(handoff.expiresAt);
+    if (!flightOfferId || !duffelOfferIdHash || !expiresAt) {
+      throw new NotFoundException({
+        code: 'HANDOFF_NOT_FOUND',
+        message: 'Handoff offer unavailable',
+      });
+    }
+
+    const flightOffer = await this.prisma.flightOffer.findUnique({
+      where: { id: flightOfferId },
+      select: {
+        duffelOfferId: true,
+        origin: true,
+        destination: true,
+        adults: true,
+        children: true,
+        infants: true,
+        price: true,
+        currency: true,
+        rawOffer: true,
+      },
+    });
+    if (!flightOffer) {
+      throw new NotFoundException({
+        code: 'HANDOFF_NOT_FOUND',
+        message: 'Handoff offer unavailable',
+      });
+    }
+
+    const computedDuffelOfferIdHash = crypto
+      .createHash('sha256')
+      .update(flightOffer.duffelOfferId)
+      .digest('hex');
+    if (computedDuffelOfferIdHash !== duffelOfferIdHash) {
+      throw new NotFoundException({
+        code: 'HANDOFF_NOT_FOUND',
+        message: 'Handoff offer unavailable',
+      });
+    }
+
+    const rawOffer = isJsonRecord(flightOffer.rawOffer) ? flightOffer.rawOffer : null;
+    const offerExpiresAt = isoDateValue(rawOffer?.expires_at);
+    if (!offerExpiresAt || new Date(offerExpiresAt) <= new Date()) {
+      throw new GoneException({
+        code: 'HANDOFF_OFFER_STALE',
+        message: 'Handoff offer is stale',
+      });
+    }
+
+    const firstSegment = firstFlightSegment(rawOffer);
+    const lastSegment = lastFlightSegment(rawOffer);
+    const departureAt = firstSegment ? stringValue(firstSegment.departing_at) : null;
+    const arrivalAt = lastSegment ? stringValue(lastSegment.arriving_at) : null;
+    if (!departureAt || !arrivalAt) {
+      throw new NotFoundException('Handoff offer unavailable');
+    }
+
+    const operatingCarrier =
+      firstSegment && isJsonRecord(firstSegment.operating_carrier)
+        ? firstSegment.operating_carrier
+        : null;
+    const marketingCarrier =
+      firstSegment && isJsonRecord(firstSegment.marketing_carrier)
+        ? firstSegment.marketing_carrier
+        : null;
+    const airline =
+      stringValue(operatingCarrier?.name) ??
+      stringValue(marketingCarrier?.name) ??
+      'Unknown Airline';
+
+    return {
+      status: 'ACTIVE',
+      expiresAt,
+      offer: {
+        airline,
+        origin: flightOffer.origin,
+        destination: flightOffer.destination,
+        departureAt,
+        arrivalAt,
+        price: String(flightOffer.price),
+        currency: flightOffer.currency,
+        adults: flightOffer.adults,
+        children: flightOffer.children,
+        infants: flightOffer.infants,
+      },
+    };
+  }
+
   private async recordTelemetry(
     operation: ChatTelemetryOperation,
     status: string,
@@ -216,23 +471,18 @@ export class ChatHandoffService {
     metadata: Record<string, unknown>,
   ): Promise<void> {
     try {
-      const event = createChatTelemetryEvent(
-        operation,
-        status,
-        latencyMs,
-        context,
-        metadata,
-      );
+      const event = createChatTelemetryEvent(operation, status, latencyMs, context, metadata);
       emitChatTelemetry(this.logger, event);
 
       if (this.auditService) {
-        await this.auditService.createLog(null, {
+        const auditWrite = this.auditService.createLog(null, {
           userId,
-          action: operation === 'handoff_create'
-            ? 'chat_handoff_created'
-            : operation === 'handoff_resolve'
-              ? 'chat_handoff_resolved'
-              : 'chat_handoff_replay',
+          action:
+            operation === 'handoff_create'
+              ? 'chat_handoff_created'
+              : operation === 'handoff_resolve'
+                ? 'chat_handoff_resolved'
+                : 'chat_handoff_replay',
           resourceType: 'ChatHandoff',
           resourceId: null,
           metadata: {
@@ -244,6 +494,9 @@ export class ChatHandoffService {
           },
           traceId: event.trace_id,
           correlationId: event.correlation_id,
+        });
+        void Promise.resolve(auditWrite).catch(() => {
+          this.logger.warn('chat_handoff_telemetry_failed');
         });
       }
     } catch {
@@ -268,10 +521,7 @@ export class ChatHandoffService {
         userId: userId,
         consumedAt: null,
         expiresAt: { gt: now },
-        OR: [
-          { claimExpiresAt: null },
-          { claimExpiresAt: { lte: now } },
-        ],
+        OR: [{ claimRecoverAfter: null }, { claimRecoverAfter: { lte: now } }],
       },
       data: {
         claimedAt: now,
@@ -320,6 +570,7 @@ export class ChatHandoffService {
    */
   async releaseClaim(handoffId: string, claimToken: string, maxRetries = 3): Promise<void> {
     const claimTokenHash = crypto.createHash('sha256').update(claimToken).digest('hex');
+    const now = new Date();
 
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
       try {
@@ -328,6 +579,7 @@ export class ChatHandoffService {
             id: handoffId,
             claimTokenHash,
             consumedAt: null,
+            claimExpiresAt: { gt: now },
           },
           data: {
             claimedAt: null,

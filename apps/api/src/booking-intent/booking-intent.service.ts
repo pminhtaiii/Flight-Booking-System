@@ -348,16 +348,18 @@ export class BookingIntentService {
 
         const session = await tx.chatSession.findUnique({
           where: { id: handoff.chatSessionId },
-          select: { deletedAt: true },
+          select: { userId: true, deletedAt: true },
         });
         
-        if (!session || session.deletedAt !== null) {
+        if (!session || session.userId !== userId || session.deletedAt !== null) {
           throw new ConflictException({ code: 'SESSION_DELETED', message: 'Chat session was deleted' });
         }
 
         const updateResult = await tx.chatHandoff.updateMany({
           where: {
             id: handoff.id,
+            userId,
+            chatSessionId: handoff.chatSessionId,
             claimTokenHash: claimTokenHash,
             consumedAt: null,
             claimExpiresAt: { gt: new Date() },

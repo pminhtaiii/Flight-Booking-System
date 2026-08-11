@@ -1,70 +1,100 @@
 import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
+import { isSameOrigin } from '@/lib/checkoutHandoffOrigin';
+import { readHandoffCredential } from '@/lib/handoffCredential';
+import { resolveHandoffForBootstrap } from '@/lib/handoffBootstrap';
 
-const VERSIONED_HANDOFF_TOKEN = /^chk_handoff_v1_[A-Za-z0-9_-]{43}$/;
+type AuthenticatedSession = {
+  accessToken: string;
+};
 
-function isValidHandoffCredential(value: string): boolean {
-  return VERSIONED_HANDOFF_TOKEN.test(value);
-}
-
-function hasAuthenticatedSession(session: unknown): boolean {
+function getAuthenticatedSession(session: unknown): AuthenticatedSession | null {
   if (typeof session !== 'object' || session === null) {
-    return false;
+    return null;
   }
 
-  return 'accessToken' in session
+  if ('accessToken' in session
     && typeof session.accessToken === 'string'
-    && session.accessToken.length > 0;
-}
-
-function isSameOrigin(request: Request, candidate: string): boolean {
-  try {
-    return new URL(candidate).origin === new URL(request.url).origin;
-  } catch {
-    return false;
+    && session.accessToken.length > 0) {
+    return { accessToken: session.accessToken };
   }
+
+  return null;
 }
 
 function hasValidSameOriginHeaders(request: Request): boolean {
   const boundaryValues = [request.headers.get('origin'), request.headers.get('referer')]
-    .filter((value): value is string => value !== null);
-
-  return boundaryValues.length > 0 && boundaryValues.every((value) => isSameOrigin(request, value));
-}
-
-async function readHandoffCredential(request: Request): Promise<string | null> {
-  try {
-    const formEntries = Array.from((await request.formData()).entries());
-    if (formEntries.length !== 1 || formEntries[0][0] !== 'handoffToken') {
-      return null;
+    .filter((value): value is string => value !== null && value !== 'null');
+  const configuredOrigin = process.env.NEXTAUTH_URL;
+  let expectedOrigin = request.url;
+  if (configuredOrigin) {
+    try {
+      expectedOrigin = new URL(configuredOrigin).origin;
+    } catch {
+      expectedOrigin = request.url;
     }
-
-    const handoffToken = formEntries[0][1];
-    return typeof handoffToken === 'string' && isValidHandoffCredential(handoffToken)
-      ? handoffToken
-      : null;
-  } catch {
-    return null;
   }
+
+  if (boundaryValues.length > 0) {
+    return boundaryValues.every((value) => isSameOrigin(expectedOrigin, value));
+  }
+
+  return request.headers.get('sec-fetch-site') === 'same-origin';
 }
 
 export async function POST(request: Request): Promise<NextResponse> {
   const session = await getServerSession(authOptions);
-  if (!hasAuthenticatedSession(session)) {
-    return new NextResponse('Unauthorized', { status: 401 });
+  const authenticatedSession = getAuthenticatedSession(session);
+  if (authenticatedSession === null) {
+    return new NextResponse('Unauthorized', {
+      status: 401,
+      headers: { 'Cache-Control': 'no-store, private' },
+    });
   }
 
   if (!hasValidSameOriginHeaders(request)) {
-    return new NextResponse('Forbidden', { status: 403 });
+    return new NextResponse('Forbidden', {
+      status: 403,
+      headers: { 'Cache-Control': 'no-store, private' },
+    });
   }
 
   const handoffToken = await readHandoffCredential(request);
   if (handoffToken === null) {
-    return new NextResponse('Bad Request', { status: 400 });
+    return new NextResponse('Bad Request', {
+      status: 400,
+      headers: { 'Cache-Control': 'no-store, private' },
+    });
+  }
+
+  const apiUrl = process.env.NEXT_PUBLIC_API_URL;
+  if (!apiUrl) {
+    return new NextResponse('Handoff unavailable', {
+      status: 503,
+      headers: { 'Cache-Control': 'no-store, private' },
+    });
+  }
+
+  const resolution = await resolveHandoffForBootstrap(
+    apiUrl,
+    handoffToken,
+    authenticatedSession.accessToken,
+    request.headers.get('x-trace-id') ?? undefined,
+    request.headers.get('x-correlation-id') ?? undefined,
+  );
+  if (!resolution.ok) {
+    const safeStatus = [400, 401, 403, 404, 409, 410, 503].includes(resolution.status)
+      ? resolution.status
+      : 502;
+    return new NextResponse('Handoff unavailable', {
+      status: safeStatus,
+      headers: { 'Cache-Control': 'no-store, private' },
+    });
   }
 
   const response = NextResponse.redirect(new URL('/checkout/passengers', request.url), 303);
+  response.headers.set('Cache-Control', 'no-store, private');
 
   response.cookies.set('chat_handoff_token', handoffToken, {
     httpOnly: true,

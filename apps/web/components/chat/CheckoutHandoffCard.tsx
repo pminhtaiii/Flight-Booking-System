@@ -16,22 +16,19 @@ export function CheckoutHandoffCard({ event }: CheckoutHandoffCardProps): JSX.El
     setError(false);
 
     try {
-      const body = new URLSearchParams({ handoffToken: event.handoffToken });
-      const response = await fetch('/checkout/handoff', {
-        method: 'POST',
-        body,
-        credentials: 'same-origin',
-        redirect: 'manual',
-      });
+      const form = document.createElement('form');
+      form.method = 'POST';
+      form.action = '/checkout/handoff';
+      form.hidden = true;
 
-      if (response.status === 303 || response.type === 'opaqueredirect') {
-        window.location.assign('/checkout/passengers');
-        return;
-      }
-      setError(true);
+      const input = document.createElement('input');
+      input.name = 'handoffToken';
+      input.value = event.handoffToken;
+      form.appendChild(input);
+      document.body.appendChild(form);
+      form.submit();
     } catch {
       setError(true);
-    } finally {
       setSubmitting(false);
     }
   }
