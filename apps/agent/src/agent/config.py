@@ -28,6 +28,8 @@ class Settings(BaseSettings):
     MEMORY_WINDOW_SIZE: int = 20
     MEMORY_TOKEN_BUDGET: int = 4000
     QUEUE_MAX_DEPTH: int = 3
+    SESSION_LOCK_TTL_MS: int = 10000
+    SESSION_LOCK_REFRESH_INTERVAL_SECONDS: float = 3.0
 
     AGENT_SERVICE_API_KEY: str = Field(..., min_length=1)
     CLAIM_TOKEN_SECRET: str = Field(..., min_length=1)
@@ -65,9 +67,15 @@ class Settings(BaseSettings):
     )
 
     @model_validator(mode="after")
-    def validate_handoff_flags(self) -> 'Settings':
+    def validate_settings(self) -> 'Settings':
         if self.FEATURE_FLAG_CHAT_HANDOFF_ISSUE and not self.FEATURE_FLAG_CHAT_HANDOFF_ACCEPT:
             raise ValueError("Invalid config: ISSUE=true but ACCEPT=false")
+        if self.SESSION_LOCK_TTL_MS <= 0:
+            raise ValueError("SESSION_LOCK_TTL_MS must be positive")
+        if self.SESSION_LOCK_REFRESH_INTERVAL_SECONDS <= 0:
+            raise ValueError("SESSION_LOCK_REFRESH_INTERVAL_SECONDS must be positive")
+        if self.SESSION_LOCK_REFRESH_INTERVAL_SECONDS * 1000 >= self.SESSION_LOCK_TTL_MS:
+            raise ValueError("Refresh interval must be less than TTL")
         return self
 
 settings: Optional[Settings] = None
@@ -77,4 +85,3 @@ def get_settings() -> Settings:
     if settings is None:
         settings = Settings()
     return settings
-

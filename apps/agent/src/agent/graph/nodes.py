@@ -116,10 +116,10 @@ async def create_handoff_token(state: AgentState, config: RunnableConfig) -> dic
                     res = results[idx]
                     display_info = {
                         "airline": res.get("airline"),
-                        "origin": res.get("departureAirport"),
-                        "destination": res.get("arrivalAirport"),
-                        "departureAt": res.get("departureTime"),
-                        "arrivalAt": res.get("arrivalTime"),
+                        "origin": res.get("origin"),
+                        "destination": res.get("destination"),
+                        "departureAt": res.get("departureAt"),
+                        "arrivalAt": res.get("arrivalAt"),
                         "price": str(res.get("price")),
                         "currency": res.get("currency")
                     }
@@ -134,5 +134,5 @@ async def create_handoff_token(state: AgentState, config: RunnableConfig) -> dic
                 "display": display_info
             }
         }
-    except Exception as e:
-        return {"action": {"error": str(e)}}
+    except Exception:
+        return {"action": {"error": "Checkout handoff could not be created."}}
