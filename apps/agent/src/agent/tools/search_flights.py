@@ -1,4 +1,5 @@
 from datetime import datetime, timezone
+from typing import Any
 from langchain_core.tools import tool
 from langchain_core.runnables import RunnableConfig
 from agent.tools.base import get_nestjs_client
@@ -13,7 +14,39 @@ AIRLINE_MAP = {
     "SQ": "Singapore Airlines",
 }
 
-FLIGHTS_CACHE = {}
+_SAFE_LLM_FIELDS = (
+    "offerExpiresAt",
+    "airline",
+    "flightNumber",
+    "departureAirport",
+    "arrivalAirport",
+    "departureTime",
+    "arrivalTime",
+    "duration",
+    "stops",
+    "price",
+    "currency",
+    "fareClass",
+    "baggageAllowance",
+)
+
+
+def project_snapshot_results(snapshot: TrustedSearchSnapshot) -> list[dict[str, Any]]:
+    """Project the trusted snapshot into the exact browser-safe result shape."""
+
+    return [
+        {
+            "index": result.offerIndex,
+            "airline": result.airline,
+            "origin": result.origin,
+            "destination": result.destination,
+            "departureAt": result.departureAt.isoformat(),
+            "arrivalAt": result.arrivalAt.isoformat(),
+            "price": result.price,
+            "currency": result.currency,
+        }
+        for result in snapshot.results
+    ]
 
 @tool("search_flights")
 async def search_flights(
@@ -79,14 +112,17 @@ async def search_flights(
             "destination": flight["arrivalAirport"],
             "departureAt": flight["departureTime"],
             "arrivalAt": flight["arrivalTime"],
-            "price": flight["price"],
+            "price": str(flight["price"]),
             "currency": flight["currency"]
         })
         
-        # Build safe dictionary for LLM (no identifiers)
-        safe_flight = flight.copy()
-        safe_flight.pop("flightOfferId", None)
-        safe_flight.pop("duffelOfferId", None)
+        # Build an explicit safe dictionary for the LLM, excluding provider and
+        # service-only fields instead of copying arbitrary gateway metadata.
+        safe_flight = {
+            key: flight[key]
+            for key in _SAFE_LLM_FIELDS
+            if key in flight
+        }
         safe_results.append(safe_flight)
 
 
@@ -108,10 +144,7 @@ async def search_flights(
         import logging
         logging.getLogger(__name__).warning("Failed to save trusted snapshot: %s", str(e))
         # If we can't save snapshot, it's safer to fail the search so we don't present unbookable results
-        FLIGHTS_CACHE.pop(thread_id, None)
         return "I encountered an error preparing your search results. Please try again."
-
-    FLIGHTS_CACHE[thread_id] = {"results": safe_results}
 
     flight_blocks = []
     for idx, flight in enumerate(safe_results, 1):

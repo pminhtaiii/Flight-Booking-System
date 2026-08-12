@@ -25,15 +25,21 @@ class MessageQueueManager:
     and reject requests exceeding the maximum allowed depth.
     Uses SessionLockRepository for distributed locking and refresh-loss cancellation.
     """
-    def __init__(self, max_depth: int = 3):
+    def __init__(
+        self,
+        max_depth: int = 3,
+        *,
+        lock_ttl_ms: int = 10000,
+        refresh_interval: float = 3.0,
+    ):
         self.max_depth = max_depth
         self.depths: dict[str, int] = {}
         self.manager_lock = asyncio.Lock()
         self.repo = SessionLockRepository()
         
         self.active_fences: dict[str, ActiveFence] = {}
-        self.refresh_interval = 3.0
-        self.lock_ttl_ms = 10000
+        self.refresh_interval = refresh_interval
+        self.lock_ttl_ms = lock_ttl_ms
 
     async def _cancel_monitored_tasks(self, session_id: str, req_id: str) -> None:
         async with self.manager_lock:

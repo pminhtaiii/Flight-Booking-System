@@ -33,7 +33,11 @@ async def lifespan(app: FastAPI):
     await guardrails.probe()
     # Initialize message queue manager
     from agent.queue.message_queue import MessageQueueManager
-    app.state.message_queue = MessageQueueManager(max_depth=settings.QUEUE_MAX_DEPTH)
+    app.state.message_queue = MessageQueueManager(
+        max_depth=settings.QUEUE_MAX_DEPTH,
+        lock_ttl_ms=settings.SESSION_LOCK_TTL_MS,
+        refresh_interval=settings.SESSION_LOCK_REFRESH_INTERVAL_SECONDS,
+    )
     yield
     # Graceful shutdown: notify all active SSE streams
     if active_streams:

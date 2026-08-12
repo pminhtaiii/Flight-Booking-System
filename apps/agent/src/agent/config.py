@@ -28,6 +28,8 @@ class Settings(BaseSettings):
     MEMORY_WINDOW_SIZE: int = 20
     MEMORY_TOKEN_BUDGET: int = 4000
     QUEUE_MAX_DEPTH: int = 3
+    SESSION_LOCK_TTL_MS: int = 10000
+    SESSION_LOCK_REFRESH_INTERVAL_SECONDS: float = 3.0
 
     AGENT_SERVICE_API_KEY: str = Field(..., min_length=1)
     CLAIM_TOKEN_SECRET: str = Field(..., min_length=1)

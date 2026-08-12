@@ -61,6 +61,35 @@ async def test_create_handoff_token():
     assert result["action"]["action"] == "begin_checkout"
     assert result["action"]["handoffToken"] == "test_token"
 
+
+# User approved T093 security regression coverage on 2026-08-10.
+@pytest.mark.asyncio
+async def test_create_handoff_token_redacts_upstream_failure_details():
+    state = AgentState(
+        signal={"offer_index": 1},
+        trusted_snapshot={
+            "version": 1,
+            "attestation": "test_attestation",
+        },
+    )
+    mock_client = AsyncMock()
+    mock_client.create_handoff.side_effect = RuntimeError(
+        "request failed for https://supplier.invalid/off_sensitive"
+    )
+
+    with (
+        patch("agent.graph.nodes.get_settings") as get_settings,
+        patch("agent.graph.nodes.get_nestjs_client", return_value=mock_client),
+    ):
+        get_settings.return_value.FEATURE_FLAG_CHAT_HANDOFF_ISSUE = True
+        result = await create_handoff_token(state, None)
+
+    assert result == {
+        "action": {"error": "Checkout handoff could not be created."}
+    }
+    assert "supplier.invalid" not in str(result)
+    assert "off_sensitive" not in str(result)
+
 @pytest.mark.asyncio
 async def test_create_handoff_token_client_not_exposed():
     from agent.tools.registry import get_tools

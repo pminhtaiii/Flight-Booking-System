@@ -6,7 +6,8 @@ import datetime
 import httpx
 from unittest.mock import patch, MagicMock
 
-from agent.tools.search_flights import search_flights
+from agent.tools.search_flights import project_snapshot_results, search_flights
+from agent.models.snapshot import TrustedSearchSnapshot
 from agent.tools.nestjs_client import NestJSClient
 from agent.repositories.trusted_snapshot_repository import TrustedSnapshotRepository
 
@@ -128,3 +129,44 @@ async def test_search_flights_strips_identifiers_and_saves_snapshot():
         assert saved_snapshot.selectionAttestation == "sel_v1_signed-opaque"
         assert len(saved_snapshot.results) == 1
         assert saved_snapshot.results[0].flightOfferId == "local-uuid-1"
+
+
+def test_project_snapshot_results_is_identifier_free():
+    snapshot = TrustedSearchSnapshot.model_validate({
+        "schemaVersion": 1,
+        "snapshotVersion": 3,
+        "userId": "user-456",
+        "sessionId": "session-123",
+        "createdAt": "2026-09-20T00:00:00Z",
+        "expiresAt": "2026-09-20T00:15:00Z",
+        "fingerprint": "opaque-fingerprint",
+        "selectionAttestation": "sel_v1_signed-opaque",
+        "results": [{
+            "offerIndex": 1,
+            "flightOfferId": "local-uuid-1",
+            "duffelOfferId": "provider-id-1",
+            "airline": "VN",
+            "origin": "SGN",
+            "destination": "NRT",
+            "departureAt": "2026-09-20T02:00:00Z",
+            "arrivalAt": "2026-09-20T08:30:00Z",
+            "price": "420.00",
+            "currency": "USD",
+        }],
+    })
+
+    projected = project_snapshot_results(snapshot)
+
+    assert projected == [{
+        "index": 1,
+        "airline": "VN",
+        "origin": "SGN",
+        "destination": "NRT",
+        "departureAt": "2026-09-20T02:00:00+00:00",
+        "arrivalAt": "2026-09-20T08:30:00+00:00",
+        "price": "420.00",
+        "currency": "USD",
+    }]
+    assert "local-uuid-1" not in str(projected)
+    assert "provider-id-1" not in str(projected)
+    assert "sel_v1_signed-opaque" not in str(projected)

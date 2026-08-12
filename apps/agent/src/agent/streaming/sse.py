@@ -386,7 +386,7 @@ async def chat_stream(
                                     "event": "error",
                                     "data": json.dumps({
                                         "code": "HANDOFF_ERROR",
-                                        "message": action_res["error"],
+                                        "message": "Checkout handoff could not be created.",
                                         "partialMessageId": None
                                     })
                                 })
@@ -500,9 +500,17 @@ async def chat_stream(
                         })
 
                         if tool_name == "search_flights":
-                            from agent.tools.search_flights import FLIGHTS_CACHE
-                            raw_cache = FLIGHTS_CACHE.pop(session_id, None)
-                            raw_results = raw_cache.get("results") if raw_cache else None
+                            from agent.tools.search_flights import project_snapshot_results
+
+                            raw_results = None
+                            try:
+                                latest_snapshot = await TrustedSnapshotRepository(
+                                    get_redis_client()
+                                ).get_snapshot(user_id, session_id)
+                                if latest_snapshot:
+                                    raw_results = project_snapshot_results(latest_snapshot)
+                            except Exception:
+                                logger.warning("search_result_projection_failed")
                             if raw_results:
                                 await q.put({
                                     "event": "flight_results",
@@ -634,7 +642,13 @@ async def chat_stream(
                 else:
                     logger.warning("empty_response_generated")
             except OutputGuardrailBlockedError as e:
-                guardrails_logger.warning("security_block")
+                guardrails_logger.warning(json.dumps({
+                    "event": "security_block",
+                    "session_id": session_id,
+                    "guardrail_layer": e.layer,
+                    "rule_name": e.rule,
+                    "message": "LLM output blocked by guardrail",
+                }))
                 partial_message_id = None
                 if not persisted and e.partial_response and e.partial_response.strip():
                     try:
