@@ -44,11 +44,8 @@ export async function protectCheckoutRoute() {
   if (!session) {
     const cookieHeader = headers().get('cookie') ?? '';
     const hasSessionCookie = cookieHeader.includes('next-auth') || cookieHeader.includes('__Secure-next-auth');
-    const host = headers().get('x-forwarded-host') || headers().get('host') || 'localhost:3000';
-    const protocol = headers().get('x-forwarded-proto') || 'http';
-    const baseUrl = `${protocol}://${host}`;
 
-    redirect(hasSessionCookie ? `${baseUrl}/login?message=session_expired` : `${baseUrl}/login`);
+    redirect(hasSessionCookie ? `/login?message=session_expired` : `/login`);
   }
 
   const accessToken = (session as { accessToken?: string }).accessToken;

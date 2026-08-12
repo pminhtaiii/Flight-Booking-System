@@ -2,7 +2,7 @@ import { protectCheckoutRoute, resolveHandoffToken } from '@/lib/checkout';
 import { Header } from '@/components/layout/Header';
 import { PassengerFormClient } from '@/components/checkout/PassengerFormClient';
 import { redirect } from 'next/navigation';
-import { cookies, headers } from 'next/headers';
+import { cookies } from 'next/headers';
 import type { TravelerProfileResponse } from '@/lib/profile-contract';
 
 interface PassengerPageFlightDetail {
@@ -46,15 +46,10 @@ export default async function PassengersPage({ searchParams }: Props) {
   const cookieStore = cookies();
   const handoffCookie = cookieStore.get('chat_handoff_token');
   
-  const headerStore = headers();
-  const host = headerStore.get('x-forwarded-host') || headerStore.get('host') || 'localhost:3000';
-  const protocol = headerStore.get('x-forwarded-proto') || 'http';
-  const baseUrl = `${protocol}://${host}`;
-
   if (handoffCookie?.value) {
     const resolved = await resolveHandoffToken(handoffCookie.value, accessToken);
     const targetOfferId = resolved?.flightOfferId || offerId || '';
-    redirect(`${baseUrl}/checkout/handoff/consume?offerId=${targetOfferId}`);
+    redirect(`/checkout/handoff/consume?offerId=${targetOfferId}`);
   }
 
   // Reject any passenger data passed via query string to prevent PII exposure
@@ -63,11 +58,11 @@ export default async function PassengersPage({ searchParams }: Props) {
   );
 
   if (hasPiiInQuery) {
-    redirect(`${baseUrl}/checkout/passengers?offerId=${offerId || ''}`);
+    redirect(`/checkout/passengers?offerId=${offerId || ''}`);
   }
 
   if (!offerId) {
-    redirect(`${baseUrl}/search`);
+    redirect(`/search`);
   }
 
   const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
@@ -79,7 +74,7 @@ export default async function PassengersPage({ searchParams }: Props) {
   let profile: TravelerProfileResponse | null = null;
 
   // 1. Mock support for test environment
-  if (mockScenario) {
+  if ((process.env.NODE_ENV === 'test' || process.env.CI === 'true') && mockScenario) {
     profile = {
       profileId: 'mock-profile-id',
       revision: 1,

@@ -94,7 +94,7 @@ export default defineConfig({
           },
           {
             command:
-              '.venv\\Scripts\\python.exe -m uvicorn agent.main:app --app-dir src --host 127.0.0.1 --port 3002',
+              'uv run uvicorn agent.main:app --app-dir src --host 127.0.0.1 --port 3002',
             url: 'http://127.0.0.1:3002/health',
             reuseExistingServer: false,
             timeout: 600000,
