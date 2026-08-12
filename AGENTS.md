@@ -59,6 +59,52 @@ When the task involves writing, running, or verifying E2E tests:
 3. **Running E2E Tests**:
    - Backend API E2E tests: run `npm run test:e2e --workspace=apps/api`
    - Frontend Playwright E2E tests: run `npx playwright test --config=apps/web/tests/playwright.config.ts`
+   - **Verified T093 workflow (PowerShell)**: use the direct workspace binaries below. The T093 Playwright configuration starts the installed Next CLI directly so Windows does not recurse into an implicit `pnpm install`.
+     ```powershell
+     docker compose up -d
+
+     Push-Location apps/api
+     & '.\node_modules\.bin\prisma.CMD' generate
+     $env:DATABASE_URL = 'postgresql://postgres:postgres@127.0.0.1:5432/test_db'
+     & '.\node_modules\.bin\prisma.CMD' migrate status
+     Pop-Location
+
+     & '.\node_modules\.bin\tsx.CMD' --test `
+       apps/web/tests/handoff-bootstrap-acceptance.unit.ts `
+       apps/web/tests/handoff-bootstrap.unit.ts `
+       apps/web/tests/handoff-form-submission.unit.ts `
+       apps/web/tests/handoff-checkout-proxy.unit.ts `
+       apps/web/tests/handoff-cookie.unit.mts
+
+     Push-Location apps/api
+     & '.\node_modules\.bin\jest.CMD' --runInBand `
+       src/chat-handoff/chat-handoff.service.spec.ts `
+       src/chat-handoff/booking-handoff.controller.spec.ts
+     Pop-Location
+
+     Push-Location apps/web
+     $env:NEXTAUTH_SECRET = 'local-build-only'
+     $env:NEXTAUTH_URL = 'http://localhost:3000'
+     $env:NEXT_PUBLIC_API_URL = 'http://127.0.0.1:3001'
+     $env:NEXT_PUBLIC_FEATURE_FLAG_BOOKING_READINESS = 'true'
+     $env:NEXT_PUBLIC_FEATURE_FLAG_CHAT_HANDOFF = 'true'
+     $env:NEXT_PUBLIC_FEATURE_FLAG_CHAT_DIRECT_STREAM = 'true'
+     $env:NEXT_PUBLIC_AGENT_URL = 'http://127.0.0.1:3002'
+     node node_modules/next/dist/bin/next build
+     Pop-Location
+
+     $env:UV_CACHE_DIR = 'C:\Booking Systems\.t093-uv-cache'
+     $env:T093_REAL_FLOW = 'true'
+     $env:T093_TEST_TIMEOUT_MS = '600000'
+     $env:T093_STREAM_TIMEOUT_MS = '300000'
+     $env:T093_BROWSER_TIMEOUT_MS = '120000'
+     $env:DATABASE_URL = 'postgresql://postgres:postgres@127.0.0.1:5432/test_db'
+     & '.\apps\web\node_modules\.bin\playwright.CMD' test `
+       'apps/web/tests/chat-t093-real-flow.spec.ts' `
+       --config='apps/web/tests/playwright.config.ts' `
+       --reporter=line
+     ```
+     On Windows, run the full Playwright command in an environment that permits local service access and `taskkill` cleanup of Playwright-owned web-server trees; otherwise the assertions may finish while the runner hangs during teardown. Do not report T093 as passing without the final Playwright exit code `0`.
 4. **Mocking & Test Strategy**:
    - Follow the opaque-box verification strategies defined in [TEST_INFRA.md](file:///c:/Booking%20Systems/TEST_INFRA.md).
    - Use time acceleration (`POST /auth/test/reset-lockout` when `NODE_ENV === 'test'`) and database assertions.
@@ -91,18 +137,6 @@ To run the full stack locally (Next.js frontend, NestJS backend, and Python agen
    - **Next.js Frontend only (Port 3000)**: `pnpm --filter @web/frontend dev`
    - **NestJS Backend only (Port 3001)**: `pnpm --filter @api/backend dev`
    - **Python Agent only (Port 3002)**: `uv run uvicorn agent.main:app --port 3002 --app-dir src` inside `apps/agent/`
-
-### GitHub MCP & CodeRabbit Integration
-
-When a task involves creating a pull request or requesting CodeRabbit reviews:
-
-1. **PR Creation**: Use the `github-mcp-server` to create Pull Requests directly. The target repository details are `owner: "pminhtaiii"`, `repo: "Flight-Booking-System"`. The base branch is typically `development`. Do not ask the user to manually create the PR.
-2. **Triggering CodeRabbit**: CodeRabbit skips automatic reviews on non-default target branches (like `development`). You must trigger the review manually:
-   - Use the `add_issue_comment` tool from `github-mcp-server` to post `@coderabbitai review` on the pull request (pass the PR number as `issue_number`).
-3. **Harvesting Feedback**:
-   - Use `pull_request_read` with method `get_comments` to check when CodeRabbit completes its run.
-   - Use `pull_request_read` with method `get_review_comments` to fetch CodeRabbit's inline review threads.
-   - Address all findings, push changes, and post `@coderabbitai review` again to confirm convergence. Do not consider a planning or implementation phase complete until all CodeRabbit comments are resolved.
 
 <!-- SPECKIT START -->
 

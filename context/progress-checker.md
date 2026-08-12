@@ -7,9 +7,9 @@ Update this file after every completed feature. Any AI agent reading this should
 ### Current Status
 
 **Feature:** Chatbot Backend Infrastructure & Booking Handoff (Feature 17)
-**Last completed:** Phase 7D / US5: proxy rollback checkpoint (T092).
-**In progress:** Phase 7D/T093 remains pending until the continuous real browser-to-consume observation flow and its required browser verification run are complete.
-**Next:** Complete T093 without starting the separately gated Phase 8. See [plan.md](file:///c:/Booking%20Systems/specs/017-chatbot-backend-infrastructure/plan.md) for details.
+**Last completed:** Phase 7D / US5: continuous real browser-to-consume observation (T093).
+**In progress:** Feature 17 Phase 7 is complete; Phase 8 remains separately gated and has not started.
+**Next:** Await explicit approval before Phase 8 polish/cleanup. See [plan.md](file:///c:/Booking%20Systems/specs/017-chatbot-backend-infrastructure/plan.md) for details.
 
 ---
 
@@ -54,7 +54,7 @@ Update this file after every completed feature. Any AI agent reading this should
   - [x] WP 6C: Deterministic action and clean web bootstrap — ACTION_HANDOFF SSE parsing, strict card, CSRF bootstrap cookie, clean checkout URL
   - [x] WP 6D: Claimed canonical consume — Token-only readiness, pre-supplier claim, final atomic intent/consume CAS
   - **All Checkout Handoff tests pass (NestJS create/resolve/consume, agent signal integration, and Playwright UI tests).**
-- [ ] Phase 7 / US5: Observable, Reversible Rollout (T085–T093)
+- [x] Phase 7 / US5: Observable, Reversible Rollout (T085–T093)
   - [x] WP 7A: Flag/direct-client gate — independent ISSUE/ACCEPT behavior, direct-stream boundary coverage, and ChatWidget direct streaming with proxy fallback (T085, T087, T091)
   - [x] WP 7B: PII-safe telemetry — per-field closed schemas, fail-open agent metrics/logs, opaque trace/correlation IDs, real Agent→NestJS trace verification, and NestJS create/resolve/consume/replay audit linkage (T086, T088, T089)
   - **WP 7B GREEN evidence:** agent focused suites `83 passed`; API focused unit suites `51 passed`; chat-handoff E2E `8 passed`; handoff-consumption E2E `1 passed`; Ruff and Python compile checks passed. Playwright was not rerun per handoff instruction.
@@ -62,8 +62,8 @@ Update this file after every completed feature. Any AI agent reading this should
   - **WP 7C GREEN evidence (2026-08-10):** the three-service test invokes the production browser request builder and preserves its generated opaque pair through real FastAPI access, memory, turn persistence, handoff creation, NestJS telemetry, and audit. NestJS handoff E2E passed `9/9`; gateway E2E passed `11/11`; Agent client tests passed `24/24`; the focused direct-stream test passed `1` with `11` deselected; and web trace/direct/proxy unit suites passed `17/17`. Duplicate API-base composition, canonical/legacy signed-JWT handling, memory-query coercion, and NestJS-token-to-`ACTION_HANDOFF` adaptation are fixed. Playwright was not rerun; user-provided successful browser runs remain accepted evidence.
   - [x] WP 7D/T092: Proxy rollback checkpoint — same-origin proxy retained, explicit direct-stream flag honored, opaque headers filtered, and legacy `ACTION_REQUIRED` SSE passed through unchanged.
   - **WP 7D/T092 GREEN evidence:** route-level proxy tests `2/2` passed; the user-provided `chat-checkout-handoff.spec.ts` browser run passed. The proxy rollback matrix remains retained.
-  - [ ] WP 7D/T093: Reversible observation — direct-stream signed-search/selection/action ordering, strict authenticated clean bootstrap, owner/internal-session resolution, readiness/claim/consume regression, legacy `ACTION_REQUIRED`, session continuity, encrypted persistence, and credential privacy assertions.
-  - **WP 7D/T093 partial evidence (2026-08-10):** API chat-handoff E2E previously passed `9/9`; focused Agent rollout tests previously passed `73/73`; browser boundary specs cover strict bootstrap and credential privacy. The service evidence is still composed across separate FastAPI→NestJS and readiness/consume checks, while the browser specs intercept FastAPI. T093 therefore remains pending until one continuous real browser→FastAPI→NestJS→bootstrap→resolve→readiness→consume run and the required Playwright verification complete. Phase 8 remains unchecked and was not started.
+  - [x] WP 7D/T093: Reversible observation — direct-stream signed-search/selection/action ordering, strict authenticated clean bootstrap, owner/internal-session resolution, readiness/claim/consume regression, legacy `ACTION_REQUIRED`, session continuity, encrypted persistence, and credential privacy assertions.
+  - **WP 7D/T093 GREEN evidence (2026-08-12):** exact-final-source real browser→Next.js→FastAPI→NestJS→bootstrap→resolve→readiness→consume Playwright run exited `0` with `1 passed (7.4m)`. Assertions proved one BookingIntent and one consumed handoff under 16-way concurrency, two expected supplier calls and zero payment calls, four encrypted plaintext-free messages, retained session continuity, clean URL/DOM/storage/cookie/console/request privacy, and distinct legacy `ACTION_REQUIRED`. Focused web boundary tests passed `11/11`, focused API handoff tests passed `20/20`, and the Next production build passed with both cookie-backed checkout proxy routes compiled. Phase 8 remains unchecked and was not started.
 - [ ] Phase 8 / Polish & Cleanup (T094–T102)
 
 ### [ ] Feature: Traveler Profile & Booking Readiness (Feature 16)
