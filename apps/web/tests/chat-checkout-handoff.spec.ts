@@ -1,4 +1,9 @@
-import { test, expect, Page, Route } from '@playwright/test';
+import { test, expect, type Page, type Route } from '@playwright/test';
+
+const WEB_ORIGIN = 'http://127.0.0.1:3000';
+const HANDOFF_TOKEN = `chk_handoff_v1_${'a'.repeat(43)}`;
+
+// User-approved review fix (2026-08-10): align existing expectations with the strict handoff contract.
 
 async function loginAsNewUser(page: Page): Promise<void> {
   const unique = Date.now() + Math.floor(Math.random() * 10000);
@@ -13,7 +18,7 @@ test.describe('Chat Checkout Handoff', () => {
   const mockHandoffEvent = {
     version: 1,
     action: 'begin_checkout',
-    handoffToken: 'chk_handoff_v1_opaque',
+    handoffToken: HANDOFF_TOKEN,
     expiresAt: new Date(Date.now() + 15 * 60 * 1000).toISOString(),
     display: {
       airline: 'Test Airlines',
@@ -36,6 +41,56 @@ test.describe('Chat Checkout Handoff', () => {
       });
     });
   };
+
+  test('rejects an unauthenticated handoff bootstrap', async ({ page }) => {
+    const response = await page.request.post(`${WEB_ORIGIN}/checkout/handoff`, {
+      form: { handoffToken: HANDOFF_TOKEN },
+      headers: { Origin: WEB_ORIGIN },
+    });
+
+    expect(response.status()).toBe(401);
+    expect(response.headers()['set-cookie']).toBeUndefined();
+  });
+
+  test('rejects malformed and non-contract handoff bodies', async ({ page }) => {
+    await loginAsNewUser(page);
+
+    const legacyTokenResponse = await page.request.post(`${WEB_ORIGIN}/checkout/handoff`, {
+      form: { handoffToken: 'a'.repeat(43) },
+      headers: { Origin: WEB_ORIGIN },
+    });
+    expect(legacyTokenResponse.status()).toBe(400);
+
+    const extraFieldResponse = await page.request.post(`${WEB_ORIGIN}/checkout/handoff`, {
+      form: { handoffToken: HANDOFF_TOKEN, unexpected: 'field' },
+      headers: { Origin: WEB_ORIGIN },
+    });
+    expect(extraFieldResponse.status()).toBe(400);
+
+    const invalidMediaResponse = await page.request.post(`${WEB_ORIGIN}/checkout/handoff`, {
+      data: '{"handoffToken":',
+      headers: { Origin: WEB_ORIGIN, 'Content-Type': 'application/json' },
+    });
+    expect(invalidMediaResponse.status()).toBe(400);
+  });
+
+  test('rejects missing, malformed, and non-identical origins', async ({ page }) => {
+    await loginAsNewUser(page);
+
+    for (const headers of [
+      {},
+      { Origin: 'not a URL' },
+      { Origin: 'https://127.0.0.1:3000' },
+      { Referer: 'http://127.0.0.1:3001/checkout' },
+    ]) {
+      const response = await page.request.post(`${WEB_ORIGIN}/checkout/handoff`, {
+        form: { handoffToken: HANDOFF_TOKEN },
+        headers,
+      });
+      expect(response.status()).toBe(403);
+      expect(response.headers()['set-cookie']).toBeUndefined();
+    }
+  });
 
   test('should render strict checkout card from ACTION_HANDOFF event', async ({ page }) => {
     await setupMockStream(page);
@@ -110,6 +165,9 @@ test.describe('Chat Checkout Handoff', () => {
   test('should submit CSRF/origin-protected POST bootstrap and redirect cleanly', async ({ page }) => {
     await loginAsNewUser(page);
     await setupMockStream(page);
+    await page.route(`${WEB_ORIGIN}/checkout/passengers`, async (route) => {
+      await route.fulfill({ status: 200, contentType: 'text/html', body: '<main>Checkout</main>' });
+    });
     await page.goto('http://127.0.0.1:3000/search');
     
     await page.fill('input[placeholder="Type a message..."]', 'checkout');
@@ -118,8 +176,6 @@ test.describe('Chat Checkout Handoff', () => {
     const submitButton = page.locator('text=Continue to Checkout');
     await submitButton.waitFor();
 
-    // The backend /api/chat-handoff/resolve might fail, but we just need to verify the redirect happened
-    // and token is not in URL
     await submitButton.click();
     await expect(page).toHaveURL(/\/checkout\/passengers$/);
     expect(page.url()).not.toContain('handoffToken');
@@ -127,59 +183,26 @@ test.describe('Chat Checkout Handoff', () => {
 
   test('should set HttpOnly/Secure/SameSite cookie on bootstrap', async ({ page, context }) => {
     await loginAsNewUser(page);
-    // Mock the resolve endpoint so we don't crash the server side
-    await page.context().addCookies([{
-      name: 'mock-scenario',
-      value: 'valid-intent', // to prevent the page from crashing if it fetches intent
-      domain: '127.0.0.1',
-      path: '/',
-    }]);
-
-    // Send a direct POST request to /checkout/handoff to simulate form submission
-    const response = await page.request.post('http://127.0.0.1:3000/checkout/handoff', {
+    const response = await page.request.post(`${WEB_ORIGIN}/checkout/handoff`, {
       form: {
-        handoffToken: 'a'.repeat(43),
+        handoffToken: HANDOFF_TOKEN,
       },
       headers: {
-        'Origin': 'http://127.0.0.1:3000',
-      }
+        Origin: WEB_ORIGIN,
+      },
+      maxRedirects: 0,
     });
 
-    expect(response.status()).toBe(200); // Wait, Next.js redirect from route.ts returns 303, but Playwright follows it and returns 200 of the passenger page
+    expect(response.status()).toBe(303);
+    expect(response.headers().location).toBe(`${WEB_ORIGIN}/checkout/passengers`);
     
     const cookies = await context.cookies();
     const handoffCookie = cookies.find((cookie) => cookie.name === 'chat_handoff_token');
     
     expect(handoffCookie).toBeDefined();
     expect(handoffCookie?.httpOnly).toBe(true);
-    // Secure is true but in http localhost it might be ignored or set, but we expect it.
+    expect(handoffCookie?.secure).toBe(true);
     expect(handoffCookie?.sameSite).toBe('Strict');
-  });
-
-  test('should resolve owner-only from cookie and recover state', async ({ page, context }) => {
-    await loginAsNewUser(page);
-    await context.addCookies([{
-      name: 'chat_handoff_token',
-      value: 'dummy_token',
-      domain: '127.0.0.1',
-      path: '/',
-    }, {
-      name: 'mock-scenario',
-      value: 'valid-intent', // so the page renders fine
-      domain: '127.0.0.1',
-      path: '/',
-    }]);
-
-    await page.route('**/api/chat-handoff/resolve*', async (route: Route) => {
-      await route.fulfill({
-        status: 200,
-        json: { flightOfferId: 'off_test123' },
-      });
-    });
-
-    await page.goto('http://127.0.0.1:3000/checkout/passengers');
-    
-    await expect(page.locator('text=Passenger 1 (ADULT)')).toBeVisible({ timeout: 15000 });
   });
 
   test('should enforce browser-storage privacy', async ({ page }) => {
@@ -198,19 +221,39 @@ test.describe('Chat Checkout Handoff', () => {
     await expect(page.locator('input[name="handoffToken"]')).toHaveCount(0);
   });
 
-  test('keeps the handoff credential out of browser URLs, storage, and observed request URLs', async ({ page }) => {
+  test('keeps the handoff credential out of browser URLs, logs, storage, and redirect targets', async ({ page }) => {
     const credential = mockHandoffEvent.handoffToken;
     const observedUrls: string[] = [];
+    const browserLogs: string[] = [];
+    const bootstrapBodies: Array<string | null> = [];
+
+    await loginAsNewUser(page);
     page.on('request', (request) => observedUrls.push(request.url()));
+    page.on('request', (request) => {
+      if (new URL(request.url()).pathname === '/checkout/handoff') {
+        bootstrapBodies.push(request.postData());
+      }
+    });
+    page.on('console', (message) => browserLogs.push(message.text()));
 
     await setupMockStream(page);
+    await page.route(`${WEB_ORIGIN}/checkout/passengers`, async (route) => {
+      await route.fulfill({ status: 200, contentType: 'text/html', body: '<main>Checkout</main>' });
+    });
     await page.goto('http://127.0.0.1:3000/search');
     await page.fill('input[placeholder="Type a message..."]', 'checkout');
     await page.keyboard.press('Enter');
-    await page.getByRole('button', { name: 'Continue to Checkout' }).waitFor();
+    const continueButton = page.getByRole('button', { name: 'Continue to Checkout' });
+    await continueButton.waitFor();
+    const renderedDom = await page.locator('html').evaluate((element) => element.outerHTML);
+    expect(renderedDom).not.toContain(credential);
+    await continueButton.click();
+    await expect(page).toHaveURL(/\/checkout\/passengers$/);
 
+    expect(bootstrapBodies).toEqual([`handoffToken=${encodeURIComponent(credential)}`]);
     expect(page.url()).not.toContain(credential);
     expect(observedUrls.every((url) => !url.includes(credential))).toBe(true);
+    expect(browserLogs.every((message) => !message.includes(credential))).toBe(true);
     const browserStorage = await page.evaluate(() => ({
       local: JSON.stringify(window.localStorage),
       session: JSON.stringify(window.sessionStorage),

@@ -4,6 +4,8 @@ import { ServiceUnavailableException } from '@nestjs/common';
 import { ChatHandoffController } from './chat-handoff.controller';
 import { ChatHandoffService } from './chat-handoff.service';
 
+// User approved updating existing tests for Feature 017 T093 contract coverage on 2026-08-10.
+
 describe('Chat Handoff Config Validation', () => {
   function configService(values: Record<string, string>): ConfigService {
     return {
@@ -76,6 +78,7 @@ describe('Chat Handoff Config Validation', () => {
     expect(handoffService.resolve).toHaveBeenCalledWith(
       'chk_handoff_v1_test',
       'user-1',
+      { traceId: undefined, correlationId: undefined },
     );
   });
 

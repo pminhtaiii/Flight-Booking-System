@@ -1,8 +1,8 @@
 import { IsString, Matches } from 'class-validator';
 import { HANDOFF_CREDENTIAL_PATTERN } from '@shared/types';
 
-export class ResolveChatHandoffDto {
+export class ResolveChatHandoffBodyDto {
   @IsString()
   @Matches(HANDOFF_CREDENTIAL_PATTERN)
-  token!: string;
+  handoffToken!: string;
 }

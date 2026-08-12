@@ -11,7 +11,8 @@ import * as crypto from 'crypto';
 
 export type CabinClass = 'economy' | 'premium_economy' | 'business' | 'first';
 
-function parseISO8601Duration(durationStr: string): number {
+function parseISO8601Duration(durationStr: string | null | undefined): number {
+  if (!durationStr) return 0;
   const regex = /P(?:(\d+)D)?T(?:(\d+)H)?(?:(\d+)M)?/;
   const matches = durationStr.match(regex);
   if (!matches) return 0;
