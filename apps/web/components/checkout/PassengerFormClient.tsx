@@ -14,8 +14,9 @@ interface PassengerFormClientProps {
   };
   profile: TravelerProfileResponse | null;
   offerPassengers: Array<{ id: string; type: 'ADULT' | 'CHILD' | 'INFANT' }>;
-  accessToken: string;
-  offerId: string;
+  accessToken?: string;
+  offerId?: string;
+  handoff?: boolean;
 }
 
 interface FormPassenger {
@@ -104,6 +105,7 @@ export function PassengerFormClient({
   offerPassengers,
   accessToken,
   offerId,
+  handoff = false,
 }: PassengerFormClientProps) {
   const router = useRouter();
   const [passengers, setPassengers] = useState<FormPassenger[]>(() => initialPassengers(flight, offerPassengers));
@@ -192,23 +194,23 @@ export function PassengerFormClient({
     }
 
     setLoading(true);
-    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+    const apiUrl = handoff ? '' : process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
     const traceId = globalThis.crypto?.randomUUID?.() ?? `checkout-${Date.now()}`;
     const correlationId = globalThis.crypto?.randomUUID?.() ?? `booking-${Date.now()}`;
     const sources = buildSources();
 
     try {
-      const readinessResponse = await fetch(`${apiUrl}/api/bookings/intents/readiness`, {
+      const readinessResponse = await fetch(handoff ? '/api/checkout/handoff/readiness' : `${apiUrl}/api/bookings/intents/readiness`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${accessToken}`,
+          ...(handoff ? {} : { Authorization: `Bearer ${accessToken}` }),
           'x-trace-id': traceId,
           'x-correlation-id': correlationId,
         },
         cache: 'no-store',
         body: JSON.stringify({
-          flightOfferId: offerId,
+          ...(handoff ? {} : { flightOfferId: offerId }),
           passengers: sources.map((passenger) => ({
             offerPassengerId: passenger.offerPassengerId,
             passengerType: passenger.type,
@@ -224,17 +226,17 @@ export function PassengerFormClient({
         throw new Error('The server needs more passenger details before this booking can continue.');
       }
 
-      const createResponse = await fetch(`${apiUrl}/api/bookings/intents`, {
+      const createResponse = await fetch(handoff ? '/api/checkout/handoff/intents' : `${apiUrl}/api/bookings/intents`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${accessToken}`,
+          ...(handoff ? {} : { Authorization: `Bearer ${accessToken}` }),
           'x-trace-id': traceId,
           'x-correlation-id': correlationId,
         },
         cache: 'no-store',
         body: JSON.stringify({
-          flightOfferId: offerId,
+          ...(handoff ? {} : { flightOfferId: offerId }),
           readinessScope: readiness.scope,
           passengers: sources,
         }),

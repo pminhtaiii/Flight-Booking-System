@@ -1,8 +1,9 @@
-import { protectCheckoutRoute, resolveHandoffToken } from '@/lib/checkout';
+import { protectCheckoutRoute } from '@/lib/checkout';
 import { Header } from '@/components/layout/Header';
 import { PassengerFormClient } from '@/components/checkout/PassengerFormClient';
 import { redirect } from 'next/navigation';
 import { cookies } from 'next/headers';
+import { hasCheckoutHandoffContext, resolveHandoffForBootstrap } from '@/lib/handoffBootstrap';
 import type { TravelerProfileResponse } from '@/lib/profile-contract';
 
 interface PassengerPageFlightDetail {
@@ -47,9 +48,31 @@ export default async function PassengersPage({ searchParams }: Props) {
   const handoffCookie = cookieStore.get('chat_handoff_token');
   
   if (handoffCookie?.value) {
-    const resolved = await resolveHandoffToken(handoffCookie.value, accessToken);
-    const targetOfferId = resolved?.flightOfferId || offerId || '';
-    redirect(`/checkout/handoff/consume?offerId=${targetOfferId}`);
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL;
+    if (!apiUrl) redirect('/search');
+    const resolved = await resolveHandoffForBootstrap(apiUrl, handoffCookie.value, accessToken, undefined, undefined);
+    if (!hasCheckoutHandoffContext(resolved)) redirect('/search');
+    const { offer, passengers } = resolved.context;
+    return (
+      <div className="flex min-h-screen flex-col bg-background">
+        <Header />
+        <main className="mx-auto w-full max-w-3xl space-y-6 py-12 px-4">
+          <h1 className="text-3xl font-bold text-text-primary">Passenger Details</h1>
+          <div className="card p-6 space-y-2 text-text-secondary">
+            <h2 className="text-lg font-semibold text-text-primary">Flight Selected</h2>
+            <p>{offer.airline}: {offer.origin} to {offer.destination}</p>
+            <p>{offer.departureAt} – {offer.arrivalAt}</p>
+            <p>{offer.price} {offer.currency}</p>
+          </div>
+          <PassengerFormClient
+            flight={{ id: 'handoff', adults: offer.adults, children: offer.children, infants: offer.infants }}
+            profile={null}
+            offerPassengers={passengers}
+            handoff
+          />
+        </main>
+      </div>
+    );
   }
 
   // Reject any passenger data passed via query string to prevent PII exposure

@@ -1,7 +1,8 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import type { HandoffEvent } from '@shared/types/chat.types';
+import { appendHandoffCredential } from '@/lib/handoffFormSubmission';
 
 type CheckoutHandoffCardProps = {
   event: HandoffEvent;
@@ -9,26 +10,22 @@ type CheckoutHandoffCardProps = {
 
 export function CheckoutHandoffCard({ event }: CheckoutHandoffCardProps): JSX.Element {
   const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState(false);
+  const formRef = useRef<HTMLFormElement>(null);
 
-  async function submitHandoff(): Promise<void> {
+  useEffect(() => {
+    const form = formRef.current;
+    if (!form) return undefined;
+
+    const addCredential = (formDataEvent: FormDataEvent): void => {
+      appendHandoffCredential(formDataEvent.formData, event.handoffToken);
+    };
+
+    form.addEventListener('formdata', addCredential);
+    return () => form.removeEventListener('formdata', addCredential);
+  }, [event.handoffToken]);
+
+  function submitHandoff(): void {
     setSubmitting(true);
-    setError(false);
-
-    try {
-      const response = await fetch('/checkout/handoff', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: new URLSearchParams({ handoffToken: event.handoffToken }),
-      });
-      if (!response.ok) {
-        throw new Error('Handoff failed');
-      }
-      window.location.assign(response.url);
-    } catch {
-      setError(true);
-      setSubmitting(false);
-    }
   }
 
   return (
@@ -41,16 +38,11 @@ export function CheckoutHandoffCard({ event }: CheckoutHandoffCardProps): JSX.El
         <div><span className="font-medium text-text-primary">Arrival:</span> {new Date(event.display.arrivalAt).toLocaleString()}</div>
         <div><span className="font-medium text-text-primary">Price:</span> {event.display.price} {event.display.currency}</div>
       </div>
-      {error ? (
-        <p role="alert" className="text-sm text-text-secondary">
-          We couldn&apos;t open checkout. Please try again.
-        </p>
-      ) : null}
       <form
-        onSubmit={(formEvent) => {
-          formEvent.preventDefault();
-          void submitHandoff();
-        }}
+        ref={formRef}
+        action="/checkout/handoff"
+        method="post"
+        onSubmit={submitHandoff}
         className="mt-2 text-right"
       >
         <button

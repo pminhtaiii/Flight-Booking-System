@@ -53,6 +53,7 @@ export type ChatHandoffSafeResolveResponse = {
     children: number;
     infants: number;
   };
+  passengers?: Array<{ id: string; type: 'ADULT' | 'CHILD' | 'INFANT' }>;
 };
 
 function isJsonRecord(value: unknown): value is JsonRecord {
@@ -94,6 +95,19 @@ function lastFlightSegment(rawOffer: unknown): JsonRecord | null {
 
   const lastSegment = lastSlice.segments[lastSlice.segments.length - 1];
   return isJsonRecord(lastSegment) ? lastSegment : null;
+}
+
+function handoffPassengers(rawOffer: JsonRecord | null): Array<{ id: string; type: 'ADULT' | 'CHILD' | 'INFANT' }> | null {
+  if (!rawOffer || !Array.isArray(rawOffer.passengers)) return null;
+  const passengers = rawOffer.passengers.map((passenger) => {
+    if (!isJsonRecord(passenger)) return null;
+    const id = stringValue(passenger.id);
+    const type = stringValue(passenger.type)?.toUpperCase();
+    return id && (type === 'ADULT' || type === 'CHILD' || type === 'INFANT') ? { id, type } : null;
+  });
+  return passengers.every((passenger) => passenger !== null)
+    ? passengers as Array<{ id: string; type: 'ADULT' | 'CHILD' | 'INFANT' }>
+    : null;
 }
 
 /**
@@ -415,6 +429,7 @@ export class ChatHandoffService {
     }
 
     const rawOffer = isJsonRecord(flightOffer.rawOffer) ? flightOffer.rawOffer : null;
+    const passengers = handoffPassengers(rawOffer);
     const offerExpiresAt = isoDateValue(rawOffer?.expires_at);
     if (!offerExpiresAt || new Date(offerExpiresAt) <= new Date()) {
       throw new GoneException({
@@ -459,6 +474,7 @@ export class ChatHandoffService {
         children: flightOffer.children,
         infants: flightOffer.infants,
       },
+      ...(passengers && passengers.length > 0 ? { passengers } : {}),
     };
   }
 

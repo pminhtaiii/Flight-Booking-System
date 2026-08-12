@@ -125,7 +125,7 @@ export default defineConfig({
       : []),
     {
       command: t093RealFlow
-        ? 'pnpm dev'
+        ? 'node node_modules/next/dist/bin/next dev -p 3000'
         : directStreamE2E
           ? 'pnpm dev'
           : 'pnpm start',

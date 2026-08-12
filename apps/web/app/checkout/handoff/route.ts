@@ -3,7 +3,8 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { isSameOrigin } from '@/lib/checkoutHandoffOrigin';
 import { readHandoffCredential } from '@/lib/handoffCredential';
-import { resolveHandoffForBootstrap } from '@/lib/handoffBootstrap';
+import { hasCheckoutHandoffContext, resolveHandoffForBootstrap } from '@/lib/handoffBootstrap';
+import { HANDOFF_COOKIE_NAME, handoffCookieOptions } from '@/lib/handoffCookie';
 
 type AuthenticatedSession = {
   accessToken: string;
@@ -83,7 +84,7 @@ export async function POST(request: Request): Promise<NextResponse> {
     request.headers.get('x-trace-id') ?? undefined,
     request.headers.get('x-correlation-id') ?? undefined,
   );
-  if (!resolution.ok) {
+  if (!hasCheckoutHandoffContext(resolution)) {
     const safeStatus = [400, 401, 403, 404, 409, 410, 503].includes(resolution.status)
       ? resolution.status
       : 502;
@@ -96,13 +97,7 @@ export async function POST(request: Request): Promise<NextResponse> {
   const response = NextResponse.redirect(new URL('/checkout/passengers', request.url), 303);
   response.headers.set('Cache-Control', 'no-store, private');
 
-  response.cookies.set('chat_handoff_token', handoffToken, {
-    httpOnly: true,
-    secure: true,
-    sameSite: 'strict',
-    maxAge: 15 * 60,
-    path: '/',
-  });
+  response.cookies.set(HANDOFF_COOKIE_NAME, handoffToken, handoffCookieOptions());
 
   return response;
 }
