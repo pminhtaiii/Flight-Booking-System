@@ -67,9 +67,15 @@ class Settings(BaseSettings):
     )
 
     @model_validator(mode="after")
-    def validate_handoff_flags(self) -> 'Settings':
+    def validate_settings(self) -> 'Settings':
         if self.FEATURE_FLAG_CHAT_HANDOFF_ISSUE and not self.FEATURE_FLAG_CHAT_HANDOFF_ACCEPT:
             raise ValueError("Invalid config: ISSUE=true but ACCEPT=false")
+        if self.SESSION_LOCK_TTL_MS <= 0:
+            raise ValueError("SESSION_LOCK_TTL_MS must be positive")
+        if self.SESSION_LOCK_REFRESH_INTERVAL_SECONDS <= 0:
+            raise ValueError("SESSION_LOCK_REFRESH_INTERVAL_SECONDS must be positive")
+        if self.SESSION_LOCK_REFRESH_INTERVAL_SECONDS * 1000 >= self.SESSION_LOCK_TTL_MS:
+            raise ValueError("Refresh interval must be less than TTL")
         return self
 
 settings: Optional[Settings] = None
@@ -79,4 +85,3 @@ def get_settings() -> Settings:
     if settings is None:
         settings = Settings()
     return settings
-
