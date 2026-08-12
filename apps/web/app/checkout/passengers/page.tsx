@@ -2,7 +2,7 @@ import { protectCheckoutRoute, resolveHandoffToken } from '@/lib/checkout';
 import { Header } from '@/components/layout/Header';
 import { PassengerFormClient } from '@/components/checkout/PassengerFormClient';
 import { redirect } from 'next/navigation';
-import { headers, cookies } from 'next/headers';
+import { cookies } from 'next/headers';
 import type { TravelerProfileResponse } from '@/lib/profile-contract';
 
 interface PassengerPageFlightDetail {
@@ -62,15 +62,13 @@ export default async function PassengersPage({ searchParams }: Props) {
   }
 
   if (!offerId) {
-    redirect('/search');
+    redirect(`/search`);
   }
 
   const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
   // Extract mock scenario for Playwright tests
-  const cookieHeader = headers().get('cookie') ?? '';
-  const mockScenarioMatch = cookieHeader.match(/mock-scenario=([^;]+)/);
-  const mockScenario = mockScenarioMatch ? mockScenarioMatch[1].trim() : null;
+  const mockScenario = cookieStore.get('mock-scenario')?.value || null;
 
   let flight: PassengerPageFlightDetail | null = null;
   let profile: TravelerProfileResponse | null = null;
