@@ -7,9 +7,9 @@ Update this file after every completed feature. Any AI agent reading this should
 ### Current Status
 
 **Feature:** Chatbot Backend Infrastructure & Booking Handoff (Feature 17)
-**Last completed:** Phase 7D / US5: continuous real browser-to-consume observation (T093).
-**In progress:** Feature 17 Phase 7 is complete; Phase 8 remains separately gated and has not started.
-**Next:** Await explicit approval before Phase 8 polish/cleanup. See [plan.md](file:///c:/Booking%20Systems/specs/017-chatbot-backend-infrastructure/plan.md) for details.
+**Last completed:** Phase 7D/T093 (owning-session browser-flow evidence) and Phase 8A / operations and context documentation (T094-T096; documentation review only).
+**In progress:** Phase 8B / observability and performance gates (T097-T098) remains pending.
+**Next:** Complete Phase 8B, then advance through Phase 8C-8E only at their explicit gates. See [plan.md](../specs/017-chatbot-backend-infrastructure/plan.md) for details.
 
 ---
 
@@ -63,11 +63,28 @@ Update this file after every completed feature. Any AI agent reading this should
   - [x] WP 7D/T092: Proxy rollback checkpoint — same-origin proxy retained, explicit direct-stream flag honored, opaque headers filtered, and legacy `ACTION_REQUIRED` SSE passed through unchanged.
   - **WP 7D/T092 GREEN evidence:** route-level proxy tests `2/2` passed; the user-provided `chat-checkout-handoff.spec.ts` browser run passed. The proxy rollback matrix remains retained.
   - [x] WP 7D/T093: Reversible observation — direct-stream signed-search/selection/action ordering, strict authenticated clean bootstrap, owner/internal-session resolution, readiness/claim/consume regression, legacy `ACTION_REQUIRED`, session continuity, encrypted persistence, and credential privacy assertions.
-  - **WP 7D/T093 GREEN evidence (2026-08-12):** exact-final-source real browser→Next.js→FastAPI→NestJS→bootstrap→resolve→readiness→consume Playwright run exited `0` with `1 passed (7.4m)`. Assertions proved one BookingIntent and one consumed handoff under 16-way concurrency, two expected supplier calls and zero payment calls, four encrypted plaintext-free messages, retained session continuity, clean URL/DOM/storage/cookie/console/request privacy, and distinct legacy `ACTION_REQUIRED`. Focused web boundary tests passed `11/11`, focused API handoff tests passed `20/20`, and the Next production build passed with both cookie-backed checkout proxy routes compiled. Phase 8 remains unchecked and was not started.
+  - **WP 7D/T093 GREEN evidence (2026-08-12):** exact-final-source real browser→Next.js→FastAPI→NestJS→bootstrap→resolve→readiness→consume Playwright run exited `0` with `1 passed (7.4m)`. Assertions proved one BookingIntent and one consumed handoff under 16-way concurrency, two expected supplier calls and zero payment calls, four encrypted plaintext-free messages, retained session continuity, clean URL/DOM/storage/cookie/console/request privacy, and distinct legacy `ACTION_REQUIRED`. Focused web boundary tests passed `11/11`, focused API handoff tests passed `20/20`, and the Next production build passed with both cookie-backed checkout proxy routes compiled. This documentation session did not rerun the browser flow.
 - [ ] Phase 8 / Polish & Cleanup (T094–T102)
 
-### [ ] Feature: Traveler Profile & Booking Readiness (Feature 16)
+  - [x] WP 8A / T094-T096: Operations/context documentation reviewed. Added the handoff runbook; synchronized architecture, dependency rules, and progress terminology; recorded rollback, rotation, retention, privacy, and session-deletion limitations.
+  - [ ] WP 8B / T097-T098: Dashboard/alert contract assertions and 100-request/router/quota/handoff performance evidence remain pending. No performance, dashboard, alert, or backup evidence is claimed.
+  - [ ] WP 8C: Polish and non-destructive verification remain pending after T093/8B dependencies.
+  - [ ] WP 8D / T101: Direct-only proxy cleanup is unstarted and requires separate explicit post-observation approval.
+  - [ ] WP 8E / T102: Plaintext-column cleanup is unstarted and requires separate explicit encrypted-chat observation/rollback approval plus recovery, database, and backup evidence.
+  - **8A documentation validation (2026-08-12):** the exact commands and fresh results were:
+    - `git diff --check` -> exit `0` (only Git's informational LF-to-CRLF warnings).
+    - `C:\Booking Systems\node_modules\.bin\prettier.CMD --check docs/runbooks/chatbot-handoff.md context/architecture.md context/library-docs.md context/progress-checker.md specs/017-chatbot-backend-infrastructure/tasks.md` -> exit `0`, `All matched files use Prettier code style!`.
+    - The following read-only PowerShell validation command -> `BROKEN_LINKS=0`, `STALE_TERM_HITS=0`, `RUNBOOK_NUMBERED_SECTIONS=10`; its status output showed T093-T096 checked and T097-T102 unchecked:
 
+      ```powershell
+      $files=@('docs/runbooks/chatbot-handoff.md','context/architecture.md','context/library-docs.md','context/progress-checker.md','specs/017-chatbot-backend-infrastructure/tasks.md'); $bad=@(); foreach($file in $files){$dir=Split-Path $file; if(-not $dir){$dir='.'}; foreach($m in [regex]::Matches((Get-Content -Raw $file),'\[[^\]]+\]\(([^)]+)\)')){$target=$m.Groups[1].Value; if($target -match '^(https?://|#|mailto:)'){continue}; $clean=($target -split '#')[0]; if($clean -and -not (Test-Path (Join-Path $dir $clean))){$bad += "$file -> $target"}}}; "BROKEN_LINKS=$($bad.Count)"; $bad; $terms=@(('7'+'E'),('Phase 7'+'E'),('proxy '+'removed'),('plaintext cleanup '+'complete'),('LLM creates '+'booking'),('offer ID sent to '+'LLM'),('token in '+'URL')); $hits=@(); foreach($file in $files){$n=0; foreach($line in Get-Content $file){$n++; foreach($term in $terms){if($line.IndexOf($term,[System.StringComparison]::OrdinalIgnoreCase) -ge 0){$hits += "$file`:$n -> $term"}}}}; "STALE_TERM_HITS=$($hits.Count)"; $hits; $sections=(Select-String -Path docs\runbooks\chatbot-handoff.md -Pattern '^## ([1-9]\.|10\.)').Count; "RUNBOOK_NUMBERED_SECTIONS=$sections"; Select-String -Path specs\017-chatbot-backend-infrastructure\tasks.md -Pattern '^- \[[ x]\] T09[3-9]|^- \[[ x]\] T10[0-2]' | ForEach-Object {$_.Line}
+      ```
+
+    No Playwright, privacy-corpus, performance, backup, or recovery validation was run for this documentation task.
+
+  - **Known limitations:** T093 was completed by its owning session; this documentation session did not rerun the browser flow. Attestation, handoff-token, and chat-encryption formats are v1 with single-key runtime support, while JWT, claim, service, and provider credentials are unversioned single values; configuration drift exists (`ATTESTATION_SECRET` versus example `CHAT_ATTESTATION_KEY`, missing example `CHAT_HANDOFF_SECRET`, incomplete NestJS schema); session deletion does not explicitly revoke active handoffs/claims or erase ciphertext; crypto/claim logging has identifier/raw-error privacy gaps; full dashboard contracts are pending T097/T098.
+
+### [ ] Feature: Traveler Profile & Booking Readiness (Feature 16)
 
 - [x] Phase 1 / PR 1: Setup — Shared Contracts, Flags, and Observability Vocabulary (implemented shared types for traveler profiles, passenger sources, readiness scopes, results, reason codes, profile sections, and masked summaries; added API and web feature flags `FEATURE_FLAG_BOOKING_READINESS` and `NEXT_PUBLIC_FEATURE_FLAG_BOOKING_READINESS` defaulting to false; created client helper `apps/web/lib/featureFlags.ts`; defined PII-safe operation names, metric names, and allowed metadata keys in `booking-readiness-observability.types.ts`; verified with configuration schema parser tests and contract allowlist validation tests)
 - [x] Phase 2 / PR 2: Additive Schema, Bound Encryption, and Migration Safety (implemented additive traveler profile and passenger snapshot database models and applied SQL migration safely preserving legacy data; added record-bound versioned AES-256-GCM encryption helper methods to EncryptionService with backward-compatibility for legacy unbound ciphertext; created idempotent data-quality backfill service with revision-checking CAS updates, mismatched-date validation quarantine, and abort thresholds; registered ProfileModule, PassportExpiryBackfillController, and a daily scheduled cron task for backfill execution; secured backfill encryption with context-bound AAD keys tied to travelerProfileId and fieldName; verified with a comprehensive migration compatibility E2E test suite, unit tests, and controller integration tests)
@@ -264,7 +281,7 @@ Update this file after every completed feature. Any AI agent reading this should
 - Refactored `PrismaService` to remove the query interceptor facade. This ensures it behaves as a genuine client and reports health status truthfully based on real database availability.
 - Implemented clean Jest spies and mock lifecycles directly in `test/health.e2e-spec.ts` to manage database connectivity states in local environments where PostgreSQL and Redis are unavailable.
 - Added client warming to E2E setup in `health.e2e-spec.ts` to bypass Express/NestJS router bootstrap cold-start latencies.
-- Chatbot backend infrastructure uses AES-256-GCM dual-write/read for encrypted persistence, soft deletion for preserving relational structure without PII, and X-Fencing-Token alongside X-Service-Auth to protect write operations and backend-to-backend communication.
+- Chatbot backend infrastructure uses AES-256-GCM dual-write/read for encrypted persistence, soft deletion for preserving relational structure without PII, and X-Fencing-Token alongside the X-Agent-API-Key plus X-User-Claim service boundary to protect writes and backend-to-backend communication.
 
 ---
 
