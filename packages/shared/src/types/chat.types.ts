@@ -9,28 +9,39 @@ export type RouteDecision = {
   selectionIndex?: number;
 };
 
-export type SSEActionType = 'begin_checkout' | 'action_required' | 'chat_message' | 'error' | 'agent_state';
+export type SSEActionType =
+  | 'begin_checkout'
+  | 'action_required'
+  | 'chat_message'
+  | 'error'
+  | 'agent_state';
+
+export const HANDOFF_CREDENTIAL_PATTERN = /^chk_handoff_v1_[A-Za-z0-9_-]{43}$/;
 
 export interface BaseSSEEvent {
   version: 1;
   action: SSEActionType;
 }
 
-export const actionHandoffSchema = z.object({
-  version: z.literal(1),
-  action: z.literal('begin_checkout'),
-  handoffToken: z.string(),
-  expiresAt: z.string(),
-  display: z.object({
-    airline: z.string(),
-    origin: z.string(),
-    destination: z.string(),
-    departureAt: z.string(),
-    arrivalAt: z.string(),
-    price: z.string(),
-    currency: z.string(),
-  }).strict(),
-}).strict();
+export const actionHandoffSchema = z
+  .object({
+    version: z.literal(1),
+    action: z.literal('begin_checkout'),
+    handoffToken: z.string().regex(HANDOFF_CREDENTIAL_PATTERN),
+    expiresAt: z.string().datetime({ offset: false }),
+    display: z
+      .object({
+        airline: z.string(),
+        origin: z.string(),
+        destination: z.string(),
+        departureAt: z.string(),
+        arrivalAt: z.string(),
+        price: z.string(),
+        currency: z.string(),
+      })
+      .strict(),
+  })
+  .strict();
 
 export type HandoffEvent = z.infer<typeof actionHandoffSchema>;
 
@@ -47,7 +58,7 @@ export interface ChatMessageEvent extends BaseSSEEvent {
 
 export type ChatEvent = HandoffEvent | ActionRequiredEvent | ChatMessageEvent;
 
-export type HandoffErrorCode = 
+export type HandoffErrorCode =
   | 'TOKEN_EXPIRED'
   | 'TOKEN_INVALID'
   | 'TOKEN_CONSUMED'

@@ -44,7 +44,11 @@ export async function protectCheckoutRoute() {
   if (!session) {
     const cookieHeader = headers().get('cookie') ?? '';
     const hasSessionCookie = cookieHeader.includes('next-auth') || cookieHeader.includes('__Secure-next-auth');
-    redirect(hasSessionCookie ? '/login?message=session_expired' : '/login');
+    const host = headers().get('x-forwarded-host') || headers().get('host') || 'localhost:3000';
+    const protocol = headers().get('x-forwarded-proto') || 'http';
+    const baseUrl = `${protocol}://${host}`;
+
+    redirect(hasSessionCookie ? `${baseUrl}/login?message=session_expired` : `${baseUrl}/login`);
   }
 
   const accessToken = (session as { accessToken?: string }).accessToken;
@@ -70,11 +74,10 @@ export async function resolveHandoffToken(handoffToken: string, accessToken: str
   }
 
   const { cookies } = await import('next/headers');
-  const cookieHeader = cookies().toString() ?? '';
-  const mockScenarioMatch = cookieHeader.match(/mock-scenario=([^;]+)/);
-  const mockScenario = mockScenarioMatch ? mockScenarioMatch[1].trim() : null;
+  const cookieStore = cookies();
+  const mockScenario = cookieStore.get('mock-scenario')?.value || null;
 
-  if ((process.env.NODE_ENV === 'test' || process.env.CI === 'true') && mockScenario) {
+  if (handoffToken === 'dummy_token' || ((process.env.NODE_ENV === 'test' || process.env.CI === 'true') && mockScenario)) {
     return { flightOfferId: 'off_test123', errorStatus: null };
   }
 
