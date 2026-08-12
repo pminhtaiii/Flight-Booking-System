@@ -61,7 +61,7 @@ export const envSchema = z.object({
       isGlobal: true,
       validate: (config) => envSchema.parse(config),
     }),
-    ...(process.env.CI !== 'true' ? [ScheduleModule.forRoot()] : []),
+    ScheduleModule.forRoot(),
     PrismaModule,
     HealthModule,
     CacheModule,

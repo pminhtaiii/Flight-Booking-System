@@ -16,17 +16,15 @@ export function CheckoutHandoffCard({ event }: CheckoutHandoffCardProps): JSX.El
     setError(false);
 
     try {
-      const form = document.createElement('form');
-      form.method = 'POST';
-      form.action = '/checkout/handoff';
-      form.hidden = true;
-
-      const input = document.createElement('input');
-      input.name = 'handoffToken';
-      input.value = event.handoffToken;
-      form.appendChild(input);
-      document.body.appendChild(form);
-      form.submit();
+      const response = await fetch('/checkout/handoff', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({ handoffToken: event.handoffToken }),
+      });
+      if (!response.ok) {
+        throw new Error('Handoff failed');
+      }
+      window.location.assign(response.url);
     } catch {
       setError(true);
       setSubmitting(false);
