@@ -168,7 +168,7 @@ export class ChatMessageCryptoService {
           message.contentKeyVersion,
         );
       } catch (error) {
-        this.logger.warn(`Failed to decrypt ChatMessage ${message.id}, falling back to plaintext content: ${error instanceof Error ? error.message : String(error)}`);
+        this.logger.warn('Failed to decrypt ChatMessage content, falling back to legacy plaintext');
         return message.content || '';
       }
     }
@@ -220,7 +220,7 @@ export class ChatMessageCryptoService {
           session.titleKeyVersion,
         );
       } catch (error) {
-        this.logger.warn(`Failed to decrypt ChatSession ${session.id} title, falling back to plaintext: ${error instanceof Error ? error.message : String(error)}`);
+        this.logger.warn('Failed to decrypt ChatSession title, falling back to legacy plaintext');
         return session.title || null;
       }
     }

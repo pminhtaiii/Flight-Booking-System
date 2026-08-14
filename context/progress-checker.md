@@ -7,9 +7,9 @@ Update this file after every completed feature. Any AI agent reading this should
 ### Current Status
 
 **Feature:** Chatbot Backend Infrastructure & Booking Handoff (Feature 17)
-**Last completed:** Phase 7D / US5 continuous real browser-to-consume observation (T093) and Phase 8B T098 handoff latency/concurrency benchmark gate (2026-08-14).
-**In progress:** Feature 17 Phase 8 remaining gates (T097 dashboard assertions, T099 privacy corpus, T100 full regressions).
-**Next:** Complete only separately approved Phase 8 runbook, context, privacy, and full-regression tasks. See [plan.md](file:///c:/Booking%20Systems/specs/017-chatbot-backend-infrastructure/plan.md) for details.
+**Last completed:** Phase 8C Privacy Corpus (T099) and Full Regression Suite (T100) (2026-08-14).
+**In progress:** None.
+**Next:** Separately approved Phase 8 polish/cleanup tasks (T101 proxy cleanup and T102 plaintext DB column drop require separate explicit approvals). See [plan.md](file:///c:/Booking%20Systems/specs/017-chatbot-backend-infrastructure/plan.md) for details.
 
 ---
 
@@ -66,6 +66,9 @@ Update this file after every completed feature. Any AI agent reading this should
   - **WP 7D/T093 GREEN evidence (2026-08-12):** exact-final-source real browser→Next.js→FastAPI→NestJS→bootstrap→resolve→readiness→consume Playwright run exited `0` with `1 passed (7.4m)`. Assertions proved one BookingIntent and one consumed handoff under 16-way concurrency, two expected supplier calls and zero payment calls, four encrypted plaintext-free messages, retained session continuity, clean URL/DOM/storage/cookie/console/request privacy, and distinct legacy `ACTION_REQUIRED`. Focused web boundary tests passed `11/11`, focused API handoff tests passed `20/20`, and the Next production build passed with both cookie-backed checkout proxy routes compiled. Phase 8 remains unchecked and was not started.
 - [ ] Phase 8 / Polish & Cleanup (T094–T102)
   - [x] T098 / Handoff latency and concurrency: post-remediation gates passed on 2026-08-14. Router p95 11.338 ms; quota race 1 accepted/99 denied; handoff create/resolve p95 13.9823/24.0127 ms; 100-consumer p95 150.7542 ms with one supplier call, one intent, 99 expected conflicts, and zero payment calls.
+  - [x] T099 / Negative Privacy Corpus: verified zero exposure across LLM fixtures, SSE, bootstrap/access logs, traces, audits, clean URLs, DOM, cookies, and browser storage on 2026-08-14. Closed crypto fallback and claim token logging gaps.
+  - [x] T100 / Full Regression Suite: full agent pytest (264/264 PASS), shared types build, NestJS unit suites (575/575 PASS), Next.js production build (21 routes), web boundary unit suites (15/15 PASS), and API E2E privacy/chat suites passed cleanly on 2026-08-14.
+  - [ ] T101 (Proxy cleanup) & T102 (Plaintext columns drop) require separate explicit approvals.
 
 ### [ ] Feature: Traveler Profile & Booking Readiness (Feature 16)
 

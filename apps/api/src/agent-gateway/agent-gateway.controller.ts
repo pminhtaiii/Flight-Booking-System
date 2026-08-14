@@ -41,9 +41,8 @@ export class AgentGatewayController {
 
       return await this.agentGatewayService.searchFlights(userId, query, traceId, correlationId);
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : String(err);
       const stack = err instanceof Error ? err.stack : undefined;
-      this.logger.error(`Failed to search flights: ${msg}`, stack);
+      this.logger.error('Failed to search flights', stack);
       throw err;
     }
   }
@@ -62,9 +61,8 @@ export class AgentGatewayController {
 
       return await this.agentGatewayService.searchFlightsV2(userId, dto, traceId, correlationId);
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : String(err);
       const stack = err instanceof Error ? err.stack : undefined;
-      this.logger.error(`Failed to search attested flights: ${msg}`, stack);
+      this.logger.error('Failed to search attested flights', stack);
       throw err;
     }
   }
@@ -81,9 +79,8 @@ export class AgentGatewayController {
 
       return await this.agentGatewayService.getUserPreferences(userId, traceId, correlationId);
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : String(err);
       const stack = err instanceof Error ? err.stack : undefined;
-      this.logger.error(`Failed to get user preferences: ${msg}`, stack);
+      this.logger.error('Failed to get user preferences', stack);
       throw err;
     }
   }
@@ -100,9 +97,8 @@ export class AgentGatewayController {
 
       return await this.agentGatewayService.getUserBookings(userId, traceId, correlationId);
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : String(err);
       const stack = err instanceof Error ? err.stack : undefined;
-      this.logger.error(`Failed to get user bookings: ${msg}`, stack);
+      this.logger.error('Failed to get user bookings', stack);
       throw err;
     }
   }
