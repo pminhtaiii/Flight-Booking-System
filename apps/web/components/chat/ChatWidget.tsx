@@ -64,6 +64,7 @@ async function consumeChatStream(
   onActionRequired: (payload: unknown) => void,
   onDone?: (sessionId: string) => void,
   onHandoff?: (payload: unknown) => void,
+  onError?: (errorMessage: string) => void,
 ): Promise<void> {
   try {
     const response = await createChatStreamRequest({
@@ -74,6 +75,7 @@ async function consumeChatStream(
     });
 
     if (!response.ok || !response.body) {
+      onError?.('Chat service is temporarily unavailable. Please try again later.');
       return;
     }
 
@@ -95,8 +97,15 @@ async function consumeChatStream(
         return;
       }
     }
-  } catch {
-    // Stream failures remain generic because the stream can contain sensitive conversational context.
+  } catch (err: unknown) {
+    if (signal.aborted) {
+      return;
+    }
+    const messageText =
+      err instanceof Error && err.message
+        ? err.message
+        : 'Chat service is temporarily unavailable. Please try again later.';
+    onError?.(messageText);
     return;
   }
 }
@@ -106,6 +115,7 @@ function ChatWidgetInner(): JSX.Element {
   const token = (session as { accessToken?: string })?.accessToken ?? null;
   const [actionEvent, setActionEvent] = useState<SafeActionRequiredEvent | null>(null);
   const [handoffEvent, setHandoffEvent] = useState<HandoffEvent | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [inputMessage, setInputMessage] = useState('');
   const pathname = usePathname();
   const router = useRouter();
@@ -146,7 +156,16 @@ function ChatWidgetInner(): JSX.Element {
   useEffect(() => {
     if (autoResume && activeSessionId) {
       const controller = new AbortController();
-      void consumeChatStream('resume', activeSessionId, token, controller.signal, acceptActionRequiredEvent, handleDone, acceptHandoffEvent);
+      void consumeChatStream(
+        'resume',
+        activeSessionId,
+        token,
+        controller.signal,
+        acceptActionRequiredEvent,
+        handleDone,
+        acceptHandoffEvent,
+        setErrorMessage,
+      );
       return () => controller.abort();
     }
   }, [autoResume, activeSessionId, token, acceptActionRequiredEvent, handleDone, acceptHandoffEvent]);
@@ -174,8 +193,18 @@ function ChatWidgetInner(): JSX.Element {
 
   const handleSend = () => {
     if (!inputMessage.trim()) return;
+    setErrorMessage(null);
     const controller = new AbortController();
-    void consumeChatStream(inputMessage, activeSessionId ?? '', token, controller.signal, acceptActionRequiredEvent, handleDone, acceptHandoffEvent);
+    void consumeChatStream(
+      inputMessage,
+      activeSessionId ?? '',
+      token,
+      controller.signal,
+      acceptActionRequiredEvent,
+      handleDone,
+      acceptHandoffEvent,
+      setErrorMessage,
+    );
     setInputMessage('');
   };
 
@@ -186,6 +215,11 @@ function ChatWidgetInner(): JSX.Element {
         <p className="rounded border border-card-border bg-card p-2 text-sm text-text-primary">
           Hello! How can I help you book your flight today?
         </p>
+        {errorMessage ? (
+          <p className="rounded border border-danger-border bg-bg-cancelled p-2 text-xs text-text-cancelled" role="alert">
+            {errorMessage}
+          </p>
+        ) : null}
         {actionEvent ? <BookingActionCard event={actionEvent} onNavigate={handleNavigate} /> : null}
         {handoffEvent ? <CheckoutHandoffCard event={handoffEvent} /> : null}
       </div>
