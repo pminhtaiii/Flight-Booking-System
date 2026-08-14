@@ -360,13 +360,8 @@ export class AgentGatewayService {
       }
 
       if (lastMessage) {
+        const content = await this.chatMessageCryptoService.decryptMessageContent(lastMessage);
         const matchedKeywords: string[] = [];
-        let content = '';
-        try {
-          content = await this.chatMessageCryptoService.decryptMessageContent(lastMessage);
-        } catch {
-          content = '';
-        }
 
         for (const kw of CABIN_KEYWORDS) {
           const regex = new RegExp(`\\b${kw}\\b`, 'i');
@@ -603,13 +598,8 @@ export class AgentGatewayService {
       });
 
       if (lastMessage) {
+        const content = await this.chatMessageCryptoService.decryptMessageContent(lastMessage);
         const matchedKeywords: string[] = [];
-        let content = '';
-        try {
-          content = await this.chatMessageCryptoService.decryptMessageContent(lastMessage);
-        } catch {
-          content = '';
-        }
 
         for (const kw of CABIN_KEYWORDS) {
           const regex = new RegExp(`\\b${kw}\\b`, 'i');
