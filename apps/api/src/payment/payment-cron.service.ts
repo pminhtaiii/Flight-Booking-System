@@ -164,10 +164,9 @@ export class PaymentCronService {
     const start = Date.now();
     this.logger.log('Starting stale lock detection...');
 
-    const lockTimeoutMinutes = this.configService.get<number>(
-      'IDEMPOTENCY_LOCK_TIMEOUT_MINUTES',
-      5,
-    );
+    const rawTimeout = this.configService.get<string | number>('IDEMPOTENCY_LOCK_TIMEOUT_MINUTES', 5);
+    const parsedMinutes = typeof rawTimeout === 'number' ? rawTimeout : parseInt(String(rawTimeout), 10);
+    const lockTimeoutMinutes = Number.isFinite(parsedMinutes) && parsedMinutes > 0 ? parsedMinutes : 5;
     const lockCutoff = new Date(Date.now() - lockTimeoutMinutes * 60 * 1000);
 
     try {

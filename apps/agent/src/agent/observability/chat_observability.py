@@ -21,9 +21,52 @@ logger = logging.getLogger("agent.chat_observability")
 
 _OPAQUE_ID = re.compile(r"chat_[a-f0-9]{32}\Z")
 _SAFE_VALUE = re.compile(r"[A-Za-z0-9_.:/-]{1,64}\Z")
+FORBIDDEN_TELEMETRY_FIELD_NAMES = frozenset(
+    {
+        "authorization",
+        "booking_db_id",
+        "contact_data",
+        "duffel_offer_id",
+        "handoff_token",
+        "handoff_token_hash",
+        "local_offer_id",
+        "message_content",
+        "passenger_data",
+        "passport_data",
+        "payment_data",
+        "pnr",
+        "raw_tool_payload",
+        "secret",
+        "session_id",
+        "summary_content",
+        "url",
+        "user_id",
+    }
+)
+FORBIDDEN_TELEMETRY_VALUE_MARKERS = frozenset(
+    {
+        "authorization",
+        "booking_db_id",
+        "contact",
+        "duffel_offer_id",
+        "handoff_token",
+        "handoff_token_hash",
+        "local_offer_id",
+        "message",
+        "passport",
+        "passenger",
+        "payment",
+        "pnr",
+        "raw_tool_payload",
+        "secret",
+        "summary",
+        "token",
+    }
+)
 _FORBIDDEN_VALUE = re.compile(
-    r"(?:https?://|Bearer\s|@|passport|token|session|user[_-]?id|offer[_-]?id|"
-    r"message|passenger|payment|card|secret|authorization)",
+    r"(?:https?://|bearer\s|@|"
+    + "|".join(re.escape(marker) for marker in FORBIDDEN_TELEMETRY_VALUE_MARKERS)
+    + r")",
     re.IGNORECASE,
 )
 
@@ -92,6 +135,29 @@ _ALLOWED_STRING_VALUES: dict[str, frozenset[str]] = {
 
 _ALLOWED_INTEGER_FIELDS = frozenset({"result_count", "snapshot_version"})
 
+# These are deliberately narrower than the validation allowlists.  The
+# allowlists describe safe vocabulary that future call sites may use; this set
+# describes the telemetry emitted by the agent today.
+EMITTED_AGENT_OPERATIONS = frozenset(
+    {
+        "handoff_create",
+        "quota_admission",
+        "router_decision",
+        "snapshot_read",
+        "tool_call",
+    }
+)
+EMITTED_AGENT_FIELDS = frozenset(
+    {
+        "confidence_bucket",
+        "dependency",
+        "error_class",
+        "intent",
+        "outcome",
+        "tool_name",
+    }
+)
+
 _SAFE_TOOL_NAMES = frozenset(
     {
         "check_booking_readiness",
@@ -100,6 +166,43 @@ _SAFE_TOOL_NAMES = frozenset(
         "handoff_creator",
     }
 )
+
+
+def dashboard_alert_contract() -> dict[str, object]:
+    """Return the maintained dashboard/alert contract for agent telemetry.
+
+    This distinguishes signals the agent currently emits from dashboard panels
+    that remain required by the feature specification but cannot yet be backed
+    by an emitted agent signal.
+    """
+    return {
+        "emitted_operations": tuple(sorted(EMITTED_AGENT_OPERATIONS)),
+        "emitted_fields": tuple(sorted(EMITTED_AGENT_FIELDS)),
+        "allowed_but_not_yet_emitted_capabilities": {
+            "operations": tuple(sorted(ALLOWED_OPERATIONS - EMITTED_AGENT_OPERATIONS)),
+            "fields": tuple(sorted(ALLOWED_FIELDS - EMITTED_AGENT_FIELDS)),
+        },
+        "required_but_not_yet_emitted_panels": (
+            "active_streams",
+            "daily_quota_utilization_buckets",
+            "disambiguations",
+            "handoff_expired",
+            "handoff_foreign",
+            "handoff_stale",
+            "redis_latency",
+            "snapshot_expire",
+            "snapshot_replace",
+            "stream_time_to_first_safe_token",
+        ),
+        "alert_thresholds": {
+            "error_rate": {"baseline_multiplier": 2, "window_minutes": 5},
+            "handoff_consume_p95_ms": 300,
+            "handoff_resolve_p95_ms": 300,
+        },
+        "performance_gates": {"router_overhead_p95_ms_under": 100},
+        "forbidden_field_names": tuple(sorted(FORBIDDEN_TELEMETRY_FIELD_NAMES)),
+        "forbidden_value_markers": tuple(sorted(FORBIDDEN_TELEMETRY_VALUE_MARKERS)),
+    }
 
 
 class TelemetryPrivacyError(ValueError):
@@ -119,10 +222,13 @@ def safe_opaque_id(value: str | None) -> str:
 def _safe_string(field_name: str, value: Any) -> str:
     if not isinstance(value, str) or not _SAFE_VALUE.fullmatch(value):
         raise TelemetryPrivacyError(f"field {field_name!r} must be a bounded enum-like value")
-    if _FORBIDDEN_VALUE.search(value):
-        raise TelemetryPrivacyError(f"field {field_name!r} contains protected data")
     allowed_values = _ALLOWED_STRING_VALUES.get(field_name)
-    if allowed_values is not None and value not in allowed_values:
+    if allowed_values is None or value not in allowed_values:
+        # Closed enums are the primary privacy boundary.  The corpus is still
+        # consulted for rejected values, but cannot suppress a valid enum such
+        # as ``non_human_message`` merely because it contains a marker token.
+        if _FORBIDDEN_VALUE.search(value):
+            raise TelemetryPrivacyError(f"field {field_name!r} contains protected data")
         raise TelemetryPrivacyError(f"field {field_name!r} is not an allowlisted value")
     return value
 

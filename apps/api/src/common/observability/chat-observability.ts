@@ -115,3 +115,38 @@ export function emitChatTelemetry(
 ): void {
   logger.log(JSON.stringify(event));
 }
+
+export const CHAT_HANDOFF_OBSERVABILITY_CONTRACT = {
+  requiredButNotEmittedByApi: [
+    'redis_latency',
+    'quota_daily_utilization_bucket',
+    'active_streams',
+    'router_disambiguations',
+    'snapshot_replace',
+    'snapshot_expire',
+    'handoff_foreign_owner',
+    'handoff_expired',
+    'handoff_stale',
+    'time_to_first_safe_token',
+  ],
+  alerts: [
+    { panel: 'redis_health', condition: 'operator_configured' },
+    { panel: 'quota_bypass_invariant', condition: 'operator_configured' },
+    {
+      panel: 'error_rate',
+      condition: 'above_baseline_multiple',
+      baselineMultiple: 2,
+      forSeconds: 300,
+    },
+    { panel: 'router_malformed_output', condition: 'operator_configured' },
+    { panel: 'handoff_cross_owner', condition: 'operator_configured' },
+    { panel: 'token_integrity_or_privacy_corpus', condition: 'operator_configured' },
+    {
+      panel: 'handoff_resolve_consume_latency',
+      condition: 'p95_above_ms',
+      thresholdMs: 300,
+    },
+    { panel: 'time_to_first_safe_token', condition: 'operator_configured' },
+  ],
+};
+

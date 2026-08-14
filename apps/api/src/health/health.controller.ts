@@ -59,4 +59,9 @@ export class HealthController {
       });
     }
   }
+
+  @Get('ping')
+  ping(@Res() res: Response): Response {
+    return res.status(HttpStatus.OK).json({ status: 'ok' });
+  }
 }

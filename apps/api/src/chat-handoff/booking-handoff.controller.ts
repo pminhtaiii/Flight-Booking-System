@@ -2,6 +2,8 @@ import {
   Body,
   Controller,
   Headers,
+  HttpCode,
+  HttpStatus,
   Logger,
   Post,
   Req,
@@ -29,6 +31,7 @@ export class BookingHandoffController {
   constructor(private readonly chatHandoffService: ChatHandoffService) {}
 
   @Post('resolve')
+  @HttpCode(HttpStatus.OK)
   async resolve(
     @Body() body: ResolveChatHandoffBodyDto,
     @Req() request: AuthenticatedRequest,

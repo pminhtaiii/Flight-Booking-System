@@ -5,6 +5,7 @@ import { CacheService } from '@/cache/cache.service';
 @Injectable()
 export class AirportsService {
   private readonly logger = new Logger(AirportsService.name);
+  private readonly countryCache = new Map<string, string | null>();
 
   constructor(
     private readonly prisma: PrismaService,
@@ -63,17 +64,34 @@ export class AirportsService {
         .filter((code) => /^[A-Z]{3}$/.test(code)),
     )];
 
-    const rows = await this.prisma.airport.findMany({
-      where: { iataCode: { in: normalizedCodes } },
-      select: { iataCode: true, country: true },
-    });
+    const missingCodes: string[] = [];
+    const countries = new Map<string, string | null>();
 
-    const countries = new Map<string, string | null>(
-      normalizedCodes.map((code) => [code, null]),
-    );
+    for (const code of normalizedCodes) {
+      if (this.countryCache.has(code)) {
+        countries.set(code, this.countryCache.get(code)!);
+      } else {
+        missingCodes.push(code);
+      }
+    }
 
-    for (const row of rows) {
-      countries.set(row.iataCode.trim().toUpperCase(), row.country ?? null);
+    if (missingCodes.length > 0) {
+      const rows = await this.prisma.airport.findMany({
+        where: { iataCode: { in: missingCodes } },
+        select: { iataCode: true, country: true },
+      });
+
+      for (const code of missingCodes) {
+        this.countryCache.set(code, null);
+      }
+      for (const row of rows) {
+        const code = row.iataCode.trim().toUpperCase();
+        const country = row.country ?? null;
+        this.countryCache.set(code, country);
+      }
+      for (const code of missingCodes) {
+        countries.set(code, this.countryCache.get(code)!);
+      }
     }
 
     return countries;
