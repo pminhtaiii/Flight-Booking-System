@@ -410,7 +410,7 @@ const userPrefsTool = tool(
 - Agent functions NEVER access Prisma directly — all data access goes through agent-gateway
 - Agent functions NEVER import from frontend code
 - Errors logged with trace ID before returning
-- Feature 17 chat runs must not send prompts, messages, credentials, identifiers, or raw tool payloads to LangSmith or another third-party trace store; use PII-safe internal telemetry.
+- LangSmith records full traces for every agent run
 
 **Temperature settings:**
 
@@ -419,9 +419,26 @@ const userPrefsTool = tool(
 
 ---
 
-## LangSmith (not approved for Feature 17 chat payloads)
+## LangSmith
 
-Feature 17 uses bounded internal telemetry with opaque trace/correlation IDs. Do not configure full agent inputs, outputs, tool payloads, credentials, user/session/offer identifiers, or raw exception data for LangSmith or another third-party trace store. Propagate only the approved opaque identifiers and finite operational labels. Dashboard/alert assertions and measured latency evidence remain T097/T098. See the [handoff runbook](../docs/runbooks/chatbot-handoff.md).
+### Tracing Setup
+
+```typescript
+// src/agents/agent.module.ts
+import { Client } from 'langsmith';
+
+export const langsmithClient = new Client({
+  apiUrl: 'https://api.smith.langchain.com',
+  apiKey: process.env.LANGSMITH_API_KEY!,
+});
+```
+
+**Rules:**
+
+- Every agent run is traced — tool calls, inputs, outputs, latency
+- Trace ID propagated through all agent functions for correlation
+- Traces used for debugging agent behavior, not for production monitoring dashboards
+- Never log PII or payment data in traces — use `user_id` references only
 
 ---
 
@@ -615,18 +632,15 @@ export function FlightSearchForm({ flights }: Props) {
 ## Python Redis (redis.asyncio)
 
 ### Client Lifecycle
-
 - Create one `redis.asyncio.Redis` pooled client during FastAPI lifespan and close it on shutdown.
 - Redis is the agent control plane, not conversation storage.
 - Redis unavailability fails closed before inference. Health reports Redis separately.
 
 ### Allowed Data
-
 - No message text, prompt, booking passenger data, token, or payment data is stored in Redis.
 - Only counters, locks, and explicitly PII-free Trusted Search Snapshots are permitted.
 
 ### Approved Use Cases
-
 1. **Budget/Quota Admission**:
    - Keys: `chat:budget:{userId}:{YYYY-MM-DD}` and `chat:burst:{userId}:{window}`
    - One versioned Lua admission script increments both only when both admit, uses next-UTC-boundary expiry, and never charges denied attempts.
@@ -637,45 +651,23 @@ export function FlightSearchForm({ flights }: Props) {
    - Key: `chat:snapshot:{userId}:{sessionId}`
    - Versioned PII-free snapshot with TTL no longer than offer freshness.
 
-### Ownership and safety rules
-
-- Implement control-plane behavior only in `ChatBudgetRepository`, `SessionLockRepository`, and `TrustedSnapshotRepository`; do not add ad-hoc Redis calls to graph nodes, tools, or controllers.
-- Redis is not durable truth and never stores conversation text, summaries, handoff credentials/tokens/hashes, booking projections, passenger/contact/passport data, or payment data. The strict Trusted Search Snapshot is the only approved place for service-only local/provider offer bindings and the signed attestation; those fields never enter LLM messages, browser events, logs, or telemetry.
-- A failed control plane fails closed before inference. Lua admission charges accepted requests only; refresh loss cancels work; snapshots atomically replace and are owner/session/expiry bound.
-
 ---
 
 ## Python LangGraph
 
 ### Graph Architecture
-
 - The compiled LangGraph remains a single graph containing all agent nodes, but without an interrupt-capable checkpointer (no `MemorySaver`).
 - One graph execution per turn. Durable context is restored at entry from NestJS (decrypted summary/messages) and Redis (snapshot).
 - After execution, the encrypted completed turn is persisted via the service-authenticated gateway.
 - LangGraph is a direct dependency, not just transitive through LangChain.
 
 ### Routing and Agents
-
 - **Stateless Router**: Uses strict Pydantic structured output. No tools, never writes conversational text. A deterministic route function applies configured thresholds.
 - **Explicit Registries**: Tool inventories are constructed per agent, not filtered at runtime.
-  - _General_: no tools
-  - _Travel_: `search_flights`, `get_user_preferences`, `list_user_booking_summaries`, `get_booking_detail`, `check_booking_readiness`
-  - _Checkout_: `signal_checkout_intent` (state-only, no I/O)
+  - *General*: no tools
+  - *Travel*: `search_flights`, `get_user_preferences`, `list_user_booking_summaries`, `get_booking_detail`, `check_booking_readiness`
+  - *Checkout*: `signal_checkout_intent` (state-only, no I/O)
 
 ### Deterministic Nodes
-
 - Graph nodes that interact with token issuance or intent lifecycle are deterministic application I/O and must never be exposed as LLM tools.
 - Validation and handoff creation happen in strict graph nodes, never directly in LLM responses.
-
-### Service, encryption, and observability boundary
-
-- The agent has no direct Prisma/PostgreSQL access. Durable chat, safe booking projections, attestation/handoff operations, and persistence go only through service-authenticated NestJS gateway endpoints; browser JWT forwarding is not service identity.
-- Chat content/titles are record-bound AES-256-GCM at the NestJS boundary with keys outside PostgreSQL. Legacy plaintext is rollback inventory; T102 is separately approved irreversible cleanup.
-- Snapshots are minimum PII-free owner/session/version/expiry data. Offer IDs and attestations are service-only and never LLM or browser-display inputs. Fence revalidation is mandatory before durable writes/handoff emission.
-- Emit only opaque trace/correlation IDs, finite allowlisted labels, and aggregate fields. Never emit content, summaries, credentials/hashes, IDs, PNR, passenger/contact/passport/payment data, or raw tool payloads. Existing logging gaps are tracked in the runbook and must not become patterns.
-
-### Dependency rationale
-
-- `redis.asyncio` is a direct dependency for pooled lifecycle, Lua admission, leases, and TTL snapshots; in-process controls cannot coordinate replicas.
-- `langgraph` is a direct dependency for the single routed state graph without `MemorySaver` or another durable checkpointer. NestJS remains the durable state owner.
-- Keep the deployed Mimo adapter and existing LangChain dependencies. Do not add a tracing provider or new guardrail framework in this feature. See the [Feature 17 plan](../specs/017-chatbot-backend-infrastructure/plan.md) and [handoff runbook](../docs/runbooks/chatbot-handoff.md).

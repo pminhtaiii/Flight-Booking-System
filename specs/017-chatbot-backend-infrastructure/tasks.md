@@ -289,9 +289,9 @@
 
 **Purpose**: Close documentation, performance, privacy, and repository-wide regression gates after all desired stories are complete.
 
-- [x] T094 [P] Create the operations, alerts, JWT/attestation/token/chat-encryption key rotation, ciphertext retention/backups, CORS, rollback, claim recovery, and session-deletion runbook in `docs/runbooks/chatbot-handoff.md`
-- [x] T095 [P] Update implemented chatbot topology, data flow, invariants, and direct-stream exception in `context/architecture.md`
-- [x] T096 [P] Update dependency rules and approved Redis/LangGraph usage in `context/library-docs.md` and completed feature status in `context/progress-checker.md`
+- [ ] T094 [P] Create the operations, alerts, JWT/attestation/token/chat-encryption key rotation, ciphertext retention/backups, CORS, rollback, claim recovery, and session-deletion runbook in `docs/runbooks/chatbot-handoff.md`
+- [ ] T095 [P] Update implemented chatbot topology, data flow, invariants, and direct-stream exception in `context/architecture.md`
+- [ ] T096 [P] Update dependency rules and approved Redis/LangGraph usage in `context/library-docs.md` and completed feature status in `context/progress-checker.md`
 - [ ] T097 Add maintained dashboard/alert contract assertions in `apps/api/test/chat-handoff-observability.e2e-spec.ts` and `apps/agent/tests/test_chat_observability.py`
 - [x] T098 Run 100-request router-overhead, quota-edge, handoff-latency, and consume-concurrency benchmarks and record p95/count evidence in `docs/runbooks/chatbot-handoff.md`
 - [ ] T099 Run the seeded negative privacy corpus across LLM fixtures, SSE, bootstrap/access logs, traces, audits, clean URLs, DOM, JavaScript-readable cookies, and browser storage; verify temporary legacy ChatMessage/title plaintext has complete ciphertext twins/recovery export and zero migrated-path exposure, and record evidence in `docs/runbooks/chatbot-handoff.md`
@@ -326,25 +326,25 @@
 
 ### Mapping to the Seventeen Plan Slices
 
-| Plan slice                                         | Task phase                                 |
-| -------------------------------------------------- | ------------------------------------------ |
-| 1. Contract/JWT/flag freeze                        | Work Packages 1A–1D                        |
-| 2. Redis lifecycle/health                          | Work Package 2A                            |
-| 3. Atomic quota admission                          | Work Package 2B                            |
-| 4. Fenced session lease                            | Work Package 2C plus US1 fence integration |
-| 5. Trusted snapshot repository                     | Work Package 2D                            |
-| 6. Encrypted additive persistence                  | Work Packages 2E–2F                        |
-| 7. Secure stream/persistence migration             | Work Packages 3A–3F                        |
-| 8. Router/specialist graph                         | Work Packages 4A–4C and 4E–4F              |
-| 9. Read tools/attested search/projection           | Work Package 4D and Work Packages 5A–5D    |
-| 10. State-only checkout signal                     | Work Package 6A                            |
-| 11. Credential primitive                           | Work Package 6B                            |
-| 12. Dark create/resolve API                        | Work Packages 6C–6D                        |
-| 13. Deterministic action/clean bootstrap           | Work Packages 6E–6G                        |
-| 14. Claimed canonical consume                      | Work Packages 6H–6I                        |
-| 15. Direct cutover/observation with proxy retained | Work Packages 7A–7D and 8A–8C              |
-| 16. Approved direct-only cleanup                   | Work Package 8D / T101                     |
-| 17. Approved plaintext cleanup                     | Work Package 8E / T102                     |
+| Plan slice | Task phase |
+|---|---|
+| 1. Contract/JWT/flag freeze | Work Packages 1A–1D |
+| 2. Redis lifecycle/health | Work Package 2A |
+| 3. Atomic quota admission | Work Package 2B |
+| 4. Fenced session lease | Work Package 2C plus US1 fence integration |
+| 5. Trusted snapshot repository | Work Package 2D |
+| 6. Encrypted additive persistence | Work Packages 2E–2F |
+| 7. Secure stream/persistence migration | Work Packages 3A–3F |
+| 8. Router/specialist graph | Work Packages 4A–4C and 4E–4F |
+| 9. Read tools/attested search/projection | Work Package 4D and Work Packages 5A–5D |
+| 10. State-only checkout signal | Work Package 6A |
+| 11. Credential primitive | Work Package 6B |
+| 12. Dark create/resolve API | Work Packages 6C–6D |
+| 13. Deterministic action/clean bootstrap | Work Packages 6E–6G |
+| 14. Claimed canonical consume | Work Packages 6H–6I |
+| 15. Direct cutover/observation with proxy retained | Work Packages 7A–7D and 8A–8C |
+| 16. Approved direct-only cleanup | Work Package 8D / T101 |
+| 17. Approved plaintext cleanup | Work Package 8E / T102 |
 
 ### User Story Dependencies
 

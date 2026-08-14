@@ -2,21 +2,21 @@
 
 ## Stack
 
-| Layer              | Tool                           | Purpose                                                                               |
-| ------------------ | ------------------------------ | ------------------------------------------------------------------------------------- |
-| Language           | TypeScript & Python 3.11+      | TS for web/API, Python for agent service                                              |
-| Backend Framework  | NestJS                         | Deterministic backend services (booking, payments, auth)                              |
-| Frontend Framework | Next.js (App Router)           | SSR, SEO, Server Components for the user-facing UI                                    |
-| Database           | PostgreSQL                     | Primary transactional store (users, bookings, payments)                               |
-| ORM                | Prisma                         | Type-safe queries, declarative schema, versioned migrations                           |
-| Cache / Rate Limit | Redis                          | Search result caching, seat map caching (60s TTL), rate limiting, API budget tracking |
-| Authentication     | NextAuth.js (Auth.js) + JWT    | Email/password for v1. Social login deferred                                          |
-| Payment            | Stripe (Payment Intents)       | PCI-DSS compliant payment processing                                                  |
-| Flight Data        | Duffel API                     | Flight search, pricing, seat maps, ancillary services, PNR creation, ticketing        |
-| AI Model           | Mimo (OpenAI-compatible URL)   | Advisory agents — search assistance, recommendations                                  |
-| AI Framework       | LangGraph + LangChain (Python) | One per-turn routed workflow with read-only tool inventories                          |
-| Chat observability | PII-safe internal telemetry    | Opaque trace/correlation IDs and bounded operational events; no full chat tracing     |
-| Code Review        | CodeRabbit                     | Automated PR review for security and code quality                                     |
+| Layer              | Tool                         | Purpose                                                                               |
+| ------------------ | ---------------------------- | ------------------------------------------------------------------------------------- |
+| Language           | TypeScript & Python 3.11+    | TS for web/API, Python for agent service                                              |
+| Backend Framework  | NestJS                       | Deterministic backend services (booking, payments, auth)                              |
+| Frontend Framework | Next.js (App Router)         | SSR, SEO, Server Components for the user-facing UI                                    |
+| Database           | PostgreSQL                   | Primary transactional store (users, bookings, payments)                               |
+| ORM                | Prisma                       | Type-safe queries, declarative schema, versioned migrations                           |
+| Cache / Rate Limit | Redis                        | Search result caching, seat map caching (60s TTL), rate limiting, API budget tracking |
+| Authentication     | NextAuth.js (Auth.js) + JWT  | Email/password for v1. Social login deferred                                          |
+| Payment            | Stripe (Payment Intents)     | PCI-DSS compliant payment processing                                                  |
+| Flight Data        | Duffel API                   | Flight search, pricing, seat maps, ancillary services, PNR creation, ticketing        |
+| AI Model           | Mimo (OpenAI-compatible URL) | Advisory agents — search assistance, recommendations                                  |
+| AI Framework       | LangChain (JS/Python)        | Agent chains, tool calling, conversation memory                                       |
+| AI Observability   | LangSmith                    | Agent run tracing, tool call auditing                                                 |
+| Code Review        | CodeRabbit                   | Automated PR review for security and code quality                                     |
 
 ---
 
@@ -82,29 +82,6 @@
 ## Build and Runtime Output
 
 The root TypeScript configuration is type-check-only and sets `noEmit: true`. Package build configurations override that setting where runtime JavaScript is required: the API emits `apps/api/dist/main.js` for NestJS startup, and the shared package emits `packages/shared/dist` for the API's workspace imports. The API development command builds shared types first and then runs `nest start --watch`; inheriting the root `noEmit` setting prevents the API entrypoint from being created and causes a `dist/main` module-resolution failure.
-
----
-
-## Chatbot and Deterministic Handoff Topology (Feature 17)
-
-```mermaid
-flowchart LR
-  B["Browser"] -->|"direct bearer SSE"| A["FastAPI agent"]
-  B -->|"rollback SSE proxy"| W["Next.js"] --> A
-  A -->|"service-authenticated gateway"| N["NestJS"]
-  A -->|"quota, fenced lease, PII-free snapshot"| R["Redis control plane"]
-  N -->|"encrypted chat, handoff, canonical intent"| P["PostgreSQL"]
-  N -->|"deterministic supplier/payment operations only"| D["Duffel / Stripe"]
-```
-
-- **Transport:** direct browser-to-FastAPI streaming is feature-flagged. The same-origin Next.js proxy remains the rollback seam and has not been removed. FastAPI enforces configured-origin CORS, bearer authentication, and opaque trace/correlation propagation.
-- **Ownership:** NestJS/Prisma own durable ChatSession, encrypted ChatMessage/title, ChatHandoff, BookingAgentProjection, BookingIntent, audit linkage, and all supplier/payment actions. FastAPI has no direct PostgreSQL access; Redis is a control plane, never conversation storage.
-- **BookingAgentProjection boundary:** the additive one-to-one NestJS-owned safe read model and restart-safe backfill exist as the intended privacy boundary. Agent access is limited to an opaque booking reference and exact summary/detail allowlists; raw booking, passenger, or provider snapshots, database IDs, PNRs, financial fields, and PII must not cross to FastAPI or the LLM. Transactional confirmation/supplier refresh and projection-only summary/detail services remain pending Feature 17 Phase 5 (T053-T063), so operators must not enable those agent tools yet.
-- **Turn and fence:** FastAPI verifies JWT access/revocation through NestJS, then performs Redis quota admission and token-owned fenced session locking before inference. It restores durable encrypted memory through NestJS and a PII-free Trusted Search Snapshot from Redis. Refresh loss cancels the worker; stale owners cannot persist or emit a handoff.
-- **Snapshot and graph:** an opt-in signed search atomically replaces an owner/session/version/expiry-bound PII-free snapshot that expires with offer freshness. Supplier IDs and the attestation are service-only; the LLM never receives offer IDs. A single LangGraph run routes to General (no tools), Travel (approved read tools), or Checkout (state-only signal); deterministic nodes validate and create handoffs. No LLM tool can create a booking, payment, supplier order, or credential.
-- **Handoff:** NestJS verifies attestation and creates/resolves hash-only v1 credentials. Bootstrap posts the transient token to same-origin code, stores it only in a short-lived HttpOnly/Secure/SameSite cookie, then redirects to a clean URL. Resolve is read-only; a claim precedes supplier work; atomic consume plus BookingIntent creation permits at most one canonical intent. Losers have zero supplier/payment side effects.
-- **Encryption/deletion:** messages and session-derived titles use record-bound AES-256-GCM with keys outside PostgreSQL. Legacy plaintext remains for reversible observation; cleanup is not complete and requires T102 approval/evidence. Sessions are soft-deleted; deleted-session checks block later resolve/consume, but deletion does not explicitly revoke active handoffs/claims or erase ciphertext.
-- **Rollout/observability:** deploy inert additive code, verify Redis/encrypted persistence, enable API ACCEPT, then validate multi-agent and web action support, booking readiness, ISSUE for a controlled cohort, and direct transport last after auth/CORS/session verification. ISSUE without ACCEPT is invalid. The current agent/web multi-agent and ACCEPT mirrors and the agent direct flag are not runtime gates; public-boundary behavior must be verified. Either the canonical web direct flag or its legacy alias currently selects direct transport, so both must be false for rollback. Disable ISSUE first, preserve API ACCEPT for valid outstanding credentials when policy permits, and return transport to the retained proxy. Telemetry uses opaque trace/correlation IDs and bounded safe fields. Full dashboard/alert assertions and performance evidence remain T097/T098. See the [handoff runbook](../docs/runbooks/chatbot-handoff.md).
 
 ---
 
@@ -454,7 +431,7 @@ FastAPI JWTAuthMiddleware validates JWT token (shared JWT_SECRET)
 FastAPI NemoGuardrailService runs safety checks (length, regex heuristics, Mimo safety classification)
         ├── Safety check FAILS/BLOCKED → Log security event, return error event and close stream
         └── Safety check PASSES ↓
-            Agent checks conversation memory (loads history/summary through NestJS using X-Agent-API-Key plus X-User-Claim)
+            Agent checks conversation memory (loads history/summary from NestJS Chat API using X-Service-Auth)
                 ↓
             Orchestrates LangGraph StateGraph agent (Router → Travel Assistant or Checkout Orchestrator)
                 ↓
@@ -474,7 +451,7 @@ FastAPI NemoGuardrailService runs safety checks (length, regex heuristics, Mimo 
 - **Browser Transport & Correlation**: Chat clients stream directly to the public FastAPI agent endpoint (bypassing the Next.js proxy during the direct transport phase). Independently sanitized opaque trace and correlation IDs propagate across browser, agent, and backend; the Python sanitizer is shared by SSE and the NestJS client, and a real loopback integration test verifies identical IDs in NestJS telemetry and audit persistence. Agent and API telemetry enforce per-field closed type/value schemas, fail open on emission failure, and use fixed event names; audit metadata never stores request/session/user/offer/message/token/passenger/payment/passport values.
 - **Independent Handoff Gates**: The LLM remains read-only and never creates bookings. When users commit to a flight, the Checkout Orchestrator signals a deterministic NestJS handoff service to issue a token.
 - **Secure Handoff Lifecycle**: The `ACTION_HANDOFF` SSE event delivers a hash-only token without URL or offer identifier. A native same-origin form adds the in-memory credential only while constructing the POST body; the bootstrap route validates a renderable safe checkout context, sets a short-lived root-scoped `HttpOnly; Secure; SameSite=Strict` cookie, and redirects to `/checkout/passengers`. The passenger page resolves server-side, and same-origin readiness/intent routes accept only allowlisted passenger inputs, inject the credential from the HttpOnly cookie, use bounded upstream calls, and clear the cookie at the same root scope only after successful intent creation. Tokens are strictly absent from URLs, DOM fields, readable storage, and telemetry.
-- **Service-Authenticated Endpoints**: The Python Agent authenticates with the NestJS Agent Gateway using `X-Agent-API-Key` plus a short-lived `X-User-Claim`, rather than forwarding the browser JWT to ordinary ChatController paths.
+- **Service-Authenticated Endpoints**: The Python Agent authenticates with the NestJS Chat API using a dedicated `X-Service-Auth` token rather than relying on user credentials or unauthenticated paths.
 - **Encrypted Persistence**: Chat messages and summaries are dual-written/read using record-bound AES-256-GCM encryption, ensuring conversation data is encrypted at rest and tied to specific sessions.
 - **Fencing Integration**: Concurrent writes are prevented through strict session ownership. The agent must acquire and propagate an `X-Fencing-Token`, and the NestJS backend enforces this write fence on all mutative chat operations.
 - **Soft Deletion**: Chat sessions and messages are soft-deleted instead of hard-removed, preserving the relational structure and audit trails while stripping PII/ciphertext and hiding them from active queries.
@@ -502,7 +479,7 @@ The following are **architecture-specific** invariants that enforce the system d
 - **AI agents NEVER access PostgreSQL directly.** All agent data access goes through the agent-gateway, which strips PII and enforces scoped access.
 - **JWT tokens MUST be validated on every protected endpoint.** No endpoint in the deterministic path is accessible without authentication.
 - **Prisma migrations MUST be version-controlled and reviewed.** No ad-hoc schema changes in production.
-- **Frontend components contain no deterministic booking/payment/supplier business logic or direct supplier/payment calls.** Feature 17 explicitly permits the authenticated, strict-CORS browser-to-FastAPI chat stream; durable application state and all transactional operations still go through NestJS.
+- **Frontend components contain no business logic or direct API calls to external services.** All external communication goes through the NestJS backend.
 - **Shared TypeScript types are the single source of truth.** Frontend and backend must use the same type definitions — never redefine them locally.
 - **Traveler Profile PII must be encrypted using record-bound AES-256-GCM encryption.** All sensitive columns (like passport fields) must bind encryption to user/profile identifiers to prevent cross-record decryption or ciphertext substitution attacks.
 - **Data-quality backfills must use optimistic concurrency controls (CAS).** Schema migrations and data backfills must run in additive, non-destructive steps and abort if the validation/quarantine ratio exceeds safe thresholds.
