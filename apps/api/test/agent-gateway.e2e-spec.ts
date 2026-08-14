@@ -8,6 +8,7 @@ import { DuffelOfferRequest } from '@/duffel/duffel.types';
 import * as crypto from 'crypto';
 import { HttpExceptionFilter } from '@/common/filters/http-exception.filter';
 import { User } from '@prisma/client';
+import { ChatMessageCryptoService } from '@/chat/chat-message-crypto.service';
 
 function mintClaimToken(userId: string, iat: number, secret = 'test-claim-token-secret'): string {
   const payload = { userId, iat };
@@ -28,6 +29,7 @@ describe('Agent Gateway (E2E)', () => {
   jest.setTimeout(30000);
   let app: INestApplication;
   let prisma: PrismaService;
+  let cryptoService: ChatMessageCryptoService;
 
   const apiKey = 'test-agent-api-key';
 
@@ -37,6 +39,7 @@ describe('Agent Gateway (E2E)', () => {
     process.env.CLAIM_TOKEN_SECRET = 'test-claim-token-secret';
     process.env.CLAIM_TOKEN_TTL_SECONDS = '300';
     process.env.ATTESTATION_SECRET = 'test-attestation-secret';
+    process.env.CHAT_ENCRYPTION_KEY = crypto.randomBytes(32).toString('hex');
 
     const moduleFixture: TestingModule = await Test.createTestingModule({
       imports: [AppModule],
@@ -55,6 +58,7 @@ describe('Agent Gateway (E2E)', () => {
     await app.init();
 
     prisma = moduleFixture.get<PrismaService>(PrismaService);
+    cryptoService = moduleFixture.get<ChatMessageCryptoService>(ChatMessageCryptoService);
 
     jest.spyOn(DuffelService.prototype, 'searchFlights').mockImplementation(async (query) => {
       const offerRequest = {
@@ -755,16 +759,28 @@ describe('Agent Gateway (E2E)', () => {
       const session = await prisma.chatSession.create({
         data: {
           userId: user.id,
-          title: 'Degradation Test Session',
         },
       });
 
-      // 2. Create a ChatMessage with cabin keyword 'business'
+      // 2. Create an encrypted ChatMessage with cabin keyword 'business'
+      const msgId = crypto.randomUUID();
+      const encMsg = await cryptoService.encryptMessageContent(
+        msgId,
+        session.id,
+        'USER',
+        'STANDARD',
+        'Find me a business class flight from SGN to NRT',
+      );
       await prisma.chatMessage.create({
         data: {
+          id: msgId,
           sessionId: session.id,
           sender: 'USER',
-          content: 'Find me a business class flight from SGN to NRT',
+          type: 'STANDARD',
+          contentCiphertext: encMsg.ciphertext,
+          contentNonce: encMsg.nonce,
+          contentAuthTag: encMsg.authTag,
+          contentKeyVersion: encMsg.keyVersion,
         },
       });
 
@@ -793,16 +809,28 @@ describe('Agent Gateway (E2E)', () => {
       const session = await prisma.chatSession.create({
         data: {
           userId: user.id,
-          title: 'Degradation Test Session',
         },
       });
 
-      // 2. Create a ChatMessage with passenger keyword 'infant'
+      // 2. Create an encrypted ChatMessage with passenger keyword 'infant'
+      const msgId = crypto.randomUUID();
+      const encMsg = await cryptoService.encryptMessageContent(
+        msgId,
+        session.id,
+        'USER',
+        'STANDARD',
+        'I want to travel with an infant',
+      );
       await prisma.chatMessage.create({
         data: {
+          id: msgId,
           sessionId: session.id,
           sender: 'USER',
-          content: 'I want to travel with an infant',
+          type: 'STANDARD',
+          contentCiphertext: encMsg.ciphertext,
+          contentNonce: encMsg.nonce,
+          contentAuthTag: encMsg.authTag,
+          contentKeyVersion: encMsg.keyVersion,
         },
       });
 
@@ -981,7 +1009,6 @@ describe('Agent Gateway (E2E)', () => {
       const session = await prisma.chatSession.create({
         data: {
           userId: user.id,
-          title: 'Search Session',
         },
       });
 

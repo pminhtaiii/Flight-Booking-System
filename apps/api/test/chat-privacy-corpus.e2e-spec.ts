@@ -76,7 +76,7 @@ describe('Chat and Handoff Privacy Corpus E2E & Boundary Safety', () => {
     await app?.close();
   });
 
-  it('ChatMessageCryptoService fallback warning logs do NOT leak message ID, session ID, or raw error', async () => {
+  it('ChatMessageCryptoService decryption failure warning logs do NOT leak message ID, session ID, or raw error', async () => {
     const warnSpy = jest.spyOn(cryptoService!['logger'], 'warn');
     const secretMessageId = 'msg-secret-uuid-12345';
     const secretSessionId = 'ses-secret-uuid-67890';
@@ -90,11 +90,9 @@ describe('Chat and Handoff Privacy Corpus E2E & Boundary Safety', () => {
       contentNonce: crypto.randomBytes(12).toString('hex'),
       contentAuthTag: crypto.randomBytes(16).toString('hex'),
       contentKeyVersion: 1,
-      content: 'fallback plaintext',
     };
 
-    const result = await cryptoService!.decryptMessageContent(corruptedMessage);
-    expect(result).toBe('fallback plaintext');
+    await expect(cryptoService!.decryptMessageContent(corruptedMessage)).rejects.toThrow();
     expect(warnSpy).toHaveBeenCalled();
 
     const loggedWarning = warnSpy.mock.calls.map((c) => String(c[0])).join(' ');
@@ -103,7 +101,7 @@ describe('Chat and Handoff Privacy Corpus E2E & Boundary Safety', () => {
     warnSpy.mockRestore();
   });
 
-  it('ChatMessageCryptoService session title fallback warning logs do NOT leak session ID or raw error', async () => {
+  it('ChatMessageCryptoService session title decryption failure warning logs do NOT leak session ID or raw error', async () => {
     const warnSpy = jest.spyOn(cryptoService!['logger'], 'warn');
     const secretSessionId = 'ses-title-secret-uuid-99999';
 
@@ -113,11 +111,9 @@ describe('Chat and Handoff Privacy Corpus E2E & Boundary Safety', () => {
       titleNonce: crypto.randomBytes(12).toString('hex'),
       titleAuthTag: crypto.randomBytes(16).toString('hex'),
       titleKeyVersion: 1,
-      title: 'fallback title',
     };
 
-    const result = await cryptoService!.decryptSessionTitle(corruptedSession);
-    expect(result).toBe('fallback title');
+    await expect(cryptoService!.decryptSessionTitle(corruptedSession)).rejects.toThrow();
     expect(warnSpy).toHaveBeenCalled();
 
     const loggedWarning = warnSpy.mock.calls.map((c) => String(c[0])).join(' ');

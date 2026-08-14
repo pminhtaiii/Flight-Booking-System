@@ -223,7 +223,7 @@ describe('Chat handoff performance (E2E)', () => {
     );
 
     const session = await prisma.chatSession.create({
-      data: { userId, title: 'T098 performance session' },
+      data: { userId },
     });
     chatSessionId = session.id;
 

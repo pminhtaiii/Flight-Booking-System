@@ -170,10 +170,11 @@ async function seedReadinessOffer(
   prisma: PrismaService,
   overrides: Partial<Prisma.FlightOfferCreateInput> = {},
 ): Promise<{ id: string }> {
+  const uniqueId = require('crypto').randomUUID();
   const offer = await prisma.flightOffer.create({
     data: {
-      searchHash: 'booking-readiness-search-hash',
-      duffelOfferId: 'off_readiness_123',
+      searchHash: overrides.searchHash ?? `booking-readiness-search-hash-${uniqueId}`,
+      duffelOfferId: overrides.duffelOfferId ?? `off_readiness_${uniqueId}`,
       rawOffer: {
         expires_at: '2030-08-25T10:00:00Z',
         passengers: [{ id: 'pas_001', type: 'adult' }],
@@ -888,7 +889,7 @@ describe('Booking Readiness (E2E RED)', () => {
       const profile = await seedTravelerProfile(prisma, encryptionService, primaryUser.id);
       
       const session = await prisma.chatSession.create({
-        data: { userId: primaryUser.id, title: 'Token Test' },
+        data: { userId: primaryUser.id },
       });
       const validHandoffToken = 'valid-handoff-token-123';
       const tokenHash = require('crypto').createHash('sha256').update(validHandoffToken).digest('hex');

@@ -271,7 +271,7 @@ docs/runbooks/chatbot-handoff.md
 8. Enable direct browser→FastAPI streaming after CORS/JWT/session continuity tests in the deployed topology. Keep the proxy and its configuration behind the transport flag for the complete observation window and rollback-matrix test.
 9. Rollback order during observation: disable issuance → disable multi-agent router → revert client to proxy if needed. Acceptance may stay enabled to honor already-issued unexpired tokens. Never drop `ChatHandoff`, encryption envelopes, or BookingAgentProjection rows during rollback.
 10. Only after explicit observation approval, archive the successful rollback matrix, delete the proxy and obsolete `Direct=false` configuration, then rerun direct-stream/session/full-handoff plus direct-only configuration rejection tests. This cleanup is not part of the reversible rollout checkpoint.
-11. Under a separate encrypted-chat approval, verify live dual-read/write observation, complete message/title ciphertext twins, recovery export, database/backup inventory, and legacy-reader shutdown; only then apply the Phase 17 plaintext cleanup and run final zero-plaintext/recovery checks.
+11. Under explicit encrypted-chat approval, live dual-read/write observation, complete message/title ciphertext twins, recovery export, and database/backup inventories were verified; Phase 17 / Phase 8E plaintext cleanup (`20260805010000_chat_message_plaintext_cleanup`) has been applied, dropping legacy columns with final zero-plaintext checks passed.
 
 ## Observability Deliverables
 

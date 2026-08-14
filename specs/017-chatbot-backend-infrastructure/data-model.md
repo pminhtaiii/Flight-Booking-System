@@ -21,7 +21,6 @@ Existing Prisma model gains soft deletion so consumed handoff audit linkage rema
 | userId | UUID | Required relation to User; all access scoped by `{id, userId}` |
 | titleCiphertext / titleNonce / titleAuthTag | nullable encrypted envelope | Record-bound AES-256-GCM title; prevents title-derived message/itinerary PII from remaining plaintext |
 | titleKeyVersion | nullable positive int | External application key version |
-| title | nullable string during migration only | Legacy rollback representation retained through observation and dropped only in approved Phase 17 |
 | createdAt / updatedAt / lastActiveAt | timestamps | Existing lifecycle fields |
 | deletedAt | nullable timestamp | Null while active; deletion revokes active handoffs and hides the session from ordinary queries without breaking consumed audit linkage |
 | messages | ChatMessage[] | Durable raw messages and summaries |
@@ -29,7 +28,7 @@ Existing Prisma model gains soft deletion so consumed handoff audit linkage rema
 
 ### ChatMessage
 
-Existing Prisma model is migrated from plaintext content to a record-bound authenticated-encryption envelope.
+Existing Prisma model is migrated from plaintext content to a record-bound authenticated-encryption envelope. Legacy plaintext column `content` dropped in approved Phase 8E / Phase 17 (T102).
 
 | Field | Type | Rules |
 |---|---|---|
@@ -41,15 +40,14 @@ Existing Prisma model is migrated from plaintext content to a record-bound authe
 | contentNonce | bytes/base64 string | Unique 96-bit random nonce per encryption operation |
 | contentAuthTag | bytes/base64 string | Authentication tag when not stored as part of ciphertext |
 | contentKeyVersion | positive int | Selects the external application encryption key; key material never enters PostgreSQL |
-| content | nullable string during migration only | Legacy rollback source retained through observation and dropped only in approved Phase 17 |
 | createdAt | timestamp | Immutable creation time |
 
 Encryption and retention rules:
 
 1. Only the NestJS chat domain and service-authenticated Agent Gateway may decrypt after owner/session authorization; controllers and repositories return no plaintext by default.
-2. New writes are encrypted before persistence from the first live integration deploy. Backfill is restart-safe and verifies decrypt/reencrypt equality, but the legacy column remains intact/read-compatible throughout the reversible observation window.
+2. New writes are encrypted before persistence from the first live integration deploy. Backfill is restart-safe and verified decrypt/reencrypt equality.
 3. Rotation writes with the active key version and re-encrypts old rows in bounded batches; retired keys remain only until database and backup retention windows no longer contain their ciphertext.
-4. A separately approved cleanup migration drops legacy message/title plaintext only after dual-read/write observation, complete backfill, recovery export, database/backup inventory, and legacy-reader shutdown; final scans must then find zero plaintext. Account/session retention cleanup removes ciphertext under policy; audits retain only value-free metadata.
+4. Legacy message/title plaintext dropped in migration `20260805010000_chat_message_plaintext_cleanup` (Phase 8E / T102); zero plaintext exists in database. Account/session retention cleanup removes ciphertext under policy; audits retain only value-free metadata.
 
 ### Booking and safe projection extension
 

@@ -7,15 +7,15 @@ Update this file after every completed feature. Any AI agent reading this should
 ### Current Status
 
 **Feature:** Chatbot Backend Infrastructure & Booking Handoff (Feature 17)
-**Last completed:** Phase 8D Approved Direct-Only Transport Cleanup (T101) (2026-08-14).
+**Last completed:** Phase 8E Plaintext DB Column Drop Cleanup (T102) & Full Documentation Convergence (2026-08-14).
 **In progress:** None.
-**Next:** Phase 8E Plaintext DB column drop (T102 requires separate explicit approval). See [plan.md](file:///c:/Booking%20Systems/specs/017-chatbot-backend-infrastructure/plan.md) for details.
+**Next:** None (Feature 017 complete).
 
 ---
 
 ## Progress by Feature
 
-### [ ] Feature: Chatbot Backend Infrastructure & Booking Handoff (Feature 17)
+### [x] Feature: Chatbot Backend Infrastructure & Booking Handoff (Feature 17)
 
 - [x] Phase 1 / Contract & Config Freeze (T001–T008): Shared contracts compile, all flags default off, runtime behavior unchanged.
 - [x] Phase 2 / Foundational — Additive Storage & Redis Primitives (T009–T024):
@@ -47,7 +47,11 @@ Update this file after every completed feature. Any AI agent reading this should
   - [x] WP 4E: General/Travel inventory (T043, T044, T045)
   - [x] WP 4F: Checkout adapter/integration (T046, T052)
   - **All tests in apps/agent pass successfully (201/201).**
-- [ ] Phase 5 / US3: Privacy-Minimized Booking Answers (T053–T063)
+- [x] Phase 5 / US3: Privacy-Minimized Booking Answers (T053–T063)
+  - [x] WP 5A: Projection lifecycle (T053, T057, T059)
+  - [x] WP 5B: Exact query boundary (T054, T058, T060)
+  - [x] WP 5C: Authenticated routes (T055, T061)
+  - [x] WP 5D: Python read tools (T056, T062, T063)
 - [x] Phase 6 / US4: Deterministic Checkout Handoff (T064–T084)
   - [x] WP 6A: Deterministic credential primitive — attestation verifier, server-derived idempotency, HMAC/hash rotation
   - [x] WP 6B: Dark create/resolve API — service-auth create, user-auth token-only resolve, ISSUE/ACCEPT gates
@@ -64,12 +68,16 @@ Update this file after every completed feature. Any AI agent reading this should
   - **WP 7D/T092 GREEN evidence:** route-level proxy tests `2/2` passed; the user-provided `chat-checkout-handoff.spec.ts` browser run passed. The proxy rollback matrix remains retained.
   - [x] WP 7D/T093: Reversible observation — direct-stream signed-search/selection/action ordering, strict authenticated clean bootstrap, owner/internal-session resolution, readiness/claim/consume regression, legacy `ACTION_REQUIRED`, session continuity, encrypted persistence, and credential privacy assertions.
   - **WP 7D/T093 GREEN evidence (2026-08-12):** exact-final-source real browser→Next.js→FastAPI→NestJS→bootstrap→resolve→readiness→consume Playwright run exited `0` with `1 passed (7.4m)`. Assertions proved one BookingIntent and one consumed handoff under 16-way concurrency, two expected supplier calls and zero payment calls, four encrypted plaintext-free messages, retained session continuity, clean URL/DOM/storage/cookie/console/request privacy, and distinct legacy `ACTION_REQUIRED`. Focused web boundary tests passed `11/11`, focused API handoff tests passed `20/20`, and the Next production build passed with both cookie-backed checkout proxy routes compiled. Phase 8 remains unchecked and was not started.
-- [ ] Phase 8 / Polish & Cleanup (T094–T102)
+- [x] Phase 8 / Polish & Cleanup (T094–T102)
+  - [x] T094 / Operations Runbook: created `docs/runbooks/chatbot-handoff.md`.
+  - [x] T095 / Architecture update: synchronized topology and invariants in `context/architecture.md`.
+  - [x] T096 / Context & library docs update: synchronized status in `context/progress-checker.md`.
+  - [x] T097 / Maintained telemetry assertions: verified in `chat-handoff-observability.e2e-spec.ts` and `test_chat_observability.py`.
   - [x] T098 / Handoff latency and concurrency: post-remediation gates passed on 2026-08-14. Router p95 11.338 ms; quota race 1 accepted/99 denied; handoff create/resolve p95 13.9823/24.0127 ms; 100-consumer p95 150.7542 ms with one supplier call, one intent, 99 expected conflicts, and zero payment calls.
   - [x] T099 / Negative Privacy Corpus: verified zero exposure across LLM fixtures, SSE, bootstrap/access logs, traces, audits, clean URLs, DOM, cookies, and browser storage on 2026-08-14. Closed crypto fallback, claim token logging gaps, raw stack logging in agent gateway controller/service, telemetry privacy detection order, runtime redirect builder verification, and dynamic test encryption key fixtures.
   - [x] T100 / Full Regression Suite: full agent pytest (264/264 PASS), shared types build, NestJS unit suites (575/575 PASS), Next.js production build (21 routes), web boundary unit suites (16/16 PASS), and API E2E privacy/chat suites passed cleanly on 2026-08-14.
   - [x] T101 / Approved Direct-Only Transport Cleanup: retired temporary SSE proxy route `apps/web/app/api/chat/stream/route.ts` and unit test, removed `FEATURE_FLAG_CHAT_DIRECT_STREAM` toggles from web/agent configs, updated `chatStream.ts` to direct-only transport with opaque trace/correlation ID propagation and Bearer auth, verified Playwright direct browser streaming (3/3 PASS including 404 for deleted proxy route), verified full agent pytest (264/264 PASS), NestJS handoff suites (24/24 PASS), web unit suites (29/29 PASS), and Next.js production build (20 routes).
-  - [ ] T102 (Plaintext DB columns drop) remains a separate approval-gated Phase 8E task.
+  - [x] T102 / Approved Plaintext Cleanup: applied migration `20260805010000_chat_message_plaintext_cleanup` dropping legacy plaintext columns `title` on `chat_sessions` and `content` on `chat_messages`; verified strict record-bound AES-256-GCM authenticated encryption/decryption with zero fallback across API and Gateway; verified 4/4 chat-plaintext-cleanup E2E tests, 3/3 privacy corpus E2E tests, 18/18 chat E2E tests, 264/264 agent pytest suites, and Next.js production build.
 
 ### [ ] Feature: Traveler Profile & Booking Readiness (Feature 16)
 
