@@ -14,6 +14,7 @@ import { HttpException, NotFoundException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { ChatService } from '@/chat/chat.service';
 import { SelectionAttestationService } from './selection-attestation.service';
+import { ChatMessageCryptoService } from '@/chat/chat-message-crypto.service';
 
 describe('AgentGatewayService', () => {
   let service: AgentGatewayService;
@@ -43,6 +44,7 @@ describe('AgentGatewayService', () => {
         { provide: ConfigService, useValue: { get: jest.fn().mockReturnValue('false') } },
         { provide: ChatService, useValue: {} },
         { provide: SelectionAttestationService, useValue: { verifySelectionAttestation: jest.fn() } },
+        { provide: ChatMessageCryptoService, useValue: { decryptMessageContent: jest.fn().mockResolvedValue('') } },
       ],
     }).compile();
 

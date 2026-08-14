@@ -66,7 +66,10 @@ export class ChatService {
     let titleAuthTag: string | null = null;
     let titleKeyVersion: number | null = null;
 
-    if (title && this.cryptoService.isConfigured()) {
+    if (title) {
+      if (!this.cryptoService.isConfigured()) {
+        throw new Error('CHAT_ENCRYPTION_KEY must be configured to store session titles');
+      }
       const encrypted = await this.cryptoService.encryptSessionTitle(sessionId, title);
       titleCiphertext = encrypted.ciphertext;
       titleNonce = encrypted.nonce;
@@ -79,7 +82,6 @@ export class ChatService {
         data: {
           id: sessionId,
           userId,
-          title: title || null,
           titleCiphertext,
           titleNonce,
           titleAuthTag,
@@ -224,7 +226,10 @@ export class ChatService {
     let titleAuthTag: string | null = session.titleAuthTag;
     let titleKeyVersion: number | null = session.titleKeyVersion;
 
-    if (title !== undefined && title !== null && this.cryptoService.isConfigured()) {
+    if (title !== undefined && title !== null) {
+      if (!this.cryptoService.isConfigured()) {
+        throw new Error('CHAT_ENCRYPTION_KEY must be configured to update session titles');
+      }
       const encrypted = await this.cryptoService.encryptSessionTitle(sessionId, title);
       titleCiphertext = encrypted.ciphertext;
       titleNonce = encrypted.nonce;
@@ -241,7 +246,6 @@ export class ChatService {
           title === undefined
             ? {}
             : {
-                title,
                 titleCiphertext,
                 titleNonce,
                 titleAuthTag,
@@ -343,7 +347,10 @@ export class ChatService {
     let contentAuthTag: string | null = null;
     let contentKeyVersion: number | null = null;
 
-    if (content && this.cryptoService.isConfigured()) {
+    if (content) {
+      if (!this.cryptoService.isConfigured()) {
+        throw new Error('CHAT_ENCRYPTION_KEY must be configured to store chat messages');
+      }
       const encrypted = await this.cryptoService.encryptMessageContent(
         messageId,
         sessionId,
@@ -366,7 +373,6 @@ export class ChatService {
           sessionId,
           sender: sender as MessageSender,
           type: messageType as MessageType,
-          content: contentCiphertext === null ? content : null,
           contentCiphertext,
           contentNonce,
           contentAuthTag,
@@ -559,7 +565,10 @@ export class ChatService {
         let contentAuthTag: string | null = null;
         let contentKeyVersion: number | null = null;
 
-        if (content && this.cryptoService.isConfigured()) {
+        if (content) {
+          if (!this.cryptoService.isConfigured()) {
+            throw new Error('CHAT_ENCRYPTION_KEY must be configured to store chat messages');
+          }
           const encrypted = await this.cryptoService.encryptMessageContent(
             messageId,
             sessionId,
@@ -579,7 +588,6 @@ export class ChatService {
             sessionId,
             sender: sender as any,
             type: messageType as any,
-            content: contentCiphertext === null ? content : null,
             contentCiphertext,
             contentNonce,
             contentAuthTag,

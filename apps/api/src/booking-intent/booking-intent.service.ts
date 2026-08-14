@@ -459,7 +459,7 @@ export class BookingIntentService {
       }
 
       if (this.auditService) {
-        const auditWrite = this.auditService.createLog(null, {
+        await this.auditService.createLog(tx, {
           userId,
           action: handoff ? 'chat_handoff_consumed' : 'booking_intent_created',
           resourceType: handoff ? 'ChatHandoff' : 'BookingIntent',
@@ -475,7 +475,6 @@ export class BookingIntentService {
             ...telemetryEvent.metadata,
           },
         });
-        void Promise.resolve(auditWrite).catch(() => {});
       }
 
       return { intent, passengers, maskedPassengers };

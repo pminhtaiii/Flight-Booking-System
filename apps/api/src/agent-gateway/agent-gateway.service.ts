@@ -24,6 +24,7 @@ import { BookingReadinessOperation } from '@/common/observability/booking-readin
 import { ProfileService } from '@/profile/profile.service';
 import { BookingReadinessRequestDto, BookingReadinessPassengerDto } from '@/booking-intent/dto/booking-readiness.dto';
 import { ChatService } from '@/chat/chat.service';
+import { ChatMessageCryptoService } from '@/chat/chat-message-crypto.service';
 
 function capitalizeCabinClass(cabinClass: string): string {
   if (!cabinClass) return '';
@@ -86,6 +87,7 @@ export class AgentGatewayService {
     private readonly configService: ConfigService,
     private readonly chatService: ChatService,
     private readonly selectionAttestationService: SelectionAttestationService,
+    private readonly chatMessageCryptoService: ChatMessageCryptoService,
   ) {}
 
   /**
@@ -357,9 +359,14 @@ export class AgentGatewayService {
         });
       }
 
-      if (lastMessage && lastMessage.content) {
+      if (lastMessage) {
         const matchedKeywords: string[] = [];
-        const content = lastMessage.content;
+        let content = '';
+        try {
+          content = await this.chatMessageCryptoService.decryptMessageContent(lastMessage);
+        } catch {
+          content = '';
+        }
 
         for (const kw of CABIN_KEYWORDS) {
           const regex = new RegExp(`\\b${kw}\\b`, 'i');
@@ -595,9 +602,14 @@ export class AgentGatewayService {
         orderBy: { createdAt: 'desc' },
       });
 
-      if (lastMessage && lastMessage.content) {
+      if (lastMessage) {
         const matchedKeywords: string[] = [];
-        const content = lastMessage.content;
+        let content = '';
+        try {
+          content = await this.chatMessageCryptoService.decryptMessageContent(lastMessage);
+        } catch {
+          content = '';
+        }
 
         for (const kw of CABIN_KEYWORDS) {
           const regex = new RegExp(`\\b${kw}\\b`, 'i');

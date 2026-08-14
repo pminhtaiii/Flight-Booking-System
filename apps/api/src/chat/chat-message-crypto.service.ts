@@ -138,7 +138,7 @@ export class ChatMessageCryptoService {
   }
 
   /**
-   * Record-bound decryption for ChatMessage content with fallback to legacy plaintext.
+   * Record-bound decryption for ChatMessage content with strict AES-256-GCM authentication.
    */
   async decryptMessageContent(message: {
     id: string;
@@ -149,7 +149,6 @@ export class ChatMessageCryptoService {
     contentNonce?: string | null;
     contentAuthTag?: string | null;
     contentKeyVersion?: number | null;
-    content?: string | null;
   }): Promise<string> {
     if (
       this.isConfigured() &&
@@ -168,11 +167,14 @@ export class ChatMessageCryptoService {
           message.contentKeyVersion,
         );
       } catch (error) {
-        this.logger.warn('Failed to decrypt ChatMessage content, falling back to legacy plaintext');
-        return message.content || '';
+        this.logger.warn('Failed to decrypt ChatMessage content');
+        throw new Error('Failed to decrypt ChatMessage content');
       }
     }
-    return message.content || '';
+    if (!this.isConfigured()) {
+      throw new Error('CHAT_ENCRYPTION_KEY is not configured');
+    }
+    throw new Error('ChatMessage is missing ciphertext envelope or is corrupted');
   }
 
   /**
@@ -193,7 +195,7 @@ export class ChatMessageCryptoService {
   }
 
   /**
-   * Record-bound decryption for ChatSession title with fallback to legacy plaintext.
+   * Record-bound decryption for ChatSession title with strict AES-256-GCM authentication.
    */
   async decryptSessionTitle(session: {
     id: string;
@@ -201,7 +203,6 @@ export class ChatMessageCryptoService {
     titleNonce?: string | null;
     titleAuthTag?: string | null;
     titleKeyVersion?: number | null;
-    title?: string | null;
   }): Promise<string | null> {
     if (
       this.isConfigured() &&
@@ -220,11 +221,18 @@ export class ChatMessageCryptoService {
           session.titleKeyVersion,
         );
       } catch (error) {
-        this.logger.warn('Failed to decrypt ChatSession title, falling back to legacy plaintext');
-        return session.title || null;
+        this.logger.warn('Failed to decrypt ChatSession title');
+        throw new Error('Failed to decrypt ChatSession title');
       }
     }
-    return session.title || null;
+    if (!session.titleCiphertext && !session.titleNonce && !session.titleAuthTag) {
+      return null;
+    }
+    if (!this.isConfigured()) {
+      throw new Error('CHAT_ENCRYPTION_KEY is not configured');
+    }
+    throw new Error('ChatSession title is missing ciphertext envelope or is corrupted');
   }
 }
+
 

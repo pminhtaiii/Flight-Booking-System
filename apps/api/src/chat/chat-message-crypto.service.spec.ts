@@ -128,8 +128,41 @@ describe('ChatMessageCryptoService', () => {
       titleNonce: encrypted.nonce,
       titleAuthTag: encrypted.authTag,
       titleKeyVersion: encrypted.keyVersion,
-      title: 'legacy fallback title',
     });
     expect(decrypted).toBe(title);
   });
+
+  it('should throw an error on decryptMessageContent when ciphertext is corrupt (no legacy fallback)', async () => {
+    const corruptMsg = {
+      id: 'msg-err',
+      sessionId: 'session-err',
+      sender: 'USER',
+      type: 'STANDARD',
+      contentCiphertext: 'badciphertext1234',
+      contentNonce: '0102030405060708090a0b0c',
+      contentAuthTag: '0102030405060708090a0b0c0d0e0f10',
+      contentKeyVersion: 1,
+      content: 'legacy fallback that should NOT be returned',
+    };
+
+    await expect(
+      (service as any).decryptMessageContent(corruptMsg),
+    ).rejects.toThrow();
+  });
+
+  it('should throw an error on decryptSessionTitle when ciphertext is corrupt (no legacy fallback)', async () => {
+    const corruptSession = {
+      id: 'sess-err',
+      titleCiphertext: 'badciphertext1234',
+      titleNonce: '0102030405060708090a0b0c',
+      titleAuthTag: '0102030405060708090a0b0c0d0e0f10',
+      titleKeyVersion: 1,
+      title: 'legacy fallback title that should NOT be returned',
+    };
+
+    await expect(
+      (service as any).decryptSessionTitle(corruptSession),
+    ).rejects.toThrow();
+  });
 });
+
