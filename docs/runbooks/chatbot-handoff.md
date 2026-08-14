@@ -76,7 +76,17 @@ The operational dashboard must include:
 
 Alert on Redis health failure; any quota-bypass invariant failure; error rate above 2x baseline for five minutes; malformed-output spike; cross-owner handoff spike; any token-integrity or privacy-corpus failure; handoff resolve/consume p95 above 300 ms; and first-safe-token p95 regression. Only the error-rate window and handoff latency have specification-defined numeric thresholds. Configure all spike/regression thresholds per environment and label them operator-configured.
 
-Current coverage is partial: NestJS emits intent and handoff create/resolve/consume/replay telemetry; FastAPI emits allowlisted quota, Router, tool, snapshot-read, and handoff-action telemetry. Treat the complete dashboard list as the required contract. T097 adds maintained assertions; T098 records measured p95/count evidence. Do not claim those gates from this runbook alone.
+Current coverage is partial: NestJS emits intent and handoff create/resolve/consume/replay telemetry; FastAPI emits allowlisted quota, Router, tool, snapshot-read, and handoff-action telemetry. Treat the complete dashboard list as the required contract. T097 adds maintained assertions; T098 measured p95/count evidence is recorded below.
+
+### 4.1 T098 latency and concurrency benchmark evidence (2026-08-14)
+
+Measured gate results on `test` / `test_db` environment with deterministic model, Duffel, and Stripe fakes:
+
+- **Router overhead (100 requests):** p95 = 11.338 ms (limit < 100 ms), 0 failures.
+- **Daily quota race (100 simultaneous requests at limit - 1):** exactly 1 accepted, 99 denied (0 quota bypass, daily count = 100, burst count = 1), 0 failures.
+- **Handoff create (100 requests):** p95 = 13.9823 ms (limit < 300 ms), 0 failures, 0 supplier/payment calls.
+- **Handoff resolve (100 requests):** p95 = 24.0127 ms (limit < 300 ms), 0 failures, 0 supplier/payment calls.
+- **100-consumer consume concurrency (100 simultaneous consume requests for 1 token):** p95 = 150.7542 ms (limit < 300 ms), 1 winner (201 Created), 99 expected conflicts (409 Conflict), 0 unexpected failures, exactly 1 supplier call (`duffel.offers.get`), 1 canonical `BookingIntent` created and bound to consumed handoff, 0 payment calls (`createPaymentIntent`).
 
 ## 5. Key and secret rotation
 
@@ -136,4 +146,4 @@ Chat message content, summaries, handoff credentials or hashes, local/provider o
 
 Known release gaps prevent an absolute privacy-completion claim: crypto fallback logging can include message/session identifiers and raw decrypt errors; claim-token logging can include a user identifier; protected audit columns retain identifiers required by existing audit linkage. Fix and validate these surfaces in the privacy gate before claiming full compliance.
 
-Before rollout or incident closure, record flag state, dependency health, direct/proxy mode, safe aggregate handoff/claim/intent outcomes, and unresolved limitations. T093's continuous real browser-to-consume Playwright flow is complete according to the owning session's recorded evidence; T097-T100 evidence remains pending; T101 and T102 remain separately approval-gated.
+Before rollout or incident closure, record flag state, dependency health, direct/proxy mode, safe aggregate handoff/claim/intent outcomes, and unresolved limitations. T093's continuous real browser-to-consume Playwright flow is complete according to the owning session's recorded evidence; T098 latency and concurrency benchmark evidence is verified and recorded (2026-08-14); T097, T099, and T100 evidence remains pending; T101 and T102 remain separately approval-gated.

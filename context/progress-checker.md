@@ -7,8 +7,8 @@ Update this file after every completed feature. Any AI agent reading this should
 ### Current Status
 
 **Feature:** Chatbot Backend Infrastructure & Booking Handoff (Feature 17)
-**Last completed:** Phase 7D / US5: continuous real browser-to-consume observation (T093).
-**In progress:** Feature 17 Phase 8 has started for the independently scoped T098 latency/concurrency gate; remaining Phase 8 tasks are separately gated.
+**Last completed:** Phase 7D / US5 continuous real browser-to-consume observation (T093) and Phase 8B T098 handoff latency/concurrency benchmark gate (2026-08-14).
+**In progress:** Feature 17 Phase 8 remaining gates (T097 dashboard assertions, T099 privacy corpus, T100 full regressions).
 **Next:** Complete only separately approved Phase 8 runbook, context, privacy, and full-regression tasks. See [plan.md](file:///c:/Booking%20Systems/specs/017-chatbot-backend-infrastructure/plan.md) for details.
 
 ---
