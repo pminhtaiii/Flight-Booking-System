@@ -8,8 +8,7 @@ Production request flow:
 
 ```text
 Browser / ChatWidget
-  -> direct bearer-authenticated FastAPI SSE stream
-     (or the retained same-origin Next.js SSE proxy during rollback)
+  -> direct bearer-authenticated FastAPI SSE stream (direct-only; proxy retired in Phase 8D)
   -> Redis quota admission, fenced session lease, and Trusted Search Snapshot
   -> LangGraph Router and read-only specialists
   -> service-authenticated NestJS gateway
@@ -19,7 +18,7 @@ Browser / ChatWidget
 
 The browser renders versioned events but makes no booking decision. FastAPI owns JWT ingress checks, guardrails, quota admission, the per-turn graph, and session-fence enforcement. Redis is a control plane: it stores counters, leases, and the PII-free snapshot, including service-only offer bindings and attestation required for deterministic selection; it never stores conversation text. NestJS owns durable chat and every handoff/readiness/claim/consume decision through Prisma/PostgreSQL. Duffel and Stripe are called only by deterministic NestJS services, never by the LLM or a losing consumer.
 
-For checkout, deterministic code validates the latest owner/session-bound snapshot and asks NestJS to issue a hash-only credential. FastAPI emits `ACTION_HANDOFF`; the browser POSTs the transient credential to `/checkout/handoff`; Next.js stores it in a short-lived HttpOnly/Secure/SameSite=Strict cookie and redirects to clean `/checkout/passengers`. NestJS resolves without consuming, readiness remains read-only, a claim is acquired before supplier work, and the final transaction creates one canonical BookingIntent and consumes the handoff. The older Next.js stream proxy remains a rollback path; it has not been permanently removed.
+For checkout, deterministic code validates the latest owner/session-bound snapshot and asks NestJS to issue a hash-only credential. FastAPI emits `ACTION_HANDOFF`; the browser POSTs the transient credential to `/checkout/handoff`; Next.js stores it in a short-lived HttpOnly/Secure/SameSite=Strict cookie and redirects to clean `/checkout/passengers`. NestJS resolves without consuming, readiness remains read-only, a claim is acquired before supplier work, and the final transaction creates one canonical BookingIntent and consumes the handoff. The temporary Next.js stream proxy has been retired and removed following approved direct-only transport cleanup (Phase 8D / T101).
 
 ## 2. Feature flags and rollout order
 
@@ -28,18 +27,18 @@ For checkout, deterministic code validates the latest owner/session-bound snapsh
 | Multi-agent Router            | Agent `FEATURE_FLAG_CHAT_MULTI_AGENT`; web `NEXT_PUBLIC_FEATURE_FLAG_CHAT_MULTI_AGENT`                               | Present as rollout/config vocabulary but not wired as runtime gates in the current implementation. Keep issuance off while validating routing; do not treat changing either value alone as a cutover.                                                                                                                      |
 | Handoff acceptance            | API `FEATURE_FLAG_CHAT_HANDOFF_ACCEPT`; agent/web mirrors                                                            | The API flag gates resolve/readiness/consume policy and must be deployed before issuance. Agent/web values are currently config/exposure mirrors, not independent runtime enforcement.                                                                                                                                     |
 | Handoff issuance              | API/agent `FEATURE_FLAG_CHAT_HANDOFF_ISSUE`                                                                          | Must be off unless ACCEPT is on in both relevant services.                                                                                                                                                                                                                                                                 |
-| Direct streaming              | Web `NEXT_PUBLIC_FEATURE_FLAG_CHAT_DIRECT_STREAM`; legacy web `NEXT_PUBLIC_ENABLE_DIRECT_AGENT_STREAM`; agent mirror | Either web variable currently enables direct transport because the legacy alias is OR'ed with the canonical flag. The agent value is not a transport gate. Set both web variables false for a reliable proxy rollback; enable only after deployed bearer-auth, strict CORS, trace, session-continuity, and browser checks. |
+| Direct streaming              | Direct-only canonical transport (`NEXT_PUBLIC_AGENT_URL`); legacy proxy toggles permanently retired in Phase 8D / T101 | Direct transport is permanent and canonical. All chat streaming routes directly from browser to FastAPI (`${NEXT_PUBLIC_AGENT_URL}/chat/stream`) with Bearer auth, strict CORS, and opaque trace/correlation ID propagation. Proxy fallback route has been deleted.                                                    |
 | Booking readiness             | API `FEATURE_FLAG_BOOKING_READINESS` and web counterpart                                                             | Must be on before a handoff may advance through canonical readiness/intent.                                                                                                                                                                                                                                                |
 | Encrypted persistence/fencing | `CHAT_ENCRYPTION_KEY` and `FEATURE_FLAG_WRITE_FENCE`                                                                 | Keep encryption configured and fencing enforced before direct/multi-instance rollout. These are safety controls, not routine cohort toggles.                                                                                                                                                                               |
 
-Safe rollout: deploy code and additive schema inert; verify Redis and encrypted persistence; enable API ACCEPT; deploy/validate multi-agent routing and web `ACTION_HANDOFF` support with ISSUE off; enable booking readiness; enable ISSUE for an internal cohort; enable direct transport last after auth/CORS/session tests. Because several mirror flags are not runtime-wired, verify behavior at the public boundary instead of relying on configuration display. Keep the proxy for the observation window.
+Safe rollout: deploy code and additive schema inert; verify Redis and encrypted persistence; enable API ACCEPT; deploy/validate multi-agent routing and web `ACTION_HANDOFF` support with ISSUE off; enable booking readiness; enable ISSUE for an internal cohort; direct transport is canonical. Because several mirror flags are not runtime-wired, verify behavior at the public boundary instead of relying on configuration display.
 
 Invalid or unsafe combinations:
 
 - `ISSUE=true` with `ACCEPT=false` is invalid and must fail configuration/startup or force issuance off.
 - ISSUE with readiness unavailable, encrypted persistence unavailable, or fencing disabled is unsafe.
 - Direct transport without an exact production origin, bearer authentication, or session-continuity verification is unsafe.
-- Removing the proxy before T101 approval, or removing plaintext columns before T102 approval, is invalid.
+- Removing plaintext columns before T102 approval is invalid.
 
 Rollback: disable ISSUE first. Preserve ACCEPT for already-issued unexpired credentials when the incident policy permits; otherwise return the stable disabled error. Disable multi-agent routing if needed, then switch the browser from direct transport to the proxy. Do not delete ChatHandoff, encryption envelopes, BookingAgentProjection, migration, backup, or recovery data during routine rollback.
 
@@ -117,9 +116,7 @@ Reversible observation means additive encrypted fields, verified twins, retained
 
 FastAPI parses `FRONTEND_URL` as a comma-separated list of exact allowed origins, accepts only `POST`/`OPTIONS`, and allowlists bearer/content/trace headers. Browser requests use `Authorization: Bearer ...`; `allow_credentials=False` means browser cookies are not the direct-stream credential. `X-Trace-Id` and `X-Correlation-Id` must be independently generated opaque values in the exact `chat_<32 lowercase hex>` format.
 
-Check scheme, host, and port exactly. Common failures are `localhost` versus `127.0.0.1`, HTTP versus HTTPS, a production hostname absent from the allowlist, missing/expired bearer JWT, or a public agent URL pointing at the API/web service. Compare a direct request to FastAPI `/chat/stream` with the same-origin `POST /api/chat/stream` proxy path. A direct-only failure with a healthy proxy localizes CORS/public-agent/auth configuration; both failing suggests shared auth/NestJS/Redis/model health.
-
-To revert safely, set both the canonical web direct flag and `NEXT_PUBLIC_ENABLE_DIRECT_AGENT_STREAM` false, deploy, confirm requests use the proxy, verify opaque-header filtering and legacy `ACTION_REQUIRED` pass-through, and leave durable handoff/encryption/projection state intact. Never use wildcard origins, enable credentialed CORS as a shortcut, place tokens in query strings, or log authorization/bootstrap bodies.
+Check scheme, host, and port exactly. Common failures are `localhost` versus `127.0.0.1`, HTTP versus HTTPS, a production hostname absent from the allowlist, missing/expired bearer JWT, or a public agent URL pointing at the API/web service. In Phase 8D / T101, direct streaming is the sole supported transport (`POST ${NEXT_PUBLIC_AGENT_URL}/chat/stream`). Never use wildcard origins, enable credentialed CORS as a shortcut, place tokens in query strings, or log authorization/bootstrap bodies.
 
 ## 8. Claim and handoff recovery
 
@@ -151,5 +148,5 @@ Phase 8C privacy validation and logging boundaries are closed and verified (2026
 - **Web client & cookies**: `chat_handoff_token` cookie enforces `HttpOnly`, `SameSite=Strict`, `Path=/`, and `Max-Age <= 900`; clean redirect path `/checkout/passengers` forbids query parameters with tokens or IDs. Verified in `apps/web/tests/handoff-privacy.unit.ts`.
 - **Reversible dual-write model**: Dual-write/dual-read fallback tested and verified with zero plaintext leakages across API/Gateway boundaries.
 
-Before rollout or incident closure, record flag state, dependency health, direct/proxy mode, safe aggregate handoff/claim/intent outcomes, and unresolved limitations. T093's continuous real browser-to-consume Playwright flow is complete according to the owning session's recorded evidence; T098 latency and concurrency benchmark evidence is verified and recorded (2026-08-14); T099 privacy corpus verification is complete and recorded (2026-08-14); T100 full agent/shared/API/web regression is complete and reconciled (2026-08-14); T101 and T102 remain separately approval-gated.
+Before rollout or incident closure, record flag state, dependency health, direct transport status, safe aggregate handoff/claim/intent outcomes, and unresolved limitations. T093's continuous real browser-to-consume Playwright flow is complete according to the owning session's recorded evidence; T098 latency and concurrency benchmark evidence is verified and recorded (2026-08-14); T099 privacy corpus verification is complete and recorded (2026-08-14); T100 full agent/shared/API/web regression is complete and reconciled (2026-08-14); T101 direct-only transport cleanup is complete and verified (2026-08-14); T102 remains separately approval-gated.
 

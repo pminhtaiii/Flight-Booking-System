@@ -88,7 +88,6 @@ When the task involves writing, running, or verifying E2E tests:
      $env:NEXT_PUBLIC_API_URL = 'http://127.0.0.1:3001'
      $env:NEXT_PUBLIC_FEATURE_FLAG_BOOKING_READINESS = 'true'
      $env:NEXT_PUBLIC_FEATURE_FLAG_CHAT_HANDOFF = 'true'
-     $env:NEXT_PUBLIC_FEATURE_FLAG_CHAT_DIRECT_STREAM = 'true'
      $env:NEXT_PUBLIC_AGENT_URL = 'http://127.0.0.1:3002'
      node node_modules/next/dist/bin/next build
      Pop-Location

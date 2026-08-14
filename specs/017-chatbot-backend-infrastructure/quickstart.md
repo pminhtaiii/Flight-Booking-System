@@ -386,3 +386,18 @@ Record in `docs/runbooks/chatbot-handoff.md` and `context/progress-checker.md` o
 - **Focused/build evidence:** the web handoff boundary suite passed `11/11`; focused NestJS handoff/controller suites passed `20/20`; `next build` exited `0` after compiling and type-checking the passenger page plus both same-origin checkout proxy routes. The T093-only Playwright web server starts the installed Next CLI directly on Windows so Playwright does not recurse into an implicit `pnpm install`, while all non-T093 startup commands remain unchanged.
 - **Handoff lifecycle hardening:** native form submission adds the credential only at `formdata` time; safe resolve projects only passenger IDs/types required by readiness; unreadable 200 resolve bodies are rejected before cookie issuance; readiness/intent browser payloads exclude tokens and offer/provider IDs; the server injects the HttpOnly cookie credential; and successful intent creation clears the cookie with the same root scope used at issuance.
 - **Stop point:** T093 is GREEN. Phase 8 remains separately gated; retain the proxy rollback path and the plaintext-cleanup approval gates.
+
+### Phase 8: Work Package 8D / T101 Approved Direct-Only Cleanup (2026-08-14)
+
+- **Proxy route retirement:** Deleted temporary SSE proxy route `apps/web/app/api/chat/stream/route.ts` and test `apps/web/app/api/chat/stream/route.spec.ts`.
+- **Direct-only transport configuration:** Removed `FEATURE_FLAG_CHAT_DIRECT_STREAM` and `NEXT_PUBLIC_ENABLE_DIRECT_AGENT_STREAM` variables from `apps/web` and `apps/agent` configuration schemas, examples, and tests. Updated `apps/web/lib/chatStream.ts` to direct-only transport (`POST ${NEXT_PUBLIC_AGENT_URL}/chat/stream`) with Bearer authentication and independent opaque `X-Trace-Id` / `X-Correlation-Id` propagation (`chat_<32 hex>`).
+- **Web boundary & Playwright evidence:**
+  - `apps/web/lib/featureFlags.spec.ts` & `apps/web/lib/chatStream.spec.ts`: 8/8 tests passed.
+  - All web unit suites (`apps/web/tests/*.unit.ts`): 29/29 tests passed.
+  - `apps/web/tests/chat-direct-stream.spec.ts`: 3/3 tests passed with exit code 0 (verified retired `/api/chat/stream` returns 404, direct streaming authenticates and reuses session, and identifier-bearing handoffs are rejected).
+  - Next.js production build: 20 routes compiled cleanly with 0 TypeScript/ESLint errors and `/api/chat/stream` completely absent from the route manifest.
+- **Backend & agent regression evidence:**
+  - Python agent pytest: 264/264 tests passed.
+  - NestJS handoff unit suites: 24/24 tests passed.
+  - Shared types build (`@shared/types`): code 0.
+- **Rollback matrix archived:** Direct streaming is canonical; proxy rollback matrix archived. T102 (plaintext DB columns drop) remains a separate approval-gated Phase 8E task.

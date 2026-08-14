@@ -1,4 +1,3 @@
-import { getFeatureFlags } from './featureFlags';
 import { createOpaqueChatId } from './chatTrace';
 
 export interface ChatStreamOptions {
@@ -8,19 +7,9 @@ export interface ChatStreamOptions {
   signal?: AbortSignal;
 }
 
-export function isDirectAgentStreamEnabled(): boolean {
-  return (
-    process.env.NEXT_PUBLIC_ENABLE_DIRECT_AGENT_STREAM === 'true' ||
-    getFeatureFlags().FEATURE_FLAG_CHAT_DIRECT_STREAM
-  );
-}
-
 export function getAgentStreamEndpoint(): string {
-  if (isDirectAgentStreamEnabled()) {
-    const baseUrl = process.env.NEXT_PUBLIC_AGENT_URL || 'http://localhost:3002';
-    return `${baseUrl.replace(/\/+$/, '')}/chat/stream`;
-  }
-  return '/api/chat/stream';
+  const baseUrl = process.env.NEXT_PUBLIC_AGENT_URL || 'http://localhost:3002';
+  return `${baseUrl.replace(/\/+$/, '')}/chat/stream`;
 }
 
 export async function createChatStreamRequest({
@@ -29,7 +18,6 @@ export async function createChatStreamRequest({
   token,
   signal,
 }: ChatStreamOptions): Promise<Response> {
-  const isDirect = isDirectAgentStreamEnabled();
   const endpoint = getAgentStreamEndpoint();
 
   const headers: Record<string, string> = {
@@ -38,10 +26,8 @@ export async function createChatStreamRequest({
     'X-Correlation-Id': createOpaqueChatId(),
   };
 
-  if (isDirect) {
-    if (token) {
-      headers['Authorization'] = `Bearer ${token}`;
-    }
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
   }
 
   return fetch(endpoint, {

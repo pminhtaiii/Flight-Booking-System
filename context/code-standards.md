@@ -117,8 +117,7 @@ export class FlightsService {
 - Data fetching happens in Server Components — never fetch in Client Components directly
 - **Next.js is the frontend only** — all API calls go to the NestJS backend, not `app/api/` route handlers
 - Minimal `app/api/` usage — only for NextAuth.js auth routes and webhook receivers
-- **Temporary Feature 017 exception** — `apps/web/app/api/chat/stream/route.ts` is the FR-001 rollback proxy and must remain until rollback retirement
-- **Temporary Feature 017 handoff exception** — `CheckoutHandoffCard` may POST its in-memory credential only to same-origin `/checkout/handoff`; native hidden form fields are forbidden because they expose the credential in the DOM, and no response data fetching or business logic belongs in the Client Component
+- **Feature 017 handoff exception** — `CheckoutHandoffCard` may POST its in-memory credential only to same-origin `/checkout/handoff`; native hidden form fields are forbidden because they expose the credential in the DOM, and no response data fetching or business logic belongs in the Client Component
 - Never put business logic in the Next.js layer — it belongs in NestJS services
 
 ---
