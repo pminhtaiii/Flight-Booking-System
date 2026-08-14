@@ -7,9 +7,9 @@ Update this file after every completed feature. Any AI agent reading this should
 ### Current Status
 
 **Feature:** Chatbot Backend Infrastructure & Booking Handoff (Feature 17)
-**Last completed:** Phase 7D / US5: continuous real browser-to-consume observation (T093).
-**In progress:** Feature 17 Phase 7 is complete; Phase 8 remains separately gated and has not started.
-**Next:** Await explicit approval before Phase 8 polish/cleanup. See [plan.md](file:///c:/Booking%20Systems/specs/017-chatbot-backend-infrastructure/plan.md) for details.
+**Last completed:** Phase 7D / US5 continuous real browser-to-consume observation (T093) and Phase 8B T098 handoff latency/concurrency benchmark gate (2026-08-14).
+**In progress:** Feature 17 Phase 8 remaining gates (T097 dashboard assertions, T099 privacy corpus, T100 full regressions).
+**Next:** Complete only separately approved Phase 8 runbook, context, privacy, and full-regression tasks. See [plan.md](file:///c:/Booking%20Systems/specs/017-chatbot-backend-infrastructure/plan.md) for details.
 
 ---
 
@@ -65,6 +65,7 @@ Update this file after every completed feature. Any AI agent reading this should
   - [x] WP 7D/T093: Reversible observation — direct-stream signed-search/selection/action ordering, strict authenticated clean bootstrap, owner/internal-session resolution, readiness/claim/consume regression, legacy `ACTION_REQUIRED`, session continuity, encrypted persistence, and credential privacy assertions.
   - **WP 7D/T093 GREEN evidence (2026-08-12):** exact-final-source real browser→Next.js→FastAPI→NestJS→bootstrap→resolve→readiness→consume Playwright run exited `0` with `1 passed (7.4m)`. Assertions proved one BookingIntent and one consumed handoff under 16-way concurrency, two expected supplier calls and zero payment calls, four encrypted plaintext-free messages, retained session continuity, clean URL/DOM/storage/cookie/console/request privacy, and distinct legacy `ACTION_REQUIRED`. Focused web boundary tests passed `11/11`, focused API handoff tests passed `20/20`, and the Next production build passed with both cookie-backed checkout proxy routes compiled. Phase 8 remains unchecked and was not started.
 - [ ] Phase 8 / Polish & Cleanup (T094–T102)
+  - [x] T098 / Handoff latency and concurrency: post-remediation gates passed on 2026-08-14. Router p95 11.338 ms; quota race 1 accepted/99 denied; handoff create/resolve p95 13.9823/24.0127 ms; 100-consumer p95 150.7542 ms with one supplier call, one intent, 99 expected conflicts, and zero payment calls.
 
 ### [ ] Feature: Traveler Profile & Booking Readiness (Feature 16)
 

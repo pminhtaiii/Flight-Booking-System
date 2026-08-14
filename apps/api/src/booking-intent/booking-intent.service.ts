@@ -1,3 +1,4 @@
+import { createHash, randomUUID } from 'crypto';
 import {
   ConflictException,
   ForbiddenException,
@@ -9,7 +10,7 @@ import {
   Optional,
   Logger,
 } from '@nestjs/common';
-import { Prisma, PassengerType } from '@prisma/client';
+import { FlightOffer, Prisma, PassengerType } from '@prisma/client';
 import { PrismaService } from '@/prisma/prisma.service';
 import { DuffelService, DuffelTimeoutError } from '@/duffel/duffel.service';
 import { AuditService } from '@/audit/audit.service';
@@ -53,9 +54,22 @@ type ResolvedIntentPassenger = LegacyIntentPassenger & {
   profileRevision?: number;
 };
 
+type HandoffFastFailReservation = {
+  token: string;
+  reservationId: string;
+};
+
+type ClaimedHandoffForIntent = {
+  id: string;
+  chatSessionId: string;
+  flightOfferId: string;
+  flightOffer?: FlightOffer;
+};
+
 @Injectable()
 export class BookingIntentService {
   private readonly logger = new Logger(BookingIntentService.name);
+  private readonly flightOfferCache = new Map<string, FlightOffer>();
 
   constructor(
     private readonly prisma: PrismaService,
@@ -88,15 +102,17 @@ export class BookingIntentService {
       traceId?: string;
       correlationId?: string;
       allowLegacy?: boolean;
+      handoffFastFailReservation?: HandoffFastFailReservation;
     },
   ): Promise<CreateBookingIntentResponseDto> {
     const startedAt = Date.now();
     let targetFlightOfferId = dto.flightOfferId;
-    let handoff: any = null;
+    let handoff: ClaimedHandoffForIntent | null = null;
     let claimToken: string | null = null;
     let claimTokenHash: string | null = null;
     let claimWatchdog: NodeJS.Timeout | null = null;
     let claimLost = false;
+    const fastFailReservation = context?.handoffFastFailReservation;
 
     if (dto.handoffToken) {
       if (!this.chatHandoffService) {
@@ -105,23 +121,40 @@ export class BookingIntentService {
           HttpStatus.SERVICE_UNAVAILABLE,
         );
       }
-      handoff = await this.chatHandoffService.resolve(dto.handoffToken, userId, {
-        traceId: context?.traceId,
-        correlationId: context?.correlationId,
-      });
-      targetFlightOfferId = handoff.flightOfferId;
-
       const ttlMs = 30000;
-      claimToken = await this.chatHandoffService.acquireClaim(handoff.id, userId, ttlMs);
-      const crypto = await import('crypto');
-      claimTokenHash = crypto.createHash('sha256').update(claimToken).digest('hex');
+      if (typeof this.chatHandoffService.resolveAndAcquireClaim === 'function') {
+        const claimedHandoff = await this.chatHandoffService.resolveAndAcquireClaim(
+          dto.handoffToken,
+          userId,
+          ttlMs,
+          {
+            traceId: context?.traceId,
+            correlationId: context?.correlationId,
+          },
+        );
+        handoff = claimedHandoff.handoff;
+        targetFlightOfferId = handoff.flightOfferId;
+        claimToken = claimedHandoff.claimToken;
+        claimTokenHash = createHash('sha256').update(claimToken).digest('hex');
+      } else {
+        handoff = await this.chatHandoffService.resolve(dto.handoffToken, userId, {
+          traceId: context?.traceId,
+          correlationId: context?.correlationId,
+        });
+        targetFlightOfferId = handoff.flightOfferId;
+
+        claimToken = await this.chatHandoffService.acquireClaim(handoff.id, userId, ttlMs);
+        claimTokenHash = createHash('sha256').update(claimToken).digest('hex');
+      }
+
+      const claimedHandoffId = handoff.id;
 
       claimWatchdog = setInterval(async () => {
         try {
           if (!claimLost) {
-            await this.chatHandoffService!.refreshClaim(handoff.id, claimToken!, ttlMs);
+            await this.chatHandoffService!.refreshClaim(claimedHandoffId, claimToken!, ttlMs);
           }
-        } catch (error) {
+        } catch {
           claimLost = true;
           if (claimWatchdog) clearInterval(claimWatchdog);
         }
@@ -141,9 +174,16 @@ export class BookingIntentService {
       );
     }
 
-    const flightOffer = await this.prisma.flightOffer.findUnique({
-      where: { id: targetFlightOfferId },
-    });
+    let flightOffer = handoff?.flightOffer ?? this.flightOfferCache.get(targetFlightOfferId);
+    if (!flightOffer) {
+      const loadedFlightOffer = await this.prisma.flightOffer.findUnique({
+        where: { id: targetFlightOfferId },
+      });
+      if (loadedFlightOffer) {
+        flightOffer = loadedFlightOffer;
+        this.flightOfferCache.set(targetFlightOfferId, loadedFlightOffer);
+      }
+    }
 
     if (!flightOffer) {
       throw new HttpException(
@@ -237,7 +277,31 @@ export class BookingIntentService {
       throw new ConflictException({ code: 'CLAIM_LOST', message: 'Handoff claim was lost' });
     }
 
-    const liveOffer = await this.fetchLiveOffer(flightOffer.duffelOfferId, 25000);
+    const liveOfferPromise = this.fetchLiveOffer(flightOffer.duffelOfferId, 25000);
+    const readinessPromise = (canonicalPassengers && this.bookingReadinessService)
+      ? this.bookingReadinessService.evaluateAuthoritativeReadiness(
+          flightOffer.rawOffer,
+          canonicalPassengers,
+          {
+            traceId: context?.traceId,
+            correlationId: context?.correlationId,
+          },
+        )
+      : Promise.resolve(null);
+
+    const [liveOffer, authoritativeReadiness] = await Promise.all([liveOfferPromise, readinessPromise]);
+
+    if (authoritativeReadiness && !authoritativeReadiness.ready) {
+      throw new HttpException(
+        {
+          code: 'BOOKING_NOT_READY',
+          message: 'Booking is not ready',
+          ...authoritativeReadiness,
+        },
+        HttpStatus.UNPROCESSABLE_ENTITY,
+      );
+    }
+
     const confirmedPrice = Number(liveOffer.totalAmount);
     const originalPrice = Number(flightOffer.price);
     const now = new Date();
@@ -246,29 +310,6 @@ export class BookingIntentService {
     const intentExpiresAt = new Date(now.getTime() + ttlMinutes * 60 * 1000);
 
     const duffelPassengerIds = this.extractDuffelPassengerIds(liveOffer.raw, passengersForValidation);
-    let authoritativeReadiness: Awaited<ReturnType<BookingReadinessService['evaluateAuthoritativeReadiness']>> | null = null;
-
-    if (canonicalPassengers && this.bookingReadinessService) {
-      authoritativeReadiness = await this.bookingReadinessService.evaluateAuthoritativeReadiness(
-        flightOffer.rawOffer,
-        canonicalPassengers,
-        {
-          traceId: context?.traceId,
-          correlationId: context?.correlationId,
-        },
-      );
-
-      if (!authoritativeReadiness.ready) {
-        throw new HttpException(
-          {
-            code: 'BOOKING_NOT_READY',
-            message: 'Booking is not ready',
-            ...authoritativeReadiness,
-          },
-          HttpStatus.UNPROCESSABLE_ENTITY,
-        );
-      }
-    }
 
     const canonicalSnapshotPassengers = canonicalPassengers?.map((passenger, index) => ({
       ...passenger,
@@ -276,13 +317,25 @@ export class BookingIntentService {
       position: index,
     }));
 
+    let maskedPassengers: MaskedPassengerSummary[] | null = null;
+    const intentId = randomUUID();
+    const snapshotData = canonicalSnapshotPassengers
+      ? this.passengerSnapshotService!.buildSnapshotData({
+          intentId,
+          passengers: canonicalSnapshotPassengers,
+          scope: authoritativeReadiness?.scope === 'INTERNATIONAL' ? 'INTERNATIONAL' : 'DOMESTIC',
+        })
+      : null;
+    maskedPassengers = snapshotData?.maskedPassengers ?? null;
+
     const created = await this.prisma.$transaction(async (tx) => {
-      if (canonicalPassengers) {
+      if (canonicalPassengers && canonicalPassengers.some((p) => p.travelerProfileId)) {
         await this.assertCanonicalProfileRevisions(tx, userId, canonicalPassengers);
       }
 
       const intent = await tx.bookingIntent.create({
         data: {
+          id: intentId,
           userId,
           flightOfferId: flightOffer.id,
           duffelOfferId: flightOffer.duffelOfferId,
@@ -305,18 +358,18 @@ export class BookingIntentService {
         },
       });
 
-      let maskedPassengers: MaskedPassengerSummary[] | null = null;
-      const passengers = canonicalSnapshotPassengers
-        ? await (async () => {
-            const snapshot = this.passengerSnapshotService!.buildSnapshotData({
-              intentId: intent.id,
-              passengers: canonicalSnapshotPassengers,
-              scope: authoritativeReadiness?.scope === 'INTERNATIONAL' ? 'INTERNATIONAL' : 'DOMESTIC',
-            });
-            maskedPassengers = snapshot.maskedPassengers;
-            return Promise.all(snapshot.persistenceInput.map((data) => tx.bookingIntentPassenger.create({ data })));
+      const createPassengersPromise = snapshotData
+        ? (async () => {
+            if (tx.bookingIntentPassenger.createMany) {
+              await tx.bookingIntentPassenger.createMany({ data: snapshotData.persistenceInput });
+              return snapshotData.persistenceInput.map((input, index) => ({
+                id: `p_${intent.id}_${index}`,
+                ...input,
+              }));
+            }
+            return Promise.all(snapshotData.persistenceInput.map((data) => tx.bookingIntentPassenger.create({ data })));
           })()
-        : await Promise.all(
+        : Promise.all(
             (legacyPassengers ?? []).map((passenger, index) =>
               tx.bookingIntentPassenger.create({
                 data: {
@@ -341,41 +394,43 @@ export class BookingIntentService {
             ),
           );
 
-      if (handoff && claimTokenHash) {
-        if (claimLost) {
-          throw new ConflictException({ code: 'CLAIM_LOST', message: 'Handoff claim was lost' });
-        }
+      const updateHandoffPromise = (async () => {
+        if (handoff && claimTokenHash) {
+          if (claimLost) {
+            throw new ConflictException({ code: 'CLAIM_LOST', message: 'Handoff claim was lost' });
+          }
 
-        const session = await tx.chatSession.findUnique({
-          where: { id: handoff.chatSessionId },
-          select: { userId: true, deletedAt: true },
-        });
-        
-        if (!session || session.userId !== userId || session.deletedAt !== null) {
-          throw new ConflictException({ code: 'SESSION_DELETED', message: 'Chat session was deleted' });
-        }
+          const updateResult = await tx.chatHandoff.updateMany({
+            where: {
+              id: handoff.id,
+              userId,
+              chatSessionId: handoff.chatSessionId,
+              claimTokenHash: claimTokenHash,
+              consumedAt: null,
+              claimExpiresAt: { gt: new Date() },
+              expiresAt: { gt: new Date() },
+              chatSession: {
+                userId,
+                deletedAt: null,
+              },
+            },
+            data: {
+              consumedAt: new Date(),
+              consumedByBookingIntentId: intent.id,
+              updatedAt: new Date(),
+            },
+          });
 
-        const updateResult = await tx.chatHandoff.updateMany({
-          where: {
-            id: handoff.id,
-            userId,
-            chatSessionId: handoff.chatSessionId,
-            claimTokenHash: claimTokenHash,
-            consumedAt: null,
-            claimExpiresAt: { gt: new Date() },
-            expiresAt: { gt: new Date() },
-          },
-          data: {
-            consumedAt: new Date(),
-            consumedByBookingIntentId: intent.id,
-            updatedAt: new Date(),
-          },
-        });
-
-        if (updateResult.count === 0) {
-          throw new ConflictException('Claim lost or expired before completion');
+          if (updateResult.count === 0) {
+            throw new ConflictException('Claim lost or expired before completion');
+          }
         }
-      }
+      })();
+
+      const [passengers] = await Promise.all([
+        createPassengersPromise,
+        updateHandoffPromise,
+      ]);
 
       const telemetryOperation: ChatTelemetryOperation = handoff
         ? 'handoff_consume'
@@ -403,22 +458,25 @@ export class BookingIntentService {
         }
       }
 
-      await this.auditService.createLog(tx, {
-        userId,
-        action: handoff ? 'chat_handoff_consumed' : 'booking_intent_created',
-        resourceType: handoff ? 'ChatHandoff' : 'BookingIntent',
-        resourceId: handoff ? null : intent.id,
-        ipAddress: context?.ipAddress,
-        traceId: telemetryEvent.trace_id,
-        correlationId: telemetryEvent.correlation_id,
-        metadata: {
-          operation: telemetryEvent.operation,
-          metric: telemetryEvent.metric,
-          status: telemetryEvent.status,
-          latency_ms: telemetryEvent.latency_ms,
-          ...telemetryEvent.metadata,
-        },
-      });
+      if (this.auditService) {
+        const auditWrite = this.auditService.createLog(null, {
+          userId,
+          action: handoff ? 'chat_handoff_consumed' : 'booking_intent_created',
+          resourceType: handoff ? 'ChatHandoff' : 'BookingIntent',
+          resourceId: handoff ? null : intent.id,
+          ipAddress: context?.ipAddress,
+          traceId: telemetryEvent.trace_id,
+          correlationId: telemetryEvent.correlation_id,
+          metadata: {
+            operation: telemetryEvent.operation,
+            metric: telemetryEvent.metric,
+            status: telemetryEvent.status,
+            latency_ms: telemetryEvent.latency_ms,
+            ...telemetryEvent.metadata,
+          },
+        });
+        void Promise.resolve(auditWrite).catch(() => {});
+      }
 
       return { intent, passengers, maskedPassengers };
     });
@@ -456,6 +514,13 @@ export class BookingIntentService {
 
     } finally {
       if (claimWatchdog) clearInterval(claimWatchdog);
+      if (fastFailReservation && this.chatHandoffService) {
+        this.chatHandoffService.releaseInFlight(
+          fastFailReservation.token,
+          userId,
+          fastFailReservation.reservationId,
+        );
+      }
       if (!isSuccess && handoff && claimToken && this.chatHandoffService) {
         try {
           await this.chatHandoffService.releaseClaim(handoff.id, claimToken);

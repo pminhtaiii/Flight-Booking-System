@@ -84,6 +84,8 @@ export class BookingReadinessObservability {
       return;
     }
 
-    this.logger.warn('readiness_advisory', serializedPayload);
+    if (process.env.NODE_ENV !== 'test') {
+      this.logger.warn('readiness_advisory', serializedPayload);
+    }
   }
 }

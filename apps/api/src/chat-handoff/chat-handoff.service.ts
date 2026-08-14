@@ -22,10 +22,26 @@ import { CreateChatHandoffDto } from './dto/create-chat-handoff.dto';
 import { ChatHandoffResponseDto } from './dto/chat-handoff-response.dto';
 import { ChatHandoffTokenService } from './chat-handoff-token.service';
 import { SelectionAttestationService } from '@/agent-gateway/selection-attestation.service';
-import { Prisma } from '@prisma/client';
+import { FlightOffer, Prisma } from '@prisma/client';
 import * as crypto from 'crypto';
 
 type JsonRecord = Record<string, unknown>;
+
+type InFlightReservation = {
+  reservationId: string;
+  expiresAt: number;
+};
+
+type ClaimedHandoffRow = {
+  id: string;
+  userId: string;
+  chatSessionId: string;
+  flightOfferId: string;
+  tokenHash: string;
+  tokenKeyVersion: number;
+  expiresAt: Date;
+  consumedAt: Date | null;
+};
 
 type ResolvedChatHandoff = Prisma.ChatHandoffGetPayload<{
   include: {
@@ -116,6 +132,10 @@ function handoffPassengers(rawOffer: JsonRecord | null): Array<{ id: string; typ
 @Injectable()
 export class ChatHandoffService {
   private readonly logger = new Logger(ChatHandoffService.name);
+  private readonly activeClaimAttempts = new Map<string, Promise<{ handoff: ResolvedChatHandoff; claimToken: string }>>();
+  private readonly claimedTokens = new Map<string, number>();
+  private readonly inFlightClaims = new Map<string, InFlightReservation>();
+  private readonly flightOfferCache = new Map<string, FlightOffer>();
 
   constructor(
     private readonly prisma: PrismaService,
@@ -124,6 +144,57 @@ export class ChatHandoffService {
     private readonly selectionAttestationService: SelectionAttestationService,
     @Optional() private readonly auditService?: AuditService,
   ) {}
+
+  isClaimed(token: string, userId?: string): boolean {
+    if (!token || typeof token !== 'string' || !token.startsWith('chk_handoff_v1_')) return false;
+    const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
+    const attemptKey = userId ? `${userId}:${tokenHash}` : tokenHash;
+    const claimedUntil = this.claimedTokens.get(attemptKey) ?? (userId ? this.claimedTokens.get(tokenHash) : undefined);
+    const inFlight = this.inFlightClaims.get(attemptKey) ?? (userId ? this.inFlightClaims.get(tokenHash) : undefined);
+    return (
+      (claimedUntil !== undefined && claimedUntil > Date.now()) ||
+      (inFlight !== undefined && inFlight.expiresAt > Date.now()) ||
+      this.activeClaimAttempts.has(attemptKey)
+    );
+  }
+
+  tryAcquireInFlight(token: string, userId?: string, ttlMs = 30000): string | null {
+    if (!token || typeof token !== 'string' || !token.startsWith('chk_handoff_v1_')) return crypto.randomUUID();
+    const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
+    const attemptKey = userId ? `${userId}:${tokenHash}` : tokenHash;
+    const now = Date.now();
+    const claimedUntil = this.claimedTokens.get(attemptKey) ?? (userId ? this.claimedTokens.get(tokenHash) : undefined);
+    const inFlight = this.inFlightClaims.get(attemptKey) ?? (userId ? this.inFlightClaims.get(tokenHash) : undefined);
+
+    if (
+      (claimedUntil !== undefined && claimedUntil > now) ||
+      (inFlight !== undefined && inFlight.expiresAt > now) ||
+      this.activeClaimAttempts.has(attemptKey) ||
+      (userId && this.activeClaimAttempts.has(tokenHash))
+    ) {
+      return null;
+    }
+
+    const reservationId = crypto.randomUUID();
+    const reservation = { reservationId, expiresAt: now + ttlMs };
+    this.inFlightClaims.set(attemptKey, reservation);
+    if (userId) {
+      this.inFlightClaims.set(tokenHash, reservation);
+    }
+    return reservationId;
+  }
+
+  releaseInFlight(token: string, userId: string | undefined, reservationId: string): void {
+    if (!token || typeof token !== 'string') return;
+    const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
+    const keys = userId ? [`${userId}:${tokenHash}`, tokenHash] : [tokenHash];
+    for (const key of keys) {
+      const reservation = this.inFlightClaims.get(key);
+      if (reservation?.reservationId === reservationId) {
+        this.inFlightClaims.delete(key);
+      }
+    }
+  }
 
   /**
    * Creates a new chat handoff claim record.
@@ -224,6 +295,16 @@ export class ChatHandoffService {
           expiresAt,
         },
       });
+
+      if (!this.flightOfferCache.has(flightOfferId)) {
+        const offerLookup = this.prisma.flightOffer.findUnique({ where: { id: flightOfferId } });
+        if (offerLookup) {
+          void offerLookup.then((flightOffer) => {
+            if (flightOffer) this.flightOfferCache.set(flightOfferId, flightOffer);
+          })
+          .catch(() => this.logger.warn('chat_handoff_offer_lookup_failed'));
+        }
+      }
 
       await this.recordTelemetry(
         'handoff_create',
@@ -478,6 +559,128 @@ export class ChatHandoffService {
     };
   }
 
+  /**
+   * Resolves and claims a handoff for canonical intent creation without
+   * producing a durable resolve event for each losing concurrent request.
+   */
+  async resolveAndAcquireClaim(
+    token: string,
+    userId: string,
+    ttlMs: number,
+    context: ChatTelemetryContext = {},
+  ): Promise<{ handoff: ResolvedChatHandoff; claimToken: string }> {
+    const isEnabled = this.configService.get<string>('FEATURE_FLAG_CHAT_HANDOFF_ACCEPT') === 'true';
+    if (!isEnabled) {
+      throw new ServiceUnavailableException({
+        code: 'CHAT_HANDOFF_DISABLED',
+        message: 'Chat handoff acceptance is disabled',
+      });
+    }
+
+    const tokenHash = token.startsWith('chk_handoff_v1_')
+      ? crypto.createHash('sha256').update(token).digest('hex')
+      : token;
+
+    const attemptKey = `${userId}:${tokenHash}`;
+    const claimedUntil = this.claimedTokens.get(attemptKey);
+    if ((claimedUntil && claimedUntil > Date.now()) || this.activeClaimAttempts.has(attemptKey)) {
+      throw new ConflictException({ code: 'HANDOFF_IN_PROGRESS', message: 'Handoff in progress' });
+    }
+
+    const attempt = this.resolveAndAcquireClaimOnce(tokenHash, userId, ttlMs, context);
+    attempt.catch(() => {});
+    this.activeClaimAttempts.set(attemptKey, attempt);
+    try {
+      const result = await attempt;
+      this.claimedTokens.set(attemptKey, Date.now() + ttlMs);
+      return result;
+    } finally {
+      if (this.activeClaimAttempts.get(attemptKey) === attempt) {
+        this.activeClaimAttempts.delete(attemptKey);
+      }
+    }
+  }
+
+  private async resolveAndAcquireClaimOnce(
+    tokenHash: string,
+    userId: string,
+    ttlMs: number,
+    context: ChatTelemetryContext,
+  ): Promise<{ handoff: ResolvedChatHandoff; claimToken: string }> {
+    const startedAt = Date.now();
+    const claimToken = crypto.randomUUID();
+    const claimTokenHash = crypto.createHash('sha256').update(claimToken).digest('hex');
+    const now = new Date();
+    const claimExpiresAt = new Date(now.getTime() + ttlMs);
+    const claimRecoverAfter = new Date(now.getTime() + ttlMs + 5000);
+
+    let claimed: ClaimedHandoffRow | null = null;
+    try {
+        const claimedRows = await this.prisma.$queryRaw<ClaimedHandoffRow[]>`
+          UPDATE "chat_handoffs"
+          SET "claimedAt" = ${now},
+              "claimTokenHash" = ${claimTokenHash},
+              "claimExpiresAt" = ${claimExpiresAt},
+              "claimRecoverAfter" = ${claimRecoverAfter}
+          WHERE "tokenHash" = ${tokenHash}
+            AND "userId" = ${userId}
+            AND "consumedAt" IS NULL
+            AND "expiresAt" > ${now}
+            AND ("claimRecoverAfter" IS NULL OR "claimRecoverAfter" <= ${now})
+            AND EXISTS (
+              SELECT 1
+              FROM "chat_sessions"
+              WHERE "chat_sessions"."id" = "chat_handoffs"."chatSessionId"
+                AND "chat_sessions"."userId" = ${userId}
+                AND "chat_sessions"."deletedAt" IS NULL
+            )
+          RETURNING "id", "userId", "chatSessionId", "flightOfferId", "tokenHash", "tokenKeyVersion", "expiresAt", "consumedAt"
+        `;
+        if (claimedRows.length > 0) {
+          claimed = claimedRows[0];
+        }
+    } catch (error) {
+      this.logger.error('chat_handoff_claim_query_failed');
+      throw error;
+    }
+
+    if (!claimed) {
+      throw new ConflictException({ code: 'HANDOFF_IN_PROGRESS', message: 'Handoff in progress' });
+    }
+
+    let flightOffer = this.flightOfferCache.get(claimed.flightOfferId);
+    if (!flightOffer) {
+      try {
+        const loadedFlightOffer = await this.prisma.flightOffer.findUnique({
+          where: { id: claimed.flightOfferId },
+        });
+        if (loadedFlightOffer) {
+          flightOffer = loadedFlightOffer;
+          this.flightOfferCache.set(claimed.flightOfferId, loadedFlightOffer);
+        }
+      } catch {
+        this.logger.warn('chat_handoff_offer_lookup_failed');
+      }
+    }
+
+    const handoff = {
+      ...claimed,
+      ...(flightOffer ? { flightOffer } : {}),
+      chatSession: { userId, deletedAt: null },
+    } as unknown as ResolvedChatHandoff;
+
+    this.recordTelemetry(
+      'handoff_resolve',
+      'resolved',
+      Date.now() - startedAt,
+      context,
+      userId,
+      { outcome: 'resolved' },
+    ).catch(() => {});
+
+    return { handoff, claimToken };
+  }
+
   private async recordTelemetry(
     operation: ChatTelemetryOperation,
     status: string,
@@ -525,33 +728,67 @@ export class ChatHandoffService {
    * Acquires a temporary claim over a handoff record to prevent concurrent checkouts.
    */
   async acquireClaim(handoffId: string, userId: string, ttlMs: number): Promise<string> {
+    const claimToken = await this.tryAcquireClaim(handoffId, userId, ttlMs);
+    if (!claimToken) {
+      throw new ConflictException('Failed to acquire handoff claim');
+    }
+    return claimToken;
+  }
+
+  private async tryAcquireClaim(
+    handoffId: string,
+    userId: string,
+    ttlMs: number,
+  ): Promise<string | null> {
     const claimToken = crypto.randomUUID();
     const claimTokenHash = crypto.createHash('sha256').update(claimToken).digest('hex');
     const now = new Date();
     const claimExpiresAt = new Date(now.getTime() + ttlMs);
     const claimRecoverAfter = new Date(now.getTime() + ttlMs + 5000); // 5s recovery buffer
 
-    const result = await this.prisma.chatHandoff.updateMany({
-      where: {
-        id: handoffId,
-        userId: userId,
-        consumedAt: null,
-        expiresAt: { gt: now },
-        OR: [{ claimRecoverAfter: null }, { claimRecoverAfter: { lte: now } }],
-      },
-      data: {
-        claimedAt: now,
-        claimTokenHash,
-        claimExpiresAt,
-        claimRecoverAfter,
-      },
+    const claimed = await this.prisma.$transaction(async (tx) => {
+      const unlockedHandoffs = await tx.$queryRaw<Array<{ id: string }>>`
+        SELECT "id"
+        FROM "chat_handoffs"
+        WHERE "id" = ${handoffId}
+          AND "userId" = ${userId}
+          AND "consumedAt" IS NULL
+          AND "expiresAt" > ${now}
+          AND ("claimRecoverAfter" IS NULL OR "claimRecoverAfter" <= ${now})
+          AND EXISTS (
+            SELECT 1
+            FROM "chat_sessions"
+            WHERE "chat_sessions"."id" = "chat_handoffs"."chatSessionId"
+              AND "chat_sessions"."userId" = ${userId}
+              AND "chat_sessions"."deletedAt" IS NULL
+          )
+        FOR UPDATE SKIP LOCKED
+      `;
+
+      if (unlockedHandoffs.length === 0) {
+        return false;
+      }
+
+      const result = await tx.chatHandoff.updateMany({
+        where: {
+          id: handoffId,
+          userId,
+          consumedAt: null,
+          expiresAt: { gt: now },
+          OR: [{ claimRecoverAfter: null }, { claimRecoverAfter: { lte: now } }],
+        },
+        data: {
+          claimedAt: now,
+          claimTokenHash,
+          claimExpiresAt,
+          claimRecoverAfter,
+        },
+      });
+
+      return result.count === 1;
     });
 
-    if (result.count === 0) {
-      throw new ConflictException('Failed to acquire handoff claim');
-    }
-
-    return claimToken;
+    return claimed ? claimToken : null;
   }
 
   /**

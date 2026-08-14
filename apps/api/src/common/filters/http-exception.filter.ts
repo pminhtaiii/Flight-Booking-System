@@ -87,7 +87,7 @@ export class HttpExceptionFilter implements ExceptionFilter {
         `[HttpExceptionFilter] ${request.method} ${request.url} - ${logPayload.message}`,
         JSON.stringify(logPayload),
       );
-    } else {
+    } else if (process.env.NODE_ENV !== 'test') {
       this.logger.warn(
         `[HttpExceptionFilter] ${request.method} ${request.url} - ${logPayload.message}`,
         JSON.stringify(logPayload),
