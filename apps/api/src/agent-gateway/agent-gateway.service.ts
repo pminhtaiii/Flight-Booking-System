@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, Logger, HttpException, HttpStatus } from '@nestjs/common';
+import { Injectable, NotFoundException, Logger, HttpException, HttpStatus, ServiceUnavailableException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '@/prisma/prisma.service';
 import { AuditService } from '@/audit/audit.service';
@@ -24,6 +24,11 @@ import { BookingReadinessOperation } from '@/common/observability/booking-readin
 import { ProfileService } from '@/profile/profile.service';
 import { BookingReadinessRequestDto, BookingReadinessPassengerDto } from '@/booking-intent/dto/booking-readiness.dto';
 import { ChatService } from '@/chat/chat.service';
+import {
+  ChatMessageCryptoService,
+  CryptoKeyUnavailableError,
+  UnsupportedKeyVersionError,
+} from '@/chat/chat-message-crypto.service';
 
 function capitalizeCabinClass(cabinClass: string): string {
   if (!cabinClass) return '';
@@ -86,6 +91,7 @@ export class AgentGatewayService {
     private readonly configService: ConfigService,
     private readonly chatService: ChatService,
     private readonly selectionAttestationService: SelectionAttestationService,
+    private readonly chatMessageCryptoService: ChatMessageCryptoService,
   ) {}
 
   /**
@@ -357,9 +363,27 @@ export class AgentGatewayService {
         });
       }
 
-      if (lastMessage && lastMessage.content) {
+      if (lastMessage) {
+        let content: string;
+        try {
+          content = await this.chatMessageCryptoService.decryptMessageContent(lastMessage);
+        } catch (error: unknown) {
+          if (
+            error instanceof CryptoKeyUnavailableError ||
+            error instanceof UnsupportedKeyVersionError ||
+            !this.chatMessageCryptoService.isConfigured() ||
+            (error instanceof Error &&
+              (error.message.includes('CHAT_ENCRYPTION_KEY') ||
+                error.message.includes('Unsupported key version')))
+          ) {
+            throw new ServiceUnavailableException('Chat encryption service is unavailable');
+          }
+          throw new HttpException(
+            'Unable to decrypt chat message envelope',
+            HttpStatus.BAD_REQUEST,
+          );
+        }
         const matchedKeywords: string[] = [];
-        const content = lastMessage.content;
 
         for (const kw of CABIN_KEYWORDS) {
           const regex = new RegExp(`\\b${kw}\\b`, 'i');
@@ -595,9 +619,27 @@ export class AgentGatewayService {
         orderBy: { createdAt: 'desc' },
       });
 
-      if (lastMessage && lastMessage.content) {
+      if (lastMessage) {
+        let content: string;
+        try {
+          content = await this.chatMessageCryptoService.decryptMessageContent(lastMessage);
+        } catch (error: unknown) {
+          if (
+            error instanceof CryptoKeyUnavailableError ||
+            error instanceof UnsupportedKeyVersionError ||
+            !this.chatMessageCryptoService.isConfigured() ||
+            (error instanceof Error &&
+              (error.message.includes('CHAT_ENCRYPTION_KEY') ||
+                error.message.includes('Unsupported key version')))
+          ) {
+            throw new ServiceUnavailableException('Chat encryption service is unavailable');
+          }
+          throw new HttpException(
+            'Unable to decrypt chat message envelope',
+            HttpStatus.BAD_REQUEST,
+          );
+        }
         const matchedKeywords: string[] = [];
-        const content = lastMessage.content;
 
         for (const kw of CABIN_KEYWORDS) {
           const regex = new RegExp(`\\b${kw}\\b`, 'i');

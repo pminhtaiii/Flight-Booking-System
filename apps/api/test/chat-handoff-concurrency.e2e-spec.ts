@@ -130,7 +130,6 @@ describe('Chat Handoff Concurrency (E2E)', () => {
       data: {
         id: 'test-session-id',
         userId: userA.id,
-        title: 'enc:title',
       },
     });
 

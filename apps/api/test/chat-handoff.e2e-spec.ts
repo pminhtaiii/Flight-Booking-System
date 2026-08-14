@@ -125,6 +125,7 @@ describe('ChatHandoff (E2E)', () => {
     process.env.CLAIM_TOKEN_TTL_SECONDS = '300';
     process.env.ATTESTATION_SECRET = 'test-attestation-secret';
     process.env.FEATURE_FLAG_CHAT_HANDOFF_ACCEPT = 'true';
+    process.env.CHAT_ENCRYPTION_KEY = crypto.randomBytes(32).toString('hex');
     const moduleFixture: TestingModule = await Test.createTestingModule({
       imports: [AppModule],
     })
@@ -171,42 +172,6 @@ describe('ChatHandoff (E2E)', () => {
     prisma = moduleFixture.get<PrismaService>(PrismaService);
     attestationService = moduleFixture.get<SelectionAttestationService>(SelectionAttestationService);
     jwtService = moduleFixture.get<JwtService>(JwtService);
-
-    validUser = await prisma.user.create({
-      data: {
-        id: crypto.randomUUID(),
-        email: `test-${crypto.randomUUID()}@example.com`,
-        password: 'Password123!',
-        status: 'ACTIVE',
-      },
-    });
-
-    validUserToken = jwtService.sign(
-      { sub: validUser.id, id: validUser.id, jti: crypto.randomUUID(), email: validUser.email },
-      { issuer: 'booking-systems-api', audience: 'booking-systems-clients' },
-    );
-
-    validSession = await prisma.chatSession.create({
-      data: {
-        userId: validUser.id,
-        title: 'Test Session',
-      },
-    });
-
-    validFlightOffer = await prisma.flightOffer.create({
-      data: {
-        searchHash: 'testhash',
-        duffelOfferId: 'off_test123',
-        rawOffer: {},
-        origin: 'HAN',
-        destination: 'NRT',
-        departureDate: new Date(),
-        adults: 1,
-        cabinClass: 'economy',
-        price: 100.0,
-        currency: 'USD',
-      },
-    });
   });
 
   afterAll(async () => {
@@ -256,7 +221,6 @@ describe('ChatHandoff (E2E)', () => {
     validSession = await prisma.chatSession.create({
       data: {
         userId: validUser.id,
-        title: 'Test Session',
       },
     });
 

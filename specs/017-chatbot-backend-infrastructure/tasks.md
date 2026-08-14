@@ -178,20 +178,20 @@
 
 ### Tests for User Story 3
 
-- [ ] T053 [P] [US3] Write failing BookingAgentProjection confirmation/cancellation/supplier-sync/disruption-reconciliation/backfill/reference/owner tests in `apps/api/src/agent-gateway/booking-agent-projection.service.spec.ts`, `apps/api/src/disruption/sync/supplier-sync.service.spec.ts`, `apps/api/src/disruption/sync/reconciliation.service.spec.ts`, and `apps/api/src/disruption/webhook/duffel-event.processor.spec.ts`
-- [ ] T054 [P] [US3] Write failing exact-key summary/detail query tests with forbidden-field corpus and spies proving no broad Booking/passenger/provider snapshots load in `apps/api/src/agent-gateway/agent-gateway.service.spec.ts`
-- [ ] T055 [P] [US3] Write failing authenticated summary/detail and cross-owner E2E tests in `apps/api/test/agent-gateway.e2e-spec.ts`
-- [ ] T056 [P] [US3] Write failing Python summary/detail formatting, reference validation, and error-degradation tests in `apps/agent/tests/test_booking_tools.py`
+- [x] T053 [P] [US3] Write failing BookingAgentProjection confirmation/cancellation/supplier-sync/disruption-reconciliation/backfill/reference/owner tests in `apps/api/src/agent-gateway/booking-agent-projection.service.spec.ts`, `apps/api/src/disruption/sync/supplier-sync.service.spec.ts`, `apps/api/src/disruption/sync/reconciliation.service.spec.ts`, and `apps/api/src/disruption/webhook/duffel-event.processor.spec.ts`
+- [x] T054 [P] [US3] Write failing exact-key summary/detail query tests with forbidden-field corpus and spies proving no broad Booking/passenger/provider snapshots load in `apps/api/src/agent-gateway/agent-gateway.service.spec.ts`
+- [x] T055 [P] [US3] Write failing authenticated summary/detail and cross-owner E2E tests in `apps/api/test/agent-gateway.e2e-spec.ts`
+- [x] T056 [P] [US3] Write failing Python summary/detail formatting, reference validation, and error-degradation tests in `apps/agent/tests/test_booking_tools.py`
 
 ### Implementation for User Story 3
 
-- [ ] T057 [US3] Implement restart-safe projection/reference backfill and verification in `apps/api/prisma/scripts/backfill-booking-agent-projections.ts`
-- [ ] T058 [US3] Implement strict summary/detail DTOs in `apps/api/src/agent-gateway/dto/booking-summary.dto.ts` and `apps/api/src/agent-gateway/dto/booking-detail.dto.ts`
-- [ ] T059 [US3] Implement transactional projection population/update at payment/webhook confirmation, cancellation, Duffel event processing, supplier sync, and reconciliation plus owner-scoped opaque lookup in `apps/api/src/agent-gateway/booking-agent-projection.service.ts`, `apps/api/src/payment/payment.service.ts`, `apps/api/src/payment/payment-webhook.service.ts`, `apps/api/src/booking/booking.service.ts`, `apps/api/src/disruption/webhook/duffel-event.processor.ts`, `apps/api/src/disruption/sync/supplier-sync.service.ts`, and `apps/api/src/disruption/sync/reconciliation.service.ts`
-- [ ] T060 [US3] Replace broad booking snapshot logic with exact BookingAgentProjection-only summary/detail selects in `apps/api/src/agent-gateway/agent-gateway.service.ts`
-- [ ] T061 [US3] Expose service-authenticated summary and detail routes in `apps/api/src/agent-gateway/agent-gateway.controller.ts`
-- [ ] T062 [P] [US3] Implement `list_user_booking_summaries` in `apps/agent/src/agent/tools/booking_summaries.py`
-- [ ] T063 [P] [US3] Implement `get_booking_detail` in `apps/agent/src/agent/tools/booking_detail.py`, remove `list_user_bookings` from the enabled registry, and run US3 gateway/tool privacy suites
+- [x] T057 [US3] Implement restart-safe projection/reference backfill and verification in `apps/api/prisma/scripts/backfill-booking-agent-projections.ts`
+- [x] T058 [US3] Implement strict summary/detail DTOs in `apps/api/src/agent-gateway/dto/booking-summary.dto.ts` and `apps/api/src/agent-gateway/dto/booking-detail.dto.ts`
+- [x] T059 [US3] Implement transactional projection population/update at payment/webhook confirmation, cancellation, Duffel event processing, supplier sync, and reconciliation plus owner-scoped opaque lookup in `apps/api/src/agent-gateway/booking-agent-projection.service.ts`, `apps/api/src/payment/payment.service.ts`, `apps/api/src/payment/payment-webhook.service.ts`, `apps/api/src/booking/booking.service.ts`, `apps/api/src/disruption/webhook/duffel-event.processor.ts`, `apps/api/src/disruption/sync/supplier-sync.service.ts`, and `apps/api/src/disruption/sync/reconciliation.service.ts`
+- [x] T060 [US3] Replace broad booking snapshot logic with exact BookingAgentProjection-only summary/detail selects in `apps/api/src/agent-gateway/agent-gateway.service.ts`
+- [x] T061 [US3] Expose service-authenticated summary and detail routes in `apps/api/src/agent-gateway/agent-gateway.controller.ts`
+- [x] T062 [P] [US3] Implement `list_user_booking_summaries` in `apps/agent/src/agent/tools/booking_summaries.py`
+- [x] T063 [P] [US3] Implement `get_booking_detail` in `apps/agent/src/agent/tools/booking_detail.py`, remove `list_user_bookings` from the enabled registry, and run US3 gateway/tool privacy suites
 
 **Checkpoint**: US3 works independently; the default tool exposes logistics only and explicit detail adds only flight number, baggage, and fare-condition booleans.
 
@@ -218,7 +218,7 @@
 - [x] T067 [P] [US4] Write failing service-auth, signed ordered-offer binding, owner/internal-session, stale-offer/attestation, cross-user, and exact-response E2E tests in `apps/api/test/chat-handoff.e2e-spec.ts`
 - [x] T068 [P] [US4] Write failing deterministic validate/create-node and no-LLM-client exposure tests in `apps/agent/tests/test_handoff_nodes.py`
 - [x] T069 [P] [US4] Write failing `ACTION_HANDOFF` ordering, strict schema, disconnect/retry, and privacy tests in `apps/agent/tests/test_sse_integration.py`
-- [ ] T070 [US4] Run the Feature 016a checkout-readiness preflight from `specs/016a-traveler-profile-booking-readiness/plan.md`, record evidence in `specs/017-chatbot-backend-infrastructure/quickstart.md`, and stop with handoff issuance off if canonical readiness/intent prerequisites are not green
+- [x] T070 [US4] Run the Feature 016a checkout-readiness preflight from `specs/016a-traveler-profile-booking-readiness/plan.md`, record evidence in `specs/017-chatbot-backend-infrastructure/quickstart.md`, and stop with handoff issuance off if canonical readiness/intent prerequisites are not green
 - [x] T071 [P] [US4] Write failing token-only readiness, claim acquire/owned-refresh/loss/cancel/expiry/recovery, supplier-hard-timeout-below-lease, final active-session/unexpired-claim consume, and 100-request single-winner tests proving every loser makes zero Duffel/payment calls in `apps/api/test/booking-readiness.e2e-spec.ts`, `apps/api/test/booking-intent.e2e-spec.ts`, and `apps/api/test/chat-handoff-concurrency.e2e-spec.ts`
 - [x] T072 [P] [US4] Write failing strict card, Origin/CSRF bootstrap POST, HttpOnly/Secure/SameSite cookie, clean redirect/URL, access-log redaction, and browser-storage privacy tests in `apps/web/tests/chat-checkout-handoff.spec.ts`
 
@@ -289,15 +289,15 @@
 
 **Purpose**: Close documentation, performance, privacy, and repository-wide regression gates after all desired stories are complete.
 
-- [ ] T094 [P] Create the operations, alerts, JWT/attestation/token/chat-encryption key rotation, ciphertext retention/backups, CORS, rollback, claim recovery, and session-deletion runbook in `docs/runbooks/chatbot-handoff.md`
-- [ ] T095 [P] Update implemented chatbot topology, data flow, invariants, and direct-stream exception in `context/architecture.md`
-- [ ] T096 [P] Update dependency rules and approved Redis/LangGraph usage in `context/library-docs.md` and completed feature status in `context/progress-checker.md`
-- [ ] T097 Add maintained dashboard/alert contract assertions in `apps/api/test/chat-handoff-observability.e2e-spec.ts` and `apps/agent/tests/test_chat_observability.py`
+- [x] T094 [P] Create the operations, alerts, JWT/attestation/token/chat-encryption key rotation, ciphertext retention/backups, CORS, rollback, claim recovery, and session-deletion runbook in `docs/runbooks/chatbot-handoff.md`
+- [x] T095 [P] Update implemented chatbot topology, data flow, invariants, and direct-stream exception in `context/architecture.md`
+- [x] T096 [P] Update dependency rules and approved Redis/LangGraph usage in `context/library-docs.md` and completed feature status in `context/progress-checker.md`
+- [x] T097 Add maintained dashboard/alert contract assertions in `apps/api/test/chat-handoff-observability.e2e-spec.ts` and `apps/agent/tests/test_chat_observability.py`
 - [x] T098 Run 100-request router-overhead, quota-edge, handoff-latency, and consume-concurrency benchmarks and record p95/count evidence in `docs/runbooks/chatbot-handoff.md`
 - [x] T099 Run the seeded negative privacy corpus across LLM fixtures, SSE, bootstrap/access logs, traces, audits, clean URLs, DOM, JavaScript-readable cookies, and browser storage; verify temporary legacy ChatMessage/title plaintext has complete ciphertext twins/recovery export and zero migrated-path exposure, and record evidence in `docs/runbooks/chatbot-handoff.md`
 - [x] T100 Run full agent pytest, shared/API builds, API Jest/E2E, and Playwright regressions from `specs/017-chatbot-backend-infrastructure/quickstart.md`, then reconcile `spec.md`, `plan.md`, `data-model.md`, `contracts/api.md`, `tasks.md`, and accepted `CONTEXT.md` terminology against green behavior
 - [x] T101 After explicit post-observation approval, archive the successful proxy rollback matrix, remove `apps/web/app/api/chat/stream/route.ts` and proxy-only configuration from `apps/web/.env.example`, replace `Direct=false` with a direct-only configuration rejection/removal test in `apps/web/lib/featureFlags.spec.ts`, then rerun direct-stream continuity and full handoff tests and record cleanup evidence in `specs/017-chatbot-backend-infrastructure/quickstart.md`
-- [ ] T102 After separate encrypted-chat observation/rollback approval proves T034 live dual-read/write, full message/title backfill, database/backup inventories, recovery export, and legacy-reader shutdown, create/apply/test both plaintext-column drops in `apps/api/prisma/migrations/20260805010000_chat_message_plaintext_cleanup/migration.sql` and record irreversible cleanup/recovery evidence in `specs/017-chatbot-backend-infrastructure/quickstart.md`
+- [x] T102 After separate encrypted-chat observation/rollback approval proves T034 live dual-read/write, full message/title backfill, database/backup inventories, recovery export, and legacy-reader shutdown, create/apply/test both plaintext-column drops in `apps/api/prisma/migrations/20260805010000_chat_message_plaintext_cleanup/migration.sql` and record irreversible cleanup/recovery evidence in `specs/017-chatbot-backend-infrastructure/quickstart.md`
 
 **Checkpoint**: All functional, privacy, concurrency, observability, performance, migration, and documentation evidence is green; reversible rollout evidence is archived before the separately approved direct-only cleanup.
 

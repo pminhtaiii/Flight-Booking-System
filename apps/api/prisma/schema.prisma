@@ -110,7 +110,6 @@ enum MessageType {
 model ChatSession {
   id              String        @id @default(uuid())
   userId          String
-  title           String?
   titleCiphertext String?
   titleNonce      String?
   titleAuthTag    String?
@@ -133,7 +132,6 @@ model ChatMessage {
   sessionId         String
   sender            MessageSender
   type              MessageType   @default(STANDARD)
-  content           String?
   contentCiphertext String?
   contentNonce      String?
   contentAuthTag    String?

@@ -22,19 +22,44 @@ describe('Chat Persistence Migration (e2e)', () => {
       }
     });
 
+    const KEY_BUFFER = Buffer.from(process.env.CHAT_ENCRYPTION_KEY!, 'hex');
+
+    const sessionNonce = crypto.randomBytes(12);
+    const sessionCipher = crypto.createCipheriv('aes-256-gcm', KEY_BUFFER, sessionNonce);
+    sessionCipher.setAAD(Buffer.from(`ChatSession:ses_test_migration:v1`));
+    let sessionCiphertext = sessionCipher.update('Legacy Title', 'utf8', 'hex');
+    sessionCiphertext += sessionCipher.final('hex');
+    const sessionAuthTag = sessionCipher.getAuthTag().toString('hex');
+
     testSession = await prisma.chatSession.create({
       data: {
+        id: 'ses_test_migration',
         userId: testUser.id,
-        title: 'Legacy Title',
-      }
+        titleCiphertext: sessionCiphertext,
+        titleNonce: sessionNonce.toString('hex'),
+        titleAuthTag: sessionAuthTag,
+        titleKeyVersion: 1,
+      },
     });
+
+    const msgNonce = crypto.randomBytes(12);
+    const msgCipher = crypto.createCipheriv('aes-256-gcm', KEY_BUFFER, msgNonce);
+    msgCipher.setAAD(Buffer.from(`ChatMessage:msg_test_migration:ses_test_migration:USER:STANDARD:v1`));
+    let msgCiphertext = msgCipher.update('Legacy Content', 'utf8', 'hex');
+    msgCiphertext += msgCipher.final('hex');
+    const msgAuthTag = msgCipher.getAuthTag().toString('hex');
 
     testMessage = await prisma.chatMessage.create({
       data: {
+        id: 'msg_test_migration',
         sessionId: testSession.id,
         sender: 'USER',
-        content: 'Legacy Content',
-      }
+        type: 'STANDARD',
+        contentCiphertext: msgCiphertext,
+        contentNonce: msgNonce.toString('hex'),
+        contentAuthTag: msgAuthTag,
+        contentKeyVersion: 1,
+      },
     });
     
     // Create BookingIntent separately to avoid Prisma XOR type conflict

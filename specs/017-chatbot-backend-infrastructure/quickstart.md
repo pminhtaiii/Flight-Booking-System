@@ -400,4 +400,23 @@ Record in `docs/runbooks/chatbot-handoff.md` and `context/progress-checker.md` o
   - Python agent pytest: 264/264 tests passed.
   - NestJS handoff unit suites: 24/24 tests passed.
   - Shared types build (`@shared/types`): code 0.
-- **Rollback matrix archived:** Direct streaming is canonical; proxy rollback matrix archived. T102 (plaintext DB columns drop) remains a separate approval-gated Phase 8E task.
+- **Rollback matrix archived:** Direct streaming is canonical; proxy rollback matrix archived.
+
+### Phase 8: Work Package 8E / T102 Approved Plaintext Cleanup (2026-08-14)
+
+- **Database migration applied:** Applied migration `20260805010000_chat_message_plaintext_cleanup` dropping legacy plaintext columns `title` on `chat_sessions` and `content` on `chat_messages` via `prisma migrate deploy`. Preflight SQL assertions verified zero unmigrated rows.
+- **Strict crypto & fail-closed behavior:**
+  - `ChatMessageCryptoService`: Record-bound AES-256-GCM authenticated encryption/decryption with zero plaintext fallback. Throws fail-closed errors on missing key, corrupt payload, or auth tag mismatch.
+  - `ChatService`: Exclusively writes to ciphertext envelopes (`contentCiphertext`, `contentNonce`, `contentAuthTag`, `contentKeyVersion` on messages; `titleCiphertext`, `titleNonce`, `titleAuthTag`, `titleKeyVersion` on sessions). Decrypts upon authorized retrieval.
+  - `AgentGatewayService`: Securely decrypts `lastMessage` for honest cabin/passenger keyword limitation checks.
+- **Zero-plaintext and security verification evidence:**
+  - `test/chat-plaintext-cleanup.e2e-spec.ts`: 4/4 passed (verified exhaustive raw JSON scan for zero plaintext in DB, round-trip decryption, and fail-closed tampering detection).
+  - `test/chat-privacy-corpus.e2e-spec.ts`: 3/3 passed.
+  - `test/chat.e2e-spec.ts`: 18/18 passed.
+  - `test/agent-chat-gateway.e2e-spec.ts`: 11/11 passed.
+  - `test/agent-gateway.e2e-spec.ts`: 28/28 passed.
+  - `test/chat-persistence-migration.e2e-spec.ts`: 3/3 passed.
+  - `test/booking-readiness.e2e-spec.ts`: 10/10 passed.
+  - Python agent pytest: 264/264 passed.
+  - Next.js production build: 20 routes compiled cleanly with zero TypeScript errors.
+- **Feature 017 complete:** All Phase 1 through Phase 8 tasks (T001–T102) completed, verified, and reconciled across codebase and documentation.

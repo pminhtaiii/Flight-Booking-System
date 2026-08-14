@@ -33,6 +33,10 @@ describe('Booking Intent (E2E)', () => {
   let tokenB: string;
 
   beforeAll(async () => {
+    process.env.FEATURE_FLAG_CHAT_HANDOFF_ACCEPT = 'true';
+    process.env.FEATURE_FLAG_BOOKING_READINESS = 'true';
+    process.env.CHAT_HANDOFF_SECRET = 'test-handoff-secret';
+
     const moduleFixture: TestingModule = await Test.createTestingModule({
       imports: [AppModule],
     }).compile();
@@ -116,10 +120,11 @@ describe('Booking Intent (E2E)', () => {
   });
 
   async function createMockFlightOffer(data: Partial<Prisma.FlightOfferCreateInput> = {}) {
+    const unique = crypto.randomUUID();
     return prisma.flightOffer.create({
       data: {
-        searchHash: 'test-search-hash',
-        duffelOfferId: 'off_duffel_123',
+        searchHash: data.searchHash ?? `test-search-hash-${unique}`,
+        duffelOfferId: data.duffelOfferId ?? `off_duffel_${unique}`,
         rawOffer: {},
         origin: 'SGN',
         destination: 'HAN',
@@ -188,7 +193,7 @@ describe('Booking Intent (E2E)', () => {
         })
         .expect(201);
 
-      expect(duffelSpy).toHaveBeenCalledWith('off_duffel_123');
+      expect(duffelSpy).toHaveBeenCalledWith(offer.duffelOfferId);
       duffelSpy.mockRestore();
 
       expect(res.body).toHaveProperty('intentId');
@@ -942,14 +947,13 @@ describe('Booking Intent (E2E)', () => {
       const crypto = await import('crypto');
 
       const handoffId = crypto.randomUUID();
-      const token = 'valid-token';
+      const token = 'chk_handoff_v1_valid-token';
       const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
 
       const session = await prisma.chatSession.create({
         data: {
           id: 'test-session-id',
           userId: userA.id,
-          title: 'enc:title',
         },
       });
 
@@ -1020,14 +1024,13 @@ describe('Booking Intent (E2E)', () => {
       const crypto = await import('crypto');
 
       const handoffId = crypto.randomUUID();
-      const token = 'valid-token-deleted-session';
+      const token = 'chk_handoff_v1_valid-token-deleted-session';
       const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
 
       const session = await prisma.chatSession.create({
         data: {
           id: 'deleted-session-id',
           userId: userA.id,
-          title: 'enc:title',
           deletedAt: new Date(),
         },
       });
@@ -1080,14 +1083,13 @@ describe('Booking Intent (E2E)', () => {
       const crypto = await import('crypto');
 
       const handoffId = crypto.randomUUID();
-      const token = 'valid-token-expired-claim';
+      const token = 'chk_handoff_v1_valid-token-expired-claim';
       const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
 
       const session = await prisma.chatSession.create({
         data: {
           id: 'active-session-id',
           userId: userA.id,
-          title: 'enc:title',
         },
       });
 
@@ -1147,14 +1149,13 @@ describe('Booking Intent (E2E)', () => {
       const crypto = await import('crypto');
 
       const handoffId = crypto.randomUUID();
-      const token = 'valid-token-timeout';
+      const token = 'chk_handoff_v1_valid-token-timeout';
       const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
 
       const session = await prisma.chatSession.create({
         data: {
           id: 'active-session-id-2',
           userId: userA.id,
-          title: 'enc:title',
         },
       });
 
@@ -1207,14 +1208,13 @@ describe('Booking Intent (E2E)', () => {
       const crypto = await import('crypto');
 
       const handoffId = crypto.randomUUID();
-      const token = 'valid-token-concurrency';
+      const token = 'chk_handoff_v1_valid-token-concurrency';
       const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
 
       const session = await prisma.chatSession.create({
         data: {
           id: 'active-session-id-3',
           userId: userA.id,
-          title: 'enc:title',
         },
       });
 

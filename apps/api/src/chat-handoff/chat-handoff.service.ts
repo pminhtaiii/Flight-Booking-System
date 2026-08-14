@@ -645,6 +645,16 @@ export class ChatHandoffService {
     }
 
     if (!claimed) {
+      const handoffRecord = await this.prisma.chatHandoff.findFirst({
+        where: { tokenHash, userId },
+        include: { chatSession: { select: { deletedAt: true } } },
+      });
+      if (handoffRecord?.chatSession?.deletedAt) {
+        throw new ConflictException({
+          code: 'CHAT_SESSION_DELETED',
+          message: 'Chat session was deleted',
+        });
+      }
       throw new ConflictException({ code: 'HANDOFF_IN_PROGRESS', message: 'Handoff in progress' });
     }
 

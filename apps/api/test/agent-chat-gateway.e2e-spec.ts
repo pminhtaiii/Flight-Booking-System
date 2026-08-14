@@ -167,7 +167,7 @@ describe('Agent Chat Gateway (E2E)', () => {
       });
 
       const sessionA = await prisma.chatSession.create({
-        data: { userId: userA.id, title: 'User A Session' },
+        data: { userId: userA.id },
       });
 
       const claimTokenB = mintClaimToken(userB.id, Math.floor(Date.now() / 1000));
@@ -198,7 +198,7 @@ describe('Agent Chat Gateway (E2E)', () => {
       });
 
       const session = await prisma.chatSession.create({
-        data: { userId: user.id, title: 'Fence Test Session' },
+        data: { userId: user.id },
       });
 
       const claimToken = mintClaimToken(user.id, Math.floor(Date.now() / 1000));
@@ -219,7 +219,7 @@ describe('Agent Chat Gateway (E2E)', () => {
       });
 
       const session = await prisma.chatSession.create({
-        data: { userId: user.id, title: 'Fence Test Session 2' },
+        data: { userId: user.id },
       });
 
       const claimToken = mintClaimToken(user.id, Math.floor(Date.now() / 1000));
@@ -246,7 +246,7 @@ describe('Agent Chat Gateway (E2E)', () => {
       });
 
       const session = await prisma.chatSession.create({
-        data: { userId: user.id, title: 'Fence Test Session 3' },
+        data: { userId: user.id },
       });
 
       const claimToken = mintClaimToken(user.id, Math.floor(Date.now() / 1000));
@@ -267,8 +267,8 @@ describe('Agent Chat Gateway (E2E)', () => {
     });
   });
 
-  describe('Encrypted Persistence, Browser Injection Protection & Soft-Delete (WP 3D)', () => {
-    it('should store encrypted fields for turns and session title while retaining legacy plaintext', async () => {
+  describe('Encrypted Persistence, Browser Injection Protection & Soft-Delete (WP 3D / Phase 8E)', () => {
+    it('should store encrypted fields for turns and session title exclusively', async () => {
       const user = await prisma.user.create({
         data: { email: 'crypto-user@example.com', password: 'password', status: 'ACTIVE' },
       });
@@ -284,9 +284,9 @@ describe('Agent Chat Gateway (E2E)', () => {
 
       const sessionId = createSessRes.body.id;
       expect(sessionId).toBeDefined();
+      expect(createSessRes.body.title).toBe('Encrypted Flight Search');
 
       const sessionDb = await prisma.chatSession.findUnique({ where: { id: sessionId } });
-      expect(sessionDb!.title).toBe('Encrypted Flight Search');
       expect(sessionDb!.titleCiphertext).not.toBeNull();
       expect(sessionDb!.titleNonce).not.toBeNull();
       expect(sessionDb!.titleAuthTag).not.toBeNull();
@@ -298,8 +298,9 @@ describe('Agent Chat Gateway (E2E)', () => {
         .send({ messages: [{ sender: 'USER', content: 'Find me flights to Tokyo' }] })
         .expect(201);
 
+      expect(turnRes.body.messages[0].content).toBe('Find me flights to Tokyo');
+
       const messageDb = await prisma.chatMessage.findUnique({ where: { id: turnRes.body.messages[0].id } });
-      expect(messageDb!.content).toBe('Find me flights to Tokyo');
       expect(messageDb!.contentCiphertext).not.toBeNull();
       expect(messageDb!.contentNonce).not.toBeNull();
       expect(messageDb!.contentAuthTag).not.toBeNull();
@@ -311,7 +312,7 @@ describe('Agent Chat Gateway (E2E)', () => {
       });
 
       const session = await prisma.chatSession.create({
-        data: { userId: user.id, title: 'Browser Session' },
+        data: { userId: user.id },
       });
 
       const userToken = jwtService.sign({ id: user.id, email: user.email });
@@ -338,7 +339,7 @@ describe('Agent Chat Gateway (E2E)', () => {
       const claimToken = mintClaimToken(user.id, Math.floor(Date.now() / 1000));
 
       const session = await prisma.chatSession.create({
-        data: { userId: user.id, title: 'To Be Soft Deleted' },
+        data: { userId: user.id },
       });
 
       const deleteRes = await request(app.getHttpServer())
@@ -364,7 +365,7 @@ describe('Agent Chat Gateway (E2E)', () => {
       });
       const claimToken = mintClaimToken(user.id, Math.floor(Date.now() / 1000));
       const session = await prisma.chatSession.create({
-        data: { userId: user.id, title: 'Memory Query Session' },
+        data: { userId: user.id },
       });
 
       const response = await request(app.getHttpServer())
