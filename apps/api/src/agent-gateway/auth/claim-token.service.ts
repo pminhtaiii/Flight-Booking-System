@@ -35,9 +35,8 @@ export class ClaimTokenService {
     let payloadStr: string;
     try {
       payloadStr = Buffer.from(payloadPart, 'base64url').toString('utf8');
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : String(err);
-      this.logger.warn(`Failed to base64url-decode payload: ${msg}`);
+    } catch {
+      this.logger.warn('Failed to base64url-decode claim token payload');
       throw new UnauthorizedException({
         statusCode: 401,
         message: 'Invalid claim token encoding',
@@ -48,9 +47,8 @@ export class ClaimTokenService {
     let payload: ClaimTokenPayload;
     try {
       payload = JSON.parse(payloadStr);
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : String(err);
-      this.logger.warn(`Failed to parse payload JSON: ${msg}`);
+    } catch {
+      this.logger.warn('Failed to parse claim token payload JSON');
       throw new UnauthorizedException({
         statusCode: 401,
         message: 'Invalid claim token JSON',
@@ -86,9 +84,8 @@ export class ClaimTokenService {
     let signatureBuffer: Buffer;
     try {
       signatureBuffer = Buffer.from(signaturePart, 'base64url');
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : String(err);
-      this.logger.warn(`Failed to base64url-decode signature: ${msg}`);
+    } catch {
+      this.logger.warn('Failed to base64url-decode claim token signature');
       throw new UnauthorizedException({
         statusCode: 401,
         message: 'Invalid claim token signature encoding',
@@ -135,7 +132,7 @@ export class ClaimTokenService {
     });
 
     if (!user) {
-      this.logger.warn(`User ${payload.userId} not found in database`);
+      this.logger.warn('User not found in database for claim token');
       throw new ForbiddenException({
         statusCode: 403,
         message: 'User not found',
@@ -144,7 +141,7 @@ export class ClaimTokenService {
     }
 
     if (user.status !== 'ACTIVE') {
-      this.logger.warn(`User ${payload.userId} is inactive (status: ${user.status})`);
+      this.logger.warn(`User account is inactive for claim token (status: ${user.status})`);
       throw new ForbiddenException({
         statusCode: 403,
         message: 'User account is inactive',

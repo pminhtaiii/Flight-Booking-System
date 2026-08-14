@@ -704,7 +704,7 @@ export class AgentGatewayService {
         const slice = offer.slices?.[0];
         if (!slice || !slice.segments || slice.segments.length === 0) continue;
         
-        const createdOffer = createdOffers.find((co: any) => co.duffelOfferId === offer.id);
+        const createdOffer = createdOffers.find((co) => co.duffelOfferId === offer.id);
         if (!createdOffer) continue;
 
         const segments = slice.segments;
@@ -777,7 +777,7 @@ export class AgentGatewayService {
         results,
       };
     } catch (err: unknown) {
-      this.logger.error(`Failed to search flights V2: ${err}`);
+      this.logger.error('Failed to search flights V2');
       throw err;
     }
   }

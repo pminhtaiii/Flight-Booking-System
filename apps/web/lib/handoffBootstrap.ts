@@ -1,4 +1,22 @@
+import { NextResponse } from 'next/server';
 import { isOpaqueChatId } from './chatTrace';
+import { HANDOFF_COOKIE_NAME, handoffCookieOptions } from './handoffCookie';
+
+export function createHandoffRedirectResponse(
+  requestUrl: string | URL,
+  handoffToken: string,
+): NextResponse {
+  const targetUrl = typeof requestUrl === 'string' ? new URL(requestUrl) : new URL(requestUrl.href);
+  targetUrl.pathname = '/checkout/passengers';
+  targetUrl.search = '';
+  targetUrl.hash = '';
+  targetUrl.username = '';
+  targetUrl.password = '';
+  const response = NextResponse.redirect(targetUrl, 303);
+  response.headers.set('Cache-Control', 'no-store, private');
+  response.cookies.set(HANDOFF_COOKIE_NAME, handoffToken, handoffCookieOptions());
+  return response;
+}
 
 export type HandoffBootstrapResult = {
   ok: boolean;

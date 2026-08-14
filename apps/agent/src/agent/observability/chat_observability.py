@@ -16,6 +16,8 @@ import secrets
 from collections.abc import Mapping
 from typing import Any
 
+from agent.sanitization.pii_scrubber import detect_pii
+
 
 logger = logging.getLogger("agent.chat_observability")
 
@@ -220,17 +222,17 @@ def safe_opaque_id(value: str | None) -> str:
 
 
 def _safe_string(field_name: str, value: Any) -> str:
-    if not isinstance(value, str) or not _SAFE_VALUE.fullmatch(value):
+    if not isinstance(value, str):
         raise TelemetryPrivacyError(f"field {field_name!r} must be a bounded enum-like value")
     allowed_values = _ALLOWED_STRING_VALUES.get(field_name)
-    if allowed_values is None or value not in allowed_values:
-        # Closed enums are the primary privacy boundary.  The corpus is still
-        # consulted for rejected values, but cannot suppress a valid enum such
-        # as ``non_human_message`` merely because it contains a marker token.
-        if _FORBIDDEN_VALUE.search(value):
-            raise TelemetryPrivacyError(f"field {field_name!r} contains protected data")
-        raise TelemetryPrivacyError(f"field {field_name!r} is not an allowlisted value")
-    return value
+    if allowed_values is not None and value in allowed_values:
+        return value
+    if _FORBIDDEN_VALUE.search(value) or detect_pii(value):
+        raise TelemetryPrivacyError(f"field {field_name!r} contains protected data")
+    if not _SAFE_VALUE.fullmatch(value):
+        raise TelemetryPrivacyError(f"field {field_name!r} must be a bounded enum-like value")
+    raise TelemetryPrivacyError(f"field {field_name!r} is not an allowlisted value")
+
 
 
 def _safe_scalar(field_name: str, value: Any) -> str | int | float | bool | None:

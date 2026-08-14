@@ -450,9 +450,9 @@ export class BookingIntentService {
       );
       try {
         emitChatTelemetry(this.logger, telemetryEvent);
-      } catch (err) {
+      } catch {
         try {
-          this.logger.warn('Chat telemetry emission failed', err);
+          this.logger.warn('Chat telemetry emission failed');
         } catch (_) {
           // Swallow error to prevent transaction abort if logger sink throws
         }

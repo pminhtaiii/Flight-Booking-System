@@ -616,7 +616,7 @@ describe('ChatHandoff (E2E)', () => {
       await request(app.getHttpServer())
         .get(`/chat-handoff/resolve?token=${createdToken}`)
         .set('Authorization', `Bearer ${otherUserToken}`)
-        .expect(401); // Not authorized for this handoff
+        .expect(404); // Not authorized for this handoff (opaque 404 to prevent token probing)
     });
 
     it('should enforce owner/internal-session resolve and exact-response', async () => {

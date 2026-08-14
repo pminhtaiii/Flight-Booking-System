@@ -474,8 +474,10 @@ async def test_sse_action_handoff_ordering_and_schema(mock_nestjs_client):
 
     with patch("agent.streaming.sse.NestJSClient", return_value=mock_nestjs_client), \
          patch("agent.agents.chat_agent.ChatOpenAI", return_value=llm), \
-         patch("agent.graph.graph.invoke_router", return_value=RouteDecision(intent="CHECKOUT", confidence=1.0, isCommitment=True)):
+         patch("agent.graph.graph.invoke_router", return_value=RouteDecision(intent="CHECKOUT", confidence=1.0, isCommitment=True)), \
+         patch("agent.graph.nodes.get_settings") as mock_settings:
 
+        mock_settings.return_value.FEATURE_FLAG_CHAT_HANDOFF_ISSUE = True
         mock_snapshot_obj = MagicMock()
         mock_snapshot_obj.model_dump.return_value = trusted_snapshot
         
