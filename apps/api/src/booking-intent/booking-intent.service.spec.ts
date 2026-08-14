@@ -200,7 +200,7 @@ describe('BookingIntentService Refinements', () => {
       expect(result.passengers[0]).not.toHaveProperty('givenName');
       expect(prisma.bookingIntentPassenger.create).toHaveBeenCalledWith({
         data: expect.objectContaining({
-          intentId: 'intent-1',
+          intentId: expect.any(String),
           givenName: 'Grace',
           familyName: 'Hopper',
           gender: 'female',
@@ -209,6 +209,9 @@ describe('BookingIntentService Refinements', () => {
           snapshotVersion: 1,
         }),
       });
+      const createdIntentId = (prisma.bookingIntent.create as jest.Mock).mock.calls[0][0].data.id;
+      const snapshotIntentId = (prisma.bookingIntentPassenger.create as jest.Mock).mock.calls[0][0].data.intentId;
+      expect(snapshotIntentId).toBe(createdIntentId);
 
       const auditMetadata = JSON.stringify(audit.createLog.mock.calls[0][1].metadata);
       expect(auditMetadata).toContain('intent_create');
@@ -346,6 +349,43 @@ describe('BookingIntentService Refinements', () => {
     expect(loggerError).toHaveBeenCalledWith('chat_handoff_claim_release_failed');
     expect(JSON.stringify(loggerError.mock.calls)).not.toContain('internal.test');
     loggerError.mockRestore();
+  });
+
+  it('releases only the request-owned fast-fail reservation when intent validation fails', async () => {
+    const prisma = {
+      flightOffer: { findUnique: jest.fn().mockResolvedValue(null) },
+    };
+    const chatHandoff = {
+      releaseInFlight: jest.fn(),
+    };
+    const Service = BookingIntentService as unknown as new (...args: unknown[]) => BookingIntentService;
+    const service = new Service(
+      prisma,
+      {} as never,
+      { createLog: jest.fn() },
+      {} as never,
+      undefined,
+      undefined,
+      undefined,
+      chatHandoff,
+    );
+
+    await expect(service.createIntent(
+      'user-1',
+      { flightOfferId: 'missing-offer', passengers: [] } as never,
+      {
+        handoffFastFailReservation: {
+          token: 'chk_handoff_v1_token',
+          reservationId: 'reservation-1',
+        },
+      },
+    )).rejects.toMatchObject({ status: HttpStatus.NOT_FOUND });
+
+    expect(chatHandoff.releaseInFlight).toHaveBeenCalledWith(
+      'chk_handoff_v1_token',
+      'user-1',
+      'reservation-1',
+    );
   });
 
   describe('fetchLiveOffer', () => {

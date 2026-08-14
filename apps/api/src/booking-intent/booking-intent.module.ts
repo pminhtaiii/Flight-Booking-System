@@ -14,6 +14,7 @@ import { BookingReadinessObservability } from './booking-readiness.observability
 import { BookingReadinessService } from './booking-readiness.service';
 import { PassengerSourceResolverService } from './passenger-source-resolver.service';
 import { PassengerSnapshotService } from './passenger-snapshot.service';
+import { HandoffFastFailGuard } from './guards/handoff-fast-fail.guard';
 
 @Module({
   imports: [PrismaModule, DuffelModule, AuditModule, AirportsModule, ProfileModule, forwardRef(() => ChatHandoffModule)],
@@ -27,6 +28,7 @@ import { PassengerSnapshotService } from './passenger-snapshot.service';
     PassengerSnapshotService,
     EncryptionService,
     BookingIntentCron,
+    HandoffFastFailGuard,
   ],
   exports: [
     BookingIntentService,
@@ -34,6 +36,7 @@ import { PassengerSnapshotService } from './passenger-snapshot.service';
     BookingReadinessObservability,
     PassengerSourceResolverService,
     PassengerSnapshotService,
+    HandoffFastFailGuard,
   ],
 })
 export class BookingIntentModule {}

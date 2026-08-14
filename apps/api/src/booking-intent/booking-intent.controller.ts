@@ -16,6 +16,7 @@ import {
 } from '@nestjs/common';
 import { Request, Response } from 'express';
 import { JwtAuthGuard } from '@/auth/guards/jwt-auth.guard';
+import { HandoffFastFailGuard } from './guards/handoff-fast-fail.guard';
 import { BookingIntentService } from './booking-intent.service';
 import { CreateIntentDto } from './dto/create-intent.dto';
 import { BookingReadinessRequestDto } from './dto/booking-readiness.dto';
@@ -24,6 +25,10 @@ interface AuthenticatedRequest extends Request {
   user: {
     id: string;
     email: string;
+  };
+  handoffFastFailReservation?: {
+    token: string;
+    reservationId: string;
   };
 }
 
@@ -64,7 +69,7 @@ function assertCanonicalCreate(dto: CreateIntentDto): void {
 }
 
 @Controller('bookings/intents')
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, HandoffFastFailGuard)
 export class BookingIntentController {
   private readonly logger = new Logger(BookingIntentController.name);
 
@@ -79,7 +84,7 @@ export class BookingIntentController {
     userId: string,
     dto: CreateIntentDto,
     context?: Parameters<BookingIntentService['createIntent']>[2],
-  ) {
+  ): Promise<ReturnType<BookingIntentService['createIntent']> extends Promise<infer Response> ? Response : never> {
     return this.bookingIntentService.createIntent(userId, dto, context);
   }
 
@@ -105,6 +110,7 @@ export class BookingIntentController {
       ...requestContext(headers),
       allowLegacy: false,
       ipAddress: req.ip || req.socket?.remoteAddress || undefined,
+      handoffFastFailReservation: req.handoffFastFailReservation,
     });
   }
 
@@ -134,7 +140,7 @@ export class BookingIntentController {
 }
 
 @Controller('bookings/intent')
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, HandoffFastFailGuard)
 export class BookingIntentLegacyController {
   private readonly logger = new Logger(BookingIntentLegacyController.name);
 
@@ -160,6 +166,7 @@ export class BookingIntentLegacyController {
       ...requestContext(headers),
       allowLegacy: true,
       ipAddress: req.ip || req.socket?.remoteAddress || undefined,
+      handoffFastFailReservation: req.handoffFastFailReservation,
     });
   }
 

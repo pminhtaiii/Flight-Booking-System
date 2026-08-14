@@ -46,6 +46,7 @@ describe('ChatHandoffService', () => {
         {
           provide: PrismaService,
           useValue: {
+            $transaction: jest.fn(),
             chatHandoff: {
               findUnique: jest.fn(),
               create: jest.fn(),
@@ -302,6 +303,68 @@ describe('ChatHandoffService', () => {
       expect(result).not.toBe('timed-out');
     });
 
+    it('claims the canonical consume winner before emitting resolve telemetry', async () => {
+      jest.spyOn(configService, 'get').mockReturnValue('true');
+      jest.spyOn(tokenService, 'verifyToken').mockResolvedValue(true);
+      jest.spyOn(prisma.chatHandoff, 'findUnique').mockResolvedValue({
+        id: 'handoff-1',
+        userId: 'u1',
+        chatSession: { userId: 'u1', deletedAt: null },
+        tokenHash: 'token-hash',
+        tokenKeyVersion: 1,
+        flightOfferId: 'offer-1',
+        expiresAt: new Date(Date.now() + 60_000),
+        consumedAt: null,
+      } as any);
+      (prisma.$queryRaw as jest.Mock) = jest.fn().mockResolvedValue([{
+        id: 'handoff-1',
+        userId: 'u1',
+        chatSessionId: 'session-1',
+        flightOfferId: 'offer-1',
+        tokenHash: 'token-hash',
+        tokenKeyVersion: 1,
+        expiresAt: new Date(Date.now() + 60_000),
+        consumedAt: null,
+      }]);
+
+      const result = await service.resolveAndAcquireClaim('chk_handoff_v1_test', 'u1', 30_000);
+
+      expect(result.handoff.id).toBe('handoff-1');
+      expect(result.claimToken).toEqual(expect.any(String));
+      expect(prisma.$queryRaw).toHaveBeenCalledTimes(1);
+      const [sqlParts] = (prisma.$queryRaw as jest.Mock).mock.calls[0] as [TemplateStringsArray];
+      expect(sqlParts.join('')).toContain('"chat_sessions"."deletedAt" IS NULL');
+      expect(sqlParts.join('')).toContain('"chat_sessions"."userId"');
+      expect(prisma.$transaction).not.toHaveBeenCalled();
+      expect(auditService.createLog).toHaveBeenCalledWith(
+        null,
+        expect.objectContaining({
+          action: 'chat_handoff_resolved',
+          metadata: expect.objectContaining({ operation: 'handoff_resolve' }),
+        }),
+      );
+    });
+
+    it('rejects a simultaneous same-owner claim without a second database attempt', async () => {
+      jest.spyOn(configService, 'get').mockReturnValue('true');
+      let releaseClaim!: (rows: Array<Record<string, unknown>>) => void;
+      const claimQuery = new Promise<Array<Record<string, unknown>>>((resolve) => {
+        releaseClaim = resolve;
+      });
+      (prisma.$queryRaw as jest.Mock) = jest.fn().mockReturnValue(claimQuery);
+
+      const first = service.resolveAndAcquireClaim('chk_handoff_v1_test', 'u1', 30_000);
+      await Promise.resolve();
+      const second = service.resolveAndAcquireClaim('chk_handoff_v1_test', 'u1', 30_000);
+
+      await expect(second).rejects.toMatchObject({
+        response: { code: 'HANDOFF_IN_PROGRESS' },
+      });
+      expect(prisma.$queryRaw).toHaveBeenCalledTimes(1);
+      releaseClaim([{ id: 'handoff-1', userId: 'u1', chatSessionId: 'session-1', flightOfferId: 'offer-1', tokenHash: 'hash', tokenKeyVersion: 1, expiresAt: new Date(Date.now() + 60_000), consumedAt: null }]);
+      await expect(first).resolves.toMatchObject({ handoff: { id: 'handoff-1' } });
+    });
+
     // User approved T093 ownership and claim-recovery regression coverage on 2026-08-10.
     it('does not reveal expiration state to a foreign owner', async () => {
       jest.spyOn(configService, 'get').mockReturnValue('true');
@@ -448,12 +511,46 @@ describe('ChatHandoffService', () => {
     });
   });
 
+  describe('fast-fail reservations', () => {
+    it('releases only the matching owner reservation', () => {
+      const reservationId = service.tryAcquireInFlight('chk_handoff_v1_test', 'u1');
+      expect(reservationId).toEqual(expect.any(String));
+      expect(service.tryAcquireInFlight('chk_handoff_v1_test', 'u1')).toBeNull();
+
+      service.releaseInFlight('chk_handoff_v1_test', 'u1', 'different-reservation');
+      expect(service.tryAcquireInFlight('chk_handoff_v1_test', 'u1')).toBeNull();
+
+      service.releaseInFlight('chk_handoff_v1_test', 'u1', reservationId!);
+      expect(service.tryAcquireInFlight('chk_handoff_v1_test', 'u1')).toEqual(expect.any(String));
+    });
+  });
+
   describe('claim lifecycle', () => {
+    it('uses a skip-locked transaction so concurrent claim losers do not queue', async () => {
+      const tx = {
+        $queryRaw: jest.fn().mockResolvedValue([{ id: '1' }]),
+        chatHandoff: { updateMany: jest.fn().mockResolvedValue({ count: 1 }) },
+      };
+      (prisma.$transaction as jest.Mock).mockImplementation(async (callback) => callback(tx));
+
+      await expect(service.acquireClaim('1', 'u1', 30000)).resolves.toEqual(expect.any(String));
+
+      expect(prisma.$transaction).toHaveBeenCalledTimes(1);
+      expect(tx.$queryRaw).toHaveBeenCalledTimes(1);
+      expect(tx.chatHandoff.updateMany).toHaveBeenCalledTimes(1);
+      expect(prisma.chatHandoff.updateMany).not.toHaveBeenCalled();
+    });
+
     it('acquires a claim', async () => {
-      jest.spyOn(prisma.chatHandoff, 'updateMany').mockResolvedValue({ count: 1 });
+      const tx = {
+        $queryRaw: jest.fn().mockResolvedValue([{ id: '1' }]),
+        chatHandoff: { updateMany: jest.fn().mockResolvedValue({ count: 1 }) },
+      };
+      (prisma.$transaction as jest.Mock).mockImplementation(async (callback) => callback(tx));
+
       const result = await service.acquireClaim('1', 'u1', 30000);
       expect(result).toBeDefined();
-      expect(prisma.chatHandoff.updateMany).toHaveBeenCalledWith(
+      expect(tx.chatHandoff.updateMany).toHaveBeenCalledWith(
         expect.objectContaining({
           where: expect.objectContaining({
             OR: [{ claimRecoverAfter: null }, { claimRecoverAfter: { lte: expect.any(Date) } }],
@@ -463,10 +560,16 @@ describe('ChatHandoffService', () => {
     });
 
     it('fails to acquire a claim if already claimed', async () => {
-      jest.spyOn(prisma.chatHandoff, 'updateMany').mockResolvedValue({ count: 0 });
+      const tx = {
+        $queryRaw: jest.fn().mockResolvedValue([]),
+        chatHandoff: { updateMany: jest.fn() },
+      };
+      (prisma.$transaction as jest.Mock).mockImplementation(async (callback) => callback(tx));
+
       await expect(service.acquireClaim('1', 'u1', 30000)).rejects.toThrow(
         'Failed to acquire handoff claim',
       );
+      expect(tx.chatHandoff.updateMany).not.toHaveBeenCalled();
     });
 
     it('refreshes a claim', async () => {
