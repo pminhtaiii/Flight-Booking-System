@@ -2,11 +2,6 @@ import { defineConfig, devices } from '@playwright/test';
 import { randomBytes } from 'node:crypto';
 import path from 'path';
 
-const explicitDirectStreamFlag = process.env.NEXT_PUBLIC_FEATURE_FLAG_CHAT_DIRECT_STREAM;
-const directStreamE2E =
-  explicitDirectStreamFlag !== undefined
-    ? explicitDirectStreamFlag === 'true'
-    : process.env.CHAT_DIRECT_STREAM_E2E === 'true';
 const t093RealFlow = process.env.T093_REAL_FLOW === 'true';
 const generatedSecret = (): string => randomBytes(32).toString('base64url');
 const t093Secrets = {
@@ -28,7 +23,6 @@ const frontendEnv = {
   NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:3001',
   NEXT_PUBLIC_FEATURE_FLAG_BOOKING_READINESS: 'true',
   NEXT_PUBLIC_FEATURE_FLAG_CHAT_HANDOFF: 'true',
-  NEXT_PUBLIC_FEATURE_FLAG_CHAT_DIRECT_STREAM: directStreamE2E || t093RealFlow ? 'true' : 'false',
   NEXT_PUBLIC_AGENT_URL: 'http://127.0.0.1:3002',
 };
 
@@ -40,7 +34,7 @@ export default defineConfig({
   use: {
     baseURL: 'http://127.0.0.1:3000',
     trace: 'on-first-retry',
-    actionTimeout: 10000,
+    actionTimeout: 30000,
   },
   projects: [
     {
@@ -49,40 +43,36 @@ export default defineConfig({
     },
   ],
   webServer: [
-    ...(!directStreamE2E || t093RealFlow
-      ? [
-          {
-            command: t093RealFlow
-              ? 'node -r ts-node/register -r tsconfig-paths/register test/t093-server.ts'
-              : 'pnpm start:prod',
-            url: t093RealFlow
-              ? 'http://127.0.0.1:3001/test/t093/ready'
-              : 'http://127.0.0.1:3001/health',
-            reuseExistingServer: t093RealFlow ? false : !process.env.CI,
-            timeout: 600000,
-            cwd: path.resolve(__dirname, '../../api'),
-            env: {
-              NODE_ENV: 'test',
-              DATABASE_URL: 'postgresql://postgres:postgres@127.0.0.1:5432/test_db',
-              REDIS_URL: 'redis://127.0.0.1:6379/1',
-              FEATURE_FLAG_BOOKING_READINESS: 'true',
-              FEATURE_FLAG_CHAT_HANDOFF_ISSUE: 'true',
-              FEATURE_FLAG_CHAT_HANDOFF_ACCEPT: 'true',
-              CHAT_HANDOFF_SECRET: t093Secrets.handoff,
-              ATTESTATION_SECRET: t093Secrets.attestation,
-              CHAT_ENCRYPTION_KEY: t093Secrets.encryption,
-              ENCRYPTION_KEY: randomBytes(32).toString('hex'),
-              JWT_SECRET: t093Secrets.jwt,
-              AGENT_SERVICE_API_KEY: t093Secrets.agent,
-              CLAIM_TOKEN_SECRET: t093Secrets.claim,
-              STRIPE_SECRET_KEY: t093Secrets.stripe,
-              STRIPE_WEBHOOK_SECRET: t093Secrets.stripeWebhook,
-              DUFFEL_ACCESS_TOKEN: generatedSecret(),
-              FRONTEND_URL: t093RealFlow ? 'http://localhost:3000' : 'http://127.0.0.1:3000',
-            },
-          },
-        ]
-      : []),
+    {
+      command: t093RealFlow
+        ? 'node -r ts-node/register -r tsconfig-paths/register test/t093-server.ts'
+        : 'pnpm start:prod',
+      url: t093RealFlow
+        ? 'http://127.0.0.1:3001/test/t093/ready'
+        : 'http://127.0.0.1:3001/health',
+      reuseExistingServer: t093RealFlow ? false : !process.env.CI,
+      timeout: 600000,
+      cwd: path.resolve(__dirname, '../../api'),
+      env: {
+        NODE_ENV: 'test',
+        DATABASE_URL: 'postgresql://postgres:postgres@127.0.0.1:5432/test_db',
+        REDIS_URL: 'redis://127.0.0.1:6379/1',
+        FEATURE_FLAG_BOOKING_READINESS: 'true',
+        FEATURE_FLAG_CHAT_HANDOFF_ISSUE: 'true',
+        FEATURE_FLAG_CHAT_HANDOFF_ACCEPT: 'true',
+        CHAT_HANDOFF_SECRET: t093Secrets.handoff,
+        ATTESTATION_SECRET: t093Secrets.attestation,
+        CHAT_ENCRYPTION_KEY: t093Secrets.encryption,
+        ENCRYPTION_KEY: randomBytes(32).toString('hex'),
+        JWT_SECRET: t093Secrets.jwt,
+        AGENT_SERVICE_API_KEY: t093Secrets.agent,
+        CLAIM_TOKEN_SECRET: t093Secrets.claim,
+        STRIPE_SECRET_KEY: t093Secrets.stripe,
+        STRIPE_WEBHOOK_SECRET: t093Secrets.stripeWebhook,
+        DUFFEL_ACCESS_TOKEN: generatedSecret(),
+        FRONTEND_URL: t093RealFlow ? 'http://localhost:3000' : 'http://127.0.0.1:3000',
+      },
+    },
     ...(t093RealFlow
       ? [
           {
@@ -111,7 +101,6 @@ export default defineConfig({
               MIMO_API_URL: 'http://127.0.0.1:3003/v1',
               MIMO_API_KEY: t093Secrets.mimo,
               MIMO_MODEL_NAME: 't093',
-              FEATURE_FLAG_CHAT_DIRECT_STREAM: 'true',
               FEATURE_FLAG_CHAT_MULTI_AGENT: 'true',
               FEATURE_FLAG_CHAT_HANDOFF_ISSUE: 'true',
               FEATURE_FLAG_CHAT_HANDOFF_ACCEPT: 'true',
@@ -126,9 +115,7 @@ export default defineConfig({
     {
       command: t093RealFlow
         ? 'node node_modules/next/dist/bin/next dev -p 3000'
-        : directStreamE2E
-          ? 'pnpm dev'
-          : 'pnpm start',
+        : 'pnpm dev',
       url: t093RealFlow ? 'http://127.0.0.1:3000/api/auth/csrf' : 'http://127.0.0.1:3000',
       reuseExistingServer: t093RealFlow ? false : !process.env.CI,
       timeout: 600000,

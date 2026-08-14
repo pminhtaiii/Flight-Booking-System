@@ -35,6 +35,9 @@ class Settings(BaseSettings):
     CLAIM_TOKEN_SECRET: str = Field(..., min_length=1)
     CLAIM_TOKEN_TTL_SECONDS: int = 300
     AGENT_MAX_ITERATIONS: int = 5
+    CLAIM_TOKEN_SECRET: str = Field(..., min_length=1)
+    CLAIM_TOKEN_TTL_SECONDS: int = 300
+    AGENT_MAX_ITERATIONS: int = 5
 
     OUTPUT_GUARDRAIL_ENABLED: bool = DEFAULT_OUTPUT_GUARDRAIL_ENABLED
     OUTPUT_GUARDRAIL_OVERLAP_TOKENS: int = DEFAULT_OUTPUT_GUARDRAIL_OVERLAP_TOKENS
@@ -44,7 +47,6 @@ class Settings(BaseSettings):
     FEATURE_FLAG_CHAT_MULTI_AGENT: bool = False
     FEATURE_FLAG_CHAT_HANDOFF_ACCEPT: bool = False
     FEATURE_FLAG_CHAT_HANDOFF_ISSUE: bool = False
-    FEATURE_FLAG_CHAT_DIRECT_STREAM: bool = False
     REDIS_URL: Optional[str] = "redis://localhost:6379/0"
     CHAT_QUOTA_DAILY: int = 50
     CHAT_QUOTA_BURST: int = 60

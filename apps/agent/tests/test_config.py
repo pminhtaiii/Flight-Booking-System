@@ -12,7 +12,6 @@ def test_agent_config_defaults():
     settings = Settings()
     
     assert settings.FEATURE_FLAG_CHAT_MULTI_AGENT is False
-    assert settings.FEATURE_FLAG_CHAT_DIRECT_STREAM is False
     assert settings.REDIS_URL is not None
     assert settings.CHAT_QUOTA_DAILY > 0
     assert settings.CHAT_QUOTA_BURST > 0

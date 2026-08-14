@@ -1,166 +1,120 @@
-import {
-  isDirectAgentStreamEnabled,
-  getAgentStreamEndpoint,
-  createChatStreamRequest,
-} from './chatStream';
+import assert from 'node:assert/strict';
+import { afterEach, beforeEach, describe, it } from 'node:test';
+import { getAgentStreamEndpoint, createChatStreamRequest } from './chatStream';
 import { isOpaqueChatId } from './chatTrace';
 
-describe('chatStream', () => {
+describe('chatStream - Direct-Only Transport', () => {
   const originalEnv = process.env;
 
   beforeEach(() => {
-    jest.resetModules();
     process.env = { ...originalEnv };
   });
 
-  afterAll(() => {
+  afterEach(() => {
     process.env = originalEnv;
   });
 
-  it('defaults to proxy endpoint when direct stream flag is off', () => {
+  it('throws an error when NEXT_PUBLIC_AGENT_URL is unset to prevent unsafe loopback in deployed environments', () => {
+    delete process.env.NEXT_PUBLIC_AGENT_URL;
     delete process.env.NEXT_PUBLIC_ENABLE_DIRECT_AGENT_STREAM;
-    process.env.NEXT_PUBLIC_FEATURE_FLAG_CHAT_DIRECT_STREAM = 'false';
-
-    expect(isDirectAgentStreamEnabled()).toBe(false);
-    expect(getAgentStreamEndpoint()).toBe('/api/chat/stream');
-  });
-
-  it('uses direct agent endpoint when NEXT_PUBLIC_FEATURE_FLAG_CHAT_DIRECT_STREAM is true', () => {
-    process.env.NEXT_PUBLIC_FEATURE_FLAG_CHAT_DIRECT_STREAM = 'true';
-    process.env.NEXT_PUBLIC_AGENT_URL = 'http://localhost:3002';
-
-    expect(isDirectAgentStreamEnabled()).toBe(true);
-    expect(getAgentStreamEndpoint()).toBe('http://localhost:3002/chat/stream');
-  });
-
-  it('uses direct agent endpoint when NEXT_PUBLIC_ENABLE_DIRECT_AGENT_STREAM is true', () => {
     delete process.env.NEXT_PUBLIC_FEATURE_FLAG_CHAT_DIRECT_STREAM;
-    process.env.NEXT_PUBLIC_ENABLE_DIRECT_AGENT_STREAM = 'true';
-    process.env.NEXT_PUBLIC_AGENT_URL = 'http://localhost:3002/';
 
-    expect(isDirectAgentStreamEnabled()).toBe(true);
-    expect(getAgentStreamEndpoint()).toBe('http://localhost:3002/chat/stream');
+    assert.throws(
+      () => getAgentStreamEndpoint(),
+      /NEXT_PUBLIC_AGENT_URL is required but not configured\./,
+    );
   });
 
-  it('generates independent opaque trace and correlation headers for direct streaming', async () => {
-    process.env.NEXT_PUBLIC_FEATURE_FLAG_CHAT_DIRECT_STREAM = 'true';
-    process.env.NEXT_PUBLIC_AGENT_URL = 'http://localhost:3002';
+  it('respects configured NEXT_PUBLIC_AGENT_URL and trims trailing slashes', () => {
+    process.env.NEXT_PUBLIC_AGENT_URL = 'http://custom-agent.internal:3002///';
 
-    const mockFetch = jest.fn().mockResolvedValue(new Response('ok'));
-    global.fetch = mockFetch;
-
-    await createChatStreamRequest({
-      message: 'test message',
-      sessionId: 'sess-123',
-      token: 'jwt-token-xyz',
-    });
-
-    const request = mockFetch.mock.calls[0][1] as RequestInit;
-    expect(request).toEqual(expect.objectContaining({
-      method: 'POST',
-      body: JSON.stringify({ message: 'test message', sessionId: 'sess-123' }),
-    }));
-    expect(request.headers).toEqual(expect.objectContaining({
-      'Content-Type': 'application/json',
-      Authorization: 'Bearer jwt-token-xyz',
-    }));
-    const headers = request.headers as Record<string, string>;
-    expect(isOpaqueChatId(headers['X-Trace-Id'])).toBe(true);
-    expect(isOpaqueChatId(headers['X-Correlation-Id'])).toBe(true);
-    expect(headers['X-Trace-Id']).not.toBe(headers['X-Correlation-Id']);
+    const endpoint = getAgentStreamEndpoint();
+    assert.strictEqual(endpoint, 'http://custom-agent.internal:3002/chat/stream');
   });
 
-  it('generates independent opaque trace and correlation headers for proxy streaming', async () => {
+  it('never routes to /api/chat/stream even if legacy false flags are provided in environment', () => {
     process.env.NEXT_PUBLIC_FEATURE_FLAG_CHAT_DIRECT_STREAM = 'false';
+    process.env.NEXT_PUBLIC_ENABLE_DIRECT_AGENT_STREAM = 'false';
+    process.env.NEXT_PUBLIC_AGENT_URL = 'http://127.0.0.1:3002';
 
-    const mockFetch = jest.fn().mockResolvedValue(new Response('ok'));
-    global.fetch = mockFetch;
-
-    await createChatStreamRequest({
-      message: 'proxy turn',
-      sessionId: 'proxy-session',
-      token: 'jwt-token-xyz',
-    });
-
-    const request = mockFetch.mock.calls[0][1];
-    const headers = new Headers(request?.headers);
-    const traceId = headers.get('X-Trace-Id');
-    const correlationId = headers.get('X-Correlation-Id');
-    expect(isOpaqueChatId(traceId)).toBe(true);
-    expect(isOpaqueChatId(correlationId)).toBe(true);
-    expect(traceId).not.toBe(correlationId);
+    const endpoint = getAgentStreamEndpoint();
+    assert.strictEqual(endpoint, 'http://127.0.0.1:3002/chat/stream');
+    assert.notStrictEqual(endpoint, '/api/chat/stream');
   });
 
-  it('never derives trace or correlation headers from the chat session', async () => {
-    process.env.NEXT_PUBLIC_FEATURE_FLAG_CHAT_DIRECT_STREAM = 'true';
+  it('generates independent opaque trace and correlation headers and attaches bearer auth directly', async () => {
     process.env.NEXT_PUBLIC_AGENT_URL = 'http://localhost:3002';
 
-    const mockFetch = jest.fn().mockResolvedValue(new Response('ok'));
-    global.fetch = mockFetch;
+    let capturedUrl = '';
+    let capturedInit: RequestInit | undefined;
 
-    await createChatStreamRequest({
-      message: 'second turn',
-      sessionId: 'continued-session',
-      token: 'jwt-token-xyz',
-    });
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+      capturedUrl = String(input);
+      capturedInit = init;
+      return new Response('event: done\ndata: {}\n\n', { status: 200 });
+    }) as typeof fetch;
 
-    const request = mockFetch.mock.calls[0][1] as RequestInit;
-    const headers = request.headers as Record<string, string>;
-    expect(headers).toEqual(expect.objectContaining({
-      'Content-Type': 'application/json',
-      Authorization: 'Bearer jwt-token-xyz',
-    }));
-    expect(isOpaqueChatId(headers['X-Trace-Id'])).toBe(true);
-    expect(isOpaqueChatId(headers['X-Correlation-Id'])).toBe(true);
-    expect(headers['X-Trace-Id']).not.toBe(headers['X-Correlation-Id']);
-    expect(headers['X-Correlation-Id']).not.toBe('continued-session');
+    try {
+      await createChatStreamRequest({
+        message: 'test direct message',
+        sessionId: 'sess-123',
+        token: 'jwt-token-xyz',
+      });
+
+      assert.strictEqual(capturedUrl, 'http://localhost:3002/chat/stream');
+      assert.strictEqual(capturedInit?.method, 'POST');
+      assert.deepStrictEqual(JSON.parse(String(capturedInit?.body)), {
+        message: 'test direct message',
+        sessionId: 'sess-123',
+      });
+
+      const headers = capturedInit?.headers as Record<string, string>;
+      assert.strictEqual(headers['Content-Type'], 'application/json');
+      assert.strictEqual(headers['Authorization'], 'Bearer jwt-token-xyz');
+
+      const traceId = headers['X-Trace-Id'];
+      const correlationId = headers['X-Correlation-Id'];
+      assert.strictEqual(isOpaqueChatId(traceId), true);
+      assert.strictEqual(isOpaqueChatId(correlationId), true);
+      assert.notStrictEqual(traceId, correlationId);
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
   });
 
-  it('ignores supplied values that mimic protected direct-request content', async () => {
-    process.env.NEXT_PUBLIC_FEATURE_FLAG_CHAT_DIRECT_STREAM = 'true';
+  it('never derives trace or correlation headers from session ID, tokens, or PII', async () => {
     process.env.NEXT_PUBLIC_AGENT_URL = 'http://localhost:3002';
 
-    const mockFetch = jest.fn().mockResolvedValue(new Response('ok'));
-    global.fetch = mockFetch;
+    let capturedInit: RequestInit | undefined;
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = (async (_input: RequestInfo | URL, init?: RequestInit) => {
+      capturedInit = init;
+      return new Response('event: done\ndata: {}\n\n', { status: 200 });
+    }) as typeof fetch;
 
-    const protectedFragments = {
-      sessionId: 'continued-session',
-      token: 'jwt-token-xyz',
-      userId: 'user-123',
-      offerId: 'off_123',
-      message: 'safe-message',
-    };
-    const suppliedValues = {
-      traceId: `chat_${protectedFragments.sessionId}`,
-      correlationId: `chat_${protectedFragments.token}`,
-      opaqueCorrelationId: `chat_${'a1'.repeat(16)}`,
-      userId: protectedFragments.userId,
-      offerId: protectedFragments.offerId,
-      messageId: `chat_${protectedFragments.message}`,
-    };
+    const sensitiveSessionId = 'session-secret-999';
+    const sensitiveToken = 'token-secret-888';
 
-    await createChatStreamRequest({
-      message: protectedFragments.message,
-      sessionId: protectedFragments.sessionId,
-      token: protectedFragments.token,
-      ...suppliedValues,
-    } as unknown as Parameters<typeof createChatStreamRequest>[0]);
+    try {
+      await createChatStreamRequest({
+        message: 'hello from user',
+        sessionId: sensitiveSessionId,
+        token: sensitiveToken,
+      });
 
-    const request = mockFetch.mock.calls[0][1] as RequestInit;
-    const headers = request.headers as Record<string, string>;
-    expect(headers).toEqual(expect.objectContaining({
-      'Content-Type': 'application/json',
-      Authorization: 'Bearer jwt-token-xyz',
-    }));
-    expect(isOpaqueChatId(headers['X-Trace-Id'])).toBe(true);
-    expect(isOpaqueChatId(headers['X-Correlation-Id'])).toBe(true);
-    expect(headers['X-Trace-Id']).not.toBe(headers['X-Correlation-Id']);
-    Object.values(suppliedValues).forEach((value) => {
-      expect(headers['X-Correlation-Id']).not.toBe(value);
-      expect(headers['X-Trace-Id']).not.toBe(value);
-    });
-    Object.values(protectedFragments).forEach((value) => {
-      expect(headers['X-Correlation-Id']).not.toContain(value);
-    });
+      const headers = capturedInit?.headers as Record<string, string>;
+      const traceId = headers['X-Trace-Id'];
+      const correlationId = headers['X-Correlation-Id'];
+
+      assert.strictEqual(isOpaqueChatId(traceId), true);
+      assert.strictEqual(isOpaqueChatId(correlationId), true);
+      assert.strictEqual(traceId.includes(sensitiveSessionId), false);
+      assert.strictEqual(correlationId.includes(sensitiveSessionId), false);
+      assert.strictEqual(traceId.includes(sensitiveToken), false);
+      assert.strictEqual(correlationId.includes(sensitiveToken), false);
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
   });
 });

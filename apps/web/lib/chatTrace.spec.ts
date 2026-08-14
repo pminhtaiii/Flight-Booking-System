@@ -1,3 +1,5 @@
+import assert from 'node:assert/strict';
+import { describe, it } from 'node:test';
 import { createOpaqueChatId, isOpaqueChatId } from './chatTrace';
 
 describe('chat trace identifiers', () => {
@@ -5,12 +7,12 @@ describe('chat trace identifiers', () => {
     const traceId = createOpaqueChatId();
     const correlationId = createOpaqueChatId();
 
-    expect(isOpaqueChatId(traceId)).toBe(true);
-    expect(isOpaqueChatId(correlationId)).toBe(true);
-    expect(traceId).not.toBe(correlationId);
+    assert.strictEqual(isOpaqueChatId(traceId), true);
+    assert.strictEqual(isOpaqueChatId(correlationId), true);
+    assert.notStrictEqual(traceId, correlationId);
   });
 
-  it.each([
+  const invalidCases = [
     null,
     '',
     `chat_${'a'.repeat(31)}`,
@@ -18,7 +20,12 @@ describe('chat trace identifiers', () => {
     `chat_${'A'.repeat(32)}`,
     `trace_${'a'.repeat(32)}`,
     `chat_${'g'.repeat(32)}`,
-  ])('rejects a non-opaque chat identifier: %s', (value) => {
-    expect(isOpaqueChatId(value)).toBe(false);
-  });
+  ];
+
+  for (const value of invalidCases) {
+    it(`rejects a non-opaque chat identifier: ${value}`, () => {
+      assert.strictEqual(isOpaqueChatId(value), false);
+    });
+  }
 });
+

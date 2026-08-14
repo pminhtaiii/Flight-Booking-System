@@ -114,9 +114,20 @@ test.describe('Booking Readiness Chat Handoff', () => {
       },
     ]);
 
-    // Intercept BFF chat stream
-    await page.route('/api/chat/stream', async (route) => {
+    // Intercept direct chat stream
+    await page.route(/.*:3002\/chat\/stream/, async (route) => {
       const request = route.request();
+      if (request.method() === 'OPTIONS') {
+        return route.fulfill({
+          status: 204,
+          headers: {
+            'Access-Control-Allow-Origin': 'http://127.0.0.1:3000',
+            'Access-Control-Allow-Methods': 'POST, OPTIONS',
+            'Access-Control-Allow-Headers': 'Authorization, Content-Type, X-Trace-Id, X-Correlation-Id',
+          },
+        });
+      }
+
       const body = JSON.parse(request.postData() || '{}');
       let payload;
       
@@ -131,6 +142,7 @@ test.describe('Booking Readiness Chat Handoff', () => {
         return route.fulfill({
           status: 200,
           contentType: 'text/event-stream',
+          headers: { 'Access-Control-Allow-Origin': 'http://127.0.0.1:3000' },
           body: 'event: message\ndata: "Hello"\n\n'
         });
       }
@@ -139,6 +151,7 @@ test.describe('Booking Readiness Chat Handoff', () => {
       return route.fulfill({
         status: 200,
         contentType: 'text/event-stream',
+        headers: { 'Access-Control-Allow-Origin': 'http://127.0.0.1:3000' },
         body: streamData
       });
     });
