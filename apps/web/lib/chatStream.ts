@@ -8,7 +8,10 @@ export interface ChatStreamOptions {
 }
 
 export function getAgentStreamEndpoint(): string {
-  const baseUrl = process.env.NEXT_PUBLIC_AGENT_URL || 'http://localhost:3002';
+  const baseUrl = process.env.NEXT_PUBLIC_AGENT_URL;
+  if (!baseUrl) {
+    throw new Error('NEXT_PUBLIC_AGENT_URL is required but not configured.');
+  }
   return `${baseUrl.replace(/\/+$/, '')}/chat/stream`;
 }
 

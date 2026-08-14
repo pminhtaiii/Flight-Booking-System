@@ -14,14 +14,15 @@ describe('chatStream - Direct-Only Transport', () => {
     process.env = originalEnv;
   });
 
-  it('always resolves to direct agent endpoint with default URL when NEXT_PUBLIC_AGENT_URL is unset', () => {
+  it('throws an error when NEXT_PUBLIC_AGENT_URL is unset to prevent unsafe loopback in deployed environments', () => {
     delete process.env.NEXT_PUBLIC_AGENT_URL;
     delete process.env.NEXT_PUBLIC_ENABLE_DIRECT_AGENT_STREAM;
     delete process.env.NEXT_PUBLIC_FEATURE_FLAG_CHAT_DIRECT_STREAM;
 
-    const endpoint = getAgentStreamEndpoint();
-    assert.strictEqual(endpoint, 'http://localhost:3002/chat/stream');
-    assert.notStrictEqual(endpoint, '/api/chat/stream');
+    assert.throws(
+      () => getAgentStreamEndpoint(),
+      /NEXT_PUBLIC_AGENT_URL is required but not configured\./,
+    );
   });
 
   it('respects configured NEXT_PUBLIC_AGENT_URL and trims trailing slashes', () => {
