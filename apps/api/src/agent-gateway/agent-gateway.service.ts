@@ -360,7 +360,15 @@ export class AgentGatewayService {
       }
 
       if (lastMessage) {
-        const content = await this.chatMessageCryptoService.decryptMessageContent(lastMessage);
+        let content: string;
+        try {
+          content = await this.chatMessageCryptoService.decryptMessageContent(lastMessage);
+        } catch {
+          throw new HttpException(
+            'Unable to decrypt chat message envelope',
+            HttpStatus.BAD_REQUEST,
+          );
+        }
         const matchedKeywords: string[] = [];
 
         for (const kw of CABIN_KEYWORDS) {
@@ -598,7 +606,15 @@ export class AgentGatewayService {
       });
 
       if (lastMessage) {
-        const content = await this.chatMessageCryptoService.decryptMessageContent(lastMessage);
+        let content: string;
+        try {
+          content = await this.chatMessageCryptoService.decryptMessageContent(lastMessage);
+        } catch {
+          throw new HttpException(
+            'Unable to decrypt chat message envelope',
+            HttpStatus.BAD_REQUEST,
+          );
+        }
         const matchedKeywords: string[] = [];
 
         for (const kw of CABIN_KEYWORDS) {

@@ -167,4 +167,73 @@ describe('AgentGatewayService', () => {
       expect.objectContaining({ operation: 'gateway_readiness', error: true }),
     );
   });
+
+  it('throws HttpException BAD_REQUEST when chat message decryption fails in searchFlights', async () => {
+    (prismaService as any).chatMessage = {
+      findFirst: jest.fn().mockResolvedValue({
+        id: 'msg-1',
+        sessionId: 'session-1',
+        sender: 'USER',
+        type: 'STANDARD',
+        contentCiphertext: 'corrupt',
+      }),
+    };
+    const cryptoService = (service as any).chatMessageCryptoService;
+    jest.spyOn(cryptoService, 'decryptMessageContent').mockRejectedValueOnce(new Error('Corrupt envelope'));
+
+    await expect(
+      service.searchFlights('user-1', { origin: 'SGN', destination: 'HAN', date: '2026-09-01', adults: 1 } as any),
+    ).rejects.toThrow(HttpException);
+
+    jest.spyOn(cryptoService, 'decryptMessageContent').mockRejectedValueOnce(new Error('Corrupt envelope'));
+    try {
+      await service.searchFlights('user-1', { origin: 'SGN', destination: 'HAN', date: '2026-09-01', adults: 1 } as any);
+    } catch (err: any) {
+      expect(err.getStatus()).toBe(400);
+      expect(err.message).toBe('Unable to decrypt chat message envelope');
+    }
+  });
+
+  it('throws HttpException BAD_REQUEST when chat message decryption fails in searchFlightsV2', async () => {
+    (prismaService as any).chatSession = {
+      findFirst: jest.fn().mockResolvedValue({
+        id: 'session-1',
+        userId: 'user-1',
+        deletedAt: null,
+      }),
+    };
+    (prismaService as any).chatMessage = {
+      findFirst: jest.fn().mockResolvedValue({
+        id: 'msg-1',
+        sessionId: 'session-1',
+        sender: 'USER',
+        type: 'STANDARD',
+        contentCiphertext: 'corrupt',
+      }),
+    };
+    const cryptoService = (service as any).chatMessageCryptoService;
+    jest.spyOn(cryptoService, 'decryptMessageContent').mockRejectedValueOnce(new Error('Corrupt envelope'));
+
+    const dto = {
+      chatSessionId: 'session-1',
+      search: {
+        origin: 'SGN',
+        destination: 'HAN',
+        departureDate: '2026-09-01',
+        adults: 1,
+      },
+    };
+
+    await expect(
+      service.searchFlightsV2('user-1', dto as any),
+    ).rejects.toThrow(HttpException);
+
+    jest.spyOn(cryptoService, 'decryptMessageContent').mockRejectedValueOnce(new Error('Corrupt envelope'));
+    try {
+      await service.searchFlightsV2('user-1', dto as any);
+    } catch (err: any) {
+      expect(err.getStatus()).toBe(400);
+      expect(err.message).toBe('Unable to decrypt chat message envelope');
+    }
+  });
 });
