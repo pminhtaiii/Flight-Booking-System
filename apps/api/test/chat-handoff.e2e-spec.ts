@@ -470,9 +470,7 @@ describe('ChatHandoff (E2E)', () => {
           audience: 'booking-systems-clients',
         },
       );
-      const previousDirectFlag = process.env.NEXT_PUBLIC_ENABLE_DIRECT_AGENT_STREAM;
       const previousAgentUrl = process.env.NEXT_PUBLIC_AGENT_URL;
-      process.env.NEXT_PUBLIC_ENABLE_DIRECT_AGENT_STREAM = 'true';
       process.env.NEXT_PUBLIC_AGENT_URL = 'http://agent.invalid';
       const fetchSpy = jest
         .spyOn(globalThis, 'fetch')
@@ -487,11 +485,6 @@ describe('ChatHandoff (E2E)', () => {
         browserHeaders = new Headers(fetchSpy.mock.calls[0]?.[1]?.headers);
       } finally {
         fetchSpy.mockRestore();
-        if (previousDirectFlag === undefined) {
-          delete process.env.NEXT_PUBLIC_ENABLE_DIRECT_AGENT_STREAM;
-        } else {
-          process.env.NEXT_PUBLIC_ENABLE_DIRECT_AGENT_STREAM = previousDirectFlag;
-        }
         if (previousAgentUrl === undefined) {
           delete process.env.NEXT_PUBLIC_AGENT_URL;
         } else {
