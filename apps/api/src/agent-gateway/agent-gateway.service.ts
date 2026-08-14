@@ -777,8 +777,7 @@ export class AgentGatewayService {
         results,
       };
     } catch (err: unknown) {
-      const stack = err instanceof Error ? err.stack : undefined;
-      this.logger.error('Failed to search flights V2', stack);
+      this.logger.error('Failed to search flights V2');
       throw err;
     }
   }

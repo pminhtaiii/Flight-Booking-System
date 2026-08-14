@@ -17,7 +17,7 @@ SEEDED_PRIVACY_CORPUS = [
     "booking_db_id_uuid_000",
     "PNR123456",
     "pnr_ABCDEF",
-    "Johnathan Doe",
+    "passenger_john_doe",
     "traveller.john@example.com",
     "+1 555-123-4567",
     "P12345678",
@@ -124,7 +124,7 @@ def test_chat_telemetry_strictly_rejects_privacy_corpus():
     """Verify telemetry rejects each value in the seeded privacy corpus."""
     telemetry = ChatTelemetry()
     for forbidden_val in SEEDED_PRIVACY_CORPUS:
-        with pytest.raises(TelemetryPrivacyError):
+        with pytest.raises(TelemetryPrivacyError, match="contains protected data"):
             telemetry.emit(
                 "tool_call",
                 status="failed",

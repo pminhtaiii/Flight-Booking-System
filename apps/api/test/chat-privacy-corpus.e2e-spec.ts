@@ -1,5 +1,10 @@
-process.env.ENCRYPTION_KEY = 'a'.repeat(64);
-process.env.CHAT_ENCRYPTION_KEY = 'b'.repeat(64);
+import * as crypto from 'crypto';
+
+const encryptionKey = crypto.randomBytes(32).toString('hex');
+const chatEncryptionKey = crypto.randomBytes(32).toString('hex');
+
+process.env.ENCRYPTION_KEY = encryptionKey;
+process.env.CHAT_ENCRYPTION_KEY = chatEncryptionKey;
 process.env.FEATURE_FLAG_CHAT_HANDOFF_ISSUE = 'true';
 process.env.FEATURE_FLAG_CHAT_HANDOFF_ACCEPT = 'true';
 process.env.AGENT_SERVICE_API_KEY = 'test-agent-api-key';
@@ -10,7 +15,6 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication, ValidationPipe, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import request from 'supertest';
-import * as crypto from 'crypto';
 import { AppModule } from '@/app.module';
 import { PrismaService } from '@/prisma/prisma.service';
 import { JwtService } from '@nestjs/jwt';
@@ -50,7 +54,7 @@ describe('Chat and Handoff Privacy Corpus E2E & Boundary Safety', () => {
           if (key === 'FEATURE_FLAG_CHAT_HANDOFF_ACCEPT') return 'true';
           if (key === 'FEATURE_FLAG_BOOKING_READINESS') return 'true';
           if (key === 'CHAT_HANDOFF_SECRET') return 'test-handoff-secret';
-          if (key === 'CHAT_ENCRYPTION_KEY') return 'b'.repeat(64);
+          if (key === 'CHAT_ENCRYPTION_KEY') return chatEncryptionKey;
           if (key === 'CLAIM_TOKEN_SECRET') return 'test-claim-token-secret-must-be-long-enough';
           return process.env[key];
         },

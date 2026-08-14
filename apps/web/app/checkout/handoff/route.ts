@@ -3,8 +3,11 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { isSameOrigin } from '@/lib/checkoutHandoffOrigin';
 import { readHandoffCredential } from '@/lib/handoffCredential';
-import { hasCheckoutHandoffContext, resolveHandoffForBootstrap } from '@/lib/handoffBootstrap';
-import { HANDOFF_COOKIE_NAME, handoffCookieOptions } from '@/lib/handoffCookie';
+import {
+  createHandoffRedirectResponse,
+  hasCheckoutHandoffContext,
+  resolveHandoffForBootstrap,
+} from '@/lib/handoffBootstrap';
 
 type AuthenticatedSession = {
   accessToken: string;
@@ -94,10 +97,5 @@ export async function POST(request: Request): Promise<NextResponse> {
     });
   }
 
-  const response = NextResponse.redirect(new URL('/checkout/passengers', request.url), 303);
-  response.headers.set('Cache-Control', 'no-store, private');
-
-  response.cookies.set(HANDOFF_COOKIE_NAME, handoffToken, handoffCookieOptions());
-
-  return response;
+  return createHandoffRedirectResponse(request.url, handoffToken);
 }
