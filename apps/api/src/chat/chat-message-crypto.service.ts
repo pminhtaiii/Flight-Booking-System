@@ -7,6 +7,20 @@ const KEY_VERSION = 1;
 const NONCE_LENGTH = 12; // 96-bit nonce recommended for AES-GCM
 const AUTH_TAG_LENGTH = 16; // 128-bit auth tag
 
+export class CryptoKeyUnavailableError extends Error {
+  constructor(message = 'CHAT_ENCRYPTION_KEY is not configured') {
+    super(message);
+    this.name = 'CryptoKeyUnavailableError';
+  }
+}
+
+export class UnsupportedKeyVersionError extends Error {
+  constructor(version: number | string) {
+    super(`Unsupported key version: ${version}. Only version ${KEY_VERSION} is supported.`);
+    this.name = 'UnsupportedKeyVersionError';
+  }
+}
+
 @Injectable()
 export class ChatMessageCryptoService {
   private readonly logger = new Logger(ChatMessageCryptoService.name);
@@ -27,11 +41,11 @@ export class ChatMessageCryptoService {
   private getKey(): Buffer {
     const keyHex = this.configService.get<string>('CHAT_ENCRYPTION_KEY');
     if (!keyHex) {
-      throw new Error('CHAT_ENCRYPTION_KEY is not configured');
+      throw new CryptoKeyUnavailableError('CHAT_ENCRYPTION_KEY is not configured');
     }
     const keyBuffer = Buffer.from(keyHex, 'hex');
     if (keyBuffer.length !== 32) {
-      throw new Error('CHAT_ENCRYPTION_KEY must be a 64-character hex string (32 bytes for AES-256)');
+      throw new CryptoKeyUnavailableError('CHAT_ENCRYPTION_KEY must be a 64-character hex string (32 bytes for AES-256)');
     }
     return keyBuffer;
   }
@@ -93,7 +107,7 @@ export class ChatMessageCryptoService {
     keyVersion: number,
   ): Promise<string> {
     if (keyVersion !== KEY_VERSION) {
-      throw new Error(`Unsupported key version: ${keyVersion}. Only version ${KEY_VERSION} is supported.`);
+      throw new UnsupportedKeyVersionError(keyVersion);
     }
 
     const key = this.getKey();
@@ -150,8 +164,13 @@ export class ChatMessageCryptoService {
     contentAuthTag?: string | null;
     contentKeyVersion?: number | null;
   }): Promise<string> {
+    if (!this.isConfigured()) {
+      throw new CryptoKeyUnavailableError('CHAT_ENCRYPTION_KEY is not configured');
+    }
+    if (message.contentKeyVersion !== undefined && message.contentKeyVersion !== null && message.contentKeyVersion !== KEY_VERSION) {
+      throw new UnsupportedKeyVersionError(message.contentKeyVersion);
+    }
     if (
-      this.isConfigured() &&
       message.contentCiphertext &&
       message.contentNonce &&
       message.contentAuthTag &&
@@ -167,12 +186,12 @@ export class ChatMessageCryptoService {
           message.contentKeyVersion,
         );
       } catch (error) {
+        if (error instanceof CryptoKeyUnavailableError || error instanceof UnsupportedKeyVersionError) {
+          throw error;
+        }
         this.logger.warn('Failed to decrypt ChatMessage content');
         throw new Error('Failed to decrypt ChatMessage content');
       }
-    }
-    if (!this.isConfigured()) {
-      throw new Error('CHAT_ENCRYPTION_KEY is not configured');
     }
     throw new Error('ChatMessage is missing ciphertext envelope or is corrupted');
   }
@@ -204,8 +223,16 @@ export class ChatMessageCryptoService {
     titleAuthTag?: string | null;
     titleKeyVersion?: number | null;
   }): Promise<string | null> {
+    if (!session.titleCiphertext && !session.titleNonce && !session.titleAuthTag) {
+      return null;
+    }
+    if (!this.isConfigured()) {
+      throw new CryptoKeyUnavailableError('CHAT_ENCRYPTION_KEY is not configured');
+    }
+    if (session.titleKeyVersion !== undefined && session.titleKeyVersion !== null && session.titleKeyVersion !== KEY_VERSION) {
+      throw new UnsupportedKeyVersionError(session.titleKeyVersion);
+    }
     if (
-      this.isConfigured() &&
       session.titleCiphertext &&
       session.titleNonce &&
       session.titleAuthTag &&
@@ -221,15 +248,12 @@ export class ChatMessageCryptoService {
           session.titleKeyVersion,
         );
       } catch (error) {
+        if (error instanceof CryptoKeyUnavailableError || error instanceof UnsupportedKeyVersionError) {
+          throw error;
+        }
         this.logger.warn('Failed to decrypt ChatSession title');
         throw new Error('Failed to decrypt ChatSession title');
       }
-    }
-    if (!session.titleCiphertext && !session.titleNonce && !session.titleAuthTag) {
-      return null;
-    }
-    if (!this.isConfigured()) {
-      throw new Error('CHAT_ENCRYPTION_KEY is not configured');
     }
     throw new Error('ChatSession title is missing ciphertext envelope or is corrupted');
   }

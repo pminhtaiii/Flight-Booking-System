@@ -150,19 +150,34 @@ describe('ChatMessageCryptoService', () => {
     ).rejects.toThrow();
   });
 
-  it('should throw an error on decryptSessionTitle when ciphertext is corrupt (no legacy fallback)', async () => {
-    const corruptSession = {
-      id: 'sess-err',
-      titleCiphertext: 'badciphertext1234',
-      titleNonce: '0102030405060708090a0b0c',
-      titleAuthTag: '0102030405060708090a0b0c0d0e0f10',
-      titleKeyVersion: 1,
-      title: 'legacy fallback title that should NOT be returned',
-    };
+  it('should throw CryptoKeyUnavailableError when CHAT_ENCRYPTION_KEY is not configured', async () => {
+    const unconfiguredModule: TestingModule = await Test.createTestingModule({
+      providers: [
+        ChatMessageCryptoService,
+        {
+          provide: ConfigService,
+          useValue: {
+            get: jest.fn().mockReturnValue(null),
+          },
+        },
+      ],
+    }).compile();
+
+    const unconfiguredService = unconfiguredModule.get<ChatMessageCryptoService>(ChatMessageCryptoService);
+    expect(unconfiguredService.isConfigured()).toBe(false);
 
     await expect(
-      (service as any).decryptSessionTitle(corruptSession),
-    ).rejects.toThrow();
+      unconfiguredService.decryptMessageContent({
+        id: 'msg-1',
+        sessionId: 'session-1',
+        sender: 'USER',
+        type: 'STANDARD',
+        contentCiphertext: 'abcd',
+        contentNonce: '1234',
+        contentAuthTag: '5678',
+        contentKeyVersion: 1,
+      }),
+    ).rejects.toThrow(/CHAT_ENCRYPTION_KEY is not configured/);
   });
 });
 

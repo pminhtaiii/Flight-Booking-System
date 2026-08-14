@@ -44,7 +44,13 @@ describe('AgentGatewayService', () => {
         { provide: ConfigService, useValue: { get: jest.fn().mockReturnValue('false') } },
         { provide: ChatService, useValue: {} },
         { provide: SelectionAttestationService, useValue: { verifySelectionAttestation: jest.fn() } },
-        { provide: ChatMessageCryptoService, useValue: { decryptMessageContent: jest.fn().mockResolvedValue('') } },
+        {
+          provide: ChatMessageCryptoService,
+          useValue: {
+            decryptMessageContent: jest.fn().mockResolvedValue(''),
+            isConfigured: jest.fn().mockReturnValue(true),
+          },
+        },
       ],
     }).compile();
 
@@ -234,6 +240,66 @@ describe('AgentGatewayService', () => {
     } catch (err: any) {
       expect(err.getStatus()).toBe(400);
       expect(err.message).toBe('Unable to decrypt chat message envelope');
+    }
+  });
+
+  it('throws ServiceUnavailableException 503 when encryption key is not configured in searchFlights', async () => {
+    (prismaService as any).chatMessage = {
+      findFirst: jest.fn().mockResolvedValue({
+        id: 'msg-1',
+        sessionId: 'session-1',
+        sender: 'USER',
+        type: 'STANDARD',
+        contentCiphertext: 'enc',
+      }),
+    };
+    const cryptoService = (service as any).chatMessageCryptoService;
+    jest.spyOn(cryptoService, 'isConfigured').mockReturnValue(false);
+    jest.spyOn(cryptoService, 'decryptMessageContent').mockRejectedValueOnce(new Error('CHAT_ENCRYPTION_KEY is not configured'));
+
+    try {
+      await service.searchFlights('user-1', { origin: 'SGN', destination: 'HAN', date: '2026-09-01', adults: 1 } as any);
+    } catch (err: any) {
+      expect(err.getStatus()).toBe(503);
+      expect(err.message).toBe('Chat encryption service is unavailable');
+    }
+  });
+
+  it('throws ServiceUnavailableException 503 when message has unsupported key version in searchFlightsV2', async () => {
+    (prismaService as any).chatSession = {
+      findFirst: jest.fn().mockResolvedValue({
+        id: 'session-1',
+        userId: 'user-1',
+        deletedAt: null,
+      }),
+    };
+    (prismaService as any).chatMessage = {
+      findFirst: jest.fn().mockResolvedValue({
+        id: 'msg-1',
+        sessionId: 'session-1',
+        sender: 'USER',
+        type: 'STANDARD',
+        contentCiphertext: 'enc',
+      }),
+    };
+    const cryptoService = (service as any).chatMessageCryptoService;
+    jest.spyOn(cryptoService, 'decryptMessageContent').mockRejectedValueOnce(new Error('Unsupported key version: 99'));
+
+    const dto = {
+      chatSessionId: 'session-1',
+      search: {
+        origin: 'SGN',
+        destination: 'HAN',
+        departureDate: '2026-09-01',
+        adults: 1,
+      },
+    };
+
+    try {
+      await service.searchFlightsV2('user-1', dto as any);
+    } catch (err: any) {
+      expect(err.getStatus()).toBe(503);
+      expect(err.message).toBe('Chat encryption service is unavailable');
     }
   });
 });
