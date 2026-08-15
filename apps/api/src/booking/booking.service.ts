@@ -1,10 +1,12 @@
-import { BadGatewayException, BadRequestException, ForbiddenException, Injectable, NotFoundException, Logger } from '@nestjs/common';
+import { BadGatewayException, BadRequestException, ForbiddenException, Injectable, NotFoundException, Logger, Optional } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { Booking, BookingFailureReason, BookingStatus, Prisma, DisruptionStatus, DisruptionActorType } from '@prisma/client';
 import { PrismaService } from '@/prisma/prisma.service';
 import { CancellationQuoteResponseDto, CancellationResponseDto, FlightSnapshot, PassengerSnapshot } from '@shared/booking-types';
 import { BookingDetailResponseDto, BookingListItemResponseDto, BookingListResponseDto, BookingTab } from './dto';
 import { CurrentItineraryDto, BookingDisruptionDto, DisruptionResolvedReason, MaterialDisruptionReason, DisruptionStatus as SharedDisruptionStatus } from '@shared/disruption-types';
+import { BookingAgentProjectionService } from '@/agent-gateway/booking-agent-projection.service';
+
 
 export type BookingWithRelations = Prisma.BookingGetPayload<{
   include: {
@@ -134,6 +136,7 @@ export class BookingService {
     private readonly stripeService: StripeService,
     private readonly duffelService: DuffelService,
     private readonly paymentRefundService: PaymentRefundService,
+    @Optional() private readonly bookingAgentProjectionService?: BookingAgentProjectionService,
   ) {}
 
   @Cron("*/15 * * * *")
@@ -183,55 +186,53 @@ export class BookingService {
     }
   }
 
-  async createBooking(userId: string, bookingId: string, bookingIntentId: string, paymentId?: string) {
-    const bookingIntent = await this.prisma.bookingIntent.findUnique({
+  async createBooking(
+    userId: string,
+    bookingId: string,
+    bookingIntentId: string,
+    paymentId?: string,
+  ): Promise<Booking> {
+    const intent = await this.prisma.bookingIntent.findUnique({
       where: { id: bookingIntentId },
-      select: { id: true, userId: true, confirmedPrice: true, currency: true },
     });
-
-    if (!bookingIntent) {
+    if (!intent) {
       throw new NotFoundException('Booking intent not found');
     }
-    if (bookingIntent.userId !== userId) {
-      throw new ForbiddenException('You do not have access to this booking intent');
+    if (intent.userId !== userId) {
+      throw new ForbiddenException('You do not own this booking intent');
     }
-
     try {
       return await this.prisma.booking.create({
         data: {
           id: bookingId,
           userId,
           bookingIntentId,
-          totalAmount: bookingIntent.confirmedPrice.toString(),
-          currency: bookingIntent.currency,
+          totalAmount: intent.confirmedPrice.toString(),
+          currency: intent.currency,
           status: BookingStatus.PROCESSING,
           paymentId: paymentId || null,
         },
       });
-    } catch (error) {
-      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
-        const existing = await this.prisma.booking.findFirst({
-          where: {
-            OR: [
-              { id: bookingId },
-              { bookingIntentId },
-            ],
-          },
-        });
+    } catch (e: any) {
+      if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2002') {
+        const existing = await this.prisma.booking.findUnique({ where: { id: bookingId } });
         if (existing) {
           if (existing.userId !== userId) {
-            throw new ForbiddenException('You do not have access to this booking intent');
+            throw new ForbiddenException('You do not own this booking');
           }
-          if (paymentId && existing.paymentId !== paymentId && existing.status === BookingStatus.PROCESSING) {
+          if (existing.bookingIntentId !== bookingIntentId) {
+            throw new BadRequestException('Booking ID is already associated with a different booking intent');
+          }
+          if (!existing.paymentId && paymentId) {
             return await this.prisma.booking.update({
-              where: { id: existing.id },
+              where: { id: bookingId },
               data: { paymentId },
             });
           }
           return existing;
         }
       }
-      throw error;
+      throw e;
     }
   }
 
@@ -265,6 +266,7 @@ export class BookingService {
     if (!booking) {
       throw new NotFoundException('Booking not found');
     }
+    await this.bookingAgentProjectionService?.createOrUpdateProjection(bookingId, client);
     return booking;
   }
 
@@ -291,6 +293,7 @@ export class BookingService {
     if (!booking) {
       throw new NotFoundException('Booking not found');
     }
+    await this.bookingAgentProjectionService?.updateProjectionStatus(bookingId, BookingStatus.FAILED, client);
     return booking;
   }
 
@@ -405,6 +408,7 @@ export class BookingService {
              where: { id: booking.payment.id, status: { notIn: ['SUCCEEDED', 'REFUNDED', 'CANCELLED'] } },
              data: { status: 'SUCCEEDED' },
            });
+           await this.bookingAgentProjectionService?.createOrUpdateProjection(booking.id);
          }
       } else {
          const res = await this.prisma.booking.updateMany({
@@ -414,6 +418,7 @@ export class BookingService {
          if (res.count > 0) {
            booking.status = 'FAILED';
            booking.failureReason = 'SYSTEM_ERROR';
+           await this.bookingAgentProjectionService?.updateProjectionStatus(booking.id, BookingStatus.FAILED);
 
            try {
              await withTimeout(this.paymentRefundService.triggerAutomatedRefund(booking.payment.id, 'Stale processing booking timeout without duffel order'));
@@ -487,6 +492,8 @@ export class BookingService {
           if (updated.count === 0) {
             return false;
           }
+
+          await this.bookingAgentProjectionService?.updateProjectionStatus(booking.id, BookingStatus.COMPLETED, tx);
 
           if (hasActiveDisruption) {
             await tx.disruptionAuditEvent.create({
@@ -1099,6 +1106,10 @@ export class BookingService {
         where: { id: bookingId, status: BookingStatus.CANCELLATION_PENDING },
         data: updateData,
       });
+
+      if (result.count > 0) {
+        await this.bookingAgentProjectionService?.updateProjectionStatus(bookingId, BookingStatus.CANCELLED, tx);
+      }
 
       if (result.count > 0 && hasActiveDisruption) {
         await tx.disruptionAuditEvent.create({
