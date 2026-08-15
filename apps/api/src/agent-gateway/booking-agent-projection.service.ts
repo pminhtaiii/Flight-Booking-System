@@ -206,14 +206,18 @@ export class BookingAgentProjectionService {
     client?: Prisma.TransactionClient | PrismaService,
   ): Promise<BookingAgentProjection | null> {
     const prismaClient = client || this.prisma;
-    try {
-      return await prismaClient.bookingAgentProjection.update({
-        where: { bookingId },
-        data: { status },
-      });
-    } catch (err: any) {
+    const updated = await prismaClient.bookingAgentProjection.updateMany({
+      where: { bookingId },
+      data: { status },
+    });
+
+    if (updated.count === 0) {
       return await this.createOrUpdateProjection(bookingId, prismaClient);
     }
+
+    return await prismaClient.bookingAgentProjection.findUnique({
+      where: { bookingId },
+    });
   }
 
   async getProjectionByBookingId(

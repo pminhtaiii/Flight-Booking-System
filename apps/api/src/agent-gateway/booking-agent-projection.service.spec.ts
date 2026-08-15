@@ -15,6 +15,7 @@ describe('BookingAgentProjectionService', () => {
         findUnique: jest.fn(),
         upsert: jest.fn(),
         update: jest.fn(),
+        updateMany: jest.fn(),
       },
     };
     service = new BookingAgentProjectionService(prisma as unknown as PrismaService);
@@ -272,22 +273,32 @@ describe('BookingAgentProjectionService', () => {
   });
 
   describe('updateProjectionStatus', () => {
-    it('updates status in projection table', async () => {
-      prisma.bookingAgentProjection.update.mockResolvedValue({
+    it('updates status via updateMany and returns updated projection from findUnique', async () => {
+      prisma.bookingAgentProjection.updateMany.mockResolvedValue({ count: 1 });
+      prisma.bookingAgentProjection.findUnique.mockResolvedValue({
         bookingId: 'booking-1',
         status: 'CANCELLED',
+        agentReference: 'bkref_1',
       });
 
       const res = await service.updateProjectionStatus('booking-1', 'CANCELLED');
-      expect(res?.status).toBe('CANCELLED');
-      expect(prisma.bookingAgentProjection.update).toHaveBeenCalledWith({
+
+      expect(prisma.bookingAgentProjection.updateMany).toHaveBeenCalledWith({
         where: { bookingId: 'booking-1' },
         data: { status: 'CANCELLED' },
       });
+      expect(prisma.bookingAgentProjection.findUnique).toHaveBeenCalledWith({
+        where: { bookingId: 'booking-1' },
+      });
+      expect(res).toEqual({
+        bookingId: 'booking-1',
+        status: 'CANCELLED',
+        agentReference: 'bkref_1',
+      });
     });
 
-    it('falls back to createOrUpdateProjection when update fails (projection not found)', async () => {
-      prisma.bookingAgentProjection.update.mockRejectedValue(new Error('Record to update not found.'));
+    it('falls back to createOrUpdateProjection when updateMany count is 0', async () => {
+      prisma.bookingAgentProjection.updateMany.mockResolvedValue({ count: 0 });
       const fallbackSpy = jest.spyOn(service, 'createOrUpdateProjection').mockResolvedValue({
         bookingId: 'missing-booking',
         agentReference: 'bkref_fallback_123',
@@ -295,13 +306,42 @@ describe('BookingAgentProjectionService', () => {
       } as any);
 
       const res = await service.updateProjectionStatus('missing-booking', 'CANCELLED');
+
+      expect(prisma.bookingAgentProjection.updateMany).toHaveBeenCalledWith({
+        where: { bookingId: 'missing-booking' },
+        data: { status: 'CANCELLED' },
+      });
       expect(fallbackSpy).toHaveBeenCalledWith('missing-booking', prisma);
       expect(res?.bookingId).toBe('missing-booking');
       expect(res?.agentReference).toBe('bkref_fallback_123');
     });
 
-    it('returns null if update fails and fallback createOrUpdateProjection also returns null', async () => {
-      prisma.bookingAgentProjection.update.mockRejectedValue(new Error('Record to update not found.'));
+    it('falls back to createOrUpdateProjection with txClient when provided and count is 0', async () => {
+      const txClient = {
+        bookingAgentProjection: {
+          updateMany: jest.fn().mockResolvedValue({ count: 0 }),
+          findUnique: jest.fn(),
+        },
+      };
+      const fallbackSpy = jest.spyOn(service, 'createOrUpdateProjection').mockResolvedValue({
+        bookingId: 'tx-booking',
+        agentReference: 'bkref_tx_123',
+        status: 'COMPLETED',
+      } as any);
+
+      const res = await service.updateProjectionStatus('tx-booking', 'COMPLETED', txClient as any);
+
+      expect(txClient.bookingAgentProjection.updateMany).toHaveBeenCalledWith({
+        where: { bookingId: 'tx-booking' },
+        data: { status: 'COMPLETED' },
+      });
+      expect(fallbackSpy).toHaveBeenCalledWith('tx-booking', txClient);
+      expect(res?.bookingId).toBe('tx-booking');
+      expect(res?.status).toBe('COMPLETED');
+    });
+
+    it('returns null if updateMany count is 0 and fallback createOrUpdateProjection also returns null', async () => {
+      prisma.bookingAgentProjection.updateMany.mockResolvedValue({ count: 0 });
       jest.spyOn(service, 'createOrUpdateProjection').mockResolvedValue(null);
 
       const res = await service.updateProjectionStatus('missing-booking', 'CANCELLED');
