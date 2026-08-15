@@ -276,7 +276,172 @@ async def test_create_handoff_uses_the_nestjs_dto_contract():
     assert result == {
         "handoffToken": "opaque",
         "expiresAt": "2026-08-09T00:00:00Z",
+        "display": None,
     }
+
+
+@pytest.mark.asyncio
+async def test_create_handoff_token_sends_exact_payload_and_omits_forbidden_fields():
+    settings = get_settings()
+    token = jwt.encode(
+        {
+            "sub": "user-123",
+            "jti": "jti-456",
+            "iss": "booking-systems-api",
+            "aud": "booking-systems-clients",
+            "exp": 9999999999,
+        },
+        settings.JWT_SECRET,
+        algorithm="HS256",
+    )
+    client = NestJSClient(base_url="http://localhost:3001/api", token=token)
+    request = httpx.Request("POST", "http://localhost:3001/api/chat-handoff")
+    response = httpx.Response(
+        201,
+        json={"handoffToken": "ht_xyz123", "expiresAt": "2026-08-15T12:00:00Z", "display": {"offer": "VN123"}},
+        request=request,
+    )
+
+    with patch("httpx.AsyncClient.post", new_callable=AsyncMock) as mock_post:
+        mock_post.return_value = response
+
+        result = await client.create_handoff_token(
+            attestation="attestation-hash-abc",
+            selected_offer_index=0,
+            fingerprint="fingerprint-must-be-omitted",
+        )
+
+    args, kwargs = mock_post.call_args
+    assert args[0] == "http://localhost:3001/api/chat-handoff"
+    # a) sends exact payload
+    assert kwargs["json"] == {
+        "selectionAttestationHash": "attestation-hash-abc",
+        "selectedOfferIndex": 0,
+    }
+    # b) omits caller-supplied session IDs / idempotency keys / fingerprint
+    assert "sessionId" not in kwargs["json"]
+    assert "session_id" not in kwargs["json"]
+    assert "idempotencyKey" not in kwargs["json"]
+    assert "idempotency_key" not in kwargs["json"]
+    assert "fingerprint" not in kwargs["json"]
+
+
+@pytest.mark.asyncio
+async def test_create_handoff_token_propagates_trace_and_correlation_headers():
+    settings = get_settings()
+    token = jwt.encode(
+        {
+            "sub": "user-123",
+            "jti": "jti-456",
+            "iss": "booking-systems-api",
+            "aud": "booking-systems-clients",
+            "exp": 9999999999,
+        },
+        settings.JWT_SECRET,
+        algorithm="HS256",
+    )
+    client = NestJSClient(
+        base_url="http://localhost:3001/api",
+        token=token,
+        fencing_token=42,
+    )
+    request = httpx.Request("POST", "http://localhost:3001/api/chat-handoff")
+    response = httpx.Response(
+        201,
+        json={"handoffToken": "token-opaque", "expiresAt": "2026-08-15T12:00:00Z"},
+        request=request,
+    )
+
+    trace_id = "chat_" + ("11" * 16)
+    correlation_id = "chat_" + ("22" * 16)
+
+    with patch("httpx.AsyncClient.post", new_callable=AsyncMock) as mock_post:
+        mock_post.return_value = response
+
+        result = await client.create_handoff_token(
+            attestation="attestation-hash",
+            selected_offer_index=1,
+            trace_id=trace_id,
+            correlation_id=correlation_id,
+        )
+
+    _, kwargs = mock_post.call_args
+    headers = kwargs["headers"]
+    # c) propagates trace_id and correlation_id headers along with gateway auth and fencing token
+    assert headers["X-Trace-ID"] == trace_id
+    assert headers["X-Correlation-ID"] == correlation_id
+    assert headers["X-Agent-API-Key"] == settings.AGENT_SERVICE_API_KEY
+    assert "X-User-Claim" in headers
+    assert headers["X-Fencing-Token"] == "42"
+
+
+@pytest.mark.asyncio
+async def test_create_handoff_token_returns_handoff_token_expires_at_and_display():
+    settings = get_settings()
+    token = jwt.encode(
+        {
+            "sub": "user-123",
+            "jti": "jti-456",
+            "iss": "booking-systems-api",
+            "aud": "booking-systems-clients",
+            "exp": 9999999999,
+        },
+        settings.JWT_SECRET,
+        algorithm="HS256",
+    )
+    client = NestJSClient(base_url="http://localhost:3001/api", token=token)
+    request = httpx.Request("POST", "http://localhost:3001/api/chat-handoff")
+
+    # d) returns handoffToken, expiresAt, and display with handoffToken field
+    response_with_handoff_token = httpx.Response(
+        201,
+        json={
+            "handoffToken": "ht_999",
+            "expiresAt": "2026-08-15T15:30:00Z",
+            "display": {"summary": "SGN -> HAN Flight", "price": 1500000},
+        },
+        request=request,
+    )
+
+    with patch("httpx.AsyncClient.post", new_callable=AsyncMock) as mock_post:
+        mock_post.return_value = response_with_handoff_token
+
+        result = await client.create_handoff_token(
+            attestation="attestation-hash",
+            selected_offer_index=2,
+        )
+
+    assert result == {
+        "handoffToken": "ht_999",
+        "expiresAt": "2026-08-15T15:30:00Z",
+        "display": {"summary": "SGN -> HAN Flight", "price": 1500000},
+    }
+
+    # d) returns handoffToken when backend body uses "token" field fallback
+    response_with_token = httpx.Response(
+        201,
+        json={
+            "token": "tok_legacy_888",
+            "expiresAt": "2026-08-15T15:30:00Z",
+            "display": None,
+        },
+        request=request,
+    )
+
+    with patch("httpx.AsyncClient.post", new_callable=AsyncMock) as mock_post:
+        mock_post.return_value = response_with_token
+
+        result = await client.create_handoff_token(
+            attestation="attestation-hash",
+            selected_offer_index=2,
+        )
+
+    assert result == {
+        "handoffToken": "tok_legacy_888",
+        "expiresAt": "2026-08-15T15:30:00Z",
+        "display": None,
+    }
+
 
 
 @pytest.mark.asyncio

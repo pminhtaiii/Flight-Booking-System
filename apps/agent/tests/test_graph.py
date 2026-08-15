@@ -4,7 +4,7 @@ from agent.models.requests import RouteDecision
 from langchain_core.messages import AIMessage, HumanMessage
 from langchain_core.runnables import RunnableConfig
 
-from agent.graph import graph
+from agent.graph.graph import graph
 from agent.tools.nestjs_client import NestJSClient
 
 

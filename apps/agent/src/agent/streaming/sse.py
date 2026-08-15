@@ -258,6 +258,7 @@ async def chat_stream(
                 trusted_snapshot_dict = snapshot_obj.model_dump(mode="json")
                 snapshot_state = "hit"
         except Exception:
+            logger.debug("trusted_snapshot_lookup_failed")
             snapshot_state = "unavailable"
         chat_telemetry.emit_safely(
             "snapshot_read",
@@ -372,9 +373,10 @@ async def chat_stream(
                             })
                     elif kind == "on_chain_end":
                         node_name = event.get("name")
-                        if node_name == "create_handoff_token":
-                            action_res = event["data"].get("output", {}).get("action", {})
-                            if "error" in action_res:
+                        if node_name in ("create_handoff_token", "create_handoff_token_node", "validate_handoff"):
+                            output = event.get("data", {}).get("output") or {}
+                            action_res = output.get("action", {}) if isinstance(output, dict) else {}
+                            if isinstance(action_res, dict) and "error" in action_res:
                                 chat_telemetry.emit_safely(
                                     "handoff_create",
                                     status="rejected",
@@ -385,45 +387,50 @@ async def chat_stream(
                                 await q.put({
                                     "event": "error",
                                     "data": json.dumps({
-                                        "code": "HANDOFF_ERROR",
-                                        "message": "Checkout handoff could not be created.",
+                                        "code": "HANDOFF_FAILED",
+                                        "message": action_res.get("error") or "Checkout handoff could not be created.",
+                                        "error": action_res.get("error") or "Checkout handoff could not be created.",
                                         "partialMessageId": None
                                     })
                                 })
                                 return
 
-                            if queue_manager and not await queue_manager.validate_active_fence(session_id):
-                                logger.warning("stale_fence_handoff_emission_aborted")
-                                await q.put({
-                                    "event": "error",
-                                    "data": json.dumps({
-                                        "code": "PERSISTENCE_ERROR",
-                                        "message": "The requested action could not be emitted because the session lease was lost.",
-                                        "partialMessageId": None
+                            if isinstance(action_res, dict):
+                                handoff_token = action_res.get("handoffToken") or action_res.get("token")
+                                action_type = action_res.get("action")
+                                if handoff_token and action_type == "begin_checkout":
+                                    if queue_manager and not await queue_manager.validate_active_fence(session_id):
+                                        logger.warning("stale_fence_handoff_emission_aborted")
+                                        await q.put({
+                                            "event": "error",
+                                            "data": json.dumps({
+                                                "code": "PERSISTENCE_ERROR",
+                                                "message": "The requested action could not be emitted because the session lease was lost.",
+                                                "partialMessageId": None
+                                            })
+                                        })
+                                        return
+
+                                    payload = {
+                                        "version": 1,
+                                        "action": "begin_checkout",
+                                        "handoffToken": handoff_token,
+                                        "expiresAt": action_res.get("expiresAt"),
+                                        "display": action_res.get("display")
+                                    }
+
+                                    await q.put({
+                                        "event": "ACTION_HANDOFF",
+                                        "data": json.dumps(payload)
                                     })
-                                })
-                                return
-
-                            payload = {
-                                "version": 1,
-                                "action": "begin_checkout",
-                                "handoffToken": action_res.get("handoffToken"),
-                                "expiresAt": action_res.get("expiresAt"),
-                                "display": action_res.get("display")
-                            }
-
-                            await q.put({
-                                "event": "ACTION_HANDOFF",
-                                "data": json.dumps(payload)
-                            })
-                            chat_telemetry.emit_safely(
-                                "handoff_create",
-                                status="created",
-                                trace_id=trace_id,
-                                correlation_id=correlation_id,
-                                fields={"outcome": "created"},
-                            )
-                            force_persistence = True
+                                    chat_telemetry.emit_safely(
+                                        "handoff_create",
+                                        status="created",
+                                        trace_id=trace_id,
+                                        correlation_id=correlation_id,
+                                        fields={"outcome": "created"},
+                                    )
+                                    force_persistence = True
 
 
                     elif kind == "on_tool_end":
@@ -441,6 +448,8 @@ async def chat_stream(
                             )
 
                         output_data = None
+
+                        output_data = None
                         if tool_output:
                             if hasattr(tool_output, "content"):
                                 if isinstance(tool_output.content, dict):
@@ -449,7 +458,7 @@ async def chat_stream(
                                     try:
                                         output_data = json.loads(str(tool_output.content))
                                     except Exception:
-                                        pass
+                                        logger.debug("tool_output_content_not_json")
                                 output_str = str(tool_output.content)
                             else:
                                 if isinstance(tool_output, dict):
@@ -458,7 +467,7 @@ async def chat_stream(
                                     try:
                                         output_data = json.loads(str(tool_output))
                                     except Exception:
-                                        pass
+                                        logger.debug("tool_output_not_json")
                                 output_str = str(tool_output)
                             summary_str = output_str.split("\n")[0].strip()
                         else:
@@ -703,7 +712,7 @@ async def chat_stream(
                                 })
                             })
                         except asyncio.QueueFull:
-                            pass
+                            logger.debug("disconnect_error_event_queue_full")
                 raise
             except Exception:  # noqa: BLE001
                 logger.error("llm_streaming_failed")
@@ -738,7 +747,7 @@ async def chat_stream(
                 try:
                     q.put_nowait(None)
                 except asyncio.QueueFull:
-                    pass
+                    logger.debug("stream_sentinel_queue_full")
 
         producer_task = asyncio.create_task(producer())
         background_tasks.add(producer_task)

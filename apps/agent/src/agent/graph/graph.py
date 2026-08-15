@@ -6,7 +6,12 @@ from agent.graph.checkout_gate import evaluate_checkout_gate
 from agent.agents.general_agent import general_agent_node
 from agent.agents.travel_assistant import travel_assistant_node
 from agent.agents.checkout_orchestrator import checkout_orchestrator_node
-from agent.graph.nodes import custom_tool_node, final_answer_node
+from agent.graph.nodes import (
+    custom_tool_node,
+    final_answer_node,
+    validate_handoff,
+    create_handoff_token,
+)
 from agent.config import get_settings
 
 async def router_node(state: AgentState, config) -> dict:
@@ -46,7 +51,6 @@ def route_after_tools(state: AgentState) -> str:
     # After tools, always return to the travel assistant (the only one with tools)
     return "travel"
 
-from agent.graph.nodes import validate_handoff, create_handoff_token
 
 workflow = StateGraph(AgentState)
 
