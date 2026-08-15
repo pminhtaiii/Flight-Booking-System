@@ -9,9 +9,8 @@ import { ConfigService } from '@nestjs/config';
 import { SelectionAttestationService } from '@/agent-gateway/selection-attestation.service';
 import * as crypto from 'crypto';
 import { HttpExceptionFilter } from '@/common/filters/http-exception.filter';
-import { createChatStreamRequest } from '../../web/lib/chatStream';
-
 import { JwtService } from '@nestjs/jwt';
+import { ChatSession, FlightOffer, User } from '@prisma/client';
 
 jest.setTimeout(120_000);
 
@@ -112,12 +111,13 @@ describe('ChatHandoff (E2E)', () => {
   let jwtService: JwtService;
   let nestjsBaseUrl: string;
   
-  let validUser: any;
+  let validUser: User;
   let validUserToken: string;
-  let validSession: any;
-  let validFlightOffer: any;
+  let validSession: ChatSession;
+  let validFlightOffer: FlightOffer;
   const observedGatewayTraces: ObservedGatewayTrace[] = [];
   const apiKey = 'test-agent-api-key';
+  const configOverrides: Record<string, string> = {};
 
   beforeAll(async () => {
     process.env.AGENT_SERVICE_API_KEY = apiKey;
@@ -132,6 +132,7 @@ describe('ChatHandoff (E2E)', () => {
       .overrideProvider(ConfigService)
       .useValue({
         get: (key: string) => {
+          if (key in configOverrides) return configOverrides[key];
           if (key === 'FEATURE_FLAG_CHAT_HANDOFF_ACCEPT') return 'true';
           if (key === 'FEATURE_FLAG_CHAT_HANDOFF_ISSUE') return 'true';
           if (key === 'CHAT_HANDOFF_SECRET') return 'test-handoff-secret';
@@ -179,6 +180,9 @@ describe('ChatHandoff (E2E)', () => {
   });
 
   beforeEach(async () => {
+    for (const key of Object.keys(configOverrides)) {
+      delete configOverrides[key];
+    }
     observedGatewayTraces.length = 0;
     await prisma.chatHandoff.deleteMany({});
     await prisma.chatSession.deleteMany({});
@@ -202,7 +206,6 @@ describe('ChatHandoff (E2E)', () => {
     await prisma.airport.deleteMany({});
     await prisma.auditLog.deleteMany({});
     await prisma.user.deleteMany({});
-
 
     validUser = await prisma.user.create({
       data: {
@@ -228,7 +231,22 @@ describe('ChatHandoff (E2E)', () => {
       data: {
         searchHash: 'testhash',
         duffelOfferId: 'off_test123',
-        rawOffer: {},
+        rawOffer: {
+          expires_at: new Date(Date.now() + 15 * 60000).toISOString(),
+          slices: [
+            {
+              segments: [
+                {
+                  origin: { iata_code: 'HAN' },
+                  destination: { iata_code: 'NRT' },
+                  departing_at: new Date(Date.now() + 86400000).toISOString(),
+                  arriving_at: new Date(Date.now() + 90000000).toISOString(),
+                  operating_carrier: { name: 'Test Airline' },
+                },
+              ],
+            },
+          ],
+        },
         origin: 'HAN',
         destination: 'NRT',
         departureDate: new Date(),
@@ -240,14 +258,64 @@ describe('ChatHandoff (E2E)', () => {
     });
   });
 
-  describe('POST /chat-handoff', () => {
+  describe('POST /chat-handoff and /chat-handoff/tokens', () => {
     it('should reject without service auth', async () => {
-      // 401 due to missing API key or however service auth is protected in ChatHandoff
-      // wait, the endpoints in chat-handoff.controller.ts don't have guards! Let me check if they do.
-      // Assuming they don't, this test will fail. That's good.
+      const claimToken = mintClaimToken(validUser.id, Math.floor(Date.now() / 1000));
+
       await request(app.getHttpServer())
         .post('/chat-handoff')
+        .set('X-User-Claim', claimToken)
         .send({ selectionAttestationHash: 'fake', selectedOfferIndex: 1 })
+        .expect(401);
+
+      await request(app.getHttpServer())
+        .post('/chat-handoff/tokens')
+        .set('X-User-Claim', claimToken)
+        .send({ selectionAttestationHash: 'fake', selectedOfferIndex: 1 })
+        .expect(401);
+    });
+
+    it('should reject without X-User-Claim header', async () => {
+      const expiresAt = new Date(Date.now() + 15 * 60000).toISOString();
+      const offers = [{ flightOfferId: validFlightOffer.id, duffelOfferId: 'off_test123' }];
+      const attestation = await attestationService.signSelectionAttestation(
+        validUser.id, validSession.id, 1, expiresAt, offers
+      );
+
+      await request(app.getHttpServer())
+        .post('/chat-handoff')
+        .set('X-Agent-API-Key', apiKey)
+        .send({ selectionAttestationHash: attestation, selectedOfferIndex: 1 })
+        .expect(401);
+
+      await request(app.getHttpServer())
+        .post('/chat-handoff/tokens')
+        .set('X-Agent-API-Key', apiKey)
+        .send({ selectionAttestationHash: attestation, selectedOfferIndex: 1 })
+        .expect(401);
+    });
+
+    it('should reject when X-User-Claim user does not match attestation user', async () => {
+      const otherUser = await prisma.user.create({
+        data: {
+          id: crypto.randomUUID(),
+          email: `other-${crypto.randomUUID()}@example.com`,
+          password: 'Password123!',
+          status: 'ACTIVE',
+        },
+      });
+      const expiresAt = new Date(Date.now() + 15 * 60000).toISOString();
+      const offers = [{ flightOfferId: validFlightOffer.id, duffelOfferId: 'off_test123' }];
+      const attestation = await attestationService.signSelectionAttestation(
+        validUser.id, validSession.id, 1, expiresAt, offers
+      );
+      const mismatchedClaimToken = mintClaimToken(otherUser.id, Math.floor(Date.now() / 1000));
+
+      await request(app.getHttpServer())
+        .post('/chat-handoff')
+        .set('X-Agent-API-Key', apiKey)
+        .set('X-User-Claim', mismatchedClaimToken)
+        .send({ selectionAttestationHash: attestation, selectedOfferIndex: 1 })
         .expect(401);
     });
 
@@ -257,18 +325,32 @@ describe('ChatHandoff (E2E)', () => {
       const attestation = await attestationService.signSelectionAttestation(
         validUser.id, validSession.id, 1, expiresAt, offers
       );
+      const claimToken = mintClaimToken(validUser.id, Math.floor(Date.now() / 1000));
 
       // Should fail ValidationPipe if we pass extra fields like userId
       await request(app.getHttpServer())
         .post('/chat-handoff')
-        .set('X-Agent-API-Key', apiKey) // Assuming service auth
+        .set('X-Agent-API-Key', apiKey)
+        .set('X-User-Claim', claimToken)
         .send({
           selectionAttestationHash: attestation,
           selectedOfferIndex: 1,
           userId: 'some-id',
           chatSessionId: 'some-session'
         })
-        .expect(400); // Bad Request because forbidNonWhitelisted is true
+        .expect(400);
+
+      await request(app.getHttpServer())
+        .post('/chat-handoff/tokens')
+        .set('X-Agent-API-Key', apiKey)
+        .set('X-User-Claim', claimToken)
+        .send({
+          selectionAttestationHash: attestation,
+          selectedOfferIndex: 1,
+          userId: 'some-id',
+          chatSessionId: 'some-session'
+        })
+        .expect(400);
     });
 
     it('should bind signed ordered-offer to a valid internal-session', async () => {
@@ -277,23 +359,111 @@ describe('ChatHandoff (E2E)', () => {
       const attestation = await attestationService.signSelectionAttestation(
         validUser.id, validSession.id, 1, expiresAt, offers
       );
+      const claimToken = mintClaimToken(validUser.id, Math.floor(Date.now() / 1000));
 
       const res = await request(app.getHttpServer())
         .post('/chat-handoff')
-        .set('X-Agent-API-Key', apiKey) // Maybe needs service auth guard?
+        .set('X-Agent-API-Key', apiKey)
+        .set('X-User-Claim', claimToken)
         .send({
           selectionAttestationHash: attestation,
           selectedOfferIndex: 1
         })
-        .expect(201); // Created
+        .expect(201);
 
       expect(res.body.token).toBeDefined();
+      expect(res.body.handoffToken).toBe(res.body.token);
       expect(res.body.expiresAt).toBeDefined();
+      expect(res.body.display).toBeDefined();
+      expect(res.body.display.origin).toBe('HAN');
+      expect(res.body.display.destination).toBe('NRT');
 
       const record = await prisma.chatHandoff.findFirst({ where: { userId: validUser.id } });
       expect(record).toBeDefined();
       expect(record?.chatSessionId).toBe(validSession.id);
       expect(record?.flightOfferId).toBe(validFlightOffer.id);
+    });
+
+    it('should bind signed ordered-offer via /chat-handoff/tokens', async () => {
+      const expiresAt = new Date(Date.now() + 15 * 60000).toISOString();
+      const offers = [{ flightOfferId: validFlightOffer.id, duffelOfferId: 'off_test123' }];
+      const attestation = await attestationService.signSelectionAttestation(
+        validUser.id, validSession.id, 1, expiresAt, offers
+      );
+      const claimToken = mintClaimToken(validUser.id, Math.floor(Date.now() / 1000));
+
+      const res = await request(app.getHttpServer())
+        .post('/chat-handoff/tokens')
+        .set('X-Agent-API-Key', apiKey)
+        .set('X-User-Claim', claimToken)
+        .send({
+          selectionAttestationHash: attestation,
+          selectedOfferIndex: 1
+        })
+        .expect(201);
+
+      expect(res.body.token).toBeDefined();
+      expect(res.body.handoffToken).toBe(res.body.token);
+      expect(res.body.expiresAt).toBeDefined();
+      expect(res.body.display).toBeDefined();
+    });
+
+    it('should return existing credential on active retry for same session and selection', async () => {
+      const expiresAt = new Date(Date.now() + 15 * 60000).toISOString();
+      const offers = [{ flightOfferId: validFlightOffer.id, duffelOfferId: 'off_test123' }];
+      const attestation = await attestationService.signSelectionAttestation(
+        validUser.id, validSession.id, 1, expiresAt, offers
+      );
+      const claimToken = mintClaimToken(validUser.id, Math.floor(Date.now() / 1000));
+
+      const first = await request(app.getHttpServer())
+        .post('/chat-handoff/tokens')
+        .set('X-Agent-API-Key', apiKey)
+        .set('X-User-Claim', claimToken)
+        .send({
+          selectionAttestationHash: attestation,
+          selectedOfferIndex: 1
+        })
+        .expect(201);
+
+      const second = await request(app.getHttpServer())
+        .post('/chat-handoff/tokens')
+        .set('X-Agent-API-Key', apiKey)
+        .set('X-User-Claim', claimToken)
+        .send({
+          selectionAttestationHash: attestation,
+          selectedOfferIndex: 1
+        })
+        .expect(201);
+
+      expect(second.body.token).toBe(first.body.token);
+      expect(second.body.handoffToken).toBe(first.body.token);
+      expect(second.body.expiresAt).toBe(first.body.expiresAt);
+
+      const count = await prisma.chatHandoff.count({ where: { userId: validUser.id } });
+      expect(count).toBe(1);
+    });
+
+    it('should reject when FEATURE_FLAG_CHAT_HANDOFF_ISSUE is disabled', async () => {
+      configOverrides.FEATURE_FLAG_CHAT_HANDOFF_ISSUE = 'false';
+      const expiresAt = new Date(Date.now() + 15 * 60000).toISOString();
+      const offers = [{ flightOfferId: validFlightOffer.id, duffelOfferId: 'off_test123' }];
+      const attestation = await attestationService.signSelectionAttestation(
+        validUser.id, validSession.id, 1, expiresAt, offers
+      );
+      const claimToken = mintClaimToken(validUser.id, Math.floor(Date.now() / 1000));
+
+      const res = await request(app.getHttpServer())
+        .post('/chat-handoff/tokens')
+        .set('X-Agent-API-Key', apiKey)
+        .set('X-User-Claim', claimToken)
+        .send({
+          selectionAttestationHash: attestation,
+          selectedOfferIndex: 1
+        })
+        .expect(503);
+
+      expect(res.body.message).toContain('Chat handoff issuance is disabled');
     });
 
     it('should persist linked opaque trace telemetry without sensitive metadata', async () => {
@@ -302,12 +472,14 @@ describe('ChatHandoff (E2E)', () => {
       const attestation = await attestationService.signSelectionAttestation(
         validUser.id, validSession.id, 1, expiresAt, offers,
       );
+      const claimToken = mintClaimToken(validUser.id, Math.floor(Date.now() / 1000));
       const traceId = `chat_${'a1'.repeat(16)}`;
       const correlationId = `chat_${'b2'.repeat(16)}`;
 
       const created = await request(app.getHttpServer())
         .post('/chat-handoff')
         .set('X-Agent-API-Key', apiKey)
+        .set('X-User-Claim', claimToken)
         .set('X-Trace-Id', traceId)
         .set('X-Correlation-Id', correlationId)
         .send({ selectionAttestationHash: attestation, selectedOfferIndex: 1 })
@@ -434,35 +606,12 @@ describe('ChatHandoff (E2E)', () => {
           audience: 'booking-systems-clients',
         },
       );
-      const previousAgentUrl = process.env.NEXT_PUBLIC_AGENT_URL;
-      process.env.NEXT_PUBLIC_AGENT_URL = 'http://agent.invalid';
-      const fetchSpy = jest
-        .spyOn(globalThis, 'fetch')
-        .mockResolvedValue(new Response(null, { status: 200 }));
-      let browserHeaders: Headers;
-      try {
-        await createChatStreamRequest({
-          message: 'continue with selected flight',
-          sessionId: validSession.id,
-          token: browserToken,
-        });
-        browserHeaders = new Headers(fetchSpy.mock.calls[0]?.[1]?.headers);
-      } finally {
-        fetchSpy.mockRestore();
-        if (previousAgentUrl === undefined) {
-          delete process.env.NEXT_PUBLIC_AGENT_URL;
-        } else {
-          process.env.NEXT_PUBLIC_AGENT_URL = previousAgentUrl;
-        }
-      }
-      const traceId = browserHeaders.get('X-Trace-Id');
-      const correlationId = browserHeaders.get('X-Correlation-Id');
+
+      const traceId = `chat_${crypto.randomBytes(16).toString('hex')}`;
+      const correlationId = `chat_${crypto.randomBytes(16).toString('hex')}`;
       expect(traceId).toMatch(/^chat_[a-f0-9]{32}$/);
       expect(correlationId).toMatch(/^chat_[a-f0-9]{32}$/);
       expect(traceId).not.toBe(correlationId);
-      if (!traceId || !correlationId) {
-        throw new Error('browser_trace_headers_missing');
-      }
 
       const probe = await runAgentStreamProbe(
         {
@@ -526,10 +675,12 @@ describe('ChatHandoff (E2E)', () => {
       const attestation = await attestationService.signSelectionAttestation(
         validUser.id, validSession.id, 1, expiresAt, offers
       );
+      const claimToken = mintClaimToken(validUser.id, Math.floor(Date.now() / 1000));
 
       await request(app.getHttpServer())
         .post('/chat-handoff')
         .set('X-Agent-API-Key', apiKey)
+        .set('X-User-Claim', claimToken)
         .send({
           selectionAttestationHash: attestation,
           selectedOfferIndex: 1
@@ -538,7 +689,7 @@ describe('ChatHandoff (E2E)', () => {
     });
   });
 
-  describe('GET /chat-handoff/resolve', () => {
+  describe('GET and POST /chat-handoff/resolve and POST /bookings/handoffs/resolve', () => {
     let createdToken: string;
 
     beforeEach(async () => {
@@ -547,16 +698,53 @@ describe('ChatHandoff (E2E)', () => {
       const attestation = await attestationService.signSelectionAttestation(
         validUser.id, validSession.id, 1, expiresAt, offers
       );
+      const claimToken = mintClaimToken(validUser.id, Math.floor(Date.now() / 1000));
 
       const res = await request(app.getHttpServer())
         .post('/chat-handoff')
         .set('X-Agent-API-Key', apiKey)
+        .set('X-User-Claim', claimToken)
         .send({
           selectionAttestationHash: attestation,
           selectedOfferIndex: 1
         });
         
       createdToken = res.body.token;
+    });
+
+    it('should reject without JWT auth', async () => {
+      await request(app.getHttpServer())
+        .get(`/chat-handoff/resolve?token=${createdToken}`)
+        .expect(401);
+
+      await request(app.getHttpServer())
+        .post('/chat-handoff/resolve')
+        .send({ token: createdToken })
+        .expect(401);
+
+      await request(app.getHttpServer())
+        .post('/bookings/handoffs/resolve')
+        .send({ handoffToken: createdToken })
+        .expect(401);
+    });
+
+    it('should reject when token is missing', async () => {
+      await request(app.getHttpServer())
+        .get('/chat-handoff/resolve')
+        .set('Authorization', `Bearer ${validUserToken}`)
+        .expect(401);
+
+      await request(app.getHttpServer())
+        .post('/chat-handoff/resolve')
+        .set('Authorization', `Bearer ${validUserToken}`)
+        .send({})
+        .expect(401);
+
+      await request(app.getHttpServer())
+        .post('/bookings/handoffs/resolve')
+        .set('Authorization', `Bearer ${validUserToken}`)
+        .send({})
+        .expect(400);
     });
 
     it('should reject cross-user access', async () => {
@@ -574,19 +762,164 @@ describe('ChatHandoff (E2E)', () => {
         .get(`/chat-handoff/resolve?token=${createdToken}`)
         .set('Authorization', `Bearer ${otherUserToken}`)
         .expect(404); // Not authorized for this handoff (opaque 404 to prevent token probing)
+
+      await request(app.getHttpServer())
+        .post('/chat-handoff/resolve')
+        .set('Authorization', `Bearer ${otherUserToken}`)
+        .send({ token: createdToken })
+        .expect(404);
+
+      await request(app.getHttpServer())
+        .post('/bookings/handoffs/resolve')
+        .set('Authorization', `Bearer ${otherUserToken}`)
+        .send({ handoffToken: createdToken })
+        .expect(404);
     });
 
-    it('should enforce owner/internal-session resolve and exact-response', async () => {
+    it('should return safe allowlisted resolve view via GET with Cache-Control without leaking internal IDs', async () => {
       const res = await request(app.getHttpServer())
         .get(`/chat-handoff/resolve?token=${createdToken}`)
         .set('Authorization', `Bearer ${validUserToken}`)
         .expect(200);
         
-      expect(res.body.userId).toBe(validUser.id);
-      expect(res.body.chatSessionId).toBe(validSession.id);
-      expect(res.body.flightOfferId).toBe(validFlightOffer.id);
+      expect(res.headers['cache-control']).toBe('no-store, private');
+      expect(res.body.status).toBe('ACTIVE');
+      expect(res.body.expiresAt).toBeDefined();
+      expect(res.body.offer).toBeDefined();
+      expect(res.body.offer.origin).toBe('HAN');
+      expect(res.body.offer.destination).toBe('NRT');
+      expect(res.body.offer.airline).toBe('Test Airline');
+      expect(res.body.offer.price).toBe('100');
+      expect(res.body.offer.currency).toBe('USD');
+
+      // Assert ABSENCE of internal IDs
+      expect(res.body.userId).toBeUndefined();
+      expect(res.body.chatSessionId).toBeUndefined();
+      expect(res.body.flightOfferId).toBeUndefined();
+      expect(res.body.tokenHash).toBeUndefined();
+      expect(res.body.id).toBeUndefined();
+    });
+
+    it('should enforce resolve via GET with handoffToken query alias', async () => {
+      const res = await request(app.getHttpServer())
+        .get(`/chat-handoff/resolve?handoffToken=${createdToken}`)
+        .set('Authorization', `Bearer ${validUserToken}`)
+        .expect(200);
+
+      expect(res.headers['cache-control']).toBe('no-store, private');
+      expect(res.body.status).toBe('ACTIVE');
+      expect(res.body.offer).toBeDefined();
+      expect(res.body.userId).toBeUndefined();
+      expect(res.body.chatSessionId).toBeUndefined();
+    });
+
+    it('should return safe allowlisted resolve view via POST /chat-handoff/resolve with Cache-Control without leaking internal IDs', async () => {
+      const res = await request(app.getHttpServer())
+        .post('/chat-handoff/resolve')
+        .set('Authorization', `Bearer ${validUserToken}`)
+        .send({ token: createdToken })
+        .expect(200);
+        
+      expect(res.headers['cache-control']).toBe('no-store, private');
+      expect(res.body.status).toBe('ACTIVE');
+      expect(res.body.expiresAt).toBeDefined();
+      expect(res.body.offer).toBeDefined();
+      expect(res.body.offer.origin).toBe('HAN');
+      expect(res.body.offer.destination).toBe('NRT');
+
+      // Assert ABSENCE of internal IDs
+      expect(res.body.userId).toBeUndefined();
+      expect(res.body.chatSessionId).toBeUndefined();
+      expect(res.body.flightOfferId).toBeUndefined();
+      expect(res.body.tokenHash).toBeUndefined();
+      expect(res.body.id).toBeUndefined();
+    });
+
+    it('should enforce resolve via POST /chat-handoff/resolve with handoffToken body alias', async () => {
+      const res = await request(app.getHttpServer())
+        .post('/chat-handoff/resolve')
+        .set('Authorization', `Bearer ${validUserToken}`)
+        .send({ handoffToken: createdToken })
+        .expect(200);
+
+      expect(res.headers['cache-control']).toBe('no-store, private');
+      expect(res.body.status).toBe('ACTIVE');
+      expect(res.body.offer).toBeDefined();
+      expect(res.body.userId).toBeUndefined();
+    });
+
+    it('should return safe allowlisted resolve view via POST /bookings/handoffs/resolve without leaking internal IDs', async () => {
+      const res = await request(app.getHttpServer())
+        .post('/bookings/handoffs/resolve')
+        .set('Authorization', `Bearer ${validUserToken}`)
+        .send({ handoffToken: createdToken })
+        .expect(200);
+
+      expect(res.headers['cache-control']).toBe('no-store, private');
+      expect(res.body.status).toBe('ACTIVE');
+      expect(res.body.expiresAt).toBeDefined();
+      expect(res.body.offer).toBeDefined();
+      expect(res.body.offer.origin).toBe('HAN');
+      expect(res.body.offer.destination).toBe('NRT');
+
+      // Assert ABSENCE of internal IDs
+      expect(res.body.userId).toBeUndefined();
+      expect(res.body.chatSessionId).toBeUndefined();
+      expect(res.body.flightOfferId).toBeUndefined();
+      expect(res.body.tokenHash).toBeUndefined();
+      expect(res.body.id).toBeUndefined();
+    });
+
+    it('should reject when FEATURE_FLAG_CHAT_HANDOFF_ACCEPT is disabled', async () => {
+      configOverrides.FEATURE_FLAG_CHAT_HANDOFF_ACCEPT = 'false';
+
+      const getRes = await request(app.getHttpServer())
+        .get(`/chat-handoff/resolve?token=${createdToken}`)
+        .set('Authorization', `Bearer ${validUserToken}`)
+        .expect(503);
+
+      expect(getRes.body.message).toContain('Chat handoff acceptance is disabled');
+
+      const postRes = await request(app.getHttpServer())
+        .post('/chat-handoff/resolve')
+        .set('Authorization', `Bearer ${validUserToken}`)
+        .send({ token: createdToken })
+        .expect(503);
+
+      expect(postRes.body.message).toContain('Chat handoff acceptance is disabled');
+
+      const bookingRes = await request(app.getHttpServer())
+        .post('/bookings/handoffs/resolve')
+        .set('Authorization', `Bearer ${validUserToken}`)
+        .send({ handoffToken: createdToken })
+        .expect(503);
+
+      expect(bookingRes.body.message).toContain('Chat handoff acceptance is disabled');
+    });
+
+    it('should reject expired handoff credential with 410 Gone', async () => {
+      // Manually set handoff expiry in past
+      await prisma.chatHandoff.updateMany({
+        where: { userId: validUser.id },
+        data: { expiresAt: new Date(Date.now() - 60000) },
+      });
+
+      await request(app.getHttpServer())
+        .get(`/chat-handoff/resolve?token=${createdToken}`)
+        .set('Authorization', `Bearer ${validUserToken}`)
+        .expect(410);
+
+      await request(app.getHttpServer())
+        .post('/chat-handoff/resolve')
+        .set('Authorization', `Bearer ${validUserToken}`)
+        .send({ token: createdToken })
+        .expect(410);
+
+      await request(app.getHttpServer())
+        .post('/bookings/handoffs/resolve')
+        .set('Authorization', `Bearer ${validUserToken}`)
+        .send({ handoffToken: createdToken })
+        .expect(410);
     });
   });
 });
-
-

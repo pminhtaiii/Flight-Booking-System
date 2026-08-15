@@ -49,9 +49,14 @@ describe('ChatHandoffService', () => {
             $transaction: jest.fn(),
             chatHandoff: {
               findUnique: jest.fn(),
+              findFirst: jest.fn(),
               create: jest.fn(),
               update: jest.fn(),
               updateMany: jest.fn(),
+            },
+            chatSession: {
+              findUnique: jest.fn(),
+              findFirst: jest.fn().mockResolvedValue({ id: 'cs1', userId: 'u1', deletedAt: null }),
             },
             flightOffer: {
               findUnique: jest.fn(),
@@ -68,8 +73,12 @@ describe('ChatHandoffService', () => {
           provide: ChatHandoffTokenService,
           useValue: {
             deriveIdempotencyHash: jest.fn(),
+            computeIdempotencyHash: jest.fn(),
             generateToken: jest.fn(),
             verifyToken: jest.fn(),
+            hashToken: jest.fn((token: string) =>
+              token ? crypto.createHash('sha256').update(token).digest('hex') : '',
+            ),
           },
         },
         {
@@ -93,7 +102,7 @@ describe('ChatHandoffService', () => {
     auditService = module.get(AuditService);
   });
 
-  describe('extra field rejection', () => {
+  describe('extra field rejection and DTO validation', () => {
     it('fails validation when client-supplied ids or extra fields are present', async () => {
       const payload = {
         userId: 'u1',
@@ -115,10 +124,36 @@ describe('ChatHandoffService', () => {
       });
       expect(errors.length).toBeGreaterThan(0);
       expect(errors.some((e) => e.property === 'id')).toBe(true);
+      expect(errors.some((e) => e.property === 'userId')).toBe(true);
+      expect(errors.some((e) => e.property === 'chatSessionId')).toBe(true);
+      expect(errors.some((e) => e.property === 'idempotencyKey')).toBe(true);
+    });
+
+    it('validates CreateChatHandoffDto with valid fields and rejects invalid selectedOfferIndex', async () => {
+      const validDto = plainToInstance(CreateChatHandoffDto, {
+        selectionAttestationHash: 'valid_attestation_hash',
+        selectedOfferIndex: 1,
+      });
+      const validErrors = await validate(validDto, {
+        whitelist: true,
+        forbidNonWhitelisted: true,
+      });
+      expect(validErrors.length).toBe(0);
+
+      const invalidDto = plainToInstance(CreateChatHandoffDto, {
+        selectionAttestationHash: 'valid_attestation_hash',
+        selectedOfferIndex: 0,
+      });
+      const invalidErrors = await validate(invalidDto, {
+        whitelist: true,
+        forbidNonWhitelisted: true,
+      });
+      expect(invalidErrors.length).toBeGreaterThan(0);
+      expect(invalidErrors.some((e) => e.property === 'selectedOfferIndex')).toBe(true);
     });
   });
 
-  describe('create', () => {
+  describe('create and createHandoffToken', () => {
     it('throws ServiceUnavailableException without minting when ISSUE flag is off', async () => {
       jest
         .spyOn(configService, 'get')
@@ -130,7 +165,7 @@ describe('ChatHandoffService', () => {
       expect(tokenService.generateToken).not.toHaveBeenCalled();
     });
 
-    it('creates a handoff when ISSUE and ACCEPT flags are on', async () => {
+    it('creates a handoff when ISSUE flag is on and supports createHandoffToken alias', async () => {
       jest.spyOn(configService, 'get').mockReturnValue('true');
       jest.spyOn(tokenService, 'deriveIdempotencyHash').mockReturnValue('hash');
       jest.spyOn(tokenService, 'generateToken').mockResolvedValue({
@@ -138,20 +173,30 @@ describe('ChatHandoffService', () => {
         tokenHash: 'tokenhash',
         keyVersion: 1,
       });
+      jest.spyOn(prisma.chatHandoff, 'findUnique').mockResolvedValue(null);
       jest.spyOn(prisma.chatHandoff, 'create').mockResolvedValue({
         id: '1',
         expiresAt: new Date(),
       } as any);
 
-      const result = await service.create({
-        selectionAttestationHash: createMockAttestation('u1', 'cs1', 1, [
-          { flightOfferId: 'fo1', duffelOfferId: 'duff1' },
-        ]),
+      const mockAttestation = createMockAttestation('u1', 'cs1', 1, [
+        { flightOfferId: 'fo1', duffelOfferId: 'duff1' },
+      ]);
+
+      const result = await service.createHandoffToken({
+        selectionAttestationHash: mockAttestation,
         selectedOfferIndex: 1,
       });
 
       expect(result.token).toBe('token');
       expect(result.expiresAt).toBeDefined();
+      expect(attestationService.verifySelectionAttestation).toHaveBeenCalledWith(
+        mockAttestation,
+        'u1',
+        'cs1',
+        1,
+        [{ flightOfferId: 'fo1', duffelOfferId: 'duff1' }],
+      );
       const createdData = (prisma.chatHandoff.create as jest.Mock).mock.calls[0][0].data;
       expect(createdData.selectionAttestationHash).toMatch(/^[a-f0-9]{64}$/);
       expect(auditService.createLog).toHaveBeenCalledWith(
@@ -163,22 +208,75 @@ describe('ChatHandoffService', () => {
       );
     });
 
-    it('returns existing token on active-retry (Unique constraint violation)', async () => {
+    it('rejects creation when selectedOfferIndex is out of bounds', async () => {
+      jest.spyOn(configService, 'get').mockReturnValue('true');
+      const mockAttestation = createMockAttestation('u1', 'cs1', 1, [
+        { flightOfferId: 'fo1', duffelOfferId: 'duff1' },
+      ]);
+
+      await expect(
+        service.create({
+          selectionAttestationHash: mockAttestation,
+          selectedOfferIndex: 5,
+        }),
+      ).rejects.toThrow('Selected offer index out of bounds');
+    });
+
+    it('returns existing token on active-retry when existing record is found before create', async () => {
       jest.spyOn(configService, 'get').mockReturnValue('true');
       jest.spyOn(tokenService, 'deriveIdempotencyHash').mockReturnValue('hash');
+
+      const existingRecord = {
+        id: 'existing-1',
+        idempotencyKeyHash: 'hash',
+        consumedAt: null,
+        expiresAt: new Date(Date.now() + 100000),
+      };
+      jest.spyOn(prisma.chatHandoff, 'findUnique').mockResolvedValue(existingRecord as any);
+      jest.spyOn(tokenService, 'generateToken').mockResolvedValue({
+        token: 'token-replayed',
+        tokenHash: 'tokenhash2',
+        keyVersion: 1,
+      });
+
+      const result = await service.create({
+        selectionAttestationHash: createMockAttestation('u1', 'cs1', 1, [
+          { flightOfferId: 'fo1', duffelOfferId: 'duff1' },
+        ]),
+        selectedOfferIndex: 1,
+      });
+
+      expect(result.token).toBe('token-replayed');
+      expect(result.expiresAt).toBe(existingRecord.expiresAt.toISOString());
+      expect(prisma.chatHandoff.create).not.toHaveBeenCalled();
+      expect(auditService.createLog).toHaveBeenCalledWith(
+        null,
+        expect.objectContaining({
+          action: 'chat_handoff_replay',
+          metadata: expect.objectContaining({ operation: 'handoff_replay' }),
+        }),
+      );
+    });
+
+    it('returns existing token on active-retry (Unique constraint violation P2002)', async () => {
+      jest.spyOn(configService, 'get').mockReturnValue('true');
+      jest.spyOn(tokenService, 'deriveIdempotencyHash').mockReturnValue('hash');
+
+      // First findUnique returns null (simulate race condition)
+      jest.spyOn(prisma.chatHandoff, 'findUnique')
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce({
+          id: '1',
+          idempotencyKeyHash: 'hash',
+          consumedAt: null,
+          expiresAt: new Date(Date.now() + 100000),
+        } as any);
 
       const p2002Error = new Prisma.PrismaClientKnownRequestError('Unique constraint failed', {
         code: 'P2002',
         clientVersion: '5.x',
       });
       jest.spyOn(prisma.chatHandoff, 'create').mockRejectedValue(p2002Error);
-
-      const existingRecord = {
-        id: '1',
-        idempotencyKeyHash: 'hash',
-        expiresAt: new Date(Date.now() + 100000),
-      };
-      jest.spyOn(prisma.chatHandoff, 'findUnique').mockResolvedValue(existingRecord as any);
 
       jest.spyOn(tokenService, 'generateToken').mockResolvedValue({
         token: 'token2',
@@ -194,7 +292,6 @@ describe('ChatHandoffService', () => {
       });
 
       expect(result.token).toBe('token2');
-      expect(result.expiresAt).toBe(existingRecord.expiresAt.toISOString());
       expect(auditService.createLog).toHaveBeenCalledWith(
         null,
         expect.objectContaining({
@@ -203,21 +300,45 @@ describe('ChatHandoffService', () => {
         }),
       );
     });
+
+    it('rejects active-retry when existing record is expired or already consumed', async () => {
+      jest.spyOn(configService, 'get').mockReturnValue('true');
+      jest.spyOn(tokenService, 'deriveIdempotencyHash').mockReturnValue('hash');
+
+      const expiredRecord = {
+        id: '1',
+        idempotencyKeyHash: 'hash',
+        consumedAt: null,
+        expiresAt: new Date(Date.now() - 1000),
+      };
+      jest.spyOn(prisma.chatHandoff, 'findUnique').mockResolvedValue(expiredRecord as any);
+
+      await expect(
+        service.create({
+          selectionAttestationHash: createMockAttestation('u1', 'cs1', 1, [
+            { flightOfferId: 'fo1', duffelOfferId: 'duff1' },
+          ]),
+          selectedOfferIndex: 1,
+        }),
+      ).rejects.toMatchObject({
+        response: { code: 'HANDOFF_EXPIRED' },
+      });
+    });
   });
 
-  describe('resolve', () => {
+
+  describe('resolve and resolveHandoffToken', () => {
     it('throws ServiceUnavailableException when ACCEPT flag is off', async () => {
       jest.spyOn(configService, 'get').mockReturnValue('false');
       await expect(service.resolve('token', 'userId')).rejects.toThrow(ServiceUnavailableException);
     });
 
-    it('returns handoff data on successful token-only resolve', async () => {
+    it('returns handoff data on successful resolve and supports resolveHandoffToken alias', async () => {
       jest
         .spyOn(configService, 'get')
         .mockImplementation((key) =>
           key === 'FEATURE_FLAG_CHAT_HANDOFF_ACCEPT' ? 'true' : 'false',
         );
-      // Wait, resolve token-only? resolve just returns the handoff.
       const mockRecord = {
         id: '1',
         userId: 'u1',
@@ -225,21 +346,15 @@ describe('ChatHandoffService', () => {
         flightOfferId: 'fo1',
         tokenHash: 'thash',
         tokenKeyVersion: 1,
+        expiresAt: new Date(Date.now() + 60_000),
       };
 
-      // We don't store token so we can't find by token directly if it's hashed securely (wait, tokenHash is a simple SHA256 hash or hmac? Let's check tokenService - it's a simple sha256 hash of the token!)
-      // tokenService.hashToken is private, but resolve needs to find it. Wait, does resolve hash the token itself?
-      // No, resolve passes the token. The service hashes the token to lookup in DB, or tokenService provides a method for that.
-      // But tokenService doesn't expose hashToken. Wait, how do we look it up?
-      // Maybe we can't look it up? If it's a simple hash, we can hash it.
-
-      // I'll leave the test implementation high level for resolve
       jest.spyOn(tokenService, 'verifyToken').mockResolvedValue(true);
       jest.spyOn(prisma.chatHandoff, 'findUnique').mockResolvedValue(mockRecord as any);
 
-      // What should resolve return?
-      const result = await service.resolve('token', 'u1');
+      const result = await service.resolveHandoffToken('token', 'u1');
       expect(result).toBeDefined();
+      expect(result.id).toBe('1');
       expect(auditService.createLog).toHaveBeenCalledWith(
         null,
         expect.objectContaining({
@@ -248,6 +363,64 @@ describe('ChatHandoffService', () => {
         }),
       );
     });
+
+    it('rejects resolve when token is expired with GoneException', async () => {
+      jest
+        .spyOn(configService, 'get')
+        .mockImplementation((key) =>
+          key === 'FEATURE_FLAG_CHAT_HANDOFF_ACCEPT' ? 'true' : 'false',
+        );
+      const expiredRecord = {
+        id: '1',
+        userId: 'u1',
+        chatSession: { userId: 'u1', deletedAt: null },
+        flightOfferId: 'fo1',
+        tokenHash: 'thash',
+        tokenKeyVersion: 1,
+        expiresAt: new Date(Date.now() - 10_000),
+      };
+
+      jest.spyOn(prisma.chatHandoff, 'findUnique').mockResolvedValue(expiredRecord as any);
+
+      await expect(service.resolve('token', 'u1')).rejects.toMatchObject({
+        response: { code: 'HANDOFF_EXPIRED' },
+      });
+    });
+
+    it('rejects resolveSafe when handoff is already consumed with ConflictException', async () => {
+      jest.spyOn(service, 'resolve').mockResolvedValue({
+        id: 'handoff-1',
+        flightOfferId: 'offer-1',
+        consumedAt: new Date(),
+      } as any);
+
+      await expect(service.resolveSafe('token', 'u1')).rejects.toMatchObject({
+        response: { code: 'HANDOFF_ALREADY_CONSUMED' },
+      });
+    });
+
+    it('rejects resolveSafe when Duffel offer ID hash does not match', async () => {
+      jest.spyOn(service, 'resolve').mockResolvedValue({
+        id: 'handoff-1',
+        flightOfferId: 'offer-1',
+        duffelOfferIdHash: 'expected-hash-value',
+        expiresAt: new Date('2026-12-01T00:00:00.000Z'),
+        consumedAt: null,
+        claimedAt: null,
+        claimExpiresAt: null,
+        claimRecoverAfter: null,
+      } as any);
+      jest.spyOn(prisma.flightOffer, 'findUnique').mockResolvedValue({
+        duffelOfferId: 'different-duffel-id',
+        origin: 'SGN',
+        destination: 'HAN',
+      } as any);
+
+      await expect(service.resolveSafe('token', 'u1')).rejects.toMatchObject({
+        response: { code: 'HANDOFF_NOT_FOUND' },
+      });
+    });
+
 
     it('records consumed-token resolve as a replay without sensitive metadata', async () => {
       jest

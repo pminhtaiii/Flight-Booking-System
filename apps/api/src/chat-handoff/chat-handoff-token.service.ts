@@ -63,6 +63,15 @@ export class ChatHandoffTokenService {
       .digest('hex');
   }
 
+  computeIdempotencyHash(
+    attestation: string,
+    index: number,
+    keyVersion: number = this.CURRENT_KEY_VERSION,
+  ): string {
+    return this.deriveIdempotencyHash(attestation, index, keyVersion);
+  }
+
+
   async generateToken(
     rowId: string,
     idempotencyHash: string,

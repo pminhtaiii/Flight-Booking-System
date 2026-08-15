@@ -43,7 +43,7 @@ describe('Chat Handoff Config Validation', () => {
   it('rejects create when ISSUE=false even while ACCEPT honors existing credentials', async () => {
     const handoffService = {
       create: jest.fn(),
-      resolve: jest.fn(),
+      resolveSafe: jest.fn(),
     };
     const controller = new ChatHandoffController(
       handoffService as unknown as ChatHandoffService,
@@ -53,7 +53,7 @@ describe('Chat Handoff Config Validation', () => {
       }),
     );
 
-    await expect(controller.create({} as never)).rejects.toThrow(
+    await expect(controller.create({} as never, { user: { id: 'u1' } })).rejects.toThrow(
       ServiceUnavailableException,
     );
     expect(handoffService.create).not.toHaveBeenCalled();
@@ -62,7 +62,7 @@ describe('Chat Handoff Config Validation', () => {
   it('honors existing credentials when ACCEPT=true after ISSUE rollback', async () => {
     const handoffService = {
       create: jest.fn(),
-      resolve: jest.fn().mockResolvedValue({ status: 'ACTIVE' }),
+      resolveSafe: jest.fn().mockResolvedValue({ status: 'ACTIVE' }),
     };
     const controller = new ChatHandoffController(
       handoffService as unknown as ChatHandoffService,
@@ -75,7 +75,7 @@ describe('Chat Handoff Config Validation', () => {
     await expect(
       controller.resolve({ token: 'chk_handoff_v1_test' }, { user: { id: 'user-1' } }),
     ).resolves.toEqual({ status: 'ACTIVE' });
-    expect(handoffService.resolve).toHaveBeenCalledWith(
+    expect(handoffService.resolveSafe).toHaveBeenCalledWith(
       'chk_handoff_v1_test',
       'user-1',
       { traceId: undefined, correlationId: undefined },
@@ -85,7 +85,7 @@ describe('Chat Handoff Config Validation', () => {
   it('returns a stable disabled error when ACCEPT=false', async () => {
     const handoffService = {
       create: jest.fn(),
-      resolve: jest.fn(),
+      resolveSafe: jest.fn(),
     };
     const controller = new ChatHandoffController(
       handoffService as unknown as ChatHandoffService,
@@ -98,6 +98,6 @@ describe('Chat Handoff Config Validation', () => {
     await expect(
       controller.resolve({ token: 'chk_handoff_v1_test' }, { user: { id: 'user-1' } }),
     ).rejects.toThrow('Chat handoff acceptance is disabled');
-    expect(handoffService.resolve).not.toHaveBeenCalled();
+    expect(handoffService.resolveSafe).not.toHaveBeenCalled();
   });
 });

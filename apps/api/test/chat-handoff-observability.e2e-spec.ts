@@ -3,6 +3,8 @@ process.env.FEATURE_FLAG_CHAT_HANDOFF_ISSUE = 'true';
 process.env.FEATURE_FLAG_CHAT_HANDOFF_ACCEPT = 'true';
 process.env.AGENT_SERVICE_API_KEY = 'test-agent-api-key';
 process.env.ATTESTATION_SECRET = 'test-attestation-secret';
+process.env.CLAIM_TOKEN_SECRET = 'test-claim-token-secret';
+process.env.CLAIM_TOKEN_TTL_SECONDS = '300';
 
 import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication, ValidationPipe } from '@nestjs/common';
@@ -35,6 +37,13 @@ const FORBIDDEN_TELEMETRY_VALUES = [
   'payment-secret',
   'raw-tool-payload',
 ] as const;
+
+function mintClaimToken(userId: string, iat: number, secret = 'test-claim-token-secret'): string {
+  const payload = { userId, iat };
+  const payloadStr = JSON.stringify(payload);
+  const signature = crypto.createHmac('sha256', secret).update(payloadStr).digest();
+  return `${Buffer.from(payloadStr).toString('base64url')}.${signature.toString('base64url')}`;
+}
 
 describe('chat handoff observability dashboard and alert contract', () => {
   jest.setTimeout(180_000);
@@ -82,7 +91,7 @@ describe('chat handoff observability dashboard and alert contract', () => {
         { sub: user.id, id: user.id, jti: crypto.randomUUID(), email: user.email },
         { issuer: 'booking-systems-api', audience: 'booking-systems-clients' },
       );
-      const session = await prisma!.chatSession.create({ data: { userId, title: 'T097 observability session' } });
+      const session = await prisma!.chatSession.create({ data: { userId } });
       const offer = await prisma!.flightOffer.create({
         data: {
           searchHash: runMarker, duffelOfferId: `${runMarker}-offer`, origin: 'SGN', destination: 'HAN',
@@ -104,8 +113,10 @@ describe('chat handoff observability dashboard and alert contract', () => {
         userId, session.id, 1, new Date(Date.now() + 900_000).toISOString(),
         [{ flightOfferId: offer.id, duffelOfferId: `${runMarker}-offer` }],
       );
+      const claimToken = mintClaimToken(userId, Math.floor(Date.now() / 1000));
       const create = await request(app.getHttpServer())
         .post('/api/chat-handoff').set('X-Agent-API-Key', process.env.AGENT_SERVICE_API_KEY!)
+        .set('X-User-Claim', claimToken)
         .set('X-Trace-Id', traceId).set('X-Correlation-Id', correlationId)
         .send({ selectionAttestationHash: attestation, selectedOfferIndex: 1 }).expect(201);
       const handoffToken = create.body.token as string;
