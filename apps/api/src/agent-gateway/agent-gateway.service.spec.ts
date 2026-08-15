@@ -27,7 +27,12 @@ describe('AgentGatewayService', () => {
   beforeEach(async () => {
     profileService = { getProfile: jest.fn() } as any;
     bookingReadinessService = { getAdvisoryReadiness: jest.fn() } as any;
-    prismaService = { flightOffer: { findUnique: jest.fn() } } as any;
+    prismaService = {
+      flightOffer: { findUnique: jest.fn() },
+      bookingAgentProjection: { findMany: jest.fn(), findUnique: jest.fn() },
+      booking: { findMany: jest.fn(), findUnique: jest.fn() },
+      payment: { findMany: jest.fn(), findUnique: jest.fn() },
+    } as any;
     auditService = { createLog: jest.fn() } as any;
     observability = { recordOutcome: jest.fn() } as any;
 
@@ -301,5 +306,208 @@ describe('AgentGatewayService', () => {
       expect(err.getStatus()).toBe(503);
       expect(err.message).toBe('Chat encryption service is unavailable');
     }
+  });
+
+  describe('getBookingSummaries', () => {
+    it('returns booking summaries from BookingAgentProjection and structurally excludes raw entities', async () => {
+      const mockProjections = [
+        {
+          agentReference: 'bkref_11111111-1111-4111-8111-111111111111',
+          airline: 'Vietnam Airlines',
+          origin: 'SGN',
+          destination: 'HAN',
+          departureAt: new Date('2026-09-01T08:00:00.000Z'),
+          arrivalAt: new Date('2026-09-01T10:00:00.000Z'),
+          status: 'CONFIRMED',
+          durationMinutes: 120,
+          stopCount: 0,
+        },
+      ];
+
+      (prismaService.bookingAgentProjection.findMany as jest.Mock).mockResolvedValueOnce(mockProjections);
+
+      const bookingFindManySpy = jest.spyOn(prismaService.booking, 'findMany');
+      const bookingFindUniqueSpy = jest.spyOn(prismaService.booking, 'findUnique');
+      const paymentFindManySpy = jest.spyOn(prismaService.payment, 'findMany');
+      const paymentFindUniqueSpy = jest.spyOn(prismaService.payment, 'findUnique');
+
+      const result = await (service as any).getBookingSummaries('user-1', 'trace-1', 'correlation-1');
+
+      expect(prismaService.bookingAgentProjection.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { booking: { userId: 'user-1' } },
+        }),
+      );
+
+      // Verify raw booking/payment models are NOT touched
+      expect(bookingFindManySpy).not.toHaveBeenCalled();
+      expect(bookingFindUniqueSpy).not.toHaveBeenCalled();
+      expect(paymentFindManySpy).not.toHaveBeenCalled();
+      expect(paymentFindUniqueSpy).not.toHaveBeenCalled();
+
+      // Verify exact structure
+      expect(result).toEqual({
+        bookings: [
+          {
+            bookingReference: 'bkref_11111111-1111-4111-8111-111111111111',
+            airline: 'Vietnam Airlines',
+            origin: 'SGN',
+            destination: 'HAN',
+            departureTime: '2026-09-01T08:00:00.000Z',
+            arrivalTime: '2026-09-01T10:00:00.000Z',
+            status: 'CONFIRMED',
+            durationMinutes: 120,
+            stops: 0,
+          },
+        ],
+      });
+
+      // Assert forbidden properties are undefined on each booking object
+      const forbiddenProps = [
+        'id',
+        'bookingId',
+        'flightSnapshot',
+        'passengerSnapshot',
+        'Payment',
+        'payment',
+        'pnrReference',
+        'totalAmount',
+        'currency',
+        'passengers',
+      ];
+      for (const prop of forbiddenProps) {
+        expect((result.bookings[0] as any)[prop]).toBeUndefined();
+      }
+    });
+
+    it('returns empty array when user has no bookings', async () => {
+      (prismaService.bookingAgentProjection.findMany as jest.Mock).mockResolvedValueOnce([]);
+
+      const result = await (service as any).getBookingSummaries('user-no-bookings');
+      expect(result).toEqual({ bookings: [] });
+    });
+  });
+
+  describe('getBookingDetailByReference', () => {
+    it('returns detail projection with flightNumber, baggageAllowance, changeable, refundable for owned booking', async () => {
+      const mockProjection = {
+        agentReference: 'bkref_11111111-1111-4111-8111-111111111111',
+        airline: 'Vietnam Airlines',
+        origin: 'SGN',
+        destination: 'HAN',
+        departureAt: new Date('2026-09-01T08:00:00.000Z'),
+        arrivalAt: new Date('2026-09-01T10:00:00.000Z'),
+        status: 'CONFIRMED',
+        durationMinutes: 120,
+        stopCount: 0,
+        flightNumber: 'VN 123',
+        baggageSummary: '20kg checked',
+        changeable: true,
+        refundable: false,
+        booking: { userId: 'user-1' },
+      };
+
+      (prismaService.bookingAgentProjection.findUnique as jest.Mock).mockResolvedValueOnce(mockProjection);
+
+      const bookingFindManySpy = jest.spyOn(prismaService.booking, 'findMany');
+      const bookingFindUniqueSpy = jest.spyOn(prismaService.booking, 'findUnique');
+      const paymentFindManySpy = jest.spyOn(prismaService.payment, 'findMany');
+      const paymentFindUniqueSpy = jest.spyOn(prismaService.payment, 'findUnique');
+
+      const result = await (service as any).getBookingDetailByReference(
+        'user-1',
+        'bkref_11111111-1111-4111-8111-111111111111',
+      );
+
+      // Verify raw booking/payment models are NOT touched
+      expect(bookingFindManySpy).not.toHaveBeenCalled();
+      expect(bookingFindUniqueSpy).not.toHaveBeenCalled();
+      expect(paymentFindManySpy).not.toHaveBeenCalled();
+      expect(paymentFindUniqueSpy).not.toHaveBeenCalled();
+
+      // Verify exact structure with detail tier fields
+      expect(result).toEqual({
+        bookingReference: 'bkref_11111111-1111-4111-8111-111111111111',
+        airline: 'Vietnam Airlines',
+        origin: 'SGN',
+        destination: 'HAN',
+        departureTime: '2026-09-01T08:00:00.000Z',
+        arrivalTime: '2026-09-01T10:00:00.000Z',
+        status: 'CONFIRMED',
+        durationMinutes: 120,
+        stops: 0,
+        flightNumber: 'VN 123',
+        baggageAllowance: '20kg checked',
+        changeable: true,
+        refundable: false,
+      });
+
+      // Assert forbidden properties are undefined on detail object
+      const forbiddenProps = [
+        'id',
+        'bookingId',
+        'flightSnapshot',
+        'passengerSnapshot',
+        'Payment',
+        'payment',
+        'pnrReference',
+        'totalAmount',
+        'currency',
+        'passengers',
+      ];
+      for (const prop of forbiddenProps) {
+        expect((result as any)[prop]).toBeUndefined();
+      }
+    });
+
+    it('rejects with NotFoundException BOOKING_REFERENCE_NOT_FOUND on malformed reference format', async () => {
+      await expect(
+        (service as any).getBookingDetailByReference('user-1', 'invalid-ref'),
+      ).rejects.toThrow(NotFoundException);
+
+      try {
+        await (service as any).getBookingDetailByReference('user-1', 'bkref_short');
+      } catch (err: any) {
+        expect(err.getResponse()).toMatchObject({ code: 'BOOKING_REFERENCE_NOT_FOUND' });
+      }
+    });
+
+    it('rejects with NotFoundException BOOKING_REFERENCE_NOT_FOUND on non-existent reference', async () => {
+      (prismaService.bookingAgentProjection.findUnique as jest.Mock).mockResolvedValueOnce(null);
+
+      await expect(
+        (service as any).getBookingDetailByReference('user-1', 'bkref_99999999-9999-4999-8999-999999999999'),
+      ).rejects.toThrow(NotFoundException);
+
+      try {
+        (prismaService.bookingAgentProjection.findUnique as jest.Mock).mockResolvedValueOnce(null);
+        await (service as any).getBookingDetailByReference('user-1', 'bkref_99999999-9999-4999-8999-999999999999');
+      } catch (err: any) {
+        expect(err.getResponse()).toMatchObject({ code: 'BOOKING_REFERENCE_NOT_FOUND' });
+      }
+    });
+
+    it('rejects with NotFoundException BOOKING_REFERENCE_NOT_FOUND on foreign reference (cross-owner access)', async () => {
+      (prismaService.bookingAgentProjection.findUnique as jest.Mock).mockResolvedValueOnce({
+        agentReference: 'bkref_11111111-1111-4111-8111-111111111111',
+        airline: 'Vietnam Airlines',
+        booking: { userId: 'user-2' },
+      });
+
+      await expect(
+        (service as any).getBookingDetailByReference('user-1', 'bkref_11111111-1111-4111-8111-111111111111'),
+      ).rejects.toThrow(NotFoundException);
+
+      try {
+        (prismaService.bookingAgentProjection.findUnique as jest.Mock).mockResolvedValueOnce({
+          agentReference: 'bkref_11111111-1111-4111-8111-111111111111',
+          airline: 'Vietnam Airlines',
+          booking: { userId: 'user-2' },
+        });
+        await (service as any).getBookingDetailByReference('user-1', 'bkref_11111111-1111-4111-8111-111111111111');
+      } catch (err: any) {
+        expect(err.getResponse()).toMatchObject({ code: 'BOOKING_REFERENCE_NOT_FOUND' });
+      }
+    });
   });
 });
