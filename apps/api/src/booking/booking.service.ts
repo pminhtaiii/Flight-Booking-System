@@ -215,28 +215,39 @@ export class BookingService {
       });
     } catch (e: any) {
       if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2002') {
-        const existing = await this.prisma.booking.findFirst({
-          where: {
-            OR: [
-              { id: bookingId },
-              { bookingIntentId },
-            ],
-          },
+        const existingByIntent = await this.prisma.booking.findUnique({
+          where: { bookingIntentId },
         });
-        if (existing) {
-          if (existing.userId !== userId) {
+        if (existingByIntent) {
+          if (existingByIntent.userId !== userId) {
             throw new ForbiddenException('You do not own this booking');
           }
-          if (existing.bookingIntentId !== bookingIntentId) {
-            throw new BadRequestException('Booking ID is already associated with a different booking intent');
-          }
-          if (!existing.paymentId && paymentId) {
+          if (!existingByIntent.paymentId && paymentId) {
             return await this.prisma.booking.update({
-              where: { id: existing.id },
+              where: { id: existingByIntent.id },
               data: { paymentId },
             });
           }
-          return existing;
+          return existingByIntent;
+        }
+
+        const existingById = await this.prisma.booking.findUnique({
+          where: { id: bookingId },
+        });
+        if (existingById) {
+          if (existingById.userId !== userId) {
+            throw new ForbiddenException('You do not own this booking');
+          }
+          if (existingById.bookingIntentId !== bookingIntentId) {
+            throw new BadRequestException('Booking ID is already associated with a different booking intent');
+          }
+          if (!existingById.paymentId && paymentId) {
+            return await this.prisma.booking.update({
+              where: { id: existingById.id },
+              data: { paymentId },
+            });
+          }
+          return existingById;
         }
       }
       throw e;
