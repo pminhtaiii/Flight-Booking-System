@@ -8,6 +8,8 @@ import { FlightSearchResponseDto } from './dto/flight-result.dto';
 import { AttestedFlightSearchDto } from './dto/attested-flight-search.dto';
 import { UserPreferencesDto } from './dto/user-preferences.dto';
 import { UserBookingsResponseDto } from './dto/user-bookings.dto';
+import { BookingSummariesResponseDto } from './dto/booking-summary.dto';
+import { BookingDetailDto } from './dto/booking-detail.dto';
 import {
   AgentBookingReadinessRequestDto,
   AgentBookingReadinessResponseDto,
@@ -95,6 +97,46 @@ export class AgentGatewayController {
       return await this.agentGatewayService.getUserBookings(userId, traceId, correlationId);
     } catch (err: unknown) {
       this.logger.error('Failed to get user bookings');
+      throw err;
+    }
+  }
+
+  @Get('users/bookings/summaries')
+  async getBookingSummaries(
+    @Req() req: AuthenticatedRequest,
+    @Headers() headers: Record<string, string>,
+  ): Promise<BookingSummariesResponseDto> {
+    try {
+      const traceId = headers['x-trace-id'] || null;
+      const correlationId = headers['x-correlation-id'] || null;
+      const userId = req.user.id;
+
+      return await this.agentGatewayService.getBookingSummaries(userId, traceId, correlationId);
+    } catch (err: unknown) {
+      this.logger.error('Failed to get booking summaries');
+      throw err;
+    }
+  }
+
+  @Get('users/bookings/:bookingReference')
+  async getBookingDetail(
+    @Param('bookingReference') bookingReference: string,
+    @Req() req: AuthenticatedRequest,
+    @Headers() headers: Record<string, string>,
+  ): Promise<BookingDetailDto> {
+    try {
+      const traceId = headers['x-trace-id'] || null;
+      const correlationId = headers['x-correlation-id'] || null;
+      const userId = req.user.id;
+
+      return await this.agentGatewayService.getBookingDetailByReference(
+        userId,
+        bookingReference,
+        traceId,
+        correlationId,
+      );
+    } catch (err: unknown) {
+      this.logger.error('Failed to get booking detail');
       throw err;
     }
   }

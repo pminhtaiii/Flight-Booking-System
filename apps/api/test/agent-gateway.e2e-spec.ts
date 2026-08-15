@@ -291,6 +291,7 @@ describe('Agent Gateway (E2E)', () => {
     await prisma.itineraryRevision.deleteMany({});
     await prisma.disruptionAuditEvent.deleteMany({});
     await prisma.notificationOutbox.deleteMany({});
+    await prisma.bookingAgentProjection.deleteMany({});
     await prisma.booking.deleteMany({});
     await prisma.travelerProfile.deleteMany({});
     await prisma.offerRecovery.deleteMany({});
@@ -1049,6 +1050,343 @@ describe('Agent Gateway (E2E)', () => {
       expect(results.length).toBeGreaterThan(0);
       expect(results[0].flightOfferId).toBeUndefined();
       expect(results[0].duffelOfferId).toBeUndefined();
+    });
+  });
+
+  describe('Booking Projections Endpoints (GET /users/bookings/summaries and GET /users/bookings/:bookingReference)', () => {
+    let userA: User;
+    let userB: User;
+    let tokenA: string;
+    let tokenB: string;
+    const refA = 'bkref_11111111-1111-4111-8111-111111111111';
+    const refB = 'bkref_22222222-2222-4222-8222-222222222222';
+
+    beforeEach(async () => {
+      userA = await prisma.user.create({
+        data: {
+          id: crypto.randomUUID(),
+          email: `usera-${crypto.randomUUID()}@example.com`,
+          password: 'Password123!',
+          status: 'ACTIVE',
+        },
+      });
+
+      userB = await prisma.user.create({
+        data: {
+          id: crypto.randomUUID(),
+          email: `userb-${crypto.randomUUID()}@example.com`,
+          password: 'Password123!',
+          status: 'ACTIVE',
+        },
+      });
+
+      tokenA = mintClaimToken(userA.id, Math.floor(Date.now() / 1000));
+      tokenB = mintClaimToken(userB.id, Math.floor(Date.now() / 1000));
+
+      const offerA = await prisma.flightOffer.create({
+        data: {
+          searchHash: 'search_hash_a',
+          duffelOfferId: 'off_a',
+          rawOffer: {},
+          origin: 'HAN',
+          destination: 'NRT',
+          departureDate: new Date('2027-07-15T00:00:00Z'),
+          adults: 1,
+          cabinClass: 'economy',
+          price: 1250.0,
+          currency: 'USD',
+        },
+      });
+
+      const intentA = await prisma.bookingIntent.create({
+        data: {
+          userId: userA.id,
+          flightOfferId: offerA.id,
+          duffelOfferId: 'off_a',
+          status: 'CONFIRMED',
+          originalPrice: 1250.0,
+          confirmedPrice: 1250.0,
+          pricedAt: new Date(),
+          origin: 'HAN',
+          destination: 'NRT',
+          departureDate: new Date('2027-07-15T00:00:00Z'),
+          adults: 1,
+          rawOfferSnapshot: {},
+          intentExpiresAt: new Date(Date.now() + 100000),
+        },
+      });
+
+      const bookingA = await prisma.booking.create({
+        data: {
+          userId: userA.id,
+          bookingIntentId: intentA.id,
+          pnrReference: 'PNR_SECRET_A',
+          status: 'CONFIRMED',
+          totalAmount: 1250.0,
+          currency: 'USD',
+          departureAt: new Date('2027-07-15T08:30:00Z'),
+          flightSnapshot: {
+            segments: [
+              {
+                airline: { iataCode: 'VN', name: 'Vietnam Airlines' },
+                flightNumber: '310',
+                departureAirport: { iataCode: 'HAN' },
+                arrivalAirport: { iataCode: 'NRT' },
+                departureAt: '2027-07-15T08:30:00.000Z',
+                arrivalAt: '2027-07-15T15:00:00.000Z',
+              },
+            ],
+            totalDuration: 'PT5H30M',
+            stops: 0,
+            fareClass: 'Business',
+            baggageAllowance: '32kg checked',
+          },
+          passengerSnapshot: {
+            passengers: [
+              {
+                id: 'passenger-a',
+                type: 'ADULT',
+                position: 1,
+              },
+            ],
+          },
+        },
+      });
+
+      await prisma.bookingAgentProjection.create({
+        data: {
+          bookingId: bookingA.id,
+          agentReference: refA,
+          status: 'CONFIRMED',
+          airline: 'Vietnam Airlines',
+          origin: 'HAN',
+          destination: 'NRT',
+          departureAt: new Date('2027-07-15T08:30:00.000Z'),
+          arrivalAt: new Date('2027-07-15T15:00:00.000Z'),
+          durationMinutes: 330,
+          stopCount: 0,
+          flightNumber: 'VN 310',
+          baggageSummary: '32kg checked',
+          refundable: false,
+          changeable: true,
+        },
+      });
+
+      const offerB = await prisma.flightOffer.create({
+        data: {
+          searchHash: 'search_hash_b',
+          duffelOfferId: 'off_b',
+          rawOffer: {},
+          origin: 'SGN',
+          destination: 'SIN',
+          departureDate: new Date('2027-08-01T00:00:00Z'),
+          adults: 1,
+          cabinClass: 'economy',
+          price: 500.0,
+          currency: 'USD',
+        },
+      });
+
+      const intentB = await prisma.bookingIntent.create({
+        data: {
+          userId: userB.id,
+          flightOfferId: offerB.id,
+          duffelOfferId: 'off_b',
+          status: 'CONFIRMED',
+          originalPrice: 500.0,
+          confirmedPrice: 500.0,
+          pricedAt: new Date(),
+          origin: 'SGN',
+          destination: 'SIN',
+          departureDate: new Date('2027-08-01T00:00:00Z'),
+          adults: 1,
+          rawOfferSnapshot: {},
+          intentExpiresAt: new Date(Date.now() + 100000),
+        },
+      });
+
+      const bookingB = await prisma.booking.create({
+        data: {
+          userId: userB.id,
+          bookingIntentId: intentB.id,
+          pnrReference: 'PNR_SECRET_B',
+          status: 'CONFIRMED',
+          totalAmount: 500.0,
+          currency: 'USD',
+          departureAt: new Date('2027-08-01T10:00:00Z'),
+          flightSnapshot: {},
+          passengerSnapshot: {},
+        },
+      });
+
+      await prisma.bookingAgentProjection.create({
+        data: {
+          bookingId: bookingB.id,
+          agentReference: refB,
+          status: 'CONFIRMED',
+          airline: 'Singapore Airlines',
+          origin: 'SGN',
+          destination: 'SIN',
+          departureAt: new Date('2027-08-01T10:00:00.000Z'),
+          arrivalAt: new Date('2027-08-01T13:00:00.000Z'),
+          durationMinutes: 180,
+          stopCount: 0,
+          flightNumber: 'SQ 176',
+          baggageSummary: '30kg checked',
+          refundable: true,
+          changeable: true,
+        },
+      });
+    });
+
+    describe('GET /agent-gateway/users/bookings/summaries', () => {
+      it('User A receives User A projection summary, does NOT see User B bookings', async () => {
+        const res = await request(app.getHttpServer())
+          .get('/agent-gateway/users/bookings/summaries')
+          .set('X-Agent-API-Key', apiKey)
+          .set('X-User-Claim', tokenA)
+          .expect(200);
+
+        expect(res.body.bookings).toHaveLength(1);
+        const booking = res.body.bookings[0];
+        expect(booking.bookingReference).toBe(refA);
+        expect(booking.airline).toBe('Vietnam Airlines');
+        expect(booking.origin).toBe('HAN');
+        expect(booking.destination).toBe('NRT');
+        expect(booking.departureTime).toBe('2027-07-15T08:30:00.000Z');
+        expect(booking.arrivalTime).toBe('2027-07-15T15:00:00.000Z');
+        expect(booking.status).toBe('CONFIRMED');
+        expect(booking.durationMinutes).toBe(330);
+        expect(booking.stops).toBe(0);
+
+        // Forbidden fields check
+        expect(booking.id).toBeUndefined();
+        expect(booking.bookingId).toBeUndefined();
+        expect(booking.flightSnapshot).toBeUndefined();
+        expect(booking.passengerSnapshot).toBeUndefined();
+        expect(booking.pnrReference).toBeUndefined();
+        expect(booking.totalAmount).toBeUndefined();
+        expect(booking.Payment).toBeUndefined();
+        expect(booking.payment).toBeUndefined();
+      });
+
+      it('returns empty array for user without bookings', async () => {
+        const userC = await prisma.user.create({
+          data: {
+            id: crypto.randomUUID(),
+            email: `userc-${crypto.randomUUID()}@example.com`,
+            password: 'Password123!',
+            status: 'ACTIVE',
+          },
+        });
+        const tokenC = mintClaimToken(userC.id, Math.floor(Date.now() / 1000));
+
+        const res = await request(app.getHttpServer())
+          .get('/agent-gateway/users/bookings/summaries')
+          .set('X-Agent-API-Key', apiKey)
+          .set('X-User-Claim', tokenC)
+          .expect(200);
+
+        expect(res.body).toEqual({ bookings: [] });
+      });
+
+      it('fails with 401 when API key is missing', async () => {
+        await request(app.getHttpServer())
+          .get('/agent-gateway/users/bookings/summaries')
+          .set('X-User-Claim', tokenA)
+          .expect(401);
+      });
+
+      it('fails with 401 when Claim Token is missing', async () => {
+        await request(app.getHttpServer())
+          .get('/agent-gateway/users/bookings/summaries')
+          .set('X-Agent-API-Key', apiKey)
+          .expect(401);
+      });
+    });
+
+    describe('GET /agent-gateway/users/bookings/:bookingReference', () => {
+      it('User A requesting User A reference -> 200 with exact detail fields', async () => {
+        const res = await request(app.getHttpServer())
+          .get(`/agent-gateway/users/bookings/${refA}`)
+          .set('X-Agent-API-Key', apiKey)
+          .set('X-User-Claim', tokenA)
+          .expect(200);
+
+        expect(res.body).toEqual({
+          bookingReference: refA,
+          airline: 'Vietnam Airlines',
+          origin: 'HAN',
+          destination: 'NRT',
+          departureTime: '2027-07-15T08:30:00.000Z',
+          arrivalTime: '2027-07-15T15:00:00.000Z',
+          status: 'CONFIRMED',
+          durationMinutes: 330,
+          stops: 0,
+          flightNumber: 'VN 310',
+          baggageAllowance: '32kg checked',
+          refundable: false,
+          changeable: true,
+        });
+
+        // Forbidden fields check
+        expect(res.body.id).toBeUndefined();
+        expect(res.body.bookingId).toBeUndefined();
+        expect(res.body.flightSnapshot).toBeUndefined();
+        expect(res.body.passengerSnapshot).toBeUndefined();
+        expect(res.body.pnrReference).toBeUndefined();
+        expect(res.body.totalAmount).toBeUndefined();
+        expect(res.body.Payment).toBeUndefined();
+        expect(res.body.payment).toBeUndefined();
+      });
+
+      it('User B requesting User A reference -> 404 BOOKING_REFERENCE_NOT_FOUND', async () => {
+        const res = await request(app.getHttpServer())
+          .get(`/agent-gateway/users/bookings/${refA}`)
+          .set('X-Agent-API-Key', apiKey)
+          .set('X-User-Claim', tokenB)
+          .expect(404);
+
+        expect(res.body.code).toBe('BOOKING_REFERENCE_NOT_FOUND');
+      });
+
+      it('Non-existent reference -> 404 BOOKING_REFERENCE_NOT_FOUND', async () => {
+        const res = await request(app.getHttpServer())
+          .get('/agent-gateway/users/bookings/bkref_99999999-9999-4999-8999-999999999999')
+          .set('X-Agent-API-Key', apiKey)
+          .set('X-User-Claim', tokenA)
+          .expect(404);
+
+        expect(res.body.code).toBe('BOOKING_REFERENCE_NOT_FOUND');
+      });
+
+      it('Malformed reference -> 404 BOOKING_REFERENCE_NOT_FOUND', async () => {
+        const res = await request(app.getHttpServer())
+          .get('/agent-gateway/users/bookings/invalid-ref-123')
+          .set('X-Agent-API-Key', apiKey)
+          .set('X-User-Claim', tokenA)
+          .expect(404);
+
+        expect(res.body.code).toBe('BOOKING_REFERENCE_NOT_FOUND');
+      });
+
+      it('Missing/invalid API key -> 401', async () => {
+        const res = await request(app.getHttpServer())
+          .get(`/agent-gateway/users/bookings/${refA}`)
+          .set('X-User-Claim', tokenA)
+          .expect(401);
+
+        expect(res.body.code).toBe('INVALID_API_KEY');
+      });
+
+      it('Missing/invalid claim token -> 401', async () => {
+        const res = await request(app.getHttpServer())
+          .get(`/agent-gateway/users/bookings/${refA}`)
+          .set('X-Agent-API-Key', apiKey)
+          .expect(401);
+
+        expect(res.body.code).toBe('INVALID_CLAIM_TOKEN');
+      });
     });
   });
 });

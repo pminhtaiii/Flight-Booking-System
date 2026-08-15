@@ -72,21 +72,21 @@ export type HandoffError = {
 };
 
 export type BookingSummary = {
-  reference: string;
-  status: string;
+  bookingReference: string;
+  airline: string;
   origin: string;
   destination: string;
   departureTime: string;
   arrivalTime: string;
-  airline: string;
+  status: string;
+  durationMinutes: number;
+  stops: number;
 };
 
 export type BookingDetail = BookingSummary & {
-  flightNumber: string;
-  passengers: number;
+  flightNumber?: string | null;
   baggageAllowance?: string | null;
-  fareConditions: {
-    refundable: boolean;
-    changeable: boolean;
-  };
+  changeable?: boolean | null;
+  refundable?: boolean | null;
 };
+

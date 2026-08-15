@@ -11,6 +11,8 @@ import { AttestedFlightSearchDto } from './dto/attested-flight-search.dto';
 import { FlightSearchResponseDto, FlightResultDto } from './dto/flight-result.dto';
 import { UserPreferencesDto } from './dto/user-preferences.dto';
 import { UserBookingsResponseDto, BookingResultDto } from './dto/user-bookings.dto';
+import { BookingSummaryDto, BookingSummariesResponseDto } from './dto/booking-summary.dto';
+import { BookingDetailDto } from './dto/booking-detail.dto';
 import { FlightSnapshot, PassengerSnapshot } from '@shared/booking-types';
 import * as crypto from 'crypto';
 import { CABIN_KEYWORDS, PASSENGER_KEYWORDS } from './agent-gateway.constants';
@@ -1069,4 +1071,163 @@ export class AgentGatewayService {
       );
     }
   }
+
+  async getBookingSummaries(
+    userId: string,
+    traceId?: string | null,
+    correlationId?: string | null,
+  ): Promise<BookingSummariesResponseDto> {
+    const startTime = Date.now();
+    try {
+      const projections = await this.prisma.bookingAgentProjection.findMany({
+        where: { booking: { userId } },
+        select: {
+          agentReference: true,
+          airline: true,
+          origin: true,
+          destination: true,
+          departureAt: true,
+          arrivalAt: true,
+          status: true,
+          durationMinutes: true,
+          stopCount: true,
+        },
+        orderBy: { departureAt: 'asc' },
+      });
+
+      const bookings: BookingSummaryDto[] = projections.map((p) => ({
+        bookingReference: p.agentReference,
+        airline: p.airline,
+        origin: p.origin,
+        destination: p.destination,
+        departureTime: p.departureAt.toISOString(),
+        arrivalTime: p.arrivalAt.toISOString(),
+        status: p.status,
+        durationMinutes: p.durationMinutes,
+        stops: p.stopCount,
+      }));
+
+      const response: BookingSummariesResponseDto = { bookings };
+      await this.logToolCall(
+        userId,
+        'users/bookings/summaries',
+        {},
+        startTime,
+        traceId,
+        correlationId,
+        true,
+        null,
+        response,
+      );
+      return response;
+    } catch (err) {
+      await this.logToolCall(
+        userId,
+        'users/bookings/summaries',
+        {},
+        startTime,
+        traceId,
+        correlationId,
+        false,
+        err,
+        null,
+      );
+      throw err;
+    }
+  }
+
+  async getBookingDetailByReference(
+    userId: string,
+    bookingReference: string,
+    traceId?: string | null,
+    correlationId?: string | null,
+  ): Promise<BookingDetailDto> {
+    const startTime = Date.now();
+    try {
+      const BKREF_REGEX = /^bkref_[0-9a-fA-F-]{36}$/;
+      if (!bookingReference || !BKREF_REGEX.test(bookingReference)) {
+        throw new NotFoundException({
+          statusCode: 404,
+          message: 'Booking reference not found',
+          code: 'BOOKING_REFERENCE_NOT_FOUND',
+        });
+      }
+
+      const projection = await this.prisma.bookingAgentProjection.findUnique({
+        where: { agentReference: bookingReference },
+        select: {
+          agentReference: true,
+          airline: true,
+          origin: true,
+          destination: true,
+          departureAt: true,
+          arrivalAt: true,
+          status: true,
+          durationMinutes: true,
+          stopCount: true,
+          flightNumber: true,
+          baggageSummary: true,
+          refundable: true,
+          changeable: true,
+          booking: {
+            select: {
+              userId: true,
+            },
+          },
+        },
+      });
+
+      if (!projection || projection.booking.userId !== userId) {
+        throw new NotFoundException({
+          statusCode: 404,
+          message: 'Booking reference not found',
+          code: 'BOOKING_REFERENCE_NOT_FOUND',
+        });
+      }
+
+      const detail: BookingDetailDto = {
+        bookingReference: projection.agentReference,
+        airline: projection.airline,
+        origin: projection.origin,
+        destination: projection.destination,
+        departureTime: projection.departureAt.toISOString(),
+        arrivalTime: projection.arrivalAt.toISOString(),
+        status: projection.status,
+        durationMinutes: projection.durationMinutes,
+        stops: projection.stopCount,
+        flightNumber: projection.flightNumber ?? null,
+        baggageAllowance: projection.baggageSummary ?? null,
+        changeable: projection.changeable ?? null,
+        refundable: projection.refundable ?? null,
+      };
+
+      await this.logToolCall(
+        userId,
+        'users/bookings/detail',
+        { bookingReference },
+        startTime,
+        traceId,
+        correlationId,
+        true,
+        null,
+        detail,
+      );
+
+      return detail;
+    } catch (err) {
+      await this.logToolCall(
+        userId,
+        'users/bookings/detail',
+        { bookingReference },
+        startTime,
+        traceId,
+        correlationId,
+        false,
+        err,
+        null,
+      );
+      throw err;
+    }
+  }
 }
+

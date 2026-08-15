@@ -1,20 +1,6 @@
 import { IsString, IsInt, Min, ValidateNested, IsObject } from 'class-validator';
 import { Type } from 'class-transformer';
-
-export class FlightSearchQueryDto {
-  @IsString()
-  origin!: string;
-
-  @IsString()
-  destination!: string;
-
-  @IsString()
-  date!: string;
-
-  @IsInt()
-  @Min(1)
-  adults!: number;
-}
+import { FlightSearchQueryDto } from './flight-search-query.dto';
 
 export class AttestedFlightSearchDto {
   @IsString()
