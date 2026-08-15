@@ -100,6 +100,7 @@ async def test_create_session():
         assert "X-Agent-API-Key" in kwargs["headers"]
         assert "X-User-Claim" in kwargs["headers"]
 
+
 @pytest.mark.asyncio
 async def test_create_message():
     client = NestJSClient(base_url="http://localhost:3001/api", token="test-token")
@@ -123,6 +124,7 @@ async def test_create_message():
         assert kwargs["json"] == {"sender": "USER", "type": "STANDARD", "content": "hello"}
         assert "X-Agent-API-Key" in kwargs["headers"]
         assert "X-User-Claim" in kwargs["headers"]
+
 
 @pytest.mark.asyncio
 async def test_create_message_batch():
@@ -154,6 +156,7 @@ async def test_create_message_batch():
         assert "X-Agent-API-Key" in kwargs["headers"]
         assert "X-User-Claim" in kwargs["headers"]
 
+
 @pytest.mark.asyncio
 async def test_get_memory():
     client = NestJSClient(base_url="http://localhost:3001/api", token="test-token")
@@ -172,6 +175,7 @@ async def test_get_memory():
         assert kwargs["params"] == {"recentCount": 20}
         assert "X-Agent-API-Key" in kwargs["headers"]
         assert "X-User-Claim" in kwargs["headers"]
+
 
 @pytest.mark.asyncio
 async def test_get_memory_unsummarized_only():
@@ -274,15 +278,17 @@ async def test_create_handoff_uses_the_nestjs_dto_contract():
         "expiresAt": "2026-08-09T00:00:00Z",
     }
 
+
 @pytest.mark.asyncio
 async def test_get_gateway_headers_invalid_signature_fallback():
-    # Sign with a different secret
-    token = jwt.encode({"sub": "user-456"}, "wrong-secret", algorithm="HS256")
+    # Sign with a different secret (>= 32 bytes to avoid warning)
+    token = jwt.encode({"sub": "user-456"}, "wrong-secret-key-that-is-at-least-32-bytes-long!", algorithm="HS256")
     client = NestJSClient(base_url="http://localhost:3001/api", token=token)
 
     with pytest.raises(ValueError) as excinfo:
         client._get_gateway_headers()
     assert "Invalid authentication token" in str(excinfo.value)
+
 
 @pytest.mark.asyncio
 async def test_get_gateway_headers_missing_claims():
@@ -293,6 +299,7 @@ async def test_get_gateway_headers_missing_claims():
     with pytest.raises(ValueError) as excinfo:
         client._get_gateway_headers()
     assert "Token is missing user identification claims" in str(excinfo.value)
+
 
 @pytest.mark.asyncio
 async def test_get_gateway_flights_search():
@@ -328,6 +335,7 @@ async def test_get_gateway_flights_search():
             headers=headers
         )
 
+
 @pytest.mark.asyncio
 async def test_get_gateway_user_preferences():
     settings = get_settings()
@@ -349,48 +357,135 @@ async def test_get_gateway_user_preferences():
             headers=headers
         )
 
+
 @pytest.mark.asyncio
 async def test_get_gateway_user_booking_summaries():
     settings = get_settings()
     token = jwt.encode({"id": "user-123"}, settings.JWT_SECRET, algorithm="HS256")
-    client = NestJSClient(base_url="http://localhost:3001/api", token=token)
+    trace_id = "chat_" + ("a1" * 16)
+    client = NestJSClient(
+        base_url="http://localhost:3001/api",
+        token=token,
+        trace_id=trace_id,
+        correlation_id="session-123",
+    )
 
-    req = httpx.Request("GET", "http://localhost:3001/api/agent-gateway/users/bookings")
-    mock_response = httpx.Response(200, json={"bookings": [{"id": "abc", "status": "CONFIRMED"}]}, request=req)
+    req = httpx.Request("GET", "http://localhost:3001/api/agent-gateway/users/bookings/summaries")
+    mock_payload = {
+        "bookings": [
+            {
+                "bookingReference": "bkref_12345",
+                "airline": "VN",
+                "origin": "SGN",
+                "destination": "NRT",
+                "departureTime": "2026-09-20T02:00:00.000Z",
+                "arrivalTime": "2026-09-20T08:30:00.000Z",
+                "status": "CONFIRMED",
+                "durationMinutes": 330,
+                "stops": 0,
+            }
+        ]
+    }
+    mock_response = httpx.Response(200, json=mock_payload, request=req)
 
     with patch("httpx.AsyncClient.get", new_callable=AsyncMock) as mock_get:
         mock_get.return_value = mock_response
 
         result = await client.get_gateway_user_booking_summaries()
-        assert "summaries" in result
-        assert result["summaries"][0]["agentReference"] == "abc"
+        assert result == mock_payload
 
         headers = client._get_gateway_headers()
+        assert "X-Agent-API-Key" in headers
+        assert "X-User-Claim" in headers
+        assert headers["X-Trace-ID"] == trace_id
+        assert "X-Correlation-ID" in headers
         mock_get.assert_called_once_with(
-            "http://localhost:3001/api/agent-gateway/users/bookings",
-            headers=headers
+            "http://localhost:3001/api/agent-gateway/users/bookings/summaries",
+            headers=headers,
         )
+
 
 @pytest.mark.asyncio
 async def test_get_gateway_booking_detail():
     settings = get_settings()
     token = jwt.encode({"id": "user-123"}, settings.JWT_SECRET, algorithm="HS256")
-    client = NestJSClient(base_url="http://localhost:3001/api", token=token)
+    trace_id = "chat_" + ("b2" * 16)
+    client = NestJSClient(
+        base_url="http://localhost:3001/api",
+        token=token,
+        trace_id=trace_id,
+        correlation_id="session-456",
+    )
 
-    req = httpx.Request("GET", "http://localhost:3001/api/agent-gateway/users/bookings")
-    mock_response = httpx.Response(200, json={"bookings": [{"id": "abc", "status": "CONFIRMED"}]}, request=req)
+    req = httpx.Request("GET", "http://localhost:3001/api/agent-gateway/users/bookings/bkref_12345")
+    mock_payload = {
+        "bookingReference": "bkref_12345",
+        "airline": "VN",
+        "origin": "SGN",
+        "destination": "NRT",
+        "departureTime": "2026-09-20T02:00:00.000Z",
+        "arrivalTime": "2026-09-20T08:30:00.000Z",
+        "status": "CONFIRMED",
+        "durationMinutes": 330,
+        "stops": 0,
+        "flightNumber": "VN300",
+        "baggageAllowance": "1 checked bag",
+        "changeable": True,
+        "refundable": False,
+    }
+    mock_response = httpx.Response(200, json=mock_payload, request=req)
 
     with patch("httpx.AsyncClient.get", new_callable=AsyncMock) as mock_get:
         mock_get.return_value = mock_response
 
-        result = await client.get_gateway_booking_detail("abc")
-        assert result["status"] == "CONFIRMED"
+        result = await client.get_gateway_booking_detail("bkref_12345")
+        assert result == mock_payload
 
         headers = client._get_gateway_headers()
+        assert "X-Agent-API-Key" in headers
+        assert "X-User-Claim" in headers
+        assert headers["X-Trace-ID"] == trace_id
+        assert "X-Correlation-ID" in headers
         mock_get.assert_called_once_with(
-            "http://localhost:3001/api/agent-gateway/users/bookings",
-            headers=headers
+            "http://localhost:3001/api/agent-gateway/users/bookings/bkref_12345",
+            headers=headers,
         )
+
+
+@pytest.mark.asyncio
+async def test_get_gateway_booking_detail_not_found():
+    settings = get_settings()
+    token = jwt.encode({"id": "user-123"}, settings.JWT_SECRET, algorithm="HS256")
+    client = NestJSClient(base_url="http://localhost:3001/api", token=token)
+
+    req = httpx.Request("GET", "http://localhost:3001/api/agent-gateway/users/bookings/bkref_99999")
+    mock_response = httpx.Response(
+        404,
+        json={
+            "statusCode": 404,
+            "message": "Booking reference not found",
+            "code": "BOOKING_REFERENCE_NOT_FOUND",
+        },
+        request=req,
+    )
+
+    with patch("httpx.AsyncClient.get", new_callable=AsyncMock) as mock_get:
+        mock_get.return_value = mock_response
+
+        result = await client.get_gateway_booking_detail("bkref_99999")
+        assert result.get("statusCode") == 404 or result.get("error") == "BOOKING_REFERENCE_NOT_FOUND" or "not found" in str(result).lower()
+
+
+@pytest.mark.asyncio
+async def test_get_gateway_booking_detail_malformed_reference():
+    settings = get_settings()
+    token = jwt.encode({"id": "user-123"}, settings.JWT_SECRET, algorithm="HS256")
+    client = NestJSClient(base_url="http://localhost:3001/api", token=token)
+
+    with patch("httpx.AsyncClient.get", new_callable=AsyncMock) as mock_get:
+        with pytest.raises(ValueError):
+            await client.get_gateway_booking_detail("invalid_ref_no_prefix")
+        mock_get.assert_not_called()
 
 
 @pytest.mark.asyncio
