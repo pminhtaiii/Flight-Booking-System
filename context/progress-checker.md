@@ -7,9 +7,9 @@ Update this file after every completed feature. Any AI agent reading this should
 ### Current Status
 
 **Feature:** Chatbot Backend Infrastructure & Booking Handoff (Feature 17)
-**Last completed:** Phase 9D Signed Flight Search Attestation & Snapshot Isolation (2026-08-15).
+**Last completed:** Phase 10B Dark Create & Resolve Handoff Service & Endpoints (2026-08-15).
 **In progress:** None.
-**Next:** Phase 10 Checkout Handoff Cards & Token Creation Nodes.
+**Next:** Phase 10C Python Graph Nodes & SSE Action Emission.
 
 ---
 
@@ -63,6 +63,12 @@ Update this file after every completed feature. Any AI agent reading this should
 - [x] Phase 6 / US4: Deterministic Checkout Handoff (T064–T084)
   - [x] WP 6A: Deterministic credential primitive — attestation verifier, server-derived idempotency, HMAC/hash rotation
   - [x] WP 6B: Dark create/resolve API — service-auth create, user-auth token-only resolve, ISSUE/ACCEPT gates
+  - [x] Phase 10B / Dark Create & Resolve Handoff Service & Endpoints (2026-08-15):
+    - Implemented and verified deterministic NestJS `ChatHandoffService` and `ChatHandoffController` endpoints (`POST /api/chat-handoff/tokens` and `POST /api/chat-handoff/resolve`).
+    - Enforced strict attestation-bound credential creation via `SelectionAttestationService`, server-derived idempotency via `ChatHandoffTokenService.deriveIdempotencyHash` / `computeIdempotencyHash`, active-retry convergence returning existing credentials, and feature flag gating (`FEATURE_FLAG_CHAT_HANDOFF_ISSUE` & `FEATURE_FLAG_CHAT_HANDOFF_ACCEPT`).
+    - Enforced strict DTO validation rejecting client-supplied IDs, session identifiers, and extra parameters (`forbidNonWhitelisted: true`).
+    - User-authenticated resolution returns safe allowlisted checkout context (`offerSummary`, `flightDetails`, `passengerCount`, `expiresAt`, `status`) with `Cache-Control: no-store, private`, strictly excluding internal database identifiers or token hashes.
+    - Verified with 60/60 passing unit tests and 25/25 passing E2E tests in `apps/api`.
   - [x] WP 6C: Deterministic action and clean web bootstrap — ACTION_HANDOFF SSE parsing, strict card, CSRF bootstrap cookie, clean checkout URL
   - [x] WP 6D: Claimed canonical consume — Token-only readiness, pre-supplier claim, final atomic intent/consume CAS
   - **All Checkout Handoff tests pass (NestJS create/resolve/consume, agent signal integration, and Playwright UI tests).**
