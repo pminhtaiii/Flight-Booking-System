@@ -181,6 +181,14 @@ export class ChatHandoffService {
     );
   }
 
+  private setCachedFlightOffer(id: string, offer: FlightOffer): void {
+    if (this.flightOfferCache.size >= 500) {
+      const firstKey = this.flightOfferCache.keys().next().value;
+      if (firstKey) this.flightOfferCache.delete(firstKey);
+    }
+    this.flightOfferCache.set(id, offer);
+  }
+
   tryAcquireInFlight(token: string, userId?: string, ttlMs = 30000): string | null {
     if (!token || typeof token !== 'string' || !token.startsWith('chk_handoff_v1_')) return crypto.randomUUID();
     const tokenHash = this.tokenService.hashToken(token);
@@ -196,6 +204,17 @@ export class ChatHandoffService {
       (userId && this.activeClaimAttempts.has(tokenHash))
     ) {
       return null;
+    }
+
+    if (this.inFlightClaims.size >= 1000) {
+      for (const [key, val] of this.inFlightClaims.entries()) {
+        if (val.expiresAt <= now) this.inFlightClaims.delete(key);
+      }
+    }
+    if (this.claimedTokens.size >= 1000) {
+      for (const [key, val] of this.claimedTokens.entries()) {
+        if (val <= now) this.claimedTokens.delete(key);
+      }
     }
 
     const reservationId = crypto.randomUUID();
@@ -321,7 +340,7 @@ export class ChatHandoffService {
         const lookup = await this.prisma.flightOffer.findUnique({ where: { id: flightOfferId } });
         if (lookup) {
           flightOffer = lookup;
-          this.flightOfferCache.set(flightOfferId, lookup);
+          this.setCachedFlightOffer(flightOfferId, lookup);
         }
       } catch (err) {
         this.logger.warn(`[create] chat_handoff_offer_lookup_failed: ${err instanceof Error ? err.message : 'unknown'}`);
@@ -871,7 +890,7 @@ export class ChatHandoffService {
         });
         if (loadedFlightOffer) {
           flightOffer = loadedFlightOffer;
-          this.flightOfferCache.set(claimed.flightOfferId, loadedFlightOffer);
+          this.setCachedFlightOffer(claimed.flightOfferId, loadedFlightOffer);
         }
       } catch (err) {
         this.logger.warn(`[resolveAndAcquireClaimOnce] chat_handoff_offer_lookup_failed: ${err instanceof Error ? err.message : 'unknown'}`);

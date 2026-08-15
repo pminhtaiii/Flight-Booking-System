@@ -8,6 +8,7 @@ import {
   Injectable,
   NotFoundException,
   Optional,
+  ServiceUnavailableException,
   Logger,
 } from '@nestjs/common';
 import { FlightOffer, Prisma, PassengerType } from '@prisma/client';
@@ -16,7 +17,7 @@ import { DuffelService, DuffelTimeoutError } from '@/duffel/duffel.service';
 import { AuditService } from '@/audit/audit.service';
 import { EncryptionService } from '@/common/encryption.service';
 import { CreateIntentDto } from './dto/create-intent.dto';
-import { BookingReadinessRequestDto } from './dto/booking-readiness.dto';
+import { BookingReadinessRequestDto, BookingReadinessResponseDto } from './dto/booking-readiness.dto';
 import { BookingReadinessService } from './booking-readiness.service';
 import { ChatHandoffService } from '@/chat-handoff/chat-handoff.service';
 import {
@@ -86,9 +87,12 @@ export class BookingIntentService {
     userId: string,
     dto: BookingReadinessRequestDto,
     context?: { traceId?: string; correlationId?: string },
-  ) {
+  ): Promise<BookingReadinessResponseDto> {
     if (!this.bookingReadinessService) {
-      throw new Error('Booking readiness service is unavailable');
+      throw new ServiceUnavailableException({
+        code: 'FEATURE_DISABLED',
+        message: 'Booking readiness service is unavailable',
+      });
     }
 
     return this.bookingReadinessService.getAdvisoryReadiness(userId, dto, context);
@@ -159,6 +163,7 @@ export class BookingIntentService {
           if (claimWatchdog) clearInterval(claimWatchdog);
         }
       }, 10000);
+      claimWatchdog.unref?.();
     }
 
     let isSuccess = false;
@@ -181,6 +186,10 @@ export class BookingIntentService {
       });
       if (loadedFlightOffer) {
         flightOffer = loadedFlightOffer;
+        if (this.flightOfferCache.size >= 500) {
+          const firstKey = this.flightOfferCache.keys().next().value;
+          if (firstKey) this.flightOfferCache.delete(firstKey);
+        }
         this.flightOfferCache.set(targetFlightOfferId, loadedFlightOffer);
       }
     }

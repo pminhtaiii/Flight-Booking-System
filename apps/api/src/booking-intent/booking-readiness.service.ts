@@ -13,6 +13,7 @@ import {
   BookingReadinessInlineSourceDto,
   BookingReadinessPassengerDto,
   BookingReadinessRequestDto,
+  BookingReadinessResponseDto,
   BookingReadinessTravelerProfileSourceDto,
 } from './dto/booking-readiness.dto';
 import { ChatHandoffService } from '@/chat-handoff/chat-handoff.service';
@@ -190,7 +191,7 @@ export class BookingReadinessService {
     userId: string,
     dto: BookingReadinessRequestDto,
     context?: ReadinessContext,
-  ) {
+  ): Promise<BookingReadinessResponseDto> {
     const startedAt = Date.now();
 
     try {
@@ -286,7 +287,7 @@ export class BookingReadinessService {
     rawOffer: unknown,
     passengers: readonly ResolvedPassenger[],
     context?: ReadinessContext,
-  ) {
+  ): Promise<BookingReadinessResponseDto> {
     const startedAt = Date.now();
 
     try {

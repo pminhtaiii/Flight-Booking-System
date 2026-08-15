@@ -1,4 +1,5 @@
 process.env.ENCRYPTION_KEY = process.env.ENCRYPTION_KEY || 'a'.repeat(64);
+process.env.CHAT_HANDOFF_SECRET = 'test-handoff-secret';
 process.env.FEATURE_FLAG_BOOKING_READINESS = 'true';
 process.env.FEATURE_FLAG_CHAT_HANDOFF_ISSUE = 'true';
 process.env.FEATURE_FLAG_CHAT_HANDOFF_ACCEPT = 'true';
@@ -891,7 +892,7 @@ describe('Booking Readiness (E2E RED)', () => {
       const session = await prisma.chatSession.create({
         data: { userId: primaryUser.id },
       });
-      const validHandoffToken = 'valid-handoff-token-123';
+      const validHandoffToken = 'chk_handoff_v1_valid-token-123';
       const tokenHash = require('crypto').createHash('sha256').update(validHandoffToken).digest('hex');
       const handoff = await prisma.chatHandoff.create({
         data: {

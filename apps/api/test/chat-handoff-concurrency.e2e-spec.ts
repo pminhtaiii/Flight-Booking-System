@@ -123,7 +123,7 @@ describe('Chat Handoff Concurrency (E2E)', () => {
     const crypto = await import('crypto');
 
     const handoffId = crypto.randomUUID();
-    const token = 'valid-concurrency-token';
+    const token = 'chk_handoff_v1_valid-concurrency-token';
     const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
 
     const session = await prisma.chatSession.create({
