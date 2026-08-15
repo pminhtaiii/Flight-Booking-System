@@ -258,7 +258,7 @@ async def chat_stream(
                 trusted_snapshot_dict = snapshot_obj.model_dump(mode="json")
                 snapshot_state = "hit"
         except Exception:
-            logger.debug("trusted_snapshot_lookup_failed", exc_info=True)
+            logger.debug("trusted_snapshot_lookup_failed")
             snapshot_state = "unavailable"
         chat_telemetry.emit_safely(
             "snapshot_read",

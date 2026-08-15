@@ -2,6 +2,7 @@ import pytest
 import asyncio
 import httpx
 import json
+import logging
 import time
 import jwt
 from unittest.mock import AsyncMock, patch, MagicMock
@@ -817,3 +818,31 @@ async def test_sse_action_handoff_disconnect_retry(mock_nestjs_client):
                     or "failed" in error_events[0]["data"].get("message", "").lower()
                     or error_events[0]["data"].get("code") in ("HANDOFF_ERROR", "HANDOFF_FAILED")
                 )
+
+
+@pytest.mark.asyncio
+async def test_sse_snapshot_lookup_failure_redacts_redis_error(mock_nestjs_client, caplog):
+    caplog.set_level(logging.DEBUG)
+    headers = get_auth_headers()
+    llm = MockStreamingLLM(responses=[AIMessage(content="Hello world")])
+
+    with (
+        patch("agent.streaming.sse.NestJSClient", return_value=mock_nestjs_client),
+        patch("agent.agents.chat_agent.ChatOpenAI", return_value=llm),
+        patch("agent.graph.graph.invoke_router", return_value=RouteDecision(intent="SEARCH", confidence=1.0, isCommitment=False)),
+        patch("agent.streaming.sse.TrustedSnapshotRepository.get_snapshot", side_effect=RuntimeError("redis://secret_user:secret_pass@10.0.0.1:6379 failed")),
+    ):
+        transport = httpx.ASGITransport(app=app)
+        async with httpx.AsyncClient(transport=transport, base_url="http://test") as ac:
+            response = await ac.post(
+                "/chat/stream",
+                json={"message": "hello", "sessionId": "session-redis-err"},
+                headers=headers,
+            )
+            assert response.status_code == 200
+            _ = [line async for line in response.aiter_lines()]
+
+    assert "secret_pass" not in caplog.text
+    assert "10.0.0.1:6379" not in caplog.text
+    assert "trusted_snapshot_lookup_failed" in caplog.text
+
