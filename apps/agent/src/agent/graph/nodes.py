@@ -222,7 +222,7 @@ async def create_handoff_token(state: AgentState, config: RunnableConfig) -> dic
             }
         }
     except Exception:
-        logger.error("create_handoff_token_failed", exc_info=True)
+        logger.error("create_handoff_token_failed")
         return {"action": {"error": "Checkout handoff could not be created."}}
 
 create_handoff_token_node = create_handoff_token

@@ -229,7 +229,7 @@ async def test_create_handoff_token_success():
 
 
 @pytest.mark.asyncio
-async def test_create_handoff_token_redacts_upstream_failure_details():
+async def test_create_handoff_token_redacts_upstream_failure_details(caplog):
     state = AgentState(
         signal={"offer_index": 1},
         trusted_snapshot={
@@ -254,6 +254,8 @@ async def test_create_handoff_token_redacts_upstream_failure_details():
     }
     assert "supplier.invalid" not in str(result)
     assert "off_sensitive" not in str(result)
+    assert "supplier.invalid" not in caplog.text
+    assert "off_sensitive" not in caplog.text
 
 
 def test_create_handoff_token_node_alias():
