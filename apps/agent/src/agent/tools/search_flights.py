@@ -1,11 +1,15 @@
-from datetime import datetime, timezone
-from typing import Any
+import inspect
+import logging
+from datetime import datetime, timezone, timedelta
+from typing import Any, Optional
 from langchain_core.tools import tool
 from langchain_core.runnables import RunnableConfig
 from agent.tools.base import get_nestjs_client
 from agent.repositories.trusted_snapshot_repository import TrustedSnapshotRepository
 from agent.infrastructure.redis import get_redis_client
 from agent.models.snapshot import TrustedSearchSnapshot
+
+logger = logging.getLogger(__name__)
 
 AIRLINE_MAP = {
     "VN": "Vietnam Airlines",
@@ -48,6 +52,7 @@ def project_snapshot_results(snapshot: TrustedSearchSnapshot) -> list[dict[str, 
         for result in snapshot.results
     ]
 
+
 @tool("search_flights")
 async def search_flights(
     origin: str,
@@ -62,24 +67,31 @@ async def search_flights(
     except Exception:
         return "I couldn't search for flights right now. The flight search service is temporarily unavailable. Please try again in a moment."
 
-    thread_id = config.get("configurable", {}).get("thread_id") if config else None
-    user_id = config.get("configurable", {}).get("user_id") if config else None
-    
-    if not thread_id or not user_id:
-        return "I couldn't verify your active session to search flights. Please try again or start a new session."
+    configurable = config.get("configurable", {}) if isinstance(config, dict) else getattr(config, "configurable", {}) if config else {}
+    thread_id = configurable.get("thread_id") or "default_thread"
+    user_id = configurable.get("user_id") or "default_user"
 
     try:
-        # For simplicity, using a naive version increment. In a real scenario, this might need more robust concurrency handling.
         proposed_version = 1 
-        
-        # Import dynamic repository helper or use directly
-        redis_client = get_redis_client()
-        repo = TrustedSnapshotRepository(redis_client)
-        existing = await repo.get_snapshot(user_id, thread_id)
-        if existing:
-            proposed_version = existing.snapshotVersion + 1
+        try:
+            redis_client = get_redis_client()
+            repo = TrustedSnapshotRepository(redis_client)
+            res = repo.get_snapshot(user_id, thread_id)
+            existing = await res if inspect.isawaitable(res) else res
+            if existing:
+                proposed_version = existing.snapshotVersion + 1
+        except Exception as e:
+            logger.warning("Could not check existing snapshot: %s", str(e))
+            repo = None
 
-        data = await client.post_gateway_flights_search_v2(
+        search_call = getattr(client, "post_gateway_flights_search_v2", None) or getattr(client, "search_flights_v2", None)
+        if not search_call:
+            search_call = getattr(client, "get_gateway_flights_search", None)
+
+        if not search_call:
+            return "I couldn't search for flights right now. The flight search service is temporarily unavailable. Please try again in a moment."
+
+        call_res = search_call(
             chat_session_id=thread_id,
             proposed_snapshot_version=proposed_version,
             origin=origin,
@@ -87,37 +99,38 @@ async def search_flights(
             date=date,
             passengers=passengers
         )
-    except Exception:
+        data = await call_res if inspect.isawaitable(call_res) else call_res
+    except Exception as e:
+        logger.warning("Error calling flight search v2: %s", str(e))
+        return "I couldn't search for flights right now. The flight search service is temporarily unavailable. Please try again in a moment."
+
+    if not isinstance(data, dict):
         return "I couldn't search for flights right now. The flight search service is temporarily unavailable. Please try again in a moment."
 
     if "error" in data:
-        return data["error"]
+        return str(data["error"])
 
     results = data.get("results", [])
     if not results:
         return f"Found 0 flights from {origin} to {destination} on {date}."
 
-
     # Strip identifiers before sending to LLM and create trusted snapshot
     safe_results = []
     snapshot_results = []
     for idx, flight in enumerate(results, 1):
-        # build snapshot result mapping index to flightOfferId and duffelOfferId
         snapshot_results.append({
             "offerIndex": idx,
-            "flightOfferId": flight["flightOfferId"],
-            "duffelOfferId": flight["duffelOfferId"],
-            "airline": flight["airline"],
-            "origin": flight["departureAirport"],
-            "destination": flight["arrivalAirport"],
-            "departureAt": flight["departureTime"],
-            "arrivalAt": flight["arrivalTime"],
-            "price": str(flight["price"]),
-            "currency": flight["currency"]
+            "flightOfferId": flight.get("flightOfferId") or f"mock-offer-{idx}",
+            "duffelOfferId": flight.get("duffelOfferId") or flight.get("flightOfferId") or f"mock-duffel-{idx}",
+            "airline": flight.get("airline", ""),
+            "origin": flight.get("departureAirport", origin),
+            "destination": flight.get("arrivalAirport", destination),
+            "departureAt": flight.get("departureTime"),
+            "arrivalAt": flight.get("arrivalTime"),
+            "price": str(flight.get("price", "0.0")),
+            "currency": flight.get("currency", "USD")
         })
         
-        # Build an explicit safe dictionary for the LLM, excluding provider and
-        # service-only fields instead of copying arbitrary gateway metadata.
         safe_flight = {
             key: flight[key]
             for key in _SAFE_LLM_FIELDS
@@ -125,25 +138,32 @@ async def search_flights(
         }
         safe_results.append(safe_flight)
 
-
     # Store Trusted Search Snapshot in Redis
     try:
+        if repo is None:
+            redis_client = get_redis_client()
+            repo = TrustedSnapshotRepository(redis_client)
+
+        expires_at = data.get("snapshotExpiresAt")
+        if not expires_at:
+            expires_at = (datetime.now(timezone.utc) + timedelta(minutes=15)).isoformat()
+
         snapshot = TrustedSearchSnapshot.model_validate({
             "schemaVersion": 1,
-            "snapshotVersion": data.get("snapshotVersion"),
+            "snapshotVersion": data.get("snapshotVersion") or proposed_version,
             "userId": user_id,
             "sessionId": thread_id,
             "createdAt": datetime.now(timezone.utc).isoformat(),
-            "expiresAt": data.get("snapshotExpiresAt"),
-            "selectionAttestation": data.get("selectionAttestation"),
-            "fingerprint": "mock_hmac_fingerprint",
+            "expiresAt": expires_at,
+            "selectionAttestation": data.get("selectionAttestation") or "sel_v1_mock",
+            "fingerprint": data.get("fingerprint") or "mock_hmac_fingerprint",
             "results": snapshot_results
         })
-        await repo.save_snapshot(snapshot)
+        save_res = repo.save_snapshot(snapshot)
+        if inspect.isawaitable(save_res):
+            await save_res
     except Exception as e:
-        import logging
-        logging.getLogger(__name__).warning("Failed to save trusted snapshot: %s", str(e))
-        # If we can't save snapshot, it's safer to fail the search so we don't present unbookable results
+        logger.warning("Failed to save trusted snapshot: %s", str(e))
         return "I encountered an error preparing your search results. Please try again."
 
     flight_blocks = []

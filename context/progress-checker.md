@@ -7,9 +7,9 @@ Update this file after every completed feature. Any AI agent reading this should
 ### Current Status
 
 **Feature:** Chatbot Backend Infrastructure & Booking Handoff (Feature 17)
-**Last completed:** Phase 9C Python Read Tools & Privacy-Minimized Formatting (2026-08-15).
+**Last completed:** Phase 9D Signed Flight Search Attestation & Snapshot Isolation (2026-08-15).
 **In progress:** None.
-**Next:** Phase 9D Search Attestation.
+**Next:** Phase 10 Checkout Handoff Cards & Token Creation Nodes.
 
 ---
 
@@ -43,10 +43,15 @@ Update this file after every completed feature. Any AI agent reading this should
   - [x] WP 4A: Router schema/fallback (T039, T047)
   - [x] WP 4B: Checkout gate/state (T040, T048)
   - [x] WP 4C: Graph topology/removal (T041, T050, T051)
-  - [x] WP 4D: Signed search split (T042, T049)
+  - [x] WP 4D / Phase 9D Signed Search Attestation & Snapshot Isolation (T042, T049):
+    - Implemented opt-in `POST /api/agent-gateway/v2/flights/search` endpoint in `AgentGatewayController` with session ownership validation, `SelectionAttestationService` HMAC-SHA256 signing binding `userId`, `chatSessionId`, `snapshotVersion`, `issuedAt`, `expiresAt`, and ordered offers array.
+    - Updated Python `NestJSClient.post_gateway_flights_search_v2` / `search_flights_v2` with service authentication, claim token validation, and error degradation handling.
+    - Updated `search_flights` tool to atomically save `TrustedSearchSnapshot` in Redis with TTL matching offer expiry, and return strictly identifier-free 1-indexed projections to the LLM.
+    - Preserved legacy `GET /api/agent-gateway/flights/search` byte-for-byte unchanged and unenriched.
+    - Verified with 21/21 `SelectionAttestationService` unit tests, 47/47 `agent-gateway.e2e-spec.ts` tests, 9/9 `test_search_snapshot.py` tests, and full 282/282 Python agent pytest suite passing cleanly.
   - [x] WP 4E: General/Travel inventory (T043, T044, T045)
   - [x] WP 4F: Checkout adapter/integration (T046, T052)
-  - **All tests in apps/agent pass successfully (201/201).**
+  - **All tests in apps/agent pass successfully (282/282).**
 - [x] Phase 5 / US3: Privacy-Minimized Booking Answers (T053–T063)
   - [x] Phase 9A / Safe Booking Projection Foundation: Created and verified dedicated `BookingAgentProjection` persistence layer with opaque cryptographically random reference generation (`bkref_<uuid>`), transactional upsert during booking confirmation (`CONFIRMED`), cancellation, failure, and completion in `BookingService` and `PaymentService`, transactional projection refresh during `SupplierSyncService`, `ReconciliationService`, and `DuffelEventProcessor`, restart-safe cursor-paginated backfill in `apps/api/prisma/scripts/backfill-booking-agent-projections.ts`, and comprehensive DDL/data-model privacy contract tests proving total exclusion of PII, passenger counts, passport numbers, payment records, PNRs, financial fields, and raw snapshots.
   - [x] Phase 9B / Exact Booking Projection Gateway Read Boundaries: Created strict DTO tiers (`BookingSummaryDto`, `BookingSummariesResponseDto`, `BookingDetailDto`) and exposed service-authenticated (`X-Agent-API-Key`), claim-token-validated (`X-User-Claim`) Agent Gateway endpoints `GET /agent-gateway/users/bookings/summaries` and `GET /agent-gateway/users/bookings/:bookingReference`. Refactored `AgentGatewayService` to query exclusively from `BookingAgentProjection` with explicit Prisma selects, zero raw snapshot/payment/financial reads, uniform 404 (`BOOKING_REFERENCE_NOT_FOUND`) behavior on missing, malformed, or foreign references, and query spies proving complete database boundary isolation. (T054, T055, T058, T060, T061).

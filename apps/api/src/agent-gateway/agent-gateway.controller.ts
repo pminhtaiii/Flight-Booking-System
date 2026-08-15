@@ -5,7 +5,7 @@ import { ClaimTokenGuard } from './auth/claim-token.guard';
 import { AgentGatewayService } from './agent-gateway.service';
 import { FlightSearchQueryDto } from './dto/flight-search-query.dto';
 import { FlightSearchResponseDto } from './dto/flight-result.dto';
-import { AttestedFlightSearchDto } from './dto/attested-flight-search.dto';
+import { AttestedFlightSearchDto, AttestedFlightSearchResponseDto } from './dto/attested-flight-search.dto';
 import { UserPreferencesDto } from './dto/user-preferences.dto';
 import { UserBookingsResponseDto } from './dto/user-bookings.dto';
 import { BookingSummariesResponseDto } from './dto/booking-summary.dto';
@@ -54,7 +54,7 @@ export class AgentGatewayController {
     @Body() dto: AttestedFlightSearchDto,
     @Req() req: AuthenticatedRequest,
     @Headers() headers: Record<string, string>,
-  ) {
+  ): Promise<AttestedFlightSearchResponseDto> {
     try {
       const traceId = headers['x-trace-id'] || null;
       const correlationId = headers['x-correlation-id'] || null;
