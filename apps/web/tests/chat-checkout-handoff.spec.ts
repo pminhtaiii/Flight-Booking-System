@@ -12,6 +12,11 @@ async function loginAsNewUser(page: Page): Promise<void> {
   await page.fill('input[name="password"]', 'Password123!');
   await page.click('button[type="submit"]');
   await expect(page).toHaveURL(/.*127\.0\.0\.1:3000\/$/, { timeout: 15000 });
+  await page.waitForLoadState('networkidle');
+  await expect.poll(async () => {
+    const cookies = await page.context().cookies();
+    return cookies.some((c) => c.name.includes('next-auth'));
+  }).toBe(true);
 }
 
 test.describe('Chat Checkout Handoff', () => {
@@ -203,6 +208,7 @@ test.describe('Chat Checkout Handoff', () => {
     expect(handoffCookie?.secure).toBe(true);
     expect(handoffCookie?.sameSite).toBe('Strict');
   });
+
 
   test('should enforce browser-storage privacy', async ({ page }) => {
     await setupMockStream(page);
