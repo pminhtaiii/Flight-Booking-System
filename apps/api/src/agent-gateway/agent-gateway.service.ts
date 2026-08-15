@@ -1074,12 +1074,12 @@ export class AgentGatewayService {
       const safeResponse: AgentBookingReadinessResponseDto = {
         scope: result.scope,
         ready: result.ready,
-        passengers: result.passengers.map((p) => ({
+        passengers: result.passengers.map((p: any) => ({
           passengerType: p.passengerType as any,
           passengerOrdinal: p.passengerOrdinal,
-          sections: p.sections.map((s) => ({
+          sections: p.sections.map((s: any) => ({
             name: s.name,
-            fields: s.fields.map((f) => ({
+            fields: s.fields.map((f: any) => ({
               name: f.name,
               status: f.status as string,
               reason: f.reason,
