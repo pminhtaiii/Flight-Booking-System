@@ -427,12 +427,24 @@ class NestJSClient:
 
             return safe_response
 
-    async def create_handoff(self, attestation: str, offer_index: int, fingerprint: Optional[str] = None) -> dict:
+    async def create_handoff_token(
+        self,
+        attestation: str,
+        selected_offer_index: int,
+        trace_id: Optional[str] = None,
+        correlation_id: Optional[str] = None,
+        fingerprint: Optional[str] = None,
+    ) -> dict:
         url = f"{self.base_url}/chat-handoff"
         headers = self._get_gateway_headers()
+        if trace_id is not None:
+            headers["X-Trace-ID"] = safe_opaque_id(trace_id)
+        if correlation_id is not None:
+            headers["X-Correlation-ID"] = safe_opaque_id(correlation_id)
+
         payload: dict[str, Any] = {
             "selectionAttestationHash": attestation,
-            "selectedOfferIndex": offer_index,
+            "selectedOfferIndex": selected_offer_index,
         }
 
         async with httpx.AsyncClient() as client:
@@ -440,7 +452,26 @@ class NestJSClient:
             response.raise_for_status()
             body = response.json()
             return {
-                "handoffToken": body["token"],
-                "expiresAt": body["expiresAt"],
+                "handoffToken": body.get("token") or body.get("handoffToken"),
+                "expiresAt": body.get("expiresAt"),
+                "display": body.get("display"),
             }
+
+    async def create_handoff(
+        self,
+        attestation: str,
+        offer_index: int,
+        fingerprint: Optional[str] = None,
+        trace_id: Optional[str] = None,
+        correlation_id: Optional[str] = None,
+        **kwargs: Any,
+    ) -> dict:
+        return await self.create_handoff_token(
+            attestation=attestation,
+            selected_offer_index=offer_index,
+            trace_id=trace_id,
+            correlation_id=correlation_id,
+            fingerprint=fingerprint,
+        )
+
 

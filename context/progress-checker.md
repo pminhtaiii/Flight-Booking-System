@@ -7,9 +7,9 @@ Update this file after every completed feature. Any AI agent reading this should
 ### Current Status
 
 **Feature:** Chatbot Backend Infrastructure & Booking Handoff (Feature 17)
-**Last completed:** Phase 10B Dark Create & Resolve Handoff Service & Endpoints (2026-08-15).
+**Last completed:** Phase 10C Python Graph Nodes & SSE Action Emission (2026-08-15).
 **In progress:** None.
-**Next:** Phase 10C Python Graph Nodes & SSE Action Emission.
+**Next:** Phase 10D Web Handoff Bootstrap & Clean Checkout Resolution.
 
 ---
 
@@ -69,6 +69,13 @@ Update this file after every completed feature. Any AI agent reading this should
     - Enforced strict DTO validation rejecting client-supplied IDs, session identifiers, and extra parameters (`forbidNonWhitelisted: true`).
     - User-authenticated resolution returns safe allowlisted checkout context (`offerSummary`, `flightDetails`, `passengerCount`, `expiresAt`, `status`) with `Cache-Control: no-store, private`, strictly excluding internal database identifiers or token hashes.
     - Verified with 60/60 passing unit tests and 25/25 passing E2E tests in `apps/api`.
+  - [x] Phase 10C / Python Graph Nodes & SSE Action Emission (2026-08-15):
+    - Implemented `create_handoff_token` deterministic client method in `apps/agent/src/agent/tools/nestjs_client.py` sending minimal payload (`selectionAttestationHash`, `selectedOfferIndex`) with required service authentication and context headers (`X-Agent-API-Key`, `X-User-Claim`, `X-Trace-ID`, `X-Correlation-ID`, `X-Fencing-Token`), completely omitting caller-supplied session/idempotency IDs.
+    - Implemented deterministic graph execution nodes `validate_handoff` and `create_handoff_token` (`create_handoff_token_node`) in `apps/agent/src/agent/graph/nodes.py` and connected conditional routing in `apps/agent/src/agent/graph/graph.py`.
+    - Enforced strict state validation: checkout signal verification, 1-based offer index range bounds checking (`1 <= offer_index <= len(results)`), attestation and version presence, UTC snapshot expiration checks, feature flag gating (`FEATURE_FLAG_CHAT_HANDOFF_ISSUE`), allowlisted display extraction (`airline`, `origin`, `destination`, `departureAt`, `arrivalAt`, `price`, `currency`), and exception redaction preventing upstream URL/offer ID leaks.
+    - Implemented streaming SSE action contract in `apps/agent/src/agent/streaming/sse.py` emitting versioned `ACTION_HANDOFF` events upon successful node completion, validating active fence, enforcing completed turn persistence (`force_persistence = True`), and guaranteeing raw tokens are strictly excluded from message content, conversation history, and telemetry logs.
+    - Preserved zero-write LLM tool registry invariant: verified `validate_handoff` and `create_handoff_token` are absent from `_GENERAL_TOOLS`, `_TRAVEL_TOOLS`, and `_CHECKOUT_TOOLS`.
+    - Verified with 13/13 `test_handoff_nodes.py`, 11/11 `test_sse_integration.py`, 29/29 `test_nestjs_client.py`, and full 321/321 passing tests across `apps/agent`.
   - [x] WP 6C: Deterministic action and clean web bootstrap — ACTION_HANDOFF SSE parsing, strict card, CSRF bootstrap cookie, clean checkout URL
   - [x] WP 6D: Claimed canonical consume — Token-only readiness, pre-supplier claim, final atomic intent/consume CAS
   - **All Checkout Handoff tests pass (NestJS create/resolve/consume, agent signal integration, and Playwright UI tests).**

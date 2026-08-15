@@ -446,7 +446,9 @@ async def test_sse_action_handoff_ordering_and_schema(mock_nestjs_client):
         "fingerprint": "test_fingerprint",
         "results": [{
             "flightOfferId": "offer-123",
+            "duffelOfferId": "duffel-secret-456",
             "airline": "VN",
+            "flightNumber": "VN310",
             "departureAirport": "HAN",
             "arrivalAirport": "NRT",
             "departureTime": "2026-07-15T08:30:00Z",
@@ -456,10 +458,11 @@ async def test_sse_action_handoff_ordering_and_schema(mock_nestjs_client):
         }]
     }
 
-    mock_nestjs_client.create_handoff = AsyncMock(return_value={
-        "handoffToken": "test_handoff_token_123",
+    mock_nestjs_client.create_handoff_token = AsyncMock(return_value={
+        "handoffToken": "chk_handoff_v1_secret_token_12345678901234567890123",
         "expiresAt": "2026-08-07T12:00:00Z"
     })
+    mock_nestjs_client.create_handoff = mock_nestjs_client.create_handoff_token
 
     llm = MockStreamingLLM(responses=[
         AIMessage(
@@ -469,7 +472,8 @@ async def test_sse_action_handoff_ordering_and_schema(mock_nestjs_client):
                 "args": {"offer_index": 1},
                 "id": "call_signal_1"
             }]
-        )
+        ),
+        AIMessage(content="Proceeding to checkout with flight VN310.")
     ])
 
     with patch("agent.streaming.sse.NestJSClient", return_value=mock_nestjs_client), \
@@ -495,23 +499,261 @@ async def test_sse_action_handoff_ordering_and_schema(mock_nestjs_client):
                 lines = [line async for line in response.aiter_lines()]
                 events = parse_sse(lines)
                 
-                action_events = [e for e in events if e["event"] == "ACTION_HANDOFF"]
-                done_events = [e for e in events if e["event"] == "done"]
+                # Check sequence of event types
+                event_types = [e["event"] for e in events]
+                assert "tool_call" in event_types
+                assert "tool_result" in event_types
+                assert "ACTION_HANDOFF" in event_types
+                assert "done" in event_types
                 
+                # Assert ordering: tool_call -> tool_result -> ACTION_HANDOFF -> done
+                tool_call_idx = event_types.index("tool_call")
+                tool_result_idx = event_types.index("tool_result")
+                action_idx = event_types.index("ACTION_HANDOFF")
+                done_idx = event_types.index("done")
+                assert tool_call_idx < tool_result_idx < action_idx < done_idx
+                
+                action_events = [e for e in events if e["event"] == "ACTION_HANDOFF"]
                 assert len(action_events) == 1
-                assert len(done_events) == 1
                 
                 data = action_events[0]["data"]
                 assert data["action"] == "begin_checkout"
-                assert data["handoffToken"] == "test_handoff_token_123"
+                assert data["handoffToken"] == "chk_handoff_v1_secret_token_12345678901234567890123"
                 assert data["expiresAt"] == "2026-08-07T12:00:00Z"
                 assert "display" in data
+                
                 display = data["display"]
                 assert display["airline"] == "VN"
                 assert display["price"] == "452.00"
-                assert "offer-123" not in json.dumps(data)
+                assert display["origin"] == "HAN"
+                assert display["destination"] == "NRT"
                 
+                # Assert no supplier offer IDs in display or ACTION_HANDOFF payload
+                assert "flightNumber" not in display
+                assert "flightOfferId" not in display
+                assert "duffelOfferId" not in display
+                assert "offer-123" not in json.dumps(data)
+                assert "duffel-secret-456" not in json.dumps(data)
+                
+                # Negative privacy assertion: assert raw token is NOT in any token/content text
+                token_events = [e for e in events if e["event"] == "token"]
+                for te in token_events:
+                    assert "chk_handoff_v1_secret_token_12345678901234567890123" not in str(te.get("data", ""))
+                
+                # Negative privacy assertion: assert raw token is NOT in persisted message payloads
                 assert mock_nestjs_client.create_message_batch.call_count >= 1
+                for call in mock_nestjs_client.create_message_batch.mock_calls:
+                    assert "chk_handoff_v1_secret_token_12345678901234567890123" not in str(call)
+
+
+@pytest.mark.asyncio
+async def test_sse_action_handoff_validation_failure_emits_error(mock_nestjs_client):
+    headers = get_auth_headers()
+    
+    # Snapshot expired failure triggers validate_handoff error event
+    trusted_snapshot = {
+        "version": 1,
+        "attestation": "test_attestation",
+        "fingerprint": "test_fingerprint",
+        "expiresAt": "2020-01-01T00:00:00Z",
+        "results": [{
+            "flightOfferId": "offer-123",
+            "airline": "VN",
+            "departureAirport": "HAN",
+            "arrivalAirport": "NRT",
+            "departureTime": "2026-07-15T08:30:00Z",
+            "arrivalTime": "2026-07-15T15:00:00Z",
+            "price": "452.00",
+            "currency": "USD"
+        }]
+    }
+
+    mock_nestjs_client.create_handoff_token = AsyncMock()
+    mock_nestjs_client.create_handoff = mock_nestjs_client.create_handoff_token
+
+    llm = MockStreamingLLM(responses=[
+        AIMessage(
+            content="",
+            tool_calls=[{
+                "name": "signal_checkout_intent",
+                "args": {"offer_index": 1},
+                "id": "call_signal_exp"
+            }]
+        )
+    ])
+
+    with patch("agent.streaming.sse.NestJSClient", return_value=mock_nestjs_client), \
+         patch("agent.agents.chat_agent.ChatOpenAI", return_value=llm), \
+         patch("agent.graph.graph.invoke_router", return_value=RouteDecision(intent="CHECKOUT", confidence=1.0, isCommitment=True)), \
+         patch("agent.graph.nodes.get_settings") as mock_settings:
+
+        mock_settings.return_value.FEATURE_FLAG_CHAT_HANDOFF_ISSUE = True
+        mock_snapshot_obj = MagicMock()
+        mock_snapshot_obj.model_dump.return_value = trusted_snapshot
+        
+        with patch("agent.streaming.sse.TrustedSnapshotRepository.get_snapshot", new_callable=AsyncMock) as mock_get_snapshot:
+            mock_get_snapshot.return_value = mock_snapshot_obj
+            transport = httpx.ASGITransport(app=app)
+            async with httpx.AsyncClient(transport=transport, base_url="http://test") as ac:
+                response = await ac.post(
+                    "/chat/stream",
+                    json={"message": "book flight 1", "sessionId": "session-exp-fail"},
+                    headers=headers
+                )
+                assert response.status_code == 200
+
+                lines = [line async for line in response.aiter_lines()]
+                events = parse_sse(lines)
+                
+                action_events = [e for e in events if e["event"] == "ACTION_HANDOFF"]
+                error_events = [e for e in events if e["event"] == "error"]
+                
+                assert len(action_events) == 0
+                assert len(error_events) >= 1
+                assert error_events[0]["data"]["code"] in ("HANDOFF_FAILED", "HANDOFF_ERROR")
+                assert "expired" in error_events[0]["data"]["message"].lower() or "error" in error_events[0]["data"]
+                
+                # Ensure no token creation was attempted
+                assert mock_nestjs_client.create_handoff_token.call_count == 0
+
+
+@pytest.mark.asyncio
+async def test_sse_action_handoff_index_out_of_bounds_no_token(mock_nestjs_client):
+    headers = get_auth_headers()
+    
+    trusted_snapshot = {
+        "version": 1,
+        "attestation": "test_attestation",
+        "fingerprint": "test_fingerprint",
+        "results": [{
+            "flightOfferId": "offer-123",
+            "airline": "VN",
+            "departureAirport": "HAN",
+            "arrivalAirport": "NRT",
+            "departureTime": "2026-07-15T08:30:00Z",
+            "arrivalTime": "2026-07-15T15:00:00Z",
+            "price": "452.00",
+            "currency": "USD"
+        }]
+    }
+
+    mock_nestjs_client.create_handoff_token = AsyncMock()
+    mock_nestjs_client.create_handoff = mock_nestjs_client.create_handoff_token
+
+    llm = MockStreamingLLM(responses=[
+        AIMessage(
+            content="",
+            tool_calls=[{
+                "name": "signal_checkout_intent",
+                "args": {"offer_index": 99},
+                "id": "call_signal_oob"
+            }]
+        ),
+        AIMessage(content="Offer index 99 is invalid. Please pick an available flight.")
+    ])
+
+    with patch("agent.streaming.sse.NestJSClient", return_value=mock_nestjs_client), \
+         patch("agent.agents.chat_agent.ChatOpenAI", return_value=llm), \
+         patch("agent.graph.graph.invoke_router", return_value=RouteDecision(intent="CHECKOUT", confidence=1.0, isCommitment=True)), \
+         patch("agent.graph.nodes.get_settings") as mock_settings:
+
+        mock_settings.return_value.FEATURE_FLAG_CHAT_HANDOFF_ISSUE = True
+        mock_snapshot_obj = MagicMock()
+        mock_snapshot_obj.model_dump.return_value = trusted_snapshot
+        
+        with patch("agent.streaming.sse.TrustedSnapshotRepository.get_snapshot", new_callable=AsyncMock) as mock_get_snapshot:
+            mock_get_snapshot.return_value = mock_snapshot_obj
+            transport = httpx.ASGITransport(app=app)
+            async with httpx.AsyncClient(transport=transport, base_url="http://test") as ac:
+                response = await ac.post(
+                    "/chat/stream",
+                    json={"message": "book flight 99", "sessionId": "session-val-fail"},
+                    headers=headers
+                )
+                assert response.status_code == 200
+
+                lines = [line async for line in response.aiter_lines()]
+                events = parse_sse(lines)
+                
+                action_events = [e for e in events if e["event"] == "ACTION_HANDOFF"]
+                assert len(action_events) == 0
+                
+                # Stream closes cleanly with done
+                done_events = [e for e in events if e["event"] == "done"]
+                assert len(done_events) == 1
+                
+                # Ensure no token creation was attempted
+                assert mock_nestjs_client.create_handoff_token.call_count == 0
+
+
+@pytest.mark.asyncio
+async def test_sse_action_handoff_disabled_flag(mock_nestjs_client):
+    headers = get_auth_headers()
+    
+    trusted_snapshot = {
+        "version": 1,
+        "attestation": "test_attestation",
+        "fingerprint": "test_fingerprint",
+        "results": [{
+            "flightOfferId": "offer-123",
+            "airline": "VN",
+            "departureAirport": "HAN",
+            "arrivalAirport": "NRT",
+            "departureTime": "2026-07-15T08:30:00Z",
+            "arrivalTime": "2026-07-15T15:00:00Z",
+            "price": "452.00",
+            "currency": "USD"
+        }]
+    }
+
+    mock_nestjs_client.create_handoff_token = AsyncMock()
+    mock_nestjs_client.create_handoff = mock_nestjs_client.create_handoff_token
+
+    llm = MockStreamingLLM(responses=[
+        AIMessage(
+            content="",
+            tool_calls=[{
+                "name": "signal_checkout_intent",
+                "args": {"offer_index": 1},
+                "id": "call_signal_flag"
+            }]
+        )
+    ])
+
+    with patch("agent.streaming.sse.NestJSClient", return_value=mock_nestjs_client), \
+         patch("agent.agents.chat_agent.ChatOpenAI", return_value=llm), \
+         patch("agent.graph.graph.invoke_router", return_value=RouteDecision(intent="CHECKOUT", confidence=1.0, isCommitment=True)), \
+         patch("agent.graph.nodes.get_settings") as mock_settings:
+
+        mock_settings.return_value.FEATURE_FLAG_CHAT_HANDOFF_ISSUE = False
+        mock_snapshot_obj = MagicMock()
+        mock_snapshot_obj.model_dump.return_value = trusted_snapshot
+        
+        with patch("agent.streaming.sse.TrustedSnapshotRepository.get_snapshot", new_callable=AsyncMock) as mock_get_snapshot:
+            mock_get_snapshot.return_value = mock_snapshot_obj
+            transport = httpx.ASGITransport(app=app)
+            async with httpx.AsyncClient(transport=transport, base_url="http://test") as ac:
+                response = await ac.post(
+                    "/chat/stream",
+                    json={"message": "book flight 1", "sessionId": "session-disabled-flag"},
+                    headers=headers
+                )
+                assert response.status_code == 200
+
+                lines = [line async for line in response.aiter_lines()]
+                events = parse_sse(lines)
+                
+                action_events = [e for e in events if e["event"] == "ACTION_HANDOFF"]
+                error_events = [e for e in events if e["event"] == "error"]
+                
+                assert len(action_events) == 0
+                assert len(error_events) >= 1
+                assert error_events[0]["data"]["code"] in ("HANDOFF_FAILED", "HANDOFF_ERROR")
+                assert "disabled" in error_events[0]["data"]["message"].lower() or "error" in error_events[0]["data"]
+                
+                # Ensure no token creation was attempted
+                assert mock_nestjs_client.create_handoff_token.call_count == 0
+
 
 @pytest.mark.asyncio
 async def test_sse_action_handoff_disconnect_retry(mock_nestjs_client):
@@ -533,7 +775,8 @@ async def test_sse_action_handoff_disconnect_retry(mock_nestjs_client):
         }]
     }
 
-    mock_nestjs_client.create_handoff = AsyncMock(side_effect=Exception("Timeout"))
+    mock_nestjs_client.create_handoff_token = AsyncMock(side_effect=Exception("Timeout"))
+    mock_nestjs_client.create_handoff = mock_nestjs_client.create_handoff_token
 
     llm = MockStreamingLLM(responses=[
         AIMessage(
@@ -569,4 +812,8 @@ async def test_sse_action_handoff_disconnect_retry(mock_nestjs_client):
                 
                 error_events = [e for e in events if e["event"] == "error"]
                 assert len(error_events) >= 1
-                assert "Timeout" in error_events[0]["data"]["message"] or "failed" in error_events[0]["data"]["message"].lower() or "HANDOFF_ERROR" in error_events[0]["data"].get("code", "")
+                assert (
+                    "Timeout" in error_events[0]["data"].get("message", "")
+                    or "failed" in error_events[0]["data"].get("message", "").lower()
+                    or error_events[0]["data"].get("code") in ("HANDOFF_ERROR", "HANDOFF_FAILED")
+                )
