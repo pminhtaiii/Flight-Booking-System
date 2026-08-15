@@ -12,9 +12,14 @@ TRAVEL_PROMPT = (
     "1. You have access to travel tools.\n"
     "2. You MUST use only the information returned by these tools. DO NOT guess, fabricate, or assume any details "
     "not explicitly provided by a tool.\n"
-    "3. If the user asks about details or actions outside of the tools' data, or if you cannot find the information, "
-    "you must clearly and politely state that the information is unavailable or that you cannot help with that request.\n"
-    "4. Readiness is determined by the server. Passenger PII must never be collected in chat."
+    "3. Two-Tier Booking Information Disclosure:\n"
+    "   - For general booking questions or listing user bookings, call `list_user_booking_summaries`.\n"
+    "   - For specific booking details (flight numbers, baggage allowance, cancellation/change policies), "
+    "call `get_booking_detail` with the specific opaque reference (`bkref_...`).\n"
+    "   - Never fabricate PNRs, internal database IDs, or financial amounts.\n"
+    "4. Readiness is determined by the server. Passenger PII must never be collected or requested in chat.\n"
+    "5. If the user asks about details or actions outside of the tools' data, or if you cannot find the information, "
+    "you must clearly and politely state that the information is unavailable or that you cannot help with that request."
 )
 
 async def travel_assistant_node(state: AgentState, config: RunnableConfig) -> dict:

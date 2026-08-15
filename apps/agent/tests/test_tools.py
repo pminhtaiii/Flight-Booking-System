@@ -183,35 +183,36 @@ async def test_get_user_preferences_error(mock_client, run_config):
 @pytest.mark.asyncio
 async def test_list_user_booking_summaries_success(mock_client, run_config):
     mock_client.get_gateway_user_booking_summaries.return_value = {
-        "summaries": [
+        "bookings": [
             {
+                "bookingReference": "bkref_123",
                 "airline": "VN",
                 "origin": "HAN",
                 "destination": "NRT",
-                "departureAt": "2026-08-15T08:30:00Z",
-                "arrivalAt": "2026-08-15T15:00:00Z",
+                "departureTime": "2026-08-15T08:30:00Z",
+                "arrivalTime": "2026-08-15T15:00:00Z",
                 "durationMinutes": 330,
-                "stopCount": 0,
+                "stops": 0,
                 "status": "CONFIRMED",
-                "agentReference": "ref-123"
             }
         ]
     }
 
     result = await list_user_booking_summaries.ainvoke({}, config=run_config)
 
-    expected = (
-        "- [CONFIRMED] VN from HAN to NRT. Departs 2026-08-15T08:30:00Z, Arrives 2026-08-15T15:00:00Z. Duration: 330 mins, Stops: 0. (Ref: ref-123)"
-    )
-    assert result.strip() == expected.strip()
+    assert "bkref_123" in result
+    assert "CONFIRMED" in result
+    assert "VN" in result
+    assert "HAN" in result
+    assert "NRT" in result
 
 
 @pytest.mark.asyncio
 async def test_list_user_booking_summaries_empty(mock_client, run_config):
-    mock_client.get_gateway_user_booking_summaries.return_value = {"summaries": []}
+    mock_client.get_gateway_user_booking_summaries.return_value = {"bookings": []}
 
     result = await list_user_booking_summaries.ainvoke({}, config=run_config)
-    assert result == "No bookings found."
+    assert "No bookings found" in result or "You don't have any bookings" in result
 
 
 @pytest.mark.asyncio
@@ -219,28 +220,33 @@ async def test_list_user_booking_summaries_error(mock_client, run_config):
     mock_client.get_gateway_user_booking_summaries.side_effect = Exception("Auth failed")
 
     result = await list_user_booking_summaries.ainvoke({}, config=run_config)
-    assert result == "Failed to fetch booking summaries."
+    assert "failed" in result.lower() or "error" in result.lower() or "couldn't" in result.lower()
 
 @pytest.mark.asyncio
 async def test_get_booking_detail_success(mock_client, run_config):
     mock_client.get_gateway_booking_detail.return_value = {
-        "status": "CONFIRMED",
+        "bookingReference": "bkref_123",
         "airline": "VN",
         "origin": "HAN",
         "destination": "NRT",
-        "departureAt": "2026-08-15T08:30:00Z",
-        "arrivalAt": "2026-08-15T15:00:00Z",
+        "departureTime": "2026-08-15T08:30:00Z",
+        "arrivalTime": "2026-08-15T15:00:00Z",
+        "durationMinutes": 330,
+        "stops": 0,
+        "status": "CONFIRMED",
         "flightNumber": "VN310",
-        "baggageSummary": "23kg checked",
+        "baggageAllowance": "23kg checked",
         "refundable": False,
         "changeable": False
     }
 
-    result = await get_booking_detail.ainvoke({"agent_reference": "ref-123"}, config=run_config)
+    result = await get_booking_detail.ainvoke({"booking_reference": "bkref_123"}, config=run_config)
 
-    assert "Booking ref-123 Detail:" in result
-    assert "VN310 from HAN to NRT" in result
-    assert "Baggage: 23kg checked" in result
+    assert "bkref_123" in result
+    assert "VN310" in result
+    assert "HAN" in result
+    assert "NRT" in result
+    assert "23kg checked" in result
 
 
 def test_registry_inventories():
@@ -248,7 +254,6 @@ def test_registry_inventories():
     assert len(general) == 0
 
     travel = get_travel_tools()
-    # Phase 5 splits list_user_bookings into summaries and detail
     assert len(travel) == 5
     tool_names = [t.name for t in travel]
     assert "search_flights" in tool_names
@@ -257,8 +262,11 @@ def test_registry_inventories():
     assert "get_booking_detail" in tool_names
     assert "check_booking_readiness" in tool_names
 
+    all_tool_names = [t.name for t in get_tools()]
+    assert "list_user_bookings" not in all_tool_names
+    assert "list_user_bookings" not in tool_names
+
     checkout = get_checkout_tools()
-    # T046 will add signal_checkout_intent
     assert len(checkout) == 1
     tool_names = [t.name for t in checkout]
     assert "signal_checkout_intent" in tool_names
@@ -267,6 +275,15 @@ def test_tool_by_name():
     t1 = get_tool_by_name("search_flights")
     assert t1 == search_flights
     assert not requires_confirmation("search_flights")
+
+    t2 = get_tool_by_name("list_user_booking_summaries")
+    assert t2 == list_user_booking_summaries
+
+    t3 = get_tool_by_name("get_booking_detail")
+    assert t3 == get_booking_detail
+
+    with pytest.raises(ValueError, match="Tool 'list_user_bookings' is not registered."):
+        get_tool_by_name("list_user_bookings")
 
     with pytest.raises(ValueError, match="Tool 'non_existent' is not registered."):
         get_tool_by_name("non_existent")

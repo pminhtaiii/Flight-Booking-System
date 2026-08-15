@@ -149,14 +149,9 @@
     "ast_hash": "b34d9061719e2cc3f49b7f1a4eb91608",
     "semantic_hash": ""
   },
-  "apps/agent/src/agent/tools/list_bookings.py": {
-    "mtime": 1783232763.1077776,
-    "ast_hash": "5eaed80a6425fcaa4bea2a3e1f4a30e1",
-    "semantic_hash": ""
-  },
   "apps/agent/src/agent/tools/nestjs_client.py": {
-    "mtime": 1786691048.7049606,
-    "ast_hash": "61f8a330e1aa376769ffa35a5e0b4667",
+    "mtime": 1786770290.2580853,
+    "ast_hash": "7984ef0deb6815ce34da5d2bb7f0494a",
     "semantic_hash": ""
   },
   "apps/agent/src/agent/tools/registry.py": {
@@ -210,8 +205,8 @@
     "semantic_hash": "7ccb3a3410391c2ed60b44062b1bca5a"
   },
   "apps/agent/tests/test_nestjs_client.py": {
-    "mtime": 1786329393.1143818,
-    "ast_hash": "8a29bf0bb27fc59945b876f5ab4f05c0",
+    "mtime": 1786770814.3175204,
+    "ast_hash": "4e635e0af903c2168daf8e2e7cbaaaf4",
     "semantic_hash": ""
   },
   "apps/agent/tests/test_pii_scrubber.py": {
@@ -240,8 +235,8 @@
     "semantic_hash": ""
   },
   "apps/agent/tests/test_tools.py": {
-    "mtime": 1786092548.0443034,
-    "ast_hash": "17ea835576600ad42fe19f1e47cf5e61",
+    "mtime": 1786770044.7214286,
+    "ast_hash": "7d19034fa5389ac3e36702fa33477eb1",
     "semantic_hash": ""
   },
   "apps/api/.eslintrc.json": {
@@ -285,18 +280,18 @@
     "semantic_hash": ""
   },
   "apps/api/src/agent-gateway/agent-gateway.controller.ts": {
-    "mtime": 1786694476.1816695,
-    "ast_hash": "fe30e82db53cc1ba7930b8cf041a97c0",
+    "mtime": 1786766965.2025423,
+    "ast_hash": "a05bb4130af1364a92a1f5242e6483ba",
     "semantic_hash": ""
   },
   "apps/api/src/agent-gateway/agent-gateway.module.ts": {
-    "mtime": 1786122217.940916,
-    "ast_hash": "ad8333a886c8d46e6d02459ef1c0cd6e",
+    "mtime": 1786762505.45092,
+    "ast_hash": "6227c8566b82e9b46041b508a0e1482e",
     "semantic_hash": ""
   },
   "apps/api/src/agent-gateway/agent-gateway.service.ts": {
-    "mtime": 1786729192.9458635,
-    "ast_hash": "a99009f16516c72eb0dc6e770b3456ee",
+    "mtime": 1786766956.2096426,
+    "ast_hash": "ad0c08d7a691515fc6d323cf1d88994b",
     "semantic_hash": ""
   },
   "apps/api/src/agent-gateway/auth/agent-api-key.guard.ts": {
@@ -490,8 +485,8 @@
     "semantic_hash": ""
   },
   "apps/api/test/agent-gateway.e2e-spec.ts": {
-    "mtime": 1786716321.3474061,
-    "ast_hash": "14d335433507f821c49a7d855cf2290c",
+    "mtime": 1786766877.5900705,
+    "ast_hash": "9ae7ff25a5942580d0579bf787f8d10a",
     "semantic_hash": ""
   },
   "apps/api/test/audit-log.e2e-spec.ts": {
@@ -690,8 +685,8 @@
     "semantic_hash": ""
   },
   "context/architecture.md": {
-    "mtime": 1786761857.4497297,
-    "ast_hash": "ac7c08702e427173c35cf7e79eabd2cf",
+    "mtime": 1786770922.002695,
+    "ast_hash": "dccf290b82b5a0e7d726da220bfe7180",
     "semantic_hash": ""
   },
   "context/code-standards.md": {
@@ -705,8 +700,8 @@
     "semantic_hash": ""
   },
   "context/progress-checker.md": {
-    "mtime": 1786761869.611446,
-    "ast_hash": "eb5d5cfccd126fa74c6de155d0431ff7",
+    "mtime": 1786770910.9208903,
+    "ast_hash": "ff8f5448e7099e5b4acc33e778b9a196",
     "semantic_hash": ""
   },
   "context/project-overview.md": {
@@ -1575,18 +1570,18 @@
     "semantic_hash": ""
   },
   "apps/api/src/booking/booking.module.ts": {
-    "mtime": 1786091463.3468287,
-    "ast_hash": "1534c44c945a270b8c717df58d9ac501",
+    "mtime": 1786762554.7866094,
+    "ast_hash": "bc6cd54ad56f658120462b1396720c5d",
     "semantic_hash": ""
   },
   "apps/api/src/booking/booking.service.spec.ts": {
-    "mtime": 1786115844.8356082,
-    "ast_hash": "e8746309d234480e36dbba7067de1f1e",
+    "mtime": 1786764759.9150915,
+    "ast_hash": "afb3e3fe9bd09d6e04adf2347c76d581",
     "semantic_hash": ""
   },
   "apps/api/src/booking/booking.service.ts": {
-    "mtime": 1786091463.3542244,
-    "ast_hash": "226510512604a60358cf077c5b8b8754",
+    "mtime": 1786764745.0839293,
+    "ast_hash": "83ccdcc317a174c9b03806989949ad68",
     "semantic_hash": ""
   },
   "apps/api/src/booking/dto/booking-list-query.dto.ts": {
@@ -2065,8 +2060,8 @@
     "semantic_hash": ""
   },
   "apps/api/src/disruption/disruption.module.ts": {
-    "mtime": 1786091463.367415,
-    "ast_hash": "309ce79876d18f1fc31fc737027ba3f5",
+    "mtime": 1786762821.8799322,
+    "ast_hash": "b8a45ade45dd3792c2b749676b5c5fd0",
     "semantic_hash": ""
   },
   "apps/api/src/disruption/sync/supplier-sync.service.spec.ts": {
@@ -2075,8 +2070,8 @@
     "semantic_hash": ""
   },
   "apps/api/src/disruption/sync/supplier-sync.service.ts": {
-    "mtime": 1786091463.376469,
-    "ast_hash": "7bb5c873317bb5a827c574f3de12fdfe",
+    "mtime": 1786762856.563562,
+    "ast_hash": "56f399fca96be47f5b9a0931afb082d3",
     "semantic_hash": ""
   },
   "apps/api/src/disruption/sync/sync-claim.service.ts": {
@@ -2830,8 +2825,8 @@
     "semantic_hash": ""
   },
   "apps/agent/src/agent/agents/travel_assistant.py": {
-    "mtime": 1786078532.4114406,
-    "ast_hash": "17dd804906a01a95e4d7c64b38587e94",
+    "mtime": 1786770513.6412816,
+    "ast_hash": "08a790d1de22279c8c67b2d5425384bb",
     "semantic_hash": ""
   },
   "apps/agent/src/agent/graph/checkout_gate.py": {
@@ -2885,13 +2880,13 @@
     "semantic_hash": ""
   },
   "apps/agent/src/agent/tools/booking_detail.py": {
-    "mtime": 1786094320.4972997,
-    "ast_hash": "474270e70584c8497a6096e589d23c5e",
+    "mtime": 1786770807.9519646,
+    "ast_hash": "7069b910078884e778c654b00a5cec42",
     "semantic_hash": ""
   },
   "apps/agent/src/agent/tools/booking_summaries.py": {
-    "mtime": 1786091815.2309797,
-    "ast_hash": "5bb57d3f9daa3849a11d65c85c57c83f",
+    "mtime": 1786770805.5418267,
+    "ast_hash": "7a3549d081b9705c93d2be2a7dec2f8e",
     "semantic_hash": ""
   },
   "apps/agent/src/agent/tools/check_booking_readiness.py": {
@@ -3055,13 +3050,13 @@
     "semantic_hash": ""
   },
   "apps/api/src/agent-gateway/agent-gateway.service.spec.ts": {
-    "mtime": 1786729434.1719527,
-    "ast_hash": "6ab1cac20a089872f35351765a265204",
+    "mtime": 1786766842.3902187,
+    "ast_hash": "5723328fcabf163b9dbdcbec3e388194",
     "semantic_hash": ""
   },
   "apps/api/src/agent-gateway/dto/attested-flight-search.dto.ts": {
-    "mtime": 1786102220.4787054,
-    "ast_hash": "810b7767836c684120707fe30f7ac3ba",
+    "mtime": 1786766605.5036817,
+    "ast_hash": "165b2a8c7e7461de636f50cbd6f01275",
     "semantic_hash": ""
   },
   "apps/api/src/agent-gateway/dto/booking-readiness.dto.ts": {
@@ -3565,8 +3560,8 @@
     "semantic_hash": ""
   },
   "packages/shared/src/types/chat.types.ts": {
-    "mtime": 1786380072.0546627,
-    "ast_hash": "a2fcc3a56aebc0bde4e49dd78e6d288e",
+    "mtime": 1786766505.894198,
+    "ast_hash": "71678f87173a0d8440a73c9b5ab40a43",
     "semantic_hash": ""
   },
   ".playwright-cli/page-2026-08-10T17-42-39-747Z.yml": {
@@ -3667,6 +3662,56 @@
   "docs/superpowers/plans/2026-08-15-safe-booking-projection-foundation.md": {
     "mtime": 1786761646.569956,
     "ast_hash": "f26fe82494a69f580cf122729f408be9",
+    "semantic_hash": ""
+  },
+  "apps/api/src/agent-gateway/booking-agent-projection.service.spec.ts": {
+    "mtime": 1786765393.6260757,
+    "ast_hash": "2daa7064caa5bb7bbcf8cff7bf800bc5",
+    "semantic_hash": ""
+  },
+  "apps/api/src/agent-gateway/booking-agent-projection.service.ts": {
+    "mtime": 1786765385.2741864,
+    "ast_hash": "343f0a371d83914433e2eff4a2611c96",
+    "semantic_hash": ""
+  },
+  "apps/api/test/booking-agent-projection-privacy.e2e-spec.ts": {
+    "mtime": 1786763028.5667396,
+    "ast_hash": "3d750a79ed9b919df94e8c8aa06558e6",
+    "semantic_hash": ""
+  },
+  "apps/api/test/booking-projection-backfill.e2e-spec.ts": {
+    "mtime": 1786762870.6315944,
+    "ast_hash": "3e4481e66ccde47976083f226d3421fc",
+    "semantic_hash": ""
+  },
+  "apps/agent/tests/test_booking_tools.py": {
+    "mtime": 1786770024.337227,
+    "ast_hash": "d81ff9c9b35db8309a9368a759045bdc",
+    "semantic_hash": ""
+  },
+  "apps/api/src/agent-gateway/dto/booking-detail.dto.ts": {
+    "mtime": 1786766535.3887386,
+    "ast_hash": "c1d9f7a716fb9bd43d7c7eaf4d1bb355",
+    "semantic_hash": ""
+  },
+  "apps/api/src/agent-gateway/dto/booking-summary.dto.ts": {
+    "mtime": 1786766532.6907763,
+    "ast_hash": "8bd887b7a8dcc11de1bf28b3b460ef5a",
+    "semantic_hash": ""
+  },
+  "apps/api/src/agent-gateway/dto/index.ts": {
+    "mtime": 1786766549.3582592,
+    "ast_hash": "81ce83374caa8447b1493ef8ec7547c2",
+    "semantic_hash": ""
+  },
+  "docs/superpowers/plans/2026-08-15-phase-9b-booking-projection-gateway.md": {
+    "mtime": 1786766464.2177355,
+    "ast_hash": "d250fcb69e50120c3d27e5a420930990",
+    "semantic_hash": ""
+  },
+  "docs/superpowers/plans/2026-08-15-phase-9c-python-booking-read-tools.md": {
+    "mtime": 1786769943.0698955,
+    "ast_hash": "cd419acd7af9776c62f68ae4823e0c2d",
     "semantic_hash": ""
   }
 }

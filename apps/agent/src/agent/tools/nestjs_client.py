@@ -350,47 +350,28 @@ class NestJSClient:
             return response.json()
 
     async def get_gateway_user_booking_summaries(self) -> dict:
-        url = f"{self.base_url}/agent-gateway/users/bookings"
+        url = f"{self.base_url}/agent-gateway/users/bookings/summaries"
         headers = self._get_gateway_headers()
         async with httpx.AsyncClient() as client:
             response = await client.get(url, headers=headers)
             response.raise_for_status()
-            data = response.json()
-            summaries = []
-            for b in data.get("bookings", []):
-                summaries.append({
-                    "agentReference": b.get("id"),
-                    "status": b.get("status"),
-                    "airline": b.get("airline"),
-                    "origin": b.get("origin"),
-                    "destination": b.get("destination"),
-                    "departureAt": b.get("departureTime"),
-                    "arrivalAt": b.get("arrivalTime"),
-                    "durationMinutes": b.get("duration"),
-                    "stopCount": b.get("stops")
-                })
-            return {"summaries": summaries}
+            return response.json()
 
-    async def get_gateway_booking_detail(self, agent_reference: str) -> dict:
-        url = f"{self.base_url}/agent-gateway/users/bookings"
+    async def get_gateway_booking_detail(self, booking_reference: str) -> dict:
+        if (
+            not booking_reference
+            or not isinstance(booking_reference, str)
+            or not booking_reference.startswith("bkref_")
+        ):
+            raise ValueError("Invalid booking reference format. Must start with 'bkref_'")
+        url = f"{self.base_url}/agent-gateway/users/bookings/{booking_reference}"
         headers = self._get_gateway_headers()
         async with httpx.AsyncClient() as client:
             response = await client.get(url, headers=headers)
+            if response.status_code == 404:
+                return {"error": "BOOKING_REFERENCE_NOT_FOUND", "statusCode": 404}
             response.raise_for_status()
-            data = response.json()
-            for b in data.get("bookings", []):
-                if b.get("id") == agent_reference:
-                    return {
-                        "status": b.get("status"),
-                        "airline": b.get("airline"),
-                        "origin": b.get("origin"),
-                        "destination": b.get("destination"),
-                        "departureAt": b.get("departureTime"),
-                        "arrivalAt": b.get("arrivalTime"),
-                        "flightNumber": b.get("flightNumber"),
-                        "baggageSummary": b.get("baggageAllowance", "Not specified")
-                    }
-            return {"error": "Not Found", "statusCode": 404}
+            return response.json()
 
     async def check_booking_readiness(self, flight_offer_id: str, passengers: List[Dict[str, Any]]) -> dict:
         url = f"{self.base_url}/agent-gateway/bookings/readiness"
