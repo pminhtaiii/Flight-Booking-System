@@ -212,7 +212,7 @@ export class BookingAgentProjectionService {
         data: { status },
       });
     } catch (err: any) {
-      return null;
+      return await this.createOrUpdateProjection(bookingId, prismaClient);
     }
   }
 

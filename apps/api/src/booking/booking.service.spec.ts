@@ -202,6 +202,7 @@ describe('BookingService', () => {
           findFirst: jest.fn().mockResolvedValue({
             id: 'booking-1',
             userId: 'user-1',
+            bookingIntentId: 'intent-1',
             status: 'PROCESSING',
           }),
         },
@@ -211,8 +212,94 @@ describe('BookingService', () => {
       await expect(service.createBooking('user-1', 'booking-1', 'intent-1')).resolves.toEqual({
         id: 'booking-1',
         userId: 'user-1',
+        bookingIntentId: 'intent-1',
         status: 'PROCESSING',
       });
+      expect(prisma.booking.findFirst).toHaveBeenCalledWith({
+        where: {
+          OR: [
+            { id: 'booking-1' },
+            { bookingIntentId: 'intent-1' },
+          ],
+        },
+      });
+    });
+
+    it('handles unique-constraint violation and updates paymentId on existing.id when paymentId is provided', async () => {
+      const error = new Prisma.PrismaClientKnownRequestError('Unique constraint failed', {
+        code: 'P2002',
+        clientVersion: '5.14.0',
+      });
+      const prisma = {
+        bookingIntent: {
+          findUnique: jest.fn().mockResolvedValue({
+            id: 'intent-1',
+            userId: 'user-1',
+            confirmedPrice: { toString: () => '450.00' },
+            currency: 'GBP',
+          }),
+        },
+        booking: {
+          create: jest.fn().mockRejectedValue(error),
+          findFirst: jest.fn().mockResolvedValue({
+            id: 'existing-booking-id',
+            userId: 'user-1',
+            bookingIntentId: 'intent-1',
+            status: 'PROCESSING',
+            paymentId: null,
+          }),
+          update: jest.fn().mockResolvedValue({
+            id: 'existing-booking-id',
+            userId: 'user-1',
+            bookingIntentId: 'intent-1',
+            status: 'PROCESSING',
+            paymentId: 'pay-123',
+          }),
+        },
+      };
+      const service = new BookingService(prisma as never, {} as never, {} as never, {} as never);
+
+      const result = await service.createBooking('user-1', 'booking-1', 'intent-1', 'pay-123');
+      expect(result).toEqual({
+        id: 'existing-booking-id',
+        userId: 'user-1',
+        bookingIntentId: 'intent-1',
+        status: 'PROCESSING',
+        paymentId: 'pay-123',
+      });
+      expect(prisma.booking.update).toHaveBeenCalledWith({
+        where: { id: 'existing-booking-id' },
+        data: { paymentId: 'pay-123' },
+      });
+    });
+
+    it('handles unique-constraint violation and throws BadRequestException if booking intent IDs mismatch', async () => {
+      const error = new Prisma.PrismaClientKnownRequestError('Unique constraint failed', {
+        code: 'P2002',
+        clientVersion: '5.14.0',
+      });
+      const prisma = {
+        bookingIntent: {
+          findUnique: jest.fn().mockResolvedValue({
+            id: 'intent-1',
+            userId: 'user-1',
+            confirmedPrice: { toString: () => '450.00' },
+            currency: 'GBP',
+          }),
+        },
+        booking: {
+          create: jest.fn().mockRejectedValue(error),
+          findFirst: jest.fn().mockResolvedValue({
+            id: 'booking-1',
+            userId: 'user-1',
+            bookingIntentId: 'other-intent',
+            status: 'PROCESSING',
+          }),
+        },
+      };
+      const service = new BookingService(prisma as never, {} as never, {} as never, {} as never);
+
+      await expect(service.createBooking('user-1', 'booking-1', 'intent-1')).rejects.toBeInstanceOf(BadRequestException);
     });
 
     it('handles unique-constraint violation and throws ForbiddenException if booking is owned by another user', async () => {

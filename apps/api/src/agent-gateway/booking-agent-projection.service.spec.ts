@@ -286,8 +286,23 @@ describe('BookingAgentProjectionService', () => {
       });
     });
 
-    it('returns null gracefully if projection does not exist', async () => {
-      prisma.bookingAgentProjection.update.mockRejectedValue(new Error('Record not found'));
+    it('falls back to createOrUpdateProjection when update fails (projection not found)', async () => {
+      prisma.bookingAgentProjection.update.mockRejectedValue(new Error('Record to update not found.'));
+      const fallbackSpy = jest.spyOn(service, 'createOrUpdateProjection').mockResolvedValue({
+        bookingId: 'missing-booking',
+        agentReference: 'bkref_fallback_123',
+        status: 'CANCELLED',
+      } as any);
+
+      const res = await service.updateProjectionStatus('missing-booking', 'CANCELLED');
+      expect(fallbackSpy).toHaveBeenCalledWith('missing-booking', prisma);
+      expect(res?.bookingId).toBe('missing-booking');
+      expect(res?.agentReference).toBe('bkref_fallback_123');
+    });
+
+    it('returns null if update fails and fallback createOrUpdateProjection also returns null', async () => {
+      prisma.bookingAgentProjection.update.mockRejectedValue(new Error('Record to update not found.'));
+      jest.spyOn(service, 'createOrUpdateProjection').mockResolvedValue(null);
 
       const res = await service.updateProjectionStatus('missing-booking', 'CANCELLED');
       expect(res).toBeNull();

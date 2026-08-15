@@ -215,7 +215,14 @@ export class BookingService {
       });
     } catch (e: any) {
       if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2002') {
-        const existing = await this.prisma.booking.findUnique({ where: { id: bookingId } });
+        const existing = await this.prisma.booking.findFirst({
+          where: {
+            OR: [
+              { id: bookingId },
+              { bookingIntentId },
+            ],
+          },
+        });
         if (existing) {
           if (existing.userId !== userId) {
             throw new ForbiddenException('You do not own this booking');
@@ -225,7 +232,7 @@ export class BookingService {
           }
           if (!existing.paymentId && paymentId) {
             return await this.prisma.booking.update({
-              where: { id: bookingId },
+              where: { id: existing.id },
               data: { paymentId },
             });
           }
@@ -1108,7 +1115,7 @@ export class BookingService {
       });
 
       if (result.count > 0) {
-        await this.bookingAgentProjectionService?.updateProjectionStatus(bookingId, BookingStatus.CANCELLED, tx);
+        await this.bookingAgentProjectionService?.updateProjectionStatus(bookingId, cancellationStatus, tx);
       }
 
       if (result.count > 0 && hasActiveDisruption) {
