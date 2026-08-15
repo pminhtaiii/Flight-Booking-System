@@ -4,11 +4,13 @@ import { BookingController } from './booking.controller';
 import { BookingService } from './booking.service';
 import { PaymentModule } from '../payment/payment.module';
 import { DuffelModule } from '../duffel/duffel.module';
+import { AgentGatewayModule } from '../agent-gateway/agent-gateway.module';
 
 @Module({
-  imports: [PrismaModule, DuffelModule, forwardRef(() => PaymentModule)],
+  imports: [PrismaModule, DuffelModule, forwardRef(() => PaymentModule), forwardRef(() => AgentGatewayModule)],
   controllers: [BookingController],
   providers: [BookingService],
   exports: [BookingService],
 })
 export class BookingModule {}
+

@@ -1,8 +1,10 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Optional } from '@nestjs/common';
 import { PrismaService } from '@/prisma/prisma.service';
 import { DuffelService } from '@/duffel/duffel.service';
 import { SyncClaimService } from './sync-claim.service';
+import { BookingAgentProjectionService } from '@/agent-gateway/booking-agent-projection.service';
 import { normalizeDuffelOrder, normalizeFlightSegments, NormalizedSegment } from '../domain/itinerary-normalizer';
+
 import { generateItineraryFingerprint } from '../domain/itinerary-fingerprint';
 import { computeItineraryDiff } from '../domain/itinerary-diff';
 import { classifyMateriality } from '../domain/materiality-classifier';
@@ -105,6 +107,7 @@ export class SupplierSyncService {
     private readonly prisma: PrismaService,
     private readonly duffelService: DuffelService,
     private readonly syncClaimService: SyncClaimService,
+    @Optional() private readonly bookingAgentProjectionService?: BookingAgentProjectionService,
   ) {}
 
   /**
@@ -454,6 +457,8 @@ export class SupplierSyncService {
                 },
               });
             }
+
+            await this.bookingAgentProjectionService?.createOrUpdateProjection(bookingId, tx);
 
             this.logger.log(`Successfully completed sync for booking ${bookingId}. Created revision ${newRevision.id}. Correlation: ${correlationId}`);
             return { status: 'REVISION_CREATED', revisionId: newRevision.id };

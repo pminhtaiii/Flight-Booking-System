@@ -7,9 +7,9 @@ Update this file after every completed feature. Any AI agent reading this should
 ### Current Status
 
 **Feature:** Chatbot Backend Infrastructure & Booking Handoff (Feature 17)
-**Last completed:** Phase 8E Plaintext DB Column Drop Cleanup (T102) & Full Documentation Convergence (2026-08-14).
+**Last completed:** Phase 9A Safe Booking Projection Foundation (2026-08-15).
 **In progress:** None.
-**Next:** None (Feature 017 complete).
+**Next:** Phase 9B Gateway Read Endpoints.
 
 ---
 
@@ -48,6 +48,7 @@ Update this file after every completed feature. Any AI agent reading this should
   - [x] WP 4F: Checkout adapter/integration (T046, T052)
   - **All tests in apps/agent pass successfully (201/201).**
 - [x] Phase 5 / US3: Privacy-Minimized Booking Answers (T053–T063)
+  - [x] Phase 9A / Safe Booking Projection Foundation: Created and verified dedicated `BookingAgentProjection` persistence layer with opaque cryptographically random reference generation (`bkref_<uuid>`), transactional upsert during booking confirmation (`CONFIRMED`), cancellation, failure, and completion in `BookingService` and `PaymentService`, transactional projection refresh during `SupplierSyncService`, `ReconciliationService`, and `DuffelEventProcessor`, restart-safe cursor-paginated backfill in `apps/api/prisma/scripts/backfill-booking-agent-projections.ts`, and comprehensive DDL/data-model privacy contract tests proving total exclusion of PII, passenger counts, passport numbers, payment records, PNRs, financial fields, and raw snapshots.
   - [x] WP 5A: Projection lifecycle (T053, T057, T059)
   - [x] WP 5B: Exact query boundary (T054, T058, T060)
   - [x] WP 5C: Authenticated routes (T055, T061)

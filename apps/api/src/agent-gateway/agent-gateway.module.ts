@@ -3,6 +3,7 @@ import { AgentGatewayService } from './agent-gateway.service';
 import { AgentGatewayController } from './agent-gateway.controller';
 import { ClaimTokenService } from './auth/claim-token.service';
 import { SelectionAttestationService } from './selection-attestation.service';
+import { BookingAgentProjectionService } from './booking-agent-projection.service';
 import { PrismaModule } from '@/prisma/prisma.module';
 import { AuditModule } from '@/audit/audit.module';
 import { DuffelModule } from '@/duffel/duffel.module';
@@ -13,7 +14,8 @@ import { ChatModule } from '@/chat/chat.module';
 @Module({
   imports: [PrismaModule, AuditModule, DuffelModule, ProfileModule, forwardRef(() => BookingIntentModule), ChatModule],
   controllers: [AgentGatewayController],
-  providers: [AgentGatewayService, ClaimTokenService, SelectionAttestationService],
-  exports: [AgentGatewayService, ClaimTokenService, SelectionAttestationService],
+  providers: [AgentGatewayService, ClaimTokenService, SelectionAttestationService, BookingAgentProjectionService],
+  exports: [AgentGatewayService, ClaimTokenService, SelectionAttestationService, BookingAgentProjectionService],
 })
 export class AgentGatewayModule {}
+
