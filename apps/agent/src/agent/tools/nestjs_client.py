@@ -335,11 +335,31 @@ class NestJSClient:
                     data = response.json()
                     message = data.get("message")
                     if message:
-                        return {"error": message}
+                        if isinstance(message, list):
+                            return {"error": ", ".join(message)}
+                        return {"error": str(message)}
                 except ValueError:
                     logger.warning("flights_search_v2_error_response_unparseable")
             response.raise_for_status()
             return response.json()
+
+    async def search_flights_v2(
+        self,
+        chat_session_id: str,
+        proposed_snapshot_version: int,
+        origin: str,
+        destination: str,
+        date: str,
+        passengers: int,
+    ) -> dict:
+        return await self.post_gateway_flights_search_v2(
+            chat_session_id=chat_session_id,
+            proposed_snapshot_version=proposed_snapshot_version,
+            origin=origin,
+            destination=destination,
+            date=date,
+            passengers=passengers,
+        )
 
     async def get_gateway_user_preferences(self) -> dict:
         url = f"{self.base_url}/agent-gateway/users/preferences"

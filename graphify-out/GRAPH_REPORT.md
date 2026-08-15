@@ -1,16 +1,16 @@
 # Graph Report - Booking Systems  (2026-08-15)
 
 ## Corpus Check
-- 734 files · ~520,083 words
+- 735 files · ~523,689 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 6004 nodes · 8929 edges · 567 communities (417 shown, 150 thin omitted)
-- Extraction: 96% EXTRACTED · 4% INFERRED · 0% AMBIGUOUS · INFERRED: 342 edges (avg confidence: 0.78)
+- 6031 nodes · 8981 edges · 554 communities (404 shown, 150 thin omitted)
+- Extraction: 96% EXTRACTED · 4% INFERRED · 0% AMBIGUOUS · INFERRED: 354 edges (avg confidence: 0.78)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `96577b9b`
+- Built from commit: `8be83566`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -421,7 +421,6 @@
 - [[_COMMUNITY_test_sse_integration.py|test_sse_integration.py]]
 - [[_COMMUNITY_Implementation Phases|Implementation Phases]]
 - [[_COMMUNITY_MockStreamingLLM|MockStreamingLLM]]
-- [[_COMMUNITY_Implementation Phases|Implementation Phases]]
 - [[_COMMUNITY_ancillary.types.ts|ancillary.types.ts]]
 - [[_COMMUNITY_Implementation Phases|Implementation Phases]]
 - [[_COMMUNITY_Implementation Plan Disruption & Flight-Change Management|Implementation Plan: Disruption & Flight-Change Management]]
@@ -467,31 +466,22 @@
 - [[_COMMUNITY_dependencies|dependencies]]
 - [[_COMMUNITY_index.ts|index.ts]]
 - [[_COMMUNITY_Decisions Made|Decisions Made]]
-- [[_COMMUNITY_readPaymentReservation|readPaymentReservation]]
 - [[_COMMUNITY_Decisions Made|Decisions Made]]
-- [[_COMMUNITY_package.json|package.json]]
 - [[_COMMUNITY_Tasks Duffel Flight Search Service|Tasks: Duffel Flight Search Service]]
 - [[_COMMUNITY_airports.controller.ts|airports.controller.ts]]
 - [[_COMMUNITY_Quickstart Agent Tool-Calling & Data Access — Validation Guide|Quickstart: Agent Tool-Calling & Data Access — Validation Guide]]
 - [[_COMMUNITY_AncillariesService|AncillariesService]]
 - [[_COMMUNITY_Global Constraints|Global Constraints]]
 - [[_COMMUNITY_._astream|._astream]]
-- [[_COMMUNITY_CheckoutHandoffCard.tsx|CheckoutHandoffCard.tsx]]
 - [[_COMMUNITY_AncillarySelectionClient.tsx|AncillarySelectionClient.tsx]]
-- [[_COMMUNITY_.createMessageBatch|.createMessageBatch]]
-- [[_COMMUNITY_bootstrap|bootstrap]]
-- [[_COMMUNITY_.attach_task|.attach_task]]
 - [[_COMMUNITY_booking-intent.types.ts|booking-intent.types.ts]]
 - [[_COMMUNITY_paths|paths]]
 - [[_COMMUNITY_Phase 0  PR 1 — Baseline reconciliation and protected frontend foundation|Phase 0 / PR 1 — Baseline reconciliation and protected frontend foundation]]
 - [[_COMMUNITY_Phase 3  PR 4 — Supplier synchronization transaction and concurrency|Phase 3 / PR 4 — Supplier synchronization transaction and concurrency]]
 - [[_COMMUNITY_._astream|._astream]]
 - [[_COMMUNITY_.checkBookingReadiness|.checkBookingReadiness]]
-- [[_COMMUNITY_chat-handoff.service.spec.ts|chat-handoff.service.spec.ts]]
 - [[_COMMUNITY_traveler-profile.types.ts|traveler-profile.types.ts]]
-- [[_COMMUNITY_CheckoutHandoffCard.tsx|CheckoutHandoffCard.tsx]]
 - [[_COMMUNITY_BookingStatusBadge.tsx|BookingStatusBadge.tsx]]
-- [[_COMMUNITY_ItineraryChangeSummary.tsx|ItineraryChangeSummary.tsx]]
 - [[_COMMUNITY_Feature 017 Phase 9C Python Read Tools & Privacy-Minimized Formatting Plan|Feature 017 Phase 9C: Python Read Tools & Privacy-Minimized Formatting Plan]]
 - [[_COMMUNITY_Implementation Plan Ancillary Seat and Baggage Checkout|Implementation Plan: Ancillary Seat and Baggage Checkout]]
 - [[_COMMUNITY_ancillary-selection.ts|ancillary-selection.ts]]
@@ -507,10 +497,8 @@
 - [[_COMMUNITY_Phase 0 Research Traveler Profile & Booking Readiness|Phase 0 Research: Traveler Profile & Booking Readiness]]
 - [[_COMMUNITY_disruption.e2e-spec.js|disruption.e2e-spec.js]]
 - [[_COMMUNITY_get_tools|get_tools]]
-- [[_COMMUNITY_ancillary-selection.validator.ts|ancillary-selection.validator.ts]]
 - [[_COMMUNITY_agent-gateway-polish.e2e-spec.js|agent-gateway-polish.e2e-spec.js]]
 - [[_COMMUNITY_booking.e2e-spec.js|booking.e2e-spec.js]]
-- [[_COMMUNITY_flights-detail.e2e-spec.js|flights-detail.e2e-spec.js]]
 - [[_COMMUNITY_Data Model Ancillary Seat and Baggage Checkout|Data Model: Ancillary Seat and Baggage Checkout]]
 - [[_COMMUNITY_Quickstart Validation Ancillary Seat and Baggage Checkout|Quickstart Validation: Ancillary Seat and Baggage Checkout]]
 - [[_COMMUNITY_chat.e2e-spec.js|chat.e2e-spec.js]]
@@ -527,11 +515,9 @@
 - [[_COMMUNITY_Observability Contract Traveler Profile & Booking Readiness|Observability Contract: Traveler Profile & Booking Readiness]]
 - [[_COMMUNITY_airports.js|airports.js]]
 - [[_COMMUNITY_booking-readiness-observability.types.spec.ts|booking-readiness-observability.types.spec.ts]]
-- [[_COMMUNITY_ItineraryChangeSummary.tsx|ItineraryChangeSummary.tsx]]
 - [[_COMMUNITY_seed-agent-tools.js|seed-agent-tools.js]]
 - [[_COMMUNITY_page.tsx|page.tsx]]
 - [[_COMMUNITY_User Scenarios & Testing|User Scenarios & Testing]]
-- [[_COMMUNITY_search_flights|search_flights]]
 - [[_COMMUNITY_data-quality-backfill.js|data-quality-backfill.js]]
 - [[_COMMUNITY_seed.js|seed.js]]
 - [[_COMMUNITY_SearchFormClient.tsx|SearchFormClient.tsx]]
@@ -548,7 +534,7 @@
 ## God Nodes (most connected - your core abstractions)
 1. `PrismaService` - 177 edges
 2. `DuffelService` - 67 edges
-3. `NestJSClient` - 58 edges
+3. `NestJSClient` - 62 edges
 4. `AuditService` - 47 edges
 5. `CacheService` - 46 edges
 6. `StripeService` - 46 edges
@@ -558,6 +544,8 @@
 10. `PaymentRefundService` - 33 edges
 
 ## Surprising Connections (you probably didn't know these)
+- `test_agent_does_not_invoke_handoff_create_when_issue_is_disabled()` --calls--> `create_handoff_token()`  [INFERRED]
+  apps/agent/tests/test_config.py → apps/agent/src/agent/graph/nodes.py
 - `test_benchmark_output_pipeline_latency()` --calls--> `OutputGuardrailPipeline`  [INFERRED]
   apps/agent/tests/test_benchmark_output_pipeline.py → apps/agent/src/agent/guardrails/output_pipeline.py
 - `test_guardrail_logging_safe_chunks()` --calls--> `OutputGuardrailPipeline`  [INFERRED]
@@ -566,8 +554,6 @@
   apps/agent/tests/test_pipeline_parallelism.py → apps/agent/src/agent/guardrails/output_pipeline.py
 - `test_ttl_overrun_and_fence_takeover()` --calls--> `SessionLockRepository`  [INFERRED]
   apps/agent/tests/test_stream_session_control.py → apps/agent/src/agent/repositories/session_lock_repository.py
-- `mock_nestjs_client()` --indirect_call--> `NestJSClient`  [INFERRED]
-  apps/agent/tests/test_graph.py → apps/agent/src/agent/tools/nestjs_client.py
 
 ## Import Cycles
 - 3-file cycle: `apps/api/src/agent-gateway/agent-gateway.module.ts -> apps/api/src/booking-intent/booking-intent.module.ts -> apps/api/src/chat-handoff/chat-handoff.module.ts -> apps/api/src/agent-gateway/agent-gateway.module.ts`
@@ -580,27 +566,27 @@
 - **Agent Gateway REST Endpoints** — specs_003_agent_tool_calling_contracts_agent_gateway_api_get_search_flights, specs_003_agent_tool_calling_contracts_agent_gateway_api_get_user_preferences, specs_003_agent_tool_calling_contracts_agent_gateway_api_get_user_bookings [EXTRACTED 1.00]
 - **Output Guardrail Pipeline Components** — specs_004_output_guardrails_data_model_chunkbuffer_model, specs_004_output_guardrails_data_model_slidingwindow_model, specs_004_output_guardrails_data_model_outputguardrailconfig_model, specs_004_output_guardrails_data_model_outputguardrailpipeline_model [EXTRACTED 1.00]
 
-## Communities (567 total, 150 thin omitted)
+## Communities (554 total, 150 thin omitted)
 
 ### Community 0 - "NestJSClient"
 Cohesion: 0.10
-Nodes (16): OutputGuardrailConfig, Settings, enabled_config(), test_benchmark_output_pipeline_latency(), test_output_guardrail_config_custom(), test_output_guardrail_config_defaults(), test_session_lock_timing_defaults_and_override(), test_agent_config_defaults() (+8 more)
+Nodes (17): OutputGuardrailConfig, Settings, enabled_config(), test_benchmark_output_pipeline_latency(), test_output_guardrail_config_custom(), test_output_guardrail_config_defaults(), test_session_lock_timing_defaults_and_override(), test_agent_config_defaults() (+9 more)
 
 ### Community 1 - "PrismaService"
 Cohesion: 0.06
 Nodes (30): Complexity Tracking, Constitution Check, Documentation (this feature), Implementation Phases, Implementation Plan: Map Integration, Phase 1: Airport Data Model & Database Seed (Backend), Phase 2: Airport REST API Endpoints (Backend), Phase 3: Map Component Foundation (Frontend) (+22 more)
 
 ### Community 2 - "prisma.service.ts"
-Cohesion: 0.16
-Nodes (15): DuffelSegment, FlightConditionChangeBeforeDepartureDto, FlightConditionsDto, FlightDetailResponseDto, CabinMismatchDetail, FlightOfferDto, FlightSearchResponseMetaDto, FlightSegmentDto (+7 more)
+Cohesion: 0.17
+Nodes (12): FlightConditionChangeBeforeDepartureDto, FlightConditionsDto, FlightDetailResponseDto, CabinMismatchDetail, FlightOfferDto, FlightSearchRequestDto, FlightSearchResponseDto, FlightSearchResponseMetaDto (+4 more)
 
 ### Community 3 - "test_tools.py"
-Cohesion: 0.16
-Nodes (16): create_handoff_token(), custom_tool_node(), final_answer_node(), RunnableConfig, Call the LLM without tools bound to provide a final summary answer when iteratio, Execute prebuilt ToolNode, parse signals from tool messages, and increment itera, Validate snapshot and signal before creating handoff., Create a handoff token using NestJSClient and emit action. (+8 more)
+Cohesion: 0.17
+Nodes (15): create_handoff_token(), custom_tool_node(), final_answer_node(), RunnableConfig, Call the LLM without tools bound to provide a final summary answer when iteratio, Execute prebuilt ToolNode, parse signals from tool messages, and increment itera, Validate snapshot and signal before creating handoff., Create a handoff token using NestJSClient and emit action. (+7 more)
 
 ### Community 4 - "chat.controller.ts"
-Cohesion: 0.14
-Nodes (9): AuthenticatedRequest, ChatController, BatchMessagesDto, CreateMessageDto, CreateSessionDto, ListMessagesQueryDto, ListSessionsQueryDto, MemoryQueryDto (+1 more)
+Cohesion: 0.20
+Nodes (8): AuthenticatedRequest, BatchMessagesDto, CreateMessageDto, CreateSessionDto, ListMessagesQueryDto, ListSessionsQueryDto, MemoryQueryDto, UpdateSessionDto
 
 ### Community 5 - "dependencies"
 Cohesion: 0.08
@@ -643,8 +629,8 @@ Cohesion: 0.15
 Nodes (12): MemoryManager, Any, Manager responsible for counting tokens, tracking budget, and triggering      a, Count tokens in text using tiktoken base encoding, falling back to approximation, Calculate total tokens of messages that slid out of window plus the existing sum, Check if the token count of older messages (messages that have slid out of the w, Invoke LLM to generate an updated summary incorporating new slide-out messages a, test_check_and_summarize_exceeds_budget() (+4 more)
 
 ### Community 19 - "detect_pii"
-Cohesion: 0.33
-Nodes (4): AuthenticatedRequest, BookingHandoffController, ChatHandoffSafeResolveResponse, ResolveChatHandoffBodyDto
+Cohesion: 0.11
+Nodes (7): BookingService, BookingWithRelations, parseDuffelCancellationQuoteId(), serializeDuffelCancellationQuoteId(), ReconciliationResult, CancellationBooking, TestUser
 
 ### Community 20 - ".eslintrc.json"
 Cohesion: 0.15
@@ -680,10 +666,10 @@ Nodes (7): collection, compilerOptions, assets, deleteOutDir, watchAssets, $sche
 
 ### Community 29 - "app.module.ts"
 Cohesion: 0.05
-Nodes (31): AppModule, HttpExceptionFilter, DuffelConfirmedCancellation, DuffelRecoveredOrder, DuffelService, DuffelOfferRequest, DuffelSeatMap, bootstrap() (+23 more)
+Nodes (36): AppModule, HttpExceptionFilter, DuffelCleanupService, DuffelConfirmedCancellation, DuffelRecoveredOrder, DuffelOfferRequest, bootstrap(), CacheServiceWithInternal (+28 more)
 
 ### Community 30 - "NemoGuardrailService"
-Cohesion: 0.10
+Cohesion: 0.15
 Nodes (3): NemoGuardrailService, guardrail_service(), guardrail_service()
 
 ### Community 31 - "MessageQueueManager"
@@ -707,8 +693,8 @@ Cohesion: 0.29
 Nodes (6): name, private, scripts, test, test:llm, version
 
 ### Community 37 - "BookingIntentService"
-Cohesion: 0.20
-Nodes (4): ChatHandoffService, ChatTelemetryContext, ChatTelemetryOperation, emitChatTelemetry()
+Cohesion: 0.06
+Nodes (23): AgentApiKeyGuard, HandoffFastFailGuard, HandoffRequest, RequestFixture, AuthenticatedRequest, BookingHandoffController, AuthenticatedRequest, ChatHandoffController (+15 more)
 
 ### Community 38 - ".eslintrc.json"
 Cohesion: 0.40
@@ -732,11 +718,11 @@ Nodes (21): _airport_code(), _function_tool_call(), _is_guardrail_request(), _is
 
 ### Community 47 - "page.tsx"
 Cohesion: 0.12
-Nodes (5): OwnedIntent, PaymentIdempotencyService, MockIdempotencyKey, enrichRedactedDuffelOrder(), redactDuffelOrder()
+Nodes (17): DuffelAircraft, DuffelAirline, DuffelBaggage, DuffelBaggageMetadata, DuffelOffer, DuffelOfferAvailableService, DuffelOfferWithServices, DuffelPassenger (+9 more)
 
 ### Community 48 - "utils.ts"
 Cohesion: 0.09
-Nodes (22): ClaimedHandoffForIntent, HandoffFastFailReservation, LegacyIntentPassenger, ResolvedIntentPassenger, CanonicalPrismaMock, MockAuditService, MockDuffelService, MockEncryptionService (+14 more)
+Nodes (20): CanonicalPrismaMock, MockAuditService, MockDuffelService, MockEncryptionService, MockPrismaService, TestableService, PassengerSnapshotBuildInput, PassengerSnapshotBuildResult (+12 more)
 
 ### Community 51 - "Code Standards"
 Cohesion: 0.05
@@ -750,21 +736,25 @@ Nodes (22): 1. Apply schema additions, 2. Seed test data, Agent Unit & Integrati
 Cohesion: 0.27
 Nodes (7): BookingReadinessService, currentDateOnly(), httpError(), inlinePassenger(), isRecord(), profilePassenger(), BookingReadinessPassengerDto
 
+### Community 70 - "auth.spec.ts"
+Cohesion: 0.08
+Nodes (9): OwnedIntent, AncillaryCatalogService, DuffelService, DuffelSeatMap, input, Pricing, AncillaryPaymentValidationService, PrismaFake (+1 more)
+
 ### Community 71 - "dashboard.spec.ts"
 Cohesion: 0.07
 Nodes (24): Content Quality, Feature Readiness, Notes, Requirement Completeness, Specification Quality Checklist: AI Copilot Landing Page, AI Copilot Landing Page Implementation Plan, Complexity Tracking, Constitution Check (+16 more)
 
 ### Community 72 - "playwright.config.ts"
-Cohesion: 0.10
-Nodes (20): FlightSegmentSnapshot, AcceptDisruptionResponseDto, AcknowledgeDisruptionResponseDto, AdminClearAttentionRequestDto, AdminDataQualityReportDto, AdminDisruptionDto, AdminDuffelWebhookEventDto, AdminResolveDisruptionRequestDto (+12 more)
+Cohesion: 0.08
+Nodes (30): DisruptionAlert(), DisruptionAlertProps, REASON_LABELS, RESOLVED_REASON_LABELS, ItineraryRevisionHistory(), ItineraryRevisionHistoryProps, FlightSegmentSnapshot, AcceptDisruptionResponseDto (+22 more)
 
 ### Community 73 - "rate-limit.spec.ts"
 Cohesion: 0.08
 Nodes (24): Admin data-quality report, Admin disruption queue, Admin inbox operations, API Contracts: Disruption & Flight-Change Management, Existing booking detail extension, Existing cancellation command integration, GET `/api/admin/disruptions`, GET `/api/admin/disruptions/data-quality` (+16 more)
 
 ### Community 79 - "agent"
-Cohesion: 0.22
-Nodes (5): assertCanonicalCreate(), BookingIntentLegacyController, requestContext(), setSafeHeaders(), BookingReadinessRequestDto
+Cohesion: 0.13
+Nodes (10): AuthenticatedRequest, JwtAuthGuard, assertCanonicalCreate(), AuthenticatedRequest, BookingIntentController, BookingIntentLegacyController, requestContext(), setSafeHeaders() (+2 more)
 
 ### Community 91 - "Frontend Auth Contract"
 Cohesion: 0.20
@@ -779,8 +769,8 @@ Cohesion: 0.11
 Nodes (18): Assumptions, Clarifications, Edge Cases, Feature Specification: Agent Tool-Calling & Data Access, Functional Requirements, Key Entities, Measurable Outcomes, Requirements *(mandatory)* (+10 more)
 
 ### Community 115 - "Implementation Plan: LLM Output Guardrails"
-Cohesion: 0.09
-Nodes (12): Roles(), RolesGuard, ConfirmPaymentDto, CreatePaymentDto, PaymentResponseDto, RefundPaymentDto, AuthenticatedRequest, PaymentController (+4 more)
+Cohesion: 0.29
+Nodes (8): generateItineraryFingerprint(), serializeSegmentCanonical(), extractLocalDate(), normalizeDuffelOrder(), normalizeFlightSegments(), parseIsoDurationToMinutes(), DuffelOrder, DuffelPlace
 
 ### Community 116 - "Data Model: Agent Tool-Calling & Data Access"
 Cohesion: 0.04
@@ -923,8 +913,8 @@ Cohesion: 0.17
 Nodes (11): Decision 10: Concurrent Message Handling, Decision 1: Python Framework, Decision 2: SSE Streaming Implementation, Decision 3: JWT Validation in Python, Decision 4: Input Guardrails Library, Decision 5: LangChain Python Agent Setup, Decision 6: Python Project in Monorepo, Decision 7: LangSmith Tracing (+3 more)
 
 ### Community 151 - "ChunkBuffer"
-Cohesion: 0.38
-Nodes (4): BackfillOptionsDto, PassportExpiryBackfillController, BackfillResult, PassportExpiryBackfillService
+Cohesion: 0.11
+Nodes (8): Roles(), RolesGuard, EncryptionService, BackfillOptionsDto, PassportExpiryBackfillController, BackfillOptions, BackfillResult, PassportExpiryBackfillService
 
 ### Community 152 - "AuditService"
 Cohesion: 0.06
@@ -955,8 +945,8 @@ Cohesion: 0.25
 Nodes (7): Agent Operating Rules, Critical Guidelines, E2E Testing Instructions, Local Development Startup, Read Before Anything Else, Rules That Never Change, This is NOT the Next.js you know
 
 ### Community 159 - "chat_stream"
-Cohesion: 0.29
-Nodes (5): ChatStreamRequest, Request model for the chat stream endpoint., RouteDecision, TrustedSearchResult, BaseModel
+Cohesion: 0.33
+Nodes (8): DuffelSegment, CABIN_RANK, CabinClass, capitalize(), computeCabinMatch(), mapOffer(), mapSegment(), parseISO8601Duration()
 
 ### Community 160 - "Project: Flight Booking System Monorepo"
 Cohesion: 0.25
@@ -1027,7 +1017,7 @@ Cohesion: 0.15
 Nodes (13): Implementation Phases, Phase 10: Saved Payment Methods, Phase 11: Cron Jobs — Authorization Expiry & Cleanup, Phase 12: E2E Testing & Verification, Phase 1: Database Schema & Enums, Phase 2: Stripe SDK Wrapper & Shared Infrastructure, Phase 3: Payment State Machine, Phase 4: Idempotency Key Service (+5 more)
 
 ### Community 247 - "test_pipeline_parallelism.py"
-Cohesion: 0.27
+Cohesion: 0.43
 Nodes (4): capitalizeCabinClass(), cleanIsoTime(), formatDuffelBaggageAllowance(), parseISODurationToMinutes()
 
 ### Community 248 - "Sketch Manifest"
@@ -1039,8 +1029,8 @@ Cohesion: 0.09
 Nodes (14): HasValidHandoffSource(), CanonicalPassengerMetadataConstraint, CanonicalPassengerShapeConstraint, CreateIntentDto, CreateIntentPassengerDto, InlinePassengerSourceDto, LEGACY_PASSENGER_FIELDS, LEGACY_REQUIRED_PASSENGER_FIELDS (+6 more)
 
 ### Community 250 - "seed.ts"
-Cohesion: 0.08
-Nodes (16): BookingReadinessObservability, EncryptionService, ProfileResponseContactDto, ProfileResponseDto, ProfileResponseIdentityDto, ProfileResponsePreferencesDto, ProfileResponseTravelDocumentDto, ContactSectionDto (+8 more)
+Cohesion: 0.16
+Nodes (13): ProfileResponseContactDto, ProfileResponseDto, ProfileResponseIdentityDto, ProfileResponsePreferencesDto, ProfileResponseTravelDocumentDto, ContactSectionDto, IdentitySectionDto, PreferencesSectionDto (+5 more)
 
 ### Community 251 - "devDependencies"
 Cohesion: 0.14
@@ -1055,12 +1045,12 @@ Cohesion: 0.17
 Nodes (12): Automated Tests, Complexity Tracking, Constitution Check, Documentation (this feature), Environment Variables, Implementation Plan: Stripe Payment System, Manual Verification, Project Structure (+4 more)
 
 ### Community 254 - "scripts"
-Cohesion: 0.05
-Nodes (26): BookingWithRelations, CacheService, AuthenticatedRequest, DisruptionController, TravellerDisruptionController, DisruptionService, ReconciliationResult, ReconciliationService (+18 more)
+Cohesion: 0.06
+Nodes (14): BookingAgentProjectionService, SafeBookingProjectionData, AuthenticatedRequest, DisruptionController, TravellerDisruptionController, DisruptionService, DbSegment, PrismaError (+6 more)
 
 ### Community 255 - "devDependencies"
-Cohesion: 0.17
-Nodes (7): AuditService, ALLOWED_TRANSITIONS, canTransition(), enforceTransition(), getPreDisputeStatus(), resolveDisputeStatus(), PaymentWebhookService
+Cohesion: 0.06
+Nodes (12): enrichRedactedDuffelOrder(), StripeService, PaymentCronService, enrichRedactedDuffelOrder(), redactDuffelOrder(), ALLOWED_TRANSITIONS, canTransition(), enforceTransition() (+4 more)
 
 ### Community 256 - "plan.md"
 Cohesion: 0.15
@@ -1071,8 +1061,8 @@ Cohesion: 0.12
 Nodes (15): Artifacts Updated, Decisions Made, Full State Machine, Grilling Session #2 — Cancellation & Refund Stress Test, Next Steps, Q10 — User Communication ✅, Q1 — Concurrency Control ✅, Q2 — Duffel Crash Recovery ✅ (+7 more)
 
 ### Community 258 - "package.json"
-Cohesion: 0.17
-Nodes (19): test_first_chunk_unsafe(), test_mid_stream_chunk_unsafe(), test_nestjs_persistence_fails(), get_auth_headers(), mock_nestjs_client(), MockStreamingLLM, parse_sse(), test_sse_action_handoff_disconnect_retry() (+11 more)
+Cohesion: 0.22
+Nodes (16): get_auth_headers(), mock_nestjs_client(), MockStreamingLLM, parse_sse(), test_sse_action_handoff_disconnect_retry(), test_sse_action_handoff_ordering_and_schema(), test_sse_complete_profile_handoff_stops_without_persistence(), test_sse_gateway_error() (+8 more)
 
 ### Community 259 - "amadeus.types.ts"
 Cohesion: 0.08
@@ -1123,20 +1113,16 @@ Cohesion: 0.13
 Nodes (14): Dependencies & Execution Order, Format: `[ID] [P?] [Story] Description`, Implementation for User Story 1, Implementation for User Story 2, Implementation for User Story 3, Phase 1: Setup (Shared Infrastructure), Phase 2: Foundational (Blocking Prerequisites), Phase 3: User Story 1 - Select Cabin Class for Flight Search (Priority: P1) 🎯 MVP (+6 more)
 
 ### Community 273 - "BookingService"
-Cohesion: 0.08
-Nodes (13): AuthenticatedRequest, BookingController, BookingService, enrichRedactedDuffelOrder(), parseDuffelCancellationQuoteId(), serializeDuffelCancellationQuoteId(), BookingListQueryDto, BookingTab (+5 more)
+Cohesion: 0.14
+Nodes (9): AuthenticatedRequest, BookingController, BookingListQueryDto, BookingTab, BookingDetailResponseDto, BookingListItemResponseDto, BookingListResponseDto, CancelBookingDto (+1 more)
 
 ### Community 275 - ".aclose"
 Cohesion: 0.14
 Nodes (13): API Contract Changes: Cabin Class & Passenger Type Enhancement, Cabin Mismatch Detail Object, Classification Algorithm, Error Responses — New Validation Errors, Field Changes, GET /api/flights/:id — Response Changes, New/Changed Fields, POST /api/flights/search — Request Changes (+5 more)
 
 ### Community 276 - "devDependencies"
-Cohesion: 0.07
-Nodes (37): computeItineraryDiff(), ConnectionDiff, ItineraryDiffResult, SegmentDiff, SliceDiff, generateItineraryFingerprint(), serializeSegmentCanonical(), extractLocalDate() (+29 more)
-
-### Community 277 - "scripts"
-Cohesion: 0.13
-Nodes (5): BookingIntentController, BookingIntentService, BookingIntentPrefillResponseDto, CreateBookingIntentResponseDto, GetBookingIntentResponseDto
+Cohesion: 0.24
+Nodes (12): computeItineraryDiff(), ConnectionDiff, ItineraryDiffResult, SegmentDiff, SliceDiff, NormalizedSegment, classifyMateriality(), evaluateDiffForReasons() (+4 more)
 
 ### Community 278 - "Payment System — Grilling Decisions"
 Cohesion: 0.13
@@ -1155,8 +1141,8 @@ Cohesion: 0.20
 Nodes (9): R0: Cabin Class — Request-Level vs Post-Filter, R1: Mixed-Cabin Offer Handling, R2: Three-Tier Cabin Match Classification, R3: Passenger Type DTO — Flat Fields, R4: Isolated Passenger Mapper, R5: Cache Key Expansion, R6: Schema Migration — Flat Columns, R7: Agent Gateway — Honest Degradation (+1 more)
 
 ### Community 282 - "Booking Workflow — Grilling Decisions"
-Cohesion: 0.25
-Nodes (10): MockBookingDetailResponse, BookingFailureReason, BookingStatus, BookingDetailDto, BookingListItemDto, CancellationQuoteResponseDto, CancellationResponseDto, PassengerDetail (+2 more)
+Cohesion: 0.12
+Nodes (21): MOCK_BOOKINGS, MockBookingDetailResponse, BookingDetailResponse, Props, BookingConfirmationBanner(), BookingConfirmationBannerProps, BookingFailureState(), BookingFailureStateProps (+13 more)
 
 ### Community 283 - "devDependencies"
 Cohesion: 0.11
@@ -1243,8 +1229,8 @@ Cohesion: 0.20
 Nodes (10): Prerequisites, Quickstart Validation Guide: LLM Output Guardrails, Running Tests, Scenario 1: Safe Response Streams Normally, Scenario 2: PII in Output Triggers Hard Stop, Scenario 3: Boundary PII Detected by Sliding Window, Scenario 4: NeMo Output Rail Blocks Harmful Content, Scenario 5: Partial Response Persisted on Block (+2 more)
 
 ### Community 305 - "Phase 6: SSE Integration — Wire Pipeline Into Streaming"
-Cohesion: 0.10
-Nodes (6): AdminRefundController, RefundResolutionAction, refundResolutionActions, ResolveRefundDto, PaymentCronService, PaymentRefundService
+Cohesion: 0.14
+Nodes (5): AdminRefundController, RefundResolutionAction, refundResolutionActions, ResolveRefundDto, PaymentRefundService
 
 ### Community 306 - "Data Model: LLM Output Guardrails"
 Cohesion: 0.25
@@ -1255,8 +1241,8 @@ Cohesion: 0.20
 Nodes (9): Database Schema & Types, Format: `[ID] [P?] Description`, Idempotency Key Service, Parallel Opportunities (Within PR 1), Payment State Machine, Phase 1: Setup (Shared Infrastructure), Phase 2: Foundational (PR 1: Payment Foundation), Stripe SDK Wrapper (+1 more)
 
 ### Community 308 - "PaymentMethodService"
-Cohesion: 0.11
-Nodes (5): AgentGatewayController, AgentGatewayService, BookingSummariesResponseDto, UserBookingsResponseDto, UserPreferencesDto
+Cohesion: 0.14
+Nodes (3): AgentGatewayController, AgentGatewayService, UserPreferencesDto
 
 ### Community 309 - "Decision 9: Recovery Points and Dual State Tracking"
 Cohesion: 0.25
@@ -1327,12 +1313,12 @@ Cohesion: 0.15
 Nodes (12): API E2E, Focused automated tests, Frontend Playwright, Install and database preparation, Manual local smoke test, Observability acceptance, Prerequisites, Pure matcher/classifier and service tests (+4 more)
 
 ### Community 326 - "payment-refund.e2e-spec.ts"
-Cohesion: 0.20
-Nodes (16): AgentGatewayModule, AirportsModule, AncillariesModule, envSchema, AuditModule, BookingModule, BookingIntentModule, CacheModule (+8 more)
+Cohesion: 0.19
+Nodes (17): AgentGatewayModule, AirportsModule, AncillariesModule, envSchema, AuditModule, BookingModule, BookingIntentModule, CacheModule (+9 more)
 
 ### Community 327 - "paths"
-Cohesion: 0.11
-Nodes (19): StripeService, LeasedSnapshot, ValidateAncillaryPaymentInput, ValidatedAncillaryPayment, ValidationIntent, dto, validated, ancillaryDto (+11 more)
+Cohesion: 0.06
+Nodes (30): AuditService, LeasedSnapshot, ValidateAncillaryPaymentInput, ValidatedAncillaryPayment, ValidationIntent, ConfirmPaymentDto, CreatePaymentDto, PaymentResponseDto (+22 more)
 
 ### Community 328 - "jwt-auth.guard.ts"
 Cohesion: 0.15
@@ -1387,8 +1373,8 @@ Cohesion: 0.22
 Nodes (8): Decisions, Failure classification, Optimistic claims, not long database locks, Refund idempotency expiry, Remote-first crash recovery, Research: Cancellation & Refund Recovery, Supplier-first cancellation, Two-tier retry policy
 
 ### Community 341 - "Implementation Plan: Disruption & Flight-Change Management"
-Cohesion: 0.10
-Nodes (20): Complexity Tracking, Constitution Check — Post-Design Re-evaluation, Constitution Check — Pre-Design Gate, Dependency and delivery map, Exit criteria, Exit criteria, Feature documentation, Implementation Plan: Disruption & Flight-Change Management (+12 more)
+Cohesion: 0.22
+Nodes (9): Complexity Tracking, Constitution Check — Post-Design Re-evaluation, Constitution Check — Pre-Design Gate, Dependency and delivery map, Implementation Plan: Disruption & Flight-Change Management, Rollout plan, Summary, Technical Context (+1 more)
 
 ### Community 342 - "Grilling Session — Feature 14: Disruption & Flight-Change Management"
 Cohesion: 0.14
@@ -1399,8 +1385,8 @@ Cohesion: 0.25
 Nodes (8): Further Notes, Implementation Decisions, Out of Scope, Problem Statement, Product Requirements Document: Cancellation & Refund Recovery, Solution, Testing Decisions, User Stories
 
 ### Community 344 - "Feature Specification: Disruption & Flight-Change Management"
-Cohesion: 0.12
-Nodes (15): Assumptions, Edge Cases, Feature Specification: Disruption & Flight-Change Management, Functional Requirements, Key Entities, Measurable Outcomes, Requirements *(mandatory)*, Success Criteria *(mandatory)* (+7 more)
+Cohesion: 0.25
+Nodes (7): Assumptions, Feature Specification: Disruption & Flight-Change Management, Functional Requirements, Key Entities, Measurable Outcomes, Requirements *(mandatory)*, Success Criteria *(mandatory)*
 
 ### Community 345 - "User Scenarios & Testing *(mandatory)*"
 Cohesion: 0.13
@@ -1419,16 +1405,12 @@ Cohesion: 0.10
 Nodes (17): classOptions, countryOptions, documentOptions, genderOptions, getMaskedPassport(), phoneCountryOptions, ProfileDraft, ProfileSection (+9 more)
 
 ### Community 349 - "API Contracts: Cancellation & Refund Recovery"
-Cohesion: 0.16
-Nodes (12): TrustedSearchSnapshot, Redis, Atomically replaces the old snapshot and sets the TTL based on expiresAt., Loads the snapshot and verifies owner/session match., Atomically delete the snapshot., TrustedSnapshotRepository, Test atomic replace and load with correct owner/session., Test atomic overwrite replaces the old snapshot entirely. (+4 more)
+Cohesion: 0.06
+Nodes (39): TrustedSearchSnapshot, Redis, Atomically replaces the old snapshot and sets the TTL based on expiresAt., Loads the snapshot and verifies owner/session match., Atomically delete the snapshot., TrustedSnapshotRepository, project_snapshot_results(), Any (+31 more)
 
 ### Community 350 - "Data Model: Cancellation & Refund Recovery"
 Cohesion: 0.33
 Nodes (5): Booking changes, Cancellation, Data Model: Cancellation & Refund Recovery, Refund changes, State transitions
-
-### Community 351 - "Delivery phases and pull requests"
-Cohesion: 0.24
-Nodes (4): PassengerSnapshotService, ResolvedPassengerForSnapshot, internationalPassenger(), passenger()
 
 ### Community 352 - "data-quality-backfill.ts"
 Cohesion: 0.40
@@ -1450,17 +1432,13 @@ Nodes (4): Automated checks, Prerequisites, Quickstart: Cancellation & Refund Re
 Cohesion: 0.40
 Nodes (4): Decision: Keep the page server-rendered and link-only, Decision: Test the public behavior, not component internals, Decision: Use a self-contained presentation component, Research: AI Copilot Landing Page
 
-### Community 357 - "intent-response.dto.ts"
-Cohesion: 0.12
-Nodes (6): ChatMessageCryptoService, ChatService, prisma, chatEncryptionKey, encryptionKey, FORBIDDEN_PRIVACY_CORPUS
-
 ### Community 358 - "route.ts"
 Cohesion: 0.16
-Nodes (16): handler, GET(), getAccessToken(), jsonError(), mapProfileError(), PATCH(), ProfilePage(), authOptions (+8 more)
+Nodes (17): handler, GET(), getAccessToken(), jsonError(), mapProfileError(), PATCH(), ProfilePage(), authOptions (+9 more)
 
 ### Community 359 - "Phase 0 / PR 1 — Baseline reconciliation and protected frontend foundation"
-Cohesion: 0.36
-Nodes (8): detect_pii(), Detects if the input text contains Passport numbers, Credit card numbers (Luhn c, test_detect_pii_clean_text(), test_detect_pii_credit_card(), test_detect_pii_email(), test_detect_pii_multiple(), test_detect_pii_passport(), test_detect_pii_phone()
+Cohesion: 0.20
+Nodes (12): detect_pii(), Detects if the input text contains Passport numbers, Credit card numbers (Luhn c, Verify that pii_scrubber detects and scrubs email, phone, passport, and card., Verify _SAFE_LLM_FIELDS does not contain local offer IDs, Duffel offer IDs, or d, test_pii_scrubber_redacts_seeded_corpus(), test_safe_llm_fields_excludes_identifiers(), test_detect_pii_clean_text(), test_detect_pii_credit_card() (+4 more)
 
 ### Community 360 - "Phase 1 / PR 2 — Contracts, additive schema, migration, and shared types"
 Cohesion: 0.12
@@ -1499,16 +1477,12 @@ Cohesion: 0.04
 Nodes (45): Dependencies & Execution Order, Format and execution rules, GREEN implementation, GREEN implementation, GREEN implementation, GREEN implementation, GREEN implementation, GREEN implementation (+37 more)
 
 ### Community 372 - "Project Structure"
-Cohesion: 0.20
-Nodes (8): Request, Response, chat_stream(), Request, Handle POST /chat/stream requests, performing validation, checking guardrails,, decode_and_verify_jwt(), Any, Decode and verify a JWT token using the provided secret, issuer, and audience.
+Cohesion: 0.15
+Nodes (10): Request, Response, ChatStreamRequest, Request model for the chat stream endpoint., chat_stream(), Request, Handle POST /chat/stream requests, performing validation, checking guardrails,, decode_and_verify_jwt() (+2 more)
 
 ### Community 379 - "booking-intent.service.spec.ts"
 Cohesion: 0.15
 Nodes (15): make_valid_jwt(), Missing or malformed correlation data must not enter downstream telemetry., Strictly formatted opaque trace and correlation headers remain stable downstream, Health check reports degraded status and redis: 'down' when Redis ping fails., OPTIONS /chat/stream from configured origin must return exact CORS headers and a, Request from disallowed origin must be explicitly rejected with 403 ORIGIN_NOT_A, CORS headers must be present on 401 auth errors for allowed origins., CORS headers must be present on 429 rate limit / quota errors for allowed origin (+7 more)
-
-### Community 380 - "flights.controller.ts"
-Cohesion: 0.12
-Nodes (13): Test that a valid schema parses successfully., Test that schema version other than 1 is rejected., Test that unknown/forbidden fields are rejected., Test that results with forbidden fields (e.g. payment info) are rejected., Test that results list must be between 1 and 5 items., Test that result indexes must be unique and contiguous from 1., test_trusted_search_snapshot_schema_forbidden_fields(), test_trusted_search_snapshot_schema_forbidden_result_fields() (+5 more)
 
 ### Community 381 - "booking-intent.e2e-spec.ts"
 Cohesion: 0.27
@@ -1531,8 +1505,8 @@ Cohesion: 0.12
 Nodes (17): Completion Evidence, Phase 1: Contract-Freeze Checkpoint (2026-08-05), Phase 2: Checkpoint 2B (2026-08-05), Phase 2A: Redis Lifecycle Checkpoint (2026-08-05), Phase 2C: Fenced Session Lease Checkpoint (2026-08-05), Phase 2D: Trusted Snapshot Checkpoint (2026-08-05), Phase 2E: Encrypted/Additive Prisma Foundation Checkpoint (2026-08-05), Phase 2F: Inert Domain Skeletons Checkpoint (2026-08-05) (+9 more)
 
 ### Community 386 - "BookingService"
-Cohesion: 0.39
-Nodes (7): BookingActionCard(), SafeActionRequiredEvent, ChatWidgetInner(), consumeChatStream(), consumeSseBlock(), getSafeOfferId(), getSafeSessionId()
+Cohesion: 0.21
+Nodes (11): BookingActionCard(), SafeActionRequiredEvent, ChatWidgetInner(), consumeChatStream(), consumeSseBlock(), getSafeOfferId(), getSafeSessionId(), CheckoutHandoffCard() (+3 more)
 
 ### Community 387 - "AncillarySelectionClient.tsx"
 Cohesion: 0.13
@@ -1551,8 +1525,8 @@ Cohesion: 0.13
 Nodes (15): Blocking Feature 016a preflight, Build and Static Contract Checks, Configuration Under Test, Full Regression, Performance and Concurrency Gates, Phase 14: Checkout Resolve, Claim, and Atomic Consume, Phase 9: Booking Projection Boundary, Phases 10–13: Signal, Credential, Dark API, SSE Action, and Bootstrap (+7 more)
 
 ### Community 391 - "NestJSClient"
-Cohesion: 0.10
-Nodes (11): SelectionAttestationService, ActiveUser, JwtPayload, ValidatedUser, AgentHandoffProbeInput, AgentStreamProbeInput, ObservedGatewayTrace, BenchmarkSummary (+3 more)
+Cohesion: 0.06
+Nodes (18): SelectionAttestationOffer, SelectionAttestationPayload, SelectionAttestationService, BookingReadinessObservability, ChatMessageCryptoService, ClaimedHandoffRow, InFlightReservation, JsonRecord (+10 more)
 
 ### Community 392 - "Payment System — Grilling Decisions"
 Cohesion: 0.10
@@ -1571,8 +1545,8 @@ Cohesion: 0.14
 Nodes (14): Assumptions, Edge Cases, Feature Specification: Chatbot Backend Infrastructure and Booking Handoff, Functional Requirements, Key Entities, Measurable Outcomes, Requirements, Success Criteria (+6 more)
 
 ### Community 396 - "page.tsx"
-Cohesion: 0.23
-Nodes (10): ActionRequiredEvent, BaseSSEEvent, ChatMessageEvent, DisplayInfo, HandoffEvent, test_accepts_valid_handoff_event(), test_rejects_handoff_event_extra_fields(), test_rejects_handoff_event_missing_token() (+2 more)
+Cohesion: 0.18
+Nodes (12): ActionRequiredEvent, BaseSSEEvent, ChatMessageEvent, DisplayInfo, HandoffEvent, TrustedSearchResult, test_accepts_valid_handoff_event(), test_rejects_handoff_event_extra_fields() (+4 more)
 
 ### Community 397 - "dependencies"
 Cohesion: 0.15
@@ -1581,6 +1555,10 @@ Nodes (13): 10. Direct streaming is a staged transport migration, 11. Existing s
 ### Community 398 - "agent-gateway.service.ts"
 Cohesion: 0.21
 Nodes (11): _emit_aggregate(), _p95_ms(), Maintained T098 agent benchmark coverage.  The emitted aggregate deliberately, Prove Redis Lua admits exactly one of 100 simultaneous daily-limit attempts., Return an inclusive p95 for the fixed-size benchmark sample., Print the machine-readable, PII-free aggregate required by T098., Use the existing integration convention: skip only when Redis is unavailable., Measure public stream request-to-router entry with an accepted fake quota. (+3 more)
+
+### Community 399 - "dependencies"
+Cohesion: 0.14
+Nodes (5): Any, RunnableConfig, Search for available flights between two airports on a specific date. Returns th, search_flights(), ValueError
 
 ### Community 400 - "dependencies"
 Cohesion: 0.17
@@ -1595,8 +1573,8 @@ Cohesion: 0.31
 Nodes (8): make_token(), test_canonical_jwt_valid_claims_accepted(), test_cross_user_session_isolation_denied(), test_jwt_invalid_issuer_or_audience_rejected(), test_legacy_id_transition_supported(), test_nestjs_access_check_revoked_or_deactivated_rejected(), test_zero_inference_and_zero_persistence_on_quota_exceeded(), test_zero_quota_charged_and_zero_inference_on_access_check_failure()
 
 ### Community 403 - "Code Standards"
-Cohesion: 0.16
-Nodes (12): CABIN_KEYWORDS, PASSENGER_KEYWORDS, AuthenticatedRequest, AttestedFlightSearchDto, BookingDetailDto, BookingSummaryDto, FlightResultDto, FlightSearchResponseDto (+4 more)
+Cohesion: 0.12
+Nodes (16): CABIN_KEYWORDS, PASSENGER_KEYWORDS, AuthenticatedRequest, AttestedFlightSearchDto, AttestedFlightSearchResponseDto, AttestedFlightSearchResultDto, BookingDetailDto, BookingSummariesResponseDto (+8 more)
 
 ### Community 404 - "Library Docs"
 Cohesion: 0.23
@@ -1627,8 +1605,8 @@ Cohesion: 0.15
 Nodes (12): _persist_response(), Return an opaque telemetry identifier, never a request/session identifier., Resolves the original user message from body or graph state., Persists the user and agent messages as a batch.     Revalidates active fence i, _resolve_correlation_id(), _resolve_user_message(), make_token(), test_cross_user_session_access_returns_404_and_zero_inference() (+4 more)
 
 ### Community 411 - "ancillary.types.ts"
-Cohesion: 0.24
-Nodes (4): AgentApiKeyGuard, AuthenticatedRequest, ChatHandoffController, ResolveChatHandoffDto
+Cohesion: 0.25
+Nodes (8): Edge Cases, User Scenarios & Testing *(mandatory)*, User Story 1 - Reliably synchronize supplier changes (Priority: P1), User Story 2 - Detect and preserve material disruptions (Priority: P1), User Story 3 - Review and act on the active disruption (Priority: P1), User Story 4 - Preserve cancellation correctness (Priority: P1), User Story 5 - Recover failures and operate the feature (Priority: P2), User Story 6 - Roll out safely to existing bookings (Priority: P2)
 
 ### Community 412 - "agent-gateway.service.ts"
 Cohesion: 0.20
@@ -1667,16 +1645,16 @@ Cohesion: 0.29
 Nodes (4): checkout_orchestrator_node(), RunnableConfig, Call the LLM with Checkout Orchestrator tools bound., test_checkout_orchestrator_node_adds_system_prompt()
 
 ### Community 423 - "Implementation Phases"
-Cohesion: 0.21
-Nodes (7): PassengerPageFlightDetail, Props, FormPassenger, PassengerFormClient(), PassengerFormClientProps, CheckoutPassengerRequest, TravelerProfileResponse
+Cohesion: 0.29
+Nodes (6): Implementation Plan - Phase 9D: Signed Flight Search Attestation & Snapshot Isolation, NestJS Backend (`apps/api`), Proposed Changes, Python Agent (`apps/agent`), User Review Required, Verification Commands
 
 ### Community 425 - "Implementation Phases"
-Cohesion: 0.23
-Nodes (11): ClaimedHandoffRow, firstFlightSegment(), handoffPassengers(), InFlightReservation, isJsonRecord(), isoDateValue(), JsonRecord, lastFlightSegment() (+3 more)
+Cohesion: 0.40
+Nodes (3): test_first_chunk_unsafe(), test_mid_stream_chunk_unsafe(), test_nestjs_persistence_fails()
 
 ### Community 426 - "Implementation Plan: Disruption & Flight-Change Management"
-Cohesion: 0.29
-Nodes (6): app_module_1, common_1, http_exception_filter_1, prisma_service_1, supertest_1, testing_1
+Cohesion: 0.50
+Nodes (4): Exit criteria, Phase 2 / PR 3 — Pure itinerary normalization, matching, diff, and classification, Tests, Work
 
 ### Community 427 - "Implementation Phases"
 Cohesion: 0.29
@@ -1687,8 +1665,8 @@ Cohesion: 0.33
 Nodes (3): Chatbot Booking Orchestration, Flight Booking System, Language
 
 ### Community 429 - "booking.service.js"
-Cohesion: 0.16
-Nodes (6): CACHE_KEYS, CACHE_TTLS, AirportsController, AirportsService, NearbyAirportsDto, SearchAirportsDto
+Cohesion: 0.06
+Nodes (17): CACHE_KEYS, CACHE_TTLS, AirportsController, AirportsService, NearbyAirportsDto, SearchAirportsDto, ActiveUser, JwtPayload (+9 more)
 
 ### Community 430 - "flights.service.ts"
 Cohesion: 0.29
@@ -1727,8 +1705,8 @@ Cohesion: 0.20
 Nodes (9): Feature 017 Phase 9A: Safe Booking Projection Foundation Implementation Plan, Global Constraints, Task 1: BookingAgentProjection Schema & DDL Verification, Task 2: Implement `BookingAgentProjectionService` with TDD, Task 3: Transactional Projection Population on Booking Confirmation, Failure, Completion, and Cancellation, Task 4: Projection Refresh on Supplier Sync, Disruption Reconciliation, and Duffel Webhook Events, Task 5: Existing-Booking Backfill Script & Service Integration, Task 6: Privacy Contract Verification & Comprehensive Integration Tests (+1 more)
 
 ### Community 439 - "payment.service.js"
-Cohesion: 0.25
-Nodes (9): ALLOWED_METADATA_KEYS, ALLOWED_STRING_VALUES, BOOLEAN_METADATA_KEYS, CHAT_HANDOFF_OBSERVABILITY_CONTRACT, ChatTelemetryEvent, createChatTelemetryEvent(), METRIC_BY_OPERATION, opaqueId() (+1 more)
+Cohesion: 0.10
+Nodes (24): ClaimedHandoffForIntent, HandoffFastFailReservation, LegacyIntentPassenger, ResolvedIntentPassenger, BookingIntentContactSummaryDto, BookingIntentCreationPassengerDto, BookingIntentDocumentSummaryDto, BookingIntentFlightDto (+16 more)
 
 ### Community 440 - "Tasks: Database Initialization & Auth Handshake"
 Cohesion: 0.33
@@ -1783,20 +1761,20 @@ Cohesion: 0.50
 Nodes (3): MOCK_MALICIOUS_PAYLOAD, MOCK_MULTI_PAYLOAD, MOCK_SINGLE_PAYLOAD
 
 ### Community 457 - "API Contracts: Stripe Payment System"
-Cohesion: 0.33
-Nodes (7): assertCurrency(), calculateAncillaryTotals(), formatCents(), parseCents(), PricingInput, baggage, seats
+Cohesion: 0.50
+Nodes (4): Exit criteria, Phase 5 / PR 6 — Budget-aware reconciliation and correct completion lifecycle, Tests, Work
 
 ### Community 458 - "Header.tsx"
 Cohesion: 0.50
 Nodes (4): Exit criteria, Phase 1 / PR 2 — Contracts, additive schema, migration, and shared types, Tests, Work
 
 ### Community 459 - "API Contracts: Stripe Payment System"
-Cohesion: 0.29
-Nodes (3): HandoffFastFailGuard, HandoffRequest, RequestFixture
+Cohesion: 0.67
+Nodes (3): Feature documentation, Planned source layout, Project Structure
 
 ### Community 460 - "dependencies"
-Cohesion: 0.22
-Nodes (10): invoke_router(), RouteDecision, Invoke the Intent Router model to classify the user's latest message.     Retur, base_state(), Test that a valid LLM response is parsed into a RouteDecision., Test that malformed output falls back to Travel Assistant (SEARCH intent)., Test low confidence for a non-checkout message falls back to Travel Assistant., test_router_confidence_bound() (+2 more)
+Cohesion: 0.18
+Nodes (11): invoke_router(), RouteDecision, Invoke the Intent Router model to classify the user's latest message.     Retur, RouteDecision, base_state(), Test that a valid LLM response is parsed into a RouteDecision., Test that malformed output falls back to Travel Assistant (SEARCH intent)., Test low confidence for a non-checkout message falls back to Travel Assistant. (+3 more)
 
 ### Community 461 - "API Contracts: Disruption & Flight-Change Management"
 Cohesion: 0.50
@@ -1826,21 +1804,13 @@ Nodes (4): Implementation for User Story 5, Phase 7: User Story 5 — Observable
 Cohesion: 0.08
 Nodes (23): Cancellation & Refund with Ancillaries, Complete Booking Flow, Context, Decisions Made, Grilling Session #4 — Ancillary Services: Seat Selection, Baggage & Dynamic Price Tracker, Integration Points, Next Steps, Out of Scope (Deferred) (+15 more)
 
-### Community 469 - "readPaymentReservation"
-Cohesion: 0.29
-Nodes (6): Verify that pii_scrubber detects and scrubs email, phone, passport, and card., Verify _SAFE_LLM_FIELDS does not contain local offer IDs, Duffel offer IDs, or d, Verify project_snapshot_results never returns offer IDs or provider IDs to the b, test_pii_scrubber_redacts_seeded_corpus(), test_project_snapshot_results_excludes_identifiers(), test_safe_llm_fields_excludes_identifiers()
-
-### Community 471 - "package.json"
-Cohesion: 0.32
-Nodes (7): BookingIntentContactSummaryDto, BookingIntentCreationPassengerDto, BookingIntentDocumentSummaryDto, BookingIntentFlightDto, BookingIntentPassengerDetailDto, BookingIntentPassengerSummaryDto, BookingIntentPrefillPassengerDto
-
 ### Community 472 - "Tasks: Duffel Flight Search Service"
 Cohesion: 0.67
 Nodes (3): Implementation Strategy, Incremental Delivery, MVP First — US1 Only
 
 ### Community 488 - "AncillariesService"
-Cohesion: 0.18
-Nodes (4): AncillariesController, AncillariesService, AncillaryCatalogService, CommitAncillarySelectionDto
+Cohesion: 0.07
+Nodes (22): AncillariesController, AncillariesService, assertCurrency(), calculateAncillaryTotals(), formatCents(), parseCents(), PricingInput, baggage (+14 more)
 
 ### Community 489 - "Global Constraints"
 Cohesion: 0.25
@@ -1850,25 +1820,9 @@ Nodes (7): Global Constraints, Phase 8E: Approved Encrypted-Chat Plaintext Clean
 Cohesion: 0.42
 Nodes (8): get_auth_headers(), parse_sse(), test_stream_graceful_shutdown(), test_stream_guardrails_blocked(), test_stream_guardrails_unavailable(), test_stream_message_too_long(), test_stream_omitted_session_id(), test_stream_with_valid_session_id()
 
-### Community 491 - "CheckoutHandoffCard.tsx"
-Cohesion: 0.28
-Nodes (5): AuthenticatedRequest, CommitBaggageDto, CommitSeatDto, JwtAuthGuard, AuthenticatedRequest
-
 ### Community 492 - "AncillarySelectionClient.tsx"
 Cohesion: 0.12
 Nodes (12): BaggageChoice, money(), priceKey(), Props, SeatChoice, SeatMap(), SeatTier, ServiceView (+4 more)
-
-### Community 493 - ".createMessageBatch"
-Cohesion: 0.39
-Nodes (5): FlightSearchRequestDto, FlightSearchResponseDto, AuthenticatedRequest, FlightsController, FlightsService
-
-### Community 494 - "bootstrap"
-Cohesion: 0.25
-Nodes (6): MOCK_BOOKINGS, BookingDetailResponse, Props, BookingConfirmationBanner(), BookingConfirmationBannerProps, BookingDisruptionDto
-
-### Community 495 - ".attach_task"
-Cohesion: 0.50
-Nodes (4): BookingFailureState(), BookingFailureStateProps, chargeMessage(), failureMessages
 
 ### Community 496 - "booking-intent.types.ts"
 Cohesion: 0.25
@@ -1895,20 +1849,12 @@ Cohesion: 0.43
 Nodes (3): AgentBookingReadinessPassengerDto, AgentBookingReadinessRequestDto, AgentBookingReadinessResponseDto
 
 ### Community 504 - "traveler-profile.types.ts"
-Cohesion: 0.12
-Nodes (16): BookingReadinessResult, MaskedContactSummary, MaskedDocumentSummary, MaskedPassengerSummary, ReadinessFieldResult, ReadinessPassengerResult, ReadinessReasonCode, ReadinessScope (+8 more)
-
-### Community 505 - "CheckoutHandoffCard.tsx"
-Cohesion: 0.38
-Nodes (4): CheckoutHandoffCard(), CheckoutHandoffCardProps, appendHandoffCredential(), HandoffEvent
+Cohesion: 0.10
+Nodes (20): BookingReadinessResult, MaskedContactSummary, MaskedDocumentSummary, MaskedPassengerSummary, ReadinessFieldResult, ReadinessPassengerResult, ReadinessReasonCode, ReadinessScope (+12 more)
 
 ### Community 506 - "BookingStatusBadge.tsx"
-Cohesion: 0.33
-Nodes (5): BookingStatus, BookingStatusBadge(), BookingStatusBadgeProps, statusLabels, statusStyles
-
-### Community 507 - "ItineraryChangeSummary.tsx"
-Cohesion: 0.33
-Nodes (4): ItineraryChangeSummary(), ItineraryChangeSummaryProps, PresentationSummary, SliceSummary
+Cohesion: 0.14
+Nodes (13): BookingDetail(), BookingDetailProps, currencyFormatter(), BookingProcessingState(), BookingStatus, BookingStatusBadge(), BookingStatusBadgeProps, statusLabels (+5 more)
 
 ### Community 508 - "Feature 017 Phase 9C: Python Read Tools & Privacy-Minimized Formatting Plan"
 Cohesion: 0.40
@@ -1939,8 +1885,8 @@ Cohesion: 0.13
 Nodes (9): app_module_1, client_1, common_1, http_exception_filter_1, jwt_1, prisma_service_1, stripe_service_1, supertest_1 (+1 more)
 
 ### Community 648 - "BookingsList.tsx"
-Cohesion: 0.18
-Nodes (12): BookingsPageProps, BookingCard(), BookingCardBooking, BookingCardProps, formatCurrency(), formatDate(), BookingListItem, BookingsList() (+4 more)
+Cohesion: 0.19
+Nodes (11): BookingsPageProps, BookingCard(), BookingCardBooking, BookingCardProps, formatCurrency(), formatDate(), BookingListItem, BookingsList() (+3 more)
 
 ### Community 669 - "payment-refund.e2e-spec.js"
 Cohesion: 0.14
@@ -1963,28 +1909,20 @@ Cohesion: 0.15
 Nodes (12): Decision 10: Missing country data is a domain result, Decision 1: Canonical field rules, Decision 2: Additive passport-expiry migration, Decision 3: Scope from stored itinerary data, Decision 4: One evaluator for advisory and authoritative checks, Decision 5: Compatible contract migration, Decision 6: PII exposure rules, Decision 7: No new dependency (+4 more)
 
 ### Community 753 - "disruption.e2e-spec.js"
-Cohesion: 0.07
-Nodes (15): DuffelEventProcessor, DuffelProcessorHealthService, HealthController, HealthModule, app_module_1, client_1, common_1, crypto (+7 more)
+Cohesion: 0.17
+Nodes (11): app_module_1, client_1, common_1, crypto, duffel_event_processor_1, duffel_service_1, http_exception_filter_1, jwt_1 (+3 more)
 
 ### Community 782 - "get_tools"
-Cohesion: 0.22
-Nodes (14): get_checkout_tools(), get_general_tools(), get_tool_by_name(), get_tools(), get_travel_tools(), Get a list of all registered tool instances., Retrieve a registered tool instance by its name., Check if a tool requires confirmation before execution.     In the new topology (+6 more)
-
-### Community 783 - "ancillary-selection.validator.ts"
-Cohesion: 0.18
-Nodes (10): AncillarySelectionValidationError, baggageTier(), findSeatService(), invalid(), normalizedType(), catalog, passengers, validateAncillarySelection() (+2 more)
+Cohesion: 0.16
+Nodes (17): RunnableConfig, Call the LLM with Travel Assistant tools bound., travel_assistant_node(), get_checkout_tools(), get_general_tools(), get_tool_by_name(), get_tools(), get_travel_tools() (+9 more)
 
 ### Community 787 - "agent-gateway-polish.e2e-spec.js"
-Cohesion: 0.18
-Nodes (9): app_module_1, cache_service_1, common_1, crypto, duffel_service_1, http_exception_filter_1, prisma_service_1, supertest_1 (+1 more)
+Cohesion: 0.07
+Nodes (23): app_module_1, cache_service_1, common_1, crypto, duffel_service_1, http_exception_filter_1, prisma_service_1, supertest_1 (+15 more)
 
 ### Community 788 - "booking.e2e-spec.js"
 Cohesion: 0.20
 Nodes (10): app_module_1, client_1, common_1, http_exception_filter_1, createBooking(), createPaymentForBookingIntent(), jwt_1, prisma_service_1 (+2 more)
-
-### Community 789 - "flights-detail.e2e-spec.js"
-Cohesion: 0.10
-Nodes (15): DuffelCleanupService, app_module_1, cache_service_1, common_1, duffel_cleanup_service_1, duffel_service_1, http_exception_filter_1, jwt_1 (+7 more)
 
 ### Community 827 - "Data Model: Ancillary Seat and Baggage Checkout"
 Cohesion: 0.18
@@ -2003,8 +1941,8 @@ Cohesion: 0.22
 Nodes (8): Phase 1: Setup, Phase 2: Foundational (Next.js Protected Shells), Phase 3: User Story 1 — Search Entry & Navigation (US1), Phase 4: User Story 2 — Passenger Details Collection (US2), Phase 5: User Story 3 — Ancillary Placeholder & Checkout Verification (US3), Phase 6: Polish & E2E Validation, Phase 7: Phase 1 / PR 2 — Shared Contracts, State Repair, Additive Schema, and Migration, Tasks: Restoring the Checkout Foundation (Phase 0 / PR 1)
 
 ### Community 922 - "get_chat_model"
-Cohesion: 0.11
-Nodes (15): format_messages(), get_chat_model(), Any, BaseMessage, Initialize and return the LangChain ChatOpenAI instance configured with Mimo end, Format chat session history, summary, and current user message into a list of La, general_agent_node(), RunnableConfig (+7 more)
+Cohesion: 0.13
+Nodes (12): format_messages(), get_chat_model(), Any, BaseMessage, Initialize and return the LangChain ChatOpenAI instance configured with Mimo end, Format chat session history, summary, and current user message into a list of La, general_agent_node(), RunnableConfig (+4 more)
 
 ### Community 936 - "audit-log.e2e-spec.js"
 Cohesion: 0.25
@@ -2050,25 +1988,17 @@ Nodes (4): client_1, fs, prisma, path
 Cohesion: 0.22
 Nodes (9): ALLOWED_METADATA_KEY_SET, BookingReadinessObservabilityContext, BookingReadinessObservabilityEvent, safeMetadata(), sanitizeIdentifier(), ALLOWED_METADATA_KEYS, BookingReadinessMetric, BookingReadinessOperation (+1 more)
 
-### Community 1022 - "ItineraryChangeSummary.tsx"
-Cohesion: 0.16
-Nodes (14): BookingDetail(), BookingDetailProps, currencyFormatter(), BookingProcessingState(), DisruptionAlert(), DisruptionAlertProps, REASON_LABELS, RESOLVED_REASON_LABELS (+6 more)
-
 ### Community 1057 - "seed-agent-tools.js"
 Cohesion: 0.40
 Nodes (3): bcrypt, client_1, prisma
 
 ### Community 1084 - "page.tsx"
-Cohesion: 0.15
-Nodes (19): fetchBrowserProfile(), requestBrowserProfile(), updateBrowserProfile(), ErrorBody, getProfileRequestError(), isErrorBody(), ProfileContactUpdate, ProfileDocumentUpdate (+11 more)
+Cohesion: 0.12
+Nodes (21): PassengerPageFlightDetail, Props, FormPassenger, PassengerFormClient(), PassengerFormClientProps, BookingReadinessResponse, fetchBrowserProfile(), requestBrowserProfile() (+13 more)
 
 ### Community 1130 - "User Scenarios & Testing"
 Cohesion: 0.40
 Nodes (5): Edge Cases, User Scenarios & Testing, User Story 1 - Select Seats Per Passenger and Segment (Priority: P1), User Story 2 - Add Segment- or Journey-Scoped Baggage (Priority: P2), User Story 3 - Review an Instant, Authoritative Total (Priority: P3)
-
-### Community 1132 - "search_flights"
-Cohesion: 0.18
-Nodes (8): project_snapshot_results(), Any, RunnableConfig, Project the trusted snapshot into the exact browser-safe result shape., Search for available flights between two airports on a specific date. Returns th, search_flights(), test_nestjs_client_post_gateway_flights_search_v2(), test_project_snapshot_results_is_identifier_free()
 
 ### Community 1168 - "SearchFormClient.tsx"
 Cohesion: 0.11
@@ -2099,24 +2029,24 @@ Cohesion: 0.50
 Nodes (4): Exit criteria, Final verification matrix, Phase 7 / PR 8 — End-to-end resilience, observability, rollout, and documentation sync, Work
 
 ## Knowledge Gaps
-- **2872 isolated node(s):** `root`, `parser`, `plugins`, `extends`, `node` (+2867 more)
+- **2879 isolated node(s):** `root`, `parser`, `plugins`, `extends`, `node` (+2874 more)
   These have ≤1 connection - possible missing edges or undocumented components.
 - **150 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
-- **Why does `PrismaService` connect `app.module.ts` to `prisma.service.ts`, `chat.controller.ts`, `NestJSClient`, `Payment System — Grilling Decisions`, `BookingService`, `Code Standards`, `devDependencies`, `scripts`, `Library Docs`, `flights-detail.e2e-spec.js`, `AuditService`, `Project Overview`, `Implementation Phases`, `BookingIntentService`, `Implementation Phases`, `booking.service.js`, `page.tsx`, `utils.ts`, `Phase 6: SSE Integration — Wire Pipeline Into Streaming`, `auth.spec.ts`, `paths`, `payment-refund.e2e-spec.ts`, `intent-response.dto.ts`, `AncillariesService`, `Phase 1 / PR 2 — Contracts, additive schema, migration, and shared types`, `disruption.e2e-spec.js`, `Implementation Plan: LLM Output Guardrails`, `chat-handoff.service.spec.ts`, `seed.ts`, `scripts`, `devDependencies`?**
-  _High betweenness centrality (0.027) - this node is a cross-community bridge._
-- **Why does `passenger()` connect `Delivery phases and pull requests` to `plan.md`, `graph.py`?**
-  _High betweenness centrality (0.007) - this node is a cross-community bridge._
-- **Why does `isHandoffCheckoutContext()` connect `plan.md` to `Delivery phases and pull requests`?**
-  _High betweenness centrality (0.007) - this node is a cross-community bridge._
-- **Are the 39 inferred relationships involving `NestJSClient` (e.g. with `MemoryManager` and `chat_stream()`) actually correct?**
-  _`NestJSClient` has 39 INFERRED edges - model-reasoned connections that need verification._
+- **Why does `PrismaService` connect `scripts` to `chat.controller.ts`, `NestJSClient`, `Payment System — Grilling Decisions`, `Code Standards`, `detect_pii`, `scripts`, `Library Docs`, `ChunkBuffer`, `AuditService`, `app.module.ts`, `Project Overview`, `chat_stream`, `BookingIntentService`, `booking.service.js`, `utils.ts`, `Phase 6: SSE Integration — Wire Pipeline Into Streaming`, `PaymentMethodService`, `payment.service.js`, `auth.spec.ts`, `paths`, `payment-refund.e2e-spec.ts`, `intent-response.dto.ts`, `AncillariesService`, `Phase 1 / PR 2 — Contracts, additive schema, migration, and shared types`, `seed.ts`, `devDependencies`?**
+  _High betweenness centrality (0.028) - this node is a cross-community bridge._
+- **Why does `passenger()` connect `utils.ts` to `plan.md`, `graph.py`, `Delivery phases and pull requests`?**
+  _High betweenness centrality (0.008) - this node is a cross-community bridge._
+- **Why does `isHandoffCheckoutContext()` connect `plan.md` to `utils.ts`?**
+  _High betweenness centrality (0.008) - this node is a cross-community bridge._
+- **Are the 42 inferred relationships involving `NestJSClient` (e.g. with `MemoryManager` and `chat_stream()`) actually correct?**
+  _`NestJSClient` has 42 INFERRED edges - model-reasoned connections that need verification._
 - **What connects `root`, `parser`, `plugins` to the rest of the system?**
-  _3030 weakly-connected nodes found - possible documentation gaps or missing edges._
+  _3038 weakly-connected nodes found - possible documentation gaps or missing edges._
 - **Should `NestJSClient` be split into smaller, more focused modules?**
-  _Cohesion score 0.10256410256410256 - nodes in this community are weakly interconnected._
+  _Cohesion score 0.09788359788359788 - nodes in this community are weakly interconnected._
 - **Should `PrismaService` be split into smaller, more focused modules?**
   _Cohesion score 0.0625 - nodes in this community are weakly interconnected._

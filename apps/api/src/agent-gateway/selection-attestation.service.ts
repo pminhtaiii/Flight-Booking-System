@@ -2,6 +2,20 @@ import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import * as crypto from 'crypto';
 
+export interface SelectionAttestationOffer {
+  flightOfferId: string;
+  duffelOfferId: string;
+}
+
+export interface SelectionAttestationPayload {
+  userId: string;
+  sessionId: string;
+  version: number;
+  issuedAt: string;
+  expiresAt: string;
+  offers: SelectionAttestationOffer[];
+}
+
 @Injectable()
 export class SelectionAttestationService {
   constructor(private configService: ConfigService) {}
@@ -19,15 +33,25 @@ export class SelectionAttestationService {
     sessionId: string,
     version: number,
     expiresAt: string,
-    offers: { flightOfferId: string; duffelOfferId: string }[],
+    offers: SelectionAttestationOffer[],
+    issuedAt?: string,
   ): Promise<string> {
-    const payload = JSON.stringify({ userId, sessionId, version, expiresAt, offers });
+    const canonicalIssuedAt = issuedAt ?? new Date().toISOString();
+    const payload: SelectionAttestationPayload = {
+      userId,
+      sessionId,
+      version,
+      issuedAt: canonicalIssuedAt,
+      expiresAt,
+      offers,
+    };
+    const payloadStr = JSON.stringify(payload);
     const signature = crypto
       .createHmac('sha256', this.secretKey)
-      .update(payload)
+      .update(payloadStr)
       .digest('hex');
 
-    const base64Payload = Buffer.from(payload).toString('base64url');
+    const base64Payload = Buffer.from(payloadStr, 'utf8').toString('base64url');
     return `sel_v1_${base64Payload}.${signature}`;
   }
 
@@ -36,30 +60,83 @@ export class SelectionAttestationService {
     userId: string,
     sessionId: string,
     version: number,
-    offers: { flightOfferId: string; duffelOfferId: string }[],
+    offers: SelectionAttestationOffer[],
   ): Promise<boolean> {
-    const parts = attestation.split('_v1_');
-    if (parts.length !== 2) throw new UnauthorizedException('Invalid attestation format');
+    if (!attestation || typeof attestation !== 'string' || !attestation.startsWith('sel_v1_')) {
+      throw new UnauthorizedException('Invalid attestation format');
+    }
 
-    const [payloadBase64, signature] = parts[1].split('.');
-    if (!payloadBase64 || !signature) throw new UnauthorizedException('Invalid attestation format');
+    const remainder = attestation.slice('sel_v1_'.length);
+    const parts = remainder.split('.');
+    if (parts.length !== 2 || !parts[0] || !parts[1]) {
+      throw new UnauthorizedException('Invalid attestation format');
+    }
 
-    const payloadStr = Buffer.from(payloadBase64, 'base64url').toString('utf8');
-    let payload;
+    const [payloadBase64, signature] = parts;
+
+    let payloadStr: string;
+    try {
+      payloadStr = Buffer.from(payloadBase64, 'base64url').toString('utf8');
+    } catch {
+      throw new UnauthorizedException('Invalid attestation format');
+    }
+
+    let payload: SelectionAttestationPayload;
     try {
       payload = JSON.parse(payloadStr);
     } catch (e) {
       throw new UnauthorizedException('Invalid attestation payload');
     }
 
-    if (payload.userId !== userId) throw new UnauthorizedException('User mismatch');
-    if (payload.sessionId !== sessionId) throw new UnauthorizedException('Session mismatch');
-    if (payload.version !== version) throw new UnauthorizedException('Version mismatch');
-    
-    if (new Date(payload.expiresAt) < new Date()) throw new UnauthorizedException('Attestation expired');
-    
-    if (JSON.stringify(payload.offers) !== JSON.stringify(offers)) {
+    if (!payload || typeof payload !== 'object') {
+      throw new UnauthorizedException('Invalid attestation payload');
+    }
+
+    if (payload.userId !== userId) {
+      throw new UnauthorizedException('User mismatch');
+    }
+    if (payload.sessionId !== sessionId) {
+      throw new UnauthorizedException('Session mismatch');
+    }
+    if (payload.version !== version) {
+      throw new UnauthorizedException('Version mismatch');
+    }
+
+    if (!Array.isArray(payload.offers) || !Array.isArray(offers)) {
       throw new UnauthorizedException('Offers mismatch');
+    }
+    if (payload.offers.length !== offers.length) {
+      throw new UnauthorizedException('Offers mismatch');
+    }
+    for (let i = 0; i < offers.length; i++) {
+      const pOffer = payload.offers[i];
+      const expectedOffer = offers[i];
+      if (
+        !pOffer ||
+        !expectedOffer ||
+        pOffer.flightOfferId !== expectedOffer.flightOfferId ||
+        pOffer.duffelOfferId !== expectedOffer.duffelOfferId
+      ) {
+        throw new UnauthorizedException('Offers mismatch');
+      }
+    }
+
+    const expiresAtTime = new Date(payload.expiresAt).getTime();
+    if (isNaN(expiresAtTime) || expiresAtTime <= Date.now()) {
+      throw new UnauthorizedException('Attestation expired');
+    }
+
+    if (payload.issuedAt) {
+      const issuedAtTime = new Date(payload.issuedAt).getTime();
+      if (isNaN(issuedAtTime)) {
+        throw new UnauthorizedException('Invalid attestation payload');
+      }
+      if (issuedAtTime > Date.now() + 60000) {
+        throw new UnauthorizedException('Attestation issued in the future');
+      }
+      if (issuedAtTime > expiresAtTime) {
+        throw new UnauthorizedException('Attestation issuedAt exceeds expiresAt');
+      }
     }
 
     const expectedSignature = crypto
@@ -69,10 +146,11 @@ export class SelectionAttestationService {
 
     let isValid = false;
     try {
-      isValid = crypto.timingSafeEqual(
-        Buffer.from(signature, 'hex'),
-        Buffer.from(expectedSignature, 'hex')
-      );
+      const sigBuffer = Buffer.from(signature, 'hex');
+      const expectedBuffer = Buffer.from(expectedSignature, 'hex');
+      if (sigBuffer.length === expectedBuffer.length) {
+        isValid = crypto.timingSafeEqual(sigBuffer, expectedBuffer);
+      }
     } catch (e) {
       isValid = false;
     }

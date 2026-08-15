@@ -977,7 +977,7 @@ describe('Agent Gateway (E2E)', () => {
 
   describe('Attested Flight Search Endpoint (POST /v2/flights/search)', () => {
     let token: string;
-    let user: any; // Using any for simplicity in this generated block
+    let user: User;
 
     beforeEach(async () => {
       user = await prisma.user.create({
@@ -993,7 +993,7 @@ describe('Agent Gateway (E2E)', () => {
       token = mintClaimToken(user.id, iat);
     });
 
-    it('should return 404 for unowned chatSessionId', async () => {
+    it('should return 404 for non-existent chatSessionId', async () => {
       await request(app.getHttpServer())
         .post('/agent-gateway/v2/flights/search')
         .set('X-Agent-API-Key', apiKey)
@@ -1001,12 +1001,172 @@ describe('Agent Gateway (E2E)', () => {
         .send({
           chatSessionId: crypto.randomUUID(),
           proposedSnapshotVersion: 1,
-          search: { origin: 'SGN', destination: 'NRT', date: '2026-09-20', adults: 1 }
+          search: { origin: 'SGN', destination: 'NRT', date: '2027-07-20', adults: 1 },
         })
         .expect(404);
     });
 
-    it('should return signed attestation and identifiers to the service', async () => {
+    it('should return 404 for chatSessionId owned by another user', async () => {
+      const otherUser = await prisma.user.create({
+        data: {
+          id: crypto.randomUUID(),
+          email: `other-user-${crypto.randomUUID()}@example.com`,
+          password: 'Password123!',
+          status: 'ACTIVE',
+        },
+      });
+
+      const otherSession = await prisma.chatSession.create({
+        data: {
+          userId: otherUser.id,
+        },
+      });
+
+      await request(app.getHttpServer())
+        .post('/agent-gateway/v2/flights/search')
+        .set('X-Agent-API-Key', apiKey)
+        .set('X-User-Claim', token)
+        .send({
+          chatSessionId: otherSession.id,
+          proposedSnapshotVersion: 1,
+          search: { origin: 'SGN', destination: 'NRT', date: '2027-07-20', adults: 1 },
+        })
+        .expect(404);
+    });
+
+    it('should return 401 for missing X-Agent-API-Key', async () => {
+      const session = await prisma.chatSession.create({
+        data: { userId: user.id },
+      });
+
+      const res = await request(app.getHttpServer())
+        .post('/agent-gateway/v2/flights/search')
+        .set('X-User-Claim', token)
+        .send({
+          chatSessionId: session.id,
+          proposedSnapshotVersion: 1,
+          search: { origin: 'SGN', destination: 'NRT', date: '2027-07-20', adults: 1 },
+        })
+        .expect(401);
+
+      expect(res.body.code).toBe('INVALID_API_KEY');
+    });
+
+    it('should return 401 for missing X-User-Claim', async () => {
+      const session = await prisma.chatSession.create({
+        data: { userId: user.id },
+      });
+
+      const res = await request(app.getHttpServer())
+        .post('/agent-gateway/v2/flights/search')
+        .set('X-Agent-API-Key', apiKey)
+        .send({
+          chatSessionId: session.id,
+          proposedSnapshotVersion: 1,
+          search: { origin: 'SGN', destination: 'NRT', date: '2027-07-20', adults: 1 },
+        })
+        .expect(401);
+
+      expect(res.body.code).toBe('INVALID_CLAIM_TOKEN');
+    });
+
+    it('should return 403 for inactive user', async () => {
+      const inactiveUser = await prisma.user.create({
+        data: {
+          id: crypto.randomUUID(),
+          email: `inactive-${crypto.randomUUID()}@example.com`,
+          password: 'Password123!',
+          status: 'INACTIVE',
+        },
+      });
+
+      const inactiveToken = mintClaimToken(inactiveUser.id, Math.floor(Date.now() / 1000));
+      const session = await prisma.chatSession.create({
+        data: { userId: inactiveUser.id },
+      });
+
+      const res = await request(app.getHttpServer())
+        .post('/agent-gateway/v2/flights/search')
+        .set('X-Agent-API-Key', apiKey)
+        .set('X-User-Claim', inactiveToken)
+        .send({
+          chatSessionId: session.id,
+          proposedSnapshotVersion: 1,
+          search: { origin: 'SGN', destination: 'NRT', date: '2027-07-20', adults: 1 },
+        })
+        .expect(403);
+
+      expect(res.body.code).toBe('USER_INACTIVE');
+    });
+
+    it('should reject invalid airport code format', async () => {
+      const session = await prisma.chatSession.create({
+        data: { userId: user.id },
+      });
+
+      await request(app.getHttpServer())
+        .post('/agent-gateway/v2/flights/search')
+        .set('X-Agent-API-Key', apiKey)
+        .set('X-User-Claim', token)
+        .send({
+          chatSessionId: session.id,
+          proposedSnapshotVersion: 1,
+          search: { origin: 'HOCHIMINH', destination: 'NRT', date: '2027-07-20', adults: 1 },
+        })
+        .expect(400);
+    });
+
+    it('should reject past dates', async () => {
+      const session = await prisma.chatSession.create({
+        data: { userId: user.id },
+      });
+
+      await request(app.getHttpServer())
+        .post('/agent-gateway/v2/flights/search')
+        .set('X-Agent-API-Key', apiKey)
+        .set('X-User-Claim', token)
+        .send({
+          chatSessionId: session.id,
+          proposedSnapshotVersion: 1,
+          search: { origin: 'SGN', destination: 'NRT', date: '2020-01-01', adults: 1 },
+        })
+        .expect(400);
+    });
+
+    it('should reject passenger count out of range', async () => {
+      const session = await prisma.chatSession.create({
+        data: { userId: user.id },
+      });
+
+      await request(app.getHttpServer())
+        .post('/agent-gateway/v2/flights/search')
+        .set('X-Agent-API-Key', apiKey)
+        .set('X-User-Claim', token)
+        .send({
+          chatSessionId: session.id,
+          proposedSnapshotVersion: 1,
+          search: { origin: 'SGN', destination: 'NRT', date: '2027-07-20', adults: 12 },
+        })
+        .expect(400);
+    });
+
+    it('should reject missing snapshotVersion and proposedVersion', async () => {
+      const session = await prisma.chatSession.create({
+        data: { userId: user.id },
+      });
+
+      await request(app.getHttpServer())
+        .post('/agent-gateway/v2/flights/search')
+        .set('X-Agent-API-Key', apiKey)
+        .set('X-User-Claim', token)
+        .send({
+          chatSessionId: session.id,
+          search: { origin: 'SGN', destination: 'NRT', date: '2027-07-20', adults: 1 },
+        })
+        .expect(400);
+    });
+
+    it('should return signed attestation, snapshotVersion, snapshotExpiresAt, and enriched results', async () => {
       const session = await prisma.chatSession.create({
         data: {
           userId: user.id,
@@ -1020,24 +1180,78 @@ describe('Agent Gateway (E2E)', () => {
         .send({
           chatSessionId: session.id,
           proposedSnapshotVersion: 1,
-          search: { origin: 'SGN', destination: 'NRT', date: '2027-07-20', adults: 1 }
+          search: { origin: 'SGN', destination: 'NRT', date: '2027-07-20', adults: 1 },
         });
 
-      // The new endpoint should return 201 or 200 depending on framework default for POST, we will accept either for now
       expect([200, 201]).toContain(res.status);
 
       expect(res.body.selectionAttestation).toBeDefined();
       expect(res.body.selectionAttestation).toMatch(/^sel_v1_[A-Za-z0-9_-]+\.[A-Za-z0-9]+$/);
       expect(res.body.snapshotVersion).toBe(1);
-      
+      expect(res.body.snapshotExpiresAt).toBeDefined();
+      expect(new Date(res.body.snapshotExpiresAt).getTime()).toBeGreaterThan(Date.now());
+
       const results = res.body.results;
       expect(results.length).toBeGreaterThan(0);
-      
-      expect(results[0].flightOfferId).toBeDefined();
-      expect(results[0].duffelOfferId).toBeDefined();
+
+      const firstResult = results[0];
+      expect(firstResult.flightOfferId).toBeDefined();
+      expect(firstResult.duffelOfferId).toBeDefined();
+      expect(firstResult.offerExpiresAt).toBeDefined();
+      expect(firstResult.airline).toBe('Vietnam Airlines');
+      expect(firstResult.flightNumber).toBe('VN310');
+      expect(firstResult.departureAirport).toBe('HAN');
+      expect(firstResult.arrivalAirport).toBe('NRT');
+      expect(firstResult.departureTime).toBe('2027-07-15T08:30:00');
+      expect(firstResult.arrivalTime).toBe('2027-07-15T15:00:00');
+      expect(firstResult.duration).toBe(330);
+      expect(firstResult.stops).toBe(0);
+      expect(firstResult.price).toBe(452.00);
+      expect(firstResult.currency).toBe('USD');
+      expect(firstResult.fareClass).toBe('Economy');
+      expect(firstResult.baggageAllowance).toBe('23kg checked');
+
+      // Verify FlightOffer rows were created in DB
+      const persistedOffer = await prisma.flightOffer.findUnique({
+        where: { id: firstResult.flightOfferId },
+      });
+      expect(persistedOffer).toBeDefined();
+      expect(persistedOffer?.duffelOfferId).toBe(firstResult.duffelOfferId);
     });
 
-    it('legacy GET /flights/search should remain unenriched', async () => {
+    it('should support aliases proposedVersion, departureDate, and passengers', async () => {
+      const session = await prisma.chatSession.create({
+        data: {
+          userId: user.id,
+        },
+      });
+
+      const res = await request(app.getHttpServer())
+        .post('/agent-gateway/v2/flights/search')
+        .set('X-Agent-API-Key', apiKey)
+        .set('X-User-Claim', token)
+        .send({
+          chatSessionId: session.id,
+          proposedVersion: 3,
+          search: {
+            origin: 'SGN',
+            destination: 'NRT',
+            departureDate: '2027-07-20',
+            passengers: 2,
+            cabinClass: 'economy',
+          },
+        });
+
+      expect([200, 201]).toContain(res.status);
+      expect(res.body.snapshotVersion).toBe(3);
+      expect(res.body.selectionAttestation).toMatch(/^sel_v1_[A-Za-z0-9_-]+\.[A-Za-z0-9]+$/);
+      expect(res.body.results.length).toBeGreaterThan(0);
+      expect(res.body.results[0].flightOfferId).toBeDefined();
+      expect(res.body.results[0].duffelOfferId).toBeDefined();
+      expect(res.body.results[0].price).toBe(452.00 * 2);
+    });
+
+    it('legacy GET /flights/search should remain completely unenriched', async () => {
       const res = await request(app.getHttpServer())
         .get('/agent-gateway/flights/search?origin=SGN&destination=NRT&date=2027-07-20&adults=1')
         .set('X-Agent-API-Key', apiKey)
@@ -1045,11 +1259,20 @@ describe('Agent Gateway (E2E)', () => {
         .expect(200);
 
       expect(res.body.selectionAttestation).toBeUndefined();
-      
+      expect(res.body.snapshotVersion).toBeUndefined();
+      expect(res.body.snapshotExpiresAt).toBeUndefined();
+
       const results = res.body.results;
       expect(results.length).toBeGreaterThan(0);
       expect(results[0].flightOfferId).toBeUndefined();
       expect(results[0].duffelOfferId).toBeUndefined();
+      expect(results[0].offerExpiresAt).toBeUndefined();
+
+      expect(results[0].airline).toBe('Vietnam Airlines');
+      expect(results[0].flightNumber).toBe('VN310');
+      expect(results[0].departureAirport).toBe('HAN');
+      expect(results[0].arrivalAirport).toBe('NRT');
+      expect(results[0].price).toBe(452.00);
     });
   });
 

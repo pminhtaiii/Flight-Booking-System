@@ -7,7 +7,7 @@ import { DuffelService } from '@/duffel/duffel.service';
 import { DuffelBaggage } from '@/duffel/duffel.types';
 import { SelectionAttestationService } from './selection-attestation.service';
 import { FlightSearchQueryDto } from './dto/flight-search-query.dto';
-import { AttestedFlightSearchDto } from './dto/attested-flight-search.dto';
+import { AttestedFlightSearchDto, AttestedFlightSearchResponseDto } from './dto/attested-flight-search.dto';
 import { FlightSearchResponseDto, FlightResultDto } from './dto/flight-result.dto';
 import { UserPreferencesDto } from './dto/user-preferences.dto';
 import { UserBookingsResponseDto, BookingResultDto } from './dto/user-bookings.dto';
@@ -343,6 +343,15 @@ export class AgentGatewayService {
         throw new HttpException('Adults count is required', HttpStatus.BAD_REQUEST);
       }
 
+      const searchDate = query.date || query.departureDate;
+      if (!searchDate) {
+        throw new HttpException('Date is required', HttpStatus.BAD_REQUEST);
+      }
+
+      const origin = query.origin.trim().toUpperCase();
+      const destination = query.destination.trim().toUpperCase();
+      const cabinClass = query.cabinClass || 'economy';
+
       // Check for user's latest chat message and perform honest degradation keyword validation
       let lastMessage = null;
       if (correlationId) {
@@ -429,13 +438,13 @@ export class AgentGatewayService {
 
       // 1. Check Redis cache first for mapped results
       const normalizedQuery = {
-        origin: query.origin.trim().toUpperCase(),
-        destination: query.destination.trim().toUpperCase(),
-        date: query.date,
+        origin,
+        destination,
+        date: searchDate,
         adults: adultsCount,
         children: 0,
         infants: 0,
-        cabinClass: 'economy',
+        cabinClass,
       };
       const queryStr = JSON.stringify(normalizedQuery);
       const sha256 = crypto.createHash('sha256').update(queryStr).digest('hex');
@@ -463,13 +472,13 @@ export class AgentGatewayService {
       try {
         const searchResult = await this.duffelService.searchFlights(
           {
-            origin: query.origin,
-            destination: query.destination,
-            departureDate: query.date,
+            origin,
+            destination,
+            departureDate: searchDate,
             adults: adultsCount,
             children: 0,
             infants: 0,
-            cabinClass: 'economy',
+            cabinClass,
           },
           'agent',
         );
@@ -527,8 +536,8 @@ export class AgentGatewayService {
 
         const segmentPassenger = firstSegment.passengers?.[0];
         const offerPassenger = offer.passengers?.[0];
-        const cabinClass = segmentPassenger?.cabin_class || '';
-        const fareClass = cabinClass ? capitalizeCabinClass(cabinClass) : null;
+        const passengerCabinClass = segmentPassenger?.cabin_class || cabinClass;
+        const fareClass = passengerCabinClass ? capitalizeCabinClass(passengerCabinClass) : null;
         
         const baggages = segmentPassenger?.baggages || offerPassenger?.baggages;
         const baggageAllowance = formatDuffelBaggageAllowance(baggages);
@@ -589,7 +598,7 @@ export class AgentGatewayService {
     dto: AttestedFlightSearchDto,
     traceId: string | null = null,
     correlationId: string | null = null,
-  ): Promise<any> {
+  ): Promise<AttestedFlightSearchResponseDto> {
     const startTime = Date.now();
     try {
       // 1. Verify owned ChatSession
@@ -600,10 +609,12 @@ export class AgentGatewayService {
         throw new HttpException('Chat session not found', HttpStatus.NOT_FOUND);
       }
 
+      const proposedSnapshotVersion = dto.proposedSnapshotVersion ?? dto.proposedVersion ?? 1;
+
       // Check degradation triggers
       let adultsCount = dto.search.adults;
       if (adultsCount === undefined) {
-        adultsCount = (dto.search as any).passengers;
+        adultsCount = dto.search.passengers;
       }
       if (adultsCount === undefined) {
         throw new HttpException(
@@ -611,6 +622,18 @@ export class AgentGatewayService {
           HttpStatus.BAD_REQUEST,
         );
       }
+
+      const searchDate = dto.search.date || dto.search.departureDate;
+      if (!searchDate) {
+        throw new HttpException(
+          'At least one of date or departureDate must be provided',
+          HttpStatus.BAD_REQUEST,
+        );
+      }
+
+      const origin = dto.search.origin.trim().toUpperCase();
+      const destination = dto.search.destination.trim().toUpperCase();
+      const cabinClass = dto.search.cabinClass || 'economy';
 
       // Check for user's latest chat message and perform honest degradation keyword validation
       const lastMessage = await this.prisma.chatMessage.findFirst({
@@ -690,13 +713,13 @@ export class AgentGatewayService {
       try {
         const searchResult = await this.duffelService.searchFlights(
           {
-            origin: dto.search.origin,
-            destination: dto.search.destination,
-            departureDate: dto.search.date,
+            origin,
+            destination,
+            departureDate: searchDate,
             adults: adultsCount,
             children: 0,
             infants: 0,
-            cabinClass: 'economy',
+            cabinClass,
           },
           'agent',
         );
@@ -716,14 +739,15 @@ export class AgentGatewayService {
       const offers = rawResponse.offers || [];
       const limitedOffers = offers.slice(0, 5);
 
-      const flightOffersData = limitedOffers.map(offer => ({
+      const flightOffersData = limitedOffers.map((offer) => ({
         searchHash: searchHashValue,
         duffelOfferId: offer.id,
         rawOffer: offer as any,
-        origin: dto.search.origin,
-        destination: dto.search.destination,
-        departureDate: new Date(dto.search.date),
+        origin,
+        destination,
+        departureDate: new Date(searchDate),
         adults: adultsCount,
+        cabinClass,
         price: offer.total_amount,
         currency: offer.total_currency,
       }));
@@ -736,11 +760,14 @@ export class AgentGatewayService {
       }
 
       createdOffers = await this.prisma.flightOffer.findMany({
-        where: { searchHash: searchHashValue },
+        where: {
+          searchHash: searchHashValue,
+          duffelOfferId: { in: limitedOffers.map((o) => o.id) },
+        },
       });
       
       const results = [];
-      const attestationOffers = [];
+      const attestationOffers: { flightOfferId: string; duffelOfferId: string }[] = [];
       const expiresAt = new Date(Date.now() + 15 * 60000); // 15 mins
 
       for (let i = 0; i < limitedOffers.length; i++) {
@@ -780,8 +807,8 @@ export class AgentGatewayService {
 
         const segmentPassenger = firstSegment.passengers?.[0];
         const offerPassenger = offer.passengers?.[0];
-        const cabinClass = segmentPassenger?.cabin_class || '';
-        const fareClass = cabinClass ? capitalizeCabinClass(cabinClass) : null;
+        const passengerCabinClass = segmentPassenger?.cabin_class || cabinClass;
+        const fareClass = passengerCabinClass ? capitalizeCabinClass(passengerCabinClass) : null;
         
         const baggages = segmentPassenger?.baggages || offerPassenger?.baggages;
         const baggageAllowance = formatDuffelBaggageAllowance(baggages);
@@ -809,18 +836,43 @@ export class AgentGatewayService {
       const selectionAttestation = await this.selectionAttestationService.signSelectionAttestation(
         userId,
         dto.chatSessionId,
-        dto.proposedSnapshotVersion,
+        proposedSnapshotVersion,
         expiresAt.toISOString(),
         attestationOffers,
       );
 
-      return {
+      const response = {
         selectionAttestation,
-        snapshotVersion: dto.proposedSnapshotVersion,
+        snapshotVersion: proposedSnapshotVersion,
         snapshotExpiresAt: expiresAt.toISOString(),
         results,
       };
+
+      await this.logToolCall(
+        userId,
+        'v2/flights/search',
+        dto,
+        startTime,
+        traceId,
+        correlationId,
+        true,
+        null,
+        response,
+      );
+
+      return response;
     } catch (err: unknown) {
+      await this.logToolCall(
+        userId,
+        'v2/flights/search',
+        dto,
+        startTime,
+        traceId,
+        correlationId,
+        false,
+        err,
+        null,
+      );
       this.logger.error('Failed to search flights V2');
       throw err;
     }
