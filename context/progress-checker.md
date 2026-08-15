@@ -7,9 +7,9 @@ Update this file after every completed feature. Any AI agent reading this should
 ### Current Status
 
 **Feature:** Chatbot Backend Infrastructure & Booking Handoff (Feature 17)
-**Last completed:** Phase 10D Web Handoff Bootstrap & Clean Checkout Resolution (2026-08-15).
+**Last completed:** Phase 10E Pre-Supplier Claim Verification & Consumption CAS (2026-08-15).
 **In progress:** None.
-**Next:** Phase 10E Pre-Supplier Claim Verification & Consumption CAS.
+**Next:** Production observation & rollout verification.
 
 ---
 
@@ -81,6 +81,14 @@ Update this file after every completed feature. Any AI agent reading this should
     - Verified `POST /checkout/handoff` in `apps/web/app/checkout/handoff/route.ts` checking NextAuth session, same-origin CSRF headers, form body credential (`readHandoffCredential`), upstream resolution (`resolveHandoffForBootstrap`), setting `HttpOnly; Secure; SameSite=Strict` cookie (`chat_handoff_token`), and issuing clean `303 See Other` redirect to `/checkout/passengers`.
     - Updated `apps/web/app/checkout/passengers/page.tsx` to read `chat_handoff_token`, call `resolveHandoffForBootstrap`, render graceful alert UI (`Checkout Session Expired`) on failure/expiration, and render flight details with prefilled `PassengerFormClient` on success using semantic design tokens.
     - Verified with 24/24 passing unit tests in `apps/web/tests/` and 9/9 passing Playwright E2E tests in `apps/web/tests/chat-checkout-handoff.spec.ts`.
+  - [x] Phase 10E / Pre-Supplier Claim Verification & Consumption CAS (2026-08-15):
+    - Implemented mutually exclusive token-only source resolution in `BookingReadinessService` and `BookingIntentService` without accepting client `chatSessionId`.
+    - Implemented pre-supplier atomic Compare-And-Swap (CAS) claim lease protocol on `ChatHandoff` executed before any Duffel supplier or payment API call.
+    - Implemented watchdog heartbeat with 10s interval, claim TTL renewal, 25s hard supplier deadline, and cancellation on refresh loss.
+    - Implemented automatic claim release/recovery back to ACTIVE on recoverable Duffel errors.
+    - Implemented atomic Prisma transaction revalidating unexpired claim ownership and active non-deleted `ChatSession`, creating canonical `BookingIntent`, and setting `ChatHandoff.consumedAt = NOW()` with `consumedByBookingIntentId`.
+    - Verified 100-way concurrency test in `apps/api/test/chat-handoff-concurrency.e2e-spec.ts` proving exactly 1 winner and 99 zero-supplier losers (409 Conflict) with 100% reliability.
+    - Verified with 120/120 passing unit tests and full E2E suites passing in `apps/api`.
   - [x] WP 6C: Deterministic action and clean web bootstrap — ACTION_HANDOFF SSE parsing, strict card, CSRF bootstrap cookie, clean checkout URL
   - [x] WP 6D: Claimed canonical consume — Token-only readiness, pre-supplier claim, final atomic intent/consume CAS
   - **All Checkout Handoff tests pass (NestJS create/resolve/consume, agent signal integration, and Playwright UI tests).**

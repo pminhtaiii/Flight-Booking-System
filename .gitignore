@@ -31,4 +31,6 @@ Thumbs.db
 .idea/
 .superpowers/
 .worktrees/
-
+# Test results
+test-results/
+playwright-report/
