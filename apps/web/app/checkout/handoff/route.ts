@@ -82,7 +82,7 @@ export async function POST(request: Request): Promise<NextResponse> {
 
   const cookieHeader = request.headers.get('cookie') ?? '';
   const mockScenarioMatch = cookieHeader.match(/mock-scenario=([^;]+)/);
-  const mockScenario = mockScenarioMatch ? decodeURIComponent(mockScenarioMatch[1].trim()) : null;
+  const mockScenario = mockScenarioMatch ? mockScenarioMatch[1].trim() : null;
 
   const resolution = await resolveHandoffForBootstrap(
     apiUrl,

@@ -127,3 +127,25 @@ test('supports test mock fallback when mockScenario is provided in test environm
     process.env.NODE_ENV = previousEnv;
   }
 });
+
+test('handles malformed mockScenario string values safely', async () => {
+  const previousEnv = process.env.NODE_ENV;
+  process.env.NODE_ENV = 'test';
+  try {
+    const result = await resolveHandoffForBootstrap(
+      'http://127.0.0.1:3001',
+      'chk_handoff_v1_other_token',
+      'access-token',
+      undefined,
+      undefined,
+      async () => new Response('Not Found', { status: 404 }),
+      undefined,
+      '%zz',
+    );
+
+    assert.equal(result.ok, true);
+    assert.equal(result.status, 200);
+  } finally {
+    process.env.NODE_ENV = previousEnv;
+  }
+});
