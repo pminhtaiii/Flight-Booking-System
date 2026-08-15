@@ -100,6 +100,32 @@ describe('ChatHandoffService', () => {
     tokenService = module.get<ChatHandoffTokenService>(ChatHandoffTokenService);
     attestationService = module.get<SelectionAttestationService>(SelectionAttestationService);
     auditService = module.get(AuditService);
+
+    jest.spyOn(prisma.flightOffer, 'findUnique').mockResolvedValue({
+      id: 'fo1',
+      duffelOfferId: 'duff1',
+      origin: 'SGN',
+      destination: 'NRT',
+      price: '420.00',
+      currency: 'USD',
+      adults: 1,
+      children: 0,
+      infants: 0,
+      rawOffer: {
+        expires_at: new Date(Date.now() + 15 * 60 * 1000).toISOString(),
+        slices: [
+          {
+            segments: [
+              {
+                departing_at: '2026-09-20T02:00:00.000Z',
+                arriving_at: '2026-09-20T08:30:00.000Z',
+                operating_carrier: { name: 'Vietnam Airlines' },
+              },
+            ],
+          },
+        ],
+      },
+    } as any);
   });
 
   describe('extra field rejection and DTO validation', () => {
@@ -150,6 +176,52 @@ describe('ChatHandoffService', () => {
       });
       expect(invalidErrors.length).toBeGreaterThan(0);
       expect(invalidErrors.some((e) => e.property === 'selectedOfferIndex')).toBe(true);
+    });
+
+    it('fails validation when neither selectionAttestationHash nor attestation is provided', async () => {
+      const dto = plainToInstance(CreateChatHandoffDto, {
+        selectedOfferIndex: 1,
+      });
+      const errors = await validate(dto, {
+        whitelist: true,
+        forbidNonWhitelisted: true,
+      });
+      expect(errors.length).toBeGreaterThan(0);
+      expect(
+        errors.some(
+          (e) =>
+            e.property === 'selectionAttestationHash' ||
+            e.property === 'attestation' ||
+            e.property === 'selectedOfferIndex',
+        ),
+      ).toBe(true);
+    });
+
+    it('fails validation when selectionAttestationHash and attestation conflict', async () => {
+      const dto = plainToInstance(CreateChatHandoffDto, {
+        selectionAttestationHash: 'attest_hash_1',
+        attestation: 'attest_hash_2',
+        selectedOfferIndex: 1,
+      });
+      const errors = await validate(dto, {
+        whitelist: true,
+        forbidNonWhitelisted: true,
+      });
+      expect(errors.length).toBeGreaterThan(0);
+      expect(errors.some((e) => e.property === 'selectedOfferIndex')).toBe(true);
+    });
+
+    it('passes validation when both selectionAttestationHash and attestation are identical', async () => {
+      const dto = plainToInstance(CreateChatHandoffDto, {
+        selectionAttestationHash: 'attest_hash_1',
+        attestation: 'attest_hash_1',
+        selectedOfferIndex: 1,
+      });
+      const errors = await validate(dto, {
+        whitelist: true,
+        forbidNonWhitelisted: true,
+      });
+      expect(errors.length).toBe(0);
     });
   });
 
@@ -322,6 +394,68 @@ describe('ChatHandoffService', () => {
         }),
       ).rejects.toMatchObject({
         response: { code: 'HANDOFF_EXPIRED' },
+      });
+    });
+
+    it('rejects creation when flightOffer is not found in database', async () => {
+      jest.spyOn(configService, 'get').mockReturnValue('true');
+      jest.spyOn(prisma.flightOffer, 'findUnique').mockResolvedValue(null);
+
+      const mockAttestation = createMockAttestation('u1', 'cs1', 1, [
+        { flightOfferId: 'fo1', duffelOfferId: 'duff1' },
+      ]);
+
+      await expect(
+        service.create({
+          selectionAttestationHash: mockAttestation,
+          selectedOfferIndex: 1,
+        }),
+      ).rejects.toMatchObject({
+        response: { code: 'FLIGHT_OFFER_NOT_FOUND' },
+      });
+    });
+
+    it('rejects creation when duffelOfferId does not match database flight offer', async () => {
+      jest.spyOn(configService, 'get').mockReturnValue('true');
+      jest.spyOn(prisma.flightOffer, 'findUnique').mockResolvedValue({
+        id: 'fo1',
+        duffelOfferId: 'different_duff_id',
+        rawOffer: { expires_at: new Date(Date.now() + 60000).toISOString() },
+      } as any);
+
+      const mockAttestation = createMockAttestation('u1', 'cs1', 1, [
+        { flightOfferId: 'fo1', duffelOfferId: 'duff1' },
+      ]);
+
+      await expect(
+        service.create({
+          selectionAttestationHash: mockAttestation,
+          selectedOfferIndex: 1,
+        }),
+      ).rejects.toMatchObject({
+        response: { code: 'FLIGHT_OFFER_NOT_FOUND' },
+      });
+    });
+
+    it('rejects creation when flightOffer rawOffer is stale', async () => {
+      jest.spyOn(configService, 'get').mockReturnValue('true');
+      jest.spyOn(prisma.flightOffer, 'findUnique').mockResolvedValue({
+        id: 'fo1',
+        duffelOfferId: 'duff1',
+        rawOffer: { expires_at: new Date(Date.now() - 1000).toISOString() },
+      } as any);
+
+      const mockAttestation = createMockAttestation('u1', 'cs1', 1, [
+        { flightOfferId: 'fo1', duffelOfferId: 'duff1' },
+      ]);
+
+      await expect(
+        service.create({
+          selectionAttestationHash: mockAttestation,
+          selectedOfferIndex: 1,
+        }),
+      ).rejects.toMatchObject({
+        response: { code: 'HANDOFF_OFFER_STALE' },
       });
     });
   });

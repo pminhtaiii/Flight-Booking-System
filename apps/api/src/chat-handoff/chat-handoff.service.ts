@@ -315,15 +315,6 @@ export class ChatHandoffService {
       dto.selectedOfferIndex,
     );
 
-    const offerExpiryStr = selectedOffer.expires_at ?? selectedOffer.expiresAt ?? attestationExpiresAt;
-    const offerExpiry = offerExpiryStr ? new Date(offerExpiryStr) : new Date(attestationExpiresAt);
-    if (!Number.isFinite(offerExpiry.getTime()) || offerExpiry <= new Date()) {
-      throw new GoneException({
-        code: 'HANDOFF_OFFER_STALE',
-        message: 'Handoff offer is stale',
-      });
-    }
-
     let flightOffer = this.flightOfferCache.get(flightOfferId) ?? null;
     if (!flightOffer && this.prisma.flightOffer) {
       try {
@@ -335,6 +326,57 @@ export class ChatHandoffService {
       } catch (err) {
         this.logger.warn(`[create] chat_handoff_offer_lookup_failed: ${err instanceof Error ? err.message : 'unknown'}`);
       }
+    }
+
+    if (!flightOffer) {
+      throw new NotFoundException({
+        code: 'FLIGHT_OFFER_NOT_FOUND',
+        message: 'Flight offer not found or unavailable',
+      });
+    }
+
+    const computedDuffelOfferIdHash = this.tokenService.hashToken(flightOffer.duffelOfferId);
+    if (computedDuffelOfferIdHash !== duffelOfferIdHash) {
+      throw new NotFoundException({
+        code: 'FLIGHT_OFFER_NOT_FOUND',
+        message: 'Flight offer not found or unavailable',
+      });
+    }
+
+    const rawOffer = isJsonRecord(flightOffer.rawOffer) ? flightOffer.rawOffer : null;
+    const rawOfferExpiryStr = isoDateValue(rawOffer?.expires_at);
+    const selectedOfferExpiryStr = selectedOffer.expires_at ?? selectedOffer.expiresAt;
+    const effectiveOfferExpiryStr = rawOfferExpiryStr ?? selectedOfferExpiryStr;
+    if (!effectiveOfferExpiryStr) {
+      throw new GoneException({
+        code: 'HANDOFF_OFFER_STALE',
+        message: 'Handoff offer expiration missing',
+      });
+    }
+    const offerExpiry = new Date(effectiveOfferExpiryStr);
+    if (!Number.isFinite(offerExpiry.getTime()) || offerExpiry <= new Date()) {
+      throw new GoneException({
+        code: 'HANDOFF_OFFER_STALE',
+        message: 'Handoff offer is stale',
+      });
+    }
+
+    const attestationExpiry = new Date(attestationExpiresAt);
+    if (!Number.isFinite(attestationExpiry.getTime()) || attestationExpiry <= new Date()) {
+      throw new GoneException({
+        code: 'HANDOFF_OFFER_STALE',
+        message: 'Attestation is expired',
+      });
+    }
+
+    const maxTtlTime = Date.now() + 15 * 60 * 1000;
+    const effectiveExpiryTime = Math.min(attestationExpiry.getTime(), offerExpiry.getTime(), maxTtlTime);
+    const expiresAt = new Date(effectiveExpiryTime);
+    if (!Number.isFinite(expiresAt.getTime()) || expiresAt <= new Date()) {
+      throw new GoneException({
+        code: 'HANDOFF_OFFER_STALE',
+        message: 'Handoff offer is stale',
+      });
     }
 
     const display = this.buildOfferDisplay(flightOffer, selectedOffer);
@@ -371,15 +413,6 @@ export class ChatHandoffService {
     }
 
     try {
-      const expiresAt = new Date(
-        Math.min(Date.now() + 15 * 60 * 1000, offerExpiry.getTime()),
-      );
-      if (!Number.isFinite(expiresAt.getTime()) || expiresAt <= new Date()) {
-        throw new GoneException({
-          code: 'HANDOFF_OFFER_STALE',
-          message: 'Handoff offer is stale',
-        });
-      }
       const id = crypto.randomUUID();
       const { token, tokenHash, keyVersion } = await this.tokenService.generateToken(
         id,
