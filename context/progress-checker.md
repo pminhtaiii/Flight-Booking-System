@@ -7,9 +7,9 @@ Update this file after every completed feature. Any AI agent reading this should
 ### Current Status
 
 **Feature:** Chatbot Backend Infrastructure & Booking Handoff (Feature 17)
-**Last completed:** Phase 9B Exact Booking Projection Gateway Read Boundaries (2026-08-15).
+**Last completed:** Phase 9C Python Read Tools & Privacy-Minimized Formatting (2026-08-15).
 **In progress:** None.
-**Next:** Phase 9C Python Read Tools & Formatting.
+**Next:** Phase 9D Search Attestation.
 
 ---
 
@@ -50,6 +50,7 @@ Update this file after every completed feature. Any AI agent reading this should
 - [x] Phase 5 / US3: Privacy-Minimized Booking Answers (T053–T063)
   - [x] Phase 9A / Safe Booking Projection Foundation: Created and verified dedicated `BookingAgentProjection` persistence layer with opaque cryptographically random reference generation (`bkref_<uuid>`), transactional upsert during booking confirmation (`CONFIRMED`), cancellation, failure, and completion in `BookingService` and `PaymentService`, transactional projection refresh during `SupplierSyncService`, `ReconciliationService`, and `DuffelEventProcessor`, restart-safe cursor-paginated backfill in `apps/api/prisma/scripts/backfill-booking-agent-projections.ts`, and comprehensive DDL/data-model privacy contract tests proving total exclusion of PII, passenger counts, passport numbers, payment records, PNRs, financial fields, and raw snapshots.
   - [x] Phase 9B / Exact Booking Projection Gateway Read Boundaries: Created strict DTO tiers (`BookingSummaryDto`, `BookingSummariesResponseDto`, `BookingDetailDto`) and exposed service-authenticated (`X-Agent-API-Key`), claim-token-validated (`X-User-Claim`) Agent Gateway endpoints `GET /agent-gateway/users/bookings/summaries` and `GET /agent-gateway/users/bookings/:bookingReference`. Refactored `AgentGatewayService` to query exclusively from `BookingAgentProjection` with explicit Prisma selects, zero raw snapshot/payment/financial reads, uniform 404 (`BOOKING_REFERENCE_NOT_FOUND`) behavior on missing, malformed, or foreign references, and query spies proving complete database boundary isolation. (T054, T055, T058, T060, T061).
+  - [x] Phase 9C / Python Read Tools & Privacy-Minimized Formatting: Connected TravelAssistant read tools (`list_user_booking_summaries` and `get_booking_detail`) to the service-authenticated gateway endpoints via typed `NestJSClient` methods. Enforced strict two-tier information disclosure with opaque `bkref_...` references and prompt guidance. Excluded all forbidden fields (database IDs, PNRs, payment details, amounts, currencies, passenger PII). Removed legacy `list_user_bookings` from enabled registry. Verified 100% passing tests (52/52 focused, 276/276 full agent pytest suite) and code reviews with zero P0/P1 findings. (T056, T062, T063).
   - [x] WP 5A: Projection lifecycle (T053, T057, T059)
   - [x] WP 5B: Exact query boundary (T054, T058, T060)
   - [x] WP 5C: Authenticated routes (T055, T061)
