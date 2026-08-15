@@ -47,27 +47,67 @@ export default async function PassengersPage({ searchParams }: Props) {
   const cookieStore = cookies();
   const handoffCookie = cookieStore.get('chat_handoff_token');
   
+  const mockScenario = cookieStore.get('mock-scenario')?.value || null;
+
   if (handoffCookie?.value) {
-    const apiUrl = process.env.NEXT_PUBLIC_API_URL;
-    if (!apiUrl) redirect('/search');
-    const resolved = await resolveHandoffForBootstrap(apiUrl, handoffCookie.value, accessToken, undefined, undefined);
-    if (!hasCheckoutHandoffContext(resolved)) redirect('/search');
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+    const resolved = await resolveHandoffForBootstrap(
+      apiUrl,
+      handoffCookie.value,
+      accessToken,
+      undefined,
+      undefined,
+      fetch,
+      undefined,
+      mockScenario,
+    );
+    if (!hasCheckoutHandoffContext(resolved)) {
+      return (
+        <div className="flex min-h-screen flex-col bg-background">
+          <Header />
+          <main className="mx-auto w-full max-w-3xl py-12 px-4">
+            <div role="alert" className="card text-text-cancelled bg-bg-cancelled p-6">
+              <h1 className="text-xl font-bold">Checkout Session Expired</h1>
+              <p className="mt-2 text-sm text-text-secondary">
+                Your checkout session has expired or is invalid. Please restart checkout from the chat assistant.
+              </p>
+            </div>
+          </main>
+        </div>
+      );
+    }
     const { offer, passengers } = resolved.context;
     return (
       <div className="flex min-h-screen flex-col bg-background">
         <Header />
         <main className="mx-auto w-full max-w-3xl space-y-6 py-12 px-4">
           <h1 className="text-3xl font-bold text-text-primary">Passenger Details</h1>
-          <div className="card p-6 space-y-2 text-text-secondary">
+          <p className="text-text-secondary">Please enter the details for all passengers. Fields marked with * are required.</p>
+          <div className="card p-6 space-y-4">
             <h2 className="text-lg font-semibold text-text-primary">Flight Selected</h2>
-            <p>{offer.airline}: {offer.origin} to {offer.destination}</p>
-            <p>{offer.departureAt} – {offer.arrivalAt}</p>
-            <p>{offer.price} {offer.currency}</p>
+            <div className="flex flex-wrap gap-6 text-sm text-text-secondary">
+              <div>
+                <span className="font-semibold text-text-primary">Carrier:</span> {offer.airline}
+              </div>
+              <div>
+                <span className="font-semibold text-text-primary">Route:</span> {offer.origin} to {offer.destination}
+              </div>
+              <div>
+                <span className="font-semibold text-text-primary">Departure:</span> {offer.departureAt}
+              </div>
+              <div>
+                <span className="font-semibold text-text-primary">Arrival:</span> {offer.arrivalAt}
+              </div>
+              <div>
+                <span className="font-semibold text-text-primary">Price:</span> {offer.price} {offer.currency}
+              </div>
+            </div>
           </div>
           <PassengerFormClient
             flight={{ id: 'handoff', adults: offer.adults, children: offer.children, infants: offer.infants }}
             profile={null}
             offerPassengers={passengers}
+            accessToken={accessToken}
             handoff
           />
         </main>
@@ -89,9 +129,6 @@ export default async function PassengersPage({ searchParams }: Props) {
   }
 
   const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
-
-  // Extract mock scenario for Playwright tests
-  const mockScenario = cookieStore.get('mock-scenario')?.value || null;
 
   let flight: PassengerPageFlightDetail | null = null;
   let profile: TravelerProfileResponse | null = null;
