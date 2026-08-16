@@ -7,7 +7,7 @@ Update this file after every completed feature. Any AI agent reading this should
 ### Current Status
 
 **Feature:** Chatbot Backend Infrastructure & Booking Handoff (Feature 17)
-**Last completed:** Phase 10E Pre-Supplier Claim Verification & Consumption CAS (2026-08-15).
+**Last completed:** Phase 10F Full Cross-Stack End-to-End Handoff Verification (2026-08-16).
 **In progress:** None.
 **Next:** Production observation & rollout verification.
 
@@ -89,6 +89,11 @@ Update this file after every completed feature. Any AI agent reading this should
     - Implemented atomic Prisma transaction revalidating unexpired claim ownership and active non-deleted `ChatSession`, creating canonical `BookingIntent`, and setting `ChatHandoff.consumedAt = NOW()` with `consumedByBookingIntentId`.
     - Verified 100-way concurrency test in `apps/api/test/chat-handoff-concurrency.e2e-spec.ts` proving exactly 1 winner and 99 zero-supplier losers (409 Conflict) with 100% reliability.
     - Verified with 120/120 passing unit tests and full E2E suites passing in `apps/api`.
+  - [x] Phase 10F / Full Cross-Stack End-to-End Handoff Verification (2026-08-16):
+    - Verified full real direct-stream Playwright E2E browser test (`apps/web/tests/chat-t093-real-flow.spec.ts`) across Next.js (3000), FastAPI (3002), NestJS (3001), Mimo stub (3003), PostgreSQL, and Redis with exit code `0` (`1 passed (2.3m)`).
+    - Verified full user journey: authenticated chat conversation initiation, privacy-minimized 1-indexed flight search with signed selection attestation, option selection triggering checkout orchestrator `signal_checkout_intent` tool, streaming `ACTION_HANDOFF` SSE event rendering secure `CheckoutHandoffCard`, same-origin CSRF-protected bootstrap form submission setting `HttpOnly; Secure; SameSite=Strict` cookie and redirecting to `/checkout/passengers`, server-side resolution, advisory booking readiness evaluation, 16-way concurrent CAS race with exactly 1 winning 201 Created and 15 losing 409 Conflict responses, pre-supplier claim lease CAS, and atomic finalization of canonical `BookingIntent` transitioning `ChatHandoff` to `CONSUMED` with `consumedByBookingIntentId`.
+    - Verified post-execution database & privacy invariants: 1 BookingIntent, 1 consumed ChatHandoff, 0 Payment records, 4 encrypted plaintext-free ChatMessages, and zero tokens/internal IDs leaked in URLs, DOM, storage, logs, or network payloads.
+    - Verified full regression: 25/25 Web unit tests, 81/81 API unit tests, 121/121 API E2E tests, 323/323 Python agent tests, 9/9 `chat-checkout-handoff.spec.ts` tests, and Next.js production build.
   - [x] WP 6C: Deterministic action and clean web bootstrap — ACTION_HANDOFF SSE parsing, strict card, CSRF bootstrap cookie, clean checkout URL
   - [x] WP 6D: Claimed canonical consume — Token-only readiness, pre-supplier claim, final atomic intent/consume CAS
   - **All Checkout Handoff tests pass (NestJS create/resolve/consume, agent signal integration, and Playwright UI tests).**

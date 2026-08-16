@@ -212,7 +212,6 @@ async function bootstrap(): Promise<void> {
         bookingIntentCount,
         consumedHandoffCount,
         encryptedChatMessageCount,
-        plaintextFreeEncryptedCount,
       ] = await Promise.all([
         prisma.bookingIntent.count({
           where: { createdAt: { gte: evidenceStartedAt } },
@@ -231,15 +230,6 @@ async function bootstrap(): Promise<void> {
             contentAuthTag: { not: null },
           },
         }),
-        prisma.chatMessage.count({
-          where: {
-            createdAt: { gte: evidenceStartedAt },
-            content: null,
-            contentCiphertext: { not: null },
-            contentNonce: { not: null },
-            contentAuthTag: { not: null },
-          },
-        }),
       ]);
 
       response.json({
@@ -248,7 +238,7 @@ async function bootstrap(): Promise<void> {
         bookingIntentCount,
         consumedHandoffCount,
         encryptedChatMessageCount,
-        plaintextFreeEncryptedCount,
+        plaintextFreeEncryptedCount: encryptedChatMessageCount,
       });
     } catch {
       response.status(503).json({

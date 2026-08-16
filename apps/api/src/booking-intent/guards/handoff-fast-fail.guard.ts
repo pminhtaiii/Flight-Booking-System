@@ -2,6 +2,9 @@ import { CanActivate, ConflictException, ExecutionContext, Injectable, Optional 
 import { ChatHandoffService } from '@/chat-handoff/chat-handoff.service';
 
 type HandoffRequest = {
+  url?: string;
+  originalUrl?: string;
+  path?: string;
   body?: { handoffToken?: string };
   user?: { id?: string };
   handoffFastFailReservation?: { token: string; reservationId: string };
@@ -14,6 +17,10 @@ export class HandoffFastFailGuard implements CanActivate {
   canActivate(context: ExecutionContext): boolean {
     if (!this.chatHandoffService) return true;
     const req = context.switchToHttp().getRequest<HandoffRequest>();
+    const pathname = (req.path || req.originalUrl?.split('?')[0] || req.url?.split('?')[0] || '').toLowerCase();
+    if (pathname.endsWith('/readiness')) {
+      return true;
+    }
     const token = req.body?.handoffToken;
     const userId = req.user?.id;
 

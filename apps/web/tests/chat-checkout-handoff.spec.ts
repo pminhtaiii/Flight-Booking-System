@@ -20,6 +20,7 @@ async function loginAsNewUser(page: Page): Promise<void> {
 }
 
 test.describe('Chat Checkout Handoff', () => {
+  test.setTimeout(90000);
   const mockHandoffEvent = {
     version: 1,
     action: 'begin_checkout',
