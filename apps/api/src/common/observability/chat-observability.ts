@@ -6,7 +6,10 @@ export type ChatTelemetryOperation =
   | 'handoff_create'
   | 'handoff_resolve'
   | 'handoff_consume'
-  | 'handoff_replay';
+  | 'handoff_replay'
+  | 'handoff_claim_conflict'
+  | 'quota_admission'
+  | 'chat_message_turn';
 
 export type ChatTelemetryContext = {
   traceId?: string | null;
@@ -34,19 +37,45 @@ const ALLOWED_METADATA_KEYS = new Set([
 ]);
 const FORBIDDEN_VALUE_PATTERN = /(?:https?:\/\/|bearer\s|@|message|token|offer|user|session|passenger|payment|passport|secret|authorization)/i;
 const ALLOWED_STRING_VALUES: Record<string, Set<string>> = {
-  status: new Set(['created', 'resolved', 'consumed', 'replayed', 'failed', 'ok']),
-  outcome: new Set(['created', 'resolved', 'consumed', 'already_consumed', 'idempotent_retry', 'failed']),
-  error_class: new Set(['dependency_unavailable', 'timeout', 'unknown']),
+  status: new Set(['created', 'resolved', 'consumed', 'replayed', 'failed', 'ok', 'conflict', 'accepted', 'rejected', 'denied']),
+  outcome: new Set(['created', 'resolved', 'consumed', 'already_consumed', 'idempotent_retry', 'failed', 'conflict', 'admitted', 'rejected', 'unavailable']),
+  error_class: new Set(['dependency_unavailable', 'timeout', 'unknown', 'daily_quota', 'burst_limit', 'control_plane_unavailable']),
   dependency: new Set(['redis', 'nestjs', 'llm', 'control_plane']),
 };
 const BOOLEAN_METADATA_KEYS = new Set(['retry', 'price_changed']);
 
+export const STANDARDIZED_METRIC_COUNTERS = {
+  CHAT_MESSAGES_ACCEPTED: 'chat_messages_accepted_total',
+  CHAT_MESSAGES_DENIED: 'chat_messages_denied_total',
+  QUOTA_DAILY_UTILIZATION: 'quota_daily_utilization',
+  HANDOFF_TOKENS_ISSUED: 'handoff_tokens_issued_total',
+  HANDOFF_TOKENS_RESOLVED: 'handoff_tokens_resolved_total',
+  HANDOFF_TOKENS_CONSUMED: 'handoff_tokens_consumed_total',
+  HANDOFF_CLAIMS_CONFLICTED: 'handoff_claims_conflicted_total',
+} as const;
+
+export type StandardizedMetricCounter =
+  (typeof STANDARDIZED_METRIC_COUNTERS)[keyof typeof STANDARDIZED_METRIC_COUNTERS];
+
+export const STANDARDIZED_METRICS = [
+  'chat_messages_accepted_total',
+  'chat_messages_denied_total',
+  'quota_daily_utilization',
+  'handoff_tokens_issued_total',
+  'handoff_tokens_resolved_total',
+  'handoff_tokens_consumed_total',
+  'handoff_claims_conflicted_total',
+] as const;
+
 const METRIC_BY_OPERATION: Record<ChatTelemetryOperation, string> = {
   intent_create: 'chat_intent_create_total',
-  handoff_create: 'chat_handoff_create_total',
-  handoff_resolve: 'chat_handoff_resolve_total',
-  handoff_consume: 'chat_handoff_consume_total',
+  handoff_create: STANDARDIZED_METRIC_COUNTERS.HANDOFF_TOKENS_ISSUED,
+  handoff_resolve: STANDARDIZED_METRIC_COUNTERS.HANDOFF_TOKENS_RESOLVED,
+  handoff_consume: STANDARDIZED_METRIC_COUNTERS.HANDOFF_TOKENS_CONSUMED,
   handoff_replay: 'chat_handoff_replay_total',
+  handoff_claim_conflict: STANDARDIZED_METRIC_COUNTERS.HANDOFF_CLAIMS_CONFLICTED,
+  quota_admission: STANDARDIZED_METRIC_COUNTERS.QUOTA_DAILY_UTILIZATION,
+  chat_message_turn: STANDARDIZED_METRIC_COUNTERS.CHAT_MESSAGES_ACCEPTED,
 };
 
 function opaqueId(candidate?: string | null): string {
@@ -98,9 +127,42 @@ export function createChatTelemetryEvent(
     throw new Error('Chat telemetry status must be a string');
   }
 
+  let metric = METRIC_BY_OPERATION[operation];
+  if (operation === 'chat_message_turn') {
+    metric = safeStatus === 'failed' || safeStatus === 'denied' || safeStatus === 'rejected' || safeMetadata.outcome === 'rejected' || safeMetadata.outcome === 'unavailable' || safeMetadata.outcome === 'failed'
+      ? STANDARDIZED_METRIC_COUNTERS.CHAT_MESSAGES_DENIED
+      : STANDARDIZED_METRIC_COUNTERS.CHAT_MESSAGES_ACCEPTED;
+  } else if (operation === 'quota_admission') {
+    if (safeStatus === 'failed' || safeStatus === 'rejected' || safeStatus === 'denied' || safeMetadata.outcome === 'rejected' || safeMetadata.outcome === 'unavailable' || safeMetadata.outcome === 'failed') {
+      metric = STANDARDIZED_METRIC_COUNTERS.CHAT_MESSAGES_DENIED;
+    } else if (safeMetadata.outcome === 'admitted' || safeStatus === 'accepted' || safeStatus === 'ok') {
+      metric = STANDARDIZED_METRIC_COUNTERS.CHAT_MESSAGES_ACCEPTED;
+    } else {
+      metric = STANDARDIZED_METRIC_COUNTERS.QUOTA_DAILY_UTILIZATION;
+    }
+  } else if (operation === 'handoff_create') {
+    if (safeStatus === 'failed' || safeStatus === 'rejected' || safeMetadata.outcome === 'failed' || safeMetadata.outcome === 'rejected') {
+      metric = 'chat_handoff_create_total';
+    } else {
+      metric = STANDARDIZED_METRIC_COUNTERS.HANDOFF_TOKENS_ISSUED;
+    }
+  } else if (operation === 'handoff_resolve') {
+    if (safeStatus === 'failed' || safeStatus === 'rejected' || safeMetadata.outcome === 'failed' || safeMetadata.outcome === 'rejected') {
+      metric = 'chat_handoff_resolve_total';
+    } else {
+      metric = STANDARDIZED_METRIC_COUNTERS.HANDOFF_TOKENS_RESOLVED;
+    }
+  } else if (operation === 'handoff_consume') {
+    if (safeStatus === 'failed' || safeStatus === 'rejected' || safeMetadata.outcome === 'failed' || safeMetadata.outcome === 'rejected') {
+      metric = 'chat_handoff_consume_total';
+    } else {
+      metric = STANDARDIZED_METRIC_COUNTERS.HANDOFF_TOKENS_CONSUMED;
+    }
+  }
+
   return {
     operation,
-    metric: METRIC_BY_OPERATION[operation],
+    metric,
     status: safeStatus,
     latency_ms: Math.max(0, Math.min(600_000, Math.round(latencyMs))),
     trace_id: opaqueId(context.traceId),
@@ -117,6 +179,15 @@ export function emitChatTelemetry(
 }
 
 export const CHAT_HANDOFF_OBSERVABILITY_CONTRACT = {
+  standardizedMetricCounters: [
+    'chat_messages_accepted_total',
+    'chat_messages_denied_total',
+    'quota_daily_utilization',
+    'handoff_tokens_issued_total',
+    'handoff_tokens_resolved_total',
+    'handoff_tokens_consumed_total',
+    'handoff_claims_conflicted_total',
+  ],
   requiredButNotEmittedByApi: [
     'redis_latency',
     'quota_daily_utilization_bucket',

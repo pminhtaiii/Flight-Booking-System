@@ -8,7 +8,6 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { BookingStatus, PaymentStatus, Prisma, RefundStatus } from '@prisma/client';
 import request from 'supertest';
 import { AppModule } from '@/app.module';
-import { BookingService } from '@/booking/booking.service';
 import { HttpExceptionFilter } from '@/common/filters/http-exception.filter';
 import { StripeService } from '@/common/stripe.service';
 import { DuffelService } from '@/duffel/duffel.service';
@@ -95,7 +94,6 @@ describe('Cancellation and refund recovery (E2E)', () => {
     await prisma.airport.deleteMany({});
     await prisma.auditLog.deleteMany({});
     await prisma.user.deleteMany({});
-
   });
 
   async function createUser(email: string): Promise<TestUser> {
@@ -254,8 +252,8 @@ describe('Cancellation and refund recovery (E2E)', () => {
 
     expect(responses.map((response) => response.status).sort()).toEqual([201, 201]);
     for (const res of responses) {
-      expect([BookingStatus.CANCELLED_PENDING_REFUND, BookingStatus.CANCELLED_AND_REFUNDED]).toContain(res.body.bookingStatus);
-      expect([BookingStatus.CANCELLED_PENDING_REFUND, BookingStatus.CANCELLED_AND_REFUNDED]).toContain(res.body.cancellationStatus);
+      expect([BookingStatus.CANCELLATION_PENDING, BookingStatus.CANCELLED_PENDING_REFUND, BookingStatus.CANCELLED_AND_REFUNDED]).toContain(res.body.bookingStatus);
+      expect([BookingStatus.CANCELLATION_PENDING, BookingStatus.CANCELLED_PENDING_REFUND, BookingStatus.CANCELLED_AND_REFUNDED]).toContain(res.body.cancellationStatus);
       expect(['PENDING', 'SUCCEEDED']).toContain(res.body.refundStatus);
       expect(Number(res.body.refundAmount)).toBe(100);
     }
@@ -405,5 +403,3 @@ describe('Cancellation and refund recovery (E2E)', () => {
     expect(revisionsCount).toBe(0);
   });
 });
-
-

@@ -406,6 +406,16 @@ export class BookingIntentService {
       const updateHandoffPromise = (async () => {
         if (handoff && claimTokenHash) {
           if (claimLost) {
+            try {
+              const conflictEvent = createChatTelemetryEvent(
+                'handoff_claim_conflict',
+                'conflict',
+                Date.now() - startedAt,
+                { traceId: context?.traceId, correlationId: context?.correlationId },
+                { outcome: 'conflict' },
+              );
+              emitChatTelemetry(this.logger, conflictEvent);
+            } catch (_) {}
             throw new ConflictException({ code: 'CLAIM_LOST', message: 'Handoff claim was lost' });
           }
 
@@ -431,6 +441,16 @@ export class BookingIntentService {
           });
 
           if (updateResult.count === 0) {
+            try {
+              const conflictEvent = createChatTelemetryEvent(
+                'handoff_claim_conflict',
+                'conflict',
+                Date.now() - startedAt,
+                { traceId: context?.traceId, correlationId: context?.correlationId },
+                { outcome: 'conflict' },
+              );
+              emitChatTelemetry(this.logger, conflictEvent);
+            } catch (_) {}
             throw new ConflictException('Claim lost or expired before completion');
           }
         }

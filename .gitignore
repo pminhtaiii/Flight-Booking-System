@@ -30,7 +30,9 @@ Thumbs.db
 .vscode/
 .idea/
 .superpowers/
+docs/superpowers/
 .worktrees/
 # Test results
 test-results/
 playwright-report/
+apps/web/playwright-report/

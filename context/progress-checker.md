@@ -7,15 +7,23 @@ Update this file after every completed feature. Any AI agent reading this should
 ### Current Status
 
 **Feature:** Chatbot Backend Infrastructure & Booking Handoff (Feature 17)
-**Last completed:** Phase 11A Production Rollout, Live Health & Operational Runbook Verification (2026-08-16).
+**Last completed:** Phase 11B Production Deployment, Active Monitoring & Telemetry Baseline (2026-08-16).
 **In progress:** None.
-**Next:** Production deployment & monitoring.
+**Next:** Feature 17 100% Complete. Production deployment & live telemetry operational.
 
 ---
 
 ## Progress by Feature
 
 ### [x] Feature: Chatbot Backend Infrastructure & Booking Handoff (Feature 17)
+
+- [x] Phase 11B / Production Deployment, Active Monitoring & Telemetry Baseline (2026-08-16):
+  - Warmed performance baselines established: Router entry p95 `14.64 ms` (< 100 ms), Redis Lua admission p95 `2.66 ms` (< 10 ms), Handoff Token Create p95 `144.49 ms` (< 300 ms), Handoff Token Resolve p95 `28.24 ms` (< 300 ms), 100-way CAS consumption concurrency with 1 winner (201 Created), 99 losers (409 Conflict), 0 payment calls, claim CAS p95 `45.87 ms`.
+  - Standardized metric counters implemented and verified across NestJS API and Python Agent: `chat_messages_accepted_total`, `chat_messages_denied_total`, `quota_daily_utilization`, `handoff_tokens_issued_total`, `handoff_tokens_resolved_total`, `handoff_tokens_consumed_total`, `handoff_claims_conflicted_total`.
+  - Health probes validated with 200 OK healthy / 503 degraded control plane under DB, Redis, or Agent outages.
+  - Automated alert verification drills implemented and verified (`apps/api/test/alert-rules.e2e-spec.ts`) covering Redis outages, 5xx error spikes (> 2x baseline), router fallback spikes, and cross-owner resolution attempts.
+  - Negative privacy corpus audit passed with zero PII, raw tokens, message text, card numbers, passport numbers, or PNRs leaked.
+  - Multi-workspace verification: 681/681 API unit tests pass, 336/336 Python agent tests pass, Next.js production build passes.
 
 - [x] Phase 1 / Contract & Config Freeze (T001–T008): Shared contracts compile, all flags default off, runtime behavior unchanged.
 - [x] Phase 2 / Foundational — Additive Storage & Redis Primitives (T009–T024):

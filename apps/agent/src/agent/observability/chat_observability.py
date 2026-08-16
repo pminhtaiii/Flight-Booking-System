@@ -114,7 +114,7 @@ _ALLOWED_STRING_VALUES: dict[str, frozenset[str]] = {
             "admitted", "rejected", "unavailable", "empty_state", "non_human_message",
             "malformed_output", "low_confidence", "completed", "created", "handoff_rejected",
             "resolved", "consumed", "already_consumed", "idempotent_retry", "classified",
-            "hit", "miss",
+            "hit", "miss", "failed",
         }
     ),
     "dependency": frozenset({"redis", "nestjs", "llm", "control_plane"}),
@@ -169,6 +169,26 @@ _SAFE_TOOL_NAMES = frozenset(
     }
 )
 
+STANDARDIZED_METRIC_COUNTERS: dict[str, str] = {
+    "chat_messages_accepted_total": "chat_messages_accepted_total",
+    "chat_messages_denied_total": "chat_messages_denied_total",
+    "quota_daily_utilization": "quota_daily_utilization",
+    "handoff_tokens_issued_total": "handoff_tokens_issued_total",
+    "handoff_tokens_resolved_total": "handoff_tokens_resolved_total",
+    "handoff_tokens_consumed_total": "handoff_tokens_consumed_total",
+    "handoff_claims_conflicted_total": "handoff_claims_conflicted_total",
+}
+
+STANDARDIZED_METRICS: tuple[str, ...] = (
+    "chat_messages_accepted_total",
+    "chat_messages_denied_total",
+    "quota_daily_utilization",
+    "handoff_tokens_issued_total",
+    "handoff_tokens_resolved_total",
+    "handoff_tokens_consumed_total",
+    "handoff_claims_conflicted_total",
+)
+
 
 def dashboard_alert_contract() -> dict[str, object]:
     """Return the maintained dashboard/alert contract for agent telemetry.
@@ -196,6 +216,7 @@ def dashboard_alert_contract() -> dict[str, object]:
             "snapshot_replace",
             "stream_time_to_first_safe_token",
         ),
+        "standardized_metric_counters": tuple(sorted(STANDARDIZED_METRICS)),
         "alert_thresholds": {
             "error_rate": {"baseline_multiplier": 2, "window_minutes": 5},
             "handoff_consume_p95_ms": 300,
@@ -266,6 +287,31 @@ def safe_tool_name(value: str | None) -> str:
     return "other"
 
 
+def _resolve_standardized_metric(operation: str, status: str, fields: Mapping[str, Any] | None = None) -> str:
+    outcome = fields.get("outcome") if fields else None
+    if operation == "quota_admission":
+        if status in {"rejected", "failed", "denied"} or outcome in {"rejected", "unavailable", "failed"}:
+            return STANDARDIZED_METRIC_COUNTERS["chat_messages_denied_total"]
+        if status in {"accepted", "ok"} or outcome in {"admitted", "accepted", "ok"}:
+            return STANDARDIZED_METRIC_COUNTERS["chat_messages_accepted_total"]
+        return STANDARDIZED_METRIC_COUNTERS["quota_daily_utilization"]
+    if operation == "handoff_create":
+        if status in {"rejected", "failed"} or outcome in {"rejected", "failed"}:
+            return f"chat_{operation}_total"
+        return STANDARDIZED_METRIC_COUNTERS["handoff_tokens_issued_total"]
+    if operation == "handoff_resolve":
+        if status in {"rejected", "failed"} or outcome in {"rejected", "failed"}:
+            return f"chat_{operation}_total"
+        return STANDARDIZED_METRIC_COUNTERS["handoff_tokens_resolved_total"]
+    if operation == "handoff_consume":
+        if status in {"rejected", "failed"} or outcome in {"rejected", "failed"}:
+            return f"chat_{operation}_total"
+        return STANDARDIZED_METRIC_COUNTERS["handoff_tokens_consumed_total"]
+    if operation == "handoff_claim_conflict":
+        return STANDARDIZED_METRIC_COUNTERS["handoff_claims_conflicted_total"]
+    return f"chat_{operation}_total"
+
+
 class ChatTelemetry:
     """Emit bounded structured chat events through the standard logger."""
 
@@ -298,9 +344,13 @@ class ChatTelemetry:
         if not isinstance(safe_latency, (int, float)) or isinstance(safe_latency, bool):
             raise TelemetryPrivacyError("latency_ms must be numeric")
 
+        safe_status = _safe_string("status", status)
+        metric = _resolve_standardized_metric(operation, safe_status, fields)
+
         event: dict[str, Any] = {
             "operation": operation,
-            "status": _safe_string("status", status),
+            "metric": metric,
+            "status": safe_status,
             "latency_ms": max(0, min(600_000, int(round(safe_latency)))),
             "trace_id": safe_opaque_id(trace_id),
             "correlation_id": safe_opaque_id(correlation_id),

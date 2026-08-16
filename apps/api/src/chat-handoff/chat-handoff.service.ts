@@ -869,6 +869,14 @@ export class ChatHandoffService {
     }
 
     if (!claimed) {
+      void this.recordTelemetry(
+        'handoff_claim_conflict',
+        'conflict',
+        Date.now() - startedAt,
+        context,
+        userId,
+        { outcome: 'conflict' },
+      ).catch(() => {});
       const handoffRecord = await this.prisma.chatHandoff.findFirst({
         where: { tokenHash, userId },
         include: { chatSession: { select: { deletedAt: true } } },
@@ -937,7 +945,9 @@ export class ChatHandoffService {
               ? 'chat_handoff_created'
               : operation === 'handoff_resolve'
                 ? 'chat_handoff_resolved'
-                : 'chat_handoff_replay',
+                : operation === 'handoff_claim_conflict'
+                  ? 'chat_handoff_conflict'
+                  : 'chat_handoff_replay',
           resourceType: 'ChatHandoff',
           resourceId: null,
           metadata: {
@@ -963,9 +973,17 @@ export class ChatHandoffService {
   /**
    * Acquires a temporary claim over a handoff record to prevent concurrent checkouts.
    */
-  async acquireClaim(handoffId: string, userId: string, ttlMs: number): Promise<string> {
+  async acquireClaim(handoffId: string, userId: string, ttlMs: number, context: ChatTelemetryContext = {}): Promise<string> {
     const claimToken = await this.tryAcquireClaim(handoffId, userId, ttlMs);
     if (!claimToken) {
+      void this.recordTelemetry(
+        'handoff_claim_conflict',
+        'conflict',
+        0,
+        context,
+        userId,
+        { outcome: 'conflict' },
+      ).catch(() => {});
       throw new ConflictException('Failed to acquire handoff claim');
     }
     return claimToken;

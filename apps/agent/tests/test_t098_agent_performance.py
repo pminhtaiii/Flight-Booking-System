@@ -31,6 +31,7 @@ from agent.repositories.chat_budget_repository import (
 REQUEST_COUNT = 100
 WARM_REQUEST_COUNT = 5
 ROUTER_OVERHEAD_P95_LIMIT_MS = 100.0
+LUA_ADMISSION_OVERHEAD_P95_LIMIT_MS = 10.0
 QUOTA_RACE_TIMEOUT_SECONDS = 15.0
 
 
@@ -41,9 +42,10 @@ def _p95_ms(samples: list[float]) -> float:
 
 def _emit_aggregate(
     *,
-    stream_p95_ms: float | None,
-    quota_counts: dict[str, int] | None,
-    failures: int,
+    stream_p95_ms: float | None = None,
+    lua_p95_ms: float | None = None,
+    quota_counts: dict[str, int] | None = None,
+    failures: int = 0,
 ) -> None:
     """Print the machine-readable, PII-free aggregate required by T098."""
     print(
@@ -53,13 +55,17 @@ def _emit_aggregate(
                 "environment": "test",
                 "counts": {
                     "router_requests": REQUEST_COUNT if stream_p95_ms is not None else 0,
+                    "lua_admission_requests": REQUEST_COUNT if lua_p95_ms is not None else 0,
                     "quota_attempts": REQUEST_COUNT if quota_counts is not None else 0,
                     **(quota_counts or {}),
                 },
                 "p95_ms": {
                     "router_graph_entry": (
                         round(stream_p95_ms, 3) if stream_p95_ms is not None else None
-                    )
+                    ),
+                    "lua_admission": (
+                        round(lua_p95_ms, 3) if lua_p95_ms is not None else None
+                    ),
                 },
                 "failures": failures,
             },
@@ -249,3 +255,64 @@ async def test_t098_daily_quota_edge_race(t098_redis_client):
             quota_counts=quota_counts,
             failures=failures,
         )
+
+
+@pytest.mark.asyncio
+async def test_t098_lua_admission_latency_benchmark(t098_redis_client):
+    """Measure 100 Redis Lua quota/rate-limit admission decision overheads (p95 < 10ms)."""
+    user_id = f"t098-bench-{uuid.uuid4().hex}"
+    date_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    daily_key = f"chat:budget:{user_id}:{date_str}"
+    burst_keys: list[str] = []
+    lua_p95_ms = 0.0
+    failures = 0
+    budget_repository = ChatBudgetRepository(t098_redis_client)
+
+    try:
+        # Pre-warm Lua script / connections
+        for i in range(WARM_REQUEST_COUNT):
+            warm_window = f"warm-{i}"
+            burst_keys.append(f"chat:burst:{user_id}:{warm_window}")
+            admitted = await budget_repository.admit_request(
+                user_id=user_id,
+                burst_window_id=warm_window,
+                daily_limit=1000,
+                burst_limit=1000,
+                burst_ttl=120,
+            )
+            assert admitted is True
+
+        lua_samples: list[float] = []
+        for i in range(REQUEST_COUNT):
+            window_id = f"bench-{i}"
+            burst_keys.append(f"chat:burst:{user_id}:{window_id}")
+            started = time.perf_counter()
+            admitted = await budget_repository.admit_request(
+                user_id=user_id,
+                burst_window_id=window_id,
+                daily_limit=1000,
+                burst_limit=1000,
+                burst_ttl=120,
+            )
+            elapsed = time.perf_counter() - started
+            assert admitted is True
+            lua_samples.append(elapsed)
+
+        assert len(lua_samples) == REQUEST_COUNT
+        lua_p95_ms = _p95_ms(lua_samples)
+        assert lua_p95_ms < LUA_ADMISSION_OVERHEAD_P95_LIMIT_MS
+    except Exception:
+        failures = 1
+        raise
+    finally:
+        if burst_keys:
+            await t098_redis_client.delete(daily_key, *burst_keys)
+        else:
+            await t098_redis_client.delete(daily_key)
+        _emit_aggregate(
+            stream_p95_ms=None,
+            lua_p95_ms=lua_p95_ms,
+            quota_counts=None,
+            failures=failures,
+        )
+

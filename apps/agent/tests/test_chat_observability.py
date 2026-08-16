@@ -4,6 +4,8 @@ import logging
 import pytest
 
 from agent.observability.chat_observability import (
+    STANDARDIZED_METRIC_COUNTERS,
+    STANDARDIZED_METRICS,
     ChatTelemetry,
     TelemetryPrivacyError,
     safe_tool_name,
@@ -183,3 +185,42 @@ def test_safe_tool_name_uses_non_sensitive_allowlisted_labels():
     assert safe_tool_name("create_handoff_token") == "handoff_creator"
     assert safe_tool_name("search_flights") == "search_flights"
     assert safe_tool_name("arbitrary_user_supplied_name") == "other"
+
+
+def test_standardized_metric_counters_conform_to_spec():
+    expected_metrics = {
+        "chat_messages_accepted_total",
+        "chat_messages_denied_total",
+        "quota_daily_utilization",
+        "handoff_tokens_issued_total",
+        "handoff_tokens_resolved_total",
+        "handoff_tokens_consumed_total",
+        "handoff_claims_conflicted_total",
+    }
+    assert set(STANDARDIZED_METRICS) == expected_metrics
+    assert set(STANDARDIZED_METRIC_COUNTERS.values()) == expected_metrics
+
+
+def test_standardized_metrics_emitted_in_telemetry_events():
+    telemetry = ChatTelemetry()
+
+    accepted = telemetry.emit("quota_admission", status="accepted", fields={"outcome": "admitted"})
+    assert accepted["metric"] == "chat_messages_accepted_total"
+
+    denied = telemetry.emit("quota_admission", status="rejected", fields={"outcome": "rejected"})
+    assert denied["metric"] == "chat_messages_denied_total"
+
+    unavailable = telemetry.emit("quota_admission", status="failed", fields={"outcome": "unavailable"})
+    assert unavailable["metric"] == "chat_messages_denied_total"
+
+    quota = telemetry.emit("quota_admission", status="accepted")
+    assert quota["metric"] == "chat_messages_accepted_total"
+
+    handoff = telemetry.emit("handoff_create", status="created", fields={"outcome": "created"})
+    assert handoff["metric"] == "handoff_tokens_issued_total"
+
+    rejected_handoff = telemetry.emit("handoff_create", status="failed", fields={"outcome": "failed"})
+    assert rejected_handoff["metric"] == "chat_handoff_create_total"
+
+
+
