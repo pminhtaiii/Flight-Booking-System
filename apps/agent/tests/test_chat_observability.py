@@ -210,10 +210,17 @@ def test_standardized_metrics_emitted_in_telemetry_events():
     denied = telemetry.emit("quota_admission", status="rejected", fields={"outcome": "rejected"})
     assert denied["metric"] == "chat_messages_denied_total"
 
+    unavailable = telemetry.emit("quota_admission", status="failed", fields={"outcome": "unavailable"})
+    assert unavailable["metric"] == "chat_messages_denied_total"
+
     quota = telemetry.emit("quota_admission", status="accepted")
-    assert quota["metric"] == "quota_daily_utilization"
+    assert quota["metric"] == "chat_messages_accepted_total"
 
     handoff = telemetry.emit("handoff_create", status="created", fields={"outcome": "created"})
     assert handoff["metric"] == "handoff_tokens_issued_total"
+
+    rejected_handoff = telemetry.emit("handoff_create", status="failed", fields={"outcome": "failed"})
+    assert rejected_handoff["metric"] == "chat_handoff_create_total"
+
 
 

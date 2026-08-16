@@ -129,16 +129,34 @@ export function createChatTelemetryEvent(
 
   let metric = METRIC_BY_OPERATION[operation];
   if (operation === 'chat_message_turn') {
-    metric = safeStatus === 'failed' || safeStatus === 'denied' || safeStatus === 'rejected' || safeMetadata.outcome === 'rejected'
+    metric = safeStatus === 'failed' || safeStatus === 'denied' || safeStatus === 'rejected' || safeMetadata.outcome === 'rejected' || safeMetadata.outcome === 'unavailable' || safeMetadata.outcome === 'failed'
       ? STANDARDIZED_METRIC_COUNTERS.CHAT_MESSAGES_DENIED
       : STANDARDIZED_METRIC_COUNTERS.CHAT_MESSAGES_ACCEPTED;
   } else if (operation === 'quota_admission') {
-    if (safeStatus === 'failed' || safeStatus === 'rejected' || safeMetadata.outcome === 'rejected') {
+    if (safeStatus === 'failed' || safeStatus === 'rejected' || safeStatus === 'denied' || safeMetadata.outcome === 'rejected' || safeMetadata.outcome === 'unavailable' || safeMetadata.outcome === 'failed') {
       metric = STANDARDIZED_METRIC_COUNTERS.CHAT_MESSAGES_DENIED;
-    } else if (safeMetadata.outcome === 'admitted' || safeStatus === 'accepted') {
+    } else if (safeMetadata.outcome === 'admitted' || safeStatus === 'accepted' || safeStatus === 'ok') {
       metric = STANDARDIZED_METRIC_COUNTERS.CHAT_MESSAGES_ACCEPTED;
     } else {
       metric = STANDARDIZED_METRIC_COUNTERS.QUOTA_DAILY_UTILIZATION;
+    }
+  } else if (operation === 'handoff_create') {
+    if (safeStatus === 'failed' || safeStatus === 'rejected' || safeMetadata.outcome === 'failed' || safeMetadata.outcome === 'rejected') {
+      metric = 'chat_handoff_create_total';
+    } else {
+      metric = STANDARDIZED_METRIC_COUNTERS.HANDOFF_TOKENS_ISSUED;
+    }
+  } else if (operation === 'handoff_resolve') {
+    if (safeStatus === 'failed' || safeStatus === 'rejected' || safeMetadata.outcome === 'failed' || safeMetadata.outcome === 'rejected') {
+      metric = 'chat_handoff_resolve_total';
+    } else {
+      metric = STANDARDIZED_METRIC_COUNTERS.HANDOFF_TOKENS_RESOLVED;
+    }
+  } else if (operation === 'handoff_consume') {
+    if (safeStatus === 'failed' || safeStatus === 'rejected' || safeMetadata.outcome === 'failed' || safeMetadata.outcome === 'rejected') {
+      metric = 'chat_handoff_consume_total';
+    } else {
+      metric = STANDARDIZED_METRIC_COUNTERS.HANDOFF_TOKENS_CONSUMED;
     }
   }
 

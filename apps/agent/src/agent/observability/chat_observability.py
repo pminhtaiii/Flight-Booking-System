@@ -114,7 +114,7 @@ _ALLOWED_STRING_VALUES: dict[str, frozenset[str]] = {
             "admitted", "rejected", "unavailable", "empty_state", "non_human_message",
             "malformed_output", "low_confidence", "completed", "created", "handoff_rejected",
             "resolved", "consumed", "already_consumed", "idempotent_retry", "classified",
-            "hit", "miss",
+            "hit", "miss", "failed",
         }
     ),
     "dependency": frozenset({"redis", "nestjs", "llm", "control_plane"}),
@@ -288,17 +288,24 @@ def safe_tool_name(value: str | None) -> str:
 
 
 def _resolve_standardized_metric(operation: str, status: str, fields: Mapping[str, Any] | None = None) -> str:
+    outcome = fields.get("outcome") if fields else None
     if operation == "quota_admission":
-        if status == "rejected" or (fields and fields.get("outcome") == "rejected"):
+        if status in {"rejected", "failed", "denied"} or outcome in {"rejected", "unavailable", "failed"}:
             return STANDARDIZED_METRIC_COUNTERS["chat_messages_denied_total"]
-        if fields and fields.get("outcome") == "admitted":
+        if status in {"accepted", "ok"} or outcome in {"admitted", "accepted", "ok"}:
             return STANDARDIZED_METRIC_COUNTERS["chat_messages_accepted_total"]
         return STANDARDIZED_METRIC_COUNTERS["quota_daily_utilization"]
     if operation == "handoff_create":
+        if status in {"rejected", "failed"} or outcome in {"rejected", "failed"}:
+            return f"chat_{operation}_total"
         return STANDARDIZED_METRIC_COUNTERS["handoff_tokens_issued_total"]
     if operation == "handoff_resolve":
+        if status in {"rejected", "failed"} or outcome in {"rejected", "failed"}:
+            return f"chat_{operation}_total"
         return STANDARDIZED_METRIC_COUNTERS["handoff_tokens_resolved_total"]
     if operation == "handoff_consume":
+        if status in {"rejected", "failed"} or outcome in {"rejected", "failed"}:
+            return f"chat_{operation}_total"
         return STANDARDIZED_METRIC_COUNTERS["handoff_tokens_consumed_total"]
     if operation == "handoff_claim_conflict":
         return STANDARDIZED_METRIC_COUNTERS["handoff_claims_conflicted_total"]

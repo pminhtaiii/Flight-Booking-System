@@ -107,6 +107,15 @@ describe('chat telemetry privacy contract', () => {
     );
     expect(deniedEvent.metric).toBe('chat_messages_denied_total');
 
+    const unavailableEvent = createChatTelemetryEvent(
+      'quota_admission',
+      'failed',
+      5,
+      {},
+      { outcome: 'unavailable', error_class: 'control_plane_unavailable' },
+    );
+    expect(unavailableEvent.metric).toBe('chat_messages_denied_total');
+
     const quotaEvent = createChatTelemetryEvent(
       'quota_admission',
       'ok',
@@ -114,7 +123,7 @@ describe('chat telemetry privacy contract', () => {
       {},
       { outcome: 'created' },
     );
-    expect(quotaEvent.metric).toBe('quota_daily_utilization');
+    expect(quotaEvent.metric).toBe('chat_messages_accepted_total');
 
     const conflictEvent = createChatTelemetryEvent(
       'handoff_claim_conflict',
@@ -124,5 +133,14 @@ describe('chat telemetry privacy contract', () => {
       { outcome: 'conflict' },
     );
     expect(conflictEvent.metric).toBe('handoff_claims_conflicted_total');
+
+    const failedHandoffEvent = createChatTelemetryEvent(
+      'handoff_create',
+      'failed',
+      12,
+      {},
+      { outcome: 'failed' },
+    );
+    expect(failedHandoffEvent.metric).toBe('chat_handoff_create_total');
   });
 });
