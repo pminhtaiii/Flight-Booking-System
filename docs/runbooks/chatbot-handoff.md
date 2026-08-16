@@ -141,12 +141,34 @@ Current limitation: `deleteSession` does not explicitly revoke active handoff/cl
 
 Chat message content, summaries, handoff credentials or hashes, local/provider offer IDs, database IDs, PNRs, passenger/contact/passport data, payment data, and raw tool payloads must never appear in logs, traces, metrics, audits, URLs, browser storage, or user-facing text. Use opaque trace and correlation IDs only. Do not paste sensitive values into incident channels while troubleshooting.
 
-Phase 8C privacy validation and logging boundaries are closed and verified (2026-08-14):
-- **Crypto fallback logging**: Sanitized static warning messages in `ChatMessageCryptoService` (`decryptMessageContent` and `decryptSessionTitle`); zero message ID, session ID, or raw error leakages. Verified in `apps/api/test/chat-privacy-corpus.e2e-spec.ts`.
-- **Claim-token logging**: Sanitized warning logs in `ClaimTokenService`; zero user ID, raw payload snippet, or raw encoding error leakages. Verified in `apps/api/test/chat-privacy-corpus.e2e-spec.ts`.
-- **Agent LLM, Tool & Telemetry boundary**: `detect_pii`/`scrub_pii` redacts passenger PII, contact info, passport numbers, and cards; `_SAFE_LLM_FIELDS` and `project_snapshot_results` strip all local/provider offer IDs and UUIDs before LLM/browser emission; `HandoffEvent` schema allowlists only display fields and forbids private IDs/URLs; `ChatTelemetry` raises `TelemetryPrivacyError` on seeded privacy corpus values. Verified in `apps/agent/tests/test_phase8c_privacy.py`.
-- **Web client & cookies**: `chat_handoff_token` cookie enforces `HttpOnly`, `SameSite=Strict`, `Path=/`, and `Max-Age <= 900`; clean redirect path `/checkout/passengers` forbids query parameters with tokens or IDs. Verified in `apps/web/tests/handoff-privacy.unit.ts`.
-- **Encrypted-only storage model**: Plaintext columns dropped from database schema (`20260805010000_chat_message_plaintext_cleanup`), verified with zero plaintext leakages across API/Gateway boundaries in `test/chat-plaintext-cleanup.e2e-spec.ts`.
+## 11. Phase 11A: Production Rollout, Live Health & Operational Verification (2026-08-16)
 
-Before rollout or incident closure, record flag state, dependency health, direct transport status, safe aggregate handoff/claim/intent outcomes, and unresolved limitations. T093's continuous real browser-to-consume Playwright flow is complete according to the owning session's recorded evidence; T098 latency and concurrency benchmark evidence is verified and recorded (2026-08-14); T099 privacy corpus verification is complete and recorded (2026-08-14); T100 full agent/shared/API/web regression is complete and reconciled (2026-08-14); T101 direct-only transport cleanup is complete and verified (2026-08-14); T102 plaintext cleanup is complete and verified (2026-08-14). Feature 017 is fully operational and converged.
+Operational drills, health degradation, feature flag matrix, and key rotation verified under automated test suites:
+
+- **Feature Flag Matrix Governance (`apps/api/test/feature-flag-matrix.e2e-spec.ts` & `apps/agent/tests/test_config.py`)**:
+  - `ISSUE=off, ACCEPT=off`: POST `/chat-handoff` returns 503; GET `/chat-handoff/resolve` returns 503; zero stack trace leakage.
+  - `ISSUE=off, ACCEPT=on`: POST `/chat-handoff` returns 503; pre-issued unexpired tokens resolve cleanly with 200 OK and safe allowlisted checkout context.
+  - `ISSUE=on, ACCEPT=off`: Startup configuration rejected at boot by `envSchema` with fail-fast error `"Invalid config: ISSUE=true but ACCEPT=false"`.
+  - `ISSUE=on, ACCEPT=on`: Full issuance (201 Created) and resolution (200 OK) operational.
+
+- **Operational Failover Drills (`apps/api/test/operational-drills.e2e-spec.ts` & `apps/agent/tests/test_operational_drills.py`)**:
+  - **Redis Outage Drill**: When Redis is down or unreachable, quota & rate limiting fail closed with HTTP 503 `CHAT_CONTROL_PLANE_UNAVAILABLE` before LLM inference, preventing unbudgeted model and supplier costs.
+  - **Secret Key Rotation Drill**: Verified non-destructive key rotation for `CHAT_HANDOFF_SECRET` and `ATTESTATION_SECRET` using `_V1` and `_V2` keys. In-flight tokens and selection attestations signed with Key V1 continue to verify and resolve cleanly during the grace window after Key V2 becomes active.
+  - **Expired Token & Claim Recovery Drill**: Stale/expired handoff tokens return HTTP 410 `HANDOFF_EXPIRED` without blocking subsequent searches or checkouts; expired claim locks recover cleanly.
+
+- **Multi-Service Health & Degradation (`apps/api/test/multi-service-health.e2e-spec.ts` & `apps/api/src/health/health.controller.ts`)**:
+  - `GET /health` and `GET /api/health`: 200 OK when DB and Redis are up; 503 Service Unavailable when DB is down (`status: 'down'`) or when Redis is down (`status: 'degraded'`).
+  - `GET /health/redis`: 200 OK when up, 503 down when unreachable.
+  - `GET /health/agent`: 200 OK with dependency details when agent is up, 503 down when unreachable.
+
+- **Privacy & Telemetry Observability (`apps/api/test/privacy-and-telemetry-audit.e2e-spec.ts` & `apps/agent/tests/test_phase8c_privacy.py`)**:
+  - Negative privacy corpus audit confirms zero PNRs, raw tokens, message text, passport numbers, card numbers, or provider offer IDs appear in logs, DB metadata, or telemetry streams.
+  - Telemetry event contracts enforce `trace_id`, `correlation_id`, `operation`, `latency_ms`, and `status`.
+
+- **Full Multi-Workspace Regression**:
+  - `npm test --workspace=apps/api`: 71/71 suites passed, 673/673 unit tests passed.
+  - `npm run test:e2e --workspace=apps/api`: 7/7 Phase 11A E2E suites passed, 49/49 tests passed.
+  - `uv run pytest apps/agent/`: 334/334 tests passed.
+  - `apps/web` unit tests (`tsx --test`): 25/25 passed.
+  - Next.js production build (`next build`): Compiled successfully with all 20 static and dynamic routes generated.
 

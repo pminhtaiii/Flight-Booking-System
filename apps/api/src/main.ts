@@ -30,7 +30,9 @@ async function bootstrap() {
     );
 
     // 3. Set Global URL Path Prefix
-    app.setGlobalPrefix('api', { exclude: ['health'] });
+    app.setGlobalPrefix('api', {
+      exclude: ['health', 'health/(.*)', 'api/health', 'api/health/(.*)'],
+    });
 
     // Enable shutdown hooks to run OnModuleDestroy
     app.enableShutdownHooks();

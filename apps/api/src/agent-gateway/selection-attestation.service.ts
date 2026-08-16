@@ -20,12 +20,35 @@ export interface SelectionAttestationPayload {
 export class SelectionAttestationService {
   constructor(private configService: ConfigService) {}
 
-  private get secretKey(): string {
-    const secret = this.configService.get<string>('ATTESTATION_SECRET');
-    if (!secret) {
+  private getSecretKeys(): string[] {
+    const candidateKeys = [
+      this.configService.get<string>('ATTESTATION_SECRET_V3'),
+      this.configService.get<string>('SELECTION_ATTESTATION_SECRET_V3'),
+      this.configService.get<string>('ATTESTATION_SECRET_V2'),
+      this.configService.get<string>('SELECTION_ATTESTATION_SECRET_V2'),
+      this.configService.get<string>('ATTESTATION_SECRET_V1'),
+      this.configService.get<string>('SELECTION_ATTESTATION_SECRET_V1'),
+      this.configService.get<string>('ATTESTATION_SECRET'),
+      this.configService.get<string>('SELECTION_ATTESTATION_SECRET'),
+      this.configService.get<string>('CHAT_ATTESTATION_KEY'),
+    ];
+
+    const validKeys: string[] = [];
+    for (const key of candidateKeys) {
+      if (key && typeof key === 'string' && key.trim().length > 0 && !validKeys.includes(key.trim())) {
+        validKeys.push(key.trim());
+      }
+    }
+
+    return validKeys;
+  }
+
+  private get activeSecretKey(): string {
+    const keys = this.getSecretKeys();
+    if (keys.length === 0) {
       throw new Error('ATTESTATION_SECRET is not configured');
     }
-    return secret;
+    return keys[0];
   }
 
   async signSelectionAttestation(
@@ -47,7 +70,7 @@ export class SelectionAttestationService {
     };
     const payloadStr = JSON.stringify(payload);
     const signature = crypto
-      .createHmac('sha256', this.secretKey)
+      .createHmac('sha256', this.activeSecretKey)
       .update(payloadStr)
       .digest('hex');
 
@@ -139,20 +162,36 @@ export class SelectionAttestationService {
       }
     }
 
-    const expectedSignature = crypto
-      .createHmac('sha256', this.secretKey)
-      .update(payloadStr)
-      .digest('hex');
+    const keys = this.getSecretKeys();
+    if (keys.length === 0) {
+      throw new Error('ATTESTATION_SECRET is not configured');
+    }
 
     let isValid = false;
+    let sigBuffer: Buffer;
     try {
-      const sigBuffer = Buffer.from(signature, 'hex');
-      const expectedBuffer = Buffer.from(expectedSignature, 'hex');
-      if (sigBuffer.length === expectedBuffer.length) {
-        isValid = crypto.timingSafeEqual(sigBuffer, expectedBuffer);
+      sigBuffer = Buffer.from(signature, 'hex');
+    } catch {
+      throw new UnauthorizedException('Invalid signature');
+    }
+
+    for (const key of keys) {
+      const expectedSignature = crypto
+        .createHmac('sha256', key)
+        .update(payloadStr)
+        .digest('hex');
+
+      try {
+        const expectedBuffer = Buffer.from(expectedSignature, 'hex');
+        if (sigBuffer.length === expectedBuffer.length && sigBuffer.length === 32) {
+          if (crypto.timingSafeEqual(sigBuffer, expectedBuffer)) {
+            isValid = true;
+            break;
+          }
+        }
+      } catch {
+        // continue trying next key in rotation ring
       }
-    } catch (e) {
-      isValid = false;
     }
 
     if (!isValid) {

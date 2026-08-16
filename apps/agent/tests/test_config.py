@@ -16,12 +16,38 @@ def test_agent_config_defaults():
     assert settings.CHAT_QUOTA_DAILY > 0
     assert settings.CHAT_QUOTA_BURST > 0
 
-def test_agent_config_rejects_issue_true_accept_false():
-    with pytest.raises(ValidationError):
+def test_agent_config_flag_matrix_combinations():
+    # Combination 1: ISSUE=False, ACCEPT=False (valid)
+    cfg1 = Settings(
+        FEATURE_FLAG_CHAT_HANDOFF_ISSUE=False,
+        FEATURE_FLAG_CHAT_HANDOFF_ACCEPT=False,
+    )
+    assert cfg1.FEATURE_FLAG_CHAT_HANDOFF_ISSUE is False
+    assert cfg1.FEATURE_FLAG_CHAT_HANDOFF_ACCEPT is False
+
+    # Combination 2: ISSUE=False, ACCEPT=True (valid)
+    cfg2 = Settings(
+        FEATURE_FLAG_CHAT_HANDOFF_ISSUE=False,
+        FEATURE_FLAG_CHAT_HANDOFF_ACCEPT=True,
+    )
+    assert cfg2.FEATURE_FLAG_CHAT_HANDOFF_ISSUE is False
+    assert cfg2.FEATURE_FLAG_CHAT_HANDOFF_ACCEPT is True
+
+    # Combination 3: ISSUE=True, ACCEPT=False (invalid - rejected)
+    with pytest.raises(ValidationError) as exc_info:
         Settings(
             FEATURE_FLAG_CHAT_HANDOFF_ISSUE=True,
-            FEATURE_FLAG_CHAT_HANDOFF_ACCEPT=False
+            FEATURE_FLAG_CHAT_HANDOFF_ACCEPT=False,
         )
+    assert "Invalid config: ISSUE=true but ACCEPT=false" in str(exc_info.value)
+
+    # Combination 4: ISSUE=True, ACCEPT=True (valid)
+    cfg4 = Settings(
+        FEATURE_FLAG_CHAT_HANDOFF_ISSUE=True,
+        FEATURE_FLAG_CHAT_HANDOFF_ACCEPT=True,
+    )
+    assert cfg4.FEATURE_FLAG_CHAT_HANDOFF_ISSUE is True
+    assert cfg4.FEATURE_FLAG_CHAT_HANDOFF_ACCEPT is True
 
 
 @pytest.mark.asyncio
