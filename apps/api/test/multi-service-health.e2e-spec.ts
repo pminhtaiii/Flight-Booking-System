@@ -227,6 +227,29 @@ describe('Multi-Service Health & Subsystem Degradation (E2E)', () => {
       });
     });
 
+    it('GET /health/agent - returns 503 when Python agent returns 200 degraded', async () => {
+      const mockAgentResponse = {
+        status: 'degraded',
+        dependencies: {
+          llm: { status: 'down', error: 'Rate limit exceeded' },
+          redis: { status: 'ok' },
+        },
+      };
+
+      global.fetch = jest.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: async () => mockAgentResponse,
+      } as unknown as Response);
+
+      const res = await request(app.getHttpServer()).get('/health/agent').expect(503);
+      expect(res.body).toEqual({
+        status: 'down',
+        dependency: 'agent',
+        details: mockAgentResponse,
+      });
+    });
+
     it('GET /health/agent - returns 503 when Python agent connection fails/times out', async () => {
       global.fetch = jest.fn().mockRejectedValue(new Error('ECONNREFUSED'));
 

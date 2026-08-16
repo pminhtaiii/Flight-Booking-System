@@ -31,7 +31,7 @@ export class AgentHealthService {
 
       const details = (await response.json()) as Record<string, unknown>;
       return {
-        status: 'up',
+        status: details.status === 'ok' ? 'up' : 'down',
         details,
       };
     } catch (error) {

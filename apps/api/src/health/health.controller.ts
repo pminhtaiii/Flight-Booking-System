@@ -120,6 +120,7 @@ export class HealthController {
       status: 'down',
       dependency: 'agent',
       statusCode: result.statusCode,
+      details: result.details,
     });
   }
 
