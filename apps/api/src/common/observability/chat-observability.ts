@@ -6,7 +6,8 @@ export type ChatTelemetryOperation =
   | 'handoff_create'
   | 'handoff_resolve'
   | 'handoff_consume'
-  | 'handoff_replay';
+  | 'handoff_replay'
+  | 'handoff_claim_conflict';
 
 export type ChatTelemetryContext = {
   traceId?: string | null;
@@ -34,8 +35,8 @@ const ALLOWED_METADATA_KEYS = new Set([
 ]);
 const FORBIDDEN_VALUE_PATTERN = /(?:https?:\/\/|bearer\s|@|message|token|offer|user|session|passenger|payment|passport|secret|authorization)/i;
 const ALLOWED_STRING_VALUES: Record<string, Set<string>> = {
-  status: new Set(['created', 'resolved', 'consumed', 'replayed', 'failed', 'ok']),
-  outcome: new Set(['created', 'resolved', 'consumed', 'already_consumed', 'idempotent_retry', 'failed']),
+  status: new Set(['created', 'resolved', 'consumed', 'replayed', 'failed', 'ok', 'conflict']),
+  outcome: new Set(['created', 'resolved', 'consumed', 'already_consumed', 'idempotent_retry', 'failed', 'conflict']),
   error_class: new Set(['dependency_unavailable', 'timeout', 'unknown']),
   dependency: new Set(['redis', 'nestjs', 'llm', 'control_plane']),
 };
@@ -70,6 +71,7 @@ const METRIC_BY_OPERATION: Record<ChatTelemetryOperation, string> = {
   handoff_resolve: STANDARDIZED_METRIC_COUNTERS.HANDOFF_TOKENS_RESOLVED,
   handoff_consume: STANDARDIZED_METRIC_COUNTERS.HANDOFF_TOKENS_CONSUMED,
   handoff_replay: 'chat_handoff_replay_total',
+  handoff_claim_conflict: STANDARDIZED_METRIC_COUNTERS.HANDOFF_CLAIMS_CONFLICTED,
 };
 
 function opaqueId(candidate?: string | null): string {
