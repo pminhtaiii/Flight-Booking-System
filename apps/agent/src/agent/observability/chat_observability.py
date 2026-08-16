@@ -169,6 +169,26 @@ _SAFE_TOOL_NAMES = frozenset(
     }
 )
 
+STANDARDIZED_METRIC_COUNTERS: dict[str, str] = {
+    "chat_messages_accepted_total": "chat_messages_accepted_total",
+    "chat_messages_denied_total": "chat_messages_denied_total",
+    "quota_daily_utilization": "quota_daily_utilization",
+    "handoff_tokens_issued_total": "handoff_tokens_issued_total",
+    "handoff_tokens_resolved_total": "handoff_tokens_resolved_total",
+    "handoff_tokens_consumed_total": "handoff_tokens_consumed_total",
+    "handoff_claims_conflicted_total": "handoff_claims_conflicted_total",
+}
+
+STANDARDIZED_METRICS: tuple[str, ...] = (
+    "chat_messages_accepted_total",
+    "chat_messages_denied_total",
+    "quota_daily_utilization",
+    "handoff_tokens_issued_total",
+    "handoff_tokens_resolved_total",
+    "handoff_tokens_consumed_total",
+    "handoff_claims_conflicted_total",
+)
+
 
 def dashboard_alert_contract() -> dict[str, object]:
     """Return the maintained dashboard/alert contract for agent telemetry.
@@ -196,6 +216,7 @@ def dashboard_alert_contract() -> dict[str, object]:
             "snapshot_replace",
             "stream_time_to_first_safe_token",
         ),
+        "standardized_metric_counters": tuple(sorted(STANDARDIZED_METRICS)),
         "alert_thresholds": {
             "error_rate": {"baseline_multiplier": 2, "window_minutes": 5},
             "handoff_consume_p95_ms": 300,

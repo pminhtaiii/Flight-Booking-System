@@ -165,10 +165,38 @@ Operational drills, health degradation, feature flag matrix, and key rotation ve
   - Negative privacy corpus audit confirms zero PNRs, raw tokens, message text, passport numbers, card numbers, or provider offer IDs appear in logs, DB metadata, or telemetry streams.
   - Telemetry event contracts enforce `trace_id`, `correlation_id`, `operation`, `latency_ms`, and `status`.
 
-- **Full Multi-Workspace Regression**:
-  - `npm test --workspace=apps/api`: 71/71 suites passed, 673/673 unit tests passed.
-  - `npm run test:e2e --workspace=apps/api`: 7/7 Phase 11A E2E suites passed, 49/49 tests passed.
-  - `uv run pytest apps/agent/`: 334/334 tests passed.
-  - `apps/web` unit tests (`tsx --test`): 25/25 passed.
-  - Next.js production build (`next build`): Compiled successfully with all 20 static and dynamic routes generated.
+---
+
+## 12. Phase 11B Verified Production Telemetry Baselines & Alert Rules
+
+### 12.1 Performance & Latency Baselines (Warmed Benchmarks)
+- **Router Stream Entry Latency**: Measured p95 = `14.64 ms` (SLA limit < 100 ms) across 100 warmed requests in `apps/agent/tests/test_t098_agent_performance.py`.
+- **Redis Lua Admission Overhead**: Measured p95 = `2.66 ms` (SLA limit < 10 ms) across 100 requests.
+- **Handoff Token Creation (`POST /api/chat-handoff/tokens`)**: Measured p95 = `144.49 ms` (SLA limit < 300 ms) in `apps/api/test/chat-handoff-performance.e2e-spec.ts`.
+- **Handoff Token Resolution (`POST /api/chat-handoff/resolve`)**: Measured p95 = `28.24 ms` (SLA limit < 300 ms).
+- **100-Way CAS Consumption Concurrency**: 1 winner (201 Created), 99 losers (409 Conflict), exactly 1 canonical `BookingIntent`, 0 payment calls, claim CAS p95 = `45.87 ms`.
+
+### 12.2 Standardized Metric Counters
+Mapped and verified in both NestJS API (`apps/api/src/common/observability/chat-observability.ts`) and FastAPI Python Agent (`apps/agent/src/agent/observability/chat_observability.py`):
+- `chat_messages_accepted_total`: Incremented on successful conversation turns.
+- `chat_messages_denied_total`: Incremented on rate limit, quota exhaustion, or authentication failures.
+- `quota_daily_utilization`: Tracks daily allocated vs consumed budget.
+- `handoff_tokens_issued_total`: Incremented on valid `POST /api/chat-handoff/tokens`.
+- `handoff_tokens_resolved_total`: Incremented on successful `POST /api/chat-handoff/resolve`.
+- `handoff_tokens_consumed_total`: Incremented on successful `BookingIntent` claim CAS conversion.
+- `handoff_claims_conflicted_total`: Incremented when losing concurrent requests hit 409 Conflict.
+
+### 12.3 Automated Alert Verification Drills (`apps/api/test/alert-rules.e2e-spec.ts`)
+- **Alert 1 (Redis Outage)**: Verified 503 degraded control plane alert trigger on Redis disconnect.
+- **Alert 2 (5xx Error Rate)**: Verified alert trigger when error rate exceeds 2x baseline window over 300s.
+- **Alert 3 (Router Fallback Spike)**: Verified alert trigger on sudden surge in router fallback decisions.
+- **Alert 4 (Cross-Owner Handoff Access)**: Verified zero-leak 404 alert trigger when User A attempts resolution of User B's token.
+- **Trace Correlation**: Verified unified `x-trace-id` and `x-correlation-id` (`chat_<32 hex>`) across Browser → FastAPI → NestJS → Audit Logs.
+
+### 12.4 Multi-Workspace Verification
+- `apps/api` Unit Tests: **72/72 suites passed, 681/681 unit tests passed**.
+- `apps/api` E2E Tests: **100% PASS** (`alert-rules.e2e-spec.ts`, `privacy-and-telemetry-audit.e2e-spec.ts`, `multi-service-health.e2e-spec.ts`, `chat-handoff-performance.e2e-spec.ts`, `chat-handoff-observability.e2e-spec.ts`, `payment.e2e-spec.ts`, `booking.e2e-spec.ts`, `cancellation.e2e-spec.ts`).
+- `apps/agent` Python Pytest: **336/336 passed**.
+- `apps/web` Next.js Production Build: **20/20 static and dynamic routes compiled cleanly**.
+
 

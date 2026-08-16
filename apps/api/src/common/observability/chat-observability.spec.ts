@@ -1,6 +1,33 @@
-import { createChatTelemetryEvent } from './chat-observability';
+import {
+  createChatTelemetryEvent,
+  STANDARDIZED_METRIC_COUNTERS,
+  STANDARDIZED_METRICS,
+  CHAT_HANDOFF_OBSERVABILITY_CONTRACT,
+} from './chat-observability';
 
 describe('chat telemetry privacy contract', () => {
+  it('exposes standardized metric counter mappings according to Phase 11B spec', () => {
+    const expectedMetrics = [
+      'chat_messages_accepted_total',
+      'chat_messages_denied_total',
+      'quota_daily_utilization',
+      'handoff_tokens_issued_total',
+      'handoff_tokens_resolved_total',
+      'handoff_tokens_consumed_total',
+      'handoff_claims_conflicted_total',
+    ];
+
+    expect(Object.values(STANDARDIZED_METRIC_COUNTERS)).toEqual(
+      expect.arrayContaining(expectedMetrics),
+    );
+    expect(STANDARDIZED_METRICS).toEqual(
+      expect.arrayContaining(expectedMetrics),
+    );
+    expect(CHAT_HANDOFF_OBSERVABILITY_CONTRACT.standardizedMetricCounters).toEqual(
+      expect.arrayContaining(expectedMetrics),
+    );
+  });
+
   it('emits bounded opaque identifiers and allowlisted metadata', () => {
     const event = createChatTelemetryEvent(
       'handoff_create',

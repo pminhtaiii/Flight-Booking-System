@@ -4,6 +4,8 @@ import logging
 import pytest
 
 from agent.observability.chat_observability import (
+    STANDARDIZED_METRIC_COUNTERS,
+    STANDARDIZED_METRICS,
     ChatTelemetry,
     TelemetryPrivacyError,
     safe_tool_name,
@@ -183,3 +185,18 @@ def test_safe_tool_name_uses_non_sensitive_allowlisted_labels():
     assert safe_tool_name("create_handoff_token") == "handoff_creator"
     assert safe_tool_name("search_flights") == "search_flights"
     assert safe_tool_name("arbitrary_user_supplied_name") == "other"
+
+
+def test_standardized_metric_counters_conform_to_spec():
+    expected_metrics = {
+        "chat_messages_accepted_total",
+        "chat_messages_denied_total",
+        "quota_daily_utilization",
+        "handoff_tokens_issued_total",
+        "handoff_tokens_resolved_total",
+        "handoff_tokens_consumed_total",
+        "handoff_claims_conflicted_total",
+    }
+    assert set(STANDARDIZED_METRICS) == expected_metrics
+    assert set(STANDARDIZED_METRIC_COUNTERS.values()) == expected_metrics
+

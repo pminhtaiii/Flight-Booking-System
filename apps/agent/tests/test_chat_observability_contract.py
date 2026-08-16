@@ -23,6 +23,15 @@ def test_dashboard_alert_contract_separates_emitted_signals_from_pending_panels(
             "handoff_expired", "handoff_foreign", "handoff_stale", "redis_latency",
             "snapshot_expire", "snapshot_replace", "stream_time_to_first_safe_token",
         ),
+        "standardized_metric_counters": (
+            "chat_messages_accepted_total",
+            "chat_messages_denied_total",
+            "handoff_claims_conflicted_total",
+            "handoff_tokens_consumed_total",
+            "handoff_tokens_issued_total",
+            "handoff_tokens_resolved_total",
+            "quota_daily_utilization",
+        ),
         "alert_thresholds": {
             "error_rate": {"baseline_multiplier": 2, "window_minutes": 5},
             "handoff_consume_p95_ms": 300,

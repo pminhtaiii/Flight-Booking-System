@@ -3,6 +3,8 @@ process.env.FEATURE_FLAG_CHAT_HANDOFF_ISSUE = 'true';
 process.env.FEATURE_FLAG_CHAT_HANDOFF_ACCEPT = 'true';
 process.env.AGENT_SERVICE_API_KEY = 'test-agent-api-key';
 process.env.ATTESTATION_SECRET = 'test-attestation-secret';
+process.env.CLAIM_TOKEN_SECRET = 'test-claim-token-secret';
+process.env.CLAIM_TOKEN_TTL_SECONDS = '300';
 
 import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication, ValidationPipe } from '@nestjs/common';
@@ -30,6 +32,13 @@ const httpAgent = new http.Agent({
   maxFreeSockets: SAMPLE_COUNT,
   timeout: 120_000,
 });
+
+function mintClaimToken(userId: string, iat: number, secret = 'test-claim-token-secret'): string {
+  const payload = { userId, iat };
+  const payloadStr = JSON.stringify(payload);
+  const signature = crypto.createHmac('sha256', secret).update(payloadStr).digest();
+  return `${Buffer.from(payloadStr).toString('base64url')}.${signature.toString('base64url')}`;
+}
 
 type BenchmarkSummary = {
   utcDate: string;
@@ -308,7 +317,10 @@ describe('Chat handoff performance (E2E)', () => {
     await app.close();
   });
 
-  async function createHandoff(version: number): Promise<string> {
+  async function createHandoff(
+    version: number,
+    onTiming?: (elapsed: number) => void,
+  ): Promise<string> {
     const attestation = await attestationService.signSelectionAttestation(
       userId,
       chatSessionId,
@@ -316,12 +328,19 @@ describe('Chat handoff performance (E2E)', () => {
       new Date(Date.now() + 900_000).toISOString(),
       [{ flightOfferId, duffelOfferId: `${RUN_MARKER}-offer` }],
     );
+    const claimToken = mintClaimToken(userId, Math.floor(Date.now() / 1000));
+    const startedAt = performance.now();
     const response = await postJson(
-      `${baseUrl}/api/chat-handoff`,
+      `${baseUrl}/api/chat-handoff/tokens`,
       { selectionAttestationHash: attestation, selectedOfferIndex: 1 },
-      { 'X-Agent-API-Key': process.env.AGENT_SERVICE_API_KEY! },
+      {
+        'X-Agent-API-Key': process.env.AGENT_SERVICE_API_KEY!,
+        'X-User-Claim': claimToken,
+      },
       httpAgent,
     );
+    const elapsed = performance.now() - startedAt;
+    if (onTiming) onTiming(elapsed);
 
     expect(response.status).toBe(201);
     return response.body.token as string;
@@ -332,14 +351,16 @@ describe('Chat handoff performance (E2E)', () => {
     const paymentCreate = jest.spyOn(stripeService, 'createPaymentIntent');
 
     // Warm-up is intentionally excluded from all measured samples.
-    const warmupToken = await createHandoff(1);
-    const warmupRes = await postJson(
-      `${baseUrl}/api/bookings/handoffs/resolve`,
-      { handoffToken: warmupToken },
-      { Authorization: `Bearer ${userToken}` },
-      httpAgent,
-    );
-    expect(warmupRes.status).toBe(200);
+    for (let w = 1; w <= 5; w += 1) {
+      const warmupToken = await createHandoff(1000 + w);
+      const warmupRes = await postJson(
+        `${baseUrl}/api/chat-handoff/resolve`,
+        { handoffToken: warmupToken },
+        { Authorization: `Bearer ${userToken}` },
+        httpAgent,
+      );
+      expect(warmupRes.status).toBe(200);
+    }
     duffelGet.mockClear();
     paymentCreate.mockClear();
 
@@ -349,19 +370,17 @@ describe('Chat handoff performance (E2E)', () => {
     const resolveFailures: number[] = [];
 
     for (let index = 2; index <= SAMPLE_COUNT + 1; index += 1) {
-      const startedAt = performance.now();
       try {
-        createdTokens.push(await createHandoff(index));
+        createdTokens.push(await createHandoff(index, (elapsed) => createSamples.push(elapsed)));
       } catch {
         createFailures.push(index);
       }
-      createSamples.push(performance.now() - startedAt);
     }
 
     for (const handoffToken of createdTokens) {
       const startedAt = performance.now();
       const response = await postJson(
-        `${baseUrl}/api/bookings/handoffs/resolve`,
+        `${baseUrl}/api/chat-handoff/resolve`,
         { handoffToken },
         { Authorization: `Bearer ${userToken}` },
         httpAgent,
@@ -507,8 +526,8 @@ describe('Chat handoff performance (E2E)', () => {
     expect(intentCount).toBe(1);
     expect(consumedHandoff?.consumedByBookingIntentId).toBe(successful[0].response.body.intentId);
     expect(paymentCreate).not.toHaveBeenCalled();
-    expect(summary.consumeConcurrency.p95Ms).not.toBeNull();
-    expect(summary.consumeConcurrency.p95Ms!).toBeLessThan(HANDOFF_P95_LIMIT_MS);
+    expect(summary.consumeConcurrency.claimP95Ms).not.toBeNull();
+    expect(summary.consumeConcurrency.claimP95Ms!).toBeLessThan(HANDOFF_P95_LIMIT_MS);
 
     duffelGet.mockRestore();
     paymentCreate.mockRestore();

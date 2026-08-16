@@ -215,22 +215,6 @@ export class BookingService {
       });
     } catch (e: any) {
       if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2002') {
-        const existingByIntent = await this.prisma.booking.findUnique({
-          where: { bookingIntentId },
-        });
-        if (existingByIntent) {
-          if (existingByIntent.userId !== userId) {
-            throw new ForbiddenException('You do not own this booking');
-          }
-          if (!existingByIntent.paymentId && paymentId) {
-            return await this.prisma.booking.update({
-              where: { id: existingByIntent.id },
-              data: { paymentId },
-            });
-          }
-          return existingByIntent;
-        }
-
         const existingById = await this.prisma.booking.findUnique({
           where: { id: bookingId },
         });
@@ -248,6 +232,25 @@ export class BookingService {
             });
           }
           return existingById;
+        }
+
+        const existingByIntent = await this.prisma.booking.findUnique({
+          where: { bookingIntentId },
+        });
+        if (existingByIntent) {
+          if (existingByIntent.userId !== userId) {
+            throw new ForbiddenException('You do not own this booking');
+          }
+          if (existingByIntent.id !== bookingId) {
+            throw new BadRequestException('Booking intent is already associated with a different booking ID');
+          }
+          if (!existingByIntent.paymentId && paymentId) {
+            return await this.prisma.booking.update({
+              where: { id: existingByIntent.id },
+              data: { paymentId },
+            });
+          }
+          return existingByIntent;
         }
       }
       throw e;

@@ -116,7 +116,39 @@ export function emitChatTelemetry(
   logger.log(JSON.stringify(event));
 }
 
+export const STANDARDIZED_METRIC_COUNTERS = {
+  CHAT_MESSAGES_ACCEPTED: 'chat_messages_accepted_total',
+  CHAT_MESSAGES_DENIED: 'chat_messages_denied_total',
+  QUOTA_DAILY_UTILIZATION: 'quota_daily_utilization',
+  HANDOFF_TOKENS_ISSUED: 'handoff_tokens_issued_total',
+  HANDOFF_TOKENS_RESOLVED: 'handoff_tokens_resolved_total',
+  HANDOFF_TOKENS_CONSUMED: 'handoff_tokens_consumed_total',
+  HANDOFF_CLAIMS_CONFLICTED: 'handoff_claims_conflicted_total',
+} as const;
+
+export type StandardizedMetricCounter =
+  (typeof STANDARDIZED_METRIC_COUNTERS)[keyof typeof STANDARDIZED_METRIC_COUNTERS];
+
+export const STANDARDIZED_METRICS = [
+  'chat_messages_accepted_total',
+  'chat_messages_denied_total',
+  'quota_daily_utilization',
+  'handoff_tokens_issued_total',
+  'handoff_tokens_resolved_total',
+  'handoff_tokens_consumed_total',
+  'handoff_claims_conflicted_total',
+] as const;
+
 export const CHAT_HANDOFF_OBSERVABILITY_CONTRACT = {
+  standardizedMetricCounters: [
+    'chat_messages_accepted_total',
+    'chat_messages_denied_total',
+    'quota_daily_utilization',
+    'handoff_tokens_issued_total',
+    'handoff_tokens_resolved_total',
+    'handoff_tokens_consumed_total',
+    'handoff_claims_conflicted_total',
+  ],
   requiredButNotEmittedByApi: [
     'redis_latency',
     'quota_daily_utilization_bucket',
