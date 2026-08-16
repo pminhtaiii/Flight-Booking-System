@@ -200,3 +200,20 @@ def test_standardized_metric_counters_conform_to_spec():
     assert set(STANDARDIZED_METRICS) == expected_metrics
     assert set(STANDARDIZED_METRIC_COUNTERS.values()) == expected_metrics
 
+
+def test_standardized_metrics_emitted_in_telemetry_events():
+    telemetry = ChatTelemetry()
+
+    accepted = telemetry.emit("quota_admission", status="accepted", fields={"outcome": "admitted"})
+    assert accepted["metric"] == "chat_messages_accepted_total"
+
+    denied = telemetry.emit("quota_admission", status="rejected", fields={"outcome": "rejected"})
+    assert denied["metric"] == "chat_messages_denied_total"
+
+    quota = telemetry.emit("quota_admission", status="accepted")
+    assert quota["metric"] == "quota_daily_utilization"
+
+    handoff = telemetry.emit("handoff_create", status="created", fields={"outcome": "created"})
+    assert handoff["metric"] == "handoff_tokens_issued_total"
+
+

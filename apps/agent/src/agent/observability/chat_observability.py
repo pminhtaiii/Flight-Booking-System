@@ -287,6 +287,24 @@ def safe_tool_name(value: str | None) -> str:
     return "other"
 
 
+def _resolve_standardized_metric(operation: str, status: str, fields: Mapping[str, Any] | None = None) -> str:
+    if operation == "quota_admission":
+        if status == "rejected" or (fields and fields.get("outcome") == "rejected"):
+            return STANDARDIZED_METRIC_COUNTERS["chat_messages_denied_total"]
+        if fields and fields.get("outcome") == "admitted":
+            return STANDARDIZED_METRIC_COUNTERS["chat_messages_accepted_total"]
+        return STANDARDIZED_METRIC_COUNTERS["quota_daily_utilization"]
+    if operation == "handoff_create":
+        return STANDARDIZED_METRIC_COUNTERS["handoff_tokens_issued_total"]
+    if operation == "handoff_resolve":
+        return STANDARDIZED_METRIC_COUNTERS["handoff_tokens_resolved_total"]
+    if operation == "handoff_consume":
+        return STANDARDIZED_METRIC_COUNTERS["handoff_tokens_consumed_total"]
+    if operation == "handoff_claim_conflict":
+        return STANDARDIZED_METRIC_COUNTERS["handoff_claims_conflicted_total"]
+    return f"chat_{operation}_total"
+
+
 class ChatTelemetry:
     """Emit bounded structured chat events through the standard logger."""
 
@@ -319,9 +337,13 @@ class ChatTelemetry:
         if not isinstance(safe_latency, (int, float)) or isinstance(safe_latency, bool):
             raise TelemetryPrivacyError("latency_ms must be numeric")
 
+        safe_status = _safe_string("status", status)
+        metric = _resolve_standardized_metric(operation, safe_status, fields)
+
         event: dict[str, Any] = {
             "operation": operation,
-            "status": _safe_string("status", status),
+            "metric": metric,
+            "status": safe_status,
             "latency_ms": max(0, min(600_000, int(round(safe_latency)))),
             "trace_id": safe_opaque_id(trace_id),
             "correlation_id": safe_opaque_id(correlation_id),

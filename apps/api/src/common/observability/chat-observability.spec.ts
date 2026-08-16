@@ -87,4 +87,42 @@ describe('chat telemetry privacy contract', () => {
       { [key]: value },
     )).toThrow();
   });
+
+  it('emits standardized metrics for chat admission, quota, and claim conflict operations', () => {
+    const acceptedEvent = createChatTelemetryEvent(
+      'quota_admission',
+      'accepted',
+      10,
+      {},
+      { outcome: 'admitted' },
+    );
+    expect(acceptedEvent.metric).toBe('chat_messages_accepted_total');
+
+    const deniedEvent = createChatTelemetryEvent(
+      'quota_admission',
+      'rejected',
+      5,
+      {},
+      { outcome: 'rejected', error_class: 'daily_quota' },
+    );
+    expect(deniedEvent.metric).toBe('chat_messages_denied_total');
+
+    const quotaEvent = createChatTelemetryEvent(
+      'quota_admission',
+      'ok',
+      8,
+      {},
+      { outcome: 'created' },
+    );
+    expect(quotaEvent.metric).toBe('quota_daily_utilization');
+
+    const conflictEvent = createChatTelemetryEvent(
+      'handoff_claim_conflict',
+      'conflict',
+      15,
+      {},
+      { outcome: 'conflict' },
+    );
+    expect(conflictEvent.metric).toBe('handoff_claims_conflicted_total');
+  });
 });

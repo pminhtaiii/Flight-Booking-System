@@ -7,7 +7,9 @@ export type ChatTelemetryOperation =
   | 'handoff_resolve'
   | 'handoff_consume'
   | 'handoff_replay'
-  | 'handoff_claim_conflict';
+  | 'handoff_claim_conflict'
+  | 'quota_admission'
+  | 'chat_message_turn';
 
 export type ChatTelemetryContext = {
   traceId?: string | null;
@@ -35,9 +37,9 @@ const ALLOWED_METADATA_KEYS = new Set([
 ]);
 const FORBIDDEN_VALUE_PATTERN = /(?:https?:\/\/|bearer\s|@|message|token|offer|user|session|passenger|payment|passport|secret|authorization)/i;
 const ALLOWED_STRING_VALUES: Record<string, Set<string>> = {
-  status: new Set(['created', 'resolved', 'consumed', 'replayed', 'failed', 'ok', 'conflict']),
-  outcome: new Set(['created', 'resolved', 'consumed', 'already_consumed', 'idempotent_retry', 'failed', 'conflict']),
-  error_class: new Set(['dependency_unavailable', 'timeout', 'unknown']),
+  status: new Set(['created', 'resolved', 'consumed', 'replayed', 'failed', 'ok', 'conflict', 'accepted', 'rejected', 'denied']),
+  outcome: new Set(['created', 'resolved', 'consumed', 'already_consumed', 'idempotent_retry', 'failed', 'conflict', 'admitted', 'rejected', 'unavailable']),
+  error_class: new Set(['dependency_unavailable', 'timeout', 'unknown', 'daily_quota', 'burst_limit', 'control_plane_unavailable']),
   dependency: new Set(['redis', 'nestjs', 'llm', 'control_plane']),
 };
 const BOOLEAN_METADATA_KEYS = new Set(['retry', 'price_changed']);
@@ -72,6 +74,8 @@ const METRIC_BY_OPERATION: Record<ChatTelemetryOperation, string> = {
   handoff_consume: STANDARDIZED_METRIC_COUNTERS.HANDOFF_TOKENS_CONSUMED,
   handoff_replay: 'chat_handoff_replay_total',
   handoff_claim_conflict: STANDARDIZED_METRIC_COUNTERS.HANDOFF_CLAIMS_CONFLICTED,
+  quota_admission: STANDARDIZED_METRIC_COUNTERS.QUOTA_DAILY_UTILIZATION,
+  chat_message_turn: STANDARDIZED_METRIC_COUNTERS.CHAT_MESSAGES_ACCEPTED,
 };
 
 function opaqueId(candidate?: string | null): string {
@@ -123,9 +127,24 @@ export function createChatTelemetryEvent(
     throw new Error('Chat telemetry status must be a string');
   }
 
+  let metric = METRIC_BY_OPERATION[operation];
+  if (operation === 'chat_message_turn') {
+    metric = safeStatus === 'failed' || safeStatus === 'denied' || safeStatus === 'rejected' || safeMetadata.outcome === 'rejected'
+      ? STANDARDIZED_METRIC_COUNTERS.CHAT_MESSAGES_DENIED
+      : STANDARDIZED_METRIC_COUNTERS.CHAT_MESSAGES_ACCEPTED;
+  } else if (operation === 'quota_admission') {
+    if (safeStatus === 'failed' || safeStatus === 'rejected' || safeMetadata.outcome === 'rejected') {
+      metric = STANDARDIZED_METRIC_COUNTERS.CHAT_MESSAGES_DENIED;
+    } else if (safeMetadata.outcome === 'admitted' || safeStatus === 'accepted') {
+      metric = STANDARDIZED_METRIC_COUNTERS.CHAT_MESSAGES_ACCEPTED;
+    } else {
+      metric = STANDARDIZED_METRIC_COUNTERS.QUOTA_DAILY_UTILIZATION;
+    }
+  }
+
   return {
     operation,
-    metric: METRIC_BY_OPERATION[operation],
+    metric,
     status: safeStatus,
     latency_ms: Math.max(0, Math.min(600_000, Math.round(latencyMs))),
     trace_id: opaqueId(context.traceId),
