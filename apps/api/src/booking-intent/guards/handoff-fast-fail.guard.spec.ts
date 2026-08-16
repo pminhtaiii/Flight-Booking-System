@@ -56,4 +56,17 @@ describe('HandoffFastFailGuard', () => {
       reservationId: 'reservation-1',
     });
   });
+
+  it('bypasses in-flight reservation on advisory readiness route', () => {
+    const request = {
+      originalUrl: '/api/bookings/intents/readiness',
+      body: { handoffToken: 'chk_handoff_v1_token' },
+      user: { id: 'user-1' },
+    };
+    const tryAcquireInFlight = jest.fn();
+    const guard = new HandoffFastFailGuard({ tryAcquireInFlight } as never);
+
+    expect(guard.canActivate(executionContext(request as never))).toBe(true);
+    expect(tryAcquireInFlight).not.toHaveBeenCalled();
+  });
 });
