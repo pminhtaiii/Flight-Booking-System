@@ -37,7 +37,7 @@ describe('chat telemetry privacy contract', () => {
       { outcome: 'created', price_changed: false },
     );
 
-    expect(event.metric).toBe('chat_handoff_create_total');
+    expect(event.metric).toBe('handoff_tokens_issued_total');
     expect(event.latency_ms).toBe(12);
     expect(event.trace_id).toMatch(/^chat_[a-f0-9]{32}$/);
     expect(event.correlation_id).toMatch(/^chat_[a-f0-9]{32}$/);

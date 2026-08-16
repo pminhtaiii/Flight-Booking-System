@@ -239,7 +239,7 @@ describe('Privacy Corpus & Structured Telemetry Audit (e2e)', () => {
       expect(telemetryEvent).toHaveProperty('operation', 'handoff_create');
       expect(telemetryEvent).toHaveProperty('latency_ms', 46);
       expect(telemetryEvent).toHaveProperty('status', 'created');
-      expect(telemetryEvent).toHaveProperty('metric', 'chat_handoff_create_total');
+      expect(telemetryEvent).toHaveProperty('metric', 'handoff_tokens_issued_total');
       expect(telemetryEvent.metadata).toEqual({ outcome: 'created' });
     });
 

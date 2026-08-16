@@ -142,9 +142,9 @@ describe('chat handoff observability dashboard and alert contract', () => {
         .map(([entry]) => typeof entry === 'string' ? JSON.parse(entry) : null)
         .filter((entry): entry is Record<string, unknown> => entry !== null && expectedOperations.includes(String(entry.operation)));
       expect(events).toEqual(expect.arrayContaining([
-        expect.objectContaining({ operation: 'handoff_create', metric: 'chat_handoff_create_total', status: 'created', metadata: { outcome: 'created' }, trace_id: traceId, correlation_id: correlationId }),
-        expect.objectContaining({ operation: 'handoff_resolve', metric: 'chat_handoff_resolve_total', status: 'resolved', metadata: { outcome: 'resolved' }, trace_id: traceId, correlation_id: correlationId }),
-        expect.objectContaining({ operation: 'handoff_consume', metric: 'chat_handoff_consume_total', status: 'created', metadata: { outcome: 'consumed', price_changed: false }, trace_id: traceId, correlation_id: correlationId }),
+        expect.objectContaining({ operation: 'handoff_create', metric: 'handoff_tokens_issued_total', status: 'created', metadata: { outcome: 'created' }, trace_id: traceId, correlation_id: correlationId }),
+        expect.objectContaining({ operation: 'handoff_resolve', metric: 'handoff_tokens_resolved_total', status: 'resolved', metadata: { outcome: 'resolved' }, trace_id: traceId, correlation_id: correlationId }),
+        expect.objectContaining({ operation: 'handoff_consume', metric: 'handoff_tokens_consumed_total', status: 'created', metadata: { outcome: 'consumed', price_changed: false }, trace_id: traceId, correlation_id: correlationId }),
       ]));
       const auditLogs = await prisma!.auditLog.findMany({ where: { userId, action: { in: ['chat_handoff_created', 'chat_handoff_resolved', 'chat_handoff_consumed'] } } });
 
@@ -152,9 +152,9 @@ describe('chat handoff observability dashboard and alert contract', () => {
       // so the public resolve plus the canonical consume produce two resolves.
       expect(auditLogs).toHaveLength(4);
       expect(auditLogs.map((entry) => entry.metadata)).toEqual(expect.arrayContaining([
-        expect.objectContaining({ operation: 'handoff_create', metric: 'chat_handoff_create_total', status: 'created', outcome: 'created', traceId, correlationId }),
-        expect.objectContaining({ operation: 'handoff_resolve', metric: 'chat_handoff_resolve_total', status: 'resolved', outcome: 'resolved', traceId, correlationId }),
-        expect.objectContaining({ operation: 'handoff_consume', metric: 'chat_handoff_consume_total', status: 'created', outcome: 'consumed', price_changed: false, traceId, correlationId }),
+        expect.objectContaining({ operation: 'handoff_create', metric: 'handoff_tokens_issued_total', status: 'created', outcome: 'created', traceId, correlationId }),
+        expect.objectContaining({ operation: 'handoff_resolve', metric: 'handoff_tokens_resolved_total', status: 'resolved', outcome: 'resolved', traceId, correlationId }),
+        expect.objectContaining({ operation: 'handoff_consume', metric: 'handoff_tokens_consumed_total', status: 'created', outcome: 'consumed', price_changed: false, traceId, correlationId }),
       ]));
 
       const serializedTelemetry = JSON.stringify({ events, auditLogs });

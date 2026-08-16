@@ -41,11 +41,34 @@ const ALLOWED_STRING_VALUES: Record<string, Set<string>> = {
 };
 const BOOLEAN_METADATA_KEYS = new Set(['retry', 'price_changed']);
 
+export const STANDARDIZED_METRIC_COUNTERS = {
+  CHAT_MESSAGES_ACCEPTED: 'chat_messages_accepted_total',
+  CHAT_MESSAGES_DENIED: 'chat_messages_denied_total',
+  QUOTA_DAILY_UTILIZATION: 'quota_daily_utilization',
+  HANDOFF_TOKENS_ISSUED: 'handoff_tokens_issued_total',
+  HANDOFF_TOKENS_RESOLVED: 'handoff_tokens_resolved_total',
+  HANDOFF_TOKENS_CONSUMED: 'handoff_tokens_consumed_total',
+  HANDOFF_CLAIMS_CONFLICTED: 'handoff_claims_conflicted_total',
+} as const;
+
+export type StandardizedMetricCounter =
+  (typeof STANDARDIZED_METRIC_COUNTERS)[keyof typeof STANDARDIZED_METRIC_COUNTERS];
+
+export const STANDARDIZED_METRICS = [
+  'chat_messages_accepted_total',
+  'chat_messages_denied_total',
+  'quota_daily_utilization',
+  'handoff_tokens_issued_total',
+  'handoff_tokens_resolved_total',
+  'handoff_tokens_consumed_total',
+  'handoff_claims_conflicted_total',
+] as const;
+
 const METRIC_BY_OPERATION: Record<ChatTelemetryOperation, string> = {
   intent_create: 'chat_intent_create_total',
-  handoff_create: 'chat_handoff_create_total',
-  handoff_resolve: 'chat_handoff_resolve_total',
-  handoff_consume: 'chat_handoff_consume_total',
+  handoff_create: STANDARDIZED_METRIC_COUNTERS.HANDOFF_TOKENS_ISSUED,
+  handoff_resolve: STANDARDIZED_METRIC_COUNTERS.HANDOFF_TOKENS_RESOLVED,
+  handoff_consume: STANDARDIZED_METRIC_COUNTERS.HANDOFF_TOKENS_CONSUMED,
   handoff_replay: 'chat_handoff_replay_total',
 };
 
@@ -115,29 +138,6 @@ export function emitChatTelemetry(
 ): void {
   logger.log(JSON.stringify(event));
 }
-
-export const STANDARDIZED_METRIC_COUNTERS = {
-  CHAT_MESSAGES_ACCEPTED: 'chat_messages_accepted_total',
-  CHAT_MESSAGES_DENIED: 'chat_messages_denied_total',
-  QUOTA_DAILY_UTILIZATION: 'quota_daily_utilization',
-  HANDOFF_TOKENS_ISSUED: 'handoff_tokens_issued_total',
-  HANDOFF_TOKENS_RESOLVED: 'handoff_tokens_resolved_total',
-  HANDOFF_TOKENS_CONSUMED: 'handoff_tokens_consumed_total',
-  HANDOFF_CLAIMS_CONFLICTED: 'handoff_claims_conflicted_total',
-} as const;
-
-export type StandardizedMetricCounter =
-  (typeof STANDARDIZED_METRIC_COUNTERS)[keyof typeof STANDARDIZED_METRIC_COUNTERS];
-
-export const STANDARDIZED_METRICS = [
-  'chat_messages_accepted_total',
-  'chat_messages_denied_total',
-  'quota_daily_utilization',
-  'handoff_tokens_issued_total',
-  'handoff_tokens_resolved_total',
-  'handoff_tokens_consumed_total',
-  'handoff_claims_conflicted_total',
-] as const;
 
 export const CHAT_HANDOFF_OBSERVABILITY_CONTRACT = {
   standardizedMetricCounters: [
