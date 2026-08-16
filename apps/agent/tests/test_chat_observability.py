@@ -9,6 +9,15 @@ from agent.observability.chat_observability import (
     safe_tool_name,
 )
 
+FORBIDDEN_TEST_VALUES = [
+    "PNR-XYZ123",
+    "chk_handoff_v1_secret",
+    "duffel-private-offer-999",
+    "passenger.secret@example.com",
+    "PASS-123456",
+    "4111222233334444",
+]
+
 
 def test_chat_telemetry_emits_only_allowlisted_bounded_fields(caplog):
     telemetry = ChatTelemetry()
@@ -79,6 +88,15 @@ def test_chat_telemetry_rejects_unallowlisted_values_under_known_fields(field_na
 
     with pytest.raises(TelemetryPrivacyError):
         telemetry.emit("tool_call", status="failed", fields={field_name: "opaque_user_value"})
+
+
+@pytest.mark.parametrize("forbidden_val", FORBIDDEN_TEST_VALUES)
+def test_chat_telemetry_rejects_forbidden_values_across_operations(forbidden_val):
+    telemetry = ChatTelemetry()
+
+    for op in ("handoff_create", "handoff_resolve", "handoff_consume", "tool_call", "router_decision"):
+        with pytest.raises(TelemetryPrivacyError):
+            telemetry.emit(op, status="failed", fields={"outcome": forbidden_val})
 
 
 @pytest.mark.parametrize("field_value", [123, True])

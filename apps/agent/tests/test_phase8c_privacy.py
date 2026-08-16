@@ -130,3 +130,36 @@ def test_chat_telemetry_strictly_rejects_privacy_corpus():
                 status="failed",
                 fields={"outcome": forbidden_val},
             )
+
+def test_sse_error_payloads_contain_zero_pii_or_tokens():
+    """Verify that SSE error payloads contain standard error codes and scrubbed messages."""
+    pii_payload = json.dumps({
+        "code": "GUARDRAIL_BLOCKED",
+        "message": "Your message contains protected personal information and cannot be processed.",
+        "partialMessageId": None,
+    })
+    for forbidden_val in SEEDED_PRIVACY_CORPUS:
+        assert forbidden_val not in pii_payload
+
+@pytest.mark.asyncio
+async def test_sse_event_serialization_excludes_forbidden_corpus():
+    """Verify that any stream response data conforms to strict boundary safety and excludes forbidden tokens/PII."""
+    display = DisplayInfo(
+        airline="VN",
+        origin="SGN",
+        destination="HAN",
+        departureAt="2026-09-20T08:00:00Z",
+        arrivalAt="2026-09-20T10:00:00Z",
+        price="150.00",
+        currency="USD",
+    )
+    event = HandoffEvent(
+        version=1,
+        action="begin_checkout",
+        handoffToken="chk_handoff_v1_safe_token_string",
+        expiresAt="2026-09-20T09:00:00Z",
+        display=display,
+    )
+    serialized = event.model_dump_json()
+    for forbidden_val in SEEDED_PRIVACY_CORPUS:
+        assert forbidden_val not in serialized

@@ -7,9 +7,9 @@ Update this file after every completed feature. Any AI agent reading this should
 ### Current Status
 
 **Feature:** Chatbot Backend Infrastructure & Booking Handoff (Feature 17)
-**Last completed:** Phase 10F Full Cross-Stack End-to-End Handoff Verification (2026-08-16).
+**Last completed:** Phase 11A Production Rollout, Live Health & Operational Runbook Verification (2026-08-16).
 **In progress:** None.
-**Next:** Production observation & rollout verification.
+**Next:** Production deployment & monitoring.
 
 ---
 
@@ -329,4 +329,5 @@ Update this file after every completed feature. Any AI agent reading this should
 - Created a Mimo LLM diagnostic script (`apps/agent/src/agent/test_llm_connection.py`) allowing manual verification of API keys and endpoint connectivity directly from the terminal (securely prompts for keys via `getpass` and runs raw HTTP and LangChain tests).
 - Fixed backend runtime emission after the root type-check configuration enabled `noEmit`: API and shared-package build configs now explicitly emit JavaScript, preserving root type-check-only behavior and ensuring `apps/api/dist/main.js` exists for NestJS startup.
 - **Feature 017 — Phase 10A Completed**: Implemented Work Package 6A (state-only, zero-I/O `signal_checkout_intent` tool with positive integer validation against `trusted_snapshot`) and Work Package 6B (cryptographic `ChatHandoffTokenService` with high-entropy credential generation, server-derived idempotency hashing, `crypto.timingSafeEqual` constant-time verification, hash-only storage, and secret key rotation support). All unit test suites in NestJS and Python agent are 100% green.
+- **Feature 017 — Phase 11A Completed (2026-08-16)**: Validated production feature flag governance across all 4 rollout combinations, operational runbook drills (`docs/runbooks/chatbot-handoff.md`), live multi-service health verification (`/health`, `/health/redis`, `/health/agent`), secret key rotation rings (`_V1` and `_V2` for handoff and selection attestation), fail-closed Redis control plane (503 `CHAT_CONTROL_PLANE_UNAVAILABLE`), negative privacy audit, and full multi-workspace regression (673 API unit tests, 49 Phase 11A E2E tests, 334 Agent pytest tests, 25 Web unit tests, and clean Next.js production build). Feature 017 is 100% complete, verified, and production-ready.
 

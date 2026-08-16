@@ -45,6 +45,10 @@ export const envSchema = z.object({
   FEATURE_FLAG_WRITE_FENCE: z.string().optional().default('false'),
   CHAT_ENCRYPTION_KEY: z.string().optional(),
   CHAT_ATTESTATION_KEY: z.string().optional(),
+  CHAT_HANDOFF_SECRET: z.string().optional(),
+  CHAT_HANDOFF_SECRET_V1: z.string().optional(),
+  CHAT_HANDOFF_SECRET_V2: z.string().optional(),
+  CHAT_HANDOFF_SECRET_V3: z.string().optional(),
   CHAT_HANDOFF_CLAIM_TTL: z.coerce.number().optional().default(600),
 }).passthrough().refine(data => {
   if (data.FEATURE_FLAG_CHAT_HANDOFF_ISSUE === 'true' && data.FEATURE_FLAG_CHAT_HANDOFF_ACCEPT !== 'true') {

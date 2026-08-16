@@ -43,6 +43,29 @@ export class CacheService implements OnModuleInit, OnModuleDestroy {
     }
   }
 
+  async checkHealth(): Promise<'up' | 'down'> {
+    if (!this.redisClient) {
+      return 'down';
+    }
+    let timer: NodeJS.Timeout | undefined;
+    try {
+      const pingPromise = this.redisClient.ping();
+      const timeoutPromise = new Promise<string>((_, reject) => {
+        timer = setTimeout(() => reject(new Error('Redis ping timeout')), 1000);
+      });
+      const result = await Promise.race([pingPromise, timeoutPromise]);
+      return result === 'PONG' ? 'up' : 'down';
+    } catch (err: unknown) {
+      const errMsg = err instanceof Error ? err.message : String(err);
+      this.logger.warn(`Redis health check failed: ${errMsg}`);
+      return 'down';
+    } finally {
+      if (timer) {
+        clearTimeout(timer);
+      }
+    }
+  }
+
   async get(key: string): Promise<string | null> {
     if (this.redisClient) {
       try {

@@ -3,13 +3,16 @@ import { INestApplication } from '@nestjs/common';
 import request from 'supertest';
 import { AppModule } from '@/app.module';
 import { PrismaService } from '@/prisma/prisma.service';
+import { CacheService } from '@/cache/cache.service';
 import { Prisma } from '@prisma/client';
 
 describe('Health Check (E2E)', () => {
   jest.setTimeout(30000);
   let app: INestApplication;
   let prismaService: PrismaService;
+  let cacheService: CacheService;
   let dbMockSpy: jest.SpyInstance;
+  let redisMockSpy: jest.SpyInstance;
 
   beforeAll(async () => {
     // Mock Prisma's $connect and $disconnect to avoid slow TCP timeouts during E2E test setup
@@ -53,6 +56,7 @@ describe('Health Check (E2E)', () => {
     await app.init();
 
     prismaService = moduleFixture.get<PrismaService>(PrismaService);
+    cacheService = moduleFixture.get<CacheService>(CacheService);
 
     // Warm up the application using a mock implementation of $queryRaw so it doesn't try to query the real db
     const warmupSpy = jest
@@ -71,10 +75,12 @@ describe('Health Check (E2E)', () => {
     dbMockSpy = jest
       .spyOn(prismaService, '$queryRaw')
       .mockImplementation(() => Promise.resolve([1]) as unknown as Prisma.PrismaPromise<unknown>);
+    redisMockSpy = jest.spyOn(cacheService, 'checkHealth').mockResolvedValue('up');
   });
 
   afterEach(() => {
     dbMockSpy.mockRestore();
+    redisMockSpy.mockRestore();
   });
 
   it('GET /health - should return status 200 and database status up under normal conditions', async () => {
@@ -91,6 +97,7 @@ describe('Health Check (E2E)', () => {
       status: 'ok',
       dependencies: {
         database: 'up',
+        redis: 'up',
       },
       processor: {
         lastHeartbeat: null,
@@ -124,6 +131,7 @@ describe('Health Check (E2E)', () => {
           status: 'down',
           dependencies: {
             database: 'down',
+            redis: 'up',
           },
         });
       });
@@ -145,6 +153,7 @@ describe('Health Check (E2E)', () => {
           status: 'ok',
           dependencies: {
             database: 'up',
+            redis: 'up',
           },
           processor: {
             lastHeartbeat: null,
@@ -185,6 +194,7 @@ describe('Health Check (E2E)', () => {
       status: 'down',
       dependencies: {
         database: 'down',
+        redis: 'up',
       },
     });
 
