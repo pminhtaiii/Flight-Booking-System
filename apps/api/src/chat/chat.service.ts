@@ -291,13 +291,32 @@ export class ChatService {
       throw new NotFoundException('Session not found');
     }
 
+    const now = new Date();
     await this.prisma.$transaction(async (tx) => {
       await tx.chatSession.update({
         where: {
           id: sessionId,
         },
         data: {
-          deletedAt: new Date(),
+          deletedAt: now,
+        },
+      });
+
+      // Revoke / invalidate unconsumed active handoffs belonging to that session
+      // by setting expiresAt to now (or past) and clearing any active claims,
+      // while preserving consumed handoffs (consumedAt != null) and their consumedByBookingIntentId link
+      await tx.chatHandoff.updateMany({
+        where: {
+          chatSessionId: sessionId,
+          consumedAt: null,
+          expiresAt: { gt: now },
+        },
+        data: {
+          expiresAt: now,
+          claimedAt: null,
+          claimTokenHash: null,
+          claimExpiresAt: null,
+          claimRecoverAfter: null,
         },
       });
 

@@ -18,6 +18,7 @@ import { DisruptionModule } from './disruption/disruption.module';
 import { AncillariesModule } from './ancillaries/ancillaries.module';
 import { ProfileModule } from './profile/profile.module';
 import { ChatHandoffModule } from './chat-handoff/chat-handoff.module';
+import { DataDriftSentinelModule } from './common/sentinel/data-drift-sentinel.module';
 
 import { z } from 'zod';
 
@@ -83,6 +84,7 @@ export const envSchema = z.object({
     AncillariesModule,
     ProfileModule,
     ChatHandoffModule,
+    DataDriftSentinelModule,
   ],
   controllers: [],
   providers: [],

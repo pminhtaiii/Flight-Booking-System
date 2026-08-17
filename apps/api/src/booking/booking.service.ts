@@ -222,6 +222,14 @@ export class BookingService {
           if (existingByIntent.userId !== userId) {
             throw new ForbiddenException('You do not own this booking');
           }
+          if (existingByIntent.id !== bookingId) {
+            const existingById = await this.prisma.booking.findUnique({
+              where: { id: bookingId },
+            });
+            if (existingById && existingById.userId !== userId) {
+              throw new ForbiddenException('You do not own this booking');
+            }
+          }
           if (!existingByIntent.paymentId && paymentId) {
             return await this.prisma.booking.update({
               where: { id: existingByIntent.id },

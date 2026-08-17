@@ -4,7 +4,7 @@ import { ExtractJwt, Strategy } from 'passport-jwt';
 import { PrismaService } from '@/prisma/prisma.service';
 import { CacheService } from '@/cache/cache.service';
 import { Request } from 'express';
-import { createHash } from 'crypto';
+import * as crypto from 'crypto';
 
 type ActiveUser = {
   id: string;
@@ -38,13 +38,52 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     super({
       jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
       ignoreExpiration: false,
-      secretOrKey: (() => {
-        const secret = process.env.JWT_SECRET;
-        if (!secret && process.env.NODE_ENV !== 'test') {
-          throw new Error('JWT_SECRET environment variable is missing.');
+      secretOrKeyProvider: (
+        request: Request,
+        rawJwtToken: any,
+        done: (err: any, secretOrKey?: string | Buffer) => void,
+      ) => {
+        // Collect candidate keys in priority order
+        const candidateKeys = [
+          process.env.JWT_SECRET_CURRENT,
+          process.env.JWT_SECRET,
+          process.env.JWT_SECRET_PREVIOUS,
+          process.env.JWT_SECRET_V2,
+          process.env.JWT_SECRET_V1,
+        ].filter((k): k is string => typeof k === 'string' && k.trim().length > 0);
+
+        if (candidateKeys.length === 0) {
+          if (process.env.NODE_ENV !== 'test') {
+            return done(new Error('JWT_SECRET environment variable is missing.'));
+          }
+          return done(null, 'test_secret');
         }
-        return secret || 'test_secret';
-      })(),
+
+        if (typeof rawJwtToken === 'string') {
+          const parts = rawJwtToken.split('.');
+          if (parts.length === 3) {
+            const headerPayload = `${parts[0]}.${parts[1]}`;
+            const sig = parts[2].replace(/=+$/, '');
+            for (const key of candidateKeys) {
+              try {
+                const computed = crypto
+                  .createHmac('sha256', key)
+                  .update(headerPayload)
+                  .digest('base64url')
+                  .replace(/=+$/, '');
+                if (computed === sig) {
+                  return done(null, key);
+                }
+              } catch {
+                // ignore
+              }
+            }
+          }
+        }
+
+        // Default to primary key
+        return done(null, candidateKeys[0]);
+      },
       passReqToCallback: true,
     });
   }
@@ -109,6 +148,6 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
   }
 
   private inFlightKey(value: string): string {
-    return createHash('sha256').update(value).digest('hex');
+    return crypto.createHash('sha256').update(value).digest('hex');
   }
 }

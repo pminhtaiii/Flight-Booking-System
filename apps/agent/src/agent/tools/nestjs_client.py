@@ -158,7 +158,8 @@ class NestJSClient:
         """
         settings = get_settings()
         url = f"{self.base_url}/agent-gateway/chat/access/check"
-        claim_token = create_claim_token(sub, settings.CLAIM_TOKEN_SECRET)
+        claim_secret = getattr(settings, "primary_claim_token_secret", settings.CLAIM_TOKEN_SECRET)
+        claim_token = create_claim_token(sub, claim_secret)
         headers = {
             "X-Agent-API-Key": settings.AGENT_SERVICE_API_KEY,
             "X-User-Claim": claim_token,
@@ -264,13 +265,25 @@ class NestJSClient:
                 decode_kwargs["issuer"] = getattr(
                     settings, "JWT_ISSUER", "booking-systems-api"
                 )
-            payload = jwt.decode(
-                self.token,
-                settings.JWT_SECRET,
-                algorithms=["HS256"],
-                options=decode_options,
-                **decode_kwargs,
-            )
+
+            secrets = getattr(settings, "jwt_secret_ring", [settings.JWT_SECRET])
+            payload = None
+            for sec in secrets:
+                try:
+                    payload = jwt.decode(
+                        self.token,
+                        sec,
+                        algorithms=["HS256"],
+                        options=decode_options,
+                        **decode_kwargs,
+                    )
+                    break
+                except InvalidTokenError:
+                    continue
+
+            if not payload:
+                raise InvalidTokenError("Failed to decode token with any configured secret")
+
             user_id = payload.get("id") or payload.get("sub")
             if not user_id:
                 raise ValueError("Token is missing user identification claims ('id' or 'sub')")
@@ -280,7 +293,8 @@ class NestJSClient:
             else:
                 raise ValueError("Invalid authentication token") from exc
 
-        claim_token = create_claim_token(str(user_id), settings.CLAIM_TOKEN_SECRET)
+        claim_secret = getattr(settings, "primary_claim_token_secret", settings.CLAIM_TOKEN_SECRET)
+        claim_token = create_claim_token(str(user_id), claim_secret)
         headers = {
             "X-Agent-API-Key": settings.AGENT_SERVICE_API_KEY,
             "X-User-Claim": claim_token
