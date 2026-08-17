@@ -1,4 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { Cron, CronExpression } from '@nestjs/schedule';
 import { PrismaService } from '@/prisma/prisma.service';
 import { BookingStatus } from '@prisma/client';
 
@@ -221,5 +222,27 @@ export class DataDriftSentinelService {
       bookingProjectionSync,
       healthy,
     };
+  }
+
+  @Cron(CronExpression.EVERY_5_MINUTES)
+  async handleDriftSentinelCron(): Promise<FullDriftSentinelAuditSummary | void> {
+    try {
+      const summary = await this.runFullDriftSentinelAudit();
+      if (!summary.healthy) {
+        this.logger.warn(
+          `DataDriftSentinel Cron: Data drift detected. summary=${JSON.stringify(summary)}`,
+        );
+      } else {
+        this.logger.log(
+          `DataDriftSentinel Cron: Full drift sentinel audit healthy. Healed dangling claims: ${summary.danglingClaims.healedCount}`,
+        );
+      }
+      return summary;
+    } catch (error) {
+      this.logger.error(
+        'DataDriftSentinel Cron: Error occurred during full drift sentinel audit execution:',
+        error,
+      );
+    }
   }
 }

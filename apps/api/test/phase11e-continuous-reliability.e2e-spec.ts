@@ -1,5 +1,7 @@
-process.env.ENCRYPTION_KEY = 'a'.repeat(64);
-process.env.CHAT_ENCRYPTION_KEY = 'b'.repeat(64);
+import * as crypto from 'crypto';
+
+process.env.ENCRYPTION_KEY = crypto.randomBytes(32).toString('hex');
+process.env.CHAT_ENCRYPTION_KEY = crypto.randomBytes(32).toString('hex');
 process.env.FEATURE_FLAG_BOOKING_READINESS = 'true';
 process.env.FEATURE_FLAG_CHAT_HANDOFF_ISSUE = 'true';
 process.env.FEATURE_FLAG_CHAT_HANDOFF_ACCEPT = 'true';
@@ -13,7 +15,6 @@ import { PrismaService } from '@/prisma/prisma.service';
 import { ChatService } from '@/chat/chat.service';
 import { ChatMessageCryptoService } from '@/chat/chat-message-crypto.service';
 import { HttpExceptionFilter } from '@/common/filters/http-exception.filter';
-import * as crypto from 'crypto';
 import { Prisma } from '@prisma/client';
 
 describe('Phase 11E: Continuous Reliability, Lifecycle & DR Cryptographic Audit (E2E)', () => {
@@ -217,7 +218,7 @@ describe('Phase 11E: Continuous Reliability, Lifecycle & DR Cryptographic Audit 
       const wrongKeyMockConfig = {
         get: (key: string) => {
           if (key === 'CHAT_ENCRYPTION_KEY') {
-            return 'c'.repeat(64); // Different 32-byte key
+            return crypto.randomBytes(32).toString('hex'); // Different 32-byte key
           }
           return null;
         },

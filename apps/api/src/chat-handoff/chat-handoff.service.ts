@@ -169,7 +169,7 @@ export class ChatHandoffService {
   ) {}
 
   isClaimed(token: string, userId?: string): boolean {
-    if (!token || typeof token !== 'string' || !token.startsWith('chk_handoff_v1_')) return false;
+    if (!token || typeof token !== 'string' || !token.startsWith('chk_handoff_')) return false;
     const tokenHash = this.tokenService.hashToken(token);
     const attemptKey = userId ? `${userId}:${tokenHash}` : tokenHash;
     const claimedUntil = this.claimedTokens.get(attemptKey) ?? (userId ? this.claimedTokens.get(tokenHash) : undefined);
@@ -190,7 +190,7 @@ export class ChatHandoffService {
   }
 
   tryAcquireInFlight(token: string, userId?: string, ttlMs = 30000): string | null {
-    if (!token || typeof token !== 'string' || !token.startsWith('chk_handoff_v1_')) return crypto.randomUUID();
+    if (!token || typeof token !== 'string' || !token.startsWith('chk_handoff_')) return crypto.randomUUID();
     const tokenHash = this.tokenService.hashToken(token);
     const attemptKey = userId ? `${userId}:${tokenHash}` : tokenHash;
     const now = Date.now();
@@ -797,7 +797,7 @@ export class ChatHandoffService {
       });
     }
 
-    const tokenHash = token.startsWith('chk_handoff_v1_')
+    const tokenHash = token.startsWith('chk_handoff_')
       ? this.tokenService.hashToken(token)
       : token;
 

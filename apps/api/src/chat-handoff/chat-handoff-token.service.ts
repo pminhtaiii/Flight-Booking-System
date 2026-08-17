@@ -11,7 +11,7 @@ export type TokenGenerationResult = {
 @Injectable()
 export class ChatHandoffTokenService {
   private readonly logger = new Logger(ChatHandoffTokenService.name);
-  public readonly CURRENT_KEY_VERSION = 1;
+  public readonly CURRENT_KEY_VERSION = 2;
 
   constructor(private readonly configService: ConfigService) {}
 

@@ -1,5 +1,7 @@
-process.env.ENCRYPTION_KEY = 'a'.repeat(64);
-process.env.CHAT_ENCRYPTION_KEY = 'b'.repeat(64);
+import * as crypto from 'crypto';
+
+process.env.ENCRYPTION_KEY = crypto.randomBytes(32).toString('hex');
+process.env.CHAT_ENCRYPTION_KEY = crypto.randomBytes(32).toString('hex');
 process.env.FEATURE_FLAG_BOOKING_READINESS = 'true';
 process.env.FEATURE_FLAG_CHAT_HANDOFF_ISSUE = 'true';
 process.env.FEATURE_FLAG_CHAT_HANDOFF_ACCEPT = 'true';
@@ -11,7 +13,6 @@ import { AppModule } from '@/app.module';
 import { PrismaService } from '@/prisma/prisma.service';
 import { DataDriftSentinelService } from '@/common/sentinel/data-drift-sentinel.service';
 import { HttpExceptionFilter } from '@/common/filters/http-exception.filter';
-import * as crypto from 'crypto';
 import { Prisma } from '@prisma/client';
 
 describe('Phase 11E: Data-Quality & State Drift Sentinel (E2E)', () => {

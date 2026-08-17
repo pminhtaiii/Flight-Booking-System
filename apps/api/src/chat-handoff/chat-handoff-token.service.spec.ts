@@ -33,8 +33,8 @@ describe('ChatHandoffTokenService', () => {
   });
 
   describe('getCurrentKeyVersion', () => {
-    it('should return current key version 1', () => {
-      expect(service.getCurrentKeyVersion()).toBe(1);
+    it('should return current key version 2', () => {
+      expect(service.getCurrentKeyVersion()).toBe(2);
     });
   });
 
@@ -134,10 +134,12 @@ describe('ChatHandoffTokenService', () => {
       const unconfiguredService = await createService({
         CHAT_HANDOFF_SECRET: undefined,
         CHAT_HANDOFF_SECRET_V1: undefined,
+        CHAT_HANDOFF_SECRET_V2: undefined,
+        CHAT_HANDOFF_SECRET_CURRENT: undefined,
       });
 
       expect(() => unconfiguredService.deriveIdempotencyHash('sel_v1_test', 1)).toThrow(
-        'CHAT_HANDOFF_SECRET is not configured for key version 1',
+        'CHAT_HANDOFF_SECRET is not configured for key version 2',
       );
     });
   });
@@ -149,9 +151,9 @@ describe('ChatHandoffTokenService', () => {
 
       const result = await service.generateToken(rowId, idempotencyHash);
 
-      expect(result.token).toMatch(/^chk_handoff_v1_[A-Za-z0-9_-]{43}$/);
+      expect(result.token).toMatch(/^chk_handoff_v2_[A-Za-z0-9_-]{43}$/);
       expect(result.tokenHash).toMatch(/^[a-f0-9]{64}$/);
-      expect(result.keyVersion).toBe(1);
+      expect(result.keyVersion).toBe(2);
       expect(result.token).not.toEqual(result.tokenHash);
       expect(result.tokenHash).toBe(service.hashToken(result.token));
     });
