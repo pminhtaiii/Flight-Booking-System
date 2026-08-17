@@ -1,14 +1,14 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { ConfigService } from '@nestjs/config';
 import { ServiceUnavailableException } from '@nestjs/common';
-import { ChatHandoffService } from './chat-handoff.service';
+import { ChatHandoffService, ResolvedChatHandoff } from './chat-handoff.service';
 import { ChatHandoffTokenService } from './chat-handoff-token.service';
 import { SelectionAttestationService } from '@/agent-gateway/selection-attestation.service';
 import { PrismaService } from '@/prisma/prisma.service';
 import { CreateChatHandoffDto } from './dto/create-chat-handoff.dto';
 import { validate } from 'class-validator';
 import { plainToInstance } from 'class-transformer';
-import { Prisma } from '@prisma/client';
+import { ChatHandoff, Prisma } from '@prisma/client';
 import { AuditService } from '@/audit/audit.service';
 import * as crypto from 'crypto';
 
@@ -893,7 +893,14 @@ describe('ChatHandoffService', () => {
     });
 
     it('releases a claim', async () => {
+      jest.spyOn(prisma.chatHandoff, 'findUnique').mockResolvedValue({
+        userId: 'user-1',
+        tokenHash: 'token-hash-1',
+      } as unknown as ChatHandoff);
       jest.spyOn(prisma.chatHandoff, 'updateMany').mockResolvedValue({ count: 1 });
+      const internalService = service as unknown as { claimedTokens: Map<string, number> };
+      internalService.claimedTokens.set('user-1:token-hash-1', Date.now() + 30000);
+
       await service.releaseClaim('1', 'token');
       expect(prisma.chatHandoff.updateMany).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -902,12 +909,41 @@ describe('ChatHandoffService', () => {
           }),
         }),
       );
+      expect(internalService.claimedTokens.get('user-1:token-hash-1')).toBeUndefined();
     });
 
-    it('silently ignores release if token invalid', async () => {
+    it('silently ignores release if token invalid and does not clear active tracking', async () => {
+      jest.spyOn(prisma.chatHandoff, 'findUnique').mockResolvedValue({
+        userId: 'user-1',
+        tokenHash: 'token-hash-1',
+      } as unknown as ChatHandoff);
       jest.spyOn(prisma.chatHandoff, 'updateMany').mockResolvedValue({ count: 0 });
+      const internalService = service as unknown as { claimedTokens: Map<string, number> };
+      internalService.claimedTokens.set('user-1:token-hash-1', Date.now() + 30000);
+
       await service.releaseClaim('1', 'token');
       expect(prisma.chatHandoff.updateMany).toHaveBeenCalled();
+      expect(internalService.claimedTokens.get('user-1:token-hash-1')).toBeDefined();
+    });
+
+    it('does not clear in-flight activeClaimAttempts when releasing a claim', async () => {
+      jest.spyOn(prisma.chatHandoff, 'findUnique').mockResolvedValue({
+        userId: 'user-1',
+        tokenHash: 'token-hash-1',
+      } as unknown as ChatHandoff);
+      jest.spyOn(prisma.chatHandoff, 'updateMany').mockResolvedValue({ count: 1 });
+      const internalService = service as unknown as {
+        claimedTokens: Map<string, number>;
+        activeClaimAttempts: Map<string, Promise<unknown>>;
+      };
+      const inFlightPromise = new Promise<{ handoff: ResolvedChatHandoff; claimToken: string }>(() => {});
+      internalService.activeClaimAttempts.set('user-1:token-hash-1', inFlightPromise);
+      internalService.claimedTokens.set('user-1:token-hash-1', Date.now() + 30000);
+
+      await service.releaseClaim('1', 'token');
+
+      expect(internalService.claimedTokens.get('user-1:token-hash-1')).toBeUndefined();
+      expect(internalService.activeClaimAttempts.get('user-1:token-hash-1')).toBe(inFlightPromise);
     });
   });
 });

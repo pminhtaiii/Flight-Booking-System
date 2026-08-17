@@ -43,7 +43,7 @@ type ClaimedHandoffRow = {
   consumedAt: Date | null;
 };
 
-type ResolvedChatHandoff = Prisma.ChatHandoffGetPayload<{
+export type ResolvedChatHandoff = Prisma.ChatHandoffGetPayload<{
   include: {
     chatSession: {
       select: {
@@ -1081,7 +1081,12 @@ export class ChatHandoffService {
 
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
       try {
-        await this.prisma.chatHandoff.updateMany({
+        const handoff = await this.prisma.chatHandoff.findUnique({
+          where: { id: handoffId },
+          select: { userId: true, tokenHash: true },
+        });
+
+        const result = await this.prisma.chatHandoff.updateMany({
           where: {
             id: handoffId,
             claimTokenHash,
@@ -1095,6 +1100,12 @@ export class ChatHandoffService {
             claimRecoverAfter: null,
           },
         });
+
+        if (handoff && result.count > 0) {
+          const attemptKey = `${handoff.userId}:${handoff.tokenHash}`;
+          this.claimedTokens.delete(attemptKey);
+          this.claimedTokens.delete(handoff.tokenHash);
+        }
         return;
       } catch (error) {
         if (attempt === maxRetries) throw error;
