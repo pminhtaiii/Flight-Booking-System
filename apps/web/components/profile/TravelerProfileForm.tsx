@@ -345,8 +345,8 @@ export function TravelerProfileForm({
       setValidationErrors({});
       setShowPassport(false);
 
-      if (returnTarget !== '/') {
-        router.replace(returnTarget);
+      if (returnTarget && returnTarget !== '/') {
+        router.push(returnTarget);
       }
     } catch (error: unknown) {
       if (error instanceof ProfileRequestError && (error.status === 401 || error.status === 403)) {
@@ -559,8 +559,8 @@ export function TravelerProfileForm({
             </div>
             <div className={styles.fieldGrid}>
               {renderSelectField('travelDocument', 'documentType', 'Document type', draft.travelDocument.documentType, documentOptions)}
-              <label className={styles.field} htmlFor="travelDocument-passportNumber">
-                <span className={styles.fieldLabel}>Passport number</span>
+              <div className={styles.field}>
+                <label className={styles.fieldLabel} htmlFor="travelDocument-passportNumber">Passport number</label>
                 <div className={styles.passwordControl}>
                   <input
                     aria-describedby={validationErrors['travelDocument.passportNumber'] ? 'travelDocument-passportNumber-error' : 'travelDocument-passportNumber-hint'}
@@ -574,7 +574,7 @@ export function TravelerProfileForm({
                   <button aria-label={showPassport ? 'Hide passport number' : 'Show passport number'} className={styles.showButton} onClick={() => setShowPassport((current) => !current)} type="button">{showPassport ? 'Hide' : 'Show'}</button>
                 </div>
                 {validationErrors['travelDocument.passportNumber'] ? <span className={styles.fieldError} id="travelDocument-passportNumber-error">{validationErrors['travelDocument.passportNumber']}</span> : <span className={styles.fieldHint} id="travelDocument-passportNumber-hint">Visible only while you are editing this secure field.</span>}
-              </label>
+              </div>
               {renderTextField('travelDocument', 'passportExpiry', 'Passport expiry', draft.travelDocument.passportExpiry, 'date')}
               {renderSelectField('travelDocument', 'issuingCountry', 'Issuing country', draft.travelDocument.issuingCountry, countryOptions)}
               {renderSelectField('travelDocument', 'nationality', 'Nationality', draft.travelDocument.nationality, countryOptions)}
