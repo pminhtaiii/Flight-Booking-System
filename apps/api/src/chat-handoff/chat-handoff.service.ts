@@ -1086,7 +1086,7 @@ export class ChatHandoffService {
           select: { userId: true, tokenHash: true },
         });
 
-        await this.prisma.chatHandoff.updateMany({
+        const result = await this.prisma.chatHandoff.updateMany({
           where: {
             id: handoffId,
             claimTokenHash,
@@ -1101,7 +1101,7 @@ export class ChatHandoffService {
           },
         });
 
-        if (handoff) {
+        if (handoff && result.count > 0) {
           const attemptKey = `${handoff.userId}:${handoff.tokenHash}`;
           this.claimedTokens.delete(attemptKey);
           this.claimedTokens.delete(handoff.tokenHash);

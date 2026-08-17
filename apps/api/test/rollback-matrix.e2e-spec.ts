@@ -1,4 +1,9 @@
-process.env.ENCRYPTION_KEY = 'a'.repeat(64);
+import * as crypto from 'crypto';
+
+const encryptionKey = process.env.ENCRYPTION_KEY || crypto.randomBytes(32).toString('hex');
+const chatEncryptionKey = process.env.CHAT_ENCRYPTION_KEY || crypto.randomBytes(32).toString('hex');
+
+process.env.ENCRYPTION_KEY = encryptionKey;
 process.env.FEATURE_FLAG_CHAT_HANDOFF_ISSUE = 'false';
 process.env.FEATURE_FLAG_CHAT_HANDOFF_ACCEPT = 'true';
 process.env.FEATURE_FLAG_BOOKING_READINESS = 'true';
@@ -8,14 +13,13 @@ process.env.ATTESTATION_SECRET = 'test-attestation-secret';
 process.env.CLAIM_TOKEN_SECRET = 'test-claim-token-secret';
 process.env.CLAIM_TOKEN_TTL_SECONDS = '300';
 process.env.CHAT_HANDOFF_SECRET = 'test-handoff-secret';
-process.env.CHAT_ENCRYPTION_KEY = 'b'.repeat(64);
+process.env.CHAT_ENCRYPTION_KEY = chatEncryptionKey;
 process.env.STRIPE_SECRET_KEY = 'sk_test_mock';
 process.env.STRIPE_WEBHOOK_SECRET = 'whsec_mock';
 
 import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication, ValidationPipe } from '@nestjs/common';
 import request from 'supertest';
-import * as crypto from 'crypto';
 import { AppModule } from '@/app.module';
 import { PrismaService } from '@/prisma/prisma.service';
 import { ConfigService } from '@nestjs/config';
@@ -44,6 +48,33 @@ function mintClaimToken(userId: string, iat: number, secret = 'test-claim-token-
   const payloadStr = JSON.stringify(payload);
   const signature = crypto.createHmac('sha256', secret).update(payloadStr).digest();
   return `${Buffer.from(payloadStr).toString('base64url')}.${signature.toString('base64url')}`;
+}
+
+async function cleanDatabase(prisma: PrismaService): Promise<void> {
+  await prisma.chatHandoff.deleteMany({});
+  await prisma.chatMessage.deleteMany({});
+  await prisma.chatSession.deleteMany({});
+  await prisma.paymentEvent.deleteMany({});
+  await prisma.ledgerEntry.deleteMany({});
+  await prisma.refund.deleteMany({});
+  await prisma.payment.deleteMany({});
+  await prisma.idempotencyKey.deleteMany({});
+  await prisma.paymentMethod.deleteMany({});
+  await prisma.bookingAgentProjection.deleteMany({});
+  await prisma.bookingIntentPassenger.deleteMany({});
+  await prisma.booking.deleteMany({});
+  await prisma.bookingIntent.deleteMany({});
+  await prisma.itineraryRevisionSegment.deleteMany({});
+  await prisma.itineraryRevision.deleteMany({});
+  await prisma.disruptionAuditEvent.deleteMany({});
+  await prisma.notificationOutbox.deleteMany({});
+  await prisma.travelerProfile.deleteMany({});
+  await prisma.offerRecovery.deleteMany({});
+  await prisma.flightOffer.deleteMany({});
+  await prisma.searchHistory.deleteMany({});
+  await prisma.airport.deleteMany({});
+  await prisma.auditLog.deleteMany({});
+  await prisma.user.deleteMany({});
 }
 
 describe('Rollback Matrix & Database Row Integrity (E2E)', () => {
@@ -80,7 +111,8 @@ describe('Rollback Matrix & Database Row Integrity (E2E)', () => {
           if (key === 'CLAIM_TOKEN_SECRET') return 'test-claim-token-secret';
           if (key === 'CLAIM_TOKEN_TTL_SECONDS') return '300';
           if (key === 'ATTESTATION_SECRET') return 'test-attestation-secret';
-          if (key === 'CHAT_ENCRYPTION_KEY') return process.env.CHAT_ENCRYPTION_KEY;
+          if (key === 'CHAT_ENCRYPTION_KEY') return chatEncryptionKey;
+          if (key === 'ENCRYPTION_KEY') return encryptionKey;
           return process.env[key];
         },
       })
@@ -101,6 +133,9 @@ describe('Rollback Matrix & Database Row Integrity (E2E)', () => {
   });
 
   afterAll(async () => {
+    if (prisma) {
+      await cleanDatabase(prisma);
+    }
     if (app) {
       await app.close();
     }
@@ -110,6 +145,7 @@ describe('Rollback Matrix & Database Row Integrity (E2E)', () => {
     for (const key of Object.keys(configOverrides)) {
       delete configOverrides[key];
     }
+    await cleanDatabase(prisma);
 
     const runMarker = `rollback-${crypto.randomUUID()}`;
 
