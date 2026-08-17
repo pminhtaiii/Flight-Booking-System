@@ -357,51 +357,178 @@ def test_sse_readiness_action_required_payload_zero_pii():
         assert forbidden not in serialized
 
 
-def test_sse_streaming_chunk_stream_simulation_scan():
-    """Simulate complete SSE stream events and scan 100% of emitted chunks against forbidden corpus."""
-    chunks = [
-        {"event": "token", "data": json.dumps({"content": "Hello! I can help you find flights."})},
-        {"event": "tool_call", "data": json.dumps({"name": "search_flights", "inputs": {"origin": "SGN", "destination": "HAN"}})},
-        {"event": "tool_result", "data": json.dumps({"name": "search_flights", "result": "Found 3 flights."})},
+@pytest.mark.asyncio
+async def test_sse_streaming_chunk_stream_simulation_scan():
+    """
+    Simulate complete production SSE stream through chat_stream endpoint, graph event handling,
+    snapshot projection, handoff token creation, and SSE serialization, verifying that 100%
+    of emitted chunks omit the forbidden privacy corpus.
+    """
+    from starlette.requests import Request
+    import jwt
+    import time
+    from agent.config import get_settings
+    from agent.streaming.sse import chat_stream, ChatStreamRequest
+    from agent.queue.message_queue import MessageQueueManager
+
+    settings = get_settings()
+    user_id = "user_privacy_sse_audit_1"
+    session_id = "ses_privacy_sse_audit_1"
+    token = jwt.encode(
         {
-            "event": "flight_results",
-            "data": json.dumps({
-                "results": [
-                    {
-                        "offerIndex": 1,
-                        "airline": "VN",
-                        "origin": "SGN",
-                        "destination": "HAN",
-                        "departureAt": "2026-10-15T08:00:00Z",
-                        "arrivalAt": "2026-10-15T10:05:00Z",
-                        "price": "150.00",
-                        "currency": "USD",
+            "id": user_id,
+            "sub": user_id,
+            "jti": "jti_privacy_audit_1",
+            "iss": getattr(settings, "JWT_ISSUER", "booking-systems-api"),
+            "aud": getattr(settings, "JWT_AUDIENCE", "booking-systems-clients"),
+            "exp": int(time.time()) + 3600,
+        },
+        settings.JWT_SECRET,
+        algorithm="HS256",
+    )
+
+    queue_manager = MessageQueueManager(max_depth=1)
+    mock_app = MagicMock()
+    mock_app.state.message_queue = queue_manager
+    mock_guardrails = MagicMock()
+    mock_guardrails.validate_output_chunk = AsyncMock(return_value=(True, None))
+    mock_guardrails.validate_message = AsyncMock(return_value=(True, None))
+    mock_guardrails.validate_text = AsyncMock(return_value=(True, None, None))
+    mock_guardrails.is_healthy = MagicMock(return_value=True)
+    mock_app.state.guardrails = mock_guardrails
+
+    scope = {
+        "type": "http",
+        "method": "POST",
+        "path": "/chat/stream",
+        "headers": [],
+        "app": mock_app,
+    }
+    request = Request(scope)
+
+    # 1. Setup Trusted Search Snapshot in Redis with internal IDs that must be scrubbed / projected
+    snapshot_with_internal_ids = TrustedSearchSnapshot(
+        schemaVersion=1,
+        snapshotVersion=1,
+        userId=user_id,
+        sessionId=session_id,
+        fingerprint="fp-privacy-test-123",
+        selectionAttestation="attest-privacy-test-123",
+        createdAt=datetime.now(timezone.utc),
+        expiresAt=datetime.now(timezone.utc),
+        results=[
+            TrustedSearchResult(
+                offerIndex=1,
+                flightOfferId="flight-offer-local-uuid-1234",
+                duffelOfferId="duffel_offer_id_duff_123456789",
+                airline="Vietnam Airlines",
+                origin="SGN",
+                destination="HAN",
+                departureAt=datetime(2026, 10, 15, 8, 0, 0, tzinfo=timezone.utc),
+                arrivalAt=datetime(2026, 10, 15, 10, 5, 0, tzinfo=timezone.utc),
+                price="150.00",
+                currency="USD",
+            )
+        ],
+    )
+
+    mock_client = MagicMock()
+    mock_client.check_user_access = AsyncMock(return_value={"allowed": True})
+    mock_client.create_session = AsyncMock(return_value={"id": session_id})
+    mock_client.get_memory = AsyncMock(return_value={"recentMessages": [], "summary": None})
+    mock_client.create_message_batch = AsyncMock(return_value={"messages": [{"id": "msg-1"}]})
+    mock_client.set_fencing_token = MagicMock()
+
+    mock_redis = MagicMock()
+
+    # 2. Mock graph event stream emitting tool calls, results, handoff action, and clean tokens
+    async def mock_graph_events(*args, **kwargs):
+        yield {
+            "event": "on_tool_start",
+            "name": "search_flights",
+            "data": {"input": {"origin": "SGN", "destination": "HAN"}},
+        }
+        yield {
+            "event": "on_tool_end",
+            "name": "search_flights",
+            "data": {"output": {"status": "success", "count": 1}},
+        }
+        yield {
+            "event": "on_tool_start",
+            "name": "check_booking_readiness",
+            "data": {"input": {"message": "Checking readiness"}},
+        }
+        yield {
+            "event": "on_tool_end",
+            "name": "check_booking_readiness",
+            "data": {
+                "output": {
+                    "ready": True,
+                    "scope": "DOMESTIC",
+                    "nextAction": "CONTINUE_CHECKOUT",
+                    "passengers": [],
+                }
+            },
+        }
+        yield {
+            "event": "on_chain_end",
+            "name": "create_handoff_token",
+            "data": {
+                "output": {
+                    "action": {
+                        "version": 1,
+                        "action": "begin_checkout",
+                        "handoffToken": "chk_handoff_v1_boundary_safe_token_xyz",
+                        "expiresAt": "2026-10-15T09:00:00Z",
+                        "display": {
+                            "airline": "Vietnam Airlines",
+                            "origin": "SGN",
+                            "destination": "HAN",
+                            "departureAt": "2026-10-15T08:00:00Z",
+                            "arrivalAt": "2026-10-15T10:05:00Z",
+                            "price": "150.00",
+                            "currency": "USD",
+                        },
                     }
-                ]
-            }),
-        },
-        {
-            "event": "ACTION_HANDOFF",
-            "data": json.dumps({
-                "version": 1,
-                "action": "begin_checkout",
-                "handoffToken": "chk_handoff_v1_clean_stream_token_abc",
-                "expiresAt": "2026-10-15T09:00:00Z",
-                "display": {
-                    "airline": "VN",
-                    "origin": "SGN",
-                    "destination": "HAN",
-                    "departureAt": "2026-10-15T08:00:00Z",
-                    "arrivalAt": "2026-10-15T10:05:00Z",
-                    "price": "150.00",
-                    "currency": "USD",
-                },
-            }),
-        },
-        {"event": "done", "data": json.dumps({"messageId": "msg_123", "sessionId": "ses_456"})},
-    ]
+                }
+            },
+        }
+        yield {
+            "event": "on_chat_model_stream",
+            "data": {"chunk": MagicMock(content="I found your flight from Ho Chi Minh City to Hanoi.")},
+        }
 
-    all_streamed_content = " ".join([c["data"] for c in chunks])
+    with patch("agent.streaming.sse.NestJSClient", return_value=mock_client), \
+         patch("agent.streaming.sse.get_redis_client", return_value=mock_redis), \
+         patch("agent.streaming.sse.TrustedSnapshotRepository.get_snapshot", AsyncMock(return_value=snapshot_with_internal_ids)), \
+         patch("agent.streaming.sse.graph.astream_events", side_effect=mock_graph_events), \
+         patch("agent.repositories.chat_budget_repository.ChatBudgetRepository.admit_request", AsyncMock()):
 
-    for forbidden in FORBIDDEN_PRIVACY_CORPUS:
-        assert forbidden not in all_streamed_content
+        body = ChatStreamRequest(message="Book flight from SGN to HAN", sessionId=session_id)
+        response = await chat_stream(
+            request=request,
+            body=body,
+            authorization=f"Bearer {token}",
+            x_trace_id="trace_privacy_audit_1",
+            x_correlation_id="corr_privacy_audit_1",
+        )
+
+        emitted_chunks = []
+        async for chunk in response.body_iterator:
+            if isinstance(chunk, dict):
+                emitted_chunks.append(json.dumps(chunk))
+            else:
+                emitted_chunks.append(str(chunk))
+
+        all_emitted_text = "\n".join(emitted_chunks)
+
+        # 3. Assert all production events were serialized and emitted
+        assert "tool_call" in all_emitted_text
+        assert "flight_results" in all_emitted_text
+        assert "ACTION_HANDOFF" in all_emitted_text
+        assert "done" in all_emitted_text
+
+        # 4. Strict Negative Privacy Audit: Zero forbidden corpus strings in serialized SSE output
+        for forbidden in FORBIDDEN_PRIVACY_CORPUS:
+            assert forbidden not in all_emitted_text, f"Privacy violation: '{forbidden}' leaked into SSE stream!"
+

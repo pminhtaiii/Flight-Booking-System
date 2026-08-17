@@ -174,39 +174,83 @@ async def test_redis_midstream_lock_refresh_loss_cancels_worker():
 @pytest.mark.asyncio
 async def test_abrupt_client_disconnect_releases_session_lock():
     """
-    Chaos Simulation: When client abruptly disconnects during streaming (asyncio.CancelledError),
-    the sse_generator finally handler promptly releases the active session lock so
+    Chaos Simulation: When client abruptly disconnects during streaming (asyncio.CancelledError / aclose),
+    the production sse_generator finally handler promptly releases the active session lock so
     subsequent requests can immediately proceed.
     """
+    from starlette.requests import Request
+    from agent.streaming.sse import chat_stream, ChatStreamRequest
+
     queue_manager = MessageQueueManager(max_depth=1)
     session_id = "session-disconnect-drill-1"
     user_id = "user-disconnect-1"
+    token = make_token(user_id)
 
-    # Acquire lock for session
-    req_id = await queue_manager.acquire(session_id, user_id=user_id)
-    assert queue_manager.depths.get(session_id) == 1
+    mock_app = MagicMock()
+    mock_app.state.message_queue = queue_manager
+    mock_app.state.guardrails = None
 
-    # Simulate sse_generator finally release
-    released = False
-    try:
-        raise asyncio.CancelledError("Client disconnected abruptly")
-    except asyncio.CancelledError:
-        pass
-    finally:
-        if not released:
-            released = True
-            await queue_manager.release(session_id, req_id)
+    scope = {
+        "type": "http",
+        "method": "POST",
+        "path": "/chat/stream",
+        "headers": [],
+        "app": mock_app,
+    }
+    request = Request(scope)
 
-    # Session lock is promptly released and depth cleared
-    assert released is True
-    assert queue_manager.depths.get(session_id) is None
-    assert session_id not in queue_manager.active_fences
+    mock_client = MagicMock()
+    mock_client.check_user_access = AsyncMock(return_value={"allowed": True})
+    mock_client.create_session = AsyncMock(return_value={"id": session_id})
+    mock_client.get_memory = AsyncMock(return_value={"recentMessages": [], "summary": None})
+    mock_client.create_message_batch = AsyncMock(return_value={"messages": [{"id": "msg-1"}]})
+    mock_client.set_fencing_token = MagicMock()
 
-    # Subsequent request can immediately acquire lock without 429
-    new_req_id = await queue_manager.acquire(session_id, user_id=user_id)
-    assert new_req_id is not None
-    assert queue_manager.depths.get(session_id) == 1
-    await queue_manager.release(session_id, new_req_id)
+    mock_redis = MagicMock()
+
+    async def mock_astream_events(*args, **kwargs):
+        yield {"event": "on_chat_model_stream", "data": {"chunk": MagicMock(content="First chunk")}}
+        try:
+            await asyncio.sleep(60)
+        except asyncio.CancelledError:
+            raise
+
+    with patch("agent.streaming.sse.NestJSClient", return_value=mock_client), \
+         patch("agent.streaming.sse.get_redis_client", return_value=mock_redis), \
+         patch("agent.streaming.sse.graph.astream_events", side_effect=mock_astream_events), \
+         patch("agent.repositories.chat_budget_repository.ChatBudgetRepository.admit_request", AsyncMock()):
+
+        body = ChatStreamRequest(message="Search flights", sessionId=session_id)
+        response = await chat_stream(
+            request=request,
+            body=body,
+            authorization=f"Bearer {token}",
+            x_trace_id="test-trace-disconnect",
+            x_correlation_id="test-corr-disconnect",
+        )
+
+        gen = response.body_iterator
+        # Start streaming and consume first chunk
+        first_chunk = await gen.__anext__()
+        assert first_chunk is not None
+
+
+        # Lock is actively held during streaming
+        assert queue_manager.depths.get(session_id) == 1
+
+        # Simulate client abrupt disconnect by closing the response generator
+        await gen.aclose()
+
+        # Session lock is promptly released and depth cleared by sse_generator's finally block
+        assert queue_manager.depths.get(session_id) is None
+        assert session_id not in queue_manager.active_fences
+
+        # Subsequent request can immediately acquire lock without 429
+        new_req_id = await queue_manager.acquire(session_id, user_id=user_id)
+        assert new_req_id is not None
+        assert queue_manager.depths.get(session_id) == 1
+        await queue_manager.release(session_id, new_req_id)
+
 
 
 @pytest.mark.asyncio

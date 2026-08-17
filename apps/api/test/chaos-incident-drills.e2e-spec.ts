@@ -359,27 +359,96 @@ describe('Chaos & Fault-Tolerance Incident Drills (E2E)', () => {
   // =========================================================================
   describe('Drill 3: Redis Disconnect Resilience', () => {
     it('CacheService handles Redis connection drop gracefully with in-memory fallback', async () => {
-      // 1. Write key to in-memory fallback
-      await cacheService.set('chaos:redis:disconnect:key', 'resilient_value', 60);
+      const redisClient = (cacheService as unknown as { redisClient: any }).redisClient;
+      expect(redisClient).toBeDefined();
+
+      // 1. Simulate Redis command failures (connection drop) during SET and GET
+      const setSpy = jest
+        .spyOn(redisClient, 'set')
+        .mockRejectedValue(new Error('ECONNREFUSED: Redis connection lost'));
+      const getSpy = jest
+        .spyOn(redisClient, 'get')
+        .mockRejectedValue(new Error('ECONNREFUSED: Redis connection lost'));
+
+      // Writing when Redis fails should log warning and store in in-memory fallback
+      await expect(
+        cacheService.set('chaos:redis:disconnect:key', 'resilient_value', 60),
+      ).resolves.not.toThrow();
+
+      // Reading when Redis fails should log warning and retrieve from in-memory fallback
       const val = await cacheService.get('chaos:redis:disconnect:key');
       expect(val).toBe('resilient_value');
 
-      // 2. Simulate Redis health check failure
-      const checkHealthSpy = jest.spyOn(cacheService, 'checkHealth').mockResolvedValue('down');
+      // 2. Simulate Redis ping command failure for checkHealth
+      const pingSpy = jest
+        .spyOn(redisClient, 'ping')
+        .mockRejectedValue(new Error('ECONNREFUSED: Redis connection lost'));
+
+      // checkHealth() must execute real ping failure path and return 'down' without unhandled exception
       const healthStatus = await cacheService.checkHealth();
       expect(healthStatus).toBe('down');
-      checkHealthSpy.mockRestore();
+
+      setSpy.mockRestore();
+      getSpy.mockRestore();
+      pingSpy.mockRestore();
     });
 
     it('LockoutService and rate limiting handle Redis errors safely without throwing unhandled exceptions', async () => {
+      const redisClient = (cacheService as unknown as { redisClient: any }).redisClient;
+      expect(redisClient).toBeDefined();
+
       const testIp = '192.168.1.100';
 
-      // Test lockout checks operate gracefully
-      const lockoutStatus = await lockoutService.isLockedOut(testIp);
-      expect(lockoutStatus.locked).toBe(false);
+      // 1. Inject Redis command failures across incr, ttl, del, set, keys
+      const incrSpy = jest
+        .spyOn(redisClient, 'incr')
+        .mockRejectedValue(new Error('ECONNREFUSED: Redis connection lost'));
+      const ttlSpy = jest
+        .spyOn(redisClient, 'ttl')
+        .mockRejectedValue(new Error('ECONNREFUSED: Redis connection lost'));
+      const delSpy = jest
+        .spyOn(redisClient, 'del')
+        .mockRejectedValue(new Error('ECONNREFUSED: Redis connection lost'));
+      const setSpy = jest
+        .spyOn(redisClient, 'set')
+        .mockRejectedValue(new Error('ECONNREFUSED: Redis connection lost'));
+      const keysSpy = jest
+        .spyOn(redisClient, 'keys')
+        .mockRejectedValue(new Error('ECONNREFUSED: Redis connection lost'));
 
-      // Clear lockouts gracefully
+      // Test lockout checks operate gracefully on Redis failure (fallback to in-memory)
+      const initialStatus = await lockoutService.isLockedOut(testIp);
+      expect(initialStatus.locked).toBe(false);
+
+      // Record failed attempts under Redis failure -> should gracefully fall back to in-memory tracking
+      for (let i = 1; i <= 4; i++) {
+        const attempt = await lockoutService.recordFailedAttempt(testIp);
+        expect(attempt.locked).toBe(false);
+        expect(attempt.attempts).toBe(i);
+      }
+
+      // 5th attempt triggers lockout via in-memory fallback
+      const fifthAttempt = await lockoutService.recordFailedAttempt(testIp);
+      expect(fifthAttempt.locked).toBe(true);
+      expect(fifthAttempt.retryAfterSeconds).toBeGreaterThan(0);
+
+      // Verify lockout is recognized
+      const lockedStatus = await lockoutService.isLockedOut(testIp);
+      expect(lockedStatus.locked).toBe(true);
+      expect(lockedStatus.retryAfterSeconds).toBeGreaterThan(0);
+
+      // Clear lockout for IP under Redis failure
       await expect(lockoutService.clearLockoutForIp(testIp, false)).resolves.not.toThrow();
+
+      // Verify lockout cleared
+      const clearedStatus = await lockoutService.isLockedOut(testIp);
+      expect(clearedStatus.locked).toBe(false);
+
+      incrSpy.mockRestore();
+      ttlSpy.mockRestore();
+      delSpy.mockRestore();
+      setSpy.mockRestore();
+      keysSpy.mockRestore();
     });
   });
 });
