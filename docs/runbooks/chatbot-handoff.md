@@ -294,3 +294,26 @@ Automated E2E cryptographic and schema verification suite (`apps/api/test/phase1
 - **100% Safe Projection Isolation**: `booking_agent_projections` holds strictly allowlisted logistics with opaque high-entropy references (`bkref_<uuid>`). Zero PII, passenger names, contact emails, passport numbers, PNRs, financial amounts, payment IDs, or raw supplier snapshots exist in projection tables or queries.
 - **Zero Plaintext Remanence**: Direct raw SQL scans and Redis cache payload inspection verify 0 matches for forbidden sensitive corpus across all active and resting data stores.
 
+---
+
+## 18. Phase 11E: Continuous Reliability, Automated Drift Detection & Key Rotation Automation (2026-08-17)
+
+### 18.1 Automated Zero-Downtime Secret Rotation Rings
+Verified non-destructive zero-downtime secret rotation across all 4 credential rings in API (`apps/api/test/phase11e-key-rotation.e2e-spec.ts`) and Agent (`apps/agent/tests/test_phase11e_key_rotation.py`):
+- **Chat Access JWTs (`JWT_SECRET`)**: Supports multi-key ring resolution (`JWT_SECRET_CURRENT`, `JWT_SECRET`, `JWT_SECRET_PREVIOUS`, `JWT_SECRET_V2`, `JWT_SECRET_V1`). Incoming tokens signed under `_PREVIOUS` (Key V1) verify cleanly during grace periods while `_CURRENT` (Key V2) signs new tokens. Tokens signed with expired/unknown Key V0 are rejected (401).
+- **Chat Handoff Credentials (`CHAT_HANDOFF_SECRET`)**: Versioned tokens (`chk_handoff_v1_...` / `chk_handoff_v2_...`) dynamically resolve against the candidate key ring (`_CURRENT`, `_PREVIOUS`, `_V1`, `_V2`). Tokens generated with V1 resolve cleanly while V2 is active primary signer.
+- **Selection Attestations (`ATTESTATION_SECRET` / `SELECTION_ATTESTATION_SECRET`)**: Attestations (`sel_v1_...`) signed with V1 verify and resolve cleanly when V2 is active signer.
+- **User Claim Tokens (`CLAIM_TOKEN_SECRET`)**: Multi-secret HMAC-SHA256 signature verification in `ClaimTokenService` validates tokens signed with previous key while primary secret signs new gateway requests.
+
+### 18.2 Automated Data-Quality & State Drift Sentinel (`apps/api/src/common/sentinel/data-drift-sentinel.service.ts`)
+Automated sentinel routines enforce continuous transactional and relational integrity (`apps/api/test/phase11e-data-sentinel.e2e-spec.ts`):
+- **Dangling Lease Auto-Healing**: Identifies orphaned `ChatHandoff` records in `CLAIMED` status where `claimExpiresAt < NOW()` or `claimRecoverAfter < NOW()` without final consumption, and atomically resets them back to clean unreserved `ISSUED` state.
+- **Authoritative Consumed Linkage**: Asserts 100% of consumed `ChatHandoff` records have a valid, existing `consumedBookingIntentId` in the `BookingIntent` table (0 unlinked consumed records).
+- **1:1 Booking Projection Sync**: Asserts 100% of confirmed/cancelled bookings have an exact 1:1 `BookingAgentProjection` record in sync with latest itinerary changes.
+- **PII-Safe Telemetry**: Sentinel operates strictly within transactional boundaries and emits counts/status without logging customer PII.
+
+### 18.3 Soft-Delete Retention Lifecycle & Disaster Recovery Cryptographic Audit (`apps/api/test/phase11e-continuous-reliability.e2e-spec.ts`)
+- **Soft-Deleted `ChatSession` Handling**: Deleting a chat session (`deleteSession`) atomically revokes/invalidates all active unconsumed handoffs (`expiresAt` set to now, claims cleared) while strictly preserving consumed handoffs and their `consumedByBookingIntentId` audit linkage.
+- **DR Backup Cryptographic Integrity**: Simulated PostgreSQL backup dump restoration verifies that restored rows can be decrypted only by authorized services possessing the active `CHAT_ENCRYPTION_KEY` and context-bound AAD parameters (`ChatMessage:${id}:${sessionId}:${sender}:${type}:v1` and `ChatSession:${id}:v1`). Decryption fails closed if keys are altered or AAD is tampered.
+
+

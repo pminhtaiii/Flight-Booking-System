@@ -34,8 +34,52 @@ class Settings(BaseSettings):
 
     AGENT_SERVICE_API_KEY: str = Field(..., min_length=1)
     CLAIM_TOKEN_SECRET: str = Field(..., min_length=1)
+    CLAIM_TOKEN_SECRET_CURRENT: Optional[str] = None
+    CLAIM_TOKEN_SECRET_PREVIOUS: Optional[str] = None
+    CLAIM_TOKEN_SECRET_V2: Optional[str] = None
+    CLAIM_TOKEN_SECRET_V1: Optional[str] = None
+
+    JWT_SECRET_CURRENT: Optional[str] = None
+    JWT_SECRET_PREVIOUS: Optional[str] = None
+    JWT_SECRET_V2: Optional[str] = None
+    JWT_SECRET_V1: Optional[str] = None
+
     CLAIM_TOKEN_TTL_SECONDS: int = 300
     AGENT_MAX_ITERATIONS: int = 5
+
+    @property
+    def jwt_secret_ring(self) -> list[str]:
+        keys = [
+            self.JWT_SECRET_CURRENT,
+            self.JWT_SECRET,
+            self.JWT_SECRET_PREVIOUS,
+            self.JWT_SECRET_V2,
+            self.JWT_SECRET_V1,
+        ]
+        ring: list[str] = []
+        for k in keys:
+            if k and isinstance(k, str) and k.strip() and k.strip() not in ring:
+                ring.append(k.strip())
+        return ring if ring else [self.JWT_SECRET]
+
+    @property
+    def primary_claim_token_secret(self) -> str:
+        return self.CLAIM_TOKEN_SECRET_CURRENT or self.CLAIM_TOKEN_SECRET
+
+    @property
+    def claim_token_secret_ring(self) -> list[str]:
+        keys = [
+            self.CLAIM_TOKEN_SECRET_CURRENT,
+            self.CLAIM_TOKEN_SECRET,
+            self.CLAIM_TOKEN_SECRET_PREVIOUS,
+            self.CLAIM_TOKEN_SECRET_V2,
+            self.CLAIM_TOKEN_SECRET_V1,
+        ]
+        ring: list[str] = []
+        for k in keys:
+            if k and isinstance(k, str) and k.strip() and k.strip() not in ring:
+                ring.append(k.strip())
+        return ring if ring else [self.CLAIM_TOKEN_SECRET]
 
     OUTPUT_GUARDRAIL_ENABLED: bool = DEFAULT_OUTPUT_GUARDRAIL_ENABLED
     OUTPUT_GUARDRAIL_OVERLAP_TOKENS: int = DEFAULT_OUTPUT_GUARDRAIL_OVERLAP_TOKENS

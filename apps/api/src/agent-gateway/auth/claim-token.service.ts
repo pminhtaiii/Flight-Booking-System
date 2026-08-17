@@ -65,8 +65,16 @@ export class ClaimTokenService {
       });
     }
 
-    const secret = process.env.CLAIM_TOKEN_SECRET;
-    if (!secret) {
+    // Support candidate key ring
+    const candidateSecrets = [
+      process.env.CLAIM_TOKEN_SECRET_CURRENT,
+      process.env.CLAIM_TOKEN_SECRET,
+      process.env.CLAIM_TOKEN_SECRET_PREVIOUS,
+      process.env.CLAIM_TOKEN_SECRET_V2,
+      process.env.CLAIM_TOKEN_SECRET_V1,
+    ].filter((k): k is string => typeof k === 'string' && k.trim().length > 0);
+
+    if (candidateSecrets.length === 0) {
       this.logger.error('CLAIM_TOKEN_SECRET environment variable is not configured');
       throw new UnauthorizedException({
         statusCode: 401,
@@ -74,12 +82,6 @@ export class ClaimTokenService {
         code: 'INVALID_CLAIM_TOKEN',
       });
     }
-
-    // Recompute HMAC-SHA256 signature
-    const computedSignature = crypto
-      .createHmac('sha256', secret)
-      .update(payloadStr)
-      .digest();
 
     let signatureBuffer: Buffer;
     try {
@@ -93,17 +95,20 @@ export class ClaimTokenService {
       });
     }
 
-    if (signatureBuffer.length !== computedSignature.length) {
-      crypto.timingSafeEqual(computedSignature, computedSignature); // dummy check
-      this.logger.warn('Claim token signature length mismatch');
-      throw new UnauthorizedException({
-        statusCode: 401,
-        message: 'Invalid claim token signature',
-        code: 'INVALID_CLAIM_TOKEN',
-      });
+    let isSignatureValid = false;
+    for (const secret of candidateSecrets) {
+      const computedSignature = crypto
+        .createHmac('sha256', secret)
+        .update(payloadStr)
+        .digest();
+
+      if (signatureBuffer.length === computedSignature.length && crypto.timingSafeEqual(signatureBuffer, computedSignature)) {
+        isSignatureValid = true;
+        break;
+      }
     }
 
-    if (!crypto.timingSafeEqual(signatureBuffer, computedSignature)) {
+    if (!isSignatureValid) {
       this.logger.warn('Claim token signature mismatch');
       throw new UnauthorizedException({
         statusCode: 401,

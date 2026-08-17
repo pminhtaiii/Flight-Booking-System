@@ -33,8 +33,8 @@ describe('ChatHandoffTokenService', () => {
   });
 
   describe('getCurrentKeyVersion', () => {
-    it('should return current key version 1', () => {
-      expect(service.getCurrentKeyVersion()).toBe(1);
+    it('should return current key version 2', () => {
+      expect(service.getCurrentKeyVersion()).toBe(2);
     });
   });
 
@@ -134,10 +134,12 @@ describe('ChatHandoffTokenService', () => {
       const unconfiguredService = await createService({
         CHAT_HANDOFF_SECRET: undefined,
         CHAT_HANDOFF_SECRET_V1: undefined,
+        CHAT_HANDOFF_SECRET_V2: undefined,
+        CHAT_HANDOFF_SECRET_CURRENT: undefined,
       });
 
       expect(() => unconfiguredService.deriveIdempotencyHash('sel_v1_test', 1)).toThrow(
-        'CHAT_HANDOFF_SECRET is not configured for key version 1',
+        'CHAT_HANDOFF_SECRET is not configured for key version 2',
       );
     });
   });
@@ -149,9 +151,9 @@ describe('ChatHandoffTokenService', () => {
 
       const result = await service.generateToken(rowId, idempotencyHash);
 
-      expect(result.token).toMatch(/^chk_handoff_v1_[A-Za-z0-9_-]{43}$/);
+      expect(result.token).toMatch(/^chk_handoff_v2_[A-Za-z0-9_-]{43}$/);
       expect(result.tokenHash).toMatch(/^[a-f0-9]{64}$/);
-      expect(result.keyVersion).toBe(1);
+      expect(result.keyVersion).toBe(2);
       expect(result.token).not.toEqual(result.tokenHash);
       expect(result.tokenHash).toBe(service.hashToken(result.token));
     });
@@ -347,6 +349,59 @@ describe('ChatHandoffTokenService', () => {
         .update('row-1:idemp-1')
         .digest('base64url');
       const expectedToken = `chk_handoff_v1_${expectedCredential}`;
+
+      expect(result.token).toBe(expectedToken);
+    });
+
+    it('should prefer CHAT_HANDOFF_SECRET_CURRENT over CHAT_HANDOFF_SECRET_V2 for version 2 when both are set', async () => {
+      const priorityService = await createService({
+        CHAT_HANDOFF_SECRET_CURRENT: 'current-secret',
+        CHAT_HANDOFF_SECRET_V2: 'v2-specific-secret',
+        CHAT_HANDOFF_SECRET: 'legacy-secret',
+      });
+
+      const result = await priorityService.generateToken('row-1', 'idemp-1', 2);
+
+      const expectedCredential = crypto
+        .createHmac('sha256', 'current-secret')
+        .update('row-1:idemp-1')
+        .digest('base64url');
+      const expectedToken = `chk_handoff_v2_${expectedCredential}`;
+
+      expect(result.token).toBe(expectedToken);
+    });
+
+    it('should fallback to CHAT_HANDOFF_SECRET_V2 for version 2 when CHAT_HANDOFF_SECRET_CURRENT is not set', async () => {
+      const fallbackService = await createService({
+        CHAT_HANDOFF_SECRET_CURRENT: undefined,
+        CHAT_HANDOFF_SECRET_V2: 'v2-specific-secret',
+        CHAT_HANDOFF_SECRET: 'legacy-secret',
+      });
+
+      const result = await fallbackService.generateToken('row-1', 'idemp-1', 2);
+
+      const expectedCredential = crypto
+        .createHmac('sha256', 'v2-specific-secret')
+        .update('row-1:idemp-1')
+        .digest('base64url');
+      const expectedToken = `chk_handoff_v2_${expectedCredential}`;
+
+      expect(result.token).toBe(expectedToken);
+    });
+
+    it('should prefer CHAT_HANDOFF_SECRET_CURRENT over CHAT_HANDOFF_SECRET_V3 for version 3 when both are set', async () => {
+      const priorityService = await createService({
+        CHAT_HANDOFF_SECRET_CURRENT: 'current-secret-v3-test',
+        CHAT_HANDOFF_SECRET_V3: 'v3-specific-secret',
+      });
+
+      const result = await priorityService.generateToken('row-1', 'idemp-1', 3);
+
+      const expectedCredential = crypto
+        .createHmac('sha256', 'current-secret-v3-test')
+        .update('row-1:idemp-1')
+        .digest('base64url');
+      const expectedToken = `chk_handoff_v3_${expectedCredential}`;
 
       expect(result.token).toBe(expectedToken);
     });

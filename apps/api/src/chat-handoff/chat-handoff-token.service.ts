@@ -11,7 +11,7 @@ export type TokenGenerationResult = {
 @Injectable()
 export class ChatHandoffTokenService {
   private readonly logger = new Logger(ChatHandoffTokenService.name);
-  public readonly CURRENT_KEY_VERSION = 1;
+  public readonly CURRENT_KEY_VERSION = 2;
 
   constructor(private readonly configService: ConfigService) {}
 
@@ -28,9 +28,17 @@ export class ChatHandoffTokenService {
     if (version === 1) {
       secret =
         this.configService.get<string>('CHAT_HANDOFF_SECRET_V1') ||
+        this.configService.get<string>('CHAT_HANDOFF_SECRET') ||
+        this.configService.get<string>('CHAT_HANDOFF_SECRET_PREVIOUS');
+    } else if (version === 2) {
+      secret =
+        this.configService.get<string>('CHAT_HANDOFF_SECRET_CURRENT') ||
+        this.configService.get<string>('CHAT_HANDOFF_SECRET_V2') ||
         this.configService.get<string>('CHAT_HANDOFF_SECRET');
     } else {
-      secret = this.configService.get<string>(`CHAT_HANDOFF_SECRET_V${version}`);
+      secret =
+        this.configService.get<string>('CHAT_HANDOFF_SECRET_CURRENT') ||
+        this.configService.get<string>(`CHAT_HANDOFF_SECRET_V${version}`);
     }
 
     if (!secret || secret.trim().length === 0) {

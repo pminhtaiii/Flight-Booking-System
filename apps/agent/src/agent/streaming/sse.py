@@ -102,9 +102,10 @@ async def chat_stream(
     try:
         issuer = getattr(settings, "JWT_ISSUER", "booking-systems-api")
         audience = getattr(settings, "JWT_AUDIENCE", "booking-systems-clients")
+        secrets_to_try = settings.jwt_secret_ring if hasattr(settings, "jwt_secret_ring") else settings.JWT_SECRET
         payload = decode_and_verify_jwt(
             token=token,
-            secret=settings.JWT_SECRET,
+            secret=secrets_to_try,
             issuer=issuer,
             audience=audience,
         )

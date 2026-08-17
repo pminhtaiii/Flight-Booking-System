@@ -7,7 +7,7 @@ Update this file after every completed feature. Any AI agent reading this should
 ### Current Status
 
 **Feature:** Chatbot Backend Infrastructure & Booking Handoff (Feature 17)
-**Last completed:** Phase 11D Post-Rollout Decommissioning, Direct-Only Architecture Lockdown & Final Cryptographic Sign-Off (2026-08-17).
+**Last completed:** Phase 11E Continuous Reliability, Automated Drift Detection & Key Rotation Automation (2026-08-17).
 **In progress:** None.
 **Next:** Feature 17 100% Complete & Signed Off. Ready for next project milestone.
 
@@ -16,6 +16,25 @@ Update this file after every completed feature. Any AI agent reading this should
 ## Progress by Feature
 
 ### [x] Feature: Chatbot Backend Infrastructure & Booking Handoff (Feature 17)
+
+- [x] Phase 11E / Continuous Reliability, Automated Drift Detection & Key Rotation Automation (2026-08-17):
+  - **Zero-Downtime Secret Rotation Rings (`apps/api/test/phase11e-key-rotation.e2e-spec.ts` & `apps/agent/tests/test_phase11e_key_rotation.py`)**:
+    - `JWT_SECRET`: Supports multi-key resolution (`JWT_SECRET_CURRENT`, `JWT_SECRET`, `JWT_SECRET_PREVIOUS`, `JWT_SECRET_V2`, `JWT_SECRET_V1`). Tokens signed under previous key verify during grace period while primary key signs new tokens. Rejects unknown/expired keys.
+    - `CHAT_HANDOFF_SECRET`: Supports multi-version candidate ring (`_CURRENT`, `_PREVIOUS`, `_V1`, `_V2`). Tokens generated under V1 resolve cleanly while V2 is active primary signer.
+    - `ATTESTATION_SECRET`: Dual-verification ring validates both active and grace-period attestations (`sel_v1_...`).
+    - `CLAIM_TOKEN_SECRET`: Multi-secret HMAC-SHA256 signature verification in `ClaimTokenService`.
+  - **Automated Data-Quality & State Drift Sentinel (`apps/api/src/common/sentinel/data-drift-sentinel.service.ts` & `phase11e-data-sentinel.e2e-spec.ts`)**:
+    - Auto-healing dangling claims: Identifies expired `CLAIMED` handoff records (`claimExpiresAt < NOW()` or `claimRecoverAfter < NOW()`) without final consumption, and atomically resets them back to clean unreserved `ISSUED` state.
+    - Consumed handoff integrity sentinel: 100% of consumed `ChatHandoff` records link to valid `BookingIntent` records (0 unlinked consumed handoffs).
+    - Booking projection 1:1 sync sentinel: 100% of confirmed/cancelled bookings have 1:1 `BookingAgentProjection` record in sync.
+    - Telemetry: Zero customer PII emitted during automated audits.
+  - **Soft-Delete Retention & DR Cryptographic Restoration (`apps/api/test/phase11e-continuous-reliability.e2e-spec.ts`)**:
+    - `deleteSession`: Soft-deleting a session revokes active unconsumed handoffs while preserving consumed audit records.
+    - DR Restoration Audit: Restored rows decrypt cleanly with active `CHAT_ENCRYPTION_KEY` and record-bound AAD, and fail closed if key is wrong or AAD is tampered.
+  - **Multi-Workspace Regression Verification**:
+    - `apps/api`: 72/72 unit suites (683/683 unit tests) pass, all Phase 11E E2E tests 100% PASS.
+    - `apps/agent`: 364/364 pytest tests pass (100%).
+    - `apps/web`: 15/15 unit tests pass, Next.js production build cleanly compiles (20/20 routes).
 
 - [x] Phase 11D / Post-Rollout Decommissioning, Direct-Only Architecture Lockdown & Final Cryptographic Sign-Off (2026-08-17):
   - **Direct-Only Streaming Transport Lockdown (`apps/agent/src/agent/config.py` & `apps/web/lib/chatStream.ts`)**:

@@ -22,6 +22,8 @@ export class SelectionAttestationService {
 
   private getSecretKeys(): string[] {
     const candidateKeys = [
+      this.configService.get<string>('ATTESTATION_SECRET_CURRENT'),
+      this.configService.get<string>('SELECTION_ATTESTATION_SECRET_CURRENT'),
       this.configService.get<string>('ATTESTATION_SECRET_V3'),
       this.configService.get<string>('SELECTION_ATTESTATION_SECRET_V3'),
       this.configService.get<string>('ATTESTATION_SECRET_V2'),
@@ -30,6 +32,8 @@ export class SelectionAttestationService {
       this.configService.get<string>('SELECTION_ATTESTATION_SECRET_V1'),
       this.configService.get<string>('ATTESTATION_SECRET'),
       this.configService.get<string>('SELECTION_ATTESTATION_SECRET'),
+      this.configService.get<string>('ATTESTATION_SECRET_PREVIOUS'),
+      this.configService.get<string>('SELECTION_ATTESTATION_SECRET_PREVIOUS'),
       this.configService.get<string>('CHAT_ATTESTATION_KEY'),
     ];
 

@@ -60,6 +60,9 @@ describe('Payment (E2E)', () => {
     await prisma.payment.deleteMany({});
     await prisma.idempotencyKey.deleteMany({});
     await prisma.paymentMethod.deleteMany({});
+    await prisma.chatHandoff.deleteMany({});
+    await prisma.chatMessage.deleteMany({});
+    await prisma.chatSession.deleteMany({});
     await prisma.bookingIntentPassenger.deleteMany({});
     await prisma.bookingIntent.deleteMany({});
     await prisma.itineraryRevisionSegment.deleteMany({});

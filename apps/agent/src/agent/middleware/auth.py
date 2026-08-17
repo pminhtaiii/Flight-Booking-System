@@ -43,9 +43,17 @@ class JWTAuthMiddleware(BaseHTTPMiddleware):
         audience = getattr(settings, "JWT_AUDIENCE", "booking-systems-clients")
 
         try:
+            secrets_to_try = [self.secret] if self.secret else []
+            if hasattr(settings, "jwt_secret_ring"):
+                for s in settings.jwt_secret_ring:
+                    if s and s not in secrets_to_try:
+                        secrets_to_try.append(s)
+            if not secrets_to_try:
+                secrets_to_try = [self.secret]
+
             payload = decode_and_verify_jwt(
                 token=token,
-                secret=self.secret,
+                secret=secrets_to_try,
                 issuer=issuer,
                 audience=audience
             )
