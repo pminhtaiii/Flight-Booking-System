@@ -1,4 +1,5 @@
 from langgraph.graph import StateGraph, START, END
+from langchain_core.runnables import RunnableConfig
 
 from agent.graph.state import AgentState
 from agent.graph.router import invoke_router
@@ -14,7 +15,10 @@ from agent.graph.nodes import (
 )
 from agent.config import get_settings
 
-async def router_node(state: AgentState, config) -> dict:
+async def router_node(state: AgentState, config: RunnableConfig | None = None) -> dict:
+    settings = get_settings()
+    if not getattr(settings, "FEATURE_FLAG_CHAT_MULTI_AGENT", True):
+        return {"route": "travel", "disambiguation": None}
     decision = await invoke_router(state)
     gate_result = evaluate_checkout_gate(state, decision)
     return gate_result # Updates 'route' and 'disambiguation' in AgentState

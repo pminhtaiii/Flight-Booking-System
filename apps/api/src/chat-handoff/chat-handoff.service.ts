@@ -1081,6 +1081,11 @@ export class ChatHandoffService {
 
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
       try {
+        const handoff = await this.prisma.chatHandoff.findUnique({
+          where: { id: handoffId },
+          select: { userId: true, tokenHash: true },
+        });
+
         await this.prisma.chatHandoff.updateMany({
           where: {
             id: handoffId,
@@ -1095,6 +1100,14 @@ export class ChatHandoffService {
             claimRecoverAfter: null,
           },
         });
+
+        if (handoff) {
+          const attemptKey = `${handoff.userId}:${handoff.tokenHash}`;
+          this.claimedTokens.delete(attemptKey);
+          this.claimedTokens.delete(handoff.tokenHash);
+          this.activeClaimAttempts.delete(attemptKey);
+          this.activeClaimAttempts.delete(handoff.tokenHash);
+        }
         return;
       } catch (error) {
         if (attempt === maxRetries) throw error;
