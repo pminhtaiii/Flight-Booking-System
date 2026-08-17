@@ -43,7 +43,7 @@ type ClaimedHandoffRow = {
   consumedAt: Date | null;
 };
 
-type ResolvedChatHandoff = Prisma.ChatHandoffGetPayload<{
+export type ResolvedChatHandoff = Prisma.ChatHandoffGetPayload<{
   include: {
     chatSession: {
       select: {
@@ -1105,8 +1105,6 @@ export class ChatHandoffService {
           const attemptKey = `${handoff.userId}:${handoff.tokenHash}`;
           this.claimedTokens.delete(attemptKey);
           this.claimedTokens.delete(handoff.tokenHash);
-          this.activeClaimAttempts.delete(attemptKey);
-          this.activeClaimAttempts.delete(handoff.tokenHash);
         }
         return;
       } catch (error) {
