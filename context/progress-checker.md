@@ -7,7 +7,7 @@ Update this file after every completed feature. Any AI agent reading this should
 ### Current Status
 
 **Feature:** Chatbot Backend Infrastructure & Booking Handoff (Feature 17)
-**Last completed:** Phase 11C Rollback Matrix Verification, Chaos Incident Drills & Final Handover (2026-08-17).
+**Last completed:** Phase 11D Post-Rollout Decommissioning, Direct-Only Architecture Lockdown & Final Cryptographic Sign-Off (2026-08-17).
 **In progress:** None.
 **Next:** Feature 17 100% Complete & Signed Off. Ready for next project milestone.
 
@@ -16,6 +16,22 @@ Update this file after every completed feature. Any AI agent reading this should
 ## Progress by Feature
 
 ### [x] Feature: Chatbot Backend Infrastructure & Booking Handoff (Feature 17)
+
+- [x] Phase 11D / Post-Rollout Decommissioning, Direct-Only Architecture Lockdown & Final Cryptographic Sign-Off (2026-08-17):
+  - **Direct-Only Streaming Transport Lockdown (`apps/agent/src/agent/config.py` & `apps/web/lib/chatStream.ts`)**:
+    - Enforced fail-closed runtime validation throwing immediate startup/initialization errors if legacy proxy flags (`FEATURE_FLAG_CHAT_DIRECT_STREAM='false'` or `NEXT_PUBLIC_FEATURE_FLAG_CHAT_DIRECT_STREAM='false'`) are provided. Direct browser-to-agent streaming (`POST ${NEXT_PUBLIC_AGENT_URL}/chat/stream`) is permanent and canonical.
+  - **Comprehensive Database Cryptographic & Schema Audit (`apps/api/test/phase11d-cryptographic-audit.e2e-spec.ts`)**:
+    - Schema verification: 0 plaintext `content` column on `chat_messages`, 0 plaintext `title` column on `chat_sessions`, 0 `token`/`duffelOfferId` columns on `chat_handoffs`.
+    - SQL Invariants: 0 `chat_messages` with NULL `contentCiphertext`, 0 `chat_handoffs` with NULL `tokenHash`, 0 `booking_agent_projections` with non-`bkref_%` reference, 0 non-deleted `chat_sessions` with NULL `titleCiphertext`.
+    - Negative Privacy Corpus: Zero plaintext sensitive data across PostgreSQL rows, application logs, and Redis keys (`chat:budget:*`, `chat:session-lock:*`, `chat:snapshot:*`).
+    - Cryptographic Integrity: 100% AES-256-GCM record-bound encryption, strict fail-closed decryption with zero fallback on tampered envelopes, and 100% SHA-256 / HMAC-SHA256 token hashes.
+  - **Runbook & Architecture Archival (`docs/runbooks/chatbot-handoff.md` Section 17 & `context/architecture.md`)**:
+    - Archived performance & latency baselines (Router entry p95 `14.64 ms`, Redis Lua p95 `2.66 ms`, Handoff Token Create p95 `144.49 ms`, Handoff Token Resolve p95 `28.24 ms`, 100-way CAS consumption concurrency).
+    - Archived emergency operational rollback playbooks (`ISSUE=false/ACCEPT=true` and `MULTI_AGENT=false`) and codified architectural invariants.
+  - **Multi-Workspace Regression Verification**:
+    - `apps/api`: Unit & E2E test suites 100% PASS.
+    - `apps/agent`: Pytest suites 100% PASS.
+    - `apps/web`: Unit test suites 100% PASS, Next.js production build cleanly compiles.
 
 - [x] Phase 11C / Rollback Matrix Verification, Chaos Incident Drills & Final Handover (2026-08-17):
   - **Stepwise Rollback Matrix Verification (`apps/agent/tests/test_rollback_matrix.py` & `apps/api/test/rollback-matrix.e2e-spec.ts`)**:
