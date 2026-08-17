@@ -1,6 +1,6 @@
 'use client';
 
-import React, { Suspense, useCallback, useEffect, useState } from 'react';
+import React, { Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useSession } from 'next-auth/react';
 import { BookingActionCard, parseActionRequiredEvent, type SafeActionRequiredEvent } from './BookingActionCard';
@@ -56,16 +56,28 @@ function consumeSseBlock(
   }
 }
 
-async function consumeChatStream(
-  message: string,
-  sessionId: string,
-  token: string | null,
-  signal: AbortSignal,
-  onActionRequired: (payload: unknown) => void,
-  onDone?: (sessionId: string) => void,
-  onHandoff?: (payload: unknown) => void,
-  onError?: (errorMessage: string) => void,
-): Promise<void> {
+type ConsumeChatStreamOptions = {
+  message: string;
+  sessionId: string;
+  token: string | null;
+  signal: AbortSignal;
+  onActionRequired: (payload: unknown) => void;
+  onDone?: (sessionId: string) => void;
+  onHandoff?: (payload: unknown) => void;
+  onError?: (errorMessage: string) => void;
+};
+
+async function consumeChatStream(options: ConsumeChatStreamOptions): Promise<void> {
+  const {
+    message,
+    sessionId,
+    token,
+    signal,
+    onActionRequired,
+    onDone,
+    onHandoff,
+    onError,
+  } = options;
   try {
     const response = await createChatStreamRequest({
       message,
@@ -125,6 +137,7 @@ function ChatWidgetInner(): JSX.Element {
   const autoResume = searchParams.get('autoResume') === 'true';
 
   const [activeSessionId, setActiveSessionId] = useState<string | null>(sessionIdFromUrl);
+  const autoResumedRef = useRef(false);
 
   useEffect(() => {
     if (sessionIdFromUrl) {
@@ -154,18 +167,19 @@ function ChatWidgetInner(): JSX.Element {
 
   // Auto-resume hook
   useEffect(() => {
-    if (autoResume && activeSessionId) {
+    if (autoResume && activeSessionId && !autoResumedRef.current) {
+      autoResumedRef.current = true;
       const controller = new AbortController();
-      void consumeChatStream(
-        'resume',
-        activeSessionId,
+      void consumeChatStream({
+        message: 'resume',
+        sessionId: activeSessionId,
         token,
-        controller.signal,
-        acceptActionRequiredEvent,
-        handleDone,
-        acceptHandoffEvent,
-        setErrorMessage,
-      );
+        signal: controller.signal,
+        onActionRequired: acceptActionRequiredEvent,
+        onDone: handleDone,
+        onHandoff: acceptHandoffEvent,
+        onError: setErrorMessage,
+      });
       return () => controller.abort();
     }
   }, [autoResume, activeSessionId, token, acceptActionRequiredEvent, handleDone, acceptHandoffEvent]);
@@ -176,7 +190,7 @@ function ChatWidgetInner(): JSX.Element {
     if (targetOfferId) params.set('offerId', targetOfferId);
     if (activeSessionId) params.set('sessionId', activeSessionId);
     params.set('autoResume', 'true');
-    
+
     const qs = params.toString();
     const returnTo = `${pathname ?? '/'}${qs ? `?${qs}` : ''}`;
 
@@ -184,7 +198,9 @@ function ChatWidgetInner(): JSX.Element {
       if (!targetOfferId) {
         return;
       }
-      router.push(`/checkout/passengers?offerId=${encodeURIComponent(targetOfferId)}&returnTo=${encodeURIComponent(returnTo)}`);
+      router.push(
+        `/checkout/passengers?offerId=${encodeURIComponent(targetOfferId)}&returnTo=${encodeURIComponent(returnTo)}`,
+      );
       return;
     }
 
@@ -195,28 +211,34 @@ function ChatWidgetInner(): JSX.Element {
     if (!inputMessage.trim()) return;
     setErrorMessage(null);
     const controller = new AbortController();
-    void consumeChatStream(
-      inputMessage,
-      activeSessionId ?? '',
+    void consumeChatStream({
+      message: inputMessage,
+      sessionId: activeSessionId ?? '',
       token,
-      controller.signal,
-      acceptActionRequiredEvent,
-      handleDone,
-      acceptHandoffEvent,
-      setErrorMessage,
-    );
+      signal: controller.signal,
+      onActionRequired: acceptActionRequiredEvent,
+      onDone: handleDone,
+      onHandoff: acceptHandoffEvent,
+      onError: setErrorMessage,
+    });
     setInputMessage('');
   };
 
   return (
-    <aside className="card fixed bottom-4 right-4 flex h-96 w-80 flex-col overflow-hidden shadow-xl z-50" aria-label="Agent chat">
+    <aside
+      className="card fixed bottom-4 right-4 flex h-96 w-80 flex-col overflow-hidden shadow-xl z-50"
+      aria-label="Agent chat"
+    >
       <div className="bg-accent p-3 font-medium text-primary-foreground">Agent Chat</div>
       <div className="flex flex-1 flex-col gap-2 overflow-y-auto p-4">
         <p className="rounded border border-card-border bg-card p-2 text-sm text-text-primary">
           Hello! How can I help you book your flight today?
         </p>
         {errorMessage ? (
-          <p className="rounded border border-danger-border bg-bg-cancelled p-2 text-xs text-text-cancelled" role="alert">
+          <p
+            className="rounded border border-danger-border bg-bg-cancelled p-2 text-xs text-text-cancelled"
+            role="alert"
+          >
             {errorMessage}
           </p>
         ) : null}
@@ -224,13 +246,13 @@ function ChatWidgetInner(): JSX.Element {
         {handoffEvent ? <CheckoutHandoffCard event={handoffEvent} /> : null}
       </div>
       <div className="border-t border-card-border bg-card p-3">
-        <input 
-          type="text" 
-          placeholder="Type a message..." 
+        <input
+          type="text"
+          placeholder="Type a message..."
           className="form-input w-full text-sm"
           value={inputMessage}
-          onChange={e => setInputMessage(e.target.value)}
-          onKeyDown={e => {
+          onChange={(e) => setInputMessage(e.target.value)}
+          onKeyDown={(e) => {
             if (e.key === 'Enter') handleSend();
           }}
         />

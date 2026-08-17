@@ -7,9 +7,9 @@ Update this file after every completed feature. Any AI agent reading this should
 ### Current Status
 
 **Feature:** Traveler Profile & Booking Readiness (Feature 16)
-**Last completed:** Phase 12A / Phase 4 Secure Profile UI & Live Playwright Verification (2026-08-17).
+**Last completed:** Phase 12B / Secure Chat-to-Form Handoff & Action Card (2026-08-18).
 **In progress:** None.
-**Next:** Feature 16 Phase 12B / Readiness Integration & Rollout.
+**Next:** Feature 16 Phase 11 / Final Passenger Safety (User Story 5 / T066–T072).
 
 ---
 
@@ -193,6 +193,12 @@ Update this file after every completed feature. Any AI agent reading this should
 - [x] Phase 6 / `016g-advisory-booking-readiness-endpoint`: Added the feature-gated, read-only `POST /api/bookings/intents/readiness` path with discriminated passenger sources, owner-scoped profile projection, local-offer segment normalization, batched airport-country lookup, evaluator delegation, safe error mapping, no-store response headers, and PII-safe structured observability; focused Jest, API build, and endpoint E2E verification pass.
 - [x] Phase 7 / Passenger source and snapshot foundation: Added canonical nested discriminated intent passenger DTO validation with revision and matrix rules, owner/revision-aware detached source normalization, complete immutable passenger snapshot data with zero-based positions and AAD-bound passport encryption, safe masked projections, module providers, canonical create-path wiring, legacy completeness validation, backfill-context compatibility, bound snapshot reads, transaction-time revision checks, and 80 passing focused/regression tests.
 - [x] Phase 8 / Atomic intent creation and safe route migration: Added authoritative readiness parity before persistence, zero-write rejection behavior, transaction-time profile revision rechecks, atomic intent/snapshot/audit creation, allowlisted authoritative observability, canonical plural create/get/readiness routes, deprecated singular compatibility aliases, safe masked intent responses, explicit source/revision checkout submission, stable offer passenger IDs, and masked review rendering. API unit/E2E and frontend verification were run successfully after the final fixes.
+- [x] Phase 10 / Phase 12B: Secure Chat-to-Form Handoff & Action Card (2026-08-18):
+  - **Metadata-Only Action Card (`apps/web/components/chat/BookingActionCard.tsx` & `booking-action-card.unit.ts`)**: Implemented accessible `BookingActionCard` displaying high-level reason banners ("Passport Required for International Flight" / "Profile Details Needed for Domestic Flight") and missing fields checklists grouped by passenger. Enforced strict fail-closed schema parsing (`parseActionRequiredEvent`) discarding any unrecognized or value-bearing properties with 6/6 unit tests passing. Styled exclusively with semantic design tokens without hardcoded hex or raw Tailwind colors.
+  - **Ephemeral Event Handling & Auto-Resume (`apps/web/components/chat/ChatWidget.tsx`)**: Captured and parsed `ACTION_REQUIRED` SSE events, holding payloads exclusively in ephemeral React state (`useState`) without storing in `localStorage`, `sessionStorage`, or backend message history. Implemented sanitized `returnTo` navigation and auto-resume execution on mount with `autoResume=true`.
+  - **Safe Return-and-Retry Integration (`apps/web/app/profile/page.tsx`, `TravelerProfileForm.tsx`, `checkout/passengers/page.tsx`)**: Integrated `getSafeReturnTarget` allowlist validation, header breadcrumb return link (`Back to previous workspace`), and prominent return action banner upon saving profile corrections. Sanitized search parameters against PII across all entry points.
+  - **Playwright E2E Verification (`apps/web/tests/chat-booking-readiness.spec.ts`)**: 6 live Playwright E2E scenarios passing 100% green covering single-profile action card routing to `/profile`, multi-passenger routing to `/checkout/passengers`, negative privacy audit (0 PII across DOM, storage, and console), fail-closed rejection of malicious payloads, and full profile correction + return-and-retry auto-resume flow.
+  - **Multi-Workspace Regression**: 42/42 web unit tests pass, TypeScript compilation passes cleanly, and Next.js production build cleanly compiles across all 20 routes.
 
 ### [ ] Feature: Ancillary Services — Seat Selection, Baggage & Price Tracker (Feature 15)
 

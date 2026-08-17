@@ -42,10 +42,21 @@ function ProfileLoadError({ message }: { message: string }): JSX.Element {
 export default async function ProfilePage({
   searchParams,
 }: {
-  searchParams?: { returnTo?: string };
+  searchParams?: { returnTo?: string; [key: string]: string | undefined };
 }): Promise<JSX.Element> {
   if (!isBookingReadinessEnabled()) {
     return <ProfileDisabledFallback />;
+  }
+
+  // Reject any passenger PII query parameters to prevent PII exposure in browser history/logs
+  const hasPiiInQuery = Object.keys(searchParams || {}).some((key) =>
+    ['name', 'email', 'phone', 'passport', 'dob', 'gender'].some((pii) => key.toLowerCase().includes(pii)),
+  );
+
+  if (hasPiiInQuery) {
+    const safeReturn = getSafeReturnTarget(searchParams?.returnTo);
+    const returnParam = safeReturn !== '/' ? `?returnTo=${encodeURIComponent(safeReturn)}` : '';
+    redirect(`/profile${returnParam}`);
   }
 
   const session = await getServerSession(authOptions);

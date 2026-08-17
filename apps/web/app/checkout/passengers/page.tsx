@@ -5,6 +5,7 @@ import { redirect } from 'next/navigation';
 import { cookies } from 'next/headers';
 import { hasCheckoutHandoffContext, resolveHandoffForBootstrap } from '@/lib/handoffBootstrap';
 import type { TravelerProfileResponse } from '@/lib/profile-contract';
+import { getSafeReturnTarget } from '@/lib/safeReturnTarget';
 
 interface PassengerPageFlightDetail {
   id: string;
@@ -37,6 +38,7 @@ interface PassengerPageFlightDetail {
 type Props = {
   searchParams: {
     offerId?: string;
+    returnTo?: string;
     [key: string]: string | undefined;
   };
 };
@@ -44,6 +46,7 @@ type Props = {
 export default async function PassengersPage({ searchParams }: Props) {
   const { accessToken } = await protectCheckoutRoute();
   const offerId = searchParams.offerId;
+  const safeReturnTarget = searchParams.returnTo ? getSafeReturnTarget(searchParams.returnTo) : null;
   const cookieStore = cookies();
   const handoffCookie = cookieStore.get('chat_handoff_token');
   
@@ -81,6 +84,16 @@ export default async function PassengersPage({ searchParams }: Props) {
       <div className="flex min-h-screen flex-col bg-background">
         <Header />
         <main className="mx-auto w-full max-w-3xl space-y-6 py-12 px-4">
+          {safeReturnTarget && safeReturnTarget !== '/' ? (
+            <div>
+              <a
+                className="inline-flex items-center gap-1 text-sm font-semibold text-text-link hover:underline"
+                href={safeReturnTarget}
+              >
+                &larr; Back to previous workspace
+              </a>
+            </div>
+          ) : null}
           <h1 className="text-3xl font-bold text-text-primary">Passenger Details</h1>
           <p className="text-text-secondary">Please enter the details for all passengers. Fields marked with * are required.</p>
           <div className="card p-6 space-y-4">
@@ -121,7 +134,9 @@ export default async function PassengersPage({ searchParams }: Props) {
   );
 
   if (hasPiiInQuery) {
-    redirect(`/checkout/passengers?offerId=${offerId || ''}`);
+    const safeReturn = searchParams.returnTo ? getSafeReturnTarget(searchParams.returnTo) : '/';
+    const returnParam = safeReturn !== '/' ? `&returnTo=${encodeURIComponent(safeReturn)}` : '';
+    redirect(`/checkout/passengers?offerId=${offerId || ''}${returnParam}`);
   }
 
   if (!offerId) {
@@ -271,6 +286,16 @@ export default async function PassengersPage({ searchParams }: Props) {
     <div className="flex min-h-screen flex-col bg-background">
       <Header />
       <main className="mx-auto w-full max-w-3xl space-y-6 py-12 px-4">
+        {safeReturnTarget && safeReturnTarget !== '/' ? (
+          <div>
+            <a
+              className="inline-flex items-center gap-1 text-sm font-semibold text-text-link hover:underline"
+              href={safeReturnTarget}
+            >
+              &larr; Back to previous workspace
+            </a>
+          </div>
+        ) : null}
         <h1 className="text-3xl font-bold text-text-primary">Passenger Details</h1>
         <p className="text-text-secondary">Please enter the details for all passengers. Fields marked with * are required.</p>
         
