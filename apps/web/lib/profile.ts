@@ -14,11 +14,11 @@ export type {
 function getApiUrl(): string {
   const apiUrl = process.env.NEXT_PUBLIC_API_URL;
 
-  if (!apiUrl) {
+  if (!apiUrl || !apiUrl.trim()) {
     throw new Error('NEXT_PUBLIC_API_URL is required but not configured.');
   }
 
-  return apiUrl.replace(/\/$/, '');
+  return apiUrl.trim().replace(/\/+$/, '');
 }
 
 async function requestProfile<T>(
@@ -30,6 +30,7 @@ async function requestProfile<T>(
     cache: 'no-store',
     headers: {
       Authorization: `Bearer ${accessToken}`,
+      'Cache-Control': 'no-store, private',
       ...(init.headers ?? {}),
     },
   });
@@ -47,6 +48,8 @@ export function fetchProfile(accessToken: string): Promise<TravelerProfileRespon
   });
 }
 
+export const getTravelerProfile = fetchProfile;
+
 export function updateProfile(
   accessToken: string,
   payload: UpdateProfilePayload,
@@ -59,3 +62,5 @@ export function updateProfile(
     body: JSON.stringify(payload),
   });
 }
+
+export const updateTravelerProfile = updateProfile;
