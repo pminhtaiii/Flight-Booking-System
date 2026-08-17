@@ -141,6 +141,7 @@ describe('Disruption & Flight-Change Management (Webhook & Processor E2E)', () =
     await prisma.itineraryRevision.deleteMany({});
     await prisma.disruptionAuditEvent.deleteMany({});
     await prisma.notificationOutbox.deleteMany({});
+    await prisma.bookingAgentProjection.deleteMany({});
     await prisma.booking.deleteMany({});
     await prisma.travelerProfile.deleteMany({});
     await prisma.offerRecovery.deleteMany({});
