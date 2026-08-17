@@ -9,12 +9,10 @@ export interface ChatStreamOptions {
 
 export function getAgentStreamEndpoint(): string {
   const legacyDirectFlag = process.env.NEXT_PUBLIC_FEATURE_FLAG_CHAT_DIRECT_STREAM;
-  const legacyEnvDirectFlag = process.env.FEATURE_FLAG_CHAT_DIRECT_STREAM;
   const legacyEnableFlag = process.env.NEXT_PUBLIC_ENABLE_DIRECT_AGENT_STREAM;
 
   if (
     legacyDirectFlag?.trim().toLowerCase() === 'false' ||
-    legacyEnvDirectFlag?.trim().toLowerCase() === 'false' ||
     legacyEnableFlag?.trim().toLowerCase() === 'false'
   ) {
     throw new Error('Legacy proxy transport is decommissioned. Direct-only streaming transport is mandatory.');

@@ -18,7 +18,6 @@ describe('chatStream - Direct-Only Transport', () => {
     delete process.env.NEXT_PUBLIC_AGENT_URL;
     delete process.env.NEXT_PUBLIC_ENABLE_DIRECT_AGENT_STREAM;
     delete process.env.NEXT_PUBLIC_FEATURE_FLAG_CHAT_DIRECT_STREAM;
-    delete process.env.FEATURE_FLAG_CHAT_DIRECT_STREAM;
 
     assert.throws(
       () => getAgentStreamEndpoint(),
@@ -45,16 +44,6 @@ describe('chatStream - Direct-Only Transport', () => {
 
   it('throws when NEXT_PUBLIC_ENABLE_DIRECT_AGENT_STREAM is false', () => {
     process.env.NEXT_PUBLIC_ENABLE_DIRECT_AGENT_STREAM = 'false';
-    process.env.NEXT_PUBLIC_AGENT_URL = 'http://127.0.0.1:3002';
-
-    assert.throws(
-      () => getAgentStreamEndpoint(),
-      /Legacy proxy transport is decommissioned\. Direct-only streaming transport is mandatory\./,
-    );
-  });
-
-  it('throws when FEATURE_FLAG_CHAT_DIRECT_STREAM is false', () => {
-    process.env.FEATURE_FLAG_CHAT_DIRECT_STREAM = 'false';
     process.env.NEXT_PUBLIC_AGENT_URL = 'http://127.0.0.1:3002';
 
     assert.throws(

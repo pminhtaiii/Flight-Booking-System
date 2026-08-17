@@ -523,14 +523,18 @@ describe('Phase 11D: Comprehensive Cryptographic and Data Privacy Final Audit (e
     });
 
     it('fails closed when attempting to decrypt tampered ciphertext envelopes without fallback', async () => {
+      const tamperedCiphertext = crypto.randomBytes(32).toString('hex');
+      const tamperedNonce = crypto.randomBytes(12).toString('hex');
+      const tamperedAuthTag = crypto.randomBytes(16).toString('hex');
+
       const tamperedMessage = {
-        id: 'tampered-msg-id',
+        id: `tampered-msg-${crypto.randomUUID()}`,
         sessionId: testSessionId,
         sender: 'USER',
         type: 'STANDARD',
-        contentCiphertext: 'deadbeefcafebabe',
-        contentNonce: '0102030405060708090a0b0c',
-        contentAuthTag: '0102030405060708090a0b0c0d0e0f10',
+        contentCiphertext: tamperedCiphertext,
+        contentNonce: tamperedNonce,
+        contentAuthTag: tamperedAuthTag,
         contentKeyVersion: 1,
       };
 
