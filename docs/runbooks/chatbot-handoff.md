@@ -199,4 +199,63 @@ Mapped and verified in both NestJS API (`apps/api/src/common/observability/chat-
 - `apps/agent` Python Pytest: **336/336 passed**.
 - `apps/web` Next.js Production Build: **20/20 static and dynamic routes compiled cleanly**.
 
+---
 
+## 13. Continuous Negative Privacy & Security Automated Audit (Task C)
+
+Automated continuous privacy regression scanners enforce zero-leak guarantees across agent and API layers:
+
+### 13.1 Agent Privacy Scanner (`apps/agent/tests/test_negative_privacy_audit.py`)
+- **Memory Manager Audit**: Token counting, sliding window prompt assembly, and async summarization executed without dumping raw chat secrets or PII to logs/telemetry.
+- **Trusted Snapshot Repository**: Raw snapshot serialization and client/LLM projection 100% strips private identifiers (`flightOfferId`, `duffelOfferId`, provider UUIDs). Redis keys adhere strictly to `chat:snapshot:{userId}:{sessionId}`.
+- **Telemetry Boundary**: Rejects 100% of forbidden privacy corpus across `operation`, `status`, `tool_name`, `error_class`, and `outcome`. Safe emission logs only `chat_telemetry_rejected`.
+- **SSE Stream Chunks**: Continuous scan of token chunks, tool calls, tool results, `ACTION_HANDOFF`, and `ACTION_REQUIRED` payloads guarantees zero forbidden corpus leakage.
+
+### 13.2 API E2E Privacy Scanner (`apps/api/test/negative-privacy-audit.e2e-spec.ts`)
+- **PostgreSQL Schema Verification**: Confirms 0 plaintext `content` column on `chat_messages`, 0 `title` column on `chat_sessions`, 0 `token`/`duffelOfferId` columns on `chat_handoffs`.
+- **Direct Database Row Scanner**: Raw SQL queries on `chat_messages`, `chat_sessions`, `chat_handoffs`, and `audit_logs` verify ciphertext-only envelopes and zero raw token/PII persistence.
+- **Application Logs & Telemetry Streams**: Captures all application log streams and verifies zero matches for forbidden corpus.
+- **Redis Cache Scanner**: Inspects `chat:budget:*`, `chat:session-lock:*`, and `chat:snapshot:*` key names and payload contents.
+
+---
+
+## 14. Chaos & Fault-Tolerance Incident Drills (Task B)
+
+Automated drills simulate dependency faults, supplier timeouts, abrupt client disconnects, and partition recovery:
+
+### 14.1 Agent Chaos Simulation (`apps/agent/tests/test_chaos_simulation.py`)
+- **Redis Partition / Outage Drill**: Drops Redis connection during quota checks and mid-stream execution. Asserts stream fails closed with HTTP 503 `CHAT_CONTROL_PLANE_UNAVAILABLE` before LLM inference, zero compute leaked, zero burst reservations or daily quotas incremented.
+- **Abrupt Client Disconnect Drill**: Simulates client disconnect mid-stream (`asyncio.CancelledError`). Asserts active session lock is promptly released via `sse_generator` finally handler and `validate_active_fence` prevents stale turn persistence when lease is lost or taken over.
+
+### 14.2 API Chaos Incident Drills (`apps/api/test/chaos-incident-drills.e2e-spec.ts`)
+- **Supplier Timeout & Recovery Drill**: Simulates Duffel 504 / timeout during `BookingIntentService.createIntent` pricing validation. Asserts watchdog cancels and `releaseClaim` in `finally` safely resets `claimedAt`, `claimTokenHash`, `claimExpiresAt`, `claimRecoverAfter` to null. Asserts 0 orphaned `CLAIMED` locks remain and retry succeeds upon supplier recovery.
+- **Expired Claim Recovery Drill**: Creates handoff with expired claim lease (> `claimRecoverAfter`). Asserts `resolveSafe` and `tryAcquireClaim` successfully recover and allow consumption.
+- **Redis Disconnect Resilience**: Asserts `CacheService` fallback and `LockoutService` rate-limiting handle Redis disconnects safely with degraded reporting.
+
+---
+
+## 15. Stepwise Rollback Matrix Verification (Task A)
+
+- **Step 1 Rollback (`FEATURE_FLAG_CHAT_HANDOFF_ISSUE=false`, `FEATURE_FLAG_CHAT_HANDOFF_ACCEPT=true`)**:
+  - `POST /api/chat-handoff` & `/api/chat-handoff/tokens` return HTTP 503 `Service Unavailable` (`Chat handoff issuance is disabled`) with zero internal error leakage.
+  - Python agent deterministic node `create_handoff_token` returns `{"action": {"error": "Chat handoff issuance is disabled."}}` and suppresses `ACTION_HANDOFF` SSE emission.
+  - Pre-issued unexpired tokens continue resolving (200 OK) via `POST /api/chat-handoff/resolve` with safe allowlisted checkout context, claiming via CAS, and consuming via `POST /api/bookings/intents` into canonical `BookingIntent` records.
+- **Step 2 Rollback (`FEATURE_FLAG_CHAT_MULTI_AGENT=false`)**:
+  - `router_node` checks `FEATURE_FLAG_CHAT_MULTI_AGENT` and bypasses the multi-agent router LLM, routing all queries safely to single-agent Travel Assistant (`"travel"`) with 0 unhandled exceptions.
+  - Flight searches and preference inspections continue operating under single-agent execution.
+- **PostgreSQL Row Preservation**:
+  - Verified across 5 flag transition cycles: `ChatHandoff`, `BookingAgentProjection`, and encrypted `ChatMessage` rows remain 100% intact, readable, and decryptable without data loss or corruption.
+
+---
+
+## 16. Final Feature 017 Operational Sign-Off & Verification Summary
+
+| Gate / Verification | Target | Result | Status |
+|---|---|---|---|
+| Stepwise Rollback Matrix | `ISSUE=false`, `ACCEPT=true`, `MULTI_AGENT=false` | 100% Graceful Fallback & Token Continuity | **PASS** |
+| Redis Partition / Outage | Fail-closed HTTP 503 before LLM inference | 0 Compute Leaked, 0 Quota Leaked | **PASS** |
+| Supplier Timeout & Claim Release | Clear claim to NULL in `finally` | 0 Orphaned Locks, Retry Reclaim OK | **PASS** |
+| Client Disconnect Fencing | Monotonic fencing check on persistence | Stale Turns Rejected, Lock Released | **PASS** |
+| Negative Privacy Corpus Audit | 0 PII / tokens across DB, logs, Redis | 0 Matches across All Stores | **PASS** |
+| Multi-Workspace Unit & E2E | 100% Pass Rate across API, Agent, Web | 360 Pytest, 72 API Suites, 25 Web Unit | **PASS** |
+| Next.js Production Build | 20/20 Routes Compiled Cleanly | 0 TypeScript/ESLint Errors | **PASS** |

@@ -420,3 +420,21 @@ Record in `docs/runbooks/chatbot-handoff.md` and `context/progress-checker.md` o
   - Python agent pytest: 264/264 passed.
   - Next.js production build: 20 routes compiled cleanly with zero TypeScript errors.
 - **Feature 017 complete:** All Phase 1 through Phase 8 tasks (T001–T102) completed, verified, and reconciled across codebase and documentation.
+
+### Phase 11C: Rollback Matrix Verification, Chaos Incident Drills & Final Handover (2026-08-17)
+
+- **Stepwise Rollback Matrix Verification (`apps/agent/tests/test_rollback_matrix.py` & `apps/api/test/rollback-matrix.e2e-spec.ts`)**:
+  - **Step 1 Rollback (`ISSUE=false, ACCEPT=true`)**: Verified `POST /api/chat-handoff` returns 503 `Chat handoff issuance is disabled`. Agent deterministic node returns error dictionary and suppresses `ACTION_HANDOFF` emission. Pre-issued unexpired tokens continue resolving (200 OK) with safe allowlisted checkout context, claiming via CAS, and consuming into canonical `BookingIntent` records.
+  - **Step 2 Rollback (`MULTI_AGENT=false`)**: Verified `router_node` checks `FEATURE_FLAG_CHAT_MULTI_AGENT` and safely bypasses router LLM, routing all queries directly to single-agent Travel Assistant (`"travel"`) with 0 unhandled exceptions.
+  - **PostgreSQL Row Integrity**: Verified across 5 flag transition cycles that `ChatHandoff`, `BookingAgentProjection`, and encrypted `ChatMessage` rows remain 100% intact, readable, and decryptable with zero data corruption.
+- **Chaos & Fault-Tolerance Incident Drills (`apps/agent/tests/test_chaos_simulation.py` & `apps/api/test/chaos-incident-drills.e2e-spec.ts`)**:
+  - **Redis Partition / Outage Drill**: Mid-stream or pre-inference Redis failure fails closed with HTTP 503 `CHAT_CONTROL_PLANE_UNAVAILABLE`. Zero unbudgeted model inference or leaked burst reservations.
+  - **Supplier Timeout & Recovery Drill**: Duffel 504 / timeout during live pricing in `BookingIntentService` triggers `releaseClaim` in `finally` block, safely clearing `claimedAt`, `claimTokenHash`, `claimExpiresAt`, `claimRecoverAfter` back to NULL. Zero orphaned `CLAIMED` locks remain; user successfully retries and consumes upon supplier recovery. Expired claim leases (> `claimRecoverAfter`) recover automatically.
+  - **Abrupt Client Disconnect Drill**: Client connection drop (`asyncio.CancelledError`) cleanly releases session locks in generator `finally` handler. Monotonic fencing tokens (`validate_active_fence`) prevent stale turn persistence.
+- **Automated Negative Privacy Continuous Audit (`apps/agent/tests/test_negative_privacy_audit.py` & `apps/api/test/negative-privacy-audit.e2e-spec.ts`)**:
+  - Continuous automated scanner confirms 0 occurrences of forbidden corpus (raw tokens, plaintext chat, passport numbers, card numbers, Duffel offer IDs, PNRs) across PostgreSQL raw rows (`chat_messages`, `chat_sessions`, `chat_handoffs`, `audit_logs`), application logs, telemetry streams, and Redis keys (`chat:budget:*`, `chat:session-lock:*`, `chat:snapshot:*`).
+- **Multi-Workspace Regression & Build Verification**:
+  - `apps/agent`: 360/360 pytest tests PASSED.
+  - `apps/api`: 72/72 unit test suites (682/682 tests) PASSED; 3/3 Phase 11C E2E suites (16/16 tests) PASSED.
+  - `apps/web`: 25/25 tsx unit tests PASSED; Next.js production build succeeded with 20/20 routes.
+- **Final Handover Complete**: Feature 017 operational sign-off completed 100%.

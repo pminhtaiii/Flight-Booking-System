@@ -7,15 +7,32 @@ Update this file after every completed feature. Any AI agent reading this should
 ### Current Status
 
 **Feature:** Chatbot Backend Infrastructure & Booking Handoff (Feature 17)
-**Last completed:** Phase 11B Production Deployment, Active Monitoring & Telemetry Baseline (2026-08-16).
+**Last completed:** Phase 11C Rollback Matrix Verification, Chaos Incident Drills & Final Handover (2026-08-17).
 **In progress:** None.
-**Next:** Feature 17 100% Complete. Production deployment & live telemetry operational.
+**Next:** Feature 17 100% Complete & Signed Off. Ready for next project milestone.
 
 ---
 
 ## Progress by Feature
 
 ### [x] Feature: Chatbot Backend Infrastructure & Booking Handoff (Feature 17)
+
+- [x] Phase 11C / Rollback Matrix Verification, Chaos Incident Drills & Final Handover (2026-08-17):
+  - **Stepwise Rollback Matrix Verification (`apps/agent/tests/test_rollback_matrix.py` & `apps/api/test/rollback-matrix.e2e-spec.ts`)**:
+    - Step 1 Rollback (`ISSUE=false`, `ACCEPT=true`): `POST /api/chat-handoff` returns 503 `Chat handoff issuance is disabled`. Agent deterministic node suppresses `ACTION_HANDOFF`. Pre-issued unexpired tokens continue resolving (200 OK) with safe allowlisted checkout context, claiming via CAS, and consuming into canonical `BookingIntent` records.
+    - Step 2 Rollback (`MULTI_AGENT=false`): `router_node` checks `FEATURE_FLAG_CHAT_MULTI_AGENT` and bypasses router LLM, routing all queries safely to single-agent Travel Assistant (`"travel"`) with 0 unhandled exceptions.
+    - PostgreSQL Row Integrity: Multi-cycle flag transitions preserve `ChatHandoff`, `BookingAgentProjection`, and encrypted `ChatMessage` rows without data corruption.
+  - **Chaos & Fault-Tolerance Incident Drills (`apps/agent/tests/test_chaos_simulation.py` & `apps/api/test/chaos-incident-drills.e2e-spec.ts`)**:
+    - Redis Partition / Outage Drill: Mid-stream or pre-inference Redis failure fails closed with HTTP 503 `CHAT_CONTROL_PLANE_UNAVAILABLE` before LLM inference, leaking 0 compute or burst reservations.
+    - Supplier Timeout & Recovery Drill: Duffel 504 / timeout during live pricing in `BookingIntentService` triggers `releaseClaim` in `finally` block, safely clearing all claim fields to NULL with 0 orphaned locks; user successfully retries and consumes upon supplier recovery. Expired claim leases (> `claimRecoverAfter`) recover cleanly.
+    - Abrupt Client Disconnect Drill: Client connection drop cleanly releases session locks in generator `finally` handler. Monotonic fencing tokens (`validate_active_fence`) prevent stale turn persistence.
+  - **Automated Negative Privacy Continuous Audit (`apps/agent/tests/test_negative_privacy_audit.py` & `apps/api/test/negative-privacy-audit.e2e-spec.ts`)**:
+    - Continuous automated scanners confirm 0 occurrences of forbidden corpus (raw tokens, plaintext chat, passport numbers, card numbers, Duffel offer IDs, PNRs) across PostgreSQL raw rows (`chat_messages`, `chat_sessions`, `chat_handoffs`, `audit_logs`), application logs, telemetry streams, and Redis keys (`chat:budget:*`, `chat:session-lock:*`, `chat:snapshot:*`).
+  - **Multi-Workspace Verification**:
+    - `apps/agent`: 360/360 pytest unit tests pass (100%).
+    - `apps/api`: 72/72 unit test suites (682/682 tests) pass (100%); 3/3 Phase 11C E2E suites (16/16 tests) pass (100%).
+    - `apps/web`: 25/25 tsx unit tests pass (100%); Next.js production build compiles 20/20 routes cleanly.
+  - **Feature 017 100% Operational Sign-Off Complete**.
 
 - [x] Phase 11B / Production Deployment, Active Monitoring & Telemetry Baseline (2026-08-16):
   - Warmed performance baselines established: Router entry p95 `14.64 ms` (< 100 ms), Redis Lua admission p95 `2.66 ms` (< 10 ms), Handoff Token Create p95 `144.49 ms` (< 300 ms), Handoff Token Resolve p95 `28.24 ms` (< 300 ms), 100-way CAS consumption concurrency with 1 winner (201 Created), 99 losers (409 Conflict), 0 payment calls, claim CAS p95 `45.87 ms`.
