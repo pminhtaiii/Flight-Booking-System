@@ -1,6 +1,7 @@
+import os
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from pydantic import Field, BaseModel, model_validator
-from typing import Optional
+from typing import Optional, Union
 
 DEFAULT_OUTPUT_GUARDRAIL_ENABLED = True
 DEFAULT_OUTPUT_GUARDRAIL_OVERLAP_TOKENS = 30
@@ -35,9 +36,6 @@ class Settings(BaseSettings):
     CLAIM_TOKEN_SECRET: str = Field(..., min_length=1)
     CLAIM_TOKEN_TTL_SECONDS: int = 300
     AGENT_MAX_ITERATIONS: int = 5
-    CLAIM_TOKEN_SECRET: str = Field(..., min_length=1)
-    CLAIM_TOKEN_TTL_SECONDS: int = 300
-    AGENT_MAX_ITERATIONS: int = 5
 
     OUTPUT_GUARDRAIL_ENABLED: bool = DEFAULT_OUTPUT_GUARDRAIL_ENABLED
     OUTPUT_GUARDRAIL_OVERLAP_TOKENS: int = DEFAULT_OUTPUT_GUARDRAIL_OVERLAP_TOKENS
@@ -47,6 +45,9 @@ class Settings(BaseSettings):
     FEATURE_FLAG_CHAT_MULTI_AGENT: bool = False
     FEATURE_FLAG_CHAT_HANDOFF_ACCEPT: bool = False
     FEATURE_FLAG_CHAT_HANDOFF_ISSUE: bool = False
+    FEATURE_FLAG_CHAT_DIRECT_STREAM: Optional[Union[bool, str]] = None
+    ENABLE_DIRECT_AGENT_STREAM: Optional[Union[bool, str]] = None
+    CHAT_STREAM_TRANSPORT: Optional[str] = None
     REDIS_URL: Optional[str] = "redis://localhost:6379/0"
     CHAT_QUOTA_DAILY: int = 50
     CHAT_QUOTA_BURST: int = 60
@@ -70,6 +71,35 @@ class Settings(BaseSettings):
 
     @model_validator(mode="after")
     def validate_settings(self) -> 'Settings':
+        legacy_env_flags = [
+            os.getenv("FEATURE_FLAG_CHAT_DIRECT_STREAM"),
+            os.getenv("ENABLE_DIRECT_AGENT_STREAM"),
+            os.getenv("NEXT_PUBLIC_FEATURE_FLAG_CHAT_DIRECT_STREAM"),
+            os.getenv("NEXT_PUBLIC_ENABLE_DIRECT_AGENT_STREAM"),
+        ]
+        for val in legacy_env_flags:
+            if val is not None and str(val).strip().lower() == "false":
+                raise ValueError("Legacy proxy transport is decommissioned. Direct-only streaming transport is mandatory.")
+
+        env_transport = os.getenv("CHAT_STREAM_TRANSPORT")
+        if env_transport is not None and str(env_transport).strip().lower() in ("proxy", "legacy", "false"):
+            raise ValueError("Legacy proxy transport is decommissioned. Direct-only streaming transport is mandatory.")
+
+        if self.FEATURE_FLAG_CHAT_DIRECT_STREAM is False or (
+            isinstance(self.FEATURE_FLAG_CHAT_DIRECT_STREAM, str)
+            and self.FEATURE_FLAG_CHAT_DIRECT_STREAM.strip().lower() == "false"
+        ):
+            raise ValueError("Legacy proxy transport is decommissioned. Direct-only streaming transport is mandatory.")
+
+        if self.ENABLE_DIRECT_AGENT_STREAM is False or (
+            isinstance(self.ENABLE_DIRECT_AGENT_STREAM, str)
+            and self.ENABLE_DIRECT_AGENT_STREAM.strip().lower() == "false"
+        ):
+            raise ValueError("Legacy proxy transport is decommissioned. Direct-only streaming transport is mandatory.")
+
+        if self.CHAT_STREAM_TRANSPORT is not None and str(self.CHAT_STREAM_TRANSPORT).strip().lower() in ("proxy", "legacy", "false"):
+            raise ValueError("Legacy proxy transport is decommissioned. Direct-only streaming transport is mandatory.")
+
         if self.FEATURE_FLAG_CHAT_HANDOFF_ISSUE and not self.FEATURE_FLAG_CHAT_HANDOFF_ACCEPT:
             raise ValueError("Invalid config: ISSUE=true but ACCEPT=false")
         if self.SESSION_LOCK_TTL_MS <= 0:

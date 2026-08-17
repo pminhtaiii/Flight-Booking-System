@@ -50,6 +50,39 @@ def test_agent_config_flag_matrix_combinations():
     assert cfg4.FEATURE_FLAG_CHAT_HANDOFF_ACCEPT is True
 
 
+def test_agent_config_rejects_legacy_proxy_transport():
+    # Passed as kwarg FEATURE_FLAG_CHAT_DIRECT_STREAM=False
+    with pytest.raises(ValidationError) as exc_info:
+        Settings(FEATURE_FLAG_CHAT_DIRECT_STREAM=False)
+    assert "Legacy proxy transport is decommissioned. Direct-only streaming transport is mandatory." in str(exc_info.value)
+
+    # Passed as kwarg ENABLE_DIRECT_AGENT_STREAM=False
+    with pytest.raises(ValidationError) as exc_info:
+        Settings(ENABLE_DIRECT_AGENT_STREAM=False)
+    assert "Legacy proxy transport is decommissioned. Direct-only streaming transport is mandatory." in str(exc_info.value)
+
+    # Passed as kwarg CHAT_STREAM_TRANSPORT='proxy'
+    with pytest.raises(ValidationError) as exc_info:
+        Settings(CHAT_STREAM_TRANSPORT="proxy")
+    assert "Legacy proxy transport is decommissioned. Direct-only streaming transport is mandatory." in str(exc_info.value)
+
+    # Set via environment variable
+    with patch.dict(os.environ, {"FEATURE_FLAG_CHAT_DIRECT_STREAM": "false"}):
+        with pytest.raises(ValidationError) as exc_info:
+            Settings()
+        assert "Legacy proxy transport is decommissioned. Direct-only streaming transport is mandatory." in str(exc_info.value)
+
+    with patch.dict(os.environ, {"ENABLE_DIRECT_AGENT_STREAM": "false"}):
+        with pytest.raises(ValidationError) as exc_info:
+            Settings()
+        assert "Legacy proxy transport is decommissioned. Direct-only streaming transport is mandatory." in str(exc_info.value)
+
+    with patch.dict(os.environ, {"CHAT_STREAM_TRANSPORT": "proxy"}):
+        with pytest.raises(ValidationError) as exc_info:
+            Settings()
+        assert "Legacy proxy transport is decommissioned. Direct-only streaming transport is mandatory." in str(exc_info.value)
+
+
 @pytest.mark.asyncio
 async def test_agent_does_not_invoke_handoff_create_when_issue_is_disabled():
     state = AgentState(

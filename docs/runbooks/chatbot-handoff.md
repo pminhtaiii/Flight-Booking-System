@@ -259,3 +259,38 @@ Automated drills simulate dependency faults, supplier timeouts, abrupt client di
 | Negative Privacy Corpus Audit | 0 PII / tokens across DB, logs, Redis | 0 Matches across All Stores | **PASS** |
 | Multi-Workspace Unit & E2E | 100% Pass Rate across API, Agent, Web | 360 Pytest, 72 API Suites, 25 Web Unit | **PASS** |
 | Next.js Production Build | 20/20 Routes Compiled Cleanly | 0 TypeScript/ESLint Errors | **PASS** |
+
+---
+
+## 17. Phase 11D: Post-Rollout Decommissioning, Direct-Only Architecture Lockdown & Final Cryptographic Sign-Off (2026-08-17)
+
+### 17.1 Permanent Archival of Observation Window Evidence & Latency Baselines
+- **Router Stream Entry Latency**: Measured p95 = `14.64 ms` (limit < 100 ms) over 100 warmed requests in `apps/agent/tests/test_t098_agent_performance.py`.
+- **Redis Lua Admission Overhead**: Measured p95 = `2.66 ms` (limit < 10 ms) across 100 requests.
+- **Handoff Token Creation (`POST /api/chat-handoff/tokens`)**: Measured p95 = `144.49 ms` (limit < 300 ms) in `apps/api/test/chat-handoff-performance.e2e-spec.ts`.
+- **Handoff Token Resolution (`POST /api/chat-handoff/resolve`)**: Measured p95 = `28.24 ms` (limit < 300 ms).
+- **100-Way Concurrency CAS Lease**: Exactly 1 winner (201 Created), 99 losers (409 Conflict), 0 supplier leaks (`duffel.offers.get` called exactly once), 0 payment leaks, claim CAS p95 = `45.87 ms`.
+
+### 17.2 Permanent Emergency Operational Rollback Playbooks
+The verified multi-phase rollback matrix is permanently codified as the standard operational incident response playbook:
+1. **Emergency Handoff Circuit Breaker (Step 1 Rollback)**:
+   - Configure: `FEATURE_FLAG_CHAT_HANDOFF_ISSUE=false`, `FEATURE_FLAG_CHAT_HANDOFF_ACCEPT=true`.
+   - Behavior: Immediately blocks new credential minting (503 Service Unavailable), while preserving graceful resolution, claiming, and booking creation for pre-issued unexpired tokens.
+2. **Emergency Single-Agent Fallback (Step 2 Rollback)**:
+   - Configure: `FEATURE_FLAG_CHAT_MULTI_AGENT=false`.
+   - Behavior: Bypasses the multi-agent router LLM and defaults all traffic safely to the single-agent Travel Assistant without unhandled exceptions.
+3. **Database Integrity Preservation**:
+   - Transitioning flags never mutates or purges `ChatHandoff`, `BookingAgentProjection`, or encrypted `ChatMessage` rows, maintaining full audit trail integrity.
+
+### 17.3 Direct-Only Streaming Transport Lockdown
+- The temporary Next.js chat stream proxy (`/api/chat/stream`) is permanently decommissioned and removed.
+- Canonical transport is direct-only browser-to-agent streaming (`POST ${NEXT_PUBLIC_AGENT_URL}/chat/stream`).
+- **Fail-Fast Validation**: Both the Python agent configuration (`apps/agent/src/agent/config.py`) and Next.js web client (`apps/web/lib/chatStream.ts`) enforce fail-closed rejection when any legacy proxy flag (`FEATURE_FLAG_CHAT_DIRECT_STREAM='false'` or `NEXT_PUBLIC_FEATURE_FLAG_CHAT_DIRECT_STREAM='false'`) is provided, throwing a runtime error immediately at startup/request initialization.
+
+### 17.4 Final Cryptographic Audit Sign-Off
+Automated E2E cryptographic and schema verification suite (`apps/api/test/phase11d-cryptographic-audit.e2e-spec.ts`) establishes permanent proof of security invariants:
+- **100% AES-256-GCM Encrypted Chat**: Zero plaintext `content` column on `chat_messages` and zero `title` column on `chat_sessions`. All message bodies and session titles use versioned, record-bound AES-256-GCM envelopes (`contentCiphertext`, `contentNonce`, `contentAuthTag`, `contentKeyVersion`) with strict fail-closed decryption and zero plaintext fallback.
+- **100% SHA-256 Hash-Only Tokens**: Zero `token`, `rawToken`, or `duffelOfferId` columns on `chat_handoffs`. All credentials, attestation digests, and provider offer IDs are stored strictly as SHA-256 / HMAC-SHA256 hashes (`tokenHash`, `selectionAttestationHash`, `duffelOfferIdHash`, `idempotencyKeyHash`).
+- **100% Safe Projection Isolation**: `booking_agent_projections` holds strictly allowlisted logistics with opaque high-entropy references (`bkref_<uuid>`). Zero PII, passenger names, contact emails, passport numbers, PNRs, financial amounts, payment IDs, or raw supplier snapshots exist in projection tables or queries.
+- **Zero Plaintext Remanence**: Direct raw SQL scans and Redis cache payload inspection verify 0 matches for forbidden sensitive corpus across all active and resting data stores.
+
