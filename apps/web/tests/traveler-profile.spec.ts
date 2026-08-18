@@ -153,6 +153,7 @@ test.describe('Secure traveler profile', () => {
     await registerAndOpenProfile(page, request, context, '/prototype/chat');
     await fillDomesticProfile(page);
     await page.getByRole('button', { name: 'Save profile' }).click();
+    await page.getByRole('link', { name: /Return and continue booking/i }).click();
 
     await expect(page).toHaveURL(/.*\/prototype\/chat$/, { timeout: 15000 });
     await expect(page).not.toHaveURL(/jane\.doe|901234567/);

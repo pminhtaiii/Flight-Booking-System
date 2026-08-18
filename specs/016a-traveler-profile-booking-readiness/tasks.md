@@ -209,13 +209,13 @@
 
 ### RED tests
 
-- [ ] T062 [P] [US4] Write failing Playwright action-card, allowlisted return-target, retry, inline/multi-passenger redirect, and browser-privacy scenarios in `apps/web/tests/chat-booking-readiness.spec.ts`
+- [x] T062 [P] [US4] Write failing Playwright action-card, allowlisted return-target, retry, inline/multi-passenger redirect, and browser-privacy scenarios in `apps/web/tests/chat-booking-readiness.spec.ts`
 
 ### GREEN implementation
 
-- [ ] T063 [US4] Implement the metadata-only action card and secure navigation targets in `apps/web/components/chat/BookingActionCard.tsx`
-- [ ] T064 [US4] Add the minimal SSE `ACTION_REQUIRED` consumer/dispatcher without storing event payloads in `apps/web/components/chat/ChatWidget.tsx`
-- [ ] T065 [US4] Add safe return-and-retry handling to `apps/web/app/profile/page.tsx` and `apps/web/app/checkout/passengers/page.tsx`
+- [x] T063 [US4] Implement the metadata-only action card and secure navigation targets in `apps/web/components/chat/BookingActionCard.tsx`
+- [x] T064 [US4] Add the minimal SSE `ACTION_REQUIRED` consumer/dispatcher without storing event payloads in `apps/web/components/chat/ChatWidget.tsx`
+- [x] T065 [US4] Add safe return-and-retry handling to `apps/web/app/profile/page.tsx` and `apps/web/app/checkout/passengers/page.tsx`
 
 **Checkpoint**: US4 satisfies SC-007 end to end; no chat component accepts identity/contact/document input.
 

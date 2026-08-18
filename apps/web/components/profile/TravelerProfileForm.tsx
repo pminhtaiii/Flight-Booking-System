@@ -1,7 +1,6 @@
 'use client';
 
 import { FormEvent, useMemo, useState } from 'react';
-import { useRouter } from 'next/navigation';
 import styles from '@/app/prototype/profile/profile-prototype.module.css';
 import {
   ProfileRequestError,
@@ -206,7 +205,6 @@ export function TravelerProfileForm({
   initialProfile: TravelerProfileResponse;
   returnTarget?: string;
 }): JSX.Element {
-  const router = useRouter();
   const [profile, setProfile] = useState<TravelerProfileResponse>(initialProfile);
   const [draft, setDraft] = useState<ProfileDraft>(() => profileToDraft(initialProfile));
   const [saveState, setSaveState] = useState<SaveState>('idle');
@@ -344,10 +342,6 @@ export function TravelerProfileForm({
       setSaveState('saved');
       setValidationErrors({});
       setShowPassport(false);
-
-      if (returnTarget && returnTarget !== '/') {
-        router.push(returnTarget);
-      }
     } catch (error: unknown) {
       if (error instanceof ProfileRequestError && (error.status === 401 || error.status === 403)) {
         window.location.assign('/login?message=session_expired');
@@ -492,7 +486,20 @@ export function TravelerProfileForm({
           <div><strong>Your information stays private.</strong><span>Only your authenticated account can read or update this profile. Sensitive travel document fields are protected by the API.</span></div>
         </div>
 
-        {saveState === 'saved' ? <div className={styles.successAlert} role="status">Your traveler profile is saved securely.</div> : null}
+        {saveState === 'saved' ? (
+          <div className={styles.successAlert} role="status">
+            {returnTarget !== '/' ? (
+              <div className={styles.successAlertContent}>
+                <span>Your traveler profile is saved securely.</span>
+                <a className={styles.returnResumeLink} href={returnTarget}>
+                  Return and continue booking &rarr;
+                </a>
+              </div>
+            ) : (
+              'Your traveler profile is saved securely.'
+            )}
+          </div>
+        ) : null}
         {errorMessage ? <div className={saveState === 'conflict' ? styles.conflictAlert : styles.errorAlert} role="alert"><strong>{saveState === 'conflict' ? 'Profile revision conflict' : 'Profile needs attention'}</strong><span>{errorMessage}</span>{saveState === 'conflict' ? <button className="btn-secondary" onClick={reloadProfile} type="button">Reload latest profile</button> : null}</div> : null}
 
         <form className={styles.form} onSubmit={handleSave}>
