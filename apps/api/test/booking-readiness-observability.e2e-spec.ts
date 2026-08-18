@@ -1,4 +1,7 @@
-process.env.ENCRYPTION_KEY = process.env.ENCRYPTION_KEY || 'a'.repeat(64);
+import * as crypto from 'crypto';
+
+process.env.ENCRYPTION_KEY = process.env.ENCRYPTION_KEY || crypto.randomBytes(32).toString('hex');
+process.env.CHAT_ENCRYPTION_KEY = process.env.CHAT_ENCRYPTION_KEY || crypto.randomBytes(32).toString('hex');
 process.env.STRIPE_SECRET_KEY = 'sk_test_fake';
 process.env.STRIPE_WEBHOOK_SECRET = 'whsec_test_fake';
 process.env.FEATURE_FLAG_BOOKING_READINESS = 'true';
@@ -6,13 +9,13 @@ process.env.FEATURE_FLAG_CHAT_HANDOFF_ISSUE = 'true';
 process.env.FEATURE_FLAG_CHAT_HANDOFF_ACCEPT = 'true';
 process.env.CHAT_HANDOFF_SECRET = 'test-handoff-secret';
 
-import * as crypto from 'crypto';
 import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication, ValidationPipe } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import request from 'supertest';
 import { AppModule } from '@/app.module';
 import { PrismaService } from '@/prisma/prisma.service';
+import { CacheService } from '@/cache/cache.service';
 import { JwtService } from '@nestjs/jwt';
 import { DuffelService } from '@/duffel/duffel.service';
 import { EncryptionService } from '@/common/encryption.service';
@@ -44,6 +47,7 @@ describe('Booking Readiness Observability (E2E) - Tasks T073 & T074', () => {
 
   let app: INestApplication;
   let prisma: PrismaService;
+  let cacheService: CacheService;
   let jwtService: JwtService;
   let duffelService: DuffelService;
   let encryptionService: EncryptionService;
@@ -89,6 +93,7 @@ describe('Booking Readiness Observability (E2E) - Tasks T073 & T074', () => {
     await app.init();
 
     prisma = moduleFixture.get<PrismaService>(PrismaService);
+    cacheService = moduleFixture.get<CacheService>(CacheService);
     jwtService = moduleFixture.get<JwtService>(JwtService);
     duffelService = moduleFixture.get<DuffelService>(DuffelService);
     encryptionService = moduleFixture.get<EncryptionService>(EncryptionService);
@@ -714,6 +719,56 @@ describe('Booking Readiness Observability (E2E) - Tasks T073 & T074', () => {
       for (const sensitiveValue of ['P99887766', 'P11223344', 'secret-encryption-master-key']) {
         expect(auditLogText).not.toContain(sensitiveValue);
       }
+    });
+  });
+
+  describe('9. Health Degradation and Distributed Metrics Coherence', () => {
+    it('returns 503 degraded when database check fails in health endpoint', async () => {
+      const prismaSpy = jest
+        .spyOn(prisma, '$transaction')
+        .mockRejectedValueOnce(new Error('DB Timeout'));
+
+      const res = await request(app.getHttpServer())
+        .get('/health/booking-readiness')
+        .expect(503);
+
+      prismaSpy.mockRestore();
+
+      expect(res.body.status).toBe('degraded');
+      expect(res.body.dependencies.database).toBe('down');
+    });
+
+    it('returns 503 degraded when redis check fails in health endpoint', async () => {
+      const cacheSpy = jest.spyOn(cacheService, 'checkHealth').mockResolvedValueOnce('down');
+
+      const res = await request(app.getHttpServer())
+        .get('/health/booking-readiness')
+        .expect(503);
+
+      cacheSpy.mockRestore();
+
+      expect(res.body.status).toBe('degraded');
+      expect(res.body.dependencies.redis).toBe('down');
+    });
+
+    it('coherently aggregates distributed counters and latencies from cache', async () => {
+      await cacheService.incrby('metrics:booking_readiness:counter:distributed_e2e_counter', 50);
+      await cacheService.lpush(
+        'metrics:booking_readiness:latency:distributed_e2e_latency',
+        '75',
+        '125',
+      );
+
+      const res = await request(app.getHttpServer())
+        .get('/health/booking-readiness')
+        .expect(200);
+
+      expect(res.body.status).toBe('ok');
+      expect(res.body.metrics.distributed_e2e_counter).toBeGreaterThanOrEqual(50);
+      expect(res.body.latency.distributed_e2e_latency).toBeDefined();
+      expect(res.body.latency.distributed_e2e_latency.count).toBeGreaterThanOrEqual(2);
+      expect(res.body.latency.distributed_e2e_latency.min).toBe(75);
+      expect(res.body.latency.distributed_e2e_latency.max).toBe(125);
     });
   });
 });

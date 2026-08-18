@@ -105,16 +105,20 @@ export class CacheService implements OnModuleInit, OnModuleDestroy {
   }
 
   async incr(key: string, ttlSeconds?: number): Promise<number> {
+    return this.incrby(key, 1, ttlSeconds);
+  }
+
+  async incrby(key: string, amount: number, ttlSeconds?: number): Promise<number> {
     if (this.redisClient) {
       try {
-        const val = await this.redisClient.incr(key);
-        if (ttlSeconds && val === 1) {
+        const val = await this.redisClient.incrby(key, amount);
+        if (ttlSeconds && val === amount) {
           await this.redisClient.expire(key, ttlSeconds);
         }
         return val;
       } catch (err: unknown) {
         const errMsg = err instanceof Error ? err.message : String(err);
-        this.logger.warn(`Redis INCR failed for key ${key}: ${errMsg}. Using in-memory fallback.`);
+        this.logger.warn(`Redis INCRBY failed for key ${key}: ${errMsg}. Using in-memory fallback.`);
       }
     }
 
@@ -129,9 +133,122 @@ export class CacheService implements OnModuleInit, OnModuleDestroy {
       expiry = item.expiry;
     }
 
-    const nextVal = current + 1;
+    const nextVal = current + amount;
     this.inMemoryStore.set(key, { value: String(nextVal), expiry });
     return nextVal;
+  }
+
+  async lpush(key: string, ...values: string[]): Promise<number> {
+    if (values.length === 0) return 0;
+    if (this.redisClient) {
+      try {
+        return await this.redisClient.lpush(key, ...values);
+      } catch (err: unknown) {
+        const errMsg = err instanceof Error ? err.message : String(err);
+        this.logger.warn(`Redis LPUSH failed for key ${key}: ${errMsg}. Using in-memory fallback.`);
+      }
+    }
+
+    const now = Date.now();
+    const item = this.inMemoryStore.get(key);
+    let list: string[] = [];
+    let expiry = Infinity;
+
+    if (item && now <= item.expiry) {
+      try {
+        list = JSON.parse(item.value);
+        if (!Array.isArray(list)) list = [];
+      } catch {
+        list = [];
+      }
+      expiry = item.expiry;
+    }
+
+    for (const val of values) {
+      list.unshift(val);
+    }
+
+    this.inMemoryStore.set(key, { value: JSON.stringify(list), expiry });
+    return list.length;
+  }
+
+  async ltrim(key: string, start: number, stop: number): Promise<void> {
+    if (this.redisClient) {
+      try {
+        await this.redisClient.ltrim(key, start, stop);
+        return;
+      } catch (err: unknown) {
+        const errMsg = err instanceof Error ? err.message : String(err);
+        this.logger.warn(`Redis LTRIM failed for key ${key}: ${errMsg}. Using in-memory fallback.`);
+      }
+    }
+
+    const item = this.inMemoryStore.get(key);
+    if (!item) return;
+    if (Date.now() > item.expiry) {
+      this.inMemoryStore.delete(key);
+      return;
+    }
+
+    let list: string[] = [];
+    try {
+      list = JSON.parse(item.value);
+      if (!Array.isArray(list)) return;
+    } catch {
+      return;
+    }
+
+    const len = list.length;
+    let s = start < 0 ? len + start : start;
+    let e = stop < 0 ? len + stop : stop;
+    if (s < 0) s = 0;
+    if (e >= len) e = len - 1;
+
+    if (s > e || s >= len) {
+      list = [];
+    } else {
+      list = list.slice(s, e + 1);
+    }
+
+    this.inMemoryStore.set(key, { value: JSON.stringify(list), expiry: item.expiry });
+  }
+
+  async lrange(key: string, start: number, stop: number): Promise<string[]> {
+    if (this.redisClient) {
+      try {
+        return await this.redisClient.lrange(key, start, stop);
+      } catch (err: unknown) {
+        const errMsg = err instanceof Error ? err.message : String(err);
+        this.logger.warn(`Redis LRANGE failed for key ${key}: ${errMsg}. Using in-memory fallback.`);
+      }
+    }
+
+    const item = this.inMemoryStore.get(key);
+    if (!item) return [];
+    if (Date.now() > item.expiry) {
+      this.inMemoryStore.delete(key);
+      return [];
+    }
+
+    let list: string[] = [];
+    try {
+      list = JSON.parse(item.value);
+      if (!Array.isArray(list)) return [];
+    } catch {
+      return [];
+    }
+
+    const len = list.length;
+    let s = start < 0 ? len + start : start;
+    let e = stop < 0 ? len + stop : stop;
+    if (s < 0) s = 0;
+    if (e >= len) e = len - 1;
+
+    if (s > e || s >= len) {
+      return [];
+    }
+
+    return list.slice(s, e + 1);
   }
 
   async decr(key: string): Promise<number> {

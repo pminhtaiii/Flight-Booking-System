@@ -66,5 +66,81 @@ describe('CacheService', () => {
       const val = await service.get('del_key');
       expect(val).toBeNull();
     });
+
+    it('should increment by amount using in-memory store', async () => {
+      const v1 = await service.incrby('counter_key', 3, 60);
+      expect(v1).toBe(3);
+      const v2 = await service.incrby('counter_key', 5);
+      expect(v2).toBe(8);
+      const v3 = await service.incr('counter_key');
+      expect(v3).toBe(9);
+    });
+
+    it('should push, trim, and range lists using in-memory store', async () => {
+      const len1 = await service.lpush('list_key', '10', '20', '30');
+      expect(len1).toBe(3);
+
+      const items1 = await service.lrange('list_key', 0, -1);
+      expect(items1).toEqual(['30', '20', '10']);
+
+      await service.lpush('list_key', '40');
+      const items2 = await service.lrange('list_key', 0, 1);
+      expect(items2).toEqual(['40', '30']);
+
+      await service.ltrim('list_key', 0, 1);
+      const items3 = await service.lrange('list_key', 0, -1);
+      expect(items3).toEqual(['40', '30']);
+    });
+
+    it('should return empty list for non-existent key or out-of-bound range', async () => {
+      const empty = await service.lrange('non_existent', 0, 5);
+      expect(empty).toEqual([]);
+
+      await service.lpush('small_list', '1');
+      const outOfBounds = await service.lrange('small_list', 5, 10);
+      expect(outOfBounds).toEqual([]);
+    });
+  });
+
+  describe('Redis list and incr operations', () => {
+    it('should delegate incrby to redisClient if available', async () => {
+      const mockIncrby = jest.fn().mockResolvedValue(10);
+      const mockExpire = jest.fn().mockResolvedValue(1);
+      (service as unknown as { redisClient: unknown }).redisClient = {
+        incrby: mockIncrby,
+        expire: mockExpire,
+        quit: jest.fn().mockResolvedValue('OK'),
+      };
+
+      const result = await service.incrby('metric_key', 10, 60);
+      expect(result).toBe(10);
+      expect(mockIncrby).toHaveBeenCalledWith('metric_key', 10);
+      expect(mockExpire).toHaveBeenCalledWith('metric_key', 60);
+    });
+
+    it('should delegate lpush, ltrim, lrange to redisClient if available', async () => {
+      const mockLpush = jest.fn().mockResolvedValue(2);
+      const mockLtrim = jest.fn().mockResolvedValue('OK');
+      const mockLrange = jest.fn().mockResolvedValue(['100', '200']);
+      (service as unknown as { redisClient: unknown }).redisClient = {
+        lpush: mockLpush,
+        ltrim: mockLtrim,
+        lrange: mockLrange,
+        quit: jest.fn().mockResolvedValue('OK'),
+      };
+
+      const len = await service.lpush('latency_key', '100', '200');
+      expect(len).toBe(2);
+      expect(mockLpush).toHaveBeenCalledWith('latency_key', '100', '200');
+
+      await service.ltrim('latency_key', 0, 1999);
+      expect(mockLtrim).toHaveBeenCalledWith('latency_key', 0, 1999);
+
+      const samples = await service.lrange('latency_key', 0, -1);
+      expect(samples).toEqual(['100', '200']);
+      expect(mockLrange).toHaveBeenCalledWith('latency_key', 0, -1);
+    });
   });
 });
+
+

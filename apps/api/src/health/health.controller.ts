@@ -141,16 +141,23 @@ export class HealthController {
   }
 
   @Get('booking-readiness')
-  getBookingReadiness(@Res() res: Response): Response {
+  async getBookingReadiness(@Res() res: Response): Promise<Response> {
     if (!this.readinessMetrics) {
       return res.status(HttpStatus.OK).json({
         status: 'ok',
+        dependencies: {
+          database: 'up',
+          redis: 'up',
+        },
         metrics: {},
         latency: {},
         featureFlags: { bookingReadiness: false },
       });
     }
-    return res.status(HttpStatus.OK).json(this.readinessMetrics.getHealthSnapshot());
+    const snapshot = await this.readinessMetrics.getHealthSnapshot();
+    const httpStatus =
+      snapshot.status === 'degraded' ? HttpStatus.SERVICE_UNAVAILABLE : HttpStatus.OK;
+    return res.status(httpStatus).json(snapshot);
   }
 
   @Get('ping')

@@ -1,5 +1,7 @@
-import { Injectable, Optional } from '@nestjs/common';
+import { Injectable, Logger, Optional } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { CacheService } from '@/cache/cache.service';
+import { PrismaService } from '@/prisma/prisma.service';
 
 export const BOOKING_READINESS_METRIC_COUNTERS = {
   TRAVELER_PROFILE_READS: 'traveler_profile_reads_total',
@@ -45,6 +47,10 @@ export interface LatencyPercentiles {
 
 export interface BookingReadinessHealthSnapshot {
   status: 'ok' | 'degraded';
+  dependencies: {
+    database: 'up' | 'down';
+    redis: 'up' | 'down';
+  };
   metrics: Record<string, number>;
   latency: Record<string, LatencyPercentiles>;
   featureFlags: {
@@ -54,15 +60,20 @@ export interface BookingReadinessHealthSnapshot {
 
 @Injectable()
 export class BookingReadinessMetricsService {
+  private readonly logger = new Logger(BookingReadinessMetricsService.name);
   private readonly counters: Map<string, number> = new Map();
   private readonly latencySamples: Map<string, number[]> = new Map();
   private readonly maxSamples = 2000;
 
-  constructor(@Optional() private readonly configService?: ConfigService) {
-    this.resetMetrics();
+  constructor(
+    @Optional() private readonly configService?: ConfigService,
+    @Optional() private readonly cacheService?: CacheService,
+    @Optional() private readonly prisma?: PrismaService,
+  ) {
+    this.resetLocalMetrics();
   }
 
-  resetMetrics(): void {
+  private resetLocalMetrics(): void {
     this.counters.clear();
     for (const metric of STANDARDIZED_READINESS_METRICS) {
       this.counters.set(metric, 0);
@@ -70,9 +81,35 @@ export class BookingReadinessMetricsService {
     this.latencySamples.clear();
   }
 
+  async resetMetrics(): Promise<void> {
+    this.resetLocalMetrics();
+    if (this.cacheService) {
+      try {
+        const counterKeys = await this.cacheService.keys('metrics:booking_readiness:counter:*');
+        const latencyKeys = await this.cacheService.keys('metrics:booking_readiness:latency:*');
+        await Promise.all([
+          ...counterKeys.map((k) => this.cacheService!.del(k)),
+          ...latencyKeys.map((k) => this.cacheService!.del(k)),
+        ]);
+      } catch (err: unknown) {
+        const errMsg = err instanceof Error ? err.message : String(err);
+        this.logger.warn(`Failed to reset cache metrics: ${errMsg}`);
+      }
+    }
+  }
+
   increment(metric: BookingReadinessMetricCounter | string, amount = 1): void {
     const current = this.counters.get(metric) ?? 0;
     this.counters.set(metric, current + amount);
+
+    if (this.cacheService) {
+      this.cacheService
+        .incrby(`metrics:booking_readiness:counter:${metric}`, amount)
+        .catch((err: unknown) => {
+          const errMsg = err instanceof Error ? err.message : String(err);
+          this.logger.warn(`Failed to sync counter ${metric} to cache: ${errMsg}`);
+        });
+    }
   }
 
   getMetric(metric: BookingReadinessMetricCounter | string): number {
@@ -80,6 +117,7 @@ export class BookingReadinessMetricsService {
   }
 
   recordLatency(operation: string, latencyMs: number): void {
+    const rounded = Math.max(0, Math.round(latencyMs));
     if (!this.latencySamples.has(operation)) {
       this.latencySamples.set(operation, []);
     }
@@ -87,7 +125,18 @@ export class BookingReadinessMetricsService {
     if (samples.length >= this.maxSamples) {
       samples.shift();
     }
-    samples.push(Math.max(0, Math.round(latencyMs)));
+    samples.push(rounded);
+
+    if (this.cacheService) {
+      const key = `metrics:booking_readiness:latency:${operation}`;
+      Promise.all([
+        this.cacheService.lpush(key, String(rounded)),
+        this.cacheService.ltrim(key, 0, this.maxSamples - 1),
+      ]).catch((err: unknown) => {
+        const errMsg = err instanceof Error ? err.message : String(err);
+        this.logger.warn(`Failed to sync latency sample for ${operation} to cache: ${errMsg}`);
+      });
+    }
   }
 
   private calculatePercentile(sorted: number[], percentile: number): number {
@@ -96,8 +145,7 @@ export class BookingReadinessMetricsService {
     return sorted[Math.max(0, Math.min(sorted.length - 1, index))];
   }
 
-  getLatencyPercentiles(operation: string): LatencyPercentiles {
-    const raw = this.latencySamples.get(operation) ?? [];
+  private computePercentiles(raw: number[]): LatencyPercentiles {
     if (raw.length === 0) {
       return { count: 0, p50: 0, p90: 0, p95: 0, p99: 0, min: 0, max: 0, avg: 0 };
     }
@@ -115,7 +163,43 @@ export class BookingReadinessMetricsService {
     };
   }
 
-  getHealthSnapshot(): BookingReadinessHealthSnapshot {
+  getLatencyPercentiles(operation: string): LatencyPercentiles {
+    const raw = this.latencySamples.get(operation) ?? [];
+    return this.computePercentiles(raw);
+  }
+
+  async getHealthSnapshot(): Promise<BookingReadinessHealthSnapshot> {
+    let dbStatus: 'up' | 'down' = 'up';
+    if (this.prisma) {
+      try {
+        await this.prisma.$transaction(
+          async (tx) => {
+            await tx.$executeRawUnsafe('SET LOCAL statement_timeout = 500');
+            await tx.$queryRaw`SELECT 1`;
+          },
+          {
+            maxWait: 150,
+            timeout: 150,
+          },
+        );
+      } catch (err: unknown) {
+        const errMsg = err instanceof Error ? err.message : String(err);
+        this.logger.error(`Database health check failed in readiness metrics: ${errMsg}`);
+        dbStatus = 'down';
+      }
+    }
+
+    let redisStatus: 'up' | 'down' = 'up';
+    if (this.cacheService) {
+      try {
+        redisStatus = await this.cacheService.checkHealth();
+      } catch (err: unknown) {
+        const errMsg = err instanceof Error ? err.message : String(err);
+        this.logger.warn(`Redis health check failed in readiness metrics: ${errMsg}`);
+        redisStatus = 'down';
+      }
+    }
+
     const metrics: Record<string, number> = {};
     for (const metric of STANDARDIZED_READINESS_METRICS) {
       metrics[metric] = this.counters.get(metric) ?? 0;
@@ -124,9 +208,70 @@ export class BookingReadinessMetricsService {
       metrics[key] = value;
     }
 
+    if (this.cacheService && redisStatus === 'up') {
+      try {
+        const counterKeys = await this.cacheService.keys('metrics:booking_readiness:counter:*');
+        for (const key of counterKeys) {
+          const metricName = key.replace('metrics:booking_readiness:counter:', '');
+          const val = await this.cacheService.get(key);
+          if (val !== null) {
+            const num = parseInt(val, 10) || 0;
+            metrics[metricName] = Math.max(metrics[metricName] ?? 0, num);
+          }
+        }
+        for (const metric of STANDARDIZED_READINESS_METRICS) {
+          if (!counterKeys.includes(`metrics:booking_readiness:counter:${metric}`)) {
+            const val = await this.cacheService.get(`metrics:booking_readiness:counter:${metric}`);
+            if (val !== null) {
+              const num = parseInt(val, 10) || 0;
+              metrics[metric] = Math.max(metrics[metric] ?? 0, num);
+            }
+          }
+        }
+      } catch (err: unknown) {
+        const errMsg = err instanceof Error ? err.message : String(err);
+        this.logger.warn(`Failed to merge distributed counters from cache: ${errMsg}`);
+      }
+    }
+
     const latency: Record<string, LatencyPercentiles> = {};
-    for (const operation of this.latencySamples.keys()) {
-      latency[operation] = this.getLatencyPercentiles(operation);
+    const latencyOps = new Set<string>([...this.latencySamples.keys()]);
+
+    if (this.cacheService && redisStatus === 'up') {
+      try {
+        const latencyKeys = await this.cacheService.keys('metrics:booking_readiness:latency:*');
+        for (const key of latencyKeys) {
+          latencyOps.add(key.replace('metrics:booking_readiness:latency:', ''));
+        }
+      } catch (err: unknown) {
+        const errMsg = err instanceof Error ? err.message : String(err);
+        this.logger.warn(`Failed to fetch latency keys from cache: ${errMsg}`);
+      }
+    }
+
+    for (const operation of latencyOps) {
+      let samples: number[] = [];
+      if (this.cacheService && redisStatus === 'up') {
+        try {
+          const rawList = await this.cacheService.lrange(
+            `metrics:booking_readiness:latency:${operation}`,
+            0,
+            -1,
+          );
+          if (rawList && rawList.length > 0) {
+            samples = rawList.map((s) => parseInt(s, 10)).filter((n) => !isNaN(n));
+          }
+        } catch (err: unknown) {
+          const errMsg = err instanceof Error ? err.message : String(err);
+          this.logger.warn(`Failed to read latency samples for ${operation} from cache: ${errMsg}`);
+        }
+      }
+
+      if (samples.length === 0) {
+        samples = this.latencySamples.get(operation) ?? [];
+      }
+
+      latency[operation] = this.computePercentiles(samples);
     }
 
     const flagVal =
@@ -134,8 +279,15 @@ export class BookingReadinessMetricsService {
       process.env.FEATURE_FLAG_BOOKING_READINESS;
     const bookingReadiness = flagVal === 'true';
 
+    const status: 'ok' | 'degraded' =
+      dbStatus === 'down' || redisStatus === 'down' ? 'degraded' : 'ok';
+
     return {
-      status: 'ok',
+      status,
+      dependencies: {
+        database: dbStatus,
+        redis: redisStatus,
+      },
       metrics,
       latency,
       featureFlags: {
