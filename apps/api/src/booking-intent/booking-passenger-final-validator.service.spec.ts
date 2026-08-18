@@ -10,7 +10,7 @@ import {
 } from './booking-passenger-final-validator.service';
 
 const INTENT_ID = 'intent-val-123';
-const ENCRYPTION_KEY = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
+const ENCRYPTION_KEY = 'a'.repeat(64);
 
 function buildDomesticPassenger(
   overrides: Partial<BookingIntentPassengerRecord> = {},
