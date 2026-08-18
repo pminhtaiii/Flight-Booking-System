@@ -180,7 +180,10 @@ function ChatWidgetInner(): JSX.Element {
         onHandoff: acceptHandoffEvent,
         onError: setErrorMessage,
       });
-      return () => controller.abort();
+      return () => {
+        controller.abort();
+        autoResumedRef.current = false;
+      };
     }
   }, [autoResume, activeSessionId, token, acceptActionRequiredEvent, handleDone, acceptHandoffEvent]);
 
