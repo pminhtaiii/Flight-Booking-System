@@ -1,9 +1,10 @@
-import { Controller, Get, Res, HttpStatus, Logger } from '@nestjs/common';
+import { Controller, Get, Res, HttpStatus, Logger, Optional } from '@nestjs/common';
 import { Response } from 'express';
 import { PrismaService } from '@/prisma/prisma.service';
 import { CacheService } from '@/cache/cache.service';
 import { DuffelProcessorHealthService } from '@/disruption/webhook/duffel-processor-health.service';
 import { AgentHealthService } from '@/health/agent-health.service';
+import { BookingReadinessMetricsService } from '@/common/observability/booking-readiness.metrics';
 
 @Controller(['health', 'api/health'])
 export class HealthController {
@@ -14,6 +15,7 @@ export class HealthController {
     private readonly duffelHealth: DuffelProcessorHealthService,
     private readonly cacheService: CacheService,
     private readonly agentHealthService: AgentHealthService,
+    @Optional() private readonly readinessMetrics?: BookingReadinessMetricsService,
   ) {}
 
   @Get()
@@ -136,6 +138,19 @@ export class HealthController {
         error: error instanceof Error ? error.message : String(error),
       });
     }
+  }
+
+  @Get('booking-readiness')
+  getBookingReadiness(@Res() res: Response): Response {
+    if (!this.readinessMetrics) {
+      return res.status(HttpStatus.OK).json({
+        status: 'ok',
+        metrics: {},
+        latency: {},
+        featureFlags: { bookingReadiness: false },
+      });
+    }
+    return res.status(HttpStatus.OK).json(this.readinessMetrics.getHealthSnapshot());
   }
 
   @Get('ping')

@@ -1,8 +1,9 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Optional } from '@nestjs/common';
 import {
   ALLOWED_METADATA_KEYS,
   BookingReadinessOperation,
 } from '../common/observability/booking-readiness-observability.types';
+import { BookingReadinessMetricsService } from '../common/observability/booking-readiness.metrics';
 
 export type BookingReadinessObservabilityContext = {
   traceId?: string;
@@ -65,16 +66,27 @@ function safeMetadata(metadata: Record<string, unknown> | undefined): Record<str
 export class BookingReadinessObservability {
   private readonly logger = new Logger('BookingReadinessObservability');
 
+  constructor(
+    @Optional() private readonly metricsService?: BookingReadinessMetricsService,
+  ) {}
+
   recordOutcome(event: BookingReadinessObservabilityEvent): void {
+    const operation = event.operation ?? BookingReadinessOperation.READINESS_ADVISORY;
+    const latencyMs = Math.max(0, Math.round(event.latencyMs));
+
+    if (this.metricsService) {
+      this.metricsService.recordLatency(operation, latencyMs);
+    }
+
     const payload = {
       timestamp: new Date().toISOString(),
       level: event.error ? 'error' : 'warn',
       service: 'api',
       trace_id: sanitizeIdentifier(event.context?.traceId),
       correlation_id: sanitizeIdentifier(event.context?.correlationId),
-      operation: event.operation ?? BookingReadinessOperation.READINESS_ADVISORY,
+      operation,
       status: event.status,
-      latency_ms: Math.max(0, Math.round(event.latencyMs)),
+      latency_ms: latencyMs,
       metadata: safeMetadata(event.metadata),
     };
 

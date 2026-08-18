@@ -2,6 +2,7 @@ import {
   HttpException,
   HttpStatus,
   Injectable,
+  Optional,
   UnprocessableEntityException,
 } from '@nestjs/common';
 import { PassengerType } from '@prisma/client';
@@ -11,6 +12,10 @@ import {
   BookingReadinessObservabilityContext,
 } from './booking-readiness.observability';
 import { BookingReadinessOperation } from '@/common/observability/booking-readiness-observability.types';
+import {
+  BookingReadinessMetricsService,
+  BOOKING_READINESS_METRIC_COUNTERS,
+} from '@/common/observability/booking-readiness.metrics';
 
 export type DuffelIdentityDocument = {
   type: string;
@@ -124,6 +129,7 @@ export class BookingPassengerFinalValidatorService {
   constructor(
     private readonly encryptionService: EncryptionService,
     private readonly observability: BookingReadinessObservability,
+    @Optional() private readonly metricsService?: BookingReadinessMetricsService,
   ) {}
 
   validateAndMapPassengers(
@@ -156,6 +162,7 @@ export class BookingPassengerFinalValidatorService {
     options?: FinalPassengerValidationOptions,
   ): FinalPassengerValidationResult {
     const startedAt = Date.now();
+    this.metricsService?.increment(BOOKING_READINESS_METRIC_COUNTERS.BOOKING_PASSENGER_FINAL_VALIDATION);
     const now = options?.now ?? new Date();
     const passengers = intent.passengers ?? [];
     const passengerCount = passengers.length;
@@ -230,6 +237,7 @@ export class BookingPassengerFinalValidatorService {
         },
       };
     } catch (error) {
+      this.metricsService?.increment(BOOKING_READINESS_METRIC_COUNTERS.BOOKING_PASSENGER_FINAL_VALIDATION_FAILURES);
       const latencyMs = Date.now() - startedAt;
       const reasonCode =
         (error instanceof HttpException &&
