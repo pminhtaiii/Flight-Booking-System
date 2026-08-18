@@ -14,6 +14,7 @@ import { BookingReadinessObservability } from './booking-readiness.observability
 import { BookingReadinessService } from './booking-readiness.service';
 import { PassengerSourceResolverService } from './passenger-source-resolver.service';
 import { PassengerSnapshotService } from './passenger-snapshot.service';
+import { BookingPassengerFinalValidatorService } from './booking-passenger-final-validator.service';
 import { HandoffFastFailGuard } from './guards/handoff-fast-fail.guard';
 
 @Module({
@@ -26,6 +27,7 @@ import { HandoffFastFailGuard } from './guards/handoff-fast-fail.guard';
     BookingReadinessObservability,
     PassengerSourceResolverService,
     PassengerSnapshotService,
+    BookingPassengerFinalValidatorService,
     EncryptionService,
     BookingIntentCron,
     HandoffFastFailGuard,
@@ -36,6 +38,7 @@ import { HandoffFastFailGuard } from './guards/handoff-fast-fail.guard';
     BookingReadinessObservability,
     PassengerSourceResolverService,
     PassengerSnapshotService,
+    BookingPassengerFinalValidatorService,
     HandoffFastFailGuard,
   ],
 })
