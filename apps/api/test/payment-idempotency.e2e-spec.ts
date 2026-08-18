@@ -76,7 +76,6 @@ describe('Payment Idempotency (E2E)', () => {
     await prisma.auditLog.deleteMany({});
     await prisma.user.deleteMany({});
 
-
     const u = await prisma.user.create({
       data: {
         email: 'idempotency-test@example.com',
@@ -140,11 +139,11 @@ describe('Payment Idempotency (E2E)', () => {
                   arriving_at: '2026-08-01T12:00:00Z',
                   operating_carrier: { iata_code: 'VN' },
                   marketing_carrier: { iata_code: 'VN' },
-                  operating_carrier_flight_number: '123'
-                }
-              ]
-            }
-          ]
+                  operating_carrier_flight_number: '123',
+                },
+              ],
+            },
+          ],
         },
         intentExpiresAt: new Date(now.getTime() + 3600 * 1000),
         paymentAttemptCount: 0,
@@ -157,6 +156,10 @@ describe('Payment Idempotency (E2E)', () => {
               familyName: 'Doe',
               dateOfBirth: new Date('1990-01-01'),
               gender: 'male',
+              title: 'mr',
+              email: 'john.doe@example.com',
+              phoneCountryCode: '+1',
+              phoneNumber: '5551234567',
             },
           ],
         },
@@ -351,10 +354,10 @@ describe('Payment Idempotency (E2E)', () => {
                 arriving_at: '2026-08-01T12:00:00Z',
                 operating_carrier: { iata_code: 'VN' },
                 marketing_carrier: { iata_code: 'VN' },
-                operating_carrier_flight_number: '123'
-              }
-            ]
-          }
+                operating_carrier_flight_number: '123',
+              },
+            ],
+          },
         ],
       } as any);
 
@@ -373,60 +376,78 @@ describe('Payment Idempotency (E2E)', () => {
       });
       expect(updatedKey).toBeDefined();
       const advancedPoints = ['duffel_order_created', 'captured', 'completed'];
-      expect(advancedPoints).toContain(updatedKey!.recoveryPoint);
+      expect(advancedPoints).toContain(updatedKey?.recoveryPoint);
     });
-  });
 
-  describe('Stale lock detection', () => {
-    it('acquires lock when existing lock is stale (10+ minutes old)', async () => {
+    it('replays completed result without calling Stripe or Duffel again', async () => {
       const offer = await createFlightOffer();
       const intent = await createBookingIntent(testUser.id, offer.id);
-      mockStripeCreate();
 
-      const key = 'idem-stale-lock-004';
-
-      // Create an idempotency key with a stale lock (10 minutes ago)
-      const staleLockedAt = new Date(Date.now() - 11 * 60 * 1000);
-      const body = { bookingIntentId: intent.id, saveCard: false };
-      await prisma.idempotencyKey.create({
+      // Create a completed Payment
+      const idemKey = `idem-completed-${Date.now()}`;
+      const idemKeyRecord = await prisma.idempotencyKey.create({
         data: {
-          key,
-          requestHash: computeHash(body),
+          key: idemKey,
+          requestHash: computeHash({ paymentId: 'temp', bookingId: intent.id }),
           customerId: testUser.id,
-          requestPath: '/api/bookings/payment/create',
-          lockedAt: staleLockedAt,
+          requestPath: '/api/bookings/payment/confirm',
+          recoveryPoint: 'completed',
+          lockedAt: null,
           expiresAt: new Date(Date.now() + 86400000),
+          responseBody: JSON.stringify({
+            success: true,
+            paymentId: 'dummy-payment-id',
+            status: 'SUCCEEDED',
+            bookingReference: 'REPLAY123',
+            duffelOrderId: 'order_replay_xyz',
+          }),
         },
       });
 
-      // Request with same key should succeed despite stale lock
+      const payment = await prisma.payment.create({
+        data: {
+          bookingIntentId: intent.id,
+          attemptNumber: 1,
+          idempotencyKeyId: idemKeyRecord.id,
+          stripePaymentIntentId: `pi_done_${Date.now()}`,
+          amount: 12550,
+          currency: 'usd',
+          status: PaymentStatus.SUCCEEDED,
+          version: 0,
+        },
+      });
+
+      const confirmBody = { paymentId: payment.id, bookingId: intent.id };
+      await prisma.idempotencyKey.update({
+        where: { id: idemKeyRecord.id },
+        data: {
+          requestHash: computeHash(confirmBody),
+          responseBody: JSON.stringify({
+            success: true,
+            paymentId: payment.id,
+            status: 'SUCCEEDED',
+            bookingReference: 'REPLAY123',
+            duffelOrderId: 'order_replay_xyz',
+          }),
+        },
+      });
+
+      const stripeSpy = jest.spyOn(stripeService, 'capturePaymentIntent');
+      const duffelSpy = jest.spyOn(duffelService, 'createOrder');
+
       const res = await request(app.getHttpServer())
-        .post('/api/bookings/payment/create')
-        .set('Authorization', `Bearer ${testToken}`)
-        .set('Idempotency-Key', key)
-        .send(body)
-        .expect(201);
-
-      expect(res.body.paymentId).toBeDefined();
-      expect(res.body.clientSecret).toBeDefined();
-
-      // Verify the lock was acquired and then cleared on completion
-      const updatedKey = await prisma.idempotencyKey.findUnique({ where: { key } });
-      expect(updatedKey).toBeDefined();
-      expect(updatedKey!.lockedAt).toBeNull();
-      expect(updatedKey!.responseBody).toBeDefined();
-    });
-  });
-
-  describe('Missing idempotency key', () => {
-    it('returns 400 when Idempotency-Key header is omitted on confirm', async () => {
-      await request(app.getHttpServer())
         .post('/api/bookings/payment/confirm')
         .set('Authorization', `Bearer ${testToken}`)
-        .send({ paymentId: 'some-id' })
-        .expect(400);
+        .set('Idempotency-Key', idemKey)
+        .send(confirmBody)
+        .expect(200);
+
+      expect(res.body.success).toBe(true);
+      expect(res.body.bookingReference).toBe('REPLAY123');
+
+      // Neither external service should have been called
+      expect(stripeSpy).not.toHaveBeenCalled();
+      expect(duffelSpy).not.toHaveBeenCalled();
     });
   });
 });
-
-

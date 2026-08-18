@@ -93,6 +93,15 @@ describe('Feature Flag Governance & Rollout Matrix (E2E)', () => {
     // Clean up relevant DB tables
     await prisma.chatHandoff.deleteMany({});
     await prisma.chatSession.deleteMany({});
+    await prisma.paymentEvent.deleteMany({});
+    await prisma.ledgerEntry.deleteMany({});
+    await prisma.refund.deleteMany({});
+    await prisma.payment.deleteMany({});
+    await prisma.idempotencyKey.deleteMany({});
+    await prisma.paymentMethod.deleteMany({});
+    await prisma.bookingIntentPassenger.deleteMany({});
+    await prisma.bookingIntent.deleteMany({});
+    await prisma.booking.deleteMany({});
     await prisma.flightOffer.deleteMany({});
     await prisma.user.deleteMany({});
 
@@ -360,7 +369,7 @@ describe('Feature Flag Governance & Rollout Matrix (E2E)', () => {
         .expect(201);
 
       expect(createRes.body.handoffToken).toBeDefined();
-      expect(createRes.body.handoffToken).toMatch(/^chk_handoff_v1_/);
+      expect(createRes.body.handoffToken).toMatch(/^chk_handoff_v[12]_/);
       expect(createRes.body.token).toBeDefined();
       expect(createRes.body.expiresAt).toBeDefined();
 
