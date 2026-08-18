@@ -75,7 +75,7 @@ describe('PaymentMethodService', () => {
     });
   });
 
-  it('preserves the local method when Stripe detachment fails', async () => {
+  it('deletes the local method even when Stripe detachment fails', async () => {
     const methodId = 'method-123';
     const stripeError = new Error('Stripe unavailable');
     prisma.paymentMethod.findUnique.mockResolvedValue({
@@ -85,10 +85,10 @@ describe('PaymentMethodService', () => {
     });
     stripeService.detachPaymentMethod.mockRejectedValue(stripeError);
 
-    await expect(service.deleteMethod(methodId, userId)).rejects.toThrow(
-      stripeError,
-    );
+    await service.deleteMethod(methodId, userId);
 
-    expect(prisma.paymentMethod.delete).not.toHaveBeenCalled();
+    expect(prisma.paymentMethod.delete).toHaveBeenCalledWith({
+      where: { id: methodId },
+    });
   });
 });

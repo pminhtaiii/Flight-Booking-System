@@ -211,6 +211,13 @@ User clicks "Continue to Payment" → server-side validation pipeline:
 - **Observability boundary**: Advisory outcomes emit structured API events with sanitized trace/correlation identifiers and allowlisted aggregate metadata only; observability failures cannot change the endpoint result.
 - **Phase 8 canonical intent boundary**: First-party checkout uses `POST /api/bookings/intents/readiness` followed by `POST /api/bookings/intents`; every passenger source is resolved and authoritatively evaluated before a short transaction creates the intent, immutable snapshots, and audit record. The singular `/api/bookings/intent` routes remain deprecated compatibility aliases, and create/get responses expose only masked passenger/document/contact summaries with legacy passport keys set to `null`.
 - **Checkout source integrity**: Canonical profile sources carry `expectedProfileRevision`; the server rechecks revisions immediately before persistence and rejects stale profiles without writes. Inline sources carry complete identity/contact data, while browser checkout submits server-provided offer passenger IDs and never derives itinerary scope locally.
+- **Phase 12C Final Passenger Safety & Supplier Order Protection**: `BookingPassengerFinalValidatorService` sits immediately before `DuffelService.createOrder()` inside `PaymentService.executeConfirmPayment` step 2 (`stripe_authorized` recovery point). It enforces:
+  - Cryptographically bound AES-256-GCM decryption with context `{ snapshotVersion, intentId, position, fieldName }`. Swapped positions or tampered ciphertext fail closed immediately with `SNAPSHOT_INTEGRITY_FAILURE`.
+  - Decrypt-then-expiry strict ordering: ciphertext MAC checked prior to date parsing.
+  - Live clock and trip completion date revalidation against document expiry (`DOCUMENT_EXPIRED`) and offer expiry (`OFFER_EXPIRED` 409).
+  - Ephemeral Duffel passenger DTO generated in memory only for the active payment claim owner.
+  - Fail-closed boundary: On validation failure, Stripe authorization hold is automatically voided/cancelled, payment marked `CANCELLED`, booking `FAILED`, durable PII-safe audit log `final_passenger_validation_failed` recorded, and exactly ZERO calls made to Duffel.
+  - Zero Plaintext Invariant: Decrypted PII never logged, never persisted, and never returned in API error responses.
 
 ### Booking Management Read Model (Deterministic Path — No AI)
 

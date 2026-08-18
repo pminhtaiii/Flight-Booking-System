@@ -7,13 +7,34 @@ Update this file after every completed feature. Any AI agent reading this should
 ### Current Status
 
 **Feature:** Traveler Profile & Booking Readiness (Feature 16)
-**Last completed:** Phase 12B / Secure Chat-to-Form Handoff & Action Card (2026-08-18).
+**Last completed:** Phase 12C / Final Passenger Safety & Supplier Order Protection (User Story 5 / Tasks T066–T072) (2026-08-18).
 **In progress:** None.
-**Next:** Feature 16 Phase 11 / Final Passenger Safety (User Story 5 / T066–T072).
+**Next:** Phase 12 Polish / Release Gates.
 
 ---
 
 ## Progress by Feature
+
+### [x] Feature: Traveler Profile & Booking Readiness (Feature 16)
+
+- [x] Phase 12C / Final Passenger Safety & Supplier Order Protection (Tasks T066–T072) (2026-08-18):
+  - **Final Passenger Validator Service (`apps/api/src/booking-intent/booking-passenger-final-validator.service.ts`)**:
+    - Record-bound AES-256-GCM decryption with cryptographic context `{ snapshotVersion, intentId, position, fieldName }`. Tampered ciphertext, swapped positions, or mismatched intent IDs fail closed immediately with `SNAPSHOT_INTEGRITY_FAILURE`.
+    - Enforced decrypt-then-expiry strict ordering: MAC tag verified before any date parsing.
+    - Live clock & trip completion date revalidation: Expired travel documents rejected with `DOCUMENT_EXPIRED`. Expired offers rejected with `OFFER_EXPIRED` (HTTP 409).
+    - Scope detection: Domestic requires identity + contact fields; international requires complete travel documents.
+    - Ephemeral Duffel passenger DTO generated in memory only for the active payment claim owner immediately before order creation.
+    - Zero Plaintext Invariant: Decrypted PII never logged, never persisted, and never returned in API error responses.
+  - **Payment Pipeline Integration (`apps/api/src/payment/payment.service.ts`)**:
+    - Integrated validator into `executeConfirmPayment` step 2 (`stripe_authorized` recovery point) before `duffelService.createOrder()`.
+    - Fail-closed boundary: On validation failure, Stripe authorization hold is automatically voided/cancelled, payment marked `CANCELLED`, booking `FAILED`, and durable PII-safe audit log `final_passenger_validation_failed` recorded. Exactly ZERO calls made to Duffel.
+    - On success: passes ephemeral passenger DTO to `duffelService.createOrder()` and logs `final_passenger_validation_succeeded`.
+  - **Automated Verification & Zero-PII Audit**:
+    - Unit tests (`booking-passenger-final-validator.service.spec.ts`): 20/20 tests PASS.
+    - Payment integration tests (`payment.service.spec.ts`): 16/16 tests PASS.
+    - E2E tests (`booking-passenger-final-validation.e2e-spec.ts`): 7/7 tests PASS.
+    - Negative PII audit: Zero PII leaked across logs, audit records, and error responses.
+    - Workspace tests: 73/73 API test suites (710/710 tests) PASS, Next.js build passes (20/20 routes).
 
 ### [x] Feature: Chatbot Backend Infrastructure & Booking Handoff (Feature 17)
 
