@@ -167,7 +167,7 @@ function ChatWidgetInner(): JSX.Element {
 
   // Auto-resume hook
   useEffect(() => {
-    if (autoResume && activeSessionId && !autoResumedRef.current) {
+    if (autoResume && activeSessionId && token && !autoResumedRef.current) {
       autoResumedRef.current = true;
       const controller = new AbortController();
       void consumeChatStream({

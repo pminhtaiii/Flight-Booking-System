@@ -572,7 +572,8 @@ test.describe('Booking Readiness Chat Handoff', () => {
     // 7. User clicks Save profile
     await page.getByRole('button', { name: 'Save profile' }).click();
 
-    // 8. User returns back to chat via return link or auto-redirect
+    // 8. User returns back to chat via return link
+    await page.getByRole('link', { name: /Return and continue booking/i }).click();
     await expect(page).toHaveURL(new RegExp(`.*\\/\\?sessionId=${activeSessionId}&autoResume=true`), { timeout: 15000 });
 
     // 9. Verify stream re-check occurred automatically on chat widget mount with autoResume=true
