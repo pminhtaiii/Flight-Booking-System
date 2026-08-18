@@ -2,6 +2,7 @@ import {
   Controller,
   Get,
   Patch,
+  Put,
   Body,
   UseGuards,
   Req,
@@ -51,6 +52,7 @@ export class ProfileController {
   }
 
   @Patch()
+  @Put()
   async updateProfile(
     @Req() req: AuthenticatedRequest,
     @Headers() headers: Record<string, string>,

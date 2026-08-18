@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { PrismaModule } from '../prisma/prisma.module';
 import { AuditModule } from '../audit/audit.module';
 import { EncryptionService } from '../common/encryption.service';
+import { BookingReadinessMetricsService } from '../common/observability/booking-readiness.metrics';
 import { PassportExpiryBackfillService } from './passport-expiry-backfill.service';
 import { PassportExpiryBackfillController } from './passport-expiry-backfill.controller';
 import { ProfileService } from './profile.service';

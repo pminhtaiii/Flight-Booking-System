@@ -1,7 +1,11 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Optional } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { PrismaService } from '../prisma/prisma.service';
 import { EncryptionService } from '../common/encryption.service';
+import {
+  BookingReadinessMetricsService,
+  BOOKING_READINESS_METRIC_COUNTERS,
+} from '../common/observability/booking-readiness.metrics';
 
 export interface BackfillOptions {
   batchSize?: number;
@@ -21,6 +25,7 @@ export class PassportExpiryBackfillService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly encryptionService: EncryptionService,
+    @Optional() private readonly metricsService?: BookingReadinessMetricsService,
   ) {}
 
   @Cron(CronExpression.EVERY_DAY_AT_MIDNIGHT)
@@ -37,6 +42,7 @@ export class PassportExpiryBackfillService {
   }
 
   async backfill(options?: BackfillOptions): Promise<BackfillResult> {
+    this.metricsService?.increment(BOOKING_READINESS_METRIC_COUNTERS.PASSPORT_EXPIRY_BACKFILL_RUNS);
     const batchSize = options?.batchSize ?? 100;
     const abortThresholdRatio = options?.abortThresholdRatio ?? 0.1;
 
@@ -105,6 +111,7 @@ export class PassportExpiryBackfillService {
 
         if (isNaN(decryptedTime) || legacyTime !== decryptedTime) {
           quarantined++;
+          this.metricsService?.increment(BOOKING_READINESS_METRIC_COUNTERS.PASSPORT_EXPIRY_BACKFILL_QUARANTINED);
           this.logger.warn({
             message: `Quarantine profile ${profile.id} due to date mismatch.`,
             profileId: profile.id,
@@ -117,6 +124,7 @@ export class PassportExpiryBackfillService {
         }
       } catch (err) {
         quarantined++;
+        this.metricsService?.increment(BOOKING_READINESS_METRIC_COUNTERS.PASSPORT_EXPIRY_BACKFILL_QUARANTINED);
         this.logger.warn({
           message: `Quarantine profile ${profile.id} due to decryption failure.`,
           profileId: profile.id,
