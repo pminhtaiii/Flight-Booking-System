@@ -19,7 +19,7 @@ interface PassengerFormClientProps {
   handoff?: boolean;
 }
 
-interface FormPassenger {
+type FormPassenger = {
   offerPassengerId: string;
   type: 'ADULT' | 'CHILD' | 'INFANT';
   givenName: string;
@@ -158,32 +158,61 @@ export function PassengerFormClient({
     return Object.keys(errors).length === 0;
   };
 
-  const buildSources = (): CheckoutPassengerRequest[] => passengers.map((passenger, index) => ({
-    offerPassengerId: passenger.offerPassengerId || `passenger-${index + 1}`,
-    type: passenger.type,
-    source: profileSelected && index === 0 && profile?.profileId
-      ? {
-          type: 'traveler_profile' as const,
-          travelerProfileId: profile.profileId,
-          expectedProfileRevision: profile.revision,
-        }
-      : {
-          type: 'inline' as const,
-          givenName: passenger.givenName.trim(),
-          familyName: passenger.familyName.trim(),
-          dateOfBirth: passenger.dateOfBirth,
-          gender: passenger.gender,
-          nationality: passenger.nationality.trim().toUpperCase(),
-          documentType: passenger.documentType.trim() || null,
-          passportNumber: passenger.passportNumber.trim() || null,
-          passportExpiry: passenger.passportExpiry || null,
-          issuingCountry: passenger.issuingCountry.trim().toUpperCase() || null,
-          email: passenger.email.trim(),
-          phoneCountryCode: passenger.phoneCountryCode.trim(),
-          phoneNumber: passenger.phoneNumber.trim(),
-          title: passenger.title.trim(),
-        },
-  }));
+  const resetProfileConflict = () => {
+    setProfileSelected(false);
+    setProfileStale(true);
+    setPassengers((prev) => {
+      const updated = [...prev];
+      if (updated[0]) {
+        updated[0] = {
+          ...updated[0],
+          givenName: '',
+          familyName: '',
+          dateOfBirth: '',
+          gender: 'male',
+          title: 'Mr',
+          email: '',
+          phoneCountryCode: '+1',
+          phoneNumber: '',
+          nationality: '',
+          documentType: '',
+          passportNumber: '',
+          passportExpiry: '',
+          issuingCountry: '',
+        };
+      }
+      return updated;
+    });
+  };
+
+  const buildSources = (): CheckoutPassengerRequest[] =>
+    passengers.map((passenger, index) => ({
+      offerPassengerId: passenger.offerPassengerId || `passenger-${index + 1}`,
+      type: passenger.type,
+      source:
+        profileSelected && index === 0 && profile?.profileId
+          ? {
+              type: 'traveler_profile' as const,
+              travelerProfileId: profile.profileId,
+              expectedProfileRevision: profile.revision ?? 0,
+            }
+          : {
+              type: 'inline' as const,
+              givenName: passenger.givenName.trim(),
+              familyName: passenger.familyName.trim(),
+              dateOfBirth: passenger.dateOfBirth,
+              gender: passenger.gender,
+              nationality: passenger.nationality.trim().toUpperCase(),
+              documentType: passenger.documentType.trim() || null,
+              passportNumber: passenger.passportNumber.trim() || null,
+              passportExpiry: passenger.passportExpiry || null,
+              issuingCountry: passenger.issuingCountry.trim().toUpperCase() || null,
+              email: passenger.email.trim(),
+              phoneCountryCode: passenger.phoneCountryCode.trim(),
+              phoneNumber: passenger.phoneNumber.trim(),
+              title: passenger.title.trim(),
+            },
+    }));
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -200,74 +229,70 @@ export function PassengerFormClient({
     const sources = buildSources();
 
     try {
-      const readinessResponse = await fetch(handoff ? '/api/checkout/handoff/readiness' : `${apiUrl}/api/bookings/intents/readiness`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(handoff ? {} : { Authorization: `Bearer ${accessToken}` }),
-          'x-trace-id': traceId,
-          'x-correlation-id': correlationId,
+      const readinessResponse = await fetch(
+        handoff ? '/api/checkout/handoff/readiness' : `${apiUrl}/api/bookings/intents/readiness`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            ...(handoff ? {} : { Authorization: `Bearer ${accessToken}` }),
+            'x-trace-id': traceId,
+            'x-correlation-id': correlationId,
+          },
+          cache: 'no-store',
+          body: JSON.stringify({
+            ...(handoff ? {} : { flightOfferId: offerId }),
+            passengers: sources.map((passenger) => ({
+              offerPassengerId: passenger.offerPassengerId,
+              passengerType: passenger.type,
+              source: passenger.source,
+            })),
+          }),
         },
-        cache: 'no-store',
-        body: JSON.stringify({
-          ...(handoff ? {} : { flightOfferId: offerId }),
-          passengers: sources.map((passenger) => ({
-            offerPassengerId: passenger.offerPassengerId,
-            passengerType: passenger.type,
-            source: passenger.source,
-          })),
-        }),
-      });
-      const readiness = (await readinessResponse.json().catch(() => null)) as BookingReadinessResponse | { code?: string } | null;
+      );
+      const readiness = (await readinessResponse.json().catch(() => null)) as
+        | BookingReadinessResponse
+        | { code?: string; message?: string }
+        | null;
+
       if (!readinessResponse.ok) {
-        throw new Error(safeErrorMessage(readinessResponse.status, readiness && 'code' in readiness ? readiness.code : null));
+        const code = readiness && 'code' in readiness ? readiness.code : null;
+        if (readinessResponse.status === 409 && code === 'PROFILE_CHANGED') {
+          resetProfileConflict();
+        }
+        throw new Error(safeErrorMessage(readinessResponse.status, code));
       }
       if (!readiness || !('ready' in readiness) || !readiness.ready) {
         throw new Error('The server needs more passenger details before this booking can continue.');
       }
 
-      const createResponse = await fetch(handoff ? '/api/checkout/handoff/intents' : `${apiUrl}/api/bookings/intents`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(handoff ? {} : { Authorization: `Bearer ${accessToken}` }),
-          'x-trace-id': traceId,
-          'x-correlation-id': correlationId,
+      const createResponse = await fetch(
+        handoff ? '/api/checkout/handoff/intents' : `${apiUrl}/api/bookings/intents`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            ...(handoff ? {} : { Authorization: `Bearer ${accessToken}` }),
+            'x-trace-id': traceId,
+            'x-correlation-id': correlationId,
+          },
+          cache: 'no-store',
+          body: JSON.stringify({
+            ...(handoff ? {} : { flightOfferId: offerId }),
+            readinessScope: readiness.scope,
+            passengers: sources,
+          }),
         },
-        cache: 'no-store',
-        body: JSON.stringify({
-          ...(handoff ? {} : { flightOfferId: offerId }),
-          readinessScope: readiness.scope,
-          passengers: sources,
-        }),
-      });
-      const createBody = await createResponse.json().catch(() => null) as { code?: string; intentId?: string } | null;
+      );
+      const createBody = (await createResponse.json().catch(() => null)) as {
+        code?: string;
+        intentId?: string;
+        message?: string;
+      } | null;
+
       if (!createResponse.ok || !createBody?.intentId) {
         if (createResponse.status === 409 && createBody?.code === 'PROFILE_CHANGED') {
-          setProfileSelected(false);
-          setProfileStale(true);
-          setPassengers((prev) => {
-            const updated = [...prev];
-            if (updated[0]) {
-              updated[0] = {
-                ...updated[0],
-                givenName: '',
-                familyName: '',
-                dateOfBirth: '',
-                gender: 'male',
-                title: 'Mr',
-                email: '',
-                phoneCountryCode: '+1',
-                phoneNumber: '',
-                nationality: '',
-                documentType: '',
-                passportNumber: '',
-                passportExpiry: '',
-                issuingCountry: '',
-              };
-            }
-            return updated;
-          });
+          resetProfileConflict();
         }
         throw new Error(safeErrorMessage(createResponse.status, createBody?.code));
       }

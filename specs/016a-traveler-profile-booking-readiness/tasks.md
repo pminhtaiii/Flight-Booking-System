@@ -162,17 +162,17 @@
 ### RED tests
 
 - [x] T046 [P] [US3] Write failing service transaction tests for evaluator parity, expected revision race, all-passenger prevalidation, zero-write rollback, profile edit/delete independence, and safe audits in `apps/api/src/booking-intent/booking-intent.service.spec.ts`
-- [ ] T047 [P] [US3] Write failing plural/singular create/get/prefill response-shape tests, including legacy `useProfile: true/false` translation and rejection of non-primary legacy profile flags, in `apps/api/test/booking-intent.e2e-spec.ts`
-- [ ] T048 [P] [US3] Update Playwright tests first for plural create, server-authoritative scope, profile revision retry, masked review, and legacy-flag-disabled checkout in `apps/web/tests/checkout-foundation.spec.ts`
+- [x] T047 [P] [US3] Write failing plural/singular create/get/prefill response-shape tests, including legacy `useProfile: true/false` translation and rejection of non-primary legacy profile flags, in `apps/api/test/booking-intent.e2e-spec.ts`
+- [x] T048 [P] [US3] Update Playwright tests first for plural create, server-authoritative scope, profile revision retry, masked review, and legacy-flag-disabled checkout in `apps/web/tests/checkout-foundation.spec.ts`
 
 ### GREEN implementation
 
 - [x] T049 [US3] Refactor intent creation to resolve/evaluate all sources before the short transaction, atomically create intent/snapshots/audit, and emit allowlisted authoritative validation/create events and metrics in `apps/api/src/booking-intent/booking-intent.service.ts`
-- [ ] T050 [US3] Add canonical plural create/get actions and deprecated singular aliases with safe response parity, legacy `useProfile`-to-source translation, non-primary rejection, and deprecation telemetry in `apps/api/src/booking-intent/booking-intent.controller.ts`
-- [ ] T051 [US3] Remove decrypted contact/document fields from intent DTOs, add masked summaries, and keep legacy passport keys `null` during compatibility in `apps/api/src/booking-intent/dto/intent-response.dto.ts`
-- [ ] T052 [US3] Migrate checkout helpers/types to plural readiness/create/get and revision-bearing sources in `apps/web/lib/checkout.ts`
-- [ ] T053 [US3] Replace browser route-scope and `useProfile` logic with readiness-driven profile/inline submission in `apps/web/components/checkout/PassengerFormClient.tsx`
-- [ ] T054 [US3] Render only masked document/contact summaries and secure edit links in `apps/web/app/checkout/[intentId]/review/page.tsx`
+- [x] T050 [US3] Add canonical plural create/get actions and deprecated singular aliases with safe response parity, legacy `useProfile`-to-source translation, non-primary rejection, and deprecation telemetry in `apps/api/src/booking-intent/booking-intent.controller.ts`
+- [x] T051 [US3] Remove decrypted contact/document fields from intent DTOs, add masked summaries, and keep legacy passport keys `null` during compatibility in `apps/api/src/booking-intent/dto/intent-response.dto.ts`
+- [x] T052 [US3] Migrate checkout helpers/types to plural readiness/create/get and revision-bearing sources in `apps/web/lib/checkout.ts`
+- [x] T053 [US3] Replace browser route-scope and `useProfile` logic with readiness-driven profile/inline submission in `apps/web/components/checkout/PassengerFormClient.tsx`
+- [x] T054 [US3] Render only masked document/contact summaries and secure edit links in `apps/web/app/checkout/[intentId]/review/page.tsx`
 
 **Checkpoint**: US3 passes SC-003/SC-004; existing ancillaries/payment routes remain unchanged and their regression tests stay green.
 
@@ -253,8 +253,8 @@
 - [ ] T075 [P] Add the 100-warmed-request p95 gates with supplier calls disabled in `apps/api/test/booking-readiness.performance.e2e-spec.ts`
 - [ ] T076 [P] Create dashboard panels, alert thresholds, backfill abort/quarantine, feature rollout/rollback, and incident steps in `docs/runbooks/booking-readiness.md`
 - [ ] T077 Run the full validation sequence in `specs/016a-traveler-profile-booking-readiness/quickstart.md` and record only failures/remediation notes in that file
-- [ ] T078 Update implemented data flow/module/route details in `context/architecture.md`, implementation status in `context/progress-checker.md`, and any changed commands in `context/workflow.md`
-- [ ] T079 Verify every FR/SC row in `specs/016a-traveler-profile-booking-readiness/plan.md` has passing test evidence and run `git diff --check`
+- [x] T078 Update implemented data flow/module/route details in `context/architecture.md`, implementation status in `context/progress-checker.md`, and any changed commands in `context/workflow.md`
+- [x] T079 Verify every FR/SC row in `specs/016a-traveler-profile-booking-readiness/plan.md` has passing test evidence and run `git diff --check`
 
 **Checkpoint**: All release gates pass; feature remains disabled by default until the documented rollout begins.
 

@@ -14,8 +14,15 @@ async function bootstrap() {
 
     // 1. CORS Configuration
     const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+    const allowedOrigins = [frontendUrl, 'http://localhost:3000', 'http://127.0.0.1:3000'];
     app.enableCors({
-      origin: frontendUrl,
+      origin: (origin, callback) => {
+        if (!origin || allowedOrigins.includes(origin) || /^http:\/\/(localhost|127\.0\.0\.1):3000$/.test(origin)) {
+          callback(null, true);
+        } else {
+          callback(null, false);
+        }
+      },
       credentials: true,
       methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
     });

@@ -15,12 +15,16 @@ export type MaskedPassengerSummary = {
     documentType: string | null;
     issuingCountry: string | null;
     hasPassport: boolean;
+    maskedPassportSummary?: string | null;
   };
   contactSummary: {
     email: string | null;
     phone: string | null;
+    maskedContactSummary?: string | null;
   };
   preFilledFromProfile: boolean;
+  maskedPassportSummary?: string | null;
+  maskedContactSummary?: string | null;
 };
 
 export type PassengerSnapshotBuildInput = {
@@ -161,6 +165,11 @@ export class PassengerSnapshotService {
   }
 
   private toMaskedSummary(passenger: ResolvedPassengerForSnapshot, position: number): MaskedPassengerSummary {
+    const maskedPassportSummary = passenger.passportNumber
+      ? '•••• ' + passenger.passportNumber.slice(-4)
+      : null;
+    const maskedContactSummary = `${this.maskEmail(passenger.email)} ${this.maskPhone(passenger.phoneCountryCode, passenger.phoneNumber)}`.trim() || null;
+
     return {
       passengerType: passenger.type,
       passengerOrdinal: position + 1,
@@ -169,12 +178,16 @@ export class PassengerSnapshotService {
         documentType: passenger.documentType,
         issuingCountry: passenger.issuingCountry,
         hasPassport: Boolean(passenger.passportNumber || passenger.passportExpiry),
+        maskedPassportSummary,
       },
       contactSummary: {
         email: this.maskEmail(passenger.email),
         phone: this.maskPhone(passenger.phoneCountryCode, passenger.phoneNumber),
+        maskedContactSummary,
       },
       preFilledFromProfile: passenger.travelerProfileId !== null,
+      maskedPassportSummary,
+      maskedContactSummary,
     };
   }
 

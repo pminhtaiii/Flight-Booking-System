@@ -650,7 +650,6 @@ export class BookingIntentService {
         type: passenger.type,
         givenName: passenger.givenName,
         familyName: passenger.familyName,
-        dateOfBirth: this.toDateOnly(passenger.dateOfBirth),
         gender: passenger.gender,
         nationality: passenger.nationality,
         passportNumber: null,
@@ -1040,6 +1039,12 @@ export class BookingIntentService {
       ? (passenger.position as number) + 1
       : fallbackPosition + 1;
 
+    const hasPassport = Boolean(passenger.passportNumber || passenger.passportExpiry);
+    const maskedPassportSummary = hasPassport ? '•••• ••••' : null;
+    const emailMasked = this.maskEmail(passenger.email ?? null);
+    const phoneMasked = this.maskPhone(passenger.phoneCountryCode ?? null, passenger.phoneNumber ?? null);
+    const maskedContactSummary = [emailMasked, phoneMasked].filter(Boolean).join(' ').trim() || null;
+
     return {
       id: passenger.id,
       passengerType: passenger.type,
@@ -1048,13 +1053,17 @@ export class BookingIntentService {
       documentSummary: {
         documentType: passenger.documentType ?? null,
         issuingCountry: passenger.issuingCountry ?? null,
-        hasPassport: Boolean(passenger.passportNumber || passenger.passportExpiry),
+        hasPassport,
+        maskedPassportSummary,
       },
       contactSummary: {
-        email: this.maskEmail(passenger.email ?? null),
-        phone: this.maskPhone(passenger.phoneCountryCode ?? null, passenger.phoneNumber ?? null),
+        email: emailMasked,
+        phone: phoneMasked,
+        maskedContactSummary,
       },
       preFilledFromProfile: passenger.travelerProfileId !== null && passenger.travelerProfileId !== undefined,
+      maskedPassportSummary,
+      maskedContactSummary,
     };
   }
 

@@ -13,11 +13,13 @@ export class BookingIntentDocumentSummaryDto {
   documentType!: string | null;
   issuingCountry!: string | null;
   hasPassport!: boolean;
+  maskedPassportSummary?: string | null;
 }
 
 export class BookingIntentContactSummaryDto {
   email!: string | null;
   phone!: string | null;
+  maskedContactSummary?: string | null;
 }
 
 export class BookingIntentPassengerSummaryDto {
@@ -28,6 +30,8 @@ export class BookingIntentPassengerSummaryDto {
   documentSummary!: BookingIntentDocumentSummaryDto;
   contactSummary!: BookingIntentContactSummaryDto;
   preFilledFromProfile!: boolean;
+  maskedPassportSummary?: string | null;
+  maskedContactSummary?: string | null;
 
   // Kept as null-only compatibility keys for clients that still deserialize
   // the pre-Phase-8 shape. They must never be populated with sensitive data.
@@ -41,7 +45,6 @@ export class BookingIntentPassengerDetailDto extends BookingIntentPassengerSumma
   type!: string;
   givenName!: string;
   familyName!: string;
-  dateOfBirth!: string;
   gender!: string;
   nationality!: string | null;
 }
