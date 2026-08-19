@@ -33,6 +33,10 @@ import {
   type ChatTelemetryOperation,
 } from '@/common/observability/chat-observability';
 import {
+  BookingReadinessMetricsService,
+  BOOKING_READINESS_METRIC_COUNTERS,
+} from '@/common/observability/booking-readiness.metrics';
+import {
   BookingIntentPrefillResponseDto,
   CreateBookingIntentResponseDto,
   GetBookingIntentResponseDto,
@@ -304,6 +308,7 @@ export class BookingIntentService {
     const [liveOffer, authoritativeReadiness] = await Promise.all([liveOfferPromise, readinessPromise]);
 
     if (authoritativeReadiness && !authoritativeReadiness.ready) {
+      this.metricsService?.increment(BOOKING_READINESS_METRIC_COUNTERS.BOOKING_INTENT_AUTHORITATIVE_REJECTIONS);
       throw new HttpException(
         {
           code: 'BOOKING_NOT_READY',
@@ -539,9 +544,13 @@ export class BookingIntentService {
       }
 
       return { intent, passengers, maskedPassengers };
+    }, {
+      maxWait: 10000,
+      timeout: 15000,
     });
 
     isSuccess = true;
+    this.metricsService?.increment(BOOKING_READINESS_METRIC_COUNTERS.BOOKING_INTENT_CREATIONS);
     return {
       intentId: created.intent.id,
       status: created.intent.status,

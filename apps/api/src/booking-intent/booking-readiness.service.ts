@@ -3,12 +3,17 @@ import {
   HttpStatus,
   Injectable,
   NotFoundException,
+  Optional,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PassengerType } from '@prisma/client';
 import { AirportsService } from '@/airports/airports.service';
 import { ProfileService } from '@/profile/profile.service';
 import { PrismaService } from '@/prisma/prisma.service';
+import {
+  BookingReadinessMetricsService,
+  BOOKING_READINESS_METRIC_COUNTERS,
+} from '@/common/observability/booking-readiness.metrics';
 import {
   BookingReadinessInlineSourceDto,
   BookingReadinessPassengerDto,
@@ -185,6 +190,7 @@ export class BookingReadinessService {
     private readonly bookingReadinessObservability: BookingReadinessObservability,
     private readonly configService: ConfigService,
     private readonly chatHandoffService: ChatHandoffService,
+    @Optional() private readonly metricsService?: BookingReadinessMetricsService,
   ) {}
 
   async getAdvisoryReadiness(
@@ -193,6 +199,8 @@ export class BookingReadinessService {
     context?: ReadinessContext,
   ): Promise<BookingReadinessResponseDto> {
     const startedAt = Date.now();
+    this.metricsService?.increment(BOOKING_READINESS_METRIC_COUNTERS.BOOKING_READINESS_CHECKS);
+    this.metricsService?.increment(BOOKING_READINESS_METRIC_COUNTERS.BOOKING_READINESS_EVALUATIONS);
 
     try {
       this.assertFeatureEnabled();
@@ -289,6 +297,8 @@ export class BookingReadinessService {
     context?: ReadinessContext,
   ): Promise<BookingReadinessResponseDto> {
     const startedAt = Date.now();
+    this.metricsService?.increment(BOOKING_READINESS_METRIC_COUNTERS.BOOKING_READINESS_CHECKS);
+    this.metricsService?.increment(BOOKING_READINESS_METRIC_COUNTERS.BOOKING_READINESS_EVALUATIONS);
 
     try {
       this.assertFeatureEnabled();

@@ -19,6 +19,7 @@ import { AncillariesModule } from './ancillaries/ancillaries.module';
 import { ProfileModule } from './profile/profile.module';
 import { ChatHandoffModule } from './chat-handoff/chat-handoff.module';
 import { DataDriftSentinelModule } from './common/sentinel/data-drift-sentinel.module';
+import { BookingReadinessMetricsModule } from './common/observability/booking-readiness-metrics.module';
 
 import { z } from 'zod';
 
@@ -85,6 +86,7 @@ export const envSchema = z.object({
     ProfileModule,
     ChatHandoffModule,
     DataDriftSentinelModule,
+    BookingReadinessMetricsModule,
   ],
   controllers: [],
   providers: [],

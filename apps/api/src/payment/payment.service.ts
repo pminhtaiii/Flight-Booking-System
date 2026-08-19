@@ -29,6 +29,7 @@ import { forwardRef, Inject } from '@nestjs/common';
 import { FlightSnapshot, PassengerSnapshot } from '@shared/booking-types';
 import { AncillaryPaymentValidationService } from '@/payment/ancillary-payment-validation.service';
 import type { ValidatedAncillaryPayment } from '@/payment/ancillary-payment-validation.service';
+import { BookingPassengerFinalValidatorService } from '@/booking-intent/booking-passenger-final-validator.service';
 
 function majorUnitsToMinorBigInt(amount: string): bigint {
   const match = /^(\d+)(?:\.(\d{1,2}))?$/.exec(amount);
@@ -228,7 +229,10 @@ export class PaymentService {
     private readonly paymentMethodService: PaymentMethodService,
     @Inject(forwardRef(() => BookingService))
     private readonly bookingService: BookingService,
+    @Optional()
     private readonly ancillaryPaymentValidation?: AncillaryPaymentValidationService,
+    @Optional()
+    private readonly bookingPassengerFinalValidator?: BookingPassengerFinalValidatorService,
   ) {}
 
   /**
@@ -930,11 +934,17 @@ export class PaymentService {
     dto: ConfirmPaymentDto,
     idempotencyKey: string,
     userId: string,
+    traceContext?: { traceId?: string; correlationId?: string },
   ): Promise<unknown> {
     let isFinished = false;
     const confirmPromise = (async () => {
       try {
-        const result = await this.executeConfirmPayment(dto, idempotencyKey, userId);
+        const result = await this.executeConfirmPayment(
+          dto,
+          idempotencyKey,
+          userId,
+          traceContext,
+        );
         isFinished = true;
         return result;
       } catch (error) {
@@ -982,6 +992,7 @@ export class PaymentService {
     dto: ConfirmPaymentDto,
     idempotencyKey: string,
     userId: string,
+    traceContext?: { traceId?: string; correlationId?: string },
   ): Promise<unknown> {
     try {
       // 1. Check/acquire the request idempotency key
@@ -1021,6 +1032,15 @@ export class PaymentService {
 
       if (payment.bookingIntent.userId !== userId) {
         throw new ForbiddenException('You do not own this payment');
+      }
+
+      if (dto.bookingId && typeof this.prisma.booking?.findUnique === 'function') {
+        const requestedBooking = await this.prisma.booking.findUnique({
+          where: { id: dto.bookingId },
+        });
+        if (requestedBooking && requestedBooking.userId !== userId) {
+          throw new ForbiddenException('You do not own this booking');
+        }
       }
 
       // 3. Create canonical booking in PROCESSING state
@@ -1167,6 +1187,149 @@ export class PaymentService {
           servicesMap.entries(),
         ).map(([id, quantity]) => ({ id, quantity }));
 
+        let passengersToOrder: unknown[];
+        if (this.bookingPassengerFinalValidator) {
+          try {
+            const ephemeralPassengers =
+              this.bookingPassengerFinalValidator.validateAndMapPassengers(
+                bookingIntent,
+                {
+                  traceId: traceContext?.traceId,
+                  correlationId: traceContext?.correlationId,
+                },
+              );
+            passengersToOrder = ephemeralPassengers;
+
+            await this.auditService.createLog(this.prisma, {
+              userId,
+              action: 'final_passenger_validation_succeeded',
+              resourceType: 'BookingIntent',
+              resourceId: bookingIntent.id,
+              metadata: {
+                paymentId: payment.id,
+                passengerCount: bookingIntent.passengers.length,
+              },
+              traceId: traceContext?.traceId,
+              correlationId: traceContext?.correlationId,
+            });
+          } catch (validationError: unknown) {
+            const error = validationError as Error;
+            const responseObj =
+              validationError instanceof HttpException
+                ? (validationError.getResponse() as Record<string, unknown> | string)
+                : null;
+            const reasonCode =
+              typeof responseObj === 'object' && responseObj !== null && 'code' in responseObj
+                ? (responseObj as { code: string }).code
+                : 'FINAL_PASSENGER_VALIDATION_FAILED';
+            const status =
+              validationError instanceof HttpException
+                ? validationError.getStatus()
+                : HttpStatus.UNPROCESSABLE_ENTITY;
+
+            this.logger.error(
+              `Final passenger validation failed for booking intent ${bookingIntent.id}: ${error.message}`,
+              error.stack,
+            );
+
+            await this.auditService.createLog(this.prisma, {
+              userId,
+              action: 'final_passenger_validation_failed',
+              resourceType: 'BookingIntent',
+              resourceId: bookingIntent.id,
+              metadata: {
+                reasonCode,
+                intentId: bookingIntent.id,
+                paymentId: payment.id,
+                passengerCount: bookingIntent.passengers.length,
+              },
+              traceId: traceContext?.traceId,
+              correlationId: traceContext?.correlationId,
+            });
+
+            // Void / cancel Stripe authorization hold via this.stripeService.cancelPaymentIntent(payment.stripePaymentIntentId)
+            try {
+              await this.stripeService.cancelPaymentIntent(payment.stripePaymentIntentId);
+            } catch (stripeCancelError: unknown) {
+              const stripeError = stripeCancelError as Error;
+              this.logger.error(
+                `Stripe cancelPaymentIntent failed after passenger validation error: ${stripeError.message}`,
+                stripeError.stack,
+              );
+            }
+
+            // Update Payment, BookingIntent, and Booking status atomically
+            enforceTransition(payment.status, 'CANCELLED');
+            const nextBookingStatus =
+              bookingIntent.paymentAttemptCount < 2 ? 'AWAITING_PAYMENT' : 'CANCELLED';
+            await this.prisma.$transaction(async (tx) => {
+              await tx.payment.update({
+                where: { id: payment.id },
+                data: { status: 'CANCELLED' },
+              });
+              await tx.paymentEvent.create({
+                data: {
+                  paymentId: payment.id,
+                  eventType: 'payment_cancelled',
+                  previousStatus: payment.status,
+                  newStatus: 'CANCELLED',
+                  amount: payment.amount,
+                  source: 'API',
+                  createdBy: userId,
+                },
+              });
+              await tx.bookingIntent.update({
+                where: { id: bookingIntent.id },
+                data: { status: nextBookingStatus },
+              });
+              await this.bookingService.updateToFailed(
+                canonicalBooking.id,
+                BookingFailureReason.SYSTEM_ERROR,
+                undefined,
+                undefined,
+                undefined,
+                tx,
+              );
+            });
+
+            // Update recovery point to completed and complete idempotency key
+            await this.idempotencyService.updateRecoveryPoint(idempotencyKey, 'completed');
+            const failureResponse = {
+              success: false,
+              error: `Passenger validation failed: ${typeof responseObj === 'object' && responseObj !== null && 'message' in responseObj ? responseObj.message : error.message || 'Validation failed'}. Payment hold released.`,
+              code: reasonCode,
+              bookingStatus: nextBookingStatus,
+            };
+            await this.idempotencyService.completeKey(
+              idempotencyKey,
+              status,
+              failureResponse,
+            );
+
+            throw new HttpException(failureResponse, status);
+          }
+        } else {
+          passengersToOrder = bookingIntent.passengers.map((p) => {
+            const mapped: any = { ...p };
+            if (p.title) {
+              mapped.title = p.title;
+            } else {
+              delete mapped.title;
+            }
+            if (p.email) {
+              mapped.email = p.email;
+            } else {
+              delete mapped.email;
+            }
+            if (p.phoneNumber) {
+              mapped.phoneNumber = p.phoneNumber;
+            } else {
+              delete mapped.phoneNumber;
+            }
+            return mapped;
+          });
+        }
+
         let duffelOrder: unknown;
         try {
           const recheckedPayment = await this.prisma.payment.findUnique({
@@ -1206,25 +1369,7 @@ export class PaymentService {
           }
           duffelOrder = await this.duffelService.createOrder(
             bookingIntent.duffelOfferId,
-            bookingIntent.passengers.map(p => {
-              const mapped: any = { ...p };
-              if (p.title) {
-                mapped.title = p.title;
-              } else {
-                delete mapped.title;
-              }
-              if (p.email) {
-                mapped.email = p.email;
-              } else {
-                delete mapped.email;
-              }
-              if (p.phoneNumber) {
-                mapped.phoneNumber = p.phoneNumber;
-              } else {
-                delete mapped.phoneNumber;
-              }
-              return mapped;
-            }),
+            passengersToOrder as any,
             services.length > 0 ? services : undefined,
             { bookingIntentId: bookingIntent.id, paymentId: payment.id },
             idempotencyKey,

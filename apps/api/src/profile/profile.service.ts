@@ -1,9 +1,13 @@
-import { Injectable, ConflictException, NotFoundException } from '@nestjs/common';
+import { Injectable, ConflictException, NotFoundException, Optional } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '@/prisma/prisma.service';
 import { EncryptionService } from '@/common/encryption.service';
 import { AuditService } from '@/audit/audit.service';
+import {
+  BookingReadinessMetricsService,
+  BOOKING_READINESS_METRIC_COUNTERS,
+} from '@/common/observability/booking-readiness.metrics';
 import { UpdateProfileDto } from './dto/update-profile.dto';
 import { ProfileResponseDto } from './dto/profile-response.dto';
 
@@ -14,6 +18,7 @@ export class ProfileService {
     private readonly encryptionService: EncryptionService,
     private readonly auditService: AuditService,
     private readonly configService: ConfigService,
+    @Optional() private readonly metricsService?: BookingReadinessMetricsService,
   ) {}
 
   private checkFeatureEnabled() {
@@ -30,6 +35,7 @@ export class ProfileService {
 
   async getProfile(userId: string): Promise<ProfileResponseDto> {
     this.checkFeatureEnabled();
+    this.metricsService?.increment(BOOKING_READINESS_METRIC_COUNTERS.TRAVELER_PROFILE_READS);
 
     const dbProfile = await this.prisma.travelerProfile.findUnique({
       where: { userId },
@@ -246,6 +252,7 @@ export class ProfileService {
       if (!currentProfile) {
         // Upsert: profile doesn't exist
         if (updateDto.expectedRevision !== 0) {
+          this.metricsService?.increment(BOOKING_READINESS_METRIC_COUNTERS.TRAVELER_PROFILE_CONFLICTS);
           throw new ConflictException('PROFILE_UPDATE_CONFLICT');
         }
 
@@ -258,9 +265,11 @@ export class ProfileService {
           });
         } catch (err: any) {
           if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
+            this.metricsService?.increment(BOOKING_READINESS_METRIC_COUNTERS.TRAVELER_PROFILE_CONFLICTS);
             throw new ConflictException('PROFILE_UPDATE_CONFLICT');
           }
           if (err?.code === 'P2002') {
+            this.metricsService?.increment(BOOKING_READINESS_METRIC_COUNTERS.TRAVELER_PROFILE_CONFLICTS);
             throw new ConflictException('PROFILE_UPDATE_CONFLICT');
           }
           throw err;
@@ -281,6 +290,7 @@ export class ProfileService {
       } else {
         // Exists: CAS revision check
         if (currentProfile.revision !== updateDto.expectedRevision) {
+          this.metricsService?.increment(BOOKING_READINESS_METRIC_COUNTERS.TRAVELER_PROFILE_CONFLICTS);
           throw new ConflictException('PROFILE_UPDATE_CONFLICT');
         }
 
@@ -293,9 +303,11 @@ export class ProfileService {
           });
         } catch (err: any) {
           if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2025') {
+            this.metricsService?.increment(BOOKING_READINESS_METRIC_COUNTERS.TRAVELER_PROFILE_CONFLICTS);
             throw new ConflictException('PROFILE_UPDATE_CONFLICT');
           }
           if (err?.code === 'P2025') {
+            this.metricsService?.increment(BOOKING_READINESS_METRIC_COUNTERS.TRAVELER_PROFILE_CONFLICTS);
             throw new ConflictException('PROFILE_UPDATE_CONFLICT');
           }
           throw err;
@@ -316,6 +328,7 @@ export class ProfileService {
       }
     });
 
+    this.metricsService?.increment(BOOKING_READINESS_METRIC_COUNTERS.TRAVELER_PROFILE_UPDATES);
     return this.getProfile(userId);
   }
 }

@@ -14,9 +14,16 @@ import { PaymentCronService } from './payment-cron.service';
 import { BookingModule } from '../booking/booking.module';
 import { AdminRefundController } from './admin-refund.controller';
 import { AncillaryPaymentValidationService } from './ancillary-payment-validation.service';
+import { BookingIntentModule } from '../booking-intent/booking-intent.module';
 
 @Module({
-  imports: [PrismaModule, DuffelModule, AuditModule, forwardRef(() => BookingModule)],
+  imports: [
+    PrismaModule,
+    DuffelModule,
+    AuditModule,
+    forwardRef(() => BookingModule),
+    forwardRef(() => BookingIntentModule),
+  ],
   controllers: [PaymentController, PaymentWebhookController, AdminRefundController],
   providers: [
     StripeService,

@@ -229,16 +229,16 @@
 
 ### RED tests
 
-- [ ] T066 [P] [US5] Write failing final-validator unit tests for AAD authentication, decrypt-then-expiry ordering, completeness, current clock, ephemeral DTO, and plaintext-free errors in `apps/api/src/booking-intent/booking-passenger-final-validator.service.spec.ts`
-- [ ] T067 [P] [US5] Write failing payment/order integration tests for claim ownership, frozen versions, concurrent submit, lease loss, stable idempotency, and unknown supplier replay in `apps/api/src/payment/payment.service.spec.ts`
-- [ ] T068 [P] [US5] Write failing E2E tests asserting zero/one Duffel calls and durable PII-safe audit records for every expiry/completeness/AAD/lease/concurrency final-validation outcome in `apps/api/test/booking-passenger-final-validation.e2e-spec.ts`
+- [x] T066 [P] [US5] Write failing final-validator unit tests for AAD authentication, decrypt-then-expiry ordering, completeness, current clock, ephemeral DTO, and plaintext-free errors in `apps/api/src/booking-intent/booking-passenger-final-validator.service.spec.ts`
+- [x] T067 [P] [US5] Write failing payment/order integration tests for claim ownership, frozen versions, concurrent submit, lease loss, stable idempotency, and unknown supplier replay in `apps/api/src/payment/payment.service.spec.ts`
+- [x] T068 [P] [US5] Write failing E2E tests asserting zero/one Duffel calls and durable PII-safe audit records for every expiry/completeness/AAD/lease/concurrency final-validation outcome in `apps/api/test/booking-passenger-final-validation.e2e-spec.ts`
 
 ### GREEN implementation
 
-- [ ] T069 [US5] Implement trusted bound-field authentication/decryption, completeness/expiry validation, ephemeral Duffel passenger mapping, and safe outcome objects for auditing in `apps/api/src/booking-intent/booking-passenger-final-validator.service.ts`
-- [ ] T070 [US5] Register/export the final validator from `apps/api/src/booking-intent/booking-intent.module.ts`
-- [ ] T071 [US5] Invoke the validator only inside the existing payment/order idempotency owner after version freeze, persist a durable audit for every safe final-validation outcome with trace/correlation IDs inside the owning transaction/recovery boundary, and call `DuffelService.createOrder()` only after success in `apps/api/src/payment/payment.service.ts`
-- [ ] T072 [US5] Add PII-safe final-validation metrics/reasons and trace continuity in `apps/api/src/booking-intent/booking-readiness.observability.ts`
+- [x] T069 [US5] Implement trusted bound-field authentication/decryption, completeness/expiry validation, ephemeral Duffel passenger mapping, and safe outcome objects for auditing in `apps/api/src/booking-intent/booking-passenger-final-validator.service.ts`
+- [x] T070 [US5] Register/export the final validator from `apps/api/src/booking-intent/booking-intent.module.ts`
+- [x] T071 [US5] Invoke the validator only inside the existing payment/order idempotency owner after version freeze, persist a durable audit for every safe final-validation outcome with trace/correlation IDs inside the owning transaction/recovery boundary, and call `DuffelService.createOrder()` only after success in `apps/api/src/payment/payment.service.ts`
+- [x] T072 [US5] Add PII-safe final-validation metrics/reasons and trace continuity in `apps/api/src/booking-intent/booking-readiness.observability.ts`
 
 **Checkpoint**: US5 satisfies SC-006 without a second submission state machine or duplicate supplier call.
 
