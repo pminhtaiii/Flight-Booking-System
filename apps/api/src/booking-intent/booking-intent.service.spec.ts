@@ -46,9 +46,15 @@ type TestableService = {
 
 type CanonicalPrismaMock = {
   flightOffer: { findUnique: jest.Mock };
-  travelerProfile: { findFirst: jest.Mock };
-  bookingIntent: { create: jest.Mock };
-  bookingIntentPassenger: { create: jest.Mock };
+  travelerProfile: { findFirst: jest.Mock; findUnique?: jest.Mock };
+  bookingIntent: {
+    create: jest.Mock;
+    findUnique?: jest.Mock;
+    findMany?: jest.Mock;
+    updateMany?: jest.Mock;
+    deleteMany?: jest.Mock;
+  };
+  bookingIntentPassenger: { create: jest.Mock; createMany?: jest.Mock };
   $transaction: jest.Mock;
 };
 
@@ -155,8 +161,9 @@ describe('BookingIntentService Refinements', () => {
       };
       const resolver = new PassengerSourceResolverService(prisma as never, encryption as never);
       const snapshot = new PassengerSnapshotService(encryption as never);
+      const readiness = { evaluateAuthoritativeReadiness: jest.fn().mockResolvedValue({ ready: true, scope: 'DOMESTIC' }) };
       const Service = BookingIntentService as unknown as new (...args: unknown[]) => BookingIntentService;
-      const service = new Service(prisma, duffel, audit, encryption, undefined, resolver, snapshot);
+      const service = new Service(prisma, duffel, audit, encryption, readiness, resolver, snapshot);
 
       const result = await service.createIntent('user-1', {
         flightOfferId: offerId,
@@ -287,12 +294,13 @@ describe('BookingIntentService Refinements', () => {
       };
       const resolver = new PassengerSourceResolverService(prisma as never, encryption as never);
       const snapshot = new PassengerSnapshotService(encryption as never);
+      const readiness = { evaluateAuthoritativeReadiness: jest.fn().mockResolvedValue({ ready: true, scope: 'DOMESTIC' }) };
       const service = new (BookingIntentService as unknown as new (...args: unknown[]) => BookingIntentService)(
         prisma,
         duffel,
         { createLog: jest.fn() },
         encryption,
-        undefined,
+        readiness,
         resolver,
         snapshot,
       );
@@ -314,6 +322,937 @@ describe('BookingIntentService Refinements', () => {
         } as never),
       ).rejects.toMatchObject({ response: { code: 'PROFILE_CHANGED' } });
       expect(prisma.bookingIntent.create).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('Authoritative intent creation and zero-write transactions', () => {
+    let prisma: CanonicalPrismaMock;
+    let duffel: { getOfferById: jest.Mock };
+    let audit: { createLog: jest.Mock };
+    let encryption: MockEncryptionService;
+    let readinessService: { evaluateAuthoritativeReadiness: jest.Mock };
+    let readinessObservability: { recordOutcome: jest.Mock };
+    let resolver: PassengerSourceResolverService;
+    let snapshot: PassengerSnapshotService;
+    let service: BookingIntentService;
+
+    beforeEach(() => {
+      prisma = {
+        flightOffer: { findUnique: jest.fn() },
+        travelerProfile: { findFirst: jest.fn(), findUnique: jest.fn() },
+        bookingIntent: {
+          create: jest.fn().mockImplementation(({ data }) =>
+            Promise.resolve({ id: data.id || 'intent-1', status: 'PENDING', ...data }),
+          ),
+          findUnique: jest.fn(),
+        },
+        bookingIntentPassenger: {
+          create: jest.fn().mockImplementation(({ data }) =>
+            Promise.resolve({ id: `passenger-${Math.random()}`, ...data }),
+          ),
+        },
+        $transaction: jest.fn(async (callback: (tx: CanonicalPrismaMock) => Promise<unknown>) => callback(prisma)),
+      };
+
+      duffel = {
+        getOfferById: jest.fn().mockResolvedValue({
+          total_amount: '350.00',
+          total_currency: 'USD',
+          expires_at: null,
+          passengers: [
+            { id: 'duffel-pas-1', type: 'adult' },
+            { id: 'duffel-pas-2', type: 'child' },
+          ],
+        }),
+      };
+
+      audit = { createLog: jest.fn().mockResolvedValue({ id: 'log-1' }) };
+
+      encryption = {
+        encrypt: jest.fn((val: string) => `enc-${val}`),
+        decrypt: jest.fn((val: string) => `dec-${val}`),
+        encryptBound: jest.fn((val: string, ctx: Record<string, unknown>) => `bound-enc-${val}-${ctx.fieldName}`),
+        decryptBound: jest.fn((val: string) => `bound-dec-${val}`),
+      };
+
+      readinessService = {
+        evaluateAuthoritativeReadiness: jest.fn().mockResolvedValue({
+          ready: true,
+          scope: 'INTERNATIONAL',
+          passengers: [],
+          tripCompletionDate: '2026-08-10',
+          advisoryBufferDays: 180,
+        }),
+      };
+
+      readinessObservability = {
+        recordOutcome: jest.fn(),
+      };
+
+      resolver = new PassengerSourceResolverService(prisma as never, encryption as never);
+      snapshot = new PassengerSnapshotService(encryption as never);
+      const Service = BookingIntentService as unknown as new (...args: unknown[]) => BookingIntentService;
+      service = new Service(
+        prisma as never,
+        duffel as never,
+        audit as never,
+        encryption as never,
+        readinessService as never,
+        resolver,
+        snapshot,
+        undefined,
+        readinessObservability as never,
+      );
+    });
+
+    describe('Evaluator Parity & Zero-Write', () => {
+      it('throws 422 BOOKING_NOT_READY and executes 0 database writes when passenger travel documents are invalid or expired for international flight', async () => {
+        prisma.flightOffer.findUnique.mockResolvedValue({
+          id: 'offer-intl-1',
+          duffelOfferId: 'duffel-intl-1',
+          price: 500,
+          origin: 'SGN',
+          destination: 'NRT',
+          departureDate: new Date('2026-08-01T00:00:00.000Z'),
+          returnDate: new Date('2026-08-10T00:00:00.000Z'),
+          cabinClass: 'ECONOMY',
+          adults: 1,
+          children: 0,
+          infants: 0,
+          rawOffer: {
+            passengers: [{ id: 'duffel-pas-1', type: 'adult' }],
+            slices: [
+              {
+                segments: [
+                  {
+                    origin: { iata_code: 'SGN' },
+                    destination: { iata_code: 'NRT' },
+                    arriving_at: '2026-08-01T10:00:00Z',
+                  },
+                ],
+              },
+            ],
+          },
+        });
+
+        readinessService.evaluateAuthoritativeReadiness.mockResolvedValueOnce({
+          ready: false,
+          scope: 'INTERNATIONAL',
+          passengers: [
+            {
+              offerPassengerId: 'pas_001',
+              passengerOrdinal: 1,
+              status: 'INVALID_DOCUMENT',
+              missingFields: [],
+              invalidFields: ['passportExpiry'],
+            },
+          ],
+          tripCompletionDate: '2026-08-10',
+          advisoryBufferDays: 180,
+        });
+
+        const callPromise = service.createIntent('user-1', {
+          flightOfferId: 'offer-intl-1',
+          passengers: [
+            {
+              offerPassengerId: 'pas_001',
+              type: 'ADULT',
+              source: {
+                type: 'inline',
+                givenName: 'Alan',
+                familyName: 'Turing',
+                dateOfBirth: '1912-06-23',
+                gender: 'male',
+                nationality: 'GB',
+                documentType: 'passport',
+                passportNumber: 'GB12345678',
+                passportExpiry: '2020-01-01',
+                issuingCountry: 'GB',
+                email: 'alan@turing.test',
+                phoneCountryCode: '+44',
+                phoneNumber: '7000000001',
+                title: 'MR',
+              },
+            },
+          ],
+        } as never);
+
+        await expect(callPromise).rejects.toMatchObject({
+          status: HttpStatus.UNPROCESSABLE_ENTITY,
+          response: expect.objectContaining({
+            code: 'BOOKING_NOT_READY',
+            ready: false,
+            scope: 'INTERNATIONAL',
+          }),
+        });
+
+        expect(prisma.$transaction).not.toHaveBeenCalled();
+        expect(prisma.bookingIntent.create).not.toHaveBeenCalled();
+        expect(prisma.bookingIntentPassenger.create).not.toHaveBeenCalled();
+      });
+
+      it('throws 422 BOOKING_NOT_READY and executes 0 database writes when required domestic contact or identity fields are missing', async () => {
+        prisma.flightOffer.findUnique.mockResolvedValue({
+          id: 'offer-dom-missing',
+          duffelOfferId: 'duffel-dom-missing',
+          price: 120,
+          origin: 'SGN',
+          destination: 'HAN',
+          departureDate: new Date('2026-08-01T00:00:00.000Z'),
+          returnDate: null,
+          cabinClass: 'ECONOMY',
+          adults: 1,
+          children: 0,
+          infants: 0,
+          rawOffer: {
+            passengers: [{ id: 'duffel-pas-1', type: 'adult' }],
+            slices: [
+              {
+                segments: [
+                  {
+                    origin: { iata_code: 'SGN' },
+                    destination: { iata_code: 'HAN' },
+                    arriving_at: '2026-08-01T10:00:00Z',
+                  },
+                ],
+              },
+            ],
+          },
+        });
+
+        readinessService.evaluateAuthoritativeReadiness.mockResolvedValueOnce({
+          ready: false,
+          scope: 'DOMESTIC',
+          passengers: [
+            {
+              offerPassengerId: 'pas_001',
+              passengerOrdinal: 1,
+              status: 'INCOMPLETE',
+              missingFields: ['email', 'phoneNumber'],
+              invalidFields: [],
+            },
+          ],
+          tripCompletionDate: '2026-08-01',
+          advisoryBufferDays: 180,
+        });
+
+        const callPromise = service.createIntent('user-1', {
+          flightOfferId: 'offer-dom-missing',
+          passengers: [
+            {
+              offerPassengerId: 'pas_001',
+              type: 'ADULT',
+              source: {
+                type: 'inline',
+                givenName: 'Claude',
+                familyName: 'Shannon',
+                dateOfBirth: '1916-04-30',
+                gender: 'male',
+                nationality: 'US',
+                title: 'MR',
+              },
+            },
+          ],
+        } as never);
+
+        await expect(callPromise).rejects.toMatchObject({
+          status: HttpStatus.UNPROCESSABLE_ENTITY,
+          response: expect.objectContaining({
+            code: 'BOOKING_NOT_READY',
+            ready: false,
+            scope: 'DOMESTIC',
+          }),
+        });
+
+        expect(prisma.$transaction).not.toHaveBeenCalled();
+        expect(prisma.bookingIntent.create).not.toHaveBeenCalled();
+        expect(prisma.bookingIntentPassenger.create).not.toHaveBeenCalled();
+      });
+    });
+
+    describe('Profile Revision Race', () => {
+      it('aborts transaction and throws 409 ConflictException (PROFILE_CHANGED) writing 0 rows when profile revision advances before commit', async () => {
+        prisma.flightOffer.findUnique.mockResolvedValue({
+          id: 'offer-race-1',
+          duffelOfferId: 'duffel-race-1',
+          price: 200,
+          origin: 'SGN',
+          destination: 'HAN',
+          departureDate: new Date('2026-08-01T00:00:00.000Z'),
+          returnDate: null,
+          cabinClass: 'ECONOMY',
+          adults: 1,
+          children: 0,
+          infants: 0,
+        });
+
+        const initialProfile = {
+          id: 'profile-race-1',
+          revision: 2,
+          givenName: 'Katherine',
+          middleName: null,
+          familyName: 'Johnson',
+          dateOfBirth: new Date('1918-08-26T00:00:00.000Z'),
+          gender: 'female',
+          title: 'DR',
+          email: 'katherine@nasa.test',
+          phoneCountryCode: '+1',
+          phoneNumber: '5550001111',
+          nationality: 'US',
+          documentType: 'passport',
+          issuingCountry: 'US',
+          passportNumber: 'v1:enc-passport',
+          passportExpiry: new Date('2030-01-01T00:00:00.000Z'),
+          passportExpiryCiphertext: null,
+        };
+
+        // First call during resolver resolution returns revision 2;
+        // Second call inside transaction in assertCanonicalProfileRevisions returns revision 3 (advancement race)
+        prisma.travelerProfile.findFirst = jest.fn()
+          .mockResolvedValueOnce(initialProfile)
+          .mockResolvedValueOnce({ revision: 3 });
+
+        const callPromise = service.createIntent('user-1', {
+          flightOfferId: 'offer-race-1',
+          passengers: [
+            {
+              offerPassengerId: 'pas_001',
+              type: 'ADULT',
+              source: {
+                type: 'traveler_profile',
+                travelerProfileId: 'profile-race-1',
+                expectedProfileRevision: 2,
+              },
+            },
+          ],
+        } as never);
+
+        await expect(callPromise).rejects.toMatchObject({
+          response: { code: 'PROFILE_CHANGED' },
+        });
+
+        // Zero-write assertion: bookingIntent and passenger creation never occurred because revision check failed at top of transaction
+        expect(prisma.bookingIntent.create).not.toHaveBeenCalled();
+        expect(prisma.bookingIntentPassenger.create).not.toHaveBeenCalled();
+      });
+    });
+
+    describe('Multi-Passenger Pre-Validation & Atomic Persistence', () => {
+      it('fails multi-passenger intent pre-validation with 422 and 0 writes if any passenger source is invalid', async () => {
+        prisma.flightOffer.findUnique.mockResolvedValue({
+          id: 'offer-multi-1',
+          duffelOfferId: 'duffel-multi-1',
+          price: 450,
+          origin: 'SGN',
+          destination: 'NRT',
+          departureDate: new Date('2026-08-01T00:00:00.000Z'),
+          returnDate: null,
+          cabinClass: 'ECONOMY',
+          adults: 1,
+          children: 1,
+          infants: 0,
+          rawOffer: {
+            passengers: [
+              { id: 'duffel-pas-1', type: 'adult' },
+              { id: 'duffel-pas-2', type: 'child' },
+            ],
+            slices: [],
+          },
+        });
+
+        readinessService.evaluateAuthoritativeReadiness.mockResolvedValueOnce({
+          ready: false,
+          scope: 'INTERNATIONAL',
+          passengers: [
+            { offerPassengerId: 'pas_adult_1', passengerOrdinal: 1, status: 'READY', missingFields: [], invalidFields: [] },
+            { offerPassengerId: 'pas_child_1', passengerOrdinal: 2, status: 'INCOMPLETE', missingFields: ['passportNumber'], invalidFields: [] },
+          ],
+          tripCompletionDate: '2026-08-10',
+          advisoryBufferDays: 180,
+        });
+
+        const callPromise = service.createIntent('user-1', {
+          flightOfferId: 'offer-multi-1',
+          passengers: [
+            {
+              offerPassengerId: 'pas_adult_1',
+              type: 'ADULT',
+              source: {
+                type: 'inline',
+                givenName: 'John',
+                familyName: 'VonNeumann',
+                dateOfBirth: '1903-12-28',
+                gender: 'male',
+                nationality: 'US',
+                documentType: 'passport',
+                passportNumber: 'US99887766',
+                passportExpiry: '2030-01-01',
+                issuingCountry: 'US',
+                email: 'john@princeton.test',
+                phoneCountryCode: '+1',
+                phoneNumber: '5551112222',
+                title: 'MR',
+              },
+            },
+            {
+              offerPassengerId: 'pas_child_1',
+              type: 'CHILD',
+              source: {
+                type: 'inline',
+                givenName: 'Marina',
+                familyName: 'VonNeumann',
+                dateOfBirth: '2015-05-15',
+                gender: 'female',
+                nationality: 'US',
+                documentType: 'passport',
+                passportNumber: '',
+                passportExpiry: '2030-01-01',
+                issuingCountry: 'US',
+                email: 'marina@princeton.test',
+                phoneCountryCode: '+1',
+                phoneNumber: '5551112222',
+                title: 'MISS',
+              },
+            },
+          ],
+        } as never);
+
+        await expect(callPromise).rejects.toMatchObject({
+          status: HttpStatus.UNPROCESSABLE_ENTITY,
+          response: expect.objectContaining({
+            code: 'BOOKING_NOT_READY',
+            ready: false,
+          }),
+        });
+
+        expect(prisma.$transaction).not.toHaveBeenCalled();
+        expect(prisma.bookingIntent.create).not.toHaveBeenCalled();
+        expect(prisma.bookingIntentPassenger.create).not.toHaveBeenCalled();
+      });
+
+      it('atomically creates multi-passenger intent, snapshots with bound AAD encryption, and audit record when all passengers are valid', async () => {
+        prisma.flightOffer.findUnique.mockResolvedValue({
+          id: 'offer-multi-valid',
+          duffelOfferId: 'duffel-multi-valid',
+          price: 450,
+          origin: 'SGN',
+          destination: 'NRT',
+          departureDate: new Date('2026-08-01T00:00:00.000Z'),
+          returnDate: null,
+          cabinClass: 'ECONOMY',
+          adults: 1,
+          children: 1,
+          infants: 0,
+          rawOffer: {
+            passengers: [
+              { id: 'duffel-pas-1', type: 'adult' },
+              { id: 'duffel-pas-2', type: 'child' },
+            ],
+            slices: [],
+          },
+        });
+
+        readinessService.evaluateAuthoritativeReadiness.mockResolvedValueOnce({
+          ready: true,
+          scope: 'INTERNATIONAL',
+          passengers: [
+            { offerPassengerId: 'pas_adult_1', passengerOrdinal: 1, status: 'READY', missingFields: [], invalidFields: [] },
+            { offerPassengerId: 'pas_child_1', passengerOrdinal: 2, status: 'READY', missingFields: [], invalidFields: [] },
+          ],
+          tripCompletionDate: '2026-08-10',
+          advisoryBufferDays: 180,
+        });
+        const traceId = 'chat_0123456789abcdef0123456789abcdef';
+        const correlationId = 'chat_fedcba9876543210fedcba9876543210';
+
+        const result = await service.createIntent('user-1', {
+          flightOfferId: 'offer-multi-valid',
+          passengers: [
+            {
+              offerPassengerId: 'pas_adult_1',
+              type: 'ADULT',
+              source: {
+                type: 'inline',
+                givenName: 'John',
+                familyName: 'VonNeumann',
+                dateOfBirth: '1903-12-28',
+                gender: 'male',
+                nationality: 'US',
+                documentType: 'passport',
+                passportNumber: 'US99887766',
+                passportExpiry: '2030-01-01',
+                issuingCountry: 'US',
+                email: 'john@princeton.test',
+                phoneCountryCode: '+1',
+                phoneNumber: '5551112222',
+                title: 'MR',
+              },
+            },
+            {
+              offerPassengerId: 'pas_child_1',
+              type: 'CHILD',
+              source: {
+                type: 'inline',
+                givenName: 'Marina',
+                familyName: 'VonNeumann',
+                dateOfBirth: '2015-05-15',
+                gender: 'female',
+                nationality: 'US',
+                documentType: 'passport',
+                passportNumber: 'US33445566',
+                passportExpiry: '2030-01-01',
+                issuingCountry: 'US',
+                email: 'marina@princeton.test',
+                phoneCountryCode: '+1',
+                phoneNumber: '5551112222',
+                title: 'MISS',
+              },
+            },
+          ],
+        } as never, { traceId, correlationId, ipAddress: '10.0.0.1' });
+
+        expect(result.intentId).toBeDefined();
+        expect(result.passengers).toHaveLength(2);
+        expect(result.passengers[0].passengerType).toBe('ADULT');
+        expect(result.passengers[1].passengerType).toBe('CHILD');
+
+        // Verify atomic transaction was executed
+        expect(prisma.$transaction).toHaveBeenCalledTimes(1);
+        expect(prisma.bookingIntent.create).toHaveBeenCalledTimes(1);
+        expect(prisma.bookingIntentPassenger.create).toHaveBeenCalledTimes(2);
+
+        // Verify bound AAD encryption calls for each passenger
+        expect(encryption.encryptBound).toHaveBeenCalledWith(
+          'US99887766',
+          expect.objectContaining({
+            snapshotVersion: 1,
+            intentId: result.intentId,
+            position: 0,
+            fieldName: 'passportNumber',
+          }),
+        );
+        expect(encryption.encryptBound).toHaveBeenCalledWith(
+          'US33445566',
+          expect.objectContaining({
+            snapshotVersion: 1,
+            intentId: result.intentId,
+            position: 1,
+            fieldName: 'passportNumber',
+          }),
+        );
+
+        // Verify audit log creation inside transaction
+        expect(audit.createLog).toHaveBeenCalledTimes(1);
+        expect(audit.createLog).toHaveBeenCalledWith(
+          prisma,
+          expect.objectContaining({
+            userId: 'user-1',
+            action: 'booking_intent_created',
+            resourceType: 'BookingIntent',
+            resourceId: result.intentId,
+            traceId,
+            correlationId,
+          }),
+        );
+      });
+    });
+
+    describe('Snapshot Immutability', () => {
+      it('persisted passenger snapshots retain exact captured data independently of subsequent TravelerProfile changes or deletion', async () => {
+        prisma.flightOffer.findUnique.mockResolvedValue({
+          id: 'offer-snap-1',
+          duffelOfferId: 'duffel-snap-1',
+          price: 150,
+          origin: 'SGN',
+          destination: 'HAN',
+          departureDate: new Date('2026-08-01T00:00:00.000Z'),
+          returnDate: null,
+          cabinClass: 'ECONOMY',
+          adults: 1,
+          children: 0,
+          infants: 0,
+        });
+
+        const originalProfile = {
+          id: 'profile-snap-1',
+          revision: 1,
+          givenName: 'Margaret',
+          middleName: 'Hamilton',
+          familyName: 'Heafield',
+          dateOfBirth: new Date('1936-08-17T00:00:00.000Z'),
+          gender: 'female',
+          title: 'MS',
+          email: 'margaret@apollo.test',
+          phoneCountryCode: '+1',
+          phoneNumber: '5559998888',
+          nationality: 'US',
+          documentType: 'passport',
+          issuingCountry: 'US',
+          passportNumber: 'v1:encrypted-apollo-passport',
+          passportExpiry: new Date('2032-01-01T00:00:00.000Z'),
+          passportExpiryCiphertext: null,
+        };
+
+        prisma.travelerProfile.findFirst = jest.fn().mockResolvedValue(originalProfile);
+
+        const createResult = await service.createIntent('user-1', {
+          flightOfferId: 'offer-snap-1',
+          passengers: [
+            {
+              offerPassengerId: 'pas_001',
+              type: 'ADULT',
+              source: {
+                type: 'traveler_profile',
+                travelerProfileId: 'profile-snap-1',
+                expectedProfileRevision: 1,
+              },
+            },
+          ],
+        } as never);
+
+        // Verify the created passenger snapshot payload passed to DB create
+        const snapshotCreateCall = (prisma.bookingIntentPassenger.create as jest.Mock).mock.calls[0][0].data;
+        expect(snapshotCreateCall).toEqual(expect.objectContaining({
+          givenName: 'Margaret',
+          familyName: 'Heafield',
+          middleName: 'Hamilton',
+          gender: 'female',
+          email: 'margaret@apollo.test',
+          travelerProfileId: 'profile-snap-1',
+          snapshotVersion: 1,
+        }));
+
+        // Now simulate TravelerProfile being updated to completely different values or deleted
+        prisma.travelerProfile.findFirst = jest.fn().mockResolvedValue({
+          id: 'profile-snap-1',
+          revision: 5,
+          givenName: 'Tampered',
+          familyName: 'Profile',
+          email: 'tampered@evil.test',
+        });
+
+        // Query intent via getIntent - which reads directly from bookingIntent + bookingIntentPassenger
+        (prisma.bookingIntent.findUnique as jest.Mock) = jest.fn().mockResolvedValue({
+          id: createResult.intentId,
+          userId: 'user-1',
+          status: 'PENDING',
+          originalPrice: 150,
+          confirmedPrice: 150,
+          priceChanged: false,
+          currency: 'USD',
+          pricedAt: new Date('2026-08-01T10:00:00Z'),
+          intentExpiresAt: new Date('2026-08-01T10:30:00Z'),
+          offerExpiresAt: null,
+          createdAt: new Date('2026-08-01T09:50:00Z'),
+          passengers: [
+            {
+              id: 'snapshot-row-1',
+              position: 0,
+              type: 'ADULT',
+              givenName: snapshotCreateCall.givenName,
+              familyName: snapshotCreateCall.familyName,
+              dateOfBirth: snapshotCreateCall.dateOfBirth,
+              gender: snapshotCreateCall.gender,
+              nationality: snapshotCreateCall.nationality,
+              passportNumber: snapshotCreateCall.passportNumber,
+              passportExpiry: snapshotCreateCall.passportExpiry,
+              email: snapshotCreateCall.email,
+              phoneCountryCode: snapshotCreateCall.phoneCountryCode,
+              phoneNumber: snapshotCreateCall.phoneNumber,
+              travelerProfileId: snapshotCreateCall.travelerProfileId,
+            },
+          ],
+          origin: 'SGN',
+          destination: 'HAN',
+          departureDate: new Date('2026-08-01'),
+          returnDate: null,
+          cabinClass: 'ECONOMY',
+          adults: 1,
+          children: 0,
+          infants: 0,
+        });
+
+        const fetched = await service.getIntent('user-1', createResult.intentId);
+        expect(fetched.passengers[0].nameSummary).toMatch(/^M/);
+        expect(fetched.passengers[0].preFilledFromProfile).toBe(true);
+        expect(fetched.passengers[0].contactSummary.email).toMatch(/^m/);
+      });
+    });
+
+    describe('PII-Safe Audit Logging', () => {
+      it('emits structured audit log inside transaction with traceId/correlationId and zero PII in metadata', async () => {
+        prisma.flightOffer.findUnique.mockResolvedValue({
+          id: 'offer-audit-1',
+          duffelOfferId: 'duffel-audit-1',
+          price: 150,
+          origin: 'SGN',
+          destination: 'HAN',
+          departureDate: new Date('2026-08-01T00:00:00.000Z'),
+          returnDate: null,
+          cabinClass: 'ECONOMY',
+          adults: 1,
+          children: 0,
+          infants: 0,
+        });
+
+        const traceId = 'chat_11111111111111111111111111111111';
+        const correlationId = 'chat_22222222222222222222222222222222';
+
+        await service.createIntent(
+          'user-1',
+          {
+            flightOfferId: 'offer-audit-1',
+            passengers: [
+              {
+                offerPassengerId: 'pas_001',
+                type: 'ADULT',
+                source: {
+                  type: 'inline',
+                  givenName: 'Barbara',
+                  familyName: 'Liskov',
+                  dateOfBirth: '1939-11-07',
+                  gender: 'female',
+                  nationality: 'US',
+                  documentType: 'passport',
+                  passportNumber: 'US987654321',
+                  passportExpiry: '2030-01-01',
+                  issuingCountry: 'US',
+                  email: 'barbara.liskov@mit.test',
+                  phoneCountryCode: '+1',
+                  phoneNumber: '6175551234',
+                  title: 'PROF',
+                },
+              },
+            ],
+          } as never,
+          {
+            traceId,
+            correlationId,
+            ipAddress: '192.168.1.50',
+          },
+        );
+
+        expect(audit.createLog).toHaveBeenCalledTimes(1);
+        const [txArg, auditPayload] = audit.createLog.mock.calls[0];
+        expect(txArg).toBe(prisma);
+        expect(auditPayload).toEqual(expect.objectContaining({
+          userId: 'user-1',
+          action: 'booking_intent_created',
+          resourceType: 'BookingIntent',
+          resourceId: expect.any(String),
+          ipAddress: '192.168.1.50',
+          traceId,
+          correlationId,
+        }));
+
+        // Validate metadata allowlist keys
+        const metadata = auditPayload.metadata;
+        const allowedMetadataKeys = new Set([
+          'operation',
+          'metric',
+          'status',
+          'latency_ms',
+          'outcome',
+          'price_changed',
+        ]);
+        for (const key of Object.keys(metadata)) {
+          expect(allowedMetadataKeys.has(key)).toBe(true);
+        }
+
+        // Validate metadata strictly contains NO PII
+        const metadataString = JSON.stringify(metadata);
+        expect(metadataString).not.toContain('Barbara');
+        expect(metadataString).not.toContain('Liskov');
+        expect(metadataString).not.toContain('1939-11-07');
+        expect(metadataString).not.toContain('US987654321');
+        expect(metadataString).not.toContain('barbara.liskov@mit.test');
+        expect(metadataString).not.toContain('6175551234');
+        expect(metadataString).not.toContain('user-1');
+        expect(metadataString).not.toContain('offer-audit-1');
+      });
+    });
+
+    describe('Booking Readiness Observability', () => {
+      it('emits BookingReadinessObservability event for INTENT_CREATE with zero PII', async () => {
+        prisma.flightOffer.findUnique.mockResolvedValue({
+          id: 'offer-obs-1',
+          duffelOfferId: 'duffel-obs-1',
+          price: 150,
+          origin: 'SGN',
+          destination: 'HAN',
+          departureDate: new Date('2026-08-01T00:00:00.000Z'),
+          returnDate: null,
+          cabinClass: 'ECONOMY',
+          adults: 1,
+          children: 0,
+          infants: 0,
+        });
+
+        const traceId = 'chat_33333333333333333333333333333333';
+        const correlationId = 'chat_44444444444444444444444444444444';
+
+        await service.createIntent(
+          'user-1',
+          {
+            flightOfferId: 'offer-obs-1',
+            passengers: [
+              {
+                offerPassengerId: 'pas_001',
+                type: 'ADULT',
+                source: {
+                  type: 'inline',
+                  givenName: 'Dorothy',
+                  familyName: 'Vaughan',
+                  dateOfBirth: '1910-09-20',
+                  gender: 'female',
+                  nationality: 'US',
+                  documentType: 'passport',
+                  passportNumber: 'US123123123',
+                  passportExpiry: '2030-01-01',
+                  issuingCountry: 'US',
+                  email: 'dorothy@nasa.test',
+                  phoneCountryCode: '+1',
+                  phoneNumber: '5552223333',
+                  title: 'MS',
+                },
+              },
+            ],
+          } as never,
+          {
+            traceId,
+            correlationId,
+            ipAddress: '192.168.1.51',
+          },
+        );
+
+        expect(readinessObservability.recordOutcome).toHaveBeenCalledTimes(1);
+        const eventArg = readinessObservability.recordOutcome.mock.calls[0][0];
+        expect(eventArg).toEqual(expect.objectContaining({
+          operation: 'intent_create',
+          status: 'created',
+          context: {
+            traceId,
+            correlationId,
+          },
+          metadata: expect.objectContaining({
+            scope: 'INTERNATIONAL',
+            passengerCount: 1,
+            status: 'created',
+          }),
+        }));
+
+        const metadataString = JSON.stringify(eventArg.metadata);
+        expect(metadataString).not.toContain('Dorothy');
+        expect(metadataString).not.toContain('Vaughan');
+        expect(metadataString).not.toContain('1910-09-20');
+        expect(metadataString).not.toContain('US123123123');
+        expect(metadataString).not.toContain('dorothy@nasa.test');
+        expect(metadataString).not.toContain('user-1');
+        expect(metadataString).not.toContain('offer-obs-1');
+      });
+
+      it('does not abort transaction when observability recordOutcome throws', async () => {
+        prisma.flightOffer.findUnique.mockResolvedValue({
+          id: 'offer-obs-fail',
+          duffelOfferId: 'duffel-obs-fail',
+          price: 150,
+          origin: 'SGN',
+          destination: 'HAN',
+          departureDate: new Date('2026-08-01T00:00:00.000Z'),
+          returnDate: null,
+          cabinClass: 'ECONOMY',
+          adults: 1,
+          children: 0,
+          infants: 0,
+        });
+
+        readinessObservability.recordOutcome.mockImplementationOnce(() => {
+          throw new Error('Observability sink down');
+        });
+
+        const result = await service.createIntent(
+          'user-1',
+          {
+            flightOfferId: 'offer-obs-fail',
+            passengers: [
+              {
+                offerPassengerId: 'pas_001',
+                type: 'ADULT',
+                source: {
+                  type: 'inline',
+                  givenName: 'Dorothy',
+                  familyName: 'Vaughan',
+                  dateOfBirth: '1910-09-20',
+                  gender: 'female',
+                  nationality: 'US',
+                  documentType: 'passport',
+                  passportNumber: 'US123123123',
+                  passportExpiry: '2030-01-01',
+                  issuingCountry: 'US',
+                  email: 'dorothy@nasa.test',
+                  phoneCountryCode: '+1',
+                  phoneNumber: '5552223333',
+                  title: 'MS',
+                },
+              },
+            ],
+          } as never,
+        );
+
+        expect(result.intentId).toBeDefined();
+        expect(prisma.bookingIntent.create).toHaveBeenCalled();
+      });
+
+      it('does not emit created telemetry or observability event when transaction rolls back', async () => {
+        prisma.flightOffer.findUnique.mockResolvedValue({
+          id: 'offer-obs-rollback',
+          duffelOfferId: 'duffel-obs-rollback',
+          price: 150,
+          origin: 'SGN',
+          destination: 'HAN',
+          departureDate: new Date('2026-08-01T00:00:00.000Z'),
+          returnDate: null,
+          cabinClass: 'ECONOMY',
+          adults: 1,
+          children: 0,
+          infants: 0,
+        });
+
+        prisma.bookingIntent.create.mockRejectedValueOnce(new Error('DB transaction error'));
+
+        await expect(
+          service.createIntent(
+            'user-1',
+            {
+              flightOfferId: 'offer-obs-rollback',
+              passengers: [
+                {
+                  offerPassengerId: 'pas_001',
+                  type: 'ADULT',
+                  source: {
+                    type: 'inline',
+                    givenName: 'Dorothy',
+                    familyName: 'Vaughan',
+                    dateOfBirth: '1910-09-20',
+                    gender: 'female',
+                    nationality: 'US',
+                    documentType: 'passport',
+                    passportNumber: 'US123123123',
+                    passportExpiry: '2030-01-01',
+                    issuingCountry: 'US',
+                    email: 'dorothy@nasa.test',
+                    phoneCountryCode: '+1',
+                    phoneNumber: '5552223333',
+                    title: 'MS',
+                  },
+                },
+              ],
+            } as never,
+          ),
+        ).rejects.toThrow('DB transaction error');
+
+        expect(readinessObservability.recordOutcome).not.toHaveBeenCalled();
+      });
     });
   });
 
