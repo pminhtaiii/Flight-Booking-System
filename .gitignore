@@ -19,9 +19,6 @@ __pycache__/
 *.pyd
 .ipynb_checkpoints/
 
-# Graphify
-graphify-out/
-
 # Universal
 .DS_Store
 Thumbs.db
@@ -36,3 +33,6 @@ docs/superpowers/
 test-results/
 playwright-report/
 apps/web/playwright-report/
+
+# Graphify cache
+graphify-out/cache/
