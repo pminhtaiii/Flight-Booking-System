@@ -646,7 +646,10 @@ export class BookingIntentService {
       offerExpiresAt: intent.offerExpiresAt ? intent.offerExpiresAt.toISOString() : null,
       createdAt: intent.createdAt.toISOString(),
       passengers: intent.passengers.map((passenger, index) => ({
-        ...this.toSafePassengerSummary(passenger, index),
+        ...this.toSafePassengerSummary({
+          ...passenger,
+          intentId: passenger.intentId ?? intent.id,
+        }, index),
         type: passenger.type,
         givenName: passenger.givenName,
         familyName: passenger.familyName,

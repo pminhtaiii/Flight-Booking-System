@@ -7,15 +7,41 @@ Update this file after every completed feature. Any AI agent reading this should
 ### Current Status
 
 **Feature:** Traveler Profile & Booking Readiness (Feature 16)
-**Last completed:** Phase 8B / Canonical Plural Routes, Safe DTO Masking & Web Checkout Migration (Tasks T047, T048, T050–T054, T078, T079) (2026-08-19).
+**Last completed:** Task T077 / Quickstart Validation Sequence, Performance Benchmark Verification & Signed-Off Release Gate for Feature 16 (2026-08-19).
 **In progress:** None.
-**Next:** Feature 16 Phase 12 Polish, Observability, Performance & Release Gates (T073–T077).
+**Next:** Feature 17 / Chatbot Backend Infrastructure or next scheduled milestone.
 
 ---
 
 ## Progress by Feature
 
 ### [x] Feature: Traveler Profile & Booking Readiness (Feature 16)
+
+- [x] Phase 12 / Quickstart Validation Sequence, Observability & Performance Release Gates (Tasks T073–T077) (2026-08-19):
+  - **Complete Validation & Signed-Off Status (`specs/016a-traveler-profile-booking-readiness/quickstart.md`)**:
+    - Ran all quickstart validation commands with 100% green passing results across backend unit/integration tests, E2E observability, performance benchmarks, final validation E2E, booking intent E2E, Next.js web build, and Python agent test suites.
+    - Verified performance p95 baselines: Profile Read p95 = 20.39 ms (< 50 ms target), Advisory Readiness p95 = 35.72 ms (< 100 ms target), Sequential Intent Creation p95 = 108.25 ms (< 200 ms target), 100-way concurrent intent creation handled gracefully.
+    - Verified complete Negative PII Corpus Audit across logs, health snapshots (`/health/booking-readiness`), traces, audit logs, SSE streams, agent tool allowlists, and database models.
+    - Updated `quickstart.md` with timestamped execution sign-off and all tasks marked complete in `tasks.md`.
+  - **Operational Hardening & Multi-Version Key Ring (`apps/api/src/common/encryption.service.ts` & `docs/runbooks/booking-readiness.md`)**:
+    - `EncryptionService` supports zero-downtime key rotation ring: primary encryption key from `[ENCRYPTION_KEY_CURRENT, ENCRYPTION_KEY, ENCRYPTION_KEY_V2, ENCRYPTION_KEY_V1]`, candidate decryption ring from `[ENCRYPTION_KEY_CURRENT, ENCRYPTION_KEY, ENCRYPTION_KEY_PREVIOUS, ENCRYPTION_KEY_V2, ENCRYPTION_KEY_V1]`.
+    - Runbook Section 4 updated to query actual health snapshot endpoints (`/health/booking-readiness` latency percentiles) and standardized counters.
+    - Performance test teardown hardened with safe offer dereferencing and try/finally cleanup.
+
+
+- [x] Phase 12 / Operations Runbook & Operational Governance (Task T076) (2026-08-19):
+  - **Comprehensive Operations Runbook (`docs/runbooks/booking-readiness.md`)**:
+    - System topology & decision ownership (Profile, pure evaluator, advisory readiness, atomic intent creation, final validator, Duffel/Stripe boundaries).
+    - Feature flags specification & rollout order (`FEATURE_FLAG_BOOKING_READINESS`, `NEXT_PUBLIC_FEATURE_FLAG_BOOKING_READINESS`, `PASSPORT_ADVISORY_BUFFER_DAYS`, safe rollout sequence, invalid combinations, instant rollback).
+    - Telemetry, metrics & observability (11 standardized metric counters, dual health endpoints `/health/booking-readiness` and `/api/health/booking-readiness`, structured JSON logs, zero-PII guarantee).
+    - Dashboards and alert rules (Grafana panel specifications, PromQL alert rules for error rates, CAS conflicts, final validation failures, backfill quarantine, and p95 latency thresholds).
+    - Performance & concurrency baselines (p95 latency gates for Profile Read < 50ms, Profile Update < 80ms, Advisory Check < 100ms, Intent Create < 200ms, Final Validation < 30ms; 100-way concurrency verification).
+    - Incident playbooks (Step-by-step operator resolution for DB connection saturation, Redis partition recovery, corrupted/tampered AAD recovery, and Duffel 504 timeouts).
+    - Key & secret rotation (Zero-downtime multi-version candidate ring procedures for `ENCRYPTION_KEY`, `JWT_SECRET`, `CLAIM_TOKEN_SECRET`).
+    - Backfill governance & quarantine management (Daily midnight cron, `PassportExpiryBackfillService`, optimistic CAS, decrypt/compare verification, 10% abort threshold).
+    - Privacy & cryptographic invariants (Record-bound AES-256-GCM context-bound AAD `{ snapshotVersion, intentId, position, fieldName }`, masked summary projections, zero-PII guarantee).
+    - Emergency rollback procedures (Decision matrix, dual-write compatibility, instant feature flag disabling, graceful degradation to legacy checkout).
+
 
 - [x] Phase 8B / Canonical Plural Routes, Safe DTO Masking & Web Checkout Migration (Tasks T047, T048, T050–T054, T078, T079) (2026-08-19):
   - **Canonical Plural Intent Routes & Safe DTO Masking (`apps/api/src/booking-intent/`)**:
