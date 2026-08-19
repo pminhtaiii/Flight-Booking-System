@@ -1023,6 +1023,8 @@ export class BookingIntentService {
   private toSafePassengerSummary(passenger: {
     id: string;
     position?: number;
+    snapshotVersion?: number;
+    intentId?: string;
     type: PassengerType;
     givenName: string;
     familyName: string;
@@ -1040,7 +1042,7 @@ export class BookingIntentService {
       : fallbackPosition + 1;
 
     const hasPassport = Boolean(passenger.passportNumber || passenger.passportExpiry);
-    const maskedPassportSummary = hasPassport ? '•••• ••••' : null;
+    const maskedPassportSummary = this.maskPassportSummary(passenger, fallbackPosition);
     const emailMasked = this.maskEmail(passenger.email ?? null);
     const phoneMasked = this.maskPhone(passenger.phoneCountryCode ?? null, passenger.phoneNumber ?? null);
     const maskedContactSummary = [emailMasked, phoneMasked].filter(Boolean).join(' ').trim() || null;
@@ -1065,6 +1067,45 @@ export class BookingIntentService {
       maskedPassportSummary,
       maskedContactSummary,
     };
+  }
+
+  private maskPassportSummary(
+    passenger: {
+      passportNumber?: string | null;
+      passportExpiry?: string | null;
+      intentId?: string | null;
+      position?: number | null;
+      snapshotVersion?: number | null;
+    },
+    fallbackPosition = 0,
+  ): string | null {
+    if (!passenger.passportNumber && !passenger.passportExpiry) {
+      return null;
+    }
+    if (passenger.passportNumber) {
+      try {
+        const position = typeof passenger.position === 'number' ? passenger.position : fallbackPosition;
+        const snapshotVersion = typeof passenger.snapshotVersion === 'number' ? passenger.snapshotVersion : 1;
+        const intentId = passenger.intentId;
+        if (intentId) {
+          const decrypted = this.encryptionService.decryptBound(passenger.passportNumber, {
+            snapshotVersion,
+            intentId,
+            position,
+            fieldName: 'passportNumber',
+          });
+          return '•••• ' + decrypted.slice(-4);
+        }
+        const decrypted = this.encryptionService.decrypt(passenger.passportNumber);
+        return '•••• ' + decrypted.slice(-4);
+      } catch {
+        if (!passenger.passportNumber.includes(':')) {
+          return '•••• ' + passenger.passportNumber.slice(-4);
+        }
+        return '•••• ••••';
+      }
+    }
+    return '•••• ••••';
   }
 
   private maskName(value: string): string {

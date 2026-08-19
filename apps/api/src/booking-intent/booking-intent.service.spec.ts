@@ -1685,7 +1685,7 @@ describe('BookingIntentService Refinements', () => {
                 documentType: null,
                 issuingCountry: null,
                 hasPassport: true,
-                maskedPassportSummary: '•••• ••••',
+                maskedPassportSummary: '•••• port',
               },
               contactSummary: {
                 email: null,
@@ -1700,7 +1700,7 @@ describe('BookingIntentService Refinements', () => {
               passportNumber: null,
               passportExpiry: null,
               preFilledFromProfile: true,
-              maskedPassportSummary: '•••• ••••',
+              maskedPassportSummary: '•••• port',
               maskedContactSummary: null,
             }
           ],
@@ -1717,7 +1717,7 @@ describe('BookingIntentService Refinements', () => {
         });
       });
 
-      it('does not decrypt canonical snapshot documents when returning a safe summary', async () => {
+      it('safely decrypts bound passport numbers on read to construct masked summary without exposing plaintext fields', async () => {
         mockPrisma.bookingIntent.findUnique.mockResolvedValueOnce({
           id: 'intent-1',
           userId: 'user-1',
@@ -1758,11 +1758,20 @@ describe('BookingIntentService Refinements', () => {
 
         const result = await service.getIntent('user-1', 'intent-1');
 
-        expect(snapshotEncryption.decryptBound).not.toHaveBeenCalled();
+        expect(snapshotEncryption.decryptBound).toHaveBeenCalledWith('v1:iv:tag:bound-passport', {
+          snapshotVersion: 1,
+          intentId: 'intent-1',
+          position: 0,
+          fieldName: 'passportNumber',
+        });
         expect(result.passengers[0]).toEqual(expect.objectContaining({
           passportNumber: null,
           passportExpiry: null,
-          documentSummary: expect.objectContaining({ hasPassport: true }),
+          maskedPassportSummary: '•••• port',
+          documentSummary: expect.objectContaining({
+            hasPassport: true,
+            maskedPassportSummary: '•••• port',
+          }),
         }));
       });
     });

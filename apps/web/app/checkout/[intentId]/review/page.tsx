@@ -136,7 +136,6 @@ export default async function ReviewPage({ params }: Props) {
                     <span className="font-semibold text-text-primary">Contact:</span>
                     <p>
                       {p.contactSummary.maskedContactSummary || p.contactSummary.email || 'Not provided'}
-                      {p.contactSummary.phone ? ` · ${p.contactSummary.phone}` : ''}
                     </p>
                   </div>
                   <div>
