@@ -161,13 +161,13 @@
 
 ### RED tests
 
-- [ ] T046 [P] [US3] Write failing service transaction tests for evaluator parity, expected revision race, all-passenger prevalidation, zero-write rollback, profile edit/delete independence, and safe audits in `apps/api/src/booking-intent/booking-intent.service.spec.ts`
+- [x] T046 [P] [US3] Write failing service transaction tests for evaluator parity, expected revision race, all-passenger prevalidation, zero-write rollback, profile edit/delete independence, and safe audits in `apps/api/src/booking-intent/booking-intent.service.spec.ts`
 - [ ] T047 [P] [US3] Write failing plural/singular create/get/prefill response-shape tests, including legacy `useProfile: true/false` translation and rejection of non-primary legacy profile flags, in `apps/api/test/booking-intent.e2e-spec.ts`
 - [ ] T048 [P] [US3] Update Playwright tests first for plural create, server-authoritative scope, profile revision retry, masked review, and legacy-flag-disabled checkout in `apps/web/tests/checkout-foundation.spec.ts`
 
 ### GREEN implementation
 
-- [ ] T049 [US3] Refactor intent creation to resolve/evaluate all sources before the short transaction, atomically create intent/snapshots/audit, and emit allowlisted authoritative validation/create events and metrics in `apps/api/src/booking-intent/booking-intent.service.ts`
+- [x] T049 [US3] Refactor intent creation to resolve/evaluate all sources before the short transaction, atomically create intent/snapshots/audit, and emit allowlisted authoritative validation/create events and metrics in `apps/api/src/booking-intent/booking-intent.service.ts`
 - [ ] T050 [US3] Add canonical plural create/get actions and deprecated singular aliases with safe response parity, legacy `useProfile`-to-source translation, non-primary rejection, and deprecation telemetry in `apps/api/src/booking-intent/booking-intent.controller.ts`
 - [ ] T051 [US3] Remove decrypted contact/document fields from intent DTOs, add masked summaries, and keep legacy passport keys `null` during compatibility in `apps/api/src/booking-intent/dto/intent-response.dto.ts`
 - [ ] T052 [US3] Migrate checkout helpers/types to plural readiness/create/get and revision-bearing sources in `apps/web/lib/checkout.ts`

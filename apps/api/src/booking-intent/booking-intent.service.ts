@@ -37,6 +37,8 @@ import {
   CreateBookingIntentResponseDto,
   GetBookingIntentResponseDto,
 } from './dto/intent-response.dto';
+import { BookingReadinessObservability } from './booking-readiness.observability';
+import { BookingReadinessOperation } from '@/common/observability/booking-readiness-observability.types';
 
 type LegacyIntentPassenger = {
   type: PassengerType;
@@ -81,6 +83,7 @@ export class BookingIntentService {
     @Optional() private readonly passengerSourceResolver?: PassengerSourceResolverService,
     @Optional() private readonly passengerSnapshotService?: PassengerSnapshotService,
     @Optional() private readonly chatHandoffService?: ChatHandoffService,
+    @Optional() private readonly bookingReadinessObservability?: BookingReadinessObservability,
   ) {}
 
   async getAdvisoryReadiness(
@@ -240,13 +243,13 @@ export class BookingIntentService {
     let canonicalPassengers: ResolvedPassenger[] | null = null;
     let legacyPassengers: ResolvedIntentPassenger[] | null = null;
     if (hasCanonicalSources) {
-      if (!this.passengerSourceResolver || !this.passengerSnapshotService) {
+      if (!this.passengerSourceResolver || !this.passengerSnapshotService || !this.bookingReadinessService) {
         throw new HttpException(
           {
-            code: 'PASSENGER_SOURCE_INVALID',
-            message: 'Passenger source is invalid',
+            code: 'READINESS_DEPENDENCY_UNAVAILABLE',
+            message: 'Booking readiness dependencies are unavailable',
           },
-          HttpStatus.UNPROCESSABLE_ENTITY,
+          HttpStatus.SERVICE_UNAVAILABLE,
         );
       }
 
@@ -287,8 +290,8 @@ export class BookingIntentService {
     }
 
     const liveOfferPromise = this.fetchLiveOffer(flightOffer.duffelOfferId, 25000);
-    const readinessPromise = (canonicalPassengers && this.bookingReadinessService)
-      ? this.bookingReadinessService.evaluateAuthoritativeReadiness(
+    const readinessPromise = canonicalPassengers
+      ? this.bookingReadinessService!.evaluateAuthoritativeReadiness(
           flightOffer.rawOffer,
           canonicalPassengers,
           {
@@ -326,13 +329,17 @@ export class BookingIntentService {
       position: index,
     }));
 
+    const readinessScope = authoritativeReadiness
+      ? (authoritativeReadiness.scope === 'INTERNATIONAL' ? 'INTERNATIONAL' : 'DOMESTIC')
+      : 'DOMESTIC';
+
     let maskedPassengers: MaskedPassengerSummary[] | null = null;
     const intentId = randomUUID();
     const snapshotData = canonicalSnapshotPassengers
       ? this.passengerSnapshotService!.buildSnapshotData({
           intentId,
           passengers: canonicalSnapshotPassengers,
-          scope: authoritativeReadiness?.scope === 'INTERNATIONAL' ? 'INTERNATIONAL' : 'DOMESTIC',
+          scope: readinessScope,
         })
       : null;
     maskedPassengers = snapshotData?.maskedPassengers ?? null;
@@ -484,6 +491,31 @@ export class BookingIntentService {
           this.logger.warn('Chat telemetry emission failed');
         } catch (_) {
           // Swallow error to prevent transaction abort if logger sink throws
+        }
+      }
+
+      if (this.bookingReadinessObservability) {
+        try {
+          this.bookingReadinessObservability.recordOutcome({
+            operation: BookingReadinessOperation.INTENT_CREATE,
+            status: 'created',
+            latencyMs: Date.now() - startedAt,
+            metadata: {
+              scope: readinessScope,
+              passengerCount: (canonicalPassengers ?? legacyPassengers ?? []).length,
+              status: 'created',
+            },
+            context: {
+              traceId: context?.traceId,
+              correlationId: context?.correlationId,
+            },
+          });
+        } catch {
+          try {
+            this.logger.warn('Booking readiness observability emission failed');
+          } catch (_) {
+            // Swallow error to prevent transaction abort if logger sink throws
+          }
         }
       }
 
@@ -758,6 +790,7 @@ export class BookingIntentService {
       if (
         !passenger.travelerProfileId ||
         passenger.profileRevision === null ||
+        passenger.profileRevision === undefined ||
         checkedProfiles.has(passenger.travelerProfileId)
       ) {
         continue;
