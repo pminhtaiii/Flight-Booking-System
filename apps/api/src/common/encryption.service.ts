@@ -136,10 +136,20 @@ export class EncryptionService {
       'ENCRYPTION_KEY_V1',
     ];
 
+    // Validate any explicitly configured key environment variable (fail-fast)
+    for (const envName of candidateEnvNames) {
+      const val = process.env[envName];
+      if (val !== undefined && val.trim().length > 0) {
+        if (!/^[0-9a-fA-F]{64}$/.test(val)) {
+          throw new Error(`${envName} must be a 64-character hexadecimal string.`);
+        }
+      }
+    }
+
     let primaryKeyHex: string | null = null;
     for (const envName of primaryEnvNames) {
       const val = process.env[envName];
-      if (val && /^[0-9a-fA-F]{64}$/.test(val)) {
+      if (val && val.trim().length > 0) {
         primaryKeyHex = val;
         break;
       }
@@ -160,7 +170,7 @@ export class EncryptionService {
 
     for (const envName of candidateEnvNames) {
       const val = process.env[envName];
-      if (val && /^[0-9a-fA-F]{64}$/.test(val)) {
+      if (val && val.trim().length > 0) {
         candidateKeyHexes.add(val.toLowerCase());
       }
     }

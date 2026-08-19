@@ -251,5 +251,23 @@ describe('EncryptionService', () => {
       expect(() => ringService.decrypt(foreignCiphertext)).toThrow();
       expect(() => ringService.decryptBound(foreignBoundCiphertext, context)).toThrow();
     });
+
+    it('throws immediately when ENCRYPTION_KEY_CURRENT is malformed even if ENCRYPTION_KEY is valid', () => {
+      process.env.ENCRYPTION_KEY = 'a'.repeat(64);
+      process.env.ENCRYPTION_KEY_CURRENT = 'malformed-short-key';
+
+      expect(() => new EncryptionService()).toThrow(
+        'ENCRYPTION_KEY_CURRENT must be a 64-character hexadecimal string.',
+      );
+    });
+
+    it('throws immediately when ENCRYPTION_KEY_PREVIOUS is malformed even if primary key is valid', () => {
+      process.env.ENCRYPTION_KEY = 'a'.repeat(64);
+      process.env.ENCRYPTION_KEY_PREVIOUS = '12345';
+
+      expect(() => new EncryptionService()).toThrow(
+        'ENCRYPTION_KEY_PREVIOUS must be a 64-character hexadecimal string.',
+      );
+    });
   });
 });
