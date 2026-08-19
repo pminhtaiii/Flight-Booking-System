@@ -30,8 +30,8 @@
     "semantic_hash": ""
   },
   "apps/agent/src/agent/config.py": {
-    "mtime": 1786696828.4550402,
-    "ast_hash": "96de490b6c6a426dc135855fae70afd8",
+    "mtime": 1786958727.0625076,
+    "ast_hash": "b2f04de6ab794fb4e2a356a1881907d9",
     "semantic_hash": ""
   },
   "apps/agent/src/agent/graph/__init__.py": {
@@ -90,8 +90,8 @@
     "semantic_hash": "08a7996988a924e5b68e17440950c923"
   },
   "apps/agent/src/agent/middleware/auth.py": {
-    "mtime": 1786162846.0876417,
-    "ast_hash": "e79163a537ce6bc601592c808c07ef25",
+    "mtime": 1786959728.0671718,
+    "ast_hash": "16a78200907411b10f610b62bdde6026",
     "semantic_hash": ""
   },
   "apps/agent/src/agent/middleware/rate_limit.py": {
@@ -130,8 +130,8 @@
     "semantic_hash": ""
   },
   "apps/agent/src/agent/streaming/sse.py": {
-    "mtime": 1786802156.3565383,
-    "ast_hash": "54b1fcdbc8ac230c385704facd59ed6a",
+    "mtime": 1786958759.080969,
+    "ast_hash": "ac2623f22f9a6e3a263d7bec2f391d3a",
     "semantic_hash": ""
   },
   "apps/agent/src/agent/tools/__init__.py": {
@@ -150,8 +150,8 @@
     "semantic_hash": ""
   },
   "apps/agent/src/agent/tools/nestjs_client.py": {
-    "mtime": 1786798135.4437354,
-    "ast_hash": "f5fad3ac26438b137ccf8975b9970ba3",
+    "mtime": 1786958784.9215035,
+    "ast_hash": "80595ec72642e19d89df9d3673dda54f",
     "semantic_hash": ""
   },
   "apps/agent/src/agent/tools/registry.py": {
@@ -180,8 +180,8 @@
     "semantic_hash": ""
   },
   "apps/agent/tests/test_config.py": {
-    "mtime": 1786872542.372044,
-    "ast_hash": "06d8955dc9ef31e0d5416419a52685d4",
+    "mtime": 1786958546.8636775,
+    "ast_hash": "fc6c8ce629b999b5744b0616be65acb4",
     "semantic_hash": ""
   },
   "apps/agent/tests/test_graph.py": {
@@ -320,8 +320,8 @@
     "semantic_hash": ""
   },
   "apps/api/src/app.module.ts": {
-    "mtime": 1786872575.0167773,
-    "ast_hash": "2a16f95a8152a2ea3710eb421b661929",
+    "mtime": 1787136473.3422952,
+    "ast_hash": "997881a1472ce400a37bc0b4deecdb28",
     "semantic_hash": ""
   },
   "apps/api/src/audit/audit.module.ts": {
@@ -380,8 +380,8 @@
     "semantic_hash": "63d6e344f3ddae328eb643eb6085f2e5"
   },
   "apps/api/src/auth/strategies/jwt.strategy.ts": {
-    "mtime": 1786683527.7676065,
-    "ast_hash": "4ab1f4402e15ca5ad4202e8bdf2fb562",
+    "mtime": 1786960857.3572829,
+    "ast_hash": "4727fbe12abdc850d9288970af3ec06c",
     "semantic_hash": ""
   },
   "apps/api/src/cache/cache.module.ts": {
@@ -390,8 +390,8 @@
     "semantic_hash": "7fa541fa1a4d3d99b2a1df806fc1b239"
   },
   "apps/api/src/cache/cache.service.ts": {
-    "mtime": 1786873927.346984,
-    "ast_hash": "0ad0d65cb774075761eab1a481a4a21c",
+    "mtime": 1787136473.3646286,
+    "ast_hash": "02cf1f6496c1aa970006274abb968862",
     "semantic_hash": ""
   },
   "apps/api/src/chat/chat.controller.ts": {
@@ -405,8 +405,8 @@
     "semantic_hash": ""
   },
   "apps/api/src/chat/chat.service.ts": {
-    "mtime": 1786715664.1126685,
-    "ast_hash": "13a139756c7beb8102c48c344eec1324",
+    "mtime": 1786958767.826264,
+    "ast_hash": "13a74da5437e535b7a8989391736345d",
     "semantic_hash": ""
   },
   "apps/api/src/chat/dto/batch-messages.dto.ts": {
@@ -450,18 +450,18 @@
     "semantic_hash": ""
   },
   "apps/api/src/health/health.controller.ts": {
-    "mtime": 1786886790.814081,
-    "ast_hash": "ca6941a73b581730130c1995bad31fd3",
+    "mtime": 1787136473.3739848,
+    "ast_hash": "ee8ac7dceeae041038e62b3d5527af65",
     "semantic_hash": ""
   },
   "apps/api/src/health/health.module.ts": {
-    "mtime": 1786876655.1295652,
+    "mtime": 1787038982.4495733,
     "ast_hash": "f487d40e015aa5e628f211ff658777b9",
     "semantic_hash": ""
   },
   "apps/api/src/main.ts": {
-    "mtime": 1786873943.0599618,
-    "ast_hash": "7e697e66d90c4ee3154d92949be8611c",
+    "mtime": 1787140436.3524663,
+    "ast_hash": "7e9728ebb58303215c0c237fc43a20a4",
     "semantic_hash": ""
   },
   "apps/api/src/prisma/prisma.module.ts": {
@@ -650,8 +650,8 @@
     "semantic_hash": ""
   },
   "skills-lock.json": {
-    "mtime": 1786091463.5076401,
-    "ast_hash": "4f277c6a2c2b6827e251dcd2c8a9e883",
+    "mtime": 1786975734.2300992,
+    "ast_hash": "f8f362b2725f932c9f437ee1cb6748dd",
     "semantic_hash": ""
   },
   "tsconfig.json": {
@@ -660,8 +660,8 @@
     "semantic_hash": ""
   },
   "AGENTS.md": {
-    "mtime": 1786697014.051952,
-    "ast_hash": "4165cfc692b25d6ca5c6740c551cef2c",
+    "mtime": 1786958544.0329177,
+    "ast_hash": "cb4e2d41ce420a71d131690427954d75",
     "semantic_hash": ""
   },
   "PROJECT.md": {
@@ -685,8 +685,8 @@
     "semantic_hash": ""
   },
   "context/architecture.md": {
-    "mtime": 1786938007.9388247,
-    "ast_hash": "7d2214c67ad068d81d177f36c4dbcbc9",
+    "mtime": 1787153636.200845,
+    "ast_hash": "71d41f873c0e1bf9450af08e02b455de",
     "semantic_hash": ""
   },
   "context/code-standards.md": {
@@ -700,8 +700,8 @@
     "semantic_hash": ""
   },
   "context/progress-checker.md": {
-    "mtime": 1786937996.1113937,
-    "ast_hash": "a87f95c007f9777c0a34119033a4c090",
+    "mtime": 1787154827.9224243,
+    "ast_hash": "f31ab41c86dcc259f395cd376a2426da",
     "semantic_hash": ""
   },
   "context/project-overview.md": {
@@ -1275,7 +1275,7 @@
     "semantic_hash": ""
   },
   "apps/api/src/booking-intent/booking-intent.controller.spec.ts": {
-    "mtime": 1784557864.0750518,
+    "mtime": 1787129624.7238708,
     "ast_hash": "362159f2c39a43180f2aa4dbccc716aa",
     "semantic_hash": ""
   },
@@ -1295,18 +1295,18 @@
     "semantic_hash": ""
   },
   "apps/api/src/booking-intent/booking-intent.module.ts": {
-    "mtime": 1786683527.7761257,
-    "ast_hash": "2713f1e2e35feaffb5bf7685048b7e0d",
+    "mtime": 1787136473.3445313,
+    "ast_hash": "39a0fdc2764137aa05a6acd13c829b87",
     "semantic_hash": ""
   },
   "apps/api/src/booking-intent/booking-intent.service.spec.ts": {
-    "mtime": 1786683527.779151,
-    "ast_hash": "6753ef510c01137e50bfcb6a2049bc43",
+    "mtime": 1787151084.6230834,
+    "ast_hash": "74b23657ac735f9523cd552fc6664850",
     "semantic_hash": ""
   },
   "apps/api/src/booking-intent/booking-intent.service.ts": {
-    "mtime": 1786898193.240741,
-    "ast_hash": "b9f150b27538f83a3c8ad3129c19ea90",
+    "mtime": 1787154081.5913959,
+    "ast_hash": "3d8eaf66ad3cbdaf61a6608761069813",
     "semantic_hash": ""
   },
   "apps/api/src/booking-intent/dto/create-intent.dto.ts": {
@@ -1315,17 +1315,17 @@
     "semantic_hash": ""
   },
   "apps/api/src/booking-intent/dto/intent-response.dto.ts": {
-    "mtime": 1785858751.2900944,
-    "ast_hash": "611498b7d5ee21f39d0b16e21062c1cc",
+    "mtime": 1787137253.390088,
+    "ast_hash": "8bbace46ca1fc6f6b493967adb3f9ec8",
     "semantic_hash": ""
   },
   "apps/api/src/common/encryption.service.spec.ts": {
-    "mtime": 1785858751.309214,
+    "mtime": 1787129624.7875814,
     "ast_hash": "ba305e8930a7e0d46974214004417176",
     "semantic_hash": ""
   },
   "apps/api/src/common/encryption.service.ts": {
-    "mtime": 1785858751.3138375,
+    "mtime": 1787129624.801243,
     "ast_hash": "49d6409b3ebcb100471d3521dc1cf0c5",
     "semantic_hash": ""
   },
@@ -1370,8 +1370,8 @@
     "semantic_hash": ""
   },
   "apps/api/test/booking-intent.e2e-spec.ts": {
-    "mtime": 1786786834.6990445,
-    "ast_hash": "1ee7e42e9fb4a44c1c803370baab2e71",
+    "mtime": 1787137936.4672966,
+    "ast_hash": "9319255cfcb523da5840ec41a817b823",
     "semantic_hash": ""
   },
   "specs/010-stripe-payment-system/PRD.md": {
@@ -1470,13 +1470,13 @@
     "semantic_hash": ""
   },
   "apps/api/src/payment/payment.module.ts": {
-    "mtime": 1785573792.2394366,
-    "ast_hash": "9da77c79079810daffd5caeb18e3ba62",
+    "mtime": 1787136473.380439,
+    "ast_hash": "06a46406afa78ad1501855bce63d46ac",
     "semantic_hash": ""
   },
   "apps/api/src/payment/payment.service.ts": {
-    "mtime": 1786118748.6544664,
-    "ast_hash": "d3b622f33b8a0b131fe1dc19839e78b2",
+    "mtime": 1787136473.3867633,
+    "ast_hash": "58e09e5afbdc854835012420a0fc5782",
     "semantic_hash": ""
   },
   "task.md": {
@@ -1485,8 +1485,8 @@
     "semantic_hash": ""
   },
   "apps/api/src/payment/payment.service.spec.ts": {
-    "mtime": 1786116118.7659278,
-    "ast_hash": "d357626cdac872d9e9e0fb5cf63fa079",
+    "mtime": 1787136473.3827052,
+    "ast_hash": "8fa4552ebac7ed666edeb91c9d7bd757",
     "semantic_hash": ""
   },
   "apps/api/src/payment/payment-webhook.controller.spec.ts": {
@@ -1580,7 +1580,7 @@
     "semantic_hash": ""
   },
   "apps/api/src/booking/booking.service.ts": {
-    "mtime": 1786896608.2972205,
+    "mtime": 1787131327.1984925,
     "ast_hash": "83ccdcc317a174c9b03806989949ad68",
     "semantic_hash": ""
   },
@@ -1645,13 +1645,13 @@
     "semantic_hash": ""
   },
   "apps/api/src/payment/payment-method.service.spec.ts": {
-    "mtime": 1784557907.0891962,
-    "ast_hash": "8b4dc11aa697f1e1cf7c9e11777532d2",
+    "mtime": 1787136473.376017,
+    "ast_hash": "b97334f71f088f65af741557960430ff",
     "semantic_hash": ""
   },
   "apps/api/src/payment/payment-method.service.ts": {
-    "mtime": 1786896601.5034,
-    "ast_hash": "bb76f8ed099de4c351e642dfaa20b8d8",
+    "mtime": 1787136473.3784025,
+    "ast_hash": "20b36c7ee4fc9f8f5347d8425e0476c9",
     "semantic_hash": ""
   },
   "apps/api/src/payment/payment-refund.service.spec.ts": {
@@ -1680,8 +1680,8 @@
     "semantic_hash": ""
   },
   "apps/api/test/payment-idempotency.e2e-spec.ts": {
-    "mtime": 1786159648.1755664,
-    "ast_hash": "ac4628008e32f88b3de6328e1eceac94",
+    "mtime": 1787136473.407984,
+    "ast_hash": "00d89c2dba4a60a5cffffaf8f550d174",
     "semantic_hash": ""
   },
   "apps/api/test/payment-refund.e2e-spec.ts": {
@@ -1695,8 +1695,8 @@
     "semantic_hash": ""
   },
   "apps/api/test/payment.e2e-spec.ts": {
-    "mtime": 1786159648.2212412,
-    "ast_hash": "b98f07d0f5645e688bfe5ef7a518dfba",
+    "mtime": 1786960873.4821286,
+    "ast_hash": "9155c77ed7cbecbfdf7b4a9878426b91",
     "semantic_hash": ""
   },
   "apps/web/app/prototype/landing/LandingPrototype.tsx": {
@@ -2140,8 +2140,8 @@
     "semantic_hash": ""
   },
   "apps/api/test/disruption.e2e-spec.ts": {
-    "mtime": 1786159648.0855532,
-    "ast_hash": "095701bc4cab3bf02656f833e6d20faf",
+    "mtime": 1786961297.5875578,
+    "ast_hash": "ad3475731c5a7352d7e02def4b27a873",
     "semantic_hash": ""
   },
   "apps/api/src/disruption/sync/reconciliation.service.spec.ts": {
@@ -2475,13 +2475,13 @@
     "semantic_hash": ""
   },
   "apps/web/app/checkout/[intentId]/review/page.tsx": {
-    "mtime": 1785858751.43616,
-    "ast_hash": "3c42e34feb7f0c560829d9f04bf1fd00",
+    "mtime": 1787151060.456955,
+    "ast_hash": "d47cdcd311e8e92bcbe66247e4fd9c9e",
     "semantic_hash": ""
   },
   "apps/web/app/checkout/passengers/page.tsx": {
-    "mtime": 1786805164.465989,
-    "ast_hash": "da679cd4bfb8226b909755351e9d1ab8",
+    "mtime": 1786986229.3455954,
+    "ast_hash": "3ef6c43a5d6eb5807bb7e08023e78203",
     "semantic_hash": ""
   },
   "apps/web/app/search/page.tsx": {
@@ -2550,8 +2550,8 @@
     "semantic_hash": ""
   },
   "apps/web/components/checkout/PassengerFormClient.tsx": {
-    "mtime": 1786524826.9358528,
-    "ast_hash": "d3292d56c922c1382080ea3a0d908bed",
+    "mtime": 1787148942.7994306,
+    "ast_hash": "10a712e1e4cbbae694f1a3804c786b27",
     "semantic_hash": ""
   },
   "apps/web/components/layout/Header.tsx": {
@@ -2580,8 +2580,8 @@
     "semantic_hash": ""
   },
   "apps/web/lib/checkout.ts": {
-    "mtime": 1786513621.684719,
-    "ast_hash": "8bb976da0ea8ac9344ec43b8ad93d2b7",
+    "mtime": 1787148948.9380858,
+    "ast_hash": "472ee369b27d394d49cb6a99b38e9230",
     "semantic_hash": ""
   },
   "apps/web/lib/featureFlags.ts": {
@@ -2610,8 +2610,8 @@
     "semantic_hash": ""
   },
   "apps/web/tests/checkout-foundation.spec.ts": {
-    "mtime": 1785858751.5306137,
-    "ast_hash": "93cf0a88fbd88328a59fdad797f5d9e8",
+    "mtime": 1787148956.2314966,
+    "ast_hash": "096f900d285d048b4c708ab853d01c9f",
     "semantic_hash": ""
   },
   "apps/web/tests/disruptions.spec.ts": {
@@ -2760,8 +2760,8 @@
     "semantic_hash": ""
   },
   "specs/016a-traveler-profile-booking-readiness/quickstart.md": {
-    "mtime": 1785858752.13996,
-    "ast_hash": "ababd52b2c23414f7cd050100bdeffd8",
+    "mtime": 1787155471.3999376,
+    "ast_hash": "8c13a81082d7423c8a681903dbdc1f72",
     "semantic_hash": ""
   },
   "specs/016a-traveler-profile-booking-readiness/research.md": {
@@ -2775,8 +2775,8 @@
     "semantic_hash": ""
   },
   "specs/016a-traveler-profile-booking-readiness/tasks.md": {
-    "mtime": 1785858752.1529076,
-    "ast_hash": "3dfdb2cb0446e14ec3cf7e2a82adc6e6",
+    "mtime": 1787154798.3205745,
+    "ast_hash": "dff1b755bba2d6e056ca10acff84a5ef",
     "semantic_hash": ""
   },
   "apps/api/prisma/migrations/20260801174324_traveler_profile_readiness/migration.sql": {
@@ -2790,8 +2790,8 @@
     "semantic_hash": ""
   },
   "apps/api/src/profile/passport-expiry-backfill.service.ts": {
-    "mtime": 1785858751.3677983,
-    "ast_hash": "7803b5c11f3c887ead23b24f12e53282",
+    "mtime": 1787136473.3912377,
+    "ast_hash": "aff71a4f1595e1290d927c6a7e12674d",
     "semantic_hash": ""
   },
   "apps/api/test/traveler-profile-readiness-migration.e2e-spec.ts": {
@@ -2810,8 +2810,8 @@
     "semantic_hash": ""
   },
   "apps/api/src/profile/profile.module.ts": {
-    "mtime": 1785858751.3718848,
-    "ast_hash": "2aed39adf80d3469b85fe160084843db",
+    "mtime": 1787136473.394812,
+    "ast_hash": "13bf364d4e7890413419ed800bfeef83",
     "semantic_hash": ""
   },
   "apps/agent/src/agent/agents/checkout_orchestrator.py": {
@@ -2900,8 +2900,8 @@
     "semantic_hash": ""
   },
   "apps/agent/src/agent/utils/auth.py": {
-    "mtime": 1786162846.0104377,
-    "ast_hash": "8e2f1c72f6268dd01dbc98f9fec1dc87",
+    "mtime": 1786958722.433697,
+    "ast_hash": "6ad07b86e01a3a7cd54a77a1f48779a8",
     "semantic_hash": ""
   },
   "apps/agent/test_tool_node.py": {
@@ -3070,8 +3070,8 @@
     "semantic_hash": ""
   },
   "apps/api/src/agent-gateway/selection-attestation.service.ts": {
-    "mtime": 1786873054.48674,
-    "ast_hash": "95ac985d31f441f7851fa46279cb15fa",
+    "mtime": 1786958701.1102574,
+    "ast_hash": "2b5808e5c846667e203eca9ba05579f5",
     "semantic_hash": ""
   },
   "apps/api/src/auth/strategies/jwt.strategy.spec.ts": {
@@ -3080,8 +3080,8 @@
     "semantic_hash": ""
   },
   "apps/api/src/booking-intent/booking-intent.module.spec.ts": {
-    "mtime": 1785858751.2439742,
-    "ast_hash": "45765325c2472d337e4f962b36d22329",
+    "mtime": 1787025580.1728983,
+    "ast_hash": "db6276900b5fca373e70cc7d2bcc5a84",
     "semantic_hash": ""
   },
   "apps/api/src/booking-intent/booking-readiness.config.ts": {
@@ -3100,8 +3100,8 @@
     "semantic_hash": ""
   },
   "apps/api/src/booking-intent/booking-readiness.observability.ts": {
-    "mtime": 1786683506.6824436,
-    "ast_hash": "f6ec8965f1a5aade43efbe6ea28dd3f2",
+    "mtime": 1787136473.3566394,
+    "ast_hash": "9b64d8fa7f08d9bfc8dce5a340925c60",
     "semantic_hash": ""
   },
   "apps/api/src/booking-intent/booking-readiness.service.spec.ts": {
@@ -3110,8 +3110,8 @@
     "semantic_hash": ""
   },
   "apps/api/src/booking-intent/booking-readiness.service.ts": {
-    "mtime": 1786811846.6461127,
-    "ast_hash": "434687f06dbe56a3507e419d6e2ff54a",
+    "mtime": 1787136473.3586538,
+    "ast_hash": "81f0187d874871f7b24ee12dbb8d7517",
     "semantic_hash": ""
   },
   "apps/api/src/booking-intent/booking-readiness.types.ts": {
@@ -3145,13 +3145,13 @@
     "semantic_hash": ""
   },
   "apps/api/src/booking-intent/passenger-snapshot.service.spec.ts": {
-    "mtime": 1785858751.292634,
+    "mtime": 1787129624.7709494,
     "ast_hash": "7d198d9d69ebdde9b615b51e76202128",
     "semantic_hash": ""
   },
   "apps/api/src/booking-intent/passenger-snapshot.service.ts": {
-    "mtime": 1785858751.2946575,
-    "ast_hash": "d481752679001e1b2c11a266f0369f38",
+    "mtime": 1787137270.5683105,
+    "ast_hash": "e86051b309c94eee029eacc014f7d0ad",
     "semantic_hash": ""
   },
   "apps/api/src/booking-intent/passenger-source-resolver.service.spec.ts": {
@@ -3200,8 +3200,8 @@
     "semantic_hash": ""
   },
   "apps/api/src/chat-handoff/chat-handoff.service.ts": {
-    "mtime": 1786940417.5835598,
-    "ast_hash": "11ef089a78071a97deb2902a3c3ed3f0",
+    "mtime": 1786963265.3068902,
+    "ast_hash": "a946b8a0494b4e4178fd23d9bbb81a7d",
     "semantic_hash": ""
   },
   "apps/api/src/chat-handoff/dto/chat-handoff-response.dto.ts": {
@@ -3265,8 +3265,8 @@
     "semantic_hash": ""
   },
   "apps/api/src/profile/profile.controller.ts": {
-    "mtime": 1785858751.3698559,
-    "ast_hash": "80e9ecc75fc09b89c5781e9ddedd54a1",
+    "mtime": 1787136473.392774,
+    "ast_hash": "6683cca99c04dbf7ab3c6174eb2fd603",
     "semantic_hash": ""
   },
   "apps/api/src/profile/profile.service.spec.ts": {
@@ -3275,8 +3275,8 @@
     "semantic_hash": ""
   },
   "apps/api/src/profile/profile.service.ts": {
-    "mtime": 1785858751.376459,
-    "ast_hash": "389ef92ab154b4d4aafe9cdabd9d0c49",
+    "mtime": 1787136473.3968172,
+    "ast_hash": "b48444379e416b427b8ae4e6a5d049a8",
     "semantic_hash": ""
   },
   "apps/api/test/agent-chat-gateway.e2e-spec.ts": {
@@ -3360,8 +3360,8 @@
     "semantic_hash": ""
   },
   "apps/web/app/profile/page.tsx": {
-    "mtime": 1785858751.4481509,
-    "ast_hash": "d3c6bc9faa8bea13fc5be7d3976c85b0",
+    "mtime": 1786986175.6416073,
+    "ast_hash": "6b1274fade221c2251c138d1bba24abc",
     "semantic_hash": ""
   },
   "apps/web/app/prototype/chat/page.tsx": {
@@ -3375,13 +3375,13 @@
     "semantic_hash": ""
   },
   "apps/web/components/chat/BookingActionCard.tsx": {
-    "mtime": 1786091813.9207613,
-    "ast_hash": "b324ab1c9b46070f790f1d83922dc608",
+    "mtime": 1786985750.879891,
+    "ast_hash": "116f26a61c8388c0406cec79dc309737",
     "semantic_hash": ""
   },
   "apps/web/components/chat/ChatWidget.tsx": {
-    "mtime": 1786708418.5075133,
-    "ast_hash": "916f788fae37f02d0038717e5baf3544",
+    "mtime": 1787024416.488998,
+    "ast_hash": "80e7e95e616d1a4a348fe8a0e225075b",
     "semantic_hash": ""
   },
   "apps/web/components/chat/CheckoutHandoffCard.tsx": {
@@ -3390,8 +3390,8 @@
     "semantic_hash": ""
   },
   "apps/web/components/profile/TravelerProfileForm.tsx": {
-    "mtime": 1785858751.4727046,
-    "ast_hash": "70d3c7fa9e1a35afad9e1755fa8c5539",
+    "mtime": 1786990393.8456693,
+    "ast_hash": "db2ab83e0a5c0da17598238c5fa6f637",
     "semantic_hash": ""
   },
   "apps/web/components/profile/TravelerProfilePrototype.tsx": {
@@ -3400,13 +3400,13 @@
     "semantic_hash": ""
   },
   "apps/web/lib/chatStream.spec.ts": {
-    "mtime": 1786707809.6156971,
-    "ast_hash": "ba2c7d4863d651e3345e44ddabe72678",
+    "mtime": 1786958546.9499953,
+    "ast_hash": "2a64608c3dbd19a5957dad0299aac9a8",
     "semantic_hash": ""
   },
   "apps/web/lib/chatStream.ts": {
-    "mtime": 1786707803.8092413,
-    "ast_hash": "1e9cc29ad69bcc203cbe4b0aa702a42f",
+    "mtime": 1786958546.9527638,
+    "ast_hash": "51fe92a29cfe73f2a02ed62be52037c5",
     "semantic_hash": ""
   },
   "apps/web/lib/chatTrace.spec.ts": {
@@ -3475,13 +3475,13 @@
     "semantic_hash": ""
   },
   "apps/web/lib/profile.ts": {
-    "mtime": 1785858751.4875226,
-    "ast_hash": "4057f4d23df120110dc9eff5858c966b",
+    "mtime": 1786965957.9311602,
+    "ast_hash": "a11f29ad359295d44b934471c898fe9b",
     "semantic_hash": ""
   },
   "apps/web/lib/safeReturnTarget.ts": {
-    "mtime": 1785858751.4895494,
-    "ast_hash": "bb138e18011809446e573bebd2605f79",
+    "mtime": 1786966127.601403,
+    "ast_hash": "104d3cf5ef2af9cd836dd3ee997c0028",
     "semantic_hash": ""
   },
   "apps/web/scripts/check-route-files.mjs": {
@@ -3495,8 +3495,8 @@
     "semantic_hash": ""
   },
   "apps/web/tests/chat-booking-readiness.spec.ts": {
-    "mtime": 1786696970.3140008,
-    "ast_hash": "084f03c7ffa765fa4d4e60ec132d9071",
+    "mtime": 1786990401.544653,
+    "ast_hash": "45a254fbacc7d724de32d8b861ab7bc7",
     "semantic_hash": ""
   },
   "apps/web/tests/chat-checkout-handoff.spec.ts": {
@@ -3545,13 +3545,13 @@
     "semantic_hash": ""
   },
   "apps/web/tests/safe-return-target.spec.ts": {
-    "mtime": 1785858751.5402038,
-    "ast_hash": "614e15d761a30109c1385300b392fb01",
+    "mtime": 1786966136.6912131,
+    "ast_hash": "f97e0ae99252fdf1480d1d74f1673c45",
     "semantic_hash": ""
   },
   "apps/web/tests/traveler-profile.spec.ts": {
-    "mtime": 1785858751.540929,
-    "ast_hash": "6e83f8ce703650c5a6522fa861807e13",
+    "mtime": 1786990398.289886,
+    "ast_hash": "2ab8ed952b7d0f59a9f5e9faf7f4dcb2",
     "semantic_hash": ""
   },
   "packages/shared/src/types/chat.types.spec.ts": {
@@ -3585,8 +3585,8 @@
     "semantic_hash": ""
   },
   "docs/runbooks/chatbot-handoff.md": {
-    "mtime": 1786938065.6173675,
-    "ast_hash": "112da42da20be5b36ec7ab3714b39557",
+    "mtime": 1786961502.9657059,
+    "ast_hash": "93ba2eb393b07657c95269e8ff1b9bde",
     "semantic_hash": ""
   },
   "docs/superpowers/plans/2026-08-14-phase-8d-direct-only-cleanup.md": {
@@ -3730,8 +3730,8 @@
     "semantic_hash": ""
   },
   "apps/api/src/cache/cache.service.spec.ts": {
-    "mtime": 1786874168.3934593,
-    "ast_hash": "7ab3003d3a3dc298606545b595dd5987",
+    "mtime": 1787136473.362206,
+    "ast_hash": "277b9e567686fd7446a7633071c95353",
     "semantic_hash": ""
   },
   "apps/api/src/health/agent-health.service.spec.ts": {
@@ -3760,8 +3760,8 @@
     "semantic_hash": ""
   },
   "apps/api/test/feature-flag-matrix.e2e-spec.ts": {
-    "mtime": 1786872754.5442977,
-    "ast_hash": "0cddd7e6fd589710a7ac1cdd02c7e543",
+    "mtime": 1787136473.405354,
+    "ast_hash": "fc189d20a4d0871d32b6e32cf19ccff4",
     "semantic_hash": ""
   },
   "apps/api/test/multi-service-health.e2e-spec.ts": {
@@ -3789,9 +3789,99 @@
     "ast_hash": "200269fbb1dd84b7059c90bf42950cba",
     "semantic_hash": ""
   },
-  "pyproject.toml": {
-    "mtime": 1786936409.7839296,
-    "ast_hash": "5e6f91d5c1d324ff3e7ecf046bd5369a",
+  "apps/agent/tests/test_phase11e_key_rotation.py": {
+    "mtime": 1786958803.1937494,
+    "ast_hash": "3d5e77c1fd07ca880f133c3606a36e4b",
+    "semantic_hash": ""
+  },
+  "apps/api/src/booking-intent/booking-passenger-final-validator.service.spec.ts": {
+    "mtime": 1787033758.5775049,
+    "ast_hash": "d988898b85138bc6d80be0bc183e2df0",
+    "semantic_hash": ""
+  },
+  "apps/api/src/booking-intent/booking-passenger-final-validator.service.ts": {
+    "mtime": 1787136473.3541882,
+    "ast_hash": "9c851f23e4779a66e50e2aa33f80bdc1",
+    "semantic_hash": ""
+  },
+  "apps/api/src/common/observability/booking-readiness-metrics.module.ts": {
+    "mtime": 1787136473.3666704,
+    "ast_hash": "1b79fcc2244b843b4e835ee6fae1495b",
+    "semantic_hash": ""
+  },
+  "apps/api/src/common/observability/booking-readiness.metrics.spec.ts": {
+    "mtime": 1787136473.368688,
+    "ast_hash": "bc0116ee8ad63e4133531ad26f3e76d7",
+    "semantic_hash": ""
+  },
+  "apps/api/src/common/observability/booking-readiness.metrics.ts": {
+    "mtime": 1787136473.3707068,
+    "ast_hash": "cd0571d47f2c24793b9249639b8e908e",
+    "semantic_hash": ""
+  },
+  "apps/api/src/common/sentinel/data-drift-sentinel.module.ts": {
+    "mtime": 1786958761.1566858,
+    "ast_hash": "e77fee72fa503e33611010c61a64d60f",
+    "semantic_hash": ""
+  },
+  "apps/api/src/common/sentinel/data-drift-sentinel.service.ts": {
+    "mtime": 1786963239.6431031,
+    "ast_hash": "306a32b2db000247844293873d032ece",
+    "semantic_hash": ""
+  },
+  "apps/api/test/booking-passenger-final-validation.e2e-spec.ts": {
+    "mtime": 1787136473.3987901,
+    "ast_hash": "e51f049f3bb1df69a589d0bb775fa2de",
+    "semantic_hash": ""
+  },
+  "apps/api/test/booking-readiness-observability.e2e-spec.ts": {
+    "mtime": 1787136473.403327,
+    "ast_hash": "f7ebbdd139103177327d511cb7bd8e76",
+    "semantic_hash": ""
+  },
+  "apps/api/test/booking-readiness.performance.e2e-spec.ts": {
+    "mtime": 1787155375.499263,
+    "ast_hash": "65acc311a4eb5c78c1bfadfbdf4e3426",
+    "semantic_hash": ""
+  },
+  "apps/api/test/phase11d-cryptographic-audit.e2e-spec.ts": {
+    "mtime": 1786958546.9473128,
+    "ast_hash": "614c6158f85759da5ffd9ed662e98da3",
+    "semantic_hash": ""
+  },
+  "apps/api/test/phase11e-continuous-reliability.e2e-spec.ts": {
+    "mtime": 1786963274.1697512,
+    "ast_hash": "2f8634c8cd368445b8ff9d89b85ac29e",
+    "semantic_hash": ""
+  },
+  "apps/api/test/phase11e-data-sentinel.e2e-spec.ts": {
+    "mtime": 1786963281.620306,
+    "ast_hash": "13338314dcc27c5e2f7c995da39dcb04",
+    "semantic_hash": ""
+  },
+  "apps/api/test/phase11e-key-rotation.e2e-spec.ts": {
+    "mtime": 1786959394.3905127,
+    "ast_hash": "9d110aecf92373eff77b32aa4c714fdc",
+    "semantic_hash": ""
+  },
+  "apps/web/lib/profile.spec.ts": {
+    "mtime": 1786965973.8686957,
+    "ast_hash": "1af457c796cb3506b618e5d5a4254f9b",
+    "semantic_hash": ""
+  },
+  "apps/web/tests/booking-action-card.unit.ts": {
+    "mtime": 1786985765.677307,
+    "ast_hash": "5bea03088789308361f61407f32e8656",
+    "semantic_hash": ""
+  },
+  "apps/web/tests/safe-return-target.unit.ts": {
+    "mtime": 1786966133.0877962,
+    "ast_hash": "b6bcea7df79e7f8a070ed75cff542a32",
+    "semantic_hash": ""
+  },
+  "docs/runbooks/booking-readiness.md": {
+    "mtime": 1787155188.508054,
+    "ast_hash": "1b5322305a5de7b3dee79b19540b1ebf",
     "semantic_hash": ""
   }
 }

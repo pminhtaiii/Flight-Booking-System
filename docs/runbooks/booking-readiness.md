@@ -264,33 +264,32 @@ The following sensitive tokens and customer personal information **MUST NEVER** 
 
 ### 4.1 Grafana Operational Dashboard Panels
 
-The production monitoring dashboard `Flight Booking - Traveler Profile & Booking Readiness` comprises 6 core visualization panels:
+The production monitoring dashboard `Flight Booking - Traveler Profile & Booking Readiness` comprises 6 core visualization panels querying actual metrics and health snapshot endpoints (`GET /health/booking-readiness`):
 
 ```text
 +----------------------------------------------------+----------------------------------------------------+
 | PANEL 1: End-to-End Readiness Throughput           | PANEL 2: Latency Percentiles (p50 / p95 / p99)     |
-| [Rate of Advisory Checks / Intents / Validations]  | [Profile Read, Advisory Check, Intent Creation]    |
+| [booking_readiness_checks, intent_creations]       | [latency.profile_read, latency.readiness_advisory] |
 +----------------------------------------------------+----------------------------------------------------+
 | PANEL 3: Authoritative Rejections & CAS Conflicts  | PANEL 4: Dependency Health & Service Degradation   |
-| [traveler_profile_conflicts, intent_rejections]    | [PostgreSQL Status, Redis Status, 5xx Rates]       |
+| [traveler_profile_conflicts, intent_rejections]    | [GET /health/booking-readiness status, DB/Redis]   |
 +----------------------------------------------------+----------------------------------------------------+
 | PANEL 5: Cryptographic Integrity & Final Safety   | PANEL 6: Backfill Governance & Quarantine Sentinel |
-| [final_validation_failures, snapshot_tampering]   | [backfill_runs, backfill_quarantined_total]        |
+| [final_validation_failures, quarantine counts]    | [backfill_runs, backfill_quarantined_total]        |
 +----------------------------------------------------+----------------------------------------------------+
 ```
 
 ### 4.2 Standard Alert Rules & Thresholds
 
-| Alert Name | Condition & PromQL Expression | Severity | Paging Channel | Remediation Target |
+| Alert Name | Condition & Query / Metric Source | Severity | Paging Channel | Remediation Target |
 | :--- | :--- | :--- | :--- | :--- |
-| `BookingReadinessErrorRateHigh` | `sum(rate(http_requests_total{status=~"5..",route=~"/api/(profile\|bookings/intents).*"}[5m])) / sum(rate(http_requests_total{route=~"/api/(profile\|bookings/intents).*"}[5m])) > 2 * baseline` for 5m | Critical | PagerDuty P1 | Immediate triage (Playbook A / Service failure). |
+| `BookingReadinessServiceDegraded` | `GET /health/booking-readiness` health snapshot returns `status == 'degraded'` (or `dependencies.database == 'down'` / `dependencies.redis == 'down'`) for 2m | Critical | PagerDuty P1 | Immediate triage (Playbook A / Service & DB failure). |
 | `SnapshotIntegrityFailureSpike` | `increase(booking_passenger_final_validation_failures_total[5m]) > 0` | Critical | PagerDuty P1 | Investigate cryptographic key mismatch or DB corruption (Playbook C). |
 | `ProfileCasConflictRateHigh` | `rate(traveler_profile_conflicts_total[5m]) / rate(traveler_profile_updates_total[5m]) > 0.10` for 10m | Warning | Slack #eng-flight-alerts | Inspect client form revision caching or retry storm. |
 | `AuthoritativeRejectionSurge` | `rate(booking_intent_authoritative_rejections_total[5m]) / rate(booking_readiness_checks_total[5m]) > 0.05` for 15m | Warning | Slack #eng-flight-alerts | Investigate frontend advisory bypass or client validation desync. |
 | `BackfillQuarantineSpike` | `increase(passport_expiry_backfill_quarantined_total[1h]) > 0` or backfill abort | High | PagerDuty P2 | Pause backfill cron; inspect data drift (Playbook C & Section 8). |
-| `AdvisoryReadinessLatencyP95High` | `histogram_quantile(0.95, rate(booking_readiness_latency_bucket{op="readiness_advisory"}[5m])) > 300` for 10m | High | Slack #eng-flight-perf | Inspect airport country cache and query execution plan. |
-| `ProfileReadLatencyP95High` | `histogram_quantile(0.95, rate(booking_readiness_latency_bucket{op="profile_read"}[5m])) > 500` for 10m | High | Slack #eng-flight-perf | Inspect PostgreSQL traveler_profiles index latency. |
-| `UnknownScopeSpike` | `rate(booking_readiness_outcomes_total{scope="UNKNOWN"}[15m]) > 0.02` for 15m | Warning | Slack #eng-flight-alerts | Missing airport IATA codes in PostgreSQL `airports` table. |
+| `AdvisoryReadinessLatencyP95High` | `GET /health/booking-readiness` latency percentiles `latency.readiness_advisory.p95 > 300` ms for 10m | High | Slack #eng-flight-perf | Inspect airport country cache and query execution plan. |
+| `ProfileReadLatencyP95High` | `GET /health/booking-readiness` latency percentiles `latency.profile_read.p95 > 500` ms for 10m | High | Slack #eng-flight-perf | Inspect PostgreSQL traveler_profiles index latency. |
 
 ---
 
@@ -448,7 +447,7 @@ Ciphertext Format:  v1:<iv_hex>:<auth_tag_hex>:<encrypted_hex>
 
 | Secret Name | Usage | Rotation Mechanism | Rollback Strategy |
 | :--- | :--- | :--- | :--- |
-| `ENCRYPTION_KEY` | AES-256-GCM field encryption for passport numbers and expiry dates. | Multi-key ring support. Add new key as primary signer; retain prior key in decryption ring during background re-encryption. | Switch primary signer back to prior key if decryption verification fails. |
+| `ENCRYPTION_KEY` | AES-256-GCM field encryption for passport numbers and expiry dates. | Multi-version key ring support. Primary encryption key selected in priority order from `[ENCRYPTION_KEY_CURRENT, ENCRYPTION_KEY, ENCRYPTION_KEY_V2, ENCRYPTION_KEY_V1]`. Candidate decryption keys ring loaded from `[ENCRYPTION_KEY_CURRENT, ENCRYPTION_KEY, ENCRYPTION_KEY_PREVIOUS, ENCRYPTION_KEY_V2, ENCRYPTION_KEY_V1]`. All new writes use primary key; `decrypt` and `decryptBound` try primary then fallback across candidate ring. | Switch primary key back to previous key or remove new key from environment if verification fails. |
 | `JWT_SECRET` | Authentication tokens for API and web session. | Multi-secret JWT verifier ring (`JWT_SECRET_CURRENT`, `JWT_SECRET_PREVIOUS`). | Retain previous secret for 24-hour grace period before retiring. |
 | `CLAIM_TOKEN_SECRET` | HMAC-SHA256 signature for Python Agent to NestJS Gateway authentication. | Coordinated secret update supporting active and previous candidate signatures. | Revert agent and API config simultaneously. |
 
@@ -458,14 +457,15 @@ Ciphertext Format:  v1:<iv_hex>:<auth_tag_hex>:<encrypted_hex>
    ```bash
    node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
    ```
-2. **Deploy Dual-Key Ring Configuration**:
+2. **Deploy Multi-Key Ring Configuration**:
    Update environment configuration:
-   - `ENCRYPTION_KEY_CURRENT` = `<new_key_hex>`
-   - `ENCRYPTION_KEY_PREVIOUS` = `<old_key_hex>`
+   - Primary key is resolved from candidate priority: `[ENCRYPTION_KEY_CURRENT, ENCRYPTION_KEY, ENCRYPTION_KEY_V2, ENCRYPTION_KEY_V1]`.
+   - Set `ENCRYPTION_KEY_CURRENT` = `<new_key_hex>` (used for all new `encrypt` and `encryptBound` writes).
+   - Set `ENCRYPTION_KEY_PREVIOUS` = `<old_key_hex>` (retained in the candidate decryption ring `[ENCRYPTION_KEY_CURRENT, ENCRYPTION_KEY, ENCRYPTION_KEY_PREVIOUS, ENCRYPTION_KEY_V2, ENCRYPTION_KEY_V1]`).
 3. **Run Verification Suite**:
-   Execute non-destructive roundtrip decryption test against test profile.
+   Execute non-destructive roundtrip decryption tests. `decrypt` and `decryptBound` automatically try the primary key and fallback to previous/candidate keys in the ring before throwing.
 4. **Trigger Background Re-encryption**:
-   Execute batch re-encryption script for existing `traveler_profiles` and active `booking_intent_passengers`.
+   Execute batch re-encryption script for existing `traveler_profiles` and active `booking_intent_passengers` using primary key.
 5. **Retire Old Key**:
    After all rows are re-encrypted and backup retention window passes, remove `ENCRYPTION_KEY_PREVIOUS`.
 

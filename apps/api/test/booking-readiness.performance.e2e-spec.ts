@@ -561,19 +561,30 @@ describe('Booking Readiness Performance Benchmarks (E2E) - Task T075', () => {
     console.log('=======================================================================================================\n');
 
     // Cleanup resources
-    if (prisma && testUser?.id) {
-      await prisma.auditLog.deleteMany({ where: { userId: testUser.id } });
-      await prisma.bookingIntentPassenger.deleteMany({ where: { intent: { userId: testUser.id } } });
-      await prisma.bookingIntent.deleteMany({ where: { userId: testUser.id } });
-      await prisma.travelerProfile.deleteMany({ where: { userId: testUser.id } });
-      await prisma.flightOffer.deleteMany({
-        where: { id: { in: [internationalOffer.id, domesticOffer.id] } },
-      });
-      await prisma.user.deleteMany({ where: { id: testUser.id } });
+    try {
+      if (prisma && testUser?.id) {
+        await prisma.auditLog.deleteMany({ where: { userId: testUser.id } });
+        await prisma.bookingIntentPassenger.deleteMany({ where: { intent: { userId: testUser.id } } });
+        await prisma.bookingIntent.deleteMany({ where: { userId: testUser.id } });
+        await prisma.travelerProfile.deleteMany({ where: { userId: testUser.id } });
+        const offerIds = [internationalOffer?.id, domesticOffer?.id].filter(
+          (id): id is string => typeof id === 'string' && id.length > 0,
+        );
+        if (offerIds.length > 0) {
+          await prisma.flightOffer.deleteMany({
+            where: { id: { in: offerIds } },
+          });
+        }
+        await prisma.user.deleteMany({ where: { id: testUser.id } });
+      }
+    } finally {
+      if (httpAgent) {
+        httpAgent.destroy();
+      }
+      if (app) {
+        await app.close();
+      }
     }
-
-    httpAgent.destroy();
-    await app.close();
   });
 
   describe('Benchmark 1: Profile Read', () => {

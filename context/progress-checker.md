@@ -23,6 +23,10 @@ Update this file after every completed feature. Any AI agent reading this should
     - Verified performance p95 baselines: Profile Read p95 = 20.39 ms (< 50 ms target), Advisory Readiness p95 = 35.72 ms (< 100 ms target), Sequential Intent Creation p95 = 108.25 ms (< 200 ms target), 100-way concurrent intent creation handled gracefully.
     - Verified complete Negative PII Corpus Audit across logs, health snapshots (`/health/booking-readiness`), traces, audit logs, SSE streams, agent tool allowlists, and database models.
     - Updated `quickstart.md` with timestamped execution sign-off and all tasks marked complete in `tasks.md`.
+  - **Operational Hardening & Multi-Version Key Ring (`apps/api/src/common/encryption.service.ts` & `docs/runbooks/booking-readiness.md`)**:
+    - `EncryptionService` supports zero-downtime key rotation ring: primary encryption key from `[ENCRYPTION_KEY_CURRENT, ENCRYPTION_KEY, ENCRYPTION_KEY_V2, ENCRYPTION_KEY_V1]`, candidate decryption ring from `[ENCRYPTION_KEY_CURRENT, ENCRYPTION_KEY, ENCRYPTION_KEY_PREVIOUS, ENCRYPTION_KEY_V2, ENCRYPTION_KEY_V1]`.
+    - Runbook Section 4 updated to query actual health snapshot endpoints (`/health/booking-readiness` latency percentiles) and standardized counters.
+    - Performance test teardown hardened with safe offer dereferencing and try/finally cleanup.
 
 
 - [x] Phase 12 / Operations Runbook & Operational Governance (Task T076) (2026-08-19):
