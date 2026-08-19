@@ -51,6 +51,10 @@
 │   └── shared/                        → Shared library for types and constants
 │       └── src/                       → Shared TypeScript validation contracts
 │
+├── docs/
+│   ├── adr/                           → Architectural Decision Records
+│   └── runbooks/                      → Operational runbooks (booking-readiness.md, chatbot-handoff.md)
+│
 ├── context/
 │   ├── architecture.md                → This file
 │   ├── code-standards.md              → General coding rules and conventions
