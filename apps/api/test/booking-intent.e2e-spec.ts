@@ -464,8 +464,8 @@ describe('Booking Intent (E2E)', () => {
     });
   });
 
-  describe('Canonical plural routes', () => {
-    it('evaluates readiness, creates atomically, and returns the same safe shape from plural and singular GETs', async () => {
+  describe('Canonical plural routes and deprecated singular aliases', () => {
+    it('evaluates readiness, creates atomically, and returns the same safe shape from plural and singular GETs without dateOfBirth', async () => {
       const offer = await createCanonicalFlightOffer();
       const airportCountrySpy = jest.spyOn(airportsService, 'findCountriesByIataCodes')
         .mockResolvedValue(new Map([['SGN', 'VN'], ['HAN', 'VN']]));
@@ -515,35 +515,196 @@ describe('Booking Intent (E2E)', () => {
         .expect(201);
       duffelSpy.mockRestore();
 
-      expect(createRes.headers['cache-control']).toContain('no-store');
+      expect(createRes.headers['cache-control']).toBe('no-store, private');
       expect(createRes.headers['x-trace-id']).toBe('trace-phase8');
+      expect(createRes.headers['x-correlation-id']).toBe('correlation-phase8');
       expect(createRes.body.passengers[0]).toEqual(expect.objectContaining({
         passengerType: 'ADULT',
         nameSummary: expect.stringMatching(/^A/),
         passportNumber: null,
         passportExpiry: null,
+        maskedPassportSummary: null,
+        maskedContactSummary: expect.stringMatching(/^a.* \+1/),
       }));
       expect(createRes.body.passengers[0]).not.toHaveProperty('givenName');
+      expect(createRes.body.passengers[0]).not.toHaveProperty('dateOfBirth');
 
       const pluralGet = await request(app.getHttpServer())
         .get(`/api/bookings/intents/${createRes.body.intentId}`)
         .set('Authorization', `Bearer ${tokenA}`)
+        .set('x-trace-id', 'trace-get-plural')
+        .set('x-correlation-id', 'correlation-get-plural')
         .expect(200);
       const singularGet = await request(app.getHttpServer())
         .get(`/api/bookings/intent/${createRes.body.intentId}`)
         .set('Authorization', `Bearer ${tokenA}`)
+        .set('x-trace-id', 'trace-get-singular')
+        .set('x-correlation-id', 'correlation-get-singular')
         .expect(200);
 
+      expect(pluralGet.headers['cache-control']).toBe('no-store, private');
+      expect(pluralGet.headers['x-trace-id']).toBe('trace-get-plural');
+      expect(pluralGet.headers['x-correlation-id']).toBe('correlation-get-plural');
+
+      expect(singularGet.headers['cache-control']).toBe('no-store, private');
+      expect(singularGet.headers['x-trace-id']).toBe('trace-get-singular');
+      expect(singularGet.headers['x-correlation-id']).toBe('correlation-get-singular');
+
       expect(pluralGet.body.passengers[0].passportNumber).toBeNull();
+      expect(pluralGet.body.passengers[0].passportExpiry).toBeNull();
       expect(pluralGet.body.passengers[0].documentSummary.hasPassport).toBe(false);
+      expect(pluralGet.body.passengers[0]).not.toHaveProperty('dateOfBirth');
+      expect(singularGet.body.passengers[0]).not.toHaveProperty('dateOfBirth');
       expect(singularGet.body.passengers).toEqual(pluralGet.body.passengers);
       airportCountrySpy.mockRestore();
     });
 
-    it('rejects legacy profile flags on the canonical plural create route', async () => {
+    it('creates canonical plural intent with mixed traveler_profile and inline passengers returning 201 and safe masked summary', async () => {
+      const encryptedPassport = encryptionService.encryptBound('VN98765432', { userId: userA.id, fieldName: 'passportNumber' });
+      const profile = await prisma.travelerProfile.create({
+        data: {
+          userId: userA.id,
+          givenName: 'Ada',
+          familyName: 'Lovelace',
+          dateOfBirth: new Date('1815-12-10T00:00:00.000Z'),
+          gender: 'female',
+          title: 'Ms',
+          email: 'ada@example.test',
+          phoneCountryCode: '+84',
+          phoneNumber: '901234567',
+          nationality: 'VN',
+          documentType: 'passport',
+          issuingCountry: 'VN',
+          passportNumber: encryptedPassport,
+          passportExpiry: new Date('2032-12-31T00:00:00.000Z'),
+        },
+      });
+
+      const offer = await createMockFlightOffer({
+        adults: 1,
+        children: 1,
+        rawOffer: {
+          passengers: [
+            { id: 'pas_001', type: 'adult' },
+            { id: 'pas_002', type: 'child' },
+          ],
+          slices: [{
+            segments: [{
+              origin: { iata_code: 'SGN' },
+              destination: { iata_code: 'HAN' },
+              arriving_at: '2026-08-01T12:00:00Z',
+            }],
+          }],
+          expires_at: new Date(Date.now() + 3600 * 1000).toISOString(),
+        },
+      });
+
+      const airportCountrySpy = jest.spyOn(airportsService, 'findCountriesByIataCodes')
+        .mockResolvedValue(new Map([['SGN', 'VN'], ['HAN', 'VN']]));
+
+      const duffelSpy = jest.spyOn(duffelService['duffel'].offers, 'get').mockResolvedValue({
+        data: {
+          id: 'off_duffel_mixed',
+          total_amount: '200.00',
+          total_currency: 'USD',
+          expires_at: new Date(Date.now() + 3600 * 1000).toISOString(),
+          passengers: [
+            { id: 'duffel-passenger-1', type: 'adult' },
+            { id: 'duffel-passenger-2', type: 'child' },
+          ],
+        },
+      } as any);
+
+      const res = await request(app.getHttpServer())
+        .post('/api/bookings/intents')
+        .set('Authorization', `Bearer ${tokenA}`)
+        .set('x-trace-id', 'trace-mixed')
+        .set('x-correlation-id', 'correlation-mixed')
+        .send({
+          flightOfferId: offer.id,
+          passengers: [
+            {
+              offerPassengerId: 'pas_001',
+              type: PassengerType.ADULT,
+              source: {
+                type: 'traveler_profile',
+                travelerProfileId: profile.id,
+                expectedProfileRevision: profile.revision,
+              },
+            },
+            {
+              offerPassengerId: 'pas_002',
+              type: PassengerType.CHILD,
+              source: {
+                type: 'inline',
+                givenName: 'Charles',
+                familyName: 'Babbage',
+                dateOfBirth: '2016-12-26',
+                gender: 'male',
+                nationality: 'GB',
+                email: 'charles@example.test',
+                phoneCountryCode: '+44',
+                phoneNumber: '7000000002',
+                title: 'Mr',
+              },
+            },
+          ],
+        })
+        .expect(201);
+
+      duffelSpy.mockRestore();
+      airportCountrySpy.mockRestore();
+
+      expect(res.body.passengers).toHaveLength(2);
+
+      // Primary passenger from traveler profile
+      const p1 = res.body.passengers[0];
+      expect(p1.passengerType).toBe('ADULT');
+      expect(p1.passengerOrdinal).toBe(1);
+      expect(p1.preFilledFromProfile).toBe(true);
+      expect(p1.passportNumber).toBeNull();
+      expect(p1.passportExpiry).toBeNull();
+      expect(p1.maskedPassportSummary).toBe('•••• 5432');
+      expect(p1.maskedContactSummary).toBe('a•••@example.test +84••••67');
+      expect(p1.documentSummary.hasPassport).toBe(true);
+      expect(p1.documentSummary.maskedPassportSummary).toBe('•••• 5432');
+      expect(p1.contactSummary.maskedContactSummary).toBe('a•••@example.test +84••••67');
+      expect(p1).not.toHaveProperty('givenName');
+      expect(p1).not.toHaveProperty('dateOfBirth');
+
+      // Secondary child passenger inline
+      const p2 = res.body.passengers[1];
+      expect(p2.passengerType).toBe('CHILD');
+      expect(p2.passengerOrdinal).toBe(2);
+      expect(p2.preFilledFromProfile).toBe(false);
+      expect(p2.passportNumber).toBeNull();
+      expect(p2.passportExpiry).toBeNull();
+      expect(p2.maskedPassportSummary).toBeNull();
+      expect(p2.maskedContactSummary).toBe('c•••@example.test +44••••02');
+      expect(p2.documentSummary.hasPassport).toBe(false);
+
+      // GET by ID verification
+      const getRes = await request(app.getHttpServer())
+        .get(`/api/bookings/intents/${res.body.intentId}`)
+        .set('Authorization', `Bearer ${tokenA}`)
+        .expect(200);
+
+      expect(getRes.body.passengers[0].givenName).toBe('Ada');
+      expect(getRes.body.passengers[0].familyName).toBe('Lovelace');
+      expect(getRes.body.passengers[0].passportNumber).toBeNull();
+      expect(getRes.body.passengers[0].passportExpiry).toBeNull();
+      expect(getRes.body.passengers[0]).not.toHaveProperty('dateOfBirth');
+      expect(getRes.body.passengers[1].givenName).toBe('Charles');
+      expect(getRes.body.passengers[1].familyName).toBe('Babbage');
+      expect(getRes.body.passengers[1].passportNumber).toBeNull();
+      expect(getRes.body.passengers[1].passportExpiry).toBeNull();
+      expect(getRes.body.passengers[1]).not.toHaveProperty('dateOfBirth');
+    });
+
+    it('rejects legacy profile flags on the canonical plural create route with 400 PASSENGER_SOURCE_CONFLICT', async () => {
       const offer = await createMockFlightOffer({ adults: 1 });
 
-      await request(app.getHttpServer())
+      const res = await request(app.getHttpServer())
         .post('/api/bookings/intents')
         .set('Authorization', `Bearer ${tokenA}`)
         .send({
@@ -560,10 +721,87 @@ describe('Booking Intent (E2E)', () => {
         })
         .expect(400);
 
+      expect(res.body.code).toBe('PASSENGER_SOURCE_CONFLICT');
       expect(await prisma.bookingIntent.count()).toBe(0);
     });
 
-    it('rejects useProfile on a non-primary legacy passenger', async () => {
+    it('rejects payload containing both useProfile and source with 400 PASSENGER_SOURCE_CONFLICT', async () => {
+      const offer = await createMockFlightOffer({ adults: 1 });
+
+      const res = await request(app.getHttpServer())
+        .post('/api/bookings/intents')
+        .set('Authorization', `Bearer ${tokenA}`)
+        .send({
+          flightOfferId: offer.id,
+          passengers: [{
+            type: PassengerType.ADULT,
+            offerPassengerId: 'pas_001',
+            useProfile: true,
+            source: {
+              type: 'inline',
+              givenName: 'Grace',
+              familyName: 'Hopper',
+              dateOfBirth: '1906-12-09',
+              gender: 'female',
+              nationality: 'US',
+              email: 'grace@example.test',
+              phoneCountryCode: '+1',
+              phoneNumber: '5550000000',
+              title: 'MS',
+            },
+          }],
+        })
+        .expect(400);
+
+      expect(JSON.stringify(res.body)).toContain('PASSENGER_SOURCE_CONFLICT');
+      expect(await prisma.bookingIntent.count()).toBe(0);
+    });
+
+    it('translates primary useProfile: true on singular deprecated POST /api/bookings/intent and returns safe headers', async () => {
+      const offer = await createMockFlightOffer({ adults: 1 });
+      const encryptedPassport = `v1:${encryptionService.encrypt('MYPASSPORT123')}`;
+      await prisma.travelerProfile.create({
+        data: {
+          userId: userA.id,
+          nationality: 'VN',
+          passportNumber: encryptedPassport,
+          passportExpiry: new Date('2032-12-31T00:00:00.000Z'),
+        },
+      });
+
+      const duffelSpy = jest.spyOn(duffelService['duffel'].offers, 'get').mockResolvedValue(liveOfferResponse());
+
+      const res = await request(app.getHttpServer())
+        .post('/api/bookings/intent')
+        .set('Authorization', `Bearer ${tokenA}`)
+        .set('x-trace-id', 'trace-legacy-create')
+        .set('x-correlation-id', 'correlation-legacy-create')
+        .send({
+          flightOfferId: offer.id,
+          passengers: [
+            {
+              type: PassengerType.ADULT,
+              givenName: 'Primary',
+              familyName: 'User',
+              dateOfBirth: '1995-05-05',
+              gender: 'female',
+              useProfile: true,
+            },
+          ],
+        })
+        .expect(201);
+
+      duffelSpy.mockRestore();
+
+      expect(res.headers['cache-control']).toBe('no-store, private');
+      expect(res.headers['x-trace-id']).toBe('trace-legacy-create');
+      expect(res.headers['x-correlation-id']).toBe('correlation-legacy-create');
+      expect(res.body.passengers[0].preFilledFromProfile).toBe(true);
+      expect(res.body.passengers[0].passportNumber).toBeNull();
+      expect(res.body.passengers[0].passportExpiry).toBeNull();
+    });
+
+    it('rejects useProfile on a non-primary legacy passenger with 400 LEGACY_PROFILE_SOURCE_UNSUPPORTED', async () => {
       const offer = await createMockFlightOffer({ adults: 1, children: 1 });
 
       const res = await request(app.getHttpServer())

@@ -124,11 +124,33 @@ export default async function ReviewPage({ params }: Props) {
                   </span>
                 </div>
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-xs text-text-secondary">
-                  <div><span className="font-semibold text-text-primary">Document:</span><p>{p.documentSummary.documentType || 'Not provided'}{p.documentSummary.issuingCountry ? ` · ${p.documentSummary.issuingCountry}` : ''}{p.documentSummary.hasPassport ? ' · masked' : ''}</p></div>
-                  <div><span className="font-semibold text-text-primary">Contact:</span><p>{p.contactSummary.email || 'Not provided'}{p.contactSummary.phone ? ` · ${p.contactSummary.phone}` : ''}</p></div>
-                  <div><span className="font-semibold text-text-primary">Source:</span><p>{p.preFilledFromProfile ? 'Traveler profile' : 'Entered for this booking'}</p></div>
+                  <div>
+                    <span className="font-semibold text-text-primary">Document:</span>
+                    <p>
+                      {p.documentSummary.documentType || 'Not provided'}
+                      {p.documentSummary.issuingCountry ? ` · ${p.documentSummary.issuingCountry}` : ''}
+                      {p.documentSummary.hasPassport ? ` · ${p.documentSummary.maskedPassportSummary || '•••• ••••'}` : ''}
+                    </p>
+                  </div>
+                  <div>
+                    <span className="font-semibold text-text-primary">Contact:</span>
+                    <p>
+                      {p.contactSummary.maskedContactSummary || p.contactSummary.email || 'Not provided'}
+                    </p>
+                  </div>
+                  <div>
+                    <span className="font-semibold text-text-primary">Source:</span>
+                    <p>{p.preFilledFromProfile ? 'Traveler profile' : 'Entered for this booking'}</p>
+                  </div>
                 </div>
-                {p.preFilledFromProfile && <Link href={`/profile?returnTo=/checkout/${intentId}/review`} className="inline-block text-sm text-text-link underline">Edit traveler profile securely</Link>}
+                {p.preFilledFromProfile && (
+                  <Link
+                    href={`/profile?returnTo=/checkout/${intentId}/review`}
+                    className="inline-block text-sm text-text-link underline"
+                  >
+                    Edit traveler profile securely
+                  </Link>
+                )}
               </div>
             ))}
           </div>

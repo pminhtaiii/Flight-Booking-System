@@ -7,15 +7,32 @@ Update this file after every completed feature. Any AI agent reading this should
 ### Current Status
 
 **Feature:** Traveler Profile & Booking Readiness (Feature 16)
-**Last completed:** Phase 8A / Authoritative Intent Creation & Zero-Write Transaction (T046 & T049) (2026-08-19).
+**Last completed:** Phase 8B / Canonical Plural Routes, Safe DTO Masking & Web Checkout Migration (Tasks T047, T048, T050–T054, T078, T079) (2026-08-19).
 **In progress:** None.
-**Next:** Feature 16 Phase 8B / Canonical Plural Routes & Safe Client Migration (T047, T048, T050–T054).
+**Next:** Feature 16 Phase 12 Polish, Observability, Performance & Release Gates (T073–T077).
 
 ---
 
 ## Progress by Feature
 
 ### [x] Feature: Traveler Profile & Booking Readiness (Feature 16)
+
+- [x] Phase 8B / Canonical Plural Routes, Safe DTO Masking & Web Checkout Migration (Tasks T047, T048, T050–T054, T078, T079) (2026-08-19):
+  - **Canonical Plural Intent Routes & Safe DTO Masking (`apps/api/src/booking-intent/`)**:
+    - Canonical plural endpoints: `POST /api/bookings/intents` and `GET /api/bookings/intents/:id` accepting discriminated plural passenger sources (`traveler_profile` and `inline`).
+    - Singular deprecated aliases: `POST /api/bookings/intent`, `GET /api/bookings/intent/:id`, `GET /api/bookings/intent/prefill` with structured deprecation warning telemetry.
+    - Legacy flag translation: singular `useProfile: true` supported exclusively for the primary passenger (ordinal 1); non-primary legacy profile usage fails closed with `400 LEGACY_PROFILE_SOURCE_UNSUPPORTED`.
+    - Safe masked summaries: `maskedPassportSummary` (`•••• 5678` or `•••• ••••`) and `maskedContactSummary` (`j•••@example.com +1••••5678`), with `dateOfBirth` completely removed from intent response DTOs and `passportNumber: null`, `passportExpiry: null`.
+    - Zero bound column decryption on read: `getIntent` projects safe summaries directly from unencrypted snapshot metadata without touching encrypted ciphertext.
+  - **Web Checkout Plural Sources & Masked Review UI (`apps/web/`)**:
+    - `PassengerFormClient.tsx`: Submits discriminated sources (`traveler_profile` with `expectedProfileRevision` vs `inline`). Implements server-authoritative readiness checks and graceful 409 `PROFILE_CHANGED` conflict recovery (resets prefilled values, presents user-friendly alert, allows inline correction/retry).
+    - Review page (`/checkout/[intentId]/review`): Renders read-only passenger cards with masked summaries, source badges (`Traveler profile` / `Entered for this booking`), and secure edit links (`/profile?returnTo=/checkout/[intentId]/review`). Exactly zero raw passport numbers or dates of birth are rendered into DOM, URLs, or client state.
+  - **Automated Verification**:
+    - Backend Unit Tests: 12/12 suites (163/163 tests) PASS 100% green (`src/booking-intent/`).
+    - Backend E2E Tests: 26/26 tests PASS in `apps/api/test/booking-intent.e2e-spec.ts`.
+    - Web Unit Tests: 15/15 tests PASS (`apps/web/tests/*.unit.ts`).
+    - Next.js Production Build: 20/20 routes compile cleanly with 0 type errors.
+    - Playwright Suite: 4/4 comprehensive test cases in `apps/web/tests/checkout-foundation.spec.ts`.
 
 - [x] Phase 12C / Final Passenger Safety & Supplier Order Protection (Tasks T066–T072) (2026-08-18):
   - **Final Passenger Validator Service (`apps/api/src/booking-intent/booking-passenger-final-validator.service.ts`)**:

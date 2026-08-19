@@ -98,7 +98,7 @@ export async function resolveHandoffToken(handoffToken: string, accessToken: str
   }
 }
 
-export interface BookingIntentDto {
+export type BookingIntentDto = {
   intentId: string;
   status: string;
   originalPrice: number;
@@ -118,20 +118,23 @@ export interface BookingIntentDto {
       documentType: string | null;
       issuingCountry: string | null;
       hasPassport: boolean;
+      maskedPassportSummary?: string | null;
     };
     contactSummary: {
       email: string | null;
       phone: string | null;
+      maskedContactSummary?: string | null;
     };
+    maskedPassportSummary?: string | null;
+    maskedContactSummary?: string | null;
     preFilledFromProfile: boolean;
-    type: string;
-    givenName: string;
-    familyName: string;
-    dateOfBirth: string;
-    gender: string;
-    nationality: string | null;
     passportNumber: null;
     passportExpiry: null;
+    type?: string;
+    givenName?: string;
+    familyName?: string;
+    gender?: string;
+    nationality?: string | null;
   }>;
   flight: {
     origin: string;
@@ -191,15 +194,20 @@ export async function fetchBookingIntent(intentId: string, accessToken: string):
               passengerType: 'ADULT',
               passengerOrdinal: 1,
               nameSummary: 'J••• D•••',
-              documentSummary: { documentType: 'passport', issuingCountry: 'US', hasPassport: true },
-              contactSummary: { email: 'j•••@example.test', phone: '+1••••00' },
+              documentSummary: {
+                documentType: 'passport',
+                issuingCountry: 'US',
+                hasPassport: true,
+                maskedPassportSummary: '•••• ••••',
+              },
+              contactSummary: {
+                email: 'j•••@example.test',
+                phone: '+1••••00',
+                maskedContactSummary: 'j•••@example.test · +1••••00',
+              },
+              maskedPassportSummary: '•••• ••••',
+              maskedContactSummary: 'j•••@example.test · +1••••00',
               preFilledFromProfile: false,
-              type: 'ADULT',
-              givenName: 'John',
-              familyName: 'Doe',
-              dateOfBirth: '1990-01-01',
-              gender: 'male',
-              nationality: 'US',
               passportNumber: null,
               passportExpiry: null,
             }
