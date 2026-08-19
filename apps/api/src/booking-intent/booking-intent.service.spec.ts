@@ -1202,6 +1202,57 @@ describe('BookingIntentService Refinements', () => {
         expect(result.intentId).toBeDefined();
         expect(prisma.bookingIntent.create).toHaveBeenCalled();
       });
+
+      it('does not emit created telemetry or observability event when transaction rolls back', async () => {
+        prisma.flightOffer.findUnique.mockResolvedValue({
+          id: 'offer-obs-rollback',
+          duffelOfferId: 'duffel-obs-rollback',
+          price: 150,
+          origin: 'SGN',
+          destination: 'HAN',
+          departureDate: new Date('2026-08-01T00:00:00.000Z'),
+          returnDate: null,
+          cabinClass: 'ECONOMY',
+          adults: 1,
+          children: 0,
+          infants: 0,
+        });
+
+        prisma.bookingIntent.create.mockRejectedValueOnce(new Error('DB transaction error'));
+
+        await expect(
+          service.createIntent(
+            'user-1',
+            {
+              flightOfferId: 'offer-obs-rollback',
+              passengers: [
+                {
+                  offerPassengerId: 'pas_001',
+                  type: 'ADULT',
+                  source: {
+                    type: 'inline',
+                    givenName: 'Dorothy',
+                    familyName: 'Vaughan',
+                    dateOfBirth: '1910-09-20',
+                    gender: 'female',
+                    nationality: 'US',
+                    documentType: 'passport',
+                    passportNumber: 'US123123123',
+                    passportExpiry: '2030-01-01',
+                    issuingCountry: 'US',
+                    email: 'dorothy@nasa.test',
+                    phoneCountryCode: '+1',
+                    phoneNumber: '5552223333',
+                    title: 'MS',
+                  },
+                },
+              ],
+            } as never,
+          ),
+        ).rejects.toThrow('DB transaction error');
+
+        expect(readinessObservability.recordOutcome).not.toHaveBeenCalled();
+      });
     });
   });
 

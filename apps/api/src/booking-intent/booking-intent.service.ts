@@ -88,6 +88,7 @@ export class BookingIntentService {
     @Optional() private readonly passengerSnapshotService?: PassengerSnapshotService,
     @Optional() private readonly chatHandoffService?: ChatHandoffService,
     @Optional() private readonly bookingReadinessObservability?: BookingReadinessObservability,
+    @Optional() private readonly metricsService?: BookingReadinessMetricsService,
   ) {}
 
   async getAdvisoryReadiness(
@@ -489,41 +490,6 @@ export class BookingIntentService {
           price_changed: originalPrice !== confirmedPrice,
         },
       );
-      try {
-        emitChatTelemetry(this.logger, telemetryEvent);
-      } catch {
-        try {
-          this.logger.warn('Chat telemetry emission failed');
-        } catch (_) {
-          // Swallow error to prevent transaction abort if logger sink throws
-        }
-      }
-
-      if (this.bookingReadinessObservability) {
-        try {
-          this.bookingReadinessObservability.recordOutcome({
-            operation: BookingReadinessOperation.INTENT_CREATE,
-            status: 'created',
-            latencyMs: Date.now() - startedAt,
-            metadata: {
-              scope: readinessScope,
-              passengerCount: (canonicalPassengers ?? legacyPassengers ?? []).length,
-              status: 'created',
-            },
-            context: {
-              traceId: context?.traceId,
-              correlationId: context?.correlationId,
-            },
-          });
-        } catch {
-          try {
-            this.logger.warn('Booking readiness observability emission failed');
-          } catch (_) {
-            // Swallow error to prevent transaction abort if logger sink throws
-          }
-        }
-      }
-
       if (this.auditService) {
         await this.auditService.createLog(tx, {
           userId,
@@ -543,11 +509,46 @@ export class BookingIntentService {
         });
       }
 
-      return { intent, passengers, maskedPassengers };
+      return { intent, passengers, maskedPassengers, telemetryEvent };
     }, {
       maxWait: 10000,
       timeout: 15000,
     });
+
+    try {
+      emitChatTelemetry(this.logger, created.telemetryEvent);
+    } catch {
+      try {
+        this.logger.warn('Chat telemetry emission failed');
+      } catch (_) {
+        // Swallow error to prevent crash if logger sink throws
+      }
+    }
+
+    if (this.bookingReadinessObservability) {
+      try {
+        this.bookingReadinessObservability.recordOutcome({
+          operation: BookingReadinessOperation.INTENT_CREATE,
+          status: 'created',
+          latencyMs: Date.now() - startedAt,
+          metadata: {
+            scope: readinessScope,
+            passengerCount: (canonicalPassengers ?? legacyPassengers ?? []).length,
+            status: 'created',
+          },
+          context: {
+            traceId: context?.traceId,
+            correlationId: context?.correlationId,
+          },
+        });
+      } catch {
+        try {
+          this.logger.warn('Booking readiness observability emission failed');
+        } catch (_) {
+          // Swallow error to prevent crash if logger sink throws
+        }
+      }
+    }
 
     isSuccess = true;
     this.metricsService?.increment(BOOKING_READINESS_METRIC_COUNTERS.BOOKING_INTENT_CREATIONS);
