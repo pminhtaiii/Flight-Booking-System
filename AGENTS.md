@@ -138,9 +138,7 @@ To run the full stack locally (Next.js frontend, NestJS backend, and Python agen
    - **Python Agent only (Port 3002)**: `uv run uvicorn agent.main:app --port 3002 --app-dir src` inside `apps/agent/`
 
 <!-- SPECKIT START -->
-
 For additional context about technologies to be used, project structure,
 shell commands, and other important information, read the current plan
-at specs/017-chatbot-backend-infrastructure/plan.md
-
+at specs/019-improve-architecture/plan.md
 <!-- SPECKIT END -->
