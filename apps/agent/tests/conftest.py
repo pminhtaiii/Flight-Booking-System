@@ -1,5 +1,11 @@
 import os
+from unittest.mock import AsyncMock, MagicMock
+
 import pytest
+
+from agent.queue.message_queue import SessionLockRepository
+
+CI_REQUIRE_REDIS_TESTS = os.environ.get("CI_REQUIRE_REDIS_TESTS") == "1"
 
 # Set environment variables before importing any application code
 os.environ["JWT_SECRET"] = "testsecret_must_be_at_least_32_bytes_long_for_security_reasons"
@@ -9,41 +15,75 @@ os.environ["CLAIM_TOKEN_SECRET"] = "mock_claim_secret_must_be_long_enough_for_se
 os.environ["OUTPUT_GUARDRAIL_ENABLED"] = "false"
 
 
+def pytest_collection_modifyitems(items):
+    """Classify tests using the real Redis fixture as integration coverage."""
+    for item in items:
+        if "redis_client" in item.fixturenames:
+            item.add_marker(pytest.mark.redis_integration)
+
+
+def pytest_collection_finish(session):
+    """CI must prove that the Redis integration group is present and non-empty."""
+    if CI_REQUIRE_REDIS_TESTS and not any(
+        item.get_closest_marker("redis_integration") for item in session.items
+    ):
+        pytest.exit(
+            "CI_REQUIRE_REDIS_TESTS=1 requires at least one redis_integration test",
+            returncode=1,
+        )
+
+
+@pytest.hookimpl(hookwrapper=True)
+def pytest_runtest_makereport(item, call):
+    """Turn an unavailable required Redis service from a skip into a failure."""
+    outcome = yield
+    report = outcome.get_result()
+    if (
+        CI_REQUIRE_REDIS_TESTS
+        and item.get_closest_marker("redis_integration")
+        and report.when == "setup"
+        and report.skipped
+    ):
+        report.outcome = "failed"
+        report.longrepr = "Redis integration test skipped while CI_REQUIRE_REDIS_TESTS=1"
+
+
 @pytest.fixture(autouse=True)
 def setup_env(monkeypatch):
-    from unittest.mock import AsyncMock, MagicMock
-    monkeypatch.setattr("agent.tools.nestjs_client.NestJSClient.check_user_access", AsyncMock(return_value={"allowed": True}))
-    
+    monkeypatch.setattr(
+        "agent.tools.nestjs_client.NestJSClient.check_user_access",
+        AsyncMock(return_value={"allowed": True}),
+    )
+
     import agent.infrastructure.redis
+
     mock_redis = MagicMock()
     mock_redis.get = AsyncMock(return_value=None)
     mock_redis.set = AsyncMock(return_value=True)
     mock_redis.eval = AsyncMock(return_value=[1, "ok"])
     mock_redis.ping = AsyncMock(return_value=True)
     mock_redis.aclose = AsyncMock()
-    
+
     monkeypatch.setattr("agent.infrastructure.redis.init_redis", AsyncMock())
     monkeypatch.setattr("agent.infrastructure.redis.close_redis", AsyncMock())
-    
+
     agent.infrastructure.redis._redis_client = mock_redis
-    
+
     # Keep variables set, but yield for test duration
     yield
     agent.infrastructure.redis._redis_client = None
 
-from unittest.mock import AsyncMock, MagicMock
-from agent.queue.message_queue import SessionLockRepository
 
 @pytest.fixture(autouse=True)
 def mock_session_lock_repo(monkeypatch):
     _locks = set()
-    
+
     async def mock_acquire_lock(user_id, session_id, req_id, ttl_ms=None):
         if session_id in _locks:
             return None
         _locks.add(session_id)
         return 1
-        
+
     async def mock_release_lock(user_id, session_id, req_id, fence):
         _locks.discard(session_id)
         return True
@@ -53,4 +93,6 @@ def mock_session_lock_repo(monkeypatch):
     mock_repo.release_lock = mock_release_lock
     mock_repo.refresh_lock = AsyncMock(return_value=True)
     mock_repo.validate_fence = AsyncMock(return_value=True)
-    monkeypatch.setattr("agent.queue.message_queue.SessionLockRepository", lambda *args, **kwargs: mock_repo)
+    monkeypatch.setattr(
+        "agent.queue.message_queue.SessionLockRepository", lambda *args, **kwargs: mock_repo
+    )
