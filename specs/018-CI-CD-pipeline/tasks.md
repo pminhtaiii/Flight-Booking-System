@@ -4,14 +4,14 @@
 
 - [ ] T001 [P] Add Ruff 0.16.0 and policy in `apps/agent/pyproject.toml`
 - [ ] T002 Regenerate canonical root lock and remove duplicate in `pyproject.toml`, `uv.lock`, and `apps/agent/uv.lock`
-- [ ] T003 [P] Add LF/binary policy in `.gitattributes`
+- [x] T003 [P] Add LF/binary policy in `.gitattributes`
 
 ## Phase 2: Foundational contract harness
 
 - [ ] T004 Create shared evaluator in `scripts/ci/evaluate-ci-status.mjs`
 - [ ] T005 Create Node workflow contract harness in `tests/ci/ci-workflow.contract.test.mjs`
-- [ ] T006 Create and prove Node network guard in `tests/ci/node-network-guard.cjs`
-- [ ] T007 Create and prove Python network guard in `tests/ci/python/sitecustomize.py`
+- [x] T006 Create and prove Node network guard in `tests/ci/node-network-guard.cjs`
+- [x] T007 Create and prove Python network guard in `tests/ci/python/sitecustomize.py`
 
 ## Phase 3: US1 — Stable PR quality check (P1)
 
