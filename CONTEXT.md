@@ -18,6 +18,22 @@ A transient state (`CANCELLED_PENDING_REFUND`) where the flight has been success
 **Refund Escalation**:
 The hybrid process of attempting a Stripe refund with inline retries, falling back to a cron-based background worker with exponential backoff, and finally escalating to manual admin review (`REFUND_FAILED_NEEDS_ATTENTION`) if all retries are exhausted or the idempotency key expires.
 
+**Refund Settlement**:
+The sole owner of the authoritative recognition of a verified Refund Transaction outcome. It atomically records the transaction result and ledger reversal, recalculates cumulative Payment refund progress and Cancellation Refund Obligation fulfillment, and derives the resulting Payment and Booking states. It begins only after the provider or recovery flow obtains and verifies the outcome; it never initiates reimbursement, schedules installments, or owns provider retries.
+_Avoid_: Refund initiation, Refund trigger
+
+**Cancellation Refund Obligation**:
+The single financial obligation created for a booking cancellation, containing the total amount owed to the customer. One Booking has at most one cancellation refund obligation, which may be fulfilled by one or more independent Refund Transactions. Its fulfillment is measured only from successful transactions belonging to that obligation.
+_Avoid_: Refund attempt, Stripe refund
+
+**Refund Transaction**:
+One independently initiated provider money movement toward a refund. Each transaction belongs to one Payment and may belong to a Cancellation Refund Obligation; it has its own provider identifier, idempotency key, amount, lifecycle, and exact ledger reversal. Multiple transactions are created only when the provider or recovery flow produces independent refunds, never as automatic installments.
+_Avoid_: Refund obligation, Refund installment
+
+**Refund Reservation**:
+The amount temporarily claimed by an active Refund Transaction before its provider outcome is terminal. Creating a transaction must atomically reserve the same amount against both the Payment's remaining refundable balance and, when cancellation-related, the Cancellation Refund Obligation's remaining balance. `REFUND_PENDING`, `REFUND_PROCESSING`, and `REFUND_RETRY_SCHEDULED` retain the reservation; `SUCCEEDED` converts it to fulfilled/refunded value; a terminal failure releases it. Retries reuse the existing reservation and idempotency key.
+_Avoid_: Refund installment, Retry allocation
+
 **Cancellation Deadline**:
 The fare-specific cutoff time before which a booking may be cancelled for a refund. Derived from Duffel's fare conditions at booking time and stored on the Booking row. Not a system-wide constant — varies by fare class.
 _Avoid_: Cancellation Window, Refund Deadline

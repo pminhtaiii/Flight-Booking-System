@@ -9,6 +9,7 @@
     "start:dev": "pnpm --filter @shared/types build && prisma generate && nest start --watch",
     "start:debug": "pnpm --filter @shared/types build && prisma generate && nest start --debug --watch",
     "start:prod": "node dist/main",
+    "lint": "eslint \"src/**/*.ts\" \"../../packages/shared/**/*.ts\" --max-warnings 0",
     "test": "jest",
     "test:watch": "jest --watch",
     "test:cov": "jest --coverage",

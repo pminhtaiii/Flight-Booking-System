@@ -62,13 +62,17 @@ function parseCliInput(argv, stdin) {
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
-  try {
-    const stdin = process.argv[2] === undefined ? readFileSync(0, 'utf8') : '';
-    const result = evaluateCiStatus(parseCliInput(process.argv, stdin));
-    process.stdout.write(`${JSON.stringify(result)}\n`);
-    process.exitCode = result.passed ? 0 : 1;
-  } catch (error) {
-    process.stdout.write(`${JSON.stringify(fail(error instanceof Error ? error.message : String(error)))}\n`);
-    process.exitCode = 1;
+  if (process.argv[2] === '--help' || process.argv[2] === '-h') {
+    process.stdout.write('Usage: node scripts/ci/evaluate-ci-status.mjs [results-json]\n');
+  } else {
+    try {
+      const stdin = process.argv[2] === undefined ? readFileSync(0, 'utf8') : '';
+      const result = evaluateCiStatus(parseCliInput(process.argv, stdin));
+      process.stdout.write(`${JSON.stringify(result)}\n`);
+      process.exitCode = result.passed ? 0 : 1;
+    } catch (error) {
+      process.stdout.write(`${JSON.stringify(fail(error instanceof Error ? error.message : String(error)))}\n`);
+      process.exitCode = 1;
+    }
   }
 }

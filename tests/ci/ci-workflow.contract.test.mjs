@@ -39,7 +39,7 @@ function workflow() {
 }
 
 function jobBlock(source, jobId) {
-  const match = source.match(new RegExp(`^  ${jobId}:\\s*\\n([\\s\\S]*?)(?=^  [\\w-]+:\\s*\\n|^\\S|$)`, 'm'));
+  const match = source.match(new RegExp(`^  ${jobId}:[ \\t]*\\n([\\s\\S]*?)(?=^  [\\w-]+:[ \\t]*$|^(?!\\s)|$(?![\\s\\S]))`, 'm'));
   assert.ok(match, `expected ${jobId} job`);
   return match[0];
 }
@@ -114,9 +114,17 @@ test('evaluator CLI emits JSON and fails closed', () => {
   assert.equal(JSON.parse(failing.stdout).passed, false);
 });
 
+test('evaluator CLI prints usage for --help without parsing it as JSON', () => {
+  const help = spawnSync(process.execPath, [evaluatorPath, '--help'], { encoding: 'utf8' });
+
+  assert.equal(help.status, 0);
+  assert.match(help.stdout, /Usage: node scripts\/ci\/evaluate-ci-status\.mjs/i);
+  assert.equal(help.stderr, '');
+});
+
 test('workflow envelope uses the stable event, permissions, concurrency, and timeouts', () => {
   const source = workflow();
-  assertContains(source, /^on:\s*\n\s+pull_request:\s*\n\s+branches:\s*\n\s+- development\s*$/m, 'workflow must target development pull requests only');
+  assertContains(source, /^on:\s*\n\s+pull_request:\s*\n\s+branches:\s*(?:\[development\]|\n\s+- development)\s*$/m, 'workflow must target development pull requests only');
   assert.doesNotMatch(source, /^\s*(push|schedule|workflow_dispatch|workflow_call):/m, 'workflow must not have another trigger');
   assertContains(source, /^permissions:\s*\n\s+contents:\s+read\s*$/m, 'default permissions must be contents: read');
   assertContains(source, /^concurrency:\s*\n\s+group:\s+.*github\.event\.pull_request\.number.*\n\s+cancel-in-progress:\s+true\s*$/m, 'workflow must cancel superseded PR runs');
@@ -152,7 +160,7 @@ test('workflow pins actions, disables credential persistence, and avoids unsafe 
   const persistedCredentialCount = (source.match(/^\s+persist-credentials:\s+false\s*$/gm) ?? []).length;
   assert.ok(checkoutCount > 0, 'workflow must check out source explicitly');
   assert.equal(persistedCredentialCount, checkoutCount, 'every checkout must disable persisted credentials');
-  assert.doesNotMatch(source, /(?:path:|paths:)\s*(?:[^\n]*\n\s*)*(?:node_modules|\.next|\.venv)(?:\/|\b)/i, 'workflow must never cache dependency or build directories');
+  assert.doesNotMatch(source, /(?:node_modules|\.next|\.venv)(?:\/|\b)/i, 'workflow must never cache dependency or build directories');
 });
 
 test('workflow preserves service-specific validation and network boundaries', () => {
@@ -175,7 +183,7 @@ test('workflow preserves service-specific validation and network boundaries', ()
   for (const requirement of [/uv sync --locked --package agent/, /ruff check/, /ruff format --check/]) {
     assertContains(agentGate, requirement, `Agent gate must include ${requirement}`);
   }
-  for (const requirement of [/redis:7-alpine/, /CI_REQUIRE_REDIS_TESTS=1/, /redis_integration/, /PYTHONPATH.*sitecustomize\.py/]) {
+  for (const requirement of [/redis:7-alpine/, /CI_REQUIRE_REDIS_TESTS:\s*['"]?1['"]?/, /redis_integration/, /PYTHONPATH.*tests\/ci\/python/]) {
     assertContains(agentTests, requirement, `Agent tests must include ${requirement}`);
   }
 });
@@ -188,7 +196,7 @@ test('workflow defines the required job graph, routing matrix, and fail-closed s
 
   const detect = jobBlock(source, 'detect-changes');
   for (const output of Object.keys(services)) {
-    assertContains(detect, new RegExp(`^\s+${output}:\s+\\$\\{\\{\\s*steps\\..*\\.outputs\\.${output}\\s*\\}\\}`, 'm'), `detect-changes must publish ${output}`);
+    assertContains(detect, new RegExp(`^\\s+${output}:\\s+\\$\\{\\{\\s*steps\\..*\\.outputs\\.${output}\\s*\\}\\}`, 'm'), `detect-changes must publish ${output}`);
   }
   for (const path of ['apps/api/**', 'apps/web/**', 'apps/agent/**', 'packages/shared/**', 'tests/ci/**', 'scripts/ci/**']) {
     assert.ok(source.includes(path), `routing filters must include ${path}`);
@@ -206,13 +214,13 @@ test('workflow defines the required job graph, routing matrix, and fail-closed s
     ['agent-gate', 'detect-changes'],
     ['agent-tests', 'agent-gate'],
   ]) {
-    assertContains(jobBlock(source, job), new RegExp(`^    needs:\\s+${dependency}\\s*$`, 'm'), `${job} must depend on ${dependency}`);
+    assertContains(jobBlock(source, job), new RegExp(`^    needs:\\s+(?:${dependency}|\\[[^\\]]*${dependency}[^\\]]*\\])\\s*$`, 'm'), `${job} must depend on ${dependency}`);
   }
 
   const summary = jobBlock(source, 'ci-status');
-  assertContains(summary, /^    if:\s+\\$\\{\\{\s*always\(\)\s*\\}\\}\s*$/m, 'ci-status must always evaluate all results');
+  assertContains(summary, /^    if:\s+\$\{\{\s*always\(\)\s*\}\}\s*$/m, 'ci-status must always evaluate all results');
   for (const job of jobIds) {
-    assertContains(summary, new RegExp(`^\s+- ${job}\\s*$`, 'm'), `ci-status must need ${job}`);
+    assertContains(summary, new RegExp(`^    needs:\\s+\\[[^\\]]*${job}[^\\]]*\\]\\s*$|^\\s+- ${job}\\s*$`, 'm'), `ci-status must need ${job}`);
   }
   assertContains(summary, /evaluate-ci-status\.mjs/, 'ci-status must invoke the shared evaluator');
 });
