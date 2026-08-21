@@ -10,23 +10,41 @@ from agent.tools.search_flights import project_snapshot_results
 
 
 class FakeAsyncRedis:
-    """In-memory async Redis double for testing snapshot persistence."""
+    """In-memory async Redis double for testing snapshot persistence with simulated TTL expiration."""
 
     def __init__(self):
         self.store: Dict[str, str] = {}
         self.ttls: Dict[str, int] = {}
+        self.expires_at: Dict[str, float] = {}
+        self._current_time: float = 1000000.0
+
+    def time(self) -> float:
+        return self._current_time
+
+    def advance_time(self, seconds: float):
+        self._current_time += seconds
 
     async def set(self, key: str, value: str, ex: int | None = None):
         self.store[key] = value
         if ex is not None:
             self.ttls[key] = ex
+            self.expires_at[key] = self._current_time + ex
+        else:
+            self.ttls.pop(key, None)
+            self.expires_at.pop(key, None)
 
     async def get(self, key: str):
+        if key in self.expires_at and self._current_time >= self.expires_at[key]:
+            self.store.pop(key, None)
+            self.ttls.pop(key, None)
+            self.expires_at.pop(key, None)
+            return None
         return self.store.get(key)
 
     async def delete(self, key: str):
         self.store.pop(key, None)
         self.ttls.pop(key, None)
+        self.expires_at.pop(key, None)
 
 
 def _make_valid_result_payload(offer_index: int = 1) -> Dict[str, Any]:
@@ -242,6 +260,36 @@ async def test_repository_save_snapshot_skips_already_expired():
     await repo.save_snapshot(snapshot)
     key = "chat:snapshot:user_expired:session_expired"
     assert await fake_redis.get(key) is None
+
+
+@pytest.mark.asyncio
+async def test_repository_get_snapshot_returns_none_after_redis_ttl_expiry():
+    fake_redis = FakeAsyncRedis()
+    repo = TrustedSnapshotRepository(fake_redis)
+
+    now = datetime.now(timezone.utc)
+    expires_at = now + timedelta(seconds=60)
+    snapshot = TrustedSearchSnapshot.model_validate(
+        _make_valid_snapshot_payload(
+            userId="user_ttl",
+            sessionId="session_ttl",
+            createdAt=now,
+            expiresAt=expires_at,
+        )
+    )
+
+    await repo.save_snapshot(snapshot, max_ttl=60)
+    # Before expiry, snapshot is retrievable
+    loaded = await repo.get_snapshot("user_ttl", "session_ttl")
+    assert loaded is not None
+
+    # Advance time past TTL
+    fake_redis.advance_time(61)
+
+    # After expiry, snapshot is no longer readable
+    loaded_after = await repo.get_snapshot("user_ttl", "session_ttl")
+    assert loaded_after is None
+    assert await fake_redis.get("chat:snapshot:user_ttl:session_ttl") is None
 
 
 @pytest.mark.asyncio

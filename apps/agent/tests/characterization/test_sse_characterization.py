@@ -1,10 +1,21 @@
 import json
+import time
+from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional
+from unittest.mock import AsyncMock, MagicMock, patch
 
+import httpx
+import jwt
 import pytest
+from langchain_core.messages import AIMessageChunk, HumanMessage
 from pydantic import BaseModel, ConfigDict
 
+from agent.main import app
 from agent.models.events import HandoffEvent
+from agent.models.snapshot import TrustedSearchSnapshot
+from agent.repositories.trusted_snapshot_repository import TrustedSnapshotRepository
+
+from .test_snapshot_characterization import FakeAsyncRedis
 
 # =========================================================================
 # Event Wire Contract Specifications (Authoritative SSE 8 Wire Events)
@@ -54,8 +65,7 @@ class ActionRequiredPayload(BaseModel):
 class DonePayload(BaseModel):
     messageId: Optional[str] = None
     sessionId: Optional[str] = None
-    tokens: Optional[int] = None
-    model_config = ConfigDict(extra="ignore")
+    model_config = ConfigDict(extra="forbid")
 
 
 class ErrorPayload(BaseModel):
@@ -63,7 +73,7 @@ class ErrorPayload(BaseModel):
     message: str
     partialMessageId: Optional[str] = None
     error: Optional[str] = None
-    model_config = ConfigDict(extra="ignore")
+    model_config = ConfigDict(extra="forbid")
 
 
 AUTHORITATIVE_EVENT_PAYLOAD_MAP = {
@@ -98,9 +108,51 @@ def parse_sse_wire_chunk(chunk_str: str) -> Dict[str, Any]:
     }
 
 
+def parse_sse_stream_lines(lines: List[str]) -> List[Dict[str, Any]]:
+    """Parse multi-event SSE response stream lines into event objects."""
+    events = []
+    current_event = {}
+    for line in lines:
+        if isinstance(line, bytes):
+            line = line.decode("utf-8")
+        line = line.strip()
+        if not line:
+            if current_event:
+                events.append(current_event)
+                current_event = {}
+            continue
+        if ":" in line:
+            key, val = line.split(":", 1)
+            key = key.strip()
+            val = val.strip()
+            if key == "event":
+                current_event["event"] = val
+            elif key == "data":
+                current_event["data"] = json.loads(val)
+    if current_event:
+        events.append(current_event)
+    return events
+
+
 def format_sse_wire_event(event_name: str, payload: Dict[str, Any]) -> str:
     """Format an event and payload dict to standard SSE wire format."""
     return f"event: {event_name}\ndata: {json.dumps(payload)}\n\n"
+
+
+JWT_SECRET = "testsecret_must_be_at_least_32_bytes_long_for_security_reasons"
+
+
+def get_auth_headers(sub: str = "user_seq_123", session_id: str = "ses_seq_456") -> Dict[str, str]:
+    payload = {
+        "sub": sub,
+        "email": "test@example.com",
+        "iss": "booking-systems-api",
+        "aud": "booking-systems-clients",
+        "jti": f"test-jti-{sub}",
+        "exp": int(time.time()) + 3600,
+    }
+    token = jwt.encode(payload, JWT_SECRET, algorithm="HS256")
+    return {"Authorization": f"Bearer {token}"}
 
 
 # =========================================================================
@@ -208,11 +260,11 @@ class TestAuthoritativeSSEWireEvents:
         raw = {
             "action": "COMPLETE_PROFILE",
             "target": "/profile",
-            "scope": "user_profile",
+            "scope": "INTERNATIONAL",
             "display": {"title": "Action Required"},
             "passengers": [
                 {
-                    "passengerType": "adult",
+                    "passengerType": "ADULT",
                     "passengerOrdinal": 1,
                     "sections": [
                         {
@@ -221,7 +273,7 @@ class TestAuthoritativeSSEWireEvents:
                                 {
                                     "name": "passportNumber",
                                     "status": "missing",
-                                    "reason": "Required for international flight",
+                                    "reason": "REQUIRED",
                                 }
                             ],
                         }
@@ -243,16 +295,16 @@ class TestAuthoritativeSSEWireEvents:
         raw = {
             "messageId": "msg_char_789",
             "sessionId": "ses_char_456",
-            "tokens": 42,
         }
         model = DonePayload.model_validate(raw)
         assert model.messageId == "msg_char_789"
-        assert model.tokens == 42
+        assert model.sessionId == "ses_char_456"
 
         sse_wire = format_sse_wire_event("done", raw)
         parsed = parse_sse_wire_chunk(sse_wire)
         assert parsed["event"] == "done"
         assert parsed["data"]["messageId"] == "msg_char_789"
+        assert parsed["data"]["sessionId"] == "ses_char_456"
 
     def test_error_event_wire_format(self):
         raw = {
@@ -271,74 +323,152 @@ class TestAuthoritativeSSEWireEvents:
 
 
 # =========================================================================
-# 2. Event Sequence Ordering Characterization Tests
+# 2. Event Sequence Ordering Characterization Tests (Production Stream Emitter)
 # =========================================================================
 
 
 class TestSSESequenceOrdering:
-    """Validates the canonical ordering lifecycle of SSE event streams."""
+    """Validates the canonical ordering lifecycle of SSE event streams through the production emitter."""
 
-    def test_canonical_flight_search_and_handoff_sequence(self):
+    @pytest.mark.asyncio
+    async def test_canonical_flight_search_and_handoff_sequence(self, monkeypatch):
         """
-        Tests the standard event lifecycle:
+        Tests the standard event lifecycle executed through the production emitter:
         token -> tool_call -> tool_result -> flight_results -> ACTION_HANDOFF -> done
         """
-        stream_events = [
-            {"event": "token", "data": {"content": "Searching for "}},
-            {"event": "token", "data": {"content": "flights to Tokyo..."}},
-            {
-                "event": "tool_call",
-                "data": {
-                    "name": "search_flights",
-                    "inputs": {"origin": "SGN", "destination": "NRT", "date": "2026-09-10"},
-                },
-            },
-            {
-                "event": "tool_result",
-                "data": {
-                    "name": "search_flights",
-                    "result": "Found 1 flight from SGN to NRT",
-                },
-            },
-            {
-                "event": "flight_results",
-                "data": {
-                    "results": [
-                        {
-                            "index": 1,
-                            "airline": "Japan Airlines",
-                            "origin": "SGN",
-                            "destination": "NRT",
-                            "departureAt": "2026-09-10T08:00:00Z",
-                            "arrivalAt": "2026-09-10T16:00:00Z",
-                            "price": "450.00",
-                            "currency": "USD",
-                        }
+        headers = get_auth_headers(sub="user_seq_123", session_id="ses_seq_456")
+
+        mock_guardrail = MagicMock()
+        mock_guardrail.is_healthy.return_value = True
+        mock_guardrail.validate_message = AsyncMock(return_value=(True, ""))
+        monkeypatch.setattr(app.state, "guardrails", mock_guardrail, raising=False)
+
+        fake_redis = FakeAsyncRedis()
+        monkeypatch.setattr("agent.middleware.rate_limit.get_redis_client", lambda: fake_redis)
+        monkeypatch.setattr("agent.streaming.sse.get_redis_client", lambda: fake_redis)
+        monkeypatch.setattr(
+            "agent.repositories.chat_budget_repository.ChatBudgetRepository.admit_request",
+            AsyncMock(),
+        )
+        monkeypatch.setattr(
+            "agent.tools.nestjs_client.NestJSClient.check_user_access",
+            AsyncMock(return_value={"allowed": True}),
+        )
+        monkeypatch.setattr(
+            "agent.tools.nestjs_client.NestJSClient.get_memory",
+            AsyncMock(return_value={"recentMessages": [], "summary": ""}),
+        )
+        monkeypatch.setattr(
+            "agent.tools.nestjs_client.NestJSClient.create_message_batch",
+            AsyncMock(
+                return_value={
+                    "messages": [
+                        {"id": "msg_user_1", "sender": "USER"},
+                        {"id": "msg_agent_1", "sender": "AGENT"},
                     ]
-                },
-            },
+                }
+            ),
+        )
+        monkeypatch.setattr("agent.memory.manager.MemoryManager.check_and_summarize", AsyncMock())
+
+        # Pre-seed a trusted snapshot in repository so search_flights produces flight_results event
+        now = datetime.now(timezone.utc)
+        snapshot = TrustedSearchSnapshot.model_validate(
             {
-                "event": "ACTION_HANDOFF",
-                "data": {
-                    "version": 1,
-                    "action": "begin_checkout",
-                    "handoffToken": "token_seq_abc",
-                    "expiresAt": "2026-09-10T08:15:00Z",
-                    "display": {
+                "schemaVersion": 1,
+                "snapshotVersion": 1,
+                "userId": "user_seq_123",
+                "sessionId": "ses_seq_456",
+                "createdAt": now,
+                "expiresAt": now + timedelta(minutes=15),
+                "fingerprint": "fp_123",
+                "selectionAttestation": "attest_123",
+                "results": [
+                    {
+                        "offerIndex": 1,
+                        "flightOfferId": "flight_offer_1",
+                        "duffelOfferId": "duffel_offer_1",
                         "airline": "Japan Airlines",
                         "origin": "SGN",
                         "destination": "NRT",
-                        "departureAt": "2026-09-10T08:00:00Z",
-                        "arrivalAt": "2026-09-10T16:00:00Z",
+                        "departureAt": now,
+                        "arrivalAt": now + timedelta(hours=6),
                         "price": "450.00",
                         "currency": "USD",
-                    },
-                },
-            },
-            {"event": "done", "data": {"messageId": "msg_seq_1", "tokens": 120}},
-        ]
+                    }
+                ],
+            }
+        )
+        await TrustedSnapshotRepository(fake_redis).save_snapshot(snapshot)
 
-        # Verify each event matches schema and event sequence order
+        mock_graph = MagicMock()
+
+        async def mock_astream_events(*args, **kwargs):
+            # 1. token events
+            yield {
+                "event": "on_chat_model_stream",
+                "data": {"chunk": AIMessageChunk(content="Searching for ")},
+            }
+            yield {
+                "event": "on_chat_model_stream",
+                "data": {"chunk": AIMessageChunk(content="flights to Tokyo...")},
+            }
+            # 2. tool_call event
+            yield {
+                "event": "on_tool_start",
+                "name": "search_flights",
+                "data": {"input": {"origin": "SGN", "destination": "NRT", "date": "2026-09-10"}},
+            }
+            # 3. tool_result and flight_results events
+            yield {
+                "event": "on_tool_end",
+                "name": "search_flights",
+                "data": {"output": "Found 1 flight from SGN to NRT"},
+            }
+            # 4. ACTION_HANDOFF event
+            yield {
+                "event": "on_chain_end",
+                "name": "create_handoff_token",
+                "data": {
+                    "output": {
+                        "action": {
+                            "action": "begin_checkout",
+                            "handoffToken": "token_seq_abc",
+                            "expiresAt": "2026-09-10T08:15:00Z",
+                            "display": {
+                                "airline": "Japan Airlines",
+                                "origin": "SGN",
+                                "destination": "NRT",
+                                "departureAt": "2026-09-10T08:00:00Z",
+                                "arrivalAt": "2026-09-10T16:00:00Z",
+                                "price": "450.00",
+                                "currency": "USD",
+                            },
+                        }
+                    }
+                },
+            }
+
+        mock_graph.astream_events = mock_astream_events
+        mock_state = MagicMock()
+        mock_state.next = ()
+        mock_state.values = {"messages": [HumanMessage(content="find flights")]}
+        mock_graph.aget_state = AsyncMock(return_value=mock_state)
+
+        with patch("agent.streaming.sse.graph", mock_graph):
+            transport = httpx.ASGITransport(app=app)
+            async with httpx.AsyncClient(transport=transport, base_url="http://test") as ac:
+                async with ac.stream(
+                    "POST",
+                    "/chat/stream",
+                    json={"message": "find flights", "sessionId": "ses_seq_456"},
+                    headers=headers,
+                ) as response:
+                    assert response.status_code == 200
+                    lines = [line async for line in response.aiter_lines()]
+
+        stream_events = parse_sse_stream_lines(lines)
+
         observed_order = []
         for raw_event in stream_events:
             ev_name = raw_event["event"]
@@ -357,7 +487,6 @@ class TestSSESequenceOrdering:
             "done",
         ]
 
-        # Check relative ordering invariants
         first_token_idx = observed_order.index("token")
         tool_call_idx = observed_order.index("tool_call")
         tool_result_idx = observed_order.index("tool_result")
@@ -371,38 +500,108 @@ class TestSSESequenceOrdering:
         assert flight_results_idx < handoff_idx
         assert handoff_idx < done_idx
 
-    def test_canonical_action_required_sequence(self):
+    @pytest.mark.asyncio
+    async def test_canonical_action_required_sequence(self, monkeypatch):
         """
-        Tests the readiness check sequence:
+        Tests the readiness check sequence executed through the production emitter:
         token -> tool_call -> tool_result -> ACTION_REQUIRED
         """
-        stream_events = [
-            {"event": "token", "data": {"content": "Checking readiness..."}},
-            {
-                "event": "tool_call",
-                "data": {
-                    "name": "check_booking_readiness",
-                    "inputs": {"message": "Checking booking readiness..."},
-                },
-            },
-            {
-                "event": "tool_result",
-                "data": {
-                    "name": "check_booking_readiness",
-                    "result": "Successfully checked booking readiness.",
-                },
-            },
-            {
-                "event": "ACTION_REQUIRED",
-                "data": {
-                    "action": "COMPLETE_PROFILE",
-                    "scope": "missing_passport",
-                    "passengers": [],
-                    "target": "/profile",
-                },
-            },
-        ]
+        headers = get_auth_headers(sub="user_act_123", session_id="ses_act_456")
 
+        mock_guardrail = MagicMock()
+        mock_guardrail.is_healthy.return_value = True
+        mock_guardrail.validate_message = AsyncMock(return_value=(True, ""))
+        monkeypatch.setattr(app.state, "guardrails", mock_guardrail, raising=False)
+
+        fake_redis = FakeAsyncRedis()
+        monkeypatch.setattr("agent.middleware.rate_limit.get_redis_client", lambda: fake_redis)
+        monkeypatch.setattr("agent.streaming.sse.get_redis_client", lambda: fake_redis)
+        monkeypatch.setattr(
+            "agent.repositories.chat_budget_repository.ChatBudgetRepository.admit_request",
+            AsyncMock(),
+        )
+        monkeypatch.setattr(
+            "agent.tools.nestjs_client.NestJSClient.check_user_access",
+            AsyncMock(return_value={"allowed": True}),
+        )
+        monkeypatch.setattr(
+            "agent.tools.nestjs_client.NestJSClient.get_memory",
+            AsyncMock(return_value={"recentMessages": [], "summary": ""}),
+        )
+        monkeypatch.setattr(
+            "agent.tools.nestjs_client.NestJSClient.create_message_batch",
+            AsyncMock(
+                return_value={
+                    "messages": [
+                        {"id": "msg_user_1", "sender": "USER"},
+                    ]
+                }
+            ),
+        )
+
+        mock_graph = MagicMock()
+
+        async def mock_astream_events(*args, **kwargs):
+            yield {
+                "event": "on_chat_model_stream",
+                "data": {"chunk": AIMessageChunk(content="Checking readiness...")},
+            }
+            yield {
+                "event": "on_tool_start",
+                "name": "check_booking_readiness",
+                "data": {"input": {"message": "Checking booking readiness..."}},
+            }
+            yield {
+                "event": "on_tool_end",
+                "name": "check_booking_readiness",
+                "data": {
+                    "output": json.dumps(
+                        {
+                            "ready": False,
+                            "nextAction": "COMPLETE_PROFILE",
+                            "scope": "INTERNATIONAL",
+                            "passengers": [
+                                {
+                                    "passengerType": "ADULT",
+                                    "passengerOrdinal": 1,
+                                    "sections": [
+                                        {
+                                            "name": "identity",
+                                            "fields": [
+                                                {
+                                                    "name": "passportNumber",
+                                                    "status": "missing",
+                                                    "reason": "REQUIRED",
+                                                }
+                                            ],
+                                        }
+                                    ],
+                                }
+                            ],
+                        }
+                    )
+                },
+            }
+
+        mock_graph.astream_events = mock_astream_events
+        mock_state = MagicMock()
+        mock_state.next = ()
+        mock_state.values = {"messages": [HumanMessage(content="check readiness")]}
+        mock_graph.aget_state = AsyncMock(return_value=mock_state)
+
+        with patch("agent.streaming.sse.graph", mock_graph):
+            transport = httpx.ASGITransport(app=app)
+            async with httpx.AsyncClient(transport=transport, base_url="http://test") as ac:
+                async with ac.stream(
+                    "POST",
+                    "/chat/stream",
+                    json={"message": "check readiness", "sessionId": "ses_act_456"},
+                    headers=headers,
+                ) as response:
+                    assert response.status_code == 200
+                    lines = [line async for line in response.aiter_lines()]
+
+        stream_events = parse_sse_stream_lines(lines)
         observed_order = [e["event"] for e in stream_events]
         assert observed_order == ["token", "tool_call", "tool_result", "ACTION_REQUIRED"]
 
@@ -413,69 +612,161 @@ class TestSSESequenceOrdering:
 
 
 # =========================================================================
-# 3. Failure Finalization Ordering Characterization Tests
+# 3. Failure Finalization Ordering Characterization Tests (Production Stream Emitter)
 # =========================================================================
 
 
 class TestSSEFailureFinalization:
-    """Validates that failures finalize with error event and terminate stream."""
+    """Validates that failures finalize with error event and terminate stream via production emitter."""
 
     @pytest.mark.parametrize(
-        "error_code,error_msg",
+        "failure_mode,expected_code",
         [
-            ("GUARDRAIL_BLOCKED", "Your message contains protected personal information."),
-            ("OUTPUT_GUARDRAIL_BLOCKED", "Response was blocked for safety reasons."),
-            ("READINESS_RESPONSE_INVALID", "Booking readiness could not be verified safely."),
-            ("HANDOFF_FAILED", "Checkout handoff could not be created."),
-            ("PERSISTENCE_ERROR", "The response was generated but could not be saved."),
-            ("LLM_ERROR", "The AI model encountered an error. Please try again."),
+            ("GUARDRAIL_BLOCKED", "GUARDRAIL_BLOCKED"),
+            ("READINESS_RESPONSE_INVALID", "READINESS_RESPONSE_INVALID"),
+            ("HANDOFF_FAILED", "HANDOFF_FAILED"),
+            ("LLM_ERROR", "LLM_ERROR"),
         ],
     )
-    def test_error_finalization_payload_structure(self, error_code, error_msg):
-        error_event = {
-            "event": "error",
-            "data": {
-                "code": error_code,
-                "message": error_msg,
-                "partialMessageId": None,
-            },
-        }
+    @pytest.mark.asyncio
+    async def test_error_finalization_payload_structure(
+        self, failure_mode, expected_code, monkeypatch
+    ):
+        headers = get_auth_headers(sub="user_err_123", session_id="ses_err_456")
 
-        parsed = ErrorPayload.model_validate(error_event["data"])
-        assert parsed.code == error_code
-        assert parsed.message == error_msg
-        assert parsed.partialMessageId is None
+        mock_guardrail = MagicMock()
+        mock_guardrail.is_healthy.return_value = True
+        if failure_mode == "GUARDRAIL_BLOCKED":
+            mock_guardrail.validate_message = AsyncMock(return_value=(False, "Safety violation"))
+        else:
+            mock_guardrail.validate_message = AsyncMock(return_value=(True, ""))
+        monkeypatch.setattr(app.state, "guardrails", mock_guardrail, raising=False)
 
-        # Verify wire serialization
-        wire_text = format_sse_wire_event("error", error_event["data"])
-        wire_parsed = parse_sse_wire_chunk(wire_text)
-        assert wire_parsed["event"] == "error"
-        assert wire_parsed["data"]["code"] == error_code
+        fake_redis = FakeAsyncRedis()
+        monkeypatch.setattr("agent.middleware.rate_limit.get_redis_client", lambda: fake_redis)
+        monkeypatch.setattr("agent.streaming.sse.get_redis_client", lambda: fake_redis)
+        monkeypatch.setattr(
+            "agent.repositories.chat_budget_repository.ChatBudgetRepository.admit_request",
+            AsyncMock(),
+        )
+        monkeypatch.setattr(
+            "agent.tools.nestjs_client.NestJSClient.check_user_access",
+            AsyncMock(return_value={"allowed": True}),
+        )
+        monkeypatch.setattr(
+            "agent.tools.nestjs_client.NestJSClient.get_memory",
+            AsyncMock(return_value={"recentMessages": [], "summary": ""}),
+        )
+        monkeypatch.setattr(
+            "agent.tools.nestjs_client.NestJSClient.create_message_batch",
+            AsyncMock(return_value={"messages": []}),
+        )
 
-    def test_error_is_terminal_in_stream_sequence(self):
+        mock_graph = MagicMock()
+
+        async def mock_astream_events(*args, **kwargs):
+            if failure_mode == "READINESS_RESPONSE_INVALID":
+                yield {
+                    "event": "on_tool_end",
+                    "name": "check_booking_readiness",
+                    "data": {"output": json.dumps({"error": "invalid response"})},
+                }
+            elif failure_mode == "HANDOFF_FAILED":
+                yield {
+                    "event": "on_chain_end",
+                    "name": "create_handoff_token",
+                    "data": {"output": {"action": {"error": "Quote expired"}}},
+                }
+            elif failure_mode == "LLM_ERROR":
+                raise RuntimeError("LLM backend disconnected")
+
+        mock_graph.astream_events = mock_astream_events
+        mock_state = MagicMock()
+        mock_state.next = ()
+        mock_state.values = {"messages": [HumanMessage(content="hello")]}
+        mock_graph.aget_state = AsyncMock(return_value=mock_state)
+
+        with patch("agent.streaming.sse.graph", mock_graph):
+            transport = httpx.ASGITransport(app=app)
+            async with httpx.AsyncClient(transport=transport, base_url="http://test") as ac:
+                async with ac.stream(
+                    "POST",
+                    "/chat/stream",
+                    json={"message": "hello", "sessionId": "ses_err_456"},
+                    headers=headers,
+                ) as response:
+                    assert response.status_code == 200
+                    lines = [line async for line in response.aiter_lines()]
+
+        events = parse_sse_stream_lines(lines)
+        error_events = [e for e in events if e["event"] == "error"]
+        assert len(error_events) == 1
+        err = error_events[0]
+        parsed = ErrorPayload.model_validate(err["data"])
+        assert parsed.code == expected_code
+        assert parsed.message is not None
+
+    @pytest.mark.asyncio
+    async def test_error_is_terminal_in_stream_sequence(self, monkeypatch):
         """
         Verify stream termination behavior: once an error event is yielded,
         the stream finishes and no 'done' or subsequent token events are emitted.
         """
-        events_stream = [
-            {"event": "token", "data": {"content": "Starting search..."}},
-            {
-                "event": "error",
-                "data": {
-                    "code": "LLM_ERROR",
-                    "message": "The AI model encountered an error.",
-                    "partialMessageId": "msg_part_456",
-                },
-            },
-        ]
+        headers = get_auth_headers(sub="user_term_123", session_id="ses_term_456")
 
-        consumed_events = []
-        for item in events_stream:
-            consumed_events.append(item)
-            if item["event"] == "error":
-                # Simulated SSE stream generator break on error
-                break
+        mock_guardrail = MagicMock()
+        mock_guardrail.is_healthy.return_value = True
+        mock_guardrail.validate_message = AsyncMock(return_value=(True, ""))
+        monkeypatch.setattr(app.state, "guardrails", mock_guardrail, raising=False)
 
-        assert len(consumed_events) == 2
+        fake_redis = FakeAsyncRedis()
+        monkeypatch.setattr("agent.middleware.rate_limit.get_redis_client", lambda: fake_redis)
+        monkeypatch.setattr("agent.streaming.sse.get_redis_client", lambda: fake_redis)
+        monkeypatch.setattr(
+            "agent.repositories.chat_budget_repository.ChatBudgetRepository.admit_request",
+            AsyncMock(),
+        )
+        monkeypatch.setattr(
+            "agent.tools.nestjs_client.NestJSClient.check_user_access",
+            AsyncMock(return_value={"allowed": True}),
+        )
+        monkeypatch.setattr(
+            "agent.tools.nestjs_client.NestJSClient.get_memory",
+            AsyncMock(return_value={"recentMessages": [], "summary": ""}),
+        )
+        monkeypatch.setattr(
+            "agent.tools.nestjs_client.NestJSClient.create_message_batch",
+            AsyncMock(return_value={"messages": []}),
+        )
+
+        mock_graph = MagicMock()
+
+        async def mock_astream_events(*args, **kwargs):
+            yield {
+                "event": "on_chat_model_stream",
+                "data": {"chunk": AIMessageChunk(content="Starting search...")},
+            }
+            raise RuntimeError("LLM exploded")
+
+        mock_graph.astream_events = mock_astream_events
+        mock_state = MagicMock()
+        mock_state.next = ()
+        mock_state.values = {"messages": [HumanMessage(content="start search")]}
+        mock_graph.aget_state = AsyncMock(return_value=mock_state)
+
+        with patch("agent.streaming.sse.graph", mock_graph):
+            transport = httpx.ASGITransport(app=app)
+            async with httpx.AsyncClient(transport=transport, base_url="http://test") as ac:
+                async with ac.stream(
+                    "POST",
+                    "/chat/stream",
+                    json={"message": "start search", "sessionId": "ses_term_456"},
+                    headers=headers,
+                ) as response:
+                    assert response.status_code == 200
+                    lines = [line async for line in response.aiter_lines()]
+
+        consumed_events = parse_sse_stream_lines(lines)
+        assert len(consumed_events) >= 2
         assert consumed_events[-1]["event"] == "error"
         assert "done" not in [e["event"] for e in consumed_events]
