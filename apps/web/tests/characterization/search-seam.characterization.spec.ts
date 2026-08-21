@@ -1,34 +1,28 @@
-import { expect, test, type Page, type APIRequestContext, type BrowserContext } from '@playwright/test';
+import { expect, test, type BrowserContext } from '@playwright/test';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { encode } from 'next-auth/jwt';
 
-async function registerAndLoginUser(
-  page: Page,
-  request: APIRequestContext,
-  context: BrowserContext,
-): Promise<string> {
-  const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:3001';
-  await request.post(`${apiUrl}/api/auth/test/reset-lockout`, {
-    data: { clearAll: true },
-  }).catch(() => {});
-  await context.clearCookies();
-
-  const email = `search-char-${Date.now()}-${Math.random().toString(36).slice(2, 7)}@example.com`;
-  await page.goto('/register');
-  await page.getByRole('textbox', { name: 'Email' }).fill(email);
-  await page.getByRole('textbox', { name: 'Password' }).fill('Password123!');
-  await page.getByRole('button', { name: 'Create account' }).click();
-
-  await expect(page).toHaveURL(/.*\/$/, { timeout: 45000 });
-
-  if (page.url().includes('/login')) {
-    await page.getByRole('textbox', { name: 'Email address' }).fill(email);
-    await page.getByRole('textbox', { name: 'Password' }).fill('Password123!');
-    await page.getByRole('button', { name: 'Sign in' }).click();
-    await expect(page).toHaveURL(/.*\/$/, { timeout: 45000 });
-  }
-
-  return email;
+async function authenticateSearchSession(context: BrowserContext): Promise<void> {
+  const sessionToken = await encode({
+    secret: process.env.NEXTAUTH_SECRET || 'test_secret',
+    token: {
+      sub: 'user-search-char-123',
+      id: 'user-search-char-123',
+      accessToken: 'char-test-access-token',
+      name: 'Search Characterization Traveler',
+      email: 'search-char@example.com',
+    },
+  });
+  await context.addCookies([
+    {
+      name: 'next-auth.session-token',
+      value: sessionToken,
+      url: 'http://127.0.0.1:3000',
+      httpOnly: true,
+      sameSite: 'Lax',
+    },
+  ]);
 }
 
 test.describe('Search Seam Characterization - User Flows', () => {
@@ -49,10 +43,9 @@ test.describe('Search Seam Characterization - User Flows', () => {
 
   test('renders search form elements with required inputs and default values', async ({
     page,
-    request,
     context,
   }) => {
-    await registerAndLoginUser(page, request, context);
+    await authenticateSearchSession(context);
 
     await page.goto('/search');
     await page.addStyleTag({ content: 'aside[aria-label="Agent chat"] { display: none !important; }' }).catch(() => {});
@@ -102,10 +95,9 @@ test.describe('Search Seam Characterization - User Flows', () => {
 
   test('executes flight search with uppercased parameters and renders flight offers', async ({
     page,
-    request,
     context,
   }) => {
-    await registerAndLoginUser(page, request, context);
+    await authenticateSearchSession(context);
 
     let capturedSearchPayload: {
       origin?: string;
@@ -184,10 +176,9 @@ test.describe('Search Seam Characterization - User Flows', () => {
 
   test('selecting an offer verifies flight details and navigates to passenger checkout', async ({
     page,
-    request,
     context,
   }) => {
-    await registerAndLoginUser(page, request, context);
+    await authenticateSearchSession(context);
 
     await page.route('**/api/flights/search', async (route) => {
       await route.fulfill({
@@ -253,10 +244,9 @@ test.describe('Search Seam Characterization - User Flows', () => {
 
   test('displays search error alert when flight search API returns error response', async ({
     page,
-    request,
     context,
   }) => {
-    await registerAndLoginUser(page, request, context);
+    await authenticateSearchSession(context);
 
     await page.route('**/api/flights/search', async (route) => {
       await route.fulfill({
@@ -284,10 +274,9 @@ test.describe('Search Seam Characterization - User Flows', () => {
 
   test('displays error message when flight offer verification fails on book click', async ({
     page,
-    request,
     context,
   }) => {
-    await registerAndLoginUser(page, request, context);
+    await authenticateSearchSession(context);
 
     await page.route('**/api/flights/search', async (route) => {
       await route.fulfill({
