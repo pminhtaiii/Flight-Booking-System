@@ -6,14 +6,35 @@ Update this file after every completed feature. Any AI agent reading this should
 
 ### Current Status
 
-**Feature:** Pull-Request Continuous Integration Pipeline (Feature 18)
-**Last completed:** Post-release CI reliability remediation for Feature 18 (2026-08-21).
+**Feature:** Deepen Codebase Architecture (Feature 019)
+**Last completed:** Slice 0: Baseline Characterization & Safety Rails (2026-08-21).
 **In progress:** None.
-**Next:** Production operations or next scheduled milestone.
+**Next:** Slice 1 — Refund obligation, transaction reservation, and settlement.
 
 ---
 
 ## Progress by Feature
+
+### [x] Feature: Deepen Codebase Architecture (Feature 019) — Slice 0: Baseline Characterization & Safety Rails
+
+- [x] Slice 0 / Baseline Characterization & Safety Rails (2026-08-21):
+  - **Zero Production Logic Modifications**:
+    - All changes confined strictly to test suites under `test/characterization/` across `apps/api`, `apps/agent`, and `apps/web`.
+  - **Backend API Characterization (`apps/api/test/characterization/`)**:
+    - `refund-characterization.e2e-spec.ts` (8/8 tests PASS): Proves equivalent state transitions across all 4 refund triggers (Inline `processCancellationRefund`, Stripe Webhook `charge.refunded`, Background Sweeper `handleCancellationRefundRecovery`, and Admin Manual Resolution `resolveRefund`). Validates double-entry ledger balance invariant `sum(DEBIT) === sum(CREDIT)` and idempotency across all triggers.
+    - `booking-characterization.e2e-spec.ts` (10/10 tests PASS): Characterizes `createBooking` (`PROCESSING`), `updateToConfirmed`, `updateToFailed`, `reconcileBookingIfStale`, safe agent-projection synchronization, and list/detail query responses with tenant isolation. Records baseline static dependency check for `forwardRef(() => BookingService)` / `forwardRef(() => PaymentService)`.
+    - `agent-gateway-characterization.e2e-spec.ts` (24/24 tests PASS): Characterizes request validation, service authentication (`X-Agent-API-Key`, `X-User-Claim`), status codes, and PII-free allowlisted projections across all 6 read-only tool routes (`/flights/search`, `/v2/flights/search`, `/users/preferences`, `/users/bookings/summaries`, `/users/bookings/:ref`, `/bookings/readiness` & `/chat-handoff`).
+  - **Python Agent Characterization (`apps/agent/tests/characterization/`)**:
+    - `test_snapshot_characterization.py` (14/14 tests PASS): Characterizes `TrustedSearchSnapshot` model validation (contiguous 1-based indexing, `extra="forbid"`, TTL bound by offer expiry), `TrustedSnapshotRepository` CRUD & atomic version replacement, and PII-free projections (`project_snapshot_results` excludes Duffel IDs, attestation signatures, and user IDs).
+    - `test_sse_characterization.py` (17/17 tests PASS): Characterizes all 8 authoritative SSE stream event formats (`token`, `tool_call`, `tool_result`, `flight_results`, `ACTION_HANDOFF`, `ACTION_REQUIRED`, `done`, `error`), canonical ordering sequences, and terminal failure cleanup sequencing.
+  - **Web Seam Characterization (`apps/web/tests/characterization/`)**:
+    - `search-seam.characterization.spec.ts` (7/7 tests PASS): Characterizes search form rendering, validation, submission, and offer selection navigation to `/checkout`. Records baseline static scan for `accessToken` prop (7 matches), `NEXT_PUBLIC_API_URL` (2 matches), and direct NestJS API calls (2 matches).
+    - `booking-seam.characterization.spec.ts` (9/9 tests PASS): Characterizes booking detail views (confirmed, processing, disruption alert with acknowledge/accept, cancellation review modal). Records baseline static scan for `useSession` (1 match), `accessToken` (1 match), and `NEXT_PUBLIC_API_URL` (2 matches).
+  - **Multi-Workspace Regression Validation**:
+    - API: 74/74 unit suites (745/745 tests) PASS, 3/3 characterization E2E suites (42/42 tests) PASS.
+    - Agent: 31/31 characterization tests PASS, 383/383 non-benchmark pytest tests PASS.
+    - Web: 16/16 Playwright characterization tests PASS, production build compiles 20 static/dynamic routes cleanly.
+    - CI Contract: 13/13 test scenarios PASS.
 
 ### [x] Feature: Pull-Request Continuous Integration Pipeline (Feature 18)
 
