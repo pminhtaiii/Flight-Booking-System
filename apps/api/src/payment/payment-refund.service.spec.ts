@@ -12,11 +12,12 @@ describe('PaymentRefundService cancellation refunds', () => {
   const prisma = {
     payment: { findUnique: jest.fn(), update: jest.fn(), updateMany: jest.fn() },
     booking: { findUnique: jest.fn(), update: jest.fn(), updateMany: jest.fn() },
-    refund: { findFirst: jest.fn(), findUnique: jest.fn(), create: jest.fn(), update: jest.fn(), updateMany: jest.fn() },
+    refund: { findFirst: jest.fn(), findUnique: jest.fn(), findMany: jest.fn(), create: jest.fn(), update: jest.fn(), updateMany: jest.fn() },
     idempotencyKey: { findUnique: jest.fn() },
     paymentEvent: { create: jest.fn() },
     ledgerEntry: { createMany: jest.fn() },
     $transaction: jest.fn(),
+    $queryRaw: jest.fn(),
   };
   const stripe = { createRefund: jest.fn() };
   const idempotency = {
@@ -327,5 +328,69 @@ describe('PaymentRefundService cancellation refunds', () => {
     expect(prisma.ledgerEntry.createMany).not.toHaveBeenCalled();
     expect(prisma.paymentEvent.create).not.toHaveBeenCalled();
     expect(audit.createLog).not.toHaveBeenCalled();
+  });
+
+  it('transitions associated CANCELLED_PENDING_REFUND bookings to CANCELLED_AND_REFUNDED upon charge.refunded webhook completion', async () => {
+    prisma.payment.findUnique.mockResolvedValue({
+      id: 'payment-1',
+      stripePaymentIntentId: 'pi_1',
+      status: PaymentStatus.REFUND_PENDING,
+      amount: 10000,
+      currency: 'usd',
+    });
+    prisma.refund.findMany
+      .mockResolvedValueOnce([
+        {
+          id: 'refund-1',
+          paymentId: 'payment-1',
+          status: 'REFUND_PENDING',
+          stripeRefundId: 're_1',
+          bookingId: 'booking-1',
+          amount: 10000,
+        },
+      ])
+      .mockResolvedValueOnce([
+        { amount: 10000 },
+      ]);
+    prisma.refund.updateMany.mockResolvedValue({ count: 1 });
+    prisma.payment.update.mockResolvedValue({ id: 'payment-1' });
+    prisma.booking.updateMany.mockResolvedValue({ count: 1 });
+    prisma.ledgerEntry.createMany.mockResolvedValue({ count: 2 });
+    prisma.paymentEvent.create.mockResolvedValue({ id: 'evt-1' });
+
+    const webhookEvent = {
+      id: 'evt_stripe_1',
+      type: 'charge.refunded',
+      data: {
+        object: {
+          payment_intent: 'pi_1',
+          amount_refunded: 10000,
+          refunds: {
+            data: [{ id: 're_1', amount: 10000 }],
+          },
+        },
+      },
+    };
+
+    await service.handleChargeRefunded(webhookEvent);
+
+    expect(prisma.booking.updateMany).toHaveBeenCalledWith({
+      where: {
+        id: { in: ['booking-1'] },
+        status: BookingStatus.CANCELLED_PENDING_REFUND,
+      },
+      data: { status: BookingStatus.CANCELLED_AND_REFUNDED },
+    });
+    expect(prisma.booking.updateMany).toHaveBeenCalledWith({
+      where: {
+        paymentId: 'payment-1',
+        status: BookingStatus.CANCELLED_PENDING_REFUND,
+      },
+      data: { status: BookingStatus.CANCELLED_AND_REFUNDED },
+    });
+    expect(prisma.payment.update).toHaveBeenCalledWith(expect.objectContaining({
+      where: { id: 'payment-1' },
+      data: { status: PaymentStatus.REFUNDED },
+    }));
   });
 });

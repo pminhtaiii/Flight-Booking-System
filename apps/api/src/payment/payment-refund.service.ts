@@ -304,9 +304,9 @@ export class PaymentRefundService {
       // bind one null-ID REFUND_PENDING row per unmatched ID. We update exactly one
       // row at a time (LIMIT 1 via sub-select) so two concurrent webhooks cannot both
       // claim the same null row.
-      const lateBindMatches: Array<{ id: string; amount: number }> = [];
+      const lateBindMatches: Array<{ id: string; amount: number; bookingId?: string | null }> = [];
       for (const stripeId of unmatchedStripeIds) {
-        const claimed = await this.prisma.$queryRaw<Array<{ id: string; amount: number }>>`
+        const claimed = await this.prisma.$queryRaw<Array<{ id: string; amount: number; bookingId?: string | null }>>`
           UPDATE "refunds"
           SET    "stripeRefundId" = ${stripeId}
           WHERE  id = (
@@ -318,7 +318,7 @@ export class PaymentRefundService {
             LIMIT  1
             FOR UPDATE SKIP LOCKED
           )
-          RETURNING id, amount
+          RETURNING id, amount, "bookingId"
         `;
         if (claimed.length > 0) {
           lateBindMatches.push(...claimed);
@@ -406,6 +406,31 @@ export class PaymentRefundService {
           throw new Error(
             `handleChargeRefunded called with unexpected previousStatus: ${previousStatus}`,
           );
+        }
+
+        // Transition associated booking in CANCELLED_PENDING_REFUND to CANCELLED_AND_REFUNDED
+        if (newStatus === PaymentStatus.REFUNDED) {
+          const bookingIds = pendingRefunds
+            .map((r) => (r as { bookingId?: string | null }).bookingId)
+            .filter((id): id is string => Boolean(id));
+
+          if (bookingIds.length > 0) {
+            await tx.booking.updateMany({
+              where: {
+                id: { in: bookingIds },
+                status: BookingStatus.CANCELLED_PENDING_REFUND,
+              },
+              data: { status: BookingStatus.CANCELLED_AND_REFUNDED },
+            });
+          }
+
+          await tx.booking.updateMany({
+            where: {
+              paymentId: payment.id,
+              status: BookingStatus.CANCELLED_PENDING_REFUND,
+            },
+            data: { status: BookingStatus.CANCELLED_AND_REFUNDED },
+          });
         }
 
         // Create reversing ledger entries: DEBIT PLATFORM_REVENUE, CREDIT CUSTOMER_RECEIVABLE
