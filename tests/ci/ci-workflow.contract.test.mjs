@@ -45,6 +45,17 @@ function jobBlock(source, jobId) {
   return match[0];
 }
 
+function stepBlock(job, stepName) {
+  const match = job.match(
+    new RegExp(
+      `^      - name: ${stepName}[ \\t]*\\n([\\s\\S]*?)(?=^      - name: |$(?![\\s\\S]))`,
+      'm',
+    ),
+  );
+  assert.ok(match, `expected ${stepName} step`);
+  return match[0];
+}
+
 function assertContains(block, pattern, description) {
   assert.match(block, pattern, description);
 }
@@ -280,6 +291,62 @@ test('workflow preserves service-specific validation and network boundaries', ()
   ]) {
     assertContains(agentTests, requirement, `Agent tests must include ${requirement}`);
   }
+});
+
+test('Redis coverage enforcement applies only to the Redis Agent test step', () => {
+  const agentTests = jobBlock(workflow(), 'agent-tests');
+  const nonRedisStep = stepBlock(
+    agentTests,
+    'Run non-Redis Agent tests with loopback-only network',
+  );
+  const redisStep = stepBlock(
+    agentTests,
+    'Run required Redis integration tests with loopback-only network',
+  );
+
+  assert.doesNotMatch(
+    nonRedisStep,
+    /CI_REQUIRE_REDIS_TESTS/,
+    'the non-Redis selection must not require Redis-marked tests to remain collected',
+  );
+  assert.match(
+    redisStep,
+    /CI_REQUIRE_REDIS_TESTS:\s*['"]?1['"]?/,
+    'the dedicated Redis step must fail closed when Redis coverage is unavailable',
+  );
+});
+
+test('API unit CI uses a dedicated non-forwarded Jest command', () => {
+  const apiUnitTests = jobBlock(workflow(), 'api-unit-tests');
+  const unitStep = stepBlock(apiUnitTests, 'Run API unit tests with loopback-only network');
+  const apiPackage = JSON.parse(readFileSync(resolve(root, 'apps/api/package.json'), 'utf8'));
+
+  assert.equal(
+    apiPackage.scripts['test:ci'],
+    'jest --config ./jest.config.json --runInBand',
+    'API package must expose an explicit deterministic CI unit command',
+  );
+  assert.match(unitStep, /pnpm --filter @api\/backend run test:ci/);
+  assert.doesNotMatch(
+    unitStep,
+    /test -- --runInBand/,
+    'CI must not depend on pnpm forwarding Jest flags through the generic test script',
+  );
+});
+
+test('default API E2E excludes runner-dependent performance benchmarks', () => {
+  const e2eConfig = JSON.parse(readFileSync(resolve(root, 'apps/api/test/jest-e2e.json'), 'utf8'));
+  const apiPackage = JSON.parse(readFileSync(resolve(root, 'apps/api/package.json'), 'utf8'));
+
+  assert.ok(
+    e2eConfig.testPathIgnorePatterns?.includes('[.-]performance\\.e2e-spec\\.ts$'),
+    'correctness E2E must not fail on unpinned runner latency thresholds',
+  );
+  assert.equal(
+    apiPackage.scripts['test:e2e:performance'],
+    'jest --config ./test/jest-e2e-performance.json --runInBand',
+    'performance benchmarks must remain available through an explicit opt-in command',
+  );
 });
 
 test('workflow defines the required job graph, routing matrix, and fail-closed summary', () => {

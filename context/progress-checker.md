@@ -7,7 +7,7 @@ Update this file after every completed feature. Any AI agent reading this should
 ### Current Status
 
 **Feature:** Pull-Request Continuous Integration Pipeline (Feature 18)
-**Last completed:** Task T041 / CI/CD Verification, Multi-Workspace Test Suite Sign-off & Release Gate for Feature 18 (2026-08-21).
+**Last completed:** Post-release CI reliability remediation for Feature 18 (2026-08-21).
 **In progress:** None.
 **Next:** Production operations or next scheduled milestone.
 
@@ -26,7 +26,7 @@ Update this file after every completed feature. Any AI agent reading this should
   - **Deterministic Change-Aware Routing & Evaluator (`scripts/ci/evaluate-ci-status.mjs` & `tests/ci/ci-workflow.contract.test.mjs`)**:
     - Path filters map `apps/api/**`, `apps/web/**`, `apps/agent/**` to corresponding chains; `packages/shared/**`, workflow, contract, and scripts trigger all chains; docs/specs trigger none.
     - Pure evaluator `evaluateCiStatus` with JSON CLI enforces truth-table matrix, rejecting any failure, cancellation, false-green skip, or missing detection.
-    - Contract test harness passes 10/10 test scenarios in < 3s.
+    - Contract test harness passes 13/13 test scenarios, including regression coverage for pnpm/Jest argument forwarding, Redis marker enforcement scope, and correctness/performance E2E separation.
   - **Loopback-Only Network Isolation Guards (`tests/ci/node-network-guard.cjs` & `tests/ci/python/sitecustomize.py`)**:
     - Zero live provider calls permitted during CI runs. Intercepts Node `net`/`tls`/`http`/`https` and Python `socket`/`urllib3`/`requests`/`httpx`, allowing local services (`127.0.0.1`, `::1`, `localhost`, Unix sockets) and failing all public destinations.
   - **Multi-Workspace Gate & Test Convergence**:
@@ -35,6 +35,11 @@ Update this file after every completed feature. Any AI agent reading this should
     - `apps/agent`: Canonical root `uv.lock` dependency sync, Ruff lint (0 errors) and Ruff formatting (108 files formatted), 355/355 non-Redis pytest unit tests pass, and 9/9 strict Redis integration tests pass with Python network guard.
   - **Operations Runbook & Branch Protection (`specs/018-CI-CD-pipeline/quickstart.md`)**:
     - Documented single branch protection requirement (`ci-status`), warm-cache duration median (~5m 48s < 10m SLA), and safe 3-step rollback procedure.
+  - **Post-Release CI Reliability Remediation (2026-08-21)**:
+    - API unit CI now calls the explicit `test:ci` package script, preventing pnpm from forwarding `--runInBand` after a literal `--` and causing Jest to treat it as a test-name pattern.
+    - Agent Redis enforcement is scoped only to the dedicated `redis_integration` step; the non-Redis selection passes independently while the Redis step still fails closed if its required group is absent or skipped.
+    - Default API E2E selects 51 correctness suites and excludes the two runner-dependent latency benchmark suites. Benchmarks remain available through `test:e2e:performance`.
+    - Fresh-database correctness verification passed 50 suites / 427 tests before isolating the sole Redis-alert dependency failure; the corrected alert suite then passed 12/12 tests with database health held explicitly healthy.
 
 ### [x] Feature: Traveler Profile & Booking Readiness (Feature 16)
 

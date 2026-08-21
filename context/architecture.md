@@ -518,5 +518,7 @@ The repository uses a single GitHub Actions pull request CI workflow at `.github
 - **Security & Reproducibility**: Read-only repository permissions (`contents: read`), immutable 40-character action commit SHAs, line-ending normalization (`core.autocrlf=input` + `.gitattributes`), and zero token/credential persistence.
 - **Loopback-Only Network Guards**: `node-network-guard.cjs` and `python/sitecustomize.py` restrict outgoing socket connections during CI test/build stages exclusively to loopback addresses (`127.0.0.1`, `::1`, `localhost`) to prevent unauthorized live provider access.
 - **Change Detection & Routing**: `detect-changes` executes contract validation and actionlint, emitting string booleans for `api`, `web`, and `agent` via `dorny/paths-filter`.
+- **Deterministic Test Commands**: API unit CI calls the explicit `test:ci` script rather than forwarding Jest flags through pnpm. Agent Redis coverage enforcement is applied only to the dedicated Redis-marked selection, so the non-Redis and Redis groups validate independently.
+- **Correctness vs. Performance**: Blocking API E2E runs exclude `[.-]performance.e2e-spec.ts` wall-clock benchmarks, which remain available through the opt-in `test:e2e:performance` command for controlled benchmark environments.
 - **Status Evaluation**: The terminal `ci-status` job runs `evaluate-ci-status.mjs` with `always()`, verifying that all relevant service jobs succeeded, irrelevant jobs were safely skipped, and detection ran cleanly. Branch protection requires only `ci-status`.
 
