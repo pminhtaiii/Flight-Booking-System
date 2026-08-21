@@ -120,8 +120,27 @@ jobs:
     if: ${{ needs.detect-changes.outputs.api == 'true' && needs.api-gate.result == 'success' }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: flight_booking
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d flight_booking"
+          --health-interval 10s --health-timeout 5s --health-retries 5
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s --health-timeout 5s --health-retries 5
     env:
-      DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/ci_dummy?schema=public
+      DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/flight_booking?schema=public
       REDIS_URL: redis://127.0.0.1:6379/0
       NODE_ENV: test
       STRIPE_SECRET_KEY: sk_test_ci_not_a_secret
@@ -151,10 +170,11 @@ jobs:
           cache-dependency-path: pnpm-lock.yaml
       - name: Install Node dependencies
         run: pnpm install --frozen-lockfile
-      - name: Build shared package and generate Prisma Client
+      - name: Build shared package, generate Prisma Client, and deploy migrations
         run: |
           pnpm build:shared
           pnpm --filter @api/backend exec prisma generate
+          pnpm --filter @api/backend exec prisma migrate deploy
       - name: Run API unit tests with loopback-only network
         env:
           NODE_OPTIONS: --require=${{ github.workspace }}/tests/ci/node-network-guard.cjs
