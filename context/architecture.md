@@ -506,3 +506,17 @@ The following are **architecture-specific** invariants that enforce the system d
 - **Chat persistence is 100% AES-256-GCM encrypted and token persistence is 100% SHA-256 hashed.** Zero plaintext content/title columns or raw token columns exist in the database. All decryption runs in fail-closed strict mode with zero plaintext fallback.
 - **Chat transport is permanent direct-only streaming (`POST ${NEXT_PUBLIC_AGENT_URL}/chat/stream`).** Decommissioned proxy configurations fail fast and close immediately.
 - **Data-quality backfills must use optimistic concurrency controls (CAS).** Schema migrations and data backfills must run in additive, non-destructive steps and abort if the validation/quarantine ratio exceeds safe thresholds.
+- **Pull-Request CI triggers only on `development` target PRs with a single required `ci-status` summary check.** Change-aware routing deterministically executes only affected service chains, with all actions SHA-pinned, checkout credentials unpersisted, and Node/Python loopback network guards preventing live external API calls.
+
+---
+
+## Continuous Integration Pipeline
+
+The repository uses a single GitHub Actions pull request CI workflow at `.github/workflows/ci.yml`:
+
+- **Trigger & Concurrency**: Triggers exclusively on `pull_request` targeting `development` with `cancel-in-progress: true` keyed by PR number.
+- **Security & Reproducibility**: Read-only repository permissions (`contents: read`), immutable 40-character action commit SHAs, line-ending normalization (`core.autocrlf=input` + `.gitattributes`), and zero token/credential persistence.
+- **Loopback-Only Network Guards**: `node-network-guard.cjs` and `python/sitecustomize.py` restrict outgoing socket connections during CI test/build stages exclusively to loopback addresses (`127.0.0.1`, `::1`, `localhost`) to prevent unauthorized live provider access.
+- **Change Detection & Routing**: `detect-changes` executes contract validation and actionlint, emitting string booleans for `api`, `web`, and `agent` via `dorny/paths-filter`.
+- **Status Evaluation**: The terminal `ci-status` job runs `evaluate-ci-status.mjs` with `always()`, verifying that all relevant service jobs succeeded, irrelevant jobs were safely skipped, and detection ran cleanly. Branch protection requires only `ci-status`.
+

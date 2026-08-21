@@ -364,7 +364,17 @@ jobs:
 
   ci-status:
     if: ${{ always() }}
-    needs: [detect-changes, api-gate, api-unit-tests, api-e2e-tests, web-gate, web-build, agent-gate, agent-tests]
+    needs:
+      [
+        detect-changes,
+        api-gate,
+        api-unit-tests,
+        api-e2e-tests,
+        web-gate,
+        web-build,
+        agent-gate,
+        agent-tests,
+      ]
     runs-on: ubuntu-latest
     timeout-minutes: 10
     env:

@@ -96,7 +96,13 @@ def test_chat_telemetry_rejects_unallowlisted_values_under_known_fields(field_na
 def test_chat_telemetry_rejects_forbidden_values_across_operations(forbidden_val):
     telemetry = ChatTelemetry()
 
-    for op in ("handoff_create", "handoff_resolve", "handoff_consume", "tool_call", "router_decision"):
+    for op in (
+        "handoff_create",
+        "handoff_resolve",
+        "handoff_consume",
+        "tool_call",
+        "router_decision",
+    ):
         with pytest.raises(TelemetryPrivacyError):
             telemetry.emit(op, status="failed", fields={"outcome": forbidden_val})
 
@@ -112,11 +118,14 @@ def test_chat_telemetry_rejects_non_string_values_for_enum_fields(field_value):
 def test_chat_telemetry_runtime_emission_is_fail_open():
     telemetry = ChatTelemetry()
 
-    assert telemetry.emit_safely(
-        "tool_call",
-        status="failed",
-        fields={"tool_name": "opaque_user_value"},
-    ) is None
+    assert (
+        telemetry.emit_safely(
+            "tool_call",
+            status="failed",
+            fields={"tool_name": "opaque_user_value"},
+        )
+        is None
+    )
 
 
 def test_chat_telemetry_runtime_emission_is_fail_open_when_logger_fails():
@@ -210,7 +219,9 @@ def test_standardized_metrics_emitted_in_telemetry_events():
     denied = telemetry.emit("quota_admission", status="rejected", fields={"outcome": "rejected"})
     assert denied["metric"] == "chat_messages_denied_total"
 
-    unavailable = telemetry.emit("quota_admission", status="failed", fields={"outcome": "unavailable"})
+    unavailable = telemetry.emit(
+        "quota_admission", status="failed", fields={"outcome": "unavailable"}
+    )
     assert unavailable["metric"] == "chat_messages_denied_total"
 
     quota = telemetry.emit("quota_admission", status="accepted")
@@ -219,8 +230,7 @@ def test_standardized_metrics_emitted_in_telemetry_events():
     handoff = telemetry.emit("handoff_create", status="created", fields={"outcome": "created"})
     assert handoff["metric"] == "handoff_tokens_issued_total"
 
-    rejected_handoff = telemetry.emit("handoff_create", status="failed", fields={"outcome": "failed"})
+    rejected_handoff = telemetry.emit(
+        "handoff_create", status="failed", fields={"outcome": "failed"}
+    )
     assert rejected_handoff["metric"] == "chat_handoff_create_total"
-
-
-

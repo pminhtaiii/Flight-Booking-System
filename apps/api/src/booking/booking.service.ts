@@ -42,7 +42,6 @@ export type BookingWithRelations = Prisma.BookingGetPayload<{
 import { StripeService } from '@/common/stripe.service';
 import { DuffelService } from '@/duffel/duffel.service';
 import { PaymentRefundService } from '@/payment/payment-refund.service';
-import { User } from '@prisma/client';
 
 function parseDuffelCancellationQuoteId(serialized: string | null | undefined): {
   quoteId: string | null;

@@ -1,7 +1,7 @@
 import json
 import socket
 import urllib.request
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
 import httpx
 import pytest
@@ -27,11 +27,7 @@ class TestCheckoutSignalValidCases:
         }
 
     def test_signal_checkout_intent_with_selected_index(self):
-        state = {
-            "trusted_snapshot": {
-                "results": [{"id": "offer_1"}, {"id": "offer_2"}]
-            }
-        }
+        state = {"trusted_snapshot": {"results": [{"id": "offer_1"}, {"id": "offer_2"}]}}
         result = signal_checkout_intent.func(selected_index=1, state=state)
         assert isinstance(result, str)
         data = json.loads(result)
@@ -49,9 +45,7 @@ class TestCheckoutSignalValidCases:
                 "results": [{"id": "offer_1"}, {"id": "offer_2"}, {"id": "offer_3"}]
             }
         }
-        result = signal_checkout_intent.func(
-            offer_index=1, selected_index=3, state=state
-        )
+        result = signal_checkout_intent.func(offer_index=1, selected_index=3, state=state)
         assert isinstance(result, str)
         data = json.loads(result)
         assert data["signal"]["offer_index"] == 3
@@ -59,11 +53,7 @@ class TestCheckoutSignalValidCases:
 
     def test_signal_checkout_intent_with_fallback_snapshot_key(self):
         # Falls back to state["snapshot"] if "trusted_snapshot" is absent
-        state = {
-            "snapshot": {
-                "results": [{"id": "offer_1"}]
-            }
-        }
+        state = {"snapshot": {"results": [{"id": "offer_1"}]}}
         result = signal_checkout_intent.func(offer_index=1, state=state)
         data = json.loads(result)
         assert data["signal"] == {
@@ -75,20 +65,12 @@ class TestCheckoutSignalValidCases:
 
 class TestCheckoutSignalOutOfBounds:
     def test_signal_checkout_intent_index_greater_than_results(self):
-        state = {
-            "trusted_snapshot": {
-                "results": [{"id": "offer_1"}, {"id": "offer_2"}]
-            }
-        }
+        state = {"trusted_snapshot": {"results": [{"id": "offer_1"}, {"id": "offer_2"}]}}
         result = signal_checkout_intent.func(offer_index=3, state=state)
         assert result == "Invalid offer index. Must be between 1 and 2."
 
     def test_signal_checkout_intent_large_index(self):
-        state = {
-            "trusted_snapshot": {
-                "results": [{"id": "offer_1"}]
-            }
-        }
+        state = {"trusted_snapshot": {"results": [{"id": "offer_1"}]}}
         result = signal_checkout_intent.func(offer_index=999, state=state)
         assert result == "Invalid offer index. Must be between 1 and 1."
 
@@ -96,41 +78,32 @@ class TestCheckoutSignalOutOfBounds:
 class TestCheckoutSignalInvalidIndices:
     @pytest.mark.parametrize("invalid_idx", [0, -1, -5, -100])
     def test_signal_checkout_intent_zero_or_negative_index(self, invalid_idx):
-        state = {
-            "trusted_snapshot": {
-                "results": [{"id": "offer_1"}, {"id": "offer_2"}]
-            }
-        }
+        state = {"trusted_snapshot": {"results": [{"id": "offer_1"}, {"id": "offer_2"}]}}
         result = signal_checkout_intent.func(offer_index=invalid_idx, state=state)
         assert result == "Invalid offer index. Must be a positive integer (1..N)."
 
-    @pytest.mark.parametrize("invalid_type", [
-        1.5,
-        "1",
-        "2",
-        True,
-        False,
-        None,
-        [],
-        {},
-        [1],
-        {"index": 1},
-    ])
+    @pytest.mark.parametrize(
+        "invalid_type",
+        [
+            1.5,
+            "1",
+            "2",
+            True,
+            False,
+            None,
+            [],
+            {},
+            [1],
+            {"index": 1},
+        ],
+    )
     def test_signal_checkout_intent_non_integer_types(self, invalid_type):
-        state = {
-            "trusted_snapshot": {
-                "results": [{"id": "offer_1"}, {"id": "offer_2"}]
-            }
-        }
+        state = {"trusted_snapshot": {"results": [{"id": "offer_1"}, {"id": "offer_2"}]}}
         result = signal_checkout_intent.func(offer_index=invalid_type, state=state)
         assert result == "Invalid offer index. Must be a positive integer (1..N)."
 
     def test_signal_checkout_intent_no_arguments(self):
-        state = {
-            "trusted_snapshot": {
-                "results": [{"id": "offer_1"}]
-            }
-        }
+        state = {"trusted_snapshot": {"results": [{"id": "offer_1"}]}}
         result = signal_checkout_intent.func(state=state)
         assert result == "Invalid offer index. Must be a positive integer (1..N)."
 
@@ -172,10 +145,18 @@ class TestCheckoutSignalMissingOrEmptySnapshot:
 class TestCheckoutSignalZeroIO:
     def test_zero_io_side_effects(self, monkeypatch):
         """Strictly assert no network, Redis, DB, or external API calls happen during tool execution."""
-        mock_httpx_send = MagicMock(side_effect=RuntimeError("httpx.Client.send must NOT be called"))
-        mock_async_send = AsyncMock(side_effect=RuntimeError("httpx.AsyncClient.send must NOT be called"))
-        mock_urllib_open = MagicMock(side_effect=RuntimeError("urllib.request.urlopen must NOT be called"))
-        mock_socket_connect = MagicMock(side_effect=RuntimeError("socket.connect must NOT be called"))
+        mock_httpx_send = MagicMock(
+            side_effect=RuntimeError("httpx.Client.send must NOT be called")
+        )
+        mock_async_send = AsyncMock(
+            side_effect=RuntimeError("httpx.AsyncClient.send must NOT be called")
+        )
+        mock_urllib_open = MagicMock(
+            side_effect=RuntimeError("urllib.request.urlopen must NOT be called")
+        )
+        mock_socket_connect = MagicMock(
+            side_effect=RuntimeError("socket.connect must NOT be called")
+        )
 
         monkeypatch.setattr(httpx.Client, "send", mock_httpx_send)
         monkeypatch.setattr(httpx.AsyncClient, "send", mock_async_send)
@@ -183,16 +164,13 @@ class TestCheckoutSignalZeroIO:
         monkeypatch.setattr(socket.socket, "connect", mock_socket_connect)
 
         import agent.infrastructure.redis as redis_mod
+
         mock_redis = MagicMock()
         mock_redis.get.side_effect = RuntimeError("Redis GET must NOT be called")
         mock_redis.set.side_effect = RuntimeError("Redis SET must NOT be called")
         monkeypatch.setattr(redis_mod, "_redis_client", mock_redis)
 
-        state = {
-            "trusted_snapshot": {
-                "results": [{"id": "offer_1"}, {"id": "offer_2"}]
-            }
-        }
+        state = {"trusted_snapshot": {"results": [{"id": "offer_1"}, {"id": "offer_2"}]}}
 
         # Invocation should execute purely in-memory
         result = signal_checkout_intent.func(offer_index=1, state=state)

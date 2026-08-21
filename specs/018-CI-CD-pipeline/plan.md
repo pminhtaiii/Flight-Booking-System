@@ -12,14 +12,14 @@
 
 ## Constitution Check
 
-| Principle | Result | Evidence |
-|---|---|---|
-| Flight-first architecture | PASS | CI validates the existing monorepo without product-scope change. |
-| Deterministic transaction boundary | PASS | Workflow cannot participate in booking/payment behavior. |
-| API budget discipline | PASS | Test doubles, non-production fixtures, and fail-closed network guards prevent provider use. |
-| Operational visibility | NOT AFFECTED | CI logs/duration evidence do not replace runtime telemetry. |
-| Incremental delivery | PASS | Stable check, routing, validation, hardening, and rollout are independently verifiable. |
-| Security | PASS WITH CONTROLS | Immutable action SHAs, least privilege, and non-persisted checkout credentials. |
+| Principle                          | Result             | Evidence                                                                                    |
+| ---------------------------------- | ------------------ | ------------------------------------------------------------------------------------------- |
+| Flight-first architecture          | PASS               | CI validates the existing monorepo without product-scope change.                            |
+| Deterministic transaction boundary | PASS               | Workflow cannot participate in booking/payment behavior.                                    |
+| API budget discipline              | PASS               | Test doubles, non-production fixtures, and fail-closed network guards prevent provider use. |
+| Operational visibility             | NOT AFFECTED       | CI logs/duration evidence do not replace runtime telemetry.                                 |
+| Incremental delivery               | PASS               | Stable check, routing, validation, hardening, and rollout are independently verifiable.     |
+| Security                           | PASS WITH CONTROLS | Immutable action SHAs, least privilege, and non-persisted checkout credentials.             |
 
 ## Workflow Design
 
@@ -33,16 +33,16 @@
 
 ### Routing matrix
 
-| Changed path | API | Web | Agent |
-|---|:---:|:---:|:---:|
-| `apps/api/**` | yes | no | no |
-| `apps/web/**` | no | yes | no |
-| `apps/agent/**` | no | no | yes |
-| `packages/shared/**` | yes | yes | yes |
-| `.github/workflows/ci.yml`, `.gitattributes`, `tests/ci/**`, `scripts/ci/**` | yes | yes | yes |
-| root Node/package/TS/ESLint/npm inputs | yes | yes | no |
-| root `pyproject.toml`, `uv.lock` | no | no | yes |
-| docs/spec-only paths | no | no | no |
+| Changed path                                                                 | API | Web | Agent |
+| ---------------------------------------------------------------------------- | :-: | :-: | :---: |
+| `apps/api/**`                                                                | yes | no  |  no   |
+| `apps/web/**`                                                                | no  | yes |  no   |
+| `apps/agent/**`                                                              | no  | no  |  yes  |
+| `packages/shared/**`                                                         | yes | yes |  yes  |
+| `.github/workflows/ci.yml`, `.gitattributes`, `tests/ci/**`, `scripts/ci/**` | yes | yes |  yes  |
+| root Node/package/TS/ESLint/npm inputs                                       | yes | yes |  no   |
+| root `pyproject.toml`, `uv.lock`                                             | no  | no  |  yes  |
+| docs/spec-only paths                                                         | no  | no  |  no   |
 
 Detection exposes exact string booleans (`true`/`false`) for `api`, `web`, and `agent`; all conditions compare explicitly to `'true'`.
 
@@ -56,17 +56,17 @@ Detection exposes exact string booleans (`true`/`false`) for `api`, `web`, and `
 
 ### Jobs
 
-| Job | Condition / needs | Exact responsibility |
-|---|---|---|
-| `detect-changes` | always | contract suite; checksum-verified actionlint; full-SHA paths filter. |
-| `api-gate` | API true | API/shared ESLint zero warnings; shared build; Prisma generate; API `tsc --noEmit`. |
-| `api-unit-tests` | API gate success | fresh shared build/Prisma generation; Node guard; Jest `--runInBand`. |
-| `api-e2e-tests` | API gate success | healthy Postgres/Redis; complete fixture env; guard; shared/Prisma/migrate deploy/E2E. |
-| `web-gate` | Web true | shared build; lint; route check; typecheck. |
-| `web-build` | Web gate success | fresh build, NextAuth/API-3001/Agent-3002 fixtures, Node guard. |
-| `agent-gate` | Agent true | locked root sync; Ruff check and format check. |
-| `agent-tests` | Agent gate success | healthy Redis; Python guard; non-Redis pytest then strict non-empty Redis group. |
-| `ci-status` | all jobs; `always()` | Node 20 and shared evaluator with fixed outputs/results. |
+| Job              | Condition / needs    | Exact responsibility                                                                   |
+| ---------------- | -------------------- | -------------------------------------------------------------------------------------- |
+| `detect-changes` | always               | contract suite; checksum-verified actionlint; full-SHA paths filter.                   |
+| `api-gate`       | API true             | API/shared ESLint zero warnings; shared build; Prisma generate; API `tsc --noEmit`.    |
+| `api-unit-tests` | API gate success     | fresh shared build/Prisma generation; Node guard; Jest `--runInBand`.                  |
+| `api-e2e-tests`  | API gate success     | healthy Postgres/Redis; complete fixture env; guard; shared/Prisma/migrate deploy/E2E. |
+| `web-gate`       | Web true             | shared build; lint; route check; typecheck.                                            |
+| `web-build`      | Web gate success     | fresh build, NextAuth/API-3001/Agent-3002 fixtures, Node guard.                        |
+| `agent-gate`     | Agent true           | locked root sync; Ruff check and format check.                                         |
+| `agent-tests`    | Agent gate success   | healthy Redis; Python guard; non-Redis pytest then strict non-empty Redis group.       |
+| `ci-status`      | all jobs; `always()` | Node 20 and shared evaluator with fixed outputs/results.                               |
 
 ### Summary contract
 

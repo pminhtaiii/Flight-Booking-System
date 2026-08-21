@@ -1,23 +1,28 @@
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timedelta, timezone
+
 import redis.asyncio as redis
+
 
 class ChatBudgetException(Exception):
     pass
+
 
 class BudgetExceededException(ChatBudgetException):
     def __init__(self, reason: str):
         self.reason = reason
         super().__init__(f"Budget exceeded: {reason}")
 
+
 class RedisUnavailableException(ChatBudgetException):
     def __init__(self, message: str):
         super().__init__(f"Redis unavailable: {message}")
+
 
 class ChatBudgetRepository:
     """
     Repository for enforcing daily and burst rate limits atomically using a single Lua script in Redis.
     """
-    
+
     LUA_SCRIPT = """
     local daily_key = KEYS[1]
     local burst_key = KEYS[2]
@@ -60,36 +65,47 @@ class ChatBudgetRepository:
         next_midnight = tomorrow.replace(hour=0, minute=0, second=0, microsecond=0)
         return int((next_midnight - now).total_seconds())
 
-    async def admit_request(self, user_id: str, burst_window_id: str, daily_limit: int, burst_limit: int, burst_ttl: int = 60) -> bool:
+    async def admit_request(
+        self,
+        user_id: str,
+        burst_window_id: str,
+        daily_limit: int,
+        burst_limit: int,
+        burst_ttl: int = 60,
+    ) -> bool:
         """
-        Atomically increment burst and daily budgets. 
+        Atomically increment burst and daily budgets.
         Returns True if admitted. Raises BudgetExceededException if rejected.
         Raises RedisUnavailableException if Redis fails.
         """
-        daily_date = datetime.now(timezone.utc).strftime('%Y-%m-%d')
+        daily_date = datetime.now(timezone.utc).strftime("%Y-%m-%d")
         daily_key = f"chat:budget:{user_id}:{daily_date}"
         burst_key = f"chat:burst:{user_id}:{burst_window_id}"
-        
+
         daily_ttl = self._get_daily_ttl()
-        
+
         try:
             result = await self.redis.eval(
                 self.LUA_SCRIPT,
                 2,
-                daily_key, burst_key,
-                daily_limit, burst_limit, daily_ttl, burst_ttl
+                daily_key,
+                burst_key,
+                daily_limit,
+                burst_limit,
+                daily_ttl,
+                burst_ttl,
             )
-            
+
             admitted = result[0]
             reason = result[1]
-            
+
             if not admitted:
                 # Need to decode from bytes if redis client doesn't decode automatically
                 if isinstance(reason, bytes):
-                    reason = reason.decode('utf-8')
+                    reason = reason.decode("utf-8")
                 raise BudgetExceededException(reason)
-                
+
             return True
-            
+
         except redis.RedisError as e:
             raise RedisUnavailableException(str(e))

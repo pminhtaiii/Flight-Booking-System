@@ -1,11 +1,10 @@
+from typing import Any, Dict, Sequence, Union
+
 import jwt
-from typing import Dict, Any, Union, Sequence
+
 
 def decode_and_verify_jwt(
-    token: str,
-    secret: Union[str, Sequence[str]],
-    issuer: str,
-    audience: str
+    token: str, secret: Union[str, Sequence[str]], issuer: str, audience: str
 ) -> Dict[str, Any]:
     """
     Decode and verify a JWT token using the provided secret or candidate secrets, issuer, and audience.
@@ -43,4 +42,3 @@ def decode_and_verify_jwt(
             continue
 
     raise last_error
-

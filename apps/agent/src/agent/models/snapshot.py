@@ -1,6 +1,8 @@
-from pydantic import BaseModel, ConfigDict, Field, model_validator
-from typing import List, Literal
 from datetime import datetime
+from typing import List, Literal
+
+from pydantic import BaseModel, ConfigDict, Field, model_validator
+
 
 class TrustedSearchResult(BaseModel):
     offerIndex: int = Field(gt=0)
@@ -15,6 +17,7 @@ class TrustedSearchResult(BaseModel):
     currency: str
 
     model_config = ConfigDict(extra="forbid")
+
 
 class TrustedSearchSnapshot(BaseModel):
     schemaVersion: Literal[1]

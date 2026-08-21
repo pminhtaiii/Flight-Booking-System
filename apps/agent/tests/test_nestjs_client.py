@@ -1,11 +1,13 @@
-import pytest
-import httpx
-import jwt
 import base64
 import json
 from unittest.mock import AsyncMock, patch
-from agent.tools.nestjs_client import NestJSClient
+
+import httpx
+import jwt
+import pytest
+
 from agent.config import get_settings
+from agent.tools.nestjs_client import NestJSClient
 
 _CHECK_USER_ACCESS = NestJSClient.check_user_access
 
@@ -66,7 +68,9 @@ def mock_time():
 
 
 def test_set_fencing_token():
-    client = NestJSClient(base_url="http://localhost:3001/api", token="test-token", fencing_token=42)
+    client = NestJSClient(
+        base_url="http://localhost:3001/api", token="test-token", fencing_token=42
+    )
     assert client.fencing_token == 42
     assert client.headers["X-Fencing-Token"] == "42"
     assert client.headers["Authorization"] == "Bearer test-token"
@@ -85,7 +89,9 @@ async def test_create_session():
     client = NestJSClient(base_url="http://localhost:3001/api", token="test-token")
 
     req = httpx.Request("POST", "http://localhost:3001/api/agent-gateway/chat/sessions")
-    mock_response = httpx.Response(201, json={"id": "session-123", "title": "New Session"}, request=req)
+    mock_response = httpx.Response(
+        201, json={"id": "session-123", "title": "New Session"}, request=req
+    )
 
     with patch("httpx.AsyncClient.post", new_callable=AsyncMock) as mock_post:
         mock_post.return_value = mock_response
@@ -104,23 +110,24 @@ async def test_create_session():
 @pytest.mark.asyncio
 async def test_create_message():
     client = NestJSClient(base_url="http://localhost:3001/api", token="test-token")
-    req = httpx.Request("POST", "http://localhost:3001/api/agent-gateway/chat/sessions/session-123/messages")
+    req = httpx.Request(
+        "POST", "http://localhost:3001/api/agent-gateway/chat/sessions/session-123/messages"
+    )
     mock_response = httpx.Response(201, json={"id": "msg-123", "content": "hello"}, request=req)
 
     with patch("httpx.AsyncClient.post", new_callable=AsyncMock) as mock_post:
         mock_post.return_value = mock_response
 
         result = await client.create_message(
-            session_id="session-123",
-            sender="USER",
-            message_type="STANDARD",
-            content="hello"
+            session_id="session-123", sender="USER", message_type="STANDARD", content="hello"
         )
 
         assert result == {"id": "msg-123", "content": "hello"}
         mock_post.assert_called_once()
         args, kwargs = mock_post.call_args
-        assert args[0] == "http://localhost:3001/api/agent-gateway/chat/sessions/session-123/messages"
+        assert (
+            args[0] == "http://localhost:3001/api/agent-gateway/chat/sessions/session-123/messages"
+        )
         assert kwargs["json"] == {"sender": "USER", "type": "STANDARD", "content": "hello"}
         assert "X-Agent-API-Key" in kwargs["headers"]
         assert "X-User-Claim" in kwargs["headers"]
@@ -129,21 +136,20 @@ async def test_create_message():
 @pytest.mark.asyncio
 async def test_create_message_batch():
     client = NestJSClient(base_url="http://localhost:3001/api", token="test-token")
-    req = httpx.Request("POST", "http://localhost:3001/api/agent-gateway/chat/sessions/session-123/turns")
+    req = httpx.Request(
+        "POST", "http://localhost:3001/api/agent-gateway/chat/sessions/session-123/turns"
+    )
     mock_response = httpx.Response(201, json={"id": "msg-123"}, request=req)
 
     messages = [
         {"sender": "USER", "type": "STANDARD", "content": "hello"},
-        {"sender": "AGENT", "type": "STANDARD", "content": "hi"}
+        {"sender": "AGENT", "type": "STANDARD", "content": "hi"},
     ]
 
     with patch("httpx.AsyncClient.post", new_callable=AsyncMock) as mock_post:
         mock_post.return_value = mock_response
 
-        result = await client.create_message_batch(
-            session_id="session-123",
-            messages=messages
-        )
+        result = await client.create_message_batch(session_id="session-123", messages=messages)
 
         assert result == {"id": "msg-123"}
         assert mock_post.call_count == 1
@@ -160,7 +166,9 @@ async def test_create_message_batch():
 @pytest.mark.asyncio
 async def test_get_memory():
     client = NestJSClient(base_url="http://localhost:3001/api", token="test-token")
-    req = httpx.Request("GET", "http://localhost:3001/api/agent-gateway/chat/sessions/session-123/memory")
+    req = httpx.Request(
+        "GET", "http://localhost:3001/api/agent-gateway/chat/sessions/session-123/memory"
+    )
     mock_response = httpx.Response(200, json={"summary": None, "recentMessages": []}, request=req)
 
     with patch("httpx.AsyncClient.get", new_callable=AsyncMock) as mock_get:
@@ -180,13 +188,17 @@ async def test_get_memory():
 @pytest.mark.asyncio
 async def test_get_memory_unsummarized_only():
     client = NestJSClient(base_url="http://localhost:3001/api", token="test-token")
-    req = httpx.Request("GET", "http://localhost:3001/api/agent-gateway/chat/sessions/session-123/memory")
+    req = httpx.Request(
+        "GET", "http://localhost:3001/api/agent-gateway/chat/sessions/session-123/memory"
+    )
     mock_response = httpx.Response(200, json={"summary": None, "recentMessages": []}, request=req)
 
     with patch("httpx.AsyncClient.get", new_callable=AsyncMock) as mock_get:
         mock_get.return_value = mock_response
 
-        result = await client.get_memory(session_id="session-123", recent_count=20, unsummarized_only=True)
+        result = await client.get_memory(
+            session_id="session-123", recent_count=20, unsummarized_only=True
+        )
 
         assert result == {"summary": None, "recentMessages": []}
         mock_get.assert_called_once()
@@ -212,8 +224,8 @@ async def test_get_gateway_headers_valid_signature():
     payload_b64 = claim.split(".")[0]
     missing_padding = len(payload_b64) % 4
     if missing_padding:
-        payload_b64 += '=' * (4 - missing_padding)
-    payload = json.loads(base64.urlsafe_b64decode(payload_b64).decode('utf-8'))
+        payload_b64 += "=" * (4 - missing_padding)
+    payload = json.loads(base64.urlsafe_b64decode(payload_b64).decode("utf-8"))
     assert payload["userId"] == "user-123"
 
 
@@ -261,12 +273,16 @@ async def test_create_handoff_uses_the_nestjs_dto_contract():
     )
     client = NestJSClient(base_url="http://localhost:3001/api", token=token)
     request = httpx.Request("POST", "http://localhost:3001/api/chat-handoff")
-    response = httpx.Response(201, json={"token": "opaque", "expiresAt": "2026-08-09T00:00:00Z"}, request=request)
+    response = httpx.Response(
+        201, json={"token": "opaque", "expiresAt": "2026-08-09T00:00:00Z"}, request=request
+    )
 
     with patch("httpx.AsyncClient.post", new_callable=AsyncMock) as mock_post:
         mock_post.return_value = response
 
-        result = await client.create_handoff("signed-attestation", 2, fingerprint="must-not-cross-boundary")
+        result = await client.create_handoff(
+            "signed-attestation", 2, fingerprint="must-not-cross-boundary"
+        )
 
     _, kwargs = mock_post.call_args
     assert kwargs["json"] == {
@@ -298,14 +314,17 @@ async def test_create_handoff_token_sends_exact_payload_and_omits_forbidden_fiel
     request = httpx.Request("POST", "http://localhost:3001/api/chat-handoff")
     response = httpx.Response(
         201,
-        json={"handoffToken": "ht_xyz123", "expiresAt": "2026-08-15T12:00:00Z", "display": {"offer": "VN123"}},
+        json={
+            "handoffToken": "ht_xyz123",
+            "expiresAt": "2026-08-15T12:00:00Z",
+            "display": {"offer": "VN123"},
+        },
         request=request,
     )
 
     with patch("httpx.AsyncClient.post", new_callable=AsyncMock) as mock_post:
         mock_post.return_value = response
-
-        result = await client.create_handoff_token(
+        await client.create_handoff_token(
             attestation="attestation-hash-abc",
             selected_offer_index=0,
             fingerprint="fingerprint-must-be-omitted",
@@ -358,7 +377,7 @@ async def test_create_handoff_token_propagates_trace_and_correlation_headers():
     with patch("httpx.AsyncClient.post", new_callable=AsyncMock) as mock_post:
         mock_post.return_value = response
 
-        result = await client.create_handoff_token(
+        await client.create_handoff_token(
             attestation="attestation-hash",
             selected_offer_index=1,
             trace_id=trace_id,
@@ -443,11 +462,12 @@ async def test_create_handoff_token_returns_handoff_token_expires_at_and_display
     }
 
 
-
 @pytest.mark.asyncio
 async def test_get_gateway_headers_invalid_signature_fallback():
     # Sign with a different secret (>= 32 bytes to avoid warning)
-    token = jwt.encode({"sub": "user-456"}, "wrong-secret-key-that-is-at-least-32-bytes-long!", algorithm="HS256")
+    token = jwt.encode(
+        {"sub": "user-456"}, "wrong-secret-key-that-is-at-least-32-bytes-long!", algorithm="HS256"
+    )
     client = NestJSClient(base_url="http://localhost:3001/api", token=token)
 
     with pytest.raises(ValueError) as excinfo:
@@ -479,10 +499,7 @@ async def test_get_gateway_flights_search():
         mock_get.return_value = mock_response
 
         result = await client.get_gateway_flights_search(
-            origin="SGN",
-            destination="HAN",
-            date="2026-08-01",
-            passengers=2
+            origin="SGN", destination="HAN", date="2026-08-01", passengers=2
         )
 
         assert result == {"flights": []}
@@ -491,13 +508,8 @@ async def test_get_gateway_flights_search():
         headers = client._get_gateway_headers()
         mock_get.assert_called_once_with(
             "http://localhost:3001/api/agent-gateway/flights/search",
-            params={
-                "origin": "SGN",
-                "destination": "HAN",
-                "date": "2026-08-01",
-                "passengers": 2
-            },
-            headers=headers
+            params={"origin": "SGN", "destination": "HAN", "date": "2026-08-01", "passengers": 2},
+            headers=headers,
         )
 
 
@@ -518,8 +530,7 @@ async def test_get_gateway_user_preferences():
 
         headers = client._get_gateway_headers()
         mock_get.assert_called_once_with(
-            "http://localhost:3001/api/agent-gateway/users/preferences",
-            headers=headers
+            "http://localhost:3001/api/agent-gateway/users/preferences", headers=headers
         )
 
 
@@ -638,7 +649,11 @@ async def test_get_gateway_booking_detail_not_found():
         mock_get.return_value = mock_response
 
         result = await client.get_gateway_booking_detail("bkref_99999")
-        assert result.get("statusCode") == 404 or result.get("error") == "BOOKING_REFERENCE_NOT_FOUND" or "not found" in str(result).lower()
+        assert (
+            result.get("statusCode") == 404
+            or result.get("error") == "BOOKING_REFERENCE_NOT_FOUND"
+            or "not found" in str(result).lower()
+        )
 
 
 @pytest.mark.asyncio
@@ -662,21 +677,23 @@ async def test_get_gateway_flights_search_400_error():
     req = httpx.Request("GET", "http://localhost:3001/api/agent-gateway/flights/search")
     mock_response = httpx.Response(
         400,
-        json={"statusCode": 400, "message": "I can currently only search economy class for adult passengers..."},
-        request=req
+        json={
+            "statusCode": 400,
+            "message": "I can currently only search economy class for adult passengers...",
+        },
+        request=req,
     )
 
     with patch("httpx.AsyncClient.get", new_callable=AsyncMock) as mock_get:
         mock_get.return_value = mock_response
 
         result = await client.get_gateway_flights_search(
-            origin="SGN",
-            destination="HAN",
-            date="2026-08-01",
-            passengers=1
+            origin="SGN", destination="HAN", date="2026-08-01", passengers=1
         )
 
-        assert result == {"error": "I can currently only search economy class for adult passengers..."}
+        assert result == {
+            "error": "I can currently only search economy class for adult passengers..."
+        }
 
 
 @pytest.mark.asyncio
@@ -692,9 +709,9 @@ async def test_check_booking_readiness_success():
             "scope": "DOMESTIC",
             "ready": False,
             "passengers": [],
-            "nextAction": "COMPLETE_PROFILE"
+            "nextAction": "COMPLETE_PROFILE",
         },
-        request=req
+        request=req,
     )
 
     with patch("httpx.AsyncClient.post", new_callable=AsyncMock) as mock_post:
@@ -702,7 +719,7 @@ async def test_check_booking_readiness_success():
 
         result = await client.check_booking_readiness(
             flight_offer_id="offer-123",
-            passengers=[{"passengerType": "ADULT", "passengerOrdinal": 1, "sourceType": "inline"}]
+            passengers=[{"passengerType": "ADULT", "passengerOrdinal": 1, "sourceType": "inline"}],
         )
 
         assert result.get("ready") is False
@@ -713,9 +730,11 @@ async def test_check_booking_readiness_success():
             "http://localhost:3001/api/agent-gateway/bookings/readiness",
             json={
                 "flightOfferId": "offer-123",
-                "passengers": [{"passengerType": "ADULT", "passengerOrdinal": 1, "sourceType": "inline"}]
+                "passengers": [
+                    {"passengerType": "ADULT", "passengerOrdinal": 1, "sourceType": "inline"}
+                ],
             },
-            headers=headers
+            headers=headers,
         )
 
 
@@ -728,12 +747,14 @@ async def test_check_booking_readiness_rejects_pii():
     with pytest.raises(ValueError, match="invalid keys"):
         await client.check_booking_readiness(
             flight_offer_id="offer-123",
-            passengers=[{
-                "passengerType": "ADULT",
-                "passengerOrdinal": 1,
-                "sourceType": "inline",
-                "givenName": "John"  # Not allowed
-            }]
+            passengers=[
+                {
+                    "passengerType": "ADULT",
+                    "passengerOrdinal": 1,
+                    "sourceType": "inline",
+                    "givenName": "John",  # Not allowed
+                }
+            ],
         )
 
 
@@ -751,16 +772,16 @@ async def test_check_booking_readiness_unexpected_keys():
             "ready": True,
             "passengers": [],
             "nextAction": "CONTINUE_CHECKOUT",
-            "internalProfileId": "secret-123" # Unexpected key
+            "internalProfileId": "secret-123",  # Unexpected key
         },
-        request=req
+        request=req,
     )
 
     with patch("httpx.AsyncClient.post", new_callable=AsyncMock) as mock_post:
         mock_post.return_value = mock_response
         result = await client.check_booking_readiness(
             flight_offer_id="offer-123",
-            passengers=[{"passengerType": "ADULT", "passengerOrdinal": 1, "sourceType": "inline"}]
+            passengers=[{"passengerType": "ADULT", "passengerOrdinal": 1, "sourceType": "inline"}],
         )
         assert "error" in result
         assert "malformed" in result["error"]
@@ -802,12 +823,14 @@ async def test_check_booking_readiness_rejects_nested_value_bearing_response():
             "scope": "DOMESTIC",
             "ready": False,
             "nextAction": "COMPLETE_PROFILE",
-            "passengers": [{
-                "passengerType": "ADULT",
-                "passengerOrdinal": 1,
-                "sections": [],
-                "givenName": "Ada",
-            }],
+            "passengers": [
+                {
+                    "passengerType": "ADULT",
+                    "passengerOrdinal": 1,
+                    "sections": [],
+                    "givenName": "Ada",
+                }
+            ],
         },
         request=req,
     )

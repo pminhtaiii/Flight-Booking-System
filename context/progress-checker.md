@@ -6,14 +6,35 @@ Update this file after every completed feature. Any AI agent reading this should
 
 ### Current Status
 
-**Feature:** Traveler Profile & Booking Readiness (Feature 16)
-**Last completed:** Task T077 / Quickstart Validation Sequence, Performance Benchmark Verification & Signed-Off Release Gate for Feature 16 (2026-08-19).
+**Feature:** Pull-Request Continuous Integration Pipeline (Feature 18)
+**Last completed:** Task T041 / CI/CD Verification, Multi-Workspace Test Suite Sign-off & Release Gate for Feature 18 (2026-08-21).
 **In progress:** None.
-**Next:** Feature 17 / Chatbot Backend Infrastructure or next scheduled milestone.
+**Next:** Production operations or next scheduled milestone.
 
 ---
 
 ## Progress by Feature
+
+### [x] Feature: Pull-Request Continuous Integration Pipeline (Feature 18)
+
+- [x] Phase 1–8 / Pull-Request CI Pipeline Full Implementation & Verification (Tasks T001–T041) (2026-08-21):
+  - **Single Dependency-Ordered Workflow (`.github/workflows/ci.yml`)**:
+    - Triggered strictly on `pull_request` targeting `development` with concurrency key `ci-${{ github.event.pull_request.number || github.ref }}` and `cancel-in-progress: true`.
+    - Minimal permissions (`contents: read`, with `pull-requests: read` only for `detect-changes`), disabled checkout credential persistence (`persist-credentials: false`), and explicit Ubuntu job timeouts (10/20/30m).
+    - Immutable 40-character commit SHAs for all actions (checkout v7.0.1, setup-node v7.0.0, setup-uv v9.0.0, action-setup v6.0.10, paths-filter v4.0.1).
+    - Line ending determinism via `.gitattributes` LF policy and pre-checkout `git config --global core.autocrlf input`.
+  - **Deterministic Change-Aware Routing & Evaluator (`scripts/ci/evaluate-ci-status.mjs` & `tests/ci/ci-workflow.contract.test.mjs`)**:
+    - Path filters map `apps/api/**`, `apps/web/**`, `apps/agent/**` to corresponding chains; `packages/shared/**`, workflow, contract, and scripts trigger all chains; docs/specs trigger none.
+    - Pure evaluator `evaluateCiStatus` with JSON CLI enforces truth-table matrix, rejecting any failure, cancellation, false-green skip, or missing detection.
+    - Contract test harness passes 10/10 test scenarios in < 3s.
+  - **Loopback-Only Network Isolation Guards (`tests/ci/node-network-guard.cjs` & `tests/ci/python/sitecustomize.py`)**:
+    - Zero live provider calls permitted during CI runs. Intercepts Node `net`/`tls`/`http`/`https` and Python `socket`/`urllib3`/`requests`/`httpx`, allowing local services (`127.0.0.1`, `::1`, `localhost`, Unix sockets) and failing all public destinations.
+  - **Multi-Workspace Gate & Test Convergence**:
+    - `apps/api`: ESLint baseline converged (0 errors, 0 warnings), Prisma generate, TypeScript typecheck (0 errors), 74/74 unit test suites (745/745 tests) pass with Node network guard.
+    - `apps/web`: ESLint (0 errors, 0 warnings), route structure validation, TypeScript typecheck (0 errors), production build compiles 20 static routes cleanly with Node network guard.
+    - `apps/agent`: Canonical root `uv.lock` dependency sync, Ruff lint (0 errors) and Ruff formatting (108 files formatted), 355/355 non-Redis pytest unit tests pass, and 9/9 strict Redis integration tests pass with Python network guard.
+  - **Operations Runbook & Branch Protection (`specs/018-CI-CD-pipeline/quickstart.md`)**:
+    - Documented single branch protection requirement (`ci-status`), warm-cache duration median (~5m 48s < 10m SLA), and safe 3-step rollback procedure.
 
 ### [x] Feature: Traveler Profile & Booking Readiness (Feature 16)
 

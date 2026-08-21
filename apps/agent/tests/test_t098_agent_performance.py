@@ -27,7 +27,6 @@ from agent.repositories.chat_budget_repository import (
     ChatBudgetRepository,
 )
 
-
 REQUEST_COUNT = 100
 WARM_REQUEST_COUNT = 5
 ROUTER_OVERHEAD_P95_LIMIT_MS = 100.0
@@ -63,9 +62,7 @@ def _emit_aggregate(
                     "router_graph_entry": (
                         round(stream_p95_ms, 3) if stream_p95_ms is not None else None
                     ),
-                    "lua_admission": (
-                        round(lua_p95_ms, 3) if lua_p95_ms is not None else None
-                    ),
+                    "lua_admission": (round(lua_p95_ms, 3) if lua_p95_ms is not None else None),
                 },
                 "failures": failures,
             },
@@ -315,4 +312,3 @@ async def test_t098_lua_admission_latency_benchmark(t098_redis_client):
             quota_counts=None,
             failures=failures,
         )
-

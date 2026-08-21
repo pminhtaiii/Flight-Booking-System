@@ -1,17 +1,23 @@
-import pytest
-import httpx
 from unittest.mock import AsyncMock, MagicMock
+
+import httpx
+import pytest
 from langchain_core.runnables import RunnableConfig
 
 from agent.tools.base import get_nestjs_client
-from agent.tools.search_flights import search_flights
-from agent.tools.get_preferences import get_user_preferences
-from agent.tools.booking_summaries import list_user_booking_summaries
 from agent.tools.booking_detail import get_booking_detail
+from agent.tools.booking_summaries import list_user_booking_summaries
+from agent.tools.check_booking_readiness import check_booking_readiness
+from agent.tools.get_preferences import get_user_preferences
 from agent.tools.registry import (
-    get_tools, get_tool_by_name, requires_confirmation,
-    get_general_tools, get_travel_tools, get_checkout_tools
+    get_checkout_tools,
+    get_general_tools,
+    get_tool_by_name,
+    get_tools,
+    get_travel_tools,
+    requires_confirmation,
 )
+from agent.tools.search_flights import search_flights
 
 
 @pytest.fixture
@@ -27,14 +33,16 @@ def mock_client():
 
 @pytest.fixture
 def run_config(mock_client):
-    return RunnableConfig(configurable={
-        "nestjs_client": mock_client,
-        "thread_id": "test-session",
-        "user_id": "test-user",
-        "chat_budget_repository": MagicMock(),
-        "session_lock_repository": MagicMock(),
-        "trusted_snapshot_repository": AsyncMock()
-    })
+    return RunnableConfig(
+        configurable={
+            "nestjs_client": mock_client,
+            "thread_id": "test-session",
+            "user_id": "test-user",
+            "chat_budget_repository": MagicMock(),
+            "session_lock_repository": MagicMock(),
+            "trusted_snapshot_repository": AsyncMock(),
+        }
+    )
 
 
 def test_base_get_nestjs_client(mock_client, run_config):
@@ -47,7 +55,9 @@ def test_base_get_nestjs_client(mock_client, run_config):
     with pytest.raises(ValueError, match="RunnableConfig is missing 'configurable' key."):
         get_nestjs_client(RunnableConfig())
 
-    with pytest.raises(ValueError, match="NestJSClient not found in RunnableConfig's 'configurable' key."):
+    with pytest.raises(
+        ValueError, match="NestJSClient not found in RunnableConfig's 'configurable' key."
+    ):
         get_nestjs_client(RunnableConfig(configurable={}))
 
 
@@ -55,8 +65,13 @@ def test_base_get_nestjs_client(mock_client, run_config):
 def mock_repo(monkeypatch):
     mock = AsyncMock()
     mock.get_snapshot.return_value = None
-    monkeypatch.setattr("agent.tools.search_flights.TrustedSnapshotRepository", lambda *args, **kwargs: mock)
-    monkeypatch.setattr("agent.tools.search_flights.get_redis_client", lambda *args, **kwargs: MagicMock())
+    monkeypatch.setattr(
+        "agent.tools.search_flights.TrustedSnapshotRepository", lambda *args, **kwargs: mock
+    )
+    monkeypatch.setattr(
+        "agent.tools.search_flights.get_redis_client", lambda *args, **kwargs: MagicMock()
+    )
+
 
 @pytest.mark.asyncio
 async def test_search_flights_success(mock_client, run_config):
@@ -79,14 +94,14 @@ async def test_search_flights_success(mock_client, run_config):
                 "fareClass": "economy",
                 "baggageAllowance": "23kg checked",
                 "flightOfferId": "offer_123",
-                "duffelOfferId": "duffel_456"
+                "duffelOfferId": "duffel_456",
             }
-        ]
+        ],
     }
 
     result = await search_flights.ainvoke(
         {"origin": "HAN", "destination": "NRT", "date": "2026-07-15", "passengers": 1},
-        config=run_config
+        config=run_config,
     )
 
     expected = (
@@ -105,8 +120,7 @@ async def test_search_flights_empty(mock_client, run_config):
     mock_client.post_gateway_flights_search_v2.return_value = {"results": []}
 
     result = await search_flights.ainvoke(
-        {"origin": "HAN", "destination": "NRT", "date": "2026-07-15"},
-        config=run_config
+        {"origin": "HAN", "destination": "NRT", "date": "2026-07-15"}, config=run_config
     )
 
     assert result == "Found 0 flights from HAN to NRT on 2026-07-15."
@@ -117,11 +131,13 @@ async def test_search_flights_error(mock_client, run_config):
     mock_client.post_gateway_flights_search_v2.side_effect = Exception("Amadeus service error")
 
     result = await search_flights.ainvoke(
-        {"origin": "HAN", "destination": "NRT", "date": "2026-07-15"},
-        config=run_config
+        {"origin": "HAN", "destination": "NRT", "date": "2026-07-15"}, config=run_config
     )
 
-    assert result == "I couldn't search for flights right now. The flight search service is temporarily unavailable. Please try again in a moment."
+    assert (
+        result
+        == "I couldn't search for flights right now. The flight search service is temporarily unavailable. Please try again in a moment."
+    )
 
 
 @pytest.mark.asyncio
@@ -131,12 +147,13 @@ async def test_search_flights_honest_degradation_error(mock_client, run_config):
     }
 
     result = await search_flights.ainvoke(
-        {"origin": "HAN", "destination": "NRT", "date": "2026-07-15"},
-        config=run_config
+        {"origin": "HAN", "destination": "NRT", "date": "2026-07-15"}, config=run_config
     )
 
-    assert result == "I can currently only search economy class for adult passengers. For other cabin classes or passenger types, please use the search page."
-
+    assert (
+        result
+        == "I can currently only search economy class for adult passengers. For other cabin classes or passenger types, please use the search page."
+    )
 
 
 @pytest.mark.asyncio
@@ -146,7 +163,7 @@ async def test_get_user_preferences_success(mock_client, run_config):
         "classPreference": "business",
         "preferredAirlines": ["VN", "NH"],
         "blacklistedAirlines": [],
-        "dietaryNeeds": "vegetarian"
+        "dietaryNeeds": "vegetarian",
     }
 
     result = await get_user_preferences.ainvoke({}, config=run_config)
@@ -165,11 +182,18 @@ async def test_get_user_preferences_success(mock_client, run_config):
 @pytest.mark.asyncio
 async def test_get_user_preferences_profile_not_found(mock_client, run_config):
     req = httpx.Request("GET", "http://localhost:3001/api/agent-gateway/users/preferences")
-    resp = httpx.Response(404, json={"message": "No profile", "code": "PROFILE_NOT_FOUND"}, request=req)
-    mock_client.get_gateway_user_preferences.side_effect = httpx.HTTPStatusError("Not Found", request=req, response=resp)
+    resp = httpx.Response(
+        404, json={"message": "No profile", "code": "PROFILE_NOT_FOUND"}, request=req
+    )
+    mock_client.get_gateway_user_preferences.side_effect = httpx.HTTPStatusError(
+        "Not Found", request=req, response=resp
+    )
 
     result = await get_user_preferences.ainvoke({}, config=run_config)
-    assert result == "You don't have any travel preferences saved yet. You can set them up in your profile settings."
+    assert (
+        result
+        == "You don't have any travel preferences saved yet. You can set them up in your profile settings."
+    )
 
 
 @pytest.mark.asyncio
@@ -222,6 +246,7 @@ async def test_list_user_booking_summaries_error(mock_client, run_config):
     result = await list_user_booking_summaries.ainvoke({}, config=run_config)
     assert "failed" in result.lower() or "error" in result.lower() or "couldn't" in result.lower()
 
+
 @pytest.mark.asyncio
 async def test_get_booking_detail_success(mock_client, run_config):
     mock_client.get_gateway_booking_detail.return_value = {
@@ -237,7 +262,7 @@ async def test_get_booking_detail_success(mock_client, run_config):
         "flightNumber": "VN310",
         "baggageAllowance": "23kg checked",
         "refundable": False,
-        "changeable": False
+        "changeable": False,
     }
 
     result = await get_booking_detail.ainvoke({"booking_reference": "bkref_123"}, config=run_config)
@@ -271,6 +296,7 @@ def test_registry_inventories():
     tool_names = [t.name for t in checkout]
     assert "signal_checkout_intent" in tool_names
 
+
 def test_tool_by_name():
     t1 = get_tool_by_name("search_flights")
     assert t1 == search_flights
@@ -290,45 +316,55 @@ def test_tool_by_name():
 
     assert not requires_confirmation("non_existent")
 
-from agent.tools.check_booking_readiness import check_booking_readiness
 
 @pytest.fixture
 def mock_client_with_readiness(mock_client):
     mock_client.check_booking_readiness = AsyncMock()
     return mock_client
 
+
 @pytest.fixture
 def run_config_with_readiness(mock_client_with_readiness):
     return RunnableConfig(configurable={"nestjs_client": mock_client_with_readiness})
 
+
 @pytest.mark.asyncio
-async def test_check_booking_readiness_tool_success(mock_client_with_readiness, run_config_with_readiness):
+async def test_check_booking_readiness_tool_success(
+    mock_client_with_readiness, run_config_with_readiness
+):
     mock_client_with_readiness.check_booking_readiness.return_value = {
         "ready": False,
         "scope": "INTERNATIONAL",
         "nextAction": "COMPLETE_PROFILE",
-        "passengers": []
+        "passengers": [],
     }
 
     result = await check_booking_readiness.ainvoke(
-        {"flight_offer_id": "offer-123", "passengers": [{"passengerType": "ADULT", "passengerOrdinal": 1, "sourceType": "traveler_profile"}]},
-        config=run_config_with_readiness
+        {
+            "flight_offer_id": "offer-123",
+            "passengers": [
+                {"passengerType": "ADULT", "passengerOrdinal": 1, "sourceType": "traveler_profile"}
+            ],
+        },
+        config=run_config_with_readiness,
     )
 
     assert result.get("ready") is False
     assert result.get("nextAction") == "COMPLETE_PROFILE"
     mock_client_with_readiness.check_booking_readiness.assert_called_once_with(
         "offer-123",
-        [{"passengerType": "ADULT", "passengerOrdinal": 1, "sourceType": "traveler_profile"}]
+        [{"passengerType": "ADULT", "passengerOrdinal": 1, "sourceType": "traveler_profile"}],
     )
 
+
 @pytest.mark.asyncio
-async def test_check_booking_readiness_tool_error(mock_client_with_readiness, run_config_with_readiness):
+async def test_check_booking_readiness_tool_error(
+    mock_client_with_readiness, run_config_with_readiness
+):
     mock_client_with_readiness.check_booking_readiness.side_effect = Exception("DB failed")
 
     result = await check_booking_readiness.ainvoke(
-        {"flight_offer_id": "offer-123", "passengers": []},
-        config=run_config_with_readiness
+        {"flight_offer_id": "offer-123", "passengers": []}, config=run_config_with_readiness
     )
 
     assert "error" in result

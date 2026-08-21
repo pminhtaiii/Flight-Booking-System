@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-const SERVICE_CHAINS = {
+export const SERVICE_CHAINS = {
   api: ['api-gate', 'api-unit-tests', 'api-e2e-tests'],
   web: ['web-gate', 'web-build'],
   agent: ['agent-gate', 'agent-tests'],
@@ -40,12 +40,15 @@ export function evaluateCiStatus(results) {
   }
 
   for (const [service, jobs] of Object.entries(SERVICE_CHAINS)) {
-    const expectedConclusion = getDetectionOutput(results, service) === 'true' ? 'success' : 'skipped';
+    const expectedConclusion =
+      getDetectionOutput(results, service) === 'true' ? 'success' : 'skipped';
 
     for (const job of jobs) {
       const conclusion = getConclusion(results, job);
       if (conclusion !== expectedConclusion) {
-        return fail(`${job} concluded ${String(conclusion)}, expected ${expectedConclusion} because ${service} is ${getDetectionOutput(results, service)}`);
+        return fail(
+          `${job} concluded ${String(conclusion)}, expected ${expectedConclusion} because ${service} is ${getDetectionOutput(results, service)}`,
+        );
       }
     }
   }
@@ -54,6 +57,21 @@ export function evaluateCiStatus(results) {
 }
 
 function parseCliInput(argv, stdin) {
+  if (process.env.DETECT_CHANGES_RESULT !== undefined) {
+    return {
+      'detect-changes': process.env.DETECT_CHANGES_RESULT,
+      api: process.env.API_CHANGED,
+      web: process.env.WEB_CHANGED,
+      agent: process.env.AGENT_CHANGED,
+      'api-gate': process.env.API_GATE_RESULT,
+      'api-unit-tests': process.env.API_UNIT_TESTS_RESULT,
+      'api-e2e-tests': process.env.API_E2E_TESTS_RESULT,
+      'web-gate': process.env.WEB_GATE_RESULT,
+      'web-build': process.env.WEB_BUILD_RESULT,
+      'agent-gate': process.env.AGENT_GATE_RESULT,
+      'agent-tests': process.env.AGENT_TESTS_RESULT,
+    };
+  }
   const input = argv[2] ?? stdin.trim();
   if (!input) {
     throw new Error('provide a JSON result object as the first argument or via stdin');
@@ -66,12 +84,17 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
     process.stdout.write('Usage: node scripts/ci/evaluate-ci-status.mjs [results-json]\n');
   } else {
     try {
-      const stdin = process.argv[2] === undefined ? readFileSync(0, 'utf8') : '';
+      const stdin =
+        process.argv[2] === undefined && process.env.DETECT_CHANGES_RESULT === undefined
+          ? readFileSync(0, 'utf8')
+          : '';
       const result = evaluateCiStatus(parseCliInput(process.argv, stdin));
       process.stdout.write(`${JSON.stringify(result)}\n`);
       process.exitCode = result.passed ? 0 : 1;
     } catch (error) {
-      process.stdout.write(`${JSON.stringify(fail(error instanceof Error ? error.message : String(error)))}\n`);
+      process.stdout.write(
+        `${JSON.stringify(fail(error instanceof Error ? error.message : String(error)))}\n`,
+      );
       process.exitCode = 1;
     }
   }

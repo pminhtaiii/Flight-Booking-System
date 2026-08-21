@@ -18,7 +18,6 @@ from typing import Any
 
 from agent.sanitization.pii_scrubber import detect_pii
 
-
 logger = logging.getLogger("agent.chat_observability")
 
 _OPAQUE_ID = re.compile(r"chat_[a-f0-9]{32}\Z")
@@ -105,27 +104,63 @@ ALLOWED_FIELDS = frozenset(
 _ALLOWED_STRING_VALUES: dict[str, frozenset[str]] = {
     "status": frozenset(
         {
-            "accepted", "rejected", "failed", "hit", "miss", "unavailable",
-            "created", "completed", "resolved", "replayed", "fallback", "classified", "ok",
+            "accepted",
+            "rejected",
+            "failed",
+            "hit",
+            "miss",
+            "unavailable",
+            "created",
+            "completed",
+            "resolved",
+            "replayed",
+            "fallback",
+            "classified",
+            "ok",
         }
     ),
     "outcome": frozenset(
         {
-            "admitted", "rejected", "unavailable", "empty_state", "non_human_message",
-            "malformed_output", "low_confidence", "completed", "created", "handoff_rejected",
-            "resolved", "consumed", "already_consumed", "idempotent_retry", "classified",
-            "hit", "miss", "failed",
+            "admitted",
+            "rejected",
+            "unavailable",
+            "empty_state",
+            "non_human_message",
+            "malformed_output",
+            "low_confidence",
+            "completed",
+            "created",
+            "handoff_rejected",
+            "resolved",
+            "consumed",
+            "already_consumed",
+            "idempotent_retry",
+            "classified",
+            "hit",
+            "miss",
+            "failed",
         }
     ),
     "dependency": frozenset({"redis", "nestjs", "llm", "control_plane"}),
     "error_class": frozenset(
         {
-            "daily_quota", "burst_limit", "control_plane_unavailable", "handoff_rejected",
-            "dependency_unavailable", "timeout", "unknown",
+            "daily_quota",
+            "burst_limit",
+            "control_plane_unavailable",
+            "handoff_rejected",
+            "dependency_unavailable",
+            "timeout",
+            "unknown",
         }
     ),
     "tool_name": frozenset(
-        {"check_booking_readiness", "search_flights", "signal_checkout_intent", "handoff_creator", "other"}
+        {
+            "check_booking_readiness",
+            "search_flights",
+            "signal_checkout_intent",
+            "handoff_creator",
+            "other",
+        }
     ),
     "route": frozenset({"search", "checkout", "general", "booking_inquiry"}),
     "snapshot_state": frozenset({"hit", "miss", "unavailable"}),
@@ -255,13 +290,14 @@ def _safe_string(field_name: str, value: Any) -> str:
     raise TelemetryPrivacyError(f"field {field_name!r} is not an allowlisted value")
 
 
-
 def _safe_scalar(field_name: str, value: Any) -> str | int | float | bool | None:
     if field_name in _ALLOWED_STRING_VALUES:
         return _safe_string(field_name, value)
     if field_name in _ALLOWED_INTEGER_FIELDS:
         if isinstance(value, bool) or not isinstance(value, int) or not 0 <= value <= 1_000_000:
-            raise TelemetryPrivacyError(f"field {field_name!r} must be a bounded non-negative integer")
+            raise TelemetryPrivacyError(
+                f"field {field_name!r} must be a bounded non-negative integer"
+            )
         return value
     if value is None or isinstance(value, bool):
         return value
@@ -287,10 +323,16 @@ def safe_tool_name(value: str | None) -> str:
     return "other"
 
 
-def _resolve_standardized_metric(operation: str, status: str, fields: Mapping[str, Any] | None = None) -> str:
+def _resolve_standardized_metric(
+    operation: str, status: str, fields: Mapping[str, Any] | None = None
+) -> str:
     outcome = fields.get("outcome") if fields else None
     if operation == "quota_admission":
-        if status in {"rejected", "failed", "denied"} or outcome in {"rejected", "unavailable", "failed"}:
+        if status in {"rejected", "failed", "denied"} or outcome in {
+            "rejected",
+            "unavailable",
+            "failed",
+        }:
             return STANDARDIZED_METRIC_COUNTERS["chat_messages_denied_total"]
         if status in {"accepted", "ok"} or outcome in {"admitted", "accepted", "ok"}:
             return STANDARDIZED_METRIC_COUNTERS["chat_messages_accepted_total"]

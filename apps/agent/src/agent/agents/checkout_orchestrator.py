@@ -1,8 +1,9 @@
-from langchain_core.messages import SystemMessage, HumanMessage
+from langchain_core.messages import SystemMessage
 from langchain_core.runnables import RunnableConfig
+
 from agent.agents.chat_agent import get_chat_model
-from agent.tools.registry import get_checkout_tools
 from agent.graph.state import AgentState
+from agent.tools.registry import get_checkout_tools
 
 CHECKOUT_PROMPT = (
     "You are the Checkout Orchestrator for the Flight Booking System. "
@@ -12,6 +13,7 @@ CHECKOUT_PROMPT = (
     "If you need more information to identify the flight, ask the user clearly. "
     "Be concise and confirm when the checkout process is starting."
 )
+
 
 async def checkout_orchestrator_node(state: AgentState, config: RunnableConfig) -> dict:
     """Call the LLM with Checkout Orchestrator tools bound."""
@@ -23,7 +25,6 @@ async def checkout_orchestrator_node(state: AgentState, config: RunnableConfig) 
     has_system = any(isinstance(m, SystemMessage) for m in messages)
     if not has_system:
         messages.insert(0, SystemMessage(content=CHECKOUT_PROMPT))
-
 
     response = await model_with_tools.ainvoke(messages, config=config)
     return {"messages": [response]}

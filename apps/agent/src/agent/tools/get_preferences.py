@@ -1,6 +1,7 @@
 import httpx
-from langchain_core.tools import tool
 from langchain_core.runnables import RunnableConfig
+from langchain_core.tools import tool
+
 from agent.tools.base import get_nestjs_client
 
 AIRLINE_MAP = {
@@ -9,6 +10,7 @@ AIRLINE_MAP = {
     "JL": "Japan Airlines",
     "SQ": "Singapore Airlines",
 }
+
 
 @tool("get_user_preferences")
 async def get_user_preferences(config: RunnableConfig) -> str:
@@ -56,6 +58,6 @@ async def get_user_preferences(config: RunnableConfig) -> str:
         f"- Class: {class_str}",
         f"- Preferred airlines: {pref_str}",
         f"- Blacklisted airlines: {black_str}",
-        f"- Dietary needs: {dietary_str}"
+        f"- Dietary needs: {dietary_str}",
     ]
     return "\n".join(lines)
