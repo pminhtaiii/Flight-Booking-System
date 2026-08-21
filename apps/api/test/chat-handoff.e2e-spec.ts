@@ -492,13 +492,18 @@ describe('ChatHandoff (E2E)', () => {
         .set('X-Correlation-Id', correlationId)
         .expect(200);
 
-      const auditRows = await prisma.auditLog.findMany({
-        where: {
-          action: { in: ['chat_handoff_created', 'chat_handoff_resolved'] },
-        },
-        orderBy: { createdAt: 'desc' },
-        take: 2,
-      });
+      let auditRows: Array<any> = [];
+      for (let attempt = 0; attempt < 20; attempt++) {
+        auditRows = await prisma.auditLog.findMany({
+          where: {
+            action: { in: ['chat_handoff_created', 'chat_handoff_resolved'] },
+          },
+          orderBy: { createdAt: 'desc' },
+          take: 2,
+        });
+        if (auditRows.length >= 2) break;
+        await new Promise((resolve) => setTimeout(resolve, 50));
+      }
 
       expect(auditRows).toHaveLength(2);
       for (const row of auditRows) {
