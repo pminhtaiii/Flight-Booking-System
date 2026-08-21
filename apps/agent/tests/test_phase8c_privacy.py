@@ -1,13 +1,12 @@
 import json
-import re
-import pytest
-from unittest.mock import AsyncMock, MagicMock, patch
 
-from agent.models.events import HandoffEvent, DisplayInfo
-from agent.sanitization.pii_scrubber import scrub_pii, detect_pii
-from agent.observability.chat_observability import ChatTelemetry, TelemetryPrivacyError
-from agent.tools.search_flights import project_snapshot_results, _SAFE_LLM_FIELDS
+import pytest
+
+from agent.models.events import DisplayInfo, HandoffEvent
 from agent.models.snapshot import TrustedSearchSnapshot
+from agent.observability.chat_observability import ChatTelemetry, TelemetryPrivacyError
+from agent.sanitization.pii_scrubber import detect_pii, scrub_pii
+from agent.tools.search_flights import _SAFE_LLM_FIELDS, project_snapshot_results
 
 SEEDED_PRIVACY_CORPUS = [
     "chk_handoff_v1_secret_credential_12345",
@@ -24,6 +23,7 @@ SEEDED_PRIVACY_CORPUS = [
     "4111111111111111",
     "plaintext customer chat secret message",
 ]
+
 
 def test_pii_scrubber_redacts_seeded_corpus():
     """Verify that pii_scrubber detects and scrubs email, phone, passport, and card."""
@@ -42,38 +42,50 @@ def test_pii_scrubber_redacts_seeded_corpus():
     assert "[PASSPORT REDACTED]" in scrubbed
     assert "[CARD REDACTED]" in scrubbed
 
+
 def test_safe_llm_fields_excludes_identifiers():
     """Verify _SAFE_LLM_FIELDS does not contain local offer IDs, Duffel offer IDs, or database IDs."""
-    forbidden = {"flightOfferId", "duffelOfferId", "offerId", "bookingId", "id", "userId", "sessionId"}
+    forbidden = {
+        "flightOfferId",
+        "duffelOfferId",
+        "offerId",
+        "bookingId",
+        "id",
+        "userId",
+        "sessionId",
+    }
     for f in _SAFE_LLM_FIELDS:
         assert f not in forbidden
 
+
 def test_project_snapshot_results_excludes_identifiers():
     """Verify project_snapshot_results never returns offer IDs or provider IDs to the browser."""
-    snapshot = TrustedSearchSnapshot.model_validate({
-        "schemaVersion": 1,
-        "snapshotVersion": 1,
-        "userId": "usr_123",
-        "sessionId": "ses_456",
-        "createdAt": "2026-09-20T00:00:00Z",
-        "expiresAt": "2026-09-20T01:00:00Z",
-        "selectionAttestation": "sel_v1_mock",
-        "fingerprint": "mock_fp",
-        "results": [
-            {
-                "offerIndex": 1,
-                "flightOfferId": "local-uuid-1234",
-                "duffelOfferId": "duffel-offer-5678",
-                "airline": "VN",
-                "origin": "SGN",
-                "destination": "HAN",
-                "departureAt": "2026-09-20T08:00:00Z",
-                "arrivalAt": "2026-09-20T10:00:00Z",
-                "price": "120.00",
-                "currency": "USD",
-            }
-        ]
-    })
+    snapshot = TrustedSearchSnapshot.model_validate(
+        {
+            "schemaVersion": 1,
+            "snapshotVersion": 1,
+            "userId": "usr_123",
+            "sessionId": "ses_456",
+            "createdAt": "2026-09-20T00:00:00Z",
+            "expiresAt": "2026-09-20T01:00:00Z",
+            "selectionAttestation": "sel_v1_mock",
+            "fingerprint": "mock_fp",
+            "results": [
+                {
+                    "offerIndex": 1,
+                    "flightOfferId": "local-uuid-1234",
+                    "duffelOfferId": "duffel-offer-5678",
+                    "airline": "VN",
+                    "origin": "SGN",
+                    "destination": "HAN",
+                    "departureAt": "2026-09-20T08:00:00Z",
+                    "arrivalAt": "2026-09-20T10:00:00Z",
+                    "price": "120.00",
+                    "currency": "USD",
+                }
+            ],
+        }
+    )
     projected = project_snapshot_results(snapshot)
     assert len(projected) == 1
     item = projected[0]
@@ -81,6 +93,7 @@ def test_project_snapshot_results_excludes_identifiers():
     assert "duffelOfferId" not in item
     assert "local-uuid-1234" not in json.dumps(item)
     assert "duffel-offer-5678" not in json.dumps(item)
+
 
 def test_action_handoff_event_schema_strictly_forbids_private_fields():
     """Verify HandoffEvent schema allows only strict allowlisted display fields."""
@@ -120,6 +133,7 @@ def test_action_handoff_event_schema_strictly_forbids_private_fields():
             url="https://example.test/checkout",
         )
 
+
 def test_chat_telemetry_strictly_rejects_privacy_corpus():
     """Verify telemetry rejects each value in the seeded privacy corpus."""
     telemetry = ChatTelemetry()
@@ -131,15 +145,19 @@ def test_chat_telemetry_strictly_rejects_privacy_corpus():
                 fields={"outcome": forbidden_val},
             )
 
+
 def test_sse_error_payloads_contain_zero_pii_or_tokens():
     """Verify that SSE error payloads contain standard error codes and scrubbed messages."""
-    pii_payload = json.dumps({
-        "code": "GUARDRAIL_BLOCKED",
-        "message": "Your message contains protected personal information and cannot be processed.",
-        "partialMessageId": None,
-    })
+    pii_payload = json.dumps(
+        {
+            "code": "GUARDRAIL_BLOCKED",
+            "message": "Your message contains protected personal information and cannot be processed.",
+            "partialMessageId": None,
+        }
+    )
     for forbidden_val in SEEDED_PRIVACY_CORPUS:
         assert forbidden_val not in pii_payload
+
 
 @pytest.mark.asyncio
 async def test_sse_event_serialization_excludes_forbidden_corpus():

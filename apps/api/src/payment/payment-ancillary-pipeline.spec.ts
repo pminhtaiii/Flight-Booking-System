@@ -1,5 +1,4 @@
 import 'reflect-metadata';
-import { ConflictException } from '@nestjs/common';
 import { PaymentService } from './payment.service';
 import { PrismaService } from '@/prisma/prisma.service';
 import { StripeService } from '@/common/stripe.service';

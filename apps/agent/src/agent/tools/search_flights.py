@@ -1,13 +1,15 @@
 import inspect
 import logging
-from datetime import datetime, timezone, timedelta
-from typing import Any, Optional
-from langchain_core.tools import tool
+from datetime import datetime, timedelta, timezone
+from typing import Any
+
 from langchain_core.runnables import RunnableConfig
-from agent.tools.base import get_nestjs_client
-from agent.repositories.trusted_snapshot_repository import TrustedSnapshotRepository
+from langchain_core.tools import tool
+
 from agent.infrastructure.redis import get_redis_client
 from agent.models.snapshot import TrustedSearchSnapshot
+from agent.repositories.trusted_snapshot_repository import TrustedSnapshotRepository
+from agent.tools.base import get_nestjs_client
 
 logger = logging.getLogger(__name__)
 
@@ -55,11 +57,7 @@ def project_snapshot_results(snapshot: TrustedSearchSnapshot) -> list[dict[str, 
 
 @tool("search_flights")
 async def search_flights(
-    origin: str,
-    destination: str,
-    date: str,
-    passengers: int = 1,
-    config: RunnableConfig = None
+    origin: str, destination: str, date: str, passengers: int = 1, config: RunnableConfig = None
 ) -> str:
     """Search for available flights between two airports on a specific date. Returns the top 5 matching flights with airline, times, price, and baggage information. Use this when the user asks to find, search, or look up flights."""
     try:
@@ -67,12 +65,18 @@ async def search_flights(
     except Exception:
         return "I couldn't search for flights right now. The flight search service is temporarily unavailable. Please try again in a moment."
 
-    configurable = config.get("configurable", {}) if isinstance(config, dict) else getattr(config, "configurable", {}) if config else {}
+    configurable = (
+        config.get("configurable", {})
+        if isinstance(config, dict)
+        else getattr(config, "configurable", {})
+        if config
+        else {}
+    )
     thread_id = configurable.get("thread_id") or "default_thread"
     user_id = configurable.get("user_id") or "default_user"
 
     try:
-        proposed_version = 1 
+        proposed_version = 1
         try:
             redis_client = get_redis_client()
             repo = TrustedSnapshotRepository(redis_client)
@@ -84,7 +88,9 @@ async def search_flights(
             logger.warning("Could not check existing snapshot: %s", str(e))
             repo = None
 
-        search_call = getattr(client, "post_gateway_flights_search_v2", None) or getattr(client, "search_flights_v2", None)
+        search_call = getattr(client, "post_gateway_flights_search_v2", None) or getattr(
+            client, "search_flights_v2", None
+        )
         if not search_call:
             search_call = getattr(client, "get_gateway_flights_search", None)
 
@@ -97,7 +103,7 @@ async def search_flights(
             origin=origin,
             destination=destination,
             date=date,
-            passengers=passengers
+            passengers=passengers,
         )
         data = await call_res if inspect.isawaitable(call_res) else call_res
     except Exception as e:
@@ -118,24 +124,24 @@ async def search_flights(
     safe_results = []
     snapshot_results = []
     for idx, flight in enumerate(results, 1):
-        snapshot_results.append({
-            "offerIndex": idx,
-            "flightOfferId": flight.get("flightOfferId") or f"mock-offer-{idx}",
-            "duffelOfferId": flight.get("duffelOfferId") or flight.get("flightOfferId") or f"mock-duffel-{idx}",
-            "airline": flight.get("airline", ""),
-            "origin": flight.get("departureAirport", origin),
-            "destination": flight.get("arrivalAirport", destination),
-            "departureAt": flight.get("departureTime"),
-            "arrivalAt": flight.get("arrivalTime"),
-            "price": str(flight.get("price", "0.0")),
-            "currency": flight.get("currency", "USD")
-        })
-        
-        safe_flight = {
-            key: flight[key]
-            for key in _SAFE_LLM_FIELDS
-            if key in flight
-        }
+        snapshot_results.append(
+            {
+                "offerIndex": idx,
+                "flightOfferId": flight.get("flightOfferId") or f"mock-offer-{idx}",
+                "duffelOfferId": flight.get("duffelOfferId")
+                or flight.get("flightOfferId")
+                or f"mock-duffel-{idx}",
+                "airline": flight.get("airline", ""),
+                "origin": flight.get("departureAirport", origin),
+                "destination": flight.get("arrivalAirport", destination),
+                "departureAt": flight.get("departureTime"),
+                "arrivalAt": flight.get("arrivalTime"),
+                "price": str(flight.get("price", "0.0")),
+                "currency": flight.get("currency", "USD"),
+            }
+        )
+
+        safe_flight = {key: flight[key] for key in _SAFE_LLM_FIELDS if key in flight}
         safe_results.append(safe_flight)
 
     # Store Trusted Search Snapshot in Redis
@@ -148,17 +154,19 @@ async def search_flights(
         if not expires_at:
             expires_at = (datetime.now(timezone.utc) + timedelta(minutes=15)).isoformat()
 
-        snapshot = TrustedSearchSnapshot.model_validate({
-            "schemaVersion": 1,
-            "snapshotVersion": data.get("snapshotVersion") or proposed_version,
-            "userId": user_id,
-            "sessionId": thread_id,
-            "createdAt": datetime.now(timezone.utc).isoformat(),
-            "expiresAt": expires_at,
-            "selectionAttestation": data.get("selectionAttestation") or "sel_v1_mock",
-            "fingerprint": data.get("fingerprint") or "mock_hmac_fingerprint",
-            "results": snapshot_results
-        })
+        snapshot = TrustedSearchSnapshot.model_validate(
+            {
+                "schemaVersion": 1,
+                "snapshotVersion": data.get("snapshotVersion") or proposed_version,
+                "userId": user_id,
+                "sessionId": thread_id,
+                "createdAt": datetime.now(timezone.utc).isoformat(),
+                "expiresAt": expires_at,
+                "selectionAttestation": data.get("selectionAttestation") or "sel_v1_mock",
+                "fingerprint": data.get("fingerprint") or "mock_hmac_fingerprint",
+                "results": snapshot_results,
+            }
+        )
         save_res = repo.save_snapshot(snapshot)
         if inspect.isawaitable(save_res):
             await save_res

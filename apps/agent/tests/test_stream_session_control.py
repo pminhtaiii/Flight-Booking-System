@@ -1,17 +1,18 @@
 import asyncio
 import time
-import pytest
+from unittest.mock import AsyncMock, patch
+
 import jwt
-import json
-from unittest.mock import AsyncMock, patch, MagicMock
+import pytest
 from fastapi import FastAPI, HTTPException
 from fastapi.testclient import TestClient
 
+from agent.config import get_settings
 from agent.middleware.auth import JWTAuthMiddleware
-from agent.streaming.sse import router as streaming_router, _persist_response
 from agent.queue.message_queue import MessageQueueManager
 from agent.repositories.session_lock_repository import SessionLockRepository
-from agent.config import get_settings
+from agent.streaming.sse import _persist_response
+from agent.streaming.sse import router as streaming_router
 
 settings = get_settings()
 SECRET = settings.JWT_SECRET
@@ -44,13 +45,16 @@ def make_token(user_id="user-123", sub="user-123", jti="jti-uuid-1"):
 
 def test_cross_user_session_access_returns_404_and_zero_inference():
     token_user_a = make_token(user_id="user-A", sub="user-A")
-    with patch("agent.streaming.sse.NestJSClient") as MockClient, \
-         patch("agent.streaming.sse.graph.astream_events") as mock_graph, \
-         patch("agent.streaming.sse._persist_response") as mock_persist:
-
+    with (
+        patch("agent.streaming.sse.NestJSClient") as MockClient,
+        patch("agent.streaming.sse.graph.astream_events") as mock_graph,
+        patch("agent.streaming.sse._persist_response") as mock_persist,
+    ):
         mock_nestjs = AsyncMock()
         mock_nestjs.check_user_access.return_value = {"allowed": True}
-        mock_nestjs.get_memory.side_effect = Exception("CHAT_SESSION_NOT_FOUND: Session not found or foreign owner")
+        mock_nestjs.get_memory.side_effect = Exception(
+            "CHAT_SESSION_NOT_FOUND: Session not found or foreign owner"
+        )
         MockClient.return_value = mock_nestjs
 
         res = client.post(
@@ -98,13 +102,15 @@ async def test_distributed_serialization_and_queue_depth_exceeded():
 @pytest.mark.asyncio
 async def test_ttl_overrun_and_fence_takeover():
     repo = SessionLockRepository(prefix="test:lock:ttl:")
-    
+
     mock_redis = AsyncMock()
     # First acquire returns fence 1
     mock_redis.eval.side_effect = [1, None, 2, 0, None]
     mock_redis.hget.side_effect = [b"req2", b"2"]  # req1 validate returns false
 
-    with patch("agent.repositories.session_lock_repository.get_redis_client", return_value=mock_redis):
+    with patch(
+        "agent.repositories.session_lock_repository.get_redis_client", return_value=mock_redis
+    ):
         fence1 = await repo.acquire_lock("u1", "s-ttl", "req1", ttl_ms=100)
         assert fence1 == 1
 
@@ -171,8 +177,6 @@ async def test_refresh_loss_cancels_monitored_tasks():
     assert worker_task.cancelled() or worker_task.done()
 
 
-
-
 # ---------------------------------------------------------------------------
 # 5. Disconnect / Shielded Persistence Tests
 # ---------------------------------------------------------------------------
@@ -210,6 +214,7 @@ async def test_stale_fence_rejection_prevents_persistence():
 
     # Add dummy active fence
     from agent.queue.message_queue import ActiveFence
+
     manager.active_fences["sess-stale"] = ActiveFence(
         req_id="req-stale",
         fence=5,

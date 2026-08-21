@@ -1,6 +1,8 @@
 import logging
-from langchain_core.tools import tool
+
 from langchain_core.runnables import RunnableConfig
+from langchain_core.tools import tool
+
 from agent.tools.base import get_nestjs_client
 
 logger = logging.getLogger(__name__)
@@ -42,14 +44,22 @@ async def list_user_booking_summaries(config: RunnableConfig) -> str:
             status = b.get("status", "Unknown")
             airline_code = b.get("airline", "Unknown")
             airline_name = AIRLINE_MAP.get(airline_code, airline_code)
-            airline_display = f"{airline_name} ({airline_code})" if airline_code in AIRLINE_MAP else airline_code
+            airline_display = (
+                f"{airline_name} ({airline_code})" if airline_code in AIRLINE_MAP else airline_code
+            )
             origin = b.get("origin", "Unknown")
             dest = b.get("destination", "Unknown")
             dept = b.get("departureTime") or b.get("departureAt") or "Unknown"
             arr = b.get("arrivalTime") or b.get("arrivalAt") or "Unknown"
             duration = b.get("durationMinutes", 0)
             stops = b.get("stops", b.get("stopCount", 0))
-            stops_str = "Direct (0 stops)" if stops == 0 else f"{stops} stop" if stops == 1 else f"{stops} stops"
+            stops_str = (
+                "Direct (0 stops)"
+                if stops == 0
+                else f"{stops} stop"
+                if stops == 1
+                else f"{stops} stops"
+            )
 
             result.append(
                 f"- [{status}] Reference: {ref} | Airline: {airline_display} | Route: {origin} -> {dest} | "

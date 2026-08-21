@@ -492,13 +492,18 @@ describe('ChatHandoff (E2E)', () => {
         .set('X-Correlation-Id', correlationId)
         .expect(200);
 
-      const auditRows = await prisma.auditLog.findMany({
-        where: {
-          action: { in: ['chat_handoff_created', 'chat_handoff_resolved'] },
-        },
-        orderBy: { createdAt: 'desc' },
-        take: 2,
-      });
+      let auditRows: Array<any> = [];
+      for (let attempt = 0; attempt < 20; attempt++) {
+        auditRows = await prisma.auditLog.findMany({
+          where: {
+            action: { in: ['chat_handoff_created', 'chat_handoff_resolved'] },
+          },
+          orderBy: { createdAt: 'desc' },
+          take: 2,
+        });
+        if (auditRows.length >= 2) break;
+        await new Promise((resolve) => setTimeout(resolve, 50));
+      }
 
       expect(auditRows).toHaveLength(2);
       for (const row of auditRows) {
@@ -571,11 +576,16 @@ describe('ChatHandoff (E2E)', () => {
         correlation_id: correlationId,
       });
 
-      const auditRow = await prisma.auditLog.findFirst({
-        where: { action: 'chat_handoff_created', traceId, correlationId },
-      });
-      expect(auditRow).toBeDefined();
-      const metadata = JSON.stringify(auditRow?.metadata);
+      let auditRow: any = null;
+      for (let attempt = 0; attempt < 20; attempt++) {
+        auditRow = await prisma.auditLog.findFirst({
+          where: { action: 'chat_handoff_created', traceId, correlationId },
+        });
+        if (auditRow) break;
+        await new Promise((resolve) => setTimeout(resolve, 50));
+      }
+      expect(auditRow).not.toBeNull();
+      const metadata = JSON.stringify(auditRow?.metadata ?? {});
       expect(metadata).not.toContain(attestation);
       expect(metadata).not.toContain(validUser.id);
       expect(metadata).not.toContain(validSession.id);
@@ -663,9 +673,14 @@ describe('ChatHandoff (E2E)', () => {
       expect(tracedRequests.some(({ path: requestPath }) => requestPath.includes('/turns'))).toBe(true);
       expect(tracedRequests.some(({ path: requestPath }) => requestPath.includes('chat-handoff'))).toBe(true);
 
-      const auditRow = await prisma.auditLog.findFirst({
-        where: { action: 'chat_handoff_created', traceId, correlationId },
-      });
+      let auditRow: any = null;
+      for (let attempt = 0; attempt < 20; attempt++) {
+        auditRow = await prisma.auditLog.findFirst({
+          where: { action: 'chat_handoff_created', traceId, correlationId },
+        });
+        if (auditRow) break;
+        await new Promise((resolve) => setTimeout(resolve, 50));
+      }
       expect(auditRow).not.toBeNull();
     });
 

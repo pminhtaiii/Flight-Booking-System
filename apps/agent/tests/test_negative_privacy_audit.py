@@ -1,23 +1,20 @@
 import json
 import logging
-import re
 from datetime import datetime, timezone
 from unittest.mock import AsyncMock, MagicMock, patch
+
 import pytest
 
-from agent.models.events import HandoffEvent, DisplayInfo
-from agent.models.snapshot import TrustedSearchSnapshot, TrustedSearchResult
-from agent.sanitization.pii_scrubber import scrub_pii, detect_pii
+from agent.memory.manager import MemoryManager
+from agent.models.events import DisplayInfo, HandoffEvent
+from agent.models.snapshot import TrustedSearchResult, TrustedSearchSnapshot
 from agent.observability.chat_observability import (
     ChatTelemetry,
     TelemetryPrivacyError,
-    ALLOWED_OPERATIONS,
-    safe_tool_name,
 )
-from agent.tools.search_flights import project_snapshot_results, _SAFE_LLM_FIELDS
 from agent.repositories.trusted_snapshot_repository import TrustedSnapshotRepository
-from agent.memory.manager import MemoryManager
 from agent.tools.nestjs_client import validate_booking_readiness_response
+from agent.tools.search_flights import project_snapshot_results
 
 # Strict Negative Privacy Corpus for Continuous Scanning
 FORBIDDEN_PRIVACY_CORPUS = [
@@ -47,6 +44,7 @@ FORBIDDEN_PRIVACY_CORPUS = [
 # ============================================================================
 # 1. Memory Manager Privacy & Boundary Audit
 # ============================================================================
+
 
 def test_memory_manager_counts_tokens_without_logging_or_leaking():
     """Verify MemoryManager safely counts tokens on sensitive corpus without logging errors."""
@@ -119,6 +117,7 @@ async def test_memory_manager_error_handling_does_not_leak_session_content(caplo
 # ============================================================================
 # 2. Trusted Search Snapshot Repository Serialization & Projection Audit
 # ============================================================================
+
 
 def test_trusted_snapshot_serialization_and_projection_zero_leakage():
     """Verify TrustedSearchSnapshot serialization and projection 100% strips private offer IDs."""
@@ -227,6 +226,7 @@ async def test_trusted_snapshot_repository_redis_operations():
 # 3. Structured Telemetry Emissions Negative Privacy Audit
 # ============================================================================
 
+
 def test_telemetry_strictly_rejects_entire_forbidden_corpus():
     """Verify telemetry engine rejects all items in forbidden corpus across all metadata fields."""
     telemetry = ChatTelemetry()
@@ -276,9 +276,21 @@ def test_telemetry_valid_emissions_contain_zero_forbidden_corpus(caplog):
     telemetry = ChatTelemetry()
 
     with caplog.at_level(logging.INFO):
-        telemetry.emit("quota_admission", status="accepted", fields={"outcome": "admitted", "dependency": "redis"})
-        telemetry.emit("router_decision", status="completed", fields={"intent": "SEARCH", "confidence_bucket": "high"})
-        telemetry.emit("tool_call", status="completed", fields={"tool_name": "search_flights", "outcome": "completed"})
+        telemetry.emit(
+            "quota_admission",
+            status="accepted",
+            fields={"outcome": "admitted", "dependency": "redis"},
+        )
+        telemetry.emit(
+            "router_decision",
+            status="completed",
+            fields={"intent": "SEARCH", "confidence_bucket": "high"},
+        )
+        telemetry.emit(
+            "tool_call",
+            status="completed",
+            fields={"tool_name": "search_flights", "outcome": "completed"},
+        )
         telemetry.emit("snapshot_read", status="hit", fields={"outcome": "hit"})
         telemetry.emit("handoff_create", status="created", fields={"outcome": "created"})
 
@@ -290,6 +302,7 @@ def test_telemetry_valid_emissions_contain_zero_forbidden_corpus(caplog):
 # ============================================================================
 # 4. SSE Event Streaming Chunks Negative Privacy Audit
 # ============================================================================
+
 
 def test_sse_action_handoff_event_schema_boundary():
     """Verify HandoffEvent strictly enforces allowlisted display fields and opaque token."""
@@ -317,7 +330,16 @@ def test_sse_action_handoff_event_schema_boundary():
     assert "Vietnam Airlines" in serialized
 
     # Must NOT contain forbidden fields
-    for forbidden_field in ["offerId", "flightOfferId", "duffelOfferId", "userId", "sessionId", "url", "pnr", "passport"]:
+    for forbidden_field in [
+        "offerId",
+        "flightOfferId",
+        "duffelOfferId",
+        "userId",
+        "sessionId",
+        "url",
+        "pnr",
+        "passport",
+    ]:
         assert f'"{forbidden_field}"' not in serialized
 
 
@@ -364,12 +386,14 @@ async def test_sse_streaming_chunk_stream_simulation_scan():
     snapshot projection, handoff token creation, and SSE serialization, verifying that 100%
     of emitted chunks omit the forbidden privacy corpus.
     """
-    from starlette.requests import Request
-    import jwt
     import time
+
+    import jwt
+    from starlette.requests import Request
+
     from agent.config import get_settings
-    from agent.streaming.sse import chat_stream, ChatStreamRequest
     from agent.queue.message_queue import MessageQueueManager
+    from agent.streaming.sse import ChatStreamRequest, chat_stream
 
     settings = get_settings()
     user_id = "user_privacy_sse_audit_1"
@@ -495,15 +519,24 @@ async def test_sse_streaming_chunk_stream_simulation_scan():
         }
         yield {
             "event": "on_chat_model_stream",
-            "data": {"chunk": MagicMock(content="I found your flight from Ho Chi Minh City to Hanoi.")},
+            "data": {
+                "chunk": MagicMock(content="I found your flight from Ho Chi Minh City to Hanoi.")
+            },
         }
 
-    with patch("agent.streaming.sse.NestJSClient", return_value=mock_client), \
-         patch("agent.streaming.sse.get_redis_client", return_value=mock_redis), \
-         patch("agent.streaming.sse.TrustedSnapshotRepository.get_snapshot", AsyncMock(return_value=snapshot_with_internal_ids)), \
-         patch("agent.streaming.sse.graph.astream_events", side_effect=mock_graph_events), \
-         patch("agent.repositories.chat_budget_repository.ChatBudgetRepository.admit_request", AsyncMock()):
-
+    with (
+        patch("agent.streaming.sse.NestJSClient", return_value=mock_client),
+        patch("agent.streaming.sse.get_redis_client", return_value=mock_redis),
+        patch(
+            "agent.streaming.sse.TrustedSnapshotRepository.get_snapshot",
+            AsyncMock(return_value=snapshot_with_internal_ids),
+        ),
+        patch("agent.streaming.sse.graph.astream_events", side_effect=mock_graph_events),
+        patch(
+            "agent.repositories.chat_budget_repository.ChatBudgetRepository.admit_request",
+            AsyncMock(),
+        ),
+    ):
         body = ChatStreamRequest(message="Book flight from SGN to HAN", sessionId=session_id)
         response = await chat_stream(
             request=request,
@@ -530,5 +563,6 @@ async def test_sse_streaming_chunk_stream_simulation_scan():
 
         # 4. Strict Negative Privacy Audit: Zero forbidden corpus strings in serialized SSE output
         for forbidden in FORBIDDEN_PRIVACY_CORPUS:
-            assert forbidden not in all_emitted_text, f"Privacy violation: '{forbidden}' leaked into SSE stream!"
-
+            assert forbidden not in all_emitted_text, (
+                f"Privacy violation: '{forbidden}' leaked into SSE stream!"
+            )

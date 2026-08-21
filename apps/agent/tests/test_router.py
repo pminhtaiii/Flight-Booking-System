@@ -1,9 +1,12 @@
+from unittest.mock import AsyncMock, MagicMock, patch
+
 import pytest
-from unittest.mock import AsyncMock, patch, MagicMock
 from langchain_core.messages import HumanMessage
-from agent.graph.state import AgentState
+
 from agent.graph.router import invoke_router
+from agent.graph.state import AgentState
 from agent.models.requests import RouteDecision
+
 
 @pytest.fixture
 def base_state() -> AgentState:
@@ -12,8 +15,9 @@ def base_state() -> AgentState:
         "iteration_count": 0,
         "pending_confirmation": None,
         "handoff_required": False,
-        "trusted_snapshot": None
+        "trusted_snapshot": None,
     }
+
 
 @pytest.mark.asyncio
 async def test_strict_router_output(base_state):
@@ -22,21 +26,19 @@ async def test_strict_router_output(base_state):
         mock_llm = MagicMock()
         mock_with_structured = AsyncMock()
         mock_with_structured.ainvoke.return_value = RouteDecision(
-            intent="CHECKOUT",
-            confidence=0.9,
-            isCommitment=True,
-            selectionIndex=1
+            intent="CHECKOUT", confidence=0.9, isCommitment=True, selectionIndex=1
         )
         mock_llm.with_structured_output.return_value = mock_with_structured
         mock_get_model.return_value = mock_llm
 
         decision = await invoke_router(base_state)
-        
+
         assert isinstance(decision, RouteDecision)
         assert decision.intent == "CHECKOUT"
         assert decision.confidence == 0.9
         assert decision.isCommitment is True
         assert decision.selectionIndex == 1
+
 
 @pytest.mark.asyncio
 async def test_router_malformed_output(base_state):
@@ -50,9 +52,10 @@ async def test_router_malformed_output(base_state):
         mock_get_model.return_value = mock_llm
 
         decision = await invoke_router(base_state)
-        
+
         assert isinstance(decision, RouteDecision)
-        assert decision.intent in ["SEARCH", "BOOKING_INQUIRY"] # Travel Assistant intents
+        assert decision.intent in ["SEARCH", "BOOKING_INQUIRY"]  # Travel Assistant intents
+
 
 @pytest.mark.asyncio
 async def test_router_confidence_bound(base_state):
@@ -63,13 +66,13 @@ async def test_router_confidence_bound(base_state):
         mock_with_structured.ainvoke.return_value = RouteDecision(
             intent="GENERAL",
             confidence=0.1,  # low confidence
-            isCommitment=False
+            isCommitment=False,
         )
         mock_llm.with_structured_output.return_value = mock_with_structured
         mock_get_model.return_value = mock_llm
 
         decision = await invoke_router(base_state)
-        
+
         assert isinstance(decision, RouteDecision)
         # Should fallback to Travel Assistant (SEARCH/BOOKING_INQUIRY) due to low confidence
         assert decision.intent in ["SEARCH", "BOOKING_INQUIRY"]

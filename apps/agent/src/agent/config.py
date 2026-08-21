@@ -1,18 +1,21 @@
 import os
-from pydantic_settings import BaseSettings, SettingsConfigDict
-from pydantic import Field, BaseModel, model_validator
 from typing import Optional, Union
+
+from pydantic import BaseModel, Field, model_validator
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 DEFAULT_OUTPUT_GUARDRAIL_ENABLED = True
 DEFAULT_OUTPUT_GUARDRAIL_OVERLAP_TOKENS = 30
 DEFAULT_OUTPUT_GUARDRAIL_MAX_CHUNK_TOKENS = 200
 DEFAULT_OUTPUT_GUARDRAIL_NEMO_TIMEOUT = 2.0
 
+
 class OutputGuardrailConfig(BaseModel):
     enabled: bool = DEFAULT_OUTPUT_GUARDRAIL_ENABLED
     overlap_tokens: int = DEFAULT_OUTPUT_GUARDRAIL_OVERLAP_TOKENS
     max_chunk_tokens: int = DEFAULT_OUTPUT_GUARDRAIL_MAX_CHUNK_TOKENS
     nemo_timeout: float = DEFAULT_OUTPUT_GUARDRAIL_NEMO_TIMEOUT
+
 
 class Settings(BaseSettings):
     JWT_SECRET: str = Field(..., min_length=1)
@@ -104,17 +107,13 @@ class Settings(BaseSettings):
             enabled=self.OUTPUT_GUARDRAIL_ENABLED,
             overlap_tokens=self.OUTPUT_GUARDRAIL_OVERLAP_TOKENS,
             max_chunk_tokens=self.OUTPUT_GUARDRAIL_MAX_CHUNK_TOKENS,
-            nemo_timeout=self.OUTPUT_GUARDRAIL_NEMO_TIMEOUT
+            nemo_timeout=self.OUTPUT_GUARDRAIL_NEMO_TIMEOUT,
         )
 
-    model_config = SettingsConfigDict(
-        env_file=".env",
-        env_file_encoding="utf-8",
-        extra="ignore"
-    )
+    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
     @model_validator(mode="after")
-    def validate_settings(self) -> 'Settings':
+    def validate_settings(self) -> "Settings":
         legacy_env_flags = [
             os.getenv("FEATURE_FLAG_CHAT_DIRECT_STREAM"),
             os.getenv("ENABLE_DIRECT_AGENT_STREAM"),
@@ -123,26 +122,42 @@ class Settings(BaseSettings):
         ]
         for val in legacy_env_flags:
             if val is not None and str(val).strip().lower() == "false":
-                raise ValueError("Legacy proxy transport is decommissioned. Direct-only streaming transport is mandatory.")
+                raise ValueError(
+                    "Legacy proxy transport is decommissioned. Direct-only streaming transport is mandatory."
+                )
 
         env_transport = os.getenv("CHAT_STREAM_TRANSPORT")
-        if env_transport is not None and str(env_transport).strip().lower() in ("proxy", "legacy", "false"):
-            raise ValueError("Legacy proxy transport is decommissioned. Direct-only streaming transport is mandatory.")
+        if env_transport is not None and str(env_transport).strip().lower() in (
+            "proxy",
+            "legacy",
+            "false",
+        ):
+            raise ValueError(
+                "Legacy proxy transport is decommissioned. Direct-only streaming transport is mandatory."
+            )
 
         if self.FEATURE_FLAG_CHAT_DIRECT_STREAM is False or (
             isinstance(self.FEATURE_FLAG_CHAT_DIRECT_STREAM, str)
             and self.FEATURE_FLAG_CHAT_DIRECT_STREAM.strip().lower() == "false"
         ):
-            raise ValueError("Legacy proxy transport is decommissioned. Direct-only streaming transport is mandatory.")
+            raise ValueError(
+                "Legacy proxy transport is decommissioned. Direct-only streaming transport is mandatory."
+            )
 
         if self.ENABLE_DIRECT_AGENT_STREAM is False or (
             isinstance(self.ENABLE_DIRECT_AGENT_STREAM, str)
             and self.ENABLE_DIRECT_AGENT_STREAM.strip().lower() == "false"
         ):
-            raise ValueError("Legacy proxy transport is decommissioned. Direct-only streaming transport is mandatory.")
+            raise ValueError(
+                "Legacy proxy transport is decommissioned. Direct-only streaming transport is mandatory."
+            )
 
-        if self.CHAT_STREAM_TRANSPORT is not None and str(self.CHAT_STREAM_TRANSPORT).strip().lower() in ("proxy", "legacy", "false"):
-            raise ValueError("Legacy proxy transport is decommissioned. Direct-only streaming transport is mandatory.")
+        if self.CHAT_STREAM_TRANSPORT is not None and str(
+            self.CHAT_STREAM_TRANSPORT
+        ).strip().lower() in ("proxy", "legacy", "false"):
+            raise ValueError(
+                "Legacy proxy transport is decommissioned. Direct-only streaming transport is mandatory."
+            )
 
         if self.FEATURE_FLAG_CHAT_HANDOFF_ISSUE and not self.FEATURE_FLAG_CHAT_HANDOFF_ACCEPT:
             raise ValueError("Invalid config: ISSUE=true but ACCEPT=false")
@@ -154,7 +169,9 @@ class Settings(BaseSettings):
             raise ValueError("Refresh interval must be less than TTL")
         return self
 
+
 settings: Optional[Settings] = None
+
 
 def get_settings() -> Settings:
     global settings

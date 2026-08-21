@@ -40,6 +40,7 @@ describe('Agent Gateway (E2E)', () => {
     process.env.CLAIM_TOKEN_TTL_SECONDS = '300';
     process.env.ATTESTATION_SECRET = 'test-attestation-secret';
     process.env.CHAT_ENCRYPTION_KEY = crypto.randomBytes(32).toString('hex');
+    process.env.FEATURE_FLAG_BOOKING_READINESS = 'true';
 
     const moduleFixture: TestingModule = await Test.createTestingModule({
       imports: [AppModule],

@@ -25,7 +25,6 @@ const PHONE_COUNTRY_CODE_PATTERN = /^\+\d{1,4}$/;
 const PHONE_NUMBER_PATTERN = /^\d{4,15}$/;
 const PASSPORT_NUMBER_PATTERN = /^[A-Za-z0-9]{3,50}$/;
 const COUNTRY_CODE_PATTERN = /^[A-Z]{2}$/;
-const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
 function toTrimmedString(value: string | null | undefined): string | null {
   if (value === null || value === undefined) {

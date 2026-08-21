@@ -1,18 +1,19 @@
-import pytest
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timedelta, timezone
 from unittest.mock import AsyncMock, patch
 
-from agent.graph.state import AgentState
+import pytest
+
 from agent.graph.nodes import (
-    validate_handoff,
     create_handoff_token,
     create_handoff_token_node,
+    validate_handoff,
 )
+from agent.graph.state import AgentState
 from agent.tools.nestjs_client import NestJSClient
 from agent.tools.registry import (
+    _CHECKOUT_TOOLS,
     _GENERAL_TOOLS,
     _TRAVEL_TOOLS,
-    _CHECKOUT_TOOLS,
     get_tools,
 )
 
@@ -107,9 +108,7 @@ async def test_validate_handoff_expired_snapshot():
         },
     )
     result = await validate_handoff(state, None)
-    assert result == {
-        "action": {"error": "Search snapshot has expired. Please search again."}
-    }
+    assert result == {"action": {"error": "Search snapshot has expired. Please search again."}}
 
 
 @pytest.mark.asyncio
@@ -158,9 +157,7 @@ async def test_create_handoff_token_disabled_feature_flag():
         get_settings.return_value.FEATURE_FLAG_CHAT_HANDOFF_ISSUE = False
         result = await create_handoff_token(state, None)
 
-    assert result == {
-        "action": {"error": "Chat handoff issuance is disabled."}
-    }
+    assert result == {"action": {"error": "Chat handoff issuance is disabled."}}
 
 
 @pytest.mark.asyncio
@@ -249,9 +246,7 @@ async def test_create_handoff_token_redacts_upstream_failure_details(caplog):
         get_settings.return_value.FEATURE_FLAG_CHAT_HANDOFF_ISSUE = True
         result = await create_handoff_token(state, None)
 
-    assert result == {
-        "action": {"error": "Checkout handoff could not be created."}
-    }
+    assert result == {"action": {"error": "Checkout handoff could not be created."}}
     assert "supplier.invalid" not in str(result)
     assert "off_sensitive" not in str(result)
     assert "supplier.invalid" not in caplog.text

@@ -184,19 +184,23 @@ describe('Automated Alert Rules & End-to-End Trace Correlation (e2e)', () => {
     });
 
     it('triggers degraded status and 503 on /health and /health/redis when Redis is unreachable', async () => {
+      const databaseSpy = jest.spyOn(prisma, '$transaction').mockResolvedValue(undefined as never);
       const redisSpy = jest.spyOn(cacheService, 'checkHealth').mockResolvedValue('down');
 
-      const healthRes = await request(app.getHttpServer()).get('/health').expect(503);
-      expect(healthRes.body.status).toBe('degraded');
-      expect(healthRes.body.dependencies.redis).toBe('down');
+      try {
+        const healthRes = await request(app.getHttpServer()).get('/health').expect(503);
+        expect(healthRes.body.status).toBe('degraded');
+        expect(healthRes.body.dependencies.redis).toBe('down');
 
-      const redisRes = await request(app.getHttpServer()).get('/health/redis').expect(503);
-      expect(redisRes.body).toEqual({
-        status: 'down',
-        dependency: 'redis',
-      });
-
-      redisSpy.mockRestore();
+        const redisRes = await request(app.getHttpServer()).get('/health/redis').expect(503);
+        expect(redisRes.body).toEqual({
+          status: 'down',
+          dependency: 'redis',
+        });
+      } finally {
+        redisSpy.mockRestore();
+        databaseSpy.mockRestore();
+      }
     });
 
     it('emits dependency: redis failure telemetry when control plane dependency fails', () => {

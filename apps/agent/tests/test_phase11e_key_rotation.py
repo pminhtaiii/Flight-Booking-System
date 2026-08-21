@@ -1,10 +1,11 @@
-import os
 import time
-import pytest
+
 import jwt
+import pytest
+
+from agent.auth.claim_token import create_claim_token
 from agent.config import Settings
 from agent.utils.auth import decode_and_verify_jwt
-from agent.auth.claim_token import create_claim_token
 
 
 def test_jwt_verification_single_and_ring():
@@ -15,23 +16,41 @@ def test_jwt_verification_single_and_ring():
 
     # Token minted with V1
     token_v1 = jwt.encode(
-        {"sub": "user_123", "jti": "jti_123", "iss": issuer, "aud": audience, "exp": int(time.time()) + 3600},
+        {
+            "sub": "user_123",
+            "jti": "jti_123",
+            "iss": issuer,
+            "aud": audience,
+            "exp": int(time.time()) + 3600,
+        },
         secret_v1,
-        algorithm="HS256"
+        algorithm="HS256",
     )
 
     # Token minted with V2
     token_v2 = jwt.encode(
-        {"sub": "user_456", "jti": "jti_456", "iss": issuer, "aud": audience, "exp": int(time.time()) + 3600},
+        {
+            "sub": "user_456",
+            "jti": "jti_456",
+            "iss": issuer,
+            "aud": audience,
+            "exp": int(time.time()) + 3600,
+        },
         secret_v2,
-        algorithm="HS256"
+        algorithm="HS256",
     )
 
     # Token minted with unknown secret
     token_invalid = jwt.encode(
-        {"sub": "user_789", "jti": "jti_789", "iss": issuer, "aud": audience, "exp": int(time.time()) + 3600},
+        {
+            "sub": "user_789",
+            "jti": "jti_789",
+            "iss": issuer,
+            "aud": audience,
+            "exp": int(time.time()) + 3600,
+        },
         "unknown-secret",
-        algorithm="HS256"
+        algorithm="HS256",
     )
 
     # Ring containing V2 as primary and V1 in ring

@@ -708,7 +708,6 @@ export class AgentGatewayService {
 
       // Call DuffelService
       let rawResponse;
-      let createdOffers;
       let searchHashValue = '';
       try {
         const searchResult = await this.duffelService.searchFlights(
@@ -759,7 +758,7 @@ export class AgentGatewayService {
         });
       }
 
-      createdOffers = await this.prisma.flightOffer.findMany({
+      const createdOffers = await this.prisma.flightOffer.findMany({
         where: {
           searchHash: searchHashValue,
           duffelOfferId: { in: limitedOffers.map((o) => o.id) },

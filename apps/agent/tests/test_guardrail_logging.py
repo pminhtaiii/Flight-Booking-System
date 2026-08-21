@@ -1,9 +1,12 @@
-import pytest
-import logging
 import json
+import logging
 from unittest.mock import AsyncMock, MagicMock
-from agent.guardrails.output_pipeline import OutputGuardrailPipeline, OutputGuardrailBlockedError
+
+import pytest
+
 from agent.config import OutputGuardrailConfig
+from agent.guardrails.output_pipeline import OutputGuardrailBlockedError, OutputGuardrailPipeline
+
 
 @pytest.fixture
 def mock_nemo_service():
@@ -11,23 +14,20 @@ def mock_nemo_service():
     service.validate_output_chunk = AsyncMock()
     return service
 
+
 @pytest.fixture
 def enabled_config():
     return OutputGuardrailConfig(
-        enabled=True,
-        overlap_tokens=30,
-        max_chunk_tokens=200,
-        nemo_timeout=2.0
+        enabled=True, overlap_tokens=30, max_chunk_tokens=200, nemo_timeout=2.0
     )
+
 
 @pytest.mark.asyncio
 async def test_guardrail_logging_safe_chunks(enabled_config, mock_nemo_service, caplog):
     mock_nemo_service.validate_output_chunk.return_value = (True, "")
-    
+
     pipeline = OutputGuardrailPipeline(
-        config=enabled_config,
-        nemo_service=mock_nemo_service,
-        session_id="test-session-123"
+        config=enabled_config, nemo_service=mock_nemo_service, session_id="test-session-123"
     )
 
     caplog.clear()
@@ -51,7 +51,7 @@ async def test_guardrail_logging_safe_chunks(enabled_config, mock_nemo_service, 
     assert len(records) >= 3
 
     log_payloads = [json.loads(rec.message) for rec in records]
-    
+
     # Check regex check log payload for chunk 1
     regex_log = next(p for p in log_payloads if p["layer"] == "regex" and p["chunk_index"] == 1)
     assert regex_log["session_id"] == "test-session-123"
@@ -65,7 +65,9 @@ async def test_guardrail_logging_safe_chunks(enabled_config, mock_nemo_service, 
     assert nemo_log["verdict"] == "pass"
 
     # Check boundary check log payload for chunk 2
-    boundary_log = next(p for p in log_payloads if p["layer"] == "boundary" and p["chunk_index"] == 2)
+    boundary_log = next(
+        p for p in log_payloads if p["layer"] == "boundary" and p["chunk_index"] == 2
+    )
     assert boundary_log["session_id"] == "test-session-123"
     assert boundary_log["verdict"] == "pass"
 
@@ -76,15 +78,17 @@ async def test_guardrail_logging_safe_chunks(enabled_config, mock_nemo_service, 
         assert "world" not in payload_str
         assert "safe" not in payload_str
 
+
 @pytest.mark.asyncio
 async def test_guardrail_logging_blocked_chunks(enabled_config, mock_nemo_service, caplog):
     # Mock NeMo validation to fail
-    mock_nemo_service.validate_output_chunk.return_value = (False, "Safety check violation: harmful content.")
-    
+    mock_nemo_service.validate_output_chunk.return_value = (
+        False,
+        "Safety check violation: harmful content.",
+    )
+
     pipeline = OutputGuardrailPipeline(
-        config=enabled_config,
-        nemo_service=mock_nemo_service,
-        session_id="test-session-456"
+        config=enabled_config, nemo_service=mock_nemo_service, session_id="test-session-456"
     )
 
     caplog.clear()
@@ -98,10 +102,10 @@ async def test_guardrail_logging_blocked_chunks(enabled_config, mock_nemo_servic
                 pass
 
     records = [rec for rec in caplog.records if rec.name == "agent.guardrails"]
-    assert len(records) >= 2 # regex pass, nemo fail
-    
+    assert len(records) >= 2  # regex pass, nemo fail
+
     log_payloads = [json.loads(rec.message) for rec in records]
-    
+
     nemo_log = next(p for p in log_payloads if p["layer"] == "nemo")
     assert nemo_log["session_id"] == "test-session-456"
     assert nemo_log["verdict"] == "fail"

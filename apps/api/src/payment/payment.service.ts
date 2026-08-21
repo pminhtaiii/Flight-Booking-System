@@ -22,7 +22,7 @@ import { ConfirmPaymentDto } from '@/payment/dto/confirm-payment.dto';
 import { PaymentResponseDto } from '@/payment/dto/payment-response.dto';
 import { enforceTransition } from '@/payment/payment-state-machine';
 import * as crypto from 'crypto';
-import { Prisma, BookingFailureReason, AncillarySelectionStatus } from '@prisma/client';
+import { Prisma, BookingFailureReason } from '@prisma/client';
 
 import { BookingService } from '@/booking/booking.service';
 import { forwardRef, Inject } from '@nestjs/common';
@@ -65,7 +65,7 @@ function authoritativeAmountsEqual(
   }
 }
 
-function canonicalOrderServices(selection: {
+function _canonicalOrderServices(selection: {
   seatSelections: Array<{ serviceId: string }>;
   baggageSelections: Array<{ serviceId: string; quantity: number }>;
 }): Array<{ id: string; quantity: number }> {

@@ -38,8 +38,8 @@ export class BookingAgentProjectionService {
     let airline = '';
     let flightNumber: string | null = null;
     let baggageSummary: string | null = null;
-    let refundable: boolean | null = null;
-    let changeable: boolean | null = null;
+    const refundable: boolean | null = null;
+    const changeable: boolean | null = null;
     let hasFlightData = false;
 
     // 1. Primary: Active ItineraryRevision segments

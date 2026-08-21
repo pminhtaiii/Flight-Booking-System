@@ -4,12 +4,15 @@ import time
 import uuid
 from dataclasses import dataclass, field
 from typing import Optional
+
 from fastapi import HTTPException
+
 from agent.repositories.session_lock_repository import SessionLockRepository
 
 logger = logging.getLogger("agent.queue")
 
 background_tasks: set[asyncio.Task] = set()
+
 
 @dataclass
 class ActiveFence:
@@ -19,12 +22,14 @@ class ActiveFence:
     user_id: str
     monitored_tasks: set[asyncio.Task] = field(default_factory=set)
 
+
 class MessageQueueManager:
     """
-    Manages per-session locks and request depths to queue concurrent requests 
+    Manages per-session locks and request depths to queue concurrent requests
     and reject requests exceeding the maximum allowed depth.
     Uses SessionLockRepository for distributed locking and refresh-loss cancellation.
     """
+
     def __init__(
         self,
         max_depth: int = 3,
@@ -36,7 +41,7 @@ class MessageQueueManager:
         self.depths: dict[str, int] = {}
         self.manager_lock = asyncio.Lock()
         self.repo = SessionLockRepository()
-        
+
         self.active_fences: dict[str, ActiveFence] = {}
         self.refresh_interval = refresh_interval
         self.lock_ttl_ms = lock_ttl_ms
@@ -47,10 +52,12 @@ class MessageQueueManager:
             if not active or active.req_id != req_id:
                 return
             tasks = list(active.monitored_tasks)
-            
+
         for task in tasks:
             if task and not task.done():
-                logger.warning(f"Cancelling task {task.get_name()} due to lost session lock for session {session_id}.")
+                logger.warning(
+                    f"Cancelling task {task.get_name()} due to lost session lock for session {session_id}."
+                )
                 task.cancel()
 
     async def attach_task(self, session_id: str, req_id: str, task: asyncio.Task) -> bool:
@@ -81,43 +88,51 @@ class MessageQueueManager:
                 )
                 raise HTTPException(
                     status_code=429,
-                    detail="Too many concurrent requests for this conversation. Please wait."
+                    detail="Too many concurrent requests for this conversation. Please wait.",
                 )
             self.depths[session_id] = depth + 1
 
         logger.info(f"Acquiring lock for session {session_id} (depth: {depth + 1})")
         req_id = str(uuid.uuid4())
-        
+
         # Bounded wait for the distributed lock
         timeout = 30.0
         start_time = time.time()
         fence = None
-        
+
         try:
             while time.time() - start_time < timeout:
-                fence = await self.repo.acquire_lock(user_id, session_id, req_id, ttl_ms=self.lock_ttl_ms)
+                fence = await self.repo.acquire_lock(
+                    user_id, session_id, req_id, ttl_ms=self.lock_ttl_ms
+                )
                 if fence is not None:
                     break
                 await asyncio.sleep(0.1)
-                
+
             if fence is None:
                 raise HTTPException(status_code=429, detail="Could not acquire session lock.")
 
             main_task = asyncio.current_task()
-            
+
             async def refresher():
                 try:
                     while True:
                         await asyncio.sleep(self.refresh_interval)
                         try:
-                            ok = await self.repo.refresh_lock(user_id, session_id, req_id, fence, ttl_ms=self.lock_ttl_ms)
+                            ok = await self.repo.refresh_lock(
+                                user_id, session_id, req_id, fence, ttl_ms=self.lock_ttl_ms
+                            )
                         except Exception as err:
-                            logger.error(f"Redis error during session lock refresh for session {session_id}: {err!s}. Cancelling active tasks.")
+                            logger.error(
+                                f"Redis error during session lock refresh for session {session_id}: {err!s}. Cancelling active tasks."
+                            )
                             await self._cancel_monitored_tasks(session_id, req_id)
                             break
 
                         if not ok:
-                            logger.warning(f"Lost session lock refresh for session {session_id}. Cancelling active tasks.")
+                            logger.warning(
+                                f"Lost session lock refresh for session {session_id}. Cancelling active tasks."
+                            )
                             await self._cancel_monitored_tasks(session_id, req_id)
                             break
                 except asyncio.CancelledError:
@@ -126,13 +141,13 @@ class MessageQueueManager:
             refresh_task = asyncio.create_task(refresher())
             background_tasks.add(refresh_task)
             refresh_task.add_done_callback(background_tasks.discard)
-            
+
             active_fence = ActiveFence(
                 req_id=req_id,
                 fence=fence,
                 refresh_task=refresh_task,
                 user_id=user_id,
-                monitored_tasks={main_task} if main_task else set()
+                monitored_tasks={main_task} if main_task else set(),
             )
             if main_task:
                 main_task.add_done_callback(lambda t: active_fence.monitored_tasks.discard(t))
@@ -142,13 +157,15 @@ class MessageQueueManager:
 
             return req_id
         except BaseException:
-            if 'refresh_task' in locals():
-                locals()['refresh_task'].cancel()
+            if "refresh_task" in locals():
+                locals()["refresh_task"].cancel()
             if fence is not None:
-                rel_task = asyncio.create_task(self.repo.release_lock(user_id, session_id, req_id, fence))
+                rel_task = asyncio.create_task(
+                    self.repo.release_lock(user_id, session_id, req_id, fence)
+                )
                 background_tasks.add(rel_task)
                 rel_task.add_done_callback(background_tasks.discard)
-                
+
             async with self.manager_lock:
                 self.depths[session_id] -= 1
                 if self.depths[session_id] <= 0:
@@ -184,12 +201,14 @@ class MessageQueueManager:
             active.refresh_task.cancel()
             await self.repo.release_lock(active.user_id, session_id, active.req_id, active.fence)
             logger.info(f"Released lock for session {session_id} (req_id: {active.req_id})")
-        
+
     async def validate_active_fence(self, session_id: str) -> bool:
         async with self.manager_lock:
             active = self.active_fences.get(session_id)
         if active:
-            return await self.repo.validate_fence(active.user_id, session_id, active.req_id, active.fence)
+            return await self.repo.validate_fence(
+                active.user_id, session_id, active.req_id, active.fence
+            )
         return False
 
     def get_fence(self, session_id: str) -> Optional[int]:
