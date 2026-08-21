@@ -122,6 +122,16 @@ jobs:
     timeout-minutes: 20
     env:
       DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/ci_dummy?schema=public
+      REDIS_URL: redis://127.0.0.1:6379/0
+      NODE_ENV: test
+      STRIPE_SECRET_KEY: sk_test_ci_not_a_secret
+      STRIPE_WEBHOOK_SECRET: whsec_ci_not_a_secret
+      JWT_SECRET: ci-not-a-secret-jwt
+      AGENT_SERVICE_API_KEY: ci-not-a-secret-agent-key
+      CLAIM_TOKEN_SECRET: ci-not-a-secret-claim-key
+      ATTESTATION_SECRET: ci-not-a-secret-attestation
+      ENCRYPTION_KEY: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+      CHAT_ENCRYPTION_KEY: bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
     steps:
       - name: Use LF checkout behavior
         run: git config --global core.autocrlf input
@@ -361,11 +371,11 @@ jobs:
         run: uv sync --locked --package agent
       - name: Run non-Redis Agent tests with loopback-only network
         env:
-          PYTHONPATH: ${{ github.workspace }}/tests/ci/python
+          PYTHONPATH: ${{ github.workspace }}/tests/ci/python:${{ github.workspace }}/apps/agent/src
         run: uv run --package agent pytest apps/agent/tests -m "not redis_integration"
       - name: Run required Redis integration tests with loopback-only network
         env:
-          PYTHONPATH: ${{ github.workspace }}/tests/ci/python
+          PYTHONPATH: ${{ github.workspace }}/tests/ci/python:${{ github.workspace }}/apps/agent/src
         run: uv run --package agent pytest apps/agent/tests -m redis_integration --strict-markers
 
   ci-status:
