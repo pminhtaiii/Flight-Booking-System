@@ -361,6 +361,9 @@ describe('Refund Characterization (E2E)', () => {
         amount: 10000,
         status: PaymentStatus.SUCCEEDED,
       });
+      const booking = await createBooking(regularUser.id, intent.id, payment.id, {
+        status: BookingStatus.CANCELLED_PENDING_REFUND,
+      });
 
       // Initiate refund putting Payment into REFUND_PENDING and creating Refund record
       const stripeRefundSpy = jest
@@ -381,7 +384,7 @@ describe('Refund Characterization (E2E)', () => {
       // Bind stripeRefundId to the refund record to simulate Stripe's immediate return
       await prisma.refund.update({
         where: { id: refundResponse.refundId },
-        data: { stripeRefundId: 're_wh_char_1' },
+        data: { stripeRefundId: 're_wh_char_1', bookingId: booking.id },
       });
 
       // Deliver charge.refunded webhook event
@@ -408,6 +411,12 @@ describe('Refund Characterization (E2E)', () => {
         where: { id: payment.id },
       });
       expect(updatedPayment.status).toBe(PaymentStatus.REFUNDED);
+
+      // Verify Booking terminal status
+      const updatedBooking = await prisma.booking.findUniqueOrThrow({
+        where: { id: booking.id },
+      });
+      expect(updatedBooking.status).toBe(BookingStatus.CANCELLED_AND_REFUNDED);
 
       // Verify Refund record status
       const updatedRefund = await prisma.refund.findUniqueOrThrow({
@@ -882,10 +891,11 @@ describe('Refund Characterization (E2E)', () => {
       const intent2 = await createBookingIntent(regularUser.id, offer2.id);
       const key2 = await createIdempotencyKey(regularUser.id, 'inv2');
       const payment2 = await createPayment(intent2.id, key2.id, { amount: 10000, status: PaymentStatus.SUCCEEDED });
+      const booking2 = await createBooking(regularUser.id, intent2.id, payment2.id, { status: BookingStatus.CANCELLED_PENDING_REFUND });
       const stripeSpy2 = jest.spyOn(stripeService, 'createRefund').mockResolvedValue({ id: 're_inv_2' } as any);
       const ref2 = await paymentRefundService.initiateRefund(payment2.id, { amount: 10000, reason: 'customer_request' }, `inv-wh-${Date.now()}`, regularUser.id, 'USER');
       stripeSpy2.mockRestore();
-      await prisma.refund.update({ where: { id: ref2.refundId }, data: { stripeRefundId: 're_inv_2' } });
+      await prisma.refund.update({ where: { id: ref2.refundId }, data: { stripeRefundId: 're_inv_2', bookingId: booking2.id } });
       await paymentWebhookService.handleWebhookEvent({
         id: `evt_inv_2_${Date.now()}`,
         type: 'charge.refunded',
@@ -948,10 +958,11 @@ describe('Refund Characterization (E2E)', () => {
         expect(p.status).toBe(PaymentStatus.REFUNDED);
       }
 
-      // Verify bookings 1, 3, 4 are CANCELLED_AND_REFUNDED
+      // Verify all 4 bookings are CANCELLED_AND_REFUNDED
       const allBookings = await prisma.booking.findMany({
-        where: { id: { in: [booking1.id, booking3.id, booking4.id] } },
+        where: { id: { in: [booking1.id, booking2.id, booking3.id, booking4.id] } },
       });
+      expect(allBookings).toHaveLength(4);
       for (const b of allBookings) {
         expect(b.status).toBe(BookingStatus.CANCELLED_AND_REFUNDED);
       }
