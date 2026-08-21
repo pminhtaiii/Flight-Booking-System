@@ -335,6 +335,12 @@ jobs:
       REDIS_URL: redis://127.0.0.1:6379/0
       CI_REQUIRE_REDIS_TESTS: '1'
       NODE_ENV: test
+      JWT_SECRET: ci-not-a-secret-jwt
+      AGENT_SERVICE_API_KEY: ci-not-a-secret-agent-key
+      CLAIM_TOKEN_SECRET: ci-not-a-secret-claim-key
+      NESTJS_API_URL: http://127.0.0.1:3001/api
+      MIMO_API_KEY: test-mimo-key
+      MIMO_API_URL: http://127.0.0.1:8000
     steps:
       - name: Use LF checkout behavior
         run: git config --global core.autocrlf input

@@ -25,7 +25,6 @@ describe('ChatMessageCryptoService', () => {
     }).compile();
 
     service = module.get<ChatMessageCryptoService>(ChatMessageCryptoService);
-    configService = module.get<ConfigService>(ConfigService);
   });
 
   it('should be defined and configured', () => {
