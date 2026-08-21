@@ -43,36 +43,40 @@ export default defineConfig({
     },
   ],
   webServer: [
-    {
-      command: t093RealFlow
-        ? 'node -r ts-node/register -r tsconfig-paths/register test/t093-server.ts'
-        : 'pnpm start:prod',
-      url: t093RealFlow
-        ? 'http://127.0.0.1:3001/test/t093/ready'
-        : 'http://127.0.0.1:3001/health',
-      reuseExistingServer: t093RealFlow ? false : !process.env.CI,
-      timeout: 600000,
-      cwd: path.resolve(__dirname, '../../api'),
-      env: {
-        NODE_ENV: 'test',
-        DATABASE_URL: 'postgresql://postgres:postgres@127.0.0.1:5432/test_db',
-        REDIS_URL: 'redis://127.0.0.1:6379/1',
-        FEATURE_FLAG_BOOKING_READINESS: 'true',
-        FEATURE_FLAG_CHAT_HANDOFF_ISSUE: 'true',
-        FEATURE_FLAG_CHAT_HANDOFF_ACCEPT: 'true',
-        CHAT_HANDOFF_SECRET: t093Secrets.handoff,
-        ATTESTATION_SECRET: t093Secrets.attestation,
-        CHAT_ENCRYPTION_KEY: t093Secrets.encryption,
-        ENCRYPTION_KEY: randomBytes(32).toString('hex'),
-        JWT_SECRET: t093Secrets.jwt,
-        AGENT_SERVICE_API_KEY: t093Secrets.agent,
-        CLAIM_TOKEN_SECRET: t093Secrets.claim,
-        STRIPE_SECRET_KEY: t093Secrets.stripe,
-        STRIPE_WEBHOOK_SECRET: t093Secrets.stripeWebhook,
-        DUFFEL_ACCESS_TOKEN: generatedSecret(),
-        FRONTEND_URL: t093RealFlow ? 'http://localhost:3000' : 'http://127.0.0.1:3000',
-      },
-    },
+    ...(process.env.PLAYWRIGHT_FRONTEND_ONLY !== 'true'
+      ? [
+          {
+            command: t093RealFlow
+              ? 'node -r ts-node/register -r tsconfig-paths/register test/t093-server.ts'
+              : 'pnpm start:prod',
+            url: t093RealFlow
+              ? 'http://127.0.0.1:3001/test/t093/ready'
+              : 'http://127.0.0.1:3001/health',
+            reuseExistingServer: t093RealFlow ? false : !process.env.CI,
+            timeout: 600000,
+            cwd: path.resolve(__dirname, '../../api'),
+            env: {
+              NODE_ENV: 'test',
+              DATABASE_URL: 'postgresql://postgres:postgres@127.0.0.1:5432/test_db',
+              REDIS_URL: 'redis://127.0.0.1:6379/1',
+              FEATURE_FLAG_BOOKING_READINESS: 'true',
+              FEATURE_FLAG_CHAT_HANDOFF_ISSUE: 'true',
+              FEATURE_FLAG_CHAT_HANDOFF_ACCEPT: 'true',
+              CHAT_HANDOFF_SECRET: t093Secrets.handoff,
+              ATTESTATION_SECRET: t093Secrets.attestation,
+              CHAT_ENCRYPTION_KEY: t093Secrets.encryption,
+              ENCRYPTION_KEY: randomBytes(32).toString('hex'),
+              JWT_SECRET: t093Secrets.jwt,
+              AGENT_SERVICE_API_KEY: t093Secrets.agent,
+              CLAIM_TOKEN_SECRET: t093Secrets.claim,
+              STRIPE_SECRET_KEY: t093Secrets.stripe,
+              STRIPE_WEBHOOK_SECRET: t093Secrets.stripeWebhook,
+              DUFFEL_ACCESS_TOKEN: generatedSecret(),
+              FRONTEND_URL: t093RealFlow ? 'http://localhost:3000' : 'http://127.0.0.1:3000',
+            },
+          },
+        ]
+      : []),
     ...(t093RealFlow
       ? [
           {

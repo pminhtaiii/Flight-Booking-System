@@ -297,6 +297,10 @@ jobs:
         run: |
           pnpm build:shared
           pnpm --filter @web/frontend typecheck
+      - name: Run web characterization safety checks
+        env:
+          PLAYWRIGHT_FRONTEND_ONLY: 'true'
+        run: pnpm --filter @web/frontend test:characterization
 
   web-build:
     needs: [detect-changes, web-gate]
