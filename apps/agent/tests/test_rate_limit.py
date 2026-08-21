@@ -1,15 +1,16 @@
-import time
 import os
-import pytest
-import jwt
-import httpx
-from unittest.mock import AsyncMock, patch, MagicMock
-from fastapi import FastAPI, Request
-import redis.asyncio as redis
+import time
+from unittest.mock import AsyncMock, MagicMock
 
+import httpx
+import jwt
+import pytest
+import redis.asyncio as redis
+from fastapi import FastAPI
+
+from agent.config import get_settings
 from agent.middleware.auth import JWTAuthMiddleware
 from agent.middleware.rate_limit import RateLimitMiddleware
-from agent.config import get_settings
 
 settings = get_settings()
 SECRET = settings.JWT_SECRET
@@ -69,9 +70,14 @@ async def test_two_instance_burst_limit_shared(real_redis):
     async def endpoint2():
         return {"instance": 2}
 
-    async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app1), base_url="http://test") as client1, \
-               httpx.AsyncClient(transport=httpx.ASGITransport(app=app2), base_url="http://test") as client2:
-
+    async with (
+        httpx.AsyncClient(
+            transport=httpx.ASGITransport(app=app1), base_url="http://test"
+        ) as client1,
+        httpx.AsyncClient(
+            transport=httpx.ASGITransport(app=app2), base_url="http://test"
+        ) as client2,
+    ):
         # 3 requests to Instance 1 -> HTTP 200
         for _ in range(3):
             res = await client1.get("/test", headers=headers)
@@ -106,7 +112,9 @@ async def test_two_instance_daily_limit_shared(real_redis):
 
     # App 1 with daily_limit=5, burst_limit=10
     app1 = FastAPI()
-    app1.add_middleware(RateLimitMiddleware, limit=10, daily_limit=5, window=60, redis_client=real_redis)
+    app1.add_middleware(
+        RateLimitMiddleware, limit=10, daily_limit=5, window=60, redis_client=real_redis
+    )
     app1.add_middleware(JWTAuthMiddleware, secret=SECRET)
 
     @app1.get("/test")
@@ -115,16 +123,19 @@ async def test_two_instance_daily_limit_shared(real_redis):
 
     # App 2 sharing same Redis
     app2 = FastAPI()
-    app2.add_middleware(RateLimitMiddleware, limit=10, daily_limit=5, window=60, redis_client=real_redis)
+    app2.add_middleware(
+        RateLimitMiddleware, limit=10, daily_limit=5, window=60, redis_client=real_redis
+    )
     app2.add_middleware(JWTAuthMiddleware, secret=SECRET)
 
     @app2.get("/test")
     async def endpoint2():
         return {"ok": True}
 
-    async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app1), base_url="http://test") as c1, \
-               httpx.AsyncClient(transport=httpx.ASGITransport(app=app2), base_url="http://test") as c2:
-
+    async with (
+        httpx.AsyncClient(transport=httpx.ASGITransport(app=app1), base_url="http://test") as c1,
+        httpx.AsyncClient(transport=httpx.ASGITransport(app=app2), base_url="http://test") as c2,
+    ):
         # Alternate 5 accepted requests across instances
         assert (await c1.get("/test", headers=headers)).status_code == 200
         assert (await c2.get("/test", headers=headers)).status_code == 200
@@ -153,15 +164,18 @@ async def test_accepted_only_non_charging(real_redis):
     headers = {"Authorization": f"Bearer {token}"}
 
     app = FastAPI()
-    app.add_middleware(RateLimitMiddleware, limit=3, daily_limit=5, window=60, redis_client=real_redis)
+    app.add_middleware(
+        RateLimitMiddleware, limit=3, daily_limit=5, window=60, redis_client=real_redis
+    )
     app.add_middleware(JWTAuthMiddleware, secret=SECRET)
 
     @app.get("/test")
     async def endpoint():
         return {"ok": True}
 
-    async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test") as c:
-
+    async with httpx.AsyncClient(
+        transport=httpx.ASGITransport(app=app), base_url="http://test"
+    ) as c:
         # 3 accepted requests
         for _ in range(3):
             res = await c.get("/test", headers=headers)
@@ -196,7 +210,9 @@ async def test_redis_unavailable_fail_closed():
         return {"ok": True}
 
     token = make_token("user-fail-1")
-    async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test") as c:
+    async with httpx.AsyncClient(
+        transport=httpx.ASGITransport(app=app), base_url="http://test"
+    ) as c:
         res = await c.get("/test", headers={"Authorization": f"Bearer {token}"})
         assert res.status_code == 503
         body = res.json()
@@ -222,7 +238,9 @@ async def test_options_and_health_bypass_rate_limit():
     async def health_options():
         return {"status": "ok"}
 
-    async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test") as c:
+    async with httpx.AsyncClient(
+        transport=httpx.ASGITransport(app=app), base_url="http://test"
+    ) as c:
         # /health should bypass rate limit without touching Redis
         res = await c.get("/health")
         assert res.status_code == 200

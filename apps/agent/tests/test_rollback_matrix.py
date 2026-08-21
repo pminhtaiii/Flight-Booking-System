@@ -1,20 +1,19 @@
-import pytest
+import json
+import time
 from unittest.mock import AsyncMock, MagicMock, patch
+
+import httpx
+import jwt
+import pytest
 from langchain_core.messages import AIMessage, HumanMessage
 from langchain_core.runnables import RunnableConfig
-import json
-import httpx
-import time
-import jwt
 
-from agent.config import get_settings
 from agent.graph.graph import graph, router_node
 from agent.graph.nodes import create_handoff_token
 from agent.graph.state import AgentState
+from agent.main import app
 from agent.models.requests import RouteDecision
 from agent.tools.nestjs_client import NestJSClient
-from agent.main import app
-
 
 JWT_SECRET = "testsecret_must_be_at_least_32_bytes_long_for_security_reasons"
 
@@ -154,9 +153,7 @@ async def test_step1_rollback_create_handoff_token_node_returns_disabled_error(
 
         result = await create_handoff_token(state, config)
 
-    assert result == {
-        "action": {"error": "Chat handoff issuance is disabled."}
-    }
+    assert result == {"action": {"error": "Chat handoff issuance is disabled."}}
     mock_nestjs_client.create_handoff_token.assert_not_called()
 
 
@@ -189,10 +186,11 @@ async def test_step1_rollback_sse_stream_emits_no_action_handoff_on_disabled_fla
         ],
     }
 
+    from typing import Any, AsyncIterator, List
+
     from langchain_core.language_models.chat_models import BaseChatModel
-    from langchain_core.outputs import ChatResult, ChatGeneration, ChatGenerationChunk
     from langchain_core.messages import AIMessageChunk, BaseMessage
-    from typing import List, Optional, Any, AsyncIterator
+    from langchain_core.outputs import ChatGeneration, ChatGenerationChunk, ChatResult
     from pydantic import Field
 
     class MockStreamingLLM(BaseChatModel):
@@ -205,7 +203,9 @@ async def test_step1_rollback_sse_stream_emits_no_action_handoff_on_disabled_fla
             resp = self.responses.pop(0) if self.responses else AIMessage(content="Hello")
             return ChatResult(generations=[ChatGeneration(message=resp)])
 
-        async def _astream(self, messages: List[BaseMessage], **kwargs: Any) -> AsyncIterator[ChatGenerationChunk]:
+        async def _astream(
+            self, messages: List[BaseMessage], **kwargs: Any
+        ) -> AsyncIterator[ChatGenerationChunk]:
             resp = self.responses.pop(0) if self.responses else AIMessage(content="Hello")
             if resp.tool_calls:
                 yield ChatGenerationChunk(
@@ -323,9 +323,7 @@ async def test_step2_rollback_router_node_bypasses_router_llm():
 
 
 @pytest.mark.asyncio
-async def test_step2_rollback_single_agent_flight_search_succeeds(
-    mock_nestjs_client, mock_llm
-):
+async def test_step2_rollback_single_agent_flight_search_succeeds(mock_nestjs_client, mock_llm):
     """
     Step 2 Rollback: When FEATURE_FLAG_CHAT_MULTI_AGENT=False,
     flight search queries execute safely through single-agent (travel assistant)
@@ -373,9 +371,7 @@ async def test_step2_rollback_single_agent_flight_search_succeeds(
                 }
             ],
         ),
-        AIMessage(
-            content="I found Vietnam Airlines flight VN310 from HAN to NRT for $452.00 USD."
-        ),
+        AIMessage(content="I found Vietnam Airlines flight VN310 from HAN to NRT for $452.00 USD."),
     ]
 
     config = RunnableConfig(
@@ -395,9 +391,7 @@ async def test_step2_rollback_single_agent_flight_search_succeeds(
         mock_graph_settings.return_value.AGENT_MAX_ITERATIONS = 5
 
         initial_state: AgentState = {
-            "messages": [
-                HumanMessage(content="find me flights from Hanoi to Tokyo on July 15")
-            ],
+            "messages": [HumanMessage(content="find me flights from Hanoi to Tokyo on July 15")],
             "iteration_count": 0,
         }
 
@@ -418,17 +412,12 @@ async def test_step2_rollback_single_agent_flight_search_succeeds(
 
     # Final response delivered cleanly
     assert len(final_state["messages"]) >= 3
-    assert (
-        "Vietnam Airlines flight VN310"
-        in final_state["messages"][-1].content
-    )
+    assert "Vietnam Airlines flight VN310" in final_state["messages"][-1].content
     assert final_state["iteration_count"] == 1
 
 
 @pytest.mark.asyncio
-async def test_step2_rollback_single_agent_preference_query_succeeds(
-    mock_nestjs_client, mock_llm
-):
+async def test_step2_rollback_single_agent_preference_query_succeeds(mock_nestjs_client, mock_llm):
     """
     Step 2 Rollback: When FEATURE_FLAG_CHAT_MULTI_AGENT=False,
     user preference queries execute safely through single-agent (travel assistant)

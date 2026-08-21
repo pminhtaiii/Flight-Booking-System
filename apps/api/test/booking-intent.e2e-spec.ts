@@ -52,6 +52,7 @@ describe('Booking Intent (E2E)', () => {
     app.useGlobalFilters(new HttpExceptionFilter());
     app.setGlobalPrefix('api', { exclude: ['health'] });
     await app.init();
+    await app.listen(0, '127.0.0.1');
 
     prisma = moduleFixture.get<PrismaService>(PrismaService);
     jwtService = moduleFixture.get<JwtService>(JwtService);

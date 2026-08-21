@@ -1,10 +1,12 @@
+import logging
+from typing import Any, Dict, List, Optional
+
 import httpx
 import jwt
 from jwt import InvalidTokenError
-from typing import Optional, List, Dict, Any
-import logging
-from agent.config import get_settings
+
 from agent.auth.claim_token import create_claim_token
+from agent.config import get_settings
 from agent.observability.chat_observability import safe_opaque_id
 
 logger = logging.getLogger(__name__)
@@ -95,7 +97,9 @@ def validate_booking_readiness_response(data: object) -> Optional[dict]:
         for section in passenger["sections"]:
             if not _has_exact_keys(section, {"name", "fields"}):
                 return None
-            if section["name"] not in _READINESS_SECTION_NAMES or not isinstance(section["fields"], list):
+            if section["name"] not in _READINESS_SECTION_NAMES or not isinstance(
+                section["fields"], list
+            ):
                 return None
 
             safe_fields = []
@@ -108,19 +112,23 @@ def validate_booking_readiness_response(data: object) -> Optional[dict]:
                     or (field["reason"] is not None and field["reason"] not in _READINESS_REASONS)
                 ):
                     return None
-                safe_fields.append({
-                    "name": field["name"],
-                    "status": field["status"],
-                    "reason": field["reason"],
-                })
+                safe_fields.append(
+                    {
+                        "name": field["name"],
+                        "status": field["status"],
+                        "reason": field["reason"],
+                    }
+                )
 
             safe_sections.append({"name": section["name"], "fields": safe_fields})
 
-        safe_passengers.append({
-            "passengerType": passenger["passengerType"],
-            "passengerOrdinal": passenger["passengerOrdinal"],
-            "sections": safe_sections,
-        })
+        safe_passengers.append(
+            {
+                "passengerType": passenger["passengerType"],
+                "passengerOrdinal": passenger["passengerOrdinal"],
+                "sections": safe_sections,
+            }
+        )
 
     return {
         "scope": data["scope"],
@@ -128,6 +136,7 @@ def validate_booking_readiness_response(data: object) -> Optional[dict]:
         "passengers": safe_passengers,
         "nextAction": data["nextAction"],
     }
+
 
 class NestJSClient:
     def __init__(
@@ -152,7 +161,9 @@ class NestJSClient:
         else:
             self.headers.pop("X-Fencing-Token", None)
 
-    async def check_user_access(self, sub: str, jti: Optional[str] = None, exp: Optional[int] = None) -> Dict[str, Any]:
+    async def check_user_access(
+        self, sub: str, jti: Optional[str] = None, exp: Optional[int] = None
+    ) -> Dict[str, Any]:
         """
         Calls service-authenticated NestJS access check POST /api/agent-gateway/chat/access/check.
         """
@@ -163,7 +174,7 @@ class NestJSClient:
         headers = {
             "X-Agent-API-Key": settings.AGENT_SERVICE_API_KEY,
             "X-User-Claim": claim_token,
-            "Content-Type": "application/json"
+            "Content-Type": "application/json",
         }
         headers["X-Trace-Id"] = self.trace_id
         headers["X-Correlation-Id"] = self.correlation_id
@@ -193,22 +204,14 @@ class NestJSClient:
             return response.json()
 
     async def create_message(
-        self,
-        session_id: str,
-        sender: str,
-        message_type: str,
-        content: str
+        self, session_id: str, sender: str, message_type: str, content: str
     ) -> Dict[str, Any]:
         if message_type == "SUMMARY":
             url = f"{self.base_url}/agent-gateway/chat/sessions/{session_id}/summaries"
             payload = {"content": content}
         else:
             url = f"{self.base_url}/agent-gateway/chat/sessions/{session_id}/messages"
-            payload = {
-                "sender": sender,
-                "type": message_type,
-                "content": content
-            }
+            payload = {"sender": sender, "type": message_type, "content": content}
         headers = self._get_gateway_headers()
         async with httpx.AsyncClient() as client:
             response = await client.post(url, json=payload, headers=headers)
@@ -216,27 +219,29 @@ class NestJSClient:
             return response.json()
 
     async def create_message_batch(
-        self,
-        session_id: str,
-        messages: List[Dict[str, Any]]
+        self, session_id: str, messages: List[Dict[str, Any]]
     ) -> Dict[str, Any]:
         url = f"{self.base_url}/agent-gateway/chat/sessions/{session_id}/turns"
         headers = self._get_gateway_headers()
-        
+
         payload = {"messages": []}
         for msg in messages:
-            payload["messages"].append({
-                "sender": msg.get("sender", "USER"),
-                "type": msg.get("type", "STANDARD"),
-                "content": msg.get("content", "")
-            })
-            
+            payload["messages"].append(
+                {
+                    "sender": msg.get("sender", "USER"),
+                    "type": msg.get("type", "STANDARD"),
+                    "content": msg.get("content", ""),
+                }
+            )
+
         async with httpx.AsyncClient() as client:
             res = await client.post(url, json=payload, headers=headers)
             res.raise_for_status()
             return res.json()
 
-    async def get_memory(self, session_id: str, recent_count: int = 20, unsummarized_only: bool = False) -> Dict[str, Any]:
+    async def get_memory(
+        self, session_id: str, recent_count: int = 20, unsummarized_only: bool = False
+    ) -> Dict[str, Any]:
         url = f"{self.base_url}/agent-gateway/chat/sessions/{session_id}/memory"
         params = {"recentCount": recent_count}
         if unsummarized_only:
@@ -262,9 +267,7 @@ class NestJSClient:
                     settings, "JWT_AUDIENCE", "booking-systems-clients"
                 )
             if "iss" in unverified:
-                decode_kwargs["issuer"] = getattr(
-                    settings, "JWT_ISSUER", "booking-systems-api"
-                )
+                decode_kwargs["issuer"] = getattr(settings, "JWT_ISSUER", "booking-systems-api")
 
             secrets = getattr(settings, "jwt_secret_ring", [settings.JWT_SECRET])
             payload = None
@@ -295,10 +298,7 @@ class NestJSClient:
 
         claim_secret = getattr(settings, "primary_claim_token_secret", settings.CLAIM_TOKEN_SECRET)
         claim_token = create_claim_token(str(user_id), claim_secret)
-        headers = {
-            "X-Agent-API-Key": settings.AGENT_SERVICE_API_KEY,
-            "X-User-Claim": claim_token
-        }
+        headers = {"X-Agent-API-Key": settings.AGENT_SERVICE_API_KEY, "X-User-Claim": claim_token}
         if self.correlation_id:
             headers["X-Correlation-ID"] = self.correlation_id
         if self.trace_id:
@@ -307,13 +307,15 @@ class NestJSClient:
             headers["X-Fencing-Token"] = str(self.fencing_token)
         return headers
 
-    async def get_gateway_flights_search(self, origin: str, destination: str, date: str, passengers: int) -> dict:
+    async def get_gateway_flights_search(
+        self, origin: str, destination: str, date: str, passengers: int
+    ) -> dict:
         url = f"{self.base_url}/agent-gateway/flights/search"
         params = {
             "origin": origin,
             "destination": destination,
             "date": date,
-            "passengers": passengers
+            "passengers": passengers,
         }
         headers = self._get_gateway_headers()
         async with httpx.AsyncClient() as client:
@@ -329,7 +331,15 @@ class NestJSClient:
             response.raise_for_status()
             return response.json()
 
-    async def post_gateway_flights_search_v2(self, chat_session_id: str, proposed_snapshot_version: int, origin: str, destination: str, date: str, passengers: int) -> dict:
+    async def post_gateway_flights_search_v2(
+        self,
+        chat_session_id: str,
+        proposed_snapshot_version: int,
+        origin: str,
+        destination: str,
+        date: str,
+        passengers: int,
+    ) -> dict:
         url = f"{self.base_url}/agent-gateway/v2/flights/search"
         payload = {
             "chatSessionId": chat_session_id,
@@ -338,8 +348,8 @@ class NestJSClient:
                 "origin": origin,
                 "destination": destination,
                 "date": date,
-                "adults": passengers
-            }
+                "adults": passengers,
+            },
         }
         headers = self._get_gateway_headers()
         async with httpx.AsyncClient() as client:
@@ -407,7 +417,9 @@ class NestJSClient:
             response.raise_for_status()
             return response.json()
 
-    async def check_booking_readiness(self, flight_offer_id: str, passengers: List[Dict[str, Any]]) -> dict:
+    async def check_booking_readiness(
+        self, flight_offer_id: str, passengers: List[Dict[str, Any]]
+    ) -> dict:
         url = f"{self.base_url}/agent-gateway/bookings/readiness"
         headers = self._get_gateway_headers()
 
@@ -417,17 +429,18 @@ class NestJSClient:
 
         for p in passengers:
             if not set(p.keys()).issubset(allowed_keys):
-                raise ValueError("Passenger dict contains invalid keys. Only passengerType, passengerOrdinal, and sourceType are allowed.")
-            safe_passengers.append({
-                "passengerType": p.get("passengerType"),
-                "passengerOrdinal": p.get("passengerOrdinal"),
-                "sourceType": p.get("sourceType")
-            })
+                raise ValueError(
+                    "Passenger dict contains invalid keys. Only passengerType, passengerOrdinal, and sourceType are allowed."
+                )
+            safe_passengers.append(
+                {
+                    "passengerType": p.get("passengerType"),
+                    "passengerOrdinal": p.get("passengerOrdinal"),
+                    "sourceType": p.get("sourceType"),
+                }
+            )
 
-        payload = {
-            "flightOfferId": flight_offer_id,
-            "passengers": safe_passengers
-        }
+        payload = {"flightOfferId": flight_offer_id, "passengers": safe_passengers}
 
         async with httpx.AsyncClient() as client:
             response = await client.post(url, json=payload, headers=headers)
@@ -487,5 +500,3 @@ class NestJSClient:
             correlation_id=correlation_id,
             fingerprint=fingerprint,
         )
-
-

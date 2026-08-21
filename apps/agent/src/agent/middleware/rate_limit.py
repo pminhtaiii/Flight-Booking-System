@@ -1,18 +1,19 @@
-import time
 import logging
+import time
 from typing import Optional
-from fastapi import Request, Response
-from starlette.middleware.base import BaseHTTPMiddleware
-from fastapi.responses import JSONResponse
+
 import redis.asyncio as redis
+from fastapi import Request, Response
+from fastapi.responses import JSONResponse
+from starlette.middleware.base import BaseHTTPMiddleware
 
 from agent.config import get_settings
+from agent.infrastructure.redis import get_redis_client
 from agent.repositories.chat_budget_repository import (
-    ChatBudgetRepository,
     BudgetExceededException,
+    ChatBudgetRepository,
     RedisUnavailableException,
 )
-from agent.infrastructure.redis import get_redis_client
 
 logger = logging.getLogger("agent.middleware.rate_limit")
 

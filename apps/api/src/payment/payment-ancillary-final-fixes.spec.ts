@@ -7,7 +7,7 @@ import { PaymentIdempotencyService } from '@/payment/payment-idempotency.service
 import { PaymentMethodService } from '@/payment/payment-method.service';
 import { PaymentService } from '@/payment/payment.service';
 import { PrismaService } from '@/prisma/prisma.service';
-import { Prisma, BookingFailureReason } from '@prisma/client';
+import { Prisma } from '@prisma/client';
 import { BadRequestException, GoneException, ConflictException } from '@nestjs/common';
 
 describe('PaymentService - Final Fixes Spec', () => {

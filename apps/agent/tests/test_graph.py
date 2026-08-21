@@ -1,10 +1,11 @@
-import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
-from agent.models.requests import RouteDecision
+
+import pytest
 from langchain_core.messages import AIMessage, HumanMessage
 from langchain_core.runnables import RunnableConfig
 
 from agent.graph.graph import graph
+from agent.models.requests import RouteDecision
 from agent.tools.nestjs_client import NestJSClient
 
 
@@ -23,10 +24,10 @@ def mock_nestjs_client():
 def mock_llm():
     mock_model = MagicMock()
     mock_model.ainvoke = AsyncMock()
-    
+
     mock_model_with_tools = MagicMock()
     mock_model_with_tools.ainvoke = AsyncMock()
-    
+
     mock_model.bind_tools.return_value = mock_model_with_tools
     return mock_model, mock_model_with_tools
 
@@ -55,9 +56,9 @@ async def test_graph_search_flights_integration(mock_nestjs_client, mock_llm):
                 "price": 452.00,
                 "currency": "USD",
                 "fareClass": "economy",
-                "baggageAllowance": "23kg checked"
+                "baggageAllowance": "23kg checked",
             }
-        ]
+        ],
     }
 
     # Setup LLM trace
@@ -69,24 +70,40 @@ async def test_graph_search_flights_integration(mock_nestjs_client, mock_llm):
             tool_calls=[
                 {
                     "name": "search_flights",
-                    "args": {"origin": "HAN", "destination": "NRT", "date": "2026-07-15", "passengers": 1},
-                    "id": "call_search"
+                    "args": {
+                        "origin": "HAN",
+                        "destination": "NRT",
+                        "date": "2026-07-15",
+                        "passengers": 1,
+                    },
+                    "id": "call_search",
                 }
-            ]
+            ],
         ),
-        AIMessage(content="I found a Vietnam Airlines flight VN310 departing at 08:30 for $452.00 USD.")
+        AIMessage(
+            content="I found a Vietnam Airlines flight VN310 departing at 08:30 for $452.00 USD."
+        ),
     ]
 
     config = RunnableConfig(
-        configurable={"nestjs_client": mock_nestjs_client, "thread_id": "test_thread_1", "user_id": "user1"},
-        configurable_keys=["nestjs_client", "thread_id", "user_id"]
+        configurable={
+            "nestjs_client": mock_nestjs_client,
+            "thread_id": "test_thread_1",
+            "user_id": "user1",
+        },
+        configurable_keys=["nestjs_client", "thread_id", "user_id"],
     )
 
-    with patch("agent.agents.chat_agent.ChatOpenAI", return_value=mock_model), \
-         patch("agent.graph.graph.invoke_router", return_value=RouteDecision(intent="SEARCH", confidence=1.0, isCommitment=False)):
+    with (
+        patch("agent.agents.chat_agent.ChatOpenAI", return_value=mock_model),
+        patch(
+            "agent.graph.graph.invoke_router",
+            return_value=RouteDecision(intent="SEARCH", confidence=1.0, isCommitment=False),
+        ),
+    ):
         initial_state = {
             "messages": [HumanMessage(content="find me flights from Hanoi to Tokyo on July 15")],
-            "iteration_count": 0
+            "iteration_count": 0,
         }
         final_state = await graph.ainvoke(initial_state, config=config)
 
@@ -96,7 +113,10 @@ async def test_graph_search_flights_integration(mock_nestjs_client, mock_llm):
         mock_nestjs_client.post_gateway_flights_search_v2.assert_called_once_with(
             chat_session_id="test_thread_1",
             proposed_snapshot_version=1,
-            origin="HAN", destination="NRT", date="2026-07-15", passengers=1
+            origin="HAN",
+            destination="NRT",
+            date="2026-07-15",
+            passengers=1,
         )
         # Check final message content
         assert "Vietnam Airlines flight VN310" in final_state["messages"][-1].content
@@ -112,33 +132,32 @@ async def test_graph_get_user_preferences_integration(mock_nestjs_client, mock_l
         "classPreference": "business",
         "preferredAirlines": ["VN"],
         "blacklistedAirlines": [],
-        "dietaryNeeds": "vegetarian"
+        "dietaryNeeds": "vegetarian",
     }
 
     mock_model_with_tools.ainvoke.side_effect = [
         AIMessage(
             content="",
-            tool_calls=[
-                {
-                    "name": "get_user_preferences",
-                    "args": {},
-                    "id": "call_prefs"
-                }
-            ]
+            tool_calls=[{"name": "get_user_preferences", "args": {}, "id": "call_prefs"}],
         ),
-        AIMessage(content="Your travel preferences: seat is Window, class is Business.")
+        AIMessage(content="Your travel preferences: seat is Window, class is Business."),
     ]
 
     config = RunnableConfig(
         configurable={"nestjs_client": mock_nestjs_client, "thread_id": "test_thread_2"},
-        configurable_keys=["nestjs_client", "thread_id"]
+        configurable_keys=["nestjs_client", "thread_id"],
     )
 
-    with patch("agent.agents.chat_agent.ChatOpenAI", return_value=mock_model), \
-         patch("agent.graph.graph.invoke_router", return_value=RouteDecision(intent="SEARCH", confidence=1.0, isCommitment=False)):
+    with (
+        patch("agent.agents.chat_agent.ChatOpenAI", return_value=mock_model),
+        patch(
+            "agent.graph.graph.invoke_router",
+            return_value=RouteDecision(intent="SEARCH", confidence=1.0, isCommitment=False),
+        ),
+    ):
         initial_state = {
             "messages": [HumanMessage(content="what are my travel preferences?")],
-            "iteration_count": 0
+            "iteration_count": 0,
         }
         final_state = await graph.ainvoke(initial_state, config=config)
 
@@ -162,7 +181,7 @@ async def test_graph_list_user_booking_summaries_integration(mock_nestjs_client,
                 "arrivalAt": "2026-08-15T15:00:00Z",
                 "durationMinutes": 330,
                 "stopCount": 0,
-                "agentReference": "ref-123"
+                "agentReference": "ref-123",
             }
         ]
     }
@@ -170,27 +189,26 @@ async def test_graph_list_user_booking_summaries_integration(mock_nestjs_client,
     mock_model_with_tools.ainvoke.side_effect = [
         AIMessage(
             content="",
-            tool_calls=[
-                {
-                    "name": "list_user_booking_summaries",
-                    "args": {},
-                    "id": "call_bookings"
-                }
-            ]
+            tool_calls=[{"name": "list_user_booking_summaries", "args": {}, "id": "call_bookings"}],
         ),
-        AIMessage(content="You have 1 active booking: Vietnam Airlines VN310.")
+        AIMessage(content="You have 1 active booking: Vietnam Airlines VN310."),
     ]
 
     config = RunnableConfig(
         configurable={"nestjs_client": mock_nestjs_client, "thread_id": "test_thread_3"},
-        configurable_keys=["nestjs_client", "thread_id"]
+        configurable_keys=["nestjs_client", "thread_id"],
     )
 
-    with patch("agent.agents.chat_agent.ChatOpenAI", return_value=mock_model), \
-         patch("agent.graph.graph.invoke_router", return_value=RouteDecision(intent="SEARCH", confidence=1.0, isCommitment=False)):
+    with (
+        patch("agent.agents.chat_agent.ChatOpenAI", return_value=mock_model),
+        patch(
+            "agent.graph.graph.invoke_router",
+            return_value=RouteDecision(intent="SEARCH", confidence=1.0, isCommitment=False),
+        ),
+    ):
         initial_state = {
             "messages": [HumanMessage(content="show me my bookings")],
-            "iteration_count": 0
+            "iteration_count": 0,
         }
         final_state = await graph.ainvoke(initial_state, config=config)
 
@@ -210,14 +228,19 @@ async def test_graph_out_of_bounds_query(mock_nestjs_client, mock_llm):
 
     config = RunnableConfig(
         configurable={"nestjs_client": mock_nestjs_client, "thread_id": "test_thread_4"},
-        configurable_keys=["nestjs_client", "thread_id"]
+        configurable_keys=["nestjs_client", "thread_id"],
     )
 
-    with patch("agent.agents.chat_agent.ChatOpenAI", return_value=mock_model), \
-         patch("agent.graph.graph.invoke_router", return_value=RouteDecision(intent="SEARCH", confidence=1.0, isCommitment=False)):
+    with (
+        patch("agent.agents.chat_agent.ChatOpenAI", return_value=mock_model),
+        patch(
+            "agent.graph.graph.invoke_router",
+            return_value=RouteDecision(intent="SEARCH", confidence=1.0, isCommitment=False),
+        ),
+    ):
         initial_state = {
             "messages": [HumanMessage(content="What is the cancellation policy?")],
-            "iteration_count": 0
+            "iteration_count": 0,
         }
         final_state = await graph.ainvoke(initial_state, config=config)
 
@@ -237,18 +260,12 @@ async def test_graph_iteration_limit_capping(mock_nestjs_client, mock_llm):
     mock_model_with_tools.ainvoke.side_effect = [
         AIMessage(
             content="",
-            tool_calls=[
-                {
-                    "name": "get_user_preferences",
-                    "args": {},
-                    "id": f"loop_call_{i}"
-                }
-            ],
-            id=f"ai_call_{i}"
+            tool_calls=[{"name": "get_user_preferences", "args": {}, "id": f"loop_call_{i}"}],
+            id=f"ai_call_{i}",
         )
         for i in range(6)
     ]
-    
+
     # Final answer node invocation
     mock_model.ainvoke.return_value = AIMessage(
         content="Iteration limit reached. I am unable to proceed further."
@@ -260,20 +277,22 @@ async def test_graph_iteration_limit_capping(mock_nestjs_client, mock_llm):
         "classPreference": "business",
         "preferredAirlines": ["VN"],
         "blacklistedAirlines": [],
-        "dietaryNeeds": "vegetarian"
+        "dietaryNeeds": "vegetarian",
     }
 
     config = RunnableConfig(
         configurable={"nestjs_client": mock_nestjs_client, "thread_id": "test_thread_5"},
-        configurable_keys=["nestjs_client", "thread_id"]
+        configurable_keys=["nestjs_client", "thread_id"],
     )
 
-    with patch("agent.agents.chat_agent.ChatOpenAI", return_value=mock_model), \
-         patch("agent.graph.graph.invoke_router", return_value=RouteDecision(intent="SEARCH", confidence=1.0, isCommitment=False)):
-        initial_state = {
-            "messages": [HumanMessage(content="run loop")],
-            "iteration_count": 0
-        }
+    with (
+        patch("agent.agents.chat_agent.ChatOpenAI", return_value=mock_model),
+        patch(
+            "agent.graph.graph.invoke_router",
+            return_value=RouteDecision(intent="SEARCH", confidence=1.0, isCommitment=False),
+        ),
+    ):
+        initial_state = {"messages": [HumanMessage(content="run loop")], "iteration_count": 0}
         final_state = await graph.ainvoke(initial_state, config=config)
         assert final_state["iteration_count"] == 5
         assert "limit reached" in final_state["messages"][-1].content.lower()
@@ -286,7 +305,7 @@ async def test_graph_topology():
 
     nodes = set(workflow.nodes.keys())
     assert "confirm" not in nodes, "Confirm node should be removed"
-    
+
     # Verify the checkpointer is absent
     assert graph.checkpointer is None, "MemorySaver should be removed"
 

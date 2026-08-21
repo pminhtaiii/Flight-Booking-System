@@ -1,16 +1,17 @@
 import time
-import pytest
-import jwt
+from unittest.mock import AsyncMock, MagicMock, patch
+
 import httpx
-from unittest.mock import AsyncMock, patch, MagicMock
+import jwt
+import pytest
+import redis.asyncio as redis
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
-import redis.asyncio as redis
 
+from agent.config import get_settings
 from agent.main import app
 from agent.middleware.auth import JWTAuthMiddleware
 from agent.middleware.rate_limit import RateLimitMiddleware
-from agent.config import get_settings
 from agent.repositories.chat_budget_repository import RedisUnavailableException
 
 settings = get_settings()
@@ -51,7 +52,9 @@ async def test_redis_outage_rate_limit_fails_closed_503():
     token = make_token("drill-user-1")
     headers = {"Authorization": f"Bearer {token}"}
 
-    async with httpx.AsyncClient(transport=httpx.ASGITransport(app=test_app), base_url="http://test") as client:
+    async with httpx.AsyncClient(
+        transport=httpx.ASGITransport(app=test_app), base_url="http://test"
+    ) as client:
         res = await client.post("/chat/stream", headers=headers)
         assert res.status_code == 503
         data = res.json()
@@ -79,7 +82,9 @@ async def test_redis_runtime_error_fails_closed_503():
     token = make_token("drill-user-2")
     headers = {"Authorization": f"Bearer {token}"}
 
-    async with httpx.AsyncClient(transport=httpx.ASGITransport(app=test_app), base_url="http://test") as client:
+    async with httpx.AsyncClient(
+        transport=httpx.ASGITransport(app=test_app), base_url="http://test"
+    ) as client:
         res = await client.post("/chat/stream", headers=headers)
         assert res.status_code == 503
         data = res.json()
@@ -96,10 +101,11 @@ def test_health_reports_degraded_when_redis_down(monkeypatch):
 
     client = TestClient(app)
 
-    with patch("httpx.AsyncClient.get", new_callable=AsyncMock) as mock_get, \
-         patch("agent.main.settings") as mock_settings, \
-         patch("agent.infrastructure.redis.get_redis_client", return_value=mock_redis):
-
+    with (
+        patch("httpx.AsyncClient.get", new_callable=AsyncMock) as mock_get,
+        patch("agent.main.settings") as mock_settings,
+        patch("agent.infrastructure.redis.get_redis_client", return_value=mock_redis),
+    ):
         mock_settings.MIMO_API_URL = "http://mockmimo"
         mock_settings.MIMO_API_KEY = "mockkey"
         mock_settings.NESTJS_API_URL = "http://localhost:3001"
@@ -131,10 +137,11 @@ def test_health_reports_degraded_when_redis_client_none(monkeypatch):
     """
     client = TestClient(app)
 
-    with patch("httpx.AsyncClient.get", new_callable=AsyncMock) as mock_get, \
-         patch("agent.main.settings") as mock_settings, \
-         patch("agent.infrastructure.redis.get_redis_client", return_value=None):
-
+    with (
+        patch("httpx.AsyncClient.get", new_callable=AsyncMock) as mock_get,
+        patch("agent.main.settings") as mock_settings,
+        patch("agent.infrastructure.redis.get_redis_client", return_value=None),
+    ):
         mock_settings.MIMO_API_URL = "http://mockmimo"
         mock_settings.MIMO_API_KEY = "mockkey"
         mock_settings.NESTJS_API_URL = "http://localhost:3001"

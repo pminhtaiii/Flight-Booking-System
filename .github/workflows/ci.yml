@@ -120,8 +120,37 @@ jobs:
     if: ${{ needs.detect-changes.outputs.api == 'true' && needs.api-gate.result == 'success' }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: flight_booking
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d flight_booking"
+          --health-interval 10s --health-timeout 5s --health-retries 5
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s --health-timeout 5s --health-retries 5
     env:
-      DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/ci_dummy?schema=public
+      DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/flight_booking?schema=public
+      REDIS_URL: redis://127.0.0.1:6379/0
+      NODE_ENV: test
+      STRIPE_SECRET_KEY: sk_test_ci_not_a_secret
+      STRIPE_WEBHOOK_SECRET: whsec_ci_not_a_secret
+      JWT_SECRET: ci-not-a-secret-jwt
+      AGENT_SERVICE_API_KEY: ci-not-a-secret-agent-key
+      CLAIM_TOKEN_SECRET: ci-not-a-secret-claim-key
+      ATTESTATION_SECRET: ci-not-a-secret-attestation
+      ENCRYPTION_KEY: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+      CHAT_ENCRYPTION_KEY: bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
     steps:
       - name: Use LF checkout behavior
         run: git config --global core.autocrlf input
@@ -141,14 +170,15 @@ jobs:
           cache-dependency-path: pnpm-lock.yaml
       - name: Install Node dependencies
         run: pnpm install --frozen-lockfile
-      - name: Build shared package and generate Prisma Client
+      - name: Build shared package, generate Prisma Client, and deploy migrations
         run: |
           pnpm build:shared
           pnpm --filter @api/backend exec prisma generate
+          pnpm --filter @api/backend exec prisma migrate deploy
       - name: Run API unit tests with loopback-only network
         env:
           NODE_OPTIONS: --require=${{ github.workspace }}/tests/ci/node-network-guard.cjs
-        run: pnpm --filter @api/backend test -- --runInBand
+        run: pnpm --filter @api/backend run test:ci
 
   api-e2e-tests:
     needs: [detect-changes, api-gate]
@@ -186,6 +216,10 @@ jobs:
       ATTESTATION_SECRET: ci-not-a-secret-attestation
       ENCRYPTION_KEY: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
       CHAT_ENCRYPTION_KEY: bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+      FEATURE_FLAG_BOOKING_READINESS: 'true'
+      FEATURE_FLAG_CHAT_HANDOFF_ISSUE: 'true'
+      FEATURE_FLAG_CHAT_HANDOFF_ACCEPT: 'true'
+      TIKTOKEN_CACHE_DIR: ${{ github.workspace }}/.tiktoken_cache
     steps:
       - name: Use LF checkout behavior
         run: git config --global core.autocrlf input
@@ -205,6 +239,19 @@ jobs:
           cache-dependency-path: pnpm-lock.yaml
       - name: Install Node dependencies
         run: pnpm install --frozen-lockfile
+      - name: Set up uv 0.12.0 and Python 3.11
+        uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
+        with:
+          version: 0.12.0
+          python-version: '3.11'
+          enable-cache: true
+          cache-dependency-glob: uv.lock
+      - name: Install Python 3.11
+        run: uv python install 3.11
+      - name: Install Agent dependencies from root lock
+        run: uv sync --locked --package agent
+      - name: Pre-warm tiktoken cache
+        run: uv run python -c "import tiktoken; tiktoken.get_encoding('cl100k_base')"
       - name: Prepare API E2E database
         run: |
           pnpm build:shared
@@ -213,6 +260,7 @@ jobs:
       - name: Run API E2E tests with loopback-only network
         env:
           NODE_OPTIONS: --require=${{ github.workspace }}/tests/ci/node-network-guard.cjs
+          TIKTOKEN_CACHE_DIR: ${{ github.workspace }}/.tiktoken_cache
         run: pnpm --filter @api/backend test:e2e
 
   web-gate:
@@ -333,8 +381,14 @@ jobs:
           --health-interval 10s --health-timeout 5s --health-retries 5
     env:
       REDIS_URL: redis://127.0.0.1:6379/0
-      CI_REQUIRE_REDIS_TESTS: '1'
       NODE_ENV: test
+      JWT_SECRET: ci-not-a-secret-jwt
+      AGENT_SERVICE_API_KEY: ci-not-a-secret-agent-key
+      CLAIM_TOKEN_SECRET: ci-not-a-secret-claim-key
+      NESTJS_API_URL: http://127.0.0.1:3001/api
+      MIMO_API_KEY: test-mimo-key
+      MIMO_API_URL: http://127.0.0.1:8000
+      TIKTOKEN_CACHE_DIR: ${{ github.workspace }}/.tiktoken_cache
     steps:
       - name: Use LF checkout behavior
         run: git config --global core.autocrlf input
@@ -353,18 +407,33 @@ jobs:
         run: uv python install 3.11
       - name: Install Agent dependencies from root lock
         run: uv sync --locked --package agent
+      - name: Pre-warm tiktoken cache
+        run: uv run python -c "import tiktoken; tiktoken.get_encoding('cl100k_base')"
       - name: Run non-Redis Agent tests with loopback-only network
         env:
-          PYTHONPATH: ${{ github.workspace }}/tests/ci/python
+          PYTHONPATH: ${{ github.workspace }}/tests/ci/python:${{ github.workspace }}/apps/agent/src
+          TIKTOKEN_CACHE_DIR: ${{ github.workspace }}/.tiktoken_cache
         run: uv run --package agent pytest apps/agent/tests -m "not redis_integration"
       - name: Run required Redis integration tests with loopback-only network
         env:
-          PYTHONPATH: ${{ github.workspace }}/tests/ci/python
+          PYTHONPATH: ${{ github.workspace }}/tests/ci/python:${{ github.workspace }}/apps/agent/src
+          CI_REQUIRE_REDIS_TESTS: '1'
+          TIKTOKEN_CACHE_DIR: ${{ github.workspace }}/.tiktoken_cache
         run: uv run --package agent pytest apps/agent/tests -m redis_integration --strict-markers
 
   ci-status:
     if: ${{ always() }}
-    needs: [detect-changes, api-gate, api-unit-tests, api-e2e-tests, web-gate, web-build, agent-gate, agent-tests]
+    needs:
+      [
+        detect-changes,
+        api-gate,
+        api-unit-tests,
+        api-e2e-tests,
+        web-gate,
+        web-build,
+        agent-gate,
+        agent-tests,
+      ]
     runs-on: ubuntu-latest
     timeout-minutes: 10
     env:

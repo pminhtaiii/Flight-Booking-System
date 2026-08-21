@@ -26,6 +26,7 @@ describe('Concurrency and Stress (E2E)', () => {
     );
     app.useGlobalFilters(new HttpExceptionFilter());
     await app.init();
+    await app.listen(0, '127.0.0.1');
 
     prisma = moduleFixture.get<PrismaService>(PrismaService);
   });

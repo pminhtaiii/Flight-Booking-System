@@ -1,8 +1,10 @@
 import logging
 from typing import Optional
+
 from agent.infrastructure.redis import get_redis_client
 
 logger = logging.getLogger(__name__)
+
 
 class SessionLockRepository:
     """
@@ -10,6 +12,7 @@ class SessionLockRepository:
     A fencing token is returned on successful acquire, and must be provided
     for refresh, release, and validation.
     """
+
     def __init__(self, prefix: str = "chat:session-lock:"):
         self.prefix = prefix
 
@@ -19,7 +22,9 @@ class SessionLockRepository:
     def _fence_key(self, user_id: str, session_id: str) -> str:
         return f"{self.prefix}fence:{user_id}:{session_id}"
 
-    async def acquire_lock(self, user_id: str, session_id: str, req_id: str, ttl_ms: int = 10000) -> Optional[int]:
+    async def acquire_lock(
+        self, user_id: str, session_id: str, req_id: str, ttl_ms: int = 10000
+    ) -> Optional[int]:
         try:
             redis = get_redis_client()
         except RuntimeError:
@@ -48,11 +53,13 @@ class SessionLockRepository:
             self._lock_key(user_id, session_id),
             self._fence_key(user_id, session_id),
             req_id,
-            ttl_ms
+            ttl_ms,
         )
         return int(fence) if fence is not None else None
 
-    async def refresh_lock(self, user_id: str, session_id: str, req_id: str, fence: int, ttl_ms: int = 10000) -> bool:
+    async def refresh_lock(
+        self, user_id: str, session_id: str, req_id: str, fence: int, ttl_ms: int = 10000
+    ) -> bool:
         try:
             redis = get_redis_client()
         except RuntimeError:
@@ -74,12 +81,7 @@ class SessionLockRepository:
         return 0
         """
         res = await redis.eval(
-            script,
-            1,
-            self._lock_key(user_id, session_id),
-            req_id,
-            fence,
-            ttl_ms
+            script, 1, self._lock_key(user_id, session_id), req_id, fence, ttl_ms
         )
         return bool(res)
 
@@ -103,13 +105,7 @@ class SessionLockRepository:
         end
         return 0
         """
-        res = await redis.eval(
-            script,
-            1,
-            self._lock_key(user_id, session_id),
-            req_id,
-            fence
-        )
+        res = await redis.eval(script, 1, self._lock_key(user_id, session_id), req_id, fence)
         return bool(res)
 
     async def validate_fence(self, user_id: str, session_id: str, req_id: str, fence: int) -> bool:
@@ -118,10 +114,10 @@ class SessionLockRepository:
         except RuntimeError:
             return False
 
-        current_owner = await redis.hget(self._lock_key(user_id, session_id), 'req_id')
-        current_fence = await redis.hget(self._lock_key(user_id, session_id), 'fence')
-        
+        current_owner = await redis.hget(self._lock_key(user_id, session_id), "req_id")
+        current_fence = await redis.hget(self._lock_key(user_id, session_id), "fence")
+
         if current_owner is None or current_fence is None:
             return False
-            
+
         return current_owner == req_id and int(current_fence) == fence

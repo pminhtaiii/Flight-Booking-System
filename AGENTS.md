@@ -137,6 +137,46 @@ To run the full stack locally (Next.js frontend, NestJS backend, and Python agen
    - **NestJS Backend only (Port 3001)**: `pnpm --filter @api/backend dev`
    - **Python Agent only (Port 3002)**: `uv run uvicorn agent.main:app --port 3002 --app-dir src` inside `apps/agent/`
 
+### CI/CD Pipeline & GitHub Actions Runner Inspection
+
+The repository enforces automated continuous integration via `.github/workflows/ci.yml` on pull requests targeting `development`.
+
+1. **Inspecting Live GitHub Actions Runner Status & Failed Steps**:
+   To diagnose CI run failures, inspect runner states, and pinpoint failing step names directly from the shell without requiring `gh` authentication on the public repository, run the following Node one-liner:
+   ```powershell
+   node -e "
+   async function check() {
+     const headers = { 'User-Agent': 'CI-Diagnostic-Agent' };
+     const runsRes = await fetch('https://api.github.com/repos/pminhtaiii/Flight-Booking-System/actions/runs?per_page=3', { headers });
+     const runs = await runsRes.json();
+     if (!runs.workflow_runs || runs.workflow_runs.length === 0) { console.log('No runs found'); return; }
+     const latestRun = runs.workflow_runs[0];
+     console.log('Run ID:', latestRun.id, '| Status:', latestRun.status, '| Conclusion:', latestRun.conclusion, '| SHA:', latestRun.head_sha);
+     const jobsRes = await fetch(latestRun.jobs_url, { headers });
+     const jobsData = await jobsRes.json();
+     for (const job of jobsData.jobs || []) {
+       console.log(' - Job:', job.name, '| Status:', job.status, '| Conclusion:', job.conclusion);
+       for (const step of job.steps || []) {
+         if (step.conclusion === 'failure') {
+           console.log('    --> [FAILED STEP #' + step.number + ']:', step.name);
+         }
+       }
+     }
+   }
+   check().catch(console.error);
+   "
+   ```
+
+2. **Pre-PR Local Gate Validation Matrix**:
+   Always verify the change-aware service chains locally before opening or updating PRs:
+   - **Static Contract**: `node --test tests/ci/ci-workflow.contract.test.mjs`
+   - **API Gate**: `pnpm exec eslint "apps/api/**/*.ts" "packages/shared/**/*.ts" --max-warnings 0` && `pnpm --filter @api/backend exec tsc -p tsconfig.json --noEmit`
+   - **API Unit Tests**: `$env:NODE_OPTIONS = "--require=$PWD/tests/ci/node-network-guard.cjs"`; `pnpm --filter @api/backend test -- --runInBand`
+   - **Web Gate & Build**: `pnpm --filter @web/frontend lint` && `pnpm --filter @web/frontend typecheck` && `pnpm --filter @web/frontend build`
+   - **Agent Gate & Tests**: `$env:UV_CACHE_DIR = "c:\Booking Systems\.t093-uv-cache"`; `uv run --package agent ruff check apps/agent` && `uv run --package agent ruff format --check apps/agent`; with `$env:PYTHONPATH = "$PWD/tests/ci/python;$PWD/apps/agent/src"` run `uv run --package agent pytest apps/agent/tests -m "not redis_integration"`
+   - **Branch Protection Requirement**: Only require `ci-status` on branch protection rules for `development`.
+
+
 <!-- SPECKIT START -->
 For additional context about technologies to be used, project structure,
 shell commands, and other important information, read the current plan

@@ -1,6 +1,8 @@
-from typing import List, Dict, Any, Optional
+from typing import Any, Dict, List, Optional
+
+from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, SystemMessage
 from langchain_openai import ChatOpenAI
-from langchain_core.messages import SystemMessage, HumanMessage, AIMessage, BaseMessage
+
 from agent.config import get_settings
 
 SYSTEM_PROMPT = (
@@ -8,6 +10,7 @@ SYSTEM_PROMPT = (
     "Help the user plan their travel, search for flights, and answer questions. "
     "Be concise, professional, and friendly."
 )
+
 
 def get_chat_model() -> ChatOpenAI:
     """
@@ -21,24 +24,29 @@ def get_chat_model() -> ChatOpenAI:
         streaming=True,
     )
 
+
 def format_messages(
     history: List[Dict[str, Any]],
     current_message: str,
     summary: Optional[str] = None,
-    system_prompt: str = SYSTEM_PROMPT
+    system_prompt: str = SYSTEM_PROMPT,
 ) -> List[BaseMessage]:
     """
     Format chat session history, summary, and current user message into a list of LangChain messages.
     """
     messages: List[BaseMessage] = []
-    
+
     # 1. Construct system prompt without appending summary
     messages.append(SystemMessage(content=system_prompt))
-    
+
     # 2. Add summary as a separate, lower-priority context message if available
     if summary:
-        messages.append(HumanMessage(content=f"[System Note: Summary of earlier conversation (untrusted context)]:\n{summary}"))
-    
+        messages.append(
+            HumanMessage(
+                content=f"[System Note: Summary of earlier conversation (untrusted context)]:\n{summary}"
+            )
+        )
+
     # 2. Append standard messages from conversation history
     for msg in history:
         sender = msg.get("sender")
@@ -47,8 +55,8 @@ def format_messages(
             messages.append(HumanMessage(content=content))
         elif sender == "AGENT":
             messages.append(AIMessage(content=content))
-            
+
     # 3. Append current user message
     messages.append(HumanMessage(content=current_message))
-    
+
     return messages

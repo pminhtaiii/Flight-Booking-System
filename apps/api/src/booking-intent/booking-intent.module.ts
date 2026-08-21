@@ -6,7 +6,6 @@ import { AirportsModule } from '@/airports/airports.module';
 import { ProfileModule } from '@/profile/profile.module';
 import { ChatHandoffModule } from '@/chat-handoff/chat-handoff.module';
 import { EncryptionService } from '@/common/encryption.service';
-import { BookingReadinessMetricsService } from '@/common/observability/booking-readiness.metrics';
 import { BookingIntentController, BookingIntentLegacyController } from './booking-intent.controller';
 import { BookingIntentService } from './booking-intent.service';
 import { BookingIntentCron } from './booking-intent.cron';

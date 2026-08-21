@@ -1,24 +1,22 @@
 import asyncio
-import json
 import time
-import pytest
-import jwt
-import httpx
-from unittest.mock import AsyncMock, patch, MagicMock
-from fastapi import FastAPI, HTTPException
-from fastapi.testclient import TestClient
-import redis.asyncio as redis
+from unittest.mock import AsyncMock, MagicMock, patch
 
+import httpx
+import jwt
+import pytest
+import redis.asyncio as redis
+from fastapi import FastAPI
+from fastapi.testclient import TestClient
+
+from agent.config import get_settings
 from agent.main import app
 from agent.middleware.auth import JWTAuthMiddleware
 from agent.middleware.rate_limit import RateLimitMiddleware
-from agent.config import get_settings
+from agent.queue.message_queue import MessageQueueManager
 from agent.repositories.chat_budget_repository import (
-    ChatBudgetRepository,
-    BudgetExceededException,
     RedisUnavailableException,
 )
-from agent.queue.message_queue import MessageQueueManager
 from agent.streaming.sse import _persist_response
 
 settings = get_settings()
@@ -59,7 +57,9 @@ async def test_redis_partition_outage_fails_closed_before_llm_inference():
 
     mock_redis = MagicMock()
     # Simulate Redis partition / network connection drop during Lua script execution
-    mock_redis.eval = AsyncMock(side_effect=redis.ConnectionError("Redis cluster partitioned / unreachable"))
+    mock_redis.eval = AsyncMock(
+        side_effect=redis.ConnectionError("Redis cluster partitioned / unreachable")
+    )
     mock_redis.ping = AsyncMock(side_effect=redis.ConnectionError("Redis cluster unreachable"))
 
     mock_client = MagicMock()
@@ -72,10 +72,11 @@ async def test_redis_partition_outage_fails_closed_before_llm_inference():
         llm_inference_called = True
         yield {"event": "on_chat_model_stream", "data": {"chunk": MagicMock(content="leak")}}
 
-    with patch("agent.streaming.sse.NestJSClient", return_value=mock_client), \
-         patch("agent.streaming.sse.get_redis_client", return_value=mock_redis), \
-         patch("agent.streaming.sse.graph.astream_events", side_effect=mock_astream_events):
-
+    with (
+        patch("agent.streaming.sse.NestJSClient", return_value=mock_client),
+        patch("agent.streaming.sse.get_redis_client", return_value=mock_redis),
+        patch("agent.streaming.sse.graph.astream_events", side_effect=mock_astream_events),
+    ):
         client = TestClient(app)
         response = client.post(
             "/chat/stream",
@@ -86,7 +87,10 @@ async def test_redis_partition_outage_fails_closed_before_llm_inference():
         # 1. Assert fails closed with HTTP 503 CHAT_CONTROL_PLANE_UNAVAILABLE
         assert response.status_code == 503
         data = response.json()
-        assert data.get("detail") == "CHAT_CONTROL_PLANE_UNAVAILABLE" or data.get("code") == "CHAT_CONTROL_PLANE_UNAVAILABLE"
+        assert (
+            data.get("detail") == "CHAT_CONTROL_PLANE_UNAVAILABLE"
+            or data.get("code") == "CHAT_CONTROL_PLANE_UNAVAILABLE"
+        )
 
         # 2. Assert that LLM inference was NOT invoked (zero cost / zero compute leaked)
         assert llm_inference_called is False
@@ -116,7 +120,9 @@ async def test_redis_outage_middleware_fails_closed_503():
     token = make_token("chaos-user-mid-1")
     headers = {"Authorization": f"Bearer {token}"}
 
-    async with httpx.AsyncClient(transport=httpx.ASGITransport(app=test_app), base_url="http://test") as client:
+    async with httpx.AsyncClient(
+        transport=httpx.ASGITransport(app=test_app), base_url="http://test"
+    ) as client:
         res = await client.post("/chat/stream", headers=headers)
         assert res.status_code == 503
         data = res.json()
@@ -154,7 +160,9 @@ async def test_redis_midstream_lock_refresh_loss_cancels_worker():
     await worker_started.wait()
 
     # Simulate Redis connection dropping during lock refresh
-    manager.repo.refresh_lock = AsyncMock(side_effect=redis.ConnectionError("Redis partitioned mid-stream"))
+    manager.repo.refresh_lock = AsyncMock(
+        side_effect=redis.ConnectionError("Redis partitioned mid-stream")
+    )
 
     # Wait for worker task to be cancelled by refresher
     try:
@@ -165,7 +173,6 @@ async def test_redis_midstream_lock_refresh_loss_cancels_worker():
     # Monitored worker task must have been cancelled
     assert worker_task.done()
     assert worker_cancelled is True
-
 
 
 # =========================================================================
@@ -179,7 +186,8 @@ async def test_abrupt_client_disconnect_releases_session_lock():
     subsequent requests can immediately proceed.
     """
     from starlette.requests import Request
-    from agent.streaming.sse import chat_stream, ChatStreamRequest
+
+    from agent.streaming.sse import ChatStreamRequest, chat_stream
 
     queue_manager = MessageQueueManager(max_depth=1)
     session_id = "session-disconnect-drill-1"
@@ -215,11 +223,15 @@ async def test_abrupt_client_disconnect_releases_session_lock():
         except asyncio.CancelledError:
             raise
 
-    with patch("agent.streaming.sse.NestJSClient", return_value=mock_client), \
-         patch("agent.streaming.sse.get_redis_client", return_value=mock_redis), \
-         patch("agent.streaming.sse.graph.astream_events", side_effect=mock_astream_events), \
-         patch("agent.repositories.chat_budget_repository.ChatBudgetRepository.admit_request", AsyncMock()):
-
+    with (
+        patch("agent.streaming.sse.NestJSClient", return_value=mock_client),
+        patch("agent.streaming.sse.get_redis_client", return_value=mock_redis),
+        patch("agent.streaming.sse.graph.astream_events", side_effect=mock_astream_events),
+        patch(
+            "agent.repositories.chat_budget_repository.ChatBudgetRepository.admit_request",
+            AsyncMock(),
+        ),
+    ):
         body = ChatStreamRequest(message="Search flights", sessionId=session_id)
         response = await chat_stream(
             request=request,
@@ -233,7 +245,6 @@ async def test_abrupt_client_disconnect_releases_session_lock():
         # Start streaming and consume first chunk
         first_chunk = await gen.__anext__()
         assert first_chunk is not None
-
 
         # Lock is actively held during streaming
         assert queue_manager.depths.get(session_id) == 1
@@ -250,7 +261,6 @@ async def test_abrupt_client_disconnect_releases_session_lock():
         assert new_req_id is not None
         assert queue_manager.depths.get(session_id) == 1
         await queue_manager.release(session_id, new_req_id)
-
 
 
 @pytest.mark.asyncio
@@ -291,12 +301,14 @@ async def test_disconnect_persistence_with_valid_fence_succeeds():
     _persist_response validates active fence and safely persists the batch.
     """
     mock_client = MagicMock()
-    mock_client.create_message_batch = AsyncMock(return_value={
-        "messages": [
-            {"id": "msg-u1", "sender": "USER"},
-            {"id": "msg-a1", "sender": "AGENT"},
-        ]
-    })
+    mock_client.create_message_batch = AsyncMock(
+        return_value={
+            "messages": [
+                {"id": "msg-u1", "sender": "USER"},
+                {"id": "msg-a1", "sender": "AGENT"},
+            ]
+        }
+    )
 
     mock_queue_manager = MagicMock()
     mock_queue_manager.validate_active_fence = AsyncMock(return_value=True)

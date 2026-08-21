@@ -1,19 +1,20 @@
 import json
 import logging
 from datetime import datetime, timezone
-from langchain_core.messages import SystemMessage, HumanMessage, ToolMessage
+
+from langchain_core.messages import HumanMessage, SystemMessage
 from langchain_core.runnables import RunnableConfig
 from langgraph.prebuilt import ToolNode
 
 from agent.agents.chat_agent import get_chat_model
-from agent.config import get_settings
-from agent.tools.registry import get_tools
-from agent.tools.nestjs_client import validate_booking_readiness_response
-from agent.tools.base import get_nestjs_client
-from agent.graph.state import AgentState
 from agent.agents.travel_assistant import TRAVEL_PROMPT
+from agent.config import get_settings
+from agent.graph.state import AgentState
+from agent.tools.base import get_nestjs_client
+from agent.tools.registry import get_tools
 
 logger = logging.getLogger("agent.graph.nodes")
+
 
 async def final_answer_node(state: AgentState, config: RunnableConfig) -> dict:
     """Call the LLM without tools bound to provide a final summary answer when iteration limit is reached."""
@@ -34,23 +35,25 @@ async def final_answer_node(state: AgentState, config: RunnableConfig) -> dict:
     response = await model.ainvoke(messages, config=config)
     return {"messages": [response]}
 
+
 # Create the prebuilt ToolNode
 prebuilt_tool_node = ToolNode(get_tools())
+
 
 async def custom_tool_node(state: AgentState, config: RunnableConfig) -> dict:
     """Execute prebuilt ToolNode, parse signals from tool messages, and increment iteration count."""
     result = await prebuilt_tool_node.ainvoke(state, config=config)
     current_iter = state.get("iteration_count") or 0
-    
+
     update_dict = {"iteration_count": current_iter + 1}
-    
+
     if isinstance(result, dict) and "messages" in result:
         messages = result["messages"]
         update_dict["messages"] = messages
-        
+
         # Parse signal from ToolMessage if present
         for msg in messages:
-            if hasattr(msg, 'content') and isinstance(msg.content, str):
+            if hasattr(msg, "content") and isinstance(msg.content, str):
                 try:
                     data = json.loads(msg.content)
                     if isinstance(data, dict) and "signal" in data:
@@ -64,8 +67,9 @@ async def custom_tool_node(state: AgentState, config: RunnableConfig) -> dict:
     else:
         # Fallback if ToolNode returns something else
         update_dict.update(result)
-        
+
     return update_dict
+
 
 _ALLOWLISTED_DISPLAY_FIELDS = (
     "airline",
@@ -77,6 +81,7 @@ _ALLOWLISTED_DISPLAY_FIELDS = (
     "currency",
 )
 
+
 async def validate_handoff(state: AgentState, config: RunnableConfig) -> dict:
     """Validate snapshot and signal before creating handoff."""
     signal = state.get("signal")
@@ -84,8 +89,17 @@ async def validate_handoff(state: AgentState, config: RunnableConfig) -> dict:
         logger.info("validate_handoff_missing_signal")
         return {"action": {"error": "Missing checkout signal."}}
 
-    offer_index = signal.get("offer_index") if signal.get("offer_index") is not None else signal.get("selected_index")
-    if offer_index is None or isinstance(offer_index, bool) or not isinstance(offer_index, int) or offer_index < 1:
+    offer_index = (
+        signal.get("offer_index")
+        if signal.get("offer_index") is not None
+        else signal.get("selected_index")
+    )
+    if (
+        offer_index is None
+        or isinstance(offer_index, bool)
+        or not isinstance(offer_index, int)
+        or offer_index < 1
+    ):
         logger.info("validate_handoff_invalid_offer_index")
         return {"action": {"error": "Missing checkout signal."}}
 
@@ -97,7 +111,11 @@ async def validate_handoff(state: AgentState, config: RunnableConfig) -> dict:
         logger.info("validate_handoff_missing_snapshot")
         return {"action": {"error": "Missing or invalid trusted snapshot."}}
 
-    version = snapshot.get("version") if snapshot.get("version") is not None else snapshot.get("snapshotVersion")
+    version = (
+        snapshot.get("version")
+        if snapshot.get("version") is not None
+        else snapshot.get("snapshotVersion")
+    )
     if version is None or isinstance(version, bool) or not isinstance(version, int) or version < 1:
         logger.info("validate_handoff_invalid_snapshot_version")
         return {"action": {"error": "Missing or invalid trusted snapshot."}}
@@ -107,7 +125,9 @@ async def validate_handoff(state: AgentState, config: RunnableConfig) -> dict:
         logger.info("validate_handoff_invalid_snapshot_attestation")
         return {"action": {"error": "Missing or invalid trusted snapshot."}}
 
-    results = snapshot.get("results") if snapshot.get("results") is not None else snapshot.get("offers")
+    results = (
+        snapshot.get("results") if snapshot.get("results") is not None else snapshot.get("offers")
+    )
     if not isinstance(results, list) or len(results) == 0:
         logger.info("validate_handoff_missing_results")
         return {"action": {"error": "Missing or invalid search results in snapshot."}}
@@ -131,12 +151,15 @@ async def validate_handoff(state: AgentState, config: RunnableConfig) -> dict:
                     expires_dt = expires_dt.replace(tzinfo=timezone.utc)
                 if expires_dt < datetime.now(timezone.utc):
                     logger.info("validate_handoff_snapshot_expired")
-                    return {"action": {"error": "Search snapshot has expired. Please search again."}}
+                    return {
+                        "action": {"error": "Search snapshot has expired. Please search again."}
+                    }
         except (ValueError, TypeError):
             logger.info("validate_handoff_snapshot_expiry_parse_error")
             return {"action": {"error": "Search snapshot has expired. Please search again."}}
 
     return {}
+
 
 async def create_handoff_token(state: AgentState, config: RunnableConfig) -> dict:
     """Create a handoff token using NestJSClient and emit action."""
@@ -154,7 +177,11 @@ async def create_handoff_token(state: AgentState, config: RunnableConfig) -> dic
         return {"action": {"error": "Invalid state for handoff creation."}}
 
     attestation = snapshot.get("attestation") or snapshot.get("selectionAttestation")
-    offer_index = signal.get("offer_index") if signal.get("offer_index") is not None else signal.get("selected_index")
+    offer_index = (
+        signal.get("offer_index")
+        if signal.get("offer_index") is not None
+        else signal.get("selected_index")
+    )
     fingerprint = snapshot.get("fingerprint")
 
     try:
@@ -181,7 +208,11 @@ async def create_handoff_token(state: AgentState, config: RunnableConfig) -> dic
             try:
                 idx = int(offer_index) - 1
                 results = snapshot.get("results") or snapshot.get("offers") or []
-                if isinstance(results, list) and 0 <= idx < len(results) and isinstance(results[idx], dict):
+                if (
+                    isinstance(results, list)
+                    and 0 <= idx < len(results)
+                    and isinstance(results[idx], dict)
+                ):
                     source_item.update(results[idx])
             except (ValueError, TypeError):
                 logger.debug("create_handoff_token_source_item_parse_failed")
@@ -224,5 +255,6 @@ async def create_handoff_token(state: AgentState, config: RunnableConfig) -> dic
     except Exception:
         logger.error("create_handoff_token_failed")
         return {"action": {"error": "Checkout handoff could not be created."}}
+
 
 create_handoff_token_node = create_handoff_token

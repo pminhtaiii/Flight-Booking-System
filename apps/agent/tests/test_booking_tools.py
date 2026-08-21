@@ -1,10 +1,11 @@
-import pytest
-import httpx
 from unittest.mock import AsyncMock, MagicMock
+
+import httpx
+import pytest
 from langchain_core.runnables import RunnableConfig
 
-from agent.tools.booking_summaries import list_user_booking_summaries
 from agent.tools.booking_detail import get_booking_detail
+from agent.tools.booking_summaries import list_user_booking_summaries
 
 
 @pytest.fixture
@@ -17,11 +18,13 @@ def mock_client():
 
 @pytest.fixture
 def run_config(mock_client):
-    return RunnableConfig(configurable={
-        "nestjs_client": mock_client,
-        "thread_id": "test-session",
-        "user_id": "test-user"
-    })
+    return RunnableConfig(
+        configurable={
+            "nestjs_client": mock_client,
+            "thread_id": "test-session",
+            "user_id": "test-user",
+        }
+    )
 
 
 @pytest.mark.asyncio
@@ -131,18 +134,39 @@ async def test_list_user_booking_summaries_privacy_negative(mock_client, run_con
     result = await list_user_booking_summaries.ainvoke({}, config=run_config)
     lower_res = result.lower()
 
-    forbidden = ["price", "usd", "vnd", "currency", "pnr", "passenger", "passport", "payment", "database id", "credit_card", "stripe"]
+    forbidden = [
+        "price",
+        "usd",
+        "vnd",
+        "currency",
+        "pnr",
+        "passenger",
+        "passport",
+        "payment",
+        "database id",
+        "credit_card",
+        "stripe",
+    ]
     for term in forbidden:
-        assert term not in lower_res, f"Forbidden term '{term}' found in booking summary output: {result}"
+        assert term not in lower_res, (
+            f"Forbidden term '{term}' found in booking summary output: {result}"
+        )
 
 
 @pytest.mark.asyncio
 async def test_list_user_booking_summaries_error_degradation(mock_client, run_config):
-    mock_client.get_gateway_user_booking_summaries.side_effect = Exception("Internal DB Connection Timeout")
+    mock_client.get_gateway_user_booking_summaries.side_effect = Exception(
+        "Internal DB Connection Timeout"
+    )
 
     result = await list_user_booking_summaries.ainvoke({}, config=run_config)
 
-    assert "failed" in result.lower() or "error" in result.lower() or "couldn't" in result.lower() or "unavailable" in result.lower()
+    assert (
+        "failed" in result.lower()
+        or "error" in result.lower()
+        or "couldn't" in result.lower()
+        or "unavailable" in result.lower()
+    )
     assert "Internal DB Connection Timeout" not in result
     assert "Traceback" not in result
 
@@ -165,7 +189,9 @@ async def test_get_booking_detail_success(mock_client, run_config):
         "refundable": False,
     }
 
-    result = await get_booking_detail.ainvoke({"booking_reference": "bkref_12345"}, config=run_config)
+    result = await get_booking_detail.ainvoke(
+        {"booking_reference": "bkref_12345"}, config=run_config
+    )
 
     assert "bkref_12345" in result
     assert "VN300" in result
@@ -177,24 +203,38 @@ async def test_get_booking_detail_success(mock_client, run_config):
 @pytest.mark.asyncio
 async def test_get_booking_detail_not_found(mock_client, run_config):
     req = httpx.Request("GET", "http://localhost:3001/api/agent-gateway/users/bookings/bkref_99999")
-    resp = httpx.Response(404, json={"error": "BOOKING_REFERENCE_NOT_FOUND", "statusCode": 404}, request=req)
-    mock_client.get_gateway_booking_detail.side_effect = httpx.HTTPStatusError("Not Found", request=req, response=resp)
+    resp = httpx.Response(
+        404, json={"error": "BOOKING_REFERENCE_NOT_FOUND", "statusCode": 404}, request=req
+    )
+    mock_client.get_gateway_booking_detail.side_effect = httpx.HTTPStatusError(
+        "Not Found", request=req, response=resp
+    )
 
-    result = await get_booking_detail.ainvoke({"booking_reference": "bkref_99999"}, config=run_config)
+    result = await get_booking_detail.ainvoke(
+        {"booking_reference": "bkref_99999"}, config=run_config
+    )
 
     assert "not found" in result.lower() or "no booking found" in result.lower()
 
 
 @pytest.mark.asyncio
 async def test_get_booking_detail_malformed_reference(mock_client, run_config):
-    result = await get_booking_detail.ainvoke({"booking_reference": "invalid_ref_no_prefix"}, config=run_config)
+    result = await get_booking_detail.ainvoke(
+        {"booking_reference": "invalid_ref_no_prefix"}, config=run_config
+    )
 
-    assert "invalid" in result.lower() or "malformed" in result.lower() or "format" in result.lower()
+    assert (
+        "invalid" in result.lower() or "malformed" in result.lower() or "format" in result.lower()
+    )
     mock_client.get_gateway_booking_detail.assert_not_called()
 
     mock_client.reset_mock()
     result_empty = await get_booking_detail.ainvoke({"booking_reference": ""}, config=run_config)
-    assert "invalid" in result_empty.lower() or "required" in result_empty.lower() or "malformed" in result_empty.lower()
+    assert (
+        "invalid" in result_empty.lower()
+        or "required" in result_empty.lower()
+        or "malformed" in result_empty.lower()
+    )
     mock_client.get_gateway_booking_detail.assert_not_called()
 
 
@@ -216,20 +256,44 @@ async def test_get_booking_detail_privacy_negative(mock_client, run_config):
         "refundable": False,
     }
 
-    result = await get_booking_detail.ainvoke({"booking_reference": "bkref_12345"}, config=run_config)
+    result = await get_booking_detail.ainvoke(
+        {"booking_reference": "bkref_12345"}, config=run_config
+    )
     lower_res = result.lower()
 
-    forbidden = ["price", "usd", "vnd", "currency", "pnr", "passenger", "passport", "payment", "database id", "credit_card", "stripe", "cvv"]
+    forbidden = [
+        "price",
+        "usd",
+        "vnd",
+        "currency",
+        "pnr",
+        "passenger",
+        "passport",
+        "payment",
+        "database id",
+        "credit_card",
+        "stripe",
+        "cvv",
+    ]
     for term in forbidden:
-        assert term not in lower_res, f"Forbidden term '{term}' found in booking detail output: {result}"
+        assert term not in lower_res, (
+            f"Forbidden term '{term}' found in booking detail output: {result}"
+        )
 
 
 @pytest.mark.asyncio
 async def test_get_booking_detail_error_degradation(mock_client, run_config):
     mock_client.get_gateway_booking_detail.side_effect = Exception("Gateway connection error 500")
 
-    result = await get_booking_detail.ainvoke({"booking_reference": "bkref_12345"}, config=run_config)
+    result = await get_booking_detail.ainvoke(
+        {"booking_reference": "bkref_12345"}, config=run_config
+    )
 
-    assert "failed" in result.lower() or "error" in result.lower() or "couldn't" in result.lower() or "unavailable" in result.lower()
+    assert (
+        "failed" in result.lower()
+        or "error" in result.lower()
+        or "couldn't" in result.lower()
+        or "unavailable" in result.lower()
+    )
     assert "500" not in result
     assert "Traceback" not in result

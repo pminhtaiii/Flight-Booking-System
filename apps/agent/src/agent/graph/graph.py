@@ -1,19 +1,20 @@
-from langgraph.graph import StateGraph, START, END
 from langchain_core.runnables import RunnableConfig
+from langgraph.graph import END, START, StateGraph
 
-from agent.graph.state import AgentState
-from agent.graph.router import invoke_router
-from agent.graph.checkout_gate import evaluate_checkout_gate
+from agent.agents.checkout_orchestrator import checkout_orchestrator_node
 from agent.agents.general_agent import general_agent_node
 from agent.agents.travel_assistant import travel_assistant_node
-from agent.agents.checkout_orchestrator import checkout_orchestrator_node
+from agent.config import get_settings
+from agent.graph.checkout_gate import evaluate_checkout_gate
 from agent.graph.nodes import (
+    create_handoff_token,
     custom_tool_node,
     final_answer_node,
     validate_handoff,
-    create_handoff_token,
 )
-from agent.config import get_settings
+from agent.graph.router import invoke_router
+from agent.graph.state import AgentState
+
 
 async def router_node(state: AgentState, config: RunnableConfig | None = None) -> dict:
     settings = get_settings()
@@ -21,7 +22,8 @@ async def router_node(state: AgentState, config: RunnableConfig | None = None) -
         return {"route": "travel", "disambiguation": None}
     decision = await invoke_router(state)
     gate_result = evaluate_checkout_gate(state, decision)
-    return gate_result # Updates 'route' and 'disambiguation' in AgentState
+    return gate_result  # Updates 'route' and 'disambiguation' in AgentState
+
 
 def route_after_router(state: AgentState) -> str:
     route = state.get("route", "general")
@@ -30,6 +32,7 @@ def route_after_router(state: AgentState) -> str:
     elif route == "checkout":
         return "checkout"
     return "general"
+
 
 def should_continue(state: AgentState) -> str:
     messages = state.get("messages", [])
@@ -47,6 +50,7 @@ def should_continue(state: AgentState) -> str:
     if current_iterations >= max_iterations:
         return "final_answer"
     return "tools"
+
 
 def route_after_tools(state: AgentState) -> str:
     signal = state.get("signal")
@@ -79,7 +83,7 @@ workflow.add_conditional_edges(
         "tools": "tools",
         "final_answer": "final_answer",
         END: END,
-    }
+    },
 )
 
 workflow.add_conditional_edges(
@@ -89,7 +93,7 @@ workflow.add_conditional_edges(
         "tools": "tools",
         "final_answer": "final_answer",
         END: END,
-    }
+    },
 )
 
 workflow.add_conditional_edges(
@@ -102,11 +106,13 @@ workflow.add_conditional_edges(
     },
 )
 
+
 def route_after_validate(state: AgentState) -> str:
     action = state.get("action", {})
     if action and action.get("error"):
         return END
     return "create_handoff_token"
+
 
 workflow.add_conditional_edges(
     "validate_handoff",
@@ -114,7 +120,7 @@ workflow.add_conditional_edges(
     {
         "create_handoff_token": "create_handoff_token",
         END: END,
-    }
+    },
 )
 workflow.add_edge("create_handoff_token", END)
 workflow.add_edge("final_answer", END)

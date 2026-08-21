@@ -1,9 +1,12 @@
-import pytest
 import asyncio
 import time
-from unittest.mock import AsyncMock, MagicMock, patch
-from agent.guardrails.output_pipeline import OutputGuardrailPipeline, OutputGuardrailBlockedError
+from unittest.mock import AsyncMock, MagicMock
+
+import pytest
+
 from agent.config import OutputGuardrailConfig
+from agent.guardrails.output_pipeline import OutputGuardrailBlockedError, OutputGuardrailPipeline
+
 
 @pytest.fixture
 def mock_nemo_service():
@@ -11,14 +14,13 @@ def mock_nemo_service():
     service.validate_output_chunk = AsyncMock()
     return service
 
+
 @pytest.fixture
 def enabled_config():
     return OutputGuardrailConfig(
-        enabled=True,
-        overlap_tokens=30,
-        max_chunk_tokens=200,
-        nemo_timeout=2.0
+        enabled=True, overlap_tokens=30, max_chunk_tokens=200, nemo_timeout=2.0
     )
+
 
 @pytest.mark.asyncio
 async def test_pipeline_parallelism_latency(enabled_config, mock_nemo_service):
@@ -26,6 +28,7 @@ async def test_pipeline_parallelism_latency(enabled_config, mock_nemo_service):
     async def mock_validate(chunk):
         await asyncio.sleep(0.2)
         return True, ""
+
     mock_nemo_service.validate_output_chunk.side_effect = mock_validate
 
     pipeline = OutputGuardrailPipeline(config=enabled_config, nemo_service=mock_nemo_service)
@@ -74,11 +77,12 @@ async def test_pipeline_parallelism_latency(enabled_config, mock_nemo_service):
     print("Timestamps of yielded chunks:", timestamps)
     # The first chunk should have yielded after its 0.2s validation completes.
     assert timestamps[0] >= 0.2
-    
+
     # Assert that parallel validation hid the latency:
     # Total time to process and yield 3 chunks (with 0.6s total generation and 0.6s total validation time)
     # should be less than 1.8 seconds under parallel execution, whereas sequential execution would take >1.5s.
     assert timestamps[2] < 1.8
+
 
 @pytest.mark.asyncio
 async def test_pipeline_parallelism_fail_lookahead(enabled_config, mock_nemo_service):
@@ -88,6 +92,7 @@ async def test_pipeline_parallelism_fail_lookahead(enabled_config, mock_nemo_ser
         if "unsafe" in chunk:
             return False, "Output safety violation."
         return True, ""
+
     mock_nemo_service.validate_output_chunk.side_effect = mock_validate
 
     pipeline = OutputGuardrailPipeline(config=enabled_config, nemo_service=mock_nemo_service)
@@ -107,7 +112,7 @@ async def test_pipeline_parallelism_fail_lookahead(enabled_config, mock_nemo_ser
     # When Chunk 2 is complete, its validation task (unsafe) is started.
     # When we feed Chunk 3, we should detect that Chunk 2 failed validation and raise an exception immediately,
     # preventing any more chunks from being processed or yielded.
-    
+
     with pytest.raises(OutputGuardrailBlockedError) as exc_info:
         for token in tokens_unsafe:
             async for chunk in pipeline.process_token(token):

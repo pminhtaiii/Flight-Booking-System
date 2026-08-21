@@ -1,7 +1,10 @@
-import pytest
+from unittest.mock import AsyncMock, MagicMock, patch
+
 import httpx
-from unittest.mock import AsyncMock, patch, MagicMock
+import pytest
+
 from agent.guardrails.nemo import NemoGuardrailService
+
 
 @pytest.fixture
 def guardrail_service():
@@ -13,9 +16,10 @@ def guardrail_service():
         mock_set.MIMO_MODEL_NAME = "mimo"
         mock_set.OUTPUT_GUARDRAIL_NEMO_TIMEOUT = 3.5
         mock_settings.return_value = mock_set
-        
+
         service = NemoGuardrailService()
         yield service
+
 
 @pytest.mark.asyncio
 async def test_validate_output_chunk_safe(guardrail_service):
@@ -23,11 +27,13 @@ async def test_validate_output_chunk_safe(guardrail_service):
         mock_response = httpx.Response(
             200,
             json={"choices": [{"message": {"content": "SAFE"}}]},
-            request=httpx.Request("POST", "http://mockmimo")
+            request=httpx.Request("POST", "http://mockmimo"),
         )
         mock_post.return_value = mock_response
 
-        is_allowed, reason = await guardrail_service.validate_output_chunk("This is a safe response chunk.")
+        is_allowed, reason = await guardrail_service.validate_output_chunk(
+            "This is a safe response chunk."
+        )
         assert is_allowed is True
         assert reason == ""
         assert guardrail_service.is_healthy() is True
@@ -36,7 +42,7 @@ async def test_validate_output_chunk_safe(guardrail_service):
         mock_post.assert_called_once()
         call_kwargs = mock_post.call_args[1]
         assert call_kwargs.get("timeout") == 3.5
-        
+
         # Verify output-specific system prompt is used
         payload = call_kwargs.get("json")
         messages = payload.get("messages", [])
@@ -46,13 +52,14 @@ async def test_validate_output_chunk_safe(guardrail_service):
         assert messages[1]["role"] == "user"
         assert messages[1]["content"] == "This is a safe response chunk."
 
+
 @pytest.mark.asyncio
 async def test_validate_output_chunk_unsafe(guardrail_service):
     with patch("httpx.AsyncClient.post", new_callable=AsyncMock) as mock_post:
         mock_response = httpx.Response(
             200,
             json={"choices": [{"message": {"content": "UNSAFE"}}]},
-            request=httpx.Request("POST", "http://mockmimo")
+            request=httpx.Request("POST", "http://mockmimo"),
         )
         mock_post.return_value = mock_response
 
@@ -60,6 +67,7 @@ async def test_validate_output_chunk_unsafe(guardrail_service):
         assert is_allowed is False
         assert reason == "Output safety violation."
         assert guardrail_service.is_healthy() is True
+
 
 @pytest.mark.asyncio
 async def test_validate_output_chunk_timeout(guardrail_service):
@@ -71,6 +79,7 @@ async def test_validate_output_chunk_timeout(guardrail_service):
         assert reason == "Safety check unavailable."
         assert guardrail_service.is_healthy() is False
 
+
 @pytest.mark.asyncio
 async def test_validate_output_chunk_unexpected_response(guardrail_service):
     with patch("httpx.AsyncClient.post", new_callable=AsyncMock) as mock_post:
@@ -78,7 +87,7 @@ async def test_validate_output_chunk_unexpected_response(guardrail_service):
         mock_response = httpx.Response(
             200,
             json={"choices": [{"message": {"content": "SOMETHING_ELSE"}}]},
-            request=httpx.Request("POST", "http://mockmimo")
+            request=httpx.Request("POST", "http://mockmimo"),
         )
         mock_post.return_value = mock_response
 

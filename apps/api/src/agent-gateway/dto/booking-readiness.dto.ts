@@ -8,8 +8,6 @@ import {
   IsInt,
   IsString,
   IsUUID,
-  Matches,
-  MaxLength,
   Min,
   ValidateNested,
 } from 'class-validator';

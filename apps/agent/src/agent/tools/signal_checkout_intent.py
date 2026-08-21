@@ -1,5 +1,6 @@
 import json
 from typing import Annotated, Optional
+
 from langchain_core.tools import tool
 from langgraph.prebuilt import InjectedState
 
@@ -32,10 +33,12 @@ def signal_checkout_intent(
     if idx > len(results):
         return f"Invalid offer index. Must be between 1 and {len(results)}."
 
-    return json.dumps({
-        "signal": {
-            "intent": "checkout",
-            "offer_index": idx,
-            "selected_index": idx,
+    return json.dumps(
+        {
+            "signal": {
+                "intent": "checkout",
+                "offer_index": idx,
+                "selected_index": idx,
+            }
         }
-    })
+    )

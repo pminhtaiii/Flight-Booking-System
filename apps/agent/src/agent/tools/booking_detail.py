@@ -1,7 +1,9 @@
 import logging
+
 import httpx
-from langchain_core.tools import tool
 from langchain_core.runnables import RunnableConfig
+from langchain_core.tools import tool
+
 from agent.tools.base import get_nestjs_client
 
 logger = logging.getLogger(__name__)
@@ -47,7 +49,9 @@ async def get_booking_detail(booking_reference: str, config: RunnableConfig) -> 
         status = response.get("status", "Unknown")
         airline_code = response.get("airline", "Unknown")
         airline_name = AIRLINE_MAP.get(airline_code, airline_code)
-        airline_display = f"{airline_name} ({airline_code})" if airline_code in AIRLINE_MAP else airline_code
+        airline_display = (
+            f"{airline_name} ({airline_code})" if airline_code in AIRLINE_MAP else airline_code
+        )
 
         origin = response.get("origin", "Unknown")
         dest = response.get("destination", "Unknown")
@@ -56,9 +60,17 @@ async def get_booking_detail(booking_reference: str, config: RunnableConfig) -> 
         flight_num = response.get("flightNumber") or "Not specified"
         duration = response.get("durationMinutes", 0)
         stops = response.get("stops", response.get("stopCount", 0))
-        stops_str = "Direct (0 stops)" if stops == 0 else f"{stops} stop" if stops == 1 else f"{stops} stops"
+        stops_str = (
+            "Direct (0 stops)"
+            if stops == 0
+            else f"{stops} stop"
+            if stops == 1
+            else f"{stops} stops"
+        )
 
-        baggage = response.get("baggageAllowance") or response.get("baggageSummary") or "Not specified"
+        baggage = (
+            response.get("baggageAllowance") or response.get("baggageSummary") or "Not specified"
+        )
 
         refundable_val = response.get("refundable")
         if refundable_val is True:

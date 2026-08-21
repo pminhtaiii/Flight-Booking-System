@@ -5,7 +5,6 @@ import * as crypto from 'crypto';
 
 describe('ChatMessageCryptoService', () => {
   let service: ChatMessageCryptoService;
-  let configService: ConfigService;
 
   const TEST_KEY_HEX = crypto.randomBytes(32).toString('hex');
 
@@ -26,7 +25,6 @@ describe('ChatMessageCryptoService', () => {
     }).compile();
 
     service = module.get<ChatMessageCryptoService>(ChatMessageCryptoService);
-    configService = module.get<ConfigService>(ConfigService);
   });
 
   it('should be defined and configured', () => {

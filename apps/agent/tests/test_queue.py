@@ -1,16 +1,18 @@
 import asyncio
 import os
-import pytest
-import jwt
 import time
 from unittest.mock import AsyncMock, MagicMock
-from fastapi import HTTPException
+
 import httpx
+import jwt
+import pytest
+from fastapi import HTTPException
+from langchain_core.messages import AIMessageChunk
+
+from agent.infrastructure.redis import close_redis, init_redis
+from agent.main import app
 from agent.queue.message_queue import ActiveFence, MessageQueueManager
 
-from agent.main import app
-from agent.infrastructure.redis import init_redis, close_redis
-from langchain_core.messages import AIMessageChunk
 
 @pytest.fixture(autouse=True)
 async def setup_redis():
@@ -18,8 +20,11 @@ async def setup_redis():
     await init_redis(redis_url)
     yield
     await close_redis()
+
+
 # JWT Secret from conftest / env
 JWT_SECRET = "testsecret_must_be_at_least_32_bytes_long_for_security_reasons"
+
 
 def get_auth_headers(payload_data=None):
     payload = {
@@ -28,149 +33,154 @@ def get_auth_headers(payload_data=None):
         "aud": "booking-systems-clients",
         "jti": "jti-test-uuid",
         "email": "test@example.com",
-        "exp": int(time.time()) + 100
+        "exp": int(time.time()) + 100,
     }
     if payload_data:
         payload.update(payload_data)
     token = jwt.encode(payload, JWT_SECRET, algorithm="HS256")
     return {"Authorization": f"Bearer {token}"}
 
+
 @pytest.mark.asyncio
 async def test_queue_manager_max_depth():
     manager = MessageQueueManager(max_depth=2)
-    
+
     # First acquire
     req1 = await manager.acquire("session-1")
     # Second acquire (blocks because lock is held, but increments depth)
     acquire_task = asyncio.create_task(manager.acquire("session-1"))
-    await asyncio.sleep(0.01) # Yield to let task run
-    
+    await asyncio.sleep(0.01)  # Yield to let task run
+
     assert manager.depths["session-1"] == 2
-    
+
     # Third acquire should fail immediately with 429 HTTPException
     with pytest.raises(HTTPException) as exc_info:
         await manager.acquire("session-1")
-    
+
     assert exc_info.value.status_code == 429
     assert "Too many concurrent requests" in exc_info.value.detail
-    
+
     # Clean up tasks
     await manager.release("session-1", req1)
     req2 = await acquire_task
     await manager.release("session-1", req2)
 
+
 @pytest.mark.asyncio
 async def test_queue_manager_fifo_order():
     manager = MessageQueueManager(max_depth=3)
     order = []
-    
+
     async def worker(name, session_id, hold_time=0.05):
         req = await manager.acquire(session_id)
         order.append(name)
         await asyncio.sleep(hold_time)
         await manager.release(session_id, req)
-        
+
     # Start worker 1 (acquires lock immediately and holds for 0.2s)
     t1 = asyncio.create_task(worker("worker1", "session-fifo-1", hold_time=0.2))
     await asyncio.sleep(0.01)
-    
+
     # Start worker 2 (waits)
     t2 = asyncio.create_task(worker("worker2", "session-fifo-1"))
     await asyncio.sleep(0.01)
-    
+
     # Start worker 3 (waits)
     t3 = asyncio.create_task(worker("worker3", "session-fifo-1"))
     await asyncio.sleep(0.01)
-    
+
     await asyncio.gather(t1, t2, t3)
-    
+
     # Verification of FIFO order
     assert order == ["worker1", "worker2", "worker3"]
+
 
 @pytest.mark.asyncio
 async def test_queue_manager_session_isolation():
     manager = MessageQueueManager(max_depth=1)
-    
+
     # Acquire for session-1
     req1 = await manager.acquire("session-1")
-    
+
     # Acquire for session-2 should succeed because it is a different session
     req2 = await manager.acquire("session-2")
-    
+
     assert manager.depths["session-1"] == 1
     assert manager.depths["session-2"] == 1
-    
+
     await manager.release("session-1", req1)
     await manager.release("session-2", req2)
+
 
 @pytest.mark.asyncio
 async def test_endpoint_concurrency_limit(monkeypatch):
     headers = get_auth_headers()
-    
+
     # Configure app state message queue to max_depth=2
     queue_manager = MessageQueueManager(max_depth=2)
     monkeypatch.setattr(app.state, "message_queue", queue_manager, raising=False)
-    
+
     # Mock guardrails to allow
     mock_guardrail = MagicMock()
     mock_guardrail.is_healthy.return_value = True
     mock_guardrail.validate_message = AsyncMock(return_value=(True, ""))
     monkeypatch.setattr(app.state, "guardrails", mock_guardrail, raising=False)
-    
+
     # Mock get_memory to wait briefly
     async def mock_get_memory(self, session_id, recent_count):
         await asyncio.sleep(0.1)
         return {"recentMessages": [], "summary": None}
+
     monkeypatch.setattr("agent.tools.nestjs_client.NestJSClient.get_memory", mock_get_memory)
-    
+
     # Mock create_message_batch
-    mock_create_batch = AsyncMock(return_value={
-        "messages": [
-            {"id": "msg-123", "sender": "USER"},
-            {"id": "msg-456", "sender": "AGENT"}
-        ]
-    })
-    monkeypatch.setattr("agent.tools.nestjs_client.NestJSClient.create_message_batch", mock_create_batch)
-    
+    mock_create_batch = AsyncMock(
+        return_value={
+            "messages": [{"id": "msg-123", "sender": "USER"}, {"id": "msg-456", "sender": "AGENT"}]
+        }
+    )
+    monkeypatch.setattr(
+        "agent.tools.nestjs_client.NestJSClient.create_message_batch", mock_create_batch
+    )
+
     # Mock graph
     mock_graph = MagicMock()
+
     async def mock_astream_events(*args, **kwargs):
         await asyncio.sleep(2.0)
-        yield {
-            "event": "on_chat_model_stream",
-            "data": {"chunk": AIMessageChunk(content="Word")}
-        }
+        yield {"event": "on_chat_model_stream", "data": {"chunk": AIMessageChunk(content="Word")}}
+
     mock_graph.astream_events = mock_astream_events
-    
+
     mock_state = MagicMock()
     mock_state.next = ()
     from langchain_core.messages import HumanMessage
+
     mock_state.values = {"messages": [HumanMessage(content="hello")]}
     mock_graph.aget_state = AsyncMock(return_value=mock_state)
 
     import agent.streaming.sse
+
     monkeypatch.setattr(agent.streaming.sse, "graph", mock_graph)
-    
+
     transport = httpx.ASGITransport(app=app)
     async with httpx.AsyncClient(transport=transport, base_url="http://test") as ac:
         # Send first request (will run and hold queue slot)
         r1_task = asyncio.create_task(
             ac.post(
-                "/chat/stream",
-                json={"message": "hello", "sessionId": "session-1"},
-                headers=headers
+                "/chat/stream", json={"message": "hello", "sessionId": "session-1"}, headers=headers
             )
         )
-        
+
         # Send second request (will wait in queue, slot 2)
         r2_task = asyncio.create_task(
             ac.post(
                 "/chat/stream",
                 json={"message": "hello again", "sessionId": "session-1"},
-                headers=headers
+                headers=headers,
             )
         )
-        
+
         # Wait for both requests to hit the queue
         for _ in range(50):
             if queue_manager.depths.get("session-1", 0) == 2:
@@ -182,15 +192,20 @@ async def test_endpoint_concurrency_limit(monkeypatch):
             ac.post(
                 "/chat/stream",
                 json={"message": "hello third", "sessionId": "session-1"},
-                headers=headers
+                headers=headers,
             )
         )
-        
+
         responses = await asyncio.gather(r1_task, r2_task, r3_task)
         status_codes = [r.status_code for r in responses]
-        
-        assert status_codes.count(429) == 1, f"Expected exactly one 429, got statuses: {status_codes}"
-        assert status_codes.count(200) == 2, f"Expected exactly two 200s, got statuses: {status_codes}"
+
+        assert status_codes.count(429) == 1, (
+            f"Expected exactly one 429, got statuses: {status_codes}"
+        )
+        assert status_codes.count(200) == 2, (
+            f"Expected exactly two 200s, got statuses: {status_codes}"
+        )
+
 
 @pytest.mark.asyncio
 async def test_refresher_redis_error_cancels_request(monkeypatch):
@@ -220,6 +235,7 @@ async def test_refresher_redis_error_cancels_request(monkeypatch):
         await task
 
     assert cancelled is True
+
 
 @pytest.mark.asyncio
 async def test_attached_producer_task_cancelled_on_refresh_loss():
@@ -256,6 +272,7 @@ async def test_attached_producer_task_cancelled_on_refresh_loss():
 
     assert producer_cancelled is True
 
+
 @pytest.mark.asyncio
 async def test_stale_release_decrements_queue_depth():
     manager = MessageQueueManager(max_depth=3)
@@ -271,10 +288,7 @@ async def test_stale_release_decrements_queue_depth():
     req_id_2 = "req-id-successor"
     dummy_task = asyncio.create_task(asyncio.sleep(10))
     successor_fence = ActiveFence(
-        req_id=req_id_2,
-        fence=2,
-        refresh_task=dummy_task,
-        user_id="default"
+        req_id=req_id_2, fence=2, refresh_task=dummy_task, user_id="default"
     )
     manager.active_fences["session-stale-1"] = successor_fence
     manager.depths["session-stale-1"] = 2
@@ -335,6 +349,3 @@ async def test_release_none_req_id_ignored():
     # Clean up with valid release
     await manager.release("session-none-test", req_id)
     assert "session-none-test" not in manager.depths
-
-
-

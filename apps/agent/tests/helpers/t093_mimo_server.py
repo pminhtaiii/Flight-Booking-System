@@ -16,7 +16,6 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Any, Mapping, Sequence
 from urllib.parse import urlsplit
 
-
 DEFAULT_HOST = "127.0.0.1"
 DEFAULT_PORT = 3012
 CHAT_PATHS = frozenset({"/v1/chat/completions", "/chat/completions"})
@@ -75,10 +74,15 @@ def _latest_tool_name(messages: Sequence[Mapping[str, Any]]) -> str:
             if isinstance(tool_call_id, str):
                 for previous in reversed(messages[:index]):
                     tool_calls = previous.get("tool_calls")
-                    if not isinstance(tool_calls, Sequence) or isinstance(tool_calls, (str, bytes, bytearray)):
+                    if not isinstance(tool_calls, Sequence) or isinstance(
+                        tool_calls, (str, bytes, bytearray)
+                    ):
                         continue
                     for tool_call in tool_calls:
-                        if not isinstance(tool_call, Mapping) or tool_call.get("id") != tool_call_id:
+                        if (
+                            not isinstance(tool_call, Mapping)
+                            or tool_call.get("id") != tool_call_id
+                        ):
                             continue
                         function = tool_call.get("function")
                         if isinstance(function, Mapping) and isinstance(function.get("name"), str):
@@ -130,10 +134,14 @@ def _router_decision(user_text: str) -> dict[str, Any]:
         r"\b(?:flight|option|offer)\s*(?:number|no\.?|#)?\s*(\d+)\b|\b(?:number|option|offer)\s+(\d+)\b",
         lowered,
     )
-    selection_index = next(
-        (int(value) for value in selection_match.groups() if value is not None),
-        1,
-    ) if selection_match else None
+    selection_index = (
+        next(
+            (int(value) for value in selection_match.groups() if value is not None),
+            1,
+        )
+        if selection_match
+        else None
+    )
 
     decision: dict[str, Any] = {
         "intent": "CHECKOUT" if commitment else "SEARCH",
@@ -239,13 +247,17 @@ class _MimoRequestHandler(BaseHTTPRequestHandler):
 
     def do_GET(self) -> None:  # noqa: N802
         if urlsplit(self.path).path != "/health":
-            self._send_json(404, {"error": {"message": "Not found", "type": "invalid_request_error"}})
+            self._send_json(
+                404, {"error": {"message": "Not found", "type": "invalid_request_error"}}
+            )
             return
         self._send_json(200, {"status": "ok", "ok": True})
 
     def do_POST(self) -> None:  # noqa: N802
         if urlsplit(self.path).path not in CHAT_PATHS:
-            self._send_json(404, {"error": {"message": "Not found", "type": "invalid_request_error"}})
+            self._send_json(
+                404, {"error": {"message": "Not found", "type": "invalid_request_error"}}
+            )
             return
 
         try:
@@ -257,7 +269,9 @@ class _MimoRequestHandler(BaseHTTPRequestHandler):
                 raise ValueError("request must be a JSON object")
             response = self._completion_response(body)
         except (ValueError, TypeError, json.JSONDecodeError):
-            self._send_json(400, {"error": {"message": "Invalid request", "type": "invalid_request_error"}})
+            self._send_json(
+                400, {"error": {"message": "Invalid request", "type": "invalid_request_error"}}
+            )
             return
         if body.get("stream") is True:
             self._send_stream(response)
@@ -302,17 +316,27 @@ class _MimoRequestHandler(BaseHTTPRequestHandler):
                     None,
                 )
                 if router_name:
-                    return _openai_response(body, tool_calls=[_function_tool_call(router_name, decision)])
+                    return _openai_response(
+                        body, tool_calls=[_function_tool_call(router_name, decision)]
+                    )
             return _openai_response(body, content=json.dumps(decision, separators=(",", ":")))
 
         available_tools = body.get("tools")
-        tool_names = {
-            str(tool["function"]["name"])
-            for tool in available_tools
-            if isinstance(tool, Mapping) and isinstance(tool.get("function"), Mapping)
-        } if isinstance(available_tools, Sequence) and not isinstance(available_tools, (str, bytes, bytearray)) else set()
+        tool_names = (
+            {
+                str(tool["function"]["name"])
+                for tool in available_tools
+                if isinstance(tool, Mapping) and isinstance(tool.get("function"), Mapping)
+            }
+            if isinstance(available_tools, Sequence)
+            and not isinstance(available_tools, (str, bytes, bytearray))
+            else set()
+        )
 
-        if "signal_checkout_intent" in tool_names and _router_decision(latest_user)["intent"] == "CHECKOUT":
+        if (
+            "signal_checkout_intent" in tool_names
+            and _router_decision(latest_user)["intent"] == "CHECKOUT"
+        ):
             index = _router_decision(latest_user).get("selectionIndex") or 1
             return _openai_response(
                 body,
@@ -360,16 +384,23 @@ class _MimoRequestHandler(BaseHTTPRequestHandler):
             "object": "chat.completion.chunk",
             "created": response.get("created", 0),
             "model": response.get("model", "t093"),
-            "choices": [{
-                "index": 0,
-                "delta": {},
-                "finish_reason": choice.get("finish_reason", "stop") if isinstance(choice, Mapping) else "stop",
-            }],
+            "choices": [
+                {
+                    "index": 0,
+                    "delta": {},
+                    "finish_reason": choice.get("finish_reason", "stop")
+                    if isinstance(choice, Mapping)
+                    else "stop",
+                }
+            ],
         }
-        payload = "".join(
-            f"data: {json.dumps(chunk, separators=(',', ':'))}\n\n"
-            for chunk in (first_chunk, finish_chunk)
-        ) + "data: [DONE]\n\n"
+        payload = (
+            "".join(
+                f"data: {json.dumps(chunk, separators=(',', ':'))}\n\n"
+                for chunk in (first_chunk, finish_chunk)
+            )
+            + "data: [DONE]\n\n"
+        )
         encoded = payload.encode("utf-8")
         self.send_response(200)
         self.send_header("Content-Type", "text/event-stream")

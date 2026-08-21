@@ -1,14 +1,16 @@
+import re
+from unittest.mock import AsyncMock, MagicMock, patch
+
 import jwt
 import pytest
-import re
-from unittest.mock import AsyncMock, patch, MagicMock
 from fastapi.testclient import TestClient
 
-from agent.main import app
 from agent.config import get_settings
+from agent.main import app
 
 client = TestClient(app)
 settings = get_settings()
+
 
 def make_valid_jwt(sub="user-123", jti="jti-456"):
     issuer = getattr(settings, "JWT_ISSUER", "booking-systems-api")
@@ -21,6 +23,7 @@ def make_valid_jwt(sub="user-123", jti="jti-456"):
         "exp": 9999999999,
     }
     return jwt.encode(payload, settings.JWT_SECRET, algorithm="HS256")
+
 
 def test_cors_preflight_success():
     """OPTIONS /chat/stream from configured origin must return exact CORS headers and allow_credentials=False."""
@@ -45,6 +48,7 @@ def test_cors_preflight_success():
     # allow_credentials must be False or absent/not 'true'
     assert response.headers.get("access-control-allow-credentials") in (None, "false")
 
+
 def test_cors_unallowed_origin_rejection():
     """Request from disallowed origin must be explicitly rejected with 403 ORIGIN_NOT_ALLOWED."""
     response = client.post(
@@ -60,6 +64,7 @@ def test_cors_unallowed_origin_rejection():
     data = response.json()
     assert data.get("detail") == "ORIGIN_NOT_ALLOWED" or "Origin" in str(data.get("detail"))
 
+
 def test_cors_headers_present_on_auth_error():
     """CORS headers must be present on 401 auth errors for allowed origins."""
     response = client.post(
@@ -73,6 +78,7 @@ def test_cors_headers_present_on_auth_error():
     assert response.status_code == 401
     assert response.headers.get("access-control-allow-origin") == "http://localhost:3000"
 
+
 def test_cors_headers_present_on_quota_error(monkeypatch):
     """CORS headers must be present on 429 rate limit / quota errors for allowed origins."""
     token = make_valid_jwt()
@@ -83,11 +89,18 @@ def test_cors_headers_present_on_quota_error(monkeypatch):
         # Mock Redis budget to raise daily limit error
         mock_budget = MagicMock()
         from agent.repositories.chat_budget_repository import BudgetExceededException
-        mock_budget.admit_request = AsyncMock(side_effect=BudgetExceededException("CHAT_DAILY_QUOTA_EXCEEDED"))
-        
-        with patch("agent.repositories.chat_budget_repository.ChatBudgetRepository", return_value=mock_budget), \
-             patch("agent.streaming.sse.get_redis_client", return_value=MagicMock()):
-            
+
+        mock_budget.admit_request = AsyncMock(
+            side_effect=BudgetExceededException("CHAT_DAILY_QUOTA_EXCEEDED")
+        )
+
+        with (
+            patch(
+                "agent.repositories.chat_budget_repository.ChatBudgetRepository",
+                return_value=mock_budget,
+            ),
+            patch("agent.streaming.sse.get_redis_client", return_value=MagicMock()),
+        ):
             response = client.post(
                 "/chat/stream",
                 headers={
@@ -99,6 +112,7 @@ def test_cors_headers_present_on_quota_error(monkeypatch):
             )
             assert response.status_code == 429
             assert response.headers.get("access-control-allow-origin") == "http://localhost:3000"
+
 
 @pytest.mark.parametrize(
     "correlation_id",
@@ -130,14 +144,18 @@ def test_direct_stream_generates_correlation_for_missing_or_invalid_header(
     monkeypatch.setattr(app.state, "message_queue", None, raising=False)
 
     mock_graph = MagicMock()
+
     async def mock_astream_events(*args, **kwargs):
         yield {"event": "on_chat_model_stream", "data": {"chunk": MagicMock(content="Hello")}}
+
     mock_graph.astream_events = mock_astream_events
     mock_graph.aget_state = AsyncMock(return_value=MagicMock(next=(), values={}))
     monkeypatch.setattr("agent.streaming.sse.graph", mock_graph)
 
     monkeypatch.setattr("agent.streaming.sse.get_redis_client", lambda: MagicMock())
-    monkeypatch.setattr("agent.repositories.chat_budget_repository.ChatBudgetRepository.admit_request", AsyncMock())
+    monkeypatch.setattr(
+        "agent.repositories.chat_budget_repository.ChatBudgetRepository.admit_request", AsyncMock()
+    )
     monkeypatch.setattr("agent.streaming.sse.NestJSClient", lambda **kwargs: mock_client)
 
     headers = {
@@ -155,7 +173,9 @@ def test_direct_stream_generates_correlation_for_missing_or_invalid_header(
         json={"message": "hello agent", "sessionId": "session-123"},
     )
     # Should be processed (either 200 stream or valid response)
-    assert response.status_code == 200, f"Expected 200 but got {response.status_code}: {response.text}"
+    assert response.status_code == 200, (
+        f"Expected 200 but got {response.status_code}: {response.text}"
+    )
     assert mock_client.correlation_id != "session-123"
     assert mock_client.correlation_id != correlation_id
     assert re.fullmatch(r"chat_[a-f0-9]{32}", mock_client.correlation_id)
@@ -192,7 +212,9 @@ def test_direct_stream_preserves_strictly_valid_opaque_trace_and_correlation_ids
     monkeypatch.setattr("agent.streaming.sse.graph", mock_graph)
 
     monkeypatch.setattr("agent.streaming.sse.get_redis_client", lambda: MagicMock())
-    monkeypatch.setattr("agent.repositories.chat_budget_repository.ChatBudgetRepository.admit_request", AsyncMock())
+    monkeypatch.setattr(
+        "agent.repositories.chat_budget_repository.ChatBudgetRepository.admit_request", AsyncMock()
+    )
     monkeypatch.setattr("agent.streaming.sse.NestJSClient", lambda **kwargs: mock_client)
 
     response = client.post(
@@ -207,9 +229,12 @@ def test_direct_stream_preserves_strictly_valid_opaque_trace_and_correlation_ids
         json={"message": "hello agent", "sessionId": "session-123"},
     )
 
-    assert response.status_code == 200, f"Expected 200 but got {response.status_code}: {response.text}"
+    assert response.status_code == 200, (
+        f"Expected 200 but got {response.status_code}: {response.text}"
+    )
     assert mock_client.trace_id == opaque_trace_id
     assert mock_client.correlation_id == opaque_correlation_id
+
 
 def test_health_degraded_when_redis_down(monkeypatch):
     """Health check reports degraded status and redis: 'down' when Redis ping fails."""
