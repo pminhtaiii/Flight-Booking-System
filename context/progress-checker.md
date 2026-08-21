@@ -39,7 +39,9 @@ Update this file after every completed feature. Any AI agent reading this should
     - API unit CI now calls the explicit `test:ci` package script, preventing pnpm from forwarding `--runInBand` after a literal `--` and causing Jest to treat it as a test-name pattern.
     - Agent Redis enforcement is scoped only to the dedicated `redis_integration` step; the non-Redis selection passes independently while the Redis step still fails closed if its required group is absent or skipped.
     - Default API E2E selects 51 correctness suites and excludes the two runner-dependent latency benchmark suites. Benchmarks remain available through `test:e2e:performance`.
-    - Fresh-database correctness verification passed 50 suites / 427 tests before isolating the sole Redis-alert dependency failure; the corrected alert suite then passed 12/12 tests with database health held explicitly healthy.
+    - Resolved `agent-tests` tiktoken cache download block under loopback-only CI by setting `TIKTOKEN_CACHE_DIR` and adding a pre-warm step `uv run python -c "import tiktoken; ..."` before network isolation.
+    - Resolved `api-e2e-tests` probe failures by provisioning `setup-uv`, Python 3.11, and `uv sync` in the `api-e2e-tests` job environment.
+    - Resolved `agent-gateway.e2e-spec.ts` 404 code expectation by explicitly configuring `FEATURE_FLAG_BOOKING_READINESS: 'true'` in test setup and CI environment.
 
 ### [x] Feature: Traveler Profile & Booking Readiness (Feature 16)
 
