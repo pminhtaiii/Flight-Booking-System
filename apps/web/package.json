@@ -8,7 +8,9 @@
     "check:routes": "node scripts/check-route-files.mjs",
     "start": "next start -p 3000",
     "lint": "next lint",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "playwright test --config=tests/playwright.config.ts",
+    "test:characterization": "playwright test tests/characterization/ --config=tests/playwright.config.ts"
   },
   "dependencies": {
     "@shared/types": "workspace:*",

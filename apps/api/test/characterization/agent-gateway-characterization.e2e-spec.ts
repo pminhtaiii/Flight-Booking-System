@@ -206,6 +206,9 @@ describe('Agent Gateway Characterization (E2E)', () => {
       expect(flight.currency).toBe('USD');
 
       // Assert PII-free projection: no user details, no secrets
+      expect(flight).not.toHaveProperty('user');
+      expect(flight).not.toHaveProperty('password');
+      expect(flight).not.toHaveProperty('passportNumber');
       expect(res.body).not.toHaveProperty('user');
       expect(res.body).not.toHaveProperty('password');
       expect(res.body).not.toHaveProperty('passportNumber');
