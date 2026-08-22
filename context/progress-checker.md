@@ -7,13 +7,32 @@ Update this file after every completed feature. Any AI agent reading this should
 ### Current Status
 
 **Feature:** Deepen Codebase Architecture (Feature 019)
-**Last completed:** Slice 1A: Expand Schema for Refund Obligation, Refund Transaction & Balanced Ledger Linkage (2026-08-21).
+**Last completed:** Slice 1B: Add Reservation & Provider-Blind Settlement Modules (2026-08-22).
 **In progress:** None.
-**Next:** Slice 1B: Add reservation and settlement modules.
+**Next:** Slice 1C: Convert trigger paths to RefundSettlementService.
 
 ---
 
 ## Progress by Feature
+
+### [x] Feature: Deepen Codebase Architecture (Feature 019) — Slice 1B: Add Reservation & Provider-Blind Settlement Modules
+
+- [x] Slice 1B / Add Reservation & Provider-Blind Settlement Modules (2026-08-22):
+  - **Refund Transaction Module (`apps/api/src/refund/`)**:
+    - `RefundTransactionService.reserveTransaction()`: Enforces strict pessimistic locking order (`Payment` locked first, then `CancellationRefundObligation` if provided). Computes active (`REFUND_PENDING`, `REFUND_PROCESSING`, `REFUND_RETRY_SCHEDULED`) + successful refund totals. Validates remaining capacity on both Payment and Obligation. Binds and reuses idempotency keys safely, returning existing active or terminal transactions on match. Creates new `Refund` record in `REFUND_PENDING` status.
+    - `RefundModule`: Provides and exports `RefundTransactionService`. Registered in `AppModule`.
+    - Unit Tests (`refund-transaction.service.spec.ts`): 15/15 unit tests PASS, testing payment and obligation capacity bounds, multi-transaction active sum tracking, idempotency reuse, and mismatch rejections.
+  - **Refund Settlement Module (`apps/api/src/refund-settlement/`)**:
+    - `RefundSettlementService.settleVerifiedOutcome()`: Pure in-process deterministic operation. Validates transaction amount and currency facts. Enforces idempotent claim (returns `applied: false` without duplicate writes on terminal replay). Atomically writes balanced `LedgerEntry` reversal pair (`DEBIT PLATFORM_REVENUE`, `CREDIT CUSTOMER_RECEIVABLE`) linked to `refundTransactionId`. Derived projections update Payment (`REFUNDED` vs `PARTIALLY_REFUNDED`, preserving `preDisputeStatus` under `DISPUTED`/`CHARGEBACK_LOST`) and Booking (`CANCELLED_AND_REFUNDED` only when cumulative obligation refunds fulfill `obligation.totalAmount`, else `CANCELLED_PENDING_REFUND`). Appends `PaymentEvent` and structured PII-safe `AuditLog`. Zero Stripe/Duffel network calls.
+    - `RefundSettlementModule`: Provides and exports `RefundSettlementService`. Registered in `AppModule`.
+    - Unit Tests (`refund-settlement.service.spec.ts`): 12/12 unit tests PASS, testing single/multi-transaction fulfillment, duplicate webhook delivery, dispute overlays, zero-obligation transitions, and failure fallbacks.
+  - **E2E Integration Verification (`apps/api/test/refund-settlement.e2e-spec.ts`)**:
+    - 11/11 E2E tests PASS against live PostgreSQL database: single full refund lifecycle, multi-transaction partial refund sequence ($500 payment / $300 obligation with 3x $100 refunds), capacity limit rejections, replay idempotency, terminal failure recovery, dispute overlays, and non-cancellation direct refunds.
+  - **Characterization & Regression Verification**:
+    - `refund-characterization.e2e-spec.ts`: 11/11 tests PASS.
+    - `cancellation-refund-obligation-migration.e2e-spec.ts`: 6/6 tests PASS.
+    - Full API Unit Suite: 77/77 test suites (786/786 tests) PASS 100% green.
+    - Static Quality: ESLint 0 errors / 0 warnings; TypeScript typecheck 0 errors.
 
 ### [x] Feature: Deepen Codebase Architecture (Feature 019) — Slice 1A: Expand Schema for Refund Obligation, Refund Transaction & Balanced Ledger Linkage
 
