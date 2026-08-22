@@ -36,6 +36,21 @@ export class RefundTransactionService {
 
   constructor(private readonly prisma: PrismaService) {}
 
+  private computeRequestHash(input: ReserveRefundTransactionInput): string {
+    return crypto
+      .createHash('sha256')
+      .update(
+        JSON.stringify({
+          paymentId: input.paymentId,
+          obligationId: input.cancellationRefundObligationId,
+          amount: input.amount,
+          currency: input.currency,
+          reason: input.reason,
+        }),
+      )
+      .digest('hex');
+  }
+
   async reserveTransaction(input: ReserveRefundTransactionInput): Promise<Refund> {
     if (!input.amount || !Number.isInteger(input.amount) || input.amount <= 0) {
       throw new BadRequestException('Refund amount must be a positive integer in minor units');
@@ -103,11 +118,17 @@ export class RefundTransactionService {
         throw new BadRequestException('Currency mismatch with payment');
       }
 
+      const requestHash = this.computeRequestHash(input);
+
       const existingKeyRecord = await tx.idempotencyKey.findUnique({
         where: { key: input.idempotencyKey },
       });
 
       if (existingKeyRecord) {
+        if (existingKeyRecord.requestHash !== requestHash) {
+          throw new BadRequestException('Idempotency key reuse with different payload');
+        }
+
         const existingRefund = await tx.refund.findUnique({
           where: { idempotencyKeyId: existingKeyRecord.id },
         });
@@ -159,19 +180,6 @@ export class RefundTransactionService {
 
       let idempotencyKeyRecord = existingKeyRecord;
       if (!idempotencyKeyRecord) {
-        const requestHash = crypto
-          .createHash('sha256')
-          .update(
-            JSON.stringify({
-              paymentId: input.paymentId,
-              obligationId: input.cancellationRefundObligationId,
-              amount: input.amount,
-              currency: input.currency,
-              reason: input.reason,
-            }),
-          )
-          .digest('hex');
-
         let customerId = input.actorId;
         if (!customerId) {
           const p = await tx.payment.findUnique({

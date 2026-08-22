@@ -42,7 +42,13 @@ describe('RefundSettlementService', () => {
 
   beforeEach(() => {
     mockTx = {
-      $queryRaw: jest.fn().mockResolvedValue([{ id: 'ref_123' }]),
+      $queryRaw: jest.fn().mockResolvedValue([
+        {
+          id: 'ref_123',
+          paymentId: 'pay_123',
+          cancellationRefundObligationId: 'obl_123',
+        },
+      ]),
       refund: {
         findUnique: jest.fn(),
         findMany: jest.fn(),

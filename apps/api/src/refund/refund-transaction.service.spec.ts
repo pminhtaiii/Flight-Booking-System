@@ -1,4 +1,5 @@
 import 'reflect-metadata';
+import * as crypto from 'crypto';
 import { Test, TestingModule } from '@nestjs/testing';
 import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { PaymentStatus, RefundStatus, RefundTriggerType } from '@prisma/client';
@@ -188,6 +189,19 @@ describe('RefundTransactionService', () => {
   });
 
   describe('idempotency key reuse', () => {
+    const expectedHash = crypto
+      .createHash('sha256')
+      .update(
+        JSON.stringify({
+          paymentId: baseInput.paymentId,
+          obligationId: baseInput.cancellationRefundObligationId,
+          amount: baseInput.amount,
+          currency: baseInput.currency,
+          reason: baseInput.reason,
+        }),
+      )
+      .digest('hex');
+
     beforeEach(() => {
       mockPrisma.$queryRaw.mockResolvedValueOnce([
         {
@@ -220,6 +234,7 @@ describe('RefundTransactionService', () => {
         mockPrisma.idempotencyKey.findUnique.mockResolvedValueOnce({
           id: 'key-rec-1',
           key: 'idem-key-abc',
+          requestHash: expectedHash,
         });
         mockPrisma.refund.findUnique.mockResolvedValueOnce(existingRefund);
 
@@ -229,6 +244,20 @@ describe('RefundTransactionService', () => {
         expect(mockPrisma.refund.create).not.toHaveBeenCalled();
       },
     );
+
+    it('throws BadRequestException when idempotency key is reused with different amount, currency, reason, or payment', async () => {
+      mockPrisma.idempotencyKey.findUnique.mockResolvedValueOnce({
+        id: 'key-rec-1',
+        key: 'idem-key-abc',
+        requestHash: 'different-hash',
+      });
+
+      await expect(service.reserveTransaction(baseInput)).rejects.toThrow(
+        new BadRequestException('Idempotency key reuse with different payload'),
+      );
+      expect(mockPrisma.refund.findUnique).not.toHaveBeenCalled();
+      expect(mockPrisma.refund.create).not.toHaveBeenCalled();
+    });
   });
 
   describe('capacity calculations against Payment and Obligation', () => {

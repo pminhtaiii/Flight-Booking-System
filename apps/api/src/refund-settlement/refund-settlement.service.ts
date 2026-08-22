@@ -48,8 +48,14 @@ export class RefundSettlementService {
 
   async settleVerifiedOutcome(input: RefundSettlementInput): Promise<RefundSettlementResult> {
     return this.prisma.$transaction(async (tx) => {
-      const lockedRefunds = await tx.$queryRaw<Array<{ id: string }>>`
-        SELECT id
+      const lockedRefunds = await tx.$queryRaw<
+        Array<{
+          id: string;
+          paymentId: string;
+          cancellationRefundObligationId: string | null;
+        }>
+      >`
+        SELECT id, "paymentId", "cancellationRefundObligationId"
         FROM refunds
         WHERE id = ${input.transactionId}
         FOR UPDATE
@@ -57,6 +63,26 @@ export class RefundSettlementService {
 
       if (!lockedRefunds || lockedRefunds.length === 0) {
         throw new NotFoundException(`Refund transaction ${input.transactionId} not found`);
+      }
+
+      const lockedRefundMeta = lockedRefunds[0];
+
+      if (lockedRefundMeta.paymentId) {
+        await tx.$queryRaw`
+          SELECT id
+          FROM payments
+          WHERE id = ${lockedRefundMeta.paymentId}
+          FOR UPDATE
+        `;
+      }
+
+      if (lockedRefundMeta.cancellationRefundObligationId) {
+        await tx.$queryRaw`
+          SELECT id
+          FROM cancellation_refund_obligations
+          WHERE id = ${lockedRefundMeta.cancellationRefundObligationId}
+          FOR UPDATE
+        `;
       }
 
       const refund = await tx.refund.findUnique({
