@@ -15,6 +15,7 @@ import { PrismaService } from '@/prisma/prisma.service';
 
 export type ReserveRefundTransactionInput = {
   paymentId: string;
+  bookingId?: string;
   cancellationRefundObligationId?: string;
   amount: number;
   currency: string;
@@ -42,6 +43,7 @@ export class RefundTransactionService {
       .update(
         JSON.stringify({
           paymentId: input.paymentId,
+          bookingId: input.bookingId,
           obligationId: input.cancellationRefundObligationId,
           amount: input.amount,
           currency: input.currency,
@@ -203,6 +205,7 @@ export class RefundTransactionService {
       const createdRefund = await tx.refund.create({
         data: {
           paymentId: input.paymentId,
+          bookingId: input.bookingId ?? (obligation as any)?.bookingId ?? null,
           cancellationRefundObligationId: input.cancellationRefundObligationId ?? null,
           idempotencyKeyId: idempotencyKeyRecord.id,
           amount: input.amount,

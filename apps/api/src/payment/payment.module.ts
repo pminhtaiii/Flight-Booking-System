@@ -15,12 +15,16 @@ import { BookingModule } from '../booking/booking.module';
 import { AdminRefundController } from './admin-refund.controller';
 import { AncillaryPaymentValidationService } from './ancillary-payment-validation.service';
 import { BookingIntentModule } from '../booking-intent/booking-intent.module';
+import { RefundModule } from '../refund/refund.module';
+import { RefundSettlementModule } from '../refund-settlement/refund-settlement.module';
 
 @Module({
   imports: [
     PrismaModule,
     DuffelModule,
     AuditModule,
+    RefundModule,
+    RefundSettlementModule,
     forwardRef(() => BookingModule),
     forwardRef(() => BookingIntentModule),
   ],

@@ -46,6 +46,27 @@ export class RefundSettlementService {
     }
   }
 
+  private deriveEventType(
+    source: RefundProvenanceSource,
+    reason?: string | null,
+    metadata?: Record<string, unknown>,
+  ): string {
+    if (typeof metadata?.eventType === 'string') {
+      return metadata.eventType;
+    }
+    switch (source) {
+      case 'WEBHOOK':
+        return 'charge.refunded';
+      case 'CRON':
+        return 'cancellation_refund_recovered';
+      case 'ADMIN':
+        return 'cancellation_refund_manually_resolved';
+      case 'INLINE':
+      default:
+        return reason?.startsWith('cancellation:') ? 'cancellation_refund_succeeded' : 'refund_settled';
+    }
+  }
+
   async settleVerifiedOutcome(input: RefundSettlementInput): Promise<RefundSettlementResult> {
     return this.prisma.$transaction(async (tx) => {
       const lockedRefunds = await tx.$queryRaw<
@@ -89,6 +110,7 @@ export class RefundSettlementService {
         where: { id: input.transactionId },
         include: {
           payment: true,
+          booking: true,
           cancellationRefundObligation: {
             include: { booking: true },
           },
@@ -108,7 +130,7 @@ export class RefundSettlementService {
         );
       }
 
-      const booking = refund.cancellationRefundObligation?.booking;
+      const booking = refund.cancellationRefundObligation?.booking ?? refund.booking;
 
       if (refund.status === RefundStatus.SUCCEEDED) {
         return {
@@ -121,7 +143,8 @@ export class RefundSettlementService {
 
       if (
         refund.status === RefundStatus.FAILED ||
-        refund.status === RefundStatus.REFUND_FAILED_NEEDS_ATTENTION
+        (refund.status === RefundStatus.REFUND_FAILED_NEEDS_ATTENTION &&
+          input.outcome.status !== 'SUCCEEDED')
       ) {
         return {
           applied: false,
@@ -137,6 +160,7 @@ export class RefundSettlementService {
           data: {
             status: RefundStatus.SUCCEEDED,
             stripeRefundId: input.outcome.providerReference,
+            nextRetryAt: null,
             updatedAt: new Date(input.outcome.occurredAt),
           },
         });
@@ -201,7 +225,7 @@ export class RefundSettlementService {
         await tx.paymentEvent.create({
           data: {
             paymentId: refund.paymentId,
-            eventType: 'refund_settled',
+            eventType: this.deriveEventType(input.provenance.source, refund.reason, input.provenance.metadata),
             previousStatus: refund.payment.status,
             newStatus: finalPaymentStatus,
             amount: refund.amount,
@@ -238,6 +262,18 @@ export class RefundSettlementService {
             await tx.booking.update({
               where: { id: obligation.bookingId },
               data: { status: finalBookingStatus },
+            });
+          }
+        } else if (refund.bookingId) {
+          if (finalPaymentStatus === PaymentStatus.REFUNDED) {
+            finalBookingStatus = BookingStatus.CANCELLED_AND_REFUNDED;
+            await tx.booking.updateMany({
+              where: { id: refund.bookingId, status: BookingStatus.CANCELLED_PENDING_REFUND },
+              data: { status: BookingStatus.CANCELLED_AND_REFUNDED },
+            });
+            await tx.booking.updateMany({
+              where: { paymentId: refund.paymentId, status: BookingStatus.CANCELLED_PENDING_REFUND },
+              data: { status: BookingStatus.CANCELLED_AND_REFUNDED },
             });
           }
         }
