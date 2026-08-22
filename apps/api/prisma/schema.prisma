@@ -214,6 +214,7 @@ model Booking {
   bookingIntent      BookingIntent @relation(fields: [bookingIntentId], references: [id], onDelete: Cascade)
   payment            Payment?      @relation(fields: [paymentId], references: [id], onDelete: SetNull)
   cancellationRefund Refund?       @relation("CancellationBookingRefund")
+  cancellationRefundObligation CancellationRefundObligation?
 
   disruptionStatus           DisruptionStatus           @default(NONE)
   activeDisruptionRevisionId String?                    @unique
@@ -585,10 +586,11 @@ model Payment {
   createdAt                 DateTime            @default(now())
   updatedAt                 DateTime            @updatedAt
 
-  paymentEvents PaymentEvent[]
-  ledgerEntries LedgerEntry[]
-  refunds       Refund[]
-  booking       Booking?
+  paymentEvents                  PaymentEvent[]
+  ledgerEntries                  LedgerEntry[]
+  refunds                        Refund[]
+  booking                        Booking?
+  cancellationRefundObligations CancellationRefundObligation[]
 
   @@unique([bookingIntentId, attemptNumber])
   @@index([stripeCustomerId])
@@ -640,20 +642,42 @@ model PaymentEvent {
 }
 
 model LedgerEntry {
-  id            String          @id @default(uuid())
-  paymentId     String
-  payment       Payment         @relation(fields: [paymentId], references: [id])
-  transactionId String // groups paired debit/credit rows
-  accountId     String // CUSTOMER_RECEIVABLE | PLATFORM_REVENUE | DUFFEL_COST
-  entryType     LedgerEntryType // DEBIT or CREDIT
-  amount        Int // smallest currency unit
-  currency      String // ISO 4217
-  createdAt     DateTime        @default(now())
+  id                  String          @id @default(uuid())
+  paymentId           String
+  payment             Payment         @relation(fields: [paymentId], references: [id])
+  refundTransactionId String?
+  refundTransaction   Refund?         @relation(fields: [refundTransactionId], references: [id], onDelete: SetNull)
+  transactionId       String // groups paired debit/credit rows
+  accountId           String // CUSTOMER_RECEIVABLE | PLATFORM_REVENUE | DUFFEL_COST
+  entryType           LedgerEntryType // DEBIT or CREDIT
+  amount              Int // smallest currency unit
+  currency            String // ISO 4217
+  createdAt           DateTime        @default(now())
 
+  @@unique([refundTransactionId, accountId, entryType])
   @@index([paymentId])
   @@index([transactionId])
   @@index([accountId])
+  @@index([refundTransactionId])
   @@map("ledger_entries")
+}
+
+model CancellationRefundObligation {
+  id                  String   @id @default(uuid())
+  bookingId           String   @unique
+  booking             Booking  @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  paymentId           String
+  payment             Payment  @relation(fields: [paymentId], references: [id], onDelete: Restrict)
+  totalAmount         Int // minor units (cents), non-negative; total customer amount owed
+  airlineRefundAmount Int // minor units (cents), non-negative; supplier refund quote amount
+  currency            String   @default("GBP")
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  refunds Refund[]
+
+  @@index([paymentId])
+  @@map("cancellation_refund_obligations")
 }
 
 /// Stores payment refund transactions.
@@ -661,36 +685,41 @@ model LedgerEntry {
 /// In contrast, Booking stores currency amounts in major currency units (DECIMAL(10,2), e.g. 100.50).
 /// Always use explicit unit conversions (Math.round(amount * 100) when converting major to minor units, or amount / 100 when converting minor to major units) when mapping between Booking and Refund.
 model Refund {
-  id                      String            @id @default(uuid())
-  paymentId               String
-  payment                 Payment           @relation(fields: [paymentId], references: [id])
-  idempotencyKeyId        String
-  idempotencyKey          IdempotencyKey    @relation(fields: [idempotencyKeyId], references: [id])
-  stripeRefundId          String?           @unique
-  amount                  Int // smallest currency unit
-  currency                String // ISO 4217
-  reason                  String?
-  triggerType             RefundTriggerType // USER, ADMIN, or SYSTEM_AUTOMATED
-  triggeredByUserId       String? // NULL for automated refunds
-  triggeredByUser         User?             @relation(fields: [triggeredByUserId], references: [id])
-  requiresReview          Boolean           @default(false) // flags automated refunds for 24h human check
-  status                  RefundStatus      @default(REFUND_PENDING)
-  airlineRefundAmount     Int?
-  customerRefundAmount    Int?
-  bookingId               String?           @unique
-  booking                 Booking?          @relation("CancellationBookingRefund", fields: [bookingId], references: [id], onDelete: SetNull)
-  retryCount              Int               @default(0)
-  nextRetryAt             DateTime?
-  idempotencyKeyCreatedAt DateTime?
-  lastErrorCode           String?
-  lastErrorAt             DateTime?
-  createdAt               DateTime          @default(now())
-  updatedAt               DateTime          @updatedAt
+  id                             String                        @id @default(uuid())
+  paymentId                      String
+  payment                        Payment                       @relation(fields: [paymentId], references: [id])
+  cancellationRefundObligationId String?
+  cancellationRefundObligation   CancellationRefundObligation? @relation(fields: [cancellationRefundObligationId], references: [id], onDelete: SetNull)
+  idempotencyKeyId               String
+  idempotencyKey                 IdempotencyKey                @relation(fields: [idempotencyKeyId], references: [id])
+  stripeRefundId                 String?                       @unique
+  amount                         Int // smallest currency unit
+  currency                       String // ISO 4217
+  reason                         String?
+  triggerType                    RefundTriggerType // USER, ADMIN, or SYSTEM_AUTOMATED
+  triggeredByUserId              String? // NULL for automated refunds
+  triggeredByUser                User?                         @relation(fields: [triggeredByUserId], references: [id])
+  requiresReview                 Boolean                       @default(false) // flags automated refunds for 24h human check
+  status                         RefundStatus                  @default(REFUND_PENDING)
+  airlineRefundAmount            Int?
+  customerRefundAmount           Int?
+  bookingId                      String?                       @unique
+  booking                        Booking?                      @relation("CancellationBookingRefund", fields: [bookingId], references: [id], onDelete: SetNull)
+  retryCount                     Int                           @default(0)
+  nextRetryAt                    DateTime?
+  idempotencyKeyCreatedAt        DateTime?
+  lastErrorCode                  String?
+  lastErrorAt                    DateTime?
+  createdAt                      DateTime                      @default(now())
+  updatedAt                      DateTime                      @updatedAt
+
+  ledgerEntries LedgerEntry[]
 
   @@unique([idempotencyKeyId])
   @@index([paymentId])
   @@index([status])
   @@index([status, nextRetryAt])
+  @@index([cancellationRefundObligationId])
   @@map("refunds")
 }
 

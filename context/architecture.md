@@ -291,6 +291,10 @@ An ADMIN may schedule a retry with a fresh key or record an externally completed
 
 - **Frontend User Experience**: The booking detail page dynamically renders cancellation/refund alerts and provides an inline "Cancel Booking" quote review and confirmation modal, gated by the fare-specific cutoff deadline. Stale pending states are automatically polled every 5s.
 - **Operator Dashboard**: Admins use the `/admin/refunds` view to inspect PII-safe escalated refund states and trigger the manual resolution pipeline.
+- **Cancellation Refund Obligation & Transaction Foundation (Feature 019 Slice 1A)**:
+  - `CancellationRefundObligation`: Decouples the single customer cancellation debt from individual payment refund attempts. 1:1 with `Booking` (`onDelete: Cascade`), 1:N with `Payment` (`onDelete: Restrict`), and 1:N with `Refund` (Refund Transactions). Amounts are stored in integer minor units (`totalAmount`, `airlineRefundAmount`).
+  - `LedgerEntry` Transaction Linkage: `LedgerEntry` links directly to `Refund` records via nullable `refundTransactionId` with compound uniqueness `@@unique([refundTransactionId, accountId, entryType])`, guaranteeing exactly one `DEBIT PLATFORM_REVENUE` and one `CREDIT CUSTOMER_RECEIVABLE` per refund transaction.
+  - Restart-Safe Backfill: `apps/api/prisma/scripts/backfill-cancellation-refund-obligations.ts` migrates legacy cancellation refunds into obligations with exact Decimal-to-minor-unit conversion (`Math.round(amount * 100)`), validates double-entry ledger balance invariants (`sum(DEBIT) === sum(CREDIT)`), and strictly quarantines ambiguous candidate ledger pairs when multiple pairs match the same payment without durable refund identity.
 
 ### Disruption Core Domain (Deterministic Path)
 
