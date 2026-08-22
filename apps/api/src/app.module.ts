@@ -20,6 +20,8 @@ import { ProfileModule } from './profile/profile.module';
 import { ChatHandoffModule } from './chat-handoff/chat-handoff.module';
 import { DataDriftSentinelModule } from './common/sentinel/data-drift-sentinel.module';
 import { BookingReadinessMetricsModule } from './common/observability/booking-readiness-metrics.module';
+import { RefundModule } from './refund/refund.module';
+import { RefundSettlementModule } from './refund-settlement/refund-settlement.module';
 
 import { z } from 'zod';
 
@@ -87,6 +89,8 @@ export const envSchema = z.object({
     ChatHandoffModule,
     DataDriftSentinelModule,
     BookingReadinessMetricsModule,
+    RefundModule,
+    RefundSettlementModule,
   ],
   controllers: [],
   providers: [],
