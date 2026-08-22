@@ -32,7 +32,7 @@ Update this file after every completed feature. Any AI agent reading this should
     - Quarantines currency, payment ID, and ledger imbalances without halting execution.
   - **Verification & Characterization Test Suites (100% Green)**:
     - `cancellation-refund-obligation-migration.e2e-spec.ts` (5/5 tests PASS): Validates schema invariants, unique constraints on `LedgerEntry`, backfill idempotency, ledger balances, quarantine resilience, and existing workflow non-regression.
-    - `backfill-cancellation-refund-obligations.spec.ts` (8/8 unit tests PASS): Validates unit-level backfill mechanics, conversion math, and anomaly quarantine.
+    - `backfill-cancellation-refund-obligations.spec.ts` (13/13 unit tests PASS): Validates unit-level backfill mechanics, conversion math, ambiguous candidate quarantine, and anomaly quarantine.
     - `refund-characterization.e2e-spec.ts` (11/11 tests PASS) & `booking-characterization.e2e-spec.ts` (14/14 tests PASS): Zero regression on baseline characterization.
     - Full API unit test suite: 75/75 suites (754/754 tests) PASS; ESLint 0 errors / 0 warnings; TypeScript typecheck 0 errors; API build passes cleanly.
 

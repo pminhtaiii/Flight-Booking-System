@@ -581,8 +581,6 @@ export async function backfillCancellationRefundObligations(
                 transactionId: string;
                 debitEntry: (typeof unlinkedEntries)[0];
                 creditEntry: (typeof unlinkedEntries)[0];
-                createdAt: number;
-                minEntryId: string;
               };
 
               const validPairs: ValidPair[] = [];
@@ -590,46 +588,26 @@ export async function backfillCancellationRefundObligations(
               for (const [txId, entries] of grouped.entries()) {
                 const validation = validateLedgerPair(entries, refund.amount, refund.currency);
                 if (validation.isValid && validation.debitEntry && validation.creditEntry) {
-                  const pairTimestamp =
-                    validation.debitEntry.createdAt ??
-                    validation.creditEntry.createdAt ??
-                    entries[0]?.createdAt;
-                  const parsedPairTime = pairTimestamp ? new Date(pairTimestamp).getTime() : 0;
-                  const minEntryId =
-                    validation.debitEntry.id.localeCompare(validation.creditEntry.id) < 0
-                      ? validation.debitEntry.id
-                      : validation.creditEntry.id;
                   validPairs.push({
                     transactionId: txId,
                     debitEntry: validation.debitEntry,
                     creditEntry: validation.creditEntry,
-                    createdAt: isNaN(parsedPairTime) ? 0 : parsedPairTime,
-                    minEntryId,
                   });
                 }
               }
 
-              if (validPairs.length > 0) {
-                const refundTimestamp = refund.createdAt;
-                const parsedRefundTime = refundTimestamp ? new Date(refundTimestamp).getTime() : 0;
-                const targetTime = isNaN(parsedRefundTime) ? 0 : parsedRefundTime;
-
-                validPairs.sort((a, b) => {
-                  const diffA = Math.abs(a.createdAt - targetTime);
-                  const diffB = Math.abs(b.createdAt - targetTime);
-                  if (diffA !== diffB) {
-                    return diffA - diffB;
-                  }
-                  if (a.createdAt !== b.createdAt) {
-                    return a.createdAt - b.createdAt;
-                  }
-                  return a.minEntryId.localeCompare(b.minEntryId);
-                });
-              }
-
-              let linked = false;
-
-              for (const pair of validPairs) {
+              if (validPairs.length === 0) {
+                logger.warn(
+                  `[QUARANTINE] SUCCEEDED refund ${refund.id} (amount: ${refund.amount} ${refund.currency}) has no unlinked balanced ledger entries for payment ${refund.paymentId}. Quarantining.`,
+                );
+                stats.quarantined++;
+              } else if (validPairs.length > 1) {
+                logger.warn(
+                  `[QUARANTINE] SUCCEEDED refund ${refund.id} (amount: ${refund.amount} ${refund.currency}) has multiple (${validPairs.length}) ambiguous unlinked ledger pairs for payment ${refund.paymentId}. Quarantining.`,
+                );
+                stats.quarantined++;
+              } else {
+                const pair = validPairs[0];
                 const [debitRes, creditRes] = await prisma.$transaction([
                   prisma.ledgerEntry.updateMany({
                     where: { id: pair.debitEntry.id, refundTransactionId: null },
@@ -643,29 +621,24 @@ export async function backfillCancellationRefundObligations(
 
                 if (debitRes.count === 1 && creditRes.count === 1) {
                   stats.ledgerEntriesLinked += 2;
-                  linked = true;
-                  break;
+                } else {
+                  // If a partial claim occurred, roll it back
+                  if (debitRes.count === 1 && creditRes.count === 0) {
+                    await prisma.ledgerEntry.updateMany({
+                      where: { id: pair.debitEntry.id, refundTransactionId: refund.id },
+                      data: { refundTransactionId: null },
+                    });
+                  } else if (creditRes.count === 1 && debitRes.count === 0) {
+                    await prisma.ledgerEntry.updateMany({
+                      where: { id: pair.creditEntry.id, refundTransactionId: refund.id },
+                      data: { refundTransactionId: null },
+                    });
+                  }
+                  logger.warn(
+                    `[QUARANTINE] SUCCEEDED refund ${refund.id} could not claim candidate ledger pair for payment ${refund.paymentId}. Quarantining.`,
+                  );
+                  stats.quarantined++;
                 }
-
-                // If a partial claim occurred, roll it back
-                if (debitRes.count === 1 && creditRes.count === 0) {
-                  await prisma.ledgerEntry.updateMany({
-                    where: { id: pair.debitEntry.id, refundTransactionId: refund.id },
-                    data: { refundTransactionId: null },
-                  });
-                } else if (creditRes.count === 1 && debitRes.count === 0) {
-                  await prisma.ledgerEntry.updateMany({
-                    where: { id: pair.creditEntry.id, refundTransactionId: refund.id },
-                    data: { refundTransactionId: null },
-                  });
-                }
-              }
-
-              if (!linked) {
-                logger.warn(
-                  `[QUARANTINE] SUCCEEDED refund ${refund.id} (amount: ${refund.amount} ${refund.currency}) has no unlinked balanced ledger entries for payment ${refund.paymentId}. Quarantining.`,
-                );
-                stats.quarantined++;
               }
             }
           } else {

@@ -483,7 +483,7 @@ describe('backfillCancellationRefundObligations unit tests', () => {
     expect(mockPrisma.cancellationRefundObligation.update).not.toHaveBeenCalled();
   });
 
-  it('matches two refunds on the same payment with identical amount and currency to their closest chronological ledger entry pairs without cross-linking', async () => {
+  it('quarantines refunds when multiple ambiguous candidate ledger entry pairs exist for the same payment', async () => {
     const mockRefund1 = {
       id: 'refund-early',
       paymentId: 'payment-multi-refund',
@@ -493,7 +493,7 @@ describe('backfillCancellationRefundObligations unit tests', () => {
       status: RefundStatus.SUCCEEDED,
       cancellationRefundObligationId: 'obligation-1',
       createdAt: new Date('2026-08-01T10:00:00.000Z'),
-      updatedAt: new Date('2026-08-01T15:00:00.000Z'), // Later administrative update / retry must not alter chronological matching
+      updatedAt: new Date('2026-08-01T10:00:00.000Z'),
       payment: { id: 'payment-multi-refund', amount: 20000 },
       ledgerEntries: [],
     };
@@ -512,10 +512,10 @@ describe('backfillCancellationRefundObligations unit tests', () => {
       ledgerEntries: [],
     };
 
-    const earlyDebit = {
-      id: 'entry-early-debit',
+    const pair1Debit = {
+      id: 'entry-1-debit',
       paymentId: 'payment-multi-refund',
-      transactionId: 'tx-early',
+      transactionId: 'tx-1',
       accountId: 'PLATFORM_REVENUE',
       entryType: LedgerEntryType.DEBIT,
       amount: 5000,
@@ -523,10 +523,10 @@ describe('backfillCancellationRefundObligations unit tests', () => {
       refundTransactionId: null,
       createdAt: new Date('2026-08-01T10:00:02.000Z'),
     };
-    const earlyCredit = {
-      id: 'entry-early-credit',
+    const pair1Credit = {
+      id: 'entry-1-credit',
       paymentId: 'payment-multi-refund',
-      transactionId: 'tx-early',
+      transactionId: 'tx-1',
       accountId: 'CUSTOMER_RECEIVABLE',
       entryType: LedgerEntryType.CREDIT,
       amount: 5000,
@@ -535,10 +535,10 @@ describe('backfillCancellationRefundObligations unit tests', () => {
       createdAt: new Date('2026-08-01T10:00:02.000Z'),
     };
 
-    const lateDebit = {
-      id: 'entry-late-debit',
+    const pair2Debit = {
+      id: 'entry-2-debit',
       paymentId: 'payment-multi-refund',
-      transactionId: 'tx-late',
+      transactionId: 'tx-2',
       accountId: 'PLATFORM_REVENUE',
       entryType: LedgerEntryType.DEBIT,
       amount: 5000,
@@ -546,10 +546,10 @@ describe('backfillCancellationRefundObligations unit tests', () => {
       refundTransactionId: null,
       createdAt: new Date('2026-08-01T12:00:04.000Z'),
     };
-    const lateCredit = {
-      id: 'entry-late-credit',
+    const pair2Credit = {
+      id: 'entry-2-credit',
       paymentId: 'payment-multi-refund',
-      transactionId: 'tx-late',
+      transactionId: 'tx-2',
       accountId: 'CUSTOMER_RECEIVABLE',
       entryType: LedgerEntryType.CREDIT,
       amount: 5000,
@@ -565,15 +565,129 @@ describe('backfillCancellationRefundObligations unit tests', () => {
 
     // For refund-early:
     // 1st ledger findMany: linked check -> returns []
-    // 2nd ledger findMany: candidate unlinked entries (passed with late pair first to verify distance sorting)
+    // 2nd ledger findMany: candidate unlinked entries -> returns both pairs (ambiguous: 2 pairs matching 5000 GBP)
     // For refund-late:
     // 3rd ledger findMany: linked check -> returns []
-    // 4th ledger findMany: remaining candidate entries
+    // 4th ledger findMany: candidate unlinked entries -> returns both pairs (ambiguous: 2 pairs matching 5000 GBP)
     mockPrisma.ledgerEntry.findMany
       .mockResolvedValueOnce([])
-      .mockResolvedValueOnce([lateDebit, lateCredit, earlyDebit, earlyCredit])
+      .mockResolvedValueOnce([pair1Debit, pair1Credit, pair2Debit, pair2Credit])
       .mockResolvedValueOnce([])
-      .mockResolvedValueOnce([lateDebit, lateCredit]);
+      .mockResolvedValueOnce([pair1Debit, pair1Credit, pair2Debit, pair2Credit]);
+
+    const stats = await backfillCancellationRefundObligations({
+      prisma: mockPrisma as unknown as PrismaClient,
+      logger: mockLogger,
+    });
+
+    expect(stats.ledgerEntriesLinked).toBe(0);
+    expect(stats.quarantined).toBe(2);
+    expect(stats.errors).toBe(0);
+
+    expect(mockPrisma.ledgerEntry.updateMany).not.toHaveBeenCalled();
+    expect(mockLogger.warn).toHaveBeenCalledWith(
+      expect.stringContaining('[QUARANTINE] SUCCEEDED refund refund-early (amount: 5000 GBP) has multiple (2) ambiguous unlinked ledger pairs for payment payment-multi-refund'),
+    );
+    expect(mockLogger.warn).toHaveBeenCalledWith(
+      expect.stringContaining('[QUARANTINE] SUCCEEDED refund refund-late (amount: 5000 GBP) has multiple (2) ambiguous unlinked ledger pairs for payment payment-multi-refund'),
+    );
+  });
+
+  it('matches multiple refunds on the same payment when distinct amounts make pairing unambiguous', async () => {
+    const mockRefund1 = {
+      id: 'refund-50',
+      paymentId: 'payment-multi-distinct',
+      bookingId: null,
+      amount: 5000,
+      currency: 'GBP',
+      status: RefundStatus.SUCCEEDED,
+      cancellationRefundObligationId: 'obligation-1',
+      createdAt: new Date('2026-08-01T10:00:00.000Z'),
+      payment: { id: 'payment-multi-distinct', amount: 20000 },
+      ledgerEntries: [],
+    };
+
+    const mockRefund2 = {
+      id: 'refund-30',
+      paymentId: 'payment-multi-distinct',
+      bookingId: null,
+      amount: 3000,
+      currency: 'GBP',
+      status: RefundStatus.SUCCEEDED,
+      cancellationRefundObligationId: 'obligation-1',
+      createdAt: new Date('2026-08-01T12:00:00.000Z'),
+      payment: { id: 'payment-multi-distinct', amount: 20000 },
+      ledgerEntries: [],
+    };
+
+    const debit50 = {
+      id: 'entry-50-debit',
+      paymentId: 'payment-multi-distinct',
+      transactionId: 'tx-50',
+      accountId: 'PLATFORM_REVENUE',
+      entryType: LedgerEntryType.DEBIT,
+      amount: 5000,
+      currency: 'GBP',
+      refundTransactionId: null,
+      createdAt: new Date('2026-08-01T10:00:02.000Z'),
+    };
+    const credit50 = {
+      id: 'entry-50-credit',
+      paymentId: 'payment-multi-distinct',
+      transactionId: 'tx-50',
+      accountId: 'CUSTOMER_RECEIVABLE',
+      entryType: LedgerEntryType.CREDIT,
+      amount: 5000,
+      currency: 'GBP',
+      refundTransactionId: null,
+      createdAt: new Date('2026-08-01T10:00:02.000Z'),
+    };
+
+    const debit30 = {
+      id: 'entry-30-debit',
+      paymentId: 'payment-multi-distinct',
+      transactionId: 'tx-30',
+      accountId: 'PLATFORM_REVENUE',
+      entryType: LedgerEntryType.DEBIT,
+      amount: 3000,
+      currency: 'GBP',
+      refundTransactionId: null,
+      createdAt: new Date('2026-08-01T12:00:04.000Z'),
+    };
+    const credit30 = {
+      id: 'entry-30-credit',
+      paymentId: 'payment-multi-distinct',
+      transactionId: 'tx-30',
+      accountId: 'CUSTOMER_RECEIVABLE',
+      entryType: LedgerEntryType.CREDIT,
+      amount: 3000,
+      currency: 'GBP',
+      refundTransactionId: null,
+      createdAt: new Date('2026-08-01T12:00:04.000Z'),
+    };
+
+    mockPrisma.booking.findMany.mockResolvedValueOnce([]);
+    mockPrisma.refund.findMany
+      .mockResolvedValueOnce([mockRefund1, mockRefund2])
+      .mockResolvedValueOnce([]);
+
+    // For refund-50:
+    // 1st: linked -> []
+    // 2nd: unlinked -> both pairs, but only 1 matches 5000 GBP
+    // For refund-30:
+    // 3rd: linked -> []
+    // 4th: unlinked -> remaining 3000 GBP pair
+    mockPrisma.ledgerEntry.findMany
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([debit50, credit50, debit30, credit30])
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([debit30, credit30]);
+
+    mockPrisma.ledgerEntry.updateMany
+      .mockResolvedValueOnce({ count: 1 })
+      .mockResolvedValueOnce({ count: 1 })
+      .mockResolvedValueOnce({ count: 1 })
+      .mockResolvedValueOnce({ count: 1 });
 
     const stats = await backfillCancellationRefundObligations({
       prisma: mockPrisma as unknown as PrismaClient,
@@ -584,24 +698,21 @@ describe('backfillCancellationRefundObligations unit tests', () => {
     expect(stats.quarantined).toBe(0);
     expect(stats.errors).toBe(0);
 
-    expect(mockPrisma.$transaction).toHaveBeenCalledTimes(2);
-
     expect(mockPrisma.ledgerEntry.updateMany).toHaveBeenCalledWith({
-      where: { id: 'entry-early-debit', refundTransactionId: null },
-      data: { refundTransactionId: 'refund-early' },
+      where: { id: 'entry-50-debit', refundTransactionId: null },
+      data: { refundTransactionId: 'refund-50' },
     });
     expect(mockPrisma.ledgerEntry.updateMany).toHaveBeenCalledWith({
-      where: { id: 'entry-early-credit', refundTransactionId: null },
-      data: { refundTransactionId: 'refund-early' },
-    });
-
-    expect(mockPrisma.ledgerEntry.updateMany).toHaveBeenCalledWith({
-      where: { id: 'entry-late-debit', refundTransactionId: null },
-      data: { refundTransactionId: 'refund-late' },
+      where: { id: 'entry-50-credit', refundTransactionId: null },
+      data: { refundTransactionId: 'refund-50' },
     });
     expect(mockPrisma.ledgerEntry.updateMany).toHaveBeenCalledWith({
-      where: { id: 'entry-late-credit', refundTransactionId: null },
-      data: { refundTransactionId: 'refund-late' },
+      where: { id: 'entry-30-debit', refundTransactionId: null },
+      data: { refundTransactionId: 'refund-30' },
+    });
+    expect(mockPrisma.ledgerEntry.updateMany).toHaveBeenCalledWith({
+      where: { id: 'entry-30-credit', refundTransactionId: null },
+      data: { refundTransactionId: 'refund-30' },
     });
   });
 
@@ -650,110 +761,7 @@ describe('backfillCancellationRefundObligations unit tests', () => {
     );
   });
 
-  it('matches refunds on the same payment with identical amounts and equal timestamps deterministically in chronological order without ties', async () => {
-    const equalTime = new Date('2026-08-01T10:00:00.000Z');
-    const mockRefund1 = {
-      id: 'refund-a',
-      paymentId: 'payment-equal',
-      bookingId: null,
-      amount: 5000,
-      currency: 'GBP',
-      status: RefundStatus.SUCCEEDED,
-      cancellationRefundObligationId: 'obligation-1',
-      createdAt: equalTime,
-      payment: { id: 'payment-equal', amount: 20000 },
-      ledgerEntries: [],
-    };
-
-    const mockRefund2 = {
-      id: 'refund-b',
-      paymentId: 'payment-equal',
-      bookingId: null,
-      amount: 5000,
-      currency: 'GBP',
-      status: RefundStatus.SUCCEEDED,
-      cancellationRefundObligationId: 'obligation-1',
-      createdAt: equalTime,
-      payment: { id: 'payment-equal', amount: 20000 },
-      ledgerEntries: [],
-    };
-
-    const pair1Debit = {
-      id: 'entry-1-debit',
-      paymentId: 'payment-equal',
-      transactionId: 'tx-z-later-uuid',
-      accountId: 'PLATFORM_REVENUE',
-      entryType: LedgerEntryType.DEBIT,
-      amount: 5000,
-      currency: 'GBP',
-      refundTransactionId: null,
-      createdAt: equalTime,
-    };
-    const pair1Credit = {
-      id: 'entry-1-credit',
-      paymentId: 'payment-equal',
-      transactionId: 'tx-z-later-uuid',
-      accountId: 'CUSTOMER_RECEIVABLE',
-      entryType: LedgerEntryType.CREDIT,
-      amount: 5000,
-      currency: 'GBP',
-      refundTransactionId: null,
-      createdAt: equalTime,
-    };
-
-    const pair2Debit = {
-      id: 'entry-2-debit',
-      paymentId: 'payment-equal',
-      transactionId: 'tx-a-earlier-uuid',
-      accountId: 'PLATFORM_REVENUE',
-      entryType: LedgerEntryType.DEBIT,
-      amount: 5000,
-      currency: 'GBP',
-      refundTransactionId: null,
-      createdAt: equalTime,
-    };
-    const pair2Credit = {
-      id: 'entry-2-credit',
-      paymentId: 'payment-equal',
-      transactionId: 'tx-a-earlier-uuid',
-      accountId: 'CUSTOMER_RECEIVABLE',
-      entryType: LedgerEntryType.CREDIT,
-      amount: 5000,
-      currency: 'GBP',
-      refundTransactionId: null,
-      createdAt: equalTime,
-    };
-
-    mockPrisma.booking.findMany.mockResolvedValueOnce([]);
-    mockPrisma.refund.findMany
-      .mockResolvedValueOnce([mockRefund1, mockRefund2])
-      .mockResolvedValueOnce([]);
-
-    mockPrisma.ledgerEntry.findMany
-      .mockResolvedValueOnce([])
-      .mockResolvedValueOnce([pair2Debit, pair2Credit, pair1Debit, pair1Credit])
-      .mockResolvedValueOnce([])
-      .mockResolvedValueOnce([pair2Debit, pair2Credit]);
-
-    const stats = await backfillCancellationRefundObligations({
-      prisma: mockPrisma as unknown as PrismaClient,
-      logger: mockLogger,
-    });
-
-    expect(stats.ledgerEntriesLinked).toBe(4);
-    expect(stats.quarantined).toBe(0);
-
-    expect(mockPrisma.ledgerEntry.updateMany).toHaveBeenCalledWith({
-      where: { id: 'entry-1-debit', refundTransactionId: null },
-      data: { refundTransactionId: 'refund-a' },
-    });
-    expect(mockPrisma.ledgerEntry.updateMany).toHaveBeenCalledWith({
-      where: { id: 'entry-2-debit', refundTransactionId: null },
-      data: { refundTransactionId: 'refund-b' },
-    });
-  });
-
-  it('handles concurrent race conditions gracefully by claiming available alternatives via CAS updateMany', async () => {
+  it('handles partial CAS claim rollback and quarantines gracefully', async () => {
     const mockRefund = {
       id: 'refund-race',
       paymentId: 'payment-race',
@@ -767,10 +775,10 @@ describe('backfillCancellationRefundObligations unit tests', () => {
       ledgerEntries: [],
     };
 
-    const pair1Debit = {
-      id: 'race-1-debit',
+    const pairDebit = {
+      id: 'race-debit',
       paymentId: 'payment-race',
-      transactionId: 'tx-race-1',
+      transactionId: 'tx-race',
       accountId: 'PLATFORM_REVENUE',
       entryType: LedgerEntryType.DEBIT,
       amount: 5000,
@@ -778,39 +786,16 @@ describe('backfillCancellationRefundObligations unit tests', () => {
       refundTransactionId: null,
       createdAt: new Date('2026-08-01T10:00:00.000Z'),
     };
-    const pair1Credit = {
-      id: 'race-1-credit',
+    const pairCredit = {
+      id: 'race-credit',
       paymentId: 'payment-race',
-      transactionId: 'tx-race-1',
+      transactionId: 'tx-race',
       accountId: 'CUSTOMER_RECEIVABLE',
       entryType: LedgerEntryType.CREDIT,
       amount: 5000,
       currency: 'GBP',
       refundTransactionId: null,
       createdAt: new Date('2026-08-01T10:00:00.000Z'),
-    };
-
-    const pair2Debit = {
-      id: 'race-2-debit',
-      paymentId: 'payment-race',
-      transactionId: 'tx-race-2',
-      accountId: 'PLATFORM_REVENUE',
-      entryType: LedgerEntryType.DEBIT,
-      amount: 5000,
-      currency: 'GBP',
-      refundTransactionId: null,
-      createdAt: new Date('2026-08-01T10:00:05.000Z'),
-    };
-    const pair2Credit = {
-      id: 'race-2-credit',
-      paymentId: 'payment-race',
-      transactionId: 'tx-race-2',
-      accountId: 'CUSTOMER_RECEIVABLE',
-      entryType: LedgerEntryType.CREDIT,
-      amount: 5000,
-      currency: 'GBP',
-      refundTransactionId: null,
-      createdAt: new Date('2026-08-01T10:00:05.000Z'),
     };
 
     mockPrisma.booking.findMany.mockResolvedValueOnce([]);
@@ -820,32 +805,37 @@ describe('backfillCancellationRefundObligations unit tests', () => {
 
     mockPrisma.ledgerEntry.findMany
       .mockResolvedValueOnce([])
-      .mockResolvedValueOnce([pair1Debit, pair1Credit, pair2Debit, pair2Credit]);
+      .mockResolvedValueOnce([pairDebit, pairCredit]);
 
-    // First attempt on pair 1 fails CAS (count: 0 - already claimed by concurrent process)
-    // Second attempt on pair 2 succeeds CAS (count: 1)
+    // Partial claim: debit succeeds (1), credit fails (0)
     mockPrisma.ledgerEntry.updateMany
-      .mockResolvedValueOnce({ count: 0 })
-      .mockResolvedValueOnce({ count: 0 })
       .mockResolvedValueOnce({ count: 1 })
-      .mockResolvedValueOnce({ count: 1 });
+      .mockResolvedValueOnce({ count: 0 })
+      .mockResolvedValueOnce({ count: 1 }); // rollback updateMany
 
     const stats = await backfillCancellationRefundObligations({
       prisma: mockPrisma as unknown as PrismaClient,
       logger: mockLogger,
     });
 
-    expect(stats.ledgerEntriesLinked).toBe(2);
-    expect(stats.quarantined).toBe(0);
+    expect(stats.ledgerEntriesLinked).toBe(0);
+    expect(stats.quarantined).toBe(1);
 
     expect(mockPrisma.ledgerEntry.updateMany).toHaveBeenCalledWith({
-      where: { id: 'race-1-debit', refundTransactionId: null },
+      where: { id: 'race-debit', refundTransactionId: null },
       data: { refundTransactionId: 'refund-race' },
     });
     expect(mockPrisma.ledgerEntry.updateMany).toHaveBeenCalledWith({
-      where: { id: 'race-2-debit', refundTransactionId: null },
+      where: { id: 'race-credit', refundTransactionId: null },
       data: { refundTransactionId: 'refund-race' },
     });
+    expect(mockPrisma.ledgerEntry.updateMany).toHaveBeenCalledWith({
+      where: { id: 'race-debit', refundTransactionId: 'refund-race' },
+      data: { refundTransactionId: null },
+    });
+    expect(mockLogger.warn).toHaveBeenCalledWith(
+      expect.stringContaining('[QUARANTINE] SUCCEEDED refund refund-race could not claim candidate ledger pair for payment payment-race'),
+    );
   });
 });
 
