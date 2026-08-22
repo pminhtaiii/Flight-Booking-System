@@ -443,5 +443,161 @@ describe('backfillCancellationRefundObligations unit tests', () => {
       expect.stringContaining('[QUARANTINE] Non-succeeded refund refund-failed (status: FAILED) has 1 linked ledger entries'),
     );
   });
+
+  it('skips quote-only confirmed bookings and does not create obligations', async () => {
+    const mockBooking = {
+      id: 'booking-quote-only',
+      paymentId: 'payment-1',
+      status: BookingStatus.CONFIRMED,
+      currency: 'GBP',
+      totalAmount: new Prisma.Decimal('150.00'),
+      customerRefundAmount: new Prisma.Decimal('150.00'),
+      airlineRefundAmount: new Prisma.Decimal('140.00'),
+      cancellationRefundObligation: null,
+      payment: { id: 'payment-1', currency: 'GBP', amount: 15000 },
+      cancellationRefund: null,
+    };
+
+    mockPrisma.booking.findMany
+      .mockResolvedValueOnce([mockBooking])
+      .mockResolvedValueOnce([]);
+    mockPrisma.refund.findMany.mockResolvedValueOnce([]);
+
+    const stats = await backfillCancellationRefundObligations({
+      prisma: mockPrisma as unknown as PrismaClient,
+      logger: mockLogger,
+    });
+
+    expect(stats.processedBookings).toBe(1);
+    expect(stats.obligationsCreated).toBe(0);
+    expect(stats.obligationsUpdated).toBe(0);
+    expect(stats.quarantined).toBe(0);
+    expect(stats.errors).toBe(0);
+    expect(mockPrisma.cancellationRefundObligation.create).not.toHaveBeenCalled();
+    expect(mockPrisma.cancellationRefundObligation.update).not.toHaveBeenCalled();
+  });
+
+  it('matches two refunds on the same payment with identical amount and currency to their closest chronological ledger entry pairs without cross-linking', async () => {
+    const mockRefund1 = {
+      id: 'refund-early',
+      paymentId: 'payment-multi-refund',
+      bookingId: null,
+      amount: 5000,
+      currency: 'GBP',
+      status: RefundStatus.SUCCEEDED,
+      cancellationRefundObligationId: 'obligation-1',
+      createdAt: new Date('2026-08-01T10:00:00.000Z'),
+      updatedAt: new Date('2026-08-01T10:00:00.000Z'),
+      payment: { id: 'payment-multi-refund', amount: 20000 },
+      ledgerEntries: [],
+    };
+
+    const mockRefund2 = {
+      id: 'refund-late',
+      paymentId: 'payment-multi-refund',
+      bookingId: null,
+      amount: 5000,
+      currency: 'GBP',
+      status: RefundStatus.SUCCEEDED,
+      cancellationRefundObligationId: 'obligation-1',
+      createdAt: new Date('2026-08-01T12:00:00.000Z'),
+      updatedAt: new Date('2026-08-01T12:00:00.000Z'),
+      payment: { id: 'payment-multi-refund', amount: 20000 },
+      ledgerEntries: [],
+    };
+
+    const earlyDebit = {
+      id: 'entry-early-debit',
+      paymentId: 'payment-multi-refund',
+      transactionId: 'tx-early',
+      accountId: 'PLATFORM_REVENUE',
+      entryType: LedgerEntryType.DEBIT,
+      amount: 5000,
+      currency: 'GBP',
+      refundTransactionId: null,
+      createdAt: new Date('2026-08-01T10:00:02.000Z'),
+    };
+    const earlyCredit = {
+      id: 'entry-early-credit',
+      paymentId: 'payment-multi-refund',
+      transactionId: 'tx-early',
+      accountId: 'CUSTOMER_RECEIVABLE',
+      entryType: LedgerEntryType.CREDIT,
+      amount: 5000,
+      currency: 'GBP',
+      refundTransactionId: null,
+      createdAt: new Date('2026-08-01T10:00:02.000Z'),
+    };
+
+    const lateDebit = {
+      id: 'entry-late-debit',
+      paymentId: 'payment-multi-refund',
+      transactionId: 'tx-late',
+      accountId: 'PLATFORM_REVENUE',
+      entryType: LedgerEntryType.DEBIT,
+      amount: 5000,
+      currency: 'GBP',
+      refundTransactionId: null,
+      createdAt: new Date('2026-08-01T12:00:04.000Z'),
+    };
+    const lateCredit = {
+      id: 'entry-late-credit',
+      paymentId: 'payment-multi-refund',
+      transactionId: 'tx-late',
+      accountId: 'CUSTOMER_RECEIVABLE',
+      entryType: LedgerEntryType.CREDIT,
+      amount: 5000,
+      currency: 'GBP',
+      refundTransactionId: null,
+      createdAt: new Date('2026-08-01T12:00:04.000Z'),
+    };
+
+    mockPrisma.booking.findMany.mockResolvedValueOnce([]);
+    mockPrisma.refund.findMany
+      .mockResolvedValueOnce([mockRefund1, mockRefund2])
+      .mockResolvedValueOnce([]);
+
+    // For refund-early:
+    // 1st ledger findMany: linked check -> returns []
+    // 2nd ledger findMany: candidate unlinked entries (passed with late pair first to verify distance sorting)
+    // For refund-late:
+    // 3rd ledger findMany: linked check -> returns []
+    // 4th ledger findMany: remaining candidate entries
+    mockPrisma.ledgerEntry.findMany
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([lateDebit, lateCredit, earlyDebit, earlyCredit])
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([lateDebit, lateCredit]);
+
+    const stats = await backfillCancellationRefundObligations({
+      prisma: mockPrisma as unknown as PrismaClient,
+      logger: mockLogger,
+    });
+
+    expect(stats.ledgerEntriesLinked).toBe(4);
+    expect(stats.quarantined).toBe(0);
+    expect(stats.errors).toBe(0);
+
+    expect(mockPrisma.$transaction).toHaveBeenCalledTimes(2);
+
+    expect(mockPrisma.ledgerEntry.update).toHaveBeenCalledWith({
+      where: { id: 'entry-early-debit' },
+      data: { refundTransactionId: 'refund-early' },
+    });
+    expect(mockPrisma.ledgerEntry.update).toHaveBeenCalledWith({
+      where: { id: 'entry-early-credit' },
+      data: { refundTransactionId: 'refund-early' },
+    });
+
+    expect(mockPrisma.ledgerEntry.update).toHaveBeenCalledWith({
+      where: { id: 'entry-late-debit' },
+      data: { refundTransactionId: 'refund-late' },
+    });
+    expect(mockPrisma.ledgerEntry.update).toHaveBeenCalledWith({
+      where: { id: 'entry-late-credit' },
+      data: { refundTransactionId: 'refund-late' },
+    });
+  });
 });
+
 

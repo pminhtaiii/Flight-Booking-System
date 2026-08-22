@@ -182,8 +182,6 @@ export async function backfillCancellationRefundObligations(
           const hasCancellationContext =
             booking.cancellationRefundObligation !== null ||
             booking.cancellationRefund !== null ||
-            booking.customerRefundAmount !== null ||
-            booking.airlineRefundAmount !== null ||
             booking.status === BookingStatus.CANCELLED_AND_REFUNDED ||
             booking.status === BookingStatus.CANCELLED_PENDING_REFUND ||
             booking.status === BookingStatus.CANCELLED_NO_REFUND;
@@ -352,7 +350,7 @@ export async function backfillCancellationRefundObligations(
         take: chunkSize,
         skip: lastRefundId ? 1 : 0,
         cursor: lastRefundId ? { id: lastRefundId } : undefined,
-        orderBy: { id: 'asc' },
+        orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
         include: {
           payment: true,
           cancellationRefundObligation: true,
@@ -495,16 +493,54 @@ export async function backfillCancellationRefundObligations(
                 grouped.set(entry.transactionId, group);
               }
 
+              type ValidPair = {
+                transactionId: string;
+                debitEntry: (typeof unlinkedEntries)[0];
+                creditEntry: (typeof unlinkedEntries)[0];
+                createdAt: number;
+              };
+
+              const validPairs: ValidPair[] = [];
+
+              for (const [txId, entries] of grouped.entries()) {
+                const validation = validateLedgerPair(entries, refund.amount, refund.currency);
+                if (validation.isValid && validation.debitEntry && validation.creditEntry) {
+                  const pairTimestamp =
+                    validation.debitEntry.createdAt ??
+                    validation.creditEntry.createdAt ??
+                    entries[0]?.createdAt;
+                  const parsedPairTime = pairTimestamp ? new Date(pairTimestamp).getTime() : 0;
+                  validPairs.push({
+                    transactionId: txId,
+                    debitEntry: validation.debitEntry,
+                    creditEntry: validation.creditEntry,
+                    createdAt: isNaN(parsedPairTime) ? 0 : parsedPairTime,
+                  });
+                }
+              }
+
               let matchedDebit: (typeof unlinkedEntries)[0] | null = null;
               let matchedCredit: (typeof unlinkedEntries)[0] | null = null;
 
-              for (const [, entries] of grouped.entries()) {
-                const validation = validateLedgerPair(entries, refund.amount, refund.currency);
-                if (validation.isValid && validation.debitEntry && validation.creditEntry) {
-                  matchedDebit = validation.debitEntry;
-                  matchedCredit = validation.creditEntry;
-                  break;
-                }
+              if (validPairs.length > 0) {
+                const refundTimestamp = refund.updatedAt ?? refund.createdAt;
+                const parsedRefundTime = refundTimestamp ? new Date(refundTimestamp).getTime() : 0;
+                const targetTime = isNaN(parsedRefundTime) ? 0 : parsedRefundTime;
+
+                validPairs.sort((a, b) => {
+                  const diffA = Math.abs(a.createdAt - targetTime);
+                  const diffB = Math.abs(b.createdAt - targetTime);
+                  if (diffA !== diffB) {
+                    return diffA - diffB;
+                  }
+                  if (a.createdAt !== b.createdAt) {
+                    return a.createdAt - b.createdAt;
+                  }
+                  return a.transactionId.localeCompare(b.transactionId);
+                });
+
+                matchedDebit = validPairs[0].debitEntry;
+                matchedCredit = validPairs[0].creditEntry;
               }
 
               if (matchedDebit && matchedCredit) {

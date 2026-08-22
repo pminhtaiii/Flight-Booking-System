@@ -44,3 +44,8 @@ ALTER TABLE "refunds" ADD CONSTRAINT "refunds_cancellationRefundObligationId_fke
 
 -- AddForeignKey
 ALTER TABLE "ledger_entries" ADD CONSTRAINT "ledger_entries_refundTransactionId_fkey" FOREIGN KEY ("refundTransactionId") REFERENCES "refunds"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddCheckConstraints
+ALTER TABLE "cancellation_refund_obligations" ADD CONSTRAINT "cancellation_refund_obligations_totalAmount_check" CHECK ("totalAmount" >= 0);
+ALTER TABLE "cancellation_refund_obligations" ADD CONSTRAINT "cancellation_refund_obligations_airlineRefundAmount_check" CHECK ("airlineRefundAmount" >= 0);
+
