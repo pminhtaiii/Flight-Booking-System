@@ -28,6 +28,7 @@ describe('RefundSettlementService', () => {
     };
     booking: {
       update: jest.Mock;
+      updateMany: jest.Mock;
     };
     ledgerEntry: {
       create: jest.Mock;
@@ -59,6 +60,7 @@ describe('RefundSettlementService', () => {
       },
       booking: {
         update: jest.fn(),
+        updateMany: jest.fn(),
       },
       ledgerEntry: {
         create: jest.fn(),
@@ -188,6 +190,7 @@ describe('RefundSettlementService', () => {
         data: {
           status: RefundStatus.SUCCEEDED,
           stripeRefundId: 're_stripe_123',
+          nextRetryAt: null,
           updatedAt: new Date('2026-08-22T10:00:00.000Z'),
         },
       });
@@ -205,7 +208,7 @@ describe('RefundSettlementService', () => {
       expect(mockTx.paymentEvent.create).toHaveBeenCalledWith({
         data: {
           paymentId: 'pay_123',
-          eventType: 'refund_settled',
+          eventType: 'charge.refunded',
           previousStatus: PaymentStatus.REFUND_PENDING,
           newStatus: PaymentStatus.REFUNDED,
           amount: 20000,
@@ -626,7 +629,7 @@ describe('RefundSettlementService', () => {
         applied: true,
         transactionStatus: 'REFUND_FAILED_NEEDS_ATTENTION',
         paymentStatus: PaymentStatus.PARTIALLY_REFUNDED,
-        bookingStatus: BookingStatus.CANCELLED_PENDING_REFUND,
+        bookingStatus: BookingStatus.REFUND_FAILED_NEEDS_ATTENTION,
       });
 
       expect(mockTx.refund.update).toHaveBeenCalledWith({

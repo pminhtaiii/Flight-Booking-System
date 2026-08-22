@@ -17,6 +17,10 @@ describe('RefundTransactionService', () => {
     $queryRaw: jest.fn(),
     payment: {
       findUnique: jest.fn(),
+      update: jest.fn(),
+    },
+    paymentEvent: {
+      create: jest.fn(),
     },
     user: {
       findFirst: jest.fn(),
@@ -439,6 +443,7 @@ describe('RefundTransactionService', () => {
       expect(mockPrisma.refund.create).toHaveBeenCalledWith({
         data: {
           paymentId: 'pay-123',
+          bookingId: null,
           cancellationRefundObligationId: 'ob-1',
           idempotencyKeyId: 'key-new',
           amount: 4000,
@@ -447,6 +452,7 @@ describe('RefundTransactionService', () => {
           triggerType: RefundTriggerType.USER,
           triggeredByUserId: 'user-123',
           status: RefundStatus.REFUND_PENDING,
+          idempotencyKeyCreatedAt: expect.any(Date),
         },
       });
     });

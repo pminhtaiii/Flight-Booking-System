@@ -462,7 +462,7 @@ export class SupplierSyncService {
 
             this.logger.log(`Successfully completed sync for booking ${bookingId}. Created revision ${newRevision.id}. Correlation: ${correlationId}`);
             return { status: 'REVISION_CREATED', revisionId: newRevision.id };
-          });
+          }, { timeout: 15000, maxWait: 10000 });
         } catch (txError: unknown) {
           const errWithCode = txError as { code?: string; meta?: { target?: string[] } };
           if (errWithCode.code === 'P2002') {

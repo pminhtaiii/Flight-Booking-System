@@ -5,6 +5,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import {
+  PaymentEventSource,
   PaymentStatus,
   Refund,
   RefundStatus,
@@ -15,6 +16,7 @@ import { PrismaService } from '@/prisma/prisma.service';
 
 export type ReserveRefundTransactionInput = {
   paymentId: string;
+  bookingId?: string;
   cancellationRefundObligationId?: string;
   amount: number;
   currency: string;
@@ -42,6 +44,7 @@ export class RefundTransactionService {
       .update(
         JSON.stringify({
           paymentId: input.paymentId,
+          bookingId: input.bookingId,
           obligationId: input.cancellationRefundObligationId,
           amount: input.amount,
           currency: input.currency,
@@ -203,6 +206,7 @@ export class RefundTransactionService {
       const createdRefund = await tx.refund.create({
         data: {
           paymentId: input.paymentId,
+          bookingId: input.bookingId ?? (obligation as any)?.bookingId ?? null,
           cancellationRefundObligationId: input.cancellationRefundObligationId ?? null,
           idempotencyKeyId: idempotencyKeyRecord.id,
           amount: input.amount,
@@ -211,8 +215,35 @@ export class RefundTransactionService {
           triggerType: input.triggerType,
           triggeredByUserId: input.actorId ?? null,
           status: RefundStatus.REFUND_PENDING,
+          idempotencyKeyCreatedAt: new Date(),
         },
       });
+
+      if (
+        payment.status !== PaymentStatus.REFUND_PENDING &&
+        payment.status !== PaymentStatus.DISPUTED &&
+        payment.status !== PaymentStatus.CHARGEBACK_LOST
+      ) {
+        await tx.payment.update({
+          where: { id: payment.id },
+          data: { status: PaymentStatus.REFUND_PENDING },
+        });
+
+        await tx.paymentEvent.create({
+          data: {
+            paymentId: payment.id,
+            eventType: 'refund_initiated',
+            previousStatus: payment.status,
+            newStatus: PaymentStatus.REFUND_PENDING,
+            amount: input.amount,
+            source:
+              input.triggerType === RefundTriggerType.SYSTEM_AUTOMATED
+                ? PaymentEventSource.SYSTEM
+                : PaymentEventSource.API,
+            createdBy: input.actorId || 'system',
+          },
+        });
+      }
 
       this.logger.log({
         message: 'Refund transaction reserved',

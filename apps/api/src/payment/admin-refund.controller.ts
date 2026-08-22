@@ -1,4 +1,4 @@
-import { Body, Controller, Param, Post, Get, UseGuards } from '@nestjs/common';
+import { Body, Controller, Param, Post, Get, UseGuards, Req } from '@nestjs/common';
 import { JwtAuthGuard } from '@/auth/guards/jwt-auth.guard';
 import { Roles } from '@/auth/decorators/roles.decorator';
 import { RolesGuard } from '@/auth/guards/roles.guard';
@@ -15,8 +15,13 @@ export class AdminRefundController {
   async resolveRefund(
     @Param('refundId') refundId: string,
     @Body() dto: ResolveRefundDto,
+    @Req() req: { user?: { id?: string } },
   ): Promise<{ refundId: string; refundStatus: string; bookingStatus: string }> {
-    return this.paymentRefundService.resolveEscalatedCancellationRefund(refundId, dto.action);
+    return this.paymentRefundService.resolveEscalatedCancellationRefund(
+      refundId,
+      dto.action,
+      req.user?.id,
+    );
   }
 
   @Get()
