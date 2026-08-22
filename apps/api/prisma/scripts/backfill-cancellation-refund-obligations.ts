@@ -401,11 +401,45 @@ export async function backfillCancellationRefundObligations(
                 );
                 stats.quarantined++;
               } else {
-                await prisma.refund.update({
-                  where: { id: refund.id },
-                  data: { cancellationRefundObligationId: obligation.id },
+                const linkResult = await prisma.$transaction(async (tx) => {
+                  const existingObligationRefunds = await tx.refund.aggregate({
+                    where: {
+                      cancellationRefundObligationId: obligation.id,
+                      status: RefundStatus.SUCCEEDED,
+                      id: { not: refund.id },
+                    },
+                    _sum: { amount: true },
+                  });
+                  const currentObligationRefunded = existingObligationRefunds._sum.amount ?? 0;
+                  const prospectiveObligationTotal =
+                    refund.status === RefundStatus.SUCCEEDED
+                      ? currentObligationRefunded + refund.amount
+                      : currentObligationRefunded;
+
+                  if (prospectiveObligationTotal > obligation.totalAmount) {
+                    return {
+                      success: false,
+                      currentObligationRefunded,
+                      totalAmount: obligation.totalAmount,
+                    };
+                  }
+
+                  await tx.refund.update({
+                    where: { id: refund.id },
+                    data: { cancellationRefundObligationId: obligation.id },
+                  });
+
+                  return { success: true };
                 });
-                stats.refundsLinked++;
+
+                if (linkResult.success) {
+                  stats.refundsLinked++;
+                } else {
+                  logger.warn(
+                    `[QUARANTINE] Linking refund ${refund.id} (amount: ${refund.amount}) to obligation ${obligation.id} (totalAmount: ${linkResult.totalAmount}) would exceed obligation debt (current refunded: ${linkResult.currentObligationRefunded}). Quarantining.`,
+                  );
+                  stats.quarantined++;
+                }
               }
             } else {
               const booking = await prisma.booking.findUnique({
@@ -428,22 +462,72 @@ export async function backfillCancellationRefundObligations(
                   totalMinor >= 0 &&
                   airlineMinor >= 0
                 ) {
-                  const newObligation = await prisma.cancellationRefundObligation.create({
-                    data: {
-                      bookingId: booking.id,
-                      paymentId: refund.paymentId,
-                      totalAmount: totalMinor,
-                      airlineRefundAmount: airlineMinor,
-                      currency: refund.currency.toUpperCase(),
-                    },
-                  });
-                  stats.obligationsCreated++;
+                  if (refund.status === RefundStatus.SUCCEEDED && refund.amount > totalMinor) {
+                    logger.warn(
+                      `[QUARANTINE] Refund ${refund.id} amount (${refund.amount}) exceeds new obligation totalAmount (${totalMinor}) for booking ${booking.id}. Quarantining.`,
+                    );
+                    stats.quarantined++;
+                  } else {
+                    const createResult = await prisma.$transaction(async (tx) => {
+                      let obligationRecord = await tx.cancellationRefundObligation.findUnique({
+                        where: { bookingId: booking.id },
+                      });
 
-                  await prisma.refund.update({
-                    where: { id: refund.id },
-                    data: { cancellationRefundObligationId: newObligation.id },
-                  });
-                  stats.refundsLinked++;
+                      let createdNew = false;
+                      if (!obligationRecord) {
+                        obligationRecord = await tx.cancellationRefundObligation.create({
+                          data: {
+                            bookingId: booking.id,
+                            paymentId: refund.paymentId,
+                            totalAmount: totalMinor,
+                            airlineRefundAmount: airlineMinor,
+                            currency: refund.currency.toUpperCase(),
+                          },
+                        });
+                        createdNew = true;
+                      } else {
+                        const existingObligationRefunds = await tx.refund.aggregate({
+                          where: {
+                            cancellationRefundObligationId: obligationRecord.id,
+                            status: RefundStatus.SUCCEEDED,
+                            id: { not: refund.id },
+                          },
+                          _sum: { amount: true },
+                        });
+                        const currentRefunded = existingObligationRefunds._sum.amount ?? 0;
+                        const prospective =
+                          refund.status === RefundStatus.SUCCEEDED
+                            ? currentRefunded + refund.amount
+                            : currentRefunded;
+                        if (prospective > obligationRecord.totalAmount) {
+                          return {
+                            success: false,
+                            currentRefunded,
+                            totalAmount: obligationRecord.totalAmount,
+                          };
+                        }
+                      }
+
+                      await tx.refund.update({
+                        where: { id: refund.id },
+                        data: { cancellationRefundObligationId: obligationRecord.id },
+                      });
+
+                      return { success: true, createdNew };
+                    });
+
+                    if (createResult.success) {
+                      if (createResult.createdNew) {
+                        stats.obligationsCreated++;
+                      }
+                      stats.refundsLinked++;
+                    } else {
+                      logger.warn(
+                        `[QUARANTINE] Linking refund ${refund.id} (amount: ${refund.amount}) to obligation for booking ${booking.id} would exceed obligation debt. Quarantining.`,
+                      );
+                      stats.quarantined++;
+                    }
+                  }
                 } else {
                   logger.warn(
                     `[QUARANTINE] Refund ${refund.id} associated booking has invalid refund amounts. Quarantining.`,
@@ -482,7 +566,7 @@ export async function backfillCancellationRefundObligations(
                   paymentId: refund.paymentId,
                   refundTransactionId: null,
                 },
-                orderBy: { createdAt: 'asc' },
+                orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
               });
 
               // Group candidate entries by transactionId
@@ -498,6 +582,7 @@ export async function backfillCancellationRefundObligations(
                 debitEntry: (typeof unlinkedEntries)[0];
                 creditEntry: (typeof unlinkedEntries)[0];
                 createdAt: number;
+                minEntryId: string;
               };
 
               const validPairs: ValidPair[] = [];
@@ -510,20 +595,22 @@ export async function backfillCancellationRefundObligations(
                     validation.creditEntry.createdAt ??
                     entries[0]?.createdAt;
                   const parsedPairTime = pairTimestamp ? new Date(pairTimestamp).getTime() : 0;
+                  const minEntryId =
+                    validation.debitEntry.id.localeCompare(validation.creditEntry.id) < 0
+                      ? validation.debitEntry.id
+                      : validation.creditEntry.id;
                   validPairs.push({
                     transactionId: txId,
                     debitEntry: validation.debitEntry,
                     creditEntry: validation.creditEntry,
                     createdAt: isNaN(parsedPairTime) ? 0 : parsedPairTime,
+                    minEntryId,
                   });
                 }
               }
 
-              let matchedDebit: (typeof unlinkedEntries)[0] | null = null;
-              let matchedCredit: (typeof unlinkedEntries)[0] | null = null;
-
               if (validPairs.length > 0) {
-                const refundTimestamp = refund.updatedAt ?? refund.createdAt;
+                const refundTimestamp = refund.createdAt;
                 const parsedRefundTime = refundTimestamp ? new Date(refundTimestamp).getTime() : 0;
                 const targetTime = isNaN(parsedRefundTime) ? 0 : parsedRefundTime;
 
@@ -536,26 +623,45 @@ export async function backfillCancellationRefundObligations(
                   if (a.createdAt !== b.createdAt) {
                     return a.createdAt - b.createdAt;
                   }
-                  return a.transactionId.localeCompare(b.transactionId);
+                  return a.minEntryId.localeCompare(b.minEntryId);
                 });
-
-                matchedDebit = validPairs[0].debitEntry;
-                matchedCredit = validPairs[0].creditEntry;
               }
 
-              if (matchedDebit && matchedCredit) {
-                await prisma.$transaction([
-                  prisma.ledgerEntry.update({
-                    where: { id: matchedDebit.id },
+              let linked = false;
+
+              for (const pair of validPairs) {
+                const [debitRes, creditRes] = await prisma.$transaction([
+                  prisma.ledgerEntry.updateMany({
+                    where: { id: pair.debitEntry.id, refundTransactionId: null },
                     data: { refundTransactionId: refund.id },
                   }),
-                  prisma.ledgerEntry.update({
-                    where: { id: matchedCredit.id },
+                  prisma.ledgerEntry.updateMany({
+                    where: { id: pair.creditEntry.id, refundTransactionId: null },
                     data: { refundTransactionId: refund.id },
                   }),
                 ]);
-                stats.ledgerEntriesLinked += 2;
-              } else {
+
+                if (debitRes.count === 1 && creditRes.count === 1) {
+                  stats.ledgerEntriesLinked += 2;
+                  linked = true;
+                  break;
+                }
+
+                // If a partial claim occurred, roll it back
+                if (debitRes.count === 1 && creditRes.count === 0) {
+                  await prisma.ledgerEntry.updateMany({
+                    where: { id: pair.debitEntry.id, refundTransactionId: refund.id },
+                    data: { refundTransactionId: null },
+                  });
+                } else if (creditRes.count === 1 && debitRes.count === 0) {
+                  await prisma.ledgerEntry.updateMany({
+                    where: { id: pair.creditEntry.id, refundTransactionId: refund.id },
+                    data: { refundTransactionId: null },
+                  });
+                }
+              }
+
+              if (!linked) {
                 logger.warn(
                   `[QUARANTINE] SUCCEEDED refund ${refund.id} (amount: ${refund.amount} ${refund.currency}) has no unlinked balanced ledger entries for payment ${refund.paymentId}. Quarantining.`,
                 );
@@ -601,9 +707,10 @@ export async function backfillCancellationRefundObligations(
 if (require.main === module) {
   const prisma = new PrismaClient();
   backfillCancellationRefundObligations({ prisma })
-    .then((stats) => {
+    .then(async (stats) => {
       console.log('Backfill execution complete:', JSON.stringify(stats, null, 2));
-      return prisma.$disconnect().then(() => process.exit(0));
+      await prisma.$disconnect();
+      process.exit(stats.errors > 0 ? 1 : 0);
     })
     .catch(async (err: unknown) => {
       console.error('Fatal error during backfill execution:', err);
@@ -611,4 +718,5 @@ if (require.main === module) {
       process.exit(1);
     });
 }
+
 

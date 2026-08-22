@@ -7,13 +7,34 @@ Update this file after every completed feature. Any AI agent reading this should
 ### Current Status
 
 **Feature:** Deepen Codebase Architecture (Feature 019)
-**Last completed:** Slice 0: Baseline Characterization & Safety Rails (2026-08-21).
+**Last completed:** Slice 1A: Expand Schema for Refund Obligation, Refund Transaction & Balanced Ledger Linkage (2026-08-21).
 **In progress:** None.
-**Next:** Slice 1 — Refund obligation, transaction reservation, and settlement.
+**Next:** Slice 1B: Add reservation and settlement modules.
 
 ---
 
 ## Progress by Feature
+
+### [x] Feature: Deepen Codebase Architecture (Feature 019) — Slice 1A: Expand Schema for Refund Obligation, Refund Transaction & Balanced Ledger Linkage
+
+- [x] Slice 1A / Expand Schema, Migration, Backfill & Verification (2026-08-21):
+  - **Additive PostgreSQL/Prisma Schema Expansion (`apps/api/prisma/schema.prisma` & migration `20260822000000_cancellation_refund_obligation_expand`)**:
+    - Created `CancellationRefundObligation` model (UUID PK, 1:1 unique relation to `Booking` with `onDelete: Cascade`, 1:N relation to `Payment` with `onDelete: Restrict`, `totalAmount` & `airlineRefundAmount` integer minor units, `currency`, timestamps, mapped to `cancellation_refund_obligations`).
+    - Expanded `Booking` with optional `cancellationRefundObligation` relation while preserving legacy fields (`cancellationRefund`, `airlineRefundAmount`, `customerRefundAmount`).
+    - Expanded `Payment` with `cancellationRefundObligations` relation.
+    - Expanded `Refund` with nullable `cancellationRefundObligationId`, relation to `CancellationRefundObligation`, `ledgerEntries` relation, and index.
+    - Expanded `LedgerEntry` with nullable `refundTransactionId`, relation to `Refund`, index, and compound unique constraint `@@unique([refundTransactionId, accountId, entryType])`.
+  - **Restart-Safe Idempotent Backfill Script (`apps/api/prisma/scripts/backfill-cancellation-refund-obligations.ts`)**:
+    - Cursor-paginated over `Booking` and `Refund` with configurable batch size.
+    - Explicit decimal major-to-minor units conversion (`Math.round(amount * 100)`).
+    - Links legacy refunds to obligations and reconciles reversing ledger entries.
+    - Strictly asserts double-entry ledger balance (`sum(DEBIT) === sum(CREDIT) === refund.amount`) and cumulative payment refund bounds.
+    - Quarantines currency, payment ID, and ledger imbalances without halting execution.
+  - **Verification & Characterization Test Suites (100% Green)**:
+    - `cancellation-refund-obligation-migration.e2e-spec.ts` (5/5 tests PASS): Validates schema invariants, unique constraints on `LedgerEntry`, backfill idempotency, ledger balances, quarantine resilience, and existing workflow non-regression.
+    - `backfill-cancellation-refund-obligations.spec.ts` (8/8 unit tests PASS): Validates unit-level backfill mechanics, conversion math, and anomaly quarantine.
+    - `refund-characterization.e2e-spec.ts` (11/11 tests PASS) & `booking-characterization.e2e-spec.ts` (14/14 tests PASS): Zero regression on baseline characterization.
+    - Full API unit test suite: 75/75 suites (754/754 tests) PASS; ESLint 0 errors / 0 warnings; TypeScript typecheck 0 errors; API build passes cleanly.
 
 ### [x] Feature: Deepen Codebase Architecture (Feature 019) — Slice 0: Baseline Characterization & Safety Rails
 
