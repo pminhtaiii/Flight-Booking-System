@@ -20,7 +20,42 @@ import {
 } from '@prisma/client';
 import type Stripe from 'stripe';
 import * as crypto from 'crypto';
+import * as fs from 'fs';
+import * as path from 'path';
 import { backfillCancellationRefundObligations } from '../prisma/scripts/backfill-cancellation-refund-obligations';
+
+const MIGRATION_PATH = path.join(
+  __dirname,
+  '../prisma/migrations/20260822000000_cancellation_refund_obligation_expand/migration.sql',
+);
+
+async function revertMigration(prisma: PrismaService) {
+  const statements = [
+    'ALTER TABLE "ledger_entries" DROP CONSTRAINT IF EXISTS "ledger_entries_refundTransactionId_fkey"',
+    'DROP INDEX IF EXISTS "ledger_entries_refundTransactionId_accountId_entryType_key"',
+    'DROP INDEX IF EXISTS "ledger_entries_refundTransactionId_idx"',
+    'ALTER TABLE "ledger_entries" DROP COLUMN IF EXISTS "refundTransactionId"',
+    'ALTER TABLE "refunds" DROP CONSTRAINT IF EXISTS "refunds_cancellationRefundObligationId_fkey"',
+    'DROP INDEX IF EXISTS "refunds_cancellationRefundObligationId_idx"',
+    'ALTER TABLE "refunds" DROP COLUMN IF EXISTS "cancellationRefundObligationId"',
+    'DROP TABLE IF EXISTS "cancellation_refund_obligations" CASCADE',
+  ];
+  for (const stmt of statements) {
+    await prisma.$executeRawUnsafe(stmt);
+  }
+}
+
+async function applyMigration(prisma: PrismaService) {
+  const migrationSql = fs.readFileSync(MIGRATION_PATH, 'utf-8');
+  const statements = migrationSql
+    .split(';')
+    .map((s) => s.trim())
+    .filter((s) => s.length > 0);
+
+  for (const stmt of statements) {
+    await prisma.$executeRawUnsafe(stmt);
+  }
+}
 
 describe('CancellationRefundObligation Migration & Backfill (E2E)', () => {
   jest.setTimeout(60000);
@@ -54,6 +89,11 @@ describe('CancellationRefundObligation Migration & Backfill (E2E)', () => {
   });
 
   afterAll(async () => {
+    try {
+      await applyMigration(prisma);
+    } catch {
+      // Ignored if already applied
+    }
     await app.close();
   });
 
@@ -64,7 +104,11 @@ describe('CancellationRefundObligation Migration & Backfill (E2E)', () => {
     await prisma.paymentEvent.deleteMany({});
     await prisma.ledgerEntry.deleteMany({});
     await prisma.refund.deleteMany({});
-    await prisma.cancellationRefundObligation.deleteMany({});
+    try {
+      await prisma.cancellationRefundObligation.deleteMany({});
+    } catch {
+      // Ignored if table temporarily dropped
+    }
     await prisma.seatSelection.deleteMany({});
     await prisma.baggageSelectionSegment.deleteMany({});
     await prisma.baggageSelection.deleteMany({});
@@ -204,6 +248,183 @@ describe('CancellationRefundObligation Migration & Backfill (E2E)', () => {
       },
     });
   }
+
+  describe('Scenario 0: Pre-Migration Legacy Schema Upgrade Boundary & DDL Verification', () => {
+    it('applies DDL migration to pre-existing legacy database rows, verifies non-null defaults / constraints, and runs backfill end-to-end', async () => {
+      // 1. Revert schema to pre-migration state (simulate pre-migration PostgreSQL database)
+      await revertMigration(prisma);
+
+      // Verify pre-migration state: table and new columns do NOT exist
+      const tableCheck = await prisma.$queryRawUnsafe<Array<{ exists: boolean }>>(`
+        SELECT EXISTS (
+          SELECT FROM information_schema.tables 
+          WHERE table_name = 'cancellation_refund_obligations'
+        );
+      `);
+      expect(tableCheck[0].exists).toBe(false);
+
+      const refundColCheck = await prisma.$queryRawUnsafe<Array<{ exists: boolean }>>(`
+        SELECT EXISTS (
+          SELECT FROM information_schema.columns 
+          WHERE table_name = 'refunds' AND column_name = 'cancellationRefundObligationId'
+        );
+      `);
+      expect(refundColCheck[0].exists).toBe(false);
+
+      const ledgerColCheck = await prisma.$queryRawUnsafe<Array<{ exists: boolean }>>(`
+        SELECT EXISTS (
+          SELECT FROM information_schema.columns 
+          WHERE table_name = 'ledger_entries' AND column_name = 'refundTransactionId'
+        );
+      `);
+      expect(ledgerColCheck[0].exists).toBe(false);
+
+      // 2. Insert pre-migration legacy database fixtures using raw SQL (legacy schema only)
+      const legacyOfferId = crypto.randomUUID();
+      const legacyIntentId = crypto.randomUUID();
+      const legacyPayIdemId = crypto.randomUUID();
+      const legacyPaymentId = crypto.randomUUID();
+      const legacyBookingId = crypto.randomUUID();
+      const legacyRefundIdemId = crypto.randomUUID();
+      const legacyRefundId = crypto.randomUUID();
+      const legacyTxId = `tx_legacy_${crypto.randomUUID()}`;
+      const legacyPayTxId = `tx_pay_auth_${crypto.randomUUID()}`;
+
+      // Insert Flight Offer
+      await prisma.$executeRawUnsafe(`
+        INSERT INTO "flight_offers" ("id", "searchHash", "duffelOfferId", "rawOffer", "origin", "destination", "departureDate", "adults", "children", "infants", "cabin_class", "price", "currency", "createdAt")
+        VALUES ('${legacyOfferId}', 'search-legacy', 'off_legacy_${Date.now()}', '{}'::jsonb, 'SGN', 'HAN', '2027-08-01'::date, 1, 0, 0, 'economy', 150.00, 'USD', NOW());
+      `);
+
+      // Insert Booking Intent
+      await prisma.$executeRawUnsafe(`
+        INSERT INTO "booking_intents" ("id", "userId", "flightOfferId", "duffelOfferId", "status", "originalPrice", "confirmedPrice", "currency", "priceChanged", "pricedAt", "origin", "destination", "departureDate", "cabinClass", "adults", "children", "infants", "rawOfferSnapshot", "intentExpiresAt", "paymentAttemptCount", "createdAt", "updatedAt")
+        VALUES ('${legacyIntentId}', '${testUser.id}', '${legacyOfferId}', 'off_legacy_${Date.now()}', 'CONFIRMED'::"BookingIntentStatus", 150.00, 150.00, 'USD', false, NOW(), 'SGN', 'HAN', '2027-08-01'::date, 'economy', 1, 0, 0, '{}'::jsonb, NOW() + INTERVAL '1 hour', 1, NOW(), NOW());
+      `);
+
+      // Insert Payment Idempotency Key
+      await prisma.$executeRawUnsafe(`
+        INSERT INTO "idempotency_keys" ("id", "key", "requestHash", "customerId", "requestPath", "recoveryPoint", "createdAt", "expiresAt")
+        VALUES ('${legacyPayIdemId}', 'sc0-pay:${Date.now()}', '${crypto.randomBytes(16).toString('hex')}', '${testUser.id}', '/api/bookings/payment', 'completed', NOW(), NOW() + INTERVAL '1 day');
+      `);
+
+      // Insert Payment
+      await prisma.$executeRawUnsafe(`
+        INSERT INTO "payments" ("id", "bookingIntentId", "attemptNumber", "idempotencyKeyId", "stripePaymentIntentId", "amount", "currency", "status", "version", "createdAt", "updatedAt")
+        VALUES ('${legacyPaymentId}', '${legacyIntentId}', 1, '${legacyPayIdemId}', 'pi_legacy_${Date.now()}', 15000, 'USD', 'SUCCEEDED'::"PaymentStatus", 0, NOW(), NOW());
+      `);
+
+      // Insert Legacy Booking with Decimal amounts
+      await prisma.$executeRawUnsafe(`
+        INSERT INTO "bookings" ("id", "userId", "bookingIntentId", "paymentId", "totalAmount", "customerRefundAmount", "airlineRefundAmount", "currency", "status", "createdAt", "updatedAt")
+        VALUES ('${legacyBookingId}', '${testUser.id}', '${legacyIntentId}', '${legacyPaymentId}', 150.00, 123.45, 100.00, 'USD', 'CANCELLED_AND_REFUNDED'::"BookingStatus", NOW(), NOW());
+      `);
+
+      // Insert Refund Idempotency Key
+      await prisma.$executeRawUnsafe(`
+        INSERT INTO "idempotency_keys" ("id", "key", "requestHash", "customerId", "requestPath", "recoveryPoint", "createdAt", "expiresAt")
+        VALUES ('${legacyRefundIdemId}', 'sc0-ref:${Date.now()}', '${crypto.randomBytes(16).toString('hex')}', '${testUser.id}', '/api/bookings/payment/refund', 'started', NOW(), NOW() + INTERVAL '1 day');
+      `);
+
+      // Insert Legacy Refund (without cancellationRefundObligationId)
+      await prisma.$executeRawUnsafe(`
+        INSERT INTO "refunds" ("id", "paymentId", "bookingId", "idempotencyKeyId", "stripeRefundId", "amount", "currency", "status", "triggerType", "requiresReview", "retryCount", "createdAt", "updatedAt")
+        VALUES ('${legacyRefundId}', '${legacyPaymentId}', '${legacyBookingId}', '${legacyRefundIdemId}', 're_legacy_upgrade_${Date.now()}', 12345, 'USD', 'SUCCEEDED'::"RefundStatus", 'SYSTEM_AUTOMATED'::"RefundTriggerType", false, 0, NOW(), NOW());
+      `);
+
+      // Insert Legacy Ledger Entries (including both initial payment entries and refund reversal entries with duplicate (accountId, entryType))
+      await prisma.$executeRawUnsafe(`
+        INSERT INTO "ledger_entries" ("id", "paymentId", "transactionId", "accountId", "entryType", "amount", "currency", "createdAt")
+        VALUES
+          ('${crypto.randomUUID()}', '${legacyPaymentId}', '${legacyPayTxId}', 'PLATFORM_REVENUE', 'CREDIT'::"LedgerEntryType", 15000, 'USD', NOW() - INTERVAL '1 minute'),
+          ('${crypto.randomUUID()}', '${legacyPaymentId}', '${legacyPayTxId}', 'CUSTOMER_RECEIVABLE', 'DEBIT'::"LedgerEntryType", 15000, 'USD', NOW() - INTERVAL '1 minute'),
+          ('${crypto.randomUUID()}', '${legacyPaymentId}', '${legacyTxId}', 'PLATFORM_REVENUE', 'DEBIT'::"LedgerEntryType", 12345, 'USD', NOW()),
+          ('${crypto.randomUUID()}', '${legacyPaymentId}', '${legacyTxId}', 'CUSTOMER_RECEIVABLE', 'CREDIT'::"LedgerEntryType", 12345, 'USD', NOW());
+      `);
+
+      // 3. Execute the actual migration DDL script against populated legacy database
+      await applyMigration(prisma);
+
+      // 4. Assert DDL upgrade success & nullability semantics on legacy rows
+      const postTableCheck = await prisma.$queryRawUnsafe<Array<{ exists: boolean }>>(`
+        SELECT EXISTS (
+          SELECT FROM information_schema.tables 
+          WHERE table_name = 'cancellation_refund_obligations'
+        );
+      `);
+      expect(postTableCheck[0].exists).toBe(true);
+
+      const legacyRefundRow = await prisma.$queryRawUnsafe<Array<{ id: string; cancellationRefundObligationId: string | null }>>(`
+        SELECT id, "cancellationRefundObligationId" FROM "refunds" WHERE id = '${legacyRefundId}';
+      `);
+      expect(legacyRefundRow[0].cancellationRefundObligationId).toBeNull();
+
+      const legacyLedgerRows = await prisma.$queryRawUnsafe<Array<{ id: string; refundTransactionId: string | null }>>(`
+        SELECT id, "refundTransactionId" FROM "ledger_entries" WHERE "paymentId" = '${legacyPaymentId}';
+      `);
+      expect(legacyLedgerRows.length).toBe(4);
+      for (const row of legacyLedgerRows) {
+        expect(row.refundTransactionId).toBeNull();
+      }
+
+      // 5. Execute backfill on the upgraded database
+      const stats = await backfillCancellationRefundObligations({ prisma });
+      expect(stats.errors).toBe(0);
+      expect(stats.obligationsCreated).toBeGreaterThanOrEqual(1);
+      expect(stats.refundsLinked).toBeGreaterThanOrEqual(1);
+      expect(stats.ledgerEntriesLinked).toBeGreaterThanOrEqual(2);
+
+      // 6. Verify backfilled records via Prisma Client
+      const obligation = await prisma.cancellationRefundObligation.findUnique({
+        where: { bookingId: legacyBookingId },
+        include: { refunds: true },
+      });
+      expect(obligation).toBeDefined();
+      expect(obligation?.totalAmount).toBe(12345); // 123.45 -> 12345
+      expect(obligation?.airlineRefundAmount).toBe(10000); // 100.00 -> 10000
+      expect(obligation?.paymentId).toBe(legacyPaymentId);
+      expect(obligation?.refunds.length).toBe(1);
+      expect(obligation?.refunds[0].id).toBe(legacyRefundId);
+
+      const linkedEntries = await prisma.ledgerEntry.findMany({
+        where: { refundTransactionId: legacyRefundId },
+      });
+      expect(linkedEntries.length).toBe(2);
+      const debitEntry = linkedEntries.find((e) => e.entryType === LedgerEntryType.DEBIT);
+      const creditEntry = linkedEntries.find((e) => e.entryType === LedgerEntryType.CREDIT);
+      expect(debitEntry?.amount).toBe(12345);
+      expect(creditEntry?.amount).toBe(12345);
+
+      // 7. Verify migration-only constraints (CHECK constraints, foreign key restrictions)
+      // CHECK constraint: totalAmount >= 0
+      await expect(
+        prisma.$executeRawUnsafe(`
+          INSERT INTO "cancellation_refund_obligations" ("id", "bookingId", "paymentId", "totalAmount", "airlineRefundAmount", "currency", "createdAt", "updatedAt")
+          VALUES ('${crypto.randomUUID()}', '${legacyBookingId}-fake', '${legacyPaymentId}', -100, 0, 'USD', NOW(), NOW());
+        `),
+      ).rejects.toThrow();
+
+      // CHECK constraint: airlineRefundAmount >= 0
+      await expect(
+        prisma.$executeRawUnsafe(`
+          INSERT INTO "cancellation_refund_obligations" ("id", "bookingId", "paymentId", "totalAmount", "airlineRefundAmount", "currency", "createdAt", "updatedAt")
+          VALUES ('${crypto.randomUUID()}', '${legacyBookingId}-fake2', '${legacyPaymentId}', 100, -50, 'USD', NOW(), NOW());
+        `),
+      ).rejects.toThrow();
+
+      // Foreign key RESTRICT: cannot delete Payment when referenced by CancellationRefundObligation
+      await expect(
+        prisma.payment.delete({ where: { id: legacyPaymentId } }),
+      ).rejects.toThrow();
+
+      // Foreign key CASCADE: deleting Booking cascades to CancellationRefundObligation
+      await prisma.booking.delete({ where: { id: legacyBookingId } });
+      const deletedObligation = await prisma.cancellationRefundObligation.findUnique({
+        where: { id: obligation!.id },
+      });
+      expect(deletedObligation).toBeNull();
+    });
+  });
 
   describe('Scenario 1: Additive Schema Operability & Invariants', () => {
     it('supports CancellationRefundObligation linked to Booking and Payment, multiple Refunds per Obligation, and verifies ledger entry constraints', async () => {
