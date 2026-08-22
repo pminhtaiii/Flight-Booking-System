@@ -214,6 +214,7 @@ export class RefundTransactionService {
           triggerType: input.triggerType,
           triggeredByUserId: input.actorId ?? null,
           status: RefundStatus.REFUND_PENDING,
+          idempotencyKeyCreatedAt: new Date(),
         },
       });
 

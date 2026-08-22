@@ -1,19 +1,23 @@
 import 'reflect-metadata';
 import { Test, TestingModule } from '@nestjs/testing';
-import { BookingStatus, PaymentStatus } from '@prisma/client';
+import { BookingStatus, PaymentStatus, RefundStatus, RefundTriggerType } from '@prisma/client';
 import { PrismaService } from '@/prisma/prisma.service';
 import { StripeService } from '@/common/stripe.service';
 import { PaymentIdempotencyService } from '@/payment/payment-idempotency.service';
 import { AuditService } from '@/audit/audit.service';
+import { RefundTransactionService } from '../refund/refund-transaction.service';
+import { RefundSettlementService } from '../refund-settlement/refund-settlement.service';
 import { PaymentRefundService } from './payment-refund.service';
+import { ConflictException, ForbiddenException } from '@nestjs/common';
 
-describe('PaymentRefundService cancellation refunds', () => {
+describe('PaymentRefundService', () => {
   let service: PaymentRefundService;
   const prisma = {
     payment: { findUnique: jest.fn(), update: jest.fn(), updateMany: jest.fn() },
-    booking: { findUnique: jest.fn(), update: jest.fn(), updateMany: jest.fn() },
+    booking: { findUnique: jest.fn(), findUniqueOrThrow: jest.fn(), update: jest.fn(), updateMany: jest.fn() },
+    cancellationRefundObligation: { findUnique: jest.fn() },
     refund: { findFirst: jest.fn(), findUnique: jest.fn(), findMany: jest.fn(), create: jest.fn(), update: jest.fn(), updateMany: jest.fn() },
-    idempotencyKey: { findUnique: jest.fn() },
+    idempotencyKey: { findUnique: jest.fn(), create: jest.fn() },
     paymentEvent: { create: jest.fn() },
     ledgerEntry: { createMany: jest.fn() },
     $transaction: jest.fn(),
@@ -25,6 +29,8 @@ describe('PaymentRefundService cancellation refunds', () => {
     completeKey: jest.fn(),
   };
   const audit = { createLog: jest.fn() };
+  const refundTransactionService = { reserveTransaction: jest.fn() };
+  const refundSettlementService = { settleVerifiedOutcome: jest.fn() };
 
   beforeEach(async () => {
     jest.resetAllMocks();
@@ -35,6 +41,8 @@ describe('PaymentRefundService cancellation refunds', () => {
       id: 'payment-1',
       stripePaymentIntentId: 'pi_1',
       status: PaymentStatus.SUCCEEDED,
+      currency: 'usd',
+      amount: 12_500,
       bookingIntent: { userId: 'user-1' },
     });
     prisma.booking.findUnique.mockResolvedValue({
@@ -42,6 +50,7 @@ describe('PaymentRefundService cancellation refunds', () => {
       paymentId: 'payment-1',
       status: BookingStatus.CANCELLED_PENDING_REFUND,
     });
+    prisma.cancellationRefundObligation.findUnique.mockResolvedValue(null);
     prisma.idempotencyKey.findUnique.mockResolvedValue({ id: 'key-1' });
     prisma.refund.findFirst.mockResolvedValue(null);
     prisma.refund.create.mockResolvedValue({ id: 'refund-1' });
@@ -55,342 +64,506 @@ describe('PaymentRefundService cancellation refunds', () => {
         { provide: StripeService, useValue: stripe },
         { provide: PaymentIdempotencyService, useValue: idempotency },
         { provide: AuditService, useValue: audit },
+        { provide: RefundTransactionService, useValue: refundTransactionService },
+        { provide: RefundSettlementService, useValue: refundSettlementService },
       ],
     }).compile();
     service = module.get(PaymentRefundService);
   });
 
-  it('finalizes the refund, payment, booking, event, and balanced ledger atomically after Stripe succeeds', async () => {
-    stripe.createRefund.mockResolvedValue({ id: 're_1', status: 'succeeded' });
-
-    const result = await service.processCancellationRefund({
-      bookingId: 'booking-1',
-      paymentId: 'payment-1',
-      amount: 12_500,
-      currency: 'usd',
-    });
-
-    expect(result).toEqual({ refundStatus: 'SUCCEEDED', refundAmount: '125.00' });
-    expect(stripe.createRefund).toHaveBeenCalledWith('pi_1', 12_500, 'requested_by_customer', 'cancellation-refund:booking-1');
-    expect(prisma.refund.updateMany).toHaveBeenCalledWith(expect.objectContaining({
-      where: { id: 'refund-1', status: 'REFUND_PENDING' },
-      data: expect.objectContaining({ status: 'SUCCEEDED', stripeRefundId: 're_1' }),
-    }));
-    expect(prisma.payment.update).toHaveBeenCalledWith(expect.objectContaining({
-      where: { id: 'payment-1' },
-      data: expect.objectContaining({ status: PaymentStatus.REFUNDED }),
-    }));
-    expect(prisma.booking.update).toHaveBeenCalledWith({
-      where: { id: 'booking-1' },
-      data: { status: BookingStatus.CANCELLED_AND_REFUNDED },
-    });
-    expect(prisma.ledgerEntry.createMany).toHaveBeenCalledWith(expect.objectContaining({
-      data: [
-        expect.objectContaining({ accountId: 'PLATFORM_REVENUE', entryType: 'DEBIT', amount: 12_500 }),
-        expect.objectContaining({ accountId: 'CUSTOMER_RECEIVABLE', entryType: 'CREDIT', amount: 12_500 }),
-      ],
-    }));
-  });
-
-  it('retries only transient Stripe failures with the same deterministic idempotency key and leaves exhaustion pending', async () => {
-    stripe.createRefund
-      .mockRejectedValueOnce({ statusCode: 503, message: 'upstream unavailable' })
-      .mockRejectedValueOnce({ statusCode: 429, message: 'rate limited' })
-      .mockRejectedValueOnce({ statusCode: 500, message: 'upstream unavailable' })
-      .mockRejectedValueOnce({ statusCode: 503, message: 'upstream unavailable' });
-    jest.spyOn(service as unknown as { delay: (milliseconds: number) => Promise<void> }, 'delay').mockResolvedValue();
-
-    const result = await service.processCancellationRefund({
-      bookingId: 'booking-1',
-      paymentId: 'payment-1',
-      amount: 12_500,
-      currency: 'usd',
-    });
-
-    expect(result.refundStatus).toBe('REFUND_RETRY_SCHEDULED');
-    expect(result.nextRetryAt).toEqual(expect.any(String));
-    expect(stripe.createRefund).toHaveBeenCalledTimes(4);
-    expect(stripe.createRefund.mock.calls.map((call) => call[3])).toEqual([
-      'cancellation-refund:booking-1',
-      'cancellation-refund:booking-1',
-      'cancellation-refund:booking-1',
-      'cancellation-refund:booking-1',
-    ]);
-    expect(prisma.refund.update).not.toHaveBeenCalled();
-    expect(prisma.booking.update).not.toHaveBeenCalled();
-  });
-
-  it('marks a permanently rejected refund for attention and restores the payment state', async () => {
-    stripe.createRefund.mockRejectedValue({ statusCode: 400, message: 'invalid refund request' });
-
-    await expect(service.processCancellationRefund({
-      bookingId: 'booking-1',
-      paymentId: 'payment-1',
-      amount: 12_500,
-      currency: 'usd',
-    })).rejects.toEqual(expect.objectContaining({ statusCode: 400 }));
-
-    expect(prisma.refund.updateMany).toHaveBeenCalledWith({
-      where: { id: 'refund-1', status: 'REFUND_PENDING' },
-      data: { status: 'REFUND_FAILED_NEEDS_ATTENTION' },
-    });
-    expect(prisma.payment.updateMany).toHaveBeenCalledWith({
-      where: { id: 'payment-1', status: PaymentStatus.REFUND_PENDING },
-      data: { status: PaymentStatus.SUCCEEDED },
-    });
-    expect(prisma.paymentEvent.create).toHaveBeenCalledWith(expect.objectContaining({
-      data: expect.objectContaining({ eventType: 'cancellation_refund_failed' }),
-    }));
-    expect(prisma.booking.updateMany).toHaveBeenCalledWith({
-      where: { id: 'booking-1', status: 'CANCELLED_PENDING_REFUND' },
-      data: { status: 'REFUND_FAILED_NEEDS_ATTENTION' },
-    });
-  });
-
-  it('does not write ledger entries or events when a webhook already finalized the refund', async () => {
-    stripe.createRefund.mockResolvedValue({ id: 're_1', status: 'succeeded' });
-    prisma.refund.updateMany.mockResolvedValueOnce({ count: 0 });
-
-    await expect(service.processCancellationRefund({
-      bookingId: 'booking-1',
-      paymentId: 'payment-1',
-      amount: 12_500,
-      currency: 'usd',
-    })).resolves.toEqual({ refundStatus: 'SUCCEEDED', refundAmount: '125.00' });
-
-    expect(prisma.payment.update).not.toHaveBeenCalled();
-    expect(prisma.booking.update).not.toHaveBeenCalled();
-    expect(prisma.booking.updateMany).toHaveBeenCalledWith({
-      where: { id: 'booking-1', status: 'CANCELLED_PENDING_REFUND' },
-      data: { status: 'CANCELLED_AND_REFUNDED' },
-    });
-    expect(prisma.ledgerEntry.createMany).not.toHaveBeenCalled();
-    expect(prisma.paymentEvent.create).toHaveBeenCalledTimes(1);
-  });
-
-  it('escalates a stale cancellation refund before calling Stripe again', async () => {
-    prisma.refund.findUnique.mockResolvedValue({
-      id: 'refund-1',
-      status: 'REFUND_PROCESSING',
-      bookingId: 'booking-1',
-      paymentId: 'payment-1',
-      retryCount: 0,
-      amount: 12_500,
-      currency: 'usd',
-      idempotencyKeyCreatedAt: new Date(Date.now() - 22 * 60 * 60 * 1000),
-      payment: { id: 'payment-1', stripePaymentIntentId: 'pi_1' },
-      idempotencyKey: { key: 'cancellation-refund:booking-1' },
-    });
-    prisma.refund.updateMany.mockResolvedValue({ count: 1 });
-
-    await service.recoverScheduledCancellationRefund('refund-1');
-
-    expect(stripe.createRefund).not.toHaveBeenCalled();
-    expect(prisma.refund.updateMany).toHaveBeenCalledWith(expect.objectContaining({
-      where: { id: 'refund-1', status: 'REFUND_PROCESSING' },
-      data: expect.objectContaining({
-        status: 'REFUND_FAILED_NEEDS_ATTENTION',
-        lastErrorCode: 'IDEMPOTENCY_KEY_SAFETY_WINDOW',
-      }),
-    }));
-    expect(prisma.booking.updateMany).toHaveBeenCalledWith({
-      where: { id: 'booking-1', status: 'CANCELLED_PENDING_REFUND' },
-      data: { status: 'REFUND_FAILED_NEEDS_ATTENTION' },
-    });
-  });
-
-  it('requeues a transient worker failure for the next retry window without changing its Stripe key', async () => {
-    prisma.refund.findUnique.mockResolvedValue({
-      id: 'refund-1',
-      status: 'REFUND_PROCESSING',
-      bookingId: 'booking-1',
-      paymentId: 'payment-1',
-      retryCount: 0,
-      amount: 12_500,
-      currency: 'usd',
-      idempotencyKeyCreatedAt: new Date(),
-      payment: { id: 'payment-1', stripePaymentIntentId: 'pi_1' },
-      idempotencyKey: { key: 'cancellation-refund:booking-1' },
-    });
-    stripe.createRefund.mockRejectedValue({ statusCode: 503, message: 'unavailable' });
-    prisma.refund.updateMany.mockResolvedValue({ count: 1 });
-
-    await service.recoverScheduledCancellationRefund('refund-1');
-
-    expect(stripe.createRefund).toHaveBeenCalledWith(
-      'pi_1', 12_500, 'requested_by_customer', 'cancellation-refund:booking-1',
-    );
-    expect(prisma.refund.updateMany).toHaveBeenCalledWith(expect.objectContaining({
-      where: { id: 'refund-1', status: 'REFUND_PROCESSING' },
-      data: expect.objectContaining({
-        status: 'REFUND_RETRY_SCHEDULED',
-        retryCount: { increment: 1 },
-        nextRetryAt: expect.any(Date),
-        lastErrorCode: 'HTTP_503',
-      }),
-    }));
-  });
-
-  it('finalizes a CAS-claimed scheduled refund exactly once after Stripe succeeds', async () => {
-    prisma.refund.findUnique.mockResolvedValue({
-      id: 'refund-1',
-      status: 'REFUND_PROCESSING',
-      bookingId: 'booking-1',
-      paymentId: 'payment-1',
-      retryCount: 1,
-      amount: 12_500,
-      currency: 'usd',
-      idempotencyKeyCreatedAt: new Date(),
-      payment: { id: 'payment-1', stripePaymentIntentId: 'pi_1' },
-      idempotencyKey: { key: 'cancellation-refund:booking-1' },
-    });
-    stripe.createRefund.mockResolvedValue({ id: 're_1' });
-    prisma.refund.updateMany.mockResolvedValue({ count: 1 });
-
-    await service.recoverScheduledCancellationRefund('refund-1');
-
-    expect(prisma.refund.updateMany).toHaveBeenCalledWith({
-      where: { id: 'refund-1', status: 'REFUND_PROCESSING' },
-      data: { status: 'SUCCEEDED', stripeRefundId: 're_1', nextRetryAt: null },
-    });
-    expect(prisma.booking.updateMany).toHaveBeenCalledWith({
-      where: { id: 'booking-1', status: 'CANCELLED_PENDING_REFUND' },
-      data: { status: 'CANCELLED_AND_REFUNDED' },
-    });
-    expect(prisma.ledgerEntry.createMany).toHaveBeenCalledWith(expect.objectContaining({
-      data: [
-        expect.objectContaining({ accountId: 'PLATFORM_REVENUE', entryType: 'DEBIT', amount: 12_500 }),
-        expect.objectContaining({ accountId: 'CUSTOMER_RECEIVABLE', entryType: 'CREDIT', amount: 12_500 }),
-      ],
-    }));
-  });
-
-  it('records balanced accounting entries and a payment event when an admin confirms an external refund', async () => {
-    prisma.refund.findUnique.mockResolvedValue({
-      id: 'refund-1',
-      bookingId: 'booking-1',
-      paymentId: 'payment-1',
-      status: 'REFUND_FAILED_NEEDS_ATTENTION',
-      amount: 12_500,
-      currency: 'usd',
-    });
-
-    await service.resolveEscalatedCancellationRefund('refund-1', 'MARK_RESOLVED_MANUALLY');
-
-    expect(prisma.ledgerEntry.createMany).toHaveBeenCalledWith(expect.objectContaining({
-      data: [
-        expect.objectContaining({
-          paymentId: 'payment-1',
-          accountId: 'PLATFORM_REVENUE',
-          entryType: 'DEBIT',
-          amount: 12_500,
-          currency: 'usd',
-        }),
-        expect.objectContaining({
-          paymentId: 'payment-1',
-          accountId: 'CUSTOMER_RECEIVABLE',
-          entryType: 'CREDIT',
-          amount: 12_500,
-          currency: 'usd',
-        }),
-      ],
-    }));
-    expect(prisma.paymentEvent.create).toHaveBeenCalledWith({
-      data: expect.objectContaining({
+  describe('initiateRefund', () => {
+    it('reserves transaction and settles verified outcome on success', async () => {
+      refundTransactionService.reserveTransaction.mockResolvedValue({
+        id: 'refund-1',
         paymentId: 'payment-1',
-        eventType: 'cancellation_refund_manually_resolved',
-        previousStatus: PaymentStatus.SUCCEEDED,
-        newStatus: PaymentStatus.REFUNDED,
+        amount: 5000,
+        currency: 'usd',
+        status: RefundStatus.REFUND_PENDING,
+      });
+      stripe.createRefund.mockResolvedValue({ id: 're_stripe_1' });
+      refundSettlementService.settleVerifiedOutcome.mockResolvedValue({
+        applied: true,
+        transactionStatus: 'SUCCEEDED',
+        paymentStatus: PaymentStatus.PARTIALLY_REFUNDED,
+      });
+
+      const res = await service.initiateRefund(
+        'payment-1',
+        { amount: 5000, reason: 'customer_request' },
+        'idem-key-1',
+        'user-1',
+        'USER',
+      );
+
+      expect(refundTransactionService.reserveTransaction).toHaveBeenCalledWith(
+        expect.objectContaining({
+          paymentId: 'payment-1',
+          amount: 5000,
+          currency: 'usd',
+          reason: 'customer_request',
+          triggerType: RefundTriggerType.USER,
+          actorId: 'user-1',
+          idempotencyKey: 'refund:payment-1:idem-key-1',
+        }),
+      );
+      expect(stripe.createRefund).toHaveBeenCalledWith(
+        'pi_1',
+        5000,
+        'customer_request',
+        'idem-key-1-stripe-refund',
+      );
+      expect(prisma.refund.update).toHaveBeenCalledWith({
+        where: { id: 'refund-1' },
+        data: { stripeRefundId: 're_stripe_1' },
+      });
+      expect(res).toEqual({
+        refundId: 'refund-1',
+        paymentId: 'payment-1',
+        amount: 5000,
+        currency: 'usd',
+        status: RefundStatus.REFUND_PENDING,
+        triggerType: RefundTriggerType.USER,
+      });
+    });
+
+    it('rejects if non-admin user does not own the payment', async () => {
+      await expect(
+        service.initiateRefund(
+          'payment-1',
+          { amount: 5000, reason: 'customer_request' },
+          'idem-key-1',
+          'other-user',
+          'USER',
+        ),
+      ).rejects.toThrow(ForbiddenException);
+    });
+
+    it('settles failure outcome if Stripe call throws', async () => {
+      refundTransactionService.reserveTransaction.mockResolvedValue({
+        id: 'refund-1',
+        amount: 5000,
+        currency: 'usd',
+        status: RefundStatus.REFUND_PENDING,
+      });
+      stripe.createRefund.mockRejectedValue(new Error('Stripe card declined'));
+      refundSettlementService.settleVerifiedOutcome.mockResolvedValue({
+        applied: true,
+        transactionStatus: 'FAILED',
+        paymentStatus: PaymentStatus.SUCCEEDED,
+      });
+
+      await expect(
+        service.initiateRefund(
+          'payment-1',
+          { amount: 5000, reason: 'customer_request' },
+          'idem-key-1',
+          'user-1',
+          'USER',
+        ),
+      ).rejects.toThrow('Stripe card declined');
+
+      expect(refundSettlementService.settleVerifiedOutcome).toHaveBeenCalledWith(
+        expect.objectContaining({
+          transactionId: 'refund-1',
+          outcome: expect.objectContaining({
+            status: 'FAILED',
+          }),
+          provenance: expect.objectContaining({
+            source: 'INLINE',
+            actorId: 'user-1',
+          }),
+        }),
+      );
+    });
+  });
+
+  describe('triggerAutomatedRefund', () => {
+    it('reserves and settles automated refund cleanly', async () => {
+      prisma.refund.findMany.mockResolvedValue([]);
+      refundTransactionService.reserveTransaction.mockResolvedValue({
+        id: 'refund-auto-1',
         amount: 12_500,
-        source: 'API',
-        createdBy: 'admin_refund_resolution',
-      }),
+        currency: 'usd',
+        status: RefundStatus.REFUND_PENDING,
+      });
+      stripe.createRefund.mockResolvedValue({ id: 're_auto_1' });
+      refundSettlementService.settleVerifiedOutcome.mockResolvedValue({
+        applied: true,
+        transactionStatus: 'SUCCEEDED',
+        paymentStatus: PaymentStatus.REFUNDED,
+      });
+
+      const res = await service.triggerAutomatedRefund('payment-1', 'duffel_booking_failed');
+
+      expect(refundTransactionService.reserveTransaction).toHaveBeenCalledWith(
+        expect.objectContaining({
+          paymentId: 'payment-1',
+          amount: 12_500,
+          currency: 'usd',
+          reason: 'duffel_booking_failed',
+          triggerType: RefundTriggerType.SYSTEM_AUTOMATED,
+          idempotencyKey: 'refund:payment-1:duffel_booking_failed:1',
+        }),
+      );
+      expect(res.status).toBe('SUCCEEDED');
     });
   });
 
-  it('does not apply a manual resolution when another admin already claimed the refund', async () => {
-    prisma.refund.findUnique.mockResolvedValue({
-      id: 'refund-1',
-      bookingId: 'booking-1',
-      paymentId: 'payment-1',
-      status: 'REFUND_FAILED_NEEDS_ATTENTION',
-      amount: 12_500,
-      currency: 'usd',
+  describe('processCancellationRefund', () => {
+    it('reserves transaction and settles verified outcome on Stripe success', async () => {
+      refundTransactionService.reserveTransaction.mockResolvedValue({
+        id: 'refund-1',
+        status: RefundStatus.REFUND_PENDING,
+      });
+      stripe.createRefund.mockResolvedValue({ id: 're_1' });
+      refundSettlementService.settleVerifiedOutcome.mockResolvedValue({
+        applied: true,
+        transactionStatus: 'SUCCEEDED',
+        paymentStatus: PaymentStatus.REFUNDED,
+        bookingStatus: BookingStatus.CANCELLED_AND_REFUNDED,
+      });
+
+      const result = await service.processCancellationRefund({
+        bookingId: 'booking-1',
+        paymentId: 'payment-1',
+        amount: 12_500,
+        currency: 'usd',
+      });
+
+      expect(result).toEqual({ refundStatus: 'SUCCEEDED', refundAmount: '125.00' });
+      expect(refundTransactionService.reserveTransaction).toHaveBeenCalledWith(
+        expect.objectContaining({
+          paymentId: 'payment-1',
+          amount: 12_500,
+          currency: 'usd',
+          reason: 'cancellation:booking-1',
+          triggerType: RefundTriggerType.SYSTEM_AUTOMATED,
+          idempotencyKey: 'cancellation-refund:booking-1:1',
+        }),
+      );
+      expect(stripe.createRefund).toHaveBeenCalledWith(
+        'pi_1',
+        12_500,
+        'requested_by_customer',
+        'cancellation-refund:booking-1:1',
+      );
+      expect(refundSettlementService.settleVerifiedOutcome).toHaveBeenCalledWith(
+        expect.objectContaining({
+          transactionId: 'refund-1',
+          money: { amount: 12_500, currency: 'usd' },
+          outcome: expect.objectContaining({
+            status: 'SUCCEEDED',
+            providerReference: 're_1',
+          }),
+          provenance: expect.objectContaining({
+            source: 'INLINE',
+          }),
+        }),
+      );
     });
-    prisma.refund.updateMany.mockResolvedValueOnce({ count: 0 });
 
-    await expect(
-      service.resolveEscalatedCancellationRefund('refund-1', 'MARK_RESOLVED_MANUALLY'),
-    ).rejects.toThrow('Refund is not awaiting manual resolution');
+    it('schedules retry when transient retries are exhausted', async () => {
+      refundTransactionService.reserveTransaction.mockResolvedValue({
+        id: 'refund-1',
+        status: RefundStatus.REFUND_PENDING,
+      });
+      stripe.createRefund
+        .mockRejectedValueOnce({ statusCode: 503, message: 'upstream unavailable' })
+        .mockRejectedValueOnce({ statusCode: 429, message: 'rate limited' })
+        .mockRejectedValueOnce({ statusCode: 500, message: 'upstream unavailable' })
+        .mockRejectedValueOnce({ statusCode: 503, message: 'upstream unavailable' });
+      jest.spyOn(service as unknown as { delay: (milliseconds: number) => Promise<void> }, 'delay').mockResolvedValue();
 
-    expect(prisma.payment.update).not.toHaveBeenCalled();
-    expect(prisma.booking.update).not.toHaveBeenCalled();
-    expect(prisma.ledgerEntry.createMany).not.toHaveBeenCalled();
-    expect(prisma.paymentEvent.create).not.toHaveBeenCalled();
-    expect(audit.createLog).not.toHaveBeenCalled();
+      const result = await service.processCancellationRefund({
+        bookingId: 'booking-1',
+        paymentId: 'payment-1',
+        amount: 12_500,
+        currency: 'usd',
+      });
+
+      expect(result.refundStatus).toBe('REFUND_RETRY_SCHEDULED');
+      expect(result.nextRetryAt).toEqual(expect.any(String));
+      expect(stripe.createRefund).toHaveBeenCalledTimes(4);
+      expect(prisma.refund.updateMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: 'refund-1', status: RefundStatus.REFUND_PENDING },
+          data: expect.objectContaining({ status: RefundStatus.REFUND_RETRY_SCHEDULED }),
+        }),
+      );
+      expect(refundSettlementService.settleVerifiedOutcome).not.toHaveBeenCalled();
+    });
+
+    it('settles failure outcome on non-transient Stripe failure and throws', async () => {
+      refundTransactionService.reserveTransaction.mockResolvedValue({
+        id: 'refund-1',
+        status: RefundStatus.REFUND_PENDING,
+      });
+      stripe.createRefund.mockRejectedValue({ statusCode: 400, message: 'invalid request' });
+
+      await expect(
+        service.processCancellationRefund({
+          bookingId: 'booking-1',
+          paymentId: 'payment-1',
+          amount: 12_500,
+          currency: 'usd',
+        }),
+      ).rejects.toEqual(expect.objectContaining({ statusCode: 400 }));
+
+      expect(refundSettlementService.settleVerifiedOutcome).toHaveBeenCalledWith(
+        expect.objectContaining({
+          transactionId: 'refund-1',
+          outcome: expect.objectContaining({
+            status: 'FAILED',
+            errorCode: 'REFUND_FAILED_NEEDS_ATTENTION',
+          }),
+          provenance: expect.objectContaining({ source: 'INLINE' }),
+        }),
+      );
+    });
   });
 
-  it('transitions associated CANCELLED_PENDING_REFUND bookings to CANCELLED_AND_REFUNDED upon charge.refunded webhook completion', async () => {
-    prisma.payment.findUnique.mockResolvedValue({
-      id: 'payment-1',
-      stripePaymentIntentId: 'pi_1',
-      status: PaymentStatus.REFUND_PENDING,
-      amount: 10000,
-      currency: 'usd',
+  describe('recoverScheduledCancellationRefund', () => {
+    it('escalates unsafe idempotency key to failed settlement without calling Stripe', async () => {
+      prisma.refund.findUnique.mockResolvedValue({
+        id: 'refund-1',
+        status: RefundStatus.REFUND_PROCESSING,
+        bookingId: 'booking-1',
+        paymentId: 'payment-1',
+        retryCount: 0,
+        amount: 12_500,
+        currency: 'usd',
+        idempotencyKeyCreatedAt: new Date(Date.now() - 23 * 60 * 60 * 1000),
+        payment: { id: 'payment-1', stripePaymentIntentId: 'pi_1', currency: 'usd' },
+        idempotencyKey: { key: 'cancellation-refund:booking-1:1' },
+      });
+
+      await service.recoverScheduledCancellationRefund('refund-1');
+
+      expect(stripe.createRefund).not.toHaveBeenCalled();
+      expect(refundSettlementService.settleVerifiedOutcome).toHaveBeenCalledWith(
+        expect.objectContaining({
+          transactionId: 'refund-1',
+          outcome: expect.objectContaining({
+            status: 'FAILED',
+            errorCode: 'IDEMPOTENCY_KEY_SAFETY_WINDOW',
+          }),
+          provenance: expect.objectContaining({ source: 'CRON' }),
+        }),
+      );
     });
-    prisma.refund.findMany
-      .mockResolvedValueOnce([
+
+    it('settles success outcome via CRON provenance after Stripe succeeds', async () => {
+      prisma.refund.findUnique.mockResolvedValue({
+        id: 'refund-1',
+        status: RefundStatus.REFUND_PROCESSING,
+        bookingId: 'booking-1',
+        paymentId: 'payment-1',
+        retryCount: 1,
+        amount: 12_500,
+        currency: 'usd',
+        idempotencyKeyCreatedAt: new Date(),
+        payment: { id: 'payment-1', stripePaymentIntentId: 'pi_1', currency: 'usd' },
+        idempotencyKey: { key: 'cancellation-refund:booking-1:1' },
+      });
+      stripe.createRefund.mockResolvedValue({ id: 're_cron_1' });
+
+      await service.recoverScheduledCancellationRefund('refund-1');
+
+      expect(stripe.createRefund).toHaveBeenCalledWith(
+        'pi_1',
+        12_500,
+        'requested_by_customer',
+        'cancellation-refund:booking-1:1',
+      );
+      expect(refundSettlementService.settleVerifiedOutcome).toHaveBeenCalledWith(
+        expect.objectContaining({
+          transactionId: 'refund-1',
+          outcome: expect.objectContaining({
+            status: 'SUCCEEDED',
+            providerReference: 're_cron_1',
+          }),
+          provenance: expect.objectContaining({ source: 'CRON' }),
+        }),
+      );
+    });
+
+    it('requeues transient error when retryCount < 3', async () => {
+      prisma.refund.findUnique.mockResolvedValue({
+        id: 'refund-1',
+        status: RefundStatus.REFUND_PROCESSING,
+        bookingId: 'booking-1',
+        paymentId: 'payment-1',
+        retryCount: 0,
+        amount: 12_500,
+        currency: 'usd',
+        idempotencyKeyCreatedAt: new Date(),
+        payment: { id: 'payment-1', stripePaymentIntentId: 'pi_1', currency: 'usd' },
+        idempotencyKey: { key: 'cancellation-refund:booking-1:1' },
+      });
+      stripe.createRefund.mockRejectedValue({ statusCode: 503, message: 'unavailable' });
+
+      await service.recoverScheduledCancellationRefund('refund-1');
+
+      expect(prisma.refund.updateMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: 'refund-1', status: RefundStatus.REFUND_PROCESSING },
+          data: expect.objectContaining({
+            status: RefundStatus.REFUND_RETRY_SCHEDULED,
+            retryCount: { increment: 1 },
+            lastErrorCode: 'HTTP_503',
+          }),
+        }),
+      );
+      expect(refundSettlementService.settleVerifiedOutcome).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('resolveEscalatedCancellationRefund', () => {
+    it('settles manual resolution with ADMIN provenance and actorId', async () => {
+      prisma.refund.findUnique.mockResolvedValue({
+        id: 'refund-1',
+        bookingId: 'booking-1',
+        paymentId: 'payment-1',
+        status: RefundStatus.REFUND_FAILED_NEEDS_ATTENTION,
+        amount: 12_500,
+        currency: 'usd',
+      });
+      refundSettlementService.settleVerifiedOutcome.mockResolvedValue({
+        applied: true,
+        transactionStatus: 'SUCCEEDED',
+        paymentStatus: PaymentStatus.REFUNDED,
+        bookingStatus: BookingStatus.CANCELLED_AND_REFUNDED,
+      });
+
+      const res = await service.resolveEscalatedCancellationRefund(
+        'refund-1',
+        'MARK_RESOLVED_MANUALLY',
+        'admin-user-1',
+      );
+
+      expect(refundSettlementService.settleVerifiedOutcome).toHaveBeenCalledWith(
+        expect.objectContaining({
+          transactionId: 'refund-1',
+          money: { amount: 12_500, currency: 'usd' },
+          outcome: expect.objectContaining({
+            status: 'SUCCEEDED',
+            providerReference: 'MANUAL_ADMIN_OVERRIDE',
+          }),
+          provenance: expect.objectContaining({
+            source: 'ADMIN',
+            actorId: 'admin-user-1',
+          }),
+        }),
+      );
+      expect(res).toEqual({
+        refundId: 'refund-1',
+        refundStatus: 'SUCCEEDED',
+        bookingStatus: BookingStatus.CANCELLED_AND_REFUNDED,
+      });
+      expect(audit.createLog).toHaveBeenCalledWith(
+        null,
+        expect.objectContaining({
+          userId: 'admin-user-1',
+          action: 'CANCELLATION_REFUND_MANUALLY_RESOLVED',
+          resourceId: 'refund-1',
+        }),
+      );
+    });
+
+    it('rejects MARK_RESOLVED_MANUALLY if refund is not in REFUND_FAILED_NEEDS_ATTENTION', async () => {
+      prisma.refund.findUnique.mockResolvedValue({
+        id: 'refund-1',
+        bookingId: 'booking-1',
+        paymentId: 'payment-1',
+        status: RefundStatus.SUCCEEDED,
+        amount: 12_500,
+        currency: 'usd',
+      });
+
+      await expect(
+        service.resolveEscalatedCancellationRefund('refund-1', 'MARK_RESOLVED_MANUALLY', 'admin-1'),
+      ).rejects.toThrow(ConflictException);
+    });
+
+    it('handles RETRY_WITH_FRESH_KEY cleanly', async () => {
+      prisma.refund.findUnique.mockResolvedValue({
+        id: 'refund-1',
+        bookingId: 'booking-1',
+        paymentId: 'payment-1',
+        status: RefundStatus.REFUND_FAILED_NEEDS_ATTENTION,
+        amount: 12_500,
+        currency: 'usd',
+      });
+      prisma.booking.findUniqueOrThrow.mockResolvedValue({ userId: 'user-1' });
+      prisma.idempotencyKey.create.mockResolvedValue({ id: 'new-key-1' });
+      prisma.refund.updateMany.mockResolvedValue({ count: 1 });
+      prisma.booking.update.mockResolvedValue({ id: 'booking-1' });
+
+      const res = await service.resolveEscalatedCancellationRefund(
+        'refund-1',
+        'RETRY_WITH_FRESH_KEY',
+        'admin-1',
+      );
+
+      expect(res.refundStatus).toBe(RefundStatus.REFUND_RETRY_SCHEDULED);
+      expect(res.bookingStatus).toBe(BookingStatus.CANCELLED_PENDING_REFUND);
+    });
+  });
+
+  describe('handleChargeRefunded webhook', () => {
+    it('settles verified outcome with WEBHOOK provenance for matching refund rows', async () => {
+      prisma.payment.findUnique.mockResolvedValue({
+        id: 'payment-1',
+        stripePaymentIntentId: 'pi_1',
+        currency: 'usd',
+      });
+      prisma.refund.findMany.mockResolvedValue([
         {
           id: 'refund-1',
-          paymentId: 'payment-1',
-          status: 'REFUND_PENDING',
-          stripeRefundId: 're_1',
-          bookingId: 'booking-1',
           amount: 10000,
+          stripeRefundId: 're_stripe_wh_1',
         },
-      ])
-      .mockResolvedValueOnce([
-        { amount: 10000 },
       ]);
-    prisma.refund.updateMany.mockResolvedValue({ count: 1 });
-    prisma.payment.update.mockResolvedValue({ id: 'payment-1' });
-    prisma.booking.updateMany.mockResolvedValue({ count: 1 });
-    prisma.ledgerEntry.createMany.mockResolvedValue({ count: 2 });
-    prisma.paymentEvent.create.mockResolvedValue({ id: 'evt-1' });
+      refundSettlementService.settleVerifiedOutcome.mockResolvedValue({
+        applied: true,
+        transactionStatus: 'SUCCEEDED',
+        paymentStatus: PaymentStatus.REFUNDED,
+        bookingStatus: BookingStatus.CANCELLED_AND_REFUNDED,
+      });
 
-    const webhookEvent = {
-      id: 'evt_stripe_1',
-      type: 'charge.refunded',
-      data: {
-        object: {
-          payment_intent: 'pi_1',
-          amount_refunded: 10000,
-          refunds: {
-            data: [{ id: 're_1', amount: 10000 }],
+      const event = {
+        id: 'evt_stripe_wh_1',
+        type: 'charge.refunded',
+        data: {
+          object: {
+            payment_intent: 'pi_1',
+            refunds: {
+              data: [{ id: 're_stripe_wh_1', amount: 10000 }],
+            },
           },
         },
-      },
-    };
+      };
 
-    await service.handleChargeRefunded(webhookEvent);
+      await service.handleChargeRefunded(event);
 
-    expect(prisma.booking.updateMany).toHaveBeenCalledWith({
-      where: {
-        id: { in: ['booking-1'] },
-        status: BookingStatus.CANCELLED_PENDING_REFUND,
-      },
-      data: { status: BookingStatus.CANCELLED_AND_REFUNDED },
+      expect(refundSettlementService.settleVerifiedOutcome).toHaveBeenCalledWith(
+        expect.objectContaining({
+          transactionId: 'refund-1',
+          money: { amount: 10000, currency: 'usd' },
+          outcome: expect.objectContaining({
+            status: 'SUCCEEDED',
+            providerReference: 're_stripe_wh_1',
+          }),
+          provenance: expect.objectContaining({
+            source: 'WEBHOOK',
+            externalEventId: 'evt_stripe_wh_1',
+            metadata: {
+              paymentIntentId: 'pi_1',
+              stripeRefundId: 're_stripe_wh_1',
+            },
+          }),
+        }),
+      );
     });
-    expect(prisma.booking.updateMany).toHaveBeenCalledWith({
-      where: {
-        paymentId: 'payment-1',
-        status: BookingStatus.CANCELLED_PENDING_REFUND,
-      },
-      data: { status: BookingStatus.CANCELLED_AND_REFUNDED },
-    });
-    expect(prisma.payment.update).toHaveBeenCalledWith(expect.objectContaining({
-      where: { id: 'payment-1' },
-      data: { status: PaymentStatus.REFUNDED },
-    }));
   });
 });

@@ -188,6 +188,7 @@ describe('RefundSettlementService', () => {
         data: {
           status: RefundStatus.SUCCEEDED,
           stripeRefundId: 're_stripe_123',
+          nextRetryAt: null,
           updatedAt: new Date('2026-08-22T10:00:00.000Z'),
         },
       });
@@ -205,7 +206,7 @@ describe('RefundSettlementService', () => {
       expect(mockTx.paymentEvent.create).toHaveBeenCalledWith({
         data: {
           paymentId: 'pay_123',
-          eventType: 'refund_settled',
+          eventType: 'charge.refunded',
           previousStatus: PaymentStatus.REFUND_PENDING,
           newStatus: PaymentStatus.REFUNDED,
           amount: 20000,
