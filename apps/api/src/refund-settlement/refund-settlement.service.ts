@@ -265,17 +265,15 @@ export class RefundSettlementService {
             });
           }
         } else if (refund.bookingId) {
-          if (finalPaymentStatus === PaymentStatus.REFUNDED) {
-            finalBookingStatus = BookingStatus.CANCELLED_AND_REFUNDED;
-            await tx.booking.updateMany({
-              where: { id: refund.bookingId, status: BookingStatus.CANCELLED_PENDING_REFUND },
-              data: { status: BookingStatus.CANCELLED_AND_REFUNDED },
-            });
-            await tx.booking.updateMany({
-              where: { paymentId: refund.paymentId, status: BookingStatus.CANCELLED_PENDING_REFUND },
-              data: { status: BookingStatus.CANCELLED_AND_REFUNDED },
-            });
-          }
+          finalBookingStatus = BookingStatus.CANCELLED_AND_REFUNDED;
+          await tx.booking.updateMany({
+            where: { id: refund.bookingId, status: BookingStatus.CANCELLED_PENDING_REFUND },
+            data: { status: BookingStatus.CANCELLED_AND_REFUNDED },
+          });
+          await tx.booking.updateMany({
+            where: { paymentId: refund.paymentId, status: BookingStatus.CANCELLED_PENDING_REFUND },
+            data: { status: BookingStatus.CANCELLED_AND_REFUNDED },
+          });
         }
 
         await this.auditService.createLog(tx, {
@@ -315,7 +313,9 @@ export class RefundSettlementService {
 
       const targetStatus =
         input.outcome.errorCode === 'REFUND_FAILED_NEEDS_ATTENTION' ||
-        input.outcome.errorCode.includes('ATTENTION')
+        input.outcome.errorCode === 'IDEMPOTENCY_KEY_SAFETY_WINDOW' ||
+        input.outcome.errorCode?.includes('ATTENTION') ||
+        input.outcome.errorCode?.includes('SAFETY_WINDOW')
           ? RefundStatus.REFUND_FAILED_NEEDS_ATTENTION
           : RefundStatus.FAILED;
 
@@ -327,6 +327,23 @@ export class RefundSettlementService {
           lastErrorAt: new Date(input.outcome.occurredAt),
         },
       });
+
+      let finalBookingStatus: BookingStatus | undefined = booking?.status;
+      if (targetStatus === RefundStatus.REFUND_FAILED_NEEDS_ATTENTION) {
+        finalBookingStatus = BookingStatus.REFUND_FAILED_NEEDS_ATTENTION;
+        if (refund.bookingId) {
+          await tx.booking.updateMany({
+            where: { id: refund.bookingId },
+            data: { status: BookingStatus.REFUND_FAILED_NEEDS_ATTENTION },
+          });
+        }
+        if (refund.cancellationRefundObligation?.bookingId) {
+          await tx.booking.updateMany({
+            where: { id: refund.cancellationRefundObligation.bookingId },
+            data: { status: BookingStatus.REFUND_FAILED_NEEDS_ATTENTION },
+          });
+        }
+      }
 
       const activeOtherRefunds = await tx.refund.findMany({
         where: {
@@ -421,7 +438,7 @@ export class RefundSettlementService {
         applied: true,
         transactionStatus: targetStatus,
         paymentStatus: finalPaymentStatus,
-        bookingStatus: booking?.status,
+        bookingStatus: finalBookingStatus,
       };
     });
   }

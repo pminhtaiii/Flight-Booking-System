@@ -28,6 +28,7 @@ describe('RefundSettlementService', () => {
     };
     booking: {
       update: jest.Mock;
+      updateMany: jest.Mock;
     };
     ledgerEntry: {
       create: jest.Mock;
@@ -59,6 +60,7 @@ describe('RefundSettlementService', () => {
       },
       booking: {
         update: jest.fn(),
+        updateMany: jest.fn(),
       },
       ledgerEntry: {
         create: jest.fn(),
@@ -627,7 +629,7 @@ describe('RefundSettlementService', () => {
         applied: true,
         transactionStatus: 'REFUND_FAILED_NEEDS_ATTENTION',
         paymentStatus: PaymentStatus.PARTIALLY_REFUNDED,
-        bookingStatus: BookingStatus.CANCELLED_PENDING_REFUND,
+        bookingStatus: BookingStatus.REFUND_FAILED_NEEDS_ATTENTION,
       });
 
       expect(mockTx.refund.update).toHaveBeenCalledWith({

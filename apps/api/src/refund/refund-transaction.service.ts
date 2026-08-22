@@ -5,6 +5,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import {
+  PaymentEventSource,
   PaymentStatus,
   Refund,
   RefundStatus,
@@ -217,6 +218,32 @@ export class RefundTransactionService {
           idempotencyKeyCreatedAt: new Date(),
         },
       });
+
+      if (
+        payment.status !== PaymentStatus.REFUND_PENDING &&
+        payment.status !== PaymentStatus.DISPUTED &&
+        payment.status !== PaymentStatus.CHARGEBACK_LOST
+      ) {
+        await tx.payment.update({
+          where: { id: payment.id },
+          data: { status: PaymentStatus.REFUND_PENDING },
+        });
+
+        await tx.paymentEvent.create({
+          data: {
+            paymentId: payment.id,
+            eventType: 'refund_initiated',
+            previousStatus: payment.status,
+            newStatus: PaymentStatus.REFUND_PENDING,
+            amount: input.amount,
+            source:
+              input.triggerType === RefundTriggerType.SYSTEM_AUTOMATED
+                ? PaymentEventSource.SYSTEM
+                : PaymentEventSource.API,
+            createdBy: input.actorId || 'system',
+          },
+        });
+      }
 
       this.logger.log({
         message: 'Refund transaction reserved',

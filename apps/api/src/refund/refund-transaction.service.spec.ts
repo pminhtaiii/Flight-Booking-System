@@ -17,6 +17,10 @@ describe('RefundTransactionService', () => {
     $queryRaw: jest.fn(),
     payment: {
       findUnique: jest.fn(),
+      update: jest.fn(),
+    },
+    paymentEvent: {
+      create: jest.fn(),
     },
     user: {
       findFirst: jest.fn(),

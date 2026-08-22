@@ -7,13 +7,38 @@ Update this file after every completed feature. Any AI agent reading this should
 ### Current Status
 
 **Feature:** Deepen Codebase Architecture (Feature 019)
-**Last completed:** Slice 1B: Add Reservation & Provider-Blind Settlement Modules (2026-08-22).
+**Last completed:** Slice 1C: Convert All Refund Trigger Paths to Unified Settlement (2026-08-22).
 **In progress:** None.
-**Next:** Slice 1C: Convert trigger paths to RefundSettlementService.
+**Next:** Slice 1D: Contract Schema (remove legacy refund/booking fields).
 
 ---
 
 ## Progress by Feature
+
+### [x] Feature: Deepen Codebase Architecture (Feature 019) — Slice 1C: Convert All Refund Trigger Paths to Unified Settlement
+
+- [x] Slice 1C / Convert All Refund Trigger Paths to Unified Settlement (2026-08-22):
+  - **Converted Trigger 1 (Inline Cancellation Refund)**:
+    - `PaymentRefundService.processCancellationRefund()`: Looks up `CancellationRefundObligation`, reserves transaction with transaction-scoped key (`cancellation-refund:${obligation?.id || bookingId}:1`), executes Stripe refund outside DB locks, and settles verified outcome via `RefundSettlementService.settleVerifiedOutcome({ provenance: { source: 'INLINE' } })`.
+  - **Converted Trigger 2 (Stripe Webhook)**:
+    - `PaymentWebhookService.handleChargeRefunded()`: Processes incoming `charge.refunded` webhook events, matches existing `Refund` record or late-binds pending refund, and invokes `RefundSettlementService.settleVerifiedOutcome({ provenance: { source: 'WEBHOOK', externalEventId } })` to atomically generate double-entry ledger entries and project terminal payment/booking states.
+  - **Converted Trigger 3 (Background Cron Sweeper)**:
+    - `PaymentCronService.handleCancellationRefundRecovery()` & `PaymentRefundService.recoverScheduledCancellationRefund()`: Claims lease on stale/retryable refund records, calls Stripe safely outside locks, and delegates all terminal outcomes (success, retry escalation, permanent failure) to `RefundSettlementService.settleVerifiedOutcome({ provenance: { source: 'CRON' } })`.
+  - **Converted Trigger 4 (Admin Manual Resolution)**:
+    - `AdminRefundController.resolveRefund()` & `PaymentRefundService.resolveEscalatedCancellationRefund()`: Injects `@Req() req` for audit actor attribution (`req.user?.id`), validates manual resolution action, and invokes `RefundSettlementService.settleVerifiedOutcome({ provenance: { source: 'ADMIN', actorId } })` to settle terminal state with double-entry ledger entries.
+  - **Unified Transaction-Specific Idempotency**:
+    - Replaced monolithic `cancellation-refund:{bookingId}` with transaction-specific idempotency keys across reservation and Stripe provider calls.
+  - **Verification & Test Suites (100% Green)**:
+    - `payment-refund.service.spec.ts`: 14/14 PASS.
+    - `payment-webhook.service.spec.ts`: 11/11 PASS.
+    - `payment-cron.service.spec.ts`: 7/7 PASS.
+    - `admin-refund.controller.spec.ts`: 2/2 PASS.
+    - `refund-transaction.service.spec.ts`: 15/15 PASS.
+    - `refund-settlement.service.spec.ts`: 12/12 PASS.
+    - `test/characterization/refund-characterization.e2e-spec.ts`: 11/11 E2E tests PASS.
+    - `test/refund-settlement.e2e-spec.ts`: 12/12 E2E tests PASS.
+    - Full API Unit Suite: 78/78 suites (793/793 tests) PASS.
+    - ESLint: 0 errors / 0 warnings; Typecheck: 0 errors; Web typecheck: 0 errors; Agent ruff: 0 errors.
 
 ### [x] Feature: Deepen Codebase Architecture (Feature 019) — Slice 1B: Add Reservation & Provider-Blind Settlement Modules
 
