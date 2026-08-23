@@ -83,6 +83,68 @@ describe('BookingService', () => {
     expect(bookingManagementService.getBookingDetail).toHaveBeenCalledWith('booking-1', 'user-1');
   });
 
+  it('delegates getCancellationStatus to cancellationService when available', async () => {
+    const cancellationService = {
+      getCancellationStatus: jest.fn().mockResolvedValue({ bookingId: 'booking-1', refundStatus: 'SUCCEEDED' }),
+    };
+    const service = new BookingService(
+      {} as never,
+      {} as never,
+      {} as never,
+      {} as never,
+      undefined,
+      undefined,
+      cancellationService as never,
+    );
+
+    await expect(service.getCancellationStatus('booking-1', 'user-1')).resolves.toEqual({
+      bookingId: 'booking-1',
+      refundStatus: 'SUCCEEDED',
+    });
+    expect(cancellationService.getCancellationStatus).toHaveBeenCalledWith('booking-1', 'user-1');
+  });
+
+  it('delegates getCancellationQuote to cancellationService when available', async () => {
+    const cancellationService = {
+      getCancellationQuote: jest.fn().mockResolvedValue({ quoteId: 'quote-1' }),
+    };
+    const service = new BookingService(
+      {} as never,
+      {} as never,
+      {} as never,
+      {} as never,
+      undefined,
+      undefined,
+      cancellationService as never,
+    );
+
+    await expect(service.getCancellationQuote('booking-1', 'user-1')).resolves.toEqual({
+      quoteId: 'quote-1',
+    });
+    expect(cancellationService.getCancellationQuote).toHaveBeenCalledWith('booking-1', 'user-1');
+  });
+
+  it('delegates cancelBooking to cancellationService when available', async () => {
+    const cancellationService = {
+      cancelBooking: jest.fn().mockResolvedValue({ bookingId: 'booking-1', cancellationStatus: 'CANCELLED' }),
+    };
+    const service = new BookingService(
+      {} as never,
+      {} as never,
+      {} as never,
+      {} as never,
+      undefined,
+      undefined,
+      cancellationService as never,
+    );
+
+    await expect(service.cancelBooking('booking-1', 'user-1', 'quote-1')).resolves.toEqual({
+      bookingId: 'booking-1',
+      cancellationStatus: 'CANCELLED',
+    });
+    expect(cancellationService.cancelBooking).toHaveBeenCalledWith('booking-1', 'user-1', 'quote-1');
+  });
+
 
   describe('getCancellationStatus refund projection', () => {
     const baseBooking = {

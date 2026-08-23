@@ -3,8 +3,14 @@ import { Request } from 'express';
 import { JwtAuthGuard } from '@/auth/guards/jwt-auth.guard';
 import { BookingService } from './booking.service';
 import { BookingManagementService } from '@/booking-management/booking-management.service';
-import { BookingDetailResponseDto, BookingListQueryDto, BookingListResponseDto, CancelBookingDto, CancellationStatusResponseDto } from './dto';
-import { CancellationQuoteResponseDto, CancellationResponseDto } from '@shared/booking-types';
+import { CancellationService } from '@/cancellation/cancellation.service';
+import { BookingDetailResponseDto, BookingListQueryDto, BookingListResponseDto } from './dto';
+import {
+  CancelBookingDto,
+  CancellationQuoteResponseDto,
+  CancellationResponseDto,
+  CancellationStatusResponseDto,
+} from '@/cancellation/cancellation.types';
 
 interface AuthenticatedRequest extends Request {
   user: { id: string };
@@ -16,6 +22,7 @@ export class BookingController {
   constructor(
     private readonly bookingService: BookingService,
     private readonly bookingManagementService: BookingManagementService,
+    private readonly cancellationService: CancellationService,
   ) {}
 
   @Get()
@@ -36,16 +43,15 @@ export class BookingController {
     @Req() req: AuthenticatedRequest,
     @Param('bookingId', new ParseUUIDPipe({ version: '4' })) bookingId: string,
   ): Promise<CancellationStatusResponseDto> {
-    return this.bookingService.getCancellationStatus(bookingId, req.user.id);
+    return this.cancellationService.getCancellationStatus(bookingId, req.user.id);
   }
 
   @Post(':bookingId/cancellation-quote')
-  @UseGuards(JwtAuthGuard)
   async getCancellationQuote(
     @Req() req: AuthenticatedRequest,
     @Param('bookingId', new ParseUUIDPipe({ version: '4' })) bookingId: string,
   ): Promise<CancellationQuoteResponseDto> {
-    return this.bookingService.getCancellationQuote(bookingId, req.user.id);
+    return this.cancellationService.getCancellationQuote(bookingId, req.user.id);
   }
 
   @Post(':bookingId/cancel')
@@ -54,7 +60,7 @@ export class BookingController {
     @Param('bookingId', new ParseUUIDPipe({ version: '4' })) bookingId: string,
     @Body() dto: CancelBookingDto,
   ): Promise<CancellationResponseDto> {
-    return this.bookingService.cancelBooking(bookingId, req.user.id, dto.quoteId);
+    return this.cancellationService.cancelBooking(bookingId, req.user.id, dto.quoteId);
   }
 }
 
