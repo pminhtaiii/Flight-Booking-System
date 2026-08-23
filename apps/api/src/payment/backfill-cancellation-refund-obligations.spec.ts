@@ -7,7 +7,9 @@ import {
 } from '@prisma/client';
 import {
   backfillCancellationRefundObligations,
+  BackfillLogger,
   BackfillStats,
+  LegacyRefundBookingIdColumnMissingError,
 } from '../../prisma/scripts/backfill-cancellation-refund-obligations';
 
 type MockPrisma = {
@@ -31,13 +33,14 @@ type MockPrisma = {
     update: jest.Mock;
     updateMany: jest.Mock;
   };
+  $queryRaw: jest.Mock;
   $transaction: jest.Mock;
   $disconnect: jest.Mock;
 };
 
 describe('backfillCancellationRefundObligations unit tests', () => {
   let mockPrisma: MockPrisma;
-  let mockLogger: { log: jest.Mock; warn: jest.Mock; error: jest.Mock };
+  let mockLogger: jest.Mocked<BackfillLogger>;
 
   beforeEach(() => {
     mockLogger = {
@@ -67,6 +70,14 @@ describe('backfillCancellationRefundObligations unit tests', () => {
         update: jest.fn(),
         updateMany: jest.fn().mockResolvedValue({ count: 1 }),
       },
+      $queryRaw: jest.fn((query: unknown) => {
+        const sqlQuery = query as { strings?: readonly string[] };
+        const isSchemaGuard = sqlQuery.strings
+          ?.join('')
+          .includes('information_schema.columns');
+
+        return Promise.resolve(isSchemaGuard ? [{ hasBookingId: true }] : []);
+      }),
       $transaction: jest.fn(async (arg: unknown) =>
         typeof arg === 'function'
           ? (arg as (tx: unknown) => Promise<unknown>)(mockPrisma)
@@ -87,20 +98,11 @@ describe('backfillCancellationRefundObligations unit tests', () => {
       airlineRefundAmount: new Prisma.Decimal('140.00'),
       cancellationRefundObligation: null,
       payment: { id: 'payment-1', currency: 'GBP', amount: 15000 },
-      cancellationRefund: {
-        id: 'refund-1',
-        paymentId: 'payment-1',
-        amount: 15000,
-        currency: 'GBP',
-        cancellationRefundObligationId: null,
-        airlineRefundAmount: 14000,
-      },
     };
 
     const mockRefund = {
       id: 'refund-1',
       paymentId: 'payment-1',
-      bookingId: 'booking-1',
       amount: 15000,
       currency: 'GBP',
       status: RefundStatus.SUCCEEDED,
@@ -143,6 +145,19 @@ describe('backfillCancellationRefundObligations unit tests', () => {
       id: 'obligation-1',
     });
 
+    mockPrisma.$queryRaw
+      .mockResolvedValueOnce([{ hasBookingId: true }])
+      .mockResolvedValueOnce([
+        {
+          id: 'refund-1',
+          bookingId: 'booking-1',
+          paymentId: 'payment-1',
+          currency: 'GBP',
+          cancellationRefundObligationId: null,
+        },
+      ])
+      .mockResolvedValueOnce([{ bookingId: 'booking-1' }]);
+
     mockPrisma.ledgerEntry.findMany
       .mockResolvedValueOnce([]) // linked check
       .mockResolvedValueOnce(mockUnlinkedLedger); // candidate search
@@ -173,6 +188,24 @@ describe('backfillCancellationRefundObligations unit tests', () => {
       where: { id: 'refund-1' },
       data: { cancellationRefundObligationId: 'obligation-1' },
     });
+  });
+
+  it('fails fast before row processing when the pre-contract bookingId column is absent', async () => {
+    mockPrisma.$queryRaw.mockResolvedValueOnce([{ hasBookingId: false }]);
+
+    const result = backfillCancellationRefundObligations({
+      prisma: mockPrisma as unknown as PrismaClient,
+      logger: mockLogger,
+    });
+
+    await expect(result).rejects.toBeInstanceOf(LegacyRefundBookingIdColumnMissingError);
+    await expect(result).rejects.toThrow(
+      'requires the pre-contract refunds.bookingId column',
+    );
+
+    expect(mockPrisma.booking.findMany).not.toHaveBeenCalled();
+    expect(mockPrisma.refund.findMany).not.toHaveBeenCalled();
+    expect(mockLogger.warn).not.toHaveBeenCalled();
   });
 
   it('is idempotent when re-run on already backfilled data', async () => {
@@ -286,10 +319,13 @@ describe('backfillCancellationRefundObligations unit tests', () => {
     });
 
     expect(stats.quarantined).toBe(1);
+    expect(stats.mismatches).toBe(1);
     expect(stats.obligationsCreated).toBe(0);
-    expect(mockLogger.warn).toHaveBeenCalledWith(
-      expect.stringContaining('[QUARANTINE] Booking booking-curr-mismatch currency (EUR) does not match Payment currency (GBP)'),
-    );
+    expect(mockLogger.warn).toHaveBeenCalledWith({
+      message: 'refund_obligation_backfill',
+      outcome: 'QUARANTINED',
+      reason: 'BOOKING_PAYMENT_CURRENCY_MISMATCH',
+    });
   });
 
   it('quarantines when paymentId is missing for cancelled booking', async () => {
@@ -317,7 +353,25 @@ describe('backfillCancellationRefundObligations unit tests', () => {
     });
 
     expect(stats.quarantined).toBe(1);
+    expect(stats.mismatches).toBe(1);
     expect(stats.obligationsCreated).toBe(0);
+    expect(mockLogger.warn).toHaveBeenCalledWith({
+      message: 'refund_obligation_backfill',
+      outcome: 'QUARANTINED',
+      reason: 'MISSING_PAYMENT',
+    });
+    expect(mockLogger.log).toHaveBeenLastCalledWith({
+      message: 'refund_obligation_backfill',
+      outcome: 'COMPLETED',
+      processedBookings: 1,
+      obligationsCreated: 0,
+      obligationsUpdated: 0,
+      refundsLinked: 0,
+      ledgerEntriesLinked: 0,
+      quarantined: 1,
+      mismatches: 1,
+      errors: 0,
+    });
   });
 
   it('quarantines when booking paymentId does not match Payment record id', async () => {
@@ -345,10 +399,13 @@ describe('backfillCancellationRefundObligations unit tests', () => {
     });
 
     expect(stats.quarantined).toBe(1);
+    expect(stats.mismatches).toBe(1);
     expect(stats.obligationsCreated).toBe(0);
-    expect(mockLogger.warn).toHaveBeenCalledWith(
-      expect.stringContaining('[QUARANTINE] Booking booking-payment-mismatch paymentId (payment-1) does not match Payment record id (payment-other)'),
-    );
+    expect(mockLogger.warn).toHaveBeenCalledWith({
+      message: 'refund_obligation_backfill',
+      outcome: 'QUARANTINED',
+      reason: 'BOOKING_PAYMENT_MISMATCH',
+    });
   });
 
   it('quarantines when cumulative succeeded refunds exceed payment amount', async () => {
@@ -379,10 +436,13 @@ describe('backfillCancellationRefundObligations unit tests', () => {
     });
 
     expect(stats.quarantined).toBe(1);
+    expect(stats.mismatches).toBe(1);
     expect(stats.obligationsCreated).toBe(0);
-    expect(mockLogger.warn).toHaveBeenCalledWith(
-      expect.stringContaining('[QUARANTINE] Payment payment-1 has cumulative succeeded refunds (15000) exceeding payment amount (10000)'),
-    );
+    expect(mockLogger.warn).toHaveBeenCalledWith({
+      message: 'refund_obligation_backfill',
+      outcome: 'QUARANTINED',
+      reason: 'PAYMENT_OVER_REFUND',
+    });
   });
 
   it('quarantines when SUCCEEDED refund lacks balanced ledger entries', async () => {
@@ -412,10 +472,13 @@ describe('backfillCancellationRefundObligations unit tests', () => {
     });
 
     expect(stats.quarantined).toBe(1);
+    expect(stats.mismatches).toBe(1);
     expect(stats.ledgerEntriesLinked).toBe(0);
-    expect(mockLogger.warn).toHaveBeenCalledWith(
-      expect.stringContaining('[QUARANTINE] SUCCEEDED refund refund-unbalanced'),
-    );
+    expect(mockLogger.warn).toHaveBeenCalledWith({
+      message: 'refund_obligation_backfill',
+      outcome: 'QUARANTINED',
+      reason: 'MISSING_LEDGER_PAIR',
+    });
   });
 
   it('quarantines when non-succeeded refund has linked ledger entries', async () => {
@@ -445,9 +508,12 @@ describe('backfillCancellationRefundObligations unit tests', () => {
     });
 
     expect(stats.quarantined).toBe(1);
-    expect(mockLogger.warn).toHaveBeenCalledWith(
-      expect.stringContaining('[QUARANTINE] Non-succeeded refund refund-failed (status: FAILED) has 1 linked ledger entries'),
-    );
+    expect(stats.mismatches).toBe(1);
+    expect(mockLogger.warn).toHaveBeenCalledWith({
+      message: 'refund_obligation_backfill',
+      outcome: 'QUARANTINED',
+      reason: 'NON_TERMINAL_REFUND_LEDGER_LINK',
+    });
   });
 
   it('skips quote-only confirmed bookings and does not create obligations', async () => {
@@ -582,15 +648,15 @@ describe('backfillCancellationRefundObligations unit tests', () => {
 
     expect(stats.ledgerEntriesLinked).toBe(0);
     expect(stats.quarantined).toBe(2);
+    expect(stats.mismatches).toBe(2);
     expect(stats.errors).toBe(0);
 
     expect(mockPrisma.ledgerEntry.updateMany).not.toHaveBeenCalled();
-    expect(mockLogger.warn).toHaveBeenCalledWith(
-      expect.stringContaining('[QUARANTINE] SUCCEEDED refund refund-early (amount: 5000 GBP) has multiple (2) ambiguous unlinked ledger pairs for payment payment-multi-refund'),
-    );
-    expect(mockLogger.warn).toHaveBeenCalledWith(
-      expect.stringContaining('[QUARANTINE] SUCCEEDED refund refund-late (amount: 5000 GBP) has multiple (2) ambiguous unlinked ledger pairs for payment payment-multi-refund'),
-    );
+    expect(mockLogger.warn).toHaveBeenCalledWith({
+      message: 'refund_obligation_backfill',
+      outcome: 'QUARANTINED',
+      reason: 'AMBIGUOUS_LEDGER_PAIR',
+    });
   });
 
   it('matches multiple refunds on the same payment when distinct amounts make pairing unambiguous', async () => {
@@ -742,6 +808,9 @@ describe('backfillCancellationRefundObligations unit tests', () => {
       .mockResolvedValueOnce([mockRefund])
       .mockResolvedValueOnce([]);
     mockPrisma.cancellationRefundObligation.findUnique.mockResolvedValueOnce(mockObligation);
+    mockPrisma.$queryRaw
+      .mockResolvedValueOnce([{ hasBookingId: true }])
+      .mockResolvedValueOnce([{ bookingId: 'booking-1' }]);
     // Payment-level aggregate sum: 11000 (payment is 20000, so within payment amount)
     mockPrisma.refund.aggregate
       .mockResolvedValueOnce({ _sum: { amount: 11000 } }) // payment check
@@ -755,10 +824,13 @@ describe('backfillCancellationRefundObligations unit tests', () => {
     });
 
     expect(stats.quarantined).toBe(1);
+    expect(stats.mismatches).toBe(1);
     expect(stats.refundsLinked).toBe(0);
-    expect(mockLogger.warn).toHaveBeenCalledWith(
-      expect.stringContaining('[QUARANTINE] Linking refund refund-over-obligation (amount: 6000) to obligation obligation-1 (totalAmount: 10000) would exceed obligation debt'),
-    );
+    expect(mockLogger.warn).toHaveBeenCalledWith({
+      message: 'refund_obligation_backfill',
+      outcome: 'QUARANTINED',
+      reason: 'OBLIGATION_OVER_REFUND',
+    });
   });
 
   it('handles partial CAS claim rollback and quarantines gracefully', async () => {
@@ -820,6 +892,7 @@ describe('backfillCancellationRefundObligations unit tests', () => {
 
     expect(stats.ledgerEntriesLinked).toBe(0);
     expect(stats.quarantined).toBe(1);
+    expect(stats.mismatches).toBe(1);
 
     expect(mockPrisma.ledgerEntry.updateMany).toHaveBeenCalledWith({
       where: { id: 'race-debit', refundTransactionId: null },
@@ -833,10 +906,10 @@ describe('backfillCancellationRefundObligations unit tests', () => {
       where: { id: 'race-debit', refundTransactionId: 'refund-race' },
       data: { refundTransactionId: null },
     });
-    expect(mockLogger.warn).toHaveBeenCalledWith(
-      expect.stringContaining('[QUARANTINE] SUCCEEDED refund refund-race could not claim candidate ledger pair for payment payment-race'),
-    );
+    expect(mockLogger.warn).toHaveBeenCalledWith({
+      message: 'refund_obligation_backfill',
+      outcome: 'QUARANTINED',
+      reason: 'LEDGER_PAIR_CLAIM_FAILURE',
+    });
   });
 });
-
-
