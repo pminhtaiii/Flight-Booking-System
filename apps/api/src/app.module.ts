@@ -15,6 +15,7 @@ import { BookingIntentModule } from './booking-intent/booking-intent.module';
 import { BookingModule } from './booking/booking.module';
 import { BookingLifecycleModule } from './booking-lifecycle/booking-lifecycle.module';
 import { BookingManagementModule } from './booking-management/booking-management.module';
+import { CancellationModule } from './cancellation/cancellation.module';
 import { PaymentModule } from './payment/payment.module';
 
 import { DisruptionModule } from './disruption/disruption.module';
@@ -90,6 +91,7 @@ export const envSchema = z.object({
     BookingModule,
     BookingLifecycleModule,
     BookingManagementModule,
+    CancellationModule,
     PaymentModule,
 
     DisruptionModule,

@@ -23,45 +23,8 @@ import {
   BookingListResponseDto,
   BookingTab,
 } from './dto';
-
-export function parseDuffelCancellationQuoteId(serialized: string | null | undefined): {
-  quoteId: string | null;
-  refundTo: string | null;
-  nonRefundableAncillaryAmount: string | null;
-  nonRefundableAncillaryCurrency: string | null;
-} {
-  if (!serialized) {
-    return {
-      quoteId: null,
-      refundTo: null,
-      nonRefundableAncillaryAmount: null,
-      nonRefundableAncillaryCurrency: null,
-    };
-  }
-  if (serialized === 'PENDING_QUOTE') {
-    return {
-      quoteId: 'PENDING_QUOTE',
-      refundTo: null,
-      nonRefundableAncillaryAmount: null,
-      nonRefundableAncillaryCurrency: null,
-    };
-  }
-  const parts = serialized.split('|');
-  if (parts.length === 1) {
-    return {
-      quoteId: parts[0],
-      refundTo: null,
-      nonRefundableAncillaryAmount: null,
-      nonRefundableAncillaryCurrency: null,
-    };
-  }
-  return {
-    quoteId: parts[0] || null,
-    refundTo: parts[1] || null,
-    nonRefundableAncillaryAmount: parts[2] || null,
-    nonRefundableAncillaryCurrency: parts[3] || null,
-  };
-}
+import { parseDuffelCancellationQuoteId } from '@/cancellation/cancellation.types';
+export { parseDuffelCancellationQuoteId };
 
 @Injectable()
 export class BookingManagementService {

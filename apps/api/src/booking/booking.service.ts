@@ -3,7 +3,7 @@ import { Cron, CronExpression } from '@nestjs/schedule';
 import { Booking, BookingFailureReason, BookingStatus, Prisma, DisruptionStatus, DisruptionActorType, RefundStatus } from '@prisma/client';
 import { PrismaService } from '@/prisma/prisma.service';
 import { CancellationQuoteResponseDto, CancellationResponseDto, FlightSnapshot, PassengerSnapshot } from '@shared/booking-types';
-import { BookingDetailResponseDto, BookingListResponseDto, BookingTab } from './dto';
+import { BookingDetailResponseDto, BookingListResponseDto, BookingTab, CancellationStatusResponseDto } from './dto';
 import { BookingAgentProjectionService } from '@/agent-gateway/booking-agent-projection.service';
 
 
@@ -42,6 +42,7 @@ import { StripeService } from '@/common/stripe.service';
 import { DuffelService } from '@/duffel/duffel.service';
 import { PaymentRefundService } from '@/payment/payment-refund.service';
 import { BookingManagementService, parseDuffelCancellationQuoteId } from '@/booking-management/booking-management.service';
+import { CancellationService } from '@/cancellation/cancellation.service';
 
 function serializeDuffelCancellationQuoteId(
   quoteId: string,
@@ -98,6 +99,7 @@ export class BookingService {
     private readonly paymentRefundService: PaymentRefundService,
     @Optional() private readonly bookingManagementService?: BookingManagementService,
     @Optional() private readonly bookingAgentProjectionService?: BookingAgentProjectionService,
+    @Optional() private readonly cancellationService?: CancellationService,
   ) {}
 
   @Cron("*/15 * * * *")
@@ -528,6 +530,9 @@ export class BookingService {
 
 
   async getCancellationQuote(bookingId: string, userId: string): Promise<CancellationQuoteResponseDto> {
+    if (this.cancellationService) {
+      return this.cancellationService.getCancellationQuote(bookingId, userId);
+    }
     const booking = await this.prisma.booking.findUnique({
       where: { id: bookingId },
     });
@@ -686,6 +691,9 @@ export class BookingService {
   }
 
   async cancelBooking(bookingId: string, userId: string, quoteId: string): Promise<CancellationResponseDto> {
+    if (this.cancellationService) {
+      return this.cancellationService.cancelBooking(bookingId, userId, quoteId);
+    }
     const booking = await this.prisma.booking.findUnique({
       where: { id: bookingId },
       include: { payment: { select: { id: true } } },
@@ -906,7 +914,10 @@ export class BookingService {
     };
   }
 
-  async getCancellationStatus(bookingId: string, userId: string): Promise<any> {
+  async getCancellationStatus(bookingId: string, userId: string): Promise<CancellationStatusResponseDto> {
+    if (this.cancellationService) {
+      return this.cancellationService.getCancellationStatus(bookingId, userId);
+    }
     const booking = await this.prisma.booking.findUnique({
       where: { id: bookingId },
       include: {

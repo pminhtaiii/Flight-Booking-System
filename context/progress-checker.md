@@ -7,13 +7,38 @@ Update this file after every completed feature. Any AI agent reading this should
 ### Current Status
 
 **Feature:** Deepen Codebase Architecture (Feature 019)
-**Last completed:** Slice 2B: Extract Booking Management Module (2026-08-23).
+**Last completed:** Slice 2C: Extract Cancellation Module (2026-08-23).
 **In progress:** None.
-**Next:** Slice 2C: Extract Cancellation Module (US2).
+**Next:** Slice 2D: Rewire and Remove Facade (US2).
 
 ---
 
 ## Progress by Feature
+
+### [x] Feature: Deepen Codebase Architecture (Feature 019) — Slice 2C: Extract Cancellation Module
+
+- [x] Slice 2C / Extract Cancellation Module (2026-08-23):
+  - **Cancellation Module Creation (`apps/api/src/cancellation/`)**:
+    - Implemented `CancellationService` owning cancellation status, quote generation, unexpired quote caching, optimistic concurrency quote locking (`PENDING_QUOTE`), supplier-first cancellation execution with retries (`confirmCancellationWithRetries`), remote order recovery (`retrieveOrder`), `CancellationRefundObligation` creation (in minor unit integer cents), active disruption resolution (`BOOKING_CANCELLED`), `BookingAgentProjection` updates, and refund initiation via `PaymentRefundService`.
+    - Enforced architectural invariant: `CancellationService` initiates refund processing via `PaymentRefundService.processCancellationRefund()` but never performs direct ledger writes or terminal settlement (strictly owned by `RefundSettlementService`).
+    - Organized DTOs & Serialization Helpers: `CancellationStatusResponseDto`, `CancelBookingDto`, `serializeDuffelCancellationQuoteId`, `parseDuffelCancellationQuoteId`, and re-exported `@shared/booking-types` (`CancellationQuoteResponseDto`, `CancellationResponseDto`).
+    - Configured `CancellationModule` importing `PrismaModule`, `DuffelModule`, `PaymentModule`, and `AgentGatewayModule`.
+  - **Controller Direct Rewiring (`apps/api/src/booking/booking.controller.ts`)**:
+    - Injected `CancellationService` directly for `@Get(':bookingId/cancellation')`, `@Post(':bookingId/cancellation-quote')`, and `@Post(':bookingId/cancel')`.
+  - **Transitional Compatibility (`apps/api/src/booking/booking.service.ts`)**:
+    - Injected `CancellationService` (`@Optional()`) and delegated `getCancellationStatus`, `getCancellationQuote`, and `cancelBooking` to `cancellationService` for backward compatibility until full retirement in Slice 2D.
+  - **Module Registration (`apps/api/src/app.module.ts` & `booking.module.ts`)**:
+    - Registered `CancellationModule` in `AppModule` and `BookingModule`.
+  - **Verification & Test Suites (100% Green)**:
+    - `cancellation.service.spec.ts`: 46/46 tests PASS.
+    - `booking.controller.spec.ts`: 5/5 tests PASS.
+    - `booking.service.spec.ts`: 31/31 tests PASS.
+    - `test/characterization/booking-characterization.e2e-spec.ts`: 14/14 tests PASS.
+    - `test/characterization/refund-characterization.e2e-spec.ts`: 11/11 tests PASS.
+    - `test/cancellation.e2e-spec.ts`: 10/10 tests PASS.
+    - Full API Unit Suite: 82/82 suites (906/906 tests) PASS.
+    - ESLint: 0 errors, 0 warnings; TypeScript Typecheck: 0 errors; Web Typecheck: 0 errors; API Build succeeds.
+
 
 ### [x] Feature: Deepen Codebase Architecture (Feature 019) — Slice 2B: Extract Booking Management Module
 
