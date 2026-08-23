@@ -77,10 +77,10 @@
 
 ### Contract migration and final gate
 
-- [ ] T026 [US1] Add the contract migration that requires cancellation obligation linkage and removes Refund.bookingId and Booking.cancellationRefund only after the observation window in apps/api/prisma/schema.prisma and apps/api/prisma/migrations/20260823000000_refund_obligation_contract/migration.sql
-- [ ] T027 [US1] Add preflight, reverse-mapping, abort/quarantine, rollback, and cleanup-eligibility procedures for the contract migration in docs/runbooks/refund-settlement-migration.md
-- [ ] T028 [P] [US1] Add settlement replay/conflict, reservation rejection, backfill mismatch, and ledger invariant telemetry without raw provider data or PII in apps/api/src/refund-settlement/refund-settlement.service.ts and apps/api/src/refund/refund-transaction.service.ts
-- [ ] T029 [US1] Run Feature 019 Gate 1 after the contract migration and record exact migration, unit, E2E, lint, typecheck, and rollback evidence in context/progress-checker.md and context/architecture.md
+- [x] T026 [US1] Add the contract migration that requires cancellation obligation linkage and removes Refund.bookingId and Booking.cancellationRefund only after the observation window in apps/api/prisma/schema.prisma and apps/api/prisma/migrations/20260823000000_refund_obligation_contract/migration.sql
+- [x] T027 [US1] Add preflight, reverse-mapping, abort/quarantine, rollback, and cleanup-eligibility procedures for the contract migration in docs/runbooks/refund-settlement-migration.md
+- [x] T028 [P] [US1] Add settlement replay/conflict, reservation rejection, backfill mismatch, and ledger invariant telemetry without raw provider data or PII in apps/api/src/refund-settlement/refund-settlement.service.ts and apps/api/src/refund/refund-transaction.service.ts
+- [x] T029 [US1] Run Feature 019 Gate 1 after the contract migration and record exact migration, unit, E2E, lint, typecheck, and rollback evidence in context/progress-checker.md and context/architecture.md
 
 **Checkpoint**: User Story 1 is complete only when Slice 1D is contracted safely and Gate 1 passes.
 

@@ -7,13 +7,40 @@ Update this file after every completed feature. Any AI agent reading this should
 ### Current Status
 
 **Feature:** Deepen Codebase Architecture (Feature 019)
-**Last completed:** Slice 1C: Convert All Refund Trigger Paths to Unified Settlement (2026-08-22).
+**Last completed:** Slice 1D: Contract Schema & Final Gate 1 Validation (2026-08-23).
 **In progress:** None.
-**Next:** Slice 1D: Contract Schema (remove legacy refund/booking fields).
+**Next:** Slice 2: Isolate Booking Lifecycle, Reads, and Cancellation (US2).
 
 ---
 
 ## Progress by Feature
+
+### [x] Feature: Deepen Codebase Architecture (Feature 019) — Slice 1D: Contract Schema & Final Gate 1 Validation
+
+- [x] Slice 1D / Contract Schema & Final Gate 1 Validation (2026-08-23):
+  - **Contract Migration & Schema Hardening (`apps/api/prisma/schema.prisma` & migration `20260823000000_refund_obligation_contract`)**:
+    - Finalized removal of legacy `Refund.bookingId` foreign key and unique constraint.
+    - Finalized removal of legacy `Booking.cancellationRefund` singular relation.
+    - Added database-level CHECK constraint enforcing `cancellationRefundObligationId IS NOT NULL` whenever `reason` starts with `'cancellation:'`.
+    - Maintained `CancellationRefundObligation` as canonical link for all booking-related refund transactions.
+  - **Operations Runbook (`docs/runbooks/refund-settlement-migration.md`)**:
+    - Documented comprehensive preflight checks, reverse-mapping procedures, abort/quarantine thresholds, dual-capacity validation, and safe rollback mechanisms.
+  - **Structured Telemetry & PII Safety**:
+    - Added PII-free structured telemetry in `RefundSettlementService` and `RefundTransactionService` for `refund_reservation` (`RESERVED` / `REJECTED` with capacity attribution `PAYMENT` | `OBLIGATION`) and `refund_settlement` (`APPLIED` / `NO_OP` / `CONFLICT`).
+  - **Verification & Gate 1 Test Suites (100% Green)**:
+    - `refund-settlement.service.spec.ts`: 12/12 PASS.
+    - `refund-transaction.service.spec.ts`: 15/15 PASS.
+    - `payment-refund.service.spec.ts`: 14/14 PASS.
+    - `payment-webhook.service.spec.ts`: 11/11 PASS.
+    - `payment-cron.service.spec.ts`: 7/7 PASS.
+    - `booking.service.spec.ts`: 29/29 PASS.
+    - `test/payment-refund.e2e-spec.ts`: 8/8 PASS.
+    - `test/cancellation.e2e-spec.ts`: 8/8 PASS.
+    - `test/refund-obligation-contract-migration.e2e-spec.ts`: 5/5 PASS.
+    - `test/refund-settlement.e2e-spec.ts`: 12/12 PASS.
+    - `test/characterization/refund-characterization.e2e-spec.ts`: 11/11 PASS.
+    - Full API Unit Suite: 78/78 suites (805/805 tests) PASS 100% green.
+    - ESLint: 0 errors / 0 warnings; Typecheck (API & Web): 0 errors; Agent ruff: 0 errors.
 
 ### [x] Feature: Deepen Codebase Architecture (Feature 019) — Slice 1C: Convert All Refund Trigger Paths to Unified Settlement
 

@@ -549,5 +549,10 @@ Feature 019 restructures high-leverage boundaries without changing public produc
   - Characterizes Trusted Search Snapshot validation (contiguous 1-indexed results, extra forbid, TTL bound), repository lifecycle, and PII-free projections.
   - Characterizes all 8 authoritative SSE wire events (`token`, `tool_call`, `tool_result`, `flight_results`, `ACTION_HANDOFF`, `ACTION_REQUIRED`, `done`, `error`), canonical event sequencing, and terminal failure cleanup.
   - Characterizes Web search and booking flows, recording baseline static metrics for Client Component token props (`accessToken`), `NEXT_PUBLIC_API_URL`, and `forwardRef` dependencies.
+- **Slice 1 (Unified Refund Settlement & Obligation Contract)**:
+  - **Slice 1A (Additive PostgreSQL/Prisma Schema Expansion)**: Introduced `CancellationRefundObligation` model, `refundTransactionId` on `LedgerEntry`, and double-entry ledger constraints. Added restart-safe backfill script.
+  - **Slice 1B (Reservation & Provider-Blind Settlement Core)**: Added `RefundTransactionService` with strict Payment-first pessimistic locking and capacity checks, and `RefundSettlementService` for in-process atomic ledger and projection settlement.
+  - **Slice 1C (Trigger Path Cutover)**: Unified all 4 refund paths (Inline, Webhook, Sweeper Cron, Admin Manual) to route exclusively through unified reservation and settlement with transaction-scoped idempotency keys.
+  - **Slice 1D (Contract Schema & Gate 1 Sign-Off)**: Contract migration `20260823000000_refund_obligation_contract` removes legacy `Refund.bookingId` and `Booking.cancellationRefund` columns/relations and enforces obligation linkage constraints on cancellation refunds. Runbook documented in `docs/runbooks/refund-settlement-migration.md`. Feature 019 Gate 1 100% green.
 
 
