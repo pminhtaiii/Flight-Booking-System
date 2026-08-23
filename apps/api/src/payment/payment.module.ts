@@ -1,5 +1,4 @@
 import { Module, forwardRef } from '@nestjs/common';
-import { StripeService } from '../common/stripe.service';
 import { PaymentIdempotencyService } from './payment-idempotency.service';
 import { PrismaModule } from '../prisma/prisma.module';
 import { PaymentService } from './payment.service';
@@ -30,7 +29,6 @@ import { RefundSettlementModule } from '../refund-settlement/refund-settlement.m
   ],
   controllers: [PaymentController, PaymentWebhookController, AdminRefundController],
   providers: [
-    StripeService,
     PaymentIdempotencyService,
     PaymentService,
     PaymentRefundService,
@@ -40,7 +38,6 @@ import { RefundSettlementModule } from '../refund-settlement/refund-settlement.m
     AncillaryPaymentValidationService,
   ],
   exports: [
-    StripeService,
     PaymentIdempotencyService,
     PaymentService,
     PaymentRefundService,

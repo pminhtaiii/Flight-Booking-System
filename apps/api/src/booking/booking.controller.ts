@@ -2,6 +2,7 @@ import { Body, Controller, Get, Post, Param, ParseUUIDPipe, Query, Req, UseGuard
 import { Request } from 'express';
 import { JwtAuthGuard } from '@/auth/guards/jwt-auth.guard';
 import { BookingService } from './booking.service';
+import { BookingManagementService } from '@/booking-management/booking-management.service';
 import { BookingDetailResponseDto, BookingListQueryDto, BookingListResponseDto, CancelBookingDto, CancellationStatusResponseDto } from './dto';
 import { CancellationQuoteResponseDto, CancellationResponseDto } from '@shared/booking-types';
 
@@ -12,11 +13,14 @@ interface AuthenticatedRequest extends Request {
 @Controller('bookings')
 @UseGuards(JwtAuthGuard)
 export class BookingController {
-  constructor(private readonly bookingService: BookingService) {}
+  constructor(
+    private readonly bookingService: BookingService,
+    private readonly bookingManagementService: BookingManagementService,
+  ) {}
 
   @Get()
   async listBookings(@Req() req: AuthenticatedRequest, @Query() query: BookingListQueryDto): Promise<BookingListResponseDto> {
-    return this.bookingService.listBookings(req.user.id, query.tab, query.page, query.limit);
+    return this.bookingManagementService.listBookings(req.user.id, query.tab, query.page, query.limit);
   }
 
   @Get(':bookingId')
@@ -24,7 +28,7 @@ export class BookingController {
     @Req() req: AuthenticatedRequest,
     @Param('bookingId', new ParseUUIDPipe({ version: '4' })) bookingId: string,
   ): Promise<BookingDetailResponseDto> {
-    return this.bookingService.getBookingDetail(bookingId, req.user.id);
+    return this.bookingManagementService.getBookingDetail(bookingId, req.user.id);
   }
 
   @Get(':bookingId/cancellation')
@@ -53,3 +57,4 @@ export class BookingController {
     return this.bookingService.cancelBooking(bookingId, req.user.id, dto.quoteId);
   }
 }
+

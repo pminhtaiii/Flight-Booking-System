@@ -94,14 +94,14 @@
 
 ### Tests and implementation
 
-- [ ] T030 [P] [US2] Add failing normalized lifecycle and recovery unit tests in apps/api/src/booking-lifecycle/booking-lifecycle.service.spec.ts and apps/api/src/booking-lifecycle/booking-recovery.service.spec.ts
-- [ ] T031 [US2] Define BookingPipelineOutcome and implement provider-blind booking transitions in apps/api/src/booking-lifecycle/booking-lifecycle.types.ts, apps/api/src/booking-lifecycle/booking-lifecycle.service.ts, and apps/api/src/booking-lifecycle/booking-lifecycle.module.ts
-- [ ] T032 [US2] Move provider-aware stale recovery and existing schedules behind the lifecycle core in apps/api/src/booking-lifecycle/booking-recovery.service.ts
+- [x] T030 [P] [US2] Add failing normalized lifecycle and recovery unit tests in apps/api/src/booking-lifecycle/booking-lifecycle.service.spec.ts and apps/api/src/booking-lifecycle/booking-recovery.service.spec.ts
+- [x] T031 [US2] Define BookingPipelineOutcome and implement provider-blind booking transitions in apps/api/src/booking-lifecycle/booking-lifecycle.types.ts, apps/api/src/booking-lifecycle/booking-lifecycle.service.ts, and apps/api/src/booking-lifecycle/booking-lifecycle.module.ts
+- [x] T032 [US2] Move provider-aware stale recovery and existing schedules behind the lifecycle core in apps/api/src/booking-lifecycle/booking-recovery.service.ts
 - [ ] T033 [US2] Replace Payment's broad BookingService calls with BookingLifecycleService at every confirmation, failure, and recovery point in apps/api/src/payment/payment.service.ts and apps/api/src/payment/payment.service.spec.ts
 - [ ] T034 [P] [US2] Rewire disruption reconciliation to BookingLifecycleService in apps/api/src/disruption/sync/reconciliation.service.ts, apps/api/src/disruption/disruption.module.ts, and apps/api/src/disruption/sync/reconciliation.service.spec.ts
 - [ ] T035 [US2] Move safe booking projection write ownership behind a booking-owned provider without introducing a lifecycle↔gateway cycle in apps/api/src/booking-lifecycle/booking-agent-projection-writer.service.ts and apps/api/src/agent-gateway/booking-agent-projection.service.ts
-- [ ] T036 [P] [US2] Add failing list, detail, disruption projection, itinerary mapping, sorting, and tenant-isolation tests in apps/api/src/booking-management/booking-management.service.spec.ts
-- [ ] T037 [US2] Extract safe read projections into apps/api/src/booking-management/booking-management.service.ts and apps/api/src/booking-management/booking-management.module.ts
+- [x] T036 [P] [US2] Add failing list, detail, disruption projection, itinerary mapping, sorting, and tenant-isolation tests in apps/api/src/booking-management/booking-management.service.spec.ts
+- [x] T037 [US2] Extract safe read projections into apps/api/src/booking-management/booking-management.service.ts and apps/api/src/booking-management/booking-management.module.ts
 - [ ] T038 [P] [US2] Add failing cancellation status, quote, supplier-first cancellation, recovery, obligation, and refund-trigger tests in apps/api/src/cancellation/cancellation.service.spec.ts
 - [ ] T039 [US2] Extract cancellation orchestration without terminal settlement writes into apps/api/src/cancellation/cancellation.service.ts and apps/api/src/cancellation/cancellation.module.ts
 - [ ] T040 [US2] Make Booking HTTP composition inject Booking Management and Cancellation directly in apps/api/src/booking/booking.controller.ts, apps/api/src/booking/booking.controller.spec.ts, and apps/api/src/booking/booking.module.ts

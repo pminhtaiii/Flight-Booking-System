@@ -13,7 +13,10 @@ import { DuffelModule } from './duffel/duffel.module';
 import { FlightsModule } from './flights/flights.module';
 import { BookingIntentModule } from './booking-intent/booking-intent.module';
 import { BookingModule } from './booking/booking.module';
+import { BookingLifecycleModule } from './booking-lifecycle/booking-lifecycle.module';
+import { BookingManagementModule } from './booking-management/booking-management.module';
 import { PaymentModule } from './payment/payment.module';
+
 import { DisruptionModule } from './disruption/disruption.module';
 import { AncillariesModule } from './ancillaries/ancillaries.module';
 import { ProfileModule } from './profile/profile.module';
@@ -22,6 +25,8 @@ import { DataDriftSentinelModule } from './common/sentinel/data-drift-sentinel.m
 import { BookingReadinessMetricsModule } from './common/observability/booking-readiness-metrics.module';
 import { RefundModule } from './refund/refund.module';
 import { RefundSettlementModule } from './refund-settlement/refund-settlement.module';
+
+import { StripeModule } from './common/stripe.module';
 
 import { z } from 'zod';
 
@@ -71,6 +76,7 @@ export const envSchema = z.object({
     }),
     ScheduleModule.forRoot(),
     PrismaModule,
+    StripeModule,
     HealthModule,
     CacheModule,
     AuthModule,
@@ -82,7 +88,10 @@ export const envSchema = z.object({
     FlightsModule,
     BookingIntentModule,
     BookingModule,
+    BookingLifecycleModule,
+    BookingManagementModule,
     PaymentModule,
+
     DisruptionModule,
     AncillariesModule,
     ProfileModule,
