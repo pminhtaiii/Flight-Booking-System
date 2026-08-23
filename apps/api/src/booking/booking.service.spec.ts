@@ -36,21 +36,23 @@ describe('BookingService', () => {
     });
   });
 
-  it('returns paginated upcoming bookings with processing bookings first', async () => {
-    const prisma = {
-      booking: {
-        findMany: jest.fn().mockResolvedValue([
-          {
-            id: 'confirmed', status: 'CONFIRMED', failureReason: null, pnrReference: 'PNR1', totalAmount: { toString: () => '450.00' }, currency: 'GBP', departureAt: new Date('2026-09-01T10:00:00Z'), flightSnapshot: null, createdAt: new Date('2026-07-20T10:00:00Z'), payment: null, bookingIntent: { id: 'intent-1', duffelOfferId: 'offer-1' },
-          },
-          {
-            id: 'processing', status: 'PROCESSING', failureReason: null, pnrReference: null, totalAmount: { toString: () => '250.00' }, currency: 'GBP', departureAt: null, flightSnapshot: null, createdAt: new Date('2026-07-20T11:00:00Z'), payment: null, bookingIntent: { id: 'intent-2', duffelOfferId: 'offer-2' },
-          },
-        ]),
-        updateMany: jest.fn().mockResolvedValue({ count: 0 }),
-      },
+  it('returns paginated upcoming bookings by delegating to bookingManagementService', async () => {
+    const bookingManagementService = {
+      listBookings: jest.fn().mockResolvedValue({
+        bookings: [
+          { id: 'processing', status: 'PROCESSING', departureAt: null },
+          { id: 'confirmed', status: 'CONFIRMED', departureAt: '2026-09-01T10:00:00.000Z' },
+        ],
+        pagination: { page: 1, limit: 20, total: 2, totalPages: 1 },
+      }),
     };
-    const service = new BookingService(prisma as never, {} as never, {} as never, {} as never);
+    const service = new BookingService(
+      {} as never,
+      {} as never,
+      {} as never,
+      {} as never,
+      bookingManagementService as never,
+    );
 
     await expect(service.listBookings('user-1', 'upcoming', 1, 20)).resolves.toEqual({
       bookings: [
@@ -59,25 +61,28 @@ describe('BookingService', () => {
       ],
       pagination: { page: 1, limit: 20, total: 2, totalPages: 1 },
     });
+    expect(bookingManagementService.listBookings).toHaveBeenCalledWith('user-1', 'upcoming', 1, 20);
   });
 
-  it('does not disclose another user\'s booking detail', async () => {
-    const prisma = {
-      booking: {
-        findUnique: jest.fn().mockResolvedValue({ id: 'booking-1', userId: 'other-user' }),
-      },
+  it('delegates getBookingDetail to bookingManagementService', async () => {
+    const bookingManagementService = {
+      getBookingDetail: jest.fn().mockResolvedValue({ id: 'booking-1', status: 'CONFIRMED' }),
     };
-    const service = new BookingService(prisma as never, {} as never, {} as never, {} as never);
+    const service = new BookingService(
+      {} as never,
+      {} as never,
+      {} as never,
+      {} as never,
+      bookingManagementService as never,
+    );
 
-    await expect(service.getBookingDetail('booking-1', 'user-1')).rejects.toBeInstanceOf(ForbiddenException);
+    await expect(service.getBookingDetail('booking-1', 'user-1')).resolves.toEqual({
+      id: 'booking-1',
+      status: 'CONFIRMED',
+    });
+    expect(bookingManagementService.getBookingDetail).toHaveBeenCalledWith('booking-1', 'user-1');
   });
 
-  it('reports a missing booking detail as not found', async () => {
-    const prisma = { booking: { findUnique: jest.fn().mockResolvedValue(null) } };
-    const service = new BookingService(prisma as never, {} as never, {} as never, {} as never);
-
-    await expect(service.getBookingDetail('missing', 'user-1')).rejects.toBeInstanceOf(NotFoundException);
-  });
 
   describe('getCancellationStatus refund projection', () => {
     const baseBooking = {

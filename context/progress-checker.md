@@ -7,13 +7,39 @@ Update this file after every completed feature. Any AI agent reading this should
 ### Current Status
 
 **Feature:** Deepen Codebase Architecture (Feature 019)
-**Last completed:** Slice 1D: Contract Schema & Final Gate 1 Validation (2026-08-23).
+**Last completed:** Slice 2B: Extract Booking Management Module (2026-08-23).
 **In progress:** None.
-**Next:** Slice 2: Isolate Booking Lifecycle, Reads, and Cancellation (US2).
+**Next:** Slice 2C: Extract Cancellation Module (US2).
 
 ---
 
 ## Progress by Feature
+
+### [x] Feature: Deepen Codebase Architecture (Feature 019) — Slice 2B: Extract Booking Management Module
+
+- [x] Slice 2B / Extract Booking Management Module (2026-08-23):
+  - **Booking Management Module Creation (`apps/api/src/booking-management/`)**:
+    - Implemented `BookingManagementService` owning read operations: `listBookings`, `getBookingDetail`, `mapDisruptionAndItinerary`, `sortBookings`, `toListItem`, and ancillary mapping.
+    - Wired `BookingManagementService` with `BookingLifecycleService.checkAndCompleteBooking()` and `BookingRecoveryService.reconcileBookingIfStale()`.
+    - Organized DTOs: `BookingListQueryDto`, `BookingTab`, `BookingListItemResponseDto`, `BookingListResponseDto`, `BookingDetailResponseDto`.
+    - Configured `BookingManagementModule` importing `PrismaModule` and `BookingLifecycleModule`.
+  - **Controller Rewiring (`apps/api/src/booking/booking.controller.ts`)**:
+    - Rewired `GET /bookings` to `bookingManagementService.listBookings(req.user.id, query.tab, query.page, query.limit)`.
+    - Rewired `GET /bookings/:bookingId` to `bookingManagementService.getBookingDetail(bookingId, req.user.id)`.
+    - Preserved existing response DTO shapes, tenant isolation (`ForbiddenException`), and missing 404 semantics.
+  - **Transitional Compatibility (`apps/api/src/booking/booking.service.ts`)**:
+    - Injected `BookingManagementService` and delegated `listBookings` / `getBookingDetail` for backward compatibility until full retirement in Slice 2D.
+  - **Module Registration (`apps/api/src/app.module.ts` & `booking.module.ts`)**:
+    - Registered `BookingLifecycleModule` and `BookingManagementModule` in `AppModule` and `BookingModule`.
+  - **Verification & Test Suites (100% Green)**:
+    - `booking-management.service.spec.ts`: 17/17 tests PASS.
+    - `booking.controller.spec.ts`: 5/5 tests PASS.
+    - `booking.service.spec.ts`: 28/28 tests PASS.
+    - `test/characterization/booking-characterization.e2e-spec.ts`: 14/14 tests PASS.
+    - Full API Unit Suite: 81/81 suites (857/857 tests) PASS.
+    - Full API E2E Suite: 57/57 suites (495/495 tests) PASS.
+    - ESLint: 0 errors, 0 warnings; TypeScript Typecheck: 0 errors; NestJS build succeeds.
+
 
 ### [x] Feature: Deepen Codebase Architecture (Feature 019) — Slice 1D: Contract Schema & Final Gate 1 Validation
 

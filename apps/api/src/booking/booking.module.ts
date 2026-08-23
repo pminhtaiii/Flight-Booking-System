@@ -5,12 +5,22 @@ import { BookingService } from './booking.service';
 import { PaymentModule } from '../payment/payment.module';
 import { DuffelModule } from '../duffel/duffel.module';
 import { AgentGatewayModule } from '../agent-gateway/agent-gateway.module';
+import { BookingManagementModule } from '@/booking-management/booking-management.module';
+import { BookingLifecycleModule } from '@/booking-lifecycle/booking-lifecycle.module';
 
 @Module({
-  imports: [PrismaModule, DuffelModule, forwardRef(() => PaymentModule), forwardRef(() => AgentGatewayModule)],
+  imports: [
+    PrismaModule,
+    DuffelModule,
+    forwardRef(() => PaymentModule),
+    forwardRef(() => AgentGatewayModule),
+    BookingManagementModule,
+    BookingLifecycleModule,
+  ],
   controllers: [BookingController],
   providers: [BookingService],
   exports: [BookingService],
 })
 export class BookingModule {}
+
 
