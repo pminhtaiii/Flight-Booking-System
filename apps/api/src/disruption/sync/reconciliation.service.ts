@@ -30,8 +30,7 @@ export class ReconciliationService {
   @Cron(process.env.DUFFEL_RECONCILIATION_CRON || '*/30 * * * *')
   async handleCron(): Promise<void> {
     const isReconciliationEnabled = process.env.FEATURE_FLAG_DISRUPTION_RECONCILIATION === 'true';
-    const isTestEnv = process.env.NODE_ENV === 'test' || process.env.JEST_WORKER_ID !== undefined;
-    if (!isReconciliationEnabled && !isTestEnv) {
+    if (!isReconciliationEnabled) {
       return;
     }
 

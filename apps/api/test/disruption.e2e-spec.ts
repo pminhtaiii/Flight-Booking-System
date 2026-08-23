@@ -56,6 +56,11 @@ describe('Disruption & Flight-Change Management (Webhook & Processor E2E)', () =
   });
 
   afterAll(async () => {
+    delete process.env.FEATURE_FLAG_DISRUPTION_INGRESS;
+    delete process.env.FEATURE_FLAG_DISRUPTION_PROCESSOR;
+    delete process.env.FEATURE_FLAG_DISRUPTION_RECONCILIATION;
+    delete process.env.FEATURE_FLAG_DISRUPTION_SURFACING;
+    delete process.env.FEATURE_FLAG_DISRUPTION_OUTBOX;
     await app.close();
   });
 

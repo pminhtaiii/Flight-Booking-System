@@ -36,8 +36,7 @@ export class DuffelWebhookController {
   ): Promise<{ received: boolean }> {
     // 1. Feature flag control
     const isReceiverEnabled = process.env.FEATURE_FLAG_DISRUPTION_INGRESS === 'true';
-    const isTestEnv = process.env.NODE_ENV === 'test' || process.env.JEST_WORKER_ID !== undefined;
-    if (!isReceiverEnabled && !isTestEnv) {
+    if (!isReceiverEnabled) {
       this.logger.warn('Duffel webhook receiver request rejected (receiver disabled)');
       throw new BadRequestException({
         message: 'Duffel webhook receiver is disabled',
