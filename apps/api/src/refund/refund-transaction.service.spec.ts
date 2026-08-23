@@ -1,7 +1,7 @@
 import 'reflect-metadata';
 import * as crypto from 'crypto';
 import { Test, TestingModule } from '@nestjs/testing';
-import { BadRequestException, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Logger, NotFoundException } from '@nestjs/common';
 import { PaymentStatus, RefundStatus, RefundTriggerType } from '@prisma/client';
 import { PrismaService } from '@/prisma/prisma.service';
 import {
@@ -11,6 +11,8 @@ import {
 
 describe('RefundTransactionService', () => {
   let service: RefundTransactionService;
+  let logSpy: jest.SpyInstance;
+  let warnSpy: jest.SpyInstance;
 
   const mockPrisma = {
     $transaction: jest.fn(),
@@ -41,6 +43,8 @@ describe('RefundTransactionService', () => {
 
   beforeEach(async () => {
     jest.resetAllMocks();
+    logSpy = jest.spyOn(Logger.prototype, 'log').mockImplementation(() => undefined);
+    warnSpy = jest.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
 
     mockPrisma.$transaction.mockImplementation(
       async (callback: (tx: typeof mockPrisma) => Promise<unknown>) =>
@@ -60,7 +64,12 @@ describe('RefundTransactionService', () => {
     service = module.get<RefundTransactionService>(RefundTransactionService);
   });
 
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
   const baseInput: ReserveRefundTransactionInput = {
+    kind: 'DIRECT',
     paymentId: 'pay-123',
     amount: 5000,
     currency: 'USD',
@@ -83,6 +92,46 @@ describe('RefundTransactionService', () => {
       await expect(
         service.reserveTransaction({ ...baseInput, amount: 10.5 }),
       ).rejects.toThrow(BadRequestException);
+    });
+
+    it('rejects a direct reservation that uses the cancellation discriminator', async () => {
+      await expect(
+        service.reserveTransaction({
+          ...baseInput,
+          reason: 'Cancellation:booking-123',
+        }),
+      ).rejects.toThrow('Direct refund requests cannot use cancellation semantics');
+      expect(mockPrisma.$transaction).not.toHaveBeenCalled();
+    });
+
+    it('rejects direct reservations carrying legacy cancellation fields at runtime', async () => {
+      const invalidDirectInput: unknown = {
+        ...baseInput,
+        cancellationRefundObligationId: 'obligation-123',
+        cancellationBookingId: 'booking-123',
+      };
+
+      await expect(
+        (service.reserveTransaction as unknown as (input: unknown) => Promise<unknown>)(
+          invalidDirectInput,
+        ),
+      ).rejects.toThrow('Direct refund requests cannot use cancellation semantics');
+      expect(mockPrisma.$transaction).not.toHaveBeenCalled();
+    });
+
+    it('requires an obligation for a cancellation reservation before opening a transaction', async () => {
+      await expect(
+        (service.reserveTransaction as unknown as (input: unknown) => Promise<unknown>)({
+          paymentId: baseInput.paymentId,
+          amount: baseInput.amount,
+          currency: baseInput.currency,
+          triggerType: baseInput.triggerType,
+          idempotencyKey: baseInput.idempotencyKey,
+          kind: 'CANCELLATION',
+          cancellationBookingId: 'booking-123',
+        }),
+      ).rejects.toThrow('Cancellation refunds require a cancellation refund obligation');
+      expect(mockPrisma.$transaction).not.toHaveBeenCalled();
     });
   });
 
@@ -130,7 +179,9 @@ describe('RefundTransactionService', () => {
       await expect(
         service.reserveTransaction({
           ...baseInput,
+          kind: 'CANCELLATION',
           cancellationRefundObligationId: 'ob-999',
+          cancellationBookingId: 'booking-1',
         }),
       ).rejects.toThrow(NotFoundException);
     });
@@ -149,6 +200,7 @@ describe('RefundTransactionService', () => {
         .mockResolvedValueOnce([
           {
             id: 'ob-1',
+            bookingId: 'booking-1',
             paymentId: 'other-payment',
             totalAmount: 5000,
             currency: 'USD',
@@ -158,7 +210,9 @@ describe('RefundTransactionService', () => {
       await expect(
         service.reserveTransaction({
           ...baseInput,
+          kind: 'CANCELLATION',
           cancellationRefundObligationId: 'ob-1',
+          cancellationBookingId: 'booking-1',
         }),
       ).rejects.toThrow(BadRequestException);
     });
@@ -177,6 +231,7 @@ describe('RefundTransactionService', () => {
         .mockResolvedValueOnce([
           {
             id: 'ob-1',
+            bookingId: 'booking-1',
             paymentId: 'pay-123',
             totalAmount: 5000,
             currency: 'GBP',
@@ -186,7 +241,9 @@ describe('RefundTransactionService', () => {
       await expect(
         service.reserveTransaction({
           ...baseInput,
+          kind: 'CANCELLATION',
           cancellationRefundObligationId: 'ob-1',
+          cancellationBookingId: 'booking-1',
         }),
       ).rejects.toThrow(BadRequestException);
     });
@@ -198,7 +255,9 @@ describe('RefundTransactionService', () => {
       .update(
         JSON.stringify({
           paymentId: baseInput.paymentId,
-          obligationId: baseInput.cancellationRefundObligationId,
+          kind: 'DIRECT',
+          obligationId: null,
+          bookingId: null,
           amount: baseInput.amount,
           currency: baseInput.currency,
           reason: baseInput.reason,
@@ -289,6 +348,12 @@ describe('RefundTransactionService', () => {
       await expect(
         service.reserveTransaction({ ...baseInput, amount: 2000 }),
       ).rejects.toThrow(BadRequestException);
+
+      expect(warnSpy).toHaveBeenCalledWith({
+        message: 'refund_reservation',
+        outcome: 'REJECTED',
+        capacity: 'PAYMENT',
+      });
     });
 
     it('ignores terminal failed refunds in payment capacity calculation', async () => {
@@ -346,6 +411,7 @@ describe('RefundTransactionService', () => {
         .mockResolvedValueOnce([
           {
             id: 'ob-1',
+            bookingId: 'booking-1',
             paymentId: 'pay-123',
             totalAmount: 8000,
             currency: 'USD',
@@ -368,10 +434,18 @@ describe('RefundTransactionService', () => {
       await expect(
         service.reserveTransaction({
           ...baseInput,
+          kind: 'CANCELLATION',
           cancellationRefundObligationId: 'ob-1',
+          cancellationBookingId: 'booking-1',
           amount: 2000,
         }),
       ).rejects.toThrow(BadRequestException);
+
+      expect(warnSpy).toHaveBeenCalledWith({
+        message: 'refund_reservation',
+        outcome: 'REJECTED',
+        capacity: 'OBLIGATION',
+      });
     });
 
     it('tracks active and successful refunds across payment and obligation and creates refund reservation', async () => {
@@ -388,6 +462,7 @@ describe('RefundTransactionService', () => {
         .mockResolvedValueOnce([
           {
             id: 'ob-1',
+            bookingId: 'booking-1',
             paymentId: 'pay-123',
             totalAmount: 10000,
             currency: 'USD',
@@ -419,7 +494,7 @@ describe('RefundTransactionService', () => {
         idempotencyKeyId: 'key-new',
         amount: 4000,
         currency: 'USD',
-        reason: 'Customer cancellation',
+        reason: 'cancellation:booking-1',
         triggerType: RefundTriggerType.USER,
         triggeredByUserId: 'user-123',
         status: RefundStatus.REFUND_PENDING,
@@ -428,7 +503,9 @@ describe('RefundTransactionService', () => {
 
       const result = await service.reserveTransaction({
         ...baseInput,
+        kind: 'CANCELLATION',
         cancellationRefundObligationId: 'ob-1',
+        cancellationBookingId: 'booking-1',
         amount: 4000,
       });
 
@@ -438,22 +515,39 @@ describe('RefundTransactionService', () => {
           key: 'idem-key-abc',
           customerId: 'user-123',
           requestPath: '/api/refund/reserve',
+          requestHash: crypto
+            .createHash('sha256')
+            .update(
+              JSON.stringify({
+                paymentId: 'pay-123',
+                kind: 'CANCELLATION',
+                obligationId: 'ob-1',
+                bookingId: 'booking-1',
+                amount: 4000,
+                currency: 'USD',
+                reason: 'cancellation:booking-1',
+              }),
+            )
+            .digest('hex'),
         }),
       });
       expect(mockPrisma.refund.create).toHaveBeenCalledWith({
         data: {
           paymentId: 'pay-123',
-          bookingId: null,
           cancellationRefundObligationId: 'ob-1',
           idempotencyKeyId: 'key-new',
           amount: 4000,
           currency: 'USD',
-          reason: baseInput.reason,
+          reason: 'cancellation:booking-1',
           triggerType: RefundTriggerType.USER,
           triggeredByUserId: 'user-123',
           status: RefundStatus.REFUND_PENDING,
           idempotencyKeyCreatedAt: expect.any(Date),
         },
+      });
+      expect(logSpy).toHaveBeenCalledWith({
+        message: 'refund_reservation',
+        outcome: 'RESERVED',
       });
     });
 
@@ -482,6 +576,7 @@ describe('RefundTransactionService', () => {
       });
 
       await service.reserveTransaction({
+        kind: 'DIRECT',
         paymentId: 'pay-123',
         amount: 2000,
         currency: 'USD',

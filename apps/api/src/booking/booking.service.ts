@@ -1,6 +1,6 @@
 import { BadGatewayException, BadRequestException, ForbiddenException, Injectable, NotFoundException, Logger, Optional } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
-import { Booking, BookingFailureReason, BookingStatus, Prisma, DisruptionStatus, DisruptionActorType } from '@prisma/client';
+import { Booking, BookingFailureReason, BookingStatus, Prisma, DisruptionStatus, DisruptionActorType, RefundStatus } from '@prisma/client';
 import { PrismaService } from '@/prisma/prisma.service';
 import { CancellationQuoteResponseDto, CancellationResponseDto, FlightSnapshot, PassengerSnapshot } from '@shared/booking-types';
 import { BookingDetailResponseDto, BookingListItemResponseDto, BookingListResponseDto, BookingTab } from './dto';
@@ -1128,6 +1128,46 @@ export class BookingService {
         await this.bookingAgentProjectionService?.updateProjectionStatus(bookingId, cancellationStatus, tx);
       }
 
+      if (result.count > 0 && booking.payment) {
+        const existingObligation = await tx.cancellationRefundObligation.findUnique({
+          where: { bookingId },
+          select: { id: true },
+        });
+        const obligation = await tx.cancellationRefundObligation.upsert({
+          where: { bookingId },
+          update: {
+            paymentId: booking.payment.id,
+            totalAmount: amountInMinorUnits,
+            airlineRefundAmount: amountInMinorUnits,
+            currency: booking.currency.toUpperCase(),
+          },
+          create: {
+            bookingId,
+            paymentId: booking.payment.id,
+            totalAmount: amountInMinorUnits,
+            airlineRefundAmount: amountInMinorUnits,
+            currency: booking.currency.toUpperCase(),
+          },
+        });
+        const obligationAuditId = `cancellation-obligation:${bookingId}`;
+        await tx.auditLog.create({
+          data: {
+            userId,
+            action: 'cancellation_refund_obligation_upserted',
+            resourceType: 'CancellationRefundObligation',
+            resourceId: obligation.id,
+            metadata: {
+              operation: existingObligation ? 'UPDATED' : 'CREATED',
+              totalAmountMinorUnits: amountInMinorUnits,
+              airlineRefundAmountMinorUnits: amountInMinorUnits,
+              currency: booking.currency.toUpperCase(),
+            },
+            traceId: obligationAuditId,
+            correlationId: obligationAuditId,
+          },
+        });
+      }
+
       if (result.count > 0 && hasActiveDisruption) {
         await tx.disruptionAuditEvent.create({
           data: {
@@ -1223,7 +1263,18 @@ export class BookingService {
   async getCancellationStatus(bookingId: string, userId: string): Promise<any> {
     const booking = await this.prisma.booking.findUnique({
       where: { id: bookingId },
-      include: { cancellationRefund: true },
+      include: {
+        cancellationRefundObligation: {
+          include: {
+            refunds: {
+              orderBy: [
+                { updatedAt: 'desc' },
+                { id: 'desc' },
+              ],
+            },
+          },
+        },
+      },
     });
 
     if (!booking) {
@@ -1233,17 +1284,67 @@ export class BookingService {
       throw new ForbiddenException('You do not have access to this booking');
     }
 
+    const obligation = booking.cancellationRefundObligation;
+    const refunds = obligation?.refunds ?? [];
+    const isZeroValueObligation = obligation?.totalAmount === 0;
+    const refundedAmount = refunds
+      .filter((refund) => refund.status === RefundStatus.SUCCEEDED)
+      .reduce((total, refund) => total + refund.amount, 0);
+    const isFulfilled = obligation != null
+      ? !isZeroValueObligation && refundedAmount >= obligation.totalAmount
+      : booking.status === BookingStatus.CANCELLED_AND_REFUNDED;
+
+    const selectHighestPriority = <T extends {
+      status: RefundStatus;
+      updatedAt: Date;
+      id: string;
+    }>(candidates: T[], priority: Partial<Record<RefundStatus, number>>): T | undefined => {
+      const matching = candidates.filter((c) => priority[c.status] !== undefined);
+      if (matching.length === 0) {
+        return undefined;
+      }
+      return [...matching].sort((left, right) => {
+        const priorityDifference = (priority[left.status] ?? Number.MAX_SAFE_INTEGER)
+          - (priority[right.status] ?? Number.MAX_SAFE_INTEGER);
+        if (priorityDifference !== 0) {
+          return priorityDifference;
+        }
+
+        const updatedAtDifference = right.updatedAt.getTime() - left.updatedAt.getTime();
+        return updatedAtDifference !== 0
+          ? updatedAtDifference
+          : right.id.localeCompare(left.id);
+      })[0];
+    };
+
+    const activeRefund = selectHighestPriority(refunds, {
+      [RefundStatus.REFUND_PROCESSING]: 0,
+      [RefundStatus.REFUND_RETRY_SCHEDULED]: 1,
+      [RefundStatus.REFUND_PENDING]: 2,
+    });
+    const terminalRefund = selectHighestPriority(refunds, {
+      [RefundStatus.REFUND_FAILED_NEEDS_ATTENTION]: 0,
+      [RefundStatus.FAILED]: 1,
+    });
+    const projectedRefund = isFulfilled || isZeroValueObligation
+      ? undefined
+      : activeRefund ?? terminalRefund;
+    const refundStatus: RefundStatus | 'NOT_REQUIRED' | null = isZeroValueObligation
+      ? 'NOT_REQUIRED'
+      : isFulfilled
+        ? RefundStatus.SUCCEEDED
+        : projectedRefund?.status ?? (obligation ? RefundStatus.REFUND_PENDING : null);
+
     let escalationMessage = null;
-    if (booking.status === BookingStatus.REFUND_FAILED_NEEDS_ATTENTION) {
-      const hoursElapsed = (Date.now() - booking.updatedAt.getTime()) / (1000 * 60 * 60);
+    if (refundStatus === RefundStatus.REFUND_FAILED_NEEDS_ATTENTION) {
+      const updatedAt = projectedRefund?.updatedAt ?? booking.updatedAt;
+      const hoursElapsed = (Date.now() - updatedAt.getTime()) / (1000 * 60 * 60);
       if (hoursElapsed < 48) {
         escalationMessage = "Refund is taking longer than expected. Our team is reviewing \u2014 no action needed.";
       } else {
         escalationMessage = "Refund requires attention. Please contact support.";
       }
     }
-
-    const refund = booking.cancellationRefund;
 
     return {
       bookingId: booking.id,
@@ -1252,10 +1353,10 @@ export class BookingService {
       airlineRefundAmount: booking.airlineRefundAmount?.toString() ?? null,
       customerRefundAmount: booking.customerRefundAmount?.toString() ?? null,
       duffelCancellationQuoteId: parseDuffelCancellationQuoteId(booking.duffelCancellationQuoteId).quoteId,
-      refundStatus: refund?.status ?? null,
-      retryCount: refund?.retryCount ?? null,
-      nextRetryAt: refund?.nextRetryAt?.toISOString() ?? null,
-      lastErrorCode: refund?.lastErrorCode ?? null,
+      refundStatus,
+      retryCount: projectedRefund?.retryCount ?? null,
+      nextRetryAt: projectedRefund?.nextRetryAt?.toISOString() ?? null,
+      lastErrorCode: projectedRefund?.lastErrorCode ?? null,
       escalationMessage,
     };
   }

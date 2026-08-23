@@ -77,6 +77,7 @@ describe('Cancellation and refund recovery (E2E)', () => {
     await prisma.paymentEvent.deleteMany({});
     await prisma.ledgerEntry.deleteMany({});
     await prisma.refund.deleteMany({});
+    await prisma.cancellationRefundObligation.deleteMany({});
     await prisma.payment.deleteMany({});
     await prisma.idempotencyKey.deleteMany({});
     await prisma.paymentMethod.deleteMany({});
@@ -167,6 +168,17 @@ describe('Cancellation and refund recovery (E2E)', () => {
   }
 
   async function createScheduledRefund(booking: CancellationBooking, keyCreatedAt: Date): Promise<string> {
+    const obligation = await prisma.cancellationRefundObligation.upsert({
+      where: { bookingId: booking.id },
+      update: {},
+      create: {
+        bookingId: booking.id,
+        paymentId: booking.paymentId,
+        totalAmount: 10_000,
+        airlineRefundAmount: 10_000,
+        currency: 'USD',
+      },
+    });
     const refundKey = await prisma.idempotencyKey.create({
       data: {
         key: `cancellation-refund:${booking.id}`,
@@ -180,7 +192,7 @@ describe('Cancellation and refund recovery (E2E)', () => {
       data: {
         paymentId: booking.paymentId,
         idempotencyKeyId: refundKey.id,
-        bookingId: booking.id,
+        cancellationRefundObligationId: obligation.id,
         amount: 10_000,
         currency: 'USD',
         triggerType: 'SYSTEM_AUTOMATED',
@@ -260,9 +272,84 @@ describe('Cancellation and refund recovery (E2E)', () => {
     expect(confirmSpy).toHaveBeenCalledTimes(1);
     expect(retrieveSpy).toHaveBeenCalledTimes(1);
     expect(stripeSpy).toHaveBeenCalledTimes(1);
-    const persisted = await prisma.booking.findUniqueOrThrow({ where: { id: booking.id }, include: { cancellationRefund: true } });
+    const persisted = await prisma.booking.findUniqueOrThrow({
+      where: { id: booking.id },
+      include: { cancellationRefundObligation: { include: { refunds: true } } },
+    });
     expect(persisted.status).toBe(BookingStatus.CANCELLED_AND_REFUNDED);
-    expect(persisted.cancellationRefund?.status).toBe(RefundStatus.SUCCEEDED);
+    expect(persisted.cancellationRefundObligation?.refunds[0]?.status).toBe(RefundStatus.SUCCEEDED);
+  });
+
+  it('records a zero-value cancellation obligation and one PII-safe audit without creating a provider refund', async (): Promise<void> => {
+    const booking = await createCancellationBooking(owner.id, { refundAmount: '0.00' });
+    const supplierCancellation = {
+      id: `cancel-${crypto.randomUUID()}`,
+      order_id: `order-${crypto.randomUUID()}`,
+      status: 'CONFIRMED' as const,
+      refund_amount: '0.00',
+      refund_currency: 'USD',
+      refundable: false,
+      confirmed_at: new Date().toISOString(),
+    };
+    jest.spyOn(duffelService, 'retrieveOrder').mockResolvedValue({
+      id: booking.id,
+      order_id: booking.id,
+      status: 'ACTIVE',
+      cancelled_at: null,
+      cancellation_id: null,
+    });
+    jest.spyOn(duffelService, 'confirmCancellationQuote').mockResolvedValue(supplierCancellation);
+    const stripeSpy = jest.spyOn(stripeService, 'createRefund');
+
+    const response = await request(app.getHttpServer())
+      .post(`/api/bookings/${booking.id}/cancel`)
+      .set('Authorization', `Bearer ${owner.token}`)
+      .send({ quoteId: booking.quoteId })
+      .expect(201);
+
+    expect(response.body).toMatchObject({
+      bookingId: booking.id,
+      bookingStatus: BookingStatus.CANCELLED_NO_REFUND,
+      cancellationStatus: BookingStatus.CANCELLED_NO_REFUND,
+      refundStatus: 'NOT_REQUIRED',
+      refundAmount: '0.00',
+    });
+    expect(stripeSpy).not.toHaveBeenCalled();
+
+    const obligation = await prisma.cancellationRefundObligation.findUniqueOrThrow({
+      where: { bookingId: booking.id },
+      include: { refunds: true },
+    });
+    expect(obligation).toMatchObject({
+      bookingId: booking.id,
+      paymentId: booking.paymentId,
+      totalAmount: 0,
+      airlineRefundAmount: 0,
+      currency: 'USD',
+    });
+    expect(obligation.refunds).toHaveLength(0);
+
+    const audits = await prisma.auditLog.findMany({
+      where: {
+        resourceType: 'CancellationRefundObligation',
+        resourceId: obligation.id,
+        action: 'cancellation_refund_obligation_upserted',
+      },
+    });
+    expect(audits).toHaveLength(1);
+    expect(audits[0]).toMatchObject({
+      userId: owner.id,
+      traceId: `cancellation-obligation:${booking.id}`,
+      correlationId: `cancellation-obligation:${booking.id}`,
+      metadata: {
+        operation: 'CREATED',
+        totalAmountMinorUnits: 0,
+        airlineRefundAmountMinorUnits: 0,
+        currency: 'USD',
+      },
+    });
+    expect(JSON.stringify(audits[0])).not.toContain(supplierCancellation.id);
+    expect(JSON.stringify(audits[0])).not.toContain(supplierCancellation.order_id);
   });
 
   it('uses remote supplier state during recovery instead of confirming the quote again', async (): Promise<void> => {
@@ -323,7 +410,9 @@ describe('Cancellation and refund recovery (E2E)', () => {
 
     expect(stripeSpy).toHaveBeenCalledTimes(2);
     const [refund, persistedBooking] = await Promise.all([
-      prisma.refund.findFirstOrThrow({ where: { bookingId: booking.id } }),
+      prisma.refund.findFirstOrThrow({
+        where: { cancellationRefundObligation: { bookingId: booking.id } },
+      }),
       prisma.booking.findUniqueOrThrow({ where: { id: booking.id } }),
     ]);
     expect(refund.status).toBe(RefundStatus.SUCCEEDED);

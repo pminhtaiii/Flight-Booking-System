@@ -245,11 +245,12 @@ describe('Refund Settlement & Transaction Lifecycle (E2E)', () => {
 
       // 1. Reserve refund transaction
       const refund = await refundTransactionService.reserveTransaction({
+        kind: 'CANCELLATION',
         paymentId: payment.id,
         cancellationRefundObligationId: obligation.id,
+        cancellationBookingId: booking.id,
         amount: 10000,
         currency: 'USD',
-        reason: 'Cancellation refund',
         triggerType: RefundTriggerType.SYSTEM_AUTOMATED,
         actorId: testUser.id,
         idempotencyKey: `single-full-ref-${crypto.randomUUID()}`,
@@ -330,7 +331,7 @@ describe('Refund Settlement & Transaction Lifecycle (E2E)', () => {
 
       // PaymentEvent
       const paymentEvent = await prisma.paymentEvent.findFirst({
-        where: { paymentId: payment.id, eventType: 'refund_settled' },
+        where: { paymentId: payment.id, eventType: 'cancellation_refund_succeeded' },
       });
       expect(paymentEvent).toBeDefined();
       expect(paymentEvent!.newStatus).toBe(PaymentStatus.REFUNDED);
@@ -367,11 +368,12 @@ describe('Refund Settlement & Transaction Lifecycle (E2E)', () => {
 
       // Tx 1: Reserve $100 -> Settle SUCCEEDED -> Payment PARTIALLY_REFUNDED, Booking CANCELLED_PENDING_REFUND
       const refund1 = await refundTransactionService.reserveTransaction({
+        kind: 'CANCELLATION',
         paymentId: payment.id,
         cancellationRefundObligationId: obligation.id,
+        cancellationBookingId: booking.id,
         amount: 10000,
         currency: 'USD',
-        reason: 'Partial refund 1',
         triggerType: RefundTriggerType.SYSTEM_AUTOMATED,
         actorId: testUser.id,
         idempotencyKey: `multi-ref-1-${crypto.randomUUID()}`,
@@ -398,11 +400,12 @@ describe('Refund Settlement & Transaction Lifecycle (E2E)', () => {
 
       // Tx 2: Reserve $100 -> Settle SUCCEEDED -> Payment PARTIALLY_REFUNDED, Booking CANCELLED_PENDING_REFUND
       const refund2 = await refundTransactionService.reserveTransaction({
+        kind: 'CANCELLATION',
         paymentId: payment.id,
         cancellationRefundObligationId: obligation.id,
+        cancellationBookingId: booking.id,
         amount: 10000,
         currency: 'USD',
-        reason: 'Partial refund 2',
         triggerType: RefundTriggerType.SYSTEM_AUTOMATED,
         actorId: testUser.id,
         idempotencyKey: `multi-ref-2-${crypto.randomUUID()}`,
@@ -428,11 +431,12 @@ describe('Refund Settlement & Transaction Lifecycle (E2E)', () => {
 
       // Tx 3: Reserve $100 -> Settle SUCCEEDED -> Payment PARTIALLY_REFUNDED (30000/50000), Booking CANCELLED_AND_REFUNDED (30000/30000)
       const refund3 = await refundTransactionService.reserveTransaction({
+        kind: 'CANCELLATION',
         paymentId: payment.id,
         cancellationRefundObligationId: obligation.id,
+        cancellationBookingId: booking.id,
         amount: 10000,
         currency: 'USD',
-        reason: 'Partial refund 3 (completes obligation)',
         triggerType: RefundTriggerType.SYSTEM_AUTOMATED,
         actorId: testUser.id,
         idempotencyKey: `multi-ref-3-${crypto.randomUUID()}`,
@@ -462,11 +466,12 @@ describe('Refund Settlement & Transaction Lifecycle (E2E)', () => {
       // Tx 4: Attempt to reserve $100 against obligation -> rejected with BadRequestException because obligation capacity is 0
       await expect(
         refundTransactionService.reserveTransaction({
+          kind: 'CANCELLATION',
           paymentId: payment.id,
           cancellationRefundObligationId: obligation.id,
+          cancellationBookingId: booking.id,
           amount: 10000,
           currency: 'USD',
-          reason: 'Excess obligation refund',
           triggerType: RefundTriggerType.USER,
           actorId: testUser.id,
           idempotencyKey: `multi-ref-4-${crypto.randomUUID()}`,
@@ -475,6 +480,7 @@ describe('Refund Settlement & Transaction Lifecycle (E2E)', () => {
 
       // Tx 5: Reserve $100 against Payment directly (no obligation) -> succeeds (payment remaining capacity is $200)
       const refund5 = await refundTransactionService.reserveTransaction({
+        kind: 'DIRECT',
         paymentId: payment.id,
         amount: 10000,
         currency: 'USD',
@@ -524,6 +530,7 @@ describe('Refund Settlement & Transaction Lifecycle (E2E)', () => {
       // Attempt $600 on $500 payment
       await expect(
         refundTransactionService.reserveTransaction({
+          kind: 'DIRECT',
           paymentId: payment.id,
           amount: 60000,
           currency: 'USD',
@@ -552,6 +559,7 @@ describe('Refund Settlement & Transaction Lifecycle (E2E)', () => {
       // Currency mismatch with payment
       await expect(
         refundTransactionService.reserveTransaction({
+          kind: 'DIRECT',
           paymentId: payment.id,
           amount: 5000,
           currency: 'EUR',
@@ -582,11 +590,12 @@ describe('Refund Settlement & Transaction Lifecycle (E2E)', () => {
 
       await expect(
         refundTransactionService.reserveTransaction({
+          kind: 'CANCELLATION',
           paymentId: payment2.id,
           cancellationRefundObligationId: eurObligation.id,
+          cancellationBookingId: booking2.id,
           amount: 5000,
           currency: 'USD',
-          reason: 'Currency mismatch obligation',
           triggerType: RefundTriggerType.USER,
           actorId: testUser.id,
           idempotencyKey: `cur-mis-ref-2-${crypto.randomUUID()}`,
@@ -610,11 +619,12 @@ describe('Refund Settlement & Transaction Lifecycle (E2E)', () => {
       // Attempt to reserve for payment2 using obligation1 (which belongs to payment1)
       await expect(
         refundTransactionService.reserveTransaction({
+          kind: 'CANCELLATION',
           paymentId: payment2.id,
           cancellationRefundObligationId: obligation1.id,
+          cancellationBookingId: booking1.id,
           amount: 5000,
           currency: 'USD',
-          reason: 'Obligation payment mismatch',
           triggerType: RefundTriggerType.USER,
           actorId: testUser.id,
           idempotencyKey: `ob-mis-ref-${crypto.randomUUID()}`,
@@ -637,6 +647,7 @@ describe('Refund Settlement & Transaction Lifecycle (E2E)', () => {
 
       // First reservation
       const refund1 = await refundTransactionService.reserveTransaction({
+        kind: 'DIRECT',
         paymentId: payment.id,
         amount: 5000,
         currency: 'USD',
@@ -648,6 +659,7 @@ describe('Refund Settlement & Transaction Lifecycle (E2E)', () => {
 
       // Duplicate reservation with same key and same payload
       const refund2 = await refundTransactionService.reserveTransaction({
+        kind: 'DIRECT',
         paymentId: payment.id,
         amount: 5000,
         currency: 'USD',
@@ -677,6 +689,7 @@ describe('Refund Settlement & Transaction Lifecycle (E2E)', () => {
       const sharedKey = `shared-mismatch-key-${crypto.randomUUID()}`;
 
       await refundTransactionService.reserveTransaction({
+        kind: 'DIRECT',
         paymentId: payment.id,
         amount: 5000,
         currency: 'USD',
@@ -689,6 +702,7 @@ describe('Refund Settlement & Transaction Lifecycle (E2E)', () => {
       // Attempt reuse with different amount
       await expect(
         refundTransactionService.reserveTransaction({
+          kind: 'DIRECT',
           paymentId: payment.id,
           amount: 6000,
           currency: 'USD',
@@ -702,6 +716,7 @@ describe('Refund Settlement & Transaction Lifecycle (E2E)', () => {
       // Attempt reuse with different reason
       await expect(
         refundTransactionService.reserveTransaction({
+          kind: 'DIRECT',
           paymentId: payment.id,
           amount: 5000,
           currency: 'USD',
@@ -725,11 +740,12 @@ describe('Refund Settlement & Transaction Lifecycle (E2E)', () => {
       const obligation = await createObligation(booking.id, payment.id);
 
       const refund = await refundTransactionService.reserveTransaction({
+        kind: 'CANCELLATION',
         paymentId: payment.id,
         cancellationRefundObligationId: obligation.id,
+        cancellationBookingId: booking.id,
         amount: 10000,
         currency: 'USD',
-        reason: 'Settlement idempotency test',
         triggerType: RefundTriggerType.SYSTEM_AUTOMATED,
         actorId: testUser.id,
         idempotencyKey: `idem-settle-ref-${crypto.randomUUID()}`,
@@ -756,7 +772,7 @@ describe('Refund Settlement & Transaction Lifecycle (E2E)', () => {
       expect(initialLedgers).toBe(2);
 
       const initialEvents = await prisma.paymentEvent.count({
-        where: { paymentId: payment.id, eventType: 'refund_settled' },
+        where: { paymentId: payment.id, eventType: 'cancellation_refund_succeeded' },
       });
       expect(initialEvents).toBe(1);
 
@@ -778,7 +794,7 @@ describe('Refund Settlement & Transaction Lifecycle (E2E)', () => {
       expect(postReplayLedgers).toBe(2);
 
       const postReplayEvents = await prisma.paymentEvent.count({
-        where: { paymentId: payment.id, eventType: 'refund_settled' },
+        where: { paymentId: payment.id, eventType: 'cancellation_refund_succeeded' },
       });
       expect(postReplayEvents).toBe(1);
 
@@ -801,6 +817,7 @@ describe('Refund Settlement & Transaction Lifecycle (E2E)', () => {
       });
 
       const refund = await refundTransactionService.reserveTransaction({
+        kind: 'DIRECT',
         paymentId: payment.id,
         amount: 10000,
         currency: 'USD',
@@ -862,6 +879,7 @@ describe('Refund Settlement & Transaction Lifecycle (E2E)', () => {
       });
 
       const refund = await refundTransactionService.reserveTransaction({
+        kind: 'DIRECT',
         paymentId: payment.id,
         amount: 10000,
         currency: 'USD',
@@ -906,6 +924,7 @@ describe('Refund Settlement & Transaction Lifecycle (E2E)', () => {
       });
 
       const refund = await refundTransactionService.reserveTransaction({
+        kind: 'DIRECT',
         paymentId: payment.id,
         amount: 20000,
         currency: 'USD',
@@ -949,6 +968,7 @@ describe('Refund Settlement & Transaction Lifecycle (E2E)', () => {
       });
 
       const refund = await refundTransactionService.reserveTransaction({
+        kind: 'DIRECT',
         paymentId: payment.id,
         amount: 10000,
         currency: 'USD',

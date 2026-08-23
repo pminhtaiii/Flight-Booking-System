@@ -75,6 +75,7 @@ export class PaymentRefundService {
       const refundIdempotencyKey = `refund:${paymentId}:${idempotencyKey}`;
 
       const refund = await this.refundTransactionService.reserveTransaction({
+        kind: 'DIRECT',
         paymentId,
         amount: dto.amount,
         currency: payment.currency,
@@ -198,9 +199,9 @@ export class PaymentRefundService {
       // bind one null-ID REFUND_PENDING row per unmatched ID. We update exactly one
       // row at a time (LIMIT 1 via sub-select) so two concurrent webhooks cannot both
       // claim the same null row.
-      const lateBindMatches: Array<{ id: string; amount: number; stripeRefundId?: string | null; bookingId?: string | null }> = [];
+      const lateBindMatches: Array<{ id: string; amount: number; stripeRefundId?: string | null }> = [];
       for (const stripeId of unmatchedStripeIds) {
-        const claimed = await this.prisma.$queryRaw<Array<{ id: string; amount: number; stripeRefundId?: string | null; bookingId?: string | null }>>`
+        const claimed = await this.prisma.$queryRaw<Array<{ id: string; amount: number; stripeRefundId?: string | null }>>`
           UPDATE "refunds"
           SET    "stripeRefundId" = ${stripeId}
           WHERE  id = (
@@ -212,7 +213,7 @@ export class PaymentRefundService {
             LIMIT  1
             FOR UPDATE SKIP LOCKED
           )
-          RETURNING id, amount, "stripeRefundId", "bookingId"
+          RETURNING id, amount, "stripeRefundId"
         `;
         if (claimed.length > 0) {
           lateBindMatches.push(...claimed);
@@ -315,6 +316,7 @@ export class PaymentRefundService {
       }
 
       const refund = await this.refundTransactionService.reserveTransaction({
+        kind: 'DIRECT',
         paymentId,
         amount: refundableAmount,
         currency: payment.currency,
@@ -427,16 +429,19 @@ export class PaymentRefundService {
     const obligation = await this.prisma.cancellationRefundObligation.findUnique({
       where: { bookingId: input.bookingId },
     });
+    if (!obligation) {
+      throw new NotFoundException('Cancellation refund obligation not found');
+    }
 
-    const idempotencyKey = `cancellation-refund:${obligation ? obligation.id : input.bookingId}:1`;
+    const idempotencyKey = `cancellation-refund:${obligation.id}:1`;
 
     const refund = await this.refundTransactionService.reserveTransaction({
+      kind: 'CANCELLATION',
       paymentId: input.paymentId,
-      bookingId: input.bookingId,
-      cancellationRefundObligationId: obligation?.id,
+      cancellationRefundObligationId: obligation.id,
+      cancellationBookingId: input.bookingId,
       amount: input.amount,
       currency: input.currency,
-      reason: 'cancellation:' + input.bookingId,
       triggerType: RefundTriggerType.SYSTEM_AUTOMATED,
       idempotencyKey,
     });
@@ -502,7 +507,11 @@ export class PaymentRefundService {
         idempotencyKey: { select: { key: true } },
       },
     });
-    if (!refund || refund.status !== RefundStatus.REFUND_PROCESSING || !refund.bookingId) {
+    if (
+      !refund ||
+      refund.status !== RefundStatus.REFUND_PROCESSING ||
+      !refund.cancellationRefundObligationId
+    ) {
       return;
     }
 
@@ -574,12 +583,19 @@ export class PaymentRefundService {
   ): Promise<{ refundId: string; refundStatus: string; bookingStatus: string }> {
     const refund = await this.prisma.refund.findUnique({
       where: { id: refundId },
-      select: { id: true, bookingId: true, paymentId: true, status: true, amount: true, currency: true },
+      select: {
+        id: true,
+        paymentId: true,
+        status: true,
+        amount: true,
+        currency: true,
+        cancellationRefundObligation: { select: { bookingId: true } },
+      },
     });
-    if (!refund?.bookingId) {
+    if (!refund?.cancellationRefundObligation) {
       throw new NotFoundException('Escalated cancellation refund not found');
     }
-    const bookingId = refund.bookingId;
+    const bookingId = refund.cancellationRefundObligation.bookingId;
 
     if (action === 'RETRY_WITH_FRESH_KEY') {
       const result = await this.prisma.$transaction(async (tx) => {
@@ -669,11 +685,15 @@ export class PaymentRefundService {
   }
 
   async listEscalatedRefunds() {
-    return this.prisma.refund.findMany({
+    const refunds = await this.prisma.refund.findMany({
       where: { status: RefundStatus.REFUND_FAILED_NEEDS_ATTENTION },
       include: {
-        booking: {
-          select: { id: true, status: true, pnrReference: true, duffelOrderId: true },
+        cancellationRefundObligation: {
+          select: {
+            booking: {
+              select: { id: true, status: true, pnrReference: true, duffelOrderId: true },
+            },
+          },
         },
         payment: {
           select: { id: true, status: true, stripePaymentIntentId: true, amount: true, currency: true },
@@ -681,6 +701,11 @@ export class PaymentRefundService {
       },
       orderBy: { updatedAt: 'desc' },
     });
+
+    return refunds.map(({ cancellationRefundObligation, ...refund }) => ({
+      ...refund,
+      booking: cancellationRefundObligation?.booking ?? null,
+    }));
   }
 
   private isIdempotencyKeyUnsafe(createdAt: Date): boolean {

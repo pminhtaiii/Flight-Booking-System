@@ -213,7 +213,6 @@ model Booking {
   user               User          @relation(fields: [userId], references: [id], onDelete: Cascade)
   bookingIntent      BookingIntent @relation(fields: [bookingIntentId], references: [id], onDelete: Cascade)
   payment            Payment?      @relation(fields: [paymentId], references: [id], onDelete: SetNull)
-  cancellationRefund Refund?       @relation("CancellationBookingRefund")
   cancellationRefundObligation CancellationRefundObligation?
 
   disruptionStatus           DisruptionStatus           @default(NONE)
@@ -703,8 +702,6 @@ model Refund {
   status                         RefundStatus                  @default(REFUND_PENDING)
   airlineRefundAmount            Int?
   customerRefundAmount           Int?
-  bookingId                      String?                       @unique
-  booking                        Booking?                      @relation("CancellationBookingRefund", fields: [bookingId], references: [id], onDelete: SetNull)
   retryCount                     Int                           @default(0)
   nextRetryAt                    DateTime?
   idempotencyKeyCreatedAt        DateTime?

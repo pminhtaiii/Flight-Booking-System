@@ -107,6 +107,7 @@ describe('Booking Readiness Observability (E2E) - Tasks T073 & T074', () => {
     await prisma.paymentEvent.deleteMany({});
     await prisma.ledgerEntry.deleteMany({});
     await prisma.refund.deleteMany({});
+    await prisma.cancellationRefundObligation.deleteMany({});
     await prisma.payment.deleteMany({});
     await prisma.idempotencyKey.deleteMany({});
     await prisma.bookingIntentPassenger.deleteMany({});

@@ -14,16 +14,46 @@ import {
 import * as crypto from 'crypto';
 import { PrismaService } from '@/prisma/prisma.service';
 
-export type ReserveRefundTransactionInput = {
+type RefundReservationBase = {
   paymentId: string;
-  bookingId?: string;
-  cancellationRefundObligationId?: string;
   amount: number;
   currency: string;
-  reason: string;
   triggerType: RefundTriggerType;
   actorId?: string;
   idempotencyKey: string;
+};
+
+export type DirectRefundReservationInput = RefundReservationBase & {
+  kind: 'DIRECT';
+  reason: string;
+};
+
+export type CancellationRefundReservationInput = RefundReservationBase & {
+  kind: 'CANCELLATION';
+  cancellationRefundObligationId: string;
+  cancellationBookingId: string;
+  // Runtime validation deliberately ignores this legacy/untyped property and
+  // persists its canonical discriminator instead.
+  reason?: string;
+};
+
+export type ReserveRefundTransactionInput =
+  | DirectRefundReservationInput
+  | CancellationRefundReservationInput;
+
+type NormalizedRefundReservationInput = RefundReservationBase & {
+  kind: 'DIRECT' | 'CANCELLATION';
+  cancellationRefundObligationId: string | null;
+  cancellationBookingId: string | null;
+  reason: string;
+};
+
+type UnsafeRefundReservationInput = RefundReservationBase & {
+  kind?: unknown;
+  cancellationRefundObligationId?: unknown;
+  cancellationBookingId?: unknown;
+  bookingId?: unknown;
+  reason?: unknown;
 };
 
 const ACTIVE_REFUND_STATUSES: readonly RefundStatus[] = [
@@ -32,20 +62,23 @@ const ACTIVE_REFUND_STATUSES: readonly RefundStatus[] = [
   RefundStatus.REFUND_RETRY_SCHEDULED,
 ] as const;
 
+type RefundReservationCapacity = 'PAYMENT' | 'OBLIGATION';
+
 @Injectable()
 export class RefundTransactionService {
   private readonly logger = new Logger(RefundTransactionService.name);
 
   constructor(private readonly prisma: PrismaService) {}
 
-  private computeRequestHash(input: ReserveRefundTransactionInput): string {
+  private computeRequestHash(input: NormalizedRefundReservationInput): string {
     return crypto
       .createHash('sha256')
       .update(
         JSON.stringify({
           paymentId: input.paymentId,
-          bookingId: input.bookingId,
+          kind: input.kind,
           obligationId: input.cancellationRefundObligationId,
+          bookingId: input.cancellationBookingId,
           amount: input.amount,
           currency: input.currency,
           reason: input.reason,
@@ -54,10 +87,102 @@ export class RefundTransactionService {
       .digest('hex');
   }
 
+  private normalizeReservationInput(
+    input: ReserveRefundTransactionInput,
+  ): NormalizedRefundReservationInput {
+    // TypeScript callers receive a discriminated union, but this service is also
+    // reached at runtime by untyped NestJS boundaries and tests.
+    const rawInput = input as unknown as UnsafeRefundReservationInput;
+
+    if (rawInput.kind === 'DIRECT') {
+      if (
+        rawInput.cancellationRefundObligationId !== undefined ||
+        rawInput.cancellationBookingId !== undefined ||
+        rawInput.bookingId !== undefined ||
+        typeof rawInput.reason !== 'string' ||
+        rawInput.reason.trim().toLowerCase().startsWith('cancellation:')
+      ) {
+        throw new BadRequestException(
+          'Direct refund requests cannot use cancellation semantics',
+        );
+      }
+
+      return {
+        paymentId: rawInput.paymentId,
+        amount: rawInput.amount,
+        currency: rawInput.currency,
+        triggerType: rawInput.triggerType,
+        actorId: rawInput.actorId,
+        idempotencyKey: rawInput.idempotencyKey,
+        kind: 'DIRECT',
+        cancellationRefundObligationId: null,
+        cancellationBookingId: null,
+        reason: rawInput.reason,
+      };
+    }
+
+    if (rawInput.kind === 'CANCELLATION') {
+      if (rawInput.bookingId !== undefined) {
+        throw new BadRequestException(
+          'Cancellation refunds must use cancellationBookingId instead of bookingId',
+        );
+      }
+      if (
+        typeof rawInput.cancellationRefundObligationId !== 'string' ||
+        rawInput.cancellationRefundObligationId.trim().length === 0
+      ) {
+        throw new BadRequestException(
+          'Cancellation refunds require a cancellation refund obligation',
+        );
+      }
+      if (
+        typeof rawInput.cancellationBookingId !== 'string' ||
+        rawInput.cancellationBookingId.trim().length === 0
+      ) {
+        throw new BadRequestException('Cancellation refunds require a booking identifier');
+      }
+
+      return {
+        paymentId: rawInput.paymentId,
+        amount: rawInput.amount,
+        currency: rawInput.currency,
+        triggerType: rawInput.triggerType,
+        actorId: rawInput.actorId,
+        idempotencyKey: rawInput.idempotencyKey,
+        kind: 'CANCELLATION',
+        cancellationRefundObligationId: rawInput.cancellationRefundObligationId.trim(),
+        cancellationBookingId: rawInput.cancellationBookingId.trim(),
+        reason: `cancellation:${rawInput.cancellationBookingId.trim()}`,
+      };
+    }
+
+    throw new BadRequestException('Refund reservation kind must be DIRECT or CANCELLATION');
+  }
+
+  private logReservationTelemetry(
+    outcome: 'RESERVED' | 'REJECTED',
+    capacity?: RefundReservationCapacity,
+  ): void {
+    const event = {
+      message: 'refund_reservation',
+      outcome,
+      ...(capacity ? { capacity } : {}),
+    };
+
+    if (outcome === 'REJECTED') {
+      this.logger.warn(event);
+      return;
+    }
+
+    this.logger.log(event);
+  }
+
   async reserveTransaction(input: ReserveRefundTransactionInput): Promise<Refund> {
     if (!input.amount || !Number.isInteger(input.amount) || input.amount <= 0) {
       throw new BadRequestException('Refund amount must be a positive integer in minor units');
     }
+
+    const normalizedInput = this.normalizeReservationInput(input);
 
     return await this.prisma.$transaction(async (tx) => {
       const payments = await tx.$queryRaw<
@@ -82,35 +207,40 @@ export class RefundTransactionService {
 
       let obligation: {
         id: string;
+        bookingId: string;
         paymentId: string;
         totalAmount: number;
         currency: string;
       } | null = null;
 
-      if (input.cancellationRefundObligationId) {
+      if (normalizedInput.cancellationRefundObligationId) {
         const obligations = await tx.$queryRaw<
           Array<{
             id: string;
+            bookingId: string;
             paymentId: string;
             totalAmount: number;
             currency: string;
           }>
         >`
-          SELECT id, "paymentId", "totalAmount", currency
+          SELECT id, "bookingId", "paymentId", "totalAmount", currency
           FROM cancellation_refund_obligations
-          WHERE id = ${input.cancellationRefundObligationId}
+          WHERE id = ${normalizedInput.cancellationRefundObligationId}
           FOR UPDATE
         `;
 
         if (!obligations || obligations.length === 0) {
           throw new NotFoundException(
-            `CancellationRefundObligation ${input.cancellationRefundObligationId} not found`,
+            `CancellationRefundObligation ${normalizedInput.cancellationRefundObligationId} not found`,
           );
         }
         obligation = obligations[0];
 
         if (obligation.paymentId !== payment.id) {
           throw new BadRequestException('Obligation does not belong to the specified payment');
+        }
+        if (obligation.bookingId !== normalizedInput.cancellationBookingId) {
+          throw new BadRequestException('Obligation does not belong to the specified booking');
         }
         if (obligation.currency.toUpperCase() !== input.currency.toUpperCase()) {
           throw new BadRequestException('Currency mismatch with obligation');
@@ -121,7 +251,7 @@ export class RefundTransactionService {
         throw new BadRequestException('Currency mismatch with payment');
       }
 
-      const requestHash = this.computeRequestHash(input);
+      const requestHash = this.computeRequestHash(normalizedInput);
 
       const existingKeyRecord = await tx.idempotencyKey.findUnique({
         where: { key: input.idempotencyKey },
@@ -154,6 +284,7 @@ export class RefundTransactionService {
         payment.amount - successfulPaymentRefunds - activePaymentReservations;
 
       if (input.amount > remainingPaymentCapacity) {
+        this.logReservationTelemetry('REJECTED', 'PAYMENT');
         throw new BadRequestException(
           `Requested refund amount (${input.amount}) exceeds remaining payment capacity (${remainingPaymentCapacity})`,
         );
@@ -175,6 +306,7 @@ export class RefundTransactionService {
           activeObligationReservations;
 
         if (input.amount > remainingObligationCapacity) {
+          this.logReservationTelemetry('REJECTED', 'OBLIGATION');
           throw new BadRequestException(
             `Requested refund amount (${input.amount}) exceeds remaining obligation capacity (${remainingObligationCapacity})`,
           );
@@ -206,12 +338,12 @@ export class RefundTransactionService {
       const createdRefund = await tx.refund.create({
         data: {
           paymentId: input.paymentId,
-          bookingId: input.bookingId ?? (obligation as any)?.bookingId ?? null,
-          cancellationRefundObligationId: input.cancellationRefundObligationId ?? null,
+          cancellationRefundObligationId:
+            normalizedInput.cancellationRefundObligationId,
           idempotencyKeyId: idempotencyKeyRecord.id,
           amount: input.amount,
           currency: input.currency.toUpperCase(),
-          reason: input.reason,
+          reason: normalizedInput.reason,
           triggerType: input.triggerType,
           triggeredByUserId: input.actorId ?? null,
           status: RefundStatus.REFUND_PENDING,
@@ -245,13 +377,7 @@ export class RefundTransactionService {
         });
       }
 
-      this.logger.log({
-        message: 'Refund transaction reserved',
-        refundId: createdRefund.id,
-        paymentId: input.paymentId,
-        amount: input.amount,
-        currency: input.currency,
-      });
+      this.logReservationTelemetry('RESERVED');
 
       return createdRefund;
     });

@@ -37,23 +37,13 @@ describe('DuffelWebhookController', () => {
 
   it('should throw BadRequestException if receiver feature flag is disabled', async () => {
     process.env.FEATURE_FLAG_DISRUPTION_INGRESS = 'false';
-    const oldNodeEnv = process.env.NODE_ENV;
-    const oldJestWorkerId = process.env.JEST_WORKER_ID;
-    delete process.env.NODE_ENV;
-    delete process.env.JEST_WORKER_ID;
-
-    try {
-      const mockReq = { rawBody: Buffer.from('{}'), body: {} } as unknown as Request;
-      await expect(controller.handleWebhook(mockReq, 'sig')).rejects.toThrow(
-        expect.objectContaining({
-          message: 'Duffel webhook receiver is disabled',
-          response: expect.objectContaining({ error: 'WEBHOOK_RECEIVER_DISABLED' }),
-        }),
-      );
-    } finally {
-      process.env.NODE_ENV = oldNodeEnv;
-      process.env.JEST_WORKER_ID = oldJestWorkerId;
-    }
+    const mockReq = { rawBody: Buffer.from('{}'), body: {} } as unknown as Request;
+    await expect(controller.handleWebhook(mockReq, 'sig')).rejects.toThrow(
+      expect.objectContaining({
+        message: 'Duffel webhook receiver is disabled',
+        response: expect.objectContaining({ error: 'WEBHOOK_RECEIVER_DISABLED' }),
+      }),
+    );
   });
 
   it('should throw BadRequestException if DUFFEL_WEBHOOK_SECRET is missing', async () => {

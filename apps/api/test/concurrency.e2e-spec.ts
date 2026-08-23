@@ -41,6 +41,7 @@ describe('Concurrency and Stress (E2E)', () => {
     await prisma.paymentEvent.deleteMany({});
     await prisma.ledgerEntry.deleteMany({});
     await prisma.refund.deleteMany({});
+    await prisma.cancellationRefundObligation.deleteMany({});
     await prisma.payment.deleteMany({});
     await prisma.idempotencyKey.deleteMany({});
     await prisma.paymentMethod.deleteMany({});

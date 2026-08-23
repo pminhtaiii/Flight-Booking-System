@@ -67,6 +67,26 @@ export class RefundSettlementService {
     }
   }
 
+  private logSettlementTelemetry(
+    outcome: 'APPLIED' | 'NO_OP' | 'CONFLICT',
+    provenance: RefundProvenanceSource,
+    transactionStatus: RefundStatus,
+  ): void {
+    const event = {
+      message: 'refund_settlement',
+      outcome,
+      provenance,
+      transactionStatus,
+    };
+
+    if (outcome === 'CONFLICT') {
+      this.logger.warn(event);
+      return;
+    }
+
+    this.logger.log(event);
+  }
+
   async settleVerifiedOutcome(input: RefundSettlementInput): Promise<RefundSettlementResult> {
     return this.prisma.$transaction(async (tx) => {
       const lockedRefunds = await tx.$queryRaw<
@@ -110,7 +130,6 @@ export class RefundSettlementService {
         where: { id: input.transactionId },
         include: {
           payment: true,
-          booking: true,
           cancellationRefundObligation: {
             include: { booking: true },
           },
@@ -125,14 +144,24 @@ export class RefundSettlementService {
         refund.amount !== input.money.amount ||
         refund.currency.toUpperCase() !== input.money.currency.toUpperCase()
       ) {
+        this.logSettlementTelemetry(
+          'CONFLICT',
+          input.provenance.source,
+          refund.status,
+        );
         throw new BadRequestException(
           `Refund transaction facts mismatch for ${input.transactionId}: expected ${refund.amount} ${refund.currency}, got ${input.money.amount} ${input.money.currency}`,
         );
       }
 
-      const booking = refund.cancellationRefundObligation?.booking ?? refund.booking;
+      const booking = refund.cancellationRefundObligation?.booking;
 
       if (refund.status === RefundStatus.SUCCEEDED) {
+        this.logSettlementTelemetry(
+          'NO_OP',
+          input.provenance.source,
+          RefundStatus.SUCCEEDED,
+        );
         return {
           applied: false,
           transactionStatus: 'SUCCEEDED',
@@ -146,6 +175,11 @@ export class RefundSettlementService {
         (refund.status === RefundStatus.REFUND_FAILED_NEEDS_ATTENTION &&
           input.outcome.status !== 'SUCCEEDED')
       ) {
+        this.logSettlementTelemetry(
+          'NO_OP',
+          input.provenance.source,
+          refund.status,
+        );
         return {
           applied: false,
           transactionStatus: refund.status,
@@ -166,29 +200,38 @@ export class RefundSettlementService {
         });
 
         const transactionId = crypto.randomUUID();
-        await tx.ledgerEntry.create({
-          data: {
-            paymentId: refund.paymentId,
-            refundTransactionId: refund.id,
-            transactionId,
-            accountId: LEDGER_ACCOUNT_PLATFORM_REVENUE,
-            entryType: LedgerEntryType.DEBIT,
-            amount: refund.amount,
-            currency: refund.currency,
-          },
-        });
+        try {
+          await tx.ledgerEntry.create({
+            data: {
+              paymentId: refund.paymentId,
+              refundTransactionId: refund.id,
+              transactionId,
+              accountId: LEDGER_ACCOUNT_PLATFORM_REVENUE,
+              entryType: LedgerEntryType.DEBIT,
+              amount: refund.amount,
+              currency: refund.currency,
+            },
+          });
 
-        await tx.ledgerEntry.create({
-          data: {
-            paymentId: refund.paymentId,
-            refundTransactionId: refund.id,
-            transactionId,
-            accountId: LEDGER_ACCOUNT_CUSTOMER_RECEIVABLE,
-            entryType: LedgerEntryType.CREDIT,
-            amount: refund.amount,
-            currency: refund.currency,
-          },
-        });
+          await tx.ledgerEntry.create({
+            data: {
+              paymentId: refund.paymentId,
+              refundTransactionId: refund.id,
+              transactionId,
+              accountId: LEDGER_ACCOUNT_CUSTOMER_RECEIVABLE,
+              entryType: LedgerEntryType.CREDIT,
+              amount: refund.amount,
+              currency: refund.currency,
+            },
+          });
+        } catch (error) {
+          this.logger.error({
+            message: 'refund_ledger_invariant_failure',
+            provenance: input.provenance.source,
+            operation: 'WRITE_REVERSAL_PAIR',
+          });
+          throw error;
+        }
 
         const allSucceeded = await tx.refund.findMany({
           where: {
@@ -264,16 +307,6 @@ export class RefundSettlementService {
               data: { status: finalBookingStatus },
             });
           }
-        } else if (refund.bookingId) {
-          finalBookingStatus = BookingStatus.CANCELLED_AND_REFUNDED;
-          await tx.booking.updateMany({
-            where: { id: refund.bookingId, status: BookingStatus.CANCELLED_PENDING_REFUND },
-            data: { status: BookingStatus.CANCELLED_AND_REFUNDED },
-          });
-          await tx.booking.updateMany({
-            where: { paymentId: refund.paymentId, status: BookingStatus.CANCELLED_PENDING_REFUND },
-            data: { status: BookingStatus.CANCELLED_AND_REFUNDED },
-          });
         }
 
         await this.auditService.createLog(tx, {
@@ -293,15 +326,11 @@ export class RefundSettlementService {
           },
         });
 
-        this.logger.log({
-          message: 'Refund settled successfully',
-          refundId: refund.id,
-          paymentId: refund.paymentId,
-          amount: refund.amount,
-          currency: refund.currency,
-          paymentStatus: finalPaymentStatus,
-          bookingStatus: finalBookingStatus,
-        });
+        this.logSettlementTelemetry(
+          'APPLIED',
+          input.provenance.source,
+          RefundStatus.SUCCEEDED,
+        );
 
         return {
           applied: true,
@@ -331,12 +360,6 @@ export class RefundSettlementService {
       let finalBookingStatus: BookingStatus | undefined = booking?.status;
       if (targetStatus === RefundStatus.REFUND_FAILED_NEEDS_ATTENTION) {
         finalBookingStatus = BookingStatus.REFUND_FAILED_NEEDS_ATTENTION;
-        if (refund.bookingId) {
-          await tx.booking.updateMany({
-            where: { id: refund.bookingId },
-            data: { status: BookingStatus.REFUND_FAILED_NEEDS_ATTENTION },
-          });
-        }
         if (refund.cancellationRefundObligation?.bookingId) {
           await tx.booking.updateMany({
             where: { id: refund.cancellationRefundObligation.bookingId },
@@ -426,13 +449,11 @@ export class RefundSettlementService {
         },
       });
 
-      this.logger.warn({
-        message: 'Refund settlement recorded failure',
-        refundId: refund.id,
-        paymentId: refund.paymentId,
-        errorCode: input.outcome.errorCode,
-        transactionStatus: targetStatus,
-      });
+      this.logSettlementTelemetry(
+        'APPLIED',
+        input.provenance.source,
+        targetStatus,
+      );
 
       return {
         applied: true,

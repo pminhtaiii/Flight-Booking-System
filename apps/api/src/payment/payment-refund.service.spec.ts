@@ -50,7 +50,11 @@ describe('PaymentRefundService', () => {
       paymentId: 'payment-1',
       status: BookingStatus.CANCELLED_PENDING_REFUND,
     });
-    prisma.cancellationRefundObligation.findUnique.mockResolvedValue(null);
+    prisma.cancellationRefundObligation.findUnique.mockResolvedValue({
+      id: 'obligation-1',
+      bookingId: 'booking-1',
+      paymentId: 'payment-1',
+    });
     prisma.idempotencyKey.findUnique.mockResolvedValue({ id: 'key-1' });
     prisma.refund.findFirst.mockResolvedValue(null);
     prisma.refund.create.mockResolvedValue({ id: 'refund-1' });
@@ -97,6 +101,7 @@ describe('PaymentRefundService', () => {
 
       expect(refundTransactionService.reserveTransaction).toHaveBeenCalledWith(
         expect.objectContaining({
+          kind: 'DIRECT',
           paymentId: 'payment-1',
           amount: 5000,
           currency: 'usd',
@@ -197,6 +202,7 @@ describe('PaymentRefundService', () => {
 
       expect(refundTransactionService.reserveTransaction).toHaveBeenCalledWith(
         expect.objectContaining({
+          kind: 'DIRECT',
           paymentId: 'payment-1',
           amount: 12_500,
           currency: 'usd',
@@ -210,6 +216,21 @@ describe('PaymentRefundService', () => {
   });
 
   describe('processCancellationRefund', () => {
+    it('rejects a cancellation refund when the booking has no refund obligation', async () => {
+      prisma.cancellationRefundObligation.findUnique.mockResolvedValue(null);
+
+      await expect(
+        service.processCancellationRefund({
+          bookingId: 'booking-1',
+          paymentId: 'payment-1',
+          amount: 12_500,
+          currency: 'usd',
+        }),
+      ).rejects.toThrow('Cancellation refund obligation not found');
+
+      expect(refundTransactionService.reserveTransaction).not.toHaveBeenCalled();
+    });
+
     it('reserves transaction and settles verified outcome on Stripe success', async () => {
       refundTransactionService.reserveTransaction.mockResolvedValue({
         id: 'refund-1',
@@ -233,19 +254,21 @@ describe('PaymentRefundService', () => {
       expect(result).toEqual({ refundStatus: 'SUCCEEDED', refundAmount: '125.00' });
       expect(refundTransactionService.reserveTransaction).toHaveBeenCalledWith(
         expect.objectContaining({
+          kind: 'CANCELLATION',
           paymentId: 'payment-1',
+          cancellationRefundObligationId: 'obligation-1',
+          cancellationBookingId: 'booking-1',
           amount: 12_500,
           currency: 'usd',
-          reason: 'cancellation:booking-1',
           triggerType: RefundTriggerType.SYSTEM_AUTOMATED,
-          idempotencyKey: 'cancellation-refund:booking-1:1',
+          idempotencyKey: 'cancellation-refund:obligation-1:1',
         }),
       );
       expect(stripe.createRefund).toHaveBeenCalledWith(
         'pi_1',
         12_500,
         'requested_by_customer',
-        'cancellation-refund:booking-1:1',
+        'cancellation-refund:obligation-1:1',
       );
       expect(refundSettlementService.settleVerifiedOutcome).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -327,14 +350,14 @@ describe('PaymentRefundService', () => {
       prisma.refund.findUnique.mockResolvedValue({
         id: 'refund-1',
         status: RefundStatus.REFUND_PROCESSING,
-        bookingId: 'booking-1',
+        cancellationRefundObligationId: 'obligation-1',
         paymentId: 'payment-1',
         retryCount: 0,
         amount: 12_500,
         currency: 'usd',
         idempotencyKeyCreatedAt: new Date(Date.now() - 23 * 60 * 60 * 1000),
         payment: { id: 'payment-1', stripePaymentIntentId: 'pi_1', currency: 'usd' },
-        idempotencyKey: { key: 'cancellation-refund:booking-1:1' },
+        idempotencyKey: { key: 'cancellation-refund:obligation-1:1' },
       });
 
       await service.recoverScheduledCancellationRefund('refund-1');
@@ -356,14 +379,14 @@ describe('PaymentRefundService', () => {
       prisma.refund.findUnique.mockResolvedValue({
         id: 'refund-1',
         status: RefundStatus.REFUND_PROCESSING,
-        bookingId: 'booking-1',
+        cancellationRefundObligationId: 'obligation-1',
         paymentId: 'payment-1',
         retryCount: 1,
         amount: 12_500,
         currency: 'usd',
         idempotencyKeyCreatedAt: new Date(),
         payment: { id: 'payment-1', stripePaymentIntentId: 'pi_1', currency: 'usd' },
-        idempotencyKey: { key: 'cancellation-refund:booking-1:1' },
+        idempotencyKey: { key: 'cancellation-refund:obligation-1:1' },
       });
       stripe.createRefund.mockResolvedValue({ id: 're_cron_1' });
 
@@ -373,7 +396,7 @@ describe('PaymentRefundService', () => {
         'pi_1',
         12_500,
         'requested_by_customer',
-        'cancellation-refund:booking-1:1',
+        'cancellation-refund:obligation-1:1',
       );
       expect(refundSettlementService.settleVerifiedOutcome).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -391,14 +414,14 @@ describe('PaymentRefundService', () => {
       prisma.refund.findUnique.mockResolvedValue({
         id: 'refund-1',
         status: RefundStatus.REFUND_PROCESSING,
-        bookingId: 'booking-1',
+        cancellationRefundObligationId: 'obligation-1',
         paymentId: 'payment-1',
         retryCount: 0,
         amount: 12_500,
         currency: 'usd',
         idempotencyKeyCreatedAt: new Date(),
         payment: { id: 'payment-1', stripePaymentIntentId: 'pi_1', currency: 'usd' },
-        idempotencyKey: { key: 'cancellation-refund:booking-1:1' },
+        idempotencyKey: { key: 'cancellation-refund:obligation-1:1' },
       });
       stripe.createRefund.mockRejectedValue({ statusCode: 503, message: 'unavailable' });
 
@@ -422,7 +445,7 @@ describe('PaymentRefundService', () => {
     it('settles manual resolution with ADMIN provenance and actorId', async () => {
       prisma.refund.findUnique.mockResolvedValue({
         id: 'refund-1',
-        bookingId: 'booking-1',
+        cancellationRefundObligation: { bookingId: 'booking-1' },
         paymentId: 'payment-1',
         status: RefundStatus.REFUND_FAILED_NEEDS_ATTENTION,
         amount: 12_500,
@@ -473,7 +496,7 @@ describe('PaymentRefundService', () => {
     it('rejects MARK_RESOLVED_MANUALLY if refund is not in REFUND_FAILED_NEEDS_ATTENTION', async () => {
       prisma.refund.findUnique.mockResolvedValue({
         id: 'refund-1',
-        bookingId: 'booking-1',
+        cancellationRefundObligation: { bookingId: 'booking-1' },
         paymentId: 'payment-1',
         status: RefundStatus.SUCCEEDED,
         amount: 12_500,
@@ -488,7 +511,7 @@ describe('PaymentRefundService', () => {
     it('handles RETRY_WITH_FRESH_KEY cleanly', async () => {
       prisma.refund.findUnique.mockResolvedValue({
         id: 'refund-1',
-        bookingId: 'booking-1',
+        cancellationRefundObligation: { bookingId: 'booking-1' },
         paymentId: 'payment-1',
         status: RefundStatus.REFUND_FAILED_NEEDS_ATTENTION,
         amount: 12_500,

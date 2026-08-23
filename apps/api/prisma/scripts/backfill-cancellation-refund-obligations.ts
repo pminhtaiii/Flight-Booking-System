@@ -5,6 +5,7 @@ import {
   LedgerEntryType,
   Prisma,
 } from '@prisma/client';
+import { Logger } from '@nestjs/common';
 
 export type BackfillStats = {
   processedBookings: number;
@@ -13,13 +14,28 @@ export type BackfillStats = {
   refundsLinked: number;
   ledgerEntriesLinked: number;
   quarantined: number;
+  mismatches: number;
   errors: number;
 };
 
+export type BackfillTelemetry = {
+  message: 'refund_obligation_backfill';
+  outcome: 'STARTED' | 'QUARANTINED' | 'COMPLETED' | 'FAILED';
+  reason?: string;
+  processedBookings?: number;
+  obligationsCreated?: number;
+  obligationsUpdated?: number;
+  refundsLinked?: number;
+  ledgerEntriesLinked?: number;
+  quarantined?: number;
+  mismatches?: number;
+  errors?: number;
+};
+
 export type BackfillLogger = {
-  log: (message: string, ...args: unknown[]) => void;
-  warn: (message: string, ...args: unknown[]) => void;
-  error: (message: string, ...args: unknown[]) => void;
+  log: (event: BackfillTelemetry) => void;
+  warn: (event: BackfillTelemetry) => void;
+  error: (event: BackfillTelemetry) => void;
 };
 
 export type BackfillOptions = {
@@ -30,7 +46,6 @@ export type BackfillOptions = {
 
 export type BookingWithRelations = Prisma.BookingGetPayload<{
   include: {
-    cancellationRefund: true;
     cancellationRefundObligation: true;
     payment: true;
   };
@@ -44,8 +59,124 @@ export type RefundWithRelations = Prisma.RefundGetPayload<{
   };
 }>;
 
+/**
+ * The pre-contract schema stored the cancellation-to-booking association on
+ * `refunds.bookingId`. The contracted Prisma client intentionally no longer
+ * exposes that column or the inverse Booking relation. This narrow projection
+ * keeps the one-off backfill runnable before the destructive migration without
+ * reintroducing either legacy field to the application schema.
+ */
+type LegacyRefundCompatibilityRow = {
+  id: string;
+  bookingId: string | null;
+  paymentId: string;
+  currency: string;
+  cancellationRefundObligationId: string | null;
+};
+
+type LegacyRefundBookingRow = Pick<LegacyRefundCompatibilityRow, 'bookingId'>;
+
+type LegacyRefundBookingIdColumnGuardRow = {
+  hasBookingId: boolean;
+};
+
+export class LegacyRefundBookingIdColumnMissingError extends Error {
+  constructor() {
+    super(
+      'Cancellation refund obligation backfill requires the pre-contract refunds.bookingId column. Run it before the refund obligation contract migration.',
+    );
+    this.name = 'LegacyRefundBookingIdColumnMissingError';
+  }
+}
+
+async function assertLegacyRefundBookingIdColumn(prisma: PrismaClient): Promise<void> {
+  const rows = await prisma.$queryRaw<LegacyRefundBookingIdColumnGuardRow[]>(Prisma.sql`
+    SELECT EXISTS (
+      SELECT 1
+      FROM information_schema.columns
+      WHERE table_schema = current_schema()
+        AND table_name = 'refunds'
+        AND column_name = 'bookingId'
+    ) AS "hasBookingId"
+  `);
+
+  if (rows[0]?.hasBookingId !== true) {
+    throw new LegacyRefundBookingIdColumnMissingError();
+  }
+}
+
+async function findLegacyRefundsForBooking(
+  prisma: PrismaClient,
+  bookingId: string,
+): Promise<LegacyRefundCompatibilityRow[]> {
+  return prisma.$queryRaw<LegacyRefundCompatibilityRow[]>(Prisma.sql`
+    SELECT "id", "bookingId", "paymentId", "currency", "cancellationRefundObligationId"
+    FROM "refunds"
+    WHERE "bookingId" = ${bookingId}
+    ORDER BY "createdAt" ASC, "id" ASC
+  `);
+}
+
+async function findLegacyBookingIdForRefund(
+  prisma: PrismaClient,
+  refundId: string,
+): Promise<string | null> {
+  const rows = await prisma.$queryRaw<LegacyRefundBookingRow[]>(Prisma.sql`
+    SELECT "bookingId"
+    FROM "refunds"
+    WHERE "id" = ${refundId}
+    LIMIT 1
+  `);
+
+  return rows[0]?.bookingId ?? null;
+}
+
 export const ACCOUNT_PLATFORM_REVENUE = 'PLATFORM_REVENUE';
 export const ACCOUNT_CUSTOMER_RECEIVABLE = 'CUSTOMER_RECEIVABLE';
+
+type QuarantineReason =
+  | 'AMBIGUOUS_LEGACY_REFUND'
+  | 'MISSING_PAYMENT'
+  | 'BOOKING_PAYMENT_MISMATCH'
+  | 'LEGACY_REFUND_PAYMENT_MISMATCH'
+  | 'BOOKING_PAYMENT_CURRENCY_MISMATCH'
+  | 'LEGACY_REFUND_CURRENCY_MISMATCH'
+  | 'INVALID_OBLIGATION_AMOUNT'
+  | 'OBLIGATION_EXCEEDS_PAYMENT'
+  | 'PAYMENT_OVER_REFUND'
+  | 'REFUND_OBLIGATION_MISMATCH'
+  | 'OBLIGATION_OVER_REFUND'
+  | 'REFUND_EXCEEDS_OBLIGATION'
+  | 'REFUND_BOOKING_MISMATCH'
+  | 'LEDGER_INVARIANT_FAILURE'
+  | 'MISSING_LEDGER_PAIR'
+  | 'AMBIGUOUS_LEDGER_PAIR'
+  | 'LEDGER_PAIR_CLAIM_FAILURE'
+  | 'NON_TERMINAL_REFUND_LEDGER_LINK';
+
+// Each quarantine represents a data-quality or financial-invariant violation
+// from the rollout runbook. Processing failures are counted separately in
+// `errors`, never as mismatches.
+const DATA_QUALITY_OR_INVARIANT_QUARANTINE_REASONS = new Set<QuarantineReason>([
+  'AMBIGUOUS_LEGACY_REFUND',
+  'MISSING_PAYMENT',
+  'BOOKING_PAYMENT_MISMATCH',
+  'LEGACY_REFUND_PAYMENT_MISMATCH',
+  'BOOKING_PAYMENT_CURRENCY_MISMATCH',
+  'LEGACY_REFUND_CURRENCY_MISMATCH',
+  'INVALID_OBLIGATION_AMOUNT',
+  'OBLIGATION_EXCEEDS_PAYMENT',
+  'PAYMENT_OVER_REFUND',
+  'REFUND_OBLIGATION_MISMATCH',
+  'OBLIGATION_OVER_REFUND',
+  'REFUND_EXCEEDS_OBLIGATION',
+  'REFUND_BOOKING_MISMATCH',
+  'LEDGER_INVARIANT_FAILURE',
+  'MISSING_LEDGER_PAIR',
+  'AMBIGUOUS_LEDGER_PAIR',
+  'LEDGER_PAIR_CLAIM_FAILURE',
+  'NON_TERMINAL_REFUND_LEDGER_LINK',
+]);
 
 export function toMinorUnits(amount: Prisma.Decimal | number | string | null | undefined): number | null {
   if (amount === null || amount === undefined) {
@@ -130,14 +261,7 @@ export async function backfillCancellationRefundObligations(
   const prisma = options?.prisma ?? new PrismaClient();
   const shouldDisconnect = !options?.prisma;
   const chunkSize = options?.chunkSize ?? 50;
-  const logger: BackfillLogger = {
-    log: (msg: string, ...args: unknown[]) =>
-      options?.logger ? options.logger.log(msg, ...args) : console.log(msg, ...args),
-    warn: (msg: string, ...args: unknown[]) =>
-      options?.logger ? options.logger.warn(msg, ...args) : console.warn(msg, ...args),
-    error: (msg: string, ...args: unknown[]) =>
-      options?.logger ? options.logger.error(msg, ...args) : console.error(msg, ...args),
-  };
+  const logger: BackfillLogger = options?.logger ?? new Logger('CancellationRefundObligationBackfill');
 
   const stats: BackfillStats = {
     processedBookings: 0,
@@ -146,11 +270,25 @@ export async function backfillCancellationRefundObligations(
     refundsLinked: 0,
     ledgerEntriesLinked: 0,
     quarantined: 0,
+    mismatches: 0,
     errors: 0,
   };
 
+  const quarantine = (reason: QuarantineReason): void => {
+    stats.quarantined++;
+    if (DATA_QUALITY_OR_INVARIANT_QUARANTINE_REASONS.has(reason)) {
+      stats.mismatches++;
+    }
+    logger.warn({
+      message: 'refund_obligation_backfill',
+      outcome: 'QUARANTINED',
+      reason,
+    });
+  };
+
   try {
-    logger.log('Starting restart-safe backfill of CancellationRefundObligations and LedgerEntries...');
+    await assertLegacyRefundBookingIdColumn(prisma);
+    logger.log({ message: 'refund_obligation_backfill', outcome: 'STARTED' });
 
     // =========================================================================
     // Phase 1: Cursor pagination over Bookings
@@ -164,7 +302,6 @@ export async function backfillCancellationRefundObligations(
         cursor: lastBookingId ? { id: lastBookingId } : undefined,
         orderBy: { id: 'asc' },
         include: {
-          cancellationRefund: true,
           cancellationRefundObligation: true,
           payment: true,
         },
@@ -179,9 +316,16 @@ export async function backfillCancellationRefundObligations(
         stats.processedBookings++;
 
         try {
+          const legacyRefunds = await findLegacyRefundsForBooking(prisma, booking.id);
+          if (legacyRefunds.length > 1) {
+            quarantine('AMBIGUOUS_LEGACY_REFUND');
+            continue;
+          }
+          const legacyRefund = legacyRefunds[0] ?? null;
+
           const hasCancellationContext =
             booking.cancellationRefundObligation !== null ||
-            booking.cancellationRefund !== null ||
+            legacyRefund !== null ||
             booking.status === BookingStatus.CANCELLED_AND_REFUNDED ||
             booking.status === BookingStatus.CANCELLED_PENDING_REFUND ||
             booking.status === BookingStatus.CANCELLED_NO_REFUND;
@@ -191,29 +335,20 @@ export async function backfillCancellationRefundObligations(
           }
 
           if (!booking.paymentId) {
-            logger.warn(
-              `[QUARANTINE] Booking ${booking.id} has cancellation context but no associated paymentId. Quarantining.`,
-            );
-            stats.quarantined++;
+            quarantine('MISSING_PAYMENT');
             continue;
           }
 
           if (booking.payment && booking.payment.id !== booking.paymentId) {
-            logger.warn(
-              `[QUARANTINE] Booking ${booking.id} paymentId (${booking.paymentId}) does not match Payment record id (${booking.payment.id}). Quarantining.`,
-            );
-            stats.quarantined++;
+            quarantine('BOOKING_PAYMENT_MISMATCH');
             continue;
           }
 
           if (
-            booking.cancellationRefund?.paymentId &&
-            booking.paymentId !== booking.cancellationRefund.paymentId
+            legacyRefund?.paymentId &&
+            booking.paymentId !== legacyRefund.paymentId
           ) {
-            logger.warn(
-              `[QUARANTINE] Booking ${booking.id} paymentId (${booking.paymentId}) does not match cancellationRefund paymentId (${booking.cancellationRefund.paymentId}). Quarantining.`,
-            );
-            stats.quarantined++;
+            quarantine('LEGACY_REFUND_PAYMENT_MISMATCH');
             continue;
           }
 
@@ -221,21 +356,15 @@ export async function backfillCancellationRefundObligations(
             booking.payment &&
             booking.currency.toUpperCase() !== booking.payment.currency.toUpperCase()
           ) {
-            logger.warn(
-              `[QUARANTINE] Booking ${booking.id} currency (${booking.currency}) does not match Payment currency (${booking.payment.currency}). Quarantining.`,
-            );
-            stats.quarantined++;
+            quarantine('BOOKING_PAYMENT_CURRENCY_MISMATCH');
             continue;
           }
 
           if (
-            booking.cancellationRefund &&
-            booking.currency.toUpperCase() !== booking.cancellationRefund.currency.toUpperCase()
+            legacyRefund &&
+            booking.currency.toUpperCase() !== legacyRefund.currency.toUpperCase()
           ) {
-            logger.warn(
-              `[QUARANTINE] Booking ${booking.id} currency (${booking.currency}) does not match cancellationRefund currency (${booking.cancellationRefund.currency}). Quarantining.`,
-            );
-            stats.quarantined++;
+            quarantine('LEGACY_REFUND_CURRENCY_MISMATCH');
             continue;
           }
 
@@ -249,18 +378,12 @@ export async function backfillCancellationRefundObligations(
             totalAmountMinor < 0 ||
             airlineRefundAmountMinor < 0
           ) {
-            logger.warn(
-              `[QUARANTINE] Booking ${booking.id} has negative or unparseable obligation amounts (total: ${totalAmountMinor}, airline: ${airlineRefundAmountMinor}). Quarantining.`,
-            );
-            stats.quarantined++;
+            quarantine('INVALID_OBLIGATION_AMOUNT');
             continue;
           }
 
           if (booking.payment && totalAmountMinor > booking.payment.amount) {
-            logger.warn(
-              `[QUARANTINE] Booking ${booking.id} total refund amount (${totalAmountMinor}) exceeds Payment amount (${booking.payment.amount}). Quarantining.`,
-            );
-            stats.quarantined++;
+            quarantine('OBLIGATION_EXCEEDS_PAYMENT');
             continue;
           }
 
@@ -275,10 +398,7 @@ export async function backfillCancellationRefundObligations(
             });
             const cumulativeRefunded = refundSum._sum.amount ?? 0;
             if (cumulativeRefunded > booking.payment.amount) {
-              logger.warn(
-                `[QUARANTINE] Payment ${booking.payment.id} has cumulative succeeded refunds (${cumulativeRefunded}) exceeding payment amount (${booking.payment.amount}). Quarantining booking ${booking.id}.`,
-              );
-              stats.quarantined++;
+              quarantine('PAYMENT_OVER_REFUND');
               continue;
             }
           }
@@ -322,11 +442,11 @@ export async function backfillCancellationRefundObligations(
           }
 
           if (
-            booking.cancellationRefund &&
-            booking.cancellationRefund.cancellationRefundObligationId !== obligationId
+            legacyRefund &&
+            legacyRefund.cancellationRefundObligationId !== obligationId
           ) {
             await prisma.refund.update({
-              where: { id: booking.cancellationRefund.id },
+              where: { id: legacyRefund.id },
               data: {
                 cancellationRefundObligationId: obligationId,
               },
@@ -335,7 +455,11 @@ export async function backfillCancellationRefundObligations(
           }
         } catch (err: unknown) {
           stats.errors++;
-          logger.error(`Error processing booking ${booking.id}:`, err);
+          logger.error({
+            message: 'refund_obligation_backfill',
+            outcome: 'FAILED',
+            reason: 'BOOKING_PROCESSING_FAILURE',
+          });
         }
       }
     }
@@ -377,18 +501,18 @@ export async function backfillCancellationRefundObligations(
             });
             const cumulativeRefunded = refundSum._sum.amount ?? 0;
             if (cumulativeRefunded > refund.payment.amount) {
-              logger.warn(
-                `[QUARANTINE] Payment ${refund.payment.id} has cumulative succeeded refunds (${cumulativeRefunded}) exceeding payment amount (${refund.payment.amount}). Quarantining refund ${refund.id}.`,
-              );
-              stats.quarantined++;
+              quarantine('PAYMENT_OVER_REFUND');
               continue;
             }
           }
 
-          // 1. Link cancellationRefundObligationId if missing but refund has legacy bookingId
-          if (refund.bookingId && !refund.cancellationRefundObligationId) {
+          // 1. Link cancellationRefundObligationId if missing but refund has the
+          // pre-contract bookingId column. The compatibility read is deliberate:
+          // Refund.bookingId is absent from the contracted Prisma schema.
+          const legacyBookingId = await findLegacyBookingIdForRefund(prisma, refund.id);
+          if (legacyBookingId && !refund.cancellationRefundObligationId) {
             const obligation = await prisma.cancellationRefundObligation.findUnique({
-              where: { bookingId: refund.bookingId },
+              where: { bookingId: legacyBookingId },
             });
 
             if (obligation) {
@@ -396,10 +520,7 @@ export async function backfillCancellationRefundObligations(
                 obligation.paymentId !== refund.paymentId ||
                 obligation.currency.toUpperCase() !== refund.currency.toUpperCase()
               ) {
-                logger.warn(
-                  `[QUARANTINE] Refund ${refund.id} payment/currency mismatches obligation ${obligation.id}. Quarantining.`,
-                );
-                stats.quarantined++;
+                quarantine('REFUND_OBLIGATION_MISMATCH');
               } else {
                 const linkResult = await prisma.$transaction(async (tx) => {
                   const existingObligationRefunds = await tx.refund.aggregate({
@@ -435,15 +556,12 @@ export async function backfillCancellationRefundObligations(
                 if (linkResult.success) {
                   stats.refundsLinked++;
                 } else {
-                  logger.warn(
-                    `[QUARANTINE] Linking refund ${refund.id} (amount: ${refund.amount}) to obligation ${obligation.id} (totalAmount: ${linkResult.totalAmount}) would exceed obligation debt (current refunded: ${linkResult.currentObligationRefunded}). Quarantining.`,
-                  );
-                  stats.quarantined++;
+                  quarantine('OBLIGATION_OVER_REFUND');
                 }
               }
             } else {
               const booking = await prisma.booking.findUnique({
-                where: { id: refund.bookingId },
+                where: { id: legacyBookingId },
                 include: { payment: true },
               });
 
@@ -463,10 +581,7 @@ export async function backfillCancellationRefundObligations(
                   airlineMinor >= 0
                 ) {
                   if (refund.status === RefundStatus.SUCCEEDED && refund.amount > totalMinor) {
-                    logger.warn(
-                      `[QUARANTINE] Refund ${refund.id} amount (${refund.amount}) exceeds new obligation totalAmount (${totalMinor}) for booking ${booking.id}. Quarantining.`,
-                    );
-                    stats.quarantined++;
+                    quarantine('REFUND_EXCEEDS_OBLIGATION');
                   } else {
                     const createResult = await prisma.$transaction(async (tx) => {
                       let obligationRecord = await tx.cancellationRefundObligation.findUnique({
@@ -522,23 +637,14 @@ export async function backfillCancellationRefundObligations(
                       }
                       stats.refundsLinked++;
                     } else {
-                      logger.warn(
-                        `[QUARANTINE] Linking refund ${refund.id} (amount: ${refund.amount}) to obligation for booking ${booking.id} would exceed obligation debt. Quarantining.`,
-                      );
-                      stats.quarantined++;
+                      quarantine('OBLIGATION_OVER_REFUND');
                     }
                   }
                 } else {
-                  logger.warn(
-                    `[QUARANTINE] Refund ${refund.id} associated booking has invalid refund amounts. Quarantining.`,
-                  );
-                  stats.quarantined++;
+                  quarantine('INVALID_OBLIGATION_AMOUNT');
                 }
               } else {
-                logger.warn(
-                  `[QUARANTINE] Refund ${refund.id} links to missing, invalid, or mismatched booking ${refund.bookingId}. Quarantining.`,
-                );
-                stats.quarantined++;
+                quarantine('REFUND_BOOKING_MISMATCH');
               }
             }
           }
@@ -554,10 +660,7 @@ export async function backfillCancellationRefundObligations(
               const validation = validateLedgerPair(linkedEntries, refund.amount, refund.currency);
 
               if (!validation.isValid) {
-                logger.warn(
-                  `[QUARANTINE] Refund ${refund.id} has invalid or unbalanced linked ledger entries. Quarantining.`,
-                );
-                stats.quarantined++;
+                quarantine('LEDGER_INVARIANT_FAILURE');
               }
             } else {
               // Find candidate unlinked ledger entries for this payment
@@ -597,15 +700,9 @@ export async function backfillCancellationRefundObligations(
               }
 
               if (validPairs.length === 0) {
-                logger.warn(
-                  `[QUARANTINE] SUCCEEDED refund ${refund.id} (amount: ${refund.amount} ${refund.currency}) has no unlinked balanced ledger entries for payment ${refund.paymentId}. Quarantining.`,
-                );
-                stats.quarantined++;
+                quarantine('MISSING_LEDGER_PAIR');
               } else if (validPairs.length > 1) {
-                logger.warn(
-                  `[QUARANTINE] SUCCEEDED refund ${refund.id} (amount: ${refund.amount} ${refund.currency}) has multiple (${validPairs.length}) ambiguous unlinked ledger pairs for payment ${refund.paymentId}. Quarantining.`,
-                );
-                stats.quarantined++;
+                quarantine('AMBIGUOUS_LEDGER_PAIR');
               } else {
                 const pair = validPairs[0];
                 const [debitRes, creditRes] = await prisma.$transaction([
@@ -634,10 +731,7 @@ export async function backfillCancellationRefundObligations(
                       data: { refundTransactionId: null },
                     });
                   }
-                  logger.warn(
-                    `[QUARANTINE] SUCCEEDED refund ${refund.id} could not claim candidate ledger pair for payment ${refund.paymentId}. Quarantining.`,
-                  );
-                  stats.quarantined++;
+                  quarantine('LEDGER_PAIR_CLAIM_FAILURE');
                 }
               }
             }
@@ -647,27 +741,32 @@ export async function backfillCancellationRefundObligations(
               where: { refundTransactionId: refund.id },
             });
             if (linkedEntries.length > 0) {
-              logger.warn(
-                `[QUARANTINE] Non-succeeded refund ${refund.id} (status: ${refund.status}) has ${linkedEntries.length} linked ledger entries. Quarantining.`,
-              );
-              stats.quarantined++;
+              quarantine('NON_TERMINAL_REFUND_LEDGER_LINK');
             }
           }
         } catch (err: unknown) {
           stats.errors++;
-          logger.error(`Error processing refund ${refund.id}:`, err);
+          logger.error({
+            message: 'refund_obligation_backfill',
+            outcome: 'FAILED',
+            reason: 'REFUND_PROCESSING_FAILURE',
+          });
         }
       }
     }
 
-    logger.log('Backfill finished. Summary:');
-    logger.log(`- Processed Bookings: ${stats.processedBookings}`);
-    logger.log(`- Obligations Created: ${stats.obligationsCreated}`);
-    logger.log(`- Obligations Updated: ${stats.obligationsUpdated}`);
-    logger.log(`- Refunds Linked: ${stats.refundsLinked}`);
-    logger.log(`- Ledger Entries Linked: ${stats.ledgerEntriesLinked}`);
-    logger.log(`- Quarantined: ${stats.quarantined}`);
-    logger.log(`- Errors: ${stats.errors}`);
+    logger.log({
+      message: 'refund_obligation_backfill',
+      outcome: 'COMPLETED',
+      processedBookings: stats.processedBookings,
+      obligationsCreated: stats.obligationsCreated,
+      obligationsUpdated: stats.obligationsUpdated,
+      refundsLinked: stats.refundsLinked,
+      ledgerEntriesLinked: stats.ledgerEntriesLinked,
+      quarantined: stats.quarantined,
+      mismatches: stats.mismatches,
+      errors: stats.errors,
+    });
 
     return stats;
   } finally {
@@ -679,17 +778,22 @@ export async function backfillCancellationRefundObligations(
 
 if (require.main === module) {
   const prisma = new PrismaClient();
-  backfillCancellationRefundObligations({ prisma })
+  const logger = new Logger('CancellationRefundObligationBackfill');
+  backfillCancellationRefundObligations({ prisma, logger })
     .then(async (stats) => {
-      console.log('Backfill execution complete:', JSON.stringify(stats, null, 2));
       await prisma.$disconnect();
       process.exit(stats.errors > 0 ? 1 : 0);
     })
-    .catch(async (err: unknown) => {
-      console.error('Fatal error during backfill execution:', err);
+    .catch(async (error: unknown) => {
+      logger.error({
+        message: 'refund_obligation_backfill',
+        outcome: 'FAILED',
+        reason:
+          error instanceof LegacyRefundBookingIdColumnMissingError
+            ? 'PRE_CONTRACT_SCHEMA_GUARD_FAILED'
+            : 'FATAL_PROCESSING_FAILURE',
+      });
       await prisma.$disconnect().catch(() => {});
       process.exit(1);
     });
 }
-
-

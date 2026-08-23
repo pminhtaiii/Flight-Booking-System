@@ -1,4 +1,4 @@
-import { BadRequestException, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Logger, NotFoundException } from '@nestjs/common';
 import {
   BookingStatus,
   LedgerEntryType,
@@ -40,8 +40,14 @@ describe('RefundSettlementService', () => {
   let mockAuditService: {
     createLog: jest.Mock;
   };
+  let logSpy: jest.SpyInstance;
+  let warnSpy: jest.SpyInstance;
+  let errorSpy: jest.SpyInstance;
 
   beforeEach(() => {
+    logSpy = jest.spyOn(Logger.prototype, 'log').mockImplementation(() => undefined);
+    warnSpy = jest.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
+    errorSpy = jest.spyOn(Logger.prototype, 'error').mockImplementation(() => undefined);
     mockTx = {
       $queryRaw: jest.fn().mockResolvedValue([
         {
@@ -82,6 +88,10 @@ describe('RefundSettlementService', () => {
       mockPrisma as unknown as PrismaService,
       mockAuditService as unknown as AuditService,
     );
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
   });
 
   describe('settleVerifiedOutcome', () => {
@@ -149,6 +159,13 @@ describe('RefundSettlementService', () => {
       await expect(
         service.settleVerifiedOutcome(mismatchedAmountInput),
       ).rejects.toThrow(BadRequestException);
+
+      expect(warnSpy).toHaveBeenCalledWith({
+        message: 'refund_settlement',
+        outcome: 'CONFLICT',
+        provenance: 'WEBHOOK',
+        transactionStatus: RefundStatus.REFUND_PENDING,
+      });
 
       const mismatchedCurrencyInput: RefundSettlementInput = {
         ...baseInput,
@@ -232,6 +249,20 @@ describe('RefundSettlementService', () => {
           outcome: baseInput.outcome,
           provenance: baseInput.provenance,
         },
+      });
+    });
+
+    it('emits identifier-free applied settlement telemetry by provenance', async () => {
+      mockTx.refund.findUnique.mockResolvedValue(baseRefundRow);
+      mockTx.refund.findMany.mockResolvedValue([{ amount: 20000 }]);
+
+      await service.settleVerifiedOutcome(baseInput);
+
+      expect(logSpy).toHaveBeenCalledWith({
+        message: 'refund_settlement',
+        outcome: 'APPLIED',
+        provenance: 'WEBHOOK',
+        transactionStatus: 'SUCCEEDED',
       });
     });
 
@@ -415,6 +446,27 @@ describe('RefundSettlementService', () => {
       expect(mockTx.booking.update).not.toHaveBeenCalled();
       expect(mockTx.paymentEvent.create).not.toHaveBeenCalled();
       expect(mockAuditService.createLog).not.toHaveBeenCalled();
+      expect(logSpy).toHaveBeenCalledWith({
+        message: 'refund_settlement',
+        outcome: 'NO_OP',
+        provenance: 'WEBHOOK',
+        transactionStatus: RefundStatus.SUCCEEDED,
+      });
+    });
+
+    it('alerts without identifiers when writing the ledger pair fails', async () => {
+      mockTx.refund.findUnique.mockResolvedValue(baseRefundRow);
+      mockTx.ledgerEntry.create.mockRejectedValueOnce(new Error('constraint failure'));
+
+      await expect(service.settleVerifiedOutcome(baseInput)).rejects.toThrow(
+        'constraint failure',
+      );
+
+      expect(errorSpy).toHaveBeenCalledWith({
+        message: 'refund_ledger_invariant_failure',
+        provenance: 'WEBHOOK',
+        operation: 'WRITE_REVERSAL_PAIR',
+      });
     });
 
     it('should return applied: false on duplicate delivery of FAILED or REFUND_FAILED_NEEDS_ATTENTION', async () => {

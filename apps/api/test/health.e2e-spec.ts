@@ -15,6 +15,12 @@ describe('Health Check (E2E)', () => {
   let redisMockSpy: jest.SpyInstance;
 
   beforeAll(async () => {
+    delete process.env.FEATURE_FLAG_DISRUPTION_PROCESSOR;
+    delete process.env.FEATURE_FLAG_DISRUPTION_INGRESS;
+    delete process.env.FEATURE_FLAG_DISRUPTION_RECONCILIATION;
+    delete process.env.FEATURE_FLAG_DISRUPTION_SURFACING;
+    delete process.env.FEATURE_FLAG_DISRUPTION_OUTBOX;
+
     // Mock Prisma's $connect and $disconnect to avoid slow TCP timeouts during E2E test setup
     jest.spyOn(PrismaService.prototype, '$connect').mockImplementation(async () => {});
     jest.spyOn(PrismaService.prototype, '$disconnect').mockImplementation(async () => {});

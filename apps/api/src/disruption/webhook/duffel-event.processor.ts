@@ -20,8 +20,7 @@ export class DuffelEventProcessor {
   @Cron('*/10 * * * * *')
   async handleCron(): Promise<void> {
     const isProcessorEnabled = process.env.FEATURE_FLAG_DISRUPTION_PROCESSOR === 'true';
-    const isTestEnv = process.env.NODE_ENV === 'test' || process.env.JEST_WORKER_ID !== undefined;
-    if (!isProcessorEnabled && !isTestEnv) {
+    if (!isProcessorEnabled) {
       return;
     }
 
@@ -289,8 +288,7 @@ export class DuffelEventProcessor {
   @Cron(CronExpression.EVERY_DAY_AT_MIDNIGHT)
   async handleRetentionRedaction(): Promise<void> {
     const isRedactionEnabled = process.env.FEATURE_FLAG_DISRUPTION_PROCESSOR === 'true';
-    const isTestEnv = process.env.NODE_ENV === 'test' || process.env.JEST_WORKER_ID !== undefined;
-    if (!isRedactionEnabled && !isTestEnv) {
+    if (!isRedactionEnabled) {
       return;
     }
 
