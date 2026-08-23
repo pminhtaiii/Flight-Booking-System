@@ -54,7 +54,16 @@ async function executeSqlScript(sql: string): Promise<void> {
   const prismaProcess = spawn(
     process.execPath,
     [prismaCliPath, 'db', 'execute', '--stdin', '--url', databaseUrl],
-    { stdio: ['pipe', 'ignore', 'pipe'] },
+    {
+      stdio: ['pipe', 'ignore', 'pipe'],
+      env: {
+        ...process.env,
+        CHECKPOINT_DISABLE: '1',
+        PRISMA_TELEMETRY_INFORMATION: '0',
+        PRISMA_HIDE_UPDATE_MESSAGE: 'true',
+        NODE_OPTIONS: '',
+      },
+    },
   );
   let stderr = '';
   let processError: Error | undefined;
