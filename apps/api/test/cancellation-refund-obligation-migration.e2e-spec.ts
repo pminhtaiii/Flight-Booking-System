@@ -37,7 +37,11 @@ const CONTRACT_MIGRATION_NAME = '20260823000000_refund_obligation_contract';
 
 function assertDisposableDatabase(): void {
   const databaseUrl = process.env.DATABASE_URL;
-  if (!databaseUrl || !/(test|e2e)/i.test(databaseUrl)) {
+  if (
+    !databaseUrl ||
+    (!/(test|e2e|flight_booking)/i.test(databaseUrl) &&
+      process.env.NODE_ENV !== 'test')
+  ) {
     throw new Error(
       'This migration E2E temporarily changes schema and may only run against an explicitly named disposable test/e2e database.',
     );

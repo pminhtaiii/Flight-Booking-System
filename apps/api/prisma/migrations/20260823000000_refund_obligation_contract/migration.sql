@@ -4,26 +4,37 @@ BEGIN;
 
 DO $$
 DECLARE
-  legacy_unlinked_count integer;
-  cancellation_unlinked_count integer;
-  obligation_fact_mismatch_count integer;
-  linked_refund_mismatch_count integer;
-  over_capacity_parent_count integer;
-  invalid_successful_ledger_pair_count integer;
-  non_successful_ledger_link_count integer;
+  legacy_unlinked_count integer := 0;
+  cancellation_unlinked_count integer := 0;
+  obligation_fact_mismatch_count integer := 0;
+  linked_refund_mismatch_count integer := 0;
+  over_capacity_parent_count integer := 0;
+  invalid_successful_ledger_pair_count integer := 0;
+  non_successful_ledger_link_count integer := 0;
+  has_booking_id boolean;
 BEGIN
-  SELECT COUNT(*)
-  INTO legacy_unlinked_count
-  FROM "refunds"
-  WHERE "bookingId" IS NOT NULL
-    AND "cancellationRefundObligationId" IS NULL;
+  SELECT EXISTS (
+    SELECT FROM information_schema.columns
+    WHERE table_schema = current_schema()
+      AND table_name = 'refunds'
+      AND column_name = 'bookingId'
+  ) INTO has_booking_id;
 
-  IF legacy_unlinked_count > 0 THEN
-    RAISE EXCEPTION
-      'Refund obligation contract preflight failed: % legacy booking-linked refund(s) are not backfilled',
-      legacy_unlinked_count
-      USING ERRCODE = 'P0001',
-            HINT = 'Run and resolve the cancellation-refund obligation backfill before retrying this migration.';
+  IF has_booking_id THEN
+    EXECUTE '
+      SELECT COUNT(*)
+      FROM "refunds"
+      WHERE "bookingId" IS NOT NULL
+        AND "cancellationRefundObligationId" IS NULL
+    ' INTO legacy_unlinked_count;
+
+    IF legacy_unlinked_count > 0 THEN
+      RAISE EXCEPTION
+        'Refund obligation contract preflight failed: % legacy booking-linked refund(s) are not backfilled',
+        legacy_unlinked_count
+        USING ERRCODE = 'P0001',
+              HINT = 'Run and resolve the cancellation-refund obligation backfill before retrying this migration.';
+    END IF;
   END IF;
 
   SELECT COUNT(*)
@@ -168,6 +179,9 @@ END
 $$;
 
 ALTER TABLE "refunds"
+  DROP CONSTRAINT IF EXISTS "refunds_cancellation_refund_obligation_required";
+
+ALTER TABLE "refunds"
   ADD CONSTRAINT "refunds_cancellation_refund_obligation_required"
   CHECK (
     -- Runtime cancellation transactions use the normalized `cancellation:`
@@ -182,6 +196,6 @@ ALTER TABLE "refunds"
 DROP INDEX IF EXISTS "refunds_bookingId_key";
 
 ALTER TABLE "refunds"
-  DROP COLUMN "bookingId";
+  DROP COLUMN IF EXISTS "bookingId";
 
 COMMIT;
