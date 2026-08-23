@@ -20,6 +20,7 @@ import {
 } from '@prisma/client';
 import type Stripe from 'stripe';
 import * as crypto from 'crypto';
+import { spawn } from 'child_process';
 import * as fs from 'fs';
 import * as path from 'path';
 import { backfillCancellationRefundObligations } from '../prisma/scripts/backfill-cancellation-refund-obligations';
@@ -28,6 +29,60 @@ const MIGRATION_PATH = path.join(
   __dirname,
   '../prisma/migrations/20260822000000_cancellation_refund_obligation_expand/migration.sql',
 );
+const CONTRACT_MIGRATION_PATH = path.join(
+  __dirname,
+  '../prisma/migrations/20260823000000_refund_obligation_contract/migration.sql',
+);
+const CONTRACT_MIGRATION_NAME = '20260823000000_refund_obligation_contract';
+
+function assertDisposableDatabase(): void {
+  const databaseUrl = process.env.DATABASE_URL;
+  if (!databaseUrl || !/(test|e2e)/i.test(databaseUrl)) {
+    throw new Error(
+      'This migration E2E temporarily changes schema and may only run against an explicitly named disposable test/e2e database.',
+    );
+  }
+}
+
+async function executeSqlScript(sql: string): Promise<void> {
+  const databaseUrl = process.env.DATABASE_URL;
+  if (!databaseUrl) {
+    throw new Error('DATABASE_URL is required to execute migration SQL batches.');
+  }
+
+  const prismaCliPath = require.resolve('prisma/build/index.js');
+  const prismaProcess = spawn(
+    process.execPath,
+    [prismaCliPath, 'db', 'execute', '--stdin', '--url', databaseUrl],
+    { stdio: ['pipe', 'ignore', 'pipe'] },
+  );
+  let stderr = '';
+  let processError: Error | undefined;
+  prismaProcess.stderr.on('data', (chunk: Buffer | string): void => {
+    stderr += chunk.toString();
+  });
+  prismaProcess.once('error', (error: Error): void => {
+    processError = error;
+  });
+  prismaProcess.stdin.end(sql);
+
+  await new Promise<void>((resolve, reject) => {
+    prismaProcess.once('close', (exitCode: number | null, signal: NodeJS.Signals | null): void => {
+      if (processError) {
+        reject(new Error(`Prisma db execute could not start: ${processError.message}`));
+      } else if (exitCode === 0) {
+        resolve();
+      } else {
+        const termination = signal ? ` (terminated by ${signal})` : '';
+        reject(
+          new Error(
+            `Prisma db execute failed with exit code ${String(exitCode)}${termination}: ${stderr.trim() || 'No stderr output was produced.'}`,
+          ),
+        );
+      }
+    });
+  });
+}
 
 async function revertMigration(prisma: PrismaService) {
   const statements = [
@@ -47,14 +102,77 @@ async function revertMigration(prisma: PrismaService) {
 
 async function applyMigration(prisma: PrismaService) {
   const migrationSql = fs.readFileSync(MIGRATION_PATH, 'utf-8');
-  const statements = migrationSql
-    .split(';')
-    .map((s) => s.trim())
-    .filter((s) => s.length > 0);
+  // A migration can contain PostgreSQL DO $$ blocks with internal semicolons.
+  // Execute the exact file as one batch rather than parsing SQL in JavaScript.
+  await executeSqlScript(migrationSql);
+}
 
-  for (const stmt of statements) {
-    await prisma.$executeRawUnsafe(stmt);
+async function restoreLegacyContractSurface() {
+  await executeSqlScript(`
+    BEGIN;
+    ALTER TABLE "refunds"
+      DROP CONSTRAINT IF EXISTS "refunds_cancellation_refund_obligation_required";
+    ALTER TABLE "refunds" ADD COLUMN IF NOT EXISTS "bookingId" TEXT;
+    CREATE UNIQUE INDEX IF NOT EXISTS "refunds_bookingId_key" ON "refunds"("bookingId");
+    DO $$
+    BEGIN
+      IF NOT EXISTS (
+        SELECT FROM pg_constraint
+        WHERE conrelid = '"refunds"'::regclass
+          AND conname = 'refunds_bookingId_fkey'
+      ) THEN
+        ALTER TABLE "refunds"
+          ADD CONSTRAINT "refunds_bookingId_fkey"
+          FOREIGN KEY ("bookingId") REFERENCES "bookings"("id")
+          ON DELETE SET NULL ON UPDATE CASCADE;
+      END IF;
+    END $$;
+    COMMIT;
+  `);
+}
+
+async function assertContractMigrationRecorded(prisma: PrismaService): Promise<void> {
+  const rows = await prisma.$queryRawUnsafe<Array<{ exists: boolean }>>(`
+    SELECT EXISTS (
+      SELECT FROM "_prisma_migrations"
+      WHERE migration_name = '${CONTRACT_MIGRATION_NAME}'
+        AND finished_at IS NOT NULL
+        AND rolled_back_at IS NULL
+    ) AS "exists";
+  `);
+  if (!rows[0]?.exists) {
+    throw new Error(
+      `This migration E2E requires ${CONTRACT_MIGRATION_NAME} to be applied before it restores the legacy test surface.`,
+    );
   }
+}
+
+async function restoreContractMigrationHead(prisma: PrismaService): Promise<void> {
+  const expandTable = await prisma.$queryRawUnsafe<Array<{ exists: boolean }>>(`
+    SELECT EXISTS (
+      SELECT FROM information_schema.tables
+      WHERE table_schema = current_schema()
+        AND table_name = 'cancellation_refund_obligations'
+    ) AS "exists";
+  `);
+  if (!expandTable[0]?.exists) {
+    await applyMigration(prisma);
+  }
+  const bookingIdColumn = await prisma.$queryRawUnsafe<Array<{ exists: boolean }>>(`
+    SELECT EXISTS (
+      SELECT FROM information_schema.columns
+      WHERE table_schema = current_schema()
+        AND table_name = 'refunds'
+        AND column_name = 'bookingId'
+    ) AS "exists";
+  `);
+  if (bookingIdColumn[0]?.exists) {
+    await prisma.$executeRawUnsafe(
+      'ALTER TABLE "refunds" DROP CONSTRAINT IF EXISTS "refunds_cancellation_refund_obligation_required"',
+    );
+    await executeSqlScript(fs.readFileSync(CONTRACT_MIGRATION_PATH, 'utf-8'));
+  }
+  await assertContractMigrationRecorded(prisma);
 }
 
 describe('CancellationRefundObligation Migration & Backfill (E2E)', () => {
@@ -86,18 +204,24 @@ describe('CancellationRefundObligation Migration & Backfill (E2E)', () => {
     prisma = moduleFixture.get<PrismaService>(PrismaService);
     stripeService = moduleFixture.get<StripeService>(StripeService);
     paymentRefundService = moduleFixture.get<PaymentRefundService>(PaymentRefundService);
+
+    assertDisposableDatabase();
+    await assertContractMigrationRecorded(prisma);
+    // The scenarios deliberately exercise the expand migration and legacy
+    // Refund.bookingId relation, starting from the current contract head.
+    await restoreLegacyContractSurface();
   });
 
   afterAll(async () => {
     try {
-      await applyMigration(prisma);
-    } catch {
-      // Ignored if already applied
+      await clearDisposableDatabase();
+      await restoreContractMigrationHead(prisma);
+    } finally {
+      await app.close();
     }
-    await app.close();
   });
 
-  beforeEach(async () => {
+  async function clearDisposableDatabase(): Promise<void> {
     await prisma.chatHandoff.deleteMany({});
     await prisma.chatSession.deleteMany({});
     await prisma.bookingAgentProjection.deleteMany({});
@@ -130,6 +254,10 @@ describe('CancellationRefundObligation Migration & Backfill (E2E)', () => {
     await prisma.airport.deleteMany({});
     await prisma.auditLog.deleteMany({});
     await prisma.user.deleteMany({});
+  }
+
+  beforeEach(async () => {
+    await clearDisposableDatabase();
 
     const user = await prisma.user.create({
       data: {
@@ -619,7 +747,6 @@ describe('CancellationRefundObligation Migration & Backfill (E2E)', () => {
       const legacyRefundA = await prisma.refund.create({
         data: {
           paymentId: paymentA.id,
-          bookingId: bookingA.id,
           cancellationRefundObligationId: null,
           idempotencyKeyId: refundIdemA.id,
           stripeRefundId: `re_legacy_a_${Date.now()}`,
@@ -629,6 +756,9 @@ describe('CancellationRefundObligation Migration & Backfill (E2E)', () => {
           triggerType: RefundTriggerType.SYSTEM_AUTOMATED,
         },
       });
+      await prisma.$executeRawUnsafe(
+        `UPDATE "refunds" SET "bookingId" = '${bookingA.id}' WHERE "id" = '${legacyRefundA.id}'`,
+      );
 
       const txA = `tx_legacy_a_${crypto.randomUUID()}`;
       await prisma.ledgerEntry.createMany({
@@ -748,7 +878,6 @@ describe('CancellationRefundObligation Migration & Backfill (E2E)', () => {
       const refund = await prisma.refund.create({
         data: {
           paymentId: payment.id,
-          bookingId: booking.id,
           idempotencyKeyId: refundIdem.id,
           stripeRefundId: `re_sc3_${Date.now()}`,
           amount: 5000,
@@ -757,6 +886,9 @@ describe('CancellationRefundObligation Migration & Backfill (E2E)', () => {
           triggerType: RefundTriggerType.SYSTEM_AUTOMATED,
         },
       });
+      await prisma.$executeRawUnsafe(
+        `UPDATE "refunds" SET "bookingId" = '${booking.id}' WHERE "id" = '${refund.id}'`,
+      );
 
       const txId = `tx_sc3_${crypto.randomUUID()}`;
       await prisma.ledgerEntry.createMany({
@@ -860,7 +992,6 @@ describe('CancellationRefundObligation Migration & Backfill (E2E)', () => {
       const refund3 = await prisma.refund.create({
         data: {
           paymentId: payment3.id,
-          bookingId: booking3.id,
           idempotencyKeyId: refundIdem3.id,
           stripeRefundId: `re_imbalance_${Date.now()}`,
           amount: 5000,
@@ -869,6 +1000,9 @@ describe('CancellationRefundObligation Migration & Backfill (E2E)', () => {
           triggerType: RefundTriggerType.SYSTEM_AUTOMATED,
         },
       });
+      await prisma.$executeRawUnsafe(
+        `UPDATE "refunds" SET "bookingId" = '${booking3.id}' WHERE "id" = '${refund3.id}'`,
+      );
 
       // Imbalanced candidate ledger entries
       const txImbalanced = `tx_imbal_${crypto.randomUUID()}`;
@@ -947,6 +1081,19 @@ describe('CancellationRefundObligation Migration & Backfill (E2E)', () => {
         totalAmount: new Prisma.Decimal(100.0),
         currency: 'USD',
       });
+      // Current cancellation processing reserves against the canonical
+      // obligation. The legacy schema surface remains available for the
+      // migration scenarios above, while this non-regression flow verifies
+      // the post-backfill runtime contract.
+      await prisma.cancellationRefundObligation.create({
+        data: {
+          bookingId: booking.id,
+          paymentId: payment.id,
+          totalAmount: 10_000,
+          airlineRefundAmount: 0,
+          currency: 'USD',
+        },
+      });
 
       // Mock stripe createRefund
       jest.spyOn(stripeService, 'createRefund').mockResolvedValue({
@@ -970,7 +1117,6 @@ describe('CancellationRefundObligation Migration & Backfill (E2E)', () => {
         where: { id: booking.id },
         include: {
           payment: true,
-          cancellationRefund: true,
           cancellationRefundObligation: {
             include: {
               refunds: true,
@@ -982,8 +1128,9 @@ describe('CancellationRefundObligation Migration & Backfill (E2E)', () => {
       expect(updatedBooking).toBeDefined();
       expect(updatedBooking?.status).toBe(BookingStatus.CANCELLED_AND_REFUNDED);
       expect(updatedBooking?.paymentId).toBe(payment.id);
-      expect(updatedBooking?.cancellationRefund).toBeDefined();
-      expect(updatedBooking?.cancellationRefund?.amount).toBe(10000);
+      expect(updatedBooking?.cancellationRefundObligation).toBeDefined();
+      expect(updatedBooking?.cancellationRefundObligation?.refunds).toHaveLength(1);
+      expect(updatedBooking?.cancellationRefundObligation?.refunds[0]?.amount).toBe(10000);
 
       // Verify ledger entries created during standard refund flow
       const ledgerEntries = await prisma.ledgerEntry.findMany({
