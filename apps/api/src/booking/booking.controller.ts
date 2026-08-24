@@ -1,7 +1,6 @@
 import { Body, Controller, Get, Post, Param, ParseUUIDPipe, Query, Req, UseGuards } from '@nestjs/common';
 import { Request } from 'express';
 import { JwtAuthGuard } from '@/auth/guards/jwt-auth.guard';
-import { BookingService } from './booking.service';
 import { BookingManagementService } from '@/booking-management/booking-management.service';
 import { CancellationService } from '@/cancellation/cancellation.service';
 import { BookingDetailResponseDto, BookingListQueryDto, BookingListResponseDto } from './dto';
@@ -20,7 +19,6 @@ interface AuthenticatedRequest extends Request {
 @UseGuards(JwtAuthGuard)
 export class BookingController {
   constructor(
-    private readonly bookingService: BookingService,
     private readonly bookingManagementService: BookingManagementService,
     private readonly cancellationService: CancellationService,
   ) {}

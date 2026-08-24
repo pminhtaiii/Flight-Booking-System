@@ -7,13 +7,48 @@ Update this file after every completed feature. Any AI agent reading this should
 ### Current Status
 
 **Feature:** Deepen Codebase Architecture (Feature 019)
-**Last completed:** Slice 2C: Extract Cancellation Module (2026-08-23).
-**In progress:** None.
-**Next:** Slice 2D: Rewire and Remove Facade (US2).
+**Last completed:** Slice 2D: Rewire, Remove BookingService Facade & Eliminate Payment-Booking forwardRef (2026-08-24).
+**In progress:** Feature 019 Slice 3A implementation and focused verification; full-suite, review, and convergence gates remain.
+**Next:** Complete Slice 3A final gates, then Slice 3B: Agent Gateway Decomposition & Direct Service Binding (US3).
 
 ---
 
 ## Progress by Feature
+
+### [x] Feature: Deepen Codebase Architecture (Feature 019) — Slice 2D: Rewire, Remove BookingService Facade & Eliminate Payment-Booking forwardRef
+
+- [x] Slice 2D / Rewire, Remove BookingService Facade & Eliminate forwardRef (2026-08-24):
+  - **Disruption Module Rewire (`apps/api/src/disruption/`)**:
+    - Rewired `ReconciliationService` to depend directly on `BookingLifecycleService.checkAndCompleteBooking()`.
+    - Replaced `BookingModule` with `BookingLifecycleModule` in `DisruptionModule` imports.
+    - Updated `reconciliation.service.spec.ts` test fixtures to mock `BookingLifecycleService`.
+  - **Payment Module Rewire & `forwardRef` Elimination (`apps/api/src/payment/`)**:
+    - Rewired `PaymentService` to inject `BookingLifecycleService` directly, replacing legacy `BookingService` and eliminating `@Inject(forwardRef(() => BookingService))`.
+    - Updated `PaymentModule` imports to directly import `BookingLifecycleModule` and `BookingIntentModule`, eliminating `forwardRef(() => BookingModule)` and `forwardRef(() => BookingIntentModule)`.
+    - Updated all 8 unit test suites (`payment.service.spec.ts`, `payment-ancillary-*.spec.ts`) to use `BookingLifecycleService`.
+  - **Broad Facade Decommissioning (`apps/api/src/booking/`)**:
+    - Completely deleted legacy broad facade `apps/api/src/booking/booking.service.ts` and its spec `apps/api/src/booking/booking.service.spec.ts`.
+    - Transformed `BookingModule` into a pure HTTP composition module declaring `controllers: [BookingController]`, importing `[BookingManagementModule, BookingLifecycleModule, CancellationModule]`, with zero providers and zero exports.
+    - Verified `git grep "BookingService" apps/api/src` returns exactly 0 matches.
+    - Verified `git grep "forwardRef" apps/api/src/payment apps/api/src/booking` returns exactly 0 matches (zero circular dependencies).
+  - **Characterization & E2E Verification**:
+    - Updated `apps/api/test/characterization/booking-characterization.e2e-spec.ts` to verify modular services and assert zero circular dependencies across `PaymentModule` and `BookingModule` (14/14 tests PASS).
+  - **Verification & Test Suites (100% Green)**:
+    - Full API Unit Suite: 81/81 suites (875/875 tests) PASS.
+    - Characterization E2E: 1/1 suite (14/14 tests) PASS.
+    - CI Contract Test: 13/13 tests PASS.
+    - Agent Test Suite: 396/396 tests PASS.
+    - ESLint: 0 errors, 0 warnings; TypeScript Typecheck (API & Web): 0 errors; Agent Ruff: 0 errors.
+
+### [ ] Feature: Deepen Codebase Architecture (Feature 019) — Slice 3A: Trusted Search Snapshot Lifecycle Core
+
+- [x] Slice 3A implementation and focused verification (2026-08-24):
+  - Added canonical `apps/agent/src/agent/trusted_search_snapshot/` ownership for strict Pydantic snapshot models, owner-scoped lifecycle operations, graph-state normalization, atomic Redis persistence, and PII/provider-ID-free LLM/browser projections.
+  - Enforced contiguous 1-based result indices, positive/monotonic versions, UTC expiry, selection bounds/expiry, and strict `extra="forbid"` model validation.
+  - Added atomic Redis Lua version-aware replacement under `chat:snapshot:{user_id}:{chat_session_id}`. Incoming versions less than or equal to the stored version are rejected; TTL is limited by positive offer freshness and `max_ttl`.
+  - Preserved legacy compatibility through re-exports from `agent.models.snapshot` and `agent.repositories.trusted_snapshot_repository`; existing callers were not migrated in this slice.
+  - Verified focused evidence: lifecycle 21/21 tests PASS; snapshot characterization 15/15 PASS; SSE characterization 15/15 PASS; legacy snapshot 10/10 PASS; search snapshot 9/9 PASS; focused Ruff and format checks PASS.
+  - Full `apps/agent` suite, separate standards/spec-compliance review, and `speckit-converge` remain pending; this entry does not claim those gates.
 
 ### [x] Feature: Deepen Codebase Architecture (Feature 019) — Slice 2C: Extract Cancellation Module
 
@@ -656,4 +691,3 @@ Update this file after every completed feature. Any AI agent reading this should
 - Fixed backend runtime emission after the root type-check configuration enabled `noEmit`: API and shared-package build configs now explicitly emit JavaScript, preserving root type-check-only behavior and ensuring `apps/api/dist/main.js` exists for NestJS startup.
 - **Feature 017 — Phase 10A Completed**: Implemented Work Package 6A (state-only, zero-I/O `signal_checkout_intent` tool with positive integer validation against `trusted_snapshot`) and Work Package 6B (cryptographic `ChatHandoffTokenService` with high-entropy credential generation, server-derived idempotency hashing, `crypto.timingSafeEqual` constant-time verification, hash-only storage, and secret key rotation support). All unit test suites in NestJS and Python agent are 100% green.
 - **Feature 017 — Phase 11A Completed (2026-08-16)**: Validated production feature flag governance across all 4 rollout combinations, operational runbook drills (`docs/runbooks/chatbot-handoff.md`), live multi-service health verification (`/health`, `/health/redis`, `/health/agent`), secret key rotation rings (`_V1` and `_V2` for handoff and selection attestation), fail-closed Redis control plane (503 `CHAT_CONTROL_PLANE_UNAVAILABLE`), negative privacy audit, and full multi-workspace regression (673 API unit tests, 49 Phase 11A E2E tests, 334 Agent pytest tests, 25 Web unit tests, and clean Next.js production build). Feature 017 is 100% complete, verified, and production-ready.
-

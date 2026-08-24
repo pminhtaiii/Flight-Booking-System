@@ -120,10 +120,30 @@ async def search_flights(
     if not results:
         return f"Found 0 flights from {origin} to {destination} on {date}."
 
+    def _to_utc_iso(val: Any) -> str:
+        if not val:
+            return datetime.now(timezone.utc).isoformat()
+        if isinstance(val, datetime):
+            if val.tzinfo is None:
+                val = val.replace(tzinfo=timezone.utc)
+            return val.astimezone(timezone.utc).isoformat()
+        val_str = str(val).strip()
+        try:
+            dt = datetime.fromisoformat(val_str.replace("Z", "+00:00"))
+            if dt.tzinfo is None:
+                dt = dt.replace(tzinfo=timezone.utc)
+            return dt.astimezone(timezone.utc).isoformat()
+        except Exception:
+            if not val_str.endswith("Z") and "+" not in val_str and "-" not in val_str[10:]:
+                return val_str + "Z"
+            return val_str
+
     # Strip identifiers before sending to LLM and create trusted snapshot
     safe_results = []
     snapshot_results = []
     for idx, flight in enumerate(results, 1):
+        dep_time_val = flight.get("departureTime") or flight.get("departureAt")
+        arr_time_val = flight.get("arrivalTime") or flight.get("arrivalAt")
         snapshot_results.append(
             {
                 "offerIndex": idx,
@@ -134,8 +154,8 @@ async def search_flights(
                 "airline": flight.get("airline", ""),
                 "origin": flight.get("departureAirport", origin),
                 "destination": flight.get("arrivalAirport", destination),
-                "departureAt": flight.get("departureTime"),
-                "arrivalAt": flight.get("arrivalTime"),
+                "departureAt": _to_utc_iso(dep_time_val),
+                "arrivalAt": _to_utc_iso(arr_time_val),
                 "price": str(flight.get("price", "0.0")),
                 "currency": flight.get("currency", "USD"),
             }
@@ -150,9 +170,20 @@ async def search_flights(
             redis_client = get_redis_client()
             repo = TrustedSnapshotRepository(redis_client)
 
-        expires_at = data.get("snapshotExpiresAt")
-        if not expires_at:
-            expires_at = (datetime.now(timezone.utc) + timedelta(minutes=15)).isoformat()
+        now_dt = datetime.now(timezone.utc)
+        expires_at_raw = data.get("snapshotExpiresAt")
+        if expires_at_raw:
+            try:
+                exp_dt = datetime.fromisoformat(str(expires_at_raw).replace("Z", "+00:00"))
+                if exp_dt.tzinfo is None:
+                    exp_dt = exp_dt.replace(tzinfo=timezone.utc)
+                if exp_dt <= now_dt:
+                    exp_dt = now_dt + timedelta(minutes=15)
+                expires_at = exp_dt.astimezone(timezone.utc).isoformat()
+            except Exception:
+                expires_at = (now_dt + timedelta(minutes=15)).isoformat()
+        else:
+            expires_at = (now_dt + timedelta(minutes=15)).isoformat()
 
         snapshot = TrustedSearchSnapshot.model_validate(
             {
@@ -160,7 +191,7 @@ async def search_flights(
                 "snapshotVersion": data.get("snapshotVersion") or proposed_version,
                 "userId": user_id,
                 "sessionId": thread_id,
-                "createdAt": datetime.now(timezone.utc).isoformat(),
+                "createdAt": (now_dt - timedelta(seconds=1)).isoformat(),
                 "expiresAt": expires_at,
                 "selectionAttestation": data.get("selectionAttestation") or "sel_v1_mock",
                 "fingerprint": data.get("fingerprint") or "mock_hmac_fingerprint",

@@ -1,6 +1,6 @@
 import json
 import logging
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -182,6 +182,8 @@ def test_trusted_snapshot_serialization_and_projection_zero_leakage():
 async def test_trusted_snapshot_repository_redis_operations():
     """Verify repository key names and TTL handling do not leak tokens or offer IDs."""
     mock_redis = AsyncMock()
+    mock_redis.get.return_value = None
+    mock_redis.eval.return_value = 1
     repo = TrustedSnapshotRepository(mock_redis)
 
     key = repo._get_key("usr_abc", "ses_xyz")
@@ -215,9 +217,11 @@ async def test_trusted_snapshot_repository_redis_operations():
         ],
     )
 
+    mock_redis.eval.return_value = 1
     await repo.save_snapshot(snapshot)
-    mock_redis.set.assert_awaited_once()
-    saved_key, saved_payload = mock_redis.set.call_args[0][:2]
+    mock_redis.eval.assert_awaited_once()
+    saved_key = mock_redis.eval.call_args[0][2]
+    saved_payload = mock_redis.eval.call_args[0][4]
     assert saved_key == "chat:snapshot:usr_abc:ses_xyz"
     assert isinstance(saved_payload, str)
 
@@ -439,7 +443,7 @@ async def test_sse_streaming_chunk_stream_simulation_scan():
         fingerprint="fp-privacy-test-123",
         selectionAttestation="attest-privacy-test-123",
         createdAt=datetime.now(timezone.utc),
-        expiresAt=datetime.now(timezone.utc),
+        expiresAt=datetime.now(timezone.utc) + timedelta(hours=1),
         results=[
             TrustedSearchResult(
                 offerIndex=1,

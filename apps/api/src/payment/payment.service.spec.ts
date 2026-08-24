@@ -61,7 +61,7 @@ describe('PaymentService - recoveryPoint === completed', () => {
     };
     mockAudit = {};
     mockPaymentMethod = { saveMethod: jest.fn() };
-    const mockBookingService = { createBooking: jest.fn().mockResolvedValue({ id: '123e4567-e89b-42d3-a456-426614174000', userId: 'user-123' }), updateToConfirmed: jest.fn(), updateToFailed: jest.fn() };
+    const mockBookingLifecycleService = { createBooking: jest.fn().mockResolvedValue({ id: '123e4567-e89b-42d3-a456-426614174000', userId: 'user-123' }), updateToConfirmed: jest.fn(), updateToFailed: jest.fn() };
 
     service = new PaymentService(
       mockPrisma as unknown as PrismaService,
@@ -70,7 +70,7 @@ describe('PaymentService - recoveryPoint === completed', () => {
       mockDuffel as unknown as DuffelService,
       mockAudit as unknown as AuditService,
       mockPaymentMethod as unknown as PaymentMethodService,
-      mockBookingService as any
+      mockBookingLifecycleService as any
     );
   });
 
@@ -539,7 +539,7 @@ describe('PaymentService - recoveryPoint === completed', () => {
       validateAndMapPassengers: jest.Mock;
     };
     let validatorService: PaymentService;
-    let mockBookingService: {
+    let mockBookingLifecycleService: {
       createBooking: jest.Mock;
       updateToConfirmed: jest.Mock;
       updateToFailed: jest.Mock;
@@ -608,7 +608,7 @@ describe('PaymentService - recoveryPoint === completed', () => {
 
       mockAudit.createLog = jest.fn().mockResolvedValue({});
 
-      mockBookingService = {
+      mockBookingLifecycleService = {
         createBooking: jest.fn().mockResolvedValue({ id: 'booking-uuid-val', userId: 'user-val-123' }),
         updateToConfirmed: jest.fn().mockResolvedValue({}),
         updateToFailed: jest.fn().mockResolvedValue({}),
@@ -626,7 +626,7 @@ describe('PaymentService - recoveryPoint === completed', () => {
         mockDuffel as unknown as DuffelService,
         mockAudit as unknown as AuditService,
         mockPaymentMethod as unknown as PaymentMethodService,
-        mockBookingService as any,
+        mockBookingLifecycleService as any,
         undefined,
         mockValidator as unknown as BookingPassengerFinalValidatorService,
       );
@@ -738,7 +738,7 @@ describe('PaymentService - recoveryPoint === completed', () => {
       );
 
       // Updates booking to FAILED with reason SYSTEM_ERROR
-      expect(mockBookingService.updateToFailed).toHaveBeenCalledWith(
+      expect(mockBookingLifecycleService.updateToFailed).toHaveBeenCalledWith(
         'booking-uuid-val',
         BookingFailureReason.SYSTEM_ERROR,
         undefined,
@@ -864,7 +864,7 @@ describe('PaymentService - recoveryPoint === completed', () => {
         mockDuffel as unknown as DuffelService,
         mockAudit as unknown as AuditService,
         mockPaymentMethod as unknown as PaymentMethodService,
-        mockBookingService as any,
+        mockBookingLifecycleService as any,
       );
 
       await fallbackService.executeConfirmPayment(dto, idempotencyKey, userId);
