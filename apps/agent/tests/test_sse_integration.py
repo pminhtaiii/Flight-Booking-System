@@ -174,7 +174,7 @@ async def test_sse_readonly_tool(mock_nestjs_client):
 
     mock_nestjs_client.post_gateway_flights_search_v2.return_value = {
         "snapshotVersion": 1,
-        "snapshotExpiresAt": "2026-08-15T10:00:00Z",
+        "snapshotExpiresAt": "2027-08-15T10:00:00Z",
         "selectionAttestation": "mock_attestation",
         "results": [
             {

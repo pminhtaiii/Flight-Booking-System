@@ -19,23 +19,124 @@ class FakeAsyncRedis:
     def __init__(self):
         self.store = {}
         self.ttls = {}
+        self._clock = 0
+        self._expires_at = {}
 
-    async def set(self, key: str, value: str, ex: int = None):
-        self.store[key] = value
+    async def set(self, key: str, value: str | int, ex: int = None):
+        self.store[key] = str(value)
         if ex is not None:
-            self.ttls[key] = ex
+            self.ttls[key] = int(ex)
+            self._expires_at[key] = self._clock + int(ex)
 
     async def get(self, key: str):
+        if key in self._expires_at and self._expires_at[key] <= self._clock:
+            self.store.pop(key, None)
+            self.ttls.pop(key, None)
+            self._expires_at.pop(key, None)
+            return None
         return self.store.get(key)
 
-    async def delete(self, key: str):
-        self.store.pop(key, None)
-        self.ttls.pop(key, None)
+    async def delete(self, *keys: str):
+        deleted = 0
+        for key in keys:
+            if key in self.store:
+                deleted += 1
+            self.store.pop(key, None)
+            self.ttls.pop(key, None)
+            self._expires_at.pop(key, None)
+        return deleted
 
     async def ttl(self, key: str):
-        if key not in self.store:
+        if await self.get(key) is None:
             return -2
-        return self.ttls.get(key, -1)
+        if key not in self._expires_at:
+            return -1
+        return self._expires_at[key] - self._clock
+
+    async def eval(self, _script: str, _num_keys: int, *args: object) -> int:
+        """Emulate the repository's atomic replacement and version-allocation Lua calls."""
+
+        snapshot_key, version_key, *operation_args = args
+        if not isinstance(snapshot_key, str) or not isinstance(version_key, str):
+            raise TypeError("Redis keys must be strings")
+
+        if len(operation_args) == 3:
+            payload, incoming_version, ttl = operation_args
+            if (
+                not isinstance(payload, str)
+                or not self._is_positive_integer(incoming_version)
+                or not self._is_positive_integer(ttl)
+            ):
+                return 0
+
+            existing_payload = await self.get(snapshot_key)
+            if existing_payload is not None:
+                try:
+                    existing_version = json.loads(existing_payload)["snapshotVersion"]
+                except (KeyError, TypeError, json.JSONDecodeError):
+                    return 0
+                if (
+                    not self._is_positive_integer(existing_version)
+                    or incoming_version <= existing_version
+                ):
+                    return 0
+
+            counter = self._counter_value(await self.get(version_key))
+            if counter is None:
+                return 0
+
+            await self.set(snapshot_key, payload, ex=ttl)
+            if incoming_version > counter:
+                await self.set(version_key, incoming_version, ex=ttl)
+            elif version_key in self._expires_at:
+                self._expires_at[version_key] = self._clock + ttl
+                self.ttls[version_key] = ttl
+            return 1
+
+        if len(operation_args) == 1:
+            (initial_ttl,) = operation_args
+            if not self._is_positive_integer(initial_ttl):
+                return -4
+
+            snapshot_payload = await self.get(snapshot_key)
+            snapshot_version = 0
+            counter_ttl = initial_ttl
+            if snapshot_payload is not None:
+                try:
+                    snapshot_version = json.loads(snapshot_payload)["snapshotVersion"]
+                except (KeyError, TypeError, json.JSONDecodeError):
+                    return -2
+                if not self._is_positive_integer(snapshot_version):
+                    return -2
+                counter_ttl = await self.ttl(snapshot_key)
+                if counter_ttl <= 0:
+                    return -3
+
+            counter = self._counter_value(await self.get(version_key))
+            if counter is None:
+                return -1
+
+            next_version = max(counter, snapshot_version) + 1
+            await self.set(version_key, next_version, ex=counter_ttl)
+            return next_version
+
+        raise TypeError("Unsupported Redis Lua call")
+
+    @staticmethod
+    def _is_positive_integer(value: object) -> bool:
+        return type(value) is int and value > 0
+
+    @staticmethod
+    def _counter_value(value: str | None) -> int | None:
+        if value is None:
+            return 0
+        try:
+            parsed = float(value)
+        except (TypeError, ValueError):
+            return None
+        if parsed < 0 or not parsed.is_integer():
+            return None
+        return int(parsed)
 
 
 @pytest.mark.asyncio

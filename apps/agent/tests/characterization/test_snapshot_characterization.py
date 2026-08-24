@@ -1,3 +1,4 @@
+import json
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict
 
@@ -12,6 +13,8 @@ from agent.tools.search_flights import project_snapshot_results
 class FakeAsyncRedis:
     """In-memory async Redis double for testing snapshot persistence with simulated TTL expiration."""
 
+    connection_pool = object()
+
     def __init__(self):
         self.store: Dict[str, str] = {}
         self.ttls: Dict[str, int] = {}
@@ -24,8 +27,8 @@ class FakeAsyncRedis:
     def advance_time(self, seconds: float):
         self._current_time += seconds
 
-    async def set(self, key: str, value: str, ex: int | None = None):
-        self.store[key] = value
+    async def set(self, key: str, value: str | int, ex: int | None = None):
+        self.store[key] = str(value)
         if ex is not None:
             self.ttls[key] = ex
             self.expires_at[key] = self._current_time + ex
@@ -41,10 +44,104 @@ class FakeAsyncRedis:
             return None
         return self.store.get(key)
 
-    async def delete(self, key: str):
-        self.store.pop(key, None)
-        self.ttls.pop(key, None)
-        self.expires_at.pop(key, None)
+    async def delete(self, *keys: str):
+        deleted = 0
+        for key in keys:
+            if key in self.store:
+                deleted += 1
+            self.store.pop(key, None)
+            self.ttls.pop(key, None)
+            self.expires_at.pop(key, None)
+        return deleted
+
+    async def eval(self, _script: str, _num_keys: int, *args: object) -> int:
+        """Emulate the two atomic Lua lifecycle boundaries used by the repository."""
+
+        snapshot_key, version_key, *operation_args = args
+        if not isinstance(snapshot_key, str) or not isinstance(version_key, str):
+            raise TypeError("Redis keys must be strings")
+
+        if len(operation_args) == 3:
+            payload, incoming_version, ttl = operation_args
+            if not isinstance(payload, str) or not isinstance(incoming_version, int):
+                return 0
+            if not isinstance(ttl, int) or ttl <= 0:
+                return 0
+            if incoming_version <= 0:
+                return 0
+
+            existing_payload = await self.get(snapshot_key)
+            if existing_payload is not None:
+                try:
+                    existing_version = json.loads(existing_payload)["snapshotVersion"]
+                except (KeyError, TypeError, json.JSONDecodeError):
+                    return 0
+                if (
+                    isinstance(existing_version, bool)
+                    or not isinstance(existing_version, int)
+                    or existing_version <= 0
+                    or incoming_version <= existing_version
+                ):
+                    return 0
+
+            counter_payload = await self.get(version_key)
+            if counter_payload is None:
+                counter = 0
+            else:
+                try:
+                    counter = int(counter_payload)
+                except (TypeError, ValueError):
+                    return 0
+                if counter < 0 or str(counter) != counter_payload:
+                    return 0
+
+            await self.set(snapshot_key, payload, ex=ttl)
+            if incoming_version > counter:
+                await self.set(version_key, incoming_version, ex=ttl)
+            else:
+                self.ttls[version_key] = ttl
+                self.expires_at[version_key] = self._current_time + ttl
+            return 1
+
+        if len(operation_args) == 1:
+            (initial_ttl,) = operation_args
+            if not isinstance(initial_ttl, int) or initial_ttl <= 0:
+                return -4
+
+            snapshot_payload = await self.get(snapshot_key)
+            snapshot_version = 0
+            counter_ttl = initial_ttl
+            if snapshot_payload is not None:
+                try:
+                    snapshot_version = json.loads(snapshot_payload)["snapshotVersion"]
+                except (KeyError, TypeError, json.JSONDecodeError):
+                    return -2
+                if (
+                    isinstance(snapshot_version, bool)
+                    or not isinstance(snapshot_version, int)
+                    or snapshot_version <= 0
+                ):
+                    return -2
+                counter_ttl = self.ttls.get(snapshot_key, -1)
+                if counter_ttl <= 0:
+                    return -3
+
+            counter_payload = await self.get(version_key)
+            if counter_payload is None:
+                counter = 0
+            else:
+                try:
+                    counter = int(counter_payload)
+                except (TypeError, ValueError):
+                    return -1
+                if counter < 0 or str(counter) != counter_payload:
+                    return -1
+
+            next_version = max(counter, snapshot_version) + 1
+            await self.set(version_key, next_version, ex=counter_ttl)
+            return next_version
+
+        raise TypeError("Unsupported Redis Lua call")
 
 
 def _make_valid_result_payload(offer_index: int = 1) -> Dict[str, Any]:

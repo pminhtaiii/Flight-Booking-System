@@ -13,7 +13,9 @@ import { PrismaService } from '@/prisma/prisma.service';
 import { JwtService } from '@nestjs/jwt';
 import { StripeService } from '@/common/stripe.service';
 import { DuffelService } from '@/duffel/duffel.service';
-import { BookingService } from '@/booking/booking.service';
+import { BookingLifecycleService } from '@/booking-lifecycle/booking-lifecycle.service';
+import { BookingRecoveryService } from '@/booking-lifecycle/booking-recovery.service';
+import { BookingManagementService } from '@/booking-management/booking-management.service';
 import { BookingAgentProjectionService } from '@/agent-gateway/booking-agent-projection.service';
 import { HttpExceptionFilter } from '@/common/filters/http-exception.filter';
 import { BookingStatus, BookingFailureReason, PaymentStatus, Prisma } from '@prisma/client';
@@ -27,7 +29,9 @@ describe('Booking Characterization (E2E)', () => {
   let jwtService: JwtService;
   let stripeService: StripeService;
   let duffelService: DuffelService;
-  let bookingService: BookingService;
+  let bookingLifecycleService: BookingLifecycleService;
+  let bookingRecoveryService: BookingRecoveryService;
+  let bookingManagementService: BookingManagementService;
   let projectionService: BookingAgentProjectionService;
 
   let userA: { id: string; email: string };
@@ -56,7 +60,9 @@ describe('Booking Characterization (E2E)', () => {
     jwtService = moduleFixture.get<JwtService>(JwtService);
     stripeService = moduleFixture.get<StripeService>(StripeService);
     duffelService = moduleFixture.get<DuffelService>(DuffelService);
-    bookingService = moduleFixture.get<BookingService>(BookingService);
+    bookingLifecycleService = moduleFixture.get<BookingLifecycleService>(BookingLifecycleService);
+    bookingRecoveryService = moduleFixture.get<BookingRecoveryService>(BookingRecoveryService);
+    bookingManagementService = moduleFixture.get<BookingManagementService>(BookingManagementService);
     projectionService = moduleFixture.get<BookingAgentProjectionService>(BookingAgentProjectionService);
   });
 
@@ -196,7 +202,7 @@ describe('Booking Characterization (E2E)', () => {
       const intent = await createBookingIntent(userA.id, '175.50', 'USD');
       const bookingId = crypto.randomUUID();
 
-      const booking = await bookingService.createBooking(userA.id, bookingId, intent.id);
+      const booking = await bookingLifecycleService.createBooking(userA.id, bookingId, intent.id);
 
       expect(booking).toBeDefined();
       expect(booking.id).toBe(bookingId);
@@ -215,16 +221,16 @@ describe('Booking Characterization (E2E)', () => {
       const bookingId = crypto.randomUUID();
 
       // First call
-      const first = await bookingService.createBooking(userA.id, bookingId, intent.id);
+      const first = await bookingLifecycleService.createBooking(userA.id, bookingId, intent.id);
       expect(first.id).toBe(bookingId);
 
       // Replay with same intentId and same bookingId
-      const replay = await bookingService.createBooking(userA.id, bookingId, intent.id);
+      const replay = await bookingLifecycleService.createBooking(userA.id, bookingId, intent.id);
       expect(replay.id).toBe(bookingId);
 
       // Replay with same intentId but different requested bookingId -> returns existing booking by intent
       const diffBookingId = crypto.randomUUID();
-      const byIntent = await bookingService.createBooking(userA.id, diffBookingId, intent.id);
+      const byIntent = await bookingLifecycleService.createBooking(userA.id, diffBookingId, intent.id);
       expect(byIntent.id).toBe(bookingId);
 
       const totalCount = await prisma.booking.count({ where: { bookingIntentId: intent.id } });
@@ -236,7 +242,7 @@ describe('Booking Characterization (E2E)', () => {
       const bookingId = crypto.randomUUID();
 
       await expect(
-        bookingService.createBooking(userB.id, bookingId, intent.id),
+        bookingLifecycleService.createBooking(userB.id, bookingId, intent.id),
       ).rejects.toThrow(ForbiddenException);
     });
 
@@ -245,7 +251,7 @@ describe('Booking Characterization (E2E)', () => {
       const bookingId = crypto.randomUUID();
 
       await expect(
-        bookingService.createBooking(userA.id, bookingId, nonExistentIntentId),
+        bookingLifecycleService.createBooking(userA.id, bookingId, nonExistentIntentId),
       ).rejects.toThrow(NotFoundException);
     });
   });
@@ -254,12 +260,12 @@ describe('Booking Characterization (E2E)', () => {
     it('transitions booking to CONFIRMED, populates pnr, duffelOrderId, snapshots, departureAt, and creates agent projection', async () => {
       const intent = await createBookingIntent(userA.id);
       const bookingId = crypto.randomUUID();
-      await bookingService.createBooking(userA.id, bookingId, intent.id);
+      await bookingLifecycleService.createBooking(userA.id, bookingId, intent.id);
 
       const pnr = 'VNABC1';
       const duffelOrderId = 'ord_duffel_123';
 
-      const confirmedBooking = await bookingService.updateToConfirmed(
+      const confirmedBooking = await bookingLifecycleService.updateToConfirmed(
         bookingId,
         pnr,
         duffelOrderId,
@@ -293,7 +299,7 @@ describe('Booking Characterization (E2E)', () => {
     it('throws BadRequestException if flightSnapshot has empty segments', async () => {
       const intent = await createBookingIntent(userA.id);
       const bookingId = crypto.randomUUID();
-      await bookingService.createBooking(userA.id, bookingId, intent.id);
+      await bookingLifecycleService.createBooking(userA.id, bookingId, intent.id);
 
       const invalidSnapshot: FlightSnapshot = {
         segments: [],
@@ -303,7 +309,7 @@ describe('Booking Characterization (E2E)', () => {
       };
 
       await expect(
-        bookingService.updateToConfirmed(
+        bookingLifecycleService.updateToConfirmed(
           bookingId,
           'PNR123',
           'ord_123',
@@ -318,9 +324,9 @@ describe('Booking Characterization (E2E)', () => {
     it('transitions booking to FAILED with failureReason and updates projection status', async () => {
       const intent = await createBookingIntent(userA.id);
       const bookingId = crypto.randomUUID();
-      await bookingService.createBooking(userA.id, bookingId, intent.id);
+      await bookingLifecycleService.createBooking(userA.id, bookingId, intent.id);
 
-      const failedBooking = await bookingService.updateToFailed(
+      const failedBooking = await bookingLifecycleService.updateToFailed(
         bookingId,
         BookingFailureReason.CAPTURE_FAILED,
         sampleFlightSnapshot,
@@ -372,7 +378,7 @@ describe('Booking Characterization (E2E)', () => {
         },
       });
 
-      const reconciled = await bookingService.reconcileBookingIfStale(booking as any);
+      const reconciled = await bookingRecoveryService.reconcileBookingIfStale(booking as any);
       expect(reconciled.status).toBe(BookingStatus.PROCESSING);
     });
 
@@ -408,7 +414,7 @@ describe('Booking Characterization (E2E)', () => {
         },
       });
 
-      const reconciled = await bookingService.reconcileBookingIfStale(booking as any);
+      const reconciled = await bookingRecoveryService.reconcileBookingIfStale(booking as any);
       expect(reconciled.status).toBe(BookingStatus.FAILED);
       expect(reconciled.failureReason).toBe(BookingFailureReason.BOOKING_TIMEOUT);
     });
@@ -454,7 +460,7 @@ describe('Booking Characterization (E2E)', () => {
         .spyOn(stripeService, 'cancelPaymentIntent')
         .mockResolvedValue({ id: payment.stripePaymentIntentId, status: 'canceled' } as any);
 
-      const reconciled = await bookingService.reconcileBookingIfStale(booking as any);
+      const reconciled = await bookingRecoveryService.reconcileBookingIfStale(booking as any);
 
       retrieveSpy.mockRestore();
       cancelSpy.mockRestore();
@@ -540,7 +546,7 @@ describe('Booking Characterization (E2E)', () => {
         .spyOn(stripeService, 'retrievePaymentIntent')
         .mockResolvedValue({ id: payment.stripePaymentIntentId, status: 'succeeded' } as any);
 
-      const reconciled = await bookingService.reconcileBookingIfStale(booking as any);
+      const reconciled = await bookingRecoveryService.reconcileBookingIfStale(booking as any);
       retrieveSpy.mockRestore();
 
       expect(reconciled.status).toBe(BookingStatus.CONFIRMED);
@@ -586,7 +592,7 @@ describe('Booking Characterization (E2E)', () => {
       });
 
       // Query upcoming
-      const upcomingRes = await bookingService.listBookings(userA.id, 'upcoming', 1, 10);
+      const upcomingRes = await bookingManagementService.listBookings(userA.id, 'upcoming', 1, 10);
       expect(upcomingRes.bookings).toHaveLength(1);
       expect(upcomingRes.bookings[0].id).toBe(bookingActive.id);
       expect(upcomingRes.pagination.total).toBe(1);
@@ -594,7 +600,7 @@ describe('Booking Characterization (E2E)', () => {
       expect(upcomingRes.pagination.limit).toBe(10);
 
       // Query past
-      const pastRes = await bookingService.listBookings(userA.id, 'past', 1, 10);
+      const pastRes = await bookingManagementService.listBookings(userA.id, 'past', 1, 10);
       expect(pastRes.bookings).toHaveLength(1);
       expect(pastRes.bookings[0].id).toBe(bookingPast.id);
     });
@@ -620,7 +626,7 @@ describe('Booking Characterization (E2E)', () => {
       });
 
       // User A (owner) retrieves detail
-      const detail = await bookingService.getBookingDetail(booking.id, userA.id);
+      const detail = await bookingManagementService.getBookingDetail(booking.id, userA.id);
       expect(detail).toBeDefined();
       expect(detail.id).toBe(booking.id);
       expect(detail.status).toBe(BookingStatus.CONFIRMED);
@@ -631,13 +637,13 @@ describe('Booking Characterization (E2E)', () => {
 
       // User B (non-owner) is rejected with ForbiddenException
       await expect(
-        bookingService.getBookingDetail(booking.id, userB.id),
+        bookingManagementService.getBookingDetail(booking.id, userB.id),
       ).rejects.toThrow(ForbiddenException);
     });
   });
 
-  describe('6. Baseline Static Metric Check (Circular Dependencies)', () => {
-    it('verifies existing baseline circular reference patterns between Booking and Payment services', () => {
+  describe('6. Module Graph Metric Check (Elimination of Circular Dependencies)', () => {
+    it('verifies zero forwardRef or circular reference patterns between Booking and Payment services', () => {
       const rootDir = path.resolve(__dirname, '../../src');
 
       const paymentServicePath = path.join(rootDir, 'payment/payment.service.ts');
@@ -648,17 +654,17 @@ describe('Booking Characterization (E2E)', () => {
       const bookingModuleContent = fs.readFileSync(bookingModulePath, 'utf8');
       const paymentModuleContent = fs.readFileSync(paymentModulePath, 'utf8');
 
-      // Assert forwardRef injection in PaymentService
-      const hasBookingServiceForwardRef = paymentServiceContent.includes('forwardRef(() => BookingService)');
-      expect(hasBookingServiceForwardRef).toBe(true);
+      // Assert NO forwardRef injection in PaymentService
+      const hasBookingServiceForwardRef = paymentServiceContent.includes('forwardRef');
+      expect(hasBookingServiceForwardRef).toBe(false);
 
-      // Assert forwardRef in BookingModule for PaymentModule
-      const hasPaymentModuleForwardRefInBooking = bookingModuleContent.includes('forwardRef(() => PaymentModule)');
-      expect(hasPaymentModuleForwardRefInBooking).toBe(true);
+      // Assert NO forwardRef in BookingModule
+      const hasForwardRefInBooking = bookingModuleContent.includes('forwardRef');
+      expect(hasForwardRefInBooking).toBe(false);
 
-      // Assert forwardRef in PaymentModule for BookingModule
+      // Assert NO forwardRef in PaymentModule for BookingModule
       const hasBookingModuleForwardRefInPayment = paymentModuleContent.includes('forwardRef(() => BookingModule)');
-      expect(hasBookingModuleForwardRefInPayment).toBe(true);
+      expect(hasBookingModuleForwardRefInPayment).toBe(false);
     });
   });
 });
