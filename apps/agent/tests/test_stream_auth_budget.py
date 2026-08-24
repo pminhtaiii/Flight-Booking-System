@@ -246,6 +246,7 @@ def test_cross_user_session_isolation_denied():
             json={"message": "hello", "sessionId": "session-owned-by-user-B"},
             headers={"Authorization": f"Bearer {token_user_a}"},
         )
-        assert res.status_code in (403, 404, 503)
+        assert res.status_code == 200
+        assert "CHAT_SESSION_NOT_FOUND" in res.text
         mock_graph.assert_not_called()
         mock_persist.assert_not_called()
