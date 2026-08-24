@@ -1,6 +1,6 @@
 import { ConflictException } from '@nestjs/common';
 import { AuditService } from '@/audit/audit.service';
-import { BookingService } from '@/booking/booking.service';
+import { BookingLifecycleService } from '@/booking-lifecycle/booking-lifecycle.service';
 import { StripeService } from '@/common/stripe.service';
 import { DuffelService } from '@/duffel/duffel.service';
 import { PaymentIdempotencyService } from '@/payment/payment-idempotency.service';
@@ -47,7 +47,7 @@ describe('PaymentService ancillary validation boundary', () => {
       {} as DuffelService,
       {} as AuditService,
       {} as PaymentMethodService,
-      {} as BookingService,
+      {} as BookingLifecycleService,
       validation as unknown as AncillaryPaymentValidationService,
     );
 

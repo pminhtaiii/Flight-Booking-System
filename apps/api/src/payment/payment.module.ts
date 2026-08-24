@@ -1,4 +1,4 @@
-import { Module, forwardRef } from '@nestjs/common';
+import { Module } from '@nestjs/common';
 import { PaymentIdempotencyService } from './payment-idempotency.service';
 import { PrismaModule } from '../prisma/prisma.module';
 import { PaymentService } from './payment.service';
@@ -10,7 +10,7 @@ import { PaymentWebhookService } from './payment-webhook.service';
 import { DuffelModule } from '../duffel/duffel.module';
 import { AuditModule } from '../audit/audit.module';
 import { PaymentCronService } from './payment-cron.service';
-import { BookingModule } from '../booking/booking.module';
+import { BookingLifecycleModule } from '../booking-lifecycle/booking-lifecycle.module';
 import { AdminRefundController } from './admin-refund.controller';
 import { AncillaryPaymentValidationService } from './ancillary-payment-validation.service';
 import { BookingIntentModule } from '../booking-intent/booking-intent.module';
@@ -24,8 +24,8 @@ import { RefundSettlementModule } from '../refund-settlement/refund-settlement.m
     AuditModule,
     RefundModule,
     RefundSettlementModule,
-    forwardRef(() => BookingModule),
-    forwardRef(() => BookingIntentModule),
+    BookingLifecycleModule,
+    BookingIntentModule,
   ],
   controllers: [PaymentController, PaymentWebhookController, AdminRefundController],
   providers: [

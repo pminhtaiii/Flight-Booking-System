@@ -1,5 +1,5 @@
 import { AuditService } from '@/audit/audit.service';
-import { BookingService } from '@/booking/booking.service';
+import { BookingLifecycleService } from '@/booking-lifecycle/booking-lifecycle.service';
 import { StripeService } from '@/common/stripe.service';
 import { DuffelService } from '@/duffel/duffel.service';
 import { PaymentIdempotencyService } from '@/payment/payment-idempotency.service';
@@ -138,7 +138,7 @@ function buildHarness(options: HarnessOptions = {}) {
     duffel as unknown as DuffelService,
     audit as unknown as AuditService,
     {} as PaymentMethodService,
-    booking as unknown as BookingService,
+    booking as unknown as BookingLifecycleService,
   );
 
   return { service, payment, prisma, stripe, idempotency, duffel, booking };

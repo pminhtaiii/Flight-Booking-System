@@ -16,7 +16,7 @@ describe('PaymentService - Ancillary Pipeline', () => {
   let mockDuffel: any;
   let mockAudit: any;
   let mockPaymentMethod: any;
-  let mockBookingService: any;
+  let mockBookingLifecycleService: any;
   let mockAncillaryValidation: any;
 
   beforeEach(() => {
@@ -85,7 +85,7 @@ describe('PaymentService - Ancillary Pipeline', () => {
       saveMethod: jest.fn(),
     };
 
-    mockBookingService = {
+    mockBookingLifecycleService = {
       createBooking: jest.fn().mockResolvedValue({ id: 'booking-123', userId: 'user-123' }),
       updateToConfirmed: jest.fn(),
       updateToFailed: jest.fn(),
@@ -102,7 +102,7 @@ describe('PaymentService - Ancillary Pipeline', () => {
       mockDuffel as unknown as DuffelService,
       mockAudit as unknown as AuditService,
       mockPaymentMethod as unknown as PaymentMethodService,
-      mockBookingService,
+      mockBookingLifecycleService,
       mockAncillaryValidation as unknown as AncillaryPaymentValidationService,
     );
   });

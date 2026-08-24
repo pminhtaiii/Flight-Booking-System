@@ -24,8 +24,7 @@ import { enforceTransition } from '@/payment/payment-state-machine';
 import * as crypto from 'crypto';
 import { Prisma, BookingFailureReason } from '@prisma/client';
 
-import { BookingService } from '@/booking/booking.service';
-import { forwardRef, Inject } from '@nestjs/common';
+import { BookingLifecycleService } from '@/booking-lifecycle/booking-lifecycle.service';
 import { FlightSnapshot, PassengerSnapshot } from '@shared/booking-types';
 import { AncillaryPaymentValidationService } from '@/payment/ancillary-payment-validation.service';
 import type { ValidatedAncillaryPayment } from '@/payment/ancillary-payment-validation.service';
@@ -227,8 +226,7 @@ export class PaymentService {
     private readonly duffelService: DuffelService,
     private readonly auditService: AuditService,
     private readonly paymentMethodService: PaymentMethodService,
-    @Inject(forwardRef(() => BookingService))
-    private readonly bookingService: BookingService,
+    private readonly bookingLifecycleService: BookingLifecycleService,
     @Optional()
     private readonly ancillaryPaymentValidation?: AncillaryPaymentValidationService,
     @Optional()
@@ -1044,7 +1042,7 @@ export class PaymentService {
       }
 
       // 3. Create canonical booking in PROCESSING state
-      const canonicalBooking = await this.bookingService.createBooking(
+      const canonicalBooking = await this.bookingLifecycleService.createBooking(
         userId,
         dto.bookingId,
         payment.bookingIntentId,
@@ -1282,7 +1280,7 @@ export class PaymentService {
                 where: { id: bookingIntent.id },
                 data: { status: nextBookingStatus },
               });
-              await this.bookingService.updateToFailed(
+              await this.bookingLifecycleService.updateToFailed(
                 canonicalBooking.id,
                 BookingFailureReason.SYSTEM_ERROR,
                 undefined,
@@ -1409,7 +1407,7 @@ export class PaymentService {
               where: { id: bookingIntent.id },
               data: { status: nextBookingStatus },
             });
-            await this.bookingService.updateToFailed(
+            await this.bookingLifecycleService.updateToFailed(
               canonicalBooking.id,
               BookingFailureReason.SYSTEM_ERROR,
               undefined,
@@ -1598,7 +1596,7 @@ export class PaymentService {
               where: { id: payment.bookingIntentId },
               data: { status: nextBookingStatus },
             });
-            await this.bookingService.updateToFailed(
+            await this.bookingLifecycleService.updateToFailed(
               canonicalBooking.id,
               BookingFailureReason.CAPTURE_FAILED,
               flightSnap,
@@ -1686,7 +1684,7 @@ export class PaymentService {
             }
 
             const { flightSnapshot, passengerSnapshot } = this.duffelService.mapDuffelOrderToSnapshots(completeOrder);
-            await this.bookingService.updateToConfirmed(
+            await this.bookingLifecycleService.updateToConfirmed(
               canonicalBooking.id,
               duffelOrder.booking_reference as string,
               duffelOrder.id as string,
@@ -1971,7 +1969,7 @@ export class PaymentService {
           data: { status: nextBookingStatus },
         });
         if (booking) {
-          await this.bookingService.updateToFailed(
+          await this.bookingLifecycleService.updateToFailed(
             booking.id,
             BookingFailureReason.SYSTEM_ERROR,
             flightSnap,
