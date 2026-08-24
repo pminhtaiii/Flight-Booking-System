@@ -59,7 +59,6 @@ class ActionRequiredPayload(BaseModel):
     action: str
     target: str
     scope: Optional[str] = None
-    display: Optional[Dict[str, Any]] = None
     passengers: Optional[List[Dict[str, Any]]] = None
     model_config = ConfigDict(extra="forbid")
 
@@ -263,7 +262,6 @@ class TestAuthoritativeSSEWireEvents:
             "action": "COMPLETE_PROFILE",
             "target": "/profile",
             "scope": "INTERNATIONAL",
-            "display": {"title": "Action Required"},
             "passengers": [
                 {
                     "passengerType": "ADULT",

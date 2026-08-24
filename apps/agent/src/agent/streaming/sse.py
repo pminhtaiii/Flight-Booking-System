@@ -8,6 +8,25 @@ from langchain_core.messages import HumanMessage
 from sse_starlette.sse import EventSourceResponse
 
 from agent.agents.chat_agent import format_messages
+from agent.chat_turn import (
+    ActionHandoffEvent,
+    ActionHandoffPayload,
+    ActionRequiredEvent,
+    ActionRequiredPayload,
+    ChatTurnEvent,
+    DoneEvent,
+    DonePayload,
+    ErrorEvent,
+    ErrorPayload,
+    FlightResultsEvent,
+    FlightResultsPayload,
+    TokenEvent,
+    TokenPayload,
+    ToolCallEvent,
+    ToolCallPayload,
+    ToolResultEvent,
+    ToolResultPayload,
+)
 from agent.config import get_settings
 from agent.graph.graph import graph
 from agent.guardrails.output_pipeline import OutputGuardrailBlockedError, OutputGuardrailPipeline
@@ -148,16 +167,14 @@ async def chat_stream(
         guardrails_logger.warning("Ingress PII detected in user message: REDACTED")
 
         async def pii_error_generator():
-            yield {
-                "event": "error",
-                "data": json.dumps(
-                    {
-                        "code": "GUARDRAIL_BLOCKED",
-                        "message": "Your message contains protected personal information and cannot be processed.",
-                        "partialMessageId": None,
-                    }
-                ),
-            }
+            event = ErrorEvent(
+                data=ErrorPayload(
+                    code="GUARDRAIL_BLOCKED",
+                    message="Your message contains protected personal information and cannot be processed.",
+                    partialMessageId=None,
+                )
+            )
+            yield {"event": event.event, "data": event.data.model_dump_json()}
 
         return EventSourceResponse(pii_error_generator())
 
@@ -169,16 +186,14 @@ async def chat_stream(
                 raise HTTPException(status_code=503, detail="Safety check unavailable")
 
             async def error_generator():
-                yield {
-                    "event": "error",
-                    "data": json.dumps(
-                        {
-                            "code": "GUARDRAIL_BLOCKED",
-                            "message": "Your message could not be processed.",
-                            "partialMessageId": None,
-                        }
-                    ),
-                }
+                event = ErrorEvent(
+                    data=ErrorPayload(
+                        code="GUARDRAIL_BLOCKED",
+                        message="Your message could not be processed.",
+                        partialMessageId=None,
+                    )
+                )
+                yield {"event": event.event, "data": event.data.model_dump_json()}
 
             return EventSourceResponse(error_generator())
 
@@ -306,7 +321,7 @@ async def chat_stream(
         )
 
         # 6. Generator-based SSE streaming with bounded queue (maxsize=100)
-        q = asyncio.Queue(maxsize=100)
+        q: asyncio.Queue[ChatTurnEvent | dict | None] = asyncio.Queue(maxsize=100)
         from agent.main import active_streams
 
         active_streams.add(q)
@@ -341,16 +356,13 @@ async def chat_stream(
             except Exception:
                 logger.warning("user_message_persistence_failed")
                 await q.put(
-                    {
-                        "event": "error",
-                        "data": json.dumps(
-                            {
-                                "code": "PERSISTENCE_ERROR",
-                                "message": "Failed to persist user message before tool execution.",
-                                "partialMessageId": None,
-                            }
-                        ),
-                    }
+                    ErrorEvent(
+                        data=ErrorPayload(
+                            code="PERSISTENCE_ERROR",
+                            message="Failed to persist user message before tool execution.",
+                            partialMessageId=None,
+                        )
+                    )
                 )
                 return
 
@@ -381,9 +393,7 @@ async def chat_stream(
                             token_content = chunk.content
                             async for safe_chunk in pipeline.process_token(token_content):
                                 partial_response += safe_chunk
-                                await q.put(
-                                    {"event": "token", "data": json.dumps({"content": safe_chunk})}
-                                )
+                                await q.put(TokenEvent(data=TokenPayload(content=safe_chunk)))
 
                     elif kind == "on_tool_start":
                         tool_name = event.get("name")
@@ -398,17 +408,18 @@ async def chat_stream(
                         if tool_name == "check_booking_readiness":
                             safe_input = {"message": "Checking booking readiness..."}
                             await q.put(
-                                {
-                                    "event": "tool_call",
-                                    "data": json.dumps({"name": tool_name, "inputs": safe_input}),
-                                }
+                                ToolCallEvent(
+                                    data=ToolCallPayload(name=tool_name, inputs=safe_input)
+                                )
                             )
                         else:
                             await q.put(
-                                {
-                                    "event": "tool_call",
-                                    "data": json.dumps({"name": tool_name, "inputs": tool_input}),
-                                }
+                                ToolCallEvent(
+                                    data=ToolCallPayload(
+                                        name=tool_name or "",
+                                        inputs=tool_input if isinstance(tool_input, dict) else {},
+                                    )
+                                )
                             )
                     elif kind == "on_chain_end":
                         node_name = event.get("name")
@@ -432,20 +443,19 @@ async def chat_stream(
                                         "error_class": "handoff_rejected",
                                     },
                                 )
+                                err_msg = (
+                                    action_res.get("error")
+                                    or "Checkout handoff could not be created."
+                                )
                                 await q.put(
-                                    {
-                                        "event": "error",
-                                        "data": json.dumps(
-                                            {
-                                                "code": "HANDOFF_FAILED",
-                                                "message": action_res.get("error")
-                                                or "Checkout handoff could not be created.",
-                                                "error": action_res.get("error")
-                                                or "Checkout handoff could not be created.",
-                                                "partialMessageId": None,
-                                            }
-                                        ),
-                                    }
+                                    ErrorEvent(
+                                        data=ErrorPayload(
+                                            code="HANDOFF_FAILED",
+                                            message=err_msg,
+                                            error=err_msg,
+                                            partialMessageId=None,
+                                        )
+                                    )
                                 )
                                 return
 
@@ -463,30 +473,27 @@ async def chat_stream(
                                     ):
                                         logger.warning("stale_fence_handoff_emission_aborted")
                                         await q.put(
-                                            {
-                                                "event": "error",
-                                                "data": json.dumps(
-                                                    {
-                                                        "code": "PERSISTENCE_ERROR",
-                                                        "message": "The requested action could not be emitted because the session lease was lost.",
-                                                        "partialMessageId": None,
-                                                    }
-                                                ),
-                                            }
+                                            ErrorEvent(
+                                                data=ErrorPayload(
+                                                    code="PERSISTENCE_ERROR",
+                                                    message="The requested action could not be emitted because the session lease was lost.",
+                                                    partialMessageId=None,
+                                                )
+                                            )
                                         )
                                         return
 
-                                    payload = {
-                                        "version": 1,
-                                        "action": "begin_checkout",
-                                        "handoffToken": handoff_token,
-                                        "expiresAt": action_res.get("expiresAt"),
-                                        "display": action_res.get("display"),
-                                    }
-
-                                    await q.put(
-                                        {"event": "ACTION_HANDOFF", "data": json.dumps(payload)}
+                                    payload = ActionHandoffPayload(
+                                        version=1,
+                                        action="begin_checkout",
+                                        handoffToken=handoff_token,
+                                        expiresAt=str(action_res.get("expiresAt") or ""),
+                                        display=action_res.get("display")
+                                        if isinstance(action_res.get("display"), dict)
+                                        else {},
                                     )
+
+                                    await q.put(ActionHandoffEvent(data=payload))
                                     chat_telemetry.emit_safely(
                                         "handoff_create",
                                         status="created",
@@ -512,8 +519,6 @@ async def chat_stream(
                                     "outcome": "completed",
                                 },
                             )
-
-                        output_data = None
 
                         output_data = None
                         if tool_output:
@@ -544,41 +549,34 @@ async def chat_stream(
                         if tool_name == "check_booking_readiness":
                             if output_data and "error" in output_data:
                                 await q.put(
-                                    {
-                                        "event": "error",
-                                        "data": json.dumps(
-                                            {
-                                                "code": "READINESS_RESPONSE_INVALID",
-                                                "message": "Booking readiness could not be verified safely.",
-                                                "partialMessageId": None,
-                                            }
-                                        ),
-                                    }
+                                    ErrorEvent(
+                                        data=ErrorPayload(
+                                            code="READINESS_RESPONSE_INVALID",
+                                            message="Booking readiness could not be verified safely.",
+                                            partialMessageId=None,
+                                        )
+                                    )
                                 )
                                 return
                             else:
                                 safe_readiness = validate_booking_readiness_response(output_data)
                                 if safe_readiness is None:
                                     await q.put(
-                                        {
-                                            "event": "error",
-                                            "data": json.dumps(
-                                                {
-                                                    "code": "READINESS_RESPONSE_INVALID",
-                                                    "message": "Booking readiness could not be verified safely.",
-                                                    "partialMessageId": None,
-                                                }
-                                            ),
-                                        }
+                                        ErrorEvent(
+                                            data=ErrorPayload(
+                                                code="READINESS_RESPONSE_INVALID",
+                                                message="Booking readiness could not be verified safely.",
+                                                partialMessageId=None,
+                                            )
+                                        )
                                     )
                                     return
                                 summary_str = "Successfully checked booking readiness."
 
                         await q.put(
-                            {
-                                "event": "tool_result",
-                                "data": json.dumps({"name": tool_name, "result": summary_str}),
-                            }
+                            ToolResultEvent(
+                                data=ToolResultPayload(name=tool_name or "", result=summary_str)
+                            )
                         )
 
                         if tool_name == "search_flights":
@@ -598,10 +596,9 @@ async def chat_stream(
                                 logger.warning("search_result_projection_failed")
                             if raw_results:
                                 await q.put(
-                                    {
-                                        "event": "flight_results",
-                                        "data": json.dumps({"results": raw_results}),
-                                    }
+                                    FlightResultsEvent(
+                                        data=FlightResultsPayload(results=raw_results)
+                                    )
                                 )
                         elif (
                             tool_name == "check_booking_readiness"
@@ -642,49 +639,43 @@ async def chat_stream(
                             ):
                                 logger.warning("stale_fence_action_required_emission_aborted")
                                 await q.put(
-                                    {
-                                        "event": "error",
-                                        "data": json.dumps(
-                                            {
-                                                "code": "PERSISTENCE_ERROR",
-                                                "message": "The requested action could not be emitted because the session lease was lost.",
-                                                "partialMessageId": None,
-                                            }
-                                        ),
-                                    }
+                                    ErrorEvent(
+                                        data=ErrorPayload(
+                                            code="PERSISTENCE_ERROR",
+                                            message="The requested action could not be emitted because the session lease was lost.",
+                                            partialMessageId=None,
+                                        )
+                                    )
                                 )
                                 return
 
-                            payload = {
-                                "action": action,
-                                "scope": scope,
-                                "passengers": safe_passengers,
-                                "target": target,
-                            }
+                            payload = ActionRequiredPayload(
+                                action=action,
+                                scope=scope,
+                                passengers=safe_passengers,
+                                target=target,
+                            )
 
-                            await q.put({"event": "ACTION_REQUIRED", "data": json.dumps(payload)})
+                            await q.put(ActionRequiredEvent(data=payload))
                             return
 
                 # Flush the pipeline and yield any remaining safe chunks
                 async for safe_chunk in pipeline.flush():
                     partial_response += safe_chunk
-                    await q.put({"event": "token", "data": json.dumps({"content": safe_chunk})})
+                    await q.put(TokenEvent(data=TokenPayload(content=safe_chunk)))
 
                 # Completed turn - Persist message batch and send done event
                 if partial_response.strip() or force_persistence:
                     if queue_manager and not await queue_manager.validate_active_fence(session_id):
                         logger.warning("stale_fence_completed_persistence_aborted")
                         await q.put(
-                            {
-                                "event": "error",
-                                "data": json.dumps(
-                                    {
-                                        "code": "PERSISTENCE_ERROR",
-                                        "message": "The response was generated but could not be saved.",
-                                        "partialMessageId": None,
-                                    }
-                                ),
-                            }
+                            ErrorEvent(
+                                data=ErrorPayload(
+                                    code="PERSISTENCE_ERROR",
+                                    message="The response was generated but could not be saved.",
+                                    partialMessageId=None,
+                                )
+                            )
                         )
                         return
                     user_msg_content = await _resolve_user_message(body, graph, config)
@@ -701,16 +692,13 @@ async def chat_stream(
                     except Exception:  # noqa: BLE001
                         logger.error("completed_response_persistence_failed")
                         await q.put(
-                            {
-                                "event": "error",
-                                "data": json.dumps(
-                                    {
-                                        "code": "PERSISTENCE_ERROR",
-                                        "message": "The response was generated but could not be saved.",
-                                        "partialMessageId": None,
-                                    }
-                                ),
-                            }
+                            ErrorEvent(
+                                data=ErrorPayload(
+                                    code="PERSISTENCE_ERROR",
+                                    message="The response was generated but could not be saved.",
+                                    partialMessageId=None,
+                                )
+                            )
                         )
                         return
 
@@ -720,12 +708,9 @@ async def chat_stream(
                             agent_message_id = msg.get("id")
 
                     await q.put(
-                        {
-                            "event": "done",
-                            "data": json.dumps(
-                                {"messageId": agent_message_id, "sessionId": session_id}
-                            ),
-                        }
+                        DoneEvent(
+                            data=DonePayload(messageId=agent_message_id, sessionId=session_id)
+                        )
                     )
 
                     # Trigger token budget check and summarization
@@ -774,16 +759,13 @@ async def chat_stream(
                         logger.error("guardrail_partial_persistence_failed")
 
                 await q.put(
-                    {
-                        "event": "error",
-                        "data": json.dumps(
-                            {
-                                "code": "OUTPUT_GUARDRAIL_BLOCKED",
-                                "message": "Response was blocked for safety reasons.",
-                                "partialMessageId": partial_message_id,
-                            }
-                        ),
-                    }
+                    ErrorEvent(
+                        data=ErrorPayload(
+                            code="OUTPUT_GUARDRAIL_BLOCKED",
+                            message="Response was blocked for safety reasons.",
+                            partialMessageId=partial_message_id,
+                        )
+                    )
                 )
             except asyncio.CancelledError:
                 logger.warning("stream_connection_dropped")
@@ -804,16 +786,13 @@ async def chat_stream(
                         logger.error("disconnect_partial_persistence_failed")
                         try:
                             q.put_nowait(
-                                {
-                                    "event": "error",
-                                    "data": json.dumps(
-                                        {
-                                            "code": "PERSISTENCE_ERROR",
-                                            "message": "The response was generated but could not be saved.",
-                                            "partialMessageId": None,
-                                        }
-                                    ),
-                                }
+                                ErrorEvent(
+                                    data=ErrorPayload(
+                                        code="PERSISTENCE_ERROR",
+                                        message="The response was generated but could not be saved.",
+                                        partialMessageId=None,
+                                    )
+                                )
                             )
                         except asyncio.QueueFull:
                             logger.debug("disconnect_error_event_queue_full")
@@ -840,16 +819,13 @@ async def chat_stream(
                         logger.error("llm_partial_persistence_failed")
 
                 await q.put(
-                    {
-                        "event": "error",
-                        "data": json.dumps(
-                            {
-                                "code": "LLM_ERROR",
-                                "message": "The AI model encountered an error. Please try again.",
-                                "partialMessageId": partial_message_id,
-                            }
-                        ),
-                    }
+                    ErrorEvent(
+                        data=ErrorPayload(
+                            code="LLM_ERROR",
+                            message="The AI model encountered an error. Please try again.",
+                            partialMessageId=partial_message_id,
+                        )
+                    )
                 )
             finally:
                 try:
@@ -874,9 +850,20 @@ async def chat_stream(
                     event = await q.get()
                     if event is None:
                         break
-                    yield event
-                    if event.get("event") == "error":
-                        break
+                    if hasattr(event, "event") and hasattr(event, "data"):
+                        event_name = event.event
+                        data_val = (
+                            event.data.model_dump_json()
+                            if hasattr(event.data, "model_dump_json")
+                            else json.dumps(event.data)
+                        )
+                        yield {"event": event_name, "data": data_val}
+                        if event_name == "error":
+                            break
+                    elif isinstance(event, dict):
+                        yield event
+                        if event.get("event") == "error":
+                            break
             finally:
                 active_streams.discard(q)
                 if not producer_task.done():

@@ -7,13 +7,39 @@ Update this file after every completed feature. Any AI agent reading this should
 ### Current Status
 
 **Feature:** Deepen Codebase Architecture (Feature 019)
-**Last completed:** Slice 3B: Cut Over Callers to TrustedSearchSnapshotLifecycle & Decommission Legacy Shims (2026-08-24).
+**Last completed:** Slice 4A: Authoritative Chat Turn Event Models & Golden Contract Tests (2026-08-24).
 **In progress:** None.
-**Next:** Slice 4: Separate Chat Turn Lifecycle from SSE Transport (US4).
+**Next:** Slice 4B: Extract ChatTurnRunner in Causal-Cleanup Order (US4).
 
 ---
 
 ## Progress by Feature
+
+### [x] Feature: Deepen Codebase Architecture (Feature 019) — Slice 4A: Authoritative Chat Turn Event Models & Golden Contract Tests
+
+- [x] Slice 4A / Authoritative Chat Turn Event Models & Golden Contract Tests (2026-08-24):
+  - **Authoritative Event Models (`apps/agent/src/agent/chat_turn/`)**:
+    - Created `events.py` defining strict Pydantic v2 payload models with `ConfigDict(extra="forbid")`: `TokenPayload`, `ToolCallPayload`, `ToolResultPayload`, `FlightResultsPayload`, `ActionHandoffPayload`, `ActionRequiredPayload`, `DonePayload`, `ErrorPayload`.
+    - Created tagged event wrapper models with `ConfigDict(extra="forbid")`: `TokenEvent`, `ToolCallEvent`, `ToolResultEvent`, `FlightResultsEvent`, `ActionHandoffEvent`, `ActionRequiredEvent`, `DoneEvent`, `ErrorEvent`.
+    - Defined discriminated union `ChatTurnEvent` with `discriminator="event"`.
+    - Implemented `format_sse(event: ChatTurnEvent) -> str` formatting wire SSE chunks.
+    - Exported all models and helpers in `apps/agent/src/agent/chat_turn/__init__.py`.
+  - **Streaming Generator Integration (`apps/agent/src/agent/streaming/sse.py`)**:
+    - Replaced all raw dict allocations with typed `ChatTurnEvent` instances across `pii_error_generator`, `error_generator`, and `producer` yield points.
+    - Updated `sse_generator` to serialize `ChatTurnEvent` payloads via `model_dump_json()` while retaining dict fallback.
+  - **Backwards Compatibility Re-exports (`apps/agent/src/agent/models/events.py`)**:
+    - Re-exported canonical events and payloads from `agent.chat_turn.events`.
+    - Preserved legacy classes (`DisplayInfo`, `HandoffEvent`, `BaseSSEEvent`, `LegacyActionRequiredEvent`, `ChatMessageEvent`) with `extra="forbid"` for existing test compatibility.
+  - **Golden Contract Tests (`apps/agent/tests/test_chat_turn_events.py`)**:
+    - Validated all 8 wire event payloads, strict `extra="forbid"` field rejection, `handoffToken` isolation exclusively within `ActionHandoffPayload`, exact SSE formatting, `TypeAdapter(ChatTurnEvent)` discriminated union parsing, and zero PII/secret leakage.
+  - **Verification & Test Suites (100% Green)**:
+    - Golden Contract Suite: 7/7 tests PASS.
+    - SSE Characterization Suite: 15/15 tests PASS.
+    - Snapshot Characterization Suite: 15/15 tests PASS.
+    - Event Contracts Suite: 3/3 tests PASS.
+    - Full Agent Pytest Suite: 431/431 tests PASS.
+    - Ruff Lint & Format Checks: 0 errors, 117 files clean.
+    - Two-Axis Code Review: Standards Review & Spec Review completed with 0 remaining P0/P1 issues.
 
 ### [x] Feature: Deepen Codebase Architecture (Feature 019) — Slice 2D: Rewire, Remove BookingService Facade & Eliminate Payment-Booking forwardRef
 
