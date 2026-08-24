@@ -142,13 +142,14 @@
 
 **Independent Test**: Exercise ChatTurnRunner without HTTP, then verify SSE encoding, disconnect closure, fence loss, failure ordering, and shutdown cleanup independently.
 
-- [ ] T056 [P] [US4] Add failing golden contracts for all eight strict event variants and unchanged names, keys, and order in apps/agent/tests/test_event_contracts.py
-- [ ] T057 [US4] Implement the authoritative strict ChatTurnEvent union and SSE encoding helpers in apps/agent/src/agent/chat_turn/events.py
-- [ ] T058 [P] [US4] Add failing runner success, failure, disconnect, fence-loss, cancellation, and shutdown tests in apps/agent/tests/test_chat_turn_runner.py
-- [ ] T059 [US4] Define ChatTurnCommand and the transport-independent runner interface in apps/agent/src/agent/chat_turn/models.py, apps/agent/src/agent/chat_turn/runner.py, and apps/agent/src/agent/chat_turn/__init__.py
-- [ ] T060 [US4] Move session, memory, snapshot, lease, guardrail, persistence, recovery, and summarization ownership into apps/agent/src/agent/chat_turn/runner.py
-- [ ] T061 [US4] Isolate LangGraph astream_events v2 parsing and typed event ordering in apps/agent/src/agent/chat_turn/runner.py
-- [ ] T062 [US4] Implement one awaited cancellation-safe finalizer that blocks stale fencing owners and completes durable cleanup before terminal errors in apps/agent/src/agent/chat_turn/runner.py
+- [x] T056 [P] [US4] Add failing golden contracts for all eight strict event variants and unchanged names, keys, and order in apps/agent/tests/test_event_contracts.py
+- [x] T057 [US4] Implement the authoritative strict ChatTurnEvent union and SSE encoding helpers in apps/agent/src/agent/chat_turn/events.py
+- [x] T058 [P] [US4] Add failing runner success, failure, disconnect, fence-loss, cancellation, and shutdown tests in apps/agent/tests/test_chat_turn_runner.py
+- [x] T059 [US4] Define ChatTurnCommand and the transport-independent runner interface in apps/agent/src/agent/chat_turn/models.py, apps/agent/src/agent/chat_turn/runner.py, and apps/agent/src/agent/chat_turn/__init__.py
+- [x] T060 [US4] Move session, memory, snapshot, lease, guardrail, persistence, recovery, and summarization ownership into apps/agent/src/agent/chat_turn/runner.py
+- [x] T061 [US4] Isolate LangGraph astream_events v2 parsing and typed event ordering in apps/agent/src/agent/chat_turn/runner.py
+- [x] T062 [US4] Implement one awaited cancellation-safe finalizer that blocks stale fencing owners and completes durable cleanup before terminal errors in apps/agent/src/agent/chat_turn/runner.py
+
 - [ ] T063 [US4] Reduce apps/agent/src/agent/streaming/sse.py to admission, HTTP error mapping, disconnect detection, runner closure, and typed SSE encoding
 - [ ] T064 [US4] Replace raw active queue shutdown mutation with cancelled and awaited runner handles in apps/agent/src/agent/main.py
 - [ ] T065 [P] [US4] Verify thin-adapter encoding, cleanup ordering, no leaked leases/tasks, direct stream, and output guardrails in apps/agent/tests/test_sse_integration.py, apps/agent/tests/test_stream_session_control.py, and apps/agent/tests/test_direct_stream.py
