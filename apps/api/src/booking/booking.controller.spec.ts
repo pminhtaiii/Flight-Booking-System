@@ -2,7 +2,6 @@ import 'reflect-metadata';
 import { BookingController } from './booking.controller';
 
 describe('BookingController', () => {
-  const bookingService = {};
   const bookingManagementService = {
     listBookings: jest.fn(),
     getBookingDetail: jest.fn(),
@@ -13,7 +12,6 @@ describe('BookingController', () => {
     cancelBooking: jest.fn(),
   };
   const controller = new BookingController(
-    bookingService as never,
     bookingManagementService as never,
     cancellationService as never,
   );
