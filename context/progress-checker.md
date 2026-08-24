@@ -7,15 +7,45 @@ Update this file after every completed feature. Any AI agent reading this should
 ### Current Status
 
 **Feature:** Deepen Codebase Architecture (Feature 019)
-**Last completed:** Slice 4A: Authoritative Chat Turn Event Models & Golden Contract Tests (2026-08-24).
+**Last completed:** Slice 4B: Extract ChatTurnRunner in Causal-Cleanup Order (2026-08-24).
 **In progress:** None.
-**Next:** Slice 4B: Extract ChatTurnRunner in Causal-Cleanup Order (US4).
+**Next:** Slice 4C: Thin Transport and Shutdown (US4).
 
 ---
 
 ## Progress by Feature
 
+### [x] Feature: Deepen Codebase Architecture (Feature 019) — Slice 4B: Extract ChatTurnRunner in Causal-Cleanup Order
+
+- [x] Slice 4B / Extract ChatTurnRunner in Causal-Cleanup Order (2026-08-24):
+  - **Command & Runner Architecture (`apps/agent/src/agent/chat_turn/`)**:
+    - Created `command.py` defining `ChatTurnCommand` as a strict Pydantic v2 `BaseModel` (`ConfigDict(extra="forbid")`) encapsulating all turn input parameters (`user_id`, `session_id`, `message`, `action_required`, `action_type`, `action_payload`, `token`, `trace_id`, `correlation_id`).
+    - Implemented `runner.py` defining `ChatTurnRunner` with transport-agnostic async generator `run(command: ChatTurnCommand) -> AsyncIterator[ChatTurnEvent]`.
+    - Integrated session auto-provisioning, distributed session lease acquisition (`MessageQueueManager.acquire`), monotonic fencing token propagation (`client.set_fencing_token`), memory context retrieval, and `TrustedSearchSnapshot` loading with PII-safe telemetry.
+    - Encapsulated LangGraph `astream_events(version="v2")` stream interpretation, token-by-token `OutputGuardrailPipeline` processing, readiness tool input/output masking, browser flight result projections, and checkout handoff emissions.
+    - Exported all models, runner, event types, and helpers in `apps/agent/src/agent/chat_turn/__init__.py`.
+  - **Deterministic Causal Failure Cleanup Ordering (`_finalize_cleanup`)**:
+    - Enforced strict 4-step sequence across all error, cancellation, and guardrail block paths:
+      1. Persist permitted safe partial turn (if tokens were emitted and fence is valid, using `asyncio.shield` on cancellation).
+      2. Finalize and close output guardrail pipeline (`pipeline.aclose()`).
+      3. Release owned distributed session lease (`queue_manager.release()`).
+      4. Construct and yield terminal `ErrorEvent` (`OUTPUT_GUARDRAIL_BLOCKED`, `LLM_ERROR`, `PERSISTENCE_ERROR`, `READINESS_RESPONSE_INVALID`, etc.).
+  - **Monotonic Fencing Protection & Data Safety**:
+    - Re-validates active lease fence prior to (1) user message pre-persistence, (2) handoff token emission, (3) action-required emission, (4) completed batch persistence, and (5) partial response persistence in cleanup.
+    - Zero plaintext customer PII or payment secrets logged; handoff tokens restricted strictly to `ActionHandoffPayload.handoffToken`.
+  - **Comprehensive Runner Unit Test Suite (`apps/agent/tests/test_chat_turn_runner.py`)**:
+    - 10 targeted test cases testing command validation & `extra="forbid"`, happy path streaming & monotonic fencing, session auto-provisioning, tool execution & browser snapshot projection, readiness sanitization & `ActionRequiredEvent`, checkout handoff token emission, causal cleanup order on guardrail block, causal cleanup on LLM runtime error, stale fence persistence abort, and shielded cancellation lease release.
+  - **Verification & Test Suites (100% Green)**:
+    - Chat Turn Runner Suite: 10/10 tests PASS.
+    - Golden Contract Suite: 7/7 tests PASS.
+    - SSE Characterization Suite: 15/15 tests PASS.
+    - Snapshot Characterization Suite: 15/15 tests PASS.
+    - Full Agent Pytest Suite: 430/430 tests PASS (11 deselected).
+    - Ruff Lint & Format Checks: 0 errors, 120 files clean.
+    - Two-Axis Code Review: Standards Review & Spec Review completed with 0 remaining P0/P1 issues.
+
 ### [x] Feature: Deepen Codebase Architecture (Feature 019) — Slice 4A: Authoritative Chat Turn Event Models & Golden Contract Tests
+
 
 - [x] Slice 4A / Authoritative Chat Turn Event Models & Golden Contract Tests (2026-08-24):
   - **Authoritative Event Models (`apps/agent/src/agent/chat_turn/`)**:
