@@ -1,15 +1,20 @@
 import inspect
 import logging
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 from typing import Any
 
 from langchain_core.runnables import RunnableConfig
 from langchain_core.tools import tool
 
 from agent.infrastructure.redis import get_redis_client
-from agent.models.snapshot import TrustedSearchSnapshot
-from agent.repositories.trusted_snapshot_repository import TrustedSnapshotRepository
 from agent.tools.base import get_nestjs_client
+from agent.trusted_search_snapshot import (
+    AttestedSearchEnvelope,
+    SnapshotOwner,
+    TrustedSearchResult,
+    TrustedSearchSnapshotLifecycle,
+    TrustedSnapshotRepository,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -20,39 +25,24 @@ AIRLINE_MAP = {
     "SQ": "Singapore Airlines",
 }
 
-_SAFE_LLM_FIELDS = (
-    "offerExpiresAt",
-    "airline",
-    "flightNumber",
-    "departureAirport",
-    "arrivalAirport",
-    "departureTime",
-    "arrivalTime",
-    "duration",
-    "stops",
-    "price",
-    "currency",
-    "fareClass",
-    "baggageAllowance",
-)
+
+def _get_snapshot_lifecycle() -> TrustedSearchSnapshotLifecycle:
+    redis_client = get_redis_client()
+    repo = TrustedSnapshotRepository(redis_client)
+    return TrustedSearchSnapshotLifecycle(repo)
 
 
-def project_snapshot_results(snapshot: TrustedSearchSnapshot) -> list[dict[str, Any]]:
-    """Project the trusted snapshot into the exact browser-safe result shape."""
-
-    return [
-        {
-            "index": result.offerIndex,
-            "airline": result.airline,
-            "origin": result.origin,
-            "destination": result.destination,
-            "departureAt": result.departureAt.isoformat(),
-            "arrivalAt": result.arrivalAt.isoformat(),
-            "price": result.price,
-            "currency": result.currency,
-        }
-        for result in snapshot.results
-    ]
+def _to_utc_datetime(val: Any) -> datetime:
+    if isinstance(val, datetime):
+        if val.tzinfo is None:
+            return val.replace(tzinfo=timezone.utc)
+        return val.astimezone(timezone.utc)
+    if not val or not isinstance(val, str):
+        raise ValueError(f"Invalid datetime value: {val}")
+    dt = datetime.fromisoformat(val.strip().replace("Z", "+00:00"))
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    return dt.astimezone(timezone.utc)
 
 
 @tool("search_flights")
@@ -75,19 +65,24 @@ async def search_flights(
     thread_id = configurable.get("thread_id") or "default_thread"
     user_id = configurable.get("user_id") or "default_user"
 
+    owner = SnapshotOwner(user_id=user_id, chat_session_id=thread_id)
     try:
-        proposed_version = 1
-        try:
-            redis_client = get_redis_client()
-            repo = TrustedSnapshotRepository(redis_client)
-            res = repo.get_snapshot(user_id, thread_id)
-            existing = await res if inspect.isawaitable(res) else res
-            if existing:
-                proposed_version = existing.snapshotVersion + 1
-        except Exception as e:
-            logger.warning("Could not check existing snapshot: %s", str(e))
-            repo = None
+        lifecycle = _get_snapshot_lifecycle()
+    except Exception as e:
+        logger.error("Could not initialize snapshot lifecycle: %s", str(e))
+        return "I couldn't search for flights right now. The flight search service is temporarily unavailable. Please try again in a moment."
 
+    proposed_version = 1
+    try:
+        res = lifecycle.next_version(owner)
+        allocated = await res if inspect.isawaitable(res) else res
+        if isinstance(allocated, int) and not isinstance(allocated, bool) and allocated > 0:
+            proposed_version = allocated
+    except Exception as e:
+        logger.warning("Could not allocate snapshot version: %s", str(e))
+        proposed_version = 1
+
+    try:
         search_call = getattr(client, "post_gateway_flights_search_v2", None) or getattr(
             client, "search_flights_v2", None
         )
@@ -117,157 +112,113 @@ async def search_flights(
         return str(data["error"])
 
     results = data.get("results", [])
-    if not results:
+    if not results or not isinstance(results, list):
         return f"Found 0 flights from {origin} to {destination} on {date}."
 
-    def _to_utc_iso(val: Any) -> str:
-        if not val:
-            return datetime.now(timezone.utc).isoformat()
-        if isinstance(val, datetime):
-            if val.tzinfo is None:
-                val = val.replace(tzinfo=timezone.utc)
-            return val.astimezone(timezone.utc).isoformat()
-        val_str = str(val).strip()
-        try:
-            dt = datetime.fromisoformat(val_str.replace("Z", "+00:00"))
-            if dt.tzinfo is None:
-                dt = dt.replace(tzinfo=timezone.utc)
-            return dt.astimezone(timezone.utc).isoformat()
-        except Exception:
-            if not val_str.endswith("Z") and "+" not in val_str and "-" not in val_str[10:]:
-                return val_str + "Z"
-            return val_str
-
-    # Strip identifiers before sending to LLM and create trusted snapshot
-    safe_results = []
-    snapshot_results = []
-    for idx, flight in enumerate(results, 1):
-        dep_time_val = flight.get("departureTime") or flight.get("departureAt")
-        arr_time_val = flight.get("arrivalTime") or flight.get("arrivalAt")
-        snapshot_results.append(
-            {
-                "offerIndex": idx,
-                "flightOfferId": flight.get("flightOfferId") or f"mock-offer-{idx}",
-                "duffelOfferId": flight.get("duffelOfferId")
-                or flight.get("flightOfferId")
-                or f"mock-duffel-{idx}",
-                "airline": flight.get("airline", ""),
-                "origin": flight.get("departureAirport", origin),
-                "destination": flight.get("arrivalAirport", destination),
-                "departureAt": _to_utc_iso(dep_time_val),
-                "arrivalAt": _to_utc_iso(arr_time_val),
-                "price": str(flight.get("price", "0.0")),
-                "currency": flight.get("currency", "USD"),
-            }
-        )
-
-        safe_flight = {key: flight[key] for key in _SAFE_LLM_FIELDS if key in flight}
-        safe_results.append(safe_flight)
-
-    # Store Trusted Search Snapshot in Redis
     try:
-        if repo is None:
-            redis_client = get_redis_client()
-            repo = TrustedSnapshotRepository(redis_client)
+        snapshot_results = []
+        for idx, flight in enumerate(results[:5], 1):
+            flight_offer_id = flight.get("flightOfferId")
+            duffel_offer_id = flight.get("duffelOfferId") or flight_offer_id
+            if not flight_offer_id or not duffel_offer_id:
+                logger.error("Flight result missing required offer ID")
+                return "I encountered an error preparing your search results. Please try again."
+
+            dep_time_val = flight.get("departureTime") or flight.get("departureAt")
+            arr_time_val = flight.get("arrivalTime") or flight.get("arrivalAt")
+            if not dep_time_val or not arr_time_val:
+                logger.error("Flight result missing departure or arrival time")
+                return "I encountered an error preparing your search results. Please try again."
+
+            snapshot_results.append(
+                TrustedSearchResult(
+                    offerIndex=idx,
+                    flightOfferId=str(flight_offer_id),
+                    duffelOfferId=str(duffel_offer_id),
+                    airline=str(flight.get("airline") or ""),
+                    origin=str(flight.get("departureAirport") or flight.get("origin") or origin),
+                    destination=str(
+                        flight.get("arrivalAirport") or flight.get("destination") or destination
+                    ),
+                    departureAt=_to_utc_datetime(dep_time_val),
+                    arrivalAt=_to_utc_datetime(arr_time_val),
+                    price=str(flight.get("price", "0.0")),
+                    currency=str(flight.get("currency", "USD")),
+                )
+            )
 
         now_dt = datetime.now(timezone.utc)
-        expires_at_raw = data.get("snapshotExpiresAt")
-        if expires_at_raw:
-            try:
-                exp_dt = datetime.fromisoformat(str(expires_at_raw).replace("Z", "+00:00"))
-                if exp_dt.tzinfo is None:
-                    exp_dt = exp_dt.replace(tzinfo=timezone.utc)
-                if exp_dt <= now_dt:
-                    exp_dt = now_dt + timedelta(minutes=15)
-                expires_at = exp_dt.astimezone(timezone.utc).isoformat()
-            except Exception:
-                expires_at = (now_dt + timedelta(minutes=15)).isoformat()
-        else:
-            expires_at = (now_dt + timedelta(minutes=15)).isoformat()
+        expires_at_raw = data.get("snapshotExpiresAt") or data.get("expiresAt")
+        if not expires_at_raw:
+            logger.error("Gateway flight search response missing snapshot expiry")
+            return "I encountered an error preparing your search results. Please try again."
 
-        snapshot = TrustedSearchSnapshot.model_validate(
-            {
-                "schemaVersion": 1,
-                "snapshotVersion": data.get("snapshotVersion") or proposed_version,
-                "userId": user_id,
-                "sessionId": thread_id,
-                "createdAt": (now_dt - timedelta(seconds=1)).isoformat(),
-                "expiresAt": expires_at,
-                "selectionAttestation": data.get("selectionAttestation") or "sel_v1_mock",
-                "fingerprint": data.get("fingerprint") or "mock_hmac_fingerprint",
-                "results": snapshot_results,
-            }
+        exp_dt = _to_utc_datetime(expires_at_raw)
+        if exp_dt <= now_dt:
+            logger.error(
+                "Gateway flight search response has expired snapshot: %s <= %s", exp_dt, now_dt
+            )
+            return "The flight search results have expired. Please search again."
+
+        selection_attestation = data.get("selectionAttestation") or data.get("attestation")
+        if (
+            not selection_attestation
+            or not isinstance(selection_attestation, str)
+            or not selection_attestation.strip()
+        ):
+            logger.error("Gateway flight search response missing selectionAttestation")
+            return "I encountered an error preparing your search results. Please try again."
+
+        fingerprint = data.get("fingerprint")
+        if not fingerprint or not isinstance(fingerprint, str) or not fingerprint.strip():
+            fingerprint = selection_attestation
+
+        snapshot_version = data.get("snapshotVersion") or proposed_version
+        if (
+            isinstance(snapshot_version, bool)
+            or not isinstance(snapshot_version, int)
+            or snapshot_version < 1
+        ):
+            logger.error(
+                "Gateway flight search response invalid snapshotVersion: %s", snapshot_version
+            )
+            return "I encountered an error preparing your search results. Please try again."
+
+        envelope = AttestedSearchEnvelope(
+            schemaVersion=1,
+            snapshotVersion=snapshot_version,
+            expiresAt=exp_dt,
+            fingerprint=fingerprint,
+            selectionAttestation=selection_attestation,
+            results=snapshot_results,
         )
-        save_res = repo.save_snapshot(snapshot)
-        if inspect.isawaitable(save_res):
-            await save_res
+
+        create_res = lifecycle.create_or_replace(owner, envelope)
+        snapshot = await create_res if inspect.isawaitable(create_res) else create_res
     except Exception as e:
-        logger.warning("Failed to save trusted snapshot: %s", str(e))
+        logger.error("Failed to save trusted snapshot: %s", str(e), exc_info=True)
         return "I encountered an error preparing your search results. Please try again."
 
+    safe_results = lifecycle.project_for_llm(snapshot)
+
     flight_blocks = []
-    for idx, flight in enumerate(safe_results, 1):
-        airline = flight.get("airline") or ""
-        airline_name = AIRLINE_MAP.get(airline, airline)
-        flight_number = flight.get("flightNumber") or ""
-        dep_airport = flight.get("departureAirport") or ""
-        arr_airport = flight.get("arrivalAirport") or ""
-
-        # Parse departure time
-        dep_time_str = "Unknown"
-        dep_time = flight.get("departureTime")
-        if dep_time:
-            try:
-                dep_dt = datetime.fromisoformat(dep_time.replace("Z", "+00:00"))
-                dep_time_str = dep_dt.strftime("%H:%M")
-            except Exception:
-                dep_time_str = "Unknown"
-
-        # Parse arrival time
-        arr_time_str = "Unknown"
-        arr_time = flight.get("arrivalTime")
-        if arr_time:
-            try:
-                arr_dt = datetime.fromisoformat(arr_time.replace("Z", "+00:00"))
-                arr_time_str = arr_dt.strftime("%H:%M")
-            except Exception:
-                arr_time_str = "Unknown"
-
-        duration = flight.get("duration") or 0
-        hours = duration // 60
-        mins = duration % 60
-        duration_str = f"{hours}h {mins}m"
-
-        stops = flight.get("stops") or 0
-        if stops == 0:
-            stops_str = "Direct"
-        elif stops == 1:
-            stops_str = "1 stop"
-        else:
-            stops_str = f"{stops} stops"
+    for flight in safe_results:
+        airline_name = AIRLINE_MAP.get(flight.airline, flight.airline)
+        dep_time_str = flight.departure_at.strftime("%H:%M")
+        arr_time_str = flight.arrival_at.strftime("%H:%M")
 
         try:
-            price = float(flight.get("price") or 0.0)
-        except ValueError:
+            price = float(flight.price)
+        except (ValueError, TypeError):
             price = 0.0
-        currency = flight.get("currency") or "USD"
         price_formatted = f"${price:,.2f}"
 
-        fare_class = flight.get("fareClass") or "Economy"
-        fare_class = fare_class.title()
-
-        baggage = flight.get("baggageAllowance") or "No checked baggage"
-        if "checked" in baggage.lower() and "carry-on" not in baggage.lower():
-            baggage = f"{baggage} + 7kg carry-on"
-
         block = (
-            f"{idx}. {airline_name} {flight_number}\n"
-            f"   Departs: {dep_time_str} {dep_airport} \u2192 Arrives: {arr_time_str} {arr_airport}\n"
-            f"   Duration: {duration_str} | {stops_str}\n"
-            f"   Price: {price_formatted} {currency} ({fare_class})\n"
-            f"   Baggage: {baggage}"
+            f"{flight.index}. {airline_name}\n"
+            f"   Departs: {dep_time_str} {flight.origin} \u2192 Arrives: {arr_time_str} {flight.destination}\n"
+            f"   Price: {price_formatted} {flight.currency}"
         )
         flight_blocks.append(block)
 
-    header = f"Found {len(results)} flights from {origin} to {destination} on {date}:"
+    header = f"Found {len(safe_results)} flights from {origin} to {destination} on {date}:"
     return f"{header}\n\n" + "\n\n".join(flight_blocks)

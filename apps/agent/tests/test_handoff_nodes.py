@@ -232,6 +232,20 @@ async def test_create_handoff_token_redacts_upstream_failure_details(caplog):
         trusted_snapshot={
             "version": 1,
             "attestation": "test_attestation",
+            "fingerprint": "test_fp",
+            "results": [
+                {
+                    "flightOfferId": "off_sensitive_id",
+                    "duffelOfferId": "duffel_sensitive_id",
+                    "airline": "Vietnam Airlines",
+                    "origin": "HAN",
+                    "destination": "NRT",
+                    "departureAt": "2026-08-15T08:30:00Z",
+                    "arrivalAt": "2026-08-15T15:00:00Z",
+                    "price": "452.00",
+                    "currency": "USD",
+                }
+            ],
         },
     )
     mock_client = AsyncMock()

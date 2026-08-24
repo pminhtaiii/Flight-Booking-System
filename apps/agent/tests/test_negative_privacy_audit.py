@@ -7,14 +7,17 @@ import pytest
 
 from agent.memory.manager import MemoryManager
 from agent.models.events import DisplayInfo, HandoffEvent
-from agent.models.snapshot import TrustedSearchResult, TrustedSearchSnapshot
 from agent.observability.chat_observability import (
     ChatTelemetry,
     TelemetryPrivacyError,
 )
-from agent.repositories.trusted_snapshot_repository import TrustedSnapshotRepository
 from agent.tools.nestjs_client import validate_booking_readiness_response
-from agent.tools.search_flights import project_snapshot_results
+from agent.trusted_search_snapshot import (
+    TrustedSearchResult,
+    TrustedSearchSnapshot,
+    TrustedSearchSnapshotLifecycle,
+    TrustedSnapshotRepository,
+)
 
 # Strict Negative Privacy Corpus for Continuous Scanning
 FORBIDDEN_PRIVACY_CORPUS = [
@@ -161,21 +164,26 @@ def test_trusted_snapshot_serialization_and_projection_zero_leakage():
 
     snapshot = TrustedSearchSnapshot.model_validate(raw_snapshot)
 
-    # 1. Test project_snapshot_results for LLM/client consumption
-    projected = project_snapshot_results(snapshot)
-    assert len(projected) == 2
-    projected_json = json.dumps(projected)
+    # 1. Test project_for_browser and project_for_llm for LLM/client consumption
+    repo = TrustedSnapshotRepository(AsyncMock())
+    lifecycle = TrustedSearchSnapshotLifecycle(repo)
+    projected_browser = [r.model_dump() for r in lifecycle.project_for_browser(snapshot)]
+    projected_llm = [r.model_dump() for r in lifecycle.project_for_llm(snapshot)]
 
-    # Must NOT contain private offer IDs
-    assert "local_flight_offer_id_uuid_777777" not in projected_json
-    assert "off_01H123456789ABCDEF000000" not in projected_json
-    assert "flight-offer-local-uuid-1234" not in projected_json
-    assert "duffel_offer_id_duff_123456789" not in projected_json
-    assert "flightOfferId" not in projected_json
-    assert "duffelOfferId" not in projected_json
+    for projected in (projected_browser, projected_llm):
+        assert len(projected) == 2
+        projected_json = json.dumps(projected, default=str)
 
-    for forbidden in FORBIDDEN_PRIVACY_CORPUS:
-        assert forbidden not in projected_json
+        # Must NOT contain private offer IDs
+        assert "local_flight_offer_id_uuid_777777" not in projected_json
+        assert "off_01H123456789ABCDEF000000" not in projected_json
+        assert "flight-offer-local-uuid-1234" not in projected_json
+        assert "duffel_offer_id_duff_123456789" not in projected_json
+        assert "flightOfferId" not in projected_json
+        assert "duffelOfferId" not in projected_json
+
+        for forbidden in FORBIDDEN_PRIVACY_CORPUS:
+            assert forbidden not in projected_json
 
 
 @pytest.mark.asyncio
