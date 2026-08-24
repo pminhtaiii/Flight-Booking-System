@@ -54,10 +54,10 @@ class FakeAsyncRedis:
         return self._expires_at[key] - self._clock
 
     async def eval(self, _script: str, _num_keys: int, *args: object) -> int:
-        """Emulate the repository's atomic replacement and version-allocation Lua calls."""
+        """Emulate the issued/accepted-version replacement, allocation, and delete scripts."""
 
-        snapshot_key, version_key, *operation_args = args
-        if not isinstance(snapshot_key, str) or not isinstance(version_key, str):
+        snapshot_key, issued_key, accepted_key, *operation_args = args
+        if not all(isinstance(key, str) for key in (snapshot_key, issued_key, accepted_key)):
             raise TypeError("Redis keys must be strings")
 
         if len(operation_args) == 3:
@@ -75,22 +75,24 @@ class FakeAsyncRedis:
                     existing_version = json.loads(existing_payload)["snapshotVersion"]
                 except (KeyError, TypeError, json.JSONDecodeError):
                     return 0
-                if (
-                    not self._is_positive_integer(existing_version)
-                    or incoming_version <= existing_version
-                ):
+                if not self._is_positive_integer(existing_version):
                     return 0
+            else:
+                existing_version = 0
 
-            counter = self._counter_value(await self.get(version_key))
-            if counter is None:
+            issued_version = self._counter_value(await self.get(issued_key))
+            accepted_version = self._counter_value(await self.get(accepted_key))
+            if issued_version is None or accepted_version is None:
+                return 0
+            effective_accepted_version = max(existing_version, accepted_version)
+            if incoming_version <= effective_accepted_version:
+                return 0
+            if issued_version > effective_accepted_version and incoming_version != issued_version:
                 return 0
 
             await self.set(snapshot_key, payload, ex=ttl)
-            if incoming_version > counter:
-                await self.set(version_key, incoming_version, ex=ttl)
-            elif version_key in self._expires_at:
-                self._expires_at[version_key] = self._clock + ttl
-                self.ttls[version_key] = ttl
+            await self.set(issued_key, incoming_version, ex=ttl)
+            await self.set(accepted_key, incoming_version, ex=ttl)
             return 1
 
         if len(operation_args) == 1:
@@ -112,13 +114,82 @@ class FakeAsyncRedis:
                 if counter_ttl <= 0:
                     return -3
 
-            counter = self._counter_value(await self.get(version_key))
-            if counter is None:
+            issued_version = self._counter_value(await self.get(issued_key))
+            if issued_version is None:
                 return -1
+            accepted_version = self._counter_value(await self.get(accepted_key))
+            if accepted_version is None:
+                return -5
 
-            next_version = max(counter, snapshot_version) + 1
-            await self.set(version_key, next_version, ex=counter_ttl)
+            if snapshot_payload is None:
+                issued_ttl = await self.ttl(issued_key) if issued_version > 0 else 0
+                accepted_ttl = await self.ttl(accepted_key) if accepted_version > 0 else 0
+                if (issued_version > 0 and issued_ttl <= 0) or (
+                    accepted_version > 0 and accepted_ttl <= 0
+                ):
+                    return -3
+                if issued_ttl > 0 and accepted_ttl > 0:
+                    counter_ttl = min(issued_ttl, accepted_ttl)
+                elif issued_ttl > 0:
+                    counter_ttl = issued_ttl
+                elif accepted_ttl > 0:
+                    counter_ttl = accepted_ttl
+
+            next_version = max(snapshot_version, issued_version, accepted_version) + 1
+            await self.set(issued_key, next_version, ex=counter_ttl)
             return next_version
+
+        if len(operation_args) == 0:
+            snapshot_payload = await self.get(snapshot_key)
+            snapshot_version = 0
+            tombstone_ttl = 0
+            if snapshot_payload is not None:
+                try:
+                    snapshot_version = json.loads(snapshot_payload)["snapshotVersion"]
+                except (KeyError, TypeError, json.JSONDecodeError):
+                    snapshot_version = 0
+                if self._is_positive_integer(snapshot_version):
+                    candidate_ttl = await self.ttl(snapshot_key)
+                    if candidate_ttl > 0:
+                        tombstone_ttl = candidate_ttl
+                    else:
+                        snapshot_version = 0
+                else:
+                    snapshot_version = 0
+
+            issued_raw = await self.get(issued_key)
+            issued_version = self._counter_value(issued_raw)
+            issued_ttl = await self.ttl(issued_key) if issued_version and issued_version > 0 else 0
+            if issued_raw is not None and (issued_version is None or issued_ttl <= 0):
+                await self.delete(issued_key)
+                issued_version = 0
+                issued_ttl = 0
+
+            accepted_raw = await self.get(accepted_key)
+            accepted_version = self._counter_value(accepted_raw)
+            accepted_ttl = (
+                await self.ttl(accepted_key) if accepted_version and accepted_version > 0 else 0
+            )
+            if accepted_raw is not None and (accepted_version is None or accepted_ttl <= 0):
+                await self.delete(accepted_key)
+                accepted_version = 0
+                accepted_ttl = 0
+
+            issued_ttl = await self.ttl(issued_key) if issued_version > 0 else 0
+            accepted_ttl = await self.ttl(accepted_key) if accepted_version > 0 else 0
+            if tombstone_ttl <= 0:
+                if issued_ttl > 0 and accepted_ttl > 0:
+                    tombstone_ttl = min(issued_ttl, accepted_ttl)
+                elif issued_ttl > 0:
+                    tombstone_ttl = issued_ttl
+                elif accepted_ttl > 0:
+                    tombstone_ttl = accepted_ttl
+
+            invalidated_version = max(snapshot_version, issued_version, accepted_version)
+            if invalidated_version > 0 and tombstone_ttl > 0:
+                await self.set(accepted_key, invalidated_version, ex=tombstone_ttl)
+            await self.delete(snapshot_key)
+            return 1
 
         raise TypeError("Unsupported Redis Lua call")
 
@@ -134,7 +205,7 @@ class FakeAsyncRedis:
             parsed = float(value)
         except (TypeError, ValueError):
             return None
-        if parsed < 0 or not parsed.is_integer():
+        if parsed <= 0 or not parsed.is_integer():
             return None
         return int(parsed)
 

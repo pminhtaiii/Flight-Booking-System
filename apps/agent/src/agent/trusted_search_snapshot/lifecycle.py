@@ -77,7 +77,7 @@ class TrustedSearchSnapshotLifecycle:
         )
 
     async def delete(self, owner: SnapshotOwner) -> None:
-        """Remove the snapshot and version state scoped to ``owner``."""
+        """Remove the owner-scoped snapshot while retaining its bounded version tombstone."""
 
         await self.repository.delete_snapshot(owner.user_id, owner.chat_session_id)
 
