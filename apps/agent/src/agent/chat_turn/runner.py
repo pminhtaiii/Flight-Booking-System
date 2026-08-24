@@ -195,16 +195,22 @@ class ChatTurnRunner:
             try:
                 fence_valid = True
                 if queue_manager is not None:
-                    fence_valid = await queue_manager.validate_active_fence(session_id)
+                    fence_valid = await asyncio.wait_for(
+                        queue_manager.validate_active_fence(session_id),
+                        timeout=1.0,
+                    )
                 if fence_valid:
-                    batch_res = await _persist_response(
-                        client=client,
-                        session_id=session_id,
-                        user_msg=user_msg_content,
-                        response_text=partial_response,
-                        user_already_persisted=user_msg_persisted,
-                        use_shield=use_shield,
-                        queue_manager=queue_manager,
+                    batch_res = await asyncio.wait_for(
+                        _persist_response(
+                            client=client,
+                            session_id=session_id,
+                            user_msg=user_msg_content,
+                            response_text=partial_response,
+                            user_already_persisted=user_msg_persisted,
+                            use_shield=use_shield,
+                            queue_manager=queue_manager,
+                        ),
+                        timeout=3.0,
                     )
                     new_persisted = True
                     for msg in batch_res.get("messages", []):
@@ -218,14 +224,14 @@ class ChatTurnRunner:
         # 2. Finalize / close output guardrail pipeline
         if pipeline is not None:
             try:
-                await pipeline.aclose()
+                await asyncio.wait_for(pipeline.aclose(), timeout=1.0)
             except Exception:  # noqa: BLE001
                 logger.warning("guardrail_pipeline_close_failed")
 
         # 3. Release owned session lease
         if queue_manager is not None and session_id is not None and req_id is not None:
             try:
-                await queue_manager.release(session_id, req_id)
+                await asyncio.wait_for(queue_manager.release(session_id, req_id), timeout=2.0)
             except Exception:  # noqa: BLE001
                 logger.error("session_lease_release_failed")
 
@@ -771,11 +777,19 @@ class ChatTurnRunner:
 
                         # Release queue lease and close pipeline upon ActionRequired
                         if pipeline is not None:
-                            await pipeline.aclose()
+                            try:
+                                await asyncio.wait_for(pipeline.aclose(), timeout=1.0)
+                            except Exception:
+                                pass
                             pipeline = None
                         if queue_manager is not None and req_id is not None and not released:
                             released = True
-                            await queue_manager.release(session_id, req_id)
+                            try:
+                                await asyncio.wait_for(
+                                    queue_manager.release(session_id, req_id), timeout=2.0
+                                )
+                            except Exception:
+                                pass
                             req_id = None
                         return
 
@@ -847,11 +861,19 @@ class ChatTurnRunner:
 
                 # Clean up pipeline and queue lease before yielding DoneEvent
                 if pipeline is not None:
-                    await pipeline.aclose()
+                    try:
+                        await asyncio.wait_for(pipeline.aclose(), timeout=1.0)
+                    except Exception:
+                        pass
                     pipeline = None
                 if queue_manager is not None and req_id is not None and not released:
                     released = True
-                    await queue_manager.release(session_id, req_id)
+                    try:
+                        await asyncio.wait_for(
+                            queue_manager.release(session_id, req_id), timeout=2.0
+                        )
+                    except Exception:
+                        pass
                     req_id = None
 
                 yield DoneEvent(data=DonePayload(messageId=agent_message_id, sessionId=session_id))
@@ -874,11 +896,19 @@ class ChatTurnRunner:
             else:
                 logger.warning("empty_response_generated")
                 if pipeline is not None:
-                    await pipeline.aclose()
+                    try:
+                        await asyncio.wait_for(pipeline.aclose(), timeout=1.0)
+                    except Exception:
+                        pass
                     pipeline = None
                 if queue_manager is not None and req_id is not None and not released:
                     released = True
-                    await queue_manager.release(session_id, req_id)
+                    try:
+                        await asyncio.wait_for(
+                            queue_manager.release(session_id, req_id), timeout=2.0
+                        )
+                    except Exception:
+                        pass
                     req_id = None
 
         except OutputGuardrailBlockedError as e:
@@ -957,11 +987,11 @@ class ChatTurnRunner:
         finally:
             if pipeline is not None:
                 try:
-                    await pipeline.aclose()
+                    await asyncio.wait_for(pipeline.aclose(), timeout=1.0)
                 except Exception:
                     pass
             if queue_manager is not None and req_id is not None and not released:
                 try:
-                    await queue_manager.release(session_id, req_id)
+                    await asyncio.wait_for(queue_manager.release(session_id, req_id), timeout=2.0)
                 except Exception:
                     pass

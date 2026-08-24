@@ -778,3 +778,37 @@ async def test_server_shutdown_awaits_slow_cancellation_cleanup_before_closing_r
     assert cleanup_finished is True
     assert redis_closed_after_cleanup is True
     assert len(active_runners) == 0
+
+
+@pytest.mark.asyncio
+async def test_server_shutdown_does_not_hang_indefinitely_on_stuck_runner(monkeypatch):
+    """Ensure shutdown does not hang indefinitely if a runner task is completely unyielding."""
+    monkeypatch.setattr("agent.infrastructure.redis.init_redis", AsyncMock())
+    monkeypatch.setattr("agent.infrastructure.redis.close_redis", AsyncMock())
+    monkeypatch.setattr("agent.guardrails.nemo.NemoGuardrailService.probe", AsyncMock())
+    monkeypatch.setattr("agent.main.settings.SHUTDOWN_TIMEOUT_SECONDS", 0.1, raising=False)
+
+    async def mock_stuck_runner_task():
+        try:
+            await asyncio.sleep(100)
+        except asyncio.CancelledError:
+            # Simulate an uncooperative/shielded task that takes longer than shutdown timeout
+            await asyncio.sleep(10)
+
+    task = asyncio.create_task(mock_stuck_runner_task())
+    await asyncio.sleep(0)
+    active_runners.add(task)
+
+    try:
+        # Lifespan shutdown must finish cleanly within ~0.2s without hanging
+        async with asyncio.timeout(1.0):
+            async with lifespan(app):
+                pass
+    finally:
+        task.cancel()
+        try:
+            await task
+        except (asyncio.CancelledError, Exception):
+            pass
+
+    assert len(active_runners) == 0
