@@ -50,10 +50,7 @@ async def lifespan(app: FastAPI):
         for t in tasks_to_cancel:
             t.cancel()
         if tasks_to_cancel:
-            try:
-                await asyncio.wait(tasks_to_cancel, timeout=5.0)
-            except Exception:
-                pass
+            await asyncio.gather(*tasks_to_cancel, return_exceptions=True)
         active_runners.clear()
 
     if active_streams:

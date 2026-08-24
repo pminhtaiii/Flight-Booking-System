@@ -740,3 +740,41 @@ async def test_server_shutdown_cancels_and_awaits_active_runners(monkeypatch):
     assert task.cancelled() or task.done()
     assert cancelled is True
     assert len(active_runners) == 0
+
+
+@pytest.mark.asyncio
+async def test_server_shutdown_awaits_slow_cancellation_cleanup_before_closing_redis(monkeypatch):
+    """Ensure runner cancellation cleanup executes and finishes BEFORE close_redis is called."""
+    cleanup_finished = False
+    redis_closed_after_cleanup = False
+
+    async def mock_close_redis():
+        nonlocal redis_closed_after_cleanup
+        # At the moment Redis is closed, cleanup MUST already be finished
+        redis_closed_after_cleanup = cleanup_finished
+
+    monkeypatch.setattr("agent.infrastructure.redis.init_redis", AsyncMock())
+    monkeypatch.setattr("agent.infrastructure.redis.close_redis", mock_close_redis)
+    monkeypatch.setattr("agent.guardrails.nemo.NemoGuardrailService.probe", AsyncMock())
+
+    async def mock_runner_task_with_cleanup():
+        nonlocal cleanup_finished
+        try:
+            await asyncio.sleep(100)
+        except asyncio.CancelledError:
+            # Simulate async cleanup (persisting partial response or releasing lock)
+            await asyncio.sleep(0.05)
+            cleanup_finished = True
+            raise
+
+    task = asyncio.create_task(mock_runner_task_with_cleanup())
+    await asyncio.sleep(0)
+    active_runners.add(task)
+
+    async with lifespan(app):
+        pass
+
+    assert task.cancelled() or task.done()
+    assert cleanup_finished is True
+    assert redis_closed_after_cleanup is True
+    assert len(active_runners) == 0
