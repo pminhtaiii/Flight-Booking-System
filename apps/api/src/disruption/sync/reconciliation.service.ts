@@ -3,7 +3,8 @@ import { Cron } from '@nestjs/schedule';
 import { PrismaService } from '@/prisma/prisma.service';
 import { SupplierSyncService } from './supplier-sync.service';
 import { CacheService } from '@/cache/cache.service';
-import { BookingService, BookingWithRelations } from '@/booking/booking.service';
+import { BookingLifecycleService } from '@/booking-lifecycle/booking-lifecycle.service';
+import { BookingWithRelations } from '@/booking-lifecycle/booking-lifecycle.types';
 
 export interface ReconciliationResult {
   selected: number;
@@ -24,7 +25,7 @@ export class ReconciliationService {
     private readonly prisma: PrismaService,
     private readonly supplierSyncService: SupplierSyncService,
     private readonly cacheService: CacheService,
-    private readonly bookingService: BookingService,
+    private readonly bookingLifecycleService: BookingLifecycleService,
   ) {}
 
   @Cron(process.env.DUFFEL_RECONCILIATION_CRON || '*/30 * * * *')
@@ -74,7 +75,7 @@ export class ReconciliationService {
     let stale = 0;
     for (const booking of staleBookings) {
       try {
-        const completedBooking = await this.bookingService.checkAndCompleteBooking(booking as BookingWithRelations);
+        const completedBooking = await this.bookingLifecycleService.checkAndCompleteBooking(booking as BookingWithRelations);
         if (completedBooking.status === 'COMPLETED') {
           stale++;
         }
