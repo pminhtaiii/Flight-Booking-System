@@ -55,10 +55,10 @@ class FakeAsyncRedis:
         return value
 
     async def eval(self, _script: str, _num_keys: int, *args: Any) -> int:
-        """Emulate the repository's replacement and next-version Lua boundaries."""
+        """Emulate the repository's issued/accepted-version Lua boundaries."""
 
-        snapshot_key, version_key, *operation_args = args
-        if not isinstance(snapshot_key, str) or not isinstance(version_key, str):
+        snapshot_key, issued_key, accepted_key, *operation_args = args
+        if not all(isinstance(key, str) for key in (snapshot_key, issued_key, accepted_key)):
             raise TypeError("Redis keys must be strings")
 
         if len(operation_args) == 3:
@@ -81,14 +81,22 @@ class FakeAsyncRedis:
                     or incoming_version <= existing_version
                 ):
                     return 0
+            else:
+                existing_version = 0
 
-            counter_payload = await self.get(version_key)
-            counter = self._counter_value(counter_payload)
-            if counter is None or incoming_version <= counter:
+            issued_version = self._counter_value(await self.get(issued_key))
+            accepted_version = self._counter_value(await self.get(accepted_key))
+            if issued_version is None or accepted_version is None:
                 return 0
+            if incoming_version <= max(existing_version, accepted_version):
+                return 0
+            if issued_version > accepted_version:
+                if incoming_version != issued_version:
+                    return 0
 
             await self.set(snapshot_key, payload, ex=ttl)
-            await self.set(version_key, incoming_version, ex=ttl)
+            await self.set(issued_key, incoming_version, ex=ttl)
+            await self.set(accepted_key, incoming_version, ex=ttl)
             return 1
 
         if len(operation_args) == 1:
@@ -110,13 +118,82 @@ class FakeAsyncRedis:
                 if counter_ttl <= 0:
                     return -3
 
-            counter = self._counter_value(await self.get(version_key))
-            if counter is None:
+            issued_version = self._counter_value(await self.get(issued_key))
+            if issued_version is None:
                 return -1
+            accepted_version = self._counter_value(await self.get(accepted_key))
+            if accepted_version is None:
+                return -5
 
-            next_version = max(counter, snapshot_version) + 1
-            await self.set(version_key, next_version, ex=counter_ttl)
+            if snapshot_payload is None:
+                issued_ttl = self._ttl(issued_key) if issued_version > 0 else 0
+                accepted_ttl = self._ttl(accepted_key) if accepted_version > 0 else 0
+                if (issued_version > 0 and issued_ttl <= 0) or (
+                    accepted_version > 0 and accepted_ttl <= 0
+                ):
+                    return -3
+                if issued_ttl > 0 and accepted_ttl > 0:
+                    counter_ttl = min(issued_ttl, accepted_ttl)
+                elif issued_ttl > 0:
+                    counter_ttl = issued_ttl
+                elif accepted_ttl > 0:
+                    counter_ttl = accepted_ttl
+
+            next_version = max(snapshot_version, issued_version, accepted_version) + 1
+            await self.set(issued_key, next_version, ex=counter_ttl)
             return next_version
+
+        if len(operation_args) == 0:
+            snapshot_payload = await self.get(snapshot_key)
+            snapshot_version = 0
+            tombstone_ttl = 0
+            if snapshot_payload is not None:
+                try:
+                    snapshot_version = json.loads(snapshot_payload)["snapshotVersion"]
+                except (KeyError, TypeError, json.JSONDecodeError):
+                    snapshot_version = 0
+                if self._is_positive_integer(snapshot_version):
+                    candidate_ttl = self._ttl(snapshot_key)
+                    if candidate_ttl > 0:
+                        tombstone_ttl = candidate_ttl
+                    else:
+                        snapshot_version = 0
+                else:
+                    snapshot_version = 0
+
+            issued_raw = await self.get(issued_key)
+            issued_version = self._counter_value(issued_raw)
+            issued_ttl = self._ttl(issued_key) if issued_version and issued_version > 0 else 0
+            if issued_raw is not None and (issued_version is None or issued_ttl <= 0):
+                await self.delete(issued_key)
+                issued_version = 0
+                issued_ttl = 0
+
+            accepted_raw = await self.get(accepted_key)
+            accepted_version = self._counter_value(accepted_raw)
+            accepted_ttl = (
+                self._ttl(accepted_key) if accepted_version and accepted_version > 0 else 0
+            )
+            if accepted_raw is not None and (accepted_version is None or accepted_ttl <= 0):
+                await self.delete(accepted_key)
+                accepted_version = 0
+                accepted_ttl = 0
+
+            issued_ttl = self._ttl(issued_key) if issued_version > 0 else 0
+            accepted_ttl = self._ttl(accepted_key) if accepted_version > 0 else 0
+            if tombstone_ttl <= 0:
+                if issued_ttl > 0 and accepted_ttl > 0:
+                    tombstone_ttl = min(issued_ttl, accepted_ttl)
+                elif issued_ttl > 0:
+                    tombstone_ttl = issued_ttl
+                elif accepted_ttl > 0:
+                    tombstone_ttl = accepted_ttl
+
+            invalidated_version = max(snapshot_version, issued_version, accepted_version)
+            if invalidated_version > 0 and tombstone_ttl > 0:
+                await self.set(accepted_key, invalidated_version, ex=tombstone_ttl)
+            await self.delete(snapshot_key)
+            return 1
 
         raise TypeError("Unsupported Redis Lua call")
 
@@ -137,7 +214,7 @@ class FakeAsyncRedis:
             parsed = float(value)
         except (TypeError, ValueError):
             return None
-        if parsed < 0 or not parsed.is_integer():
+        if parsed <= 0 or not parsed.is_integer():
             return None
         return int(parsed)
 
@@ -363,7 +440,9 @@ async def test_repository_uses_the_retained_counter_to_reject_lower_or_equal_ver
     repository = TrustedSnapshotRepository(redis)
     snapshot_key = f"chat:snapshot:{owner.user_id}:{owner.chat_session_id}"
     version_key = f"{snapshot_key}:version"
+    accepted_key = f"{snapshot_key}:accepted"
     await redis.set(version_key, "5", ex=60)
+    await redis.set(accepted_key, "5", ex=60)
 
     for incoming_version in (4, 5):
         snapshot = TrustedSearchSnapshot.model_validate(
@@ -393,6 +472,28 @@ async def test_deleting_a_snapshot_retains_its_bounded_counter_and_blocks_a_dela
     assert redis._expires_at[version_key] > redis._clock
     assert await repository.save_snapshot(delayed) is False
     assert await redis.get(snapshot_key) is None
+
+
+@pytest.mark.asyncio
+async def test_lifecycle_delete_recovers_from_corrupt_payload_and_malformed_version_state() -> None:
+    owner = _owner()
+    redis = FakeAsyncRedis()
+    lifecycle = _lifecycle(redis)
+    snapshot_key = f"chat:snapshot:{owner.user_id}:{owner.chat_session_id}"
+    issued_key = f"{snapshot_key}:version"
+    accepted_key = f"{snapshot_key}:accepted"
+    await redis.set(snapshot_key, "{corrupt snapshot", ex=60)
+    await redis.set(issued_key, "malformed-issued", ex=60)
+    await redis.set(accepted_key, "malformed-accepted", ex=60)
+
+    await lifecycle.delete(owner)
+
+    assert await redis.get(snapshot_key) is None
+    assert await redis.get(issued_key) != "malformed-issued"
+    assert await redis.get(accepted_key) != "malformed-accepted"
+    issued_version = await lifecycle.next_version(owner)
+    created = await lifecycle.create_or_replace(owner, _envelope(version=issued_version))
+    assert created.snapshotVersion == issued_version
 
 
 @pytest.mark.asyncio
@@ -734,6 +835,22 @@ async def test_next_version_is_monotonic_for_one_owner() -> None:
 
     assert await lifecycle.next_version(owner) == 1
     assert await lifecycle.next_version(owner) == 2
+
+
+@pytest.mark.asyncio
+async def test_allocated_version_can_be_persisted_once_before_becoming_a_stale_write_fence() -> (
+    None
+):
+    lifecycle = _lifecycle()
+    owner = _owner()
+
+    issued_version = await lifecycle.next_version(owner)
+    created = await lifecycle.create_or_replace(owner, _envelope(version=issued_version))
+
+    assert created.snapshotVersion == issued_version
+    assert await lifecycle.next_version(owner) == issued_version + 1
+    with pytest.raises(ValueError):
+        await lifecycle.create_or_replace(owner, _envelope(version=issued_version))
 
 
 @pytest.mark.asyncio

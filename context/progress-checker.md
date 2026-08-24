@@ -7,9 +7,9 @@ Update this file after every completed feature. Any AI agent reading this should
 ### Current Status
 
 **Feature:** Deepen Codebase Architecture (Feature 019)
-**Last completed:** Slice 2D: Rewire, Remove BookingService Facade & Eliminate Payment-Booking forwardRef (2026-08-24).
-**In progress:** Feature 019 Slice 3A implementation and focused verification; full-suite, review, and convergence gates remain.
-**Next:** Complete Slice 3A final gates, then Slice 3B: Agent Gateway Decomposition & Direct Service Binding (US3).
+**Last completed:** Slice 3A: Trusted Search Snapshot Lifecycle Core (2026-08-24).
+**In progress:** None.
+**Next:** Slice 3B: Agent Gateway Decomposition & Direct Service Binding (US3); later caller-migration slices remain outstanding.
 
 ---
 
@@ -40,15 +40,16 @@ Update this file after every completed feature. Any AI agent reading this should
     - Agent Test Suite: 396/396 tests PASS.
     - ESLint: 0 errors, 0 warnings; TypeScript Typecheck (API & Web): 0 errors; Agent Ruff: 0 errors.
 
-### [ ] Feature: Deepen Codebase Architecture (Feature 019) — Slice 3A: Trusted Search Snapshot Lifecycle Core
+### [x] Feature: Deepen Codebase Architecture (Feature 019) — Slice 3A: Trusted Search Snapshot Lifecycle Core
 
 - [x] Slice 3A implementation and focused verification (2026-08-24):
   - Added canonical `apps/agent/src/agent/trusted_search_snapshot/` ownership for strict Pydantic snapshot models, owner-scoped lifecycle operations, graph-state normalization, atomic Redis persistence, and PII/provider-ID-free LLM/browser projections.
   - Enforced contiguous 1-based result indices, positive/monotonic versions, UTC expiry, selection bounds/expiry, and strict `extra="forbid"` model validation.
-  - Added atomic Redis Lua version-aware replacement under `chat:snapshot:{user_id}:{chat_session_id}`. Incoming versions less than or equal to the stored version are rejected; TTL is limited by positive offer freshness and `max_ttl`.
+  - Added the final three-key atomic Redis Lua protocol: required payload key `chat:snapshot:{user_id}:{chat_session_id}`, private issued-version key `:version`, and accepted-version/tombstone key `:accepted`. Allocation reserves an issued version; one successful save promotes it atomically with the payload; delete removes the payload while retaining/advancing the accepted tombstone to block delayed work. Delete recovery removes corrupt payloads and clears malformed private state while retaining valid accepted fences. Incoming versions at or below the accepted boundary are rejected; TTL is limited by positive offer freshness and `max_ttl`.
   - Preserved legacy compatibility through re-exports from `agent.models.snapshot` and `agent.repositories.trusted_snapshot_repository`; existing callers were not migrated in this slice.
-  - Verified focused evidence: lifecycle 21/21 tests PASS; snapshot characterization 15/15 PASS; SSE characterization 15/15 PASS; legacy snapshot 10/10 PASS; search snapshot 9/9 PASS; focused Ruff and format checks PASS.
-  - Full `apps/agent` suite, separate standards/spec-compliance review, and `speckit-converge` remain pending; this entry does not claim those gates.
+  - Verified focused evidence: lifecycle 26/26 tests PASS; snapshot characterization 15/15 PASS; SSE characterization 15/15 PASS; legacy snapshot 10/10 PASS; search snapshot 9/9 PASS.
+  - Verified full agent checks: `uv run --package agent ruff check apps/agent` PASS; `ruff format --check` PASS; and `uv run --package agent pytest apps/agent/tests/` PASS (422 tests, warnings only).
+  - Final quality gates: separate standards/spec-compliance review reported no P0/P1 findings, and scoped Slice 3A `speckit-converge` found no actionable gaps. Later Feature 019 caller-migration slices remain outstanding and are not claimed here.
 
 ### [x] Feature: Deepen Codebase Architecture (Feature 019) — Slice 2C: Extract Cancellation Module
 
