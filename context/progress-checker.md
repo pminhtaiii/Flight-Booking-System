@@ -7,9 +7,9 @@ Update this file after every completed feature. Any AI agent reading this should
 ### Current Status
 
 **Feature:** Deepen Codebase Architecture (Feature 019)
-**Last completed:** Slice 3A: Trusted Search Snapshot Lifecycle Core (2026-08-24).
+**Last completed:** Slice 3B: Cut Over Callers to TrustedSearchSnapshotLifecycle & Decommission Legacy Shims (2026-08-24).
 **In progress:** None.
-**Next:** Slice 3B: Agent Gateway Decomposition & Direct Service Binding (US3); later caller-migration slices remain outstanding.
+**Next:** Slice 4: Separate Chat Turn Lifecycle from SSE Transport (US4).
 
 ---
 
@@ -39,6 +39,28 @@ Update this file after every completed feature. Any AI agent reading this should
     - CI Contract Test: 13/13 tests PASS.
     - Agent Test Suite: 396/396 tests PASS.
     - ESLint: 0 errors, 0 warnings; TypeScript Typecheck (API & Web): 0 errors; Agent Ruff: 0 errors.
+
+### [x] Feature: Deepen Codebase Architecture (Feature 019) — Slice 3B: Cut Over Callers to TrustedSearchSnapshotLifecycle & Decommission Legacy Shims
+ 
+- [x] Slice 3B / Cut Over Callers to TrustedSearchSnapshotLifecycle & Decommission Legacy Shims (2026-08-24):
+  - **Agent Tool Caller Cut-Over (`apps/agent/src/agent/tools/`)**:
+    - Rewired `search_flights.py` to use `TrustedSearchSnapshotLifecycle.create_or_replace()` and `lifecycle.project_for_llm()`, ensuring only sanitized projection results without Duffel IDs or internal IDs reach LLM summaries. Enforced fail-closed security handling.
+    - Rewired `signal_checkout_intent.py` to normalize graph state via `TrustedSearchSnapshotLifecycle.normalize_graph_state()`, validating selection bounds while maintaining a zero-I/O execution invariant.
+  - **Graph Logic & Streaming Transport Cut-Over (`apps/agent/src/agent/graph/`, `streaming/`)**:
+    - Updated `checkout_gate.py` to normalize graph state and validate active unexpired snapshots and selection index bounds.
+    - Updated `nodes.py:create_handoff_token` and `validate_handoff` to resolve offer selection strictly via `lifecycle.select()`, extracting allowlisted display fields from `ResolvedOfferSelection.offer` and passing valid attestation/fingerprints to NestJS.
+    - Updated `sse.py` to load active snapshots via `lifecycle.load_active(owner)` and project browser flight results via `lifecycle.project_for_browser()`.
+  - **Decommissioning Legacy Compatibility Shims**:
+    - Completely deleted `apps/agent/src/agent/models/snapshot.py` and `apps/agent/src/agent/repositories/trusted_snapshot_repository.py`.
+    - Removed `project_snapshot_results` and `_SAFE_LLM_FIELDS` from `search_flights.py`.
+    - Updated all test suites across `apps/agent/tests/` to import canonical models and methods from `agent.trusted_search_snapshot`.
+    - Verified static audit: 0 occurrences of `models.snapshot` and `repositories.trusted_snapshot_repository` across `apps/agent/`.
+  - **Verification & Test Suites (100% Green)**:
+    - Snapshot Characterization Suite: 15/15 tests PASS.
+    - SSE Characterization Suite: 15/15 tests PASS.
+    - Full Agent Pytest Suite: 423/423 tests PASS (1 deselected).
+    - Ruff Lint & Format Checks: 0 errors, 114 files clean.
+    - Two-Axis Code Review: Standards Review & Spec Review completed with 0 remaining P0/P1 issues.
 
 ### [x] Feature: Deepen Codebase Architecture (Feature 019) — Slice 3A: Trusted Search Snapshot Lifecycle Core
 

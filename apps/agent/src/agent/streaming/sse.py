@@ -15,9 +15,13 @@ from agent.infrastructure.redis import get_redis_client
 from agent.memory.manager import MemoryManager
 from agent.models.requests import ChatStreamRequest
 from agent.observability.chat_observability import ChatTelemetry, safe_opaque_id, safe_tool_name
-from agent.repositories.trusted_snapshot_repository import TrustedSnapshotRepository
 from agent.sanitization.pii_scrubber import detect_pii
 from agent.tools.nestjs_client import NestJSClient, validate_booking_readiness_response
+from agent.trusted_search_snapshot import (
+    SnapshotOwner,
+    TrustedSearchSnapshotLifecycle,
+    TrustedSnapshotRepository,
+)
 
 logger = logging.getLogger("agent.streaming")
 guardrails_logger = logging.getLogger("agent.guardrails")
@@ -283,8 +287,10 @@ async def chat_stream(
         snapshot_state = "miss"
         try:
             redis_client = get_redis_client()
-            snapshot_repo = TrustedSnapshotRepository(redis_client)
-            snapshot_obj = await snapshot_repo.get_snapshot(user_id, session_id)
+            owner = SnapshotOwner(user_id=user_id, chat_session_id=session_id)
+            repo = TrustedSnapshotRepository(redis_client)
+            lifecycle = TrustedSearchSnapshotLifecycle(repo)
+            snapshot_obj = await lifecycle.load_active(owner)
             if snapshot_obj:
                 trusted_snapshot_dict = snapshot_obj.model_dump(mode="json")
                 snapshot_state = "hit"
@@ -576,15 +582,18 @@ async def chat_stream(
                         )
 
                         if tool_name == "search_flights":
-                            from agent.tools.search_flights import project_snapshot_results
-
                             raw_results = None
                             try:
-                                latest_snapshot = await TrustedSnapshotRepository(
-                                    get_redis_client()
-                                ).get_snapshot(user_id, session_id)
+                                owner = SnapshotOwner(user_id=user_id, chat_session_id=session_id)
+                                lifecycle = TrustedSearchSnapshotLifecycle(
+                                    TrustedSnapshotRepository(get_redis_client())
+                                )
+                                latest_snapshot = await lifecycle.load_active(owner)
                                 if latest_snapshot:
-                                    raw_results = project_snapshot_results(latest_snapshot)
+                                    raw_results = [
+                                        res.model_dump(mode="json")
+                                        for res in lifecycle.project_for_browser(latest_snapshot)
+                                    ]
                             except Exception:
                                 logger.warning("search_result_projection_failed")
                             if raw_results:

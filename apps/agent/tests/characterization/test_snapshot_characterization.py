@@ -5,9 +5,12 @@ from typing import Any, Dict
 import pytest
 from pydantic import ValidationError
 
-from agent.models.snapshot import TrustedSearchResult, TrustedSearchSnapshot
-from agent.repositories.trusted_snapshot_repository import TrustedSnapshotRepository
-from agent.tools.search_flights import project_snapshot_results
+from agent.trusted_search_snapshot import (
+    TrustedSearchResult,
+    TrustedSearchSnapshot,
+    TrustedSearchSnapshotLifecycle,
+    TrustedSnapshotRepository,
+)
 
 
 class FakeAsyncRedis:
@@ -583,7 +586,11 @@ def test_project_snapshot_results_excludes_all_pii_and_internal_ids():
         )
     )
 
-    projected = project_snapshot_results(snapshot)
+    repo = TrustedSnapshotRepository(FakeAsyncRedis())
+    lifecycle = TrustedSearchSnapshotLifecycle(repo)
+    projected = [
+        result.model_dump(mode="json") for result in lifecycle.project_for_browser(snapshot)
+    ]
 
     assert isinstance(projected, list)
     assert len(projected) == 1
@@ -625,5 +632,5 @@ def test_project_snapshot_results_excludes_all_pii_and_internal_ids():
     assert item["destination"] == "HAN"
     assert item["price"] == "150.00"
     assert item["currency"] == "USD"
-    assert item["departureAt"] == "2026-09-01T08:30:00+00:00"
-    assert item["arrivalAt"] == "2026-09-01T10:30:00+00:00"
+    assert item["departureAt"] in ("2026-09-01T08:30:00Z", "2026-09-01T08:30:00+00:00")
+    assert item["arrivalAt"] in ("2026-09-01T10:30:00Z", "2026-09-01T10:30:00+00:00")

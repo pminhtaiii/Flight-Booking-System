@@ -3,10 +3,15 @@ import json
 import pytest
 
 from agent.models.events import DisplayInfo, HandoffEvent
-from agent.models.snapshot import TrustedSearchSnapshot
 from agent.observability.chat_observability import ChatTelemetry, TelemetryPrivacyError
 from agent.sanitization.pii_scrubber import detect_pii, scrub_pii
-from agent.tools.search_flights import _SAFE_LLM_FIELDS, project_snapshot_results
+from agent.trusted_search_snapshot import (
+    SafeFlightResult,
+    SafeSearchResult,
+    TrustedSearchSnapshot,
+    TrustedSearchSnapshotLifecycle,
+    TrustedSnapshotRepository,
+)
 
 SEEDED_PRIVACY_CORPUS = [
     "chk_handoff_v1_secret_credential_12345",
@@ -44,7 +49,7 @@ def test_pii_scrubber_redacts_seeded_corpus():
 
 
 def test_safe_llm_fields_excludes_identifiers():
-    """Verify _SAFE_LLM_FIELDS does not contain local offer IDs, Duffel offer IDs, or database IDs."""
+    """Verify SafeSearchResult and SafeFlightResult models do not contain local offer IDs, Duffel offer IDs, or database IDs."""
     forbidden = {
         "flightOfferId",
         "duffelOfferId",
@@ -54,12 +59,15 @@ def test_safe_llm_fields_excludes_identifiers():
         "userId",
         "sessionId",
     }
-    for f in _SAFE_LLM_FIELDS:
+    safe_fields = set(SafeSearchResult.model_fields.keys()) | set(
+        SafeFlightResult.model_fields.keys()
+    )
+    for f in safe_fields:
         assert f not in forbidden
 
 
 def test_project_snapshot_results_excludes_identifiers():
-    """Verify project_snapshot_results never returns offer IDs or provider IDs to the browser."""
+    """Verify project_for_browser and project_for_llm never return offer IDs or provider IDs to the browser."""
     snapshot = TrustedSearchSnapshot.model_validate(
         {
             "schemaVersion": 1,
@@ -86,13 +94,16 @@ def test_project_snapshot_results_excludes_identifiers():
             ],
         }
     )
-    projected = project_snapshot_results(snapshot)
-    assert len(projected) == 1
-    item = projected[0]
-    assert "flightOfferId" not in item
-    assert "duffelOfferId" not in item
-    assert "local-uuid-1234" not in json.dumps(item)
-    assert "duffel-offer-5678" not in json.dumps(item)
+    lifecycle = TrustedSearchSnapshotLifecycle(TrustedSnapshotRepository(None))
+    browser_projected = [r.model_dump() for r in lifecycle.project_for_browser(snapshot)]
+    llm_projected = [r.model_dump() for r in lifecycle.project_for_llm(snapshot)]
+    for projected in (browser_projected, llm_projected):
+        assert len(projected) == 1
+        item = projected[0]
+        assert "flightOfferId" not in item
+        assert "duffelOfferId" not in item
+        assert "local-uuid-1234" not in json.dumps(item, default=str)
+        assert "duffel-offer-5678" not in json.dumps(item, default=str)
 
 
 def test_action_handoff_event_schema_strictly_forbids_private_fields():

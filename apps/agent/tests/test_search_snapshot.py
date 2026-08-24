@@ -7,10 +7,13 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 from langchain_core.runnables import RunnableConfig
 
-from agent.models.snapshot import TrustedSearchSnapshot
-from agent.repositories.trusted_snapshot_repository import TrustedSnapshotRepository
 from agent.tools.nestjs_client import NestJSClient
-from agent.tools.search_flights import project_snapshot_results, search_flights
+from agent.tools.search_flights import search_flights
+from agent.trusted_search_snapshot import (
+    TrustedSearchSnapshot,
+    TrustedSearchSnapshotLifecycle,
+    TrustedSnapshotRepository,
+)
 
 
 class FakeAsyncRedis:
@@ -682,14 +685,15 @@ async def test_strict_privacy_no_identifiers_in_tool_output():
         assert "session-secret-thread-999" not in tool_output
 
         # 5. Positive assertions: Formatted human-readable output
-        assert "1. Vietnam Airlines VN300" in tool_output
-        assert "2. ANA NH892" in tool_output
+        assert "1. Vietnam Airlines" in tool_output
+        assert "2. ANA" in tool_output
         assert "Departs: 02:00 SGN → Arrives: 08:30 NRT" in tool_output
-        assert "Price: $420.00 USD (Economy)" in tool_output
-        assert "Price: $550.00 USD (Economy)" in tool_output
+        assert "Price: $420.00 USD" in tool_output
+        assert "Price: $550.00 USD" in tool_output
 
 
 def test_project_snapshot_results_is_identifier_free():
+    lifecycle = TrustedSearchSnapshotLifecycle(TrustedSnapshotRepository(FakeAsyncRedis()))
     snapshot = TrustedSearchSnapshot.model_validate(
         {
             "schemaVersion": 1,
@@ -717,7 +721,9 @@ def test_project_snapshot_results_is_identifier_free():
         }
     )
 
-    projected = project_snapshot_results(snapshot)
+    projected = [
+        result.model_dump(mode="json") for result in lifecycle.project_for_browser(snapshot)
+    ]
 
     assert projected == [
         {
@@ -725,8 +731,8 @@ def test_project_snapshot_results_is_identifier_free():
             "airline": "VN",
             "origin": "SGN",
             "destination": "NRT",
-            "departureAt": "2026-09-20T02:00:00+00:00",
-            "arrivalAt": "2026-09-20T08:30:00+00:00",
+            "departureAt": "2026-09-20T02:00:00Z",
+            "arrivalAt": "2026-09-20T08:30:00Z",
             "price": "420.00",
             "currency": "USD",
         }

@@ -119,18 +119,18 @@
 
 **Independent Test**: Create, persist, reload, replace, validate, select, and project through TrustedSearchSnapshotLifecycle while rejecting stale or malformed state and preserving handoff behavior.
 
-- [ ] T044 [P] [US3] Add failing lifecycle, stale-writer, expiry, selection, legacy-normalization, and privacy tests in apps/agent/tests/test_trusted_snapshot.py and apps/agent/tests/test_search_snapshot.py
-- [ ] T045 [US3] Create canonical SnapshotOwner, TrustedSearchSnapshot, TrustedSearchOffer, and ResolvedOfferSelection models in apps/agent/src/agent/trusted_search_snapshot/models.py
-- [ ] T046 [US3] Implement owner-scoped Redis persistence and atomic version-aware replacement in apps/agent/src/agent/trusted_search_snapshot/repository.py
-- [ ] T047 [US3] Implement next_version, create_or_replace, load_active, select, safe projection, and delete operations in apps/agent/src/agent/trusted_search_snapshot/lifecycle.py and apps/agent/src/agent/trusted_search_snapshot/__init__.py
-- [ ] T048 [US3] Add one fail-closed legacy graph-state normalization boundary for snapshot aliases in apps/agent/src/agent/trusted_search_snapshot/lifecycle.py
-- [ ] T049 [P] [US3] Route search snapshot creation and identifier-free LLM projection through the lifecycle in apps/agent/src/agent/tools/search_flights.py
-- [ ] T050 [P] [US3] Route selection validation through ResolvedOfferSelection in apps/agent/src/agent/tools/signal_checkout_intent.py
-- [ ] T051 [P] [US3] Route active/selectable checkout validation through the lifecycle in apps/agent/src/agent/graph/checkout_gate.py
-- [ ] T052 [P] [US3] Route handoff node selection through resolved lifecycle state while keeping HMAC and token issuance in NestJS in apps/agent/src/agent/graph/nodes.py
-- [ ] T053 [US3] Route chat/browser snapshot loading and projection through the lifecycle in apps/agent/src/agent/streaming/sse.py or apps/agent/src/agent/chat_turn/runner.py
-- [ ] T054 [US3] Convert apps/agent/src/agent/models/snapshot.py and apps/agent/src/agent/repositories/trusted_snapshot_repository.py to compatibility re-exports, then remove them after full gates pass
-- [ ] T055 [US3] Run Feature 019 Gate 3 plus handoff/privacy/T093 coverage and record atomic replacement, rejection telemetry, compatibility, rollback, and cleanup evidence in context/architecture.md and context/progress-checker.md
+- [x] T044 [P] [US3] Add failing lifecycle, stale-writer, expiry, selection, legacy-normalization, and privacy tests in apps/agent/tests/test_trusted_snapshot.py and apps/agent/tests/test_search_snapshot.py
+- [x] T045 [US3] Create canonical SnapshotOwner, TrustedSearchSnapshot, TrustedSearchOffer, and ResolvedOfferSelection models in apps/agent/src/agent/trusted_search_snapshot/models.py
+- [x] T046 [US3] Implement owner-scoped Redis persistence and atomic version-aware replacement in apps/agent/src/agent/trusted_search_snapshot/repository.py
+- [x] T047 [US3] Implement next_version, create_or_replace, load_active, select, safe projection, and delete operations in apps/agent/src/agent/trusted_search_snapshot/lifecycle.py and apps/agent/src/agent/trusted_search_snapshot/__init__.py
+- [x] T048 [US3] Add one fail-closed legacy graph-state normalization boundary for snapshot aliases in apps/agent/src/agent/trusted_search_snapshot/lifecycle.py
+- [x] T049 [P] [US3] Route search snapshot creation and identifier-free LLM projection through the lifecycle in apps/agent/src/agent/tools/search_flights.py
+- [x] T050 [P] [US3] Route selection validation through ResolvedOfferSelection in apps/agent/src/agent/tools/signal_checkout_intent.py
+- [x] T051 [P] [US3] Route active/selectable checkout validation through the lifecycle in apps/agent/src/agent/graph/checkout_gate.py
+- [x] T052 [P] [US3] Route handoff node selection through resolved lifecycle state while keeping HMAC and token issuance in NestJS in apps/agent/src/agent/graph/nodes.py
+- [x] T053 [US3] Route chat/browser snapshot loading and projection through the lifecycle in apps/agent/src/agent/streaming/sse.py or apps/agent/src/agent/chat_turn/runner.py
+- [x] T054 [US3] Convert apps/agent/src/agent/models/snapshot.py and apps/agent/src/agent/repositories/trusted_snapshot_repository.py to compatibility re-exports, then remove them after full gates pass
+- [x] T055 [US3] Run Feature 019 Gate 3 plus handoff/privacy/T093 coverage and record atomic replacement, rejection telemetry, compatibility, rollback, and cleanup evidence in context/architecture.md and context/progress-checker.md
 
 **Checkpoint**: User Story 3 has one production snapshot authority and no identifier leakage.
 

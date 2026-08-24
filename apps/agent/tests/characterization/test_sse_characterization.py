@@ -12,8 +12,10 @@ from pydantic import BaseModel, ConfigDict
 
 from agent.main import app
 from agent.models.events import HandoffEvent
-from agent.models.snapshot import TrustedSearchSnapshot
-from agent.repositories.trusted_snapshot_repository import TrustedSnapshotRepository
+from agent.trusted_search_snapshot import (
+    TrustedSearchSnapshot,
+    TrustedSnapshotRepository,
+)
 
 from .test_snapshot_characterization import FakeAsyncRedis
 
