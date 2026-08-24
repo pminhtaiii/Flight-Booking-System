@@ -84,9 +84,10 @@ class FakeAsyncRedis:
             accepted_version = self._counter_value(await self.get(accepted_key))
             if issued_version is None or accepted_version is None:
                 return 0
-            if incoming_version <= max(existing_version, accepted_version):
+            effective_accepted_version = max(existing_version, accepted_version)
+            if incoming_version <= effective_accepted_version:
                 return 0
-            if issued_version > accepted_version and incoming_version != issued_version:
+            if issued_version > effective_accepted_version and incoming_version != issued_version:
                 return 0
 
             await self.set(snapshot_key, payload, ex=ttl)

@@ -88,9 +88,10 @@ class FakeAsyncRedis:
             accepted_version = self._counter_value(await self.get(accepted_key))
             if issued_version is None or accepted_version is None:
                 return 0
-            if incoming_version <= max(existing_version, accepted_version):
+            effective_accepted_version = max(existing_version, accepted_version)
+            if incoming_version <= effective_accepted_version:
                 return 0
-            if issued_version > accepted_version:
+            if issued_version > effective_accepted_version:
                 if incoming_version != issued_version:
                     return 0
 
@@ -862,3 +863,60 @@ async def test_concurrent_next_version_allocations_are_unique_and_contiguous() -
 
     assert len(set(allocated)) == 8
     assert sorted(allocated) == list(range(1, 9))
+
+
+@pytest.mark.asyncio
+async def test_legacy_session_without_accepted_key_can_be_replaced_by_newer_snapshot() -> None:
+    owner = _owner()
+    redis = FakeAsyncRedis()
+    repository = TrustedSnapshotRepository(redis)
+    lifecycle = TrustedSearchSnapshotLifecycle(repository)
+
+    snapshot_key = f"chat:snapshot:{owner.user_id}:{owner.chat_session_id}"
+    version_key = f"{snapshot_key}:version"
+    accepted_key = f"{snapshot_key}:accepted"
+
+    # Simulate legacy session state where :accepted key was not used
+    legacy_snapshot = TrustedSearchSnapshot.model_validate(_snapshot_payload(owner, version=1))
+    await redis.set(snapshot_key, legacy_snapshot.model_dump_json(), ex=3600)
+    await redis.set(version_key, "1", ex=3600)
+    # Note: accepted_key is explicitly NOT set in Redis
+
+    # Next version should allocate 2
+    next_ver = await lifecycle.next_version(owner)
+    assert next_ver == 2
+
+    # Should successfully replace the legacy snapshot without being blocked
+    created = await lifecycle.create_or_replace(owner, _envelope(version=next_ver))
+    assert created.snapshotVersion == 2
+
+    stored = await lifecycle.load_active(owner)
+    assert stored is not None
+    assert stored.snapshotVersion == 2
+
+    # Both version and accepted keys are now properly set
+    assert await redis.get(version_key) == "2"
+    assert await redis.get(accepted_key) == "2"
+
+
+@pytest.mark.asyncio
+async def test_legacy_session_direct_save_without_prior_next_version() -> None:
+    owner = _owner()
+    redis = FakeAsyncRedis()
+    repository = TrustedSnapshotRepository(redis)
+
+    snapshot_key = f"chat:snapshot:{owner.user_id}:{owner.chat_session_id}"
+    version_key = f"{snapshot_key}:version"
+
+    # Simulate legacy snapshot and version counter without :accepted key
+    legacy_snapshot = TrustedSearchSnapshot.model_validate(_snapshot_payload(owner, version=1))
+    await redis.set(snapshot_key, legacy_snapshot.model_dump_json(), ex=3600)
+    await redis.set(version_key, "1", ex=3600)
+
+    # Directly saving version 2 must succeed and not be blocked by version_key == "1"
+    v2_snapshot = TrustedSearchSnapshot.model_validate(_snapshot_payload(owner, version=2))
+    assert await repository.save_snapshot(v2_snapshot) is True
+
+    stored = await repository.get_snapshot(owner.user_id, owner.chat_session_id)
+    assert stored is not None
+    assert stored.snapshotVersion == 2

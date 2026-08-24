@@ -49,10 +49,11 @@ if accepted_raw then
   end
 end
 
-if incoming_version <= math.max(existing_version, accepted_version) then
+local effective_accepted_version = math.max(existing_version, accepted_version)
+if incoming_version <= effective_accepted_version then
   return 0
 end
-if issued_version > accepted_version and incoming_version ~= issued_version then
+if issued_version > effective_accepted_version and incoming_version ~= issued_version then
   return 0
 end
 
