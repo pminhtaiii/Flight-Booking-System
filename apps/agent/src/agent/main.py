@@ -16,6 +16,7 @@ settings = get_settings()
 
 # Global set to track active SSE connection queues for graceful shutdown (M2)
 active_streams: Set[asyncio.Queue] = set()
+active_runners: Set[asyncio.Task] = set()
 
 
 @asynccontextmanager
@@ -43,7 +44,18 @@ async def lifespan(app: FastAPI):
         refresh_interval=settings.SESSION_LOCK_REFRESH_INTERVAL_SECONDS,
     )
     yield
-    # Graceful shutdown: notify all active SSE streams
+    # Graceful shutdown: cancel and await all active runner tasks
+    if active_runners:
+        tasks_to_cancel = [t for t in active_runners if not t.done()]
+        for t in tasks_to_cancel:
+            t.cancel()
+        if tasks_to_cancel:
+            try:
+                await asyncio.wait(tasks_to_cancel, timeout=5.0)
+            except Exception:
+                pass
+        active_runners.clear()
+
     if active_streams:
         shutdown_event = {
             "event": "error",
@@ -55,7 +67,6 @@ async def lifespan(app: FastAPI):
             except asyncio.QueueFull:
                 pass
         active_streams.clear()
-        # Allow a short duration for the queues to flush
         await asyncio.sleep(0.5)
 
     await close_redis()

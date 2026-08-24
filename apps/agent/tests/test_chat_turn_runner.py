@@ -611,3 +611,56 @@ async def test_runner_cancellation_shielded_persistence():
     # Partial turn was persisted and lock was released
     assert mock_client.create_message_batch.await_count >= 1
     mock_queue.release.assert_awaited_once_with("session-456", "req-cancel")
+
+
+@pytest.mark.asyncio
+async def test_runner_generator_exit_shielded_persistence():
+    mock_client = MagicMock()
+    mock_client.get_memory = AsyncMock(return_value={"recentMessages": [], "summary": None})
+    mock_client.create_message_batch = AsyncMock(
+        return_value={"messages": [{"id": "partial_gen_exit_id", "sender": "AGENT"}]}
+    )
+
+    mock_queue = MagicMock()
+    mock_queue.acquire = AsyncMock(return_value="req-gen-exit")
+    mock_queue.get_fence = MagicMock(return_value=7)
+    mock_queue.validate_active_fence = AsyncMock(return_value=True)
+    mock_queue.release = AsyncMock()
+
+    mock_graph = MagicMock()
+
+    async def mock_astream_events(*args, **kwargs):
+        yield {
+            "event": "on_chat_model_stream",
+            "data": {"chunk": MagicMock(content="Partial response before close")},
+        }
+        # Simulate further processing or sleep if not closed
+        await asyncio.sleep(10)
+
+    mock_graph.astream_events = mock_astream_events
+
+    runner = ChatTurnRunner(
+        graph=mock_graph,
+        queue_manager=mock_queue,
+        client_factory=lambda **kwargs: mock_client,
+        redis_client=MagicMock(),
+    )
+
+    command = ChatTurnCommand(
+        user_id="user-123",
+        session_id="session-456",
+        message="Close early",
+        token="mock_token",
+    )
+
+    gen = runner.run(command)
+    # Receive first token
+    event = await anext(gen)
+    assert isinstance(event, TokenEvent)
+
+    # Early exit generator (sends GeneratorExit)
+    await gen.aclose()
+
+    # Partial turn was persisted and lock was released
+    assert mock_client.create_message_batch.await_count >= 1
+    mock_queue.release.assert_awaited_once_with("session-456", "req-gen-exit")

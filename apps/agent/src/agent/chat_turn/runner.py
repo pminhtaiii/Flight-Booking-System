@@ -137,7 +137,7 @@ class ChatTurnRunner:
         base_url = self.settings.NESTJS_API_URL
         if self._client_factory is not None:
             try:
-                return self._client_factory(
+                client = self._client_factory(
                     base_url=base_url,
                     token=token,
                     trace_id=trace_id,
@@ -145,11 +145,11 @@ class ChatTurnRunner:
                 )
             except TypeError:
                 client = self._client_factory(base_url, token)
-                if hasattr(client, "trace_id"):
-                    client.trace_id = trace_id
-                if hasattr(client, "correlation_id"):
-                    client.correlation_id = correlation_id
-                return client
+            if hasattr(client, "trace_id"):
+                client.trace_id = trace_id
+            if hasattr(client, "correlation_id"):
+                client.correlation_id = correlation_id
+            return client
         return NestJSClient(
             base_url=base_url,
             token=token,
@@ -913,7 +913,7 @@ class ChatTurnRunner:
             if err_event:
                 yield err_event
 
-        except asyncio.CancelledError:
+        except (asyncio.CancelledError, GeneratorExit):
             logger.warning("chat_turn_cancelled")
             await self._finalize_cleanup(
                 session_id=session_id,

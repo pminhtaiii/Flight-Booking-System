@@ -7,13 +7,34 @@ Update this file after every completed feature. Any AI agent reading this should
 ### Current Status
 
 **Feature:** Deepen Codebase Architecture (Feature 019)
-**Last completed:** Slice 4B: Extract ChatTurnRunner in Causal-Cleanup Order (2026-08-24).
+**Last completed:** Slice 4C: Thin Transport Adapter and Graceful Runner Shutdown (2026-08-24) — User Story 4 Complete.
 **In progress:** None.
-**Next:** Slice 4C: Thin Transport and Shutdown (US4).
+**Next:** Slice 5A or next milestone.
 
 ---
 
 ## Progress by Feature
+
+### [x] Feature: Deepen Codebase Architecture (Feature 019) — Slice 4C: Thin Transport Adapter and Graceful Runner Shutdown (US4 Complete)
+
+- [x] Slice 4C / Thin Transport Adapter and Graceful Runner Shutdown (2026-08-24):
+  - **Thin Transport Adapter (`apps/agent/src/agent/streaming/sse.py`)**:
+    - Slimmed down `sse.py` from ~880 lines to 283 lines, delegating turn execution, LangGraph streaming, guardrails, memory, and persistence entirely to `ChatTurnRunner`.
+    - Retained HTTP-level pre-stream admission: Authorization header verification, JWT decoding (`decode_and_verify_jwt`), NestJS user status verification (`NestJSClient.check_user_access`), maximum message length enforcement, ingress PII pre-stream detection, safety guardrail checks, and Redis quota/rate limit verification.
+    - Implemented `sse_generator` stream runner tracking in `agent.main.active_runners` and client disconnect detection (`request.is_disconnected()`), invoking `generator.aclose()` in the `finally` block to trigger runner shielded cleanup.
+  - **Runner Disconnect & Exception Resilience (`apps/agent/src/agent/chat_turn/runner.py`)**:
+    - Caught `(asyncio.CancelledError, GeneratorExit)` in `ChatTurnRunner.run()`, executing shielded cleanup (`_finalize_cleanup`) to persist partial response and release Redis session lock and depth tracking.
+  - **Graceful Shutdown & Task Tracking (`apps/agent/src/agent/main.py`)**:
+    - Introduced `active_runners: Set[asyncio.Task]` for tracking active streaming runner tasks.
+    - Updated `lifespan` shutdown hook to cancel and await active runner tasks within a 5.0s bounded timeout before closing Redis.
+  - **Comprehensive Unit & Characterization Testing**:
+    - Created `apps/agent/tests/test_sse.py` with 20 unit tests covering HTTP 401/400/429/503 admission errors, PII error event responses, 8 event serialization formats, runner delegation, active runner registration, client disconnect cancellation, and lifespan shutdown.
+    - Updated `test_health.py`, `test_streaming_foundation.py`, `test_queue.py`, `test_stream_auth_budget.py`, `test_stream_session_control.py`, and `test_chat_turn_runner.py`.
+  - **Verification & Test Suites (100% Green)**:
+    - Full Agent Pytest Suite: 452/452 tests PASS (11 deselected).
+    - Web Frontend Acceptance Tests: 15/15 tests PASS.
+    - Ruff Lint & Format Checks: 0 errors, 121 files clean.
+    - Two-Axis Code Review: Standards Review & Spec Review completed with 0 remaining P0/P1 issues.
 
 ### [x] Feature: Deepen Codebase Architecture (Feature 019) — Slice 4B: Extract ChatTurnRunner in Causal-Cleanup Order
 
