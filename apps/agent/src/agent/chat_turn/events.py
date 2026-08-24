@@ -45,7 +45,6 @@ class ActionRequiredPayload(BaseModel):
     action: str
     target: str
     scope: Optional[str] = None
-    display: Optional[Dict[str, Any]] = None
     passengers: Optional[List[Dict[str, Any]]] = None
 
 

@@ -108,6 +108,7 @@ def test_extra_fields_forbidden_on_all_payloads() -> None:
         ),
         (ActionRequiredPayload, {"action": "ACT", "target": "/t", "unexpected_field": "bad"}),
         (ActionRequiredPayload, {"action": "ACT", "target": "/t", "offerId": "duffel_123"}),
+        (ActionRequiredPayload, {"action": "ACT", "target": "/t", "display": {"title": "bad"}}),
         (DonePayload, {"messageId": "msg", "unexpected_field": "bad"}),
         (DonePayload, {"messageId": "msg", "offerId": "duffel_123"}),
         (ErrorPayload, {"code": "ERR", "message": "msg", "unexpected_field": "bad"}),
