@@ -6,12 +6,14 @@
   "types": "dist/index.d.ts",
   "scripts": {
     "build": "tsc",
+    "test": "pnpm run build && node --test dist/types/flight-search.types.spec.js dist/types/booking-management.types.spec.js",
     "dev": "tsc -w"
   },
   "dependencies": {
     "zod": "^3.23.8"
   },
   "devDependencies": {
+    "@types/node": "^20.19.43",
     "typescript": "^5.4.5"
   }
 }
