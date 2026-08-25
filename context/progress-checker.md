@@ -7,13 +7,82 @@ Update this file after every completed feature. Any AI agent reading this should
 ### Current Status
 
 **Feature:** Deepen Codebase Architecture (Feature 019)
-**Last completed:** Slice 6A: Agent Gateway Shared Auth & Safe Audit Module (2026-08-25).
+**Last completed:** Slice 6C: Move Agent Chat Ownership to ChatModule (2026-08-25).
 **In progress:** None.
-**Next:** Slice 6B: Attested Flight Search module.
+**Next:** Slice 6D: Delete Broad Agent Gateway Service.
 
 ---
 
 ## Progress by Feature
+
+### [x] Feature: Deepen Codebase Architecture (Feature 019) — Slice 6C: Move Agent Chat Ownership to ChatModule
+
+- [x] Slice 6C / Move Agent Chat Ownership to ChatModule (2026-08-25):
+  - **Agent Chat Access Service (`apps/api/src/chat/agent-chat-access.service.ts`)**:
+    - Created `AgentChatAccessService` implementing `checkUserAccess(dto: CheckUserAccessDto)` validating active user status in PostgreSQL (`user.status === 'ACTIVE'`), token expiration (`exp > NOW()`), and JTI revocation status against Redis (`blacklist:jti:${dto.jti}`).
+    - Unit tests in `agent-chat-access.service.spec.ts` (8/8 tests PASS).
+  - **Agent Chat Controller (`apps/api/src/chat/agent-chat.controller.ts`)**:
+    - Created `AgentChatController` with `@Controller('agent-gateway/chat')` and `@UseGuards(AgentApiKeyGuard, ClaimTokenGuard)`.
+    - Injected `ChatService` and `AgentChatAccessService` directly without intermediate gateway layers.
+    - Implemented 7 authoritative wire routes: `POST access/check` (200 OK), `POST sessions` (201 Created), `GET sessions/:sessionId/memory` (200 OK), `POST sessions/:sessionId/messages` (201 Created), `POST sessions/:sessionId/turns` (201 Created), `POST sessions/:sessionId/summaries` (201 Created), and `DELETE sessions/:sessionId` (204 No Content).
+    - Preserved 100% wire-path, status-code, `X-Fencing-Token` header propagation, and AES-256-GCM record-bound authenticated encryption compatibility.
+    - Unit tests in `agent-chat.controller.spec.ts` (14/14 tests PASS).
+  - **Chat Module Registration (`apps/api/src/chat/chat.module.ts`)**:
+    - Imported `AgentAuthModule` and `CacheModule`.
+    - Registered `AgentChatController` in `controllers`.
+    - Registered and exported `AgentChatAccessService` in `providers` and `exports`.
+  - **Agent Gateway Decoupling (`apps/api/src/agent-gateway/`)**:
+    - Removed all chat route handlers from `AgentGatewayController`.
+    - Removed `ChatModule` from `AgentGatewayModule` imports, fully breaking Gateway↔Chat coupling.
+    - Removed `ChatService` dependency and legacy chat methods from `AgentGatewayService`.
+  - **Verification & Test Matrix (100% Green)**:
+    - Chat unit suites: 3/3 suites (36/36 tests) PASS (`src/chat`).
+    - Agent Gateway unit suites: 8/8 suites (83/83 tests) PASS (`src/agent-gateway`).
+    - Characterization E2E: `apps/api/test/characterization/agent-gateway-characterization.e2e-spec.ts` (17/17 tests PASS).
+    - Agent Chat Gateway E2E: `apps/api/test/agent-chat-gateway.e2e-spec.ts` (11/11 tests PASS).
+    - Full backend unit suites: 88/88 suites (933/933 tests) PASS.
+    - Full backend E2E suites: 57/57 suites (495/495 tests) PASS.
+    - TypeScript Strict Typecheck (`tsc -p tsconfig.json --noEmit`): 0 errors.
+    - ESLint (`pnpm exec eslint "apps/api/**/*.ts" "packages/shared/**/*.ts" --max-warnings 0`): 0 errors / 0 warnings.
+    - API Build (`pnpm --filter @api/backend build`): 0 errors, compiles cleanly.
+    - Two-Axis Code Review: Standards Review & Spec Review completed with 0 remaining P0/P1 issues.
+
+### [x] Feature: Deepen Codebase Architecture (Feature 019) — Slice 6B: Extract Capability-Local Agent Gateway Modules
+
+- [x] Slice 6B / Extract Capability-Local Agent Gateway Modules (2026-08-25):
+  - **Attested Flight Search Module (`apps/api/src/agent-gateway/attested-flight-search/`)**:
+    - Created `AttestedFlightSearchService` owning V1 legacy-compatible search (`searchFlights`) with 900s Redis cache, upstream Duffel flight mapping, honest keyword degradation checks, and zero-PII audit logging.
+    - Created `searchFlightsV2` with session ownership validation, `FlightOffer` persistence, and HMAC-SHA256 selection attestation generation.
+    - Created `AttestedFlightSearchController` under `@Controller('agent-gateway')` with `@UseGuards(AgentApiKeyGuard, ClaimTokenGuard)` serving `GET /flights/search` and `POST /v2/flights/search` (201 Created).
+    - Created `AttestedFlightSearchModule` exporting `AttestedFlightSearchService` and `SelectionAttestationService`.
+    - Unit tests in `attested-flight-search.service.spec.ts` (12/12 tests PASS).
+  - **Agent Booking Readiness Module (`apps/api/src/agent-gateway/booking-readiness/`)**:
+    - Created `AgentBookingReadinessService` evaluating advisory readiness via `BookingReadinessService`, safely mapping passenger ordinals to `offerPassengerId`, internally resolving traveler profile without caller-supplied profile IDs, calculating `nextAction`, and emitting `BookingReadinessObservability` and audit events with zero PII.
+    - Created `AgentBookingReadinessController` serving `POST /agent-gateway/bookings/readiness` (200 OK).
+    - Created `AgentBookingReadinessModule` exporting `AgentBookingReadinessService`.
+    - Unit tests in `agent-booking-readiness.service.spec.ts` (11/11 tests PASS).
+  - **Safe Booking Read Module (`apps/api/src/agent-gateway/safe-booking-read/`)**:
+    - Created `SafeBookingReadService` owning Tier-1 safe summaries (`getBookingSummaries`) and Tier-2 safe details (`getBookingDetailByReference`) strictly querying `BookingAgentProjection`, validating `^bkref_[0-9a-fA-F-]{36}$`, guaranteeing cross-tenant isolation (404 `BOOKING_REFERENCE_NOT_FOUND`), and temporarily retaining legacy `/users/bookings`.
+    - Created `SafeBookingReadController` serving `GET /users/bookings/summaries`, `GET /users/bookings/:bookingReference`, and `GET /users/bookings`.
+    - Created `SafeBookingReadModule` exporting `SafeBookingReadService`.
+    - Unit tests in `safe-booking-read.service.spec.ts` (8/8 tests PASS).
+  - **Traveler Preferences Module (`apps/api/src/agent-gateway/traveler-preferences/`)**:
+    - Created `TravelerPreferencesService` querying Prisma `travelerProfile` with select allowlist (`seatPreference`, `classPreference`, `preferredAirlines`, `blacklistedAirlines`, `dietaryNeeds`), excluding sensitive passport numbers and expiry dates, and logging tool executions via `AgentToolAuditService`.
+    - Created `TravelerPreferencesController` serving `GET /agent-gateway/users/preferences`.
+    - Created `TravelerPreferencesModule` exporting `TravelerPreferencesService`.
+    - Unit tests in `traveler-preferences.service.spec.ts` (4/4 tests PASS).
+  - **Module Composition & Monolith Deconstruction**:
+    - Reduced `AgentGatewayService` from 11 dependencies to 3 dependencies (`PrismaService`, `CacheService`, `ChatService`), retaining only chat persistence endpoints until Slice 6C.
+    - Removed extracted tool handlers from `AgentGatewayController`.
+    - Registered the four capability modules in `AgentGatewayModule` and root `AppModule`.
+  - **Verification & Test Matrix (100% Green)**:
+    - Capability unit suites: 8/8 suites (94/94 tests) PASS (`src/agent-gateway`).
+    - Characterization E2E: `apps/api/test/characterization/agent-gateway-characterization.e2e-spec.ts` (17/17 tests PASS).
+    - Full Agent Gateway E2E suites: 4/4 suites (66/66 tests) PASS (`agent-gateway.e2e-spec.ts`, `agent-chat-gateway.e2e-spec.ts`, `agent-gateway-polish.e2e-spec.ts`, `booking-agent-projection-privacy.e2e-spec.ts`).
+    - TypeScript Strict Typecheck (`tsc -p tsconfig.json --noEmit`): 0 errors.
+    - ESLint (`pnpm exec eslint "apps/api/**/*.ts" "packages/shared/**/*.ts" --max-warnings 0`): 0 errors / 0 warnings.
+    - API Build (`pnpm --filter @api/backend build`): 0 errors, compiles cleanly.
+    - Two-Axis Code Review: Standards Review & Spec Review completed with 0 remaining P0/P1 issues.
 
 ### [x] Feature: Deepen Codebase Architecture (Feature 019) — Slice 6A: Agent Gateway Shared Auth & Safe Audit Module
 
@@ -27,8 +96,11 @@ Update this file after every completed feature. Any AI agent reading this should
     - Created `AgentToolAuditService` (`agent-tool-audit.service.ts`) implementing `recordToolExecution()` with strict negative privacy enforcement: projects ONLY allowlisted metrics metadata (`toolName`, `outcome`, `durationMs`, `responseSizeBytes`, `occurredAt`, `errorCode`), discarding any raw parameters, customer messages, passenger details, passport numbers, card numbers, or Duffel IDs.
     - Provided fallback UUID generation for `traceId` and `correlationId`, and fail-safe error logging (`[recordToolExecution]`) without throwing unhandled exceptions.
     - Created `AgentToolAuditModule` (`agent-tool-audit.module.ts`) exporting `AgentToolAuditService`, registered in `AgentGatewayModule` and `AppModule`.
+    - Connected `AgentToolAuditService` into `AgentGatewayService.logToolCall`, replacing legacy parameter-storing audit writes with privacy-safe allowlisted metric audit records in production runtime paths.
   - **Unit Testing & Verification (100% Green)**:
     - Created comprehensive unit tests in `apps/api/src/agent-gateway/audit/agent-tool-audit.service.spec.ts` (6/6 tests PASS).
+    - Gateway service unit tests: `apps/api/src/agent-gateway/agent-gateway.service.spec.ts` updated with privacy audit assertions (4/4 suites, 63/63 tests PASS).
+    - Characterization E2E test suite: `apps/api/test/characterization/agent-gateway-characterization.e2e-spec.ts` (17/17 tests PASS).
     - Chat handoff unit test suite: 70/70 tests PASS (`booking-handoff.controller`, `chat-handoff-token.service`, `chat-handoff.config`, `chat-handoff.service`).
     - Agent auth & gateway test suites: 123/123 tests PASS.
     - TypeScript strict typecheck (`tsc --noEmit`): 0 errors.

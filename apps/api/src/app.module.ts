@@ -10,6 +10,10 @@ import { ChatModule } from './chat/chat.module';
 import { AgentGatewayModule } from './agent-gateway/agent-gateway.module';
 import { AgentAuthModule } from './agent-gateway/auth/agent-auth.module';
 import { AgentToolAuditModule } from './agent-gateway/audit/agent-tool-audit.module';
+import { AttestedFlightSearchModule } from './agent-gateway/attested-flight-search/attested-flight-search.module';
+import { AgentBookingReadinessModule } from './agent-gateway/booking-readiness/agent-booking-readiness.module';
+import { SafeBookingReadModule } from './agent-gateway/safe-booking-read/safe-booking-read.module';
+import { TravelerPreferencesModule } from './agent-gateway/traveler-preferences/traveler-preferences.module';
 import { AirportsModule } from './airports/airports.module';
 import { DuffelModule } from './duffel/duffel.module';
 import { FlightsModule } from './flights/flights.module';
@@ -88,6 +92,10 @@ export const envSchema = z.object({
     AgentGatewayModule,
     AgentAuthModule,
     AgentToolAuditModule,
+    AttestedFlightSearchModule,
+    AgentBookingReadinessModule,
+    SafeBookingReadModule,
+    TravelerPreferencesModule,
     AirportsModule,
     DuffelModule,
     FlightsModule,
