@@ -597,3 +597,15 @@ Feature 019 restructures high-leverage boundaries without changing public produc
   - **Thin Transport Boundary**: Reduced `apps/agent/src/agent/streaming/sse.py` to a thin HTTP transport layer (from ~880 down to 283 lines). Retained HTTP pre-stream admission (JWT validation, NestJS user access verification, length check, ingress PII detection, NeMo safety check, Redis quota & rate limiting) and delegated turn execution entirely to `ChatTurnRunner`.
   - **Client Disconnect & Lifespan Shutdown**: Added active runner task tracking (`active_runners: Set[asyncio.Task]` in `agent.main`), client disconnect detection (`request.is_disconnected()`), generator cleanup on exit (`generator.aclose()`), and graceful cancellation/await in application lifespan shutdown within a 5.0s bounded timeout.
   - **Established verification**: 20/20 unit tests in `apps/agent/tests/test_sse.py`, 452/452 full agent test suite passing (11 deselected), 15/15 web acceptance tests passing, ruff lint/format 100% green (121 files clean). Standards and spec code reviews approved with 0 P0/P1 issues.
+- **Slice 6A (Agent Gateway Shared Auth & Safe Audit Module)**:
+  - Extracted `AgentAuthModule` (`agent-auth.module.ts`) encapsulating and exporting `AgentApiKeyGuard`, `ClaimTokenGuard`, and `ClaimTokenService`.
+  - Implemented `AgentToolAuditService` enforcing negative privacy enforcement with allowlisted metrics (`toolName`, `outcome`, `durationMs`, `responseSizeBytes`, `occurredAt`, `errorCode`).
+- **Slice 6B (Extract Capability-Local Agent Gateway Modules)**:
+  - Extracted tool families into 4 capability-local modules (`AttestedFlightSearchModule`, `AgentBookingReadinessModule`, `SafeBookingReadModule`, `TravelerPreferencesModule`).
+  - Reduced `AgentGatewayService` dependencies and decoupled tool executions into their owning modules.
+- **Slice 6C (Move Agent Chat Ownership to ChatModule)**:
+  - **Chat-Owned Agent Persistence**: Extracted all `/agent-gateway/chat/...` endpoints into `AgentChatController` and `AgentChatAccessService` in `apps/api/src/chat/`, injecting `ChatService` directly without intermediate gateway layers.
+  - **Access & Revocation Verification**: `AgentChatAccessService` handles user active status, expiration timestamp verification (`exp > NOW()`), and JTI revocation checking against Redis (`blacklist:jti:${dto.jti}`).
+  - **Zero Protocol & Cryptographic Drift**: Maintained 100% wire-path, status-code, `X-Fencing-Token` header propagation, and AES-256-GCM record-bound authenticated encryption compatibility.
+  - **Gateway↔Chat Decoupling**: Completely removed `ChatModule` from `AgentGatewayModule` imports and stripped chat delegation methods from `AgentGatewayService`.
+
