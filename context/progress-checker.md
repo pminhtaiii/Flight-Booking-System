@@ -27,8 +27,11 @@ Update this file after every completed feature. Any AI agent reading this should
     - Created `AgentToolAuditService` (`agent-tool-audit.service.ts`) implementing `recordToolExecution()` with strict negative privacy enforcement: projects ONLY allowlisted metrics metadata (`toolName`, `outcome`, `durationMs`, `responseSizeBytes`, `occurredAt`, `errorCode`), discarding any raw parameters, customer messages, passenger details, passport numbers, card numbers, or Duffel IDs.
     - Provided fallback UUID generation for `traceId` and `correlationId`, and fail-safe error logging (`[recordToolExecution]`) without throwing unhandled exceptions.
     - Created `AgentToolAuditModule` (`agent-tool-audit.module.ts`) exporting `AgentToolAuditService`, registered in `AgentGatewayModule` and `AppModule`.
+    - Connected `AgentToolAuditService` into `AgentGatewayService.logToolCall`, replacing legacy parameter-storing audit writes with privacy-safe allowlisted metric audit records in production runtime paths.
   - **Unit Testing & Verification (100% Green)**:
     - Created comprehensive unit tests in `apps/api/src/agent-gateway/audit/agent-tool-audit.service.spec.ts` (6/6 tests PASS).
+    - Gateway service unit tests: `apps/api/src/agent-gateway/agent-gateway.service.spec.ts` updated with privacy audit assertions (4/4 suites, 63/63 tests PASS).
+    - Characterization E2E test suite: `apps/api/test/characterization/agent-gateway-characterization.e2e-spec.ts` (17/17 tests PASS).
     - Chat handoff unit test suite: 70/70 tests PASS (`booking-handoff.controller`, `chat-handoff-token.service`, `chat-handoff.config`, `chat-handoff.service`).
     - Agent auth & gateway test suites: 123/123 tests PASS.
     - TypeScript strict typecheck (`tsc --noEmit`): 0 errors.

@@ -15,6 +15,7 @@ import { ConfigService } from '@nestjs/config';
 import { ChatService } from '@/chat/chat.service';
 import { SelectionAttestationService } from './selection-attestation.service';
 import { ChatMessageCryptoService } from '@/chat/chat-message-crypto.service';
+import { AgentToolAuditService } from './audit/agent-tool-audit.service';
 
 describe('AgentGatewayService', () => {
   let service: AgentGatewayService;
@@ -23,6 +24,7 @@ describe('AgentGatewayService', () => {
   let prismaService: jest.Mocked<PrismaService>;
   let auditService: jest.Mocked<AuditService>;
   let observability: jest.Mocked<BookingReadinessObservability>;
+  let agentToolAuditService: jest.Mocked<AgentToolAuditService>;
 
   beforeEach(async () => {
     profileService = { getProfile: jest.fn() } as any;
@@ -32,9 +34,13 @@ describe('AgentGatewayService', () => {
       bookingAgentProjection: { findMany: jest.fn(), findUnique: jest.fn() },
       booking: { findMany: jest.fn(), findUnique: jest.fn() },
       payment: { findMany: jest.fn(), findUnique: jest.fn() },
+      travelerProfile: { findUnique: jest.fn() },
     } as any;
     auditService = { createLog: jest.fn() } as any;
     observability = { recordOutcome: jest.fn() } as any;
+    agentToolAuditService = {
+      recordToolExecution: jest.fn().mockResolvedValue(undefined),
+    } as any;
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -56,6 +62,7 @@ describe('AgentGatewayService', () => {
             isConfigured: jest.fn().mockReturnValue(true),
           },
         },
+        { provide: AgentToolAuditService, useValue: agentToolAuditService },
       ],
     }).compile();
 
@@ -508,6 +515,128 @@ describe('AgentGatewayService', () => {
       } catch (err: any) {
         expect(err.getResponse()).toMatchObject({ code: 'BOOKING_REFERENCE_NOT_FOUND' });
       }
+    });
+  });
+
+  describe('AgentToolAudit logging in logToolCall', () => {
+    it('should invoke agentToolAuditService.recordToolExecution on successful tool execution with allowlisted fields and without raw parameters', async () => {
+      const mockProfile = {
+        seatPreference: 'WINDOW',
+        classPreference: 'ECONOMY',
+        preferredAirlines: ['VN'],
+        blacklistedAirlines: [],
+        dietaryNeeds: 'Vegetarian',
+      };
+      (prismaService.travelerProfile.findUnique as jest.Mock).mockResolvedValueOnce(mockProfile);
+
+      const result = await service.getUserPreferences('user-1', 'trace-test-1', 'corr-test-1');
+
+      expect(result).toEqual(mockProfile);
+      expect(agentToolAuditService.recordToolExecution).toHaveBeenCalledTimes(1);
+      expect(agentToolAuditService.recordToolExecution).toHaveBeenCalledWith({
+        toolName: 'users/preferences',
+        actorId: 'user-1',
+        outcome: 'SUCCESS',
+        durationMs: expect.any(Number),
+        responseSizeBytes: Buffer.byteLength(JSON.stringify(mockProfile)),
+        occurredAt: expect.any(String),
+        errorCode: undefined,
+        traceId: 'trace-test-1',
+        correlationId: 'corr-test-1',
+      });
+
+      // Verify no raw parameters or PII leaked in recordToolExecution arguments
+      const passedRecord = agentToolAuditService.recordToolExecution.mock.calls[0][0];
+      expect((passedRecord as any).parameters).toBeUndefined();
+      expect((passedRecord as any).params).toBeUndefined();
+      expect((passedRecord as any)._params).toBeUndefined();
+      expect((passedRecord as any).seatPreference).toBeUndefined();
+    });
+
+    it('should invoke agentToolAuditService.recordToolExecution with FAILURE and custom errorCode when tool throws HttpException with code', async () => {
+      (prismaService.travelerProfile.findUnique as jest.Mock).mockResolvedValueOnce(null);
+
+      await expect(service.getUserPreferences('user-2', 'trace-test-2', 'corr-test-2')).rejects.toThrow(
+        NotFoundException,
+      );
+
+      expect(agentToolAuditService.recordToolExecution).toHaveBeenCalledTimes(1);
+      expect(agentToolAuditService.recordToolExecution).toHaveBeenCalledWith({
+        toolName: 'users/preferences',
+        actorId: 'user-2',
+        outcome: 'FAILURE',
+        durationMs: expect.any(Number),
+        responseSizeBytes: 0,
+        occurredAt: expect.any(String),
+        errorCode: 'PROFILE_NOT_FOUND',
+        traceId: 'trace-test-2',
+        correlationId: 'corr-test-2',
+      });
+
+      const passedRecord = agentToolAuditService.recordToolExecution.mock.calls[0][0];
+      expect((passedRecord as any).parameters).toBeUndefined();
+      expect((passedRecord as any).params).toBeUndefined();
+    });
+
+    it('should fallback to HTTP_<status> when HttpException does not contain a string error code', async () => {
+      await (service as any).logToolCall(
+        'user-3',
+        'custom/tool',
+        { sensitiveParam: 'super-secret-passport-12345' },
+        Date.now(),
+        'trace-test-3',
+        'corr-test-3',
+        false,
+        new HttpException('Forbidden access', 403),
+      );
+
+      expect(agentToolAuditService.recordToolExecution).toHaveBeenCalledTimes(1);
+      expect(agentToolAuditService.recordToolExecution).toHaveBeenCalledWith({
+        toolName: 'custom/tool',
+        actorId: 'user-3',
+        outcome: 'FAILURE',
+        durationMs: expect.any(Number),
+        responseSizeBytes: 0,
+        occurredAt: expect.any(String),
+        errorCode: 'HTTP_403',
+        traceId: 'trace-test-3',
+        correlationId: 'corr-test-3',
+      });
+
+      const passedRecord = agentToolAuditService.recordToolExecution.mock.calls[0][0];
+      expect((passedRecord as any).sensitiveParam).toBeUndefined();
+      expect((passedRecord as any).parameters).toBeUndefined();
+      expect((passedRecord as any).params).toBeUndefined();
+    });
+
+    it('should record INTERNAL_ERROR when error is a generic non-HttpException error', async () => {
+      await (service as any).logToolCall(
+        'user-4',
+        'custom/tool-db',
+        { query: 'SELECT * FROM users' },
+        Date.now(),
+        'trace-test-4',
+        'corr-test-4',
+        false,
+        new Error('Database connection failed'),
+      );
+
+      expect(agentToolAuditService.recordToolExecution).toHaveBeenCalledTimes(1);
+      expect(agentToolAuditService.recordToolExecution).toHaveBeenCalledWith({
+        toolName: 'custom/tool-db',
+        actorId: 'user-4',
+        outcome: 'FAILURE',
+        durationMs: expect.any(Number),
+        responseSizeBytes: 0,
+        occurredAt: expect.any(String),
+        errorCode: 'INTERNAL_ERROR',
+        traceId: 'trace-test-4',
+        correlationId: 'corr-test-4',
+      });
+
+      const passedRecord = agentToolAuditService.recordToolExecution.mock.calls[0][0];
+      expect((passedRecord as any).query).toBeUndefined();
+      expect((passedRecord as any).parameters).toBeUndefined();
     });
   });
 });
