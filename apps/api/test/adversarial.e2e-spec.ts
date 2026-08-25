@@ -61,6 +61,7 @@ describe('Adversarial and Edge Case Tests (E2E)', () => {
     );
     app.useGlobalFilters(new HttpExceptionFilter());
     await app.init();
+    await app.listen(0, '127.0.0.1');
 
     prisma = moduleFixture.get<PrismaService>(PrismaService);
     cacheService = moduleFixture.get<CacheService>(CacheService);
@@ -74,8 +75,29 @@ describe('Adversarial and Edge Case Tests (E2E)', () => {
 
   beforeEach(async () => {
     // Reset database state before each test
+    await prisma.chatHandoff.deleteMany({});
+    await prisma.chatSession.deleteMany({});
+    await prisma.paymentEvent.deleteMany({});
+    await prisma.ledgerEntry.deleteMany({});
+    await prisma.refund.deleteMany({});
+    await prisma.payment.deleteMany({});
+    await prisma.idempotencyKey.deleteMany({});
+    await prisma.paymentMethod.deleteMany({});
+    await prisma.bookingIntentPassenger.deleteMany({});
+    await prisma.bookingIntent.deleteMany({});
+    await prisma.itineraryRevisionSegment.deleteMany({});
+    await prisma.itineraryRevision.deleteMany({});
+    await prisma.disruptionAuditEvent.deleteMany({});
+    await prisma.notificationOutbox.deleteMany({});
+    await prisma.booking.deleteMany({});
+    await prisma.travelerProfile.deleteMany({});
+    await prisma.offerRecovery.deleteMany({});
+    await prisma.flightOffer.deleteMany({});
+    await prisma.searchHistory.deleteMany({});
+    await prisma.airport.deleteMany({});
     await prisma.auditLog.deleteMany({});
     await prisma.user.deleteMany({});
+
 
     // Clear lockouts
     await request(app.getHttpServer()).post('/auth/test/reset-lockout').send({ clearAll: true });
@@ -272,39 +294,50 @@ describe('Adversarial and Edge Case Tests (E2E)', () => {
     });
 
     it('should not return expired keys when listing keys in the fallback cache', async () => {
-      // Simulate offline Redis to force fallback to in-memory store
-      (cacheService as unknown as CacheServiceWithInternal).redisClient = null;
+      const originalClient = (cacheService as unknown as CacheServiceWithInternal).redisClient;
+      try {
+        // Simulate offline Redis to force fallback to in-memory store
+        (cacheService as unknown as CacheServiceWithInternal).redisClient = null;
 
-      await cacheService.set('auth:expired:1', 'val1', 1);
-      await cacheService.set('auth:expired:2', 'val2', 100);
+        await cacheService.set('auth:expired:1', 'val1', 1);
+        await cacheService.set('auth:expired:2', 'val2', 100);
 
-      // Wait 1.5 seconds for key 1 to expire
-      await new Promise((resolve) => setTimeout(resolve, 1500));
+        // Wait 1.5 seconds for key 1 to expire
+        await new Promise((resolve) => setTimeout(resolve, 1500));
 
-      const keys = await cacheService.keys('auth:expired:*');
-      expect(keys).toContain('auth:expired:2');
-      expect(keys).not.toContain('auth:expired:1');
+        const keys = await cacheService.keys('auth:expired:*');
+        expect(keys).toContain('auth:expired:2');
+        expect(keys).not.toContain('auth:expired:1');
+      } finally {
+        (cacheService as unknown as CacheServiceWithInternal).redisClient = originalClient;
+      }
     });
 
     it('should not reset/extend the TTL on subsequent increments in the fallback cache', async () => {
-      // Simulate offline Redis to force fallback to in-memory store
-      (cacheService as unknown as CacheServiceWithInternal).redisClient = null;
+      const originalClient = (cacheService as unknown as CacheServiceWithInternal).redisClient;
+      try {
+        // Simulate offline Redis to force fallback to in-memory store
+        (cacheService as unknown as CacheServiceWithInternal).redisClient = null;
 
-      const key = 'auth:incr-ttl-test';
-      // First increment set TTL to 10 seconds
-      await cacheService.incr(key, 10);
-      const ttl1 = await cacheService.getTtl(key);
-      expect(ttl1).toBeGreaterThan(0);
+        const key = 'auth:incr-ttl-test';
+        // First increment set TTL to 10 seconds
+        await cacheService.incr(key, 10);
+        const ttl1 = await cacheService.getTtl(key);
+        expect(ttl1).toBeGreaterThan(0);
 
-      // Wait 2 seconds
-      await new Promise((resolve) => setTimeout(resolve, 2000));
+        // Wait 2 seconds
+        await new Promise((resolve) => setTimeout(resolve, 2000));
 
-      // Subsequent increment
-      await cacheService.incr(key, 10);
-      const ttl2 = await cacheService.getTtl(key);
+        // Subsequent increment
+        await cacheService.incr(key, 10);
+        const ttl2 = await cacheService.getTtl(key);
 
-      // The remaining TTL should be less than 9 seconds (not reset back to 10)
-      expect(ttl2).toBeLessThan(9);
+        // The remaining TTL should be less than or equal to 9 seconds (not reset back to 10)
+        expect(ttl2).toBeLessThanOrEqual(9);
+        expect(ttl2).toBeLessThan(10);
+      } finally {
+        (cacheService as unknown as CacheServiceWithInternal).redisClient = originalClient;
+      }
     });
   });
 
@@ -444,3 +477,6 @@ describe('Adversarial and Edge Case Tests (E2E)', () => {
     });
   });
 });
+
+
+

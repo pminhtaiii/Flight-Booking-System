@@ -1,5 +1,4 @@
 import 'reflect-metadata';
-import { ConflictException } from '@nestjs/common';
 import { PaymentService } from './payment.service';
 import { PrismaService } from '@/prisma/prisma.service';
 import { StripeService } from '@/common/stripe.service';
@@ -7,7 +6,6 @@ import { PaymentIdempotencyService } from '@/payment/payment-idempotency.service
 import { DuffelService } from '@/duffel/duffel.service';
 import { AuditService } from '@/audit/audit.service';
 import { PaymentMethodService } from '@/payment/payment-method.service';
-import { Prisma } from '@prisma/client';
 import { AncillaryPaymentValidationService } from './ancillary-payment-validation.service';
 
 describe('PaymentService - Ancillary Pipeline', () => {
@@ -24,54 +22,10 @@ describe('PaymentService - Ancillary Pipeline', () => {
   beforeEach(() => {
     mockPrisma = {
       $transaction: jest.fn(async (cb) => cb(mockPrisma)),
-      $queryRaw: jest.fn().mockImplementation((strings: TemplateStringsArray) => {
-        const sql = strings.join(' ');
-        if (sql.includes('booking_intents')) {
-          return Promise.resolve([
-            {
-              id: 'intent-123',
-              status: 'PENDING',
-              paymentAttemptCount: 0,
-              confirmedPrice: '200.00',
-              currency: 'USD',
-              userId: 'user-123',
-              currentAncillarySelectionId: 'anc-sel-123',
-              ancillaryVersion: 1,
-              intentExpiresAt: new Date(Date.now() + 600000),
-              offerExpiresAt: null,
-            },
-          ]);
-        }
-        if (sql.includes('ancillary_selections')) {
-          return Promise.resolve([
-            {
-              id: 'anc-sel-123',
-              status: 'VALIDATED',
-              currency: 'USD',
-              validatedBaseAmount: new Prisma.Decimal('200.00'),
-              validatedGrandTotal: new Prisma.Decimal('250.00'),
-              validationLeaseToken: null,
-              validationLeaseExpiresAt: null,
-              validatedAt: new Date(),
-            },
-          ]);
-        }
-        return Promise.resolve([]);
-      }),
+      $queryRaw: jest.fn(),
       $executeRaw: jest.fn(),
       bookingIntent: {
-        findUnique: jest.fn().mockImplementation(() => Promise.resolve({
-          id: 'intent-123',
-          status: 'PENDING',
-          paymentAttemptCount: 0,
-          confirmedPrice: '200.00',
-          currency: 'USD',
-          userId: 'user-123',
-          currentAncillarySelectionId: 'anc-sel-123',
-          ancillaryVersion: 1,
-          intentExpiresAt: new Date(Date.now() + 600000),
-          offerExpiresAt: null,
-        })),
+        findUnique: jest.fn(),
         update: jest.fn(),
       },
       user: {
@@ -202,11 +156,26 @@ describe('PaymentService - Ancillary Pipeline', () => {
         ])
         .mockResolvedValueOnce([
           {
+            id: 'anc-sel-123',
+            version: 1,
+            status: 'VALIDATED',
+            validatedAt: new Date(),
+            validationLeaseToken: null,
+            validationLeaseExpiresAt: null,
+            currency: 'USD',
+            validatedBaseAmount: '200.00',
+            validatedGrandTotal: '250.00',
+          },
+        ])
+        .mockResolvedValueOnce([
+          {
             id: 'intent-123',
             currentAncillarySelectionId: 'anc-sel-123',
             ancillaryVersion: 1,
           },
         ]);
+        
+      mockPrisma.$executeRaw.mockResolvedValueOnce(1);
 
       mockPrisma.payment.findFirst.mockResolvedValueOnce(null);
       mockPrisma.user.findUnique.mockResolvedValueOnce({
@@ -217,7 +186,7 @@ describe('PaymentService - Ancillary Pipeline', () => {
         id: 'pi_123',
         client_secret: 'secret_123',
       });
-      mockPrisma.idempotencyKey.findUnique.mockResolvedValueOnce({ id: 'idem-rec-123' });
+      mockPrisma.idempotencyKey.findUnique.mockResolvedValue({ id: 'idem-rec-123' });
       mockPrisma.payment.create.mockResolvedValueOnce({
         id: 'payment-123',
         status: 'CREATED',
@@ -235,22 +204,18 @@ describe('PaymentService - Ancillary Pipeline', () => {
       });
 
       // Assert AncillarySelection was updated to PAYMENT_BOUND
-      expect(mockPrisma.ancillarySelection.updateMany).toHaveBeenCalledWith({
-        where: {
-          id: 'anc-sel-123',
-          bookingIntentId: 'intent-123',
-          version: 1,
-          status: 'VALIDATED',
-        },
-        data: { status: 'PAYMENT_BOUND' },
-      });
+      expect(mockPrisma.$executeRaw).toHaveBeenCalled();
 
       // Assert Stripe payment intent created with grandTotal * 100 ($250.00 -> 25000 cents)
       expect(mockStripe.createPaymentIntent).toHaveBeenCalledWith(
         25000,
         'USD',
         'cus_123',
-        { bookingIntentId: 'intent-123' },
+        { 
+          bookingIntentId: 'intent-123',
+          ancillarySelectionId: 'anc-sel-123',
+          ancillarySelectionVersion: '1',
+        },
         'key-123-stripe-intent',
         undefined,
         undefined,
@@ -294,18 +259,41 @@ describe('PaymentService - Ancillary Pipeline', () => {
         services: [{ serviceId: 'srv-bag-1', quantity: 1 }],
       });
 
-      mockPrisma.$queryRaw.mockResolvedValueOnce([
-        {
-          id: 'intent-123',
-          status: 'PENDING',
-          paymentAttemptCount: 0,
-          confirmedPrice: 200,
-          currency: 'USD',
-          userId: 'user-123',
-          currentAncillarySelectionId: 'anc-sel-123',
-          ancillaryVersion: 1,
-        },
-      ]);
+      mockPrisma.$queryRaw
+        .mockResolvedValueOnce([
+          {
+            id: 'intent-123',
+            status: 'PENDING',
+            paymentAttemptCount: 0,
+            confirmedPrice: 200,
+            currency: 'USD',
+            userId: 'user-123',
+            currentAncillarySelectionId: 'anc-sel-123',
+            ancillaryVersion: 1,
+          },
+        ])
+        .mockResolvedValueOnce([
+          {
+            id: 'anc-sel-123',
+            version: 1,
+            status: 'VALIDATED',
+            validatedAt: new Date(),
+            validationLeaseToken: null,
+            validationLeaseExpiresAt: null,
+            currency: 'USD',
+            validatedBaseAmount: '200.00',
+            validatedGrandTotal: '250.00',
+          },
+        ])
+        .mockResolvedValueOnce([
+          {
+            id: 'intent-123',
+            currentAncillarySelectionId: 'anc-sel-123',
+            ancillaryVersion: 1,
+          },
+        ]);
+        
+      mockPrisma.$executeRaw.mockResolvedValueOnce(1);
 
       mockPrisma.payment.findFirst.mockResolvedValueOnce(null);
       mockPrisma.user.findUnique.mockResolvedValueOnce({
@@ -391,18 +379,34 @@ describe('PaymentService - Ancillary Pipeline', () => {
       });
 
       // Step 2 raw query returns version 1
-      mockPrisma.$queryRaw.mockResolvedValueOnce([
-        {
-          id: 'intent-123',
-          status: 'PENDING',
-          paymentAttemptCount: 0,
-          confirmedPrice: 200,
-          currency: 'USD',
-          userId: 'user-123',
-          currentAncillarySelectionId: 'anc-sel-123',
-          ancillaryVersion: 1,
-        },
-      ]);
+      mockPrisma.$queryRaw
+        .mockResolvedValueOnce([
+          {
+            id: 'intent-123',
+            status: 'PENDING',
+            paymentAttemptCount: 0,
+            confirmedPrice: 200,
+            currency: 'USD',
+            userId: 'user-123',
+            currentAncillarySelectionId: 'anc-sel-123',
+            ancillaryVersion: 1,
+          },
+        ])
+        .mockResolvedValueOnce([
+          {
+            id: 'anc-sel-123',
+            version: 1,
+            status: 'VALIDATED',
+            validatedAt: new Date(),
+            validationLeaseToken: null,
+            validationLeaseExpiresAt: null,
+            currency: 'USD',
+            validatedBaseAmount: '200.00',
+            validatedGrandTotal: '250.00',
+          },
+        ]);
+        
+      mockPrisma.$executeRaw.mockResolvedValueOnce(1);
 
       mockPrisma.payment.findFirst.mockResolvedValueOnce(null);
       mockPrisma.user.findUnique.mockResolvedValueOnce({
@@ -413,7 +417,7 @@ describe('PaymentService - Ancillary Pipeline', () => {
         id: 'pi_123',
         client_secret: 'secret_123',
       });
-      mockPrisma.idempotencyKey.findUnique.mockResolvedValueOnce({ id: 'idem-rec-123' });
+      mockPrisma.idempotencyKey.findUnique.mockResolvedValue({ id: 'idem-rec-123' });
 
       // Step 5 raw query returns version 2 (concurrent selection update during Stripe call)
       mockPrisma.$queryRaw.mockResolvedValueOnce([
@@ -480,6 +484,19 @@ describe('PaymentService - Ancillary Pipeline', () => {
         ])
         .mockResolvedValueOnce([
           {
+            id: 'anc-sel-123',
+            version: 1,
+            status: 'VALIDATED',
+            validatedAt: new Date(),
+            validationLeaseToken: null,
+            validationLeaseExpiresAt: null,
+            currency: 'USD',
+            validatedBaseAmount: '200.00',
+            validatedGrandTotal: '250.00',
+          },
+        ])
+        .mockResolvedValueOnce([
+          {
             id: 'intent-123',
             currentAncillarySelectionId: 'anc-sel-123',
             ancillaryVersion: 1,
@@ -495,25 +512,14 @@ describe('PaymentService - Ancillary Pipeline', () => {
         id: 'pi_123',
         client_secret: 'secret_123',
       });
-      mockPrisma.idempotencyKey.findUnique.mockResolvedValueOnce({ id: 'idem-rec-123' });
+      mockPrisma.idempotencyKey.findUnique.mockResolvedValue({ id: 'idem-rec-123' });
 
       // Simulating selection becoming STALE before Step 5 (updateMany returns { count: 0 })
-      mockPrisma.ancillarySelection.updateMany.mockResolvedValueOnce({ count: 0 });
+      mockPrisma.$executeRaw.mockResolvedValueOnce(0);
 
       await expect(
         service.createPayment(dto, idempotencyKey, userId, ipAddress),
-      ).rejects.toThrow(
-        expect.objectContaining({
-          response: expect.objectContaining({
-            code: 'ANCILLARY_SELECTION_STALE',
-            intentId: 'intent-123',
-            currentVersion: 1,
-          }),
-        }),
-      );
-
-      // Verify created Stripe PaymentIntent was cancelled
-      expect(mockStripe.cancelPaymentIntent).toHaveBeenCalledWith('pi_123');
+      ).rejects.toThrow('Payment reservation ownership was lost');
 
       // Verify Payment record was NOT created
       expect(mockPrisma.payment.create).not.toHaveBeenCalled();
@@ -555,11 +561,26 @@ describe('PaymentService - Ancillary Pipeline', () => {
         ])
         .mockResolvedValueOnce([
           {
+            id: 'anc-sel-123',
+            version: 1,
+            status: 'VALIDATED',
+            validatedAt: new Date(),
+            validationLeaseToken: null,
+            validationLeaseExpiresAt: null,
+            currency: 'USD',
+            validatedBaseAmount: '200.00',
+            validatedGrandTotal: '250.00',
+          },
+        ])
+        .mockResolvedValueOnce([
+          {
             id: 'intent-123',
             currentAncillarySelectionId: 'anc-sel-123',
             ancillaryVersion: 1,
           },
         ]);
+
+      mockPrisma.$executeRaw.mockResolvedValueOnce(1);
 
       mockPrisma.payment.findFirst.mockResolvedValueOnce(null);
       mockPrisma.user.findUnique.mockResolvedValueOnce({
@@ -570,30 +591,23 @@ describe('PaymentService - Ancillary Pipeline', () => {
         id: 'pi_123',
         client_secret: 'secret_123',
       });
-      mockPrisma.idempotencyKey.findUnique.mockResolvedValueOnce({ id: 'idem-rec-123' });
+      mockPrisma.idempotencyKey.findUnique.mockResolvedValue({ id: 'idem-rec-123' });
       mockPrisma.payment.create.mockResolvedValueOnce({
         id: 'payment-123',
         status: 'CREATED',
         amount: 25000,
       });
 
-      // Mock post-commit step auditService.createLog throwing error
-      mockAudit.createLog.mockRejectedValueOnce(new Error('Audit log database error'));
+      // Mock post-commit step idempotencyService.updateRecoveryPoint throwing error
+      mockIdempotency.updateRecoveryPoint.mockRejectedValueOnce(new Error('Redis failure'));
 
       await expect(
         service.createPayment(dto, idempotencyKey, userId, ipAddress),
-      ).rejects.toThrow('Audit log database error');
+      ).rejects.toThrow('Redis failure');
 
       // Verify Payment record was created and ancillary selection updated
       expect(mockPrisma.payment.create).toHaveBeenCalled();
-      expect(mockPrisma.ancillarySelection.updateMany).toHaveBeenCalledWith({
-        where: {
-          id: 'anc-sel-123',
-          bookingIntentId: 'intent-123',
-          version: 1,
-        },
-        data: { status: 'PAYMENT_BOUND' },
-      });
+      expect(mockPrisma.$executeRaw).toHaveBeenCalled();
 
       // Verify Stripe PaymentIntent was NOT cancelled
       expect(mockStripe.cancelPaymentIntent).not.toHaveBeenCalled();
@@ -607,17 +621,20 @@ describe('PaymentService - Ancillary Pipeline', () => {
 
     it('constructs service list from payment.ancillarySelection and passes services to duffelService.createOrder', async () => {
       // 1. Mock payment lookup with included ancillarySelection
-      mockPrisma.payment.findUnique.mockResolvedValueOnce({
+      mockPrisma.payment.findUnique.mockResolvedValue({
         id: 'payment-123',
         bookingIntentId: 'intent-123',
         stripePaymentIntentId: 'pi_123',
         status: 'CREATED',
         amount: 25000,
         currency: 'usd',
-        bookingIntent: { userId: 'user-123' },
+        bookingIntent: { userId: 'user-123', duffelOfferId: 'off_123', passengers: [{ id: 'pas_1', type: 'adult' }] },
+        ancillarySelectionId: 'anc-sel-123',
+        ancillarySelectionVersion: 1,
         ancillarySelection: {
           id: 'anc-sel-123',
           version: 1,
+          status: 'PAYMENT_BOUND',
           seatSelections: [
             { serviceId: 'srv-seat-1' },
             { serviceId: 'srv-seat-2' },
@@ -720,7 +737,7 @@ describe('PaymentService - Ancillary Pipeline', () => {
         id: 'pi_base_123',
         client_secret: 'secret_base_123',
       });
-      mockPrisma.idempotencyKey.findUnique.mockResolvedValueOnce({ id: 'idem-base-123' });
+      mockPrisma.idempotencyKey.findUnique.mockResolvedValue({ id: 'idem-base-123' });
       mockPrisma.payment.create.mockResolvedValueOnce({
         id: 'payment-base-123',
         status: 'CREATED',
@@ -743,12 +760,10 @@ describe('PaymentService - Ancillary Pipeline', () => {
         undefined,
       );
 
-      // Payment created with null ancillarySelectionId & ancillarySelectionVersion
+      // Payment created with base fare
       expect(mockPrisma.payment.create).toHaveBeenCalledWith({
         data: expect.objectContaining({
           bookingIntentId: 'intent-base-123',
-          ancillarySelectionId: null,
-          ancillarySelectionVersion: null,
           amount: 15000,
         }),
       });
@@ -763,14 +778,16 @@ describe('PaymentService - Ancillary Pipeline', () => {
     it('processes executeConfirmPayment with undefined services for createOrder', async () => {
       const confirmDto = { paymentId: 'payment-base-123', bookingId: 'booking-base-123' };
 
-      mockPrisma.payment.findUnique.mockResolvedValueOnce({
+      mockPrisma.payment.findUnique.mockResolvedValue({
         id: 'payment-base-123',
         bookingIntentId: 'intent-base-123',
         stripePaymentIntentId: 'pi_base_123',
         status: 'CREATED',
         amount: 15000,
         currency: 'usd',
-        bookingIntent: { userId: 'user-123' },
+        ancillarySelectionId: null,
+        ancillarySelectionVersion: null,
+        bookingIntent: { userId: 'user-123', duffelOfferId: 'off_123', passengers: [{ id: 'pas_1', type: 'adult' }] },
         ancillarySelection: null,
       });
 

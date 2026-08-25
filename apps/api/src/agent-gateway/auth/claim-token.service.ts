@@ -35,9 +35,8 @@ export class ClaimTokenService {
     let payloadStr: string;
     try {
       payloadStr = Buffer.from(payloadPart, 'base64url').toString('utf8');
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : String(err);
-      this.logger.warn(`Failed to base64url-decode payload: ${msg}`);
+    } catch {
+      this.logger.warn('Failed to base64url-decode claim token payload');
       throw new UnauthorizedException({
         statusCode: 401,
         message: 'Invalid claim token encoding',
@@ -48,9 +47,8 @@ export class ClaimTokenService {
     let payload: ClaimTokenPayload;
     try {
       payload = JSON.parse(payloadStr);
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : String(err);
-      this.logger.warn(`Failed to parse payload JSON: ${msg}`);
+    } catch {
+      this.logger.warn('Failed to parse claim token payload JSON');
       throw new UnauthorizedException({
         statusCode: 401,
         message: 'Invalid claim token JSON',
@@ -67,8 +65,16 @@ export class ClaimTokenService {
       });
     }
 
-    const secret = process.env.CLAIM_TOKEN_SECRET;
-    if (!secret) {
+    // Support candidate key ring
+    const candidateSecrets = [
+      process.env.CLAIM_TOKEN_SECRET_CURRENT,
+      process.env.CLAIM_TOKEN_SECRET,
+      process.env.CLAIM_TOKEN_SECRET_PREVIOUS,
+      process.env.CLAIM_TOKEN_SECRET_V2,
+      process.env.CLAIM_TOKEN_SECRET_V1,
+    ].filter((k): k is string => typeof k === 'string' && k.trim().length > 0);
+
+    if (candidateSecrets.length === 0) {
       this.logger.error('CLAIM_TOKEN_SECRET environment variable is not configured');
       throw new UnauthorizedException({
         statusCode: 401,
@@ -77,18 +83,11 @@ export class ClaimTokenService {
       });
     }
 
-    // Recompute HMAC-SHA256 signature
-    const computedSignature = crypto
-      .createHmac('sha256', secret)
-      .update(payloadStr)
-      .digest();
-
     let signatureBuffer: Buffer;
     try {
       signatureBuffer = Buffer.from(signaturePart, 'base64url');
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : String(err);
-      this.logger.warn(`Failed to base64url-decode signature: ${msg}`);
+    } catch {
+      this.logger.warn('Failed to base64url-decode claim token signature');
       throw new UnauthorizedException({
         statusCode: 401,
         message: 'Invalid claim token signature encoding',
@@ -96,17 +95,20 @@ export class ClaimTokenService {
       });
     }
 
-    if (signatureBuffer.length !== computedSignature.length) {
-      crypto.timingSafeEqual(computedSignature, computedSignature); // dummy check
-      this.logger.warn('Claim token signature length mismatch');
-      throw new UnauthorizedException({
-        statusCode: 401,
-        message: 'Invalid claim token signature',
-        code: 'INVALID_CLAIM_TOKEN',
-      });
+    let isSignatureValid = false;
+    for (const secret of candidateSecrets) {
+      const computedSignature = crypto
+        .createHmac('sha256', secret)
+        .update(payloadStr)
+        .digest();
+
+      if (signatureBuffer.length === computedSignature.length && crypto.timingSafeEqual(signatureBuffer, computedSignature)) {
+        isSignatureValid = true;
+        break;
+      }
     }
 
-    if (!crypto.timingSafeEqual(signatureBuffer, computedSignature)) {
+    if (!isSignatureValid) {
       this.logger.warn('Claim token signature mismatch');
       throw new UnauthorizedException({
         statusCode: 401,
@@ -135,7 +137,7 @@ export class ClaimTokenService {
     });
 
     if (!user) {
-      this.logger.warn(`User ${payload.userId} not found in database`);
+      this.logger.warn('User not found in database for claim token');
       throw new ForbiddenException({
         statusCode: 403,
         message: 'User not found',
@@ -144,7 +146,7 @@ export class ClaimTokenService {
     }
 
     if (user.status !== 'ACTIVE') {
-      this.logger.warn(`User ${payload.userId} is inactive (status: ${user.status})`);
+      this.logger.warn(`User account is inactive for claim token (status: ${user.status})`);
       throw new ForbiddenException({
         statusCode: 403,
         message: 'User account is inactive',

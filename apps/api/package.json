@@ -3,17 +3,20 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "build": "pnpm --filter @shared/types build && nest build",
+    "build": "pnpm --filter @shared/types build && prisma generate && nest build",
     "dev": "pnpm start:dev",
     "start": "nest start",
-    "start:dev": "pnpm --filter @shared/types build && nest start --watch",
-    "start:debug": "pnpm --filter @shared/types build && nest start --debug --watch",
+    "start:dev": "pnpm --filter @shared/types build && prisma generate && nest start --watch",
+    "start:debug": "pnpm --filter @shared/types build && prisma generate && nest start --debug --watch",
     "start:prod": "node dist/main",
+    "lint": "eslint \"src/**/*.ts\" \"../../packages/shared/**/*.ts\" --max-warnings 0",
     "test": "jest",
+    "test:ci": "jest --config ./jest.config.json --runInBand",
     "test:watch": "jest --watch",
     "test:cov": "jest --coverage",
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
-    "test:e2e": "jest --config ./test/jest-e2e.json --runInBand"
+    "test:e2e": "jest --config ./test/jest-e2e.json --runInBand",
+    "test:e2e:performance": "jest --config ./test/jest-e2e-performance.json --runInBand"
   },
   "dependencies": {
     "@duffel/api": "^4.28.0",
@@ -31,6 +34,7 @@
     "bcrypt": "^5.1.1",
     "class-transformer": "^0.5.1",
     "class-validator": "^0.14.1",
+    "express": "^4.22.1",
     "ioredis": "^5.4.1",
     "langchain": "^0.2.2",
     "langsmith": "^0.1.68",

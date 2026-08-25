@@ -22,13 +22,14 @@ import { ConfirmPaymentDto } from '@/payment/dto/confirm-payment.dto';
 import { PaymentResponseDto } from '@/payment/dto/payment-response.dto';
 import { enforceTransition } from '@/payment/payment-state-machine';
 import * as crypto from 'crypto';
-import { Prisma, BookingFailureReason, AncillarySelectionStatus } from '@prisma/client';
+import { Prisma, BookingFailureReason } from '@prisma/client';
 
 import { BookingService } from '@/booking/booking.service';
 import { forwardRef, Inject } from '@nestjs/common';
 import { FlightSnapshot, PassengerSnapshot } from '@shared/booking-types';
 import { AncillaryPaymentValidationService } from '@/payment/ancillary-payment-validation.service';
 import type { ValidatedAncillaryPayment } from '@/payment/ancillary-payment-validation.service';
+import { BookingPassengerFinalValidatorService } from '@/booking-intent/booking-passenger-final-validator.service';
 
 function majorUnitsToMinorBigInt(amount: string): bigint {
   const match = /^(\d+)(?:\.(\d{1,2}))?$/.exec(amount);
@@ -64,7 +65,7 @@ function authoritativeAmountsEqual(
   }
 }
 
-function canonicalOrderServices(selection: {
+function _canonicalOrderServices(selection: {
   seatSelections: Array<{ serviceId: string }>;
   baggageSelections: Array<{ serviceId: string; quantity: number }>;
 }): Array<{ id: string; quantity: number }> {
@@ -228,7 +229,10 @@ export class PaymentService {
     private readonly paymentMethodService: PaymentMethodService,
     @Inject(forwardRef(() => BookingService))
     private readonly bookingService: BookingService,
+    @Optional()
     private readonly ancillaryPaymentValidation?: AncillaryPaymentValidationService,
+    @Optional()
+    private readonly bookingPassengerFinalValidator?: BookingPassengerFinalValidatorService,
   ) {}
 
   /**
@@ -239,16 +243,7 @@ export class PaymentService {
     idempotencyKey: string,
     userId: string,
     ipAddress: string,
-    traceId?: string,
-    correlationId?: string,
   ): Promise<PaymentResponseDto> {
-    if (dto.ancillarySelectionId !== undefined && process.env.FEATURE_FLAG_ANCILLARY_PAYMENT === 'false') {
-      throw new BadRequestException({
-        code: 'ANCILLARY_PAYMENT_DISABLED',
-        message: 'Ancillary checkout is currently disabled',
-      });
-    }
-
     let paymentIntent: Awaited<ReturnType<StripeService['createPaymentIntent']>> | undefined = undefined;
     let paymentRecord: unknown = null;
     try {
@@ -327,7 +322,7 @@ export class PaymentService {
               bookingIntentId: dto.bookingIntentId,
               ancillarySelectionId: dto.ancillarySelectionId,
               ancillarySelectionVersion: dto.ancillarySelectionVersion,
-            }, traceId, correlationId);
+            });
           }
         }
       }
@@ -389,9 +384,7 @@ export class PaymentService {
         throw new BadRequestException('Booking intent is not in an allowed status for payment');
       }
 
-      if (intent.paymentAttemptCount >= 2) {
-        throw new BadRequestException('Payment attempts exhausted');
-      }
+
 
       const targetAncillarySelectionId = dto.ancillarySelectionId || intent.currentAncillarySelectionId;
       const targetAncillarySelectionVersion = dto.ancillarySelectionVersion ?? intent.ancillaryVersion;
@@ -411,18 +404,22 @@ export class PaymentService {
           validatedAncillary.selectionVersion === targetAncillarySelectionVersion
         ) {
           validated = validatedAncillary;
-        } else {
+        } else if (!boundPaymentReplay) {
           if (!this.ancillaryPaymentValidation) {
-            throw new InternalServerErrorException('Ancillary payment validation is unavailable');
+            throw new BadRequestException('Ancillary payment validation service is not available');
           }
           validated = await this.ancillaryPaymentValidation.validateForPayment({
             userId,
             bookingIntentId: dto.bookingIntentId,
             ancillarySelectionId: targetAncillarySelectionId,
             ancillarySelectionVersion: targetAncillarySelectionVersion,
-          }, traceId, correlationId);
+          });
         }
-        amountInCents = Math.round(Number(validated.grandTotal) * 100);
+        if (validated) {
+          amountInCents = Math.round(Number(validated.grandTotal) * 100);
+        } else {
+          amountInCents = 0; // Will be set from existing payment
+        }
       } else {
         amountInCents = Math.round(Number(intent.confirmedPrice) * 100);
       }
@@ -834,24 +831,6 @@ export class PaymentService {
             },
           });
 
-          await this.auditService.createLog(tx, {
-            userId,
-            action: 'ancillary_payment_bound',
-            resourceType: 'Payment',
-            resourceId: created.id,
-            ipAddress,
-            traceId,
-            correlationId,
-            metadata: {
-              bookingIntentId: dto.bookingIntentId,
-              ancillarySelectionId: validatedAncillary.selectionId,
-              ancillarySelectionVersion: validatedAncillary.selectionVersion,
-              paymentId: created.id,
-              amount: amountInCents,
-              currency: result.currency.toLowerCase(),
-            },
-          });
-
           return created;
         });
       } else if ('payment' in result && result.payment) {
@@ -955,11 +934,17 @@ export class PaymentService {
     dto: ConfirmPaymentDto,
     idempotencyKey: string,
     userId: string,
+    traceContext?: { traceId?: string; correlationId?: string },
   ): Promise<unknown> {
     let isFinished = false;
     const confirmPromise = (async () => {
       try {
-        const result = await this.executeConfirmPayment(dto, idempotencyKey, userId);
+        const result = await this.executeConfirmPayment(
+          dto,
+          idempotencyKey,
+          userId,
+          traceContext,
+        );
         isFinished = true;
         return result;
       } catch (error) {
@@ -1007,6 +992,7 @@ export class PaymentService {
     dto: ConfirmPaymentDto,
     idempotencyKey: string,
     userId: string,
+    traceContext?: { traceId?: string; correlationId?: string },
   ): Promise<unknown> {
     try {
       // 1. Check/acquire the request idempotency key
@@ -1048,6 +1034,15 @@ export class PaymentService {
         throw new ForbiddenException('You do not own this payment');
       }
 
+      if (dto.bookingId && typeof this.prisma.booking?.findUnique === 'function') {
+        const requestedBooking = await this.prisma.booking.findUnique({
+          where: { id: dto.bookingId },
+        });
+        if (requestedBooking && requestedBooking.userId !== userId) {
+          throw new ForbiddenException('You do not own this booking');
+        }
+      }
+
       // 3. Create canonical booking in PROCESSING state
       const canonicalBooking = await this.bookingService.createBooking(
         userId,
@@ -1062,22 +1057,8 @@ export class PaymentService {
 
       // 4. Resume from recovery point
       let recoveryPoint = await this.idempotencyService.getResumePoint(idempotencyKey);
-      const isRecovered = recoveryPoint && recoveryPoint !== 'started';
       if (!recoveryPoint) {
         recoveryPoint = 'started';
-      }
-      if (isRecovered) {
-        await this.auditService.createLog(this.prisma, {
-          userId,
-          action: 'payment_recovery_resumed',
-          resourceType: 'Payment',
-          resourceId: payment.id,
-          metadata: {
-            paymentId: payment.id,
-            recoveryPoint,
-            idempotencyKey,
-          },
-        });
       }
 
       if (recoveryPoint === 'completed') {
@@ -1204,9 +1185,150 @@ export class PaymentService {
         }
         const services: Array<{ id: string; quantity: number }> = Array.from(
           servicesMap.entries(),
-        )
-          .sort(([left], [right]) => left.localeCompare(right))
-          .map(([id, quantity]) => ({ id, quantity }));
+        ).map(([id, quantity]) => ({ id, quantity }));
+
+        let passengersToOrder: unknown[];
+        if (this.bookingPassengerFinalValidator) {
+          try {
+            const ephemeralPassengers =
+              this.bookingPassengerFinalValidator.validateAndMapPassengers(
+                bookingIntent,
+                {
+                  traceId: traceContext?.traceId,
+                  correlationId: traceContext?.correlationId,
+                },
+              );
+            passengersToOrder = ephemeralPassengers;
+
+            await this.auditService.createLog(this.prisma, {
+              userId,
+              action: 'final_passenger_validation_succeeded',
+              resourceType: 'BookingIntent',
+              resourceId: bookingIntent.id,
+              metadata: {
+                paymentId: payment.id,
+                passengerCount: bookingIntent.passengers.length,
+              },
+              traceId: traceContext?.traceId,
+              correlationId: traceContext?.correlationId,
+            });
+          } catch (validationError: unknown) {
+            const error = validationError as Error;
+            const responseObj =
+              validationError instanceof HttpException
+                ? (validationError.getResponse() as Record<string, unknown> | string)
+                : null;
+            const reasonCode =
+              typeof responseObj === 'object' && responseObj !== null && 'code' in responseObj
+                ? (responseObj as { code: string }).code
+                : 'FINAL_PASSENGER_VALIDATION_FAILED';
+            const status =
+              validationError instanceof HttpException
+                ? validationError.getStatus()
+                : HttpStatus.UNPROCESSABLE_ENTITY;
+
+            this.logger.error(
+              `Final passenger validation failed for booking intent ${bookingIntent.id}: ${error.message}`,
+              error.stack,
+            );
+
+            await this.auditService.createLog(this.prisma, {
+              userId,
+              action: 'final_passenger_validation_failed',
+              resourceType: 'BookingIntent',
+              resourceId: bookingIntent.id,
+              metadata: {
+                reasonCode,
+                intentId: bookingIntent.id,
+                paymentId: payment.id,
+                passengerCount: bookingIntent.passengers.length,
+              },
+              traceId: traceContext?.traceId,
+              correlationId: traceContext?.correlationId,
+            });
+
+            // Void / cancel Stripe authorization hold via this.stripeService.cancelPaymentIntent(payment.stripePaymentIntentId)
+            try {
+              await this.stripeService.cancelPaymentIntent(payment.stripePaymentIntentId);
+            } catch (stripeCancelError: unknown) {
+              const stripeError = stripeCancelError as Error;
+              this.logger.error(
+                `Stripe cancelPaymentIntent failed after passenger validation error: ${stripeError.message}`,
+                stripeError.stack,
+              );
+            }
+
+            // Update Payment, BookingIntent, and Booking status atomically
+            enforceTransition(payment.status, 'CANCELLED');
+            const nextBookingStatus =
+              bookingIntent.paymentAttemptCount < 2 ? 'AWAITING_PAYMENT' : 'CANCELLED';
+            await this.prisma.$transaction(async (tx) => {
+              await tx.payment.update({
+                where: { id: payment.id },
+                data: { status: 'CANCELLED' },
+              });
+              await tx.paymentEvent.create({
+                data: {
+                  paymentId: payment.id,
+                  eventType: 'payment_cancelled',
+                  previousStatus: payment.status,
+                  newStatus: 'CANCELLED',
+                  amount: payment.amount,
+                  source: 'API',
+                  createdBy: userId,
+                },
+              });
+              await tx.bookingIntent.update({
+                where: { id: bookingIntent.id },
+                data: { status: nextBookingStatus },
+              });
+              await this.bookingService.updateToFailed(
+                canonicalBooking.id,
+                BookingFailureReason.SYSTEM_ERROR,
+                undefined,
+                undefined,
+                undefined,
+                tx,
+              );
+            });
+
+            // Update recovery point to completed and complete idempotency key
+            await this.idempotencyService.updateRecoveryPoint(idempotencyKey, 'completed');
+            const failureResponse = {
+              success: false,
+              error: `Passenger validation failed: ${typeof responseObj === 'object' && responseObj !== null && 'message' in responseObj ? responseObj.message : error.message || 'Validation failed'}. Payment hold released.`,
+              code: reasonCode,
+              bookingStatus: nextBookingStatus,
+            };
+            await this.idempotencyService.completeKey(
+              idempotencyKey,
+              status,
+              failureResponse,
+            );
+
+            throw new HttpException(failureResponse, status);
+          }
+        } else {
+          passengersToOrder = bookingIntent.passengers.map((p) => {
+            const mapped: any = { ...p };
+            if (p.title) {
+              mapped.title = p.title;
+            } else {
+              delete mapped.title;
+            }
+            if (p.email) {
+              mapped.email = p.email;
+            } else {
+              delete mapped.email;
+            }
+            if (p.phoneNumber) {
+              mapped.phoneNumber = p.phoneNumber;
+            } else {
+              delete mapped.phoneNumber;
+            }
+            return mapped;
+          });
+        }
 
         let duffelOrder: unknown;
         try {
@@ -1247,7 +1369,7 @@ export class PaymentService {
           }
           duffelOrder = await this.duffelService.createOrder(
             bookingIntent.duffelOfferId,
-            bookingIntent.passengers,
+            passengersToOrder as any,
             services.length > 0 ? services : undefined,
             { bookingIntentId: bookingIntent.id, paymentId: payment.id },
             idempotencyKey,
@@ -1306,6 +1428,7 @@ export class PaymentService {
           };
           await this.idempotencyService.completeKey(idempotencyKey, HttpStatus.BAD_GATEWAY, failureResponse);
 
+          console.error('THROWN ERROR:', failureResponse.error);
           throw new HttpException(failureResponse, HttpStatus.BAD_GATEWAY);
         }
 
@@ -1393,77 +1516,21 @@ export class PaymentService {
             const duffelOrder = duffelEvent?.metadata as Record<string, unknown> | null;
             duffelOrderId = duffelOrder?.id as string | undefined;
 
-            await this.auditService.createLog(this.prisma, {
-              userId,
-              action: 'payment_compensation_started',
-              resourceType: 'Payment',
-              resourceId: payment.id,
-              metadata: {
-                paymentId: payment.id,
-                bookingIntentId: payment.bookingIntentId,
-                duffelOrderId,
-                stripePaymentIntentId: payment.stripePaymentIntentId,
-              },
-            });
-
-            let duffelCancelSuccess = true;
-            let stripeCancelSuccess = true;
-            let duffelCancelErrorMsg: string | undefined;
-            let stripeCancelErrorMsg: string | undefined;
-
             if (duffelOrderId) {
-              try {
-                await this.duffelService.cancelOrder(duffelOrderId);
-                this.logger.log(`Successfully cancelled Duffel order ${duffelOrderId} as compensation.`);
-              } catch (cancelError: unknown) {
-                duffelCancelSuccess = false;
-                const err = cancelError as Error;
-                duffelCancelErrorMsg = err.message;
-                this.logger.error(`Duffel order cancellation failed during compensation: ${err.message}`, err.stack);
-              }
+              await this.duffelService.cancelOrder(duffelOrderId);
+              this.logger.log(`Successfully cancelled Duffel order ${duffelOrderId} as compensation.`);
             }
+          } catch (cancelError: unknown) {
+            const err = cancelError as Error;
+            this.logger.error(`Duffel order cancellation failed during compensation: ${err.message}`, err.stack);
+          }
 
-            // Release the Stripe authorization hold (cancel intent)
-            try {
-              await this.stripeService.cancelPaymentIntent(payment.stripePaymentIntentId);
-            } catch (stripeCancelError: unknown) {
-              stripeCancelSuccess = false;
-              const stripeError = stripeCancelError as Error;
-              stripeCancelErrorMsg = stripeError.message;
-              this.logger.error(`Stripe cancelPaymentIntent failed during compensation: ${stripeError.message}`, stripeError.stack);
-            }
-
-            if (duffelCancelSuccess && stripeCancelSuccess) {
-              await this.auditService.createLog(this.prisma, {
-                userId,
-                action: 'payment_compensation_succeeded',
-                resourceType: 'Payment',
-                resourceId: payment.id,
-                metadata: {
-                  paymentId: payment.id,
-                  bookingIntentId: payment.bookingIntentId,
-                  duffelOrderId,
-                  stripePaymentIntentId: payment.stripePaymentIntentId,
-                },
-              });
-            } else {
-              await this.auditService.createLog(this.prisma, {
-                userId,
-                action: 'payment_compensation_failed',
-                resourceType: 'Payment',
-                resourceId: payment.id,
-                metadata: {
-                  paymentId: payment.id,
-                  bookingIntentId: payment.bookingIntentId,
-                  duffelOrderId,
-                  stripePaymentIntentId: payment.stripePaymentIntentId,
-                  duffelCancelError: duffelCancelErrorMsg,
-                  stripeCancelError: stripeCancelErrorMsg,
-                },
-              });
-            }
-          } catch (compErr: any) {
-            this.logger.error(`Payment compensation logic failed: ${compErr.message}`, compErr.stack);
+          // Release the Stripe authorization hold (cancel intent)
+          try {
+            await this.stripeService.cancelPaymentIntent(payment.stripePaymentIntentId);
+          } catch (stripeCancelError: unknown) {
+            const stripeError = stripeCancelError as Error;
+            this.logger.error(`Stripe cancelPaymentIntent failed during compensation: ${stripeError.message}`, stripeError.stack);
           }
 
           // Update BookingIntent status
@@ -1691,21 +1758,6 @@ export class PaymentService {
         }
 
         await this.idempotencyService.updateRecoveryPoint(idempotencyKey, 'completed');
-
-        if (isRecovered) {
-          await this.auditService.createLog(this.prisma, {
-            userId,
-            action: 'payment_recovery_succeeded',
-            resourceType: 'Payment',
-            resourceId: payment.id,
-            metadata: {
-              paymentId: payment.id,
-              bookingReference: duffelOrder.booking_reference as string,
-              duffelOrderId: duffelOrder.id as string,
-              idempotencyKey,
-            },
-          });
-        }
 
         const successResponse = {
           success: true,

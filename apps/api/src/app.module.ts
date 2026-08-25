@@ -16,6 +16,10 @@ import { BookingModule } from './booking/booking.module';
 import { PaymentModule } from './payment/payment.module';
 import { DisruptionModule } from './disruption/disruption.module';
 import { AncillariesModule } from './ancillaries/ancillaries.module';
+import { ProfileModule } from './profile/profile.module';
+import { ChatHandoffModule } from './chat-handoff/chat-handoff.module';
+import { DataDriftSentinelModule } from './common/sentinel/data-drift-sentinel.module';
+import { BookingReadinessMetricsModule } from './common/observability/booking-readiness-metrics.module';
 
 import { z } from 'zod';
 
@@ -33,14 +37,29 @@ export const envSchema = z.object({
   ENCRYPTION_KEY: z.string().optional(),
   DUFFEL_WEBHOOK_SECRET: z.string().optional(),
   FEATURE_FLAG_DISRUPTION_INGRESS: z.string().optional().default('false'),
+  FEATURE_FLAG_BOOKING_READINESS: z.string().optional().default('false'),
   FEATURE_FLAG_DISRUPTION_PROCESSOR: z.string().optional().default('false'),
   FEATURE_FLAG_DISRUPTION_RECONCILIATION: z.string().optional().default('false'),
   FEATURE_FLAG_DISRUPTION_SURFACING: z.string().optional().default('false'),
   FEATURE_FLAG_DISRUPTION_OUTBOX: z.string().optional().default('false'),
-  FEATURE_FLAG_ANCILLARY_CATALOG: z.string().optional().default('true'),
-  FEATURE_FLAG_ANCILLARY_COMMIT: z.string().optional().default('true'),
-  FEATURE_FLAG_ANCILLARY_PAYMENT: z.string().optional().default('true'),
-}).passthrough();
+  FEATURE_FLAG_CHAT_HANDOFF_ACCEPT: z.string().optional().default('false'),
+  FEATURE_FLAG_CHAT_HANDOFF_ISSUE: z.string().optional().default('false'),
+  FEATURE_FLAG_WRITE_FENCE: z.string().optional().default('false'),
+  CHAT_ENCRYPTION_KEY: z.string().optional(),
+  CHAT_ATTESTATION_KEY: z.string().optional(),
+  CHAT_HANDOFF_SECRET: z.string().optional(),
+  CHAT_HANDOFF_SECRET_V1: z.string().optional(),
+  CHAT_HANDOFF_SECRET_V2: z.string().optional(),
+  CHAT_HANDOFF_SECRET_V3: z.string().optional(),
+  CHAT_HANDOFF_CLAIM_TTL: z.coerce.number().optional().default(600),
+}).passthrough().refine(data => {
+  if (data.FEATURE_FLAG_CHAT_HANDOFF_ISSUE === 'true' && data.FEATURE_FLAG_CHAT_HANDOFF_ACCEPT !== 'true') {
+    return false;
+  }
+  return true;
+}, {
+  message: "Invalid config: ISSUE=true but ACCEPT=false",
+});
 
 @Module({
   imports: [
@@ -64,6 +83,10 @@ export const envSchema = z.object({
     PaymentModule,
     DisruptionModule,
     AncillariesModule,
+    ProfileModule,
+    ChatHandoffModule,
+    DataDriftSentinelModule,
+    BookingReadinessMetricsModule,
   ],
   controllers: [],
   providers: [],

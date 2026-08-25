@@ -52,18 +52,32 @@ describe('Payment (E2E)', () => {
 
   beforeEach(async () => {
     // Clean tables in FK-dependency order
+    await prisma.chatHandoff.deleteMany({});
+    await prisma.chatSession.deleteMany({});
     await prisma.paymentEvent.deleteMany({});
     await prisma.ledgerEntry.deleteMany({});
     await prisma.refund.deleteMany({});
     await prisma.payment.deleteMany({});
     await prisma.idempotencyKey.deleteMany({});
     await prisma.paymentMethod.deleteMany({});
+    await prisma.chatHandoff.deleteMany({});
+    await prisma.chatMessage.deleteMany({});
+    await prisma.chatSession.deleteMany({});
     await prisma.bookingIntentPassenger.deleteMany({});
     await prisma.bookingIntent.deleteMany({});
+    await prisma.itineraryRevisionSegment.deleteMany({});
+    await prisma.itineraryRevision.deleteMany({});
+    await prisma.disruptionAuditEvent.deleteMany({});
+    await prisma.notificationOutbox.deleteMany({});
+    await prisma.booking.deleteMany({});
     await prisma.travelerProfile.deleteMany({});
+    await prisma.offerRecovery.deleteMany({});
     await prisma.flightOffer.deleteMany({});
+    await prisma.searchHistory.deleteMany({});
+    await prisma.airport.deleteMany({});
     await prisma.auditLog.deleteMany({});
     await prisma.user.deleteMany({});
+
 
     // Create test users
     const uA = await prisma.user.create({
@@ -506,3 +520,5 @@ describe('Payment (E2E)', () => {
     });
   });
 });
+
+

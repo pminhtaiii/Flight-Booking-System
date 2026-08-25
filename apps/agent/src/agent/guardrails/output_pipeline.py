@@ -1,28 +1,40 @@
-import tiktoken
 import asyncio
-import time
-import logging
 import json
+import logging
+import time
 from datetime import datetime, timezone
 from typing import AsyncGenerator, Tuple
-from agent.streaming.chunk_buffer import ChunkBuffer
+
+import tiktoken
+
 from agent.guardrails.base import GuardrailService
 from agent.sanitization.pii_scrubber import detect_pii
+from agent.streaming.chunk_buffer import ChunkBuffer
+
 
 class OutputGuardrailBlockedError(Exception):
     """
     Raised when an output chunk fails safety validation.
     """
-    def __init__(self, partial_response: str, layer: str, rule: str, message: str = "Response was blocked for safety reasons."):
+
+    def __init__(
+        self,
+        partial_response: str,
+        layer: str,
+        rule: str,
+        message: str = "Response was blocked for safety reasons.",
+    ):
         self.partial_response = partial_response
         self.layer = layer
         self.rule = rule
         super().__init__(message)
 
+
 class OutputGuardrailPipeline:
     """
     Orchestrates output safety validation using a layered pipeline.
     """
+
     def __init__(self, config, nemo_service: GuardrailService, session_id: str = None):
         self.config = config
         self.nemo_service = nemo_service
@@ -38,16 +50,22 @@ class OutputGuardrailPipeline:
         except Exception:
             self.encoding = None
 
-    def _log_sync_check(self, layer: str, verdict: str, latency_ms: float, chunk_index: int) -> None:
+    def _log_sync_check(
+        self, layer: str, verdict: str, latency_ms: float, chunk_index: int
+    ) -> None:
         logger = logging.getLogger("agent.guardrails")
-        logger.info(json.dumps({
-            "timestamp": datetime.now(timezone.utc).isoformat(),
-            "session_id": self.session_id,
-            "chunk_index": chunk_index,
-            "layer": layer,
-            "verdict": verdict,
-            "latency_ms": round(latency_ms, 2)
-        }))
+        logger.info(
+            json.dumps(
+                {
+                    "timestamp": datetime.now(timezone.utc).isoformat(),
+                    "session_id": self.session_id,
+                    "chunk_index": chunk_index,
+                    "layer": layer,
+                    "verdict": verdict,
+                    "latency_ms": round(latency_ms, 2),
+                }
+            )
+        )
 
     async def _validate_chunk_async_wrapper(self, chunk: str, chunk_index: int) -> Tuple[bool, str]:
         start_time = time.perf_counter()
@@ -62,14 +80,18 @@ class OutputGuardrailPipeline:
             latency_ms = (time.perf_counter() - start_time) * 1000.0
             verdict = "pass" if is_safe else "fail"
             logger = logging.getLogger("agent.guardrails")
-            logger.info(json.dumps({
-                "timestamp": datetime.now(timezone.utc).isoformat(),
-                "session_id": self.session_id,
-                "chunk_index": chunk_index,
-                "layer": "nemo",
-                "verdict": verdict,
-                "latency_ms": round(latency_ms, 2)
-            }))
+            logger.info(
+                json.dumps(
+                    {
+                        "timestamp": datetime.now(timezone.utc).isoformat(),
+                        "session_id": self.session_id,
+                        "chunk_index": chunk_index,
+                        "layer": "nemo",
+                        "verdict": verdict,
+                        "latency_ms": round(latency_ms, 2),
+                    }
+                )
+            )
         return is_safe, reason
 
     def _check_boundary_pii(self, chunk: str, context: str = None) -> None:
@@ -85,7 +107,11 @@ class OutputGuardrailPipeline:
         if self.encoding:
             try:
                 prev_tokens = self.encoding.encode(boundary_context)
-                tail_tokens = prev_tokens[-self.overlap_tokens:] if len(prev_tokens) > self.overlap_tokens else prev_tokens
+                tail_tokens = (
+                    prev_tokens[-self.overlap_tokens :]
+                    if len(prev_tokens) > self.overlap_tokens
+                    else prev_tokens
+                )
                 tail_text = self.encoding.decode(tail_tokens)
             except Exception:
                 char_limit = self.overlap_tokens * 4
@@ -98,7 +124,7 @@ class OutputGuardrailPipeline:
         if self.encoding:
             try:
                 curr_tokens = self.encoding.encode(chunk)
-                head_tokens = curr_tokens[:self.overlap_tokens]
+                head_tokens = curr_tokens[: self.overlap_tokens]
                 head_text = self.encoding.decode(head_tokens)
             except Exception:
                 char_limit = self.overlap_tokens * 4
@@ -113,7 +139,7 @@ class OutputGuardrailPipeline:
                 partial_response=self.partial_response,
                 layer="boundary",
                 rule="PII detection",
-                message="Output safety violation: PII detected."
+                message="Output safety violation: PII detected.",
             )
 
     async def process_token(self, token: str) -> AsyncGenerator[str, None]:
@@ -138,7 +164,7 @@ class OutputGuardrailPipeline:
                             partial_response=self.partial_response,
                             layer="nemo",
                             rule=reason or "Output safety violation.",
-                            message=reason or "Output safety violation."
+                            message=reason or "Output safety violation.",
                         )
                 except OutputGuardrailBlockedError:
                     raise
@@ -147,7 +173,7 @@ class OutputGuardrailPipeline:
                         partial_response=self.partial_response,
                         layer="nemo",
                         rule="Safety check unavailable.",
-                        message="Safety check unavailable."
+                        message="Safety check unavailable.",
                     ) from e
                 self.partial_response += self.pending_chunk
                 yield self.pending_chunk
@@ -169,7 +195,7 @@ class OutputGuardrailPipeline:
                     layer="boundary",
                     verdict="pass" if boundary_passed else "fail",
                     latency_ms=latency_boundary,
-                    chunk_index=chunk_idx
+                    chunk_index=chunk_idx,
                 )
 
             # Regex check
@@ -180,7 +206,7 @@ class OutputGuardrailPipeline:
                 layer="regex",
                 verdict="pass" if regex_passed else "fail",
                 latency_ms=latency_regex,
-                chunk_index=chunk_idx
+                chunk_index=chunk_idx,
             )
 
             if not regex_passed:
@@ -188,7 +214,7 @@ class OutputGuardrailPipeline:
                     partial_response=self.partial_response,
                     layer="regex",
                     rule="PII detection",
-                    message="Output safety violation: PII detected."
+                    message="Output safety violation: PII detected.",
                 )
 
             if not self.nemo_service:
@@ -196,7 +222,7 @@ class OutputGuardrailPipeline:
                     partial_response=self.partial_response,
                     layer="nemo",
                     rule="Safety check unavailable.",
-                    message="Safety check unavailable."
+                    message="Safety check unavailable.",
                 )
 
             # If it is the first chunk, validate it immediately (unavoidable latency)
@@ -210,7 +236,7 @@ class OutputGuardrailPipeline:
                         partial_response=self.partial_response,
                         layer="nemo",
                         rule="Safety check unavailable.",
-                        message="Safety check unavailable."
+                        message="Safety check unavailable.",
                     ) from e
                 finally:
                     latency_nemo = (time.perf_counter() - start_nemo) * 1000.0
@@ -218,14 +244,14 @@ class OutputGuardrailPipeline:
                         layer="nemo",
                         verdict="pass" if is_safe else "fail",
                         latency_ms=latency_nemo,
-                        chunk_index=chunk_idx
+                        chunk_index=chunk_idx,
                     )
                 if not is_safe:
                     raise OutputGuardrailBlockedError(
                         partial_response=self.partial_response,
                         layer="nemo",
                         rule=reason or "Output safety violation.",
-                        message=reason or "Output safety violation."
+                        message=reason or "Output safety violation.",
                     )
                 self.partial_response += chunk
                 yield chunk
@@ -257,7 +283,7 @@ class OutputGuardrailPipeline:
                             partial_response=self.partial_response,
                             layer="nemo",
                             rule=reason or "Output safety violation.",
-                            message=reason or "Output safety violation."
+                            message=reason or "Output safety violation.",
                         )
                 except OutputGuardrailBlockedError:
                     raise
@@ -266,7 +292,7 @@ class OutputGuardrailPipeline:
                         partial_response=self.partial_response,
                         layer="nemo",
                         rule="Safety check unavailable.",
-                        message="Safety check unavailable."
+                        message="Safety check unavailable.",
                     ) from e
                 self.partial_response += self.pending_chunk
                 yield self.pending_chunk
@@ -288,7 +314,7 @@ class OutputGuardrailPipeline:
                     layer="boundary",
                     verdict="pass" if boundary_passed else "fail",
                     latency_ms=latency_boundary,
-                    chunk_index=chunk_idx
+                    chunk_index=chunk_idx,
                 )
 
             # Regex check
@@ -299,7 +325,7 @@ class OutputGuardrailPipeline:
                 layer="regex",
                 verdict="pass" if regex_passed else "fail",
                 latency_ms=latency_regex,
-                chunk_index=chunk_idx
+                chunk_index=chunk_idx,
             )
 
             if not regex_passed:
@@ -307,7 +333,7 @@ class OutputGuardrailPipeline:
                     partial_response=self.partial_response,
                     layer="regex",
                     rule="PII detection",
-                    message="Output safety violation: PII detected."
+                    message="Output safety violation: PII detected.",
                 )
 
             if not self.nemo_service:
@@ -315,7 +341,7 @@ class OutputGuardrailPipeline:
                     partial_response=self.partial_response,
                     layer="nemo",
                     rule="Safety check unavailable.",
-                    message="Safety check unavailable."
+                    message="Safety check unavailable.",
                 )
 
             # Final chunk must be validated immediately
@@ -328,7 +354,7 @@ class OutputGuardrailPipeline:
                     partial_response=self.partial_response,
                     layer="nemo",
                     rule="Safety check unavailable.",
-                    message="Safety check unavailable."
+                    message="Safety check unavailable.",
                 ) from e
             finally:
                 latency_nemo = (time.perf_counter() - start_nemo) * 1000.0
@@ -336,7 +362,7 @@ class OutputGuardrailPipeline:
                     layer="nemo",
                     verdict="pass" if is_safe else "fail",
                     latency_ms=latency_nemo,
-                    chunk_index=chunk_idx
+                    chunk_index=chunk_idx,
                 )
 
             if not is_safe:
@@ -344,7 +370,7 @@ class OutputGuardrailPipeline:
                     partial_response=self.partial_response,
                     layer="nemo",
                     rule=reason or "Output safety violation.",
-                    message=reason or "Output safety violation."
+                    message=reason or "Output safety violation.",
                 )
             self.partial_response += chunk
             yield chunk
@@ -359,7 +385,7 @@ class OutputGuardrailPipeline:
                             partial_response=self.partial_response,
                             layer="nemo",
                             rule=reason or "Output safety violation.",
-                            message=reason or "Output safety violation."
+                            message=reason or "Output safety violation.",
                         )
                 except OutputGuardrailBlockedError:
                     raise
@@ -368,7 +394,7 @@ class OutputGuardrailPipeline:
                         partial_response=self.partial_response,
                         layer="nemo",
                         rule="Safety check unavailable.",
-                        message="Safety check unavailable."
+                        message="Safety check unavailable.",
                     ) from e
                 self.partial_response += self.pending_chunk
                 yield self.pending_chunk
@@ -392,7 +418,6 @@ class OutputGuardrailPipeline:
                 pass
             except Exception as e:  # noqa: BLE001
                 logger = logging.getLogger("agent.guardrails")
-                logger.warning(f"Background validation task encountered error during cleanup: {e!s}")
-
-
-
+                logger.warning(
+                    f"Background validation task encountered error during cleanup: {e!s}"
+                )

@@ -117,6 +117,7 @@ export class FlightsService {
 - Data fetching happens in Server Components — never fetch in Client Components directly
 - **Next.js is the frontend only** — all API calls go to the NestJS backend, not `app/api/` route handlers
 - Minimal `app/api/` usage — only for NextAuth.js auth routes and webhook receivers
+- **Feature 017 handoff exception** — `CheckoutHandoffCard` may POST its in-memory credential only to same-origin `/checkout/handoff`; native hidden form fields are forbidden because they expose the credential in the DOM, and no response data fetching or business logic belongs in the Client Component
 - Never put business logic in the Next.js layer — it belongs in NestJS services
 
 ---
@@ -366,6 +367,15 @@ All environment variables defined in `.env.local` for development. Never hardcod
 | `MIMO_API_KEY`          | agents/ (LangChain config) |
 | `LANGSMITH_API_KEY`     | agents/ (tracing config)   |
 | `JWT_SECRET`            | auth.module.ts             |
+
+### AI Agent Service (FastAPI)
+
+| Variable                                | Used In                    |
+| --------------------------------------- | -------------------------- |
+| `SESSION_LOCK_TTL_MS`                   | agent/config.py (Redis)    |
+| `SESSION_LOCK_REFRESH_INTERVAL_SECONDS` | agent/config.py (Redis)    |
+| `AGENT_SERVICE_API_KEY`                 | Gateway protection         |
+| `CLAIM_TOKEN_SECRET`                    | User claim verification    |
 
 ### Next.js Frontend
 

@@ -11,7 +11,8 @@ import * as crypto from 'crypto';
 
 export type CabinClass = 'economy' | 'premium_economy' | 'business' | 'first';
 
-function parseISO8601Duration(durationStr: string): number {
+function parseISO8601Duration(durationStr: string | null | undefined): number {
+  if (!durationStr) return 0;
   const regex = /P(?:(\d+)D)?T(?:(\d+)H)?(?:(\d+)M)?/;
   const matches = durationStr.match(regex);
   if (!matches) return 0;
@@ -482,6 +483,23 @@ export class FlightsService {
     const cabinClass = firstSegment?.passengers?.[0]?.cabin_class || null;
     const returnSlice = liveOffer.slices[1];
 
+    const passengers = Array.isArray(liveOffer.passengers)
+      ? liveOffer.passengers
+          .filter((passenger: unknown): passenger is { id: string; type: string } => {
+            if (!passenger || typeof passenger !== 'object') return false;
+            const candidate = passenger as { id?: unknown; type?: unknown };
+            return typeof candidate.id === 'string' && typeof candidate.type === 'string';
+          })
+          .map((passenger) => ({
+            id: passenger.id,
+            type: passenger.type.toLowerCase() === 'child'
+              ? 'CHILD' as const
+              : passenger.type.toLowerCase().startsWith('infant')
+                ? 'INFANT' as const
+                : 'ADULT' as const,
+          }))
+      : [];
+
     const segments = outboundSlice?.segments.map(mapSegment) || [];
     const returnSegments = returnSlice ? returnSlice.segments.map(mapSegment) : null;
 
@@ -548,6 +566,7 @@ export class FlightsService {
       adults: flightOffer.adults,
       children: flightOffer.children,
       infants: flightOffer.infants,
+      passengers,
     };
   }
 }

@@ -26,21 +26,10 @@ const validated = {
 
 function createDependencies(transaction: Record<string, unknown>) {
   const prisma = {
-    $transaction: jest.fn().mockImplementation(async (callback) => callback(transaction)),
     bookingIntent: {
-      findUnique: jest.fn().mockResolvedValue({
-        id: 'intent-1',
-        status: 'PENDING',
-        paymentAttemptCount: 0,
-        confirmedPrice: '100.00',
-        currency: 'USD',
-        userId: 'user-1',
-        currentAncillarySelectionId: 'selection-3',
-        ancillaryVersion: 3,
-        intentExpiresAt: new Date(Date.now() + 100000),
-        offerExpiresAt: new Date(Date.now() + 100000),
-      }),
+      findUnique: jest.fn().mockResolvedValue({ id: 'intent-1', status: 'PENDING', paymentAttemptCount: 0, confirmedPrice: '100.00', currency: 'USD', userId: 'user-1', currentAncillarySelectionId: 'selection-3', ancillaryVersion: 3 }),
     },
+    $transaction: jest.fn().mockImplementation(async (callback) => callback(transaction)),
     payment: { findFirst: jest.fn().mockResolvedValue(null) },
     idempotencyKey: { findUnique: jest.fn().mockResolvedValue(null) },
     user: {
@@ -108,7 +97,12 @@ describe('PaymentService ancillary binding review fixes', () => {
             validatedAt: new Date(),
           },
         ])
-        .mockResolvedValue([]),
+        .mockResolvedValueOnce([
+          {
+            currentAncillarySelectionId: 'selection-3',
+            ancillaryVersion: 3,
+          }
+        ]),
       $executeRaw: jest.fn().mockResolvedValue(1),
       ancillarySelection: { updateMany: jest.fn().mockResolvedValue({ count: 1 }) },
       idempotencyKey: {

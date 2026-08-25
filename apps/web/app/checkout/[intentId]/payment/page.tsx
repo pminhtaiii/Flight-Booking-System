@@ -1,4 +1,4 @@
-import { protectCheckoutRoute, fetchBookingIntent, fetchAncillaryCatalog } from '@/lib/checkout';
+import { protectCheckoutRoute, fetchBookingIntent } from '@/lib/checkout';
 import { Header } from '@/components/layout/Header';
 import Link from 'next/link';
 
@@ -75,24 +75,6 @@ export default async function PaymentPage({ params }: Props) {
     );
   }
 
-  const { data: ancillaryCatalog } = await fetchAncillaryCatalog(intentId, accessToken);
-  const catalogError = !ancillaryCatalog;
-  const totals = ancillaryCatalog?.selection?.totals;
-
-  const basePrice = intent.confirmedPrice;
-  const seatTotalVal = totals ? parseFloat(totals.seats) : (intent.seatTotal ?? 0);
-  const baggageTotalVal = totals ? parseFloat(totals.baggage) : (intent.baggageTotal ?? 0);
-  const ancillaryTotalVal = totals ? parseFloat(totals.ancillaries) : (intent.ancillaryTotal ?? 0);
-
-  const seatTotalStr = totals?.seats ?? seatTotalVal.toFixed(2);
-  const baggageTotalStr = totals?.baggage ?? baggageTotalVal.toFixed(2);
-  const grandTotalStr = totals?.estimatedGrandTotal ?? (basePrice + ancillaryTotalVal).toFixed(2);
-
-  const currency = totals?.currency ?? intent.currency;
-  const hasSeats = seatTotalVal > 0;
-  const hasBaggage = baggageTotalVal > 0;
-  const hasAncillaries = hasSeats || hasBaggage || ancillaryTotalVal > 0;
-
   return (
     <div className="flex min-h-screen flex-col bg-background">
       <Header />
@@ -104,47 +86,15 @@ export default async function PaymentPage({ params }: Props) {
           <p className="text-text-secondary">Provide payment information to finalize your flight booking.</p>
         </div>
 
-        {catalogError && (
-          <div role="alert" className="card text-text-pending bg-bg-pending p-4 space-y-1">
-            <h2 className="font-semibold text-text-primary text-sm">Flight extras notice</h2>
-            <p className="text-xs text-text-secondary">
-              Live seat and baggage options could not be refreshed from the airline. Your committed totals are retained below.
-            </p>
-          </div>
-        )}
-
         {/* Payment overview */}
         <div className="card space-y-4">
           <h2 className="text-lg font-semibold text-text-primary">Amount Due</h2>
           <div className="flex justify-between items-center bg-secondary p-4 rounded-lg">
-            <span className="text-sm text-text-secondary">
-              Total ({intent.flight.origin} to {intent.flight.destination}
-              {hasAncillaries ? ' + extra services' : ''})
-            </span>
+            <span className="text-sm text-text-secondary">Flight total ({intent.flight.origin} to {intent.flight.destination})</span>
             <span className="text-3xl font-extrabold text-text-primary">
-              {grandTotalStr} {currency}
+              {intent.confirmedPrice} {intent.currency}
             </span>
           </div>
-          {hasAncillaries && (
-            <div className="divide-y divide-card-border text-xs text-text-secondary pt-2 space-y-1">
-              <div className="flex justify-between py-1">
-                <span>Flight Base Fare</span>
-                <span>{basePrice} {currency}</span>
-              </div>
-              {hasSeats && (
-                <div className="flex justify-between py-1">
-                  <span>Seats</span>
-                  <span>{seatTotalStr} {currency}</span>
-                </div>
-              )}
-              {hasBaggage && (
-                <div className="flex justify-between py-1">
-                  <span>Baggage</span>
-                  <span>{baggageTotalStr} {currency}</span>
-                </div>
-              )}
-            </div>
-          )}
         </div>
 
         {/* Placeholder Payment Form */}

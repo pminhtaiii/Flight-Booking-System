@@ -6,18 +6,23 @@ import { PrismaService } from '@/prisma/prisma.service';
 import { JwtService } from '@nestjs/jwt';
 import { HttpExceptionFilter } from '@/common/filters/http-exception.filter';
 import { MessageSender, MessageType, User, ChatSession } from '@prisma/client';
+import { ChatMessageCryptoService } from '@/chat/chat-message-crypto.service';
+import * as crypto from 'crypto';
 
 describe('Chat API (E2E)', () => {
   jest.setTimeout(30000);
   let app: INestApplication;
   let prisma: PrismaService;
   let jwtService: JwtService;
+  let cryptoService: ChatMessageCryptoService;
 
   let userA: User;
   let userB: User;
   let tokenA: string;
 
   beforeAll(async () => {
+    process.env.CHAT_ENCRYPTION_KEY = crypto.randomBytes(32).toString('hex');
+
     const moduleFixture: TestingModule = await Test.createTestingModule({
       imports: [AppModule],
     }).compile();
@@ -36,6 +41,7 @@ describe('Chat API (E2E)', () => {
 
     prisma = moduleFixture.get<PrismaService>(PrismaService);
     jwtService = moduleFixture.get<JwtService>(JwtService);
+    cryptoService = moduleFixture.get<ChatMessageCryptoService>(ChatMessageCryptoService);
   });
 
   afterAll(async () => {
@@ -44,9 +50,28 @@ describe('Chat API (E2E)', () => {
 
   beforeEach(async () => {
     // Clear Database tables before each test to ensure isolation
-    await prisma.chatMessage.deleteMany({});
+    await prisma.chatHandoff.deleteMany({});
     await prisma.chatSession.deleteMany({});
+    await prisma.paymentEvent.deleteMany({});
+    await prisma.ledgerEntry.deleteMany({});
+    await prisma.refund.deleteMany({});
+    await prisma.payment.deleteMany({});
+    await prisma.idempotencyKey.deleteMany({});
+    await prisma.paymentMethod.deleteMany({});
+    await prisma.bookingIntentPassenger.deleteMany({});
+    await prisma.bookingIntent.deleteMany({});
+    await prisma.itineraryRevisionSegment.deleteMany({});
+    await prisma.itineraryRevision.deleteMany({});
+    await prisma.disruptionAuditEvent.deleteMany({});
+    await prisma.notificationOutbox.deleteMany({});
+    await prisma.booking.deleteMany({});
+    await prisma.travelerProfile.deleteMany({});
+    await prisma.offerRecovery.deleteMany({});
+    await prisma.flightOffer.deleteMany({});
+    await prisma.searchHistory.deleteMany({});
+    await prisma.airport.deleteMany({});
     await prisma.auditLog.deleteMany({});
+    await prisma.chatMessage.deleteMany({});
     await prisma.user.deleteMany({});
 
     // Create test users
@@ -66,6 +91,56 @@ describe('Chat API (E2E)', () => {
 
     tokenA = jwtService.sign({ id: userA.id, email: userA.email });
   });
+
+  async function createEncryptedSession(userId: string, title?: string, lastActiveAt?: Date) {
+    const sessionId = crypto.randomUUID();
+    let titleCiphertext: string | null = null;
+    let titleNonce: string | null = null;
+    let titleAuthTag: string | null = null;
+    let titleKeyVersion: number | null = null;
+    if (title) {
+      const enc = await cryptoService.encryptSessionTitle(sessionId, title);
+      titleCiphertext = enc.ciphertext;
+      titleNonce = enc.nonce;
+      titleAuthTag = enc.authTag;
+      titleKeyVersion = enc.keyVersion;
+    }
+    return prisma.chatSession.create({
+      data: {
+        id: sessionId,
+        userId,
+        titleCiphertext,
+        titleNonce,
+        titleAuthTag,
+        titleKeyVersion,
+        ...(lastActiveAt ? { lastActiveAt } : {}),
+      },
+    });
+  }
+
+  async function createEncryptedMessage(
+    sessionId: string,
+    sender: MessageSender,
+    content: string,
+    type: MessageType = MessageType.STANDARD,
+    createdAt?: Date,
+  ) {
+    const messageId = crypto.randomUUID();
+    const enc = await cryptoService.encryptMessageContent(messageId, sessionId, sender, type, content);
+    return prisma.chatMessage.create({
+      data: {
+        id: messageId,
+        sessionId,
+        sender,
+        type,
+        contentCiphertext: enc.ciphertext,
+        contentNonce: enc.nonce,
+        contentAuthTag: enc.authTag,
+        contentKeyVersion: enc.keyVersion,
+        ...(createdAt ? { createdAt } : {}),
+      },
+    });
+  }
 
   describe('Authorization checks', () => {
     it('should return 401 when no token is provided', async () => {
@@ -98,7 +173,9 @@ describe('Chat API (E2E)', () => {
         where: { id: res.body.id },
       });
       expect(dbSession).toBeDefined();
-      expect(dbSession!.title).toBe('My Trip Plan');
+      expect(dbSession!.titleCiphertext).not.toBeNull();
+      const decryptedTitle = await cryptoService.decryptSessionTitle(dbSession!);
+      expect(decryptedTitle).toBe('My Trip Plan');
 
       // Verify Audit Log
       const auditLog = await prisma.auditLog.findFirst({
@@ -116,37 +193,12 @@ describe('Chat API (E2E)', () => {
   describe('GET /chat/sessions', () => {
     it('should return paginated sessions sorted by lastActiveAt desc with messagePreview', async () => {
       // Create three sessions with different activity times
-      const session1 = await prisma.chatSession.create({
-        data: {
-          userId: userA.id,
-          title: 'Session 1',
-          lastActiveAt: new Date(Date.now() - 3000),
-        },
-      });
-      const session2 = await prisma.chatSession.create({
-        data: {
-          userId: userA.id,
-          title: 'Session 2',
-          lastActiveAt: new Date(Date.now() - 1000),
-        },
-      });
-      const session3 = await prisma.chatSession.create({
-        data: {
-          userId: userA.id,
-          title: 'Session 3',
-          lastActiveAt: new Date(Date.now() - 2000),
-        },
-      });
+      const session1 = await createEncryptedSession(userA.id, 'Session 1', new Date(Date.now() - 3000));
+      const session2 = await createEncryptedSession(userA.id, 'Session 2', new Date(Date.now() - 1000));
+      const session3 = await createEncryptedSession(userA.id, 'Session 3', new Date(Date.now() - 2000));
 
       // Add a message to session2 to act as messagePreview
-      await prisma.chatMessage.create({
-        data: {
-          sessionId: session2.id,
-          sender: MessageSender.USER,
-          content: 'Hello World',
-          createdAt: new Date(),
-        },
-      });
+      await createEncryptedMessage(session2.id, MessageSender.USER, 'Hello World', MessageType.STANDARD, new Date());
 
       // List limit = 2
       const res1 = await request(app.getHttpServer())
@@ -178,19 +230,10 @@ describe('Chat API (E2E)', () => {
 
   describe('GET /chat/sessions/:sessionId', () => {
     it('should return session details and messageCount', async () => {
-      const session = await prisma.chatSession.create({
-        data: {
-          userId: userA.id,
-          title: 'Test Session',
-        },
-      });
+      const session = await createEncryptedSession(userA.id, 'Test Session');
 
-      await prisma.chatMessage.createMany({
-        data: [
-          { sessionId: session.id, sender: MessageSender.USER, content: 'msg1' },
-          { sessionId: session.id, sender: MessageSender.AGENT, content: 'msg2' },
-        ],
-      });
+      await createEncryptedMessage(session.id, MessageSender.USER, 'msg1');
+      await createEncryptedMessage(session.id, MessageSender.AGENT, 'msg2');
 
       const res = await request(app.getHttpServer())
         .get(`/chat/sessions/${session.id}`)
@@ -204,12 +247,7 @@ describe('Chat API (E2E)', () => {
 
   describe('PATCH /chat/sessions/:sessionId', () => {
     it('should update session title', async () => {
-      const session = await prisma.chatSession.create({
-        data: {
-          userId: userA.id,
-          title: 'Old Title',
-        },
-      });
+      const session = await createEncryptedSession(userA.id, 'Old Title');
 
       const res = await request(app.getHttpServer())
         .patch(`/chat/sessions/${session.id}`)
@@ -222,7 +260,9 @@ describe('Chat API (E2E)', () => {
       const dbSession = await prisma.chatSession.findUnique({
         where: { id: session.id },
       });
-      expect(dbSession!.title).toBe('New Title');
+      expect(dbSession!.titleCiphertext).not.toBeNull();
+      const decrypted = await cryptoService.decryptSessionTitle(dbSession!);
+      expect(decrypted).toBe('New Title');
 
       // Verify audit log entry
       const auditLog = await prisma.auditLog.findFirst({
@@ -240,13 +280,7 @@ describe('Chat API (E2E)', () => {
 
   describe('POST /chat/sessions/:sessionId/messages', () => {
     it('should create message, update session lastActiveAt, write audit log and return 201', async () => {
-      const session = await prisma.chatSession.create({
-        data: {
-          userId: userA.id,
-          title: 'Chat Session',
-          lastActiveAt: new Date(Date.now() - 10000),
-        },
-      });
+      const session = await createEncryptedSession(userA.id, 'Chat Session', new Date(Date.now() - 10000));
 
       const res = await request(app.getHttpServer())
         .post(`/chat/sessions/${session.id}/messages`)
@@ -281,39 +315,31 @@ describe('Chat API (E2E)', () => {
 
   describe('GET /chat/sessions/:sessionId/messages', () => {
     it('should return messages chronologically with cursor pagination in both directions', async () => {
-      const session = await prisma.chatSession.create({
-        data: {
-          userId: userA.id,
-          title: 'History',
-        },
-      });
+      const session = await createEncryptedSession(userA.id, 'History');
 
-      const msg1 = await prisma.chatMessage.create({
-        data: {
-          sessionId: session.id,
-          sender: MessageSender.USER,
-          content: 'One',
-          createdAt: new Date(Date.now() - 3000),
-        },
-      });
+      const msg1 = await createEncryptedMessage(
+        session.id,
+        MessageSender.USER,
+        'One',
+        MessageType.STANDARD,
+        new Date(Date.now() - 3000),
+      );
 
-      const msg2 = await prisma.chatMessage.create({
-        data: {
-          sessionId: session.id,
-          sender: MessageSender.AGENT,
-          content: 'Two',
-          createdAt: new Date(Date.now() - 2000),
-        },
-      });
+      const msg2 = await createEncryptedMessage(
+        session.id,
+        MessageSender.AGENT,
+        'Two',
+        MessageType.STANDARD,
+        new Date(Date.now() - 2000),
+      );
 
-      const msg3 = await prisma.chatMessage.create({
-        data: {
-          sessionId: session.id,
-          sender: MessageSender.USER,
-          content: 'Three',
-          createdAt: new Date(Date.now() - 1000),
-        },
-      });
+      const msg3 = await createEncryptedMessage(
+        session.id,
+        MessageSender.USER,
+        'Three',
+        MessageType.STANDARD,
+        new Date(Date.now() - 1000),
+      );
 
       // Direction: before (default)
       const res1 = await request(app.getHttpServer())
@@ -355,12 +381,7 @@ describe('Chat API (E2E)', () => {
 
   describe('POST /chat/sessions/:sessionId/messages/batch', () => {
     it('should atomically create batch of messages, update lastActiveAt, write batch audit log', async () => {
-      const session = await prisma.chatSession.create({
-        data: {
-          userId: userA.id,
-          title: 'Batch session',
-        },
-      });
+      const session = await createEncryptedSession(userA.id, 'Batch session');
 
       const res = await request(app.getHttpServer())
         .post(`/chat/sessions/${session.id}/messages/batch`)
@@ -391,42 +412,31 @@ describe('Chat API (E2E)', () => {
 
   describe('GET /chat/sessions/:sessionId/memory', () => {
     it('should return summary and recent standard messages', async () => {
-      const session = await prisma.chatSession.create({
-        data: {
-          userId: userA.id,
-          title: 'Memory Test',
-        },
-      });
+      const session = await createEncryptedSession(userA.id, 'Memory Test');
 
-      await prisma.chatMessage.create({
-        data: {
-          sessionId: session.id,
-          sender: MessageSender.AGENT,
-          type: MessageType.SUMMARY,
-          content: 'This is the summary of old conversation',
-          createdAt: new Date(Date.now() - 5000),
-        },
-      });
+      await createEncryptedMessage(
+        session.id,
+        MessageSender.AGENT,
+        'This is the summary of old conversation',
+        MessageType.SUMMARY,
+        new Date(Date.now() - 5000),
+      );
 
-      await prisma.chatMessage.create({
-        data: {
-          sessionId: session.id,
-          sender: MessageSender.USER,
-          type: MessageType.STANDARD,
-          content: 'Hello Standard 1',
-          createdAt: new Date(Date.now() - 3000),
-        },
-      });
+      await createEncryptedMessage(
+        session.id,
+        MessageSender.USER,
+        'Hello Standard 1',
+        MessageType.STANDARD,
+        new Date(Date.now() - 3000),
+      );
 
-      await prisma.chatMessage.create({
-        data: {
-          sessionId: session.id,
-          sender: MessageSender.AGENT,
-          type: MessageType.STANDARD,
-          content: 'Hello Standard 2',
-          createdAt: new Date(Date.now() - 1000),
-        },
-      });
+      await createEncryptedMessage(
+        session.id,
+        MessageSender.AGENT,
+        'Hello Standard 2',
+        MessageType.STANDARD,
+        new Date(Date.now() - 1000),
+      );
 
       const res = await request(app.getHttpServer())
         .get(`/chat/sessions/${session.id}/memory`)
@@ -444,36 +454,26 @@ describe('Chat API (E2E)', () => {
 
   describe('DELETE /chat/sessions/:sessionId', () => {
     it('should cascade delete session and messages, and write audit log', async () => {
-      const session = await prisma.chatSession.create({
-        data: {
-          userId: userA.id,
-          title: 'To Delete',
-        },
-      });
+      const session = await createEncryptedSession(userA.id, 'To Delete');
 
-      await prisma.chatMessage.create({
-        data: {
-          sessionId: session.id,
-          sender: MessageSender.USER,
-          content: 'Some message',
-        },
-      });
+      await createEncryptedMessage(session.id, MessageSender.USER, 'Some message');
 
       await request(app.getHttpServer())
         .delete(`/chat/sessions/${session.id}`)
         .set('Authorization', `Bearer ${tokenA}`)
         .expect(204);
 
-      // Verify deletion in DB
+      // Verify soft deletion in DB
       const dbSession = await prisma.chatSession.findUnique({
         where: { id: session.id },
       });
-      expect(dbSession).toBeNull();
+      expect(dbSession).toBeDefined();
+      expect(dbSession!.deletedAt).not.toBeNull();
 
       const dbMessages = await prisma.chatMessage.findMany({
         where: { sessionId: session.id },
       });
-      expect(dbMessages).toHaveLength(0);
+      expect(dbMessages.length).toBeGreaterThan(0);
 
       // Verify audit log
       const auditLog = await prisma.auditLog.findFirst({
@@ -492,12 +492,7 @@ describe('Chat API (E2E)', () => {
     let sessionB: ChatSession;
 
     beforeEach(async () => {
-      sessionB = await prisma.chatSession.create({
-        data: {
-          userId: userB.id,
-          title: 'User B Session',
-        },
-      });
+      sessionB = await createEncryptedSession(userB.id, 'User B Session');
     });
 
     it('should return 404 when User A tries to GET User B session details', async () => {

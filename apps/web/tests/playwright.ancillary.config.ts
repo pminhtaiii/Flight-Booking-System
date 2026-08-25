@@ -7,7 +7,7 @@ export default defineConfig({
   workers: 1,
   reporter: 'line',
   use: {
-    baseURL: 'http://localhost:3000',
+    baseURL: 'http://127.0.0.1:3000',
     trace: 'on-first-retry',
   },
   projects: [{
@@ -16,14 +16,14 @@ export default defineConfig({
   }],
   webServer: {
     command: 'node node_modules/next/dist/bin/next dev -p 3000',
-    url: 'http://localhost:3000',
+    url: 'http://127.0.0.1:3000',
     reuseExistingServer: false,
     timeout: 180000,
     cwd: path.resolve(__dirname, '..'),
     env: {
       CI: 'true',
       NEXTAUTH_SECRET: 'test_secret',
-      NEXTAUTH_URL: 'http://localhost:3000',
+      NEXTAUTH_URL: 'http://127.0.0.1:3000',
       NEXT_PUBLIC_API_URL: 'http://127.0.0.1:3001',
     },
   },

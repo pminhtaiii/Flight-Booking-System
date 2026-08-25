@@ -1,50 +1,128 @@
-from langgraph.graph import StateGraph, START, END
-from langgraph.checkpoint.memory import MemorySaver
+from langchain_core.runnables import RunnableConfig
+from langgraph.graph import END, START, StateGraph
 
+from agent.agents.checkout_orchestrator import checkout_orchestrator_node
+from agent.agents.general_agent import general_agent_node
+from agent.agents.travel_assistant import travel_assistant_node
+from agent.config import get_settings
+from agent.graph.checkout_gate import evaluate_checkout_gate
+from agent.graph.nodes import (
+    create_handoff_token,
+    custom_tool_node,
+    final_answer_node,
+    validate_handoff,
+)
+from agent.graph.router import invoke_router
 from agent.graph.state import AgentState
-from agent.graph.nodes import agent_node, final_answer_node, custom_tool_node, confirm_node
-from agent.graph.router import should_continue, route_confirm
 
-# 1. Define the workflow graph
+
+async def router_node(state: AgentState, config: RunnableConfig | None = None) -> dict:
+    settings = get_settings()
+    if not getattr(settings, "FEATURE_FLAG_CHAT_MULTI_AGENT", True):
+        return {"route": "travel", "disambiguation": None}
+    decision = await invoke_router(state)
+    gate_result = evaluate_checkout_gate(state, decision)
+    return gate_result  # Updates 'route' and 'disambiguation' in AgentState
+
+
+def route_after_router(state: AgentState) -> str:
+    route = state.get("route", "general")
+    if route == "travel":
+        return "travel"
+    elif route == "checkout":
+        return "checkout"
+    return "general"
+
+
+def should_continue(state: AgentState) -> str:
+    messages = state.get("messages", [])
+    if not messages:
+        return END
+
+    last_message = messages[-1]
+    if not getattr(last_message, "tool_calls", None):
+        return END
+
+    settings = get_settings()
+    max_iterations = getattr(settings, "AGENT_MAX_ITERATIONS", 5)
+    current_iterations = state.get("iteration_count", 0)
+
+    if current_iterations >= max_iterations:
+        return "final_answer"
+    return "tools"
+
+
+def route_after_tools(state: AgentState) -> str:
+    signal = state.get("signal")
+    if signal and signal.get("intent") == "checkout":
+        return "validate_handoff"
+    # After tools, always return to the travel assistant (the only one with tools)
+    return "travel"
+
+
 workflow = StateGraph(AgentState)
 
-# 2. Add nodes
-workflow.add_node("agent", agent_node)
+workflow.add_node("router", router_node)
+workflow.add_node("general", general_agent_node)
+workflow.add_node("travel", travel_assistant_node)
+workflow.add_node("checkout", checkout_orchestrator_node)
 workflow.add_node("tools", custom_tool_node)
-workflow.add_node("confirm", confirm_node)
 workflow.add_node("final_answer", final_answer_node)
+workflow.add_node("validate_handoff", validate_handoff)
+workflow.add_node("create_handoff_token", create_handoff_token)
 
-# 3. Add edges
-workflow.add_edge(START, "agent")
+workflow.add_edge(START, "router")
+workflow.add_conditional_edges("router", route_after_router)
+
+workflow.add_edge("general", END)
 
 workflow.add_conditional_edges(
-    "agent",
+    "checkout",
     should_continue,
     {
         "tools": "tools",
-        "confirm": "confirm",
         "final_answer": "final_answer",
         END: END,
-    }
+    },
 )
 
 workflow.add_conditional_edges(
-    "confirm",
-    route_confirm,
+    "travel",
+    should_continue,
     {
         "tools": "tools",
-        "agent": "agent",
-    }
+        "final_answer": "final_answer",
+        END: END,
+    },
 )
 
-workflow.add_edge("tools", "agent")
+workflow.add_conditional_edges(
+    "tools",
+    route_after_tools,
+    {
+        "travel": "travel",
+        "validate_handoff": "validate_handoff",
+        END: END,
+    },
+)
+
+
+def route_after_validate(state: AgentState) -> str:
+    action = state.get("action", {})
+    if action and action.get("error"):
+        return END
+    return "create_handoff_token"
+
+
+workflow.add_conditional_edges(
+    "validate_handoff",
+    route_after_validate,
+    {
+        "create_handoff_token": "create_handoff_token",
+        END: END,
+    },
+)
+workflow.add_edge("create_handoff_token", END)
 workflow.add_edge("final_answer", END)
 
-# 4. Initialize checkpointer
-memory = MemorySaver()
-
-# 5. Compile the graph
-graph = workflow.compile(
-    checkpointer=memory,
-    interrupt_before=["confirm"]
-)
+graph = workflow.compile()

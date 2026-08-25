@@ -2,6 +2,10 @@
   "name": "flight-booking-system-root",
   "version": "1.0.0",
   "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
   "engines": {
     "node": ">=20.0.0",
     "pnpm": ">=9.0.0"
@@ -15,12 +19,14 @@
     "format": "prettier --write \"**/*.{ts,tsx,json,md,yaml,yml}\""
   },
   "devDependencies": {
-    "typescript": "^5.4.5",
-    "prettier": "^3.2.5",
+    "@typescript-eslint/eslint-plugin": "^7.11.0",
+    "@typescript-eslint/parser": "^7.11.0",
     "eslint": "^8.57.0",
     "eslint-config-prettier": "^9.1.0",
-    "@typescript-eslint/eslint-plugin": "^7.11.0",
-    "@typescript-eslint/parser": "^7.11.0"
+    "prettier": "^3.2.5",
+    "prisma": "^5.22.0",
+    "tsx": "^4.23.1",
+    "typescript": "^5.4.5"
   },
   "prisma": {
     "schema": "apps/api/prisma/schema.prisma",

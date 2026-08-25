@@ -127,14 +127,30 @@ describe('Disruption & Flight-Change Management (Webhook & Processor E2E)', () =
   });
 
   afterEach(async () => {
-    await prisma.notificationOutbox.deleteMany({ where: { bookingId } });
-    await prisma.disruptionAuditEvent.deleteMany({ where: { bookingId } });
-    await prisma.itineraryRevisionSegment.deleteMany({ where: { revision: { bookingId } } });
-    await prisma.itineraryRevision.deleteMany({ where: { bookingId } });
-    await prisma.duffelWebhookEvent.deleteMany({ where: { duffelOrderId: `ord_fake_${suffix}` } });
-    await prisma.booking.deleteMany({ where: { id: bookingId } });
-    await prisma.bookingIntent.deleteMany({ where: { id: bookingIntentId } });
-    await prisma.user.deleteMany({ where: { id: userId } });
+    await prisma.chatHandoff.deleteMany({});
+    await prisma.chatSession.deleteMany({});
+    await prisma.paymentEvent.deleteMany({});
+    await prisma.ledgerEntry.deleteMany({});
+    await prisma.refund.deleteMany({});
+    await prisma.payment.deleteMany({});
+    await prisma.idempotencyKey.deleteMany({});
+    await prisma.paymentMethod.deleteMany({});
+    await prisma.bookingIntentPassenger.deleteMany({});
+    await prisma.bookingIntent.deleteMany({});
+    await prisma.itineraryRevisionSegment.deleteMany({});
+    await prisma.itineraryRevision.deleteMany({});
+    await prisma.disruptionAuditEvent.deleteMany({});
+    await prisma.notificationOutbox.deleteMany({});
+    await prisma.bookingAgentProjection.deleteMany({});
+    await prisma.booking.deleteMany({});
+    await prisma.travelerProfile.deleteMany({});
+    await prisma.offerRecovery.deleteMany({});
+    await prisma.flightOffer.deleteMany({});
+    await prisma.searchHistory.deleteMany({});
+    await prisma.airport.deleteMany({});
+    await prisma.auditLog.deleteMany({});
+    await prisma.user.deleteMany({});
+
   });
 
   const generateSignatureHeader = (timestamp: number, rawBody: string, secret: string) => {
@@ -374,7 +390,29 @@ describe('Disruption & Flight-Change Management (Webhook & Processor E2E)', () =
     });
 
     afterEach(async () => {
-      await prisma.user.deleteMany({ where: { email: { startsWith: 'other-test-user-' } } });
+    await prisma.chatHandoff.deleteMany({});
+    await prisma.chatSession.deleteMany({});
+    await prisma.paymentEvent.deleteMany({});
+    await prisma.ledgerEntry.deleteMany({});
+    await prisma.refund.deleteMany({});
+    await prisma.payment.deleteMany({});
+    await prisma.idempotencyKey.deleteMany({});
+    await prisma.paymentMethod.deleteMany({});
+    await prisma.bookingIntentPassenger.deleteMany({});
+    await prisma.bookingIntent.deleteMany({});
+    await prisma.itineraryRevisionSegment.deleteMany({});
+    await prisma.itineraryRevision.deleteMany({});
+    await prisma.disruptionAuditEvent.deleteMany({});
+    await prisma.notificationOutbox.deleteMany({});
+    await prisma.booking.deleteMany({});
+    await prisma.travelerProfile.deleteMany({});
+    await prisma.offerRecovery.deleteMany({});
+    await prisma.flightOffer.deleteMany({});
+    await prisma.searchHistory.deleteMany({});
+    await prisma.airport.deleteMany({});
+    await prisma.auditLog.deleteMany({});
+    await prisma.user.deleteMany({});
+
     });
 
     it('populates extended fields (currentItinerary and disruption) in list and details endpoints', async () => {
@@ -717,3 +755,6 @@ describe('Disruption & Flight-Change Management (Webhook & Processor E2E)', () =
     });
   });
 });
+
+
+

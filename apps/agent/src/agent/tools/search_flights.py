@@ -1,7 +1,17 @@
-from datetime import datetime
-from langchain_core.tools import tool
+import inspect
+import logging
+from datetime import datetime, timedelta, timezone
+from typing import Any
+
 from langchain_core.runnables import RunnableConfig
+from langchain_core.tools import tool
+
+from agent.infrastructure.redis import get_redis_client
+from agent.models.snapshot import TrustedSearchSnapshot
+from agent.repositories.trusted_snapshot_repository import TrustedSnapshotRepository
 from agent.tools.base import get_nestjs_client
+
+logger = logging.getLogger(__name__)
 
 AIRLINE_MAP = {
     "VN": "Vietnam Airlines",
@@ -10,15 +20,44 @@ AIRLINE_MAP = {
     "SQ": "Singapore Airlines",
 }
 
-FLIGHTS_CACHE = {}
+_SAFE_LLM_FIELDS = (
+    "offerExpiresAt",
+    "airline",
+    "flightNumber",
+    "departureAirport",
+    "arrivalAirport",
+    "departureTime",
+    "arrivalTime",
+    "duration",
+    "stops",
+    "price",
+    "currency",
+    "fareClass",
+    "baggageAllowance",
+)
+
+
+def project_snapshot_results(snapshot: TrustedSearchSnapshot) -> list[dict[str, Any]]:
+    """Project the trusted snapshot into the exact browser-safe result shape."""
+
+    return [
+        {
+            "index": result.offerIndex,
+            "airline": result.airline,
+            "origin": result.origin,
+            "destination": result.destination,
+            "departureAt": result.departureAt.isoformat(),
+            "arrivalAt": result.arrivalAt.isoformat(),
+            "price": result.price,
+            "currency": result.currency,
+        }
+        for result in snapshot.results
+    ]
+
 
 @tool("search_flights")
 async def search_flights(
-    origin: str,
-    destination: str,
-    date: str,
-    passengers: int = 1,
-    config: RunnableConfig = None
+    origin: str, destination: str, date: str, passengers: int = 1, config: RunnableConfig = None
 ) -> str:
     """Search for available flights between two airports on a specific date. Returns the top 5 matching flights with airline, times, price, and baggage information. Use this when the user asks to find, search, or look up flights."""
     try:
@@ -26,47 +65,117 @@ async def search_flights(
     except Exception:
         return "I couldn't search for flights right now. The flight search service is temporarily unavailable. Please try again in a moment."
 
+    configurable = (
+        config.get("configurable", {})
+        if isinstance(config, dict)
+        else getattr(config, "configurable", {})
+        if config
+        else {}
+    )
+    thread_id = configurable.get("thread_id") or "default_thread"
+    user_id = configurable.get("user_id") or "default_user"
+
     try:
-        data = await client.get_gateway_flights_search(
+        proposed_version = 1
+        try:
+            redis_client = get_redis_client()
+            repo = TrustedSnapshotRepository(redis_client)
+            res = repo.get_snapshot(user_id, thread_id)
+            existing = await res if inspect.isawaitable(res) else res
+            if existing:
+                proposed_version = existing.snapshotVersion + 1
+        except Exception as e:
+            logger.warning("Could not check existing snapshot: %s", str(e))
+            repo = None
+
+        search_call = getattr(client, "post_gateway_flights_search_v2", None) or getattr(
+            client, "search_flights_v2", None
+        )
+        if not search_call:
+            search_call = getattr(client, "get_gateway_flights_search", None)
+
+        if not search_call:
+            return "I couldn't search for flights right now. The flight search service is temporarily unavailable. Please try again in a moment."
+
+        call_res = search_call(
+            chat_session_id=thread_id,
+            proposed_snapshot_version=proposed_version,
             origin=origin,
             destination=destination,
             date=date,
-            passengers=passengers
+            passengers=passengers,
         )
-    except Exception:
+        data = await call_res if inspect.isawaitable(call_res) else call_res
+    except Exception as e:
+        logger.warning("Error calling flight search v2: %s", str(e))
+        return "I couldn't search for flights right now. The flight search service is temporarily unavailable. Please try again in a moment."
+
+    if not isinstance(data, dict):
         return "I couldn't search for flights right now. The flight search service is temporarily unavailable. Please try again in a moment."
 
     if "error" in data:
-        return data["error"]
+        return str(data["error"])
 
     results = data.get("results", [])
-    # Limit results to top 5
-    results = results[:5]
-
-    if config:
-        thread_id = config.get("configurable", {}).get("thread_id")
-        if thread_id:
-            import time
-            now = time.time()
-            # 1. Clean up stale entries (> 1 hour old)
-            stale_keys = [k for k, v in FLIGHTS_CACHE.items() if now - v.get("timestamp", 0) > 3600]
-            for k in stale_keys:
-                FLIGHTS_CACHE.pop(k, None)
-            # 2. Bounded size (limit to 100 sessions)
-            if len(FLIGHTS_CACHE) > 100:
-                oldest_key = min(FLIGHTS_CACHE.keys(), key=lambda k: FLIGHTS_CACHE[k].get("timestamp", 0))
-                FLIGHTS_CACHE.pop(oldest_key, None)
-            # 3. Cache results
-            FLIGHTS_CACHE[thread_id] = {
-                "results": results,
-                "timestamp": now
-            }
-
     if not results:
         return f"Found 0 flights from {origin} to {destination} on {date}."
 
-    flight_blocks = []
+    # Strip identifiers before sending to LLM and create trusted snapshot
+    safe_results = []
+    snapshot_results = []
     for idx, flight in enumerate(results, 1):
+        snapshot_results.append(
+            {
+                "offerIndex": idx,
+                "flightOfferId": flight.get("flightOfferId") or f"mock-offer-{idx}",
+                "duffelOfferId": flight.get("duffelOfferId")
+                or flight.get("flightOfferId")
+                or f"mock-duffel-{idx}",
+                "airline": flight.get("airline", ""),
+                "origin": flight.get("departureAirport", origin),
+                "destination": flight.get("arrivalAirport", destination),
+                "departureAt": flight.get("departureTime"),
+                "arrivalAt": flight.get("arrivalTime"),
+                "price": str(flight.get("price", "0.0")),
+                "currency": flight.get("currency", "USD"),
+            }
+        )
+
+        safe_flight = {key: flight[key] for key in _SAFE_LLM_FIELDS if key in flight}
+        safe_results.append(safe_flight)
+
+    # Store Trusted Search Snapshot in Redis
+    try:
+        if repo is None:
+            redis_client = get_redis_client()
+            repo = TrustedSnapshotRepository(redis_client)
+
+        expires_at = data.get("snapshotExpiresAt")
+        if not expires_at:
+            expires_at = (datetime.now(timezone.utc) + timedelta(minutes=15)).isoformat()
+
+        snapshot = TrustedSearchSnapshot.model_validate(
+            {
+                "schemaVersion": 1,
+                "snapshotVersion": data.get("snapshotVersion") or proposed_version,
+                "userId": user_id,
+                "sessionId": thread_id,
+                "createdAt": datetime.now(timezone.utc).isoformat(),
+                "expiresAt": expires_at,
+                "selectionAttestation": data.get("selectionAttestation") or "sel_v1_mock",
+                "fingerprint": data.get("fingerprint") or "mock_hmac_fingerprint",
+                "results": snapshot_results,
+            }
+        )
+        save_res = repo.save_snapshot(snapshot)
+        if inspect.isawaitable(save_res):
+            await save_res
+    except Exception as e:
+        logger.warning("Failed to save trusted snapshot: %s", str(e))
+        return "I encountered an error preparing your search results. Please try again."
+
+    flight_blocks = []
+    for idx, flight in enumerate(safe_results, 1):
         airline = flight.get("airline") or ""
         airline_name = AIRLINE_MAP.get(airline, airline)
         flight_number = flight.get("flightNumber") or ""
@@ -106,7 +215,10 @@ async def search_flights(
         else:
             stops_str = f"{stops} stops"
 
-        price = flight.get("price") or 0.0
+        try:
+            price = float(flight.get("price") or 0.0)
+        except ValueError:
+            price = 0.0
         currency = flight.get("currency") or "USD"
         price_formatted = f"${price:,.2f}"
 

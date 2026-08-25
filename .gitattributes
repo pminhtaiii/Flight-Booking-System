@@ -1,0 +1,23 @@
+* text=auto eol=lf
+
+# Binary assets must not be normalized as text.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.webp binary
+*.avif binary
+*.ico binary
+*.svgz binary
+
+# Generated dependency locks and packaged artifacts are opaque inputs.
+*.lock binary
+*.zip binary
+*.gz binary
+*.tgz binary
+*.bz2 binary
+*.xz binary
+*.7z binary
+*.rar binary
+*.tar binary
+*.pdf binary

@@ -1,6 +1,5 @@
-import os
-import pytest
-from agent.config import Settings, OutputGuardrailConfig
+from agent.config import OutputGuardrailConfig, Settings
+
 
 def test_output_guardrail_config_defaults(monkeypatch):
     monkeypatch.setenv("JWT_SECRET", "testsecret")
@@ -15,7 +14,7 @@ def test_output_guardrail_config_defaults(monkeypatch):
     monkeypatch.delenv("OUTPUT_GUARDRAIL_NEMO_TIMEOUT", raising=False)
 
     settings = Settings(_env_file=None)
-    
+
     # Assert settings have the flat properties
     assert settings.OUTPUT_GUARDRAIL_ENABLED is True
     assert settings.OUTPUT_GUARDRAIL_OVERLAP_TOKENS == 30
@@ -30,6 +29,7 @@ def test_output_guardrail_config_defaults(monkeypatch):
     assert cfg.max_chunk_tokens == 200
     assert cfg.nemo_timeout == 2.0
 
+
 def test_output_guardrail_config_custom(monkeypatch):
     monkeypatch.setenv("JWT_SECRET", "testsecret")
     monkeypatch.setenv("NESTJS_API_URL", "http://localhost:3001")
@@ -42,7 +42,7 @@ def test_output_guardrail_config_custom(monkeypatch):
     monkeypatch.setenv("OUTPUT_GUARDRAIL_NEMO_TIMEOUT", "3.5")
 
     settings = Settings(_env_file=None)
-    
+
     assert settings.OUTPUT_GUARDRAIL_ENABLED is False
     assert settings.OUTPUT_GUARDRAIL_OVERLAP_TOKENS == 50
     assert settings.OUTPUT_GUARDRAIL_MAX_CHUNK_TOKENS == 150
@@ -53,3 +53,22 @@ def test_output_guardrail_config_custom(monkeypatch):
     assert cfg.overlap_tokens == 50
     assert cfg.max_chunk_tokens == 150
     assert cfg.nemo_timeout == 3.5
+
+
+def test_session_lock_timing_defaults_and_override(monkeypatch):
+    monkeypatch.setenv("JWT_SECRET", "testsecret")
+    monkeypatch.setenv("NESTJS_API_URL", "http://localhost:3001")
+    monkeypatch.setenv("AGENT_SERVICE_API_KEY", "testkey")
+    monkeypatch.setenv("CLAIM_TOKEN_SECRET", "testsecret")
+    monkeypatch.delenv("SESSION_LOCK_TTL_MS", raising=False)
+    monkeypatch.delenv("SESSION_LOCK_REFRESH_INTERVAL_SECONDS", raising=False)
+
+    defaults = Settings(_env_file=None)
+    assert defaults.SESSION_LOCK_TTL_MS == 10000
+    assert defaults.SESSION_LOCK_REFRESH_INTERVAL_SECONDS == 3.0
+
+    monkeypatch.setenv("SESSION_LOCK_TTL_MS", "120000")
+    monkeypatch.setenv("SESSION_LOCK_REFRESH_INTERVAL_SECONDS", "1.0")
+    overridden = Settings(_env_file=None)
+    assert overridden.SESSION_LOCK_TTL_MS == 120000
+    assert overridden.SESSION_LOCK_REFRESH_INTERVAL_SECONDS == 1.0

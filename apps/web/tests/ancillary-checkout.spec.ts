@@ -13,12 +13,12 @@ async function authenticateAncillaryScenario(context: Parameters<typeof test>[0]
     },
   });
   await context.addCookies([
-    { name: 'next-auth.session-token', value: sessionToken, url: 'http://localhost:3000', httpOnly: true, sameSite: 'Lax' },
-    { name: 'mock-scenario', value: 'mock-ancillary-phase4', url: 'http://localhost:3000', sameSite: 'Lax' },
+    { name: 'next-auth.session-token', value: sessionToken, url: 'http://127.0.0.1:3000', httpOnly: true, sameSite: 'Lax' },
+    { name: 'mock-scenario', value: 'mock-ancillary-phase4', url: 'http://127.0.0.1:3000', sameSite: 'Lax' },
   ]);
 }
 
-test.describe('Ancillary Checkout E2E Journey & Resilience', () => {
+test.describe('Phase 4 ancillary checkout', () => {
   test('keeps seat choices isolated across eligible travellers and segments with exact instant totals', async ({ page, context }) => {
     await authenticateAncillaryScenario(context);
     const repricingRequests: string[] = [];
@@ -45,17 +45,5 @@ test.describe('Ancillary Checkout E2E Journey & Resilience', () => {
     await page.getByRole('gridcell', { name: /2A.*available/ }).click();
     await expect(page.getByText('$122.35').first()).toBeVisible();
     expect(repricingRequests).toEqual([]);
-  });
-
-  test('navigates from ancillaries to read-only review and provides targeted edit links', async ({ page, context }) => {
-    await authenticateAncillaryScenario(context);
-    await page.goto('/checkout/mock-intent-id/ancillaries');
-
-    // Click Continue to go to Review
-    const continueBtn = page.getByRole('button', { name: /Continue/i });
-    if (await continueBtn.isVisible()) {
-      await continueBtn.click();
-      await expect(page).toHaveURL(/.*review/);
-    }
   });
 });

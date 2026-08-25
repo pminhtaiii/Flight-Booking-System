@@ -56,10 +56,7 @@ export class PaymentController {
     const rawIp = req.ip || req.socket?.remoteAddress || '127.0.0.1';
     const ipAddress = typeof rawIp === 'string' ? rawIp.split(',')[0].trim() : '127.0.0.1';
 
-    const traceId = req.headers['x-trace-id'] as string | undefined;
-    const correlationId = req.headers['x-correlation-id'] as string | undefined;
-
-    return this.paymentService.createPayment(dto, idempotencyKey, req.user.id, ipAddress, traceId, correlationId);
+    return this.paymentService.createPayment(dto, idempotencyKey, req.user.id, ipAddress);
   }
 
   @Post('confirm')

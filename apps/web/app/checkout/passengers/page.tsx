@@ -1,9 +1,11 @@
 import { protectCheckoutRoute } from '@/lib/checkout';
 import { Header } from '@/components/layout/Header';
-import { getAirportByIataCode } from '@/lib/airport-service';
 import { PassengerFormClient } from '@/components/checkout/PassengerFormClient';
 import { redirect } from 'next/navigation';
-import { headers } from 'next/headers';
+import { cookies } from 'next/headers';
+import { hasCheckoutHandoffContext, resolveHandoffForBootstrap } from '@/lib/handoffBootstrap';
+import type { TravelerProfileResponse } from '@/lib/profile-contract';
+import { getSafeReturnTarget } from '@/lib/safeReturnTarget';
 
 interface PassengerPageFlightDetail {
   id: string;
@@ -26,73 +28,138 @@ interface PassengerPageFlightDetail {
   adults: number;
   children: number;
   infants: number;
+  passengers: Array<{ id: string; type: 'ADULT' | 'CHILD' | 'INFANT' }>;
   segments: Array<{
     departureAirport: string;
     arrivalAirport: string;
   }>;
 }
 
-interface PrefillData {
-  hasProfile: boolean;
-  passenger?: {
-    givenName?: string | null;
-    familyName?: string | null;
-    dateOfBirth?: string | null;
-    gender?: string | null;
-    nationality?: string | null;
-    passportNumber?: string | null;
-    passportExpiry?: string | null;
-    seatPreference?: string | null;
-    classPreference?: string | null;
-  } | null;
-  missingFields: string[];
-}
-
 type Props = {
   searchParams: {
     offerId?: string;
+    returnTo?: string;
+    [key: string]: string | undefined;
   };
 };
 
 export default async function PassengersPage({ searchParams }: Props) {
   const { accessToken } = await protectCheckoutRoute();
   const offerId = searchParams.offerId;
+  const safeReturnTarget = searchParams.returnTo ? getSafeReturnTarget(searchParams.returnTo) : null;
+  const cookieStore = cookies();
+  const handoffCookie = cookieStore.get('chat_handoff_token');
+  
+  const mockScenario = cookieStore.get('mock-scenario')?.value || null;
+
+  if (handoffCookie?.value) {
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+    const resolved = await resolveHandoffForBootstrap(
+      apiUrl,
+      handoffCookie.value,
+      accessToken,
+      undefined,
+      undefined,
+      fetch,
+      undefined,
+      mockScenario,
+    );
+    if (!hasCheckoutHandoffContext(resolved)) {
+      return (
+        <div className="flex min-h-screen flex-col bg-background">
+          <Header />
+          <main className="mx-auto w-full max-w-3xl py-12 px-4">
+            <div role="alert" className="card text-text-cancelled bg-bg-cancelled p-6">
+              <h1 className="text-xl font-bold">Checkout Session Expired</h1>
+              <p className="mt-2 text-sm text-text-secondary">
+                Your checkout session has expired or is invalid. Please restart checkout from the chat assistant.
+              </p>
+            </div>
+          </main>
+        </div>
+      );
+    }
+    const { offer, passengers } = resolved.context;
+    return (
+      <div className="flex min-h-screen flex-col bg-background">
+        <Header />
+        <main className="mx-auto w-full max-w-3xl space-y-6 py-12 px-4">
+          {safeReturnTarget && safeReturnTarget !== '/' ? (
+            <div>
+              <a
+                className="inline-flex items-center gap-1 text-sm font-semibold text-text-link hover:underline"
+                href={safeReturnTarget}
+              >
+                &larr; Back to previous workspace
+              </a>
+            </div>
+          ) : null}
+          <h1 className="text-3xl font-bold text-text-primary">Passenger Details</h1>
+          <p className="text-text-secondary">Please enter the details for all passengers. Fields marked with * are required.</p>
+          <div className="card p-6 space-y-4">
+            <h2 className="text-lg font-semibold text-text-primary">Flight Selected</h2>
+            <div className="flex flex-wrap gap-6 text-sm text-text-secondary">
+              <div>
+                <span className="font-semibold text-text-primary">Carrier:</span> {offer.airline}
+              </div>
+              <div>
+                <span className="font-semibold text-text-primary">Route:</span> {offer.origin} to {offer.destination}
+              </div>
+              <div>
+                <span className="font-semibold text-text-primary">Departure:</span> {offer.departureAt}
+              </div>
+              <div>
+                <span className="font-semibold text-text-primary">Arrival:</span> {offer.arrivalAt}
+              </div>
+              <div>
+                <span className="font-semibold text-text-primary">Price:</span> {offer.price} {offer.currency}
+              </div>
+            </div>
+          </div>
+          <PassengerFormClient
+            flight={{ id: 'handoff', adults: offer.adults, children: offer.children, infants: offer.infants }}
+            profile={null}
+            offerPassengers={passengers}
+            accessToken={accessToken}
+            handoff
+          />
+        </main>
+      </div>
+    );
+  }
+
+  // Reject any passenger data passed via query string to prevent PII exposure
+  const hasPiiInQuery = Object.keys(searchParams).some(key =>
+    ['name', 'email', 'phone', 'passport', 'dob', 'gender'].some(pii => key.toLowerCase().includes(pii))
+  );
+
+  if (hasPiiInQuery) {
+    const safeReturn = searchParams.returnTo ? getSafeReturnTarget(searchParams.returnTo) : '/';
+    const returnParam = safeReturn !== '/' ? `&returnTo=${encodeURIComponent(safeReturn)}` : '';
+    redirect(`/checkout/passengers?offerId=${offerId || ''}${returnParam}`);
+  }
 
   if (!offerId) {
-    redirect('/search');
+    redirect(`/search`);
   }
 
   const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
-  // Extract mock scenario for Playwright tests
-  const cookieHeader = headers().get('cookie') ?? '';
-  const mockScenarioMatch = cookieHeader.match(/mock-scenario=([^;]+)/);
-  const mockScenario = mockScenarioMatch ? mockScenarioMatch[1].trim() : null;
-
   let flight: PassengerPageFlightDetail | null = null;
-  let prefill: PrefillData = { hasProfile: false, passenger: null, missingFields: [] };
-  let isInternational = false;
+  let profile: TravelerProfileResponse | null = null;
 
   // 1. Mock support for test environment
   if ((process.env.NODE_ENV === 'test' || process.env.CI === 'true') && mockScenario) {
-    prefill = {
-      hasProfile: true,
-      passenger: {
-        givenName: 'Jane',
-        familyName: 'Doe',
-        dateOfBirth: '1995-05-05',
-        gender: 'female',
-        nationality: 'US',
-        passportNumber: 'P12345',
-        passportExpiry: '2030-05-05',
-        seatPreference: 'window',
-        classPreference: 'economy',
-      },
-      missingFields: [],
+    profile = {
+      profileId: 'mock-profile-id',
+      revision: 1,
+      identity: { givenName: 'Jane', middleName: null, familyName: 'Doe', dateOfBirth: '1995-05-05', gender: 'female', title: 'Ms' },
+      contact: { email: 'jane@example.test', phoneCountryCode: '+1', phoneNumber: '5550000000' },
+      travelDocument: { documentType: 'passport', passportNumber: 'P12345', passportExpiry: '2030-05-05', issuingCountry: 'US', nationality: 'US' },
+      preferences: { seatPreference: 'window', classPreference: 'economy' },
     };
 
     if (mockScenario === 'international-offer' || mockScenario.includes('international')) {
-      isInternational = true;
       flight = {
         id: offerId,
         airline: 'British Airways',
@@ -114,10 +181,10 @@ export default async function PassengersPage({ searchParams }: Props) {
         adults: 1,
         children: 0,
         infants: 0,
+        passengers: [{ id: 'pas_001', type: 'ADULT' }],
         segments: [{ departureAirport: 'JFK', arrivalAirport: 'LHR' }],
       };
     } else {
-      isInternational = false;
       flight = {
         id: offerId,
         airline: 'Delta Air Lines',
@@ -139,6 +206,7 @@ export default async function PassengersPage({ searchParams }: Props) {
         adults: 1,
         children: 1,
         infants: 0,
+        passengers: [{ id: 'pas_001', type: 'ADULT' }, { id: 'pas_002', type: 'CHILD' }],
         segments: [{ departureAirport: 'LAX', arrivalAirport: 'SFO' }],
       };
     }
@@ -182,37 +250,22 @@ export default async function PassengersPage({ searchParams }: Props) {
       );
     }
 
-    // Fetch Prefill details
+    // Load the authenticated traveler profile. The deprecated intent prefill
+    // route is intentionally not used by first-party checkout.
     try {
-      const prefillRes = await fetch(`${apiUrl}/api/bookings/intent/prefill`, {
+      const profileRes = await fetch(`${apiUrl}/api/profile`, {
         headers: {
           Authorization: `Bearer ${accessToken}`,
         },
         cache: 'no-store',
       });
-      if (prefillRes.ok) {
-        prefill = await prefillRes.json();
+      if (profileRes.ok) {
+        profile = await profileRes.json();
       }
-    } catch (err) {
-      // Ignore prefill error, keep defaults
+    } catch {
+      // Inline passenger sources remain available when profile loading fails.
     }
 
-    // Check international route
-    if (flight && flight.segments && flight.segments.length > 0) {
-      const originCode = flight.segments[0].departureAirport;
-      const destinationCode = flight.segments[flight.segments.length - 1].arrivalAirport;
-
-      const [originAirport, destinationAirport] = await Promise.all([
-        getAirportByIataCode(originCode),
-        getAirportByIataCode(destinationCode),
-      ]);
-
-      if (originAirport && destinationAirport) {
-        isInternational = originAirport.country.toLowerCase() !== destinationAirport.country.toLowerCase();
-      } else {
-        isInternational = true;
-      }
-    }
   }
 
   if (!flight) {
@@ -233,6 +286,16 @@ export default async function PassengersPage({ searchParams }: Props) {
     <div className="flex min-h-screen flex-col bg-background">
       <Header />
       <main className="mx-auto w-full max-w-3xl space-y-6 py-12 px-4">
+        {safeReturnTarget && safeReturnTarget !== '/' ? (
+          <div>
+            <a
+              className="inline-flex items-center gap-1 text-sm font-semibold text-text-link hover:underline"
+              href={safeReturnTarget}
+            >
+              &larr; Back to previous workspace
+            </a>
+          </div>
+        ) : null}
         <h1 className="text-3xl font-bold text-text-primary">Passenger Details</h1>
         <p className="text-text-secondary">Please enter the details for all passengers. Fields marked with * are required.</p>
         
@@ -259,8 +322,8 @@ export default async function PassengersPage({ searchParams }: Props) {
 
         <PassengerFormClient
           flight={flight}
-          prefill={prefill}
-          isInternational={isInternational}
+          profile={profile}
+          offerPassengers={flight.passengers}
           accessToken={accessToken}
           offerId={offerId}
         />

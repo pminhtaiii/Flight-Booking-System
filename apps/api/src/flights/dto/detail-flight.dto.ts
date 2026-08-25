@@ -38,4 +38,8 @@ export class FlightDetailResponseDto {
   adults!: number;
   children!: number;
   infants!: number;
+  passengers!: Array<{
+    id: string;
+    type: 'ADULT' | 'CHILD' | 'INFANT';
+  }>;
 }

@@ -27,6 +27,7 @@ describe('Duffel Cleanup Service (E2E)', () => {
   });
 
   beforeEach(async () => {
+    await prisma.chatHandoff.deleteMany({});
     await prisma.flightOffer.deleteMany({});
     await prisma.offerRecovery.deleteMany({});
   });
@@ -155,3 +156,5 @@ describe('Duffel Cleanup Service (E2E)', () => {
     }
   });
 });
+
+

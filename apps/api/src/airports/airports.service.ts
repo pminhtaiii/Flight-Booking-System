@@ -5,6 +5,7 @@ import { CacheService } from '@/cache/cache.service';
 @Injectable()
 export class AirportsService {
   private readonly logger = new Logger(AirportsService.name);
+  private readonly countryCache = new Map<string, string | null>();
 
   constructor(
     private readonly prisma: PrismaService,
@@ -54,6 +55,46 @@ export class AirportsService {
       this.logger.error(`[findByIataCode] Failed to find airport by IATA: ${iataCode}`, error);
       throw error;
     }
+  }
+
+  async findCountriesByIataCodes(codes: readonly string[]): Promise<Map<string, string | null>> {
+    const normalizedCodes = [...new Set(
+      codes
+        .map((code) => code.trim().toUpperCase())
+        .filter((code) => /^[A-Z]{3}$/.test(code)),
+    )];
+
+    const missingCodes: string[] = [];
+    const countries = new Map<string, string | null>();
+
+    for (const code of normalizedCodes) {
+      if (this.countryCache.has(code)) {
+        countries.set(code, this.countryCache.get(code)!);
+      } else {
+        missingCodes.push(code);
+      }
+    }
+
+    if (missingCodes.length > 0) {
+      const rows = await this.prisma.airport.findMany({
+        where: { iataCode: { in: missingCodes } },
+        select: { iataCode: true, country: true },
+      });
+
+      for (const code of missingCodes) {
+        this.countryCache.set(code, null);
+      }
+      for (const row of rows) {
+        const code = row.iataCode.trim().toUpperCase();
+        const country = row.country ?? null;
+        this.countryCache.set(code, country);
+      }
+      for (const code of missingCodes) {
+        countries.set(code, this.countryCache.get(code)!);
+      }
+    }
+
+    return countries;
   }
 
   async findNearby(lat: number, lng: number, radiusKm: number, limit: number) {

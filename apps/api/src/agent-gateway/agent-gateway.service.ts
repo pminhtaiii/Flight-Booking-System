@@ -1,16 +1,36 @@
-import { Injectable, NotFoundException, Logger, HttpException, HttpStatus } from '@nestjs/common';
+import { Injectable, NotFoundException, Logger, HttpException, HttpStatus, ServiceUnavailableException } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '@/prisma/prisma.service';
 import { AuditService } from '@/audit/audit.service';
 import { CacheService } from '@/cache/cache.service';
 import { DuffelService } from '@/duffel/duffel.service';
 import { DuffelBaggage } from '@/duffel/duffel.types';
+import { SelectionAttestationService } from './selection-attestation.service';
 import { FlightSearchQueryDto } from './dto/flight-search-query.dto';
+import { AttestedFlightSearchDto, AttestedFlightSearchResponseDto } from './dto/attested-flight-search.dto';
 import { FlightSearchResponseDto, FlightResultDto } from './dto/flight-result.dto';
 import { UserPreferencesDto } from './dto/user-preferences.dto';
 import { UserBookingsResponseDto, BookingResultDto } from './dto/user-bookings.dto';
+import { BookingSummaryDto, BookingSummariesResponseDto } from './dto/booking-summary.dto';
+import { BookingDetailDto } from './dto/booking-detail.dto';
 import { FlightSnapshot, PassengerSnapshot } from '@shared/booking-types';
 import * as crypto from 'crypto';
 import { CABIN_KEYWORDS, PASSENGER_KEYWORDS } from './agent-gateway.constants';
+import {
+  AgentBookingReadinessRequestDto,
+  AgentBookingReadinessResponseDto,
+} from './dto/booking-readiness.dto';
+import { BookingReadinessService } from '@/booking-intent/booking-readiness.service';
+import { BookingReadinessObservability } from '@/booking-intent/booking-readiness.observability';
+import { BookingReadinessOperation } from '@/common/observability/booking-readiness-observability.types';
+import { ProfileService } from '@/profile/profile.service';
+import { BookingReadinessRequestDto, BookingReadinessPassengerDto } from '@/booking-intent/dto/booking-readiness.dto';
+import { ChatService } from '@/chat/chat.service';
+import {
+  ChatMessageCryptoService,
+  CryptoKeyUnavailableError,
+  UnsupportedKeyVersionError,
+} from '@/chat/chat-message-crypto.service';
 
 function capitalizeCabinClass(cabinClass: string): string {
   if (!cabinClass) return '';
@@ -67,7 +87,196 @@ export class AgentGatewayService {
     private readonly auditService: AuditService,
     private readonly cacheService: CacheService,
     private readonly duffelService: DuffelService,
+    private readonly profileService: ProfileService,
+    private readonly bookingReadinessService: BookingReadinessService,
+    private readonly bookingReadinessObservability: BookingReadinessObservability,
+    private readonly configService: ConfigService,
+    private readonly chatService: ChatService,
+    private readonly selectionAttestationService: SelectionAttestationService,
+    private readonly chatMessageCryptoService: ChatMessageCryptoService,
   ) {}
+
+  /**
+   * Verifies user active status and token non-revocation.
+   */
+  async checkUserAccess(dto: { sub: string; jti?: string; exp?: number }): Promise<{ allowed: boolean }> {
+    const user = await this.prisma.user.findUnique({
+      where: { id: dto.sub },
+    });
+
+    if (!user || user.status !== 'ACTIVE') {
+      throw new HttpException(
+        { code: 'UNAUTHORIZED', message: 'User is inactive or not found' },
+        HttpStatus.UNAUTHORIZED,
+      );
+    }
+
+    if (dto.jti) {
+      const isJtiBlacklisted = await this.cacheService.get(`blacklist:jti:${dto.jti}`);
+      if (isJtiBlacklisted) {
+        throw new HttpException(
+          { code: 'UNAUTHORIZED', message: 'Token JTI has been revoked' },
+          HttpStatus.UNAUTHORIZED,
+        );
+      }
+    }
+
+    return { allowed: true };
+  }
+
+  /**
+   * Validates fencing token using Redis session lock if Phase 4 write fence is enabled.
+   */
+  async validateFencingToken(
+    userId: string,
+    sessionId: string,
+    fencingToken?: string | null,
+  ): Promise<void> {
+    return this.chatService.validateFencingToken(userId, sessionId, fencingToken);
+  }
+
+  /**
+   * Creates a chat session for a claimed user.
+   */
+  async createSession(userId: string, title?: string) {
+    return this.chatService.createSession(userId, title);
+  }
+
+  /**
+   * Gets memory for a session.
+   */
+  async getMemory(userId: string, sessionId: string, query: { recentCount?: number; unsummarizedOnly?: boolean }) {
+    return this.chatService.getMemory(userId, sessionId, {
+      recentCount: query.recentCount || 20,
+      unsummarizedOnly: query.unsummarizedOnly || false,
+    });
+  }
+
+  /**
+   * Creates a chat message in the session with write fence validation.
+   */
+  async createChatMessage(
+    userId: string,
+    sessionId: string,
+    dto: { sender: string; content: string; type?: string },
+    fencingToken?: string | null,
+  ) {
+    try {
+      return await this.chatService.createMessage(
+        userId,
+        sessionId,
+        {
+          sender: dto.sender as any,
+          content: dto.content,
+          type: (dto.type || 'STANDARD') as any,
+        },
+        undefined,
+        undefined,
+        undefined,
+        fencingToken || undefined,
+      );
+    } catch (err) {
+      if (err instanceof NotFoundException) {
+        throw new NotFoundException({
+          statusCode: 404,
+          message: 'Session not found',
+          code: 'CHAT_SESSION_NOT_FOUND',
+        });
+      }
+      throw err;
+    }
+  }
+
+  async createMessageBatch(
+    userId: string,
+    sessionId: string,
+    dto: { messages: Array<{ sender: string; content: string; type?: string }> },
+    fencingToken?: string | null,
+  ) {
+    try {
+      return await this.chatService.createMessageBatch(
+        userId,
+        sessionId,
+        {
+          messages: dto.messages.map((m) => ({
+            sender: m.sender as any,
+            content: m.content,
+            type: (m.type || 'STANDARD') as any,
+          })),
+        },
+        undefined,
+        undefined,
+        undefined,
+        fencingToken || undefined,
+      );
+    } catch (err) {
+      if (err instanceof NotFoundException) {
+        throw new NotFoundException({
+          statusCode: 404,
+          message: 'Session not found',
+          code: 'CHAT_SESSION_NOT_FOUND',
+        });
+      }
+      throw err;
+    }
+  }
+
+  /**
+   * Soft deletes a chat session.
+   */
+  async deleteSession(userId: string, sessionId: string) {
+    return this.chatService.deleteSession(userId, sessionId);
+  }
+
+  private async recordReadinessOutcome(
+    userId: string,
+    status: string,
+    startedAt: number,
+    traceId: string | null | undefined,
+    correlationId: string | null | undefined,
+    passengerCount: number,
+    scope: string | null,
+    error = false,
+  ): Promise<void> {
+    const metadata = { status, scope, passengerCount };
+    this.bookingReadinessObservability.recordOutcome({
+      status,
+      error,
+      operation: BookingReadinessOperation.GATEWAY_READINESS,
+      latencyMs: Date.now() - startedAt,
+      metadata,
+      context: { traceId: traceId ?? undefined, correlationId: correlationId ?? undefined },
+    });
+
+    try {
+      await this.auditService.createLog(null, {
+        userId,
+        action: 'AGENT_GATEWAY_READINESS',
+        resourceType: 'agent-gateway',
+        resourceId: 'bookings/readiness',
+        metadata,
+        traceId,
+        correlationId,
+      });
+    } catch {
+      this.logger.error('Failed to write booking readiness audit log');
+    }
+  }
+
+  private readinessErrorCode(error: unknown): string {
+    if (error instanceof HttpException) {
+      const response = error.getResponse();
+      if (typeof response === 'object' && response !== null && 'code' in response) {
+        const code = (response as { code?: unknown }).code;
+        if (typeof code === 'string' && /^[A-Z_]{1,64}$/.test(code)) {
+          return code;
+        }
+      }
+      return `HTTP_${error.getStatus()}`;
+    }
+
+    return 'READINESS_REQUEST_FAILED';
+  }
 
   private async logToolCall(
     userId: string,
@@ -134,6 +343,15 @@ export class AgentGatewayService {
         throw new HttpException('Adults count is required', HttpStatus.BAD_REQUEST);
       }
 
+      const searchDate = query.date || query.departureDate;
+      if (!searchDate) {
+        throw new HttpException('Date is required', HttpStatus.BAD_REQUEST);
+      }
+
+      const origin = query.origin.trim().toUpperCase();
+      const destination = query.destination.trim().toUpperCase();
+      const cabinClass = query.cabinClass || 'economy';
+
       // Check for user's latest chat message and perform honest degradation keyword validation
       let lastMessage = null;
       if (correlationId) {
@@ -157,18 +375,37 @@ export class AgentGatewayService {
       }
 
       if (lastMessage) {
+        let content: string;
+        try {
+          content = await this.chatMessageCryptoService.decryptMessageContent(lastMessage);
+        } catch (error: unknown) {
+          if (
+            error instanceof CryptoKeyUnavailableError ||
+            error instanceof UnsupportedKeyVersionError ||
+            !this.chatMessageCryptoService.isConfigured() ||
+            (error instanceof Error &&
+              (error.message.includes('CHAT_ENCRYPTION_KEY') ||
+                error.message.includes('Unsupported key version')))
+          ) {
+            throw new ServiceUnavailableException('Chat encryption service is unavailable');
+          }
+          throw new HttpException(
+            'Unable to decrypt chat message envelope',
+            HttpStatus.BAD_REQUEST,
+          );
+        }
         const matchedKeywords: string[] = [];
 
         for (const kw of CABIN_KEYWORDS) {
           const regex = new RegExp(`\\b${kw}\\b`, 'i');
-          if (regex.test(lastMessage.content)) {
+          if (regex.test(content)) {
             matchedKeywords.push(kw);
           }
         }
 
         for (const kw of PASSENGER_KEYWORDS) {
           const regex = new RegExp(`\\b${kw}\\b`, 'i');
-          if (regex.test(lastMessage.content)) {
+          if (regex.test(content)) {
             matchedKeywords.push(kw);
           }
         }
@@ -201,13 +438,13 @@ export class AgentGatewayService {
 
       // 1. Check Redis cache first for mapped results
       const normalizedQuery = {
-        origin: query.origin.trim().toUpperCase(),
-        destination: query.destination.trim().toUpperCase(),
-        date: query.date,
+        origin,
+        destination,
+        date: searchDate,
         adults: adultsCount,
         children: 0,
         infants: 0,
-        cabinClass: 'economy',
+        cabinClass,
       };
       const queryStr = JSON.stringify(normalizedQuery);
       const sha256 = crypto.createHash('sha256').update(queryStr).digest('hex');
@@ -235,13 +472,13 @@ export class AgentGatewayService {
       try {
         const searchResult = await this.duffelService.searchFlights(
           {
-            origin: query.origin,
-            destination: query.destination,
-            departureDate: query.date,
+            origin,
+            destination,
+            departureDate: searchDate,
             adults: adultsCount,
             children: 0,
             infants: 0,
-            cabinClass: 'economy',
+            cabinClass,
           },
           'agent',
         );
@@ -299,8 +536,8 @@ export class AgentGatewayService {
 
         const segmentPassenger = firstSegment.passengers?.[0];
         const offerPassenger = offer.passengers?.[0];
-        const cabinClass = segmentPassenger?.cabin_class || '';
-        const fareClass = cabinClass ? capitalizeCabinClass(cabinClass) : null;
+        const passengerCabinClass = segmentPassenger?.cabin_class || cabinClass;
+        const fareClass = passengerCabinClass ? capitalizeCabinClass(passengerCabinClass) : null;
         
         const baggages = segmentPassenger?.baggages || offerPassenger?.baggages;
         const baggageAllowance = formatDuffelBaggageAllowance(baggages);
@@ -352,6 +589,290 @@ export class AgentGatewayService {
         err,
         null,
       );
+      throw err;
+    }
+  }
+
+  async searchFlightsV2(
+    userId: string,
+    dto: AttestedFlightSearchDto,
+    traceId: string | null = null,
+    correlationId: string | null = null,
+  ): Promise<AttestedFlightSearchResponseDto> {
+    const startTime = Date.now();
+    try {
+      // 1. Verify owned ChatSession
+      const chatSession = await this.prisma.chatSession.findFirst({
+        where: { id: dto.chatSessionId, userId, deletedAt: null },
+      });
+      if (!chatSession) {
+        throw new HttpException('Chat session not found', HttpStatus.NOT_FOUND);
+      }
+
+      const proposedSnapshotVersion = dto.proposedSnapshotVersion ?? dto.proposedVersion ?? 1;
+
+      // Check degradation triggers
+      let adultsCount = dto.search.adults;
+      if (adultsCount === undefined) {
+        adultsCount = dto.search.passengers;
+      }
+      if (adultsCount === undefined) {
+        throw new HttpException(
+          'At least one of adults or passengers must be provided',
+          HttpStatus.BAD_REQUEST,
+        );
+      }
+
+      const searchDate = dto.search.date || dto.search.departureDate;
+      if (!searchDate) {
+        throw new HttpException(
+          'At least one of date or departureDate must be provided',
+          HttpStatus.BAD_REQUEST,
+        );
+      }
+
+      const origin = dto.search.origin.trim().toUpperCase();
+      const destination = dto.search.destination.trim().toUpperCase();
+      const cabinClass = dto.search.cabinClass || 'economy';
+
+      // Check for user's latest chat message and perform honest degradation keyword validation
+      const lastMessage = await this.prisma.chatMessage.findFirst({
+        where: {
+          sender: 'USER',
+          sessionId: dto.chatSessionId,
+        },
+        orderBy: { createdAt: 'desc' },
+      });
+
+      if (lastMessage) {
+        let content: string;
+        try {
+          content = await this.chatMessageCryptoService.decryptMessageContent(lastMessage);
+        } catch (error: unknown) {
+          if (
+            error instanceof CryptoKeyUnavailableError ||
+            error instanceof UnsupportedKeyVersionError ||
+            !this.chatMessageCryptoService.isConfigured() ||
+            (error instanceof Error &&
+              (error.message.includes('CHAT_ENCRYPTION_KEY') ||
+                error.message.includes('Unsupported key version')))
+          ) {
+            throw new ServiceUnavailableException('Chat encryption service is unavailable');
+          }
+          throw new HttpException(
+            'Unable to decrypt chat message envelope',
+            HttpStatus.BAD_REQUEST,
+          );
+        }
+        const matchedKeywords: string[] = [];
+
+        for (const kw of CABIN_KEYWORDS) {
+          const regex = new RegExp(`\\b${kw}\\b`, 'i');
+          if (regex.test(content)) {
+            matchedKeywords.push(kw);
+          }
+        }
+
+        for (const kw of PASSENGER_KEYWORDS) {
+          const regex = new RegExp(`\\b${kw}\\b`, 'i');
+          if (regex.test(content)) {
+            matchedKeywords.push(kw);
+          }
+        }
+
+        if (matchedKeywords.length > 0) {
+          this.logger.warn(
+            `Agent gateway keyword trigger matched for user ${userId}. Matched keywords: ${matchedKeywords.join(', ')}`
+          );
+
+          // Write audit log
+          await this.auditService.createLog(null, {
+            userId,
+            action: 'AGENT_KEYWORD_TRIGGER',
+            resourceType: 'agent-gateway',
+            resourceId: lastMessage.id,
+            metadata: {
+              matchedKeywords,
+              messageId: lastMessage.id,
+            },
+            traceId,
+            correlationId: correlationId || dto.chatSessionId,
+          });
+
+          throw new HttpException(
+            'I can currently only search economy class for adult passengers. For other cabin classes or passenger types, please use the search page.',
+            HttpStatus.BAD_REQUEST,
+          );
+        }
+      }
+
+      // Call DuffelService
+      let rawResponse;
+      let searchHashValue = '';
+      try {
+        const searchResult = await this.duffelService.searchFlights(
+          {
+            origin,
+            destination,
+            departureDate: searchDate,
+            adults: adultsCount,
+            children: 0,
+            infants: 0,
+            cabinClass,
+          },
+          'agent',
+        );
+        rawResponse = searchResult.offerRequest;
+        searchHashValue = searchResult.searchHash;
+      } catch (err: unknown) {
+        if (err instanceof HttpException) throw err;
+        throw new HttpException(
+          {
+            message: err instanceof Error ? err.message : 'Upstream flight search service is temporarily unavailable',
+            code: 'UPSTREAM_UNAVAILABLE',
+          },
+          HttpStatus.BAD_GATEWAY,
+        );
+      }
+
+      const offers = rawResponse.offers || [];
+      const limitedOffers = offers.slice(0, 5);
+
+      const flightOffersData = limitedOffers.map((offer) => ({
+        searchHash: searchHashValue,
+        duffelOfferId: offer.id,
+        rawOffer: offer as any,
+        origin,
+        destination,
+        departureDate: new Date(searchDate),
+        adults: adultsCount,
+        cabinClass,
+        price: offer.total_amount,
+        currency: offer.total_currency,
+      }));
+
+      if (flightOffersData.length > 0) {
+        await this.prisma.flightOffer.createMany({
+          data: flightOffersData,
+          skipDuplicates: true,
+        });
+      }
+
+      const createdOffers = await this.prisma.flightOffer.findMany({
+        where: {
+          searchHash: searchHashValue,
+          duffelOfferId: { in: limitedOffers.map((o) => o.id) },
+        },
+      });
+      
+      const results = [];
+      const attestationOffers: { flightOfferId: string; duffelOfferId: string }[] = [];
+      const expiresAt = new Date(Date.now() + 15 * 60000); // 15 mins
+
+      for (let i = 0; i < limitedOffers.length; i++) {
+        const offer = limitedOffers[i];
+        const slice = offer.slices?.[0];
+        if (!slice || !slice.segments || slice.segments.length === 0) continue;
+        
+        const createdOffer = createdOffers.find((co) => co.duffelOfferId === offer.id);
+        if (!createdOffer) continue;
+
+        const segments = slice.segments;
+        const firstSegment = segments[0];
+        const lastSegment = segments[segments.length - 1];
+
+        const airline = firstSegment.operating_carrier?.name || 'Unknown Airline';
+        const flightNumber = `${firstSegment.marketing_carrier?.iata_code || ''}${
+          firstSegment.marketing_carrier_flight_number || ''
+        }`;
+
+        const departureAirport = firstSegment.origin?.iata_code || '';
+        const arrivalAirport = lastSegment.destination?.iata_code || '';
+        const departureTime = cleanIsoTime(firstSegment.departing_at);
+        const arrivalTime = cleanIsoTime(lastSegment.arriving_at);
+
+        let duration = 0;
+        if (slice.duration) {
+          if (slice.duration.startsWith('P')) {
+            duration = parseISODurationToMinutes(slice.duration);
+          } else {
+            duration = parseInt(slice.duration, 10) || 0;
+          }
+        }
+        const stops = segments.length - 1;
+
+        const price = parseFloat(offer.total_amount);
+        const currency = offer.total_currency;
+
+        const segmentPassenger = firstSegment.passengers?.[0];
+        const offerPassenger = offer.passengers?.[0];
+        const passengerCabinClass = segmentPassenger?.cabin_class || cabinClass;
+        const fareClass = passengerCabinClass ? capitalizeCabinClass(passengerCabinClass) : null;
+        
+        const baggages = segmentPassenger?.baggages || offerPassenger?.baggages;
+        const baggageAllowance = formatDuffelBaggageAllowance(baggages);
+
+        attestationOffers.push({ flightOfferId: createdOffer.id, duffelOfferId: offer.id });
+        results.push({
+          flightOfferId: createdOffer.id,
+          duffelOfferId: offer.id,
+          offerExpiresAt: expiresAt.toISOString(),
+          airline,
+          flightNumber,
+          departureAirport,
+          arrivalAirport,
+          departureTime,
+          arrivalTime,
+          duration,
+          stops,
+          price,
+          currency,
+          fareClass,
+          baggageAllowance,
+        });
+      }
+
+      const selectionAttestation = await this.selectionAttestationService.signSelectionAttestation(
+        userId,
+        dto.chatSessionId,
+        proposedSnapshotVersion,
+        expiresAt.toISOString(),
+        attestationOffers,
+      );
+
+      const response = {
+        selectionAttestation,
+        snapshotVersion: proposedSnapshotVersion,
+        snapshotExpiresAt: expiresAt.toISOString(),
+        results,
+      };
+
+      await this.logToolCall(
+        userId,
+        'v2/flights/search',
+        dto,
+        startTime,
+        traceId,
+        correlationId,
+        true,
+        null,
+        response,
+      );
+
+      return response;
+    } catch (err: unknown) {
+      await this.logToolCall(
+        userId,
+        'v2/flights/search',
+        dto,
+        startTime,
+        traceId,
+        correlationId,
+        false,
+        err,
+        null,
+      );
+      this.logger.error('Failed to search flights V2');
       throw err;
     }
   }
@@ -456,4 +977,308 @@ export class AgentGatewayService {
       throw err;
     }
   }
+
+  async checkBookingReadiness(
+    userId: string,
+    dto: AgentBookingReadinessRequestDto,
+    traceId?: string | null,
+    correlationId?: string | null,
+  ): Promise<AgentBookingReadinessResponseDto> {
+    const startTime = Date.now();
+    try {
+      // 1. Get primary profile ID if needed
+      let travelerProfileId: string | null = null;
+      if (dto.passengers.some((p) => p.sourceType === 'traveler_profile')) {
+        const profile = await this.profileService.getProfile(userId);
+        if (!profile || !profile.profileId) {
+          throw new NotFoundException({
+            statusCode: 404,
+            message: 'No traveler profile exists for this user',
+            code: 'PROFILE_NOT_FOUND',
+          });
+        }
+        travelerProfileId = profile.profileId;
+      }
+
+      // 2. Map passenger ordinals to offerPassengerId
+      const flightOffer = await this.prisma.flightOffer.findUnique({
+        where: { id: dto.flightOfferId },
+
+      });
+
+      if (!flightOffer) {
+        throw new NotFoundException({
+          statusCode: 404,
+          message: 'Flight offer not found',
+          code: 'OFFER_NOT_FOUND',
+        });
+      }
+
+      const rawOffer = flightOffer.rawOffer as { passengers?: Array<{ id?: string }> } | null;
+      if (!rawOffer || !Array.isArray(rawOffer.passengers)) {
+        throw new HttpException(
+          { code: 'OFFER_MALFORMED', message: 'Stored offer data is malformed' },
+          HttpStatus.UNPROCESSABLE_ENTITY,
+        );
+      }
+
+      const internalDto = new BookingReadinessRequestDto();
+      internalDto.flightOfferId = dto.flightOfferId;
+      internalDto.passengers = dto.passengers.map((p) => {
+        // ordinal is 1-indexed
+        const passengerIndex = p.passengerOrdinal - 1;
+        const offerPassenger = (rawOffer as any)?.passengers?.[passengerIndex];
+        if (!offerPassenger || !offerPassenger.id) {
+          throw new HttpException(
+            { code: 'PASSENGER_MAPPING_INVALID', message: `No passenger found for ordinal ${p.passengerOrdinal}` },
+            HttpStatus.UNPROCESSABLE_ENTITY,
+          );
+        }
+
+        const pdto = new BookingReadinessPassengerDto();
+        pdto.offerPassengerId = offerPassenger.id;
+        pdto.passengerType = p.passengerType;
+
+        if (p.sourceType === 'traveler_profile') {
+          if (!travelerProfileId) {
+             throw new HttpException(
+              { code: 'PROFILE_NOT_FOUND', message: 'Profile not found' },
+              HttpStatus.UNPROCESSABLE_ENTITY,
+            );
+          }
+          pdto.source = {
+            type: 'traveler_profile',
+            travelerProfileId: travelerProfileId,
+          };
+        } else {
+          pdto.source = {
+            type: 'inline',
+          };
+        }
+        return pdto;
+      });
+
+      // 3. Call internal readiness service
+      const result = await this.bookingReadinessService.getAdvisoryReadiness(
+        userId,
+        internalDto,
+        { traceId: traceId || undefined, correlationId: correlationId || undefined },
+      );
+
+      // 4. Extract safe fields for projection
+      // The result is already safe from getAdvisoryReadiness (BookingReadinessResult)
+      // We explicitly map it to ensure no PII leaks.
+      const hasInlinePassengers = dto.passengers.some((p) => p.sourceType === 'inline');
+      
+      const safeResponse: AgentBookingReadinessResponseDto = {
+        scope: result.scope,
+        ready: result.ready,
+        passengers: result.passengers.map((p: any) => ({
+          passengerType: p.passengerType as any,
+          passengerOrdinal: p.passengerOrdinal,
+          sections: p.sections.map((s: any) => ({
+            name: s.name,
+            fields: s.fields.map((f: any) => ({
+              name: f.name,
+              status: f.status as string,
+              reason: f.reason,
+            })),
+          })),
+        })),
+        nextAction: result.ready || hasInlinePassengers ? 'CONTINUE_CHECKOUT' : 'COMPLETE_PROFILE',
+      };
+
+      await this.recordReadinessOutcome(
+        userId,
+        result.ready ? 'ready' : 'not_ready',
+        startTime,
+        traceId,
+        correlationId,
+        dto.passengers.length,
+        result.scope,
+      );
+
+      return safeResponse;
+    } catch (err: unknown) {
+      const status = this.readinessErrorCode(err);
+      await this.recordReadinessOutcome(
+        userId,
+        status,
+        startTime,
+        traceId,
+        correlationId,
+        dto.passengers.length,
+        null,
+        !(err instanceof HttpException) || err.getStatus() >= HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+
+      if (err instanceof HttpException) {
+        throw err;
+      }
+
+      throw new HttpException(
+        { code: 'READINESS_REQUEST_FAILED', message: 'Failed to evaluate booking readiness' },
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
+  async getBookingSummaries(
+    userId: string,
+    traceId?: string | null,
+    correlationId?: string | null,
+  ): Promise<BookingSummariesResponseDto> {
+    const startTime = Date.now();
+    try {
+      const projections = await this.prisma.bookingAgentProjection.findMany({
+        where: { booking: { userId } },
+        select: {
+          agentReference: true,
+          airline: true,
+          origin: true,
+          destination: true,
+          departureAt: true,
+          arrivalAt: true,
+          status: true,
+          durationMinutes: true,
+          stopCount: true,
+        },
+        orderBy: { departureAt: 'asc' },
+      });
+
+      const bookings: BookingSummaryDto[] = projections.map((p) => ({
+        bookingReference: p.agentReference,
+        airline: p.airline,
+        origin: p.origin,
+        destination: p.destination,
+        departureTime: p.departureAt.toISOString(),
+        arrivalTime: p.arrivalAt.toISOString(),
+        status: p.status,
+        durationMinutes: p.durationMinutes,
+        stops: p.stopCount,
+      }));
+
+      const response: BookingSummariesResponseDto = { bookings };
+      await this.logToolCall(
+        userId,
+        'users/bookings/summaries',
+        {},
+        startTime,
+        traceId,
+        correlationId,
+        true,
+        null,
+        response,
+      );
+      return response;
+    } catch (err) {
+      await this.logToolCall(
+        userId,
+        'users/bookings/summaries',
+        {},
+        startTime,
+        traceId,
+        correlationId,
+        false,
+        err,
+        null,
+      );
+      throw err;
+    }
+  }
+
+  async getBookingDetailByReference(
+    userId: string,
+    bookingReference: string,
+    traceId?: string | null,
+    correlationId?: string | null,
+  ): Promise<BookingDetailDto> {
+    const startTime = Date.now();
+    try {
+      const BKREF_REGEX = /^bkref_[0-9a-fA-F-]{36}$/;
+      if (!bookingReference || !BKREF_REGEX.test(bookingReference)) {
+        throw new NotFoundException({
+          statusCode: 404,
+          message: 'Booking reference not found',
+          code: 'BOOKING_REFERENCE_NOT_FOUND',
+        });
+      }
+
+      const projection = await this.prisma.bookingAgentProjection.findUnique({
+        where: { agentReference: bookingReference },
+        select: {
+          agentReference: true,
+          airline: true,
+          origin: true,
+          destination: true,
+          departureAt: true,
+          arrivalAt: true,
+          status: true,
+          durationMinutes: true,
+          stopCount: true,
+          flightNumber: true,
+          baggageSummary: true,
+          refundable: true,
+          changeable: true,
+          booking: {
+            select: {
+              userId: true,
+            },
+          },
+        },
+      });
+
+      if (!projection || projection.booking.userId !== userId) {
+        throw new NotFoundException({
+          statusCode: 404,
+          message: 'Booking reference not found',
+          code: 'BOOKING_REFERENCE_NOT_FOUND',
+        });
+      }
+
+      const detail: BookingDetailDto = {
+        bookingReference: projection.agentReference,
+        airline: projection.airline,
+        origin: projection.origin,
+        destination: projection.destination,
+        departureTime: projection.departureAt.toISOString(),
+        arrivalTime: projection.arrivalAt.toISOString(),
+        status: projection.status,
+        durationMinutes: projection.durationMinutes,
+        stops: projection.stopCount,
+        flightNumber: projection.flightNumber ?? null,
+        baggageAllowance: projection.baggageSummary ?? null,
+        changeable: projection.changeable ?? null,
+        refundable: projection.refundable ?? null,
+      };
+
+      await this.logToolCall(
+        userId,
+        'users/bookings/detail',
+        { bookingReference },
+        startTime,
+        traceId,
+        correlationId,
+        true,
+        null,
+        detail,
+      );
+
+      return detail;
+    } catch (err) {
+      await this.logToolCall(
+        userId,
+        'users/bookings/detail',
+        { bookingReference },
+        startTime,
+        traceId,
+        correlationId,
+        false,
+        err,
+        null,
+      );
+      throw err;
+    }
+  }
 }
+

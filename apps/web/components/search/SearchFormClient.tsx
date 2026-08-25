@@ -99,6 +99,7 @@ export function SearchFormClient({ accessToken }: SearchFormClientProps) {
             break;
           }
         } catch (err) {
+          // eslint-disable-next-line no-console
           console.error(`[SearchFormClient/handleBook] Attempt ${attempt} failed:`, err);
         }
         if (attempt < 5) {
