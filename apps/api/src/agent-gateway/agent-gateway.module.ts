@@ -11,13 +11,11 @@ import { SafeBookingReadModule } from './safe-booking-read/safe-booking-read.mod
 import { TravelerPreferencesModule } from './traveler-preferences/traveler-preferences.module';
 import { PrismaModule } from '@/prisma/prisma.module';
 import { CacheModule } from '@/cache/cache.module';
-import { ChatModule } from '@/chat/chat.module';
 
 @Module({
   imports: [
     PrismaModule,
     CacheModule,
-    ChatModule,
     AgentAuthModule,
     AgentToolAuditModule,
     AttestedFlightSearchModule,
@@ -40,3 +38,4 @@ import { ChatModule } from '@/chat/chat.module';
   ],
 })
 export class AgentGatewayModule {}
+
