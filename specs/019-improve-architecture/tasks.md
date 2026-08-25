@@ -171,11 +171,11 @@
 - [x] T068 [P] [US5] Define provider-free Flight Search Zod schemas and inferred outcome types in packages/shared/src/types/flight-search.types.ts
 - [x] T069 [P] [US5] Define prepared Booking Management views and typed command/read outcomes in packages/shared/src/types/booking-management.types.ts
 - [x] T070 [US5] Export only the new vertical contracts through stable imports in packages/shared/src/types/index.ts
-- [ ] T071 [P] [US5] Add failing authenticated transport, retry, timeout, validation, and error-mapping tests in apps/web/lib/server/flight-search.spec.ts
-- [ ] T072 [US5] Implement server-only searchFlights and selectFlightOffer operations in apps/web/lib/server/flight-search.ts
-- [ ] T073 [US5] Implement serializable Next.js 14 search and selection Server Actions in apps/web/app/search/actions.ts
-- [ ] T074 [US5] Remove access-token props, local offer contracts, backend URLs, bearer fetches, and client retry logic from apps/web/app/search/page.tsx and apps/web/components/search/SearchFormClient.tsx
-- [ ] T075 [P] [US5] Introduce private API_URL transition configuration and convert browser-interception fixtures to approved server/mock-scenario seams in apps/web/.env.example and apps/web/tests/checkout-foundation.spec.ts
+- [x] T071 [P] [US5] Add failing authenticated transport, retry, timeout, validation, and error-mapping tests in apps/web/lib/server/flight-search.spec.ts
+- [x] T072 [US5] Implement server-only searchFlights and selectFlightOffer operations in apps/web/lib/server/flight-search.ts
+- [x] T073 [US5] Implement serializable Next.js 14 search and selection Server Actions in apps/web/app/search/actions.ts
+- [x] T074 [US5] Remove access-token props, local offer contracts, backend URLs, bearer fetches, and client retry logic from apps/web/app/search/page.tsx and apps/web/components/search/SearchFormClient.tsx
+- [x] T075 [P] [US5] Introduce private API_URL transition configuration and convert browser-interception fixtures to approved server/mock-scenario seams in apps/web/.env.example and apps/web/tests/checkout-foundation.spec.ts
 
 ### Booking Management
 

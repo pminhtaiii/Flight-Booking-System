@@ -3,6 +3,7 @@ import { randomBytes } from 'node:crypto';
 import path from 'path';
 
 const t093RealFlow = process.env.T093_REAL_FLOW === 'true';
+const flightSearchFixtureApiUrl = process.env.FLIGHT_SEARCH_FIXTURE_API_URL || 'http://127.0.0.1:3101';
 const generatedSecret = (): string => randomBytes(32).toString('base64url');
 const t093Secrets = {
   agent: process.env.AGENT_SERVICE_API_KEY || generatedSecret(),
@@ -20,6 +21,9 @@ const frontendEnv = {
   CI: 'true',
   NEXTAUTH_SECRET: t093RealFlow ? t093Secrets.jwt : 'test_secret',
   NEXTAUTH_URL: t093RealFlow ? 'http://localhost:3000' : 'http://127.0.0.1:3000',
+  // Search Server Actions run in Next.js, so their upstream fixture must be reachable
+  // from the Next process rather than intercepted from the browser.
+  API_URL: flightSearchFixtureApiUrl,
   NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:3001',
   NEXT_PUBLIC_FEATURE_FLAG_BOOKING_READINESS: 'true',
   NEXT_PUBLIC_FEATURE_FLAG_CHAT_HANDOFF: 'true',

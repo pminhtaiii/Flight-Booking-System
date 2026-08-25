@@ -548,6 +548,13 @@ The repository uses a single GitHub Actions pull request CI workflow at `.github
 - `packages/shared/src/types/booking-management.types.ts` owns strict prepared owner views and generic `BookingManagementOutcomeSchema(dataSchema)`. It preserves local booking/revision references, PNR, flight details, passenger names, ancillary summaries, cancellation facts, and disruption displays while rejecting Stripe IDs, Duffel order/quote/segment IDs, provider payloads, and raw snapshots.
 - Both outcome families use explicit `ok` discriminants and allowlisted error reasons. `packages/shared/src/types/index.ts` exports the contracts, and the package root re-exports that stable type surface for web and API consumers.
 
+### Slice 5B — Flight Search Server Seam
+
+- `apps/web/lib/server/flight-search.ts` is the Flight Search server-only transport owner. It obtains the NextAuth session itself, resolves `API_URL || NEXT_PUBLIC_API_URL || http://localhost:3001` only on the server, injects the bearer credential, bounds requests with a timeout and three-attempt exponential retry policy, validates NestJS responses with Zod, and normalizes every result into the shared discriminated outcome contracts.
+- `apps/web/app/search/actions.ts` provides the colocated Next.js Server Actions. Search rendering calls the typed action boundary only; `SearchFormClient` receives and stores `FlightSearchOfferView` values containing an opaque local offer ID and display fields, never a JWT, backend URL, provider payload, Duffel identifier, or retry policy.
+- Offer selection revalidates the opaque offer server-to-server and returns the contractually specified encoded checkout path. The server module is protected with the `server-only` sentinel so it cannot be imported into the browser bundle.
+- Playwright uses a loopback Flight Search fixture through private `API_URL` for Server Action coverage. The scoped static characterization audit rejects credential, public transport, direct-fetch, provider/raw payload, and retry-policy markers in the search rendering tree.
+
 Feature 019 restructures high-leverage boundaries without changing public product behavior:
 - **Slice 0 (Baseline Characterization & Safety Rails)**:
   - Establishes immutable automated characterization suites across `apps/api/test/characterization/`, `apps/agent/tests/characterization/`, and `apps/web/tests/characterization/` with 0 production business logic modifications.
