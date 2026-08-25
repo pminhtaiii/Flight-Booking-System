@@ -7,13 +7,23 @@ Update this file after every completed feature. Any AI agent reading this should
 ### Current Status
 
 **Feature:** Deepen Codebase Architecture (Feature 019)
-**Last completed:** Slice 4C: Thin Transport Adapter and Graceful Runner Shutdown (2026-08-24) — User Story 4 Complete.
+**Last completed:** Slice 5A: Narrow Shared Contracts for Flight Search & Booking Management (2026-08-25).
 **In progress:** None.
-**Next:** Slice 5A or next milestone.
+**Next:** Slice 5B: Flight Search server seam.
 
 ---
 
 ## Progress by Feature
+
+### [x] Feature: Deepen Codebase Architecture (Feature 019) — Slice 5A: Narrow Shared Contracts for Flight Search & Booking Management
+
+- [x] Slice 5A / Provider-free shared web-seam contracts (2026-08-25):
+  - Added strict Zod schemas and inferred types in `packages/shared/src/types/flight-search.types.ts` for query validation, opaque-local flight offer rendering, metadata, Flight Search outcomes, and flight-selection outcomes.
+  - Added strict prepared Booking Management views and the generic discriminated `BookingManagementOutcomeSchema(dataSchema)` in `packages/shared/src/types/booking-management.types.ts` for list/detail, cancellation status/quote/result, and itinerary revision rendering.
+  - Enforced the browser privacy boundary by rejecting unknown fields, Duffel offer/order/quote/segment identifiers, Stripe payment-intent IDs, provider payloads, and raw snapshots; allowed owner-facing PNR, itinerary, ancillary, disruption, and passenger-name facts remain explicit.
+  - Added dependency-free Node contract tests covering valid success/error parsing, malformed reason/field rejection, strict nested provider-ID rejection, and compile-time type-inference parity.
+  - Exported both vertical contracts from `packages/shared/src/types/index.ts`; package-root `index.ts` re-exports the stable `types` surface.
+  - Verification: `pnpm --filter @shared/types build`; `node --test packages/shared/dist/types/flight-search.types.spec.js packages/shared/dist/types/booking-management.types.spec.js`; `pnpm --filter @web/frontend typecheck`; `pnpm --filter @api/backend exec tsc -p tsconfig.json --noEmit`.
 
 ### [x] Feature: Deepen Codebase Architecture (Feature 019) — Slice 4C: Thin Transport Adapter and Graceful Runner Shutdown (US4 Complete)
 

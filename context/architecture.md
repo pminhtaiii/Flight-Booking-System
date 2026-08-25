@@ -540,6 +540,12 @@ The repository uses a single GitHub Actions pull request CI workflow at `.github
 
 ## Feature 019 — Architecture Deepening & Safety Rails
 
+### Slice 5A — Narrow Shared Contracts for Web Server Seams
+
+- `packages/shared/src/types/flight-search.types.ts` owns strict Zod schemas and inferred types for server-seam Flight Search query, provider-free offer/slice/segment views, metadata, and search/selection outcomes. Browser offers expose only an opaque local `id`; raw Duffel offer identifiers are rejected by strict parsing.
+- `packages/shared/src/types/booking-management.types.ts` owns strict prepared owner views and generic `BookingManagementOutcomeSchema(dataSchema)`. It preserves local booking/revision references, PNR, flight details, passenger names, ancillary summaries, cancellation facts, and disruption displays while rejecting Stripe IDs, Duffel order/quote/segment IDs, provider payloads, and raw snapshots.
+- Both outcome families use explicit `ok` discriminants and allowlisted error reasons. `packages/shared/src/types/index.ts` exports the contracts, and the package root re-exports that stable type surface for web and API consumers.
+
 Feature 019 restructures high-leverage boundaries without changing public product behavior:
 - **Slice 0 (Baseline Characterization & Safety Rails)**:
   - Establishes immutable automated characterization suites across `apps/api/test/characterization/`, `apps/agent/tests/characterization/`, and `apps/web/tests/characterization/` with 0 production business logic modifications.
@@ -584,4 +590,3 @@ Feature 019 restructures high-leverage boundaries without changing public produc
   - **Thin Transport Boundary**: Reduced `apps/agent/src/agent/streaming/sse.py` to a thin HTTP transport layer (from ~880 down to 283 lines). Retained HTTP pre-stream admission (JWT validation, NestJS user access verification, length check, ingress PII detection, NeMo safety check, Redis quota & rate limiting) and delegated turn execution entirely to `ChatTurnRunner`.
   - **Client Disconnect & Lifespan Shutdown**: Added active runner task tracking (`active_runners: Set[asyncio.Task]` in `agent.main`), client disconnect detection (`request.is_disconnected()`), generator cleanup on exit (`generator.aclose()`), and graceful cancellation/await in application lifespan shutdown within a 5.0s bounded timeout.
   - **Established verification**: 20/20 unit tests in `apps/agent/tests/test_sse.py`, 452/452 full agent test suite passing (11 deselected), 15/15 web acceptance tests passing, ruff lint/format 100% green (121 files clean). Standards and spec code reviews approved with 0 P0/P1 issues.
-

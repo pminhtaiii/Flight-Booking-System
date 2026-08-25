@@ -167,10 +167,10 @@
 
 ### Shared contracts and Flight Search
 
-- [ ] T067 [P] [US5] Add failing runtime-schema and serialization tests for Flight Search and Booking Management outcomes in packages/shared/src/types/flight-search.types.spec.ts and packages/shared/src/types/booking-management.types.spec.ts
-- [ ] T068 [P] [US5] Define provider-free Flight Search Zod schemas and inferred outcome types in packages/shared/src/types/flight-search.types.ts
-- [ ] T069 [P] [US5] Define prepared Booking Management views and typed command/read outcomes in packages/shared/src/types/booking-management.types.ts
-- [ ] T070 [US5] Export only the new vertical contracts through stable imports in packages/shared/src/types/index.ts
+- [x] T067 [P] [US5] Add failing runtime-schema and serialization tests for Flight Search and Booking Management outcomes in packages/shared/src/types/flight-search.types.spec.ts and packages/shared/src/types/booking-management.types.spec.ts
+- [x] T068 [P] [US5] Define provider-free Flight Search Zod schemas and inferred outcome types in packages/shared/src/types/flight-search.types.ts
+- [x] T069 [P] [US5] Define prepared Booking Management views and typed command/read outcomes in packages/shared/src/types/booking-management.types.ts
+- [x] T070 [US5] Export only the new vertical contracts through stable imports in packages/shared/src/types/index.ts
 - [ ] T071 [P] [US5] Add failing authenticated transport, retry, timeout, validation, and error-mapping tests in apps/web/lib/server/flight-search.spec.ts
 - [ ] T072 [US5] Implement server-only searchFlights and selectFlightOffer operations in apps/web/lib/server/flight-search.ts
 - [ ] T073 [US5] Implement serializable Next.js 14 search and selection Server Actions in apps/web/app/search/actions.ts
