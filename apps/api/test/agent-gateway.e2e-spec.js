@@ -602,23 +602,17 @@ describe('Agent Gateway (E2E)', () => {
             });
             expect(logs.length).toBe(1);
             const log = logs[0];
-            expect(log.action).toBe('TOOL_CALL');
+            expect(log.action).toBe('AGENT_TOOL_CALL');
             expect(log.resourceType).toBe('agent-gateway');
             expect(log.resourceId).toBe('flights/search');
             expect(log.traceId).toBe(traceId);
             expect(log.correlationId).toBe(correlationId);
             const metadata = log.metadata;
             expect(metadata.toolName).toBe('flights/search');
-            expect(metadata.claimTokenUserId).toBe(user.id);
-            expect(metadata.success).toBe(true);
-            expect(metadata.parameters).toEqual({
-                origin: 'HAN',
-                destination: 'NRT',
-                date: '2026-07-15',
-                adults: 1,
-            });
+            expect(metadata.outcome).toBe('SUCCESS');
             expect(metadata.durationMs).toBeDefined();
-            expect(metadata.responseSize).toBeGreaterThan(0);
+            expect(metadata.responseSizeBytes).toBeGreaterThan(0);
+            expect(metadata.parameters).toBeUndefined();
         });
     });
     describe('Keyword Degradation and Passenger Validation', () => {

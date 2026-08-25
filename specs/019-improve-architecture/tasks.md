@@ -198,9 +198,9 @@
 
 **Independent Test**: Construct and invoke each capability with only local dependencies, verify unchanged route/status/body behavior, and prove no raw request data reaches audit storage.
 
-- [ ] T084 [P] [US6] Export existing API-key and claim guards through a narrow module in apps/api/src/agent-gateway/auth/agent-auth.module.ts
-- [ ] T085 [P] [US6] Add failing allowlisted tool audit and raw-parameter rejection tests in apps/api/src/agent-gateway/audit/agent-tool-audit.service.spec.ts
-- [ ] T086 [US6] Implement tool-name, outcome, duration, response-size, and sanitized trace-only audit storage in apps/api/src/agent-gateway/audit/agent-tool-audit.service.ts
+- [x] T084 [P] [US6] Export existing API-key and claim guards through a narrow module in apps/api/src/agent-gateway/auth/agent-auth.module.ts
+- [x] T085 [P] [US6] Add failing allowlisted tool audit and raw-parameter rejection tests in apps/api/src/agent-gateway/audit/agent-tool-audit.service.spec.ts
+- [x] T086 [US6] Implement tool-name, outcome, duration, response-size, and sanitized trace-only audit storage in apps/api/src/agent-gateway/audit/agent-tool-audit.service.ts
 - [ ] T087 [P] [US6] Add capability-local legacy/V2 search, attestation, mapping, and dependency-isolation tests in apps/api/src/agent-gateway/attested-flight-search/attested-flight-search.service.spec.ts
 - [ ] T088 [US6] Extract attested search ownership while preserving routes and safe projections in apps/api/src/agent-gateway/attested-flight-search/attested-flight-search.controller.ts, apps/api/src/agent-gateway/attested-flight-search/attested-flight-search.service.ts, and apps/api/src/agent-gateway/attested-flight-search/attested-flight-search.module.ts
 - [ ] T089 [P] [US6] Add readiness projection, observability, and dependency-isolation tests in apps/api/src/agent-gateway/booking-readiness/agent-booking-readiness.service.spec.ts

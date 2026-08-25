@@ -31,6 +31,7 @@ import {
   CryptoKeyUnavailableError,
   UnsupportedKeyVersionError,
 } from '@/chat/chat-message-crypto.service';
+import { AgentToolAuditService } from './audit/agent-tool-audit.service';
 
 function capitalizeCabinClass(cabinClass: string): string {
   if (!cabinClass) return '';
@@ -94,6 +95,7 @@ export class AgentGatewayService {
     private readonly chatService: ChatService,
     private readonly selectionAttestationService: SelectionAttestationService,
     private readonly chatMessageCryptoService: ChatMessageCryptoService,
+    private readonly agentToolAuditService: AgentToolAuditService,
   ) {}
 
   /**
@@ -281,7 +283,7 @@ export class AgentGatewayService {
   private async logToolCall(
     userId: string,
     toolName: string,
-    params: unknown,
+    _params: unknown = null,
     startTime: number,
     traceId?: string | null,
     correlationId?: string | null,
@@ -290,44 +292,38 @@ export class AgentGatewayService {
     response: unknown = null,
   ) {
     const durationMs = Date.now() - startTime;
-    const responseSize = response ? Buffer.byteLength(JSON.stringify(response)) : 0;
-    
-    let errorMessage: string | null = null;
+    const responseSizeBytes = response ? Buffer.byteLength(JSON.stringify(response)) : 0;
+
+    let errorCode: string | null = null;
     if (error) {
-      const rawMessage = error instanceof Error ? error.message : String(error);
       if (error instanceof HttpException) {
-        errorMessage = rawMessage;
+        const responseObj = error.getResponse();
+        if (
+          typeof responseObj === 'object' &&
+          responseObj !== null &&
+          'code' in responseObj &&
+          typeof (responseObj as { code?: unknown }).code === 'string'
+        ) {
+          errorCode = (responseObj as { code: string }).code;
+        } else {
+          errorCode = `HTTP_${error.getStatus()}`;
+        }
       } else {
-        const errorName = error instanceof Error ? error.name : 'Error';
-        errorMessage = `Internal Service Error: ${errorName}`;
-      }
-      if (errorMessage.length > 256) {
-        errorMessage = errorMessage.substring(0, 256) + '...';
+        errorCode = 'INTERNAL_ERROR';
       }
     }
 
-    try {
-      await this.auditService.createLog(null, {
-        userId,
-        action: 'TOOL_CALL',
-        resourceType: 'agent-gateway',
-        resourceId: toolName,
-        metadata: {
-          toolName,
-          responseSize,
-          durationMs,
-          claimTokenUserId: userId,
-          parameters: params,
-          success,
-          errorMessage,
-        },
-        traceId,
-        correlationId,
-      });
-    } catch (logErr: unknown) {
-      const logMsg = logErr instanceof Error ? logErr.message : String(logErr);
-      this.logger.error(`Failed to write tool call audit log: ${logMsg}`);
-    }
+    await this.agentToolAuditService.recordToolExecution({
+      toolName,
+      actorId: userId,
+      outcome: success ? 'SUCCESS' : 'FAILURE',
+      durationMs,
+      responseSizeBytes,
+      occurredAt: new Date().toISOString(),
+      errorCode: errorCode || undefined,
+      traceId: traceId || undefined,
+      correlationId: correlationId || undefined,
+    });
   }
 
   async searchFlights(

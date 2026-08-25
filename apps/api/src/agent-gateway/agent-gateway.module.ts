@@ -1,7 +1,8 @@
 import { Module, forwardRef } from '@nestjs/common';
 import { AgentGatewayService } from './agent-gateway.service';
 import { AgentGatewayController } from './agent-gateway.controller';
-import { ClaimTokenService } from './auth/claim-token.service';
+import { AgentAuthModule } from './auth/agent-auth.module';
+import { AgentToolAuditModule } from './audit/agent-tool-audit.module';
 import { SelectionAttestationService } from './selection-attestation.service';
 import { BookingAgentProjectionService } from './booking-agent-projection.service';
 import { PrismaModule } from '@/prisma/prisma.module';
@@ -12,10 +13,20 @@ import { BookingIntentModule } from '@/booking-intent/booking-intent.module';
 import { ChatModule } from '@/chat/chat.module';
 
 @Module({
-  imports: [PrismaModule, AuditModule, DuffelModule, ProfileModule, forwardRef(() => BookingIntentModule), ChatModule],
+  imports: [
+    PrismaModule,
+    AuditModule,
+    DuffelModule,
+    ProfileModule,
+    forwardRef(() => BookingIntentModule),
+    ChatModule,
+    AgentAuthModule,
+    AgentToolAuditModule,
+  ],
   controllers: [AgentGatewayController],
-  providers: [AgentGatewayService, ClaimTokenService, SelectionAttestationService, BookingAgentProjectionService],
-  exports: [AgentGatewayService, ClaimTokenService, SelectionAttestationService, BookingAgentProjectionService],
+  providers: [AgentGatewayService, SelectionAttestationService, BookingAgentProjectionService],
+  exports: [AgentGatewayService, AgentAuthModule, AgentToolAuditModule, SelectionAttestationService, BookingAgentProjectionService],
 })
 export class AgentGatewayModule {}
+
 
