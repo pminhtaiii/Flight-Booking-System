@@ -65,13 +65,28 @@ const offer = {
   ],
 };
 
+const futureDate = (daysFromToday: number): string => {
+  const date = new Date();
+  date.setUTCHours(0, 0, 0, 0);
+  date.setUTCDate(date.getUTCDate() + daysFromToday);
+  return date.toISOString().slice(0, 10);
+};
+
+const validQuery = {
+  origin: 'SGN',
+  destination: 'HAN',
+  departureDate: futureDate(2),
+  returnDate: null,
+  adults: 1,
+  children: 0,
+  infants: 0,
+  cabinClass: 'economy' as const,
+};
+
 describe('Flight Search shared contracts', () => {
   it('parses valid query and success outcome', () => {
     assert.equal(
-      FlightSearchQuerySchema.parse({
-        origin: 'SGN', destination: 'HAN', departureDate: '2026-09-01', returnDate: null,
-        adults: 1, children: 0, infants: 0, cabinClass: 'economy',
-      }).origin,
+      FlightSearchQuerySchema.parse(validQuery).origin,
       'SGN',
     );
 
@@ -107,5 +122,18 @@ describe('Flight Search shared contracts', () => {
       ok: false, reason: 'PROVIDER_ERROR', message: 'No', retryable: false,
     }));
     assert.throws(() => FlightSelectionOutcomeSchema.parse({ ok: true }));
+  });
+
+  it('rejects semantically invalid search queries', () => {
+    assert.throws(() => FlightSearchQuerySchema.parse({ ...validQuery, destination: 'SGN' }));
+    assert.throws(() => FlightSearchQuerySchema.parse({ ...validQuery, adults: 8, children: 1, infants: 1 }));
+    assert.throws(() => FlightSearchQuerySchema.parse({ ...validQuery, infants: 2 }));
+    assert.throws(() => FlightSearchQuerySchema.parse({
+      ...validQuery,
+      departureDate: futureDate(3),
+      returnDate: futureDate(2),
+    }));
+    assert.throws(() => FlightSearchQuerySchema.parse({ ...validQuery, departureDate: '2026-02-31' }));
+    assert.throws(() => FlightSearchQuerySchema.parse({ ...validQuery, departureDate: '2000-01-01' }));
   });
 });

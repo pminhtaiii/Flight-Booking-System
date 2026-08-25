@@ -6,6 +6,19 @@ const IsoDateTimeSchema = z
   .string()
   .refine((value) => !Number.isNaN(Date.parse(value)), 'Expected an ISO datetime string');
 
+const isCurrentOrFutureCalendarDate = (value: string): boolean => {
+  const parsedDate = new Date(`${value}T00:00:00Z`);
+  const [year, month, day] = value.split('-').map(Number);
+  const isCalendarDate =
+    parsedDate.getUTCFullYear() === year &&
+    parsedDate.getUTCMonth() === month - 1 &&
+    parsedDate.getUTCDate() === day;
+  const today = new Date();
+  today.setUTCHours(0, 0, 0, 0);
+
+  return isCalendarDate && parsedDate >= today;
+};
+
 /** Validated criteria accepted by the flight-search server seam. */
 export const FlightSearchQuerySchema = z
   .object({
@@ -18,7 +31,51 @@ export const FlightSearchQuerySchema = z
     infants: z.number().int().min(0).max(8),
     cabinClass: z.enum(['economy', 'premium_economy', 'business', 'first']),
   })
-  .strict();
+  .strict()
+  .superRefine((query, context) => {
+    if (query.origin === query.destination) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['destination'],
+        message: 'Origin and destination must be different',
+      });
+    }
+    if (!isCurrentOrFutureCalendarDate(query.departureDate)) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['departureDate'],
+        message: 'Departure date must be today or later',
+      });
+    }
+    if (query.returnDate && !isCurrentOrFutureCalendarDate(query.returnDate)) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['returnDate'],
+        message: 'Return date must be today or later',
+      });
+    }
+    if (query.returnDate && query.returnDate < query.departureDate) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['returnDate'],
+        message: 'Return date must be on or after departure date',
+      });
+    }
+    if (query.adults + query.children + query.infants > 9) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['adults'],
+        message: 'Maximum 9 passengers per search',
+      });
+    }
+    if (query.infants > query.adults) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['infants'],
+        message: 'Number of infants cannot exceed number of adults',
+      });
+    }
+  });
 
 export type FlightSearchQuery = z.infer<typeof FlightSearchQuerySchema>;
 
