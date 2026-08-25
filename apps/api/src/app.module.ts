@@ -8,6 +8,8 @@ import { AuthModule } from './auth/auth.module';
 import { AuditModule } from './audit/audit.module';
 import { ChatModule } from './chat/chat.module';
 import { AgentGatewayModule } from './agent-gateway/agent-gateway.module';
+import { AgentAuthModule } from './agent-gateway/auth/agent-auth.module';
+import { AgentToolAuditModule } from './agent-gateway/audit/agent-tool-audit.module';
 import { AirportsModule } from './airports/airports.module';
 import { DuffelModule } from './duffel/duffel.module';
 import { FlightsModule } from './flights/flights.module';
@@ -84,6 +86,8 @@ export const envSchema = z.object({
     AuditModule,
     ChatModule,
     AgentGatewayModule,
+    AgentAuthModule,
+    AgentToolAuditModule,
     AirportsModule,
     DuffelModule,
     FlightsModule,

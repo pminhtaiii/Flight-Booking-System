@@ -7,13 +7,33 @@ Update this file after every completed feature. Any AI agent reading this should
 ### Current Status
 
 **Feature:** Deepen Codebase Architecture (Feature 019)
-**Last completed:** Slice 5A: Narrow Shared Contracts for Flight Search & Booking Management (2026-08-25).
+**Last completed:** Slice 6A: Agent Gateway Shared Auth & Safe Audit Module (2026-08-25).
 **In progress:** None.
-**Next:** Slice 5B: Flight Search server seam.
+**Next:** Slice 6B: Attested Flight Search module.
 
 ---
 
 ## Progress by Feature
+
+### [x] Feature: Deepen Codebase Architecture (Feature 019) — Slice 6A: Agent Gateway Shared Auth & Safe Audit Module
+
+- [x] Slice 6A / Shared Agent Auth & Privacy-Safe Tool Audit (2026-08-25):
+  - **Shared Agent Auth Module (`apps/api/src/agent-gateway/auth/`)**:
+    - Created `AgentAuthModule` (`agent-auth.module.ts`) encapsulating and exporting `AgentApiKeyGuard`, `ClaimTokenGuard`, and `ClaimTokenService`.
+    - Removed circular dependencies between `ChatHandoffModule` and `AgentGatewayModule` by importing `AgentAuthModule` directly.
+    - Exported `AgentAuthModule` from `AgentGatewayModule` and registered `AgentAuthModule` in root `AppModule`.
+  - **Safe Agent Tool Audit Service (`apps/api/src/agent-gateway/audit/`)**:
+    - Created `agent-tool-audit.types.ts` defining `AgentToolOutcome = 'SUCCESS' | 'FAILURE'` and `type AgentToolAuditRecord = { ... }`.
+    - Created `AgentToolAuditService` (`agent-tool-audit.service.ts`) implementing `recordToolExecution()` with strict negative privacy enforcement: projects ONLY allowlisted metrics metadata (`toolName`, `outcome`, `durationMs`, `responseSizeBytes`, `occurredAt`, `errorCode`), discarding any raw parameters, customer messages, passenger details, passport numbers, card numbers, or Duffel IDs.
+    - Provided fallback UUID generation for `traceId` and `correlationId`, and fail-safe error logging (`[recordToolExecution]`) without throwing unhandled exceptions.
+    - Created `AgentToolAuditModule` (`agent-tool-audit.module.ts`) exporting `AgentToolAuditService`, registered in `AgentGatewayModule` and `AppModule`.
+  - **Unit Testing & Verification (100% Green)**:
+    - Created comprehensive unit tests in `apps/api/src/agent-gateway/audit/agent-tool-audit.service.spec.ts` (6/6 tests PASS).
+    - Chat handoff unit test suite: 70/70 tests PASS (`booking-handoff.controller`, `chat-handoff-token.service`, `chat-handoff.config`, `chat-handoff.service`).
+    - Agent auth & gateway test suites: 123/123 tests PASS.
+    - TypeScript strict typecheck (`tsc --noEmit`): 0 errors.
+    - Two-Axis Code Review: Standards Review & Spec Review completed with 0 remaining P0/P1 issues.
+
 
 ### [x] Feature: Deepen Codebase Architecture (Feature 019) — Slice 5A: Narrow Shared Contracts for Flight Search & Booking Management
 
