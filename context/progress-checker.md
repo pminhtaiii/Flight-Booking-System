@@ -7,13 +7,45 @@ Update this file after every completed feature. Any AI agent reading this should
 ### Current Status
 
 **Feature:** Deepen Codebase Architecture (Feature 019)
-**Last completed:** Slice 6B: Extract Capability-Local Agent Gateway Modules (2026-08-25).
+**Last completed:** Slice 6C: Move Agent Chat Ownership to ChatModule (2026-08-25).
 **In progress:** None.
-**Next:** Slice 6C: Move Chat Ownership to ChatModule.
+**Next:** Slice 6D: Delete Broad Agent Gateway Service.
 
 ---
 
 ## Progress by Feature
+
+### [x] Feature: Deepen Codebase Architecture (Feature 019) — Slice 6C: Move Agent Chat Ownership to ChatModule
+
+- [x] Slice 6C / Move Agent Chat Ownership to ChatModule (2026-08-25):
+  - **Agent Chat Access Service (`apps/api/src/chat/agent-chat-access.service.ts`)**:
+    - Created `AgentChatAccessService` implementing `checkUserAccess(dto: CheckUserAccessDto)` validating active user status in PostgreSQL (`user.status === 'ACTIVE'`), token expiration (`exp > NOW()`), and JTI revocation status against Redis (`blacklist:jti:${dto.jti}`).
+    - Unit tests in `agent-chat-access.service.spec.ts` (8/8 tests PASS).
+  - **Agent Chat Controller (`apps/api/src/chat/agent-chat.controller.ts`)**:
+    - Created `AgentChatController` with `@Controller('agent-gateway/chat')` and `@UseGuards(AgentApiKeyGuard, ClaimTokenGuard)`.
+    - Injected `ChatService` and `AgentChatAccessService` directly without intermediate gateway layers.
+    - Implemented 7 authoritative wire routes: `POST access/check` (200 OK), `POST sessions` (201 Created), `GET sessions/:sessionId/memory` (200 OK), `POST sessions/:sessionId/messages` (201 Created), `POST sessions/:sessionId/turns` (201 Created), `POST sessions/:sessionId/summaries` (201 Created), and `DELETE sessions/:sessionId` (204 No Content).
+    - Preserved 100% wire-path, status-code, `X-Fencing-Token` header propagation, and AES-256-GCM record-bound authenticated encryption compatibility.
+    - Unit tests in `agent-chat.controller.spec.ts` (14/14 tests PASS).
+  - **Chat Module Registration (`apps/api/src/chat/chat.module.ts`)**:
+    - Imported `AgentAuthModule` and `CacheModule`.
+    - Registered `AgentChatController` in `controllers`.
+    - Registered and exported `AgentChatAccessService` in `providers` and `exports`.
+  - **Agent Gateway Decoupling (`apps/api/src/agent-gateway/`)**:
+    - Removed all chat route handlers from `AgentGatewayController`.
+    - Removed `ChatModule` from `AgentGatewayModule` imports, fully breaking Gateway↔Chat coupling.
+    - Removed `ChatService` dependency and legacy chat methods from `AgentGatewayService`.
+  - **Verification & Test Matrix (100% Green)**:
+    - Chat unit suites: 3/3 suites (36/36 tests) PASS (`src/chat`).
+    - Agent Gateway unit suites: 8/8 suites (83/83 tests) PASS (`src/agent-gateway`).
+    - Characterization E2E: `apps/api/test/characterization/agent-gateway-characterization.e2e-spec.ts` (17/17 tests PASS).
+    - Agent Chat Gateway E2E: `apps/api/test/agent-chat-gateway.e2e-spec.ts` (11/11 tests PASS).
+    - Full backend unit suites: 88/88 suites (933/933 tests) PASS.
+    - Full backend E2E suites: 57/57 suites (495/495 tests) PASS.
+    - TypeScript Strict Typecheck (`tsc -p tsconfig.json --noEmit`): 0 errors.
+    - ESLint (`pnpm exec eslint "apps/api/**/*.ts" "packages/shared/**/*.ts" --max-warnings 0`): 0 errors / 0 warnings.
+    - API Build (`pnpm --filter @api/backend build`): 0 errors, compiles cleanly.
+    - Two-Axis Code Review: Standards Review & Spec Review completed with 0 remaining P0/P1 issues.
 
 ### [x] Feature: Deepen Codebase Architecture (Feature 019) — Slice 6B: Extract Capability-Local Agent Gateway Modules
 
