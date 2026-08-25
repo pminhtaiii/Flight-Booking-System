@@ -10,20 +10,8 @@ import {
   type BookingListView,
   type BookingManagementOutcome,
 } from './booking-management.types';
+import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-
-const assert = (condition: unknown, message: string): asserts condition => {
-  if (!condition) throw new Error(message);
-};
-
-const assertThrows = (run: () => unknown, message: string) => {
-  try {
-    run();
-  } catch {
-    return;
-  }
-  throw new Error(message);
-};
 
 type Assert<T extends true> = T;
 type Equal<Left, Right> =
@@ -74,8 +62,8 @@ describe('Booking Management shared contracts', () => {
   it('parses prepared list, detail, cancellation, and itinerary outcomes', () => {
     const listOutcome = BookingManagementOutcomeSchema(BookingListViewSchema).parse({ ok: true, data: list });
     const detailOutcome = BookingManagementOutcomeSchema(BookingDetailViewSchema).parse({ ok: true, data: detail });
-    assert(listOutcome.ok, 'list outcome should parse as a success');
-    assert(detailOutcome.ok, 'detail outcome should parse as a success');
+    assert.ok(listOutcome.ok, 'list outcome should parse as a success');
+    assert.ok(detailOutcome.ok, 'detail outcome should parse as a success');
 
     const cancellationStatus = CancellationStatusViewSchema.parse({
       bookingId: 'booking-local-1', bookingStatus: 'CANCELLING', cancellationDeadline: null,
@@ -90,27 +78,27 @@ describe('Booking Management shared contracts', () => {
     const revision = ItineraryRevisionViewSchema.parse({
       revisionId: 'revision-local-1', version: 2, observedAt: timestamp, isMaterial: true, materialReasons: ['SCHEDULE_CHANGE'], segments: [segment],
     });
-    assert(cancellationStatus.bookingId === 'booking-local-1', 'cancellation status should parse');
-    assert(quote.refundable, 'cancellation quote should parse');
-    assert(result.refundAmount === '100.00', 'cancellation result should parse');
-    assert(revision.version === 2, 'itinerary revision should parse');
+    assert.ok(cancellationStatus.bookingId === 'booking-local-1', 'cancellation status should parse');
+    assert.ok(quote.refundable, 'cancellation quote should parse');
+    assert.ok(result.refundAmount === '100.00', 'cancellation result should parse');
+    assert.ok(revision.version === 2, 'itinerary revision should parse');
   });
 
   it('parses documented failures and rejects unknown reasons or private fields', () => {
     const outcomeSchema = BookingManagementOutcomeSchema(BookingListViewSchema);
     const failure = outcomeSchema.parse({ ok: false, reason: 'STALE_REVISION', message: 'Refresh the booking.', retryable: true });
-    assert(!failure.ok && failure.reason === 'STALE_REVISION', 'documented failure should parse');
-    assertThrows(() => outcomeSchema.parse({ ok: false, reason: 'OFFER_EXPIRED', message: 'Unexpected reason', retryable: false }), 'unknown failure reasons must be rejected');
-    assertThrows(() => BookingListViewSchema.parse({ ...list, duffelOrderId: 'ord_123' }), 'provider IDs must be rejected');
-    assertThrows(() => BookingDetailViewSchema.parse({ ...detail, stripePaymentIntentId: 'pi_123' }), 'payment IDs must be rejected');
-    assertThrows(() => BookingDetailViewSchema.parse({ ...detail, rawSnapshot: {} }), 'snapshots must be rejected');
-    assertThrows(() => BookingListViewSchema.parse({ ...list, bookings: [{ ...list.bookings[0], providerOfferId: 'off_123' }] }), 'nested provider IDs must be rejected');
+    assert.ok(!failure.ok && failure.reason === 'STALE_REVISION', 'documented failure should parse');
+    assert.throws(() => outcomeSchema.parse({ ok: false, reason: 'OFFER_EXPIRED', message: 'Unexpected reason', retryable: false }), /invalid_enum_value/i);
+    assert.throws(() => BookingListViewSchema.parse({ ...list, duffelOrderId: 'ord_123' }));
+    assert.throws(() => BookingDetailViewSchema.parse({ ...detail, stripePaymentIntentId: 'pi_123' }));
+    assert.throws(() => BookingDetailViewSchema.parse({ ...detail, rawSnapshot: {} }));
+    assert.throws(() => BookingListViewSchema.parse({ ...list, bookings: [{ ...list.bookings[0], providerOfferId: 'off_123' }] }));
   });
 });
 
-type _ListInferenceParity = Assert<typeof list extends BookingListView ? true : false>;
-type _DetailInferenceParity = Assert<typeof detail extends BookingDetailView ? true : false>;
-type _OutcomeInferenceParity = Assert<
+type ListInferenceParity = Assert<typeof list extends BookingListView ? true : false>;
+type DetailInferenceParity = Assert<typeof detail extends BookingDetailView ? true : false>;
+type OutcomeInferenceParity = Assert<
   Equal<BookingManagementOutcome<BookingListView>,
       | { ok: true; data: BookingListView }
       | {
@@ -126,3 +114,7 @@ type _OutcomeInferenceParity = Assert<
           retryable: boolean;
         }>
 >;
+
+void (0 as unknown as ListInferenceParity);
+void (0 as unknown as DetailInferenceParity);
+void (0 as unknown as OutcomeInferenceParity);
