@@ -1,20 +1,10 @@
-import { Controller, Get, Query, Req, UseGuards, Logger, Headers, Param, Body, Post, HttpCode, Delete } from '@nestjs/common';
+import { Controller, Req, UseGuards, Logger, Headers, Param, Body, Post, Get, Delete, HttpCode, Query } from '@nestjs/common';
 import { Request } from 'express';
 import { AgentApiKeyGuard } from './auth/agent-api-key.guard';
 import { ClaimTokenGuard } from './auth/claim-token.guard';
 import { AgentGatewayService } from './agent-gateway.service';
-import { FlightSearchQueryDto } from './dto/flight-search-query.dto';
-import { FlightSearchResponseDto } from './dto/flight-result.dto';
-import { AttestedFlightSearchDto, AttestedFlightSearchResponseDto } from './dto/attested-flight-search.dto';
-import { UserPreferencesDto } from './dto/user-preferences.dto';
-import { UserBookingsResponseDto } from './dto/user-bookings.dto';
-import { BookingSummariesResponseDto } from './dto/booking-summary.dto';
-import { BookingDetailDto } from './dto/booking-detail.dto';
-import {
-  AgentBookingReadinessRequestDto,
-  AgentBookingReadinessResponseDto,
-} from './dto/booking-readiness.dto';
 import { MemoryQueryDto } from '@/chat/dto/memory-query.dto';
+import { ChatSession, ChatMessage, MessageSender, MessageType } from '@prisma/client';
 
 interface AuthenticatedRequest extends Request {
   user: {
@@ -30,142 +20,17 @@ export class AgentGatewayController {
 
   constructor(private readonly agentGatewayService: AgentGatewayService) {}
 
-  @Get('flights/search')
-  async searchFlights(
-    @Query() query: FlightSearchQueryDto,
-    @Req() req: AuthenticatedRequest,
-    @Headers() headers: Record<string, string>,
-  ): Promise<FlightSearchResponseDto> {
-    try {
-      const traceId = headers['x-trace-id'] || null;
-      const correlationId = headers['x-correlation-id'] || null;
-      const userId = req.user.id;
-
-      return await this.agentGatewayService.searchFlights(userId, query, traceId, correlationId);
-    } catch (err: unknown) {
-      this.logger.error('Failed to search flights');
-      throw err;
-    }
-  }
-
-  @Post('v2/flights/search')
-  @HttpCode(201)
-  async searchFlightsV2(
-    @Body() dto: AttestedFlightSearchDto,
-    @Req() req: AuthenticatedRequest,
-    @Headers() headers: Record<string, string>,
-  ): Promise<AttestedFlightSearchResponseDto> {
-    try {
-      const traceId = headers['x-trace-id'] || null;
-      const correlationId = headers['x-correlation-id'] || null;
-      const userId = req.user.id;
-
-      return await this.agentGatewayService.searchFlightsV2(userId, dto, traceId, correlationId);
-    } catch (err: unknown) {
-      this.logger.error('Failed to search attested flights');
-      throw err;
-    }
-  }
-
-  @Get('users/preferences')
-  async getUserPreferences(
-    @Req() req: AuthenticatedRequest,
-    @Headers() headers: Record<string, string>,
-  ): Promise<UserPreferencesDto> {
-    try {
-      const traceId = headers['x-trace-id'] || null;
-      const correlationId = headers['x-correlation-id'] || null;
-      const userId = req.user.id;
-
-      return await this.agentGatewayService.getUserPreferences(userId, traceId, correlationId);
-    } catch (err: unknown) {
-      this.logger.error('Failed to get user preferences');
-      throw err;
-    }
-  }
-
-  @Get('users/bookings')
-  async getUserBookings(
-    @Req() req: AuthenticatedRequest,
-    @Headers() headers: Record<string, string>,
-  ): Promise<UserBookingsResponseDto> {
-    try {
-      const traceId = headers['x-trace-id'] || null;
-      const correlationId = headers['x-correlation-id'] || null;
-      const userId = req.user.id;
-
-      return await this.agentGatewayService.getUserBookings(userId, traceId, correlationId);
-    } catch (err: unknown) {
-      this.logger.error('Failed to get user bookings');
-      throw err;
-    }
-  }
-
-  @Get('users/bookings/summaries')
-  async getBookingSummaries(
-    @Req() req: AuthenticatedRequest,
-    @Headers() headers: Record<string, string>,
-  ): Promise<BookingSummariesResponseDto> {
-    try {
-      const traceId = headers['x-trace-id'] || null;
-      const correlationId = headers['x-correlation-id'] || null;
-      const userId = req.user.id;
-
-      return await this.agentGatewayService.getBookingSummaries(userId, traceId, correlationId);
-    } catch (err: unknown) {
-      this.logger.error('Failed to get booking summaries');
-      throw err;
-    }
-  }
-
-  @Get('users/bookings/:bookingReference')
-  async getBookingDetail(
-    @Param('bookingReference') bookingReference: string,
-    @Req() req: AuthenticatedRequest,
-    @Headers() headers: Record<string, string>,
-  ): Promise<BookingDetailDto> {
-    try {
-      const traceId = headers['x-trace-id'] || null;
-      const correlationId = headers['x-correlation-id'] || null;
-      const userId = req.user.id;
-
-      return await this.agentGatewayService.getBookingDetailByReference(
-        userId,
-        bookingReference,
-        traceId,
-        correlationId,
-      );
-    } catch (err: unknown) {
-      this.logger.error('Failed to get booking detail');
-      throw err;
-    }
-  }
-
-  @Post('bookings/readiness')
-  @HttpCode(200)
-  async checkBookingReadiness(
-    @Body() dto: AgentBookingReadinessRequestDto,
-    @Req() req: AuthenticatedRequest,
-    @Headers() headers: Record<string, string>,
-  ): Promise<AgentBookingReadinessResponseDto> {
-    try {
-      const traceId = headers['x-trace-id'] || null;
-      const correlationId = headers['x-correlation-id'] || null;
-      const userId = req.user.id;
-
-      return await this.agentGatewayService.checkBookingReadiness(userId, dto, traceId, correlationId);
-    } catch (err: unknown) {
-      this.logger.error('Failed to check booking readiness');
-      throw err;
-    }
-  }
-
   @Post('chat/access/check')
   @HttpCode(200)
   async checkAccess(
     @Body() dto: { sub: string; jti?: string; exp?: number },
-  ) {
-    return await this.agentGatewayService.checkUserAccess(dto);
+  ): Promise<{ allowed: boolean }> {
+    try {
+      return await this.agentGatewayService.checkUserAccess(dto);
+    } catch (err) {
+      this.logger.error('Failed to check user access');
+      throw err;
+    }
   }
 
   @Post('chat/sessions')
@@ -173,8 +38,13 @@ export class AgentGatewayController {
   async createSession(
     @Req() req: AuthenticatedRequest,
     @Body() dto: { title?: string },
-  ) {
-    return await this.agentGatewayService.createSession(req.user.id, dto.title);
+  ): Promise<ChatSession> {
+    try {
+      return await this.agentGatewayService.createSession(req.user.id, dto.title);
+    } catch (err) {
+      this.logger.error('Failed to create session');
+      throw err;
+    }
   }
 
   @Get('chat/sessions/:sessionId/memory')
@@ -182,8 +52,17 @@ export class AgentGatewayController {
     @Param('sessionId') sessionId: string,
     @Req() req: AuthenticatedRequest,
     @Query() query: MemoryQueryDto,
-  ) {
-    return await this.agentGatewayService.getMemory(req.user.id, sessionId, query);
+  ): Promise<{
+    summary: string | null;
+    recentMessages: Array<{ id: string; sender: MessageSender; content: string; createdAt: Date }>;
+    totalMessageCount: number;
+  }> {
+    try {
+      return await this.agentGatewayService.getMemory(req.user.id, sessionId, query);
+    } catch (err) {
+      this.logger.error('Failed to get memory');
+      throw err;
+    }
   }
 
   @Post('chat/sessions/:sessionId/messages')
@@ -193,9 +72,14 @@ export class AgentGatewayController {
     @Req() req: AuthenticatedRequest,
     @Headers() headers: Record<string, string>,
     @Body() dto: { sender: string; content: string; type?: string },
-  ) {
-    const fencingToken = headers['x-fencing-token'] || headers['X-Fencing-Token'];
-    return await this.agentGatewayService.createChatMessage(req.user.id, sessionId, dto, fencingToken);
+  ): Promise<ChatMessage> {
+    try {
+      const fencingToken = headers['x-fencing-token'] || headers['X-Fencing-Token'];
+      return await this.agentGatewayService.createChatMessage(req.user.id, sessionId, dto, fencingToken);
+    } catch (err) {
+      this.logger.error('Failed to create chat message');
+      throw err;
+    }
   }
 
   @Post('chat/sessions/:sessionId/turns')
@@ -205,20 +89,34 @@ export class AgentGatewayController {
     @Req() req: AuthenticatedRequest,
     @Headers() headers: Record<string, string>,
     @Body() dto: { messages: Array<{ sender?: string; content?: string; type?: string }> },
-  ) {
-    const fencingToken = headers['x-fencing-token'] || headers['X-Fencing-Token'];
-    return await this.agentGatewayService.createMessageBatch(
-      req.user.id,
-      sessionId,
-      {
-        messages: dto.messages.map(m => ({
-          sender: m.sender || 'USER',
-          content: m.content || '',
-          type: m.type || 'STANDARD',
-        })),
-      },
-      fencingToken,
-    );
+  ): Promise<{
+    messages: Array<{
+      id: string;
+      sessionId: string;
+      sender: MessageSender;
+      type: MessageType;
+      content: string;
+      createdAt: Date;
+    }>;
+  }> {
+    try {
+      const fencingToken = headers['x-fencing-token'] || headers['X-Fencing-Token'];
+      return await this.agentGatewayService.createMessageBatch(
+        req.user.id,
+        sessionId,
+        {
+          messages: dto.messages.map(m => ({
+            sender: m.sender || 'USER',
+            content: m.content || '',
+            type: m.type || 'STANDARD',
+          })),
+        },
+        fencingToken,
+      );
+    } catch (err) {
+      this.logger.error('Failed to create chat turn');
+      throw err;
+    }
   }
 
   @Post('chat/sessions/:sessionId/summaries')
@@ -228,18 +126,23 @@ export class AgentGatewayController {
     @Req() req: AuthenticatedRequest,
     @Headers() headers: Record<string, string>,
     @Body() dto: { content: string },
-  ) {
-    const fencingToken = headers['x-fencing-token'] || headers['X-Fencing-Token'];
-    return await this.agentGatewayService.createChatMessage(
-      req.user.id,
-      sessionId,
-      {
-        sender: 'AGENT',
-        content: dto.content,
-        type: 'SUMMARY',
-      },
-      fencingToken,
-    );
+  ): Promise<ChatMessage> {
+    try {
+      const fencingToken = headers['x-fencing-token'] || headers['X-Fencing-Token'];
+      return await this.agentGatewayService.createChatMessage(
+        req.user.id,
+        sessionId,
+        {
+          sender: 'AGENT',
+          content: dto.content,
+          type: 'SUMMARY',
+        },
+        fencingToken,
+      );
+    } catch (err) {
+      this.logger.error('Failed to create chat summary');
+      throw err;
+    }
   }
 
   @Delete('chat/sessions/:sessionId')
@@ -247,7 +150,12 @@ export class AgentGatewayController {
   async deleteSession(
     @Param('sessionId') sessionId: string,
     @Req() req: AuthenticatedRequest,
-  ) {
-    await this.agentGatewayService.deleteSession(req.user.id, sessionId);
+  ): Promise<void> {
+    try {
+      await this.agentGatewayService.deleteSession(req.user.id, sessionId);
+    } catch (err) {
+      this.logger.error('Failed to delete session');
+      throw err;
+    }
   }
 }
