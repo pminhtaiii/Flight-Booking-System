@@ -23,7 +23,7 @@ const frontendEnv = {
   NEXTAUTH_URL: t093RealFlow ? 'http://localhost:3000' : 'http://127.0.0.1:3000',
   // Search Server Actions run in Next.js, so their upstream fixture must be reachable
   // from the Next process rather than intercepted from the browser.
-  API_URL: flightSearchFixtureApiUrl,
+  API_URL: t093RealFlow ? 'http://127.0.0.1:3001' : flightSearchFixtureApiUrl,
   NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:3001',
   NEXT_PUBLIC_FEATURE_FLAG_BOOKING_READINESS: 'true',
   NEXT_PUBLIC_FEATURE_FLAG_CHAT_HANDOFF: 'true',

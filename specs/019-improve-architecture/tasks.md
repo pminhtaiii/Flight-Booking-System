@@ -222,11 +222,11 @@
 
 **Purpose**: Prove repository-wide compatibility, synchronize operational documentation, and remove migration scaffolding only after evidence permits it.
 
-- [ ] T099 [P] Update ownership graphs, stable module boundaries, data flow, and compatibility state for all completed slices in context/architecture.md
-- [ ] T100 [P] Update accepted server-seam, stable-import, and module naming rules introduced by Feature 019 in context/code-standards.md and context/library-docs.md only where usage rules changed
-- [ ] T101 Complete migration preflight, observability, observation-window, rollback, and cleanup-eligibility procedures in docs/runbooks/refund-settlement-migration.md, docs/runbooks/booking-module-split.md, docs/runbooks/trusted-search-snapshot.md, docs/runbooks/chat-turn-runner.md, docs/runbooks/web-server-seams.md, and docs/runbooks/agent-gateway-capabilities.md
-- [ ] T102 Run pnpm build, pnpm lint, pnpm test, full agent Ruff/pytest, and full API E2E exactly as documented in specs/019-improve-architecture/quickstart.md
-- [ ] T103 Run the real T093 Playwright flow to exit code 0, remove eligible compatibility helpers, verify SC-001 through SC-009, and record final evidence in context/progress-checker.md
+- [x] T099 [P] Update ownership graphs, stable module boundaries, data flow, and compatibility state for all completed slices in context/architecture.md
+- [x] T100 [P] Update accepted server-seam, stable-import, and module naming rules introduced by Feature 019 in context/code-standards.md and context/library-docs.md only where usage rules changed
+- [x] T101 Complete migration preflight, observability, observation-window, rollback, and cleanup-eligibility procedures in docs/runbooks/refund-settlement-migration.md, docs/runbooks/booking-module-split.md, docs/runbooks/trusted-search-snapshot.md, docs/runbooks/chat-turn-runner.md, docs/runbooks/web-server-seams.md, and docs/runbooks/agent-gateway-capabilities.md
+- [x] T102 Run pnpm build, pnpm lint, pnpm test, full agent Ruff/pytest, and full API E2E exactly as documented in specs/019-improve-architecture/quickstart.md
+- [x] T103 Run the real T093 Playwright flow to exit code 0, remove eligible compatibility helpers, verify SC-001 through SC-009, and record final evidence in context/progress-checker.md
 
 ---
 

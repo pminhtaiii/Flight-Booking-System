@@ -6,14 +6,73 @@ Update this file after every completed feature. Any AI agent reading this should
 
 ### Current Status
 
-**Feature:** Deepen Codebase Architecture (Feature 019)
-**Last completed:** Slice 6D: Delete Broad Agent Gateway Service & Finalize Module Composition (2026-08-26).
+**Feature:** Deepen Codebase Architecture (Feature 019) — COMPLETE (100%)
+**Last completed:** Phase 9: Polish, Cross-Cutting Verification, and System Completion (2026-08-26).
 **In progress:** None.
-**Next:** Phase 9: Polish and Cross-Cutting Completion.
+**Next:** Production Deployment / Feature 020.
 
 ---
 
 ## Progress by Feature
+
+### [x] Feature: Deepen Codebase Architecture (Feature 019) — Phase 9: Polish, Cross-Cutting Verification, and System Completion
+
+- [x] Phase 9 / Polish, Cross-Cutting Verification, and System Completion (2026-08-26):
+  - **T099: System Architecture & Ownership Synchronization (`context/architecture.md`)**:
+    - Synchronized high-level system overview architecture Mermaid diagrams.
+    - Updated ownership graphs and detailed architecture for all six User Stories:
+      - **US1**: `RefundSettlementModule` provider-blind settlement, `CancellationRefundObligation`, `RefundTransaction`, and balance ledger pairs (`DEBIT PLATFORM_REVENUE`, `CREDIT CUSTOMER_RECEIVABLE`).
+      - **US2**: `BookingLifecycleModule`, `BookingManagementModule`, `CancellationModule` with zero Payment↔Booking cycles.
+      - **US3**: `apps/agent/src/agent/trusted_search_snapshot/` (3-key Redis Lua CAS protocol: snapshot, version, accepted).
+      - **US4**: `apps/agent/src/agent/chat_turn/` (`ChatTurnRunner` causal cleanup 4-step order, `X-Fencing-Token` lease validation, thin SSE transport).
+      - **US5**: `apps/web/lib/server/` server modules and same-origin route handlers under `app/api/booking-management/`.
+      - **US6**: 4 capability submodules (`attested-flight-search`, `booking-readiness`, `safe-booking-read`, `traveler-preferences`) + Chat persistence in `ChatModule` + pure umbrella composition in `AgentGatewayModule`.
+  - **T100: Standards & Library Synchronization (`context/code-standards.md`, `context/library-docs.md`)**:
+    - Documented Decision 6 exception: 7 thin same-origin Route Handlers under `app/api/booking-management/` for client polling and commands.
+    - Documented Zero-Client-Credential invariant: Client Components must never receive JWTs, `NEXT_PUBLIC_API_URL`, or backend transport configuration via props or state.
+    - Documented capability-local module conventions and strict anti-cyclic dependency rules.
+    - Documented Pydantic v2 `ConfigDict(extra="forbid")` rules for agent wire models.
+    - Documented Zod schema and TypeScript type inference synchronization patterns.
+  - **T101: 6 Authoritative Production Runbooks (`docs/runbooks/`)**:
+    - Authored/standardized all 6 runbooks with exact 6-section structure (Preflight Checks, Mismatch Abort Conditions, Observability Metrics, Observation Window, Rollback Procedures, Post-Rollout Cleanup Eligibility):
+      1. `docs/runbooks/refund-settlement-migration.md`
+      2. `docs/runbooks/booking-module-split.md`
+      3. `docs/runbooks/trusted-search-snapshot.md`
+      4. `docs/runbooks/chat-turn-runner.md`
+      5. `docs/runbooks/web-server-seams.md`
+      6. `docs/runbooks/agent-gateway-capabilities.md`
+  - **T102: Monorepo Static Audits & Multi-Workspace Test Battery**:
+    - **Static Audits (0 Violations)**:
+      - Cycle & Facade: `forwardRef(() => (BookingModule|PaymentModule))` = 0; `BookingService` in payment/lifecycle/cancellation = 0.
+      - Deleted Gateway Service: `AgentGatewayService` = 0; `AgentGatewayController` = 0.
+      - Web Client Credential Leakage: `accessToken` = 0; `NEXT_PUBLIC_API_URL` = 0; `useSession` in bookings = 0.
+      - Python Agent Deprecated Shims: `agent.models.snapshot` = 0; `agent.repositories.trusted_snapshot_repository` = 0.
+    - **Multi-Workspace Test Battery (100% Green)**:
+      - Shared Workspace: `pnpm --filter @shared/types build` (Clean, exit 0).
+      - NestJS API ESLint: `pnpm exec eslint "src/**/*.ts" --max-warnings 0` (0 errors, 0 warnings).
+      - NestJS API TSC: `pnpm exec tsc -p tsconfig.json --noEmit` (Clean compilation, exit 0).
+      - NestJS API Unit Tests: 87 suites passed, 932 of 932 tests passed (exit 0).
+      - NestJS API E2E Tests: 57 suites passed, 495 of 495 tests passed (exit 0).
+      - Next.js Web ESLint: `pnpm lint` (0 errors, 0 warnings).
+      - Next.js Web TSC: `pnpm typecheck` (Clean, exit 0).
+      - Next.js Web Build: `node node_modules/next/dist/bin/next build` (21/21 routes generated, exit 0).
+      - CI Workflow Contract Test: `node --test tests/ci/ci-workflow.contract.test.mjs` (13 of 13 tests passed, exit 0).
+      - Python Agent Ruff: `uv run --package agent ruff check apps/agent` (All checks passed).
+      - Python Agent Format: `uv run --package agent ruff format --check apps/agent` (121 files pristine).
+      - Python Agent Pytest: 465 functional tests passed.
+  - **T103: Real T093 Playwright Acceptance Flow & Success Criteria Sign-Off**:
+    - Real Playwright direct-stream checkout flow: `chat-t093-real-flow.spec.ts` exited with code 0 (1 passed, 2.8m runtime).
+    - Verified direct SSE streaming, token-only consumed intent, 1 winning intent, 15 concurrent 409 rejections, zero PII leakage, and PostgreSQL/Redis consistency.
+    - Formally verified criteria SC-001 through SC-009:
+      - **SC-001**: All 4 refund paths (inline, webhook, cron, admin) pass one settlement contract suite; 0 duplicate ledger entries under replay.
+      - **SC-002**: Concurrent reservations cannot make active + successful amounts exceed parent Payment or obligation capacity.
+      - **SC-003**: Payment↔Booking `forwardRef` cycle and `BookingService` facade are completely deleted (0 occurrences).
+      - **SC-004**: Existing booking, cancellation, payment, disruption, chat, handoff, search, and gateway suites are 100% green.
+      - **SC-005**: `ChatTurnRunner` is testable without HTTP; SSE encoding is testable without LangGraph/persistence.
+      - **SC-006**: Flight Search and Booking Management browser bundles contain 0 access tokens or direct backend URLs.
+      - **SC-007**: Snapshot selection and safe projection have 1 production interface and reject malformed/stale state consistently.
+      - **SC-008**: Each Agent Gateway capability module and test constructs only its required dependencies.
+      - **SC-009**: Every slice documents migration, rollout, observability, rollback, and end-to-end verification.
 
 ### [x] Feature: Deepen Codebase Architecture (Feature 019) — Slice 6D: Delete Broad Agent Gateway Service & Finalize Module Composition
 
