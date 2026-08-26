@@ -94,9 +94,9 @@
 
 ## Decision 9: One fresh CI job, conditional on applicable terminal gates
 
-**Decision**: Add `smoke-and-sanity` with `needs` on `detect-changes`, API unit/E2E, web build, and agent tests. Use `always()` plus change-output-aware predicates: changed services require successful terminal jobs; unchanged services may have skipped jobs; failure or cancellation blocks execution. The job runs when at least one service domain changed.
+**Decision**: Add `smoke-and-sanity` with `needs` on `detect-changes`, API unit/E2E, web build, and agent tests. Use `always()` plus change-output-aware predicates: changed services require successful terminal jobs; unchanged services may have skipped jobs; failure or cancellation blocks execution. The job runs when at least one service domain changed. Because `docker-compose.yml` defines shared PostgreSQL and Redis infrastructure, add it to all three service filters so a Compose-only change runs all applicable prerequisites and the whole-stack job rather than being treated as irrelevant.
 
-**Rationale**: GitHub Actions skips downstream jobs when a needed job skips unless `always()` is used. The job is shared across all services and cannot be modeled as one ordinary per-service chain.
+**Rationale**: GitHub Actions skips downstream jobs when a needed job skips unless `always()` is used. The job is shared across all services and cannot be modeled as one ordinary per-service chain. Infrastructure changes are cross-domain by definition; fanning `docker-compose.yml` into the existing outputs avoids adding a fourth result state while preventing database/cache regressions from bypassing `ci-status`.
 
 **Alternatives considered**:
 

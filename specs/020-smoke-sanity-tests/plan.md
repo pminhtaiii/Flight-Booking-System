@@ -171,14 +171,14 @@ The workflow starts Compose, installs/builds/migrates, then invokes the orchestr
 
 ### Change detection
 
-Add `tests/smoke/**` and `scripts/ci/run-smoke-sanity.mjs` to API, Web, and Agent filters because harness changes exercise all three. Existing `.github/**`, root manifests, lockfiles, shared paths, and service paths retain their current behavior.
+Add `tests/smoke/**`, `scripts/ci/run-smoke-sanity.mjs`, and the root `docker-compose.yml` to the API, Web, and Agent filters because harness or shared infrastructure changes can affect the composed stack even when no application-service file changes. A Compose-only pull request therefore sets all three service-domain outputs to `true`, runs their applicable prerequisites, and makes `smoke-and-sanity` mandatory. Existing `.github/**`, root manifests, lockfiles, shared paths, and service paths retain their current behavior.
 
 ### Dependency predicate
 
 The job uses `if: always()` and requires:
 
 - `detect-changes` succeeded;
-- at least one of API/Web/Agent changed;
+- at least one of API/Web/Agent changed, including infrastructure changes fanned out to those outputs;
 - if API changed: both API unit and API E2E succeeded;
 - if Web changed: Web build succeeded;
 - if Agent changed: Agent tests succeeded.
@@ -197,7 +197,7 @@ Skipped terminal jobs are accepted only for unchanged domains. Cancelled or fail
 
 ### Aggregate result
 
-Add `smoke-and-sanity` to `ci-status.needs`, pass `SMOKE_AND_SANITY_RESULT`, and extend `scripts/ci/evaluate-ci-status.mjs` plus workflow contract tests. Expected result is skipped only when all service change outputs are false; otherwise success is required.
+Add `smoke-and-sanity` to `ci-status.needs`, pass `SMOKE_AND_SANITY_RESULT`, and extend `scripts/ci/evaluate-ci-status.mjs` plus workflow contract tests. Expected result is skipped only when all service change outputs are false; otherwise success is required. The workflow contract must explicitly prove that a `docker-compose.yml`-only change makes all service outputs true and cannot pass `ci-status` unless the whole-stack job succeeds.
 
 ## Environment Contract
 

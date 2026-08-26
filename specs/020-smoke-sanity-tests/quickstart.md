@@ -17,7 +17,7 @@ node --test tests/ci/ci-workflow.contract.test.mjs
 node --test tests/smoke/wait-for-ready.unit.test.mjs tests/smoke/mock-server.unit.test.mjs
 ```
 
-Expected: exit code 0. The workflow contract verifies trigger scope, path filters, dependency routing, smoke-before-sanity ordering, network guard, cleanup, and aggregate status.
+Expected: exit code 0. The workflow contract verifies that `docker-compose.yml` is present in the API, Web, and Agent filters, a Compose-only change sets all three outputs to true, and both `smoke-and-sanity` and `ci-status` require success. It also verifies dependency routing, smoke-before-sanity ordering, the network guard, and cleanup.
 
 ## Prepare infrastructure and isolated database
 

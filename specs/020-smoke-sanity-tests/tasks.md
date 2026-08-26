@@ -124,10 +124,10 @@
 
 ### Workflow graph and aggregate result
 
-- [ ] T046 [P] [US3] Add failing workflow-contract assertions for all-service smoke path filters, exact terminal needs, change-aware `always()` predicate, locked setup/build/migration order, readiness-before-smoke, smoke-before-sanity, spec reporter, network guard, diagnostics, cleanup, timeout, and `ci-status` wiring in `tests/ci/ci-workflow.contract.test.mjs`
-- [ ] T047 [P] [US3] Add a failing truth-table test for expected success/skipped/failure/cancelled `SMOKE_AND_SANITY_RESULT` states in `tests/ci/evaluate-ci-status.test.mjs`
-- [ ] T048 [US3] Extend change-aware aggregate evaluation and safe failure messages in `scripts/ci/evaluate-ci-status.mjs` (depends on T047)
-- [ ] T049 [US3] Add the single `smoke-and-sanity` job, all-service filters, locked setup, Compose infra, builds/migration, non-secret loopback env, orchestrator invocation, always-run diagnostics/cleanup, and aggregate env/needs in `.github/workflows/ci.yml` (depends on T044, T046, T048)
+- [ ] T046 [P] [US3] Add failing workflow-contract assertions for all-service smoke path filters including `docker-compose.yml`, the Compose-only all-domains-true case, exact terminal needs, change-aware `always()` predicate, locked setup/build/migration order, readiness-before-smoke, smoke-before-sanity, spec reporter, network guard, diagnostics, cleanup, timeout, and `ci-status` wiring in `tests/ci/ci-workflow.contract.test.mjs`
+- [ ] T047 [P] [US3] Add a failing truth-table test for expected success/skipped/failure/cancelled `SMOKE_AND_SANITY_RESULT` states, including Compose-only eligibility, in `tests/ci/evaluate-ci-status.test.mjs`
+- [ ] T048 [US3] Extend change-aware aggregate evaluation and safe failure messages so infrastructure changes cannot take the all-domains-false skip path in `scripts/ci/evaluate-ci-status.mjs` (depends on T047)
+- [ ] T049 [US3] Add the single `smoke-and-sanity` job, all-service filters including `docker-compose.yml`, locked setup, Compose infra, builds/migration, non-secret loopback env, orchestrator invocation, always-run diagnostics/cleanup, and aggregate env/needs in `.github/workflows/ci.yml` (depends on T044, T046, T048)
 - [ ] T050 [US3] Complete local reset/start/run/cleanup commands, CI parity, expected timings, redaction rules, and troubleshooting in `tests/smoke/README.md`
 
 **Checkpoint**: The same contract is reproducible locally and enforced by PR CI with correct skipped-job semantics.

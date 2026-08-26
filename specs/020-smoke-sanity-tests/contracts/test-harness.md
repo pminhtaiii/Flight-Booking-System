@@ -68,5 +68,6 @@ infrastructure/migrations/builds
 
 - If no API, Web, or Agent domain changed: `smoke-and-sanity` must be skipped.
 - If at least one domain changed and its applicable terminal prerequisites succeeded: job must run and succeed.
+- A `docker-compose.yml` change must set API, Web, and Agent change outputs to true, so an infrastructure-only pull request cannot take the all-domains-false skip path.
 - Any applicable prerequisite failure/cancellation blocks the job and makes `ci-status` fail.
 - If the job was expected to run, `skipped`, `cancelled`, or `failure` makes `ci-status` fail.

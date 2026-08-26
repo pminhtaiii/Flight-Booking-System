@@ -55,7 +55,7 @@ As a developer or CI operator, I need the same zero-dependency test harness, rea
 1. **Given** services become ready at different times, **When** readiness polling starts, **Then** all service probes run concurrently at two-second intervals and either complete within 120 seconds or report the last status/error and elapsed time for every unready service.
 2. **Given** a mock receives a supported request, **When** required fields are valid, **Then** it returns the deterministic fixture and records timestamp, method, pathname, and status; missing required fields fail validation and unknown method/path combinations return 404 with a warning.
 3. **Given** a local run, **When** the documented reset workflow begins, **Then** it targets only the dedicated `smoke_test` database and does not depend on cleanup inside individual tests.
-4. **Given** the pull request targets `development`, **When** the relevant CI paths change, **Then** one `smoke-and-sanity` job performs one boot cycle, reports with Node's spec reporter, cleans up unconditionally, and is included in the aggregate `ci-status` decision.
+4. **Given** the pull request targets `development`, **When** an application, harness, workflow, or shared infrastructure path such as `docker-compose.yml` changes, **Then** one `smoke-and-sanity` job performs one boot cycle, reports with Node's spec reporter, cleans up unconditionally, and is included in the aggregate `ci-status` decision.
 
 ### Edge Cases
 
@@ -67,6 +67,7 @@ As a developer or CI operator, I need the same zero-dependency test harness, rea
 - The mock receives malformed JSON, a missing required header/body field, or an unsupported method on an otherwise known pathname.
 - A background process exits before readiness or remains alive after a test failure.
 - An upstream CI job is skipped, cancelled, or fails under GitHub Actions `needs` semantics.
+- A pull request changes only `docker-compose.yml`; shared infrastructure change detection must still require the whole-stack job.
 - Secrets, tokens, passwords, passenger PII, or payment details could appear in diagnostics; logs must redact or omit them.
 
 ## Requirements
@@ -85,7 +86,7 @@ As a developer or CI operator, I need the same zero-dependency test harness, rea
 - **FR-010**: NestJS readiness MUST be the authoritative smoke proof for both Postgres and Redis connectivity; the harness MUST NOT add separate database or Redis clients.
 - **FR-011**: CI MUST run one `smoke-and-sanity` job on pull requests to `development`, after applicable API, web, and agent prerequisites, using a single stack boot cycle.
 - **FR-012**: The whole-stack job MUST accept successful or legitimately skipped upstream jobs, MUST reject failed or cancelled prerequisites, and MUST participate in the final `ci-status` result.
-- **FR-013**: Changes to smoke-suite, CI helper, workflow, dependency-lock, shared, or service files that can affect the composed system MUST make the whole-stack job eligible through change detection.
+- **FR-013**: Changes to smoke-suite, CI helper, workflow, dependency-lock, shared infrastructure including `docker-compose.yml`, shared code, or service files that can affect the composed system MUST make the whole-stack job eligible through change detection; `docker-compose.yml` MUST be included in the API, Web, and Agent filters.
 - **FR-014**: CI MUST use an ephemeral Postgres database and Redis instance; local runs MUST use a dedicated `smoke_test` database that is dropped/recreated only by an explicit harness command.
 - **FR-015**: The job MUST install locked dependencies, build or prepare required artifacts, generate Prisma Client, deploy migrations, start all application and mock processes, wait for readiness, run smoke then sanity with the spec reporter, and clean up on success or failure.
 - **FR-016**: CI and local diagnostics MUST include process/service identity and actionable failure state while excluding secrets, bearer tokens, user passwords, passenger PII, payment details, and raw provider payloads.
@@ -113,7 +114,7 @@ This feature introduces no persistent application entities or schema changes. It
 - **SC-004**: Repeated flight search proves cache use without a second Duffel mock request, while both returned public payloads satisfy the same contract.
 - **SC-005**: The booking sanity flow reaches public booking status `CONFIRMED` using only local mocks and deterministic services.
 - **SC-006**: API-to-agent liveness succeeds without an LLM request, while agent-to-API gateway checks produce success for valid service/user credentials, 401 for a missing or invalid service key, and 403 for an authenticated but unauthorized user claim.
-- **SC-007**: The GitHub Actions workflow contract test proves the new job cannot be omitted from `ci-status`, cannot run sanity before smoke, and cannot reach external provider hosts.
+- **SC-007**: The GitHub Actions workflow contract test proves the new job cannot be omitted from `ci-status`, cannot run sanity before smoke, cannot reach external provider hosts, and is required for a `docker-compose.yml`-only pull request.
 - **SC-008**: A developer can reproduce the CI suites locally from `tests/smoke/README.md` without access to Duffel, Stripe, Mimo, or deployment secrets.
 - **SC-009**: Cleanup leaves no harness-owned application or mock processes running after either a passing or failing job.
 
