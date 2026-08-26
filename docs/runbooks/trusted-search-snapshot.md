@@ -119,15 +119,20 @@ All mutations execute atomically inside Redis through three purpose-built Lua sc
 
 ### 5.2 Rollback Procedure
 If snapshot persistence causes conversational deadlocks or Redis CAS errors:
-1. Roll back the Python agent container to the release prior to `00961da`.
-2. Flush Corrupted Session Snapshots:
-   If malformed keys exist in Redis, run an operator cleanup script in Redis:
-   ```bash
-   # Emergency prefix scan and delete for corrupt session
-   redis-cli --scan --pattern "chat:snapshot:*" | xargs -r redis-cli del
-   ```
-3. Graceful User Impact:
-   Flushing snapshots causes in-flight conversations to prompt the user: *"Flight offer expired. Please search again."* No financial or booking data is lost.
+1. Roll back the Python agent container deployment to the release prior to `00961da`.
+2. **Targeted Session Cleanup (Preserving Version Fencing & Healthy Sessions)**:
+   - **DO NOT** execute repository-wide pattern deletions (e.g., never run `redis-cli --scan --pattern "chat:snapshot:*" | xargs del`). Global deletion evicts active snapshots across all healthy user sessions and wipes out critical CAS version fencing tombstones.
+   - If a specific session experiences payload corruption or deadlock, perform targeted cleanup for ONLY that affected session:
+     ```bash
+     # 1. Target and delete ONLY the primary payload key for the affected session:
+     redis-cli DEL "chat:snapshot:{userId}:{chatSessionId}"
+     ```
+   - **Preserve Version & Accepted Fencing Keys**:
+     - DO NOT delete `chat:snapshot:{userId}:{chatSessionId}:version` or `chat:snapshot:{userId}:{chatSessionId}:accepted`.
+     - Keeping the `:accepted` fence key preserves the tombstone boundary so that any delayed, in-flight async search worker cannot resurrect or overwrite the session with stale data.
+   - Healthy user sessions and unrelated chat conversations remain completely untouched and operational.
+3. **Graceful User Impact for Affected Session**:
+   Deleting the payload key prompts the affected user on their next turn: *"Flight offer expired. Please search again."* No financial, booking, or account data is lost.
 4. Run agent test suite against target deployment to verify stability.
 
 ---

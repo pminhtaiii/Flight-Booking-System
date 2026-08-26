@@ -122,11 +122,11 @@ During container SIGTERM / shutdown (`agent.main:lifespan`):
 ### 4.2 Daily Operator Verification Checklist
 1. Inspect `chat_turn_cleanup_duration_seconds`: Verify p95 is $< 1.5s$.
 2. Review partial turn persistence: Verify that aborted conversations show partial responses saved with sender `AGENT` and valid UUIDs in `chat_messages`.
-3. Verify zero orphaned session locks:
+3. Inspect active session locks (read-only inspection):
    ```bash
    redis-cli --scan --pattern "chat:session-lock:*"
    ```
-   Locks should only be present for currently active streaming requests.
+   Locks should only be present for currently active streaming requests and must expire naturally within the 30s TTL window. Never execute batch deletions.
 4. Verify graceful container shutdown logs: Check that SIGTERM signals complete cleanup within 5.0s without unhandled exceptions.
 
 ---
@@ -138,11 +138,19 @@ During container SIGTERM / shutdown (`agent.main:lifespan`):
 
 ### 5.2 Rollback Procedure
 If the runner causes deadlocks, stream hangs, or session lock exhaustion:
-1. Revert the Python agent container to the commit preceding `fb0e88b`.
-2. Clear Active Session Locks:
-   ```bash
-   redis-cli --scan --pattern "chat:session-lock:*" | xargs -r redis-cli del
-   ```
+1. Revert the Python agent container deployment to the release preceding `fb0e88b`.
+2. **Session-Scoped Cleanup & Fencing Preservation**:
+   - **DO NOT** execute global pattern deletions (e.g., never delete `chat:session-lock:*` or fence counters globally). Global key deletion destroys monotonic fencing state and risks split-brain writes from stale runners.
+   - For active sessions, allow the Redis lock TTL (`SESSION_LOCK_TTL_MS = 30000`, 30 seconds) to expire naturally.
+   - If a specific session is wedged, inspect and clean up ONLY that specific session lock while strictly preserving the fencing counter:
+     ```bash
+     # 1. Check specific session lock status
+     redis-cli GET "chat:session-lock:<sessionId>"
+
+     # 2. Release ONLY the specific session lock if verified stuck (do NOT delete fence keys)
+     redis-cli DEL "chat:session-lock:<sessionId>"
+     ```
+   - Retain all fencing tokens (`chat:session-lock:<sessionId>:fence` or monotonic fence counters) so that any lingering or restarted legacy runner with an older fencing token is strictly rejected by the NestJS persistence guard (`AgentChatController`).
 3. Restart agent instances to re-initialize clean queue managers.
 4. Verify `/health` endpoint reports `status: "ok"` and Redis connectivity is healthy.
 

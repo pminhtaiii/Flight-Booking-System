@@ -84,23 +84,37 @@ The count of violations MUST be exactly `0`.
 
 ## 3. Observability, Metrics & Alert Thresholds
 
-### 3.1 Prometheus & Gateway Metrics
+### 3.1 Currently Deployed Observability Channels
+`apps/web` does not currently instantiate a native Prometheus client or expose a `/metrics` scrape endpoint. Production observability relies on the following active operational channels:
 
-| Metric Name | Type | Purpose |
-|---|---|---|
-| `web_route_handler_requests_total` | Counter | Requests to `/api/booking-management/*` by route and HTTP status |
-| `web_server_seam_upstream_duration_seconds` | Histogram | Latency of server-to-server calls to NestJS API |
-| `web_server_seam_upstream_errors_total` | Counter | Count of upstream HTTP 5xx errors |
-| `web_client_audit_failures_total` | Counter | Static characterization assertion failures in CI |
+1. **Edge Ingress & Reverse Proxy Access Logs (NGINX / Vercel / Cloudflare)**:
+   - Tracks HTTP request volume and status codes (`200`, `401`, `403`, `404`, `409`, `500`, `503`) for all calls targeting `/api/booking-management/*`.
+   - Inspects response headers to verify `Cache-Control: private, no-store` is consistently enforced.
+2. **Server-Side Next.js Runtime Logs**:
+   - Server domain modules (`apps/web/lib/server/`) emit structured console errors upon upstream network or HTTP errors, tagging failure reasons (`UNAUTHENTICATED`, `FORBIDDEN`, `NOT_FOUND`, `STALE_REVISION`, `INVALID_COMMAND`, `UPSTREAM_UNAVAILABLE`).
+3. **CI Static Contract & Audit Gates**:
+   - Pre-merge static analysis (`tests/ci/ci-workflow.contract.test.mjs` and Section 2.3 PowerShell token audit) verifies zero occurrences of `useSession`, `accessToken`, or `NEXT_PUBLIC_API_URL` in client components.
+4. **Upstream NestJS Backend Observability**:
+   - Upstream API latency, database transactions, and error rates are monitored directly at the destination NestJS API (`apps/api`), where native metrics and health checks are deployed.
 
-### 3.2 Alert Threshold Table
+### 3.2 Proposed / Future Application Metrics (Unimplemented in apps/web)
+The following Prometheus metrics represent planned future instrumentation for an OpenTelemetry / Prometheus collector sidecar and are **not currently emitted by `apps/web`**:
 
-| Alert | Condition | Severity | Immediate Response |
+| Proposed Metric Name | Type | Proposed Purpose | Status |
 |---|---|---|---|
-| UpstreamUnavailableSpike | Upstream error rate $> 5\%$ for 5m | P1 (Critical) | Check NestJS API health, pod CPU/memory, and database connections. |
-| CacheHeaderViolation | Response missing `private, no-store` | P0 (Blocker) | Route handler misconfiguration; flush CDN cache and revert route handler. |
-| ClientTokenExposureAlert | Static audit detects `accessToken` in client code | P0 (Blocker) | CI failure blocks merge. Investigate and remove token from component props. |
-| UpstreamLatencyDrift | `web_server_seam_upstream_duration_seconds{p95} > 5.0s` | P2 (High) | Check Duffel API latency and PostgreSQL query execution plans. |
+| `web_route_handler_requests_total` | Counter | Requests to `/api/booking-management/*` by route and HTTP status | *Proposed (Future)* |
+| `web_server_seam_upstream_duration_seconds` | Histogram | Latency of server-to-server calls to NestJS API | *Proposed (Future)* |
+| `web_server_seam_upstream_errors_total` | Counter | Count of upstream HTTP 5xx errors from Next.js server runtime | *Proposed (Future)* |
+| `web_client_audit_failures_total` | Counter | Static characterization assertion failures in CI | *Proposed (Future)* |
+
+### 3.3 Active Alert Threshold Table
+
+| Alert / Signal | Active Detection Mechanism | Severity | Immediate Response |
+|---|---|---|---|
+| UpstreamUnavailableSpike | Ingress 503/504 error rate $> 5\%$ for 5m on `/api/booking-management/*` | P1 (Critical) | Check NestJS API container health, pod resources, and internal DNS resolution. |
+| CacheHeaderViolation | Edge log shows `/api/booking-management/*` response without `private, no-store` | P0 (Blocker) | Route handler misconfiguration; purge CDN cache and redeploy route handlers. |
+| ClientTokenExposureAlert | Static audit fails during CI pre-merge gate (`accessToken` in client code) | P0 (Blocker) | CI failure blocks merge. Remove credentials from component props. |
+| UpstreamLatencyDrift | Ingress upstream response time p95 $> 5.0s$ on `/api/booking-management/*` | P2 (High) | Check Duffel API latency and PostgreSQL query plans in NestJS backend. |
 
 ---
 
