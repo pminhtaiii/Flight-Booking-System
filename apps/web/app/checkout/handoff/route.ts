@@ -72,7 +72,7 @@ export async function POST(request: Request): Promise<NextResponse> {
     });
   }
 
-  const apiUrl = process.env.NEXT_PUBLIC_API_URL;
+  const apiUrl = process.env.API_URL || process.env.NEXT_PUBLIC_API_URL;
   if (!apiUrl) {
     return new NextResponse('Handoff unavailable', {
       status: 503,

@@ -53,7 +53,7 @@ export default async function PassengersPage({ searchParams }: Props) {
   const mockScenario = cookieStore.get('mock-scenario')?.value || null;
 
   if (handoffCookie?.value) {
-    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+    const apiUrl = process.env.API_URL || process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
     const resolved = await resolveHandoffForBootstrap(
       apiUrl,
       handoffCookie.value,
@@ -143,7 +143,7 @@ export default async function PassengersPage({ searchParams }: Props) {
     redirect(`/search`);
   }
 
-  const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+  const apiUrl = process.env.API_URL || process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
   let flight: PassengerPageFlightDetail | null = null;
   let profile: TravelerProfileResponse | null = null;

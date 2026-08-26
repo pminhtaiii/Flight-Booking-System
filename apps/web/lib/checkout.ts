@@ -152,7 +152,7 @@ export async function fetchBookingIntent(intentId: string, accessToken: string):
   intent: BookingIntentDto | null;
   errorStatus: number | null;
 }> {
-  const apiUrl = process.env.NEXT_PUBLIC_API_URL;
+  const apiUrl = process.env.API_URL || process.env.NEXT_PUBLIC_API_URL;
   if (!apiUrl) {
     throw new Error('NEXT_PUBLIC_API_URL is required but not configured.');
   }
