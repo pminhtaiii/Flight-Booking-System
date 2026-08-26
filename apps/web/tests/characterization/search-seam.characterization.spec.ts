@@ -53,7 +53,9 @@ async function startFlightSearchFixture(): Promise<void> {
 
   const server = createServer((request, response) => {
     const pathname = new URL(request.url || '/', flightSearchFixtureUrl).pathname;
-    fixtureRequests.push({ method: request.method || 'GET', pathname });
+    if (pathname.startsWith('/api/flights')) {
+      fixtureRequests.push({ method: request.method || 'GET', pathname });
+    }
     response.setHeader('Content-Type', 'application/json');
 
     if (request.method === 'POST' && pathname === '/api/flights/search') {
@@ -74,6 +76,11 @@ async function startFlightSearchFixture(): Promise<void> {
           passengers: [{ id: 'char-passenger-1', type: 'ADULT' }],
         }),
       );
+      return;
+    }
+
+    if (request.method === 'GET' && pathname === '/api/profile') {
+      response.end(JSON.stringify(null));
       return;
     }
 
