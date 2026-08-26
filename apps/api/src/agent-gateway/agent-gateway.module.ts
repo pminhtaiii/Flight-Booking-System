@@ -1,6 +1,4 @@
 import { Module } from '@nestjs/common';
-import { AgentGatewayService } from './agent-gateway.service';
-import { AgentGatewayController } from './agent-gateway.controller';
 import { AgentAuthModule } from './auth/agent-auth.module';
 import { AgentToolAuditModule } from './audit/agent-tool-audit.module';
 import { SelectionAttestationService } from './selection-attestation.service';
@@ -10,12 +8,10 @@ import { AgentBookingReadinessModule } from './booking-readiness/agent-booking-r
 import { SafeBookingReadModule } from './safe-booking-read/safe-booking-read.module';
 import { TravelerPreferencesModule } from './traveler-preferences/traveler-preferences.module';
 import { PrismaModule } from '@/prisma/prisma.module';
-import { CacheModule } from '@/cache/cache.module';
 
 @Module({
   imports: [
     PrismaModule,
-    CacheModule,
     AgentAuthModule,
     AgentToolAuditModule,
     AttestedFlightSearchModule,
@@ -23,10 +19,8 @@ import { CacheModule } from '@/cache/cache.module';
     SafeBookingReadModule,
     TravelerPreferencesModule,
   ],
-  controllers: [AgentGatewayController],
-  providers: [AgentGatewayService, SelectionAttestationService, BookingAgentProjectionService],
+  providers: [SelectionAttestationService, BookingAgentProjectionService],
   exports: [
-    AgentGatewayService,
     AgentAuthModule,
     AgentToolAuditModule,
     SelectionAttestationService,
@@ -38,4 +32,3 @@ import { CacheModule } from '@/cache/cache.module';
   ],
 })
 export class AgentGatewayModule {}
-

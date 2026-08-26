@@ -7,13 +7,47 @@ Update this file after every completed feature. Any AI agent reading this should
 ### Current Status
 
 **Feature:** Deepen Codebase Architecture (Feature 019)
-**Last completed:** Slice 5C: Booking Management Server Seams & Client Token Removal (2026-08-26).
+**Last completed:** Slice 6D: Delete Broad Agent Gateway Service & Finalize Module Composition (2026-08-26).
 **In progress:** None.
-**Next:** Slice 6D: Delete Broad Agent Gateway Service.
+**Next:** Phase 9: Polish and Cross-Cutting Completion.
 
 ---
 
 ## Progress by Feature
+
+### [x] Feature: Deepen Codebase Architecture (Feature 019) — Slice 6D: Delete Broad Agent Gateway Service & Finalize Module Composition
+
+- [x] Slice 6D / Delete Broad Agent Gateway Service & Finalize Module Composition (2026-08-26):
+  - **Decommission Broad Service & Controller (`apps/api/src/agent-gateway/`)**:
+    - Deleted `apps/api/src/agent-gateway/agent-gateway.service.ts`.
+    - Deleted `apps/api/src/agent-gateway/agent-gateway.controller.ts`.
+    - Deleted legacy unit test file `apps/api/src/agent-gateway/agent-gateway.service.spec.ts`.
+  - **Clean Module Composition (`apps/api/src/agent-gateway/agent-gateway.module.ts`)**:
+    - Refactored `AgentGatewayModule` into a pure composition module that re-exports capability-local submodules:
+      - `AttestedFlightSearchModule`
+      - `AgentBookingReadinessModule`
+      - `SafeBookingReadModule`
+      - `TravelerPreferencesModule`
+      - `AgentAuthModule`
+      - `AgentToolAuditModule`
+      - `SelectionAttestationService` (exported for external consumers like `chat-handoff`)
+      - `BookingAgentProjectionService` (exported for external consumers like `booking-lifecycle`)
+    - Removed empty `controllers` array and eliminated unused `CacheModule` import.
+  - **Static Monorepo Audit**:
+    - `git grep "AgentGatewayService" apps/api/src` $\rightarrow$ exactly 0 occurrences.
+    - `git grep "AgentGatewayController" apps/api/src` $\rightarrow$ exactly 0 occurrences.
+  - **Verification & Test Matrix (100% Green Parity)**:
+    - Capability unit suites (`src/agent-gateway/`): 7 passed, 7 total (82/82 tests PASS).
+    - Characterization E2E (`agent-gateway-characterization.e2e-spec.ts`): 1 suite, 17/17 tests PASS.
+    - Gateway E2E (`agent-gateway.e2e-spec.ts`): 1 suite, 47/47 tests PASS.
+    - Chat Gateway E2E (`agent-chat-gateway.e2e-spec.ts`): 1 suite, 11/11 tests PASS.
+    - Total Gateway E2E: 3 suites, 75/75 tests PASS, 0 failures.
+    - Full Python Agent pytest suite: 455/455 tests PASS (11 deselected).
+    - Python Tool integration tests (`test_tools.py`, `test_booking_tools.py`): 26/26 tests PASS.
+    - Python Ruff check & format: 0 errors, 121 files verified.
+    - NestJS strict TypeScript typecheck (`tsc -p tsconfig.json --noEmit`): 0 errors.
+    - Monorepo API ESLint (`pnpm exec eslint "apps/api/**/*.ts" --max-warnings 0`): 0 errors / 0 warnings.
+    - Two-Axis Code Review: Standards Review & Spec Review completed with 0 remaining P0/P1 issues.
 
 ### [x] Feature: Deepen Codebase Architecture (Feature 019) — Slice 5C: Booking Management Server Seams & Client Token Removal
 
