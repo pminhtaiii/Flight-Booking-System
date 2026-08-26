@@ -560,6 +560,22 @@ The repository uses a single GitHub Actions pull request CI workflow at `.github
 - Offer selection revalidates the opaque offer server-to-server and returns the contractually specified encoded checkout path. The server module is protected with the `server-only` sentinel so it cannot be imported into the browser bundle.
 - Playwright uses a loopback Flight Search fixture through private `API_URL` for Server Action coverage. The scoped static characterization audit rejects credential, public transport, direct-fetch, provider/raw payload, and retry-policy markers in the search rendering tree.
 
+### Slice 5C — Booking Management Server Seam & Client Token Removal
+
+- `apps/web/lib/server/booking-management.ts` is the Booking Management server domain module. It obtains the NextAuth session, resolves private `API_URL`, injects bearer credentials, manages bounded retry/timeout policies (3 bounded attempts on GET reads, fast-fail on POST mutations), validates upstream NestJS responses with Zod, maps typed error reasons (`UNAUTHENTICATED`, `FORBIDDEN`, `NOT_FOUND`, `STALE_REVISION`, `INVALID_COMMAND`, `UPSTREAM_UNAVAILABLE`), and prepares views stripping Stripe IDs, Duffel order IDs, and raw snapshots while preserving owner-facing PNR, status, and itinerary facts. Protected with `import 'server-only'`.
+- `apps/web/app/api/booking-management/` provides 7 thin same-origin Route Handlers:
+  - `GET /api/booking-management/bookings/[bookingId]`
+  - `POST /api/booking-management/bookings/[bookingId]/cancellation-quote`
+  - `GET /api/booking-management/bookings/[bookingId]/cancellation-status`
+  - `POST /api/booking-management/bookings/[bookingId]/cancel`
+  - `POST /api/booking-management/bookings/[bookingId]/disruptions/acknowledge`
+  - `POST /api/booking-management/bookings/[bookingId]/disruptions/accept`
+  - `GET /api/booking-management/bookings/[bookingId]/revisions`
+  - Every handler strictly enforces `Cache-Control: private, no-store` and maps failure reasons to standard HTTP status codes.
+- `apps/web/app/bookings/page.tsx` and `apps/web/app/bookings/[bookingId]/page.tsx` render Server Components using `listBookings` and `getBookingDetail` without receiving or forwarding JWT tokens or backend URLs to the browser.
+- Client Components (`BookingCard.tsx`, `BookingDetail.tsx`, `ItineraryRevisionHistory.tsx`) are completely decoupled from `useSession`, `accessToken`, `process.env.NEXT_PUBLIC_API_URL`, and direct NestJS fetches. All interactive mutations and reads route through same-origin `/api/booking-management/...` endpoints.
+- Scoped characterization and static privacy audits verify zero `useSession`, zero `accessToken`, and zero `NEXT_PUBLIC_API_URL` leakage across all 13 booking management files.
+
 Feature 019 restructures high-leverage boundaries without changing public product behavior:
 - **Slice 0 (Baseline Characterization & Safety Rails)**:
   - Establishes immutable automated characterization suites across `apps/api/test/characterization/`, `apps/agent/tests/characterization/`, and `apps/web/tests/characterization/` with 0 production business logic modifications.

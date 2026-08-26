@@ -1,10 +1,13 @@
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 import * as path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { after, afterEach, before, beforeEach, describe, it, mock } from 'node:test';
 import type { FlightSearchQuery } from '@shared/types';
 
-const testRequire = createRequire(__filename);
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const testRequire = createRequire(import.meta.url);
 type TestSession = { accessToken?: string } | null;
 
 let session: TestSession = null;
@@ -25,7 +28,7 @@ const resolvePath = (specifier: string): string => {
 
 const nextAuthPath = resolvePath('next-auth');
 const originalNextAuthModule = testRequire.cache[nextAuthPath];
-testRequire.cache[nextAuthPath] = { exports: { getServerSession } } as NodeModule;
+testRequire.cache[nextAuthPath] = { exports: { getServerSession, default: { getServerSession } } } as NodeModule;
 const serverOnlyPath = resolvePath('server-only');
 const originalServerOnlyModule = testRequire.cache[serverOnlyPath];
 testRequire.cache[serverOnlyPath] = { exports: {} } as NodeModule;
@@ -49,7 +52,7 @@ let searchFlights: typeof import('./flight-search').searchFlights;
 let selectFlightOffer: typeof import('./flight-search').selectFlightOffer;
 
 before(async () => {
-  ({ searchFlights, selectFlightOffer } = await import('./flight-search'));
+  ({ searchFlights, selectFlightOffer } = await import('./flight-search.ts'));
 });
 
 const validQuery: FlightSearchQuery = {

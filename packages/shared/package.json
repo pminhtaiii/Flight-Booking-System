@@ -4,6 +4,28 @@
   "private": true,
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./flight-search.types": {
+      "types": "./dist/types/flight-search.types.d.ts",
+      "default": "./dist/types/flight-search.types.js"
+    },
+    "./booking-management.types": {
+      "types": "./dist/types/booking-management.types.d.ts",
+      "default": "./dist/types/booking-management.types.js"
+    },
+    "./*": {
+      "types": "./dist/*.d.ts",
+      "default": "./dist/*.js"
+    },
+    "./types/*": {
+      "types": "./dist/types/*.d.ts",
+      "default": "./dist/types/*.js"
+    }
+  },
   "scripts": {
     "build": "tsc",
     "test": "pnpm run build && node --test dist/types/flight-search.types.spec.js dist/types/booking-management.types.spec.js",

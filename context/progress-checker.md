@@ -7,13 +7,48 @@ Update this file after every completed feature. Any AI agent reading this should
 ### Current Status
 
 **Feature:** Deepen Codebase Architecture (Feature 019)
-**Last completed:** Slice 6C: Move Agent Chat Ownership to ChatModule (2026-08-25).
+**Last completed:** Slice 5C: Booking Management Server Seams & Client Token Removal (2026-08-26).
 **In progress:** None.
 **Next:** Slice 6D: Delete Broad Agent Gateway Service.
 
 ---
 
 ## Progress by Feature
+
+### [x] Feature: Deepen Codebase Architecture (Feature 019) — Slice 5C: Booking Management Server Seams & Client Token Removal
+
+- [x] Slice 5C / Booking Management Server Seams & Client Token Removal (2026-08-26):
+  - **Server-Only Domain Module (`apps/web/lib/server/booking-management.ts`)**:
+    - Implemented 8 authoritative operations: `listBookings`, `getBookingDetail`, `getCancellationStatus`, `getCancellationQuote`, `cancelBooking`, `acknowledgeDisruption`, `acceptDisruption`, and `getItineraryRevisions`.
+    - Owns NextAuth token resolution, private `API_URL` fallback, 10s request timeouts, bounded 3x retries on idempotent GET reads, fast-fail on POST mutations, upstream Zod validation, and typed error reason mapping (`UNAUTHENTICATED`, `FORBIDDEN`, `NOT_FOUND`, `STALE_REVISION`, `INVALID_COMMAND`, `UPSTREAM_UNAVAILABLE`).
+    - Strips all internal provider IDs (Stripe IDs, Duffel order/quote IDs, internal raw payloads) while preserving owner-facing PNR, status, disruption, and itinerary facts.
+    - Comprehensive unit test suite in `apps/web/lib/server/booking-management.spec.ts` (21/21 tests PASS).
+  - **Same-Origin Route Handlers (`apps/web/app/api/booking-management/`)**:
+    - Created 7 thin route handlers under `app/api/booking-management/`:
+      - `GET /api/booking-management/bookings/[bookingId]` (200 OK)
+      - `POST /api/booking-management/bookings/[bookingId]/cancellation-quote` (200 OK)
+      - `GET /api/booking-management/bookings/[bookingId]/cancellation-status` (200 OK)
+      - `POST /api/booking-management/bookings/[bookingId]/cancel` (200 OK)
+      - `POST /api/booking-management/bookings/[bookingId]/disruptions/acknowledge` (200 OK)
+      - `POST /api/booking-management/bookings/[bookingId]/disruptions/accept` (200 OK)
+      - `GET /api/booking-management/bookings/[bookingId]/revisions` (200 OK)
+    - Every handler strictly enforces `Cache-Control: private, no-store` headers and maps domain failure reasons to standard HTTP status codes (401/403/404/409/400/503).
+  - **Server Pages Refactored (`apps/web/app/bookings/`)**:
+    - `app/bookings/page.tsx`: Consumes `listBookings` directly on the server without `accessToken` or `NEXT_PUBLIC_API_URL`.
+    - `app/bookings/[bookingId]/page.tsx`: Consumes `getBookingDetail` directly on the server, passing prepared `BookingDetailView` to client component with zero token or backend URL passing.
+  - **Client Components Refactored (`apps/web/components/bookings/`)**:
+    - `BookingCard.tsx`: Uses `BookingListItemView`, removing `flightSnapshot` dependencies.
+    - `BookingDetail.tsx`: Completely removed `useSession`, `accessToken`, `process.env.NEXT_PUBLIC_API_URL`, and direct NestJS API calls. Interacts with backend purely through same-origin `/api/booking-management/` routes.
+    - `ItineraryRevisionHistory.tsx`: Completely removed `accessToken` prop and `NEXT_PUBLIC_API_URL`, fetching paginated revisions from same-origin `/api/booking-management/bookings/[bookingId]/revisions`.
+  - **Verification & Privacy Audit (100% Green)**:
+    - Booking management server domain unit tests: 21/21 tests PASS.
+    - Flight search server domain unit tests: 10/10 tests PASS.
+    - Shared types contract tests: 7/7 tests PASS.
+    - Frontend TypeScript strict typecheck (`pnpm --filter @web/frontend typecheck`): 0 errors.
+    - Frontend ESLint (`pnpm --filter @web/frontend lint`): 0 warnings / 0 errors.
+    - Next.js Production Build (`pnpm --filter @web/frontend build`): Compiles 21/21 routes cleanly with 7 new dynamic route handlers.
+    - Static CI contract test (`node --test tests/ci/ci-workflow.contract.test.mjs`): 13/13 tests PASS.
+    - Static Privacy Audit: 13 booking management files scanned $\rightarrow$ exactly 0 `useSession`, 0 `accessToken`, and 0 `NEXT_PUBLIC_API_URL` occurrences.
 
 ### [x] Feature: Deepen Codebase Architecture (Feature 019) — Slice 6C: Move Agent Chat Ownership to ChatModule
 
