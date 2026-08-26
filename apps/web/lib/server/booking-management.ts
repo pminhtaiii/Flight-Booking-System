@@ -891,6 +891,8 @@ function mapDetail(item: Record<string, unknown>): BookingDetailView {
       ? item.passengers
       : Array.isArray(item.passengerSnapshot)
       ? item.passengerSnapshot
+      : Array.isArray((item.passengerSnapshot as { passengers?: unknown[] } | undefined)?.passengers)
+      ? (item.passengerSnapshot as { passengers: unknown[] }).passengers
       : Array.isArray((item.bookingIntent as { passengers?: unknown[] } | undefined)?.passengers)
       ? (item.bookingIntent as { passengers: unknown[] }).passengers
       : []
@@ -909,7 +911,15 @@ function mapDetail(item: Record<string, unknown>): BookingDetailView {
 
   const itinerary: BookingItineraryView = {
     source: (rawItin.source === 'REVISION' || currentItin.source === 'REVISION') ? 'REVISION' : 'ORIGINAL',
-    revisionId: (typeof rawItin.revisionId === 'string' ? rawItin.revisionId : typeof currentItin.revisionId === 'string' ? currentItin.revisionId : null),
+    revisionId: (
+      typeof rawItin.revisionId === 'string'
+        ? rawItin.revisionId
+        : typeof currentItin.revisionId === 'string'
+        ? currentItin.revisionId
+        : typeof (item.disruption as Record<string, unknown> | undefined)?.activeRevisionId === 'string'
+        ? ((item.disruption as Record<string, unknown>).activeRevisionId as string)
+        : null
+    ),
     version: Math.max(1, typeof rawItin.version === 'number' ? rawItin.version : typeof currentItin.version === 'number' ? currentItin.version : 1),
     segments,
     nextUnflownDepartureAt: (typeof rawItin.nextUnflownDepartureAt === 'string' ? rawItin.nextUnflownDepartureAt : typeof currentItin.nextUnflownDepartureAt === 'string' ? currentItin.nextUnflownDepartureAt : (firstSeg?.departureAt || null)),
@@ -998,4 +1008,11 @@ function mapDetail(item: Record<string, unknown>): BookingDetailView {
   };
 
   return BookingDetailViewSchema.parse(result);
+}
+
+/**
+ * Maps raw backend DTO or mock scenario object into a strongly-typed BookingDetailView.
+ */
+export function mapBookingDetail(item: Record<string, unknown>): BookingDetailView {
+  return mapDetail(item);
 }

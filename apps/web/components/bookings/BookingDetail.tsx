@@ -135,7 +135,7 @@ export function BookingDetail({ booking: initialBooking }: BookingDetailProps) {
 
   const handleDisruptionAction = async (action: 'acknowledge' | 'accept') => {
     if (!booking) return;
-    const activeRevisionId = (booking.disruption as any)?.activeRevisionId;
+    const activeRevisionId = booking.itinerary?.revisionId || (booking.disruption as any)?.activeRevisionId;
     if (!activeRevisionId) return;
 
     setLoadingAction(true);

@@ -3,7 +3,7 @@ import { headers } from 'next/headers';
 import { Header } from '@/components/layout/Header';
 import { BookingConfirmationBanner } from '@/components/bookings/BookingConfirmationBanner';
 import { BookingDetail as BookingDetailClient } from '@/components/bookings/BookingDetail';
-import { getBookingDetail } from '@/lib/server/booking-management';
+import { getBookingDetail, mapBookingDetail } from '@/lib/server/booking-management';
 import type { BookingDetailView } from '@shared/types/booking-management.types';
 import { MOCK_BOOKINGS } from './mock-bookings';
 
@@ -22,7 +22,8 @@ export default async function BookingDetailPage({ params, searchParams }: Props)
   const mockScenario = mockScenarioMatch ? mockScenarioMatch[1].trim() : null;
 
   if ((process.env.NODE_ENV === 'test' || process.env.CI === 'true') && mockScenario && MOCK_BOOKINGS[mockScenario]) {
-    const booking = MOCK_BOOKINGS[mockScenario];
+    const rawBooking = MOCK_BOOKINGS[mockScenario];
+    const booking = mapBookingDetail(rawBooking as unknown as Record<string, unknown>);
     const showConfirmation = searchParams.confirmed === 'true';
     return (
       <div className="flex min-h-screen flex-col bg-background">
@@ -31,7 +32,11 @@ export default async function BookingDetailPage({ params, searchParams }: Props)
           {showConfirmation && booking.status === 'CONFIRMED' && (
             <BookingConfirmationBanner pnrReference={booking.pnrReference ?? undefined} />
           )}
-          <BookingDetailClient booking={booking as unknown as BookingDetailView} showConfirmation={showConfirmation} />
+          <BookingDetailClient 
+            booking={booking} 
+            showConfirmation={showConfirmation} 
+            bookingId={params.bookingId}
+          />
         </main>
       </div>
     );
