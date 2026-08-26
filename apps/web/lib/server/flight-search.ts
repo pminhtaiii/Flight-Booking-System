@@ -9,7 +9,7 @@ import {
   type FlightSearchSegmentView,
   type FlightSearchSliceView,
   type FlightSelectionOutcome,
-} from '@shared/types';
+} from '@shared/types/flight-search.types';
 import { authOptions } from '../auth';
 
 const REQUEST_TIMEOUT_MS = 10_000;

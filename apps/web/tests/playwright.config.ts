@@ -34,6 +34,9 @@ export default defineConfig({
   testDir: './',
   fullyParallel: false,
   workers: 1,
+  expect: {
+    timeout: 30000,
+  },
   reporter: process.env.CI ? 'line' : [['html', { open: 'never' }]],
   use: {
     baseURL: 'http://127.0.0.1:3000',

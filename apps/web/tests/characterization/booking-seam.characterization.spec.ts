@@ -39,7 +39,7 @@ test.describe('Booking Seam Characterization - User Flows', () => {
     context,
   }) => {
     await context.clearCookies();
-    await page.goto(`/bookings/${bookingId}`, { waitUntil: 'commit' });
+    await page.goto(`/bookings/${bookingId}`);
     await expect(page).toHaveURL(/.*\/login/);
   });
 
