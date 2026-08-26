@@ -117,6 +117,14 @@ Update this file after every completed feature. Any AI agent reading this should
   - Exported both vertical contracts from `packages/shared/src/types/index.ts`; package-root `index.ts` re-exports the stable `types` surface.
   - Verification: `pnpm --filter @shared/types build`; `node --test packages/shared/dist/types/flight-search.types.spec.js packages/shared/dist/types/booking-management.types.spec.js`; `pnpm --filter @web/frontend typecheck`; `pnpm --filter @api/backend exec tsc -p tsconfig.json --noEmit`.
 
+### [x] Feature: Deepen Codebase Architecture (Feature 019) — Slice 5B: Flight Search Server Seam
+
+- [x] Slice 5B / Authenticated Flight Search server seam (2026-08-25):
+  - Added authenticated, server-only `searchFlights` and `selectFlightOffer` operations with private `API_URL` resolution, session-owned bearer injection, bounded timeout/retry handling, upstream validation, and typed error normalization.
+  - Added serializable search/selection Server Actions and removed access-token/backend-URL/retry policy concerns from the Search page and Client Component.
+  - Updated `.env.example` with the private API URL transition setting and converted checkout fixtures to approved `mock-scenario` seams instead of browser interception of backend transport.
+  - Focused coverage in `apps/web/lib/server/flight-search.spec.ts` proves authentication, retries, timeout, validation, and error mapping; the web typecheck passes for the resulting server seam.
+
 ### [x] Feature: Deepen Codebase Architecture (Feature 019) — Slice 4C: Thin Transport Adapter and Graceful Runner Shutdown (US4 Complete)
 
 - [x] Slice 4C / Thin Transport Adapter and Graceful Runner Shutdown (2026-08-24):

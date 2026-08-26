@@ -9,6 +9,13 @@
     "noEmit": true,
     "skipLibCheck": true,
     "experimentalDecorators": true,
-    "emitDecoratorMetadata": true
+    "emitDecoratorMetadata": true,
+    "baseUrl": ".",
+    "paths": {
+      "@shared/types": ["packages/shared/src/types/index"],
+      "@shared/types/*": ["packages/shared/src/types/*"],
+      "@shared/*": ["packages/shared/src/*"],
+      "@/*": ["apps/web/*"]
+    }
   }
 }

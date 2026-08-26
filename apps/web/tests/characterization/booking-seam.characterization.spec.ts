@@ -23,9 +23,15 @@ test.describe('Booking Seam Characterization - User Flows', () => {
   test.slow();
 
   test.beforeEach(async ({ page }) => {
-    await page.addStyleTag({
-      content: 'aside[aria-label="Agent chat"] { display: none !important; }',
-    }).catch(() => {});
+    await page.addInitScript(() => {
+      const style = document.createElement('style');
+      style.textContent = 'aside[aria-label="Agent chat"] { display: none !important; }';
+      if (document.head) {
+        document.head.appendChild(style);
+      } else {
+        document.addEventListener('DOMContentLoaded', () => document.head?.appendChild(style));
+      }
+    });
   });
 
   test('unauthenticated users navigating to booking details are redirected to /login', async ({
@@ -33,7 +39,7 @@ test.describe('Booking Seam Characterization - User Flows', () => {
     context,
   }) => {
     await context.clearCookies();
-    await page.goto(`/bookings/${bookingId}`, { waitUntil: 'commit' });
+    await page.goto(`/bookings/${bookingId}`);
     await expect(page).toHaveURL(/.*\/login/);
   });
 

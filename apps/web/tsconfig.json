@@ -20,6 +20,8 @@
     ],
     "paths": {
       "@/*": ["./*"],
+      "@shared/types": ["../../packages/shared/src/types/index"],
+      "@shared/types/*": ["../../packages/shared/src/types/*"],
       "@shared/*": ["../../packages/shared/src/*"]
     }
   },

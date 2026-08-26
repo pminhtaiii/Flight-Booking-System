@@ -169,7 +169,9 @@ async def test_refresh_loss_cancels_monitored_tasks():
     try:
         await asyncio.sleep(0.2)
     except asyncio.CancelledError:
-        pass
+        curr = asyncio.current_task()
+        if curr and hasattr(curr, "uncancel"):
+            curr.uncancel()
 
     await asyncio.gather(worker_task, return_exceptions=True)
 

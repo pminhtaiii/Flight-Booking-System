@@ -80,61 +80,6 @@ test.describe('Checkout Foundation Flow', () => {
     let capturedReadinessPayload: { passengers?: Array<{ source?: { type?: string } }> } | null = null;
     let capturedIntentPayload: { flightOfferId?: string; passengers?: Array<{ source?: { type?: string } }> } | null = null;
 
-    // Intercept Search API
-    await page.route('**/api/flights/search', async (route) => {
-      await route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify({
-          results: [
-            {
-              id: 'mock-dom-offer-id',
-              airline: 'Delta Air Lines',
-              flightNumber: 'DL456',
-              departureAirport: 'LAX',
-              arrivalAirport: 'SFO',
-              departureTime: '2026-12-12T12:00:00Z',
-              arrivalTime: '2026-12-12T13:30:00Z',
-              duration: 90,
-              stops: 0,
-              price: 150,
-              currency: 'USD',
-            },
-          ],
-          meta: { totalResults: 1 },
-        }),
-      });
-    });
-
-    // Intercept flight details API
-    await page.route('**/api/flights/mock-dom-offer-id', async (route) => {
-      await route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify({
-          id: 'mock-dom-offer-id',
-          airline: 'Delta Air Lines',
-          flightNumber: 'DL456',
-          departureAirport: 'LAX',
-          arrivalAirport: 'SFO',
-          departureTime: '2026-12-12T12:00:00Z',
-          arrivalTime: '2026-12-12T13:30:00Z',
-          originalPrice: 150,
-          confirmedPrice: 150,
-          priceChanged: false,
-          currency: 'USD',
-          adults: 1,
-          children: 1,
-          infants: 0,
-          passengers: [
-            { id: 'pas_001', type: 'ADULT' },
-            { id: 'pas_002', type: 'CHILD' },
-          ],
-          segments: [{ departureAirport: 'LAX', arrivalAirport: 'SFO' }],
-        }),
-      });
-    });
-
     // Intercept readiness API
     await page.route('**/api/bookings/intents/readiness', async (route) => {
       readinessQueried = true;
@@ -363,36 +308,10 @@ test.describe('Checkout Foundation Flow', () => {
     await context.addCookies([
       {
         name: 'mock-scenario',
-        value: 'mock-ancillary-phase4',
+        value: 'international-offer',
         url: 'http://127.0.0.1:3000',
       },
     ]);
-
-    // Flight offer with 1 adult passenger
-    await page.route('**/api/flights/mock-conflict-offer-id', async (route) => {
-      await route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify({
-          id: 'mock-conflict-offer-id',
-          airline: 'Delta Air Lines',
-          flightNumber: 'DL456',
-          departureAirport: 'LAX',
-          arrivalAirport: 'SFO',
-          departureTime: '2026-12-12T12:00:00Z',
-          arrivalTime: '2026-12-12T13:30:00Z',
-          originalPrice: 150,
-          confirmedPrice: 150,
-          priceChanged: false,
-          currency: 'USD',
-          adults: 1,
-          children: 0,
-          infants: 0,
-          passengers: [{ id: 'pas_001', type: 'ADULT' }],
-          segments: [{ departureAirport: 'LAX', arrivalAirport: 'SFO' }],
-        }),
-      });
-    });
 
     // Mock readiness to pass
     await page.route('**/api/bookings/intents/readiness', async (route) => {
