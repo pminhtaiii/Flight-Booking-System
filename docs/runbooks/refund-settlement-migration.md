@@ -1,31 +1,30 @@
 # Refund Settlement Contract Migration Runbook
 
-This runbook governs Feature 019 Slice 1D: contracting the legacy direct `Refund.bookingId` / `Booking.cancellationRefund` relationship after the additive obligation migration, the backfill, and the provider-blind Refund Settlement cutover. It implements the required expand → backfill → validate → cut over → observe → contract sequence from [the Feature 019 plan](../../specs/019-improve-architecture/plan.md), [data model](../../specs/019-improve-architecture/data-model.md), and [settlement contract](../../specs/019-improve-architecture/contracts/refund-settlement.md).
+This operational runbook governs Feature 019 Slice 1D: contracting the legacy direct `Refund.bookingId` / `Booking.cancellationRefund` relationship after the additive obligation migration, the backfill, and the provider-blind Refund Settlement cutover. It implements the required expand → backfill → validate → cut over → observe → contract sequence from the architecture specification and settlement contract.
 
 The physical PostgreSQL table remains `refunds`. This change does not rename it.
 
-## Safety rules
+---
 
-- Run every command first against a restored production snapshot or other disposable database. Use no live Stripe or Duffel credentials during verification.
+## 1. Preflight Checks & Prerequisites
+
+### 1.1 Safety Rules & Invariants
+- Run every command first against a restored production snapshot or disposable staging database. Use zero live Stripe or Duffel credentials during verification.
 - Do not run the contract migration while a backfill mismatch, quarantine, ledger invariant failure, reservation conflict spike, or unexplained settlement conflict is open.
 - A successful `Refund` with a cancellation obligation must retain its exact two-entry reversal pair: `DEBIT PLATFORM_REVENUE` and `CREDIT CUSTOMER_RECEIVABLE`, both for the transaction amount and currency.
 - Roll back code before rolling back schema whenever possible. The legacy one-refund-per-booking schema cannot faithfully represent an obligation that has more than one linked refund transaction.
 - Treat database identifiers, Stripe/Duffel references, booking references, amounts, and audit metadata as restricted operational data. Do not paste query output into tickets, chat, dashboards, or logs.
 
-## Required rollout order
-
+### 1.2 Required Rollout Sequence
 1. Deploy the additive migration `20260822000000_cancellation_refund_obligation_expand` and application code that can read both representations.
 2. Run the restart-safe backfill and validation; resolve every quarantine before proceeding.
 3. Deploy the four trigger cutovers. New cancellation refunds must reserve a transaction against an obligation and terminal outcomes must go exclusively through Refund Settlement.
-4. Complete the observation window below with the additive schema still present.
+4. Complete the 14-day observation window with the additive schema still present.
 5. Re-run preflight immediately before deployment, take a verified database backup, deploy `20260823000000_refund_obligation_contract`, regenerate Prisma Client, and run Gate 1.
 6. Keep legacy amount columns and the physical `refunds` table. Their removal or rename is a separate retention-approved cleanup.
 
-No step may be skipped because a lower environment happened to have no legacy rows.
-
-## Preflight and validation
-
-Set `DATABASE_URL` through the deployment secret mechanism; never place a production URL in shell history, a runbook transcript, or a ticket. The following commands are shown from the repository root and use the environment already injected into the approved operator shell.
+### 1.3 Environment & Migration Status Check
+Set `DATABASE_URL` through the approved deployment secret mechanism; never place a production URL in shell history, transcripts, or tickets.
 
 ```powershell
 docker compose up -d
@@ -38,7 +37,8 @@ Pop-Location
 
 The migration status must show the expand migration as applied and must not report divergence. Before the contract migration is deployed, it must not already report `20260823000000_refund_obligation_contract` as applied.
 
-Run the backfill once in the approved maintenance/change window. It is restart-safe and can update/attach missing obligations and ledger links, but it does **not** exit nonzero merely because it quarantines a record. Save its count-only summary in the restricted change record; do not retain its per-row log output.
+### 1.4 Backfill Execution (`CancellationRefundObligation`)
+Run the backfill once in the approved maintenance/change window. It is restart-safe and can update/attach missing obligations and ledger links, but it does **not** exit nonzero merely because it quarantines a record.
 
 ```powershell
 Push-Location apps/api
@@ -49,22 +49,23 @@ Pop-Location
 
 Proceed only when the summary has `Errors: 0` **and** `Quarantined: 0`. A nonzero `Quarantined` count is a contract-migration abort even when the process exit code is zero.
 
-Run each query through the approved production SQL console with `ON_ERROR_STOP` enabled. The expected result for every query is `0`. The queries intentionally return counts only.
+### 1.5 Preflight Verification SQL Queries
+Run each query through the approved production SQL console with `ON_ERROR_STOP` enabled. The expected result for every query is `0`. The queries return counts only.
 
 ```sql
--- Legacy cancellation rows must have a canonical obligation before the legacy FK is removed.
+-- 1. Legacy cancellation rows must have a canonical obligation before legacy FK is removed
 SELECT count(*) AS legacy_refunds_missing_obligation
 FROM "refunds"
 WHERE "bookingId" IS NOT NULL
   AND "cancellationRefundObligationId" IS NULL;
 
--- This is the exact contract predicate. Other refund reasons remain eligible to have no obligation.
+-- 2. Exact contract predicate: other refund reasons remain eligible to have no obligation
 SELECT count(*) AS cancellation_reason_missing_obligation
 FROM "refunds"
 WHERE reason LIKE 'cancellation:%'
   AND "cancellationRefundObligationId" IS NULL;
 
--- The obligation must point at the same booking payment and use its payment currency.
+-- 3. The obligation must point at the same booking payment and use its payment currency
 SELECT count(*) AS obligation_payment_or_currency_mismatch
 FROM "cancellation_refund_obligations" o
 JOIN "bookings" b ON b.id = o."bookingId"
@@ -74,7 +75,7 @@ WHERE b."paymentId" IS DISTINCT FROM o."paymentId"
    OR o."totalAmount" < 0
    OR o."airlineRefundAmount" < 0;
 
--- A refund linked to an obligation must agree with that obligation's payment and currency.
+-- 4. A refund linked to an obligation must agree with that obligation's payment and currency
 SELECT count(*) AS linked_refund_mismatch
 FROM "refunds" r
 JOIN "cancellation_refund_obligations" o
@@ -82,7 +83,7 @@ JOIN "cancellation_refund_obligations" o
 WHERE r."paymentId" <> o."paymentId"
    OR upper(r.currency) <> upper(o.currency);
 
--- Successful and active transaction capacity may never exceed either financial parent.
+-- 5. Dual-Capacity Reservation Limits: Successful + active transaction capacity may never exceed either parent
 WITH payment_totals AS (
   SELECT p.id, p.amount,
     coalesce(sum(r.amount) FILTER (WHERE r.status = 'SUCCEEDED'), 0) AS succeeded,
@@ -107,7 +108,7 @@ SELECT
   (SELECT count(*) FROM obligation_totals WHERE succeeded + active > "totalAmount")
   AS over_capacity_parents;
 
--- Every successful transaction has exactly one balanced, correctly typed reversal pair.
+-- 6. Duplicate Ledger Detection: Every successful transaction has exactly one balanced reversal pair
 WITH linked_ledger AS (
   SELECT r.id,
     count(le.id) AS entry_count,
@@ -132,15 +133,14 @@ SELECT count(*) AS invalid_successful_ledger_pairs
 FROM linked_ledger
 WHERE entry_count <> 2 OR debit_count <> 1 OR credit_count <> 1;
 
--- Active or failed transactions must not own a reversal pair.
+-- 7. Active or failed transactions must not own a reversal pair
 SELECT count(*) AS non_successful_transactions_with_ledger
 FROM "refunds" r
 JOIN "ledger_entries" le ON le."refundTransactionId" = r.id
 WHERE r.status <> 'SUCCEEDED';
 ```
 
-Run the focused Gate 1 suites against the migrated disposable database before production contract rollout, then again after it:
-
+### 1.6 Gate 1 Automated Test Verification
 ```powershell
 Push-Location apps/api
 & '.\node_modules\.bin\jest.CMD' --runInBand `
@@ -156,66 +156,96 @@ Push-Location apps/api
 Pop-Location
 ```
 
-## Mismatch and quarantine procedure
+---
 
-Stop the rollout immediately if the backfill reports an error or quarantine, any preflight count is nonzero, or a ledger/capacity query returns a violation.
+## 2. Mismatch Abort Conditions & Safeguards
 
-1. Freeze the contract deployment and leave the additive schema and dual-compatible application code in place.
-2. Preserve a database snapshot and the restricted job output. Record only the change ID, aggregate counts, trace/correlation IDs, and timestamps in the incident record.
-3. Do not manually attach a refund, alter money amounts, fabricate ledger entries, or replay a provider operation to clear the mismatch.
-4. Classify the record with an authorized finance/operator review: Booking↔Payment identity, currency/minor-unit conversion, obligation capacity, ambiguous/missing ledger pair, or invalid non-success ledger link.
-5. Correct the source data or approved migration logic in a separately reviewed change, then re-run the full backfill and all preflight queries. The result must be zero quarantines and zero violations before the contract is reconsidered.
+### 2.1 Abort Triggers
+Stop the rollout immediately if:
+1. The backfill script reports `Errors > 0` or `Quarantined > 0`.
+2. Any preflight SQL verification count is greater than `0`.
+3. An over-capacity parent violation is detected on Payment or Obligation.
+4. An unbalanced or duplicate ledger entry is detected.
+5. A settlement conflict occurs where an incoming terminal refund state contradicts the persisted state.
 
-The current backfill uses quarantine as a safe skip; it does not persist a dedicated quarantine table. The restricted change record is therefore the authoritative queue until a future feature introduces explicit case storage.
+### 2.2 Quarantine Procedure
+1. Freeze the contract deployment immediately; leave additive schema and dual-compatible code in place.
+2. Preserve a database snapshot and restricted backfill job logs. Record change ID, aggregate counts, trace/correlation IDs, and timestamps in incident ticket.
+3. Strict Prohibition: Never manually attach a refund, fabricate ledger entries, alter money values, or replay provider mutations directly in the database.
+4. Root Cause Classification:
+   - `Booking <-> Payment` identity divergence
+   - Currency or integer minor-unit conversion error
+   - Dual-capacity reservation overrun
+   - Ambiguous/missing ledger pair
+   - Non-successful transaction with attached ledger records
+5. Correct source data or migration logic in a reviewed and approved change; re-run full backfill and all 7 preflight SQL queries until all return `0`.
 
-## Observation window and promotion criteria
+### 2.3 Replay Idempotency Safeguards
+- All trigger paths (Inline, Webhook, Sweeper Cron, Admin) provide an idempotency key and external refund ID.
+- If `settleVerifiedOutcome()` is invoked with an already-settled refund transaction ID:
+  - If incoming amounts, currency, and status match the persisted record: return cached outcome immediately (`NOOP_REPLAY`).
+  - If incoming data contradicts persisted facts (e.g. different amount or currency): fail closed with `SETTLEMENT_CONFLICT` and log an emergency security/audit alert.
 
-Keep the additive schema for a minimum of **14 consecutive calendar days** and at least one full scheduled refund-recovery interval after all four triggers (inline, webhook, cron, and admin) use the settlement boundary. Reset the window after any material refund rollback, backfill rerun that changes production rows, unresolved mismatch, or settlement/ledger invariant alert.
+---
 
-During the window, review daily:
+## 3. Observability, Metrics & Alert Thresholds
 
-- `settlement applied`, `settlement no-op/replay`, and `settlement conflict` counters segmented only by `INLINE`, `WEBHOOK`, `CRON`, or `ADMIN` provenance;
-- reservation rejections segmented by `payment_capacity` versus `obligation_capacity`;
-- backfill mismatch/quarantine count and ledger invariant failures;
-- successful transaction count versus valid ledger-pair count; and
-- payment/obligation capacity violations from the preflight queries.
+### 3.1 Alert Threshold Table
 
-Promotion to contract requires all of the following:
+| Signal | Alert Condition | Severity | Immediate Response |
+|---|---|---|---|
+| Settlement Conflict | Any unexplained conflict after deduplication, or sustained increase > 0 for 15m | P1 (Critical) | Freeze deployment; inspect normalized facts via trace ID. Do not retry automatically. |
+| Reservation Rejection | Unexpected `payment_capacity` or `obligation_capacity` increase > 5 for 15m | P2 (High) | Check dual-capacity SQL query; halt automated sweeper retries if invariant violated. |
+| Backfill Quarantine | Any nonzero quarantine count | P1 (Critical) | Abort contract rollout immediately; execute Section 2.2 quarantine playbook. |
+| Ledger Invariant Failure | Any unbalanced reversal pair or orphan ledger entry | P1 (Critical) | Page on-call & finance engineering; halt settlement pipeline; do not manual-balance. |
+| Settlement Replay Ratio Drift | `settlement_noop_replay_total` / `settlement_applied_total` > 2.0 for 30m | P3 (Medium) | Inspect webhook delivery and retry intervals for redundant trigger firing. |
 
-- all four trigger paths exercised or otherwise explicitly evidenced as inactive during the window;
-- zero unexplained settlement conflicts, zero ledger invariant failures, zero quarantines, and zero over-capacity parents;
-- Gate 1 green on the target migration; and
-- an approved database backup/restore test plus the reverse-mapping eligibility check below.
+### 3.2 Telemetry Invariants & Privacy
+- All metrics and logs MUST use aggregate counts, status enums (`SUCCEEDED`, `FAILED`), provenance enums (`INLINE`, `WEBHOOK`, `CRON`, `ADMIN`), and opaque trace/correlation IDs.
+- Strictly Prohibited in Telemetry: Card numbers, CVVs, customer names, email addresses, PNRs, raw Stripe API responses, or plain database IDs.
 
-## Contract deployment
+---
 
-Schedule a maintenance window that prevents overlapping manual remediation and deploys one application version at a time. Drain or pause new cancellation-refund initiation if the deployment platform cannot guarantee that every API instance is on the cutover version before schema contract. Do not interrupt provider verification already in progress; its terminal outcome must be delivered to the compatible settlement code first.
+## 4. Observation Window Guidelines
 
-Immediately before deployment, re-run the preflight section and take a restorable backup. Then deploy the contract migration using the normal Prisma deployment path:
+### 4.1 Duration & Reset Rules
+- Keep the additive schema in place for a minimum of **14 consecutive calendar days**.
+- The window MUST cover at least one full scheduled refund-recovery interval where all 4 triggers have processed production traffic (or have been verified inactive).
+- Window Reset Condition: Any material rollback, backfill rerun altering production rows, unresolved quarantine, or ledger alert resets the 14-day clock back to Day 0.
 
-```powershell
-Push-Location apps/api
-& '.\node_modules\.bin\prisma.CMD' migrate deploy
-if ($LASTEXITCODE -ne 0) { throw 'Refund obligation contract migration failed.' }
-& '.\node_modules\.bin\prisma.CMD' generate
-Pop-Location
-```
+### 4.2 Daily Operator Review Checklist
+1. Inspect `settlement_applied_total`, `settlement_noop_replay_total`, and `settlement_conflict_total` segmented by provenance.
+2. Review reservation rejection logs segmented by `payment_capacity` vs `obligation_capacity`.
+3. Execute SQL Preflight Query #5 (capacity limits) and Query #6 (duplicate ledger detection).
+4. Verify 100% correlation between successful `Refund` rows and exactly two `LedgerEntry` rows.
 
-The contract migration drops `refunds_bookingId_fkey`, the legacy unique `refunds_bookingId_key` index, and `refunds.bookingId`; it also adds a check that requires `cancellationRefundObligationId` when `reason LIKE 'cancellation:%'`. Confirm `20260823000000_refund_obligation_contract` is applied, the deployed application no longer reads/writes `Refund.bookingId` or `Booking.cancellationRefund`, and rerun the post-contract Gate 1 suite. A migration failure must stop promotion; restore service code compatibility first and use the rollback decision tree below rather than editing Prisma migration history.
+### 4.3 Promotion Criteria to Contract
+All of the following must be green before deploying `20260823000000_refund_obligation_contract`:
+- 14 days completed with zero resets.
+- Zero unexplained settlement conflicts, zero ledger invariant failures, zero quarantines.
+- Gate 1 test suite passes with 0 failures.
+- Restorable database backup taken within 1 hour prior to contract deployment.
+- Reverse-mapping eligibility query (Section 5.3) returns `0`.
 
-## Rollback decision tree
+---
 
-### Before the contract migration
+## 5. Rollback Procedures & Exact Commit Boundaries
 
-Roll back the caller deployment to the last dual-compatible build. The additive obligation, refund FK, and ledger FK columns remain intact. Re-run backfill validation and Gate 1 before resuming. No database rollback is required unless a separately approved data repair is necessary.
+### 5.1 Exact Commit Boundaries
+- **Expand Migration & Backfill Baseline**: Commit `46a518f` (`feat(refund): contract migration and runbook for cancellation refund obligations (Slice 1D Batch 1)`).
+- **Contract Migration & Gate 1 Sign-Off**: Commit `4f9cfb1` (`docs(refund): record Slice 1D completion and Gate 1 sign-off`).
 
-### After the contract migration: preferred rollback
+### 5.2 Rollback Before Contract Migration
+If issues occur while still on the additive schema:
+1. Roll back the application container to the previous dual-compatible release (at commit `46a518f`).
+2. Leave additive schema (`CancellationRefundObligation`, `refundTransactionId`) intact in PostgreSQL.
+3. No database rollback is required. Re-run preflight verification and Gate 1 suite.
 
-Roll back to a compatible application release that continues to use obligations and Refund Settlement. This is the only safe rollback once an obligation has more than one linked refund transaction. Keep the contract schema and repair/forward-fix the application or migration issue.
+### 5.3 Rollback After Contract Migration: Preferred Rollback (Code First)
+Roll back application code to a version that uses `CancellationRefundObligation` and `RefundSettlementService` without relying on legacy `Refund.bookingId`. Keep the contract schema in place. This is the only safe procedure once an obligation has multiple linked refund transactions.
 
-### After the contract migration: schema reverse mapping (exception only)
-
-Schema restoration is permitted only when the following query returns `0`. It proves that restoring the legacy unique `refunds.bookingId` cannot discard the one-obligation-to-many-transactions model:
+### 5.4 Rollback After Contract Migration: Schema Reverse Mapping (Emergency Exception Only)
+Schema restoration is permitted ONLY when the following query returns `0`:
 
 ```sql
 SELECT count(*) AS obligations_not_representable_by_legacy_schema
@@ -228,9 +258,7 @@ FROM (
 ) AS multi_transaction_obligations;
 ```
 
-Also re-run all applicable post-contract preflight queries (without the dropped legacy-column query), verify a current restorable backup, and obtain explicit finance/on-call approval. If any condition fails, **do not perform a schema rollback**; use the preferred forward-compatible rollback.
-
-When eligible, execute the following in one approved transaction through the production SQL console. First test it on a restored production snapshot. The statements restore only the legacy compatibility FK/index; they never remove obligation or ledger data.
+If the count is `0`, execute the following transaction in the approved SQL console:
 
 ```sql
 BEGIN;
@@ -264,32 +292,21 @@ ALTER TABLE "refunds"
 COMMIT;
 ```
 
-If the constraint already exists, stop and inspect the schema rather than retrying a partial transaction. After a successful reverse mapping, deploy the matching dual-compatible application release, regenerate Prisma Client, rerun migration status, and execute Gate 1. Do not remove the contract migration directory or alter `_prisma_migrations`; record the controlled schema restoration in the change record.
+Deploy the matching dual-compatible application release, regenerate Prisma Client, and execute Gate 1 suite.
 
-## Monitoring and alerts
+---
 
-The Slice 1D telemetry in application code must stay PII-safe. Configure the following alerts using aggregate counts and opaque trace/correlation IDs only:
+## 6. Post-Rollout Cleanup Eligibility
 
-| Signal | Alert condition | Immediate response |
-|---|---|---|
-| Settlement conflict | Any unexplained conflict after deduplication, or a sustained increase above the established baseline for 15 minutes | Freeze promotion; compare normalized persisted facts without provider payloads. |
-| Reservation rejection | Unexpected `payment_capacity` or `obligation_capacity` increase for 15 minutes | Check capacity query; pause new automated retries if an over-capacity invariant is found. |
-| Backfill quarantine/mismatch | Any nonzero count | Abort contract work and follow the quarantine procedure. |
-| Ledger invariant failure | Any occurrence | Page finance/on-call; stop contract rollout and do not replay or manually balance entries. |
-| Settlement applied/no-op ratio | A material unexplained shift from the observation baseline for 30 minutes | Validate webhook/retry delivery behavior and idempotency correlation. |
+### 6.1 Retained Legacy Fields
+The following fields and tables are intentionally preserved post-contract and are NOT eligible for immediate deletion:
+- Physical table `refunds` (remains the permanent home for refund transactions).
+- Legacy amount columns: `Refund.airlineRefundAmount`, `Refund.customerRefundAmount`.
 
-Logs, metrics, traces, and audit metadata may include operation name, outcome class, provenance enum, duration, aggregate count, and trace/correlation ID. They must not include raw provider payloads or references, idempotency keys, payment or booking IDs, customer data, card data, PNRs, email addresses, or full error payloads.
-
-## Cleanup eligibility
-
-The following are explicitly **not** part of this contract migration: removing legacy amount fields (`Refund.airlineRefundAmount`, `Refund.customerRefundAmount`), renaming the physical `refunds` table, or deleting the obligation/ledger compatibility history.
-
-Approve a later cleanup only when all conditions are met:
-
-- the 14-day observation window and Gate 1 evidence are retained in the restricted change record;
-- no supported release or rollback target reads the candidate legacy field/relation;
-- the retention owner approves removal of any remaining legacy amount facts;
-- restore drills prove the necessary audit, transaction, and ledger records remain interpretable; and
-- a new migration has its own preflight, rollback, and financial-review approval.
-
-Until then, preserve the physical `refunds` table and the retained legacy amount fields even though `Refund.bookingId` and `Booking.cancellationRefund` have been contracted away.
+### 6.2 Cleanup Eligibility Criteria
+Approve future deletion of legacy amount fields only when:
+1. The 14-day observation window and Gate 1 verification have completed with zero incidents.
+2. Static audit verifies zero application code reads or writes `Refund.airlineRefundAmount` or `Refund.customerRefundAmount`.
+3. Financial retention compliance officer formally approves deprecation of legacy amount columns.
+4. Database restore drills confirm historic audit logs and ledger entries remain fully interpretable without legacy columns.
+5. A dedicated contract cleanup migration is authored, reviewed, and approved with its own independent preflight and rollback plan.

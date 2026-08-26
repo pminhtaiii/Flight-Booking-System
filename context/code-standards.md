@@ -44,6 +44,27 @@ The AI agent on this project operates as a senior engineer. This means:
 - Every controller method has a try/catch — errors are caught by a global exception filter
 - Injectable services use constructor injection — never use `new` for service instantiation
 
+### Capability-Local Module Conventions & Anti-Cyclic Architecture
+
+To maintain strict boundaries and prevent circular dependencies across domains:
+
+- **Capability-Local Module Isolation**:
+  - Decompose large monolithic domains into focused, capability-local submodules (e.g., `AttestedFlightSearchModule`, `AgentBookingReadinessModule`, `SafeBookingReadModule`, `TravelerPreferencesModule` within the Agent Gateway; `BookingLifecycleModule`, `BookingManagementModule`, `CancellationModule` within Booking).
+  - Each capability submodule encapsulates its own controllers, services, DTOs, and unit tests with minimal external module imports.
+  - Cross-cutting concerns (auth guards, audit logging, crypto) reside in dedicated shared modules (`AgentAuthModule`, `AgentToolAuditModule`, `PrismaModule`, `CacheModule`).
+
+- **Strict Anti-Cyclic Dependency Invariant**:
+  - Module import graphs MUST remain strictly acyclic (DAG). Circular module dependencies (`A -> B -> A`) are strictly forbidden.
+  - Using `forwardRef()` in production code to patch circular dependencies is prohibited. Cycles must be eliminated by architectural extraction or inversion of control.
+  - Strict one-way dependency boundaries:
+    - `BookingModule` (umbrella) imports `BookingLifecycleModule`, `BookingManagementModule`, `CancellationModule`.
+    - `CancellationModule` imports `PaymentModule` (to trigger refunds via `PaymentRefundService`).
+    - `PaymentModule` imports `BookingLifecycleModule` (for lifecycle confirmation/failure transitions), `RefundModule`, `RefundSettlementModule`.
+    - `BookingLifecycleModule` and `BookingManagementModule` NEVER import `PaymentModule`.
+    - `PaymentModule` NEVER imports `BookingModule` or `CancellationModule`.
+    - `ChatModule` NEVER imports `AgentGatewayModule`.
+  - Zero cyclic dependencies between Payment and Booking domains are enforced statically in CI.
+
 ### NestJS Controller Pattern
 
 ```typescript
@@ -114,11 +135,45 @@ export class FlightsService {
   - Event listeners
   - Third party client-only libraries
 - Never add `"use client"` to layout files unless absolutely required
-- Data fetching happens in Server Components — never fetch in Client Components directly
-- **Next.js is the frontend only** — all API calls go to the NestJS backend, not `app/api/` route handlers
-- Minimal `app/api/` usage — only for NextAuth.js auth routes and webhook receivers
+- **Next.js is the frontend only** — all API calls go to the NestJS backend, not `app/api/` route handlers (with strict Decision 6 exceptions below)
+- Minimal `app/api/` usage — only for NextAuth.js auth routes, Stripe webhook receivers, and thin same-origin booking management route handlers
 - **Feature 017 handoff exception** — `CheckoutHandoffCard` may POST its in-memory credential only to same-origin `/checkout/handoff`; native hidden form fields are forbidden because they expose the credential in the DOM, and no response data fetching or business logic belongs in the Client Component
 - Never put business logic in the Next.js layer — it belongs in NestJS services
+
+### Decision 6 Exception: Thin Same-Origin Route Handlers
+
+Client Components require interactive polling (cancellation recovery status, disruption alerts) and transactional commands (cancellation quote review, booking cancellation, disruption acknowledge/accept) without exposing backend transport topology or credentials to the browser:
+
+- **7 Thin Route Handlers (`app/api/booking-management/`)**:
+  - `GET /api/booking-management/bookings/[bookingId]` (interactive detail polling)
+  - `POST /api/booking-management/bookings/[bookingId]/cancellation-quote` (request quote)
+  - `GET /api/booking-management/bookings/[bookingId]/cancellation-status` (cancellation status polling)
+  - `POST /api/booking-management/bookings/[bookingId]/cancel` (confirm cancellation)
+  - `POST /api/booking-management/bookings/[bookingId]/disruptions/acknowledge` (acknowledge disruption)
+  - `POST /api/booking-management/bookings/[bookingId]/disruptions/accept` (accept disruption change)
+  - `GET /api/booking-management/bookings/[bookingId]/revisions` (itinerary revision history)
+- **Strict Implementation Rules**:
+  - Must declare `export const dynamic = 'force-dynamic'`.
+  - Must return `headers: { 'Cache-Control': 'private, no-store' }` on all responses.
+  - Zero business logic, zero direct database access, and zero supplier API calls.
+  - Must delegate 100% of execution to server domain module `apps/web/lib/server/booking-management.ts`.
+  - Must map domain outcome failure reasons (`UNAUTHENTICATED`, `FORBIDDEN`, `NOT_FOUND`, `STALE_REVISION`, `INVALID_COMMAND`, `UPSTREAM_UNAVAILABLE`) to standard HTTP status codes (401, 403, 404, 409, 400, 503).
+
+### Zero-Client-Credential Invariant
+
+To ensure client bundle and browser runtime isolation:
+
+- **Strict Invariant**:
+  - Client Components (`"use client"`) must NEVER receive JWTs (`accessToken`), `process.env.NEXT_PUBLIC_API_URL`, or backend transport configurations via props, state, contexts, custom hooks, or hidden DOM inputs.
+  - `useSession` from `next-auth/react` must NOT be invoked inside Client Components to retrieve tokens or credentials.
+  - NextAuth sessions and JWT tokens are acquired strictly on the server (inside Server Components, Server Actions, or server-only modules via `getServerSession`).
+  - Server domain modules resolve private `API_URL` (`process.env.API_URL || process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'`) and inject the Bearer token directly into upstream server-to-server HTTP requests.
+- **Client Transport Boundary**:
+  - Interactive client operations route exclusively through:
+    1. Server Actions (e.g. `app/search/actions.ts` for flight search).
+    2. Thin same-origin Route Handlers (`/api/booking-management/*` for interactive booking commands and polling).
+- **Automated Verification**:
+  - Monorepo automated static characterization audits continuously verify 0 occurrences of `useSession`, 0 occurrences of `accessToken`, and 0 occurrences of `NEXT_PUBLIC_API_URL` across all booking management Client Components.
 
 ---
 
