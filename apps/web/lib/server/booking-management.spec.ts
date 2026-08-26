@@ -413,6 +413,35 @@ describe('booking-management server domain module', () => {
       }
     });
 
+    it('normalizes empty offerId, paymentStatus, and pnrReference to null instead of rejecting schema', async () => {
+      globalThis.fetch = async (): Promise<Response> => {
+        return new Response(
+          JSON.stringify({
+            ...mockUpstreamBookingDetail,
+            bookingIntent: {
+              id: 'intent-uuid-001',
+              offerId: '', // Empty string from API when booking intent has no duffelOfferId
+            },
+            payment: {
+              id: 'pay-uuid-001',
+              status: '',
+            },
+            pnrReference: '',
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } },
+        );
+      };
+
+      const outcome = await getBookingDetail('booking-uuid-001');
+
+      assert.strictEqual(outcome.ok, true);
+      if (outcome.ok) {
+        assert.strictEqual(outcome.data.offerId, null);
+        assert.strictEqual(outcome.data.paymentStatus, null);
+        assert.strictEqual(outcome.data.pnrReference, null);
+      }
+    });
+
     it('returns NOT_FOUND on 404 upstream', async () => {
       globalThis.fetch = async (): Promise<Response> => {
         return new Response(JSON.stringify({ message: 'Booking not found' }), { status: 404 });

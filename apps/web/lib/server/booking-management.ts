@@ -813,19 +813,41 @@ function mapListItem(raw: unknown): BookingListItemView {
 
   const disruption = mapDisruptionAlert(item.disruption);
 
-  const paymentStatus =
+  const rawPaymentStatus =
     typeof (item.payment as { status?: unknown } | undefined)?.status === 'string'
       ? (item.payment as { status: string }).status
       : typeof item.paymentStatus === 'string'
       ? item.paymentStatus
       : undefined;
+  const paymentStatus =
+    rawPaymentStatus !== undefined
+      ? rawPaymentStatus.trim().length > 0
+        ? rawPaymentStatus.trim()
+        : null
+      : undefined;
+
+  const rawPnr = item.pnrReference;
+  const pnrReference =
+    rawPnr !== undefined
+      ? rawPnr != null && String(rawPnr).trim().length > 0
+        ? String(rawPnr).trim()
+        : null
+      : undefined;
+
+  const rawFailure = item.failureReason;
+  const failureReason =
+    rawFailure !== undefined
+      ? rawFailure != null && String(rawFailure).trim().length > 0
+        ? String(rawFailure).trim()
+        : null
+      : undefined;
 
   const result: BookingListItemView = {
     id: String(item.id ?? ''),
     status: String(item.status ?? ''),
-    ...(item.failureReason !== undefined ? { failureReason: item.failureReason != null ? String(item.failureReason) : null } : {}),
-    ...(paymentStatus !== undefined ? { paymentStatus: paymentStatus != null ? String(paymentStatus) : null } : {}),
-    ...(item.pnrReference !== undefined ? { pnrReference: item.pnrReference != null ? String(item.pnrReference) : null } : {}),
+    ...(failureReason !== undefined ? { failureReason } : {}),
+    ...(paymentStatus !== undefined ? { paymentStatus } : {}),
+    ...(pnrReference !== undefined ? { pnrReference } : {}),
     totalAmount: formatMoneyAmount(item.totalAmount),
     currency: String(item.currency ?? 'USD'),
     ...(departureAt !== undefined ? { departureAt } : {}),
@@ -1009,27 +1031,55 @@ function mapDetail(item: Record<string, unknown>): BookingDetailView {
     };
   }
 
-  const paymentStatus =
+  const rawPaymentStatus =
     typeof (item.payment as { status?: unknown } | undefined)?.status === 'string'
       ? (item.payment as { status: string }).status
       : typeof item.paymentStatus === 'string'
       ? item.paymentStatus
       : undefined;
+  const paymentStatus =
+    rawPaymentStatus !== undefined
+      ? rawPaymentStatus.trim().length > 0
+        ? rawPaymentStatus.trim()
+        : null
+      : undefined;
 
-  const offerId =
+  const rawOfferId =
     typeof (item.bookingIntent as { offerId?: unknown } | undefined)?.offerId === 'string'
       ? (item.bookingIntent as { offerId: string }).offerId
       : typeof item.offerId === 'string'
       ? item.offerId
       : undefined;
+  const offerId =
+    rawOfferId !== undefined
+      ? rawOfferId.trim().length > 0
+        ? rawOfferId.trim()
+        : null
+      : undefined;
+
+  const rawPnr = item.pnrReference;
+  const pnrReference =
+    rawPnr !== undefined
+      ? rawPnr != null && String(rawPnr).trim().length > 0
+        ? String(rawPnr).trim()
+        : null
+      : undefined;
+
+  const rawFailure = item.failureReason;
+  const failureReason =
+    rawFailure !== undefined
+      ? rawFailure != null && String(rawFailure).trim().length > 0
+        ? String(rawFailure).trim()
+        : null
+      : undefined;
 
   const result: BookingDetailView = {
     id: String(item.id ?? ''),
     status: String(item.status ?? ''),
-    ...(item.failureReason !== undefined ? { failureReason: item.failureReason != null ? String(item.failureReason) : null } : {}),
-    ...(paymentStatus !== undefined ? { paymentStatus: paymentStatus != null ? String(paymentStatus) : null } : {}),
-    ...(offerId !== undefined ? { offerId: offerId != null ? String(offerId) : null } : {}),
-    ...(item.pnrReference !== undefined ? { pnrReference: item.pnrReference != null ? String(item.pnrReference) : null } : {}),
+    ...(failureReason !== undefined ? { failureReason } : {}),
+    ...(paymentStatus !== undefined ? { paymentStatus } : {}),
+    ...(offerId !== undefined ? { offerId } : {}),
+    ...(pnrReference !== undefined ? { pnrReference } : {}),
     totalAmount: formatMoneyAmount(item.totalAmount),
     currency: String(item.currency ?? 'USD'),
     ...(departureAt !== undefined ? { departureAt } : {}),
