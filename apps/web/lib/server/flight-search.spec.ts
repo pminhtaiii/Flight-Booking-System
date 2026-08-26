@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
+import * as path from 'node:path';
 import { after, afterEach, before, beforeEach, describe, it, mock } from 'node:test';
 import type { FlightSearchQuery } from '@shared/types';
 
@@ -8,10 +9,24 @@ type TestSession = { accessToken?: string } | null;
 
 let session: TestSession = null;
 const getServerSession = mock.fn(async () => session);
-const nextAuthPath = testRequire.resolve('next-auth');
+const resolvePath = (specifier: string): string => {
+  try {
+    return testRequire.resolve(specifier);
+  } catch {
+    return require.resolve(specifier, {
+      paths: [
+        path.resolve(__dirname, '../../node_modules'),
+        path.resolve(process.cwd(), 'apps/web/node_modules'),
+        path.resolve(process.cwd(), 'node_modules'),
+      ],
+    });
+  }
+};
+
+const nextAuthPath = resolvePath('next-auth');
 const originalNextAuthModule = testRequire.cache[nextAuthPath];
 testRequire.cache[nextAuthPath] = { exports: { getServerSession } } as NodeModule;
-const serverOnlyPath = testRequire.resolve('server-only');
+const serverOnlyPath = resolvePath('server-only');
 const originalServerOnlyModule = testRequire.cache[serverOnlyPath];
 testRequire.cache[serverOnlyPath] = { exports: {} } as NodeModule;
 
@@ -162,6 +177,63 @@ describe('flight-search server seam', () => {
     assert.strictEqual(JSON.stringify(outcome).includes('duffelOfferId'), false);
   });
 
+  it('maps upstream responses containing empty string or zero fallbacks', async () => {
+    const fallbackOffer = {
+      id: 'local-offer-fallback',
+      duffelOfferId: 'off_fallback_123',
+      airline: '',
+      flightNumber: '',
+      departureAirport: '',
+      arrivalAirport: '',
+      departureTime: '',
+      arrivalTime: '',
+      duration: 0,
+      stops: 0,
+      price: 150,
+      currency: 'USD',
+      fareClass: null,
+      baggageAllowance: null,
+      requestedCabinClass: 'economy',
+      cabinClassMatch: 'full',
+      cabinMismatchDetails: null,
+      segments: [
+        {
+          carrierCode: '',
+          flightNumber: '',
+          operatingCarrier: '',
+          departureAirport: '',
+          departureTerminal: null,
+          departureTime: '',
+          arrivalAirport: '',
+          arrivalTerminal: null,
+          arrivalTime: '',
+          duration: 0,
+          aircraft: null,
+          cabinClass: 'economy',
+        },
+      ],
+      returnSegments: null,
+    };
+
+    globalThis.fetch = async (): Promise<Response> => {
+      return new Response(JSON.stringify({ results: [fallbackOffer], meta: { totalResults: 1 } }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    };
+
+    const outcome = await searchFlights(validQuery);
+
+    assert.strictEqual(outcome.ok, true);
+    if (outcome.ok) {
+      assert.strictEqual(outcome.offers.length, 1);
+      assert.strictEqual(outcome.offers[0].id, 'local-offer-fallback');
+      assert.strictEqual(outcome.offers[0].duration, 'PT0M');
+      assert.strictEqual(outcome.offers[0].slices[0].duration, 'PT0M');
+      assert.strictEqual(outcome.offers[0].slices[0].segments[0].duration, 'PT0M');
+    }
+  });
+
   it('returns an unauthenticated outcome before making an upstream call', async () => {
     session = null;
     let requested = false;
@@ -181,15 +253,33 @@ describe('flight-search server seam', () => {
     assert.strictEqual(requested, false);
   });
 
-  it('retries a 503 read failure before returning the validated response', async () => {
+  it('fails fast on 503 search response without repeating supplier-backed searches', async () => {
+    let attempts = 0;
+    globalThis.fetch = async (): Promise<Response> => {
+      attempts += 1;
+      return new Response('Unavailable', { status: 503 });
+    };
+
+    const outcome = await searchFlights(validQuery);
+
+    assert.deepEqual(outcome, {
+      ok: false,
+      reason: 'UPSTREAM_UNAVAILABLE',
+      message: 'Flight search is temporarily unavailable. Please try again.',
+      retryable: true,
+    });
+    assert.strictEqual(attempts, 1);
+  });
+
+  it('retries a 503 read failure on offer selection before returning the validated response', async () => {
     let attempts = 0;
     globalThis.fetch = async (): Promise<Response> => {
       attempts += 1;
       if (attempts === 1) return new Response('Unavailable', { status: 503 });
-      return new Response(JSON.stringify({ results: [upstreamOffer], meta: { totalResults: 1 } }), { status: 200 });
+      return new Response(JSON.stringify({ id: 'opaque-offer' }), { status: 200 });
     };
 
-    const outcome = await searchFlights(validQuery);
+    const outcome = await selectFlightOffer('opaque-offer');
 
     assert.strictEqual(outcome.ok, true);
     assert.strictEqual(attempts, 2);
@@ -215,7 +305,7 @@ describe('flight-search server seam', () => {
     }
   });
 
-  it('normalizes a timed-out upstream request after the bounded retry budget', async () => {
+  it('normalizes a timed-out search request without repeating supplier-backed searches', async () => {
     let attempts = 0;
     globalThis.fetch = async (): Promise<Response> => {
       attempts += 1;
@@ -228,6 +318,24 @@ describe('flight-search server seam', () => {
       ok: false,
       reason: 'UPSTREAM_UNAVAILABLE',
       message: 'Flight search is temporarily unavailable. Please try again.',
+      retryable: true,
+    });
+    assert.strictEqual(attempts, 1);
+  });
+
+  it('normalizes a timed-out read request after the bounded retry budget', async () => {
+    let attempts = 0;
+    globalThis.fetch = async (): Promise<Response> => {
+      attempts += 1;
+      throw new DOMException('Aborted', 'AbortError');
+    };
+
+    const outcome = await selectFlightOffer('opaque-offer');
+
+    assert.deepEqual(outcome, {
+      ok: false,
+      reason: 'OFFER_UNAVAILABLE',
+      message: 'This flight offer is unavailable. Please search again.',
       retryable: true,
     });
     assert.strictEqual(attempts, 3);

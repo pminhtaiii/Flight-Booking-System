@@ -2,9 +2,6 @@ import { z } from 'zod';
 
 const IataCodeSchema = z.string().regex(/^[A-Z]{3}$/, 'Expected a three-letter uppercase IATA code');
 const IsoDateSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Expected an ISO date (YYYY-MM-DD)');
-const IsoDateTimeSchema = z
-  .string()
-  .refine((value) => !Number.isNaN(Date.parse(value)), 'Expected an ISO datetime string');
 
 const isCurrentOrFutureCalendarDate = (value: string): boolean => {
   const parsedDate = new Date(`${value}T00:00:00Z`);
@@ -82,12 +79,12 @@ export type FlightSearchQuery = z.infer<typeof FlightSearchQuerySchema>;
 /** A sanitized segment; deliberately contains no provider identifier. */
 export const FlightSearchSegmentViewSchema = z
   .object({
-    airline: z.string().min(1),
-    flightNumber: z.string().min(1),
-    origin: IataCodeSchema,
-    destination: IataCodeSchema,
-    departureAt: IsoDateTimeSchema,
-    arrivalAt: IsoDateTimeSchema,
+    airline: z.string(),
+    flightNumber: z.string(),
+    origin: z.string(),
+    destination: z.string(),
+    departureAt: z.string(),
+    arrivalAt: z.string(),
     duration: z.string().min(1),
     cabinClass: z.enum(['economy', 'premium_economy', 'business', 'first']),
   })
@@ -98,10 +95,10 @@ export type FlightSearchSegmentView = z.infer<typeof FlightSearchSegmentViewSche
 /** A one-way slice of a rendered offer. */
 export const FlightSearchSliceViewSchema = z
   .object({
-    origin: IataCodeSchema,
-    destination: IataCodeSchema,
-    departureAt: IsoDateTimeSchema,
-    arrivalAt: IsoDateTimeSchema,
+    origin: z.string(),
+    destination: z.string(),
+    departureAt: z.string(),
+    arrivalAt: z.string(),
     duration: z.string().min(1),
     stops: z.number().int().min(0),
     segments: z.array(FlightSearchSegmentViewSchema).min(1),
@@ -116,12 +113,12 @@ export const FlightSearchOfferViewSchema = z
     id: z.string().min(1),
     price: z.number().finite().min(0),
     currency: z.string().regex(/^[A-Z]{3}$/, 'Expected a three-letter uppercase currency code'),
-    airline: z.string().min(1),
-    flightNumber: z.string().min(1),
-    origin: IataCodeSchema,
-    destination: IataCodeSchema,
-    departureAt: IsoDateTimeSchema,
-    arrivalAt: IsoDateTimeSchema,
+    airline: z.string(),
+    flightNumber: z.string(),
+    origin: z.string(),
+    destination: z.string(),
+    departureAt: z.string(),
+    arrivalAt: z.string(),
     duration: z.string().min(1),
     stops: z.number().int().min(0),
     slices: z.array(FlightSearchSliceViewSchema).min(1),

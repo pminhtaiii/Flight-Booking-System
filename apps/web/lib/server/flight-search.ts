@@ -16,8 +16,6 @@ const REQUEST_TIMEOUT_MS = 10_000;
 const MAX_ATTEMPTS = 3;
 const RETRY_BASE_DELAY_MS = 100;
 
-const IataCodeSchema = z.string().regex(/^[A-Z]{3}$/);
-const IsoDateTimeSchema = z.string().refine((value: string): boolean => !Number.isNaN(Date.parse(value)));
 const CabinClassSchema = z.enum(['economy', 'premium_economy', 'business', 'first']);
 const LocalOfferIdSchema = z
   .string()
@@ -26,16 +24,16 @@ const LocalOfferIdSchema = z
 
 const UpstreamSegmentSchema = z
   .object({
-    carrierCode: z.string().min(1),
-    flightNumber: z.string().min(1),
-    operatingCarrier: z.string().min(1),
-    departureAirport: IataCodeSchema,
+    carrierCode: z.string(),
+    flightNumber: z.string(),
+    operatingCarrier: z.string(),
+    departureAirport: z.string(),
     departureTerminal: z.string().nullable(),
-    departureTime: IsoDateTimeSchema,
-    arrivalAirport: IataCodeSchema,
+    departureTime: z.string(),
+    arrivalAirport: z.string(),
     arrivalTerminal: z.string().nullable(),
-    arrivalTime: IsoDateTimeSchema,
-    duration: z.number().int().min(1),
+    arrivalTime: z.string(),
+    duration: z.number().int().min(0),
     aircraft: z.string().nullable(),
     cabinClass: CabinClassSchema,
   })
@@ -55,13 +53,13 @@ const UpstreamOfferSchema = z
   .object({
     id: LocalOfferIdSchema,
     duffelOfferId: z.string().min(1),
-    airline: z.string().min(1),
-    flightNumber: z.string().min(1),
-    departureAirport: IataCodeSchema,
-    arrivalAirport: IataCodeSchema,
-    departureTime: IsoDateTimeSchema,
-    arrivalTime: IsoDateTimeSchema,
-    duration: z.number().int().min(1),
+    airline: z.string(),
+    flightNumber: z.string(),
+    departureAirport: z.string(),
+    arrivalAirport: z.string(),
+    departureTime: z.string(),
+    arrivalTime: z.string(),
+    duration: z.number().int().min(0),
     stops: z.number().int().min(0),
     price: z.number().finite().min(0),
     currency: z.string().regex(/^[A-Z]{3}$/),
@@ -200,14 +198,17 @@ async function getAccessToken(): Promise<string | null> {
 }
 
 async function fetchWithRetry(pathname: string, init: RequestInit): Promise<FetchResult> {
-  for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt += 1) {
+  const isIdempotentRead = !init.method || init.method.toUpperCase() === 'GET';
+  const maxAttempts = isIdempotentRead ? MAX_ATTEMPTS : 1;
+
+  for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
     try {
       const response = await fetch(`${apiUrl()}${pathname}`, { ...init, signal: controller.signal });
-      if (response.status < 500 || attempt === MAX_ATTEMPTS - 1) return { ok: true, response };
+      if (response.status < 500 || attempt === maxAttempts - 1) return { ok: true, response };
     } catch {
-      if (attempt === MAX_ATTEMPTS - 1) return { ok: false };
+      if (attempt === maxAttempts - 1) return { ok: false };
     } finally {
       clearTimeout(timeout);
     }
