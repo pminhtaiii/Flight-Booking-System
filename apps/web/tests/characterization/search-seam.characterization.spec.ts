@@ -123,6 +123,18 @@ test.describe('Search Seam Characterization - User Flows', () => {
   test.beforeAll(startFlightSearchFixture);
   test.afterAll(stopFlightSearchFixture);
 
+  test.beforeEach(async ({ page }) => {
+    await page.addInitScript(() => {
+      const style = document.createElement('style');
+      style.textContent = 'aside[aria-label="Agent chat"] { display: none !important; }';
+      if (document.head) {
+        document.head.appendChild(style);
+      } else {
+        document.addEventListener('DOMContentLoaded', () => document.head?.appendChild(style));
+      }
+    });
+  });
+
   test('unauthenticated users navigating to /search are redirected to /login', async ({ page, context }) => {
     await context.clearCookies();
     await page.goto('/search');
