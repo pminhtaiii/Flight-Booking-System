@@ -77,7 +77,7 @@ def mock_repo(monkeypatch):
 async def test_search_flights_success(mock_client, run_config):
     mock_client.post_gateway_flights_search_v2.return_value = {
         "snapshotVersion": 1,
-        "snapshotExpiresAt": "2026-07-15T09:30:00Z",
+        "snapshotExpiresAt": "2027-07-15T09:30:00Z",
         "selectionAttestation": "mock_attestation",
         "results": [
             {
@@ -106,11 +106,9 @@ async def test_search_flights_success(mock_client, run_config):
 
     expected = (
         "Found 1 flights from HAN to NRT on 2026-07-15:\n\n"
-        "1. Vietnam Airlines VN310\n"
+        "1. Vietnam Airlines\n"
         "   Departs: 08:30 HAN \u2192 Arrives: 15:00 NRT\n"
-        "   Duration: 5h 30m | Direct\n"
-        "   Price: $452.00 USD (Economy)\n"
-        "   Baggage: 23kg checked + 7kg carry-on"
+        "   Price: $452.00 USD"
     )
     assert result.strip() == expected.strip()
 

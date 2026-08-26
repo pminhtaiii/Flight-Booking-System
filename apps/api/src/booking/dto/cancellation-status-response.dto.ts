@@ -7,7 +7,7 @@ export class CancellationStatusResponseDto {
   airlineRefundAmount!: string | null;
   customerRefundAmount!: string | null;
   duffelCancellationQuoteId!: string | null;
-  refundStatus!: RefundStatus | null;
+  refundStatus!: RefundStatus | 'NOT_REQUIRED' | null;
   retryCount!: number | null;
   nextRetryAt!: string | null;
   lastErrorCode!: string | null;

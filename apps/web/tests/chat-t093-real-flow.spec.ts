@@ -316,7 +316,7 @@ test.describe('T093 real direct-stream checkout flow', () => {
     expect(handoff.version).toBe(1);
     expect(handoff.action).toBe('begin_checkout');
     expect(typeof handoff.handoffToken).toBe('string');
-    expect(handoff.handoffToken as string).toMatch(/^chk_handoff_v1_[A-Za-z0-9_-]{43}$/);
+    expect(handoff.handoffToken as string).toMatch(/^chk_handoff_v[0-9]+_[A-Za-z0-9_-]{43}$/);
     const handoffToken = handoff.handoffToken as string;
     expect(new Date(handoff.expiresAt as string).getTime()).toBeGreaterThan(Date.now());
     expect(Object.keys(handoff.display as JsonObject).sort()).toEqual([

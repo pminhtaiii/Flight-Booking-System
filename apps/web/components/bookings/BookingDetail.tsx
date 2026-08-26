@@ -2,9 +2,12 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
-import type { BookingDetailDto } from '@shared/booking-types';
+import type {
+  BookingDetailView,
+  CancellationQuoteView,
+  CancellationStatusView,
+} from '@shared/types/booking-management.types';
 import { DisruptionStatus } from '@shared/disruption-types';
 import { BookingStatusBadge } from '@/components/bookings/BookingStatusBadge';
 import { DisruptionAlert } from '@/components/bookings/DisruptionAlert';
@@ -13,49 +16,17 @@ import { ItineraryRevisionHistory } from '@/components/bookings/ItineraryRevisio
 import { BookingProcessingState } from '@/components/bookings/BookingProcessingState';
 import { BookingFailureState } from '@/components/bookings/BookingFailureState';
 
-const apiUrl = process.env.NEXT_PUBLIC_API_URL;
-
 type BookingDetailProps = {
-  booking: BookingDetailDto & {
-    currentItinerary?: any;
-    disruption?: any;
-    payment?: { status: string } | null;
-    bookingIntent?: { id: string; offerId: string };
-    ancillarySummary?: {
-      seats: {
-        intentPassengerId: string;
-        passengerName: string;
-        segmentId: string;
-        seatDesignator: string;
-        amount: string;
-        currency: string;
-      }[];
-      baggage: {
-        intentPassengerId: string;
-        passengerName: string;
-        type: string;
-        quantity: number;
-        amount: string;
-        currency: string;
-      }[];
-    } | null;
-  } | null;
+  booking: BookingDetailView | null;
   showConfirmation?: boolean;
-  isMockEnabled?: boolean;
   bookingId?: string;
 };
 
 const currencyFormatter = (amount: string, currency: string): string =>
   new Intl.NumberFormat('en-GB', { style: 'currency', currency }).format(Number(amount));
 
-export function BookingDetail({ booking: initialBooking, isMockEnabled, bookingId }: BookingDetailProps) {
-  if (!apiUrl) {
-    throw new Error('NEXT_PUBLIC_API_URL is required but not configured.');
-  }
-  const [booking, setBooking] = useState<any>(initialBooking);
-
-  const [loadingMock, setLoadingMock] = useState(!!isMockEnabled);
-  const [mockError, setMockError] = useState<string | null>(null);
+export function BookingDetail({ booking: initialBooking }: BookingDetailProps) {
+  const [booking, setBooking] = useState<BookingDetailView | null>(initialBooking);
 
   // Disruption state
   const [loadingAction, setLoadingAction] = useState(false);
@@ -68,50 +39,22 @@ export function BookingDetail({ booking: initialBooking, isMockEnabled, bookingI
     setActionSuccess(null);
   }, [initialBooking]);
 
-  const [cancellationStatus, setCancellationStatus] = useState<any>(null);
+  const [cancellationStatus, setCancellationStatus] = useState<CancellationStatusView | null>(null);
   const [showCancelModal, setShowCancelModal] = useState(false);
-  const [quote, setQuote] = useState<any>(null);
+  const [quote, setQuote] = useState<CancellationQuoteView | null>(null);
   const [loadingQuote, setLoadingQuote] = useState(false);
   const [confirmCancel, setConfirmCancel] = useState(false);
   const [cancelling, setCancelling] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const { data: session } = useSession();
-  const accessToken = (session as any)?.accessToken;
   const router = useRouter();
-
-  // Client-side fallback fetch for Playwright routing mocks
-  useEffect(() => {
-    if (isMockEnabled && bookingId && accessToken) {
-      setLoadingMock(true);
-      fetch(`${apiUrl}/api/bookings/${bookingId}`, {
-        headers: { Authorization: `Bearer ${accessToken}` },
-      })
-        .then((res) => {
-          if (!res.ok) {
-            throw new Error(res.status === 403 ? 'You do not have access to this booking.' : 'We could not find this booking.');
-          }
-          return res.json();
-        })
-        .then((data) => {
-          setBooking(data);
-          setLoadingMock(false);
-        })
-        .catch((err) => {
-          setMockError(err.message);
-          setLoadingMock(false);
-        });
-    }
-  }, [isMockEnabled, bookingId, accessToken]);
 
   const fetchCancellationStatus = useCallback(async () => {
     try {
-      if (!accessToken || !booking) return;
-      const res = await fetch(`${apiUrl}/api/bookings/${booking.id}/cancellation`, {
-        headers: { Authorization: `Bearer ${accessToken}` },
-      });
+      if (!booking) return;
+      const res = await fetch(`/api/booking-management/bookings/${booking.id}/cancellation-status`);
       if (res.ok) {
-        const data = await res.json();
+        const data: CancellationStatusView = await res.json();
         setCancellationStatus(data);
         
         // If status changed to a completed state from a pending state, refresh the parent
@@ -126,7 +69,7 @@ export function BookingDetail({ booking: initialBooking, isMockEnabled, bookingI
     } catch (e) {
       // Ignore error to avoid console noise
     }
-  }, [booking, router, accessToken]);
+  }, [booking, router]);
 
   useEffect(() => {
     if (!booking) return;
@@ -149,13 +92,14 @@ export function BookingDetail({ booking: initialBooking, isMockEnabled, bookingI
     setLoadingQuote(true);
     setError(null);
     try {
-      if (!accessToken) throw new Error('Not authenticated');
-      const res = await fetch(`${apiUrl}/api/bookings/${booking.id}/cancellation-quote`, {
+      const res = await fetch(`/api/booking-management/bookings/${booking.id}/cancellation-quote`, {
         method: 'POST',
-        headers: { Authorization: `Bearer ${accessToken}` },
       });
-      if (!res.ok) throw new Error('Failed to fetch cancellation quote');
-      const data = await res.json();
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({}));
+        throw new Error(errorData.message || 'Failed to fetch cancellation quote');
+      }
+      const data: CancellationQuoteView = await res.json();
       setQuote(data);
     } catch (err: any) {
       setError(err.message || 'An error occurred while fetching the quote.');
@@ -169,16 +113,17 @@ export function BookingDetail({ booking: initialBooking, isMockEnabled, bookingI
     setCancelling(true);
     setError(null);
     try {
-      if (!accessToken) throw new Error('Not authenticated');
-      const res = await fetch(`${apiUrl}/api/bookings/${booking.id}/cancel`, {
+      const res = await fetch(`/api/booking-management/bookings/${booking.id}/cancel`, {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${accessToken}`,
         },
         body: JSON.stringify({ quoteId: quote.quoteId }),
       });
-      if (!res.ok) throw new Error('Failed to confirm cancellation');
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({}));
+        throw new Error(errorData.message || 'Failed to confirm cancellation');
+      }
       setShowCancelModal(false);
       router.refresh();
     } catch (err: any) {
@@ -190,17 +135,18 @@ export function BookingDetail({ booking: initialBooking, isMockEnabled, bookingI
 
   const handleDisruptionAction = async (action: 'acknowledge' | 'accept') => {
     if (!booking) return;
-    const activeRevisionId = booking.disruption?.activeRevisionId;
-    if (!activeRevisionId || !accessToken) return;
+    const activeRevisionId = booking.disruption?.activeRevisionId || booking.itinerary?.revisionId;
+    if (!activeRevisionId) return;
 
     setLoadingAction(true);
     setConflictError(null);
     setActionSuccess(null);
 
     try {
-      const res = await fetch(`${apiUrl}/api/bookings/${booking.id}/disruptions/${activeRevisionId}/${action}`, {
+      const res = await fetch(`/api/booking-management/bookings/${booking.id}/disruptions/${action}`, {
         method: 'POST',
-        headers: { Authorization: `Bearer ${accessToken}` },
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ revisionId: activeRevisionId }),
       });
 
       if (res.status === 409) {
@@ -222,22 +168,6 @@ export function BookingDetail({ booking: initialBooking, isMockEnabled, bookingI
     }
   };
 
-  if (loadingMock) {
-    return (
-      <section className="card space-y-6">
-        <p className="text-text-secondary text-sm">Loading your booking details…</p>
-      </section>
-    );
-  }
-
-  if (mockError) {
-    return (
-      <section className="card space-y-6">
-        <p role="alert" className="text-text-cancelled text-sm font-semibold">{mockError}</p>
-      </section>
-    );
-  }
-
   if (!booking) {
     return (
       <section className="card space-y-6">
@@ -253,21 +183,21 @@ export function BookingDetail({ booking: initialBooking, isMockEnabled, bookingI
   if (booking.status === 'FAILED') {
     return (
       <BookingFailureState
-        failureReason={booking.failureReason}
-        flightSnapshot={booking.flightSnapshot}
-        paymentStatus={booking.payment?.status ?? booking.paymentStatus}
-        offerId={booking.bookingIntent?.offerId}
+        failureReason={booking.failureReason as any}
+        flightSnapshot={booking.itinerary as any}
+        paymentStatus={booking.paymentStatus ?? undefined}
+        offerId={booking.offerId ?? undefined}
       />
     );
   }
 
-  const segments = booking.currentItinerary?.segments ?? booking.flightSnapshot?.segments ?? [];
-  const passengers = booking.passengerSnapshot?.passengers ?? [];
+  const segments = booking.itinerary?.segments ?? [];
+  const passengers = booking.passengers ?? [];
 
   const isCancellable = booking.status === 'CONFIRMED' && 
-    booking.cancellationDeadline && new Date(booking.cancellationDeadline) > new Date();
+    Boolean(booking.cancellation?.deadline && new Date(booking.cancellation.deadline) > new Date());
 
-  const activeDisruptionStatus = booking.disruption?.status ?? DisruptionStatus.NONE;
+  const activeDisruptionStatus = (booking.disruption?.status as DisruptionStatus) ?? DisruptionStatus.NONE;
   const isDisrupted = activeDisruptionStatus !== DisruptionStatus.NONE;
 
   return (
@@ -291,21 +221,21 @@ export function BookingDetail({ booking: initialBooking, isMockEnabled, bookingI
       </div>
 
       {/* Disruption Alert */}
-      {isDisrupted && (
+      {isDisrupted && booking.disruption && (
         <DisruptionAlert
           status={activeDisruptionStatus}
           isMaterial={booking.disruption.isMaterial}
-          materialReasons={booking.disruption.materialReasons}
+          materialReasons={booking.disruption.materialReasons as any}
           stabilizationWarning={booking.disruption.stabilizationWarning}
-          resolvedReason={booking.disruption.resolvedReason}
+          resolvedReason={(booking.disruption.resolvedReason as any) ?? null}
         />
       )}
 
       {/* Itinerary Change Summary */}
       {isDisrupted && (
         <ItineraryChangeSummary
-          incrementalSummary={booking.disruption.incrementalSummary}
-          cumulativeSummary={booking.disruption.cumulativeSummary}
+          incrementalSummary={(booking.disruption as any)?.incrementalSummary ?? null}
+          cumulativeSummary={(booking.disruption as any)?.cumulativeSummary ?? null}
         />
       )}
 
@@ -366,8 +296,7 @@ export function BookingDetail({ booking: initialBooking, isMockEnabled, bookingI
               </p>
               <ul className="text-xs text-text-secondary space-y-1">
                 {cancellationStatus.refundStatus && <li>Refund Status: {cancellationStatus.refundStatus}</li>}
-                {cancellationStatus.retryCount !== null && <li>Retry Count: {cancellationStatus.retryCount}</li>}
-                {cancellationStatus.lastErrorCode && <li>Last Error: {cancellationStatus.lastErrorCode}</li>}
+                {cancellationStatus.nextRetryAt && <li>Next Retry: {cancellationStatus.nextRetryAt}</li>}
               </ul>
             </div>
           )}
@@ -378,16 +307,16 @@ export function BookingDetail({ booking: initialBooking, isMockEnabled, bookingI
         <div className="space-y-4">
           {segments.map((segment: any) => (
             <article key={`${segment.flightNumber}-${segment.departureAt}`} className="rounded-lg border border-card-border p-4">
-              <p className="font-semibold text-text-primary">{segment.airline.name} {segment.flightNumber}</p>
+              <p className="font-semibold text-text-primary">{segment.airline?.name} {segment.flightNumber}</p>
               <p className="mt-1 text-sm text-text-secondary">
-                {segment.departureAirport.city} ({segment.departureAirport.iataCode}) to {segment.arrivalAirport.city} ({segment.arrivalAirport.iataCode})
+                {segment.departureAirport?.city} ({segment.departureAirport?.iataCode}) to {segment.arrivalAirport?.city} ({segment.arrivalAirport?.iataCode})
               </p>
               <p className="mt-2 text-sm text-text-secondary">
                 {new Date(segment.departureAt).toLocaleString('en-GB')} – {new Date(segment.arrivalAt).toLocaleString('en-GB')}
               </p>
             </article>
           ))}
-          {booking.flightSnapshot?.baggageAllowance && <p className="text-sm text-text-secondary">Baggage: {booking.flightSnapshot.baggageAllowance}</p>}
+          {booking.itinerary?.baggageAllowance && <p className="text-sm text-text-secondary">Baggage: {booking.itinerary.baggageAllowance}</p>}
         </div>
       )}
 
@@ -438,11 +367,9 @@ export function BookingDetail({ booking: initialBooking, isMockEnabled, bookingI
       </div>
 
       {/* Itinerary Revision History */}
-      {accessToken && (
-        <div className="mt-8 border-t border-card-border pt-6">
-          <ItineraryRevisionHistory bookingId={booking.id} accessToken={accessToken} />
-        </div>
-      )}
+      <div className="mt-8 border-t border-card-border pt-6">
+        <ItineraryRevisionHistory bookingId={booking.id} />
+      </div>
 
       {showCancelModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">

@@ -1,20 +1,23 @@
 import json
 import logging
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
 from agent.memory.manager import MemoryManager
 from agent.models.events import DisplayInfo, HandoffEvent
-from agent.models.snapshot import TrustedSearchResult, TrustedSearchSnapshot
 from agent.observability.chat_observability import (
     ChatTelemetry,
     TelemetryPrivacyError,
 )
-from agent.repositories.trusted_snapshot_repository import TrustedSnapshotRepository
 from agent.tools.nestjs_client import validate_booking_readiness_response
-from agent.tools.search_flights import project_snapshot_results
+from agent.trusted_search_snapshot import (
+    TrustedSearchResult,
+    TrustedSearchSnapshot,
+    TrustedSearchSnapshotLifecycle,
+    TrustedSnapshotRepository,
+)
 
 # Strict Negative Privacy Corpus for Continuous Scanning
 FORBIDDEN_PRIVACY_CORPUS = [
@@ -161,27 +164,34 @@ def test_trusted_snapshot_serialization_and_projection_zero_leakage():
 
     snapshot = TrustedSearchSnapshot.model_validate(raw_snapshot)
 
-    # 1. Test project_snapshot_results for LLM/client consumption
-    projected = project_snapshot_results(snapshot)
-    assert len(projected) == 2
-    projected_json = json.dumps(projected)
+    # 1. Test project_for_browser and project_for_llm for LLM/client consumption
+    repo = TrustedSnapshotRepository(AsyncMock())
+    lifecycle = TrustedSearchSnapshotLifecycle(repo)
+    projected_browser = [r.model_dump() for r in lifecycle.project_for_browser(snapshot)]
+    projected_llm = [r.model_dump() for r in lifecycle.project_for_llm(snapshot)]
 
-    # Must NOT contain private offer IDs
-    assert "local_flight_offer_id_uuid_777777" not in projected_json
-    assert "off_01H123456789ABCDEF000000" not in projected_json
-    assert "flight-offer-local-uuid-1234" not in projected_json
-    assert "duffel_offer_id_duff_123456789" not in projected_json
-    assert "flightOfferId" not in projected_json
-    assert "duffelOfferId" not in projected_json
+    for projected in (projected_browser, projected_llm):
+        assert len(projected) == 2
+        projected_json = json.dumps(projected, default=str)
 
-    for forbidden in FORBIDDEN_PRIVACY_CORPUS:
-        assert forbidden not in projected_json
+        # Must NOT contain private offer IDs
+        assert "local_flight_offer_id_uuid_777777" not in projected_json
+        assert "off_01H123456789ABCDEF000000" not in projected_json
+        assert "flight-offer-local-uuid-1234" not in projected_json
+        assert "duffel_offer_id_duff_123456789" not in projected_json
+        assert "flightOfferId" not in projected_json
+        assert "duffelOfferId" not in projected_json
+
+        for forbidden in FORBIDDEN_PRIVACY_CORPUS:
+            assert forbidden not in projected_json
 
 
 @pytest.mark.asyncio
 async def test_trusted_snapshot_repository_redis_operations():
     """Verify repository key names and TTL handling do not leak tokens or offer IDs."""
     mock_redis = AsyncMock()
+    mock_redis.get.return_value = None
+    mock_redis.eval.return_value = 1
     repo = TrustedSnapshotRepository(mock_redis)
 
     key = repo._get_key("usr_abc", "ses_xyz")
@@ -215,9 +225,11 @@ async def test_trusted_snapshot_repository_redis_operations():
         ],
     )
 
+    mock_redis.eval.return_value = 1
     await repo.save_snapshot(snapshot)
-    mock_redis.set.assert_awaited_once()
-    saved_key, saved_payload = mock_redis.set.call_args[0][:2]
+    mock_redis.eval.assert_awaited_once()
+    saved_key = mock_redis.eval.call_args[0][2]
+    saved_payload = mock_redis.eval.call_args[0][4]
     assert saved_key == "chat:snapshot:usr_abc:ses_xyz"
     assert isinstance(saved_payload, str)
 
@@ -439,7 +451,7 @@ async def test_sse_streaming_chunk_stream_simulation_scan():
         fingerprint="fp-privacy-test-123",
         selectionAttestation="attest-privacy-test-123",
         createdAt=datetime.now(timezone.utc),
-        expiresAt=datetime.now(timezone.utc),
+        expiresAt=datetime.now(timezone.utc) + timedelta(hours=1),
         results=[
             TrustedSearchResult(
                 offerIndex=1,

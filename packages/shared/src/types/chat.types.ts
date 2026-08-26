@@ -16,12 +16,12 @@ export type SSEActionType =
   | 'error'
   | 'agent_state';
 
-export const HANDOFF_CREDENTIAL_PATTERN = /^chk_handoff_v1_[A-Za-z0-9_-]{43}$/;
+export const HANDOFF_CREDENTIAL_PATTERN = /^chk_handoff_v[0-9]+_[A-Za-z0-9_-]{43}$/;
 
-export interface BaseSSEEvent {
+export type BaseSSEEvent = {
   version: 1;
   action: SSEActionType;
-}
+};
 
 export const actionHandoffSchema = z
   .object({
@@ -45,16 +45,16 @@ export const actionHandoffSchema = z
 
 export type HandoffEvent = z.infer<typeof actionHandoffSchema>;
 
-export interface ActionRequiredEvent extends BaseSSEEvent {
+export type ActionRequiredEvent = BaseSSEEvent & {
   action: 'action_required';
   message: string;
-}
+};
 
-export interface ChatMessageEvent extends BaseSSEEvent {
+export type ChatMessageEvent = BaseSSEEvent & {
   action: 'chat_message';
   content: string;
   role: 'assistant' | 'system' | 'user';
-}
+};
 
 export type ChatEvent = HandoffEvent | ActionRequiredEvent | ChatMessageEvent;
 

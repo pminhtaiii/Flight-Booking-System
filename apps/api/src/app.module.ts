@@ -8,18 +8,32 @@ import { AuthModule } from './auth/auth.module';
 import { AuditModule } from './audit/audit.module';
 import { ChatModule } from './chat/chat.module';
 import { AgentGatewayModule } from './agent-gateway/agent-gateway.module';
+import { AgentAuthModule } from './agent-gateway/auth/agent-auth.module';
+import { AgentToolAuditModule } from './agent-gateway/audit/agent-tool-audit.module';
+import { AttestedFlightSearchModule } from './agent-gateway/attested-flight-search/attested-flight-search.module';
+import { AgentBookingReadinessModule } from './agent-gateway/booking-readiness/agent-booking-readiness.module';
+import { SafeBookingReadModule } from './agent-gateway/safe-booking-read/safe-booking-read.module';
+import { TravelerPreferencesModule } from './agent-gateway/traveler-preferences/traveler-preferences.module';
 import { AirportsModule } from './airports/airports.module';
 import { DuffelModule } from './duffel/duffel.module';
 import { FlightsModule } from './flights/flights.module';
 import { BookingIntentModule } from './booking-intent/booking-intent.module';
 import { BookingModule } from './booking/booking.module';
+import { BookingLifecycleModule } from './booking-lifecycle/booking-lifecycle.module';
+import { BookingManagementModule } from './booking-management/booking-management.module';
+import { CancellationModule } from './cancellation/cancellation.module';
 import { PaymentModule } from './payment/payment.module';
+
 import { DisruptionModule } from './disruption/disruption.module';
 import { AncillariesModule } from './ancillaries/ancillaries.module';
 import { ProfileModule } from './profile/profile.module';
 import { ChatHandoffModule } from './chat-handoff/chat-handoff.module';
 import { DataDriftSentinelModule } from './common/sentinel/data-drift-sentinel.module';
 import { BookingReadinessMetricsModule } from './common/observability/booking-readiness-metrics.module';
+import { RefundModule } from './refund/refund.module';
+import { RefundSettlementModule } from './refund-settlement/refund-settlement.module';
+
+import { StripeModule } from './common/stripe.module';
 
 import { z } from 'zod';
 
@@ -69,24 +83,37 @@ export const envSchema = z.object({
     }),
     ScheduleModule.forRoot(),
     PrismaModule,
+    StripeModule,
     HealthModule,
     CacheModule,
     AuthModule,
     AuditModule,
     ChatModule,
     AgentGatewayModule,
+    AgentAuthModule,
+    AgentToolAuditModule,
+    AttestedFlightSearchModule,
+    AgentBookingReadinessModule,
+    SafeBookingReadModule,
+    TravelerPreferencesModule,
     AirportsModule,
     DuffelModule,
     FlightsModule,
     BookingIntentModule,
     BookingModule,
+    BookingLifecycleModule,
+    BookingManagementModule,
+    CancellationModule,
     PaymentModule,
+
     DisruptionModule,
     AncillariesModule,
     ProfileModule,
     ChatHandoffModule,
     DataDriftSentinelModule,
     BookingReadinessMetricsModule,
+    RefundModule,
+    RefundSettlementModule,
   ],
   controllers: [],
   providers: [],

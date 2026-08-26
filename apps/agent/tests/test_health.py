@@ -1,6 +1,7 @@
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import httpx
+import pytest
 from fastapi.testclient import TestClient
 
 from agent.main import app
@@ -87,3 +88,38 @@ def test_lifespan_shutdown():
     event = q.get_nowait()
     assert event["event"] == "error"
     assert "Server is shutting down" in event["data"]
+
+
+@pytest.mark.asyncio
+async def test_lifespan_shutdown_cancels_active_runners(monkeypatch):
+    import asyncio
+
+    from agent.main import active_runners, app, lifespan
+
+    monkeypatch.setattr("agent.infrastructure.redis.init_redis", AsyncMock())
+    monkeypatch.setattr("agent.infrastructure.redis.close_redis", AsyncMock())
+    monkeypatch.setattr("agent.guardrails.nemo.NemoGuardrailService.probe", AsyncMock())
+
+    cancelled = False
+
+    async def mock_runner_task():
+        nonlocal cancelled
+        try:
+            await asyncio.sleep(100)
+        except asyncio.CancelledError:
+            cancelled = True
+            raise
+
+    task = asyncio.create_task(mock_runner_task())
+    await asyncio.sleep(0)
+    active_runners.add(task)
+
+    assert not task.done()
+    assert task in active_runners
+
+    async with lifespan(app):
+        pass
+
+    assert task.cancelled() or task.done()
+    assert cancelled is True
+    assert len(active_runners) == 0

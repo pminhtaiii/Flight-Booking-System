@@ -34,6 +34,7 @@ class Settings(BaseSettings):
     QUEUE_MAX_DEPTH: int = 3
     SESSION_LOCK_TTL_MS: int = 10000
     SESSION_LOCK_REFRESH_INTERVAL_SECONDS: float = 3.0
+    SHUTDOWN_TIMEOUT_SECONDS: float = 5.0
 
     AGENT_SERVICE_API_KEY: str = Field(..., min_length=1)
     CLAIM_TOKEN_SECRET: str = Field(..., min_length=1)

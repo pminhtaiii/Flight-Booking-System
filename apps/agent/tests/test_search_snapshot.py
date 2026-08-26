@@ -7,10 +7,13 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 from langchain_core.runnables import RunnableConfig
 
-from agent.models.snapshot import TrustedSearchSnapshot
-from agent.repositories.trusted_snapshot_repository import TrustedSnapshotRepository
 from agent.tools.nestjs_client import NestJSClient
-from agent.tools.search_flights import project_snapshot_results, search_flights
+from agent.tools.search_flights import search_flights
+from agent.trusted_search_snapshot import (
+    TrustedSearchSnapshot,
+    TrustedSearchSnapshotLifecycle,
+    TrustedSnapshotRepository,
+)
 
 
 class FakeAsyncRedis:
@@ -19,23 +22,195 @@ class FakeAsyncRedis:
     def __init__(self):
         self.store = {}
         self.ttls = {}
+        self._clock = 0
+        self._expires_at = {}
 
-    async def set(self, key: str, value: str, ex: int = None):
-        self.store[key] = value
+    async def set(self, key: str, value: str | int, ex: int = None):
+        self.store[key] = str(value)
         if ex is not None:
-            self.ttls[key] = ex
+            self.ttls[key] = int(ex)
+            self._expires_at[key] = self._clock + int(ex)
 
     async def get(self, key: str):
+        if key in self._expires_at and self._expires_at[key] <= self._clock:
+            self.store.pop(key, None)
+            self.ttls.pop(key, None)
+            self._expires_at.pop(key, None)
+            return None
         return self.store.get(key)
 
-    async def delete(self, key: str):
-        self.store.pop(key, None)
-        self.ttls.pop(key, None)
+    async def delete(self, *keys: str):
+        deleted = 0
+        for key in keys:
+            if key in self.store:
+                deleted += 1
+            self.store.pop(key, None)
+            self.ttls.pop(key, None)
+            self._expires_at.pop(key, None)
+        return deleted
 
     async def ttl(self, key: str):
-        if key not in self.store:
+        if await self.get(key) is None:
             return -2
-        return self.ttls.get(key, -1)
+        if key not in self._expires_at:
+            return -1
+        return self._expires_at[key] - self._clock
+
+    async def eval(self, _script: str, _num_keys: int, *args: object) -> int:
+        """Emulate the issued/accepted-version replacement, allocation, and delete scripts."""
+
+        snapshot_key, issued_key, accepted_key, *operation_args = args
+        if not all(isinstance(key, str) for key in (snapshot_key, issued_key, accepted_key)):
+            raise TypeError("Redis keys must be strings")
+
+        if len(operation_args) == 3:
+            payload, incoming_version, ttl = operation_args
+            if (
+                not isinstance(payload, str)
+                or not self._is_positive_integer(incoming_version)
+                or not self._is_positive_integer(ttl)
+            ):
+                return 0
+
+            existing_payload = await self.get(snapshot_key)
+            if existing_payload is not None:
+                try:
+                    existing_version = json.loads(existing_payload)["snapshotVersion"]
+                except (KeyError, TypeError, json.JSONDecodeError):
+                    return 0
+                if not self._is_positive_integer(existing_version):
+                    return 0
+            else:
+                existing_version = 0
+
+            issued_version = self._counter_value(await self.get(issued_key))
+            accepted_version = self._counter_value(await self.get(accepted_key))
+            if issued_version is None or accepted_version is None:
+                return 0
+            effective_accepted_version = max(existing_version, accepted_version)
+            if incoming_version <= effective_accepted_version:
+                return 0
+            if issued_version > effective_accepted_version and incoming_version != issued_version:
+                return 0
+
+            await self.set(snapshot_key, payload, ex=ttl)
+            await self.set(issued_key, incoming_version, ex=ttl)
+            await self.set(accepted_key, incoming_version, ex=ttl)
+            return 1
+
+        if len(operation_args) == 1:
+            (initial_ttl,) = operation_args
+            if not self._is_positive_integer(initial_ttl):
+                return -4
+
+            snapshot_payload = await self.get(snapshot_key)
+            snapshot_version = 0
+            counter_ttl = initial_ttl
+            if snapshot_payload is not None:
+                try:
+                    snapshot_version = json.loads(snapshot_payload)["snapshotVersion"]
+                except (KeyError, TypeError, json.JSONDecodeError):
+                    return -2
+                if not self._is_positive_integer(snapshot_version):
+                    return -2
+                counter_ttl = await self.ttl(snapshot_key)
+                if counter_ttl <= 0:
+                    return -3
+
+            issued_version = self._counter_value(await self.get(issued_key))
+            if issued_version is None:
+                return -1
+            accepted_version = self._counter_value(await self.get(accepted_key))
+            if accepted_version is None:
+                return -5
+
+            if snapshot_payload is None:
+                issued_ttl = await self.ttl(issued_key) if issued_version > 0 else 0
+                accepted_ttl = await self.ttl(accepted_key) if accepted_version > 0 else 0
+                if (issued_version > 0 and issued_ttl <= 0) or (
+                    accepted_version > 0 and accepted_ttl <= 0
+                ):
+                    return -3
+                if issued_ttl > 0 and accepted_ttl > 0:
+                    counter_ttl = min(issued_ttl, accepted_ttl)
+                elif issued_ttl > 0:
+                    counter_ttl = issued_ttl
+                elif accepted_ttl > 0:
+                    counter_ttl = accepted_ttl
+
+            next_version = max(snapshot_version, issued_version, accepted_version) + 1
+            await self.set(issued_key, next_version, ex=counter_ttl)
+            return next_version
+
+        if len(operation_args) == 0:
+            snapshot_payload = await self.get(snapshot_key)
+            snapshot_version = 0
+            tombstone_ttl = 0
+            if snapshot_payload is not None:
+                try:
+                    snapshot_version = json.loads(snapshot_payload)["snapshotVersion"]
+                except (KeyError, TypeError, json.JSONDecodeError):
+                    snapshot_version = 0
+                if self._is_positive_integer(snapshot_version):
+                    candidate_ttl = await self.ttl(snapshot_key)
+                    if candidate_ttl > 0:
+                        tombstone_ttl = candidate_ttl
+                    else:
+                        snapshot_version = 0
+                else:
+                    snapshot_version = 0
+
+            issued_raw = await self.get(issued_key)
+            issued_version = self._counter_value(issued_raw)
+            issued_ttl = await self.ttl(issued_key) if issued_version and issued_version > 0 else 0
+            if issued_raw is not None and (issued_version is None or issued_ttl <= 0):
+                await self.delete(issued_key)
+                issued_version = 0
+                issued_ttl = 0
+
+            accepted_raw = await self.get(accepted_key)
+            accepted_version = self._counter_value(accepted_raw)
+            accepted_ttl = (
+                await self.ttl(accepted_key) if accepted_version and accepted_version > 0 else 0
+            )
+            if accepted_raw is not None and (accepted_version is None or accepted_ttl <= 0):
+                await self.delete(accepted_key)
+                accepted_version = 0
+                accepted_ttl = 0
+
+            issued_ttl = await self.ttl(issued_key) if issued_version > 0 else 0
+            accepted_ttl = await self.ttl(accepted_key) if accepted_version > 0 else 0
+            if tombstone_ttl <= 0:
+                if issued_ttl > 0 and accepted_ttl > 0:
+                    tombstone_ttl = min(issued_ttl, accepted_ttl)
+                elif issued_ttl > 0:
+                    tombstone_ttl = issued_ttl
+                elif accepted_ttl > 0:
+                    tombstone_ttl = accepted_ttl
+
+            invalidated_version = max(snapshot_version, issued_version, accepted_version)
+            if invalidated_version > 0 and tombstone_ttl > 0:
+                await self.set(accepted_key, invalidated_version, ex=tombstone_ttl)
+            await self.delete(snapshot_key)
+            return 1
+
+        raise TypeError("Unsupported Redis Lua call")
+
+    @staticmethod
+    def _is_positive_integer(value: object) -> bool:
+        return type(value) is int and value > 0
+
+    @staticmethod
+    def _counter_value(value: str | None) -> int | None:
+        if value is None:
+            return 0
+        try:
+            parsed = float(value)
+        except (TypeError, ValueError):
+            return None
+        if parsed <= 0 or not parsed.is_integer():
+            return None
+        return int(parsed)
 
 
 @pytest.mark.asyncio
@@ -510,14 +685,15 @@ async def test_strict_privacy_no_identifiers_in_tool_output():
         assert "session-secret-thread-999" not in tool_output
 
         # 5. Positive assertions: Formatted human-readable output
-        assert "1. Vietnam Airlines VN300" in tool_output
-        assert "2. ANA NH892" in tool_output
+        assert "1. Vietnam Airlines" in tool_output
+        assert "2. ANA" in tool_output
         assert "Departs: 02:00 SGN → Arrives: 08:30 NRT" in tool_output
-        assert "Price: $420.00 USD (Economy)" in tool_output
-        assert "Price: $550.00 USD (Economy)" in tool_output
+        assert "Price: $420.00 USD" in tool_output
+        assert "Price: $550.00 USD" in tool_output
 
 
 def test_project_snapshot_results_is_identifier_free():
+    lifecycle = TrustedSearchSnapshotLifecycle(TrustedSnapshotRepository(FakeAsyncRedis()))
     snapshot = TrustedSearchSnapshot.model_validate(
         {
             "schemaVersion": 1,
@@ -545,7 +721,9 @@ def test_project_snapshot_results_is_identifier_free():
         }
     )
 
-    projected = project_snapshot_results(snapshot)
+    projected = [
+        result.model_dump(mode="json") for result in lifecycle.project_for_browser(snapshot)
+    ]
 
     assert projected == [
         {
@@ -553,8 +731,8 @@ def test_project_snapshot_results_is_identifier_free():
             "airline": "VN",
             "origin": "SGN",
             "destination": "NRT",
-            "departureAt": "2026-09-20T02:00:00+00:00",
-            "arrivalAt": "2026-09-20T08:30:00+00:00",
+            "departureAt": "2026-09-20T02:00:00Z",
+            "arrivalAt": "2026-09-20T08:30:00Z",
             "price": "420.00",
             "currency": "USD",
         }

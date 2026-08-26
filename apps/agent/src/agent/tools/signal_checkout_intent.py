@@ -4,6 +4,8 @@ from typing import Annotated, Optional
 from langchain_core.tools import tool
 from langgraph.prebuilt import InjectedState
 
+from agent.trusted_search_snapshot import TrustedSearchSnapshotLifecycle
+
 
 @tool
 def signal_checkout_intent(
@@ -22,7 +24,8 @@ def signal_checkout_intent(
     if not state or not isinstance(state, dict):
         return "No search results available. Please perform a search first."
 
-    snapshot = state.get("trusted_snapshot") or state.get("snapshot")
+    normalized_state = TrustedSearchSnapshotLifecycle.normalize_graph_state(state)
+    snapshot = normalized_state.get("trusted_snapshot")
     if not snapshot or not isinstance(snapshot, dict):
         return "No search results available. Please perform a search first."
 

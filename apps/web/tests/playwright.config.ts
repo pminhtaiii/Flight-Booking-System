@@ -3,6 +3,7 @@ import { randomBytes } from 'node:crypto';
 import path from 'path';
 
 const t093RealFlow = process.env.T093_REAL_FLOW === 'true';
+const flightSearchFixtureApiUrl = process.env.FLIGHT_SEARCH_FIXTURE_API_URL || 'http://127.0.0.1:3101';
 const generatedSecret = (): string => randomBytes(32).toString('base64url');
 const t093Secrets = {
   agent: process.env.AGENT_SERVICE_API_KEY || generatedSecret(),
@@ -20,6 +21,9 @@ const frontendEnv = {
   CI: 'true',
   NEXTAUTH_SECRET: t093RealFlow ? t093Secrets.jwt : 'test_secret',
   NEXTAUTH_URL: t093RealFlow ? 'http://localhost:3000' : 'http://127.0.0.1:3000',
+  // Search Server Actions run in Next.js, so their upstream fixture must be reachable
+  // from the Next process rather than intercepted from the browser.
+  API_URL: t093RealFlow ? 'http://127.0.0.1:3001' : flightSearchFixtureApiUrl,
   NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:3001',
   NEXT_PUBLIC_FEATURE_FLAG_BOOKING_READINESS: 'true',
   NEXT_PUBLIC_FEATURE_FLAG_CHAT_HANDOFF: 'true',
@@ -30,11 +34,17 @@ export default defineConfig({
   testDir: './',
   fullyParallel: false,
   workers: 1,
-  reporter: [['html', { open: 'never' }]],
+  expect: {
+    timeout: 30000,
+  },
+  reporter: process.env.CI ? 'line' : [['html', { open: 'never' }]],
   use: {
     baseURL: 'http://127.0.0.1:3000',
     trace: 'on-first-retry',
     actionTimeout: 30000,
+    launchOptions: {
+      args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--disable-gpu'],
+    },
   },
   projects: [
     {
@@ -43,36 +53,40 @@ export default defineConfig({
     },
   ],
   webServer: [
-    {
-      command: t093RealFlow
-        ? 'node -r ts-node/register -r tsconfig-paths/register test/t093-server.ts'
-        : 'pnpm start:prod',
-      url: t093RealFlow
-        ? 'http://127.0.0.1:3001/test/t093/ready'
-        : 'http://127.0.0.1:3001/health',
-      reuseExistingServer: t093RealFlow ? false : !process.env.CI,
-      timeout: 600000,
-      cwd: path.resolve(__dirname, '../../api'),
-      env: {
-        NODE_ENV: 'test',
-        DATABASE_URL: 'postgresql://postgres:postgres@127.0.0.1:5432/test_db',
-        REDIS_URL: 'redis://127.0.0.1:6379/1',
-        FEATURE_FLAG_BOOKING_READINESS: 'true',
-        FEATURE_FLAG_CHAT_HANDOFF_ISSUE: 'true',
-        FEATURE_FLAG_CHAT_HANDOFF_ACCEPT: 'true',
-        CHAT_HANDOFF_SECRET: t093Secrets.handoff,
-        ATTESTATION_SECRET: t093Secrets.attestation,
-        CHAT_ENCRYPTION_KEY: t093Secrets.encryption,
-        ENCRYPTION_KEY: randomBytes(32).toString('hex'),
-        JWT_SECRET: t093Secrets.jwt,
-        AGENT_SERVICE_API_KEY: t093Secrets.agent,
-        CLAIM_TOKEN_SECRET: t093Secrets.claim,
-        STRIPE_SECRET_KEY: t093Secrets.stripe,
-        STRIPE_WEBHOOK_SECRET: t093Secrets.stripeWebhook,
-        DUFFEL_ACCESS_TOKEN: generatedSecret(),
-        FRONTEND_URL: t093RealFlow ? 'http://localhost:3000' : 'http://127.0.0.1:3000',
-      },
-    },
+    ...(process.env.PLAYWRIGHT_FRONTEND_ONLY !== 'true'
+      ? [
+          {
+            command: t093RealFlow
+              ? 'node -r ts-node/register -r tsconfig-paths/register test/t093-server.ts'
+              : 'pnpm start:prod',
+            url: t093RealFlow
+              ? 'http://127.0.0.1:3001/test/t093/ready'
+              : 'http://127.0.0.1:3001/health',
+            reuseExistingServer: t093RealFlow ? false : !process.env.CI,
+            timeout: 600000,
+            cwd: path.resolve(__dirname, '../../api'),
+            env: {
+              NODE_ENV: 'test',
+              DATABASE_URL: 'postgresql://postgres:postgres@127.0.0.1:5432/test_db',
+              REDIS_URL: 'redis://127.0.0.1:6379/1',
+              FEATURE_FLAG_BOOKING_READINESS: 'true',
+              FEATURE_FLAG_CHAT_HANDOFF_ISSUE: 'true',
+              FEATURE_FLAG_CHAT_HANDOFF_ACCEPT: 'true',
+              CHAT_HANDOFF_SECRET: t093Secrets.handoff,
+              ATTESTATION_SECRET: t093Secrets.attestation,
+              CHAT_ENCRYPTION_KEY: t093Secrets.encryption,
+              ENCRYPTION_KEY: randomBytes(32).toString('hex'),
+              JWT_SECRET: t093Secrets.jwt,
+              AGENT_SERVICE_API_KEY: t093Secrets.agent,
+              CLAIM_TOKEN_SECRET: t093Secrets.claim,
+              STRIPE_SECRET_KEY: t093Secrets.stripe,
+              STRIPE_WEBHOOK_SECRET: t093Secrets.stripeWebhook,
+              DUFFEL_ACCESS_TOKEN: generatedSecret(),
+              FRONTEND_URL: t093RealFlow ? 'http://localhost:3000' : 'http://127.0.0.1:3000',
+            },
+          },
+        ]
+      : []),
     ...(t093RealFlow
       ? [
           {
@@ -113,9 +127,7 @@ export default defineConfig({
         ]
       : []),
     {
-      command: t093RealFlow
-        ? 'node node_modules/next/dist/bin/next dev -p 3000'
-        : 'pnpm dev',
+      command: 'node node_modules/next/dist/bin/next dev -p 3000',
       url: t093RealFlow ? 'http://127.0.0.1:3000/api/auth/csrf' : 'http://127.0.0.1:3000',
       reuseExistingServer: t093RealFlow ? false : !process.env.CI,
       timeout: 600000,

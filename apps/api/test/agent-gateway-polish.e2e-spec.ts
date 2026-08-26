@@ -73,6 +73,7 @@ describe('Agent Gateway Polish (E2E)', () => {
     await prisma.paymentEvent.deleteMany({});
     await prisma.ledgerEntry.deleteMany({});
     await prisma.refund.deleteMany({});
+    await prisma.cancellationRefundObligation.deleteMany({});
     await prisma.payment.deleteMany({});
     await prisma.idempotencyKey.deleteMany({});
     await prisma.paymentMethod.deleteMany({});
@@ -297,7 +298,7 @@ describe('Agent Gateway Polish (E2E)', () => {
       searchSpy.mockRestore();
     });
 
-    it('should create an AuditLog with ACTION = TOOL_CALL when flight search succeeds', async () => {
+    it('should create an AuditLog with ACTION = AGENT_TOOL_CALL when flight search succeeds', async () => {
       const searchSpy = jest
         .spyOn(duffelService, 'searchFlights')
         .mockResolvedValue({
@@ -316,15 +317,17 @@ describe('Agent Gateway Polish (E2E)', () => {
         .expect(200);
 
       const logs = await prisma.auditLog.findMany({
-        where: { userId: user.id, action: 'TOOL_CALL' },
+        where: { userId: user.id, action: 'AGENT_TOOL_CALL' },
       });
       expect(logs.length).toBe(1);
       expect(logs[0].resourceId).toBe('flights/search');
+      expect((logs[0].metadata as any).outcome).toBe('SUCCESS');
+      expect((logs[0].metadata as any).parameters).toBeUndefined();
 
       searchSpy.mockRestore();
     });
 
-    it('should create an AuditLog with ACTION = TOOL_CALL when flight search fails', async () => {
+    it('should create an AuditLog with ACTION = AGENT_TOOL_CALL when flight search fails', async () => {
       const searchSpy = jest
         .spyOn(duffelService, 'searchFlights')
         .mockRejectedValue(new Error('Duffel API down'));
@@ -337,15 +340,14 @@ describe('Agent Gateway Polish (E2E)', () => {
         .expect(502);
 
       const logs = await prisma.auditLog.findMany({
-        where: { userId: user.id, action: 'TOOL_CALL' },
+        where: { userId: user.id, action: 'AGENT_TOOL_CALL' },
       });
       expect(logs.length).toBe(1);
       expect(logs[0].resourceId).toBe('flights/search');
+      expect((logs[0].metadata as any).outcome).toBe('FAILURE');
+      expect((logs[0].metadata as any).parameters).toBeUndefined();
 
       searchSpy.mockRestore();
     });
   });
 });
-
-
-

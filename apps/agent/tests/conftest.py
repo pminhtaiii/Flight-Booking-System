@@ -18,7 +18,7 @@ os.environ["OUTPUT_GUARDRAIL_ENABLED"] = "false"
 def pytest_collection_modifyitems(items):
     """Classify tests using the real Redis fixture as integration coverage."""
     for item in items:
-        if "redis_client" in item.fixturenames:
+        if "redis_client" in item.fixturenames or "t098_redis_client" in item.fixturenames:
             item.add_marker(pytest.mark.redis_integration)
 
 

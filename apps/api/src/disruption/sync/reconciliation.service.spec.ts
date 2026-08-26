@@ -1,12 +1,10 @@
 import { ReconciliationService } from './reconciliation.service';
-import { BookingService, BookingWithRelations } from '@/booking/booking.service';
+import { BookingLifecycleService } from '@/booking-lifecycle/booking-lifecycle.service';
+import { BookingWithRelations } from '@/booking-lifecycle/booking-lifecycle.types';
 import { PrismaService } from '@/prisma/prisma.service';
 import { SupplierSyncService } from './supplier-sync.service';
 import { CacheService } from '@/cache/cache.service';
 import { DisruptionStatus, DisruptionActorType } from '@prisma/client';
-import { StripeService } from '@/common/stripe.service';
-import { DuffelService } from '@/duffel/duffel.service';
-import { PaymentRefundService } from '@/payment/payment-refund.service';
 
 describe('ReconciliationService & Booking Completion', () => {
   describe('ReconciliationService', () => {
@@ -27,7 +25,7 @@ describe('ReconciliationService & Booking Completion', () => {
       decr: jest.Mock;
       del: jest.Mock;
     };
-    let mockBookingService: {
+    let mockBookingLifecycleService: {
       checkAndCompleteBooking: jest.Mock;
     };
 
@@ -48,7 +46,7 @@ describe('ReconciliationService & Booking Completion', () => {
         decr: jest.fn().mockResolvedValue(0),
         del: jest.fn().mockResolvedValue(null),
       };
-      mockBookingService = {
+      mockBookingLifecycleService = {
         checkAndCompleteBooking: jest.fn().mockImplementation((booking: BookingWithRelations) => {
           return Promise.resolve({ ...booking, status: 'COMPLETED' });
         }),
@@ -58,7 +56,7 @@ describe('ReconciliationService & Booking Completion', () => {
         mockPrisma as unknown as PrismaService,
         mockSupplierSyncService as unknown as SupplierSyncService,
         mockCacheService as unknown as CacheService,
-        mockBookingService as unknown as BookingService,
+        mockBookingLifecycleService as unknown as BookingLifecycleService,
       );
     });
 
@@ -124,7 +122,7 @@ describe('ReconciliationService & Booking Completion', () => {
         })
       );
 
-      expect(mockBookingService.checkAndCompleteBooking).toHaveBeenCalledWith(
+      expect(mockBookingLifecycleService.checkAndCompleteBooking).toHaveBeenCalledWith(
         expect.objectContaining({ id: 'b-stale' })
       );
       expect(result.stale).toBe(1);
@@ -287,7 +285,7 @@ describe('ReconciliationService & Booking Completion', () => {
   });
 
   describe('BookingCompletion & Disruption Resolution', () => {
-    let bookingService: BookingService;
+    let bookingLifecycleService: BookingLifecycleService;
     let mockPrisma: {
       booking: {
         findUnique: jest.Mock;
@@ -313,11 +311,8 @@ describe('ReconciliationService & Booking Completion', () => {
         $transaction: jest.fn((callback) => callback(mockPrisma)),
       };
 
-      bookingService = new BookingService(
+      bookingLifecycleService = new BookingLifecycleService(
         mockPrisma as unknown as PrismaService,
-        {} as unknown as StripeService,
-        {} as unknown as DuffelService,
-        {} as unknown as PaymentRefundService,
       );
     });
 
@@ -340,7 +335,7 @@ describe('ReconciliationService & Booking Completion', () => {
         currentFinalArrivalAt: null,
       });
 
-      const result = await bookingService.checkAndCompleteBooking(booking);
+      const result = await bookingLifecycleService.checkAndCompleteBooking(booking);
 
       expect(mockPrisma.$transaction).toHaveBeenCalled();
       expect(mockPrisma.booking.updateMany).toHaveBeenCalledWith({
@@ -388,7 +383,7 @@ describe('ReconciliationService & Booking Completion', () => {
         disruptionStatus: DisruptionStatus.DETECTED,
       } as unknown as BookingWithRelations;
 
-      const result = await bookingService.checkAndCompleteBooking(booking);
+      const result = await bookingLifecycleService.checkAndCompleteBooking(booking);
 
       expect(mockPrisma.$transaction).not.toHaveBeenCalled();
       expect(result.status).toBe('CONFIRMED');
@@ -405,7 +400,7 @@ describe('ReconciliationService & Booking Completion', () => {
         disruptionStatus: DisruptionStatus.NONE,
       } as unknown as BookingWithRelations;
 
-      const result = await bookingService.checkAndCompleteBooking(booking);
+      const result = await bookingLifecycleService.checkAndCompleteBooking(booking);
 
       expect(mockPrisma.$transaction).not.toHaveBeenCalled();
       expect(result.status).toBe('CONFIRMED');
@@ -429,7 +424,7 @@ describe('ReconciliationService & Booking Completion', () => {
         currentFinalArrivalAt: null,
       });
 
-      const result = await bookingService.checkAndCompleteBooking(booking);
+      const result = await bookingLifecycleService.checkAndCompleteBooking(booking);
 
       expect(mockPrisma.booking.updateMany).toHaveBeenCalledWith({
         where: {
@@ -464,7 +459,7 @@ describe('ReconciliationService & Booking Completion', () => {
         departureAt: departureTime,
       });
 
-      const result = await bookingService.checkAndCompleteBooking(booking);
+      const result = await bookingLifecycleService.checkAndCompleteBooking(booking);
 
       expect(mockPrisma.booking.updateMany).not.toHaveBeenCalled();
       expect(result.status).toBe('CONFIRMED');

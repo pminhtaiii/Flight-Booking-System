@@ -9,6 +9,7 @@
     "esModuleInterop": true,
     "module": "esnext",
     "moduleResolution": "bundler",
+    "allowImportingTsExtensions": true,
     "resolveJsonModule": true,
     "isolatedModules": true,
     "jsx": "preserve",
@@ -20,6 +21,8 @@
     ],
     "paths": {
       "@/*": ["./*"],
+      "@shared/types": ["../../packages/shared/src/types/index"],
+      "@shared/types/*": ["../../packages/shared/src/types/*"],
       "@shared/*": ["../../packages/shared/src/*"]
     }
   },

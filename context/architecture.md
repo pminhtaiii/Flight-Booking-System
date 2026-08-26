@@ -37,23 +37,46 @@
 ├── apps/
 │   ├── api/                           → NestJS backend API service
 │   │   ├── prisma/                    → Prisma database schemas & migrations
-│   │   ├── src/                       → NestJS source code (auth, health, audit, etc.)
-│   │   └── test/                      → API E2E spec tests
-│   ├── agent/                         → Python/FastAPI agent service (NEW)
-│   │   ├── src/                       → FastAPI source code (middlewares, endpoints, config)
-│   │   └── tests/                     → pytest unit and integration tests
+│   │   ├── src/                       → NestJS source code
+│   │   │   ├── agent-gateway/         → Capability-local gateway umbrella & submodules
+│   │   │   │   ├── attested-flight-search/ → V1/V2 search & HMAC selection attestations
+│   │   │   │   ├── booking-readiness/     → Advisory readiness projection
+│   │   │   │   ├── safe-booking-read/     → Tier-1 & Tier-2 safe booking projections
+│   │   │   │   ├── traveler-preferences/  → PII-stripped preferences projection
+│   │   │   │   ├── auth/                  → AgentAuthModule (API key & claim token guards)
+│   │   │   │   └── audit/                 → AgentToolAuditModule (privacy-safe telemetry)
+│   │   │   ├── booking/               → Pure umbrella BookingModule aggregating submodules
+│   │   │   ├── booking-lifecycle/     → Provider-blind lifecycle transitions & recovery
+│   │   │   ├── booking-management/    → Owner read models, disruption & revision queries
+│   │   │   ├── cancellation/          → Cancellation quotes, locks & obligation generation
+│   │   │   ├── chat/                  → Chat persistence & AgentChatController (JTI checks)
+│   │   │   ├── payment/               → Payment processing & trigger coordinators
+│   │   │   ├── refund/                → RefundTransactionService & capacity reservation
+│   │   │   └── refund-settlement/     → Provider-blind atomic ledger & projection settlement
+│   │   └── test/                      → API E2E & characterization spec tests
+│   ├── agent/                         → Python/FastAPI agent service
+│   │   ├── src/agent/                 → FastAPI source code
+│   │   │   ├── chat_turn/             → ChatTurnRunner (causal cleanup) & event models
+│   │   │   ├── trusted_search_snapshot/ → 3-key Redis protocol & safe projections
+│   │   │   ├── graph/                 → LangGraph state machine & deterministic nodes
+│   │   │   └── streaming/             → Thin SSE transport adapter & pre-stream admission
+│   │   └── tests/                     → pytest unit, characterization & integration tests
 │   └── web/                           → Next.js frontend UI service
-│       ├── app/                       → Next.js App Router pages and API routes
-│       ├── components/                → React UI components
-│       └── tests/                     → Playwright UI browser tests
+│       ├── app/                       → Next.js App Router pages
+│       │   ├── api/booking-management/ → Thin same-origin route handlers (private, no-store)
+│       │   ├── bookings/              → Server Components rendering booking views
+│       │   └── search/                → Server Actions executing flight searches
+│       ├── lib/server/                → Server-only domain modules (flight-search, booking-management)
+│       ├── components/                → React UI components (Zero-Client-Credential invariant)
+│       └── tests/                     → Playwright UI browser & characterization tests
 │
 ├── packages/
 │   └── shared/                        → Shared library for types and constants
-│       └── src/                       → Shared TypeScript validation contracts
+│       └── src/types/                 → Strict Zod schemas & inferred TypeScript types
 │
 ├── docs/
 │   ├── adr/                           → Architectural Decision Records
-│   └── runbooks/                      → Operational runbooks (booking-readiness.md, chatbot-handoff.md)
+│   └── runbooks/                      → Authoritative operational runbooks
 │
 ├── context/
 │   ├── architecture.md                → This file
@@ -73,19 +96,275 @@
 └── .specify/
     ├── memory/
     │   └── constitution.md            → Project constitution (v2.0.0)
-    ├── templates/                     → Spec Kit templates (spec, plan, tasks, etc.)
-    ├── extensions/                    → Spec Kit extensions (agent-context)
-    ├── integrations/                  → Integration manifests
-    ├── scripts/                       → Setup and prerequisite scripts
-    ├── workflows/                     → Workflow definitions
-    ├── extensions.yml
-    ├── init-options.json
-    └── integration.json
+    ├── templates/                     → Spec Kit templates
+    └── scripts/                       → Setup and prerequisite scripts
 ```
 
 ## Build and Runtime Output
 
 The root TypeScript configuration is type-check-only and sets `noEmit: true`. Package build configurations override that setting where runtime JavaScript is required: the API emits `apps/api/dist/main.js` for NestJS startup, and the shared package emits `packages/shared/dist` for the API's workspace imports. The API development command builds shared types first and then runs `nest start --watch`; inheriting the root `noEmit` setting prevents the API entrypoint from being created and causes a `dist/main` module-resolution failure.
+
+---
+
+## System Architecture & Module Ownership (Feature 019 Final State)
+
+### High-Level System Overview Diagram
+
+```mermaid
+flowchart TD
+    subgraph Browser["Browser / Client"]
+        ClientUI["Next.js Client Components\n(Zero-Client-Credential Invariant)"]
+    end
+
+    subgraph WebServer["Next.js Web Service (apps/web)"]
+        ServerActions["Server Actions\n(app/search/actions.ts)"]
+        RouteHandlers["Same-Origin Route Handlers\n(app/api/booking-management/*)\nCache-Control: private, no-store"]
+        ServerSeams["Server Domain Modules (import 'server-only')\n(lib/server/flight-search.ts)\n(lib/server/booking-management.ts)"]
+    end
+
+    subgraph AgentService["Python Agent Service (apps/agent:3002)"]
+        ThinTransport["Thin SSE Transport Adapter\n(agent/streaming/sse.py)"]
+        TurnRunner["ChatTurnRunner\n(agent/chat_turn/runner.py)\n[Causal 4-Step Cleanup Order]"]
+        EventModels["Authoritative Wire Events\n(agent/chat_turn/events.py)\nConfigDict(extra='forbid')"]
+        SnapshotLifecycle["TrustedSearchSnapshotLifecycle\n(agent/trusted_search_snapshot/)"]
+    end
+
+    subgraph RedisStore["Redis Store (:6379)"]
+        RedisSnapshot["3-Key Snapshot Protocol\nchat:snapshot:{user}:{session}\n:version (issued)\n:accepted (tombstone/fence)"]
+        RedisSessionLock["Session Fencing Locks\nchat:session-lock:{user}:{session}\n(X-Fencing-Token)"]
+        RedisBudget["API Budget & Quota Counters\nbudget:duffel:* | chat:budget:*"]
+    end
+
+    subgraph NestJSBackend["NestJS API Service (apps/api:3001)"]
+        subgraph GatewayModule["AgentGatewayModule (Pure Umbrella)"]
+            AttestedSearchMod["AttestedFlightSearchModule\n(/v2/flights/search + HMAC)"]
+            ReadinessMod["AgentBookingReadinessModule\n(/bookings/readiness)"]
+            SafeBookingMod["SafeBookingReadModule\n(/users/bookings/summaries & :ref)"]
+            PreferencesMod["TravelerPreferencesModule\n(/users/preferences)"]
+            AuthMod["AgentAuthModule\n(ApiKey & ClaimToken Guards)"]
+            AuditMod["AgentToolAuditModule\n(Negative-Privacy Telemetry)"]
+        end
+
+        subgraph ChatPersistence["ChatModule (Independent Persistence)"]
+            AgentChatCtrl["AgentChatController\n(/agent-gateway/chat/*)"]
+            AgentChatSvc["AgentChatAccessService\n(JTI Revocation & Fencing)"]
+            ChatCore["ChatService\n(AES-256-GCM Encryption)"]
+        end
+
+        subgraph BookingSubmodules["Booking Domain (Zero Cycles to Payment)"]
+            BookingUmbrella["BookingModule (Umbrella)"]
+            BookingLifecycle["BookingLifecycleModule\n(BookingLifecycleService: create/confirm/fail)\n(BookingRecoveryService: sync/reconcile)"]
+            BookingManagement["BookingManagementModule\n(BookingManagementService: list/detail/revisions)"]
+            CancellationDomain["CancellationModule\n(CancellationService: quotes/locks/supplier-cancel)"]
+        end
+
+        subgraph PaymentAndSettlement["Payment & Settlement Domain"]
+            PaymentMod["PaymentModule\n(PaymentService, PaymentRefundService,\nPaymentWebhookService, PaymentCronService)"]
+            RefundTxMod["RefundModule\n(RefundTransactionService: capacity reservation)"]
+            SettlementMod["RefundSettlementModule\n(RefundSettlementService: provider-blind settlement)"]
+        end
+    end
+
+    subgraph PostgresDB["PostgreSQL 16"]
+        DBBookings["bookings & itinerary_revisions"]
+        DBObligations["cancellation_refund_obligations\n(Minor integer units)"]
+        DBRefunds["refunds (Refund Transactions)"]
+        DBLedger["ledger_entries\n(refundTransactionId FK, double-entry pairs)"]
+        DBProjections["booking_agent_projections\n(PII-free bkref_* references)"]
+        DBChat["chat_sessions & chat_messages\n(AES-256-GCM ciphertext)"]
+    end
+
+    subgraph ExternalSuppliers["External Third Parties"]
+        StripeAPI["Stripe Payments & Refunds API"]
+        DuffelAPI["Duffel Flights & Orders API"]
+    end
+
+    %% Browser to Web Server
+    ClientUI -->|Server Action Invocation| ServerActions
+    ClientUI -->|HTTP GET/POST same-origin| RouteHandlers
+    ServerActions --> ServerSeams
+    RouteHandlers --> ServerSeams
+    ServerSeams -->|Private Bearer JWT / API_URL| NestJSBackend
+
+    %% Browser to Agent Service (Direct-Only SSE)
+    ClientUI -->|Direct SSE POST /chat/stream| ThinTransport
+    ThinTransport --> TurnRunner
+    TurnRunner --> EventModels
+    TurnRunner --> SnapshotLifecycle
+
+    %% Agent to Redis
+    SnapshotLifecycle <-->|Atomic 3-Key Lua CAS| RedisSnapshot
+    TurnRunner <-->|Fenced Session Leases| RedisSessionLock
+
+    %% Agent to Gateway & Chat API
+    TurnRunner -->|X-Service-Auth + Fencing| AgentChatCtrl
+    SnapshotLifecycle -->|Fetch Attested Flights| AttestedSearchMod
+    TurnRunner -->|Tool Invocations| GatewayModule
+
+    %% NestJS Internal Wiring & Anti-Cyclic Flow
+    CancellationDomain -->|Initiates Refund| PaymentMod
+    PaymentMod -->|Transitions Status| BookingLifecycle
+    PaymentMod -->|Reserves Capacity| RefundTxMod
+    PaymentMod -->|Settles Verified Facts| SettlementMod
+    RefundTxMod --> PostgresDB
+    SettlementMod --> PostgresDB
+    BookingLifecycle --> PostgresDB
+    BookingManagement --> PostgresDB
+    ChatCore --> PostgresDB
+
+    %% External Interactions
+    PaymentMod --> StripeAPI
+    CancellationDomain --> DuffelAPI
+```
+
+### Subsystem 1: Payment & Refund Settlement Architecture
+
+The payment and refund settlement domain provides deterministic, provider-blind settlement with balanced double-entry accounting:
+
+1. **Provider-Blind Settlement Core (`RefundSettlementModule`)**:
+   - `RefundSettlementService.settleVerifiedOutcome()` is a pure in-process deterministic operation with zero external network calls.
+   - Idempotently verifies terminal payment/refund facts, writes balanced double-entry ledger reversal pairs (`DEBIT PLATFORM_REVENUE`, `CREDIT CUSTOMER_RECEIVABLE`), calculates derived status transitions (`PaymentStatus.REFUNDED` vs `PARTIALLY_REFUNDED`), and updates booking completion (`CANCELLED_AND_REFUNDED` only when cumulative obligation refunds meet obligation `totalAmount`).
+   - Emits structured PII-safe `PaymentEvent` and `AuditLog` records with trace/correlation context.
+
+2. **Cancellation Refund Obligations (`CancellationRefundObligation`)**:
+   - Decouples the single customer cancellation debt from individual payment refund transactions.
+   - Relational ownership: 1:1 with `Booking` (`onDelete: Cascade`), 1:N with `Payment` (`onDelete: Restrict`), and 1:N with `Refund` (Refund Transactions).
+   - Amounts are stored strictly in integer minor units (`totalAmount`, `airlineRefundAmount`) to prevent floating-point rounding errors.
+
+3. **Refund Transactions & Capacity Reservation (`RefundModule`)**:
+   - `RefundTransactionService.reserveTransaction()` enforces brief interactive pessimistic locking (`SELECT ... FOR UPDATE` on Payment, then CancellationRefundObligation).
+   - Dual-capacity reservation limits: Validates that active (`REFUND_PENDING`, `REFUND_PROCESSING`, `REFUND_RETRY_SCHEDULED`) plus succeeded refunds do not exceed either Payment `amount` or Obligation `totalAmount`.
+   - Transaction-scoped idempotency key binding: Keys follow the format `cancellation-refund:${obligationId}:${attemptNumber}`, creating `Refund` rows in `REFUND_PENDING` before external money movement.
+
+4. **Transaction-Linked Double-Entry Ledger Pairs**:
+   - `LedgerEntry` links directly to `Refund` records via nullable `refundTransactionId` with compound uniqueness `@@unique([refundTransactionId, accountId, entryType])`.
+   - Guarantees exactly one `DEBIT PLATFORM_REVENUE` and one `CREDIT CUSTOMER_RECEIVABLE` per refund transaction.
+
+5. **Unified Trigger Pipeline**:
+   - All four refund trigger paths (Inline Cancellation, Stripe Webhook, Background Sweeper Cron, Admin Manual Resolution) execute identically:
+     1. Reserve transaction capacity via `RefundTransactionService.reserveTransaction()`.
+     2. Execute external Stripe refund API call outside DB locks.
+     3. Deliver verified facts to `RefundSettlementService.settleVerifiedOutcome({ provenance: { source } })`.
+
+### Subsystem 2: Booking Submodules & Anti-Cyclic Architecture
+
+To prevent architectural bloat and cyclic dependencies, the monolithic `BookingService` is decomposed into three cohesive, independent domain submodules:
+
+1. **Booking Lifecycle Module (`BookingLifecycleModule`)**:
+   - `BookingLifecycleService`: Pure provider-blind core handling booking state transitions:
+     - `createBooking`: Transactional creation of `PROCESSING` booking with unique `bookingIntentId`.
+     - `updateToConfirmed`: Transitions to `CONFIRMED` upon payment capture and Duffel order completion.
+     - `updateToFailed`: Transitions to `FAILED` with non-retryable reason.
+     - `applyPipelineOutcome`: Reconciles pipeline outcomes idempotently.
+     - Terminal status guards: Enforces that `CONFIRMED`, `CANCELLED`, or `COMPLETED` bookings cannot be overwritten by stale failures.
+   - `BookingRecoveryService`: Provider-aware stale booking recovery and background sweeps.
+
+2. **Booking Management Module (`BookingManagementModule`)**:
+   - `BookingManagementService`: Dedicated read and query domain for authenticated travelers:
+     - `listBookings`: Paginated list filtered by upcoming/past tabs with passenger and flight summaries.
+     - `getBookingDetail`: Full booking view with PNR, segments, baggage, and disruption alerts.
+     - `getBookingRevisions`: Itinerary revision history and diff displays.
+     - Tenant query isolation: Every query strictly filters by `userId` and maps Prisma models to safe view DTOs.
+     - Zero payment or refund dependencies.
+
+3. **Cancellation Module (`CancellationModule`)**:
+   - `CancellationService`: Dedicated cancellation lifecycle orchestrator:
+     - Cancellation status and quote generation (`POST /bookings/:bookingId/cancellation-quote`).
+     - Optimistic quote locking via `PENDING_QUOTE` state with expiration deadlines.
+     - Supplier cancellation execution with retries (`confirmCancellationWithRetries`) via `DuffelService`.
+     - Creation of `CancellationRefundObligation` in integer minor units.
+     - Disruption resolution: Atomically marks active disruptions `RESOLVED` with reason `BOOKING_CANCELLED`.
+     - Downstream refund initiation: Delegates refund execution to `PaymentRefundService.processCancellationRefund()`.
+     - Invariant: `CancellationService` never writes ledger entries or terminal financial statuses directly.
+
+4. **Zero-Cycle Dependency Graph**:
+   - Strict one-way acyclic module graph:
+     - `BookingModule` (umbrella) $\rightarrow$ imports `BookingLifecycleModule`, `BookingManagementModule`, `CancellationModule`.
+     - `CancellationModule` $\rightarrow$ imports `PaymentModule` (for `PaymentRefundService`).
+     - `PaymentModule` $\rightarrow$ imports `BookingLifecycleModule` (for lifecycle status updates), `RefundModule`, `RefundSettlementModule`.
+     - `BookingLifecycleModule` $\rightarrow$ 0 imports to `PaymentModule` or `CancellationModule`.
+     - `BookingManagementModule` $\rightarrow$ 0 imports to `PaymentModule` or `CancellationModule`.
+     - `PaymentModule` $\rightarrow$ 0 imports to `BookingModule` or `CancellationModule`.
+   - Cyclic dependency count between Payment and Booking domains = **0**.
+
+### Subsystem 3: Python Agent Architecture
+
+The Python Agent (`apps/agent`) operates as a stateless conversational advisor with strict Redis control plane guarantees and causal failure cleanup:
+
+1. **Trusted Search Snapshot Protocol (`apps/agent/src/agent/trusted_search_snapshot/`)**:
+   - **Atomic 3-Key Redis Protocol**:
+     1. Primary snapshot payload: `chat:snapshot:{userId}:{chatSessionId}`
+     2. Issued version reservation: `chat:snapshot:{userId}:{chatSessionId}:version`
+     3. Accepted version fence / tombstone: `chat:snapshot:{userId}:{chatSessionId}:accepted`
+   - **Lua CAS Operations**:
+     - `_NEXT_VERSION_LUA`: Allocates next monotonic version above both counter and stored snapshot.
+     - `_REPLACE_SNAPSHOT_LUA`: Atomically validates version ordering ($incoming > effective\_accepted$) and updates payload, issued, and accepted keys.
+     - `_DELETE_SNAPSHOT_LUA`: Deletes snapshot payload while retaining accepted version fence as a tombstone with remaining TTL, rejecting delayed or stale writes.
+   - **Offer Freshness TTL**: Payload TTL is bounded by positive offer freshness ($\le 900s$).
+   - **Safe Projections**:
+     - `project_for_llm`: Generates contiguous 1-indexed results without provider UUIDs, Duffel IDs, or attestation signatures.
+     - `project_for_browser`: Projects safe flight cards for frontend streaming.
+
+2. **Chat Turn Runner & Causal Cleanup (`apps/agent/src/agent/chat_turn/`)**:
+   - `ChatTurnRunner`: Transport-agnostic async generator producing authoritative `ChatTurnEvent` wire models (`ConfigDict(extra="forbid")`).
+   - **Deterministic 4-Step Causal Cleanup Order (`_finalize_cleanup`)**:
+     - **Step 1: Persist Safe Partial Turn**: If tokens were emitted and fence is valid, persists partial agent message via NestJS Chat API (`asyncio.shield` protected against cancellation, 1.0s fence check, 3.0s persistence timeout).
+     - **Step 2: Finalize Output Guardrails**: Closes guardrail pipeline (`pipeline.aclose()`, 1.0s timeout).
+     - **Step 3: Release Session Lease**: Releases Redis distributed lock (`queue_manager.release(session_id, req_id)`, 2.0s timeout).
+     - **Step 4: Emit Terminal ErrorEvent**: Constructs typed `ErrorEvent` for client if caller is still attached.
+   - **Fenced Lease Validation**: Agent propagates `X-Fencing-Token` acquired from Redis session lock; NestJS validates monotonic fencing on all turn persistence.
+   - **Lifespan Shutdown Limits**: `agent.main:lifespan` tracks `active_runners: Set[asyncio.Task]`, gracefully cancels and awaits them within `SHUTDOWN_TIMEOUT_SECONDS=5.0s`, drains stream queues, and closes Redis.
+
+### Subsystem 4: Web Server Seams & Zero-Client-Credential Boundary
+
+The web layer (`apps/web`) establishes a strict server boundary protecting backend credentials and transport topology:
+
+1. **Server Domain Modules (`apps/web/lib/server/`)**:
+   - Protected with the `import 'server-only'` sentinel.
+   - `flight-search.ts`: Acquires NextAuth session, resolves private `API_URL` (`API_URL || NEXT_PUBLIC_API_URL || 'http://localhost:3001'`), bounds requests with 10s timeout and 3-attempt exponential retry policy, validates responses with Zod, and normalizes into shared `FlightSearchOutcome`.
+   - `booking-management.ts`: Acquires NextAuth session, resolves private `API_URL`, manages bounded retries (3 attempts on GET reads, fast-fail on POST mutations), validates responses with Zod, strips provider identifiers (Duffel IDs, Stripe IDs, raw snapshots), and normalizes into shared `BookingManagementOutcome`.
+
+2. **Thin Same-Origin Route Handlers (`apps/web/app/api/booking-management/`)**:
+   - 7 thin route handlers for interactive polling and mutations:
+     - `GET /api/booking-management/bookings/[bookingId]`
+     - `POST /api/booking-management/bookings/[bookingId]/cancellation-quote`
+     - `GET /api/booking-management/bookings/[bookingId]/cancellation-status`
+     - `POST /api/booking-management/bookings/[bookingId]/cancel`
+     - `POST /api/booking-management/bookings/[bookingId]/disruptions/acknowledge`
+     - `POST /api/booking-management/bookings/[bookingId]/disruptions/accept`
+     - `GET /api/booking-management/bookings/[bookingId]/revisions`
+   - Every handler enforces `export const dynamic = 'force-dynamic'`.
+   - Every handler strictly enforces `Cache-Control: private, no-store`.
+   - Maps shared domain failure reasons (`UNAUTHENTICATED`, `FORBIDDEN`, `NOT_FOUND`, `STALE_REVISION`, `INVALID_COMMAND`, `UPSTREAM_UNAVAILABLE`) to standard HTTP status codes.
+
+3. **Zero-Client-Credential Invariant**:
+   - Client Components NEVER receive JWT access tokens, `NEXT_PUBLIC_API_URL`, or backend transport configuration via props, state, contexts, or hidden DOM fields.
+   - Server Components render views with data fetched server-side; Client Components execute commands and polling exclusively through Server Actions or same-origin `/api/booking-management/` routes.
+   - Static automated characterization audits verify 0 occurrences of `useSession`, `accessToken`, and `NEXT_PUBLIC_API_URL` across all booking management client components.
+
+### Subsystem 5: Agent Gateway Capability Submodules & Chat Module Separation
+
+The Agent Gateway decomposes the legacy monolithic service into isolated capability modules with negative-privacy telemetry and decoupled chat persistence:
+
+1. **Four Isolated Capability Submodules (`apps/api/src/agent-gateway/`)**:
+   - `AttestedFlightSearchModule`: Owns legacy search and versioned attested search (`POST /api/agent-gateway/v2/flights/search`) with HMAC-SHA256 selection attestation generation.
+   - `AgentBookingReadinessModule`: Owns advisory readiness projection (`POST /api/agent-gateway/bookings/readiness`), internal profile resolution, safe ordinal mapping, and telemetry.
+   - `SafeBookingReadModule`: Owns Tier-1 summaries (`GET /api/agent-gateway/users/bookings/summaries`) and Tier-2 details (`GET /api/agent-gateway/users/bookings/:bookingReference`) strictly projected from `BookingAgentProjection` with regex reference validation (`^bkref_...`), 404 tenant isolation, and temporarily retained legacy `/users/bookings`.
+   - `TravelerPreferencesModule`: Owns allowlisted preference projection (`GET /api/agent-gateway/users/preferences`) querying Prisma `travelerProfile` without exposing passport PII.
+
+2. **Supporting Infrastructure Modules**:
+   - `AgentAuthModule`: Encapsulates and exports `AgentApiKeyGuard`, `ClaimTokenGuard`, and `ClaimTokenService`.
+   - `AgentToolAuditModule`: `AgentToolAuditService` emits structured, negative-privacy telemetry (`toolName`, `outcome`, `durationMs`, `responseSizeBytes`, `occurredAt`, `errorCode`) to `AuditLog`, unconditionally discarding raw parameters, customer messages, passenger details, and provider IDs.
+
+3. **Chat Persistence Ownership in `ChatModule` (`apps/api/src/chat/`)**:
+   - `AgentChatController` and `AgentChatAccessService` handle `/agent-gateway/chat/*` persistence endpoints directly.
+   - Injects `ChatService` with record-bound AES-256-GCM authenticated encryption.
+   - Enforces user active status, expiration timestamp verification (`exp > NOW()`), and JTI revocation checking against Redis (`blacklist:jti:${dto.jti}`).
+   - `ChatModule` has zero dependency on `AgentGatewayModule`.
+
+4. **Pure Umbrella Composition (`AgentGatewayModule`)**:
+   - `AgentGatewayModule` serves as an umbrella composition module importing and re-exporting the 4 capability submodules, `AgentAuthModule`, `AgentToolAuditModule`, and shared providers (`SelectionAttestationService`, `BookingAgentProjectionService`).
+   - Obsolete `AgentGatewayService` and `AgentGatewayController` are completely deleted with zero remaining references.
 
 ---
 
@@ -291,6 +570,20 @@ An ADMIN may schedule a retry with a fresh key or record an externally completed
 
 - **Frontend User Experience**: The booking detail page dynamically renders cancellation/refund alerts and provides an inline "Cancel Booking" quote review and confirmation modal, gated by the fare-specific cutoff deadline. Stale pending states are automatically polled every 5s.
 - **Operator Dashboard**: Admins use the `/admin/refunds` view to inspect PII-safe escalated refund states and trigger the manual resolution pipeline.
+- **Cancellation Refund Obligation & Transaction Foundation (Feature 019 Slice 1A)**:
+  - `CancellationRefundObligation`: Decouples the single customer cancellation debt from individual payment refund attempts. 1:1 with `Booking` (`onDelete: Cascade`), 1:N with `Payment` (`onDelete: Restrict`), and 1:N with `Refund` (Refund Transactions). Amounts are stored in integer minor units (`totalAmount`, `airlineRefundAmount`).
+  - `LedgerEntry` Transaction Linkage: `LedgerEntry` links directly to `Refund` records via nullable `refundTransactionId` with compound uniqueness `@@unique([refundTransactionId, accountId, entryType])`, guaranteeing exactly one `DEBIT PLATFORM_REVENUE` and one `CREDIT CUSTOMER_RECEIVABLE` per refund transaction.
+  - Restart-Safe Backfill: `apps/api/prisma/scripts/backfill-cancellation-refund-obligations.ts` migrates legacy cancellation refunds into obligations with exact Decimal-to-minor-unit conversion (`Math.round(amount * 100)`), validates double-entry ledger balance invariants (`sum(DEBIT) === sum(CREDIT)`), and strictly quarantines ambiguous candidate ledger pairs when multiple pairs match the same payment without durable refund identity.
+- **Refund Reservation & Provider-Blind Settlement Core (Feature 019 Slice 1B)**:
+  - `RefundTransactionService` (`apps/api/src/refund/`): Enforces brief interactive pessimistic locking (`SELECT ... FOR UPDATE` on Payment, then CancellationRefundObligation). Validates remaining capacities against active + successful refunds on both parents. Manages transaction-scoped idempotency key binding and reuse, creating `Refund` rows in `REFUND_PENDING` before external money movement.
+  - `RefundSettlementService` (`apps/api/src/refund-settlement/`): Pure in-process deterministic operation `settleVerifiedOutcome()` without external network calls. Atomically verifies facts, performs idempotent deduplication, writes balanced double-entry ledger reversal pairs (`DEBIT PLATFORM_REVENUE`, `CREDIT CUSTOMER_RECEIVABLE`), calculates derived aggregate transitions (`PaymentStatus.REFUNDED` vs `PARTIALLY_REFUNDED`, preserving `preDisputeStatus` under `DISPUTED`/`CHARGEBACK_LOST`), and derives Booking completion (`CANCELLED_AND_REFUNDED` only when cumulative obligation refunds meet obligation `totalAmount`). Emits structured PII-safe `PaymentEvent` and `AuditLog` records with trace/correlation context.
+- **Unified Refund Trigger Pipeline (Feature 019 Slice 1C)**:
+  - All four refund trigger paths in `apps/api/src/payment/` route 100% through `RefundTransactionService.reserveTransaction()` and `RefundSettlementService.settleVerifiedOutcome()`:
+    1. **Inline Cancellation**: `PaymentRefundService.processCancellationRefund` uses transaction-specific key (`cancellation-refund:${obligation?.id || bookingId}:1`), executes Stripe call outside DB locks, settles via `RefundSettlementService.settleVerifiedOutcome({ provenance: { source: 'INLINE' } })`.
+    2. **Stripe Webhook**: `PaymentWebhookService.handleChargeRefunded` verifies webhook payload, matches/late-binds pending `Refund` record, and settles via `RefundSettlementService.settleVerifiedOutcome({ provenance: { source: 'WEBHOOK', externalEventId } })`.
+    3. **Background Sweeper**: `PaymentCronService.handleCancellationRefundRecovery` claims lease on pending retries, executes Stripe call, and settles via `RefundSettlementService.settleVerifiedOutcome({ provenance: { source: 'CRON' } })`.
+    4. **Admin Manual Resolution**: `AdminRefundController.resolveRefund` extracts caller identity (`req.user?.id`), executes resolution action, and settles via `RefundSettlementService.settleVerifiedOutcome({ provenance: { source: 'ADMIN', actorId } })`.
+  - Monolithic `cancellation-refund:{bookingId}` keys replaced with transaction-specific idempotency keys. All disparate, duplicated DB mutations across payment refund services eliminated.
 
 ### Disruption Core Domain (Deterministic Path)
 
@@ -474,6 +767,14 @@ FastAPI NemoGuardrailService runs safety checks (length, regex heuristics, Mimo 
 - **Rollback Matrix, Chaos Recovery & Continuous Privacy Governance**: The system enforces strict multi-phase rollout/rollback matrix governance (`ISSUE=false, ACCEPT=true` safely halts new credential minting while honoring active unexpired tokens; `MULTI_AGENT=false` safely falls back to single-agent Travel Assistant). Redis outages fail closed with HTTP 503 `CHAT_CONTROL_PLANE_UNAVAILABLE` before LLM inference, preventing unbudgeted compute. Upstream supplier timeouts safely execute `releaseClaim` in `finally` blocks, clearing claim locks back to NULL with zero orphaned locks. Monotonic session fencing tokens reject stale turn persistence during abrupt client disconnects. Continuous automated scanners across PostgreSQL, application logs, telemetry, and Redis verify 100% absence of raw tokens, plaintext chat, passport numbers, card numbers, PNRs, or supplier IDs.
 - **Metadata-Only Action Card & Secure Chat Handoff (`BookingActionCard`)**: The Next.js frontend renders `BookingActionCard` upon receiving `ACTION_REQUIRED` SSE events. Payloads are strictly allowlisted by `parseActionRequiredEvent` to passenger types/ordinals, section names, field names, and non-sensitive reason codes with zero PII. Single-passenger incomplete profiles route to `/profile?returnTo=...` where the user completes profile fields outside chat, and a safe return banner with `autoResume=true` allows seamless resumption. Multi-passenger or inline flows route directly to `/checkout/passengers`. All return navigation is validated against `safeReturnTarget.ts` allowlists to prevent open redirect vulnerabilities.
 - **Fencing Integration**: Concurrent writes are prevented through strict session ownership. The agent must acquire and propagate an `X-Fencing-Token`, and the NestJS backend enforces this write fence on all mutative chat operations.
+- **Shared Agent Auth Module (`AgentAuthModule`)**: Encapsulates and exports `AgentApiKeyGuard`, `ClaimTokenGuard`, and `ClaimTokenService` with minimal `PrismaModule` dependency. Decouples cross-module agent authentication guards from the broad `AgentGatewayService`, eliminating circular module references with `ChatHandoffModule` and providing the isolated auth foundation for capability-local decomposition.
+- **Privacy-Safe Agent Tool Audit Service (`AgentToolAuditService`)**: Emits structured, privacy-safe execution telemetry (`toolName`, `outcome: 'SUCCESS' | 'FAILURE'`, `durationMs`, `responseSizeBytes`, `traceId`, `correlationId`, `actorId`, `occurredAt`, `errorCode`) to `AuditLog`. Strictly enforces negative privacy protection: projects only allowlisted performance metrics while unconditionally discarding raw parameters, customer messages, passenger details, passport numbers, card numbers, or Duffel IDs. Provides graceful fallback UUID generation and fail-safe error isolation to prevent audit logging failures from interrupting agent tool operations.
+- **Capability-Local Agent Gateway Submodules & Clean Composition (`apps/api/src/agent-gateway/`)**:
+  - `AgentGatewayModule`: Serves as an umbrella composition module importing and re-exporting the 4 capability submodules, `AgentAuthModule`, `AgentToolAuditModule`, and transitional cross-module providers (`SelectionAttestationService`, `BookingAgentProjectionService`). Broad monolithic `AgentGatewayService` and `AgentGatewayController` are completely decommissioned and deleted with zero remaining references.
+  - `AttestedFlightSearchModule`: Owns legacy search (`GET /api/agent-gateway/flights/search`) with Redis caching and V2 attested search (`POST /api/agent-gateway/v2/flights/search`) with HMAC-SHA256 selection attestation generation.
+  - `AgentBookingReadinessModule`: Owns advisory readiness projection (`POST /api/agent-gateway/bookings/readiness`), internal profile resolution, safe ordinal mapping, and telemetry.
+  - `SafeBookingReadModule`: Owns Tier-1 summaries (`GET /api/agent-gateway/users/bookings/summaries`) and Tier-2 details (`GET /api/agent-gateway/users/bookings/:bookingReference`) strictly projected from `BookingAgentProjection` with regex reference validation (`^bkref_...`), 404 tenant isolation, and temporarily retained legacy `/users/bookings`.
+  - `TravelerPreferencesModule`: Owns allowlisted preference projection (`GET /api/agent-gateway/users/preferences`) querying Prisma `travelerProfile` without exposing passport PII.
 - **Soft Deletion**: Chat sessions and messages are soft-deleted instead of hard-removed, preserving the relational structure and audit trails while stripping PII/ciphertext and hiding them from active queries.
 
 ---
@@ -521,4 +822,98 @@ The repository uses a single GitHub Actions pull request CI workflow at `.github
 - **Deterministic Test Commands**: API unit CI calls the explicit `test:ci` script rather than forwarding Jest flags through pnpm. Agent Redis coverage enforcement is applied only to the dedicated Redis-marked selection, so the non-Redis and Redis groups validate independently.
 - **Correctness vs. Performance**: Blocking API E2E runs exclude `[.-]performance.e2e-spec.ts` wall-clock benchmarks, which remain available through the opt-in `test:e2e:performance` command for controlled benchmark environments.
 - **Status Evaluation**: The terminal `ci-status` job runs `evaluate-ci-status.mjs` with `always()`, verifying that all relevant service jobs succeeded, irrelevant jobs were safely skipped, and detection ran cleanly. Branch protection requires only `ci-status`.
+
+---
+
+## Feature 019 — Architecture Deepening & Safety Rails
+
+### Slice 5A — Narrow Shared Contracts for Web Server Seams
+
+- `packages/shared/src/types/flight-search.types.ts` owns strict Zod schemas and inferred types for server-seam Flight Search query, provider-free offer/slice/segment views, metadata, and search/selection outcomes. Browser offers expose only an opaque local `id`; raw Duffel offer identifiers are rejected by strict parsing.
+- `packages/shared/src/types/booking-management.types.ts` owns strict prepared owner views and generic `BookingManagementOutcomeSchema(dataSchema)`. It preserves local booking/revision references, PNR, flight details, passenger names, ancillary summaries, cancellation facts, and disruption displays while rejecting Stripe IDs, Duffel order/quote/segment IDs, provider payloads, and raw snapshots.
+- Both outcome families use explicit `ok` discriminants and allowlisted error reasons. `packages/shared/src/types/index.ts` exports the contracts, and the package root re-exports that stable type surface for web and API consumers.
+
+### Slice 5B — Flight Search Server Seam
+
+- `apps/web/lib/server/flight-search.ts` is the Flight Search server-only transport owner. It obtains the NextAuth session itself, resolves `API_URL || NEXT_PUBLIC_API_URL || http://localhost:3001` only on the server, injects the bearer credential, bounds requests with a timeout and three-attempt exponential retry policy, validates NestJS responses with Zod, and normalizes every result into the shared discriminated outcome contracts.
+- `apps/web/app/search/actions.ts` provides the colocated Next.js Server Actions. Search rendering calls the typed action boundary only; `SearchFormClient` receives and stores `FlightSearchOfferView` values containing an opaque local offer ID and display fields, never a JWT, backend URL, provider payload, Duffel identifier, or retry policy.
+- Offer selection revalidates the opaque offer server-to-server and returns the contractually specified encoded checkout path. The server module is protected with the `server-only` sentinel so it cannot be imported into the browser bundle.
+- Playwright uses a loopback Flight Search fixture through private `API_URL` for Server Action coverage. The scoped static characterization audit rejects credential, public transport, direct-fetch, provider/raw payload, and retry-policy markers in the search rendering tree.
+
+### Slice 5C — Booking Management Server Seam & Client Token Removal
+
+- `apps/web/lib/server/booking-management.ts` is the Booking Management server domain module. It obtains the NextAuth session, resolves private `API_URL`, injects bearer credentials, manages bounded retry/timeout policies (3 bounded attempts on GET reads, fast-fail on POST mutations), validates upstream NestJS responses with Zod, maps typed error reasons (`UNAUTHENTICATED`, `FORBIDDEN`, `NOT_FOUND`, `STALE_REVISION`, `INVALID_COMMAND`, `UPSTREAM_UNAVAILABLE`), and prepares views stripping Stripe IDs, Duffel order IDs, and raw snapshots while preserving owner-facing PNR, status, and itinerary facts. Protected with `import 'server-only'`.
+- `apps/web/app/api/booking-management/` provides 7 thin same-origin Route Handlers:
+  - `GET /api/booking-management/bookings/[bookingId]`
+  - `POST /api/booking-management/bookings/[bookingId]/cancellation-quote`
+  - `GET /api/booking-management/bookings/[bookingId]/cancellation-status`
+  - `POST /api/booking-management/bookings/[bookingId]/cancel`
+  - `POST /api/booking-management/bookings/[bookingId]/disruptions/acknowledge`
+  - `POST /api/booking-management/bookings/[bookingId]/disruptions/accept`
+  - `GET /api/booking-management/bookings/[bookingId]/revisions`
+  - Every handler strictly enforces `Cache-Control: private, no-store` and maps failure reasons to standard HTTP status codes.
+- `apps/web/app/bookings/page.tsx` and `apps/web/app/bookings/[bookingId]/page.tsx` render Server Components using `listBookings` and `getBookingDetail` without receiving or forwarding JWT tokens or backend URLs to the browser.
+- Client Components (`BookingCard.tsx`, `BookingDetail.tsx`, `ItineraryRevisionHistory.tsx`) are completely decoupled from `useSession`, `accessToken`, `process.env.NEXT_PUBLIC_API_URL`, and direct NestJS fetches. All interactive mutations and reads route through same-origin `/api/booking-management/...` endpoints.
+- Scoped characterization and static privacy audits verify zero `useSession`, zero `accessToken`, and zero `NEXT_PUBLIC_API_URL` leakage across all 13 booking management files.
+
+Feature 019 restructures high-leverage boundaries without changing public product behavior:
+- **Slice 0 (Baseline Characterization & Safety Rails)**:
+  - Establishes immutable automated characterization suites across `apps/api/test/characterization/`, `apps/agent/tests/characterization/`, and `apps/web/tests/characterization/` with 0 production business logic modifications.
+  - Characterizes all 4 refund triggers (Inline, Webhook, Sweeper Cron, Admin Manual) to prove identical outcomes, status transitions, and balanced double-entry ledger records.
+  - Characterizes booking lifecycle transitions (`createBooking`, `updateToConfirmed`, `updateToFailed`, `reconcileBookingIfStale`), tenant query isolation, and safe agent projection synchronization.
+  - Characterizes all 6 read-only Agent Gateway capability endpoints, service auth guards, and PII-free allowlisted projections.
+  - Characterizes Trusted Search Snapshot validation (contiguous 1-indexed results, extra forbid, TTL bound), repository lifecycle, and PII-free projections.
+  - Characterizes all 8 authoritative SSE wire events (`token`, `tool_call`, `tool_result`, `flight_results`, `ACTION_HANDOFF`, `ACTION_REQUIRED`, `done`, `error`), canonical event sequencing, and terminal failure cleanup.
+  - Characterizes Web search and booking flows, recording baseline static metrics for Client Component token props (`accessToken`), `NEXT_PUBLIC_API_URL`, and `forwardRef` dependencies.
+- **Slice 1 (Unified Refund Settlement & Obligation Contract)**:
+  - **Slice 1A (Additive PostgreSQL/Prisma Schema Expansion)**: Introduced `CancellationRefundObligation` model, `refundTransactionId` on `LedgerEntry`, and double-entry ledger constraints. Added restart-safe backfill script.
+  - **Slice 1B (Reservation & Provider-Blind Settlement Core)**: Added `RefundTransactionService` with strict Payment-first pessimistic locking and capacity checks, and `RefundSettlementService` for in-process atomic ledger and projection settlement.
+  - **Slice 1C (Trigger Path Cutover)**: Unified all 4 refund paths (Inline, Webhook, Sweeper Cron, Admin Manual) to route exclusively through unified reservation and settlement with transaction-scoped idempotency keys.
+  - **Slice 1D (Contract Schema & Gate 1 Sign-Off)**: Contract migration `20260823000000_refund_obligation_contract` removes legacy `Refund.bookingId` and `Booking.cancellationRefund` columns/relations and enforces obligation linkage constraints on cancellation refunds. Runbook documented in `docs/runbooks/refund-settlement-migration.md`. Feature 019 Gate 1 100% green.
+- **Slice 2 (Booking Lifecycle, Management, and Cancellation)**:
+  - **Slice 2A (Extract Provider-Blind Booking Lifecycle Core)**: Extracted `createBooking`, `updateToConfirmed`, `updateToFailed`, `applyPipelineOutcome`, and flight completion checking into `BookingLifecycleService` (`apps/api/src/booking-lifecycle/`). Extracted provider-aware stale recovery and background sweeps into `BookingRecoveryService`.
+  - **Slice 2B (Extract Booking Management Module)**: Extracted read and query capabilities (`listBookings`, `getBookingDetail`, `mapDisruptionAndItinerary`, `sortBookings`, `toListItem`, and ancillary summary mapping) into `BookingManagementService` (`apps/api/src/booking-management/`). Rewired `BookingController` to inject `BookingManagementService` directly for `GET /bookings` and `GET /bookings/:bookingId` while preserving response DTO shapes, tenant isolation, and transitional delegation in `BookingService`.
+  - **Slice 2C (Extract Cancellation Module)**: Extracted cancellation status, quote generation, optimistic quote locking (`PENDING_QUOTE`), supplier-first cancellation execution with retries (`confirmCancellationWithRetries`), remote Duffel order recovery (`retrieveOrder`), `CancellationRefundObligation` creation (minor units), active disruption resolution (`BOOKING_CANCELLED`), and downstream refund initiation via `PaymentRefundService` into `CancellationService` (`apps/api/src/cancellation/`). Rewired `BookingController` to inject `CancellationService` directly for `@Get(':bookingId/cancellation')`, `@Post(':bookingId/cancellation-quote')`, and `@Post(':bookingId/cancel')`, while providing transitional delegation in `BookingService`. Invariant maintained: `CancellationService` never performs direct ledger or terminal settlement writes (strictly owned by `RefundSettlementService`).
+
+- **Slice 3A (Trusted Search Snapshot Lifecycle Core)**:
+  - **Canonical ownership**: `apps/agent/src/agent/trusted_search_snapshot/` owns the strict Pydantic domain models, owner-scoped lifecycle orchestration, Redis persistence, graph-state normalization, and safe LLM/browser projections. NestJS remains the sole HMAC verifier and handoff-token issuer; this slice does not migrate existing callers.
+  - **Model and lifecycle guarantees**: `SnapshotOwner`, `AttestedSearchEnvelope`, `TrustedSearchSnapshot`, `ResolvedOfferSelection`, `SafeSearchResult`, and `SafeFlightResult` enforce `extra="forbid"`, non-empty owner/attestation data, positive versions, contiguous 1-based result indices, monotonic snapshot versions, and timezone-aware UTC expiry. Selection validates bounds and active expiry; graph normalization accepts legacy `snapshot`/`trusted_snapshot`, `version`/`snapshotVersion`, `attestation`/`selectionAttestation`, and `offers`/`results` aliases.
+  - **Repository guarantees**: `TrustedSnapshotRepository` uses the required owner-scoped payload key `chat:snapshot:{user_id}:{chat_session_id}` plus private issued-version (`:version`) and accepted-version/tombstone (`:accepted`) keys. Lua allocation reserves an issued version; one successful save promotes that reservation into the accepted boundary and payload atomically. Delete removes the payload while retaining/advancing the accepted tombstone, so delayed work cannot write an invalidated version; its recovery path removes corrupt payloads and clears malformed private state while retaining valid accepted fences. Incoming versions less than or equal to the accepted boundary are rejected, and payload TTL is bounded by positive offer freshness and the `max_ttl` cap; expired snapshots are not stored.
+  - **Privacy and compatibility boundary**: `project_for_llm` and `project_for_browser` are explicit PII/provider-ID-free projections and never expose Duffel IDs, local offer IDs, signatures, fingerprints, user IDs, or session IDs. `ResolvedOfferSelection` remains lifecycle-internal. Legacy `agent.models.snapshot` and `agent.repositories.trusted_snapshot_repository` paths re-export the canonical classes; no existing caller migrations are included in Slice 3A.
+- **Slice 3B (Cut Over Callers to TrustedSearchSnapshotLifecycle & Decommission Legacy Shims)**:
+  - **Tool caller cut-over**: `search_flights.py` creates and saves search snapshots via `TrustedSearchSnapshotLifecycle.create_or_replace(owner, envelope)` and renders model summaries with `lifecycle.project_for_llm(snapshot)`. `signal_checkout_intent.py` normalizes state via `lifecycle.normalize_graph_state()` and performs zero-I/O bound checks.
+  - **Graph and streaming cut-over**: `checkout_gate.py` normalizes state and validates active snapshots; `nodes.py:validate_handoff` and `create_handoff_token` resolve offer selection strictly through `lifecycle.select()`, extracting allowlisted display fields from `ResolvedOfferSelection.offer` and forwarding canonical attestations to NestJS. `sse.py` loads active snapshots via `lifecycle.load_active(owner)` and projects browser flight results via `lifecycle.project_for_browser()`.
+  - **Legacy shim decommissioning**: Completely deleted `agent/models/snapshot.py` and `agent/repositories/trusted_snapshot_repository.py`. Removed `project_snapshot_results` and `_SAFE_LLM_FIELDS` from `search_flights.py`. Replaced all test imports across `apps/agent/tests/` with `agent.trusted_search_snapshot`.
+  - **Established verification**: 423 passed in agent pytest suite (1 deselected), ruff lint/format clean (114 files clean), 0 occurrences of legacy shim paths in static grep audit. Standards and spec review 100% green with 0 remaining P0/P1 issues.
+- **Slice 4A (Authoritative Chat Turn Event Models & Golden Contract Tests)**:
+  - **Authoritative Event Models**: Created canonical `apps/agent/src/agent/chat_turn/events.py` establishing strict Pydantic v2 payload models (`extra="forbid"`) and tagged event models for all 8 wire events (`token`, `tool_call`, `tool_result`, `flight_results`, `ACTION_HANDOFF`, `ACTION_REQUIRED`, `done`, `error`), along with the discriminated union `ChatTurnEvent` and helper `format_sse()`.
+  - **Streaming Integration**: Updated `apps/agent/src/agent/streaming/sse.py` to construct typed `ChatTurnEvent` instances across all event production and error paths, serializing them deterministically in `sse_generator`.
+  - **Backwards Compatibility Re-exports**: Re-exported all canonical event types in `apps/agent/src/agent/models/events.py` while preserving legacy types (`DisplayInfo`, `HandoffEvent`, `BaseSSEEvent`) with `extra="forbid"`.
+  - **Golden Contract Tests**: Added `apps/agent/tests/test_chat_turn_events.py` verifying serialization, `extra="forbid"` rejection on all payloads and wrappers, `handoffToken` isolation strictly in `ActionHandoffPayload`, exact SSE formatting, `TypeAdapter(ChatTurnEvent)` discriminated union parsing, and zero PII leakage.
+  - **Established verification**: 431 passed in full agent pytest suite, 15/15 SSE characterization passed, 15/15 snapshot characterization passed, ruff lint/format 100% green (117 files clean). Standard and spec reviews passed with 0 remaining P0/P1 issues.
+- **Slice 4B (Extract ChatTurnRunner in Causal-Cleanup Order)**:
+  - **Transport-Agnostic Runner**: Implemented `ChatTurnCommand` and `ChatTurnRunner` under `apps/agent/src/agent/chat_turn/`, extracting session creation, memory/snapshot loading, fenced lease management, LangGraph event stream interpretation, output guardrails, and persistent turn finalization into a pure async generator `run(command) -> AsyncIterator[ChatTurnEvent]`.
+  - **Causal Failure Cleanup Ordering**: Enforced deterministic 4-step sequence (`_finalize_cleanup`): persist safe partial turn if tokens were emitted $\rightarrow$ finalize/close output guardrails (`pipeline.aclose()`) $\rightarrow$ release owned session lease (`queue_manager.release()`) $\rightarrow$ yield terminal `ErrorEvent`. Shielded persistence prevents partial message loss during client disconnects.
+  - **Monotonic Fencing Protection**: Re-validates active lease fence prior to pre-persistence, handoff token emission, action-required events, and batch completion to prevent cross-turn database corruption or zombie action emissions.
+  - **Established verification**: 10/10 unit tests passing in `apps/agent/tests/test_chat_turn_runner.py`, 430/430 full agent test suite passing (11 deselected), ruff lint/format 100% green (120 files clean). Standards and spec code reviews approved with 0 P0/P1 issues.
+- **Slice 4C (Thin Transport Adapter and Graceful Runner Shutdown — US4 Complete)**:
+  - **Thin Transport Boundary**: Reduced `apps/agent/src/agent/streaming/sse.py` to a thin HTTP transport layer (from ~880 down to 283 lines). Retained HTTP pre-stream admission (JWT validation, NestJS user access verification, length check, ingress PII detection, NeMo safety check, Redis quota & rate limiting) and delegated turn execution entirely to `ChatTurnRunner`.
+  - **Client Disconnect & Lifespan Shutdown**: Added active runner task tracking (`active_runners: Set[asyncio.Task]` in `agent.main`), client disconnect detection (`request.is_disconnected()`), generator cleanup on exit (`generator.aclose()`), and graceful cancellation/await in application lifespan shutdown within a 5.0s bounded timeout.
+  - **Established verification**: 20/20 unit tests in `apps/agent/tests/test_sse.py`, 452/452 full agent test suite passing (11 deselected), 15/15 web acceptance tests passing, ruff lint/format 100% green (121 files clean). Standards and spec code reviews approved with 0 P0/P1 issues.
+- **Slice 6A (Agent Gateway Shared Auth & Safe Audit Module)**:
+  - Extracted `AgentAuthModule` (`agent-auth.module.ts`) encapsulating and exporting `AgentApiKeyGuard`, `ClaimTokenGuard`, and `ClaimTokenService`.
+  - Implemented `AgentToolAuditService` enforcing negative privacy enforcement with allowlisted metrics (`toolName`, `outcome`, `durationMs`, `responseSizeBytes`, `occurredAt`, `errorCode`).
+- **Slice 6B (Extract Capability-Local Agent Gateway Modules)**:
+  - Extracted tool families into 4 capability-local modules (`AttestedFlightSearchModule`, `AgentBookingReadinessModule`, `SafeBookingReadModule`, `TravelerPreferencesModule`).
+  - Reduced `AgentGatewayService` dependencies and decoupled tool executions into their owning modules.
+- **Slice 6C (Move Agent Chat Ownership to ChatModule)**:
+  - **Chat-Owned Agent Persistence**: Extracted all `/agent-gateway/chat/...` endpoints into `AgentChatController` and `AgentChatAccessService` in `apps/api/src/chat/`, injecting `ChatService` directly without intermediate gateway layers.
+  - **Access & Revocation Verification**: `AgentChatAccessService` handles user active status, expiration timestamp verification (`exp > NOW()`), and JTI revocation checking against Redis (`blacklist:jti:${dto.jti}`).
+  - **Zero Protocol & Cryptographic Drift**: Maintained 100% wire-path, status-code, `X-Fencing-Token` header propagation, and AES-256-GCM record-bound authenticated encryption compatibility.
+  - **Gateway↔Chat Decoupling**: Completely removed `ChatModule` from `AgentGatewayModule` imports and stripped chat delegation methods from `AgentGatewayService`.
+- **Slice 6D (Delete Broad Agent Gateway Service & Finalize Module Composition)**:
+  - **Decommission Monolithic Files**: Fully deleted obsolete `AgentGatewayService`, `AgentGatewayController`, and `agent-gateway.service.spec.ts`.
+  - **Clean Umbrella Module Composition**: Refactored `AgentGatewayModule` into an umbrella composition module importing and re-exporting capability submodules (`AttestedFlightSearchModule`, `AgentBookingReadinessModule`, `SafeBookingReadModule`, `TravelerPreferencesModule`, `AgentAuthModule`, `AgentToolAuditModule`) alongside external consumer providers (`SelectionAttestationService`, `BookingAgentProjectionService`). Eliminated unused `CacheModule` and empty `controllers` array.
+  - **Zero Production References**: Monorepo static audit confirmed exactly 0 remaining references to `AgentGatewayService` and `AgentGatewayController`.
+  - **Comprehensive Verification**: 7 capability unit suites (82/82 tests PASS), 3 gateway/characterization E2E suites (75/75 tests PASS), full Python agent pytest suite (455/455 tests PASS), and clean ESLint/TypeScript compilation across the entire monorepo.
 

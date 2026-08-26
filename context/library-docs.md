@@ -671,3 +671,168 @@ export function FlightSearchForm({ flights }: Props) {
 ### Deterministic Nodes
 - Graph nodes that interact with token issuance or intent lifecycle are deterministic application I/O and must never be exposed as LLM tools.
 - Validation and handoff creation happen in strict graph nodes, never directly in LLM responses.
+
+---
+
+## Pydantic v2 (Agent Wire Models & State Snapshots)
+
+### Configuration and Strictness (`extra="forbid"`)
+
+Pydantic v2 models define wire contracts and state persistence schemas for the Python Agent service (`apps/agent`). To prevent field smuggling, parameter injection, and schema drift, all wire and domain models MUST configure `ConfigDict(extra="forbid")`:
+
+```python
+from pydantic import BaseModel, ConfigDict, Field
+from typing import Literal, Optional, Dict, Any, List
+
+# Wire Event Payload
+class ActionHandoffPayload(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    version: int = 1
+    action: str = "begin_checkout"
+    handoffToken: str
+    expiresAt: str
+    display: Dict[str, Any]
+
+# Tagged Wire Event Model
+class ActionHandoffEvent(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    event: Literal["ACTION_HANDOFF"] = "ACTION_HANDOFF"
+    data: ActionHandoffPayload
+
+# Domain Snapshot State Model
+class TrustedSearchSnapshot(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    snapshotVersion: int = Field(gt=0)
+    selectionAttestation: str
+    offers: List[SafeFlightResult]
+    createdAt: datetime
+    expiresAt: datetime
+```
+
+### Discriminated Union Parsing & Serialization
+
+Authoritative SSE event streams use tagged discriminated unions for safe polymorphic serialization:
+
+```python
+from pydantic import TypeAdapter
+from typing import Annotated, Union
+
+ChatTurnEvent = Annotated[
+    Union[
+        TokenEvent,
+        ToolCallEvent,
+        ToolResultEvent,
+        FlightResultsEvent,
+        ActionHandoffEvent,
+        ActionRequiredEvent,
+        DoneEvent,
+        ErrorEvent,
+    ],
+    Field(discriminator="event"),
+]
+
+# Parsing untrusted wire event data
+adapter = TypeAdapter(ChatTurnEvent)
+event_instance = adapter.validate_python(raw_event_dict)
+
+# Strict JSON serialization for SSE
+sse_data = event_instance.model_dump_json(exclude_none=True)
+```
+
+**Rules:**
+- Every payload model, envelope model, and snapshot domain model MUST specify `model_config = ConfigDict(extra="forbid")`.
+- Passing unrecognized keys throws `pydantic.ValidationError` immediately (fail-closed).
+- Never use `extra="allow"` or `extra="ignore"` on agent wire protocols.
+- Use `TypeAdapter(ChatTurnEvent)` for safe polymorphic parsing of union types.
+- Datetime fields in domain models must be timezone-aware UTC (`datetime.now(timezone.utc)`).
+
+---
+
+## Zod (Shared Schema & Type Inference Synchronization)
+
+### Schema Definition & Type Inference Pattern
+
+Shared validation contracts in `packages/shared/src/types/` use Zod as the single source of truth. TypeScript types are always inferred from schemas rather than maintained in parallel:
+
+```typescript
+import { z } from 'zod';
+
+// 1. Primitive schemas with explicit constraints
+const MoneyAmountSchema = z.string().regex(/^\d+(\.\d{1,2})?$/);
+const IsoDateTimeSchema = z.string().datetime({ offset: true });
+
+// 2. Strict object schemas (.strict() forbids unexpected keys)
+export const BookingAirlineViewSchema = z
+  .object({
+    name: z.string().min(1),
+    iataCode: z.string().min(1),
+    logoUrl: z.string().url().optional(),
+  })
+  .strict();
+
+export const BookingSegmentViewSchema = z
+  .object({
+    airline: BookingAirlineViewSchema,
+    flightNumber: z.string().min(1),
+    departureAirport: BookingAirportViewSchema,
+    arrivalAirport: BookingAirportViewSchema,
+    departureAt: IsoDateTimeSchema,
+    arrivalAt: IsoDateTimeSchema,
+    duration: z.string().min(1),
+  })
+  .strict();
+
+// 3. Inferred TypeScript types derived directly from schemas
+export type BookingAirlineView = z.infer<typeof BookingAirlineViewSchema>;
+export type BookingSegmentView = z.infer<typeof BookingSegmentViewSchema>;
+```
+
+### Discriminated Outcome Patterns
+
+Server-seam operations use generic discriminated outcome schemas to guarantee typed success and failure paths:
+
+```typescript
+export const BookingManagementFailureReasonSchema = z.enum([
+  'UNAUTHENTICATED',
+  'FORBIDDEN',
+  'NOT_FOUND',
+  'STALE_REVISION',
+  'INVALID_COMMAND',
+  'UPSTREAM_UNAVAILABLE',
+]);
+
+export function BookingManagementOutcomeSchema<T extends z.ZodTypeAny>(dataSchema: T) {
+  return z.discriminatedUnion('ok', [
+    z.object({
+      ok: z.literal(true),
+      data: dataSchema,
+    }),
+    z.object({
+      ok: z.literal(false),
+      reason: BookingManagementFailureReasonSchema,
+      message: z.string(),
+      retryable: z.boolean(),
+    }),
+  ]);
+}
+
+export type BookingManagementOutcome<T> =
+  | { ok: true; data: T }
+  | {
+      ok: false;
+      reason: z.infer<typeof BookingManagementFailureReasonSchema>;
+      message: string;
+      retryable: boolean;
+    };
+```
+
+**Rules:**
+- All object schemas defining browser or wire views MUST chain `.strict()` to prevent property smuggling or unintended payload forwarding.
+- Monetary values MUST be formatted as decimal strings (`/^\d+(\.\d{1,2})?$/`), never JavaScript `number`, to eliminate floating-point precision issues.
+- Datetime strings MUST enforce ISO 8601 offset strings via `z.string().datetime({ offset: true })`.
+- Types must NEVER be declared as independent interfaces and then separately cast; use `z.infer<typeof Schema>` exclusively.
+- Upstream NestJS responses in `apps/web/lib/server/` must be validated with `Schema.safeParse(await response.json())` before returning outcomes.
+
