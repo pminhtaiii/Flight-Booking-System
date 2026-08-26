@@ -97,17 +97,17 @@
 - [x] T030 [P] [US2] Add failing normalized lifecycle and recovery unit tests in apps/api/src/booking-lifecycle/booking-lifecycle.service.spec.ts and apps/api/src/booking-lifecycle/booking-recovery.service.spec.ts
 - [x] T031 [US2] Define BookingPipelineOutcome and implement provider-blind booking transitions in apps/api/src/booking-lifecycle/booking-lifecycle.types.ts, apps/api/src/booking-lifecycle/booking-lifecycle.service.ts, and apps/api/src/booking-lifecycle/booking-lifecycle.module.ts
 - [x] T032 [US2] Move provider-aware stale recovery and existing schedules behind the lifecycle core in apps/api/src/booking-lifecycle/booking-recovery.service.ts
-- [ ] T033 [US2] Replace Payment's broad BookingService calls with BookingLifecycleService at every confirmation, failure, and recovery point in apps/api/src/payment/payment.service.ts and apps/api/src/payment/payment.service.spec.ts
-- [ ] T034 [P] [US2] Rewire disruption reconciliation to BookingLifecycleService in apps/api/src/disruption/sync/reconciliation.service.ts, apps/api/src/disruption/disruption.module.ts, and apps/api/src/disruption/sync/reconciliation.service.spec.ts
-- [ ] T035 [US2] Move safe booking projection write ownership behind a booking-owned provider without introducing a lifecycle↔gateway cycle in apps/api/src/booking-lifecycle/booking-agent-projection-writer.service.ts and apps/api/src/agent-gateway/booking-agent-projection.service.ts
+- [x] T033 [US2] Replace Payment's broad BookingService calls with BookingLifecycleService at every confirmation, failure, and recovery point in apps/api/src/payment/payment.service.ts and apps/api/src/payment/payment.service.spec.ts
+- [x] T034 [P] [US2] Rewire disruption reconciliation to BookingLifecycleService in apps/api/src/disruption/sync/reconciliation.service.ts, apps/api/src/disruption/disruption.module.ts, and apps/api/src/disruption/sync/reconciliation.service.spec.ts
+- [x] T035 [US2] Move safe booking projection write ownership behind a booking-owned provider without introducing a lifecycle↔gateway cycle in apps/api/src/booking-lifecycle/booking-agent-projection-writer.service.ts and apps/api/src/agent-gateway/booking-agent-projection.service.ts
 - [x] T036 [P] [US2] Add failing list, detail, disruption projection, itinerary mapping, sorting, and tenant-isolation tests in apps/api/src/booking-management/booking-management.service.spec.ts
 - [x] T037 [US2] Extract safe read projections into apps/api/src/booking-management/booking-management.service.ts and apps/api/src/booking-management/booking-management.module.ts
-- [ ] T038 [P] [US2] Add failing cancellation status, quote, supplier-first cancellation, recovery, obligation, and refund-trigger tests in apps/api/src/cancellation/cancellation.service.spec.ts
-- [ ] T039 [US2] Extract cancellation orchestration without terminal settlement writes into apps/api/src/cancellation/cancellation.service.ts and apps/api/src/cancellation/cancellation.module.ts
-- [ ] T040 [US2] Make Booking HTTP composition inject Booking Management and Cancellation directly in apps/api/src/booking/booking.controller.ts, apps/api/src/booking/booking.controller.spec.ts, and apps/api/src/booking/booking.module.ts
-- [ ] T041 [US2] Remove the mutual BookingModule/PaymentModule forwardRef imports and update module composition in apps/api/src/booking/booking.module.ts and apps/api/src/payment/payment.module.ts
-- [ ] T042 [US2] Remove BookingService and its exports after all production callers migrate from apps/api/src/booking/booking.service.ts and apps/api/src/booking/booking.module.ts
-- [ ] T043 [US2] Run Feature 019 Gate 2, add a no-cycle/no-broad-service static assertion, and record unit, E2E, typecheck, build, observability, and rollback evidence in apps/api/test/characterization/booking-characterization.e2e-spec.ts, context/architecture.md, and context/progress-checker.md
+- [x] T038 [P] [US2] Add failing cancellation status, quote, supplier-first cancellation, recovery, obligation, and refund-trigger tests in apps/api/src/cancellation/cancellation.service.spec.ts
+- [x] T039 [US2] Extract cancellation orchestration without terminal settlement writes into apps/api/src/cancellation/cancellation.service.ts and apps/api/src/cancellation/cancellation.module.ts
+- [x] T040 [US2] Make Booking HTTP composition inject Booking Management and Cancellation directly in apps/api/src/booking/booking.controller.ts, apps/api/src/booking/booking.controller.spec.ts, and apps/api/src/booking/booking.module.ts
+- [x] T041 [US2] Remove the mutual BookingModule/PaymentModule forwardRef imports and update module composition in apps/api/src/booking/booking.module.ts and apps/api/src/payment/payment.module.ts
+- [x] T042 [US2] Remove BookingService and its exports after all production callers migrate from apps/api/src/booking/booking.service.ts and apps/api/src/booking/booking.module.ts
+- [x] T043 [US2] Run Feature 019 Gate 2, add a no-cycle/no-broad-service static assertion, and record unit, E2E, typecheck, build, observability, and rollback evidence in apps/api/test/characterization/booking-characterization.e2e-spec.ts, context/architecture.md, and context/progress-checker.md
 
 **Checkpoint**: User Story 2 is independently testable with no Payment↔Booking cycle.
 
@@ -150,10 +150,10 @@
 - [x] T061 [US4] Isolate LangGraph astream_events v2 parsing and typed event ordering in apps/agent/src/agent/chat_turn/runner.py
 - [x] T062 [US4] Implement one awaited cancellation-safe finalizer that blocks stale fencing owners and completes durable cleanup before terminal errors in apps/agent/src/agent/chat_turn/runner.py
 
-- [ ] T063 [US4] Reduce apps/agent/src/agent/streaming/sse.py to admission, HTTP error mapping, disconnect detection, runner closure, and typed SSE encoding
-- [ ] T064 [US4] Replace raw active queue shutdown mutation with cancelled and awaited runner handles in apps/agent/src/agent/main.py
-- [ ] T065 [P] [US4] Verify thin-adapter encoding, cleanup ordering, no leaked leases/tasks, direct stream, and output guardrails in apps/agent/tests/test_sse_integration.py, apps/agent/tests/test_stream_session_control.py, and apps/agent/tests/test_direct_stream.py
-- [ ] T066 [US4] Run Feature 019 Gate 4 plus full agent, web direct-stream, and real T093 gates and record cleanup telemetry, rollback, and compatibility evidence in context/architecture.md and context/progress-checker.md
+- [x] T063 [US4] Reduce apps/agent/src/agent/streaming/sse.py to admission, HTTP error mapping, disconnect detection, runner closure, and typed SSE encoding
+- [x] T064 [US4] Replace raw active queue shutdown mutation with cancelled and awaited runner handles in apps/agent/src/agent/main.py
+- [x] T065 [P] [US4] Verify thin-adapter encoding, cleanup ordering, no leaked leases/tasks, direct stream, and output guardrails in apps/agent/tests/test_sse_integration.py, apps/agent/tests/test_stream_session_control.py, and apps/agent/tests/test_direct_stream.py
+- [x] T066 [US4] Run Feature 019 Gate 4 plus full agent, web direct-stream, and real T093 gates and record cleanup telemetry, rollback, and compatibility evidence in context/architecture.md and context/progress-checker.md
 
 **Checkpoint**: User Story 4 is independently testable without HTTP or LangGraph in the transport layer.
 
@@ -179,14 +179,14 @@
 
 ### Booking Management
 
-- [ ] T076 [P] [US5] Add failing list, detail, status, quote, cancellation, disruption, history, no-store, and typed error tests in apps/web/lib/server/booking-management.spec.ts
-- [ ] T077 [US5] Implement authenticated server-only Booking Management operations and prepared view mapping in apps/web/lib/server/booking-management.ts
-- [ ] T078 [US5] Convert initial booking list and detail reads to the server module in apps/web/app/bookings/page.tsx and apps/web/app/bookings/[bookingId]/page.tsx
-- [ ] T079 [P] [US5] Add thin same-origin polling and itinerary-history Route Handlers in apps/web/app/api/booking-management/bookings/[bookingId]/status/route.ts and apps/web/app/api/booking-management/bookings/[bookingId]/itinerary-revisions/route.ts
-- [ ] T080 [P] [US5] Add thin allowlisted commands in apps/web/app/api/booking-management/bookings/[bookingId]/cancellation/quote/route.ts, apps/web/app/api/booking-management/bookings/[bookingId]/cancellation/confirm/route.ts, and apps/web/app/api/booking-management/bookings/[bookingId]/disruptions/[action]/route.ts
-- [ ] T081 [US5] Remove useSession, accessToken, public backend URL, direct NestJS fetches, raw any, and fallback transport logic from apps/web/components/bookings/BookingDetail.tsx
-- [ ] T082 [US5] Remove token props and direct NestJS history fetches from apps/web/components/bookings/ItineraryRevisionHistory.tsx
-- [ ] T083 [US5] Run Feature 019 Gate 5, the scoped credential/transport static check, Next typecheck/build, and checkout/bookings/disruptions Playwright; record observability, rollback, and Decision 6 documentation in context/code-standards.md, context/architecture.md, and context/progress-checker.md
+- [x] T076 [P] [US5] Add failing list, detail, status, quote, cancellation, disruption, history, no-store, and typed error tests in apps/web/lib/server/booking-management.spec.ts
+- [x] T077 [US5] Implement authenticated server-only Booking Management operations and prepared view mapping in apps/web/lib/server/booking-management.ts
+- [x] T078 [US5] Convert initial booking list and detail reads to the server module in apps/web/app/bookings/page.tsx and apps/web/app/bookings/[bookingId]/page.tsx
+- [x] T079 [P] [US5] Add thin same-origin polling and itinerary-history Route Handlers in apps/web/app/api/booking-management/bookings/[bookingId]/status/route.ts and apps/web/app/api/booking-management/bookings/[bookingId]/itinerary-revisions/route.ts
+- [x] T080 [P] [US5] Add thin allowlisted commands in apps/web/app/api/booking-management/bookings/[bookingId]/cancellation/quote/route.ts, apps/web/app/api/booking-management/bookings/[bookingId]/cancellation/confirm/route.ts, and apps/web/app/api/booking-management/bookings/[bookingId]/disruptions/[action]/route.ts
+- [x] T081 [US5] Remove useSession, accessToken, public backend URL, direct NestJS fetches, raw any, and fallback transport logic from apps/web/components/bookings/BookingDetail.tsx
+- [x] T082 [US5] Remove token props and direct NestJS history fetches from apps/web/components/bookings/ItineraryRevisionHistory.tsx
+- [x] T083 [US5] Run Feature 019 Gate 5, the scoped credential/transport static check, Next typecheck/build, and checkout/bookings/disruptions Playwright; record observability, rollback, and Decision 6 documentation in context/code-standards.md, context/architecture.md, and context/progress-checker.md
 
 **Checkpoint**: User Story 5 renders prepared views with no browser-held backend credentials or transport policy.
 
@@ -201,18 +201,18 @@
 - [x] T084 [P] [US6] Export existing API-key and claim guards through a narrow module in apps/api/src/agent-gateway/auth/agent-auth.module.ts
 - [x] T085 [P] [US6] Add failing allowlisted tool audit and raw-parameter rejection tests in apps/api/src/agent-gateway/audit/agent-tool-audit.service.spec.ts
 - [x] T086 [US6] Implement tool-name, outcome, duration, response-size, and sanitized trace-only audit storage in apps/api/src/agent-gateway/audit/agent-tool-audit.service.ts
-- [ ] T087 [P] [US6] Add capability-local legacy/V2 search, attestation, mapping, and dependency-isolation tests in apps/api/src/agent-gateway/attested-flight-search/attested-flight-search.service.spec.ts
-- [ ] T088 [US6] Extract attested search ownership while preserving routes and safe projections in apps/api/src/agent-gateway/attested-flight-search/attested-flight-search.controller.ts, apps/api/src/agent-gateway/attested-flight-search/attested-flight-search.service.ts, and apps/api/src/agent-gateway/attested-flight-search/attested-flight-search.module.ts
-- [ ] T089 [P] [US6] Add readiness projection, observability, and dependency-isolation tests in apps/api/src/agent-gateway/booking-readiness/agent-booking-readiness.service.spec.ts
-- [ ] T090 [US6] Extract booking readiness ownership in apps/api/src/agent-gateway/booking-readiness/agent-booking-readiness.controller.ts, apps/api/src/agent-gateway/booking-readiness/agent-booking-readiness.service.ts, and apps/api/src/agent-gateway/booking-readiness/agent-booking-readiness.module.ts
-- [ ] T091 [P] [US6] Add summary/detail privacy, compatibility, and dependency-isolation tests in apps/api/src/agent-gateway/safe-booking-read/safe-booking-read.service.spec.ts
-- [ ] T092 [US6] Extract two-tier safe booking read ownership while retaining the legacy broad endpoint only as a compatibility route in apps/api/src/agent-gateway/safe-booking-read/safe-booking-read.controller.ts, apps/api/src/agent-gateway/safe-booking-read/safe-booking-read.service.ts, and apps/api/src/agent-gateway/safe-booking-read/safe-booking-read.module.ts
-- [ ] T093 [P] [US6] Add allowlisted preference projection and dependency-isolation tests in apps/api/src/agent-gateway/traveler-preferences/traveler-preferences.service.spec.ts
-- [ ] T094 [US6] Extract traveler preference ownership in apps/api/src/agent-gateway/traveler-preferences/traveler-preferences.controller.ts, apps/api/src/agent-gateway/traveler-preferences/traveler-preferences.service.ts, and apps/api/src/agent-gateway/traveler-preferences/traveler-preferences.module.ts
-- [ ] T095 [US6] Move existing agent chat persistence paths to Chat-owned controller/access boundaries with compatibility tests in apps/api/src/chat/agent-chat.controller.ts, apps/api/src/chat/agent-chat-access.service.ts, and apps/api/test/agent-chat-gateway.e2e-spec.ts
-- [ ] T096 [US6] Recompose capability modules and remove migrated methods/dependencies from apps/api/src/agent-gateway/agent-gateway.controller.ts and apps/api/src/agent-gateway/agent-gateway.module.ts
-- [ ] T097 [US6] Delete apps/api/src/agent-gateway/agent-gateway.service.ts after every controller and proven external provider has migrated
-- [ ] T098 [US6] Run Feature 019 Gate 6, gateway/chat E2E, privacy corpus, no-broad-service static checks, full API gates, and Python tool integration; record observability, rollback, and separate legacy endpoint deprecation status in context/architecture.md and context/progress-checker.md
+- [x] T087 [P] [US6] Add capability-local legacy/V2 search, attestation, mapping, and dependency-isolation tests in apps/api/src/agent-gateway/attested-flight-search/attested-flight-search.service.spec.ts
+- [x] T088 [US6] Extract attested search ownership while preserving routes and safe projections in apps/api/src/agent-gateway/attested-flight-search/attested-flight-search.controller.ts, apps/api/src/agent-gateway/attested-flight-search/attested-flight-search.service.ts, and apps/api/src/agent-gateway/attested-flight-search/attested-flight-search.module.ts
+- [x] T089 [P] [US6] Add readiness projection, observability, and dependency-isolation tests in apps/api/src/agent-gateway/booking-readiness/agent-booking-readiness.service.spec.ts
+- [x] T090 [US6] Extract booking readiness ownership in apps/api/src/agent-gateway/booking-readiness/agent-booking-readiness.controller.ts, apps/api/src/agent-gateway/booking-readiness/agent-booking-readiness.service.ts, and apps/api/src/agent-gateway/booking-readiness/agent-booking-readiness.module.ts
+- [x] T091 [P] [US6] Add summary/detail privacy, compatibility, and dependency-isolation tests in apps/api/src/agent-gateway/safe-booking-read/safe-booking-read.service.spec.ts
+- [x] T092 [US6] Extract two-tier safe booking read ownership while retaining the legacy broad endpoint only as a compatibility route in apps/api/src/agent-gateway/safe-booking-read/safe-booking-read.controller.ts, apps/api/src/agent-gateway/safe-booking-read/safe-booking-read.service.ts, and apps/api/src/agent-gateway/safe-booking-read/safe-booking-read.module.ts
+- [x] T093 [P] [US6] Add allowlisted preference projection and dependency-isolation tests in apps/api/src/agent-gateway/traveler-preferences/traveler-preferences.service.spec.ts
+- [x] T094 [US6] Extract traveler preference ownership in apps/api/src/agent-gateway/traveler-preferences/traveler-preferences.controller.ts, apps/api/src/agent-gateway/traveler-preferences/traveler-preferences.service.ts, and apps/api/src/agent-gateway/traveler-preferences/traveler-preferences.module.ts
+- [x] T095 [US6] Move existing agent chat persistence paths to Chat-owned controller/access boundaries with compatibility tests in apps/api/src/chat/agent-chat.controller.ts, apps/api/src/chat/agent-chat-access.service.ts, and apps/api/test/agent-chat-gateway.e2e-spec.ts
+- [x] T096 [US6] Recompose capability modules and remove migrated methods/dependencies from apps/api/src/agent-gateway/agent-gateway.controller.ts and apps/api/src/agent-gateway/agent-gateway.module.ts
+- [x] T097 [US6] Delete apps/api/src/agent-gateway/agent-gateway.service.ts after every controller and proven external provider has migrated
+- [x] T098 [US6] Run Feature 019 Gate 6, gateway/chat E2E, privacy corpus, no-broad-service static checks, full API gates, and Python tool integration; record observability, rollback, and separate legacy endpoint deprecation status in context/architecture.md and context/progress-checker.md
 
 **Checkpoint**: User Story 6 has local capability boundaries with no catch-all gateway service.
 
