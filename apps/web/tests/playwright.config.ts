@@ -34,7 +34,7 @@ export default defineConfig({
   testDir: './',
   fullyParallel: false,
   workers: 1,
-  reporter: [['html', { open: 'never' }]],
+  reporter: process.env.CI ? 'line' : [['html', { open: 'never' }]],
   use: {
     baseURL: 'http://127.0.0.1:3000',
     trace: 'on-first-retry',
@@ -121,9 +121,7 @@ export default defineConfig({
         ]
       : []),
     {
-      command: t093RealFlow
-        ? 'node node_modules/next/dist/bin/next dev -p 3000'
-        : 'pnpm dev',
+      command: 'node node_modules/next/dist/bin/next dev -p 3000',
       url: t093RealFlow ? 'http://127.0.0.1:3000/api/auth/csrf' : 'http://127.0.0.1:3000',
       reuseExistingServer: t093RealFlow ? false : !process.env.CI,
       timeout: 600000,
