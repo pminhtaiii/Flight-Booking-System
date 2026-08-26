@@ -1,18 +1,12 @@
 /* eslint-disable @next/next/no-img-element */
 import Link from 'next/link';
-import type { BookingListItemDto, FlightSnapshot } from '@shared/booking-types';
-import type { BookingDisruptionDto } from '@shared/disruption-types';
+import type { BookingListItemView } from '@shared/types/booking-management.types';
 import { DisruptionStatus } from '@shared/disruption-types';
-import { BookingStatusBadge } from '@/components/bookings/BookingStatusBadge';
+import { BookingStatusBadge, type BookingStatus } from '@/components/bookings/BookingStatusBadge';
 import { AlertTriangle } from 'lucide-react';
 
-type BookingCardBooking = BookingListItemDto & {
-  flightSnapshot?: FlightSnapshot | null;
-  disruption?: BookingDisruptionDto;
-};
-
 type BookingCardProps = {
-  booking: BookingCardBooking;
+  booking: BookingListItemView;
 };
 
 const formatDate = (value?: string): string => {
@@ -33,12 +27,10 @@ const formatCurrency = (amount: string, currency: string): string =>
   new Intl.NumberFormat('en-GB', { style: 'currency', currency }).format(Number(amount));
 
 export function BookingCard({ booking }: BookingCardProps) {
-  const firstSegment = booking.flightSnapshot?.segments[0];
-  const airline = booking.airline ?? firstSegment?.airline;
-  const origin = booking.origin ?? firstSegment?.departureAirport;
-  const lastSegment = booking.flightSnapshot?.segments.at(-1);
-  const destination = booking.destination ?? lastSegment?.arrivalAirport;
-  const arrivalAt = lastSegment?.arrivalAt;
+  const airline = booking.airline;
+  const origin = booking.origin;
+  const destination = booking.destination;
+  const arrivalAt = booking.arrivalAt;
   const destinationLabel = destination?.city ?? 'Flight booking';
   const isProcessing = booking.status === 'PROCESSING';
   const isFailed = booking.status === 'FAILED';
@@ -64,7 +56,7 @@ export function BookingCard({ booking }: BookingCardProps) {
               {isProcessing ? 'Processing details…' : airline?.name ?? 'Airline details pending'}
             </p>
           </div>
-          <BookingStatusBadge status={booking.status} />
+          <BookingStatusBadge status={booking.status as BookingStatus} />
           {booking.disruption && 
             (booking.disruption.status === DisruptionStatus.DETECTED || 
              booking.disruption.status === DisruptionStatus.ACKNOWLEDGED) && (
@@ -89,7 +81,7 @@ export function BookingCard({ booking }: BookingCardProps) {
             {origin && destination ? `${origin.city} (${origin.iataCode}) to ${destination.city} (${destination.iataCode})` : 'Route details will appear when available'}
           </p>
           <p>
-            {formatDate(booking.departureAt)}{arrivalAt ? ` – ${formatDate(arrivalAt)}` : ''}
+            {formatDate(booking.departureAt ?? undefined)}{arrivalAt ? ` – ${formatDate(arrivalAt)}` : ''}
           </p>
           {!isProcessing && booking.pnrReference && <p>PNR: {booking.pnrReference}</p>}
           <p>Total: {formatCurrency(booking.totalAmount, booking.currency)}</p>

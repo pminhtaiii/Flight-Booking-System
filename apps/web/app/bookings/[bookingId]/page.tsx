@@ -1,20 +1,11 @@
-import { getServerSession } from 'next-auth';
 import { redirect } from 'next/navigation';
 import { headers } from 'next/headers';
 import { Header } from '@/components/layout/Header';
 import { BookingConfirmationBanner } from '@/components/bookings/BookingConfirmationBanner';
 import { BookingDetail as BookingDetailClient } from '@/components/bookings/BookingDetail';
-import { authOptions } from '@/lib/auth';
-import type { BookingDetailDto } from '@shared/booking-types';
-import type { CurrentItineraryDto, BookingDisruptionDto } from '@shared/disruption-types';
+import { getBookingDetail, mapBookingDetail } from '@/lib/server/booking-management';
+import type { BookingDetailView } from '@shared/types/booking-management.types';
 import { MOCK_BOOKINGS } from './mock-bookings';
-
-type BookingDetailResponse = BookingDetailDto & {
-  payment?: { status: string } | null;
-  bookingIntent?: { id: string; offerId: string };
-  currentItinerary?: CurrentItineraryDto;
-  disruption?: BookingDisruptionDto;
-};
 
 type Props = {
   params: {
@@ -31,86 +22,67 @@ export default async function BookingDetailPage({ params, searchParams }: Props)
   const mockScenario = mockScenarioMatch ? mockScenarioMatch[1].trim() : null;
 
   if ((process.env.NODE_ENV === 'test' || process.env.CI === 'true') && mockScenario && MOCK_BOOKINGS[mockScenario]) {
-    const booking = MOCK_BOOKINGS[mockScenario];
+    const rawBooking = MOCK_BOOKINGS[mockScenario];
+    const booking = mapBookingDetail(rawBooking as unknown as Record<string, unknown>);
     const showConfirmation = searchParams.confirmed === 'true';
     return (
       <div className="flex min-h-screen flex-col bg-background">
         <Header />
         <main className="mx-auto w-full max-w-3xl space-y-6 py-12 px-4">
           {showConfirmation && booking.status === 'CONFIRMED' && (
-            <BookingConfirmationBanner pnrReference={booking.pnrReference} />
+            <BookingConfirmationBanner pnrReference={booking.pnrReference ?? undefined} />
           )}
-          <BookingDetailClient booking={booking as unknown as BookingDetailResponse} showConfirmation={showConfirmation} />
+          <BookingDetailClient 
+            booking={booking} 
+            showConfirmation={showConfirmation} 
+            bookingId={params.bookingId}
+          />
         </main>
       </div>
     );
   }
 
-  const session = await getServerSession(authOptions);
-
-  if (!session) {
-    const hasSessionCookie = cookieHeader.includes('next-auth') || cookieHeader.includes('__Secure-next-auth');
-    redirect(hasSessionCookie ? '/login?message=session_expired' : '/login');
-  }
-
   const { bookingId } = params;
   const showConfirmation = searchParams.confirmed === 'true';
-  const accessToken = (session as { accessToken?: string }).accessToken;
-  const apiUrl = process.env.NEXT_PUBLIC_API_URL;
-  if (!apiUrl) {
-    throw new Error('NEXT_PUBLIC_API_URL is required but not configured.');
-  }
-  const isTest = process.env.NODE_ENV === 'test';
 
-  let booking: BookingDetailResponse | null = null;
-  let errorStatus: number | null = null;
-  let error: string | null = null;
+  const outcome = await getBookingDetail(bookingId);
 
-  try {
-    const response = await fetch(`${apiUrl}/api/bookings/${bookingId}`, {
-      headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : undefined,
-      cache: 'no-store',
-    });
-
-    if (!response.ok) {
-      errorStatus = response.status;
-      error = response.status === 403 
-        ? 'You do not have access to this booking.' 
-        : response.status === 404
-        ? 'We could not find this booking.'
-        : 'We could not load this booking. Please try again.';
-    } else {
-      booking = (await response.json()) as BookingDetailResponse;
+  if (!outcome.ok) {
+    if (outcome.reason === 'UNAUTHENTICATED') {
+      const hasSessionCookie = cookieHeader.includes('next-auth') || cookieHeader.includes('__Secure-next-auth');
+      redirect(hasSessionCookie ? '/login?message=session_expired' : '/login');
     }
-  } catch (caughtError) {
-    error = 'We could not load this booking. Please try again.';
-  }
 
-  // Under test environment, if fetch fails, we fallback to client-side fetch so Playwright route mocks can intercept it.
-  if ((error || errorStatus || !booking) && !isTest) {
+    const error = outcome.reason === 'FORBIDDEN'
+      ? 'You do not have access to this booking.'
+      : outcome.reason === 'NOT_FOUND'
+      ? 'We could not find this booking.'
+      : (outcome.message || 'We could not load this booking. Please try again.');
+
     return (
       <div className="flex min-h-screen flex-col bg-background">
         <Header />
         <main className="mx-auto w-full max-w-3xl py-12 px-4">
           <p role="alert" className="card text-text-cancelled">
-            {error || 'We could not load this booking. Please try again.'}
+            {error}
           </p>
         </main>
       </div>
     );
   }
 
+  const booking: BookingDetailView = outcome.data;
+
   return (
     <div className="flex min-h-screen flex-col bg-background">
       <Header />
       <main className="mx-auto w-full max-w-3xl space-y-6 py-12 px-4">
-        {showConfirmation && booking?.status === 'CONFIRMED' && (
-          <BookingConfirmationBanner pnrReference={booking.pnrReference} />
+        {showConfirmation && booking.status === 'CONFIRMED' && (
+          <BookingConfirmationBanner pnrReference={booking.pnrReference ?? undefined} />
         )}
         <BookingDetailClient 
           booking={booking} 
           showConfirmation={showConfirmation} 
-          isMockEnabled={isTest && (!booking || errorStatus !== null)}
           bookingId={bookingId}
         />
       </main>

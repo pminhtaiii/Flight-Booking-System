@@ -10,7 +10,7 @@ import {
   type FlightSearchSliceView,
   type FlightSelectionOutcome,
 } from '@shared/types/flight-search.types';
-import { authOptions } from '../auth';
+import { authOptions } from '../auth.ts';
 
 const REQUEST_TIMEOUT_MS = 10_000;
 const MAX_ATTEMPTS = 3;
@@ -188,9 +188,14 @@ export async function selectFlightOffer(offerId: string): Promise<FlightSelectio
 
 async function getAccessToken(): Promise<string | null> {
   try {
-    const session: unknown = await NextAuth.getServerSession(authOptions);
+    const sessionFn =
+      typeof NextAuth.getServerSession === 'function'
+        ? NextAuth.getServerSession
+        : (NextAuth as unknown as { default?: { getServerSession: typeof NextAuth.getServerSession } }).default?.getServerSession;
+    if (!sessionFn) return null;
+    const session: unknown = await sessionFn(authOptions);
     if (!session || typeof session !== 'object' || !('accessToken' in session)) return null;
-    const token = session.accessToken;
+    const token = (session as { accessToken?: unknown }).accessToken;
     return typeof token === 'string' && token.length > 0 ? token : null;
   } catch {
     return null;

@@ -109,7 +109,6 @@ test.describe('Booking Seam Characterization - User Flows', () => {
 
   test('renders disruption alert and handles acknowledge action', async ({ page, context }) => {
     let ackCalled = false;
-    let authHeaderValue: string | null = null;
 
     await authenticateClientSession(page);
 
@@ -123,18 +122,13 @@ test.describe('Booking Seam Characterization - User Flows', () => {
     ]);
 
     await page.route(
-      `**/api/bookings/${bookingId}/disruptions/${revisionId}/acknowledge`,
+      `**/api/booking-management/bookings/${bookingId}/disruptions/acknowledge`,
       async (route) => {
         ackCalled = true;
-        authHeaderValue = route.request().headers()['authorization'] || null;
         await route.fulfill({
           status: 200,
           contentType: 'application/json',
-          body: JSON.stringify({
-            bookingId,
-            activeRevisionId: revisionId,
-            disruptionStatus: 'ACKNOWLEDGED',
-          }),
+          body: JSON.stringify({ ok: true }),
         });
       },
     );
@@ -154,12 +148,10 @@ test.describe('Booking Seam Characterization - User Flows', () => {
     await ackButton.click();
 
     expect(ackCalled).toBe(true);
-    expect(authHeaderValue).toBe('Bearer char-test-access-token');
   });
 
   test('renders disruption alert and handles accept action', async ({ page, context }) => {
     let acceptCalled = false;
-    let authHeaderValue: string | null = null;
 
     await authenticateClientSession(page);
 
@@ -173,19 +165,13 @@ test.describe('Booking Seam Characterization - User Flows', () => {
     ]);
 
     await page.route(
-      `**/api/bookings/${bookingId}/disruptions/${revisionId}/accept`,
+      `**/api/booking-management/bookings/${bookingId}/disruptions/accept`,
       async (route) => {
         acceptCalled = true;
-        authHeaderValue = route.request().headers()['authorization'] || null;
         await route.fulfill({
           status: 200,
           contentType: 'application/json',
-          body: JSON.stringify({
-            bookingId,
-            activeRevisionId: revisionId,
-            disruptionStatus: 'RESOLVED',
-            resolvedReason: 'TRAVELLER_ACCEPTED',
-          }),
+          body: JSON.stringify({ ok: true }),
         });
       },
     );
@@ -199,7 +185,6 @@ test.describe('Booking Seam Characterization - User Flows', () => {
     await acceptButton.click();
 
     expect(acceptCalled).toBe(true);
-    expect(authHeaderValue).toBe('Bearer char-test-access-token');
   });
 
   test('handles 409 conflict during disruption action gracefully', async ({ page, context }) => {
@@ -215,15 +200,14 @@ test.describe('Booking Seam Characterization - User Flows', () => {
     ]);
 
     await page.route(
-      `**/api/bookings/${bookingId}/disruptions/${revisionId}/acknowledge`,
+      `**/api/booking-management/bookings/${bookingId}/disruptions/acknowledge`,
       async (route) => {
         await route.fulfill({
           status: 409,
           contentType: 'application/json',
           body: JSON.stringify({
-            code: 'STALE_DISRUPTION_REVISION',
-            activeRevisionId: 'new-revision-id-456',
-            disruptionStatus: 'DETECTED',
+            error: 'STALE_REVISION',
+            message: 'A newer change exists and must be reviewed.',
           }),
         });
       },
@@ -262,7 +246,7 @@ test.describe('Booking Seam Characterization - User Flows', () => {
       },
     ]);
 
-    await page.route(`**/api/bookings/${bookingId}/cancellation-quote`, async (route) => {
+    await page.route(`**/api/booking-management/bookings/${bookingId}/cancellation-quote`, async (route) => {
       quoteRequested = true;
       await route.fulfill({
         status: 200,
@@ -278,7 +262,7 @@ test.describe('Booking Seam Characterization - User Flows', () => {
       });
     });
 
-    await page.route(`**/api/bookings/${bookingId}/cancel`, async (route) => {
+    await page.route(`**/api/booking-management/bookings/${bookingId}/cancel`, async (route) => {
       cancelRequested = true;
       capturedCancelPayload = route.request().postDataJSON();
       await route.fulfill({
@@ -287,6 +271,9 @@ test.describe('Booking Seam Characterization - User Flows', () => {
         body: JSON.stringify({
           bookingId,
           bookingStatus: 'CANCELLATION_PENDING',
+          refundAmount: '450.00',
+          currency: 'GBP',
+          customerRefundAmount: '450.00',
         }),
       });
     });
@@ -355,7 +342,6 @@ test.describe('Booking Seam Characterization - Static Baseline Metrics', () => {
     let useSessionMatches = 0;
     let accessTokenMatches = 0;
     let nextPublicApiUrlMatches = 0;
-    let directFetchMatches = 0;
 
     for (const { content } of allBookingFiles) {
       const sessionMatches = content.match(/useSession/g);
@@ -366,15 +352,11 @@ test.describe('Booking Seam Characterization - Static Baseline Metrics', () => {
 
       const apiUrlMatches = content.match(/NEXT_PUBLIC_API_URL/g);
       if (apiUrlMatches) nextPublicApiUrlMatches += apiUrlMatches.length;
-
-      const fetchMatches = content.match(/fetch\(/g);
-      if (fetchMatches) directFetchMatches += fetchMatches.length;
     }
 
-    // Baseline assertions for Slice 0 safety rails
-    expect(useSessionMatches).toBe(2);
-    expect(accessTokenMatches).toBe(32);
-    expect(nextPublicApiUrlMatches).toBe(8);
-    expect(directFetchMatches).toBe(8);
+    // Zero-token & zero-public-api-url safety assertion for Slice 5C
+    expect(useSessionMatches).toBe(0);
+    expect(accessTokenMatches).toBe(0);
+    expect(nextPublicApiUrlMatches).toBe(0);
   });
 });

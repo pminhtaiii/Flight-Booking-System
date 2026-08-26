@@ -2,24 +2,12 @@
 
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
-import type { BookingListItemDto, FlightSnapshot } from '@shared/booking-types';
+import type { BookingListView } from '@shared/types/booking-management.types';
 import { BookingCard } from '@/components/bookings/BookingCard';
 
 export type BookingTab = 'upcoming' | 'past';
 
-type BookingListItem = BookingListItemDto & {
-  flightSnapshot?: FlightSnapshot | null;
-};
-
-export type BookingsResponse = {
-  bookings: BookingListItem[];
-  pagination: {
-    page: number;
-    limit: number;
-    total: number;
-    totalPages: number;
-  };
-};
+export type BookingsResponse = BookingListView;
 
 type BookingsListProps = {
   data?: BookingsResponse;

@@ -64,8 +64,11 @@ export const BookingItineraryViewSchema = z
 export const DisruptionAlertViewSchema = z
   .object({
     status: z.string().min(1),
+    activeRevisionId: z.string().min(1).nullable().optional(),
     isMaterial: z.boolean(),
     materialReasons: z.array(z.string().min(1)),
+    incrementalSummary: z.record(z.unknown()).nullable().optional(),
+    cumulativeSummary: z.record(z.unknown()).nullable().optional(),
     stabilizationWarning: z.boolean(),
     resolvedReason: z.string().min(1).nullable().optional(),
     resolvedAt: IsoDateTimeSchema.nullable().optional(),
@@ -84,6 +87,7 @@ export const BookingListItemViewSchema = z
     id: z.string().min(1),
     status: z.string().min(1),
     failureReason: z.string().min(1).nullable().optional(),
+    paymentStatus: z.string().min(1).nullable().optional(),
     pnrReference: z.string().min(1).nullable().optional(),
     totalAmount: MoneyAmountSchema,
     currency: CurrencySchema,
@@ -160,6 +164,8 @@ export const BookingDetailViewSchema = z
     id: z.string().min(1),
     status: z.string().min(1),
     failureReason: z.string().min(1).nullable().optional(),
+    paymentStatus: z.string().min(1).nullable().optional(),
+    offerId: z.string().min(1).nullable().optional(),
     pnrReference: z.string().min(1).nullable().optional(),
     totalAmount: MoneyAmountSchema,
     currency: CurrencySchema,

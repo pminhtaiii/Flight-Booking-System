@@ -2,34 +2,35 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { Clock, ChevronDown, ChevronUp, ChevronLeft, ChevronRight } from 'lucide-react';
-import type { DisruptionHistoryResponseDto, DisruptionHistoryItemDto } from '@shared/disruption-types';
+import type { ItineraryRevisionView } from '@shared/types/booking-management.types';
 import { REASON_LABELS } from './DisruptionAlert';
 
-const apiUrl = process.env.NEXT_PUBLIC_API_URL;
+type RevisionsResponse = {
+  revisions?: ItineraryRevisionView[];
+  items?: ItineraryRevisionView[];
+  totalPages: number;
+  total: number;
+  page: number;
+  limit: number;
+};
 
 type ItineraryRevisionHistoryProps = {
   bookingId: string;
-  accessToken?: string;
 };
 
-export function ItineraryRevisionHistory({ bookingId, accessToken }: ItineraryRevisionHistoryProps) {
-  if (!apiUrl) {
-    throw new Error('NEXT_PUBLIC_API_URL is required but not configured.');
-  }
-  const [data, setData] = useState<DisruptionHistoryResponseDto | null>(null);
+export function ItineraryRevisionHistory({ bookingId }: ItineraryRevisionHistoryProps) {
+  const [data, setData] = useState<RevisionsResponse | null>(null);
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(false);
   const [expandedRevisionId, setExpandedRevisionId] = useState<string | null>(null);
 
   const fetchHistory = useCallback(async () => {
-    if (!accessToken) return;
+    if (!bookingId) return;
     setLoading(true);
     try {
-      const response = await fetch(`${apiUrl}/api/bookings/${bookingId}/disruptions?page=${page}&limit=5`, {
-        headers: { Authorization: `Bearer ${accessToken}` },
-      });
+      const response = await fetch(`/api/booking-management/bookings/${bookingId}/revisions?page=${page}&limit=5`);
       if (response.ok) {
-        const json = await response.json();
+        const json: RevisionsResponse = await response.json();
         setData(json);
       }
     } catch (e) {
@@ -37,7 +38,7 @@ export function ItineraryRevisionHistory({ bookingId, accessToken }: ItineraryRe
     } finally {
       setLoading(false);
     }
-  }, [bookingId, page, accessToken]);
+  }, [bookingId, page]);
 
   useEffect(() => {
     fetchHistory();
@@ -47,7 +48,9 @@ export function ItineraryRevisionHistory({ bookingId, accessToken }: ItineraryRe
     setExpandedRevisionId(prev => (prev === revisionId ? null : revisionId));
   };
 
-  if (!data || data.items.length === 0) {
+  const revisionsList = data?.revisions ?? data?.items ?? [];
+
+  if (!data || revisionsList.length === 0) {
     return null;
   }
 
@@ -59,7 +62,7 @@ export function ItineraryRevisionHistory({ bookingId, accessToken }: ItineraryRe
       </div>
 
       <div className="relative border-l border-card-border pl-6 ml-3 space-y-6">
-        {data.items.map((item: DisruptionHistoryItemDto) => {
+        {revisionsList.map((item: ItineraryRevisionView) => {
           const isExpanded = expandedRevisionId === item.revisionId;
           const observedDate = new Intl.DateTimeFormat('en-GB', {
             day: 'numeric',
@@ -98,7 +101,7 @@ export function ItineraryRevisionHistory({ bookingId, accessToken }: ItineraryRe
                     <p className="text-xs font-semibold text-text-secondary mb-1">Classification Reasons:</p>
                     <ul className="text-xs list-disc pl-4 space-y-1 text-text-secondary">
                       {item.materialReasons.map((reason) => (
-                        <li key={reason}>{REASON_LABELS[reason] || reason}</li>
+                        <li key={reason}>{(REASON_LABELS as Record<string, string>)[reason] || reason}</li>
                       ))}
                     </ul>
                   </div>
@@ -126,7 +129,7 @@ export function ItineraryRevisionHistory({ bookingId, accessToken }: ItineraryRe
                     {item.segments.map((segment, index) => (
                       <div key={index} className="bg-card p-3 rounded-lg border border-card-border text-xs space-y-1.5">
                         <div className="flex justify-between items-center font-semibold text-text-primary">
-                          <span>{segment.airline.name} {segment.flightNumber}</span>
+                          <span>{segment.airline?.name} {segment.flightNumber}</span>
                           {segment.sliceOrder !== undefined && (
                             <span className="text-text-muted font-normal text-[10px] bg-bg-secondary px-1.5 py-0.5 rounded">
                               Slice {segment.sliceOrder + 1}
@@ -134,7 +137,7 @@ export function ItineraryRevisionHistory({ bookingId, accessToken }: ItineraryRe
                           )}
                         </div>
                         <div className="text-text-secondary">
-                          {segment.departureAirport.city} ({segment.departureAirport.iataCode}) to {segment.arrivalAirport.city} ({segment.arrivalAirport.iataCode})
+                          {segment.departureAirport?.city} ({segment.departureAirport?.iataCode}) to {segment.arrivalAirport?.city} ({segment.arrivalAirport?.iataCode})
                         </div>
                         <div className="text-text-muted">
                           Departure: {new Date(segment.departureAt).toLocaleString('en-GB')}
