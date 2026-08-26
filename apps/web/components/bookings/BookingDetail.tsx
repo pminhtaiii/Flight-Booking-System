@@ -135,7 +135,7 @@ export function BookingDetail({ booking: initialBooking }: BookingDetailProps) {
 
   const handleDisruptionAction = async (action: 'acknowledge' | 'accept') => {
     if (!booking) return;
-    const activeRevisionId = booking.itinerary?.revisionId || (booking.disruption as any)?.activeRevisionId;
+    const activeRevisionId = booking.disruption?.activeRevisionId || booking.itinerary?.revisionId;
     if (!activeRevisionId) return;
 
     setLoadingAction(true);
@@ -185,8 +185,8 @@ export function BookingDetail({ booking: initialBooking }: BookingDetailProps) {
       <BookingFailureState
         failureReason={booking.failureReason as any}
         flightSnapshot={booking.itinerary as any}
-        paymentStatus={(booking as any).payment?.status ?? (booking as any).paymentStatus}
-        offerId={(booking as any).bookingIntent?.offerId}
+        paymentStatus={booking.paymentStatus ?? undefined}
+        offerId={booking.offerId ?? undefined}
       />
     );
   }

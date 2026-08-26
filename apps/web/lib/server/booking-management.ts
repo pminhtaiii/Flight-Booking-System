@@ -725,8 +725,23 @@ function mapDisruptionAlert(raw: unknown): DisruptionAlertView | undefined {
 
   const result: DisruptionAlertView = {
     status,
+    ...(typeof d.activeRevisionId === 'string' && d.activeRevisionId.length > 0
+      ? { activeRevisionId: d.activeRevisionId }
+      : d.activeRevisionId === null
+      ? { activeRevisionId: null }
+      : {}),
     isMaterial: Boolean(d.isMaterial),
     materialReasons: Array.isArray(d.materialReasons) ? d.materialReasons.map(String) : [],
+    ...(d.incrementalSummary && typeof d.incrementalSummary === 'object'
+      ? { incrementalSummary: d.incrementalSummary as Record<string, unknown> }
+      : d.incrementalSummary === null
+      ? { incrementalSummary: null }
+      : {}),
+    ...(d.cumulativeSummary && typeof d.cumulativeSummary === 'object'
+      ? { cumulativeSummary: d.cumulativeSummary as Record<string, unknown> }
+      : d.cumulativeSummary === null
+      ? { cumulativeSummary: null }
+      : {}),
     stabilizationWarning: Boolean(d.stabilizationWarning),
     ...(d.resolvedReason !== undefined ? { resolvedReason: d.resolvedReason != null ? String(d.resolvedReason) : null } : {}),
     ...(d.resolvedAt !== undefined ? { resolvedAt: typeof d.resolvedAt === 'string' ? d.resolvedAt : null } : {}),
@@ -798,10 +813,18 @@ function mapListItem(raw: unknown): BookingListItemView {
 
   const disruption = mapDisruptionAlert(item.disruption);
 
+  const paymentStatus =
+    typeof (item.payment as { status?: unknown } | undefined)?.status === 'string'
+      ? (item.payment as { status: string }).status
+      : typeof item.paymentStatus === 'string'
+      ? item.paymentStatus
+      : undefined;
+
   const result: BookingListItemView = {
     id: String(item.id ?? ''),
     status: String(item.status ?? ''),
     ...(item.failureReason !== undefined ? { failureReason: item.failureReason != null ? String(item.failureReason) : null } : {}),
+    ...(paymentStatus !== undefined ? { paymentStatus: paymentStatus != null ? String(paymentStatus) : null } : {}),
     ...(item.pnrReference !== undefined ? { pnrReference: item.pnrReference != null ? String(item.pnrReference) : null } : {}),
     totalAmount: formatMoneyAmount(item.totalAmount),
     currency: String(item.currency ?? 'USD'),
@@ -986,10 +1009,26 @@ function mapDetail(item: Record<string, unknown>): BookingDetailView {
     };
   }
 
+  const paymentStatus =
+    typeof (item.payment as { status?: unknown } | undefined)?.status === 'string'
+      ? (item.payment as { status: string }).status
+      : typeof item.paymentStatus === 'string'
+      ? item.paymentStatus
+      : undefined;
+
+  const offerId =
+    typeof (item.bookingIntent as { offerId?: unknown } | undefined)?.offerId === 'string'
+      ? (item.bookingIntent as { offerId: string }).offerId
+      : typeof item.offerId === 'string'
+      ? item.offerId
+      : undefined;
+
   const result: BookingDetailView = {
     id: String(item.id ?? ''),
     status: String(item.status ?? ''),
     ...(item.failureReason !== undefined ? { failureReason: item.failureReason != null ? String(item.failureReason) : null } : {}),
+    ...(paymentStatus !== undefined ? { paymentStatus: paymentStatus != null ? String(paymentStatus) : null } : {}),
+    ...(offerId !== undefined ? { offerId: offerId != null ? String(offerId) : null } : {}),
     ...(item.pnrReference !== undefined ? { pnrReference: item.pnrReference != null ? String(item.pnrReference) : null } : {}),
     totalAmount: formatMoneyAmount(item.totalAmount),
     currency: String(item.currency ?? 'USD'),

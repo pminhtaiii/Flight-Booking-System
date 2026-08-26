@@ -353,6 +353,8 @@ describe('booking-management server domain module', () => {
       if (outcome.ok) {
         assert.strictEqual(outcome.data.id, 'booking-uuid-001');
         assert.strictEqual(outcome.data.status, 'CONFIRMED');
+        assert.strictEqual(outcome.data.paymentStatus, 'SUCCEEDED');
+        assert.strictEqual(outcome.data.offerId, 'off_secret_duffel_789');
         assert.strictEqual(outcome.data.pnrReference, 'PNR123');
         assert.strictEqual(outcome.data.totalAmount, '499.00');
         assert.strictEqual(outcome.data.currency, 'USD');
@@ -370,11 +372,45 @@ describe('booking-management server domain module', () => {
       // Verify no provider secrets leaked
       const serialized = JSON.stringify(outcome);
       assert.strictEqual(serialized.includes('ord_secret'), false);
+      assert.strictEqual(serialized.includes('duffelOrderId'), false);
       assert.strictEqual(serialized.includes('pi_secret'), false);
       assert.strictEqual(serialized.includes('cquo_secret'), false);
-      assert.strictEqual(serialized.includes('off_secret'), false);
       assert.strictEqual(serialized.includes('passportNumber'), false);
       assert.strictEqual(serialized.includes('stripePaymentIntentId'), false);
+    });
+
+    it('preserves disruption activeRevisionId and diff summaries for browser review', async () => {
+      globalThis.fetch = async (): Promise<Response> => {
+        return new Response(
+          JSON.stringify({
+            ...mockUpstreamBookingDetail,
+            disruption: {
+              status: 'DETECTED',
+              activeRevisionId: 'rev-uuid-789',
+              isMaterial: true,
+              materialReasons: ['DEPARTURE_MOVED_LATER'],
+              incrementalSummary: { isRoutingChanged: false, sliceSummaries: [] },
+              cumulativeSummary: { isRoutingChanged: false, sliceSummaries: [] },
+              stabilizationWarning: true,
+              resolvedReason: null,
+              resolvedAt: null,
+            },
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } },
+        );
+      };
+
+      const outcome = await getBookingDetail('booking-uuid-001');
+
+      assert.strictEqual(outcome.ok, true);
+      if (outcome.ok) {
+        assert.strictEqual(outcome.data.disruption?.status, 'DETECTED');
+        assert.strictEqual(outcome.data.disruption?.activeRevisionId, 'rev-uuid-789');
+        assert.strictEqual(outcome.data.disruption?.isMaterial, true);
+        assert.strictEqual(outcome.data.disruption?.stabilizationWarning, true);
+        assert.deepEqual(outcome.data.disruption?.incrementalSummary, { isRoutingChanged: false, sliceSummaries: [] });
+        assert.deepEqual(outcome.data.disruption?.cumulativeSummary, { isRoutingChanged: false, sliceSummaries: [] });
+      }
     });
 
     it('returns NOT_FOUND on 404 upstream', async () => {
