@@ -120,19 +120,47 @@ All mutations execute atomically inside Redis through three purpose-built Lua sc
 ### 5.2 Rollback Procedure
 If snapshot persistence causes conversational deadlocks or Redis CAS errors:
 1. Roll back the Python agent container deployment to the release prior to `00961da`.
-2. **Targeted Session Cleanup (Preserving Version Fencing & Healthy Sessions)**:
-   - **DO NOT** execute repository-wide pattern deletions (e.g., never run `redis-cli --scan --pattern "chat:snapshot:*" | xargs del`). Global deletion evicts active snapshots across all healthy user sessions and wipes out critical CAS version fencing tombstones.
-   - If a specific session experiences payload corruption or deadlock, perform targeted cleanup for ONLY that affected session:
+2. **Targeted Session Cleanup with Version Fencing (Preventing In-Flight Payload Recreation)**:
+   - **DO NOT** execute repository-wide pattern deletions (e.g., never run `redis-cli --scan --pattern "chat:snapshot:*" | xargs del`). Global deletion evicts active snapshots across all healthy user sessions and destroys version fencing tombstones.
+   - **Invalidate Outstanding Reserved Version**: Simply deleting the payload key without advancing the accepted version allows an in-flight search that holds an already-reserved version (`issued_key`) to pass CAS in `_REPLACE_SNAPSHOT_LUA` and recreate the corrupted/deleted payload upon completion.
+   - To prevent this, the rollback procedure MUST atomically advance `chat:snapshot:{userId}:{chatSessionId}:accepted` to at least the current `issued_version` (`chat:snapshot:{userId}:{chatSessionId}:version`) before or atomically with deleting the payload:
      ```bash
-     # 1. Target and delete ONLY the primary payload key for the affected session:
-     redis-cli DEL "chat:snapshot:{userId}:{chatSessionId}"
+     # Execute atomic cleanup & tombstone invalidation using the production Lua script (_DELETE_SNAPSHOT_LUA):
+     redis-cli EVAL "
+       local snapshot_key = KEYS[1]
+       local issued_key = KEYS[2]
+       local accepted_key = KEYS[3]
+       local s_json = redis.call('GET', snapshot_key)
+       local s_v = 0
+       local tombstone_ttl = 3600
+       if s_json then
+         local ok, s = pcall(cjson.decode, s_json)
+         if ok and type(s) == 'table' and type(s.snapshotVersion) == 'number' then
+           s_v = s.snapshotVersion
+           local s_ttl = redis.call('TTL', snapshot_key)
+           if s_ttl > 0 then tombstone_ttl = s_ttl end
+         end
+       end
+       local i_v = tonumber(redis.call('GET', issued_key) or 0)
+       local a_v = tonumber(redis.call('GET', accepted_key) or 0)
+       local invalidated_version = math.max(s_v, i_v, a_v)
+       if invalidated_version > 0 then
+         redis.call('SET', accepted_key, invalidated_version, 'EX', tombstone_ttl)
+       end
+       redis.call('DEL', snapshot_key)
+       return 1
+     " 3 "chat:snapshot:{userId}:{chatSessionId}" "chat:snapshot:{userId}:{chatSessionId}:version" "chat:snapshot:{userId}:{chatSessionId}:accepted"
      ```
-   - **Preserve Version & Accepted Fencing Keys**:
-     - DO NOT delete `chat:snapshot:{userId}:{chatSessionId}:version` or `chat:snapshot:{userId}:{chatSessionId}:accepted`.
-     - Keeping the `:accepted` fence key preserves the tombstone boundary so that any delayed, in-flight async search worker cannot resurrect or overwrite the session with stale data.
-   - Healthy user sessions and unrelated chat conversations remain completely untouched and operational.
+   - Alternatively, trigger the repository's native atomic deletion:
+     ```powershell
+     python -c "import asyncio, redis.asyncio as redis; from agent.trusted_search_snapshot.repository import TrustedSnapshotRepository; from agent.trusted_search_snapshot.models import SnapshotOwner; r = redis.from_url('redis://localhost:6379'); repo = TrustedSnapshotRepository(r); asyncio.run(repo.delete(SnapshotOwner(user_id='{userId}', chat_session_id='{chatSessionId}')))"
+     ```
+   - **Tombstone & Monotonic Fencing Guarantees**:
+     - Advancing the accepted version tombstone guarantees that any in-flight search task that was already processing will fail CAS (`incoming_version <= effective_accepted_version`) upon return, strictly preventing it from recreating the deleted payload.
+     - Subsequent fresh searches allocate `next_version = math.max(snapshot, issued, accepted) + 1`, ensuring new valid searches immediately receive a strictly higher monotonic version that can commit successfully.
+     - All healthy, unrelated user sessions remain completely untouched and operational.
 3. **Graceful User Impact for Affected Session**:
-   Deleting the payload key prompts the affected user on their next turn: *"Flight offer expired. Please search again."* No financial, booking, or account data is lost.
+   Deleting the payload key and fencing the accepted version prompts the affected user on their next turn: *"Flight offer expired. Please search again."* No financial, booking, or account data is lost.
 4. Run agent test suite against target deployment to verify stability.
 
 ---

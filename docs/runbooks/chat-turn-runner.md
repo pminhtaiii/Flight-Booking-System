@@ -138,21 +138,21 @@ During container SIGTERM / shutdown (`agent.main:lifespan`):
 
 ### 5.2 Rollback Procedure
 If the runner causes deadlocks, stream hangs, or session lock exhaustion:
-1. Revert the Python agent container deployment to the release preceding `fb0e88b`.
-2. **Session-Scoped Cleanup & Fencing Preservation**:
-   - **DO NOT** execute global pattern deletions (e.g., never delete `chat:session-lock:*` or fence counters globally). Global key deletion destroys monotonic fencing state and risks split-brain writes from stale runners.
-   - For active sessions, allow the Redis lock TTL (`SESSION_LOCK_TTL_MS = 30000`, 30 seconds) to expire naturally.
-   - If a specific session is wedged, inspect and clean up ONLY that specific session lock while strictly preserving the fencing counter:
-     ```bash
-     # 1. Check specific session lock status
-     redis-cli GET "chat:session-lock:<sessionId>"
-
-     # 2. Release ONLY the specific session lock if verified stuck (do NOT delete fence keys)
-     redis-cli DEL "chat:session-lock:<sessionId>"
-     ```
-   - Retain all fencing tokens (`chat:session-lock:<sessionId>:fence` or monotonic fence counters) so that any lingering or restarted legacy runner with an older fencing token is strictly rejected by the NestJS persistence guard (`AgentChatController`).
-3. Restart agent instances to re-initialize clean queue managers.
-4. Verify `/health` endpoint reports `status: "ok"` and Redis connectivity is healthy.
+1. **Stop & Invalidate Old Runner Processes First**:
+   - A still-running runner must never lose its lease while it can continue executing, as that would enable split-brain concurrent execution.
+   - Gracefully drain and terminate the running Python agent container instances (`SIGTERM` triggers `agent.main:lifespan`, giving active tasks up to `SHUTDOWN_TIMEOUT_SECONDS = 5.0s` to execute causal cleanup and release their leases).
+   - If any runner process is unresponsive or hung on external I/O, force-kill the container process (`SIGKILL`) to guarantee that the old execution thread is completely stopped before any rollback proceeds.
+2. **Revert Deployment**:
+   - Revert the Python agent container deployment to the stable release preceding `fb0e88b`.
+3. **Lease Natural Expiry & Fencing Preservation (No Manual DEL)**:
+   - **DO NOT manually DEL active session leases** (`chat:session-lock:{userId}:{sessionId}`).
+   - Because the old runner process is confirmed stopped, the background heartbeat refresh task has halted. Any outstanding session lease in Redis will drain and expire naturally within its bounded TTL window (`SESSION_LOCK_TTL_MS = 10000` to `30000`, maximum 30 seconds).
+   - Wait 30 seconds for all pending lock TTLs to expire naturally before routing traffic to the rollback containers.
+   - **Strictly Preserve Fencing Counters**: Never delete or reset monotonic fence keys (`chat:session-lock:fence:{userId}:{sessionId}`). Preserving the fence counter ensures that any restarted or delayed legacy runner with an older fencing token is strictly rejected by both `MessageQueueManager` and the NestJS persistence guard (`AgentChatController`).
+4. **Restart & Validate**:
+   - Start the rolled-back agent release.
+   - Verify `/health` endpoint reports `status: "ok"` and Redis connectivity is healthy.
+   - Verify new sessions acquire locks with incremented monotonic fences (`fence > prior_fence`).
 
 ---
 
