@@ -8,8 +8,8 @@ Update this file after every completed feature. Any AI agent reading this should
 
 **Feature:** Deepen Codebase Architecture (Feature 019) — COMPLETE (100%)
 **Last completed:** Phase 9: Polish, Cross-Cutting Verification, and System Completion (2026-08-26).
-**In progress:** None.
-**Next:** Production Deployment / Feature 020.
+**In progress:** CI/CD Pipeline Enhancement — Smoke & Sanity Test Suite (design decisions captured, implementation pending).
+**Next:** Implement smoke & sanity tests per `docs/adr/research-cicd-smoke-sanity-decisions.md`, then Dockerfiles + SAST/DAST scanning.
 
 ---
 

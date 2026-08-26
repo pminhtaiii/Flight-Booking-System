@@ -823,6 +823,22 @@ The repository uses a single GitHub Actions pull request CI workflow at `.github
 - **Correctness vs. Performance**: Blocking API E2E runs exclude `[.-]performance.e2e-spec.ts` wall-clock benchmarks, which remain available through the opt-in `test:e2e:performance` command for controlled benchmark environments.
 - **Status Evaluation**: The terminal `ci-status` job runs `evaluate-ci-status.mjs` with `always()`, verifying that all relevant service jobs succeeded, irrelevant jobs were safely skipped, and detection ran cleanly. Branch protection requires only `ci-status`.
 
+### Smoke & Sanity Test Suite (Planned)
+
+A whole-stack smoke and sanity test suite will be added as a single `smoke-and-sanity` CI job that runs after all upstream gate, test, and build jobs pass. The suite uses `node:test` + built-in `fetch` for framework-agnostic black-box HTTP assertions against a full running stack. Tests live under `tests/smoke/` (separate from `tests/ci/` infrastructure and service-specific test directories).
+
+- **Stack Boot**: Docker Compose for Postgres + Redis (existing `docker-compose.yml`), application services (NestJS, Next.js, FastAPI Agent) as background processes. No Dockerfiles required. A `wait-for-ready.mjs` helper polls all service health endpoints concurrently with a 120-second overall timeout and per-service diagnostic output.
+- **Smoke Tests** (8 checks, <15s): Health endpoints for all 3 services, DB/Redis connectivity via NestJS health, frontend→API SSR communication, API→Agent service auth handshake (no LLM), and auth register→login→JWT round-trip. If smoke fails, sanity tests are skipped.
+- **Sanity Tests** (3 cross-service flows, <60s, happy path only):
+  1. **Flight Search**: Auth → search with mocked Duffel → verify response shape. Cache verification is a separate sanity test.
+  2. **Booking Lifecycle**: Profile → readiness → intent → payment (mocked Stripe) → PNR (mocked Duffel) → verify `CONFIRMED` status.
+  3. **Agent Gateway**: Direct agent health, API→Agent service auth, mocked agent responses (no LLM), negative auth tests (401/403).
+- **Mock Server**: Standalone `node:http` server under `tests/smoke/mocks/` serving canned Duffel and Stripe responses. Validates incoming request fields, fails on unknown routes (404), logs all requests with timestamps for CI diagnostics, and routes on method + pathname. Configurable via `DUFFEL_API_URL` / `STRIPE_API_URL` environment variables — zero production code changes. Network guards remain active as defense-in-depth.
+- **Test Data Isolation**: Fresh ephemeral Postgres database per CI run (service container destroyed on job completion). Local runs use a dedicated `smoke_test` database with drop-and-recreate.
+- **Trigger**: PRs to `development` only. Post-deployment smoke tests deferred until CD pipeline exists.
+- **Reporting**: `node --test --test-reporter=spec` for human-readable output in GitHub Actions logs.
+- **Grilling Decisions**: Full design rationale documented in `docs/adr/research-cicd-smoke-sanity-decisions.md`.
+
 ---
 
 ## Feature 019 — Architecture Deepening & Safety Rails
