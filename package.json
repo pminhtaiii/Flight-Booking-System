@@ -16,7 +16,8 @@
     "dev": "pnpm --parallel dev",
     "test": "pnpm --recursive test",
     "lint": "eslint \"{apps,packages}/**/*.{ts,tsx}\" --max-warnings 0",
-    "format": "prettier --write \"**/*.{ts,tsx,json,md,yaml,yml}\""
+    "format": "prettier --write \"**/*.{ts,tsx,json,md,yaml,yml}\"",
+    "test:smoke:units": "node --test tests/smoke/wait-for-ready.unit.test.mjs tests/smoke/mock-server.unit.test.mjs tests/smoke/test-utils.unit.test.mjs"
   },
   "devDependencies": {
     "@typescript-eslint/eslint-plugin": "^7.11.0",
