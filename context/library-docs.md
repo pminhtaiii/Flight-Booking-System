@@ -632,15 +632,18 @@ export function FlightSearchForm({ flights }: Props) {
 ## Python Redis (redis.asyncio)
 
 ### Client Lifecycle
+
 - Create one `redis.asyncio.Redis` pooled client during FastAPI lifespan and close it on shutdown.
 - Redis is the agent control plane, not conversation storage.
 - Redis unavailability fails closed before inference. Health reports Redis separately.
 
 ### Allowed Data
+
 - No message text, prompt, booking passenger data, token, or payment data is stored in Redis.
 - Only counters, locks, and explicitly PII-free Trusted Search Snapshots are permitted.
 
 ### Approved Use Cases
+
 1. **Budget/Quota Admission**:
    - Keys: `chat:budget:{userId}:{YYYY-MM-DD}` and `chat:burst:{userId}:{window}`
    - One versioned Lua admission script increments both only when both admit, uses next-UTC-boundary expiry, and never charges denied attempts.
@@ -656,19 +659,22 @@ export function FlightSearchForm({ flights }: Props) {
 ## Python LangGraph
 
 ### Graph Architecture
+
 - The compiled LangGraph remains a single graph containing all agent nodes, but without an interrupt-capable checkpointer (no `MemorySaver`).
 - One graph execution per turn. Durable context is restored at entry from NestJS (decrypted summary/messages) and Redis (snapshot).
 - After execution, the encrypted completed turn is persisted via the service-authenticated gateway.
 - LangGraph is a direct dependency, not just transitive through LangChain.
 
 ### Routing and Agents
+
 - **Stateless Router**: Uses strict Pydantic structured output. No tools, never writes conversational text. A deterministic route function applies configured thresholds.
 - **Explicit Registries**: Tool inventories are constructed per agent, not filtered at runtime.
-  - *General*: no tools
-  - *Travel*: `search_flights`, `get_user_preferences`, `list_user_booking_summaries`, `get_booking_detail`, `check_booking_readiness`
-  - *Checkout*: `signal_checkout_intent` (state-only, no I/O)
+  - _General_: no tools
+  - _Travel_: `search_flights`, `get_user_preferences`, `list_user_booking_summaries`, `get_booking_detail`, `check_booking_readiness`
+  - _Checkout_: `signal_checkout_intent` (state-only, no I/O)
 
 ### Deterministic Nodes
+
 - Graph nodes that interact with token issuance or intent lifecycle are deterministic application I/O and must never be exposed as LLM tools.
 - Validation and handoff creation happen in strict graph nodes, never directly in LLM responses.
 
@@ -743,6 +749,7 @@ sse_data = event_instance.model_dump_json(exclude_none=True)
 ```
 
 **Rules:**
+
 - Every payload model, envelope model, and snapshot domain model MUST specify `model_config = ConfigDict(extra="forbid")`.
 - Passing unrecognized keys throws `pydantic.ValidationError` immediately (fail-closed).
 - Never use `extra="allow"` or `extra="ignore"` on agent wire protocols.
@@ -830,9 +837,9 @@ export type BookingManagementOutcome<T> =
 ```
 
 **Rules:**
+
 - All object schemas defining browser or wire views MUST chain `.strict()` to prevent property smuggling or unintended payload forwarding.
 - Monetary values MUST be formatted as decimal strings (`/^\d+(\.\d{1,2})?$/`), never JavaScript `number`, to eliminate floating-point precision issues.
 - Datetime strings MUST enforce ISO 8601 offset strings via `z.string().datetime({ offset: true })`.
 - Types must NEVER be declared as independent interfaces and then separately cast; use `z.infer<typeof Schema>` exclusively.
 - Upstream NestJS responses in `apps/web/lib/server/` must be validated with `Schema.safeParse(await response.json())` before returning outcomes.
-

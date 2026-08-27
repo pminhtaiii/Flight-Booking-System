@@ -64,13 +64,13 @@
 
 ### Tests and implementation for User Story 1
 
-- [ ] T021 [US1] Add failing API health response and separate Postgres/Redis dependency assertions in `tests/smoke/smoke.test.mjs`
-- [ ] T022 [US1] Add failing Next homepage 200/expected-HTML and Agent direct-health reachability assertions in `tests/smoke/smoke.test.mjs`
-- [ ] T023 [US1] Add failing Web `/health/upstream` and API `/api/health/agent` cross-service assertions in `tests/smoke/smoke.test.mjs`
-- [ ] T024 [US1] Add failing register → login → bearer `/api/auth/me` identity round-trip with a unique valid credential in `tests/smoke/smoke.test.mjs`
-- [ ] T025 [US1] Add a suite-level 15-second execution budget and secret/PII-safe assertion diagnostics in `tests/smoke/smoke.test.mjs`
-- [ ] T026 [US1] Run the eight checks against a manually started local stack and fix only public-contract or fixture gaps in `tests/smoke/smoke.test.mjs`
-- [ ] T027 [US1] Document the standalone smoke command, eight-check mapping, expected timing, and failure interpretation in `tests/smoke/README.md`
+- [x] T021 [US1] Add failing API health response and separate Postgres/Redis dependency assertions in `tests/smoke/smoke.test.mjs`
+- [x] T022 [US1] Add failing Next homepage 200/expected-HTML and Agent direct-health reachability assertions in `tests/smoke/smoke.test.mjs`
+- [x] T023 [US1] Add failing Web `/health/upstream` and API `/api/health/agent` cross-service assertions in `tests/smoke/smoke.test.mjs`
+- [x] T024 [US1] Add failing register → login → bearer `/api/auth/me` identity round-trip with a unique valid credential in `tests/smoke/smoke.test.mjs`
+- [x] T025 [US1] Add a suite-level 15-second execution budget and secret/PII-safe assertion diagnostics in `tests/smoke/smoke.test.mjs`
+- [x] T026 [US1] Run the eight checks against a manually started local stack and fix only public-contract or fixture gaps in `tests/smoke/smoke.test.mjs`
+- [x] T027 [US1] Document the standalone smoke command, eight-check mapping, expected timing, and failure interpretation in `tests/smoke/README.md`
 
 **Checkpoint**: The smoke suite is a complete independently runnable MVP. Do not begin sanity work until it is green.
 

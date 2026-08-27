@@ -877,6 +877,7 @@ A whole-stack smoke and sanity test suite will be added as a single `smoke-and-s
 - Scoped characterization and static privacy audits verify zero `useSession`, zero `accessToken`, and zero `NEXT_PUBLIC_API_URL` leakage across all 13 booking management files.
 
 Feature 019 restructures high-leverage boundaries without changing public product behavior:
+
 - **Slice 0 (Baseline Characterization & Safety Rails)**:
   - Establishes immutable automated characterization suites across `apps/api/test/characterization/`, `apps/agent/tests/characterization/`, and `apps/web/tests/characterization/` with 0 production business logic modifications.
   - Characterizes all 4 refund triggers (Inline, Webhook, Sweeper Cron, Admin Manual) to prove identical outcomes, status transitions, and balanced double-entry ledger records.

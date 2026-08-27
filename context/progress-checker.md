@@ -6,14 +6,40 @@ Update this file after every completed feature. Any AI agent reading this should
 
 ### Current Status
 
-**Feature:** Whole-Stack Smoke and Sanity CI (Feature 020) — Phase 2: Foundational Contracts and Test Seams (T005–T020) COMPLETE
-**Last completed:** Phase 2 / Slice 3: Dependency-Free Harness Utilities (T015–T020) (2026-08-27).
-**In progress:** Phase 3: User Story 1 - Gate Pull Requests on Whole-Stack Readiness (T021–T027).
-**Next:** Implement 8 whole-stack smoke checks in `tests/smoke/smoke.test.mjs` (T021–T027).
+**Feature:** Whole-Stack Smoke and Sanity CI (Feature 020) — Phase 3: User Story 1 - Whole-Stack Readiness Gate (T021–T027) COMPLETE
+**Last completed:** Phase 3: Whole-Stack Readiness Smoke Gate (T021–T027) (2026-08-27).
+**In progress:** Phase 4: User Story 2 - Validate Key Deterministic Business Flows (T028–T041).
+**Next:** Phase 4: Deterministic business sanity flows (search/cache, confirmed booking happy-path, agent communication/auth).
 
 ---
 
 ## Progress by Feature
+
+### [x] Feature: Whole-Stack Smoke and Sanity CI (Feature 020) — Phase 3: User Story 1 - Whole-Stack Readiness Gate
+
+- [x] Phase 3: Whole-Stack Smoke Gate (T021–T027) (2026-08-27):
+  - **T021–T024: 8 Named Whole-Stack Readiness Checks (`tests/smoke/smoke.test.mjs`)**:
+    - Created `tests/smoke/smoke.test.mjs` with zero external dependencies, importing only Node built-ins (`node:test`, `node:assert/strict`, `fetch`) and local helper `tests/smoke/helpers/test-utils.mjs`.
+    - Configured loopback URLs with default fallback precedence: `SMOKE_API_URL` (default `http://127.0.0.1:3001/api`), `SMOKE_WEB_URL` (default `http://127.0.0.1:3000`), `SMOKE_AGENT_URL` (default `http://127.0.0.1:3002`).
+    - Implemented Check 1: 'API health and dependency shape' (`GET ${API_BASE}/health` -> 200, status `ok`, dependencies object with `database` and `redis`).
+    - Implemented Check 2: 'Next.js homepage HTML' (`GET ${WEB_BASE}/` -> 200, html contains `wayfinder` or `landing-title`).
+    - Implemented Check 3: 'Agent health HTTP reachability' (`GET ${AGENT_BASE}/health` -> 200, status `ok` or `degraded`).
+    - Implemented Check 4: 'PostgreSQL readiness' (derived from `GET ${API_BASE}/health` -> `dependencies.database === 'up'`).
+    - Implemented Check 5: 'Redis readiness' (derived from `GET ${API_BASE}/health` -> `dependencies.redis === 'up'`).
+    - Implemented Check 6: 'Web upstream reachability' (`GET ${WEB_BASE}/health/upstream` -> 200, body `{ status: 'ok', upstream: 'up' }`).
+    - Implemented Check 7: 'API-to-Agent reachability' (`GET ${API_BASE}/health/agent` -> 200, status `ok`).
+    - Implemented Check 8: 'Authentication round-trip' (unique actor generation via `createUniqueTestActor`, `POST /auth/register` returning 201 with token/id/email, `POST /auth/login` returning 200 with token/id/email, authenticated `GET /auth/me` with Bearer header via `authBearer` returning matching id/email).
+  - **T025: 15-Second Budget & Zero Token/PII Leakage Negative Privacy**:
+    - Enforced 15-second suite and check budget (`SUITE_TIMEOUT_MS = 15000`) with test/suite timeout configuration, duration tracking, and assertion guards. Emitted per-check and suite elapsed timing diagnostics via `t.diagnostic(...)`.
+    - Wrapped check execution in safe runner that sanitizes `err.message` and `err.stack` via `redactSensitive`, guaranteeing zero token, password, credential, or PII leakage across assertion failures.
+  - **T026: Local Stack Validation & Contract Hardening**:
+    - Verified all 8 checks against simulated harness endpoints in `tests/smoke/smoke-simulation.test.mjs` (all 8 checks passed in 489ms, verified failure on PostgreSQL down, verified failure on missing homepage marker, and verified negative privacy with zero leakage of passwords and secrets).
+    - Verified against unstarted stack via `node --test tests/smoke/smoke.test.mjs` confirming RED failure (0/8 passed, 8/8 failed with ECONNREFUSED with safe diagnostics and zero token/password leakage).
+    - Verified full monorepo production build via `pnpm build` cleanly succeeds.
+  - **T027: Documentation & Script Registration**:
+    - Registered `"test:smoke": "node --test --test-reporter=spec tests/smoke/smoke.test.mjs"` in root `package.json`.
+    - Updated `tests/smoke/README.md` with standalone smoke command, exact 8-check mapping table, execution timing budget (<15s), diagnostic log inspection, and troubleshooting guide.
+    - Updated `specs/020-smoke-sanity-tests/tasks.md` marking T021–T027 complete.
 
 ### [x] Feature: Whole-Stack Smoke and Sanity CI (Feature 020) — Phase 2: Foundational Contracts and Test Seams
 

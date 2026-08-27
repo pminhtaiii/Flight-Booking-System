@@ -179,16 +179,52 @@ All probes are executed concurrently every 2000 ms with a single shared 120000 m
 | **API $\to$ Agent** | `GET /api/health/agent` | HTTP 200                                                                  | Verifies NestJS can reach Agent lightweight no-LLM liveness endpoint. Failure indicates `AGENT_SERVICE_URL` misconfigured or Agent down.                                     |
 | **Mock Server**     | `GET /__mock/health`    | HTTP 200                                                                  | Verifies local Duffel/Stripe mock HTTP server is listening on loopback. Failure indicates mock failed to bind port.                                                          |
 
-### Smoke Suite Checks (8 Total)
+### Smoke Suite Execution & 8-Check Mapping
 
-1. `API health and dependency shape` (`GET /api/health` returns `ok`)
-2. `Next.js homepage HTML` (`GET /` returns 200 with landing marker)
-3. `Agent health HTTP reachability` (`GET /health` returns 200)
-4. `PostgreSQL readiness` (derived via `dependencies.database === 'up'`)
-5. `Redis readiness` (derived via `dependencies.redis === 'up'`)
-6. `Web upstream reachability` (`GET /health/upstream` returns 200)
-7. `API-to-Agent reachability` (`GET /api/health/agent` returns 200)
-8. `Authentication round-trip` (`POST /api/auth/register` $\to$ `POST /api/auth/login` $\to$ `GET /api/auth/me` with Bearer token)
+The whole-stack smoke suite executes shallow, black-box verification across the running stack without third-party dependencies, internal application imports, or LLM inference.
+
+#### Standalone Execution Command
+
+```bash
+# Run standalone smoke suite with spec reporter
+pnpm test:smoke
+
+# Equivalent underlying Node.js test command
+node --test --test-reporter=spec tests/smoke/smoke.test.mjs
+```
+
+#### Execution Timing Budget
+
+- **Budget**: `< 15 seconds` across the entire suite.
+- **Enforcement**: Suite-level timeout (`SUITE_TIMEOUT_MS = 15000`) and individual check timeouts. Elapsed duration is measured and asserted after each check and across the entire suite.
+- **Diagnostics**: Each check emits diagnostic timing via `t.diagnostic('[smoke] <check> finished in <ms> (suite elapsed: <ms>)')`.
+- **Negative Privacy Guarantee**: All check errors are passed through `redactSensitive` before surfacing in reports, ensuring zero tokens, passwords, secrets, or PII can leak into logs.
+
+#### Eight Named Smoke Checks
+
+| #     | Check Name                        | Target Endpoint                                                                                 | HTTP Method               | Expected Success Contract                                                                                                                      | System Boundary Under Test                                                                      |
+| ----- | --------------------------------- | ----------------------------------------------------------------------------------------------- | ------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
+| **1** | `API health and dependency shape` | `${SMOKE_API_URL}/health`                                                                       | `GET`                     | HTTP 200, `status === 'ok'`, `dependencies` object containing `database` and `redis` keys                                                      | NestJS API container & dependency health aggregator                                             |
+| **2** | `Next.js homepage HTML`           | `${SMOKE_WEB_URL}/`                                                                             | `GET`                     | HTTP 200, HTML body contains landing marker (`wayfinder` or `landing-title`)                                                                   | Next.js Web App Router server-side compilation and rendering                                    |
+| **3** | `Agent health HTTP reachability`  | `${SMOKE_AGENT_URL}/health`                                                                     | `GET`                     | HTTP 200, `status === 'ok'` or `status === 'degraded'` (reachability only, no LLM required)                                                    | FastAPI Python Agent HTTP service reachability                                                  |
+| **4** | `PostgreSQL readiness`            | `${SMOKE_API_URL}/health`                                                                       | `GET`                     | Derived from API health: `dependencies.database === 'up'`                                                                                      | NestJS Prisma connection pool & PostgreSQL container query readiness                            |
+| **5** | `Redis readiness`                 | `${SMOKE_API_URL}/health`                                                                       | `GET`                     | Derived from API health: `dependencies.redis === 'up'`                                                                                         | NestJS CacheService ping & Redis container reachability                                         |
+| **6** | `Web upstream reachability`       | `${SMOKE_WEB_URL}/health/upstream`                                                              | `GET`                     | HTTP 200, `{ "status": "ok", "upstream": "up" }`                                                                                               | Next.js server-side to NestJS API upstream connectivity via private `API_URL`                   |
+| **7** | `API-to-Agent reachability`       | `${SMOKE_API_URL}/health/agent`                                                                 | `GET`                     | HTTP 200, `{ "status": "ok" }`                                                                                                                 | NestJS AgentHealthService to FastAPI Agent lightweight no-LLM `/health/live` probe              |
+| **8** | `Authentication round-trip`       | `${SMOKE_API_URL}/auth/register`<br>`${SMOKE_API_URL}/auth/login`<br>`${SMOKE_API_URL}/auth/me` | `POST`<br>`POST`<br>`GET` | Register returns 201 with JWT and unique user; Login returns 200 with JWT; Authenticated `GET /auth/me` returns matching user `id` and `email` | Database user persistence, bcrypt password hashing, JWT signing and verification, and AuthGuard |
+
+#### Smoke Check Failure Diagnostics & Troubleshooting
+
+| Failing Check                     | Likely Root Cause                                                                                    | Diagnostic Steps & Remediation                                                                                                                                         |
+| --------------------------------- | ---------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Check 1: API health**           | NestJS not listening, wrong `SMOKE_API_URL`, or fatal startup exception                              | Check `.smoke-diagnostics/api.log` or console output. Verify port 3001 is listening (`netstat -ano \| findstr :3001`). Verify `DATABASE_URL` and `REDIS_URL`.          |
+| **Check 2: Homepage HTML**        | Next.js not built (`pnpm --filter @web/frontend build`), port 3000 down, or error boundary triggered | Check `.smoke-diagnostics/web.log`. Verify `apps/web/.next` exists. Verify Next.js server is bound to port 3000.                                                       |
+| **Check 3: Agent health**         | FastAPI Agent process down or wrong `SMOKE_AGENT_URL`                                                | Check `.smoke-diagnostics/agent.log`. Verify Python environment (`uv sync`) and uvicorn process listening on port 3002.                                                |
+| **Check 4: PostgreSQL readiness** | PostgreSQL container unready, down, or migrations not deployed                                       | Run `docker compose ps` to verify container `flight-postgres` is healthy. Run `pnpm --filter @api/backend exec prisma migrate status` to confirm migrations.           |
+| **Check 5: Redis readiness**      | Redis container down or unreachable on port 6379                                                     | Verify `docker compose ps` for `flight-redis`. Check `redis-cli ping` or verify `REDIS_URL=redis://127.0.0.1:6379`.                                                    |
+| **Check 6: Web upstream**         | Next.js cannot reach NestJS API via private `API_URL`                                                | Verify `API_URL` environment variable passed to Next.js (defaults to `http://127.0.0.1:3001`). Ensure NestJS `/api/health/ping` responds 200.                          |
+| **Check 7: API-to-Agent**         | NestJS cannot reach Agent `/health/live` endpoint                                                    | Verify `AGENT_SERVICE_URL` (defaults to `http://127.0.0.1:3002`). Test direct reachability of `http://127.0.0.1:3002/health/live`.                                     |
+| **Check 8: Auth round-trip**      | Prisma user table write failure, duplicate email, lockout rate limit, or invalid JWT signature       | Verify unique test actor creation (`createUniqueTestActor`). Reset lockout via `POST /api/auth/test/reset-lockout` if in test environment. Ensure `JWT_SECRET` is set. |
 
 ### Diagnostic Log Inspection (`.smoke-diagnostics/`)
 

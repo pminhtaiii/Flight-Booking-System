@@ -426,12 +426,12 @@ All environment variables defined in `.env.local` for development. Never hardcod
 
 ### AI Agent Service (FastAPI)
 
-| Variable                                | Used In                    |
-| --------------------------------------- | -------------------------- |
-| `SESSION_LOCK_TTL_MS`                   | agent/config.py (Redis)    |
-| `SESSION_LOCK_REFRESH_INTERVAL_SECONDS` | agent/config.py (Redis)    |
-| `AGENT_SERVICE_API_KEY`                 | Gateway protection         |
-| `CLAIM_TOKEN_SECRET`                    | User claim verification    |
+| Variable                                | Used In                 |
+| --------------------------------------- | ----------------------- |
+| `SESSION_LOCK_TTL_MS`                   | agent/config.py (Redis) |
+| `SESSION_LOCK_REFRESH_INTERVAL_SECONDS` | agent/config.py (Redis) |
+| `AGENT_SERVICE_API_KEY`                 | Gateway protection      |
+| `CLAIM_TOKEN_SECRET`                    | User claim verification |
 
 ### Next.js Frontend
 
