@@ -30,7 +30,7 @@ Update this file after every completed feature. Any AI agent reading this should
     - Exported module-level `sharedContext = { offerId: null, offerPassengerId: null, searchOffer: null, testActor: null }` for downstream test continuity.
     - Authenticates unique test actor via `createUniqueTestActor()`, `POST /auth/register`, and `POST /auth/login`.
     - Resets mock server via `resetMockServer(MOCK_BASE)`.
-    - Dispatches authenticated `POST /flights/search` for SGN -> HAN with future date.
+    - Dispatches authenticated `POST /flights/search` for SGN -> HAN with dynamic future date computed from timestamp and random offset (`runOffsetDays`) preventing cold cache false positives on repeated runs within TTL.
     - Asserts 200, results array length >= 1, and required offer field presence (`id`, `airline`, `flightNumber`, `departureAirport`, `arrivalAirport`, `departureTime`, `arrivalTime`, `duration`, `price`, `currency`, `segments`) via `assertResponseShape`.
     - Asserts meta envelope fields: `meta.searchHash` non-empty string, `meta.cached === false`, `meta.totalResults` (or `meta.count`) >= 1.
   - **T030: Redis Cache Suppression & Search Hash Parity in `sanity.test.mjs`**:
@@ -42,8 +42,10 @@ Update this file after every completed feature. Any AI agent reading this should
     - Queries mock server again proving `POST /air/offer_requests` count remains exactly 1 (0 additional supplier calls).
   - **T031: Capture Authoritative Offer Passenger Identifier in `sanity.test.mjs`**:
     - Calls `GET /flights/${firstOfferId}` with actor bearer token and bounded 5s polling window.
+    - Hardened `flights.service.ts` (`getFlightDetail`) and `duffel.service.ts` (`searchFlights`) to only take test-mode bypass when `DUFFEL_API_URL` is unconfigured (`!hasDuffelApiUrl`).
     - Validates 200 response with `passengers` array having at least 1 passenger.
     - Asserts `passengers[0].id` is a non-empty string (`pas_mock_1`).
+    - Queries mock server via `getMockRequests(MOCK_BASE)` and asserts at least 1 `GET /air/offers/${supplierOfferId}` call recorded.
     - Stores `sharedContext.offerId`, `sharedContext.offerPassengerId`, and `sharedContext.searchOffer` for downstream booking flows.
   - **Zero Leaks & Safety Controls**:
     - Enforced 60-second suite budget (`SUITE_TIMEOUT_MS = 60000`) with safe `runSafeCheck` runner sanitizing errors via `redactSensitive`.

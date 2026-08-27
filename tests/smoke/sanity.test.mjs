@@ -133,10 +133,12 @@ describe('whole-stack sanity suite: flight search & cache', { timeout: SUITE_TIM
 
         await resetMockServer(MOCK_BASE);
 
+        const runOffsetDays =
+          14 + ((Math.floor(Date.now() / 1000) + Math.floor(Math.random() * 500)) % 2500) + 1;
         searchQuery = buildSearchQuery({
           origin: 'SGN',
           destination: 'HAN',
-          departureDate: getFutureDate(14),
+          departureDate: getFutureDate(runOffsetDays),
           adults: 1,
           cabinClass: 'economy',
         });
@@ -320,6 +322,19 @@ describe('whole-stack sanity suite: flight search & cache', { timeout: SUITE_TIM
         assert.ok(
           firstPassenger.id.trim().length > 0,
           'passengers[0].id must be a non-empty string',
+        );
+
+        const supplierOfferId = firstResponse.results[0].duffelOfferId || 'off_mock_123';
+        const mockRequests = await getMockRequests(MOCK_BASE);
+        const detailCallCount =
+          mockRequests?.counts?.[`GET /air/offers/${supplierOfferId}`] ??
+          mockRequests?.requests?.filter(
+            (r) => r.method === 'GET' && r.pathname === `/air/offers/${supplierOfferId}`,
+          ).length ??
+          0;
+        assert.ok(
+          detailCallCount >= 1,
+          `Mock server should have recorded at least 1 GET /air/offers/${supplierOfferId} call, observed: ${detailCallCount}`,
         );
 
         sharedContext.offerId = firstOfferId;

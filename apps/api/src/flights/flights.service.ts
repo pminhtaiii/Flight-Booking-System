@@ -413,8 +413,9 @@ export class FlightsService {
       const isJest = process.env.JEST_WORKER_ID !== undefined;
       const isTestEnv = process.env.NODE_ENV === 'test' || isJest;
       const token = process.env.DUFFEL_ACCESS_TOKEN;
+      const hasDuffelApiUrl = Boolean(process.env.DUFFEL_API_URL && process.env.DUFFEL_API_URL.trim() !== '');
 
-      if (!isJest && (isTestEnv || token === 'mock')) {
+      if (!isJest && !hasDuffelApiUrl && (isTestEnv || token === 'mock')) {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         liveOffer = flightOffer.rawOffer as Record<string, any>;
       } else {

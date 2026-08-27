@@ -197,7 +197,8 @@ export class DuffelService {
       }
 
       // 4. Create Duffel offer request
-      if (!isJest && (process.env.NODE_ENV === 'test' || token === 'mock')) {
+      const hasDuffelApiUrl = Boolean(process.env.DUFFEL_API_URL && process.env.DUFFEL_API_URL.trim() !== '');
+      if (!isJest && !hasDuffelApiUrl && (process.env.NODE_ENV === 'test' || token === 'mock')) {
         this.logger.log(`Mocking Duffel API response for test environment. NODE_ENV: ${process.env.NODE_ENV}`);
         
         const mockPassengers: Array<{ id: string; type: 'adult' | 'child' | 'infant_without_seat' }> = [];
