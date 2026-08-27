@@ -45,12 +45,12 @@
 
 ### Dependency-free harness utilities
 
-- [ ] T015 [P] Add failing concurrent-success, staggered-readiness, shared-timeout, and per-service diagnostic tests in `tests/smoke/wait-for-ready.unit.test.mjs`
-- [ ] T016 Implement two-second concurrent polling with one 120-second deadline and safe structured failures in `tests/smoke/helpers/wait-for-ready.mjs` (depends on T015)
-- [ ] T017 [P] Add failing method-plus-path routing, Duffel JSON validation, Stripe form validation, counter reset/snapshot, malformed-body, unknown-route, and redaction tests in `tests/smoke/mock-server.unit.test.mjs`
-- [ ] T018 Implement the standalone validating Duffel/Stripe HTTP server and loopback-only safe control routes in `tests/smoke/mocks/mock-server.mjs` (depends on T017)
-- [ ] T019 [P] Add failing request diagnostics, unique actor, HMAC claim, cache normalization, and bounded payment-poll tests in `tests/smoke/test-utils.unit.test.mjs`
-- [ ] T020 Implement HTTP, auth, claim, profile, search, intent, payment, polling, redaction, and mock-counter helpers in `tests/smoke/helpers/test-utils.mjs` (depends on T019)
+- [x] T015 [P] Add failing concurrent-success, staggered-readiness, shared-timeout, and per-service diagnostic tests in `tests/smoke/wait-for-ready.unit.test.mjs`
+- [x] T016 Implement two-second concurrent polling with one 120-second deadline and safe structured failures in `tests/smoke/helpers/wait-for-ready.mjs` (depends on T015)
+- [x] T017 [P] Add failing method-plus-path routing, Duffel JSON validation, Stripe form validation, counter reset/snapshot, malformed-body, unknown-route, and redaction tests in `tests/smoke/mock-server.unit.test.mjs`
+- [x] T018 Implement the standalone validating Duffel/Stripe HTTP server and loopback-only safe control routes in `tests/smoke/mocks/mock-server.mjs` (depends on T017)
+- [x] T019 [P] Add failing request diagnostics, unique actor, HMAC claim, cache normalization, and bounded payment-poll tests in `tests/smoke/test-utils.unit.test.mjs`
+- [x] T020 Implement HTTP, auth, claim, profile, search, intent, payment, polling, redaction, and mock-counter helpers in `tests/smoke/helpers/test-utils.mjs` (depends on T019)
 
 **Checkpoint**: Provider calls can reach validating loopback mocks; health probes avoid inference; utilities are independently green.
 

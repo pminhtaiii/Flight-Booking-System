@@ -6,16 +6,40 @@ Update this file after every completed feature. Any AI agent reading this should
 
 ### Current Status
 
-**Feature:** Whole-Stack Smoke and Sanity CI (Feature 020) — Phase 2 / Slice 2: Cross-Service Health Contracts (T009–T014) COMPLETE
-**Last completed:** Phase 2 / Slice 2: Cross-Service Health Contracts (T009–T014) (2026-08-27).
-**In progress:** Phase 2: Foundational Contracts and Test Seams (Remaining Tasks T015–T020).
-**Next:** Implement dependency-free harness utilities (concurrent readiness polling and validating mock server T015–T020).
+**Feature:** Whole-Stack Smoke and Sanity CI (Feature 020) — Phase 2: Foundational Contracts and Test Seams (T005–T020) COMPLETE
+**Last completed:** Phase 2 / Slice 3: Dependency-Free Harness Utilities (T015–T020) (2026-08-27).
+**In progress:** Phase 3: User Story 1 - Gate Pull Requests on Whole-Stack Readiness (T021–T027).
+**Next:** Implement 8 whole-stack smoke checks in `tests/smoke/smoke.test.mjs` (T021–T027).
 
 ---
 
 ## Progress by Feature
 
-### [ ] Feature: Whole-Stack Smoke and Sanity CI (Feature 020) — Phase 2: Foundational Contracts and Test Seams
+### [x] Feature: Whole-Stack Smoke and Sanity CI (Feature 020) — Phase 2: Foundational Contracts and Test Seams
+
+- [x] Phase 2 / Slice 3: Dependency-Free Harness Utilities (T015–T020) (2026-08-27):
+  - **T015: Failing Unit Tests for Concurrent Readiness Poller (`tests/smoke/wait-for-ready.unit.test.mjs`)**:
+    - Added unit tests covering concurrent probe dispatch (all probes initiated before pending ones settle), staggered probe resolution handling, shared global timeout enforcement across probes, structured safe diagnostic failure report on deadline exceeded (`ReadinessTimeoutError` / `READINESS_TIMEOUT` with elapsedMs, attempts, lastStatus, and lastError per unready service), non-settling probe termination on deadline, and clock interface validation.
+    - RED verification confirmed: failed with module not found / assertions.
+  - **T016: Concurrent Readiness Poller Implementation (`tests/smoke/helpers/wait-for-ready.mjs`)**:
+    - Implemented pure `waitForReady({ probes, intervalMs = 2000, timeoutMs = 120000, fetchImpl, clock })` with concurrent async polling loops, shared cancellation deadline, timer-capable clock validation, and structured safe diagnostic errors.
+    - GREEN verification confirmed: 6/6 tests passed in `wait-for-ready.unit.test.mjs`.
+  - **T017: Failing Unit Tests for Validating Local Mock Server (`tests/smoke/mock-server.unit.test.mjs`)**:
+    - Added unit tests for exact method + pathname routing, Duffel flight offer search (`POST /air/offer_requests`) with JSON and required fields validation (`slices`, `passengers`, `cabin_class`), Duffel instant order creation (`POST /air/orders`) and deterministic retrieved order (`GET /air/orders/ord_mock_123`), Stripe PaymentIntent creation (`POST /v1/payment_intents`) with form-urlencoded validation and capture (`POST /v1/payment_intents/pi_mock_123/capture`), loopback control endpoints (`GET /__mock/health`, `POST /__mock/reset`, `GET /__mock/requests` with zero PII or raw bodies recorded), malformed percent escape rejection, wrong HTTP method rejection, and safe unknown pathname segment allowlisting/redaction.
+    - RED verification confirmed: failed with module not found / status mismatches.
+  - **T018: Validating Local Mock Server Implementation (`tests/smoke/mocks/mock-server.mjs`)**:
+    - Implemented standalone dependency-free `node:http` mock server with exact method/path routing, deterministic Duffel/Stripe fixtures, form and JSON body parsers with malformed percent-escape sanitization, memory-only resettable request counters and safe diagnostics log, loopback-only binding (`127.0.0.1`), and safe CLI entrypoint guarded against execution during import.
+    - GREEN verification confirmed: 17/17 tests passed in `mock-server.unit.test.mjs`.
+  - **T019: Failing Unit Tests for Harness Test Utilities (`tests/smoke/test-utils.unit.test.mjs`)**:
+    - Added unit tests covering unique test actor generation (`createUniqueTestActor`), HMAC-SHA256 user claim token signing and verification matching NestJS `ClaimTokenService` binary format, bearer authorization header helper (`authBearer`), safe JSON HTTP client (`requestJson`) with automatic serialization, custom header injection, `AbortController` timeout handling, and redacted error diagnostics (zero bearer tokens, passwords, or raw bodies in thrown errors), date generator (`getFutureDate`), payload builders (`buildSearchQuery`, `buildTravelerProfile`, `buildBookingIntent`, `buildPaymentPayload`, `buildPaymentConfirmationPayload`), cache envelope normalization (`normalizeCacheEnvelope`), loopback mock control helpers (`resetMockServer`, `getMockRequests`), bounded payment polling (`pollPaymentStatus`) with injectable clocks and allowlisted safe timeout diagnostics, safe response shape assertions (`assertResponseShape`), and centralized sensitive string redaction (`redactSensitive`).
+    - RED verification confirmed: failed with module not found / missing exports.
+  - **T020: Harness Test Utilities Implementation (`tests/smoke/helpers/test-utils.mjs`)**:
+    - Implemented zero-dependency pure ES module utilities using `node:crypto`, `node:assert`, and built-in `fetch`, enforcing negative privacy across all helpers and diagnostics.
+    - GREEN verification confirmed: 17/17 tests passed in `test-utils.unit.test.mjs`.
+  - **Phase 2 Slice 3 Script Registration & Integration Verification**:
+    - Registered `"test:smoke:units"` in root `package.json`: `node --test tests/smoke/wait-for-ready.unit.test.mjs tests/smoke/mock-server.unit.test.mjs tests/smoke/test-utils.unit.test.mjs`.
+    - Executed `pnpm test:smoke:units`: 40/40 tests passed across all 3 suites (0 failures, duration ~3.5s).
+    - Verified static CI workflow contract remains green: `node --test tests/ci/ci-workflow.contract.test.mjs` (13/13 passed).
 
 - [x] Phase 2 / Slice 2: Cross-Service Health Contracts (T009–T014) (2026-08-27):
   - **T009: Failing Unit Tests for Agent No-LLM Liveness (`apps/agent/tests/test_health.py`)**:
