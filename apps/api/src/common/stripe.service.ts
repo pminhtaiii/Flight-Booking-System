@@ -24,7 +24,7 @@ export class StripeService {
         parsed = new URL(rawUrl);
       } catch {
         this.logger.error(`Invalid STRIPE_API_URL provided`);
-        throw new Error(`Invalid STRIPE_API_URL: ${rawUrl}`);
+        throw new Error('Invalid STRIPE_API_URL');
       }
 
       if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
