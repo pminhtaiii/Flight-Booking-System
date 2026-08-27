@@ -25,14 +25,21 @@ The smoke and sanity test harness provides an automated, fast, black-box verific
 
 ## 2. Commands & Execution
 
-### Test Scripts (`package.json`)
+### Test Scripts (Harness Roadmap)
 
-| Command                 | Underlying Execution                                                                                                              | Description                                                                              |
-| ----------------------- | --------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
-| `pnpm test:smoke`       | `node --test --test-reporter=spec tests/smoke/smoke.test.mjs`                                                                     | Runs 8 whole-stack smoke checks against an already running stack                         |
-| `pnpm test:sanity`      | `node --test --test-reporter=spec tests/smoke/sanity.test.mjs`                                                                    | Runs deterministic business flow sanity checks against an already running stack          |
-| `pnpm test:smoke:units` | `node --test tests/smoke/wait-for-ready.unit.test.mjs tests/smoke/mock-server.unit.test.mjs tests/smoke/test-utils.unit.test.mjs` | Runs unit test suites for harness utilities, mock server, and readiness polling          |
-| `pnpm test:smoke:all`   | `node scripts/ci/run-smoke-sanity.mjs --mode=local`                                                                               | Runs complete orchestrator lifecycle (boot, ready, smoke, sanity, cleanup) in local mode |
+The test harness defines four discoverable scripts that are registered in `package.json` incrementally alongside each phase's executable implementation to prevent premature execution or false-positive passes:
+
+- **`pnpm test:smoke:units`**: Introduced in Phase 2 (Foundational Contracts & Test Seams)
+- **`pnpm test:smoke`**: Introduced in Phase 3 (User Story 1: Whole-Stack Readiness Gate)
+- **`pnpm test:sanity`**: Introduced in Phase 4 (User Story 2: Deterministic Business Flows)
+- **`pnpm test:smoke:all`**: Introduced in Phase 5 (User Story 3: Orchestrator Lifecycle)
+
+| Command                 | Underlying Execution                                                                                                              | Description                                                                              | Target Phase |
+| ----------------------- | --------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------- | ------------ |
+| `pnpm test:smoke:units` | `node --test tests/smoke/wait-for-ready.unit.test.mjs tests/smoke/mock-server.unit.test.mjs tests/smoke/test-utils.unit.test.mjs` | Runs unit test suites for harness utilities, mock server, and readiness polling          | Phase 2      |
+| `pnpm test:smoke`       | `node --test --test-reporter=spec tests/smoke/smoke.test.mjs`                                                                     | Runs 8 whole-stack smoke checks against an already running stack                         | Phase 3      |
+| `pnpm test:sanity`      | `node --test --test-reporter=spec tests/smoke/sanity.test.mjs`                                                                    | Runs deterministic business flow sanity checks against an already running stack          | Phase 4      |
+| `pnpm test:smoke:all`   | `node scripts/ci/run-smoke-sanity.mjs --mode=local`                                                                               | Runs complete orchestrator lifecycle (boot, ready, smoke, sanity, cleanup) in local mode | Phase 5      |
 
 ### Full Orchestrator Scripts
 

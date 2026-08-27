@@ -13,7 +13,7 @@
 **Purpose**: Establish discoverable commands, environment documentation, and safe generated-output boundaries without changing runtime behavior.
 
 - [x] T001 Create the smoke-suite coverage and command skeleton in `tests/smoke/README.md`
-- [x] T002 [P] Add zero-dependency smoke, sanity, and harness-unit test scripts to `package.json`
+- [x] T002 [P] Specify zero-dependency smoke, sanity, and harness-unit test scripts (roadmap documented in `tests/smoke/README.md` for progressive registration across Phases 2–5)
 - [x] T003 [P] Ignore only the run-scoped smoke diagnostic directory in `.gitignore`
 - [x] T004 [P] Document optional `DUFFEL_API_URL`, `STRIPE_API_URL`, private `API_URL`, and smoke-safe service URLs in `apps/api/.env.example`, `apps/web/.env.example`, and `apps/agent/.env.example`
 

@@ -20,12 +20,8 @@ Update this file after every completed feature. Any AI agent reading this should
 - [x] Phase 1 / Setup (Shared Infrastructure) (2026-08-27):
   - **T001: Authoritative Smoke & Sanity Test Harness Documentation (`tests/smoke/README.md`)**:
     - Authored comprehensive test harness guide covering zero-dependency design (`node:test`, `fetch`, `node:http`), sequential lifecycle (Builds $\to$ Boot $\to$ Polling $\to$ Smoke $\to$ Sanity $\to$ Cleanup), CLI & pnpm scripts, environment variables table matching `contracts/test-harness.md`, ephemeral CI & dedicated `smoke_test` database isolation rules, timing budgets ($\le$120s readiness, <15s smoke, <60s sanity), and diagnostics/troubleshooting.
-  - **T002: Zero-Dependency Scripts in Root `package.json`**:
-    - Added discoverable scripts:
-      - `test:smoke`: `node --test --test-reporter=spec tests/smoke/smoke.test.mjs`
-      - `test:sanity`: `node --test --test-reporter=spec tests/smoke/sanity.test.mjs`
-      - `test:smoke:units`: `node --test tests/smoke/wait-for-ready.unit.test.mjs tests/smoke/mock-server.unit.test.mjs tests/smoke/test-utils.unit.test.mjs`
-      - `test:smoke:all`: `node scripts/ci/run-smoke-sanity.mjs --mode=local`
+  - **T002: Zero-Dependency Script Specifications & Roadmap**:
+    - Defined authoritative command contracts in `tests/smoke/README.md` scheduled for incremental registration in `package.json` across phases (Phase 2: `test:smoke:units`, Phase 3: `test:smoke`, Phase 4: `test:sanity`, Phase 5: `test:smoke:all`) to eliminate false-green or missing-entrypoint execution before suites are implemented.
   - **T003: Ignore Run-Scoped Smoke Diagnostics (`.gitignore`)**:
     - Excluded `.smoke-diagnostics/` from Git tracking to ensure diagnostic outputs and process logs are never committed.
   - **T004: Environment Documentation Across Services (`apps/api/.env.example`, `apps/web/.env.example`, `apps/agent/.env.example`)**:
@@ -258,7 +254,6 @@ Update this file after every completed feature. Any AI agent reading this should
     - TypeScript strict typecheck (`tsc --noEmit`): 0 errors.
     - Two-Axis Code Review: Standards Review & Spec Review completed with 0 remaining P0/P1 issues.
 
-
 ### [x] Feature: Deepen Codebase Architecture (Feature 019) — Slice 5A: Narrow Shared Contracts for Flight Search & Booking Management
 
 - [x] Slice 5A / Provider-free shared web-seam contracts (2026-08-25):
@@ -329,7 +324,6 @@ Update this file after every completed feature. Any AI agent reading this should
 
 ### [x] Feature: Deepen Codebase Architecture (Feature 019) — Slice 4A: Authoritative Chat Turn Event Models & Golden Contract Tests
 
-
 - [x] Slice 4A / Authoritative Chat Turn Event Models & Golden Contract Tests (2026-08-24):
   - **Authoritative Event Models (`apps/agent/src/agent/chat_turn/`)**:
     - Created `events.py` defining strict Pydantic v2 payload models with `ConfigDict(extra="forbid")`: `TokenPayload`, `ToolCallPayload`, `ToolResultPayload`, `FlightResultsPayload`, `ActionHandoffPayload`, `ActionRequiredPayload`, `DonePayload`, `ErrorPayload`.
@@ -380,7 +374,7 @@ Update this file after every completed feature. Any AI agent reading this should
     - ESLint: 0 errors, 0 warnings; TypeScript Typecheck (API & Web): 0 errors; Agent Ruff: 0 errors.
 
 ### [x] Feature: Deepen Codebase Architecture (Feature 019) — Slice 3B: Cut Over Callers to TrustedSearchSnapshotLifecycle & Decommission Legacy Shims
- 
+
 - [x] Slice 3B / Cut Over Callers to TrustedSearchSnapshotLifecycle & Decommission Legacy Shims (2026-08-24):
   - **Agent Tool Caller Cut-Over (`apps/agent/src/agent/tools/`)**:
     - Rewired `search_flights.py` to use `TrustedSearchSnapshotLifecycle.create_or_replace()` and `lifecycle.project_for_llm()`, ensuring only sanitized projection results without Duffel IDs or internal IDs reach LLM summaries. Enforced fail-closed security handling.
@@ -436,7 +430,6 @@ Update this file after every completed feature. Any AI agent reading this should
     - Full API Unit Suite: 82/82 suites (906/906 tests) PASS.
     - ESLint: 0 errors, 0 warnings; TypeScript Typecheck: 0 errors; Web Typecheck: 0 errors; API Build succeeds.
 
-
 ### [x] Feature: Deepen Codebase Architecture (Feature 019) — Slice 2B: Extract Booking Management Module
 
 - [x] Slice 2B / Extract Booking Management Module (2026-08-23):
@@ -461,7 +454,6 @@ Update this file after every completed feature. Any AI agent reading this should
     - Full API Unit Suite: 81/81 suites (857/857 tests) PASS.
     - Full API E2E Suite: 57/57 suites (495/495 tests) PASS.
     - ESLint: 0 errors, 0 warnings; TypeScript Typecheck: 0 errors; NestJS build succeeds.
-
 
 ### [x] Feature: Deepen Codebase Architecture (Feature 019) — Slice 1D: Contract Schema & Final Gate 1 Validation
 
@@ -617,7 +609,6 @@ Update this file after every completed feature. Any AI agent reading this should
     - Runbook Section 4 updated to query actual health snapshot endpoints (`/health/booking-readiness` latency percentiles) and standardized counters.
     - Performance test teardown hardened with safe offer dereferencing and try/finally cleanup.
 
-
 - [x] Phase 12 / Operations Runbook & Operational Governance (Task T076) (2026-08-19):
   - **Comprehensive Operations Runbook (`docs/runbooks/booking-readiness.md`)**:
     - System topology & decision ownership (Profile, pure evaluator, advisory readiness, atomic intent creation, final validator, Duffel/Stripe boundaries).
@@ -630,7 +621,6 @@ Update this file after every completed feature. Any AI agent reading this should
     - Backfill governance & quarantine management (Daily midnight cron, `PassportExpiryBackfillService`, optimistic CAS, decrypt/compare verification, 10% abort threshold).
     - Privacy & cryptographic invariants (Record-bound AES-256-GCM context-bound AAD `{ snapshotVersion, intentId, position, fieldName }`, masked summary projections, zero-PII guarantee).
     - Emergency rollback procedures (Decision matrix, dual-write compatibility, instant feature flag disabling, graceful degradation to legacy checkout).
-
 
 - [x] Phase 8B / Canonical Plural Routes, Safe DTO Masking & Web Checkout Migration (Tasks T047, T048, T050–T054, T078, T079) (2026-08-19):
   - **Canonical Plural Intent Routes & Safe DTO Masking (`apps/api/src/booking-intent/`)**:
@@ -832,7 +822,6 @@ Update this file after every completed feature. Any AI agent reading this should
   - [x] T102 / Approved Plaintext Cleanup: applied migration `20260805010000_chat_message_plaintext_cleanup` dropping legacy plaintext columns `title` on `chat_sessions` and `content` on `chat_messages`; verified strict record-bound AES-256-GCM authenticated encryption/decryption with zero fallback across API and Gateway; verified 4/4 chat-plaintext-cleanup E2E tests, 3/3 privacy corpus E2E tests, 18/18 chat E2E tests, 264/264 agent pytest suites, and Next.js production build.
 
 ### [ ] Feature: Traveler Profile & Booking Readiness (Feature 16)
-
 
 - [x] Phase 1 / PR 1: Setup — Shared Contracts, Flags, and Observability Vocabulary (implemented shared types for traveler profiles, passenger sources, readiness scopes, results, reason codes, profile sections, and masked summaries; added API and web feature flags `FEATURE_FLAG_BOOKING_READINESS` and `NEXT_PUBLIC_FEATURE_FLAG_BOOKING_READINESS` defaulting to false; created client helper `apps/web/lib/featureFlags.ts`; defined PII-safe operation names, metric names, and allowed metadata keys in `booking-readiness-observability.types.ts`; verified with configuration schema parser tests and contract allowlist validation tests)
 - [x] Phase 2 / PR 2: Additive Schema, Bound Encryption, and Migration Safety (implemented additive traveler profile and passenger snapshot database models and applied SQL migration safely preserving legacy data; added record-bound versioned AES-256-GCM encryption helper methods to EncryptionService with backward-compatibility for legacy unbound ciphertext; created idempotent data-quality backfill service with revision-checking CAS updates, mismatched-date validation quarantine, and abort thresholds; registered ProfileModule, PassportExpiryBackfillController, and a daily scheduled cron task for backfill execution; secured backfill encryption with context-bound AAD keys tied to travelerProfileId and fieldName; verified with a comprehensive migration compatibility E2E test suite, unit tests, and controller integration tests)
