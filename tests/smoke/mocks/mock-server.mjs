@@ -130,6 +130,7 @@ function buildOfferRequest(payload) {
         slices: mappedSlices,
         passengers: mockedPassengers,
         passenger_identity_documents_required: false,
+        available_services: [],
       },
     ],
   };
@@ -166,6 +167,7 @@ const safeDiagnosticSegments = new Set([
   'requests',
   'air',
   'offer_requests',
+  'offers',
   'orders',
   'v1',
   'payment_intents',
@@ -254,9 +256,59 @@ function buildOrder() {
   };
 }
 
+export function buildOfferDetail(offerId = 'off_mock_123', lastCreatedOffer = null) {
+  if (lastCreatedOffer && lastCreatedOffer.id === offerId) {
+    return {
+      ...lastCreatedOffer,
+      available_services: lastCreatedOffer.available_services ?? [],
+    };
+  }
+  const origin = { id: 'SGN', name: 'SGN Airport', iata_code: 'SGN', type: 'airport' };
+  const destination = { id: 'SIN', name: 'SIN Airport', iata_code: 'SIN', type: 'airport' };
+  const passengers = [{ id: 'pas_mock_1', type: 'adult' }];
+  return {
+    id: offerId,
+    total_amount: '125.50',
+    total_currency: 'USD',
+    slices: [
+      {
+        id: 'sli_mock_1',
+        duration: 'PT2H10M',
+        origin,
+        destination,
+        segments: [
+          {
+            id: 'seg_mock_1',
+            duration: 'PT2H10M',
+            departing_at: '2030-01-02T08:00:00Z',
+            arriving_at: '2030-01-02T10:10:00Z',
+            origin,
+            destination,
+            operating_carrier: { id: 'VN', name: 'Vietnam Airlines', iata_code: 'VN' },
+            marketing_carrier: { id: 'VN', name: 'Vietnam Airlines', iata_code: 'VN' },
+            marketing_carrier_flight_number: '123',
+            aircraft: { id: 'arc_mock_1', name: 'Airbus A321', iata_code: '321' },
+            passengers: [
+              {
+                passenger_id: 'pas_mock_1',
+                cabin_class: 'economy',
+                baggages: [{ type: 'checked', quantity: 1 }],
+              },
+            ],
+          },
+        ],
+      },
+    ],
+    passengers,
+    passenger_identity_documents_required: false,
+    available_services: [],
+  };
+}
+
 export function createMockServer() {
   const counts = new Map();
   const requests = [];
+  let lastCreatedOffer = null;
 
   function record(method, pathname, status) {
     const routeKey = `${method} ${pathname}`;
@@ -276,6 +328,7 @@ export function createMockServer() {
     if (request.method === 'POST' && pathname === '/__mock/reset') {
       counts.clear();
       requests.length = 0;
+      lastCreatedOffer = null;
       sendJson(response, 200, { status: 'reset' });
       return;
     }
@@ -300,8 +353,10 @@ export function createMockServer() {
         sendJson(response, 422, { error: 'Invalid request' });
         return;
       }
+      const offerRequest = buildOfferRequest(parsed.value);
+      lastCreatedOffer = offerRequest.offers?.[0] ?? null;
       record(request.method, pathname, 201);
-      sendJson(response, 201, { data: buildOfferRequest(parsed.value) });
+      sendJson(response, 201, { data: offerRequest });
       return;
     }
 
@@ -350,6 +405,30 @@ export function createMockServer() {
     if (request.method === 'GET' && pathname === '/air/orders/ord_mock_123') {
       record(request.method, pathname, 200);
       sendJson(response, 200, { data: buildOrder() });
+      return;
+    }
+
+    if (
+      request.method === 'GET' &&
+      (pathname === '/air/offers' || pathname.startsWith('/air/offers/'))
+    ) {
+      const offerId = pathname.startsWith('/air/offers/')
+        ? pathname.slice('/air/offers/'.length)
+        : '';
+      if (!offerId || !offerId.startsWith('off_') || offerId === 'off_' || offerId.includes('/')) {
+        record(request.method, pathname, 400);
+        sendJson(response, 400, { error: 'Malformed offer ID' });
+        return;
+      }
+      const isKnown =
+        offerId === 'off_mock_123' || (lastCreatedOffer && lastCreatedOffer.id === offerId);
+      if (!isKnown) {
+        record(request.method, pathname, 404);
+        sendJson(response, 404, { error: 'Offer not found' });
+        return;
+      }
+      record(request.method, pathname, 200);
+      sendJson(response, 200, { data: buildOfferDetail(offerId, lastCreatedOffer) });
       return;
     }
 

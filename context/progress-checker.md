@@ -6,14 +6,50 @@ Update this file after every completed feature. Any AI agent reading this should
 
 ### Current Status
 
-**Feature:** Whole-Stack Smoke and Sanity CI (Feature 020) — Phase 3: User Story 1 - Whole-Stack Readiness Gate (T021–T027) COMPLETE
-**Last completed:** Phase 3: Whole-Stack Readiness Smoke Gate (T021–T027) (2026-08-27).
-**In progress:** Phase 4: User Story 2 - Validate Key Deterministic Business Flows (T028–T041).
-**Next:** Phase 4: Deterministic business sanity flows (search/cache, confirmed booking happy-path, agent communication/auth).
+**Feature:** Whole-Stack Smoke and Sanity CI (Feature 020) — Phase 4 / Slice 1: Flight Search & Cache Sanity Flows (T028–T031) COMPLETE
+**Last completed:** Phase 4 / Slice 1: Flight Search & Cache Sanity Flows (T028–T031) (2026-08-27).
+**In progress:** Phase 4 / Slice 2: Confirmed Booking Happy Path (T032–T036).
+**Next:** Phase 4 / Slice 3: Agent Communication & Authorization (T037–T041).
 
 ---
 
 ## Progress by Feature
+
+### [x] Feature: Whole-Stack Smoke and Sanity CI (Feature 020) — Phase 4: User Story 2 - Deterministic Business Flows (Slice 1: Search & Cache)
+
+- [x] Phase 4 / Slice 1: Flight Search & Cache Sanity Flows (T028–T031) (2026-08-27):
+  - **T028: Deterministic Duffel Offer Detail Fixture & Route in `mock-server.mjs`**:
+    - Implemented `GET /air/offers/:id` route in `tests/smoke/mocks/mock-server.mjs` with exact path and format validation.
+    - Rejects missing ID or malformed IDs (not starting with `off_` or missing suffix like `off_`) with HTTP 400 `{ error: 'Malformed offer ID' }`.
+    - Rejects unknown offer IDs with HTTP 404 `{ error: 'Offer not found' }`.
+    - Returns deterministic HTTP 200 Duffel offer fixture for `off_mock_123` with VN operating carrier, USD 125.50 amount, passenger `pas_mock_1`, and `available_services: []`. Dynamically mirrors `lastCreatedOffer` when created via `POST /air/offer_requests`.
+    - Allowlisted `'offers'` in `safeDiagnosticSegments` for zero-leakage diagnostics.
+    - Added unit tests in `tests/smoke/mock-server.unit.test.mjs` asserting 200 fixture shape, 400 on malformed/empty/missing-suffix IDs, 404 on unknown IDs, and safe request recording in `/__mock/requests`. Verified 23/23 tests pass.
+  - **T029: Authenticated Flight Search Contract Assertion in `sanity.test.mjs`**:
+    - Created `tests/smoke/sanity.test.mjs` using pure Node.js built-ins (`node:test`, `node:assert/strict`, `fetch`) and local helper `tests/smoke/helpers/test-utils.mjs`.
+    - Exported module-level `sharedContext = { offerId: null, offerPassengerId: null, searchOffer: null, testActor: null }` for downstream test continuity.
+    - Authenticates unique test actor via `createUniqueTestActor()`, `POST /auth/register`, and `POST /auth/login`.
+    - Resets mock server via `resetMockServer(MOCK_BASE)`.
+    - Dispatches authenticated `POST /flights/search` for SGN -> HAN with future date.
+    - Asserts 200, results array length >= 1, and required offer field presence (`id`, `airline`, `flightNumber`, `departureAirport`, `arrivalAirport`, `departureTime`, `arrivalTime`, `duration`, `price`, `currency`, `segments`) via `assertResponseShape`.
+    - Asserts meta envelope fields: `meta.searchHash` non-empty string, `meta.cached === false`, `meta.totalResults` (or `meta.count`) >= 1.
+  - **T030: Redis Cache Suppression & Search Hash Parity in `sanity.test.mjs`**:
+    - Inspects mock server requests via `getMockRequests(MOCK_BASE)` asserting exactly 1 `POST /air/offer_requests` call.
+    - Re-submits identical flight search payload with actor's auth token.
+    - Asserts `meta.cached === true`.
+    - Verifies search hash parity and payload comparability via `normalizeCacheEnvelope(firstResponse)` and `normalizeCacheEnvelope(cachedResponse)`.
+    - Asserts `cachedResponse.results.length === firstResponse.results.length` and `cachedResponse.results[0].id === firstResponse.results[0].id`.
+    - Queries mock server again proving `POST /air/offer_requests` count remains exactly 1 (0 additional supplier calls).
+  - **T031: Capture Authoritative Offer Passenger Identifier in `sanity.test.mjs`**:
+    - Calls `GET /flights/${firstOfferId}` with actor bearer token and bounded 5s polling window.
+    - Validates 200 response with `passengers` array having at least 1 passenger.
+    - Asserts `passengers[0].id` is a non-empty string (`pas_mock_1`).
+    - Stores `sharedContext.offerId`, `sharedContext.offerPassengerId`, and `sharedContext.searchOffer` for downstream booking flows.
+  - **Zero Leaks & Safety Controls**:
+    - Enforced 60-second suite budget (`SUITE_TIMEOUT_MS = 60000`) with safe `runSafeCheck` runner sanitizing errors via `redactSensitive`.
+    - Verified all 47 smoke unit tests pass (`pnpm test:smoke:units`).
+    - Verified CI contract tests pass (`node --test tests/ci/ci-workflow.contract.test.mjs`).
+    - Passed Prettier and ESLint with 0 errors and 0 warnings.
 
 ### [x] Feature: Whole-Stack Smoke and Sanity CI (Feature 020) — Phase 3: User Story 1 - Whole-Stack Readiness Gate
 
