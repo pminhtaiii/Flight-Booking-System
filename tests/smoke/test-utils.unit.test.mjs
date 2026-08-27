@@ -96,7 +96,7 @@ test('pollPaymentStatus throws structured error with allowlisted diagnostics on 
       const errStr = `${err.message} ${err.stack || ''} ${JSON.stringify(err)}`;
       assert.doesNotMatch(errStr, /sensitive-poll-token-99999/);
       return true;
-    }
+    },
   );
 
   assert.equal(callCount, 4);
@@ -136,7 +136,8 @@ test('requestJson throws structured error on non-2xx with redacted diagnostics a
       ok: false,
       status: 401,
       statusText: 'Unauthorized',
-      text: async () => JSON.stringify({ message: 'Invalid credentials', password: 'P@ssword123!' }),
+      text: async () =>
+        JSON.stringify({ message: 'Invalid credentials', password: 'P@ssword123!' }),
       json: async () => ({ message: 'Invalid credentials', password: 'P@ssword123!' }),
     };
   };
@@ -161,7 +162,7 @@ test('requestJson throws structured error on non-2xx with redacted diagnostics a
       assert.doesNotMatch(fullErrStr, /mySecret123/);
       assert.doesNotMatch(fullErrStr, /P@ssword123!/);
       return true;
-    }
+    },
   );
 });
 
@@ -191,7 +192,7 @@ test('requestJson handles timeout with structured REQUEST_TIMEOUT error', async 
       assert.equal(err.method, 'GET');
       assert.equal(err.url, 'http://127.0.0.1:3001/api/slow');
       return true;
-    }
+    },
   );
 });
 
@@ -279,7 +280,7 @@ test('assertResponseShape validates keys and types without leaking sensitive dat
       assert.doesNotMatch(errStr, /UnsafePassword123!/);
       assert.match(err.message, /missingField|count/);
       return true;
-    }
+    },
   );
 });
 
@@ -486,6 +487,9 @@ test('redactSensitive redacts bearer tokens, passwords, card numbers, and secret
   assert.match(redacted, /Bearer <redacted>/);
   assert.match(redacted, /"password":\s*"<redacted>"/);
   assert.match(redacted, /"passportNumber":\s*"<redacted>"/);
-  assert.match(redacted, /https:\/\/example\.com\/api\?token=<redacted>&key=<redacted>&passport=<redacted>/);
+  assert.match(
+    redacted,
+    /https:\/\/example\.com\/api\?token=<redacted>&key=<redacted>&passport=<redacted>/,
+  );
   assert.match(redacted, /<redacted>/);
 });

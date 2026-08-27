@@ -106,8 +106,16 @@ test('starts every readiness probe before any pending probe resolves', async () 
 
   const ready = waitForReady({
     probes: [
-      { name: 'api', url: 'http://api.test/health', validate: (response) => response.status === 200 },
-      { name: 'web', url: 'http://web.test/health', validate: (response) => response.status === 200 },
+      {
+        name: 'api',
+        url: 'http://api.test/health',
+        validate: (response) => response.status === 200,
+      },
+      {
+        name: 'web',
+        url: 'http://web.test/health',
+        validate: (response) => response.status === 200,
+      },
     ],
     intervalMs: 10,
     timeoutMs: 100,
@@ -123,10 +131,13 @@ test('starts every readiness probe before any pending probe resolves', async () 
   const report = await ready;
   assert.equal(report.ok, true);
   assert.equal(typeof report.elapsedMs, 'number');
-  assert.deepEqual(report.services.map(({ elapsedMs, ...service }) => service), [
-    { service: 'api', attempts: 1, lastStatus: 200, lastError: null },
-    { service: 'web', attempts: 1, lastStatus: 200, lastError: null },
-  ]);
+  assert.deepEqual(
+    report.services.map(({ elapsedMs, ...service }) => service),
+    [
+      { service: 'api', attempts: 1, lastStatus: 200, lastError: null },
+      { service: 'web', attempts: 1, lastStatus: 200, lastError: null },
+    ],
+  );
   assert.ok(report.services.every((service) => typeof service.elapsedMs === 'number'));
 });
 
@@ -147,8 +158,16 @@ test('keeps polling a staggered probe until every service is ready', async () =>
 
   const report = await waitForReady({
     probes: [
-      { name: 'api', url: 'http://api.test/health', validate: (response) => response.status === 200 },
-      { name: 'web', url: 'http://web.test/health', validate: (response) => response.status === 200 },
+      {
+        name: 'api',
+        url: 'http://api.test/health',
+        validate: (response) => response.status === 200,
+      },
+      {
+        name: 'web',
+        url: 'http://web.test/health',
+        validate: (response) => response.status === 200,
+      },
     ],
     intervalMs: 10,
     timeoutMs: 100,
@@ -157,10 +176,13 @@ test('keeps polling a staggered probe until every service is ready', async () =>
   });
 
   assert.equal(report.ok, true);
-  assert.deepEqual(report.services.map(({ service, attempts, lastStatus }) => ({ service, attempts, lastStatus })), [
-    { service: 'api', attempts: 3, lastStatus: 200 },
-    { service: 'web', attempts: 2, lastStatus: 200 },
-  ]);
+  assert.deepEqual(
+    report.services.map(({ service, attempts, lastStatus }) => ({ service, attempts, lastStatus })),
+    [
+      { service: 'api', attempts: 3, lastStatus: 200 },
+      { service: 'web', attempts: 2, lastStatus: 200 },
+    ],
+  );
 });
 
 test('stops every unready probe at one shared deadline', async () => {
@@ -170,8 +192,16 @@ test('stops every unready probe at one shared deadline', async () => {
   await assert.rejects(
     waitForReady({
       probes: [
-        { name: 'api', url: 'http://api.test/health', validate: (response) => response.status === 200 },
-        { name: 'web', url: 'http://web.test/health', validate: (response) => response.status === 200 },
+        {
+          name: 'api',
+          url: 'http://api.test/health',
+          validate: (response) => response.status === 200,
+        },
+        {
+          name: 'web',
+          url: 'http://web.test/health',
+          validate: (response) => response.status === 200,
+        },
       ],
       intervalMs: 10,
       timeoutMs: 25,
@@ -181,10 +211,17 @@ test('stops every unready probe at one shared deadline', async () => {
     (failure) => {
       assert.equal(failure.code, 'READINESS_TIMEOUT');
       assert.equal(failure.elapsedMs, 25);
-      assert.deepEqual(failure.services.map(({ service, lastStatus, elapsedMs }) => ({ service, lastStatus, elapsedMs })), [
-        { service: 'api', lastStatus: 503, elapsedMs: 25 },
-        { service: 'web', lastStatus: 503, elapsedMs: 25 },
-      ]);
+      assert.deepEqual(
+        failure.services.map(({ service, lastStatus, elapsedMs }) => ({
+          service,
+          lastStatus,
+          elapsedMs,
+        })),
+        [
+          { service: 'api', lastStatus: 503, elapsedMs: 25 },
+          { service: 'web', lastStatus: 503, elapsedMs: 25 },
+        ],
+      );
       return true;
     },
   );
@@ -197,8 +234,16 @@ test('reports every unready service with sanitized diagnostics', async () => {
   await assert.rejects(
     waitForReady({
       probes: [
-        { name: 'api', url: 'http://api.test/health', validate: (response) => response.status === 200 },
-        { name: 'web', url: 'http://web.test/health', validate: (response) => response.status === 200 },
+        {
+          name: 'api',
+          url: 'http://api.test/health',
+          validate: (response) => response.status === 200,
+        },
+        {
+          name: 'web',
+          url: 'http://web.test/health',
+          validate: (response) => response.status === 200,
+        },
       ],
       intervalMs: 10,
       timeoutMs: 25,
@@ -213,15 +258,18 @@ test('reports every unready service with sanitized diagnostics', async () => {
     (failure) => {
       assert.equal(failure.code, 'READINESS_TIMEOUT');
       assert.equal('stack' in failure, false);
-      assert.deepEqual(failure.services.map(({ service, lastStatus, lastError, elapsedMs }) => ({
-        service,
-        lastStatus,
-        lastError,
-        elapsedMs,
-      })), [
-        { service: 'api', lastStatus: null, lastError: 'request_failed', elapsedMs: 25 },
-        { service: 'web', lastStatus: 503, lastError: null, elapsedMs: 25 },
-      ]);
+      assert.deepEqual(
+        failure.services.map(({ service, lastStatus, lastError, elapsedMs }) => ({
+          service,
+          lastStatus,
+          lastError,
+          elapsedMs,
+        })),
+        [
+          { service: 'api', lastStatus: null, lastError: 'request_failed', elapsedMs: 25 },
+          { service: 'web', lastStatus: 503, lastError: null, elapsedMs: 25 },
+        ],
+      );
       assert.ok(failure.services.every((service) => service.attempts > 0));
       assert.doesNotMatch(JSON.stringify(failure), /top-secret-token|password|response-body/i);
       return true;
@@ -234,14 +282,20 @@ test('uses the shared deadline when a probe fetch never settles', async () => {
   const clock = createManualTimerClock();
   const readiness = waitForReady({
     probes: [
-      { name: 'api', url: 'http://api.test/health', validate: (response) => response.status === 200 },
-      { name: 'web', url: 'http://web.test/health', validate: (response) => response.status === 200 },
+      {
+        name: 'api',
+        url: 'http://api.test/health',
+        validate: (response) => response.status === 200,
+      },
+      {
+        name: 'web',
+        url: 'http://web.test/health',
+        validate: (response) => response.status === 200,
+      },
     ],
     intervalMs: 10,
     timeoutMs: 25,
-    fetchImpl: async (url) => (
-      url.includes('api') ? new Promise(() => {}) : { status: 200 }
-    ),
+    fetchImpl: async (url) => (url.includes('api') ? new Promise(() => {}) : { status: 200 }),
     clock,
   });
 
@@ -260,7 +314,13 @@ test('uses the shared deadline when a probe fetch never settles', async () => {
   assert.equal(outcome.kind, 'rejected');
   assert.equal(outcome.failure.code, 'READINESS_TIMEOUT');
   assert.deepEqual(outcome.failure.services, [
-    { service: 'api', attempts: 1, lastStatus: null, lastError: 'deadline_exceeded', elapsedMs: 25 },
+    {
+      service: 'api',
+      attempts: 1,
+      lastStatus: null,
+      lastError: 'deadline_exceeded',
+      elapsedMs: 25,
+    },
   ]);
 });
 
@@ -286,5 +346,8 @@ test('rejects a partial injected clock before a hung probe can wait forever', as
 
   assert.equal(outcome.kind, 'rejected');
   assert.ok(outcome.failure instanceof TypeError);
-  assert.match(outcome.failure.message, /clock must provide now, sleep, setTimeout, and clearTimeout functions/);
+  assert.match(
+    outcome.failure.message,
+    /clock must provide now, sleep, setTimeout, and clearTimeout functions/,
+  );
 });

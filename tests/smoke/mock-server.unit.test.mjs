@@ -286,7 +286,12 @@ test('records only safe diagnostics for unknown routes without leaking headers o
   const snapshot = await (await fetch(`${url}/__mock/requests`)).json();
   assert.deepEqual(snapshot.counts, { 'PATCH /not-a-provider-route': 1 });
   assert.equal(snapshot.requests.length, 1);
-  assert.deepEqual(Object.keys(snapshot.requests[0]).sort(), ['method', 'pathname', 'status', 'timestamp']);
+  assert.deepEqual(Object.keys(snapshot.requests[0]).sort(), [
+    'method',
+    'pathname',
+    'status',
+    'timestamp',
+  ]);
   assert.equal(snapshot.requests[0].method, 'PATCH');
   assert.equal(snapshot.requests[0].pathname, '/not-a-provider-route');
   assert.equal(snapshot.requests[0].status, 404);
