@@ -17,10 +17,38 @@ export class StripeService {
         'Stripe secret key (sk_) detected. It is highly recommended to use a restricted API key (rk_) with minimum scopes for security.',
       );
     }
-    // Instantiate Stripe. We cast the apiVersion as StripeConfig['apiVersion'] to satisfy typing.
-    this.stripe = new Stripe(apiKey, {
-      apiVersion: '2026-05-27.dahlia' as Stripe.StripeConfig['apiVersion'],
-    });
+    const rawUrl = process.env.STRIPE_API_URL;
+    if (rawUrl && rawUrl.trim() !== '') {
+      let parsed: URL;
+      try {
+        parsed = new URL(rawUrl);
+      } catch {
+        this.logger.error(`Invalid STRIPE_API_URL provided`);
+        throw new Error(`Invalid STRIPE_API_URL: ${rawUrl}`);
+      }
+
+      if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+        this.logger.error(`Unsupported STRIPE_API_URL protocol: ${parsed.protocol}`);
+        throw new Error(`Unsupported STRIPE_API_URL protocol: ${parsed.protocol}`);
+      }
+
+      const stripeConfig: Stripe.StripeConfig = {
+        apiVersion: '2026-05-27.dahlia' as Stripe.StripeConfig['apiVersion'],
+        protocol: parsed.protocol.replace(':', '') as 'http' | 'https',
+        host: parsed.hostname,
+      };
+
+      if (parsed.port && parsed.port.trim() !== '') {
+        stripeConfig.port = Number(parsed.port);
+      }
+
+      this.stripe = new Stripe(apiKey, stripeConfig);
+    } else {
+      // Instantiate Stripe. We cast the apiVersion as StripeConfig['apiVersion'] to satisfy typing.
+      this.stripe = new Stripe(apiKey, {
+        apiVersion: '2026-05-27.dahlia' as Stripe.StripeConfig['apiVersion'],
+      });
+    }
   }
 
   async createPaymentIntent(
