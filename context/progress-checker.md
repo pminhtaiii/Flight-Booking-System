@@ -6,14 +6,49 @@ Update this file after every completed feature. Any AI agent reading this should
 
 ### Current Status
 
-**Feature:** Whole-Stack Smoke and Sanity CI (Feature 020) — Phase 4 / Slice 1: Flight Search & Cache Sanity Flows (T028–T031) COMPLETE
-**Last completed:** Phase 4 / Slice 1: Flight Search & Cache Sanity Flows (T028–T031) (2026-08-27).
-**In progress:** Phase 4 / Slice 2: Confirmed Booking Happy Path (T032–T036).
-**Next:** Phase 4 / Slice 3: Agent Communication & Authorization (T037–T041).
+**Feature:** Whole-Stack Smoke and Sanity CI (Feature 020) — Phase 4 / Slice 2: Confirmed Booking Happy Path (T032–T036) COMPLETE
+**Last completed:** Phase 4 / Slice 2: Confirmed Booking Happy Path (T032–T036) (2026-08-27).
+**In progress:** Phase 4 / Slice 3: Agent Communication & Authorization (T037–T040).
+**Next:** Phase 5: Local & CI Orchestration (T041–T045).
 
 ---
 
 ## Progress by Feature
+
+### [x] Feature: Whole-Stack Smoke and Sanity CI (Feature 020) — Phase 4: User Story 2 - Deterministic Business Flows (Slice 2: Confirmed Booking Happy Path)
+
+- [x] Phase 4 / Slice 2: Confirmed Booking Happy Path (T032–T036) (2026-08-27):
+  - **T032: Stripe SDK Fixtures in Mock Server (`tests/smoke/mocks/mock-server.mjs`)**:
+    - Implemented form-encoded Stripe customer creation route `POST /v1/customers` returning `{ id: 'cus_mock_123', object: 'customer' }`.
+    - Implemented Stripe payment intent retrieve route `GET /v1/payment_intents/:id` validating `pi_` ID prefix and path format (returning 400 on malformed/missing ID, and 200 with `{ id, object: 'payment_intent', status: 'requires_capture', amount: 12550, currency: 'usd', capture_method: 'manual', client_secret: ... }`).
+    - Implemented generalized Stripe capture route `POST /v1/payment_intents/:id/capture` matching any valid `pi_` ID prefix and form body, returning 200 with `status: 'succeeded'`.
+    - Allowlisted `'customers'` in `safeDiagnosticSegments` for zero-leakage diagnostics.
+    - Added unit tests in `tests/smoke/mock-server.unit.test.mjs` asserting 200 fixture shapes, malformed percent escape rejection, 400 on malformed ID, and safe request recording in `/__mock/requests`. Verified 30/30 mock-server unit tests pass.
+  - **T033: Traveler Profile Upsert & Advisory Booking Readiness in `sanity.test.mjs`**:
+    - Queries current user profile via `GET /api/profile` to capture current revision (defaults to 0).
+    - Submits profile update via `PATCH /api/profile` with `expectedRevision: currentRevision`, identity (name matching test actor), contact, and travel document (passport number `P12345678`, expiry `2030-01-01`, issuing country `VN`, nationality `VN`).
+    - Asserts HTTP 200, revision incremented (`updatedProfile.revision > currentRevision`), and `profileId` is present.
+    - Dispatches advisory readiness request `POST /api/bookings/intents/readiness` with `flightOfferId: sharedContext.offerId`, passenger matching `sharedContext.offerPassengerId`, and traveler profile source (`travelerProfileId`, `expectedProfileRevision`).
+    - Asserts HTTP 200 and `readinessResult.ready === true` (or `status === 'READY'`).
+  - **T034: Canonical Booking Intent Creation in `sanity.test.mjs`**:
+    - Dispatches canonical `POST /api/bookings/intents` (plural) consuming search-derived `flightOfferId: sharedContext.offerId`, passenger matching `sharedContext.offerPassengerId`, and traveler profile reference.
+    - Asserts HTTP 201, `intentResponse.id` is valid UUID v4, status is valid lifecycle state (`DRAFT`, `PENDING`, or `AWAITING_PAYMENT`), and `flightOfferId === sharedContext.offerId`.
+    - Preserves `sharedContext.intentId = intentResponse.id` for payment execution.
+  - **T035: Idempotent Payment Creation & Confirmation in `sanity.test.mjs`**:
+    - Generates client booking UUID: `sharedContext.bookingId = crypto.randomUUID()`.
+    - Dispatches `POST /api/bookings/payment/create` with header `'Idempotency-Key': createIdempotencyKey` and body `{ bookingIntentId: sharedContext.intentId }`. Asserts 201 and extracts `sharedContext.paymentId`.
+    - Dispatches `POST /api/bookings/payment/confirm` with distinct fresh header `'Idempotency-Key': confirmIdempotencyKey` and body `{ bookingId: sharedContext.bookingId, paymentId: sharedContext.paymentId }`.
+    - Asserts HTTP 200 or 202 (`ACCEPTED`) and preserves confirmation response.
+  - **T036: Bounded Payment Status Polling & Confirmed Booking Verification in `sanity.test.mjs`**:
+    - Implemented bounded status polling if confirmation returned `status === 'PENDING'` via `pollPaymentStatus` (`GET /api/bookings/payment/:paymentId/status`, `maxAttempts: 10`, `intervalMs: 500`, bounded by remaining suite timeout). Asserts status resolves to `SUCCEEDED`.
+    - Dispatches authenticated `GET /api/bookings/${sharedContext.bookingId}`.
+    - Asserts HTTP 200 and `booking.status === 'CONFIRMED'`.
+    - Asserts booking reference (`booking.pnrReference || booking.bookingReference`) matches Duffel mock order reference `'MOCK123'`.
+    - Asserts `totalAmount || totalPrice` presence.
+  - **Verification & Review**:
+    - Passed all 54 smoke harness unit tests (`pnpm test:smoke:units`).
+    - Verified syntax with `node --check tests/smoke/sanity.test.mjs`.
+    - Dual-axis code review passed with 100% compliance across Standards and Spec axes.
 
 ### [x] Feature: Whole-Stack Smoke and Sanity CI (Feature 020) — Phase 4: User Story 2 - Deterministic Business Flows (Slice 1: Search & Cache)
 

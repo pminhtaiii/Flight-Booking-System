@@ -453,3 +453,128 @@ test('rejects GET /air/offers/off_ with 400 for missing offer ID suffix', async 
   assert.equal(response.status, 400);
   assert.deepEqual(await response.json(), { error: 'Malformed offer ID' });
 });
+
+test('accepts Stripe customer creation through POST /v1/customers', async (t) => {
+  const { mock, url } = await startMock();
+  t.after(() => stopMock(mock));
+
+  const response = await fetch(`${url}/v1/customers`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/x-www-form-urlencoded' },
+    body: 'email=traveler%40example.com&name=Test+Traveler',
+  });
+
+  assert.equal(response.status, 200);
+  assert.deepEqual(await response.json(), {
+    id: 'cus_mock_123',
+    object: 'customer',
+  });
+
+  const reqs = await fetch(`${url}/__mock/requests`);
+  const reqsBody = await reqs.json();
+  assert.equal(reqsBody.counts['POST /v1/customers'], 1);
+  const recorded = reqsBody.requests.find((r) => r.pathname === '/v1/customers');
+  assert.ok(recorded);
+  assert.equal(recorded.method, 'POST');
+  assert.equal(recorded.status, 200);
+});
+
+test('rejects POST /v1/customers with malformed percent encoding', async (t) => {
+  const { mock, url } = await startMock();
+  t.after(() => stopMock(mock));
+
+  const response = await fetch(`${url}/v1/customers`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/x-www-form-urlencoded' },
+    body: 'email=traveler%ZZexample.com',
+  });
+
+  assert.equal(response.status, 400);
+  assert.deepEqual(await response.json(), { error: 'Malformed request body' });
+});
+
+test('retrieves Stripe payment intent through GET /v1/payment_intents/:id', async (t) => {
+  const { mock, url } = await startMock();
+  t.after(() => stopMock(mock));
+
+  const response = await fetch(`${url}/v1/payment_intents/pi_mock_123`);
+
+  assert.equal(response.status, 200);
+  const body = await response.json();
+  assert.equal(body.id, 'pi_mock_123');
+  assert.equal(body.object, 'payment_intent');
+  assert.equal(body.status, 'requires_capture');
+  assert.equal(body.amount, 12550);
+  assert.equal(body.currency, 'usd');
+
+  const reqs = await fetch(`${url}/__mock/requests`);
+  const reqsBody = await reqs.json();
+  assert.equal(reqsBody.counts['GET /v1/payment_intents/pi_mock_123'], 1);
+});
+
+test('retrieves Stripe payment intent with custom valid pi_ ID', async (t) => {
+  const { mock, url } = await startMock();
+  t.after(() => stopMock(mock));
+
+  const response = await fetch(`${url}/v1/payment_intents/pi_test_custom_456`);
+
+  assert.equal(response.status, 200);
+  const body = await response.json();
+  assert.equal(body.id, 'pi_test_custom_456');
+  assert.equal(body.object, 'payment_intent');
+  assert.equal(body.status, 'requires_capture');
+  assert.equal(body.amount, 12550);
+  assert.equal(body.currency, 'usd');
+});
+
+test('rejects GET /v1/payment_intents/:id with 400 for malformed ID', async (t) => {
+  const { mock, url } = await startMock();
+  t.after(() => stopMock(mock));
+
+  const badPrefixRes = await fetch(`${url}/v1/payment_intents/not_a_pi_id`);
+  assert.equal(badPrefixRes.status, 400);
+  assert.deepEqual(await badPrefixRes.json(), { error: 'Malformed payment intent ID' });
+
+  const emptySuffixRes = await fetch(`${url}/v1/payment_intents/pi_`);
+  assert.equal(emptySuffixRes.status, 400);
+  assert.deepEqual(await emptySuffixRes.json(), { error: 'Malformed payment intent ID' });
+
+  const missingIdRes = await fetch(`${url}/v1/payment_intents`);
+  assert.equal(missingIdRes.status, 400);
+  assert.deepEqual(await missingIdRes.json(), { error: 'Malformed payment intent ID' });
+});
+
+test('captures Stripe payment intent with any valid pi_ ID through POST /v1/payment_intents/:id/capture', async (t) => {
+  const { mock, url } = await startMock();
+  t.after(() => stopMock(mock));
+
+  const response = await fetch(`${url}/v1/payment_intents/pi_custom_capture_789/capture`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/x-www-form-urlencoded' },
+    body: '',
+  });
+
+  assert.equal(response.status, 200);
+  const body = await response.json();
+  assert.equal(body.id, 'pi_custom_capture_789');
+  assert.equal(body.object, 'payment_intent');
+  assert.equal(body.status, 'succeeded');
+
+  const reqs = await fetch(`${url}/__mock/requests`);
+  const reqsBody = await reqs.json();
+  assert.equal(reqsBody.counts['POST /v1/payment_intents/pi_custom_capture_789/capture'], 1);
+});
+
+test('rejects POST /v1/payment_intents/:id/capture with 400 for malformed payment intent ID', async (t) => {
+  const { mock, url } = await startMock();
+  t.after(() => stopMock(mock));
+
+  const response = await fetch(`${url}/v1/payment_intents/bad_id/capture`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/x-www-form-urlencoded' },
+    body: '',
+  });
+
+  assert.equal(response.status, 400);
+  assert.deepEqual(await response.json(), { error: 'Malformed payment intent ID' });
+});

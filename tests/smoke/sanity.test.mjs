@@ -4,11 +4,16 @@ import test, { after, describe } from 'node:test';
 
 import {
   assertResponseShape,
+  buildBookingIntent,
+  buildPaymentConfirmationPayload,
+  buildPaymentPayload,
   buildSearchQuery,
+  buildTravelerProfile,
   createUniqueTestActor,
   getFutureDate,
   getMockRequests,
   normalizeCacheEnvelope,
+  pollPaymentStatus,
   redactSensitive,
   requestJson as baseRequestJson,
   resetMockServer,
@@ -25,6 +30,11 @@ export const sharedContext = {
   offerPassengerId: null,
   searchOffer: null,
   testActor: null,
+  travelerProfile: null,
+  intentId: null,
+  bookingId: null,
+  paymentId: null,
+  confirmResponse: null,
 };
 
 function getRemainingTimeoutMs(maxRequestMs = 10000) {
@@ -348,6 +358,292 @@ describe('whole-stack sanity suite: flight search & cache', { timeout: SUITE_TIM
         sharedContext.offerId = firstOfferId;
         sharedContext.offerPassengerId = firstPassenger.id;
         sharedContext.searchOffer = firstResponse.results[0];
+      });
+    },
+  );
+
+  test(
+    'T033: traveler profile upsert and booking readiness evaluation',
+    { timeout: SUITE_TIMEOUT_MS },
+    async (t) => {
+      await runSafeCheck(t, async () => {
+        assert.ok(
+          sharedContext.testActor?.token,
+          'Test actor must be authenticated before profile upsert',
+        );
+        assert.ok(
+          sharedContext.offerId,
+          'sharedContext.offerId from T031 must exist before readiness check',
+        );
+        assert.ok(
+          sharedContext.offerPassengerId,
+          'sharedContext.offerPassengerId from T031 must exist before readiness check',
+        );
+
+        // 1. Fetch current profile revision
+        const currentProfile = await requestJson(`${API_BASE}/profile`, {
+          method: 'GET',
+          token: sharedContext.testActor.token,
+        });
+        const currentRevision = currentProfile?.revision ?? 0;
+
+        // 2. Submit profile update via PATCH /api/profile
+        const profilePayload = buildTravelerProfile({
+          expectedRevision: currentRevision,
+          identity: {
+            givenName: sharedContext.testActor.firstName || 'Smoke',
+            familyName: sharedContext.testActor.lastName || 'Tester',
+            dateOfBirth: '1990-01-01',
+            gender: 'female',
+            title: 'Ms',
+          },
+          contact: {
+            email: sharedContext.testActor.email,
+            phoneCountryCode: '+84',
+            phoneNumber: '912345678',
+          },
+          travelDocument: {
+            documentType: 'passport',
+            passportNumber: 'P12345678',
+            passportExpiry: '2030-01-01',
+            issuingCountry: 'VN',
+            nationality: 'VN',
+          },
+        });
+
+        const updatedProfile = await requestJson(`${API_BASE}/profile`, {
+          method: 'PATCH',
+          token: sharedContext.testActor.token,
+          body: profilePayload,
+        });
+
+        assert.ok(updatedProfile, 'Updated profile response must not be null');
+        assert.ok(updatedProfile.profileId, 'Updated profile must contain a profileId');
+        assert.ok(
+          updatedProfile.revision > currentRevision,
+          `Profile revision must increment (prior: ${currentRevision}, updated: ${updatedProfile.revision})`,
+        );
+        assert.equal(
+          updatedProfile.identity?.givenName,
+          profilePayload.identity.givenName,
+          'Profile identity givenName must match submitted update',
+        );
+        assert.equal(
+          updatedProfile.identity?.familyName,
+          profilePayload.identity.familyName,
+          'Profile identity familyName must match submitted update',
+        );
+
+        sharedContext.travelerProfile = updatedProfile;
+
+        // 3. Dispatch advisory readiness request
+        const readinessPayload = {
+          flightOfferId: sharedContext.offerId,
+          passengers: [
+            {
+              offerPassengerId: sharedContext.offerPassengerId,
+              passengerType: 'ADULT',
+              source: {
+                type: 'traveler_profile',
+                travelerProfileId: updatedProfile.profileId,
+                expectedProfileRevision: updatedProfile.revision,
+              },
+            },
+          ],
+        };
+
+        const readinessResult = await requestJson(`${API_BASE}/bookings/intents/readiness`, {
+          method: 'POST',
+          token: sharedContext.testActor.token,
+          body: readinessPayload,
+        });
+
+        assert.ok(readinessResult, 'Readiness result must not be null');
+        assert.ok(
+          readinessResult.ready === true || readinessResult.status === 'READY',
+          `Readiness result must be ready or status READY (observed ready=${readinessResult.ready}, status=${readinessResult.status})`,
+        );
+      });
+    },
+  );
+
+  test('T034: canonical booking intent creation', { timeout: SUITE_TIMEOUT_MS }, async (t) => {
+    await runSafeCheck(t, async () => {
+      assert.ok(
+        sharedContext.testActor?.token,
+        'Test actor must be authenticated before creating booking intent',
+      );
+      assert.ok(
+        sharedContext.offerId,
+        'sharedContext.offerId from T031 must exist before creating booking intent',
+      );
+      assert.ok(
+        sharedContext.offerPassengerId,
+        'sharedContext.offerPassengerId from T031 must exist before creating booking intent',
+      );
+      assert.ok(
+        sharedContext.travelerProfile?.profileId,
+        'sharedContext.travelerProfile from T033 must exist before creating booking intent',
+      );
+
+      const intentPayload = buildBookingIntent({
+        flightOfferId: sharedContext.offerId,
+        passengers: [
+          {
+            offerPassengerId: sharedContext.offerPassengerId,
+            type: 'ADULT',
+            source: {
+              type: 'traveler_profile',
+              travelerProfileId: sharedContext.travelerProfile.profileId,
+              expectedProfileRevision: sharedContext.travelerProfile.revision,
+            },
+          },
+        ],
+      });
+
+      const intentResponse = await requestJson(`${API_BASE}/bookings/intents`, {
+        method: 'POST',
+        token: sharedContext.testActor.token,
+        body: intentPayload,
+      });
+
+      assert.ok(intentResponse, 'Intent response must not be null');
+      assert.ok(intentResponse.id, 'Intent response must contain an id');
+      assert.match(
+        intentResponse.id,
+        /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i,
+        'Intent id must be a valid UUID v4',
+      );
+      assert.ok(
+        ['DRAFT', 'PENDING', 'AWAITING_PAYMENT'].includes(intentResponse.status),
+        `Intent status must be DRAFT, PENDING, or AWAITING_PAYMENT (observed: ${intentResponse.status})`,
+      );
+      assert.equal(
+        intentResponse.flightOfferId,
+        sharedContext.offerId,
+        'Intent flightOfferId must equal sharedContext.offerId',
+      );
+
+      sharedContext.intentId = intentResponse.id;
+    });
+  });
+
+  test(
+    'T035: idempotent payment creation and confirmation',
+    { timeout: SUITE_TIMEOUT_MS },
+    async (t) => {
+      await runSafeCheck(t, async () => {
+        assert.ok(
+          sharedContext.testActor?.token,
+          'Test actor must be authenticated before payment creation',
+        );
+        assert.ok(
+          sharedContext.intentId,
+          'sharedContext.intentId from T034 must exist before payment creation',
+        );
+
+        sharedContext.bookingId = crypto.randomUUID();
+
+        // 1. Create payment with fresh Idempotency-Key
+        const createIdempotencyKey = crypto.randomUUID();
+        const createPayload = buildPaymentPayload({
+          bookingIntentId: sharedContext.intentId,
+        });
+
+        const createResponse = await requestJson(`${API_BASE}/bookings/payment/create`, {
+          method: 'POST',
+          token: sharedContext.testActor.token,
+          headers: {
+            'Idempotency-Key': createIdempotencyKey,
+          },
+          body: createPayload,
+        });
+
+        assert.ok(createResponse, 'Create payment response must not be null');
+        const paymentId = createResponse.paymentId || createResponse.id;
+        assert.ok(paymentId, 'Create payment response must return paymentId');
+        sharedContext.paymentId = paymentId;
+
+        // 2. Confirm payment with distinct fresh Idempotency-Key
+        const confirmIdempotencyKey = crypto.randomUUID();
+        const confirmPayload = buildPaymentConfirmationPayload({
+          bookingId: sharedContext.bookingId,
+          paymentId: sharedContext.paymentId,
+        });
+
+        const confirmResponse = await requestJson(`${API_BASE}/bookings/payment/confirm`, {
+          method: 'POST',
+          token: sharedContext.testActor.token,
+          headers: {
+            'Idempotency-Key': confirmIdempotencyKey,
+          },
+          body: confirmPayload,
+        });
+
+        assert.ok(confirmResponse, 'Confirm payment response must not be null');
+        sharedContext.confirmResponse = confirmResponse;
+      });
+    },
+  );
+
+  test(
+    'T036: bounded payment status polling and owner-visible confirmed booking verification',
+    { timeout: SUITE_TIMEOUT_MS },
+    async (t) => {
+      await runSafeCheck(t, async () => {
+        assert.ok(
+          sharedContext.testActor?.token,
+          'Test actor must be authenticated before polling/verifying booking',
+        );
+        assert.ok(
+          sharedContext.paymentId,
+          'sharedContext.paymentId from T035 must exist before polling payment status',
+        );
+        assert.ok(
+          sharedContext.bookingId,
+          'sharedContext.bookingId from T035 must exist before verifying booking',
+        );
+
+        // 1. Bounded polling if confirm response status was PENDING
+        if (sharedContext.confirmResponse?.status === 'PENDING') {
+          const pollResult = await pollPaymentStatus({
+            url: `${API_BASE}/bookings/payment/${sharedContext.paymentId}/status`,
+            token: sharedContext.testActor.token,
+            expectedStatus: 'SUCCEEDED',
+            maxAttempts: 10,
+            intervalMs: 500,
+            timeoutMs: Math.min(10000, getRemainingTimeoutMs(10000)),
+          });
+          assert.ok(pollResult.ok, 'Payment status polling must resolve to expected status');
+          assert.equal(pollResult.status, 'SUCCEEDED');
+        } else {
+          // If already resolved synchronously
+          assert.ok(
+            sharedContext.confirmResponse?.status === 'SUCCEEDED' ||
+              sharedContext.confirmResponse?.success === true,
+            'Confirm payment must succeed synchronously or via PENDING handoff',
+          );
+        }
+
+        // 2. Query confirmed booking via GET /api/bookings/:bookingId
+        const booking = await requestJson(`${API_BASE}/bookings/${sharedContext.bookingId}`, {
+          method: 'GET',
+          token: sharedContext.testActor.token,
+        });
+
+        assert.ok(booking, 'Booking detail response must not be null');
+        assert.equal(booking.status, 'CONFIRMED', 'Booking status must be CONFIRMED');
+
+        const bookingRef = booking.pnrReference || booking.bookingReference;
+        assert.ok(bookingRef, 'Booking must have a valid booking reference or pnrReference');
+        assert.equal(
+          bookingRef,
+          'MOCK123',
+          `Booking reference must match Duffel mock order reference MOCK123 (observed: ${bookingRef})`,
+        );
+
+        const totalAmount = booking.totalAmount || booking.totalPrice;
+        assert.ok(totalAmount, 'Booking must have totalAmount or totalPrice');
       });
     },
   );
