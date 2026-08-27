@@ -322,3 +322,16 @@ test('redacts sensitive unknown pathname segments before exposing request diagno
   assert.equal(snapshot.requests[0].pathname, '/unsupported/<redacted>');
   assert.equal(JSON.stringify(snapshot).includes(sensitiveSegment), false);
 });
+
+test('redacts non-keyword sensitive-looking unknown pathname segments', async (t) => {
+  const { mock, url } = await startMock();
+  t.after(() => stopMock(mock));
+  const sensitiveSegment = 'alice-smith';
+
+  const response = await fetch(`${url}/unsupported/${sensitiveSegment}`);
+
+  assert.equal(response.status, 404);
+  const snapshot = await (await fetch(`${url}/__mock/requests`)).json();
+  assert.equal(snapshot.requests[0].pathname, '/unsupported/<redacted>');
+  assert.equal(JSON.stringify(snapshot).includes(sensitiveSegment), false);
+});

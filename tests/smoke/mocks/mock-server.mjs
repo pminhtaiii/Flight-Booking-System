@@ -129,18 +129,24 @@ function hasMalformedPercentEscape(body) {
   return /%(?![0-9A-Fa-f]{2})/.test(body);
 }
 
+const safeDiagnosticSegments = new Set([
+  '__mock',
+  'health',
+  'reset',
+  'requests',
+  'air',
+  'offer_requests',
+  'orders',
+  'v1',
+  'payment_intents',
+  'capture',
+  'not-a-provider-route',
+  'unsupported',
+]);
+
 function sanitizeUnknownPathname(pathname) {
   return pathname.split('/').map((segment) => {
-    if (segment === '') {
-      return segment;
-    }
-    if (
-      !/^[a-z][a-z0-9_-]{0,63}$/i.test(segment)
-      || /(authorization|bearer|token|secret|password|card|cvv|email|phone)/i.test(segment)
-    ) {
-      return '<redacted>';
-    }
-    return segment;
+    return segment === '' || safeDiagnosticSegments.has(segment) ? segment : '<redacted>';
   }).join('/') || '/';
 }
 
