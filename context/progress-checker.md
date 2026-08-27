@@ -6,16 +6,38 @@ Update this file after every completed feature. Any AI agent reading this should
 
 ### Current Status
 
-**Feature:** Whole-Stack Smoke and Sanity CI (Feature 020) — Phase 1: Setup (Shared Infrastructure) COMPLETE
-**Last completed:** Phase 1: Setup (Shared Infrastructure) (2026-08-27).
-**In progress:** Phase 2: Foundational Contracts and Test Seams (Tasks T005–T020).
-**Next:** Implement provider override contracts (Duffel/Stripe), no-LLM Agent and upstream health endpoints, mock server, and test-utils helpers.
+**Feature:** Whole-Stack Smoke and Sanity CI (Feature 020) — Phase 2 / Slice 1: Provider Override Contracts (T005–T008) COMPLETE
+**Last completed:** Phase 2 / Slice 1: Provider Override Contracts (T005–T008) (2026-08-27).
+**In progress:** Phase 2: Foundational Contracts and Test Seams (Remaining Tasks T009–T020).
+**Next:** Implement cross-service health contracts (no-LLM Agent and upstream Next.js health endpoints T009–T014).
 
 ---
 
 ## Progress by Feature
 
-### [ ] Feature: Whole-Stack Smoke and Sanity CI (Feature 020) — Phase 1: Setup (Shared Infrastructure)
+### [ ] Feature: Whole-Stack Smoke and Sanity CI (Feature 020) — Phase 2: Foundational Contracts and Test Seams
+
+- [x] Phase 2 / Slice 1: Provider Override Contracts (T005–T008) (2026-08-27):
+  - **T005: Failing Unit Tests for Duffel Provider Override (`apps/api/src/duffel/duffel.service.spec.ts`)**:
+    - Added unit tests for default parity (`basePath: 'https://api.duffel.com'`), valid loopback override (`http://127.0.0.1:4010`), trailing slash normalization (`http://127.0.0.1:4010/`), invalid URL syntax rejection, unsupported protocol rejection (`ftp:`), and manual HTTP order creation prepending configured `basePath`.
+    - RED verification confirmed: 5 new tests failed, 7 existing passed.
+  - **T007: Duffel Provider Override Implementation (`apps/api/src/duffel/duffel.service.ts`)**:
+    - Parsed `process.env.DUFFEL_API_URL` via `new URL()`, enforced `http:`/`https:`, normalized trailing slashes, defaulted to `'https://api.duffel.com'`, passed `basePath` to SDK `Duffel` constructor, and preserved `this.basePath` in `createOrder` manual fetch.
+    - GREEN verification confirmed: 12/12 tests passed in `duffel.service.spec.ts`.
+  - **T006: Failing Unit Tests for Stripe Provider Override (`apps/api/src/common/stripe.service.spec.ts`)**:
+    - Added unit tests for default parity (`api.stripe.com`, `https`), parsed loopback override (`protocol: 'http'`, `host: '127.0.0.1'`, `port: 4010`), URL without explicit port, invalid URL rejection, and unsupported protocol rejection (`ws:`, `ftp:`).
+    - RED verification confirmed: 4 new tests failed, 2 passed.
+  - **T008: Stripe Provider Override Implementation (`apps/api/src/common/stripe.service.ts`)**:
+    - Parsed `process.env.STRIPE_API_URL` via `new URL()`, enforced `http:`/`https:`, mapped `protocol`, `hostname`, and optional `port`, and preserved default `new Stripe(apiKey, { apiVersion: '2026-05-27.dahlia' })` when absent.
+    - GREEN verification confirmed: 6/6 tests passed in `stripe.service.spec.ts`.
+  - **Verification & Code Review Gate**:
+    - Unit Tests: `pnpm --filter @api/backend test -- src/duffel/duffel.service.spec.ts src/common/stripe.service.spec.ts` (18/18 passed, exit 0).
+    - Strict Typecheck: `pnpm --filter @api/backend exec tsc -p tsconfig.json --noEmit` (0 errors, exit 0).
+    - ESLint: `pnpm exec eslint "apps/api/src/duffel/**/*.ts" "apps/api/src/common/**/*.ts" --max-warnings 0` (0 errors, 0 warnings, exit 0).
+    - CI Contract: `node --test tests/ci/ci-workflow.contract.test.mjs` (13/13 passed, exit 0).
+    - Standards & Spec dual-axis review completed via subagents with 0 P0/P1 issues.
+
+### [x] Feature: Whole-Stack Smoke and Sanity CI (Feature 020) — Phase 1: Setup (Shared Infrastructure)
 
 - [x] Phase 1 / Setup (Shared Infrastructure) (2026-08-27):
   - **T001: Authoritative Smoke & Sanity Test Harness Documentation (`tests/smoke/README.md`)**:

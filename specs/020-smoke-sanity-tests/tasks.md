@@ -29,10 +29,10 @@
 
 ### Provider override contracts
 
-- [ ] T005 [P] Add failing default-parity, valid-loopback-override, invalid-URL, and manual-request-base tests in `apps/api/src/duffel/duffel.service.spec.ts`
-- [ ] T006 [P] Add failing default-parity, parsed protocol/host/port override, and invalid-URL tests in `apps/api/src/common/stripe.service.spec.ts`
-- [ ] T007 [P] Make `DUFFEL_API_URL` configure the installed Duffel SDK `basePath` and all manual Duffel HTTP calls while preserving the absent-variable default in `apps/api/src/duffel/duffel.service.ts` (depends on T005)
-- [ ] T008 [P] Make `STRIPE_API_URL` configure Stripe protocol/host/port while preserving the absent-variable SDK default in `apps/api/src/common/stripe.service.ts` (depends on T006)
+- [x] T005 [P] Add failing default-parity, valid-loopback-override, invalid-URL, and manual-request-base tests in `apps/api/src/duffel/duffel.service.spec.ts`
+- [x] T006 [P] Add failing default-parity, parsed protocol/host/port override, and invalid-URL tests in `apps/api/src/common/stripe.service.spec.ts`
+- [x] T007 [P] Make `DUFFEL_API_URL` configure the installed Duffel SDK `basePath` and all manual Duffel HTTP calls while preserving the absent-variable default in `apps/api/src/duffel/duffel.service.ts` (depends on T005)
+- [x] T008 [P] Make `STRIPE_API_URL` configure Stripe protocol/host/port while preserving the absent-variable SDK default in `apps/api/src/common/stripe.service.ts` (depends on T006)
 
 ### Cross-service health contracts
 
