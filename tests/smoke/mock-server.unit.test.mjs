@@ -340,3 +340,116 @@ test('redacts non-keyword sensitive-looking unknown pathname segments', async (t
   assert.equal(snapshot.requests[0].pathname, '/unsupported/<redacted>');
   assert.equal(JSON.stringify(snapshot).includes(sensitiveSegment), false);
 });
+
+test('returns deterministic Duffel offer detail fixture for GET /air/offers/off_mock_123', async (t) => {
+  const { mock, url } = await startMock();
+  t.after(() => stopMock(mock));
+
+  const response = await fetch(`${url}/air/offers/off_mock_123`);
+
+  assert.equal(response.status, 200);
+  const body = await response.json();
+  assert.equal(body.data.id, 'off_mock_123');
+  assert.equal(body.data.total_amount, '125.50');
+  assert.equal(body.data.total_currency, 'USD');
+  assert.equal(body.data.slices[0].duration, 'PT2H10M');
+  assert.equal(body.data.slices[0].segments[0].operating_carrier.id, 'VN');
+  assert.equal(body.data.slices[0].segments[0].operating_carrier.name, 'Vietnam Airlines');
+  assert.deepEqual(body.data.passengers, [{ id: 'pas_mock_1', type: 'adult' }]);
+  assert.deepEqual(body.data.available_services, []);
+
+  const snapshot = await (await fetch(`${url}/__mock/requests`)).json();
+  assert.equal(snapshot.counts['GET /air/offers/off_mock_123'], 1);
+  const recorded = snapshot.requests.find((r) => r.pathname === '/air/offers/off_mock_123');
+  assert.notEqual(recorded, undefined);
+  assert.equal(recorded.method, 'GET');
+  assert.equal(recorded.status, 200);
+});
+
+test('rejects GET /air/offers/invalid_id with 400 for malformed offer ID', async (t) => {
+  const { mock, url } = await startMock();
+  t.after(() => stopMock(mock));
+
+  const response = await fetch(`${url}/air/offers/invalid_id`);
+
+  assert.equal(response.status, 400);
+  assert.deepEqual(await response.json(), { error: 'Malformed offer ID' });
+
+  const snapshot = await (await fetch(`${url}/__mock/requests`)).json();
+  assert.equal(snapshot.counts['GET /air/offers/invalid_id'], 1);
+  const recorded = snapshot.requests.find((r) => r.pathname === '/air/offers/invalid_id');
+  assert.notEqual(recorded, undefined);
+  assert.equal(recorded.method, 'GET');
+  assert.equal(recorded.status, 400);
+});
+
+test('returns 404 for unknown offer ID on GET /air/offers/off_unknown', async (t) => {
+  const { mock, url } = await startMock();
+  t.after(() => stopMock(mock));
+
+  const response = await fetch(`${url}/air/offers/off_unknown`);
+
+  assert.equal(response.status, 404);
+  assert.deepEqual(await response.json(), { error: 'Offer not found' });
+
+  const snapshot = await (await fetch(`${url}/__mock/requests`)).json();
+  assert.equal(snapshot.counts['GET /air/offers/off_unknown'], 1);
+  const recorded = snapshot.requests.find((r) => r.pathname === '/air/offers/off_unknown');
+  assert.notEqual(recorded, undefined);
+  assert.equal(recorded.method, 'GET');
+  assert.equal(recorded.status, 404);
+});
+
+test('rejects GET /air/offers with 400 for empty offer ID', async (t) => {
+  const { mock, url } = await startMock();
+  t.after(() => stopMock(mock));
+
+  const response = await fetch(`${url}/air/offers`);
+
+  assert.equal(response.status, 400);
+  assert.deepEqual(await response.json(), { error: 'Malformed offer ID' });
+});
+
+test('returns dynamically created offer detail when offer request was posted', async (t) => {
+  const { mock, url } = await startMock();
+  t.after(() => stopMock(mock));
+
+  const createRes = await fetch(`${url}/air/offer_requests`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({
+      data: {
+        slices: [{ origin: 'HAN', destination: 'DAD', departure_date: '2030-05-01' }],
+        passengers: [{ type: 'adult' }],
+        cabin_class: 'business',
+      },
+    }),
+  });
+  assert.equal(createRes.status, 201);
+  const createdBody = await createRes.json();
+  const offerId = createdBody.data.offers[0].id;
+
+  const getRes = await fetch(`${url}/air/offers/${offerId}`);
+  assert.equal(getRes.status, 200);
+  const detailBody = await getRes.json();
+  assert.equal(detailBody.data.id, offerId);
+  assert.equal(detailBody.data.slices[0].origin.id, 'HAN');
+  assert.equal(detailBody.data.slices[0].destination.id, 'DAD');
+  assert.equal(detailBody.data.slices[0].segments[0].passengers[0].cabin_class, 'business');
+
+  await fetch(`${url}/__mock/reset`, { method: 'POST' });
+  const afterReset = await fetch(`${url}/air/offers/off_mock_123`);
+  assert.equal(afterReset.status, 200);
+  const defaultBody = await afterReset.json();
+  assert.equal(defaultBody.data.slices[0].origin.id, 'SGN');
+});
+
+test('rejects GET /air/offers/off_ with 400 for missing offer ID suffix', async (t) => {
+  const { mock, url } = await startMock();
+  t.after(() => stopMock(mock));
+
+  const response = await fetch(`${url}/air/offers/off_`);
+
+  assert.equal(response.status, 400);
+  assert.deepEqual(await response.json(), { error: 'Malformed offer ID' });
+});

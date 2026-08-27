@@ -84,10 +84,10 @@
 
 ### Flight search and cache
 
-- [ ] T028 [P] [US2] Add deterministic Duffel offer-request, offer-detail, offer-pricing, and order fixtures with required-field assertions in `tests/smoke/mocks/mock-server.mjs`
-- [ ] T029 [US2] Add a failing authenticated flight-search contract test for required result/meta fields in `tests/smoke/sanity.test.mjs` (depends on T028)
-- [ ] T030 [US2] Add a failing separate cache test that compares results/search hash, asserts `cached` false→true, and asserts one Duffel offer-request in `tests/smoke/sanity.test.mjs`
-- [ ] T031 [US2] Use flight detail to capture the authoritative offer passenger identifier for later readiness instead of hardcoding it in `tests/smoke/sanity.test.mjs`
+- [x] T028 [P] [US2] Add deterministic Duffel offer-request, offer-detail, offer-pricing, and order fixtures with required-field assertions in `tests/smoke/mocks/mock-server.mjs`
+- [x] T029 [US2] Add a failing authenticated flight-search contract test for required result/meta fields in `tests/smoke/sanity.test.mjs` (depends on T028)
+- [x] T030 [US2] Add a failing separate cache test that compares results/search hash, asserts `cached` false→true, and asserts one Duffel offer-request in `tests/smoke/sanity.test.mjs`
+- [x] T031 [US2] Use flight detail to capture the authoritative offer passenger identifier for later readiness instead of hardcoding it in `tests/smoke/sanity.test.mjs`
 
 ### Confirmed booking happy path
 
