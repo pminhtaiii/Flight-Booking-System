@@ -126,7 +126,7 @@ apps/web/app/health/upstream/route.spec.ts
 
 - API readiness: existing `/api/health` with database and Redis.
 - Web serving: `/` expected HTML marker.
-- Web upstream: new dynamic/no-store `/health/upstream` route with short timeout to `/api/health/ping` and only `{status, dependency}` output.
+- Web upstream: new dynamic/no-store `/health/upstream` route with short timeout to `/api/health/ping` and only `{status, upstream}` output.
 - Agent direct: existing `/health` requires HTTP reachability only.
 - API→Agent: new lightweight Agent liveness path is called by existing `AgentHealthService`; no Mimo, chat, token generation, or LLM.
 - Agent→API auth: an approved read-only gateway endpoint is called with valid/missing/invalid `X-Agent-API-Key` and signed claims to cover success/401/403.

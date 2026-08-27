@@ -138,6 +138,7 @@ export class FlightsService {
 - **Next.js is the frontend only** — all API calls go to the NestJS backend, not `app/api/` route handlers (with strict Decision 6 exceptions below)
 - Minimal `app/api/` usage — only for NextAuth.js auth routes, Stripe webhook receivers, and thin same-origin booking management route handlers
 - **Feature 017 handoff exception** — `CheckoutHandoffCard` may POST its in-memory credential only to same-origin `/checkout/handoff`; native hidden form fields are forbidden because they expose the credential in the DOM, and no response data fetching or business logic belongs in the Client Component
+- **Feature 020 upstream health probe exception** — `GET /health/upstream` (`apps/web/app/health/upstream/route.ts`) is a minimal server-side Route Handler used by whole-stack orchestrators and CI readiness probes to verify Next.js $\to$ NestJS backend reachability (`/api/health/ping`) via private `API_URL` without coupling user availability to health probing or exposing backend URLs to client browsers
 - Never put business logic in the Next.js layer — it belongs in NestJS services
 
 ### Decision 6 Exception: Thin Same-Origin Route Handlers

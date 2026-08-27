@@ -6,16 +6,47 @@ Update this file after every completed feature. Any AI agent reading this should
 
 ### Current Status
 
-**Feature:** Whole-Stack Smoke and Sanity CI (Feature 020) — Phase 2 / Slice 1: Provider Override Contracts (T005–T008) COMPLETE
-**Last completed:** Phase 2 / Slice 1: Provider Override Contracts (T005–T008) (2026-08-27).
-**In progress:** Phase 2: Foundational Contracts and Test Seams (Remaining Tasks T009–T020).
-**Next:** Implement cross-service health contracts (no-LLM Agent and upstream Next.js health endpoints T009–T014).
+**Feature:** Whole-Stack Smoke and Sanity CI (Feature 020) — Phase 2 / Slice 2: Cross-Service Health Contracts (T009–T014) COMPLETE
+**Last completed:** Phase 2 / Slice 2: Cross-Service Health Contracts (T009–T014) (2026-08-27).
+**In progress:** Phase 2: Foundational Contracts and Test Seams (Remaining Tasks T015–T020).
+**Next:** Implement dependency-free harness utilities (concurrent readiness polling and validating mock server T015–T020).
 
 ---
 
 ## Progress by Feature
 
 ### [ ] Feature: Whole-Stack Smoke and Sanity CI (Feature 020) — Phase 2: Foundational Contracts and Test Seams
+
+- [x] Phase 2 / Slice 2: Cross-Service Health Contracts (T009–T014) (2026-08-27):
+  - **T009: Failing Unit Tests for Agent No-LLM Liveness (`apps/agent/tests/test_health.py`)**:
+    - Added unit tests for reachability of `GET /health/live` returning HTTP 200 `{"status": "ok"}`, zero-inference guarantee (succeeds with unset `MIMO_API_KEY`, unreachable `MIMO_API_URL`, uninitialized guardrails, offline Redis, with zero network calls asserted via `httpx.AsyncClient.get`), and existing `GET /health` isolation.
+    - RED verification confirmed: 2 tests failed with 404, 4 existing passed.
+  - **T012: Agent No-LLM Liveness Route Implementation (`apps/agent/src/agent/main.py`)**:
+    - Added `/health/live` to `exclude_paths` in `JWTAuthMiddleware` and implemented `@app.get("/health/live")` returning `{"status": "ok"}` with explicit return type annotation and zero inference/network/Redis calls.
+    - GREEN verification confirmed: 6/6 tests passed in `test_health.py`.
+  - **T010: Failing Unit Tests for API-to-Agent Health Client (`apps/api/src/health/agent-health.service.spec.ts`)**:
+    - Added unit tests for target URL `${agentUrl}/health/live` (not `/health`), trailing slash normalization, success mapping (`{ status: 'up', details: { status: 'ok' } }`), 2000ms timeout/abort handling (`{ status: 'down' }`), non-200 / 500 error mapping (`{ status: 'down', statusCode: 500 }` without internal leakage of bodies, headers, or stack traces), `ECONNREFUSED` handling, degraded/empty payload handling, and zero leakage of URLs, tokens, headers, or stack traces.
+    - RED verification confirmed: 5 tests failed, 4 passed.
+  - **T013: API-to-Agent Health Client Implementation (`apps/api/src/health/agent-health.service.ts`)**:
+    - Updated `checkAgentHealth` target to `${agentUrl.replace(/\/+$/, '')}/health/live` with bounded 2000ms `AbortController` timeout, safe JSON narrowing from unknown without unsafe casts, preserved upstream `statusCode` on non-2xx HTTP responses and retained parsed `details` for degraded payloads for contract compatibility with `HealthController` and `multi-service-health.e2e-spec.ts`, and sanitized logger with `[checkAgentHealth]` context prefix omitting raw error messages. Synchronized `apps/api/test/agent-health.unit.ts`.
+    - GREEN verification confirmed: 9/9 tests passed in `agent-health.service.spec.ts`, 7/7 passed in `agent-health.unit.ts`, and 17/17 passed in `multi-service-health.e2e-spec.ts`.
+  - **T011: Failing Tests for Web Upstream Health Route (`apps/web/app/health/upstream/route.spec.ts`)**:
+    - Created `node:test` suite covering `Cache-Control: no-store` header on 200 and 503 responses, success mapping (HTTP 200 `{ status: "ok", upstream: "up" }`), failure mapping (HTTP 503 `{ status: "degraded", upstream: "down" }` on connection error, timeout, non-200, or invalid JSON), private URL resolution precedence (`API_URL` > `NEXT_PUBLIC_API_URL` > fallback `http://127.0.0.1:3001`), `/api` and trailing slash trimming, and zero leakage of credentials/URLs.
+    - RED verification confirmed: failed with module not found (exit code 1).
+  - **T014: Web Upstream Route Handler Implementation (`apps/web/app/health/upstream/route.ts`)**:
+    - Implemented dynamic Next.js Route Handler with `export const dynamic = 'force-dynamic'`, 2000ms `AbortController` timeout targeting `${apiUrl}/api/health/ping`, safe JSON payload narrowing, deduplicated `degradedResponse()` helper returning 503, and `Cache-Control: no-store` header on all responses.
+    - Documented Route Handler exception in `context/code-standards.md`.
+    - GREEN verification confirmed: 8/8 tests passed in `route.spec.ts`.
+  - **Verification & Code Review Gate**:
+    - Agent tests: `Push-Location apps/agent; $env:UV_CACHE_DIR = 'C:\Booking Systems\.t093-uv-cache'; uv run pytest tests/test_health.py; Pop-Location` (6/6 passed in 18s).
+    - API tests: `pnpm --filter @api/backend test -- src/health/agent-health.service.spec.ts` (9/9 passed).
+    - Web tests: `& '.\node_modules\.bin\tsx.CMD' --test apps/web/app/health/upstream/route.spec.ts` (8/8 passed in 1.6s).
+    - API Typecheck: `pnpm --filter @api/backend exec tsc -p tsconfig.json --noEmit` (0 errors, exit 0).
+    - Web Typecheck: `pnpm --filter @web/frontend typecheck` (0 errors, exit 0).
+    - TypeScript ESLint: `pnpm exec eslint "apps/api/src/health/**/*.ts" "apps/web/app/health/**/*.ts" --max-warnings 0` (0 errors, 0 warnings).
+    - Agent Ruff check: `uv run --package agent ruff check apps/agent` (All checks passed, 0 errors).
+    - CI Contract: `node --test tests/ci/ci-workflow.contract.test.mjs` (13/13 passed).
+    - Parallel Standards & Spec reviews completed; all P0/P1/P2 findings resolved.
 
 - [x] Phase 2 / Slice 1: Provider Override Contracts (T005–T008) (2026-08-27):
   - **T005: Failing Unit Tests for Duffel Provider Override (`apps/api/src/duffel/duffel.service.spec.ts`)**:

@@ -41,3 +41,6 @@ apps/web/playwright-report/
 
 # Graphify cache
 graphify-out/cache/
+
+# Package manager local store
+.pnpm-store/
