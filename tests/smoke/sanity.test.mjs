@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import crypto from 'node:crypto';
 import test, { after, describe } from 'node:test';
 
 import {
@@ -131,11 +132,10 @@ describe('whole-stack sanity suite: flight search & cache', { timeout: SUITE_TIM
           'Test actor must be authenticated before flight search',
         );
 
-        let candidateOffset =
-          14 + ((Math.floor(Date.now() / 1000) + Math.floor(Math.random() * 500)) % 2500) + 1;
         let searchResponse = null;
 
         for (let attempt = 0; attempt < 10; attempt += 1) {
+          const candidateOffset = crypto.randomInt(14, 2000000);
           searchQuery = buildSearchQuery({
             origin: 'SGN',
             destination: 'HAN',
@@ -155,8 +155,6 @@ describe('whole-stack sanity suite: flight search & cache', { timeout: SUITE_TIM
           if (searchResponse?.meta?.cached === false) {
             break;
           }
-
-          candidateOffset += 1;
         }
 
         assert.ok(searchResponse, 'Search response must not be null or undefined');
