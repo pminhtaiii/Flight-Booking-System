@@ -38,11 +38,9 @@ export function authBearer(token) {
  * @returns {string}
  */
 export function getFutureDate(daysAhead = 14, baseDate = new Date()) {
-  const future = new Date(Date.UTC(
-    baseDate.getUTCFullYear(),
-    baseDate.getUTCMonth(),
-    baseDate.getUTCDate() + daysAhead,
-  ));
+  const future = new Date(
+    Date.UTC(baseDate.getUTCFullYear(), baseDate.getUTCMonth(), baseDate.getUTCDate() + daysAhead),
+  );
   return future.toISOString().slice(0, 10);
 }
 
@@ -219,11 +217,15 @@ export function assertResponseShape(data, schema) {
         }
       } else if (expectedType === 'object') {
         if (typeof val !== 'object' || val === null || Array.isArray(val)) {
-          throw new Error(`Field "${key}" must be an object, observed: ${val === null ? 'null' : Array.isArray(val) ? 'array' : typeof val}`);
+          throw new Error(
+            `Field "${key}" must be an object, observed: ${val === null ? 'null' : Array.isArray(val) ? 'array' : typeof val}`,
+          );
         }
       } else if (typeof expectedType === 'string') {
         if (typeof val !== expectedType) {
-          throw new Error(`Field "${key}" must be of type "${expectedType}", observed: ${typeof val}`);
+          throw new Error(
+            `Field "${key}" must be of type "${expectedType}", observed: ${typeof val}`,
+          );
         }
       }
     }
@@ -319,7 +321,7 @@ export async function requestJson(url, options = {}) {
 
     if (!response.ok) {
       const err = new Error(
-        `Request failed with status ${response.status}: ${method} ${sanitizedUrl}`
+        `Request failed with status ${response.status}: ${method} ${sanitizedUrl}`,
       );
       err.code = 'HTTP_ERROR';
       err.status = response.status;
@@ -341,7 +343,7 @@ export async function requestJson(url, options = {}) {
   } catch (err) {
     if (err.name === 'AbortError' || timedOut) {
       const timeoutErr = new Error(
-        `Request timed out after ${timeoutMs}ms: ${method} ${sanitizedUrl}`
+        `Request timed out after ${timeoutMs}ms: ${method} ${sanitizedUrl}`,
       );
       timeoutErr.code = 'REQUEST_TIMEOUT';
       timeoutErr.method = method;
@@ -387,7 +389,7 @@ export async function pollPaymentStatus({
   let attempts = 0;
   let lastStatus = null;
 
-  while (attempts < maxAttempts && (clock.now() - startedAt) < timeoutMs) {
+  while (attempts < maxAttempts && clock.now() - startedAt < timeoutMs) {
     attempts += 1;
     let data = null;
     let ok = false;
@@ -403,7 +405,7 @@ export async function pollPaymentStatus({
       // Network or parsing error: continue to evaluate polling condition
     }
 
-    const currentStatus = ok ? (data?.status || data?.payment?.status || null) : null;
+    const currentStatus = ok ? data?.status || data?.payment?.status || null : null;
     lastStatus = currentStatus;
 
     if (ok && currentStatus === expectedStatus) {
@@ -431,7 +433,7 @@ export async function pollPaymentStatus({
 
   const elapsedMs = clock.now() - startedAt;
   const err = new Error(
-    `Payment polling exhausted (${attempts} attempts, last status: ${lastStatus})`
+    `Payment polling exhausted (${attempts} attempts, last status: ${lastStatus})`,
   );
   err.code = 'POLL_TIMEOUT';
   err.attempts = attempts;
@@ -460,10 +462,7 @@ export function signHmacClaimToken(payload, secret) {
   }
   const payloadStr = typeof payloadObj === 'string' ? payloadObj : JSON.stringify(payloadObj);
   const payloadPart = Buffer.from(payloadStr, 'utf8').toString('base64url');
-  const signaturePart = crypto
-    .createHmac('sha256', secret)
-    .update(payloadStr)
-    .digest('base64url');
+  const signaturePart = crypto.createHmac('sha256', secret).update(payloadStr).digest('base64url');
 
   return `${payloadPart}.${signaturePart}`;
 }
@@ -498,10 +497,7 @@ export function verifyHmacClaimToken(token, secret) {
     return { valid: false, reason: 'invalid_signature_encoding' };
   }
 
-  const computedSignature = crypto
-    .createHmac('sha256', secret)
-    .update(payloadStr)
-    .digest();
+  const computedSignature = crypto.createHmac('sha256', secret).update(payloadStr).digest();
 
   if (
     signatureBuffer.length !== computedSignature.length ||
@@ -535,7 +531,10 @@ export function redactSensitive(value) {
     const field = match.slice(0, match.indexOf(':'));
     return `${field}: "<redacted>"`;
   });
-  str = str.replace(/([?&][^=&\s]*(?:password|token|key|secret|passport|cvv)[^=&\s]*=)[^&\s]+/gi, '$1<redacted>');
+  str = str.replace(
+    /([?&][^=&\s]*(?:password|token|key|secret|passport|cvv)[^=&\s]*=)[^&\s]+/gi,
+    '$1<redacted>',
+  );
   str = str.replace(/\b(?:sk_live_|sk_test_|rk_live_|rk_test_)[0-9a-zA-Z]+\b/g, '<redacted>');
   str = str.replace(/\b(?:\d{4}[- ]){3}\d{4}\b/g, '<redacted>');
   str = str.replace(/\b\d{15,16}\b/g, '<redacted>');

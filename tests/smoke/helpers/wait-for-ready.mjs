@@ -30,13 +30,16 @@ function failureReport(services, ready, elapsedMs) {
   return {
     code: 'READINESS_TIMEOUT',
     elapsedMs,
-    services: services.filter((_, index) => !ready[index]).map((service) => ({
-      ...service,
-      lastError: service.lastStatus === null && service.lastError === null
-        ? 'deadline_exceeded'
-        : service.lastError,
-      elapsedMs,
-    })),
+    services: services
+      .filter((_, index) => !ready[index])
+      .map((service) => ({
+        ...service,
+        lastError:
+          service.lastStatus === null && service.lastError === null
+            ? 'deadline_exceeded'
+            : service.lastError,
+        elapsedMs,
+      })),
   };
 }
 
