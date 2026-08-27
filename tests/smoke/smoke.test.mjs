@@ -5,7 +5,7 @@ import {
   authBearer,
   createUniqueTestActor,
   redactSensitive,
-  requestJson,
+  requestJson as baseRequestJson,
 } from './helpers/test-utils.mjs';
 
 const API_BASE = (process.env.SMOKE_API_URL || 'http://127.0.0.1:3001/api').replace(/\/+$/, '');
@@ -14,6 +14,22 @@ const AGENT_BASE = (process.env.SMOKE_AGENT_URL || 'http://127.0.0.1:3002').repl
 
 const SUITE_TIMEOUT_MS = 15000;
 const suiteStartTime = Date.now();
+
+function getRemainingTimeoutMs(maxRequestMs = 5000) {
+  const remaining = SUITE_TIMEOUT_MS - (Date.now() - suiteStartTime);
+  return Math.max(0, Math.min(maxRequestMs, remaining));
+}
+
+let currentTestSignal = null;
+
+function requestJson(url, options = {}) {
+  const timeoutMs = getRemainingTimeoutMs(options.timeoutMs ?? 5000);
+  return baseRequestJson(url, {
+    ...options,
+    timeoutMs,
+    signal: options.signal || currentTestSignal,
+  });
+}
 
 function sanitizeError(err) {
   if (err instanceof Error) {
@@ -28,11 +44,13 @@ function sanitizeError(err) {
 async function runSafeCheck(t, checkName, fn) {
   const checkStartTime = Date.now();
   let checkError = null;
+  currentTestSignal = t?.signal || null;
   try {
-    await fn();
+    await fn(t);
   } catch (err) {
     checkError = sanitizeError(err);
   } finally {
+    currentTestSignal = null;
     const checkElapsed = Date.now() - checkStartTime;
     const totalElapsed = Date.now() - suiteStartTime;
     t.diagnostic(
@@ -71,9 +89,18 @@ describe('whole-stack smoke suite', { timeout: SUITE_TIMEOUT_MS }, () => {
 
   // Check 2: Next.js homepage HTML
   test('Next.js homepage HTML', { timeout: SUITE_TIMEOUT_MS }, async (t) => {
-    await runSafeCheck(t, 'Next.js homepage HTML', async () => {
+    await runSafeCheck(t, 'Next.js homepage HTML', async (checkContext) => {
       const controller = new AbortController();
-      const timer = setTimeout(() => controller.abort(), 5000);
+      const timeoutMs = getRemainingTimeoutMs(5000);
+      const timer = setTimeout(() => controller.abort(), timeoutMs);
+      const onAbort = () => controller.abort();
+      if (checkContext?.signal) {
+        if (checkContext.signal.aborted) {
+          controller.abort();
+        } else {
+          checkContext.signal.addEventListener('abort', onAbort, { once: true });
+        }
+      }
       try {
         const res = await fetch(`${WEB_BASE}/`, {
           headers: { Accept: 'text/html' },
@@ -89,15 +116,27 @@ describe('whole-stack smoke suite', { timeout: SUITE_TIMEOUT_MS }, () => {
         );
       } finally {
         clearTimeout(timer);
+        if (onAbort && checkContext?.signal) {
+          checkContext.signal.removeEventListener('abort', onAbort);
+        }
       }
     });
   });
 
   // Check 3: Agent health HTTP reachability
   test('Agent health HTTP reachability', { timeout: SUITE_TIMEOUT_MS }, async (t) => {
-    await runSafeCheck(t, 'Agent health HTTP reachability', async () => {
+    await runSafeCheck(t, 'Agent health HTTP reachability', async (checkContext) => {
       const controller = new AbortController();
-      const timer = setTimeout(() => controller.abort(), 5000);
+      const timeoutMs = getRemainingTimeoutMs(5000);
+      const timer = setTimeout(() => controller.abort(), timeoutMs);
+      const onAbort = () => controller.abort();
+      if (checkContext?.signal) {
+        if (checkContext.signal.aborted) {
+          controller.abort();
+        } else {
+          checkContext.signal.addEventListener('abort', onAbort, { once: true });
+        }
+      }
       try {
         const res = await fetch(`${AGENT_BASE}/health`, {
           signal: controller.signal,
@@ -110,6 +149,9 @@ describe('whole-stack smoke suite', { timeout: SUITE_TIMEOUT_MS }, () => {
         );
       } finally {
         clearTimeout(timer);
+        if (onAbort && checkContext?.signal) {
+          checkContext.signal.removeEventListener('abort', onAbort);
+        }
       }
     });
   });

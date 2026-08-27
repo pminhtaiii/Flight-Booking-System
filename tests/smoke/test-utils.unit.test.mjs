@@ -196,6 +196,66 @@ test('requestJson handles timeout with structured REQUEST_TIMEOUT error', async 
   );
 });
 
+test('requestJson aborts immediately on external signal and cleans up timer', async () => {
+  // Catches a production mutation that ignores external signal or leaks timer
+  const fakeFetch = async (url, options) => {
+    return new Promise((resolve, reject) => {
+      if (options.signal) {
+        if (options.signal.aborted) {
+          const abortErr = new Error('The operation was aborted');
+          abortErr.name = 'AbortError';
+          return reject(abortErr);
+        }
+        options.signal.addEventListener('abort', () => {
+          const abortErr = new Error('The operation was aborted');
+          abortErr.name = 'AbortError';
+          reject(abortErr);
+        });
+      }
+    });
+  };
+
+  // Case 1: In-flight request aborted via external signal
+  const extController = new AbortController();
+  const customAbortReason = new Error('external abort reason');
+  const inFlightPromise = requestJson('http://127.0.0.1:3001/api/external-abort', {
+    timeoutMs: 30000,
+    signal: extController.signal,
+    fetchImpl: fakeFetch,
+  });
+
+  extController.abort(customAbortReason);
+
+  await assert.rejects(
+    async () => {
+      await inFlightPromise;
+    },
+    (err) => {
+      assert.equal(err, customAbortReason);
+      return true;
+    },
+  );
+
+  // Case 2: External signal already aborted prior to call
+  const preAbortedController = new AbortController();
+  const preAbortReason = new Error('already aborted');
+  preAbortedController.abort(preAbortReason);
+
+  await assert.rejects(
+    async () => {
+      await requestJson('http://127.0.0.1:3001/api/pre-aborted', {
+        timeoutMs: 30000,
+        signal: preAbortedController.signal,
+        fetchImpl: fakeFetch,
+      });
+    },
+    (err) => {
+      assert.equal(err, preAbortReason);
+      return true;
+    },
+  );
+});
+
 test('resetMockServer and getMockRequests call loopback mock control endpoints', async () => {
   // Catches a production mutation with incorrect control paths or HTTP methods
   const recordedCalls = [];

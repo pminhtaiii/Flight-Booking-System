@@ -284,3 +284,68 @@ test('preserves negative privacy (zero token/password leakage) on failure', asyn
   }
   assert.equal(failed, true, 'Smoke suite should fail when registration returns 500');
 });
+
+test('aborts hanging endpoint within bounded budget without outliving suite deadline', async (t) => {
+  const hangingSockets = new Set();
+  let hungOnce = false;
+  const server = createSimulatedServer({
+    routeHandler: (req, res, { method, pathname }) => {
+      if (method === 'GET' && pathname === '/api/health' && !hungOnce) {
+        hungOnce = true;
+        hangingSockets.add(req.socket);
+        req.socket.on('close', () => hangingSockets.delete(req.socket));
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        // Intentionally do not call res.end() to simulate hanging response
+        return true;
+      }
+      return false;
+    },
+  });
+  const { port, close } = await startServer(server);
+  t.after(async () => {
+    for (const socket of hangingSockets) {
+      socket.destroy();
+    }
+    await close();
+  });
+
+  const env = {
+    ...process.env,
+    SMOKE_API_URL: `http://127.0.0.1:${port}/api`,
+    SMOKE_WEB_URL: `http://127.0.0.1:${port}`,
+    SMOKE_AGENT_URL: `http://127.0.0.1:${port}`,
+  };
+  delete env.NODE_TEST_CONTEXT;
+
+  const startTime = Date.now();
+  let failed = false;
+  try {
+    await execFileAsync(process.execPath, ['--test', 'tests/smoke/smoke.test.mjs'], {
+      env,
+      cwd: process.cwd(),
+    });
+  } catch (err) {
+    failed = true;
+    const durationMs = Date.now() - startTime;
+    assert.ok(
+      durationMs < 7000,
+      `Hanging endpoint test should fail in under 7s, but took ${durationMs}ms`,
+    );
+    const combinedOutput = `${err.stdout || ''} ${err.stderr || ''}`;
+    assert.match(
+      combinedOutput,
+      /REQUEST_TIMEOUT|Request timed out/i,
+      'Output should contain timeout error message',
+    );
+    assert.doesNotMatch(
+      combinedOutput,
+      /Smoke suite exceeded 15-second budget/,
+      'Smoke suite should not exceed 15-second budget',
+    );
+  } finally {
+    for (const socket of hangingSockets) {
+      socket.destroy();
+    }
+  }
+  assert.equal(failed, true, 'Smoke suite should fail when endpoint hangs');
+});
