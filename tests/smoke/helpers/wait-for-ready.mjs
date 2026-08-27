@@ -7,11 +7,14 @@ const systemClock = {
   clearTimeout: (timerId) => clearTimeout(timerId),
 };
 
-function createDeadline(clock, timeoutMs) {
-  if (typeof clock.setTimeout !== 'function') {
-    return { cancel: () => {}, signal: null };
+function assertTimerClock(clock) {
+  const requiredMethods = ['now', 'sleep', 'setTimeout', 'clearTimeout'];
+  if (!clock || requiredMethods.some((method) => typeof clock[method] !== 'function')) {
+    throw new TypeError('clock must provide now, sleep, setTimeout, and clearTimeout functions');
   }
+}
 
+function createDeadline(clock, timeoutMs) {
   let timerId;
   const signal = new Promise((resolve) => {
     timerId = clock.setTimeout(resolve, timeoutMs);
@@ -44,6 +47,7 @@ export async function waitForReady({
   fetchImpl = globalThis.fetch,
   clock = systemClock,
 }) {
+  assertTimerClock(clock);
   const startedAt = clock.now();
   const deadlineAt = startedAt + timeoutMs;
   const services = probes.map((probe) => ({

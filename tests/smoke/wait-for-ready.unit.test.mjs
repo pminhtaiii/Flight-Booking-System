@@ -5,26 +5,58 @@ import { waitForReady } from './helpers/wait-for-ready.mjs';
 
 function createAdvancingClock() {
   let now = 0;
+  let nextTimerId = 1;
+  const timers = new Map();
+  const advance = (milliseconds) => {
+    now += milliseconds;
+    for (const [timerId, timer] of timers) {
+      if (timer.dueAt <= now) {
+        timers.delete(timerId);
+        timer.callback();
+      }
+    }
+  };
 
   return {
     now: () => now,
-    sleep: async (milliseconds) => {
-      now += milliseconds;
+    sleep: async (milliseconds) => advance(milliseconds),
+    setTimeout: (callback, milliseconds) => {
+      const timerId = nextTimerId;
+      nextTimerId += 1;
+      timers.set(timerId, { callback, dueAt: now + milliseconds });
+      return timerId;
     },
+    clearTimeout: (timerId) => timers.delete(timerId),
   };
 }
 
 function createDeadlineClock(limitMs) {
   let now = 0;
+  let nextTimerId = 1;
+  const timers = new Map();
+  const advance = (milliseconds) => {
+    now += milliseconds;
+    for (const [timerId, timer] of timers) {
+      if (timer.dueAt <= now) {
+        timers.delete(timerId);
+        timer.callback();
+      }
+    }
+    if (now > limitMs) {
+      throw new Error(`test clock advanced beyond ${limitMs}ms`);
+    }
+  };
 
   return {
     now: () => now,
-    sleep: async (milliseconds) => {
-      now += milliseconds;
-      if (now > limitMs) {
-        throw new Error(`test clock advanced beyond ${limitMs}ms`);
-      }
+    sleep: async (milliseconds) => advance(milliseconds),
+    setTimeout: (callback, milliseconds) => {
+      const timerId = nextTimerId;
+      nextTimerId += 1;
+      timers.set(timerId, { callback, dueAt: now + milliseconds });
+      return timerId;
     },
+    clearTimeout: (timerId) => timers.delete(timerId),
   };
 }
 
@@ -32,6 +64,15 @@ function createManualTimerClock() {
   let now = 0;
   let nextTimerId = 1;
   const timers = new Map();
+  const advance = (milliseconds) => {
+    now += milliseconds;
+    for (const [timerId, timer] of timers) {
+      if (timer.dueAt <= now) {
+        timers.delete(timerId);
+        timer.callback();
+      }
+    }
+  };
 
   return {
     now: () => now,
@@ -42,15 +83,8 @@ function createManualTimerClock() {
       return timerId;
     },
     clearTimeout: (timerId) => timers.delete(timerId),
-    advance: (milliseconds) => {
-      now += milliseconds;
-      for (const [timerId, timer] of timers) {
-        if (timer.dueAt <= now) {
-          timers.delete(timerId);
-          timer.callback();
-        }
-      }
-    },
+    sleep: async (milliseconds) => advance(milliseconds),
+    advance,
   };
 }
 
@@ -228,4 +262,29 @@ test('uses the shared deadline when a probe fetch never settles', async () => {
   assert.deepEqual(outcome.failure.services, [
     { service: 'api', attempts: 1, lastStatus: null, lastError: 'deadline_exceeded', elapsedMs: 25 },
   ]);
+});
+
+test('rejects a partial injected clock before a hung probe can wait forever', async () => {
+  // Catches a production mutation that accepts a clock without deadline scheduling support.
+  const partialClock = {
+    now: () => 0,
+    sleep: async () => {},
+  };
+  const readiness = waitForReady({
+    probes: [{ name: 'api', url: 'http://api.test/health', validate: () => true }],
+    fetchImpl: async () => new Promise(() => {}),
+    clock: partialClock,
+  });
+
+  const outcome = await Promise.race([
+    readiness.then(
+      () => ({ kind: 'resolved' }),
+      (failure) => ({ kind: 'rejected', failure }),
+    ),
+    flushMicrotasks().then(() => ({ kind: 'not-settled' })),
+  ]);
+
+  assert.equal(outcome.kind, 'rejected');
+  assert.ok(outcome.failure instanceof TypeError);
+  assert.match(outcome.failure.message, /clock must provide now, sleep, setTimeout, and clearTimeout functions/);
 });
