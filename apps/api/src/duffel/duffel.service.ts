@@ -54,7 +54,7 @@ export class DuffelService {
   private readonly duffel: Duffel;
   private readonly duffelToken: string;
   private readonly apiVersion = 'v2';
-  private readonly basePath = 'https://api.duffel.com';
+  private readonly basePath: string;
 
   constructor(private readonly cacheService: CacheService) {
     const token = process.env.DUFFEL_ACCESS_TOKEN;
@@ -65,9 +65,21 @@ export class DuffelService {
       this.logger.warn('DUFFEL_ACCESS_TOKEN is missing or invalid in production/development runtime.');
     }
 
+    const rawApiUrl = process.env.DUFFEL_API_URL;
+    if (rawApiUrl && rawApiUrl.trim() !== '') {
+      const parsed = new URL(rawApiUrl.trim());
+      if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+        throw new Error(`Unsupported DUFFEL_API_URL protocol: ${parsed.protocol}. Only http: and https: are allowed.`);
+      }
+      this.basePath = `${parsed.origin}${parsed.pathname === '/' ? '' : parsed.pathname}`.replace(/\/+$/, '');
+    } else {
+      this.basePath = 'https://api.duffel.com';
+    }
+
     this.duffelToken = token || '';
     this.duffel = new Duffel({
       token: this.duffelToken,
+      basePath: this.basePath,
     });
   }
 
