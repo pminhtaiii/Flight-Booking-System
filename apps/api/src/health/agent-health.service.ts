@@ -16,7 +16,7 @@ export class AgentHealthService {
     try {
       const controller = new AbortController();
       timeoutId = setTimeout(() => controller.abort(), 2000);
-      const url = `${agentUrl.replace(/\/+$/, '')}/health`;
+      const url = `${agentUrl.replace(/\/+$/, '')}/health/live`;
       const response = await fetch(url, {
         method: 'GET',
         signal: controller.signal,
@@ -25,19 +25,30 @@ export class AgentHealthService {
       if (!response.ok) {
         return {
           status: 'down',
-          statusCode: response.status,
         };
       }
 
-      const details = (await response.json()) as Record<string, unknown>;
+      // Parse and safely narrow unknown payload without unsafe casting
+      const rawJson: unknown = await response.json();
+      if (
+        rawJson &&
+        typeof rawJson === 'object' &&
+        !Array.isArray(rawJson) &&
+        (rawJson as Record<string, unknown>).status === 'ok'
+      ) {
+        return {
+          status: 'up',
+          details: rawJson as Record<string, unknown>,
+        };
+      }
+
       return {
-        status: details.status === 'ok' ? 'up' : 'down',
-        details,
+        status: 'down',
       };
     } catch (error) {
-      this.logger.warn(
-        `Agent health check failed: ${error instanceof Error ? error.message : String(error)}`,
-      );
+      // Redact sensitive details (URLs, tokens, stack) from operational log
+      const errorReason = error instanceof Error ? error.name : 'UnknownError';
+      this.logger.warn(`[checkAgentHealth] Agent health check failed: ${errorReason}`);
       return {
         status: 'down',
       };
