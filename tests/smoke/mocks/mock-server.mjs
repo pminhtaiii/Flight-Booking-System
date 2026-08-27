@@ -170,6 +170,7 @@ const safeDiagnosticSegments = new Set([
   'offers',
   'orders',
   'v1',
+  'customers',
   'payment_intents',
   'capture',
   'not-a-provider-route',
@@ -432,7 +433,7 @@ export function createMockServer() {
       return;
     }
 
-    if (request.method === 'POST' && pathname === '/v1/payment_intents/pi_mock_123/capture') {
+    if (request.method === 'POST' && pathname === '/v1/customers') {
       const parsed = await parseFormBody(request);
       if (!parsed.ok) {
         record(request.method, pathname, 400);
@@ -440,7 +441,75 @@ export function createMockServer() {
         return;
       }
       record(request.method, pathname, 200);
-      sendJson(response, 200, buildPaymentIntent('succeeded'));
+      sendJson(response, 200, {
+        id: 'cus_mock_123',
+        object: 'customer',
+      });
+      return;
+    }
+
+    if (
+      request.method === 'GET' &&
+      (pathname === '/v1/payment_intents' || pathname.startsWith('/v1/payment_intents/'))
+    ) {
+      const intentId = pathname.startsWith('/v1/payment_intents/')
+        ? pathname.slice('/v1/payment_intents/'.length)
+        : '';
+      if (
+        !intentId ||
+        !intentId.startsWith('pi_') ||
+        intentId === 'pi_' ||
+        intentId.includes('/')
+      ) {
+        record(request.method, pathname, 400);
+        sendJson(response, 400, { error: 'Malformed payment intent ID' });
+        return;
+      }
+      record(request.method, pathname, 200);
+      sendJson(response, 200, {
+        id: intentId,
+        object: 'payment_intent',
+        status: 'requires_capture',
+        amount: 12550,
+        currency: 'usd',
+        capture_method: 'manual',
+        client_secret: `${intentId}_secret`,
+      });
+      return;
+    }
+
+    if (
+      request.method === 'POST' &&
+      pathname.startsWith('/v1/payment_intents/') &&
+      pathname.endsWith('/capture')
+    ) {
+      const intentId = pathname.slice('/v1/payment_intents/'.length, -'/capture'.length);
+      if (
+        !intentId ||
+        !intentId.startsWith('pi_') ||
+        intentId === 'pi_' ||
+        intentId.includes('/')
+      ) {
+        record(request.method, pathname, 400);
+        sendJson(response, 400, { error: 'Malformed payment intent ID' });
+        return;
+      }
+      const parsed = await parseFormBody(request);
+      if (!parsed.ok) {
+        record(request.method, pathname, 400);
+        sendJson(response, 400, { error: 'Malformed request body' });
+        return;
+      }
+      record(request.method, pathname, 200);
+      sendJson(response, 200, {
+        id: intentId,
+        object: 'payment_intent',
+        status: 'succeeded',
+        amount: 12550,
+        currency: 'usd',
+        capture_method: 'manual',
+        client_secret: `${intentId}_secret`,
+      });
       return;
     }
 
