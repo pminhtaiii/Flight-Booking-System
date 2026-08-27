@@ -1,5 +1,6 @@
 const mockGetOrder = jest.fn();
 const mockConfirmCancellation = jest.fn();
+const mockOffersGet = jest.fn();
 
 jest.mock('@duffel/api', () => ({
   Duffel: jest.fn().mockImplementation(() => ({
@@ -9,11 +10,15 @@ jest.mock('@duffel/api', () => ({
     orderCancellations: {
       confirm: mockConfirmCancellation,
     },
+    offers: {
+      get: mockOffersGet,
+    },
   })),
 }));
 
 import { CacheService } from '@/cache/cache.service';
 import { HttpStatus } from '@nestjs/common';
+import { Duffel } from '@duffel/api';
 import { DuffelService } from './duffel.service';
 
 describe('DuffelService cancellation recovery adapter', () => {
@@ -171,6 +176,108 @@ describe('DuffelService cancellation recovery adapter', () => {
       const result = await service.retrieveCompleteOrder('ord_complete_123');
       expect(result).toEqual(mockOrderPayload);
       expect(mockGetOrder).toHaveBeenCalledWith('ord_complete_123');
+    });
+  });
+
+  describe('DUFFEL_API_URL override and initialization', () => {
+    const originalEnv = process.env.DUFFEL_API_URL;
+    const originalFetch = global.fetch;
+    const mockFetch = jest.fn();
+
+    beforeAll(() => {
+      global.fetch = mockFetch;
+    });
+
+    afterAll(() => {
+      global.fetch = originalFetch;
+    });
+
+    beforeEach(() => {
+      (Duffel as unknown as jest.Mock).mockClear();
+      mockFetch.mockReset();
+      mockOffersGet.mockReset();
+    });
+
+    afterEach(() => {
+      if (originalEnv !== undefined) {
+        process.env.DUFFEL_API_URL = originalEnv;
+      } else {
+        delete process.env.DUFFEL_API_URL;
+      }
+    });
+
+    it('initializes Duffel SDK with default basePath when DUFFEL_API_URL is undefined', () => {
+      delete process.env.DUFFEL_API_URL;
+      new DuffelService({} as CacheService);
+      expect(Duffel).toHaveBeenCalledWith(
+        expect.objectContaining({
+          basePath: 'https://api.duffel.com',
+        }),
+      );
+    });
+
+    it('initializes Duffel SDK and creates order with valid loopback override', async () => {
+      process.env.DUFFEL_API_URL = 'http://127.0.0.1:4010';
+      const overrideService = new DuffelService({} as CacheService);
+
+      expect(Duffel).toHaveBeenCalledWith(
+        expect.objectContaining({
+          basePath: 'http://127.0.0.1:4010',
+        }),
+      );
+
+      mockOffersGet.mockResolvedValue({
+        data: {
+          passengers: [{ id: 'pas_1', type: 'adult' }],
+        },
+      });
+
+      mockFetch.mockResolvedValue({
+        ok: true,
+        json: async () => ({ data: { id: 'ord_mock_123' } }),
+      });
+
+      const passengers = [
+        {
+          type: 'adult',
+          givenName: 'John',
+          familyName: 'Doe',
+          born_on: '1990-01-01',
+          email: 'john@example.com',
+          phoneNumber: '+1234567890',
+          dateOfBirth: '1990-01-01',
+        },
+      ];
+
+      await overrideService.createOrder('off_123', passengers);
+
+      expect(mockFetch).toHaveBeenCalledWith(
+        'http://127.0.0.1:4010/air/orders',
+        expect.objectContaining({
+          method: 'POST',
+        }),
+      );
+    });
+
+    it('normalizes trailing slashes for DUFFEL_API_URL', () => {
+      process.env.DUFFEL_API_URL = 'http://127.0.0.1:4010/';
+      new DuffelService({} as CacheService);
+
+      expect(Duffel).toHaveBeenCalledWith(
+        expect.objectContaining({
+          basePath: 'http://127.0.0.1:4010',
+        }),
+      );
+    });
+
+    it('rejects invalid URL syntax during initialization', () => {
+      process.env.DUFFEL_API_URL = 'not-a-valid-url';
+      expect(() => new DuffelService({} as CacheService)).toThrow();
+    });
+
+    it('rejects unsupported protocols during initialization', () => {
+      process.env.DUFFEL_API_URL = 'ftp://127.0.0.1:4010';
+      expect(() => new DuffelService({} as CacheService)).toThrow();
     });
   });
 });
