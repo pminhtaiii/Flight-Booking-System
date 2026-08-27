@@ -84,7 +84,7 @@ allowed_origins = [url.strip() for url in settings.FRONTEND_URL.split(",") if ur
 app.add_middleware(
     JWTAuthMiddleware,
     secret=settings.JWT_SECRET,
-    exclude_paths=["/health", "/docs", "/openapi.json", "/redoc"],
+    exclude_paths=["/health", "/health/live", "/docs", "/openapi.json", "/redoc"],
 )
 
 
@@ -113,6 +113,15 @@ app.add_middleware(
         "x-correlation-id",
     ],
 )
+
+
+@app.get("/health/live")
+async def health_live() -> dict[str, str]:
+    """Lightweight liveness probe for orchestrators and upstream health clients.
+
+    Performs zero LLM inference, guardrail checks, or network I/O.
+    """
+    return {"status": "ok"}
 
 
 @app.get("/health")
