@@ -325,7 +325,9 @@ export function createMockServer() {
       return;
     }
 
-    record(request.method ?? 'UNKNOWN', sanitizeUnknownPathname(pathname), 404);
+    const safePath = sanitizeUnknownPathname(pathname);
+    record(request.method ?? 'UNKNOWN', safePath, 404);
+    process.stderr.write(`[mock-server] Warning: Unknown route requested: ${request.method ?? 'UNKNOWN'} ${safePath}\n`);
     sendJson(response, 404, { error: 'Not found' });
   });
 

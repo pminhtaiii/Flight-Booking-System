@@ -70,28 +70,37 @@ export async function waitForReady({
     while (!timedOut && clock.now() < deadlineAt) {
       service.attempts += 1;
       const attempt = (async () => {
+        let response;
         try {
-          const response = await fetchImpl(probe.url);
-          if (timedOut) {
-            return;
+          response = await fetchImpl(probe.url);
+        } catch {
+          if (!timedOut) {
+            service.lastStatus = null;
+            service.lastError = 'request_failed';
           }
-          service.lastStatus = Number.isInteger(response?.status) ? response.status : null;
-          service.lastError = null;
+          return;
+        }
+
+        if (timedOut) {
+          return;
+        }
+
+        service.lastStatus = Number.isInteger(response?.status) ? response.status : null;
+        service.lastError = null;
+
+        try {
           if (await probe.validate(response)) {
             ready[index] = true;
             service.elapsedMs = clock.now() - startedAt;
           }
         } catch {
           if (!timedOut) {
-            service.lastStatus = null;
-            service.lastError = 'request_failed';
+            service.lastError = 'validation_failed';
           }
         }
       })();
-      const outcome = deadlineSignal
-        ? await Promise.race([attempt, deadlineSignal])
-        : await attempt;
 
+      const outcome = await Promise.race([attempt, deadlineSignal]);
       if (outcome === DEADLINE_REACHED || ready[index]) {
         return;
       }
@@ -102,13 +111,9 @@ export async function waitForReady({
       }
 
       const pause = clock.sleep(Math.min(intervalMs, remainingMs));
-      if (deadlineSignal) {
-        const pauseOutcome = await Promise.race([pause, deadlineSignal]);
-        if (pauseOutcome === DEADLINE_REACHED) {
-          return;
-        }
-      } else {
-        await pause;
+      const pauseOutcome = await Promise.race([pause, deadlineSignal]);
+      if (pauseOutcome === DEADLINE_REACHED) {
+        return;
       }
     }
     service.elapsedMs = Math.min(clock.now() - startedAt, timeoutMs);

@@ -70,46 +70,38 @@ export function buildSearchQuery(overrides = {}) {
  * @returns {object}
  */
 export function buildTravelerProfile(overrides = {}) {
-  const defaultIdentity = {
-    givenName: 'John',
-    familyName: 'Doe',
-    dateOfBirth: '1990-01-01',
-    gender: 'male',
-    title: 'MR',
-  };
-
-  const defaultContact = {
-    email: 'smoke-traveler@example.com',
-    phoneCountryCode: '+65',
-    phoneNumber: '91234567',
-  };
-
-  const defaultTravelDocument = {
-    documentType: 'passport',
-    passportNumber: 'E12345678',
-    passportExpiry: getFutureDate(365),
-    issuingCountry: 'SG',
-    nationality: 'SG',
-  };
+  const {
+    identity: overrideIdentity,
+    contact: overrideContact,
+    travelDocument: overrideTravelDocument,
+    ...restOverrides
+  } = overrides;
 
   return {
     expectedRevision: 0,
     identity: {
-      ...defaultIdentity,
-      ...(overrides.identity || {}),
+      givenName: 'John',
+      familyName: 'Doe',
+      dateOfBirth: '1990-01-01',
+      gender: 'male',
+      title: 'MR',
+      ...overrideIdentity,
     },
     contact: {
-      ...defaultContact,
-      ...(overrides.contact || {}),
+      email: 'smoke-traveler@example.com',
+      phoneCountryCode: '+65',
+      phoneNumber: '91234567',
+      ...overrideContact,
     },
     travelDocument: {
-      ...defaultTravelDocument,
-      ...(overrides.travelDocument || {}),
+      documentType: 'passport',
+      passportNumber: 'E12345678',
+      passportExpiry: getFutureDate(365),
+      issuingCountry: 'SG',
+      nationality: 'SG',
+      ...overrideTravelDocument,
     },
-    ...overrides,
-    ...(overrides.identity ? { identity: { ...defaultIdentity, ...overrides.identity } } : {}),
-    ...(overrides.contact ? { contact: { ...defaultContact, ...overrides.contact } } : {}),
-    ...(overrides.travelDocument ? { travelDocument: { ...defaultTravelDocument, ...overrides.travelDocument } } : {}),
+    ...restOverrides,
   };
 }
 
@@ -398,10 +390,12 @@ export async function pollPaymentStatus({
   while (attempts < maxAttempts && (clock.now() - startedAt) < timeoutMs) {
     attempts += 1;
     let data = null;
+    let ok = false;
     try {
       const headers = authBearer(token);
       headers.Accept = 'application/json';
       const response = await fetchImpl(url, { headers });
+      ok = Boolean(response?.ok);
       if (typeof response?.json === 'function') {
         data = await response.json();
       }
@@ -409,10 +403,10 @@ export async function pollPaymentStatus({
       // Network or parsing error: continue to evaluate polling condition
     }
 
-    const currentStatus = data?.status || data?.payment?.status || null;
+    const currentStatus = ok ? (data?.status || data?.payment?.status || null) : null;
     lastStatus = currentStatus;
 
-    if (currentStatus === expectedStatus) {
+    if (ok && currentStatus === expectedStatus) {
       const elapsedMs = clock.now() - startedAt;
       return {
         ok: true,
@@ -536,19 +530,13 @@ export function redactSensitive(value) {
   }
   let str = typeof value === 'string' ? value : String(value);
 
-  // Redact Bearer tokens
   str = str.replace(/Bearer\s+[A-Za-z0-9._~+/-]+=*/gi, 'Bearer <redacted>');
-
-  // Redact JSON passwords
-  str = str.replace(/"password"\s*:\s*"[^"]*"/gi, '"password": "<redacted>"');
-
-  // Redact URL query/form credentials (including compound names like secretKey, api_key, client_secret)
-  str = str.replace(/([?&][^=&\s]*(?:password|token|key|secret)[^=&\s]*=)[^&\s]+/gi, '$1<redacted>');
-
-  // Redact Stripe secret keys
+  str = str.replace(/"(?:password|passportNumber|cvv|securityCode)"\s*:\s*"[^"]*"/gi, (match) => {
+    const field = match.slice(0, match.indexOf(':'));
+    return `${field}: "<redacted>"`;
+  });
+  str = str.replace(/([?&][^=&\s]*(?:password|token|key|secret|passport|cvv)[^=&\s]*=)[^&\s]+/gi, '$1<redacted>');
   str = str.replace(/\b(?:sk_live_|sk_test_|rk_live_|rk_test_)[0-9a-zA-Z]+\b/g, '<redacted>');
-
-  // Redact 16-digit cards with separators and 15-16 consecutive digits
   str = str.replace(/\b(?:\d{4}[- ]){3}\d{4}\b/g, '<redacted>');
   str = str.replace(/\b\d{15,16}\b/g, '<redacted>');
 

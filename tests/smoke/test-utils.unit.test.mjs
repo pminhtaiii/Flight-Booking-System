@@ -467,7 +467,8 @@ test('redactSensitive redacts bearer tokens, passwords, card numbers, and secret
   const sample = [
     'Authorization: Bearer secret-token-xyz-12345.abc_def',
     'User payload: {"email":"user@test.com","password":"SuperSecretP@ss1!"}',
-    'Query: https://example.com/api?token=secret123&key=secretkey456',
+    'Traveler payload: {"passportNumber":"B12345678","nationality":"SG"}',
+    'Query: https://example.com/api?token=secret123&key=secretkey456&passport=B12345678',
     'Stripe key: sk_test_51MockKey1234567890abcdef',
     'Card: 4111-2222-3333-4444 and 4111222233334444',
   ].join('\n');
@@ -476,6 +477,7 @@ test('redactSensitive redacts bearer tokens, passwords, card numbers, and secret
 
   assert.doesNotMatch(redacted, /secret-token-xyz/);
   assert.doesNotMatch(redacted, /SuperSecretP@ss1!/);
+  assert.doesNotMatch(redacted, /B12345678/);
   assert.doesNotMatch(redacted, /secretkey456/);
   assert.doesNotMatch(redacted, /sk_test_51MockKey/);
   assert.doesNotMatch(redacted, /4111-2222-3333-4444/);
@@ -483,6 +485,7 @@ test('redactSensitive redacts bearer tokens, passwords, card numbers, and secret
 
   assert.match(redacted, /Bearer <redacted>/);
   assert.match(redacted, /"password":\s*"<redacted>"/);
-  assert.match(redacted, /https:\/\/example\.com\/api\?token=<redacted>&key=<redacted>/);
+  assert.match(redacted, /"passportNumber":\s*"<redacted>"/);
+  assert.match(redacted, /https:\/\/example\.com\/api\?token=<redacted>&key=<redacted>&passport=<redacted>/);
   assert.match(redacted, /<redacted>/);
 });
