@@ -36,12 +36,12 @@
 
 ### Cross-service health contracts
 
-- [ ] T009 [P] Add failing no-LLM liveness behavior tests in `apps/agent/tests/test_health.py`
-- [ ] T010 [P] Add failing API-to-Agent liveness target, timeout, success, and sanitized failure tests in `apps/api/src/health/agent-health.service.spec.ts`
-- [ ] T011 [P] Add failing dynamic/no-store, bounded Nest ping, sanitized 200, and sanitized 503 tests in `apps/web/app/health/upstream/route.spec.ts`
-- [ ] T012 [P] Add the lightweight liveness route without Mimo, guardrail, chat, or LLM work in `apps/agent/src/agent/main.py` (depends on T009)
-- [ ] T013 Update the Agent health client to call the lightweight liveness route with bounded diagnostics in `apps/api/src/health/agent-health.service.ts` (depends on T010, T012)
-- [ ] T014 [P] Implement the private-URL, no-store upstream readiness handler in `apps/web/app/health/upstream/route.ts` (depends on T011)
+- [x] T009 [P] Add failing no-LLM liveness behavior tests in `apps/agent/tests/test_health.py`
+- [x] T010 [P] Add failing API-to-Agent liveness target, timeout, success, and sanitized failure tests in `apps/api/src/health/agent-health.service.spec.ts`
+- [x] T011 [P] Add failing dynamic/no-store, bounded Nest ping, sanitized 200, and sanitized 503 tests in `apps/web/app/health/upstream/route.spec.ts`
+- [x] T012 [P] Add the lightweight liveness route without Mimo, guardrail, chat, or LLM work in `apps/agent/src/agent/main.py` (depends on T009)
+- [x] T013 Update the Agent health client to call the lightweight liveness route with bounded diagnostics in `apps/api/src/health/agent-health.service.ts` (depends on T010, T012)
+- [x] T014 [P] Implement the private-URL, no-store upstream readiness handler in `apps/web/app/health/upstream/route.ts` (depends on T011)
 
 ### Dependency-free harness utilities
 
