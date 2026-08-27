@@ -25,6 +25,17 @@ async function parseJsonBody(request) {
   }
 }
 
+async function parseFormBody(request) {
+  if (!isFormEncoded(request)) {
+    return { ok: false };
+  }
+  const rawBody = await readBody(request);
+  if (hasMalformedPercentEscape(rawBody)) {
+    return { ok: false };
+  }
+  return { ok: true, value: new URLSearchParams(rawBody) };
+}
+
 function isValidOfferRequest(payload) {
   const data = payload?.data;
   if (!data || typeof data !== 'object' || Array.isArray(data)) {
@@ -118,6 +129,21 @@ function hasMalformedPercentEscape(body) {
   return /%(?![0-9A-Fa-f]{2})/.test(body);
 }
 
+function sanitizeUnknownPathname(pathname) {
+  return pathname.split('/').map((segment) => {
+    if (segment === '') {
+      return segment;
+    }
+    if (
+      !/^[a-z][a-z0-9_-]{0,63}$/i.test(segment)
+      || /(authorization|bearer|token|secret|password|card|cvv|email|phone)/i.test(segment)
+    ) {
+      return '<redacted>';
+    }
+    return segment;
+  }).join('/') || '/';
+}
+
 function buildPaymentIntent(status, amount = 12550, currency = 'usd') {
   return {
     id: 'pi_mock_123',
@@ -141,7 +167,14 @@ function isValidInstantOrder(payload) {
     && data.selected_offers.length > 0
     && data.selected_offers.every((offer) => typeof offer === 'string' && offer.length > 0)
     && Array.isArray(data.passengers)
-    && data.passengers.length > 0,
+    && data.passengers.length > 0
+    && data.passengers.every((passenger) => (
+      passenger
+      && typeof passenger === 'object'
+      && !Array.isArray(passenger)
+      && typeof passenger.id === 'string'
+      && passenger.id.length > 0
+    )),
   );
 }
 
@@ -227,25 +260,19 @@ export function createMockServer() {
     }
 
     if (request.method === 'POST' && pathname === '/v1/payment_intents') {
-      if (!isFormEncoded(request)) {
+      const parsed = await parseFormBody(request);
+      if (!parsed.ok) {
         record(request.method, pathname, 400);
         sendJson(response, 400, { error: 'Malformed request body' });
         return;
       }
-      const rawBody = await readBody(request);
-      if (hasMalformedPercentEscape(rawBody)) {
-        record(request.method, pathname, 400);
-        sendJson(response, 400, { error: 'Malformed request body' });
-        return;
-      }
-      const form = new URLSearchParams(rawBody);
-      if (!isValidPaymentIntent(form)) {
+      if (!isValidPaymentIntent(parsed.value)) {
         record(request.method, pathname, 422);
         sendJson(response, 422, { error: 'Invalid request' });
         return;
       }
-      const amount = Number(form.get('amount'));
-      const currency = form.get('currency');
+      const amount = Number(parsed.value.get('amount'));
+      const currency = parsed.value.get('currency');
       record(request.method, pathname, 200);
       sendJson(response, 200, buildPaymentIntent('requires_capture', amount, currency));
       return;
@@ -281,7 +308,8 @@ export function createMockServer() {
     }
 
     if (request.method === 'POST' && pathname === '/v1/payment_intents/pi_mock_123/capture') {
-      if (!isFormEncoded(request)) {
+      const parsed = await parseFormBody(request);
+      if (!parsed.ok) {
         record(request.method, pathname, 400);
         sendJson(response, 400, { error: 'Malformed request body' });
         return;
@@ -291,7 +319,7 @@ export function createMockServer() {
       return;
     }
 
-    record(request.method ?? 'UNKNOWN', pathname, 404);
+    record(request.method ?? 'UNKNOWN', sanitizeUnknownPathname(pathname), 404);
     sendJson(response, 404, { error: 'Not found' });
   });
 

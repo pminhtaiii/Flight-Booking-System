@@ -143,6 +143,20 @@ test('captures a known Stripe payment intent through its exact method and pathna
   });
 });
 
+test('rejects a malformed form body on the Stripe capture route', async (t) => {
+  const { mock, url } = await startMock();
+  t.after(() => stopMock(mock));
+
+  const response = await fetch(`${url}/v1/payment_intents/pi_mock_123/capture`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/x-www-form-urlencoded' },
+    body: 'amount=%',
+  });
+
+  assert.equal(response.status, 400);
+  assert.deepEqual(await response.json(), { error: 'Malformed request body' });
+});
+
 test('accepts a valid Duffel instant-order request with required JSON fields', async (t) => {
   const { mock, url } = await startMock();
   t.after(() => stopMock(mock));
@@ -164,6 +178,26 @@ test('accepts a valid Duffel instant-order request with required JSON fields', a
   assert.equal(body.data.id, 'ord_mock_123');
   assert.equal(body.data.booking_reference, 'MOCK123');
   assert.equal(body.data.status, 'confirmed');
+});
+
+test('rejects an instant-order passenger without the required Duffel passenger id', async (t) => {
+  const { mock, url } = await startMock();
+  t.after(() => stopMock(mock));
+
+  const response = await fetch(`${url}/air/orders`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({
+      data: {
+        type: 'instant',
+        selected_offers: ['off_mock_123'],
+        passengers: [{}],
+      },
+    }),
+  });
+
+  assert.equal(response.status, 422);
+  assert.deepEqual(await response.json(), { error: 'Invalid request' });
 });
 
 test('rejects a Duffel body that is not declared as JSON', async (t) => {
@@ -259,4 +293,32 @@ test('records only safe diagnostics for unknown routes without leaking headers o
   assert.equal(JSON.stringify(snapshot).includes(secret), false);
   assert.equal(JSON.stringify(snapshot).includes(paymentDetails), false);
   assert.equal(JSON.stringify(snapshot).includes('4242424242424242'), false);
+});
+
+test('rejects a known pathname when its HTTP method does not match and records the 404', async (t) => {
+  const { mock, url } = await startMock();
+  t.after(() => stopMock(mock));
+
+  const response = await fetch(`${url}/air/offer_requests?return_offers=true`);
+
+  assert.equal(response.status, 404);
+  assert.deepEqual(await response.json(), { error: 'Not found' });
+  const snapshot = await (await fetch(`${url}/__mock/requests`)).json();
+  assert.deepEqual(snapshot.counts, { 'GET /air/offer_requests': 1 });
+  assert.equal(snapshot.requests[0].method, 'GET');
+  assert.equal(snapshot.requests[0].pathname, '/air/offer_requests');
+  assert.equal(snapshot.requests[0].status, 404);
+});
+
+test('redacts sensitive unknown pathname segments before exposing request diagnostics', async (t) => {
+  const { mock, url } = await startMock();
+  t.after(() => stopMock(mock));
+  const sensitiveSegment = 'token-should-not-appear';
+
+  const response = await fetch(`${url}/unsupported/${sensitiveSegment}`);
+
+  assert.equal(response.status, 404);
+  const snapshot = await (await fetch(`${url}/__mock/requests`)).json();
+  assert.equal(snapshot.requests[0].pathname, '/unsupported/<redacted>');
+  assert.equal(JSON.stringify(snapshot).includes(sensitiveSegment), false);
 });
