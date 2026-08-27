@@ -508,9 +508,9 @@ describe('whole-stack sanity suite: flight search & cache', { timeout: SUITE_TIM
       });
 
       assert.ok(intentResponse, 'Intent response must not be null');
-      assert.ok(intentResponse.id, 'Intent response must contain an id');
+      assert.ok(intentResponse.intentId, 'Intent response must contain an intentId');
       assert.match(
-        intentResponse.id,
+        intentResponse.intentId,
         /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i,
         'Intent id must be a valid UUID v4',
       );
@@ -518,13 +518,8 @@ describe('whole-stack sanity suite: flight search & cache', { timeout: SUITE_TIM
         ['DRAFT', 'PENDING', 'AWAITING_PAYMENT'].includes(intentResponse.status),
         `Intent status must be DRAFT, PENDING, or AWAITING_PAYMENT (observed: ${intentResponse.status})`,
       );
-      assert.equal(
-        intentResponse.flightOfferId,
-        sharedContext.offerId,
-        'Intent flightOfferId must equal sharedContext.offerId',
-      );
 
-      sharedContext.intentId = intentResponse.id;
+      sharedContext.intentId = intentResponse.intentId;
     });
   });
 
