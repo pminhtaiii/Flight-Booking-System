@@ -310,6 +310,16 @@ export async function requestJson(url, options = {}) {
     controller.abort();
   }, timeoutMs);
 
+  let onAbort = null;
+  if (options.signal) {
+    if (options.signal.aborted) {
+      controller.abort(options.signal.reason);
+    } else {
+      onAbort = () => controller.abort(options.signal.reason);
+      options.signal.addEventListener('abort', onAbort, { once: true });
+    }
+  }
+
   try {
     const response = await fetchImpl(url, {
       ...options,
@@ -341,7 +351,19 @@ export async function requestJson(url, options = {}) {
 
     return null;
   } catch (err) {
-    if (err.name === 'AbortError' || timedOut) {
+    if (timedOut) {
+      const timeoutErr = new Error(
+        `Request timed out after ${timeoutMs}ms: ${method} ${sanitizedUrl}`,
+      );
+      timeoutErr.code = 'REQUEST_TIMEOUT';
+      timeoutErr.method = method;
+      timeoutErr.url = sanitizedUrl;
+      throw timeoutErr;
+    }
+    if (options.signal?.aborted) {
+      throw options.signal.reason || err;
+    }
+    if (err.name === 'AbortError') {
       const timeoutErr = new Error(
         `Request timed out after ${timeoutMs}ms: ${method} ${sanitizedUrl}`,
       );
@@ -353,6 +375,9 @@ export async function requestJson(url, options = {}) {
     throw err;
   } finally {
     clearTimeout(timer);
+    if (onAbort && options.signal) {
+      options.signal.removeEventListener('abort', onAbort);
+    }
   }
 }
 

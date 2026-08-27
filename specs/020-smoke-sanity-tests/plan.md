@@ -32,17 +32,17 @@ Implementation requires four bounded compatibility seams discovered during plann
 
 ## Constitution Check
 
-*Pre-design gate: PASS. Post-design gate: PASS.*
+_Pre-design gate: PASS. Post-design gate: PASS._
 
-| Principle | Gate | Design evidence |
-|---|---|---|
-| I. Flight-First Architecture | PASS | Sanity focuses on flight search and booking; no hotel/dining scope |
-| II. Deterministic Transaction Boundary | PASS | Booking is exercised through deterministic services with local Stripe/Duffel fixtures; Agent/LLM is excluded from payment and booking |
-| III. API Budget Discipline | PASS | Network guard plus loopback provider URLs make real Duffel traffic impossible; cache suppression is directly asserted |
-| IV. Observability & Operational Visibility | PASS | Health/readiness contracts, per-service diagnostics, safe mock logs, process logs, and cleanup outcomes are first-class |
-| V. Incremental Delivery | PASS | Smoke is the MVP gate; sanity flows and CI aggregation are independently testable increments with rollback by file cluster |
-| Security Requirements | PASS | Non-production secrets only, no raw card data, public HTTP tests, existing JWT/claim guards, redacted diagnostics |
-| Complexity Governance | PASS | One dependency-free orchestrator and two provider configuration options are the smallest reliable way to provide local/CI parity and validating mocks |
+| Principle                                  | Gate | Design evidence                                                                                                                                       |
+| ------------------------------------------ | ---- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| I. Flight-First Architecture               | PASS | Sanity focuses on flight search and booking; no hotel/dining scope                                                                                    |
+| II. Deterministic Transaction Boundary     | PASS | Booking is exercised through deterministic services with local Stripe/Duffel fixtures; Agent/LLM is excluded from payment and booking                 |
+| III. API Budget Discipline                 | PASS | Network guard plus loopback provider URLs make real Duffel traffic impossible; cache suppression is directly asserted                                 |
+| IV. Observability & Operational Visibility | PASS | Health/readiness contracts, per-service diagnostics, safe mock logs, process logs, and cleanup outcomes are first-class                               |
+| V. Incremental Delivery                    | PASS | Smoke is the MVP gate; sanity flows and CI aggregation are independently testable increments with rollback by file cluster                            |
+| Security Requirements                      | PASS | Non-production secrets only, no raw card data, public HTTP tests, existing JWT/claim guards, redacted diagnostics                                     |
+| Complexity Governance                      | PASS | One dependency-free orchestrator and two provider configuration options are the smallest reliable way to provide local/CI parity and validating mocks |
 
 No constitutional violation or unresolved clarification remains.
 
@@ -50,15 +50,15 @@ No constitutional violation or unresolved clarification remains.
 
 The plan preserves the ADR's intended guarantees while correcting factual assumptions:
 
-| ADR assumption | Verified code | Planned contract |
-|---|---|---|
-| API health says `db/redis: connected` | `dependencies.database/redis: up` | Assert current public readiness shape |
-| `/` proves frontend→API | Homepage is static | Keep `/` serving check; add `/health/upstream` server fetch |
-| Agent `/health` is fully healthy without LLM | It can return HTTP 200 `degraded` due Mimo/guardrails | Direct check asserts reachability; new lightweight liveness excludes inference |
-| API→Agent uses `X-Service-Auth` | No such header; real service auth is Agent→API | Test API→Agent liveness plus existing Agent→API key/claim authorization |
-| Invalid service key is 403 | Missing/invalid key is 401; unauthorized valid claim is 403 | Assert the actual security semantics |
-| Duffel/Stripe already accept mock URLs | Both wrappers currently default/hardcode provider endpoints | Add optional URL configuration with unchanged production defaults |
-| Compose local DB is fresh | Named volume persists `flight_booking` | Guarded reset of only `smoke_test`; CI removes job-owned resources |
+| ADR assumption                               | Verified code                                               | Planned contract                                                               |
+| -------------------------------------------- | ----------------------------------------------------------- | ------------------------------------------------------------------------------ |
+| API health says `db/redis: connected`        | `dependencies.database/redis: up`                           | Assert current public readiness shape                                          |
+| `/` proves frontend→API                      | Homepage is static                                          | Keep `/` serving check; add `/health/upstream` server fetch                    |
+| Agent `/health` is fully healthy without LLM | It can return HTTP 200 `degraded` due Mimo/guardrails       | Direct check asserts reachability; new lightweight liveness excludes inference |
+| API→Agent uses `X-Service-Auth`              | No such header; real service auth is Agent→API              | Test API→Agent liveness plus existing Agent→API key/claim authorization        |
+| Invalid service key is 403                   | Missing/invalid key is 401; unauthorized valid claim is 403 | Assert the actual security semantics                                           |
+| Duffel/Stripe already accept mock URLs       | Both wrappers currently default/hardcode provider endpoints | Add optional URL configuration with unchanged production defaults              |
+| Compose local DB is fresh                    | Named volume persists `flight_booking`                      | Guarded reset of only `smoke_test`; CI removes job-owned resources             |
 
 These are compatibility and testability seams, not changes to flight, payment, booking, or authentication business behavior.
 
@@ -201,15 +201,15 @@ Add `smoke-and-sanity` to `ci-status.needs`, pass `SMOKE_AND_SANITY_RESULT`, and
 
 ## Environment Contract
 
-| Area | Required values |
-|---|---|
-| Database/cache | job/local `DATABASE_URL`, loopback `REDIS_URL` |
-| Shared auth | matching `JWT_SECRET`, `AGENT_SERVICE_API_KEY`, `CLAIM_TOKEN_SECRET` |
-| API providers | non-live tokens plus loopback `DUFFEL_API_URL`, `STRIPE_API_URL`, Stripe webhook test secret |
-| Cross-service | `AGENT_SERVICE_URL`, `NESTJS_API_URL`, private Web `API_URL` |
-| Feature flags | booking readiness and any existing booking-confirmation flags required by selected public flow |
-| Network | absolute `NODE_OPTIONS=--require=.../tests/ci/node-network-guard.cjs` |
-| Tests | `SMOKE_API_URL`, `SMOKE_WEB_URL`, `SMOKE_AGENT_URL`, `SMOKE_MOCK_URL` |
+| Area           | Required values                                                                                |
+| -------------- | ---------------------------------------------------------------------------------------------- |
+| Database/cache | job/local `DATABASE_URL`, loopback `REDIS_URL`                                                 |
+| Shared auth    | matching `JWT_SECRET`, `AGENT_SERVICE_API_KEY`, `CLAIM_TOKEN_SECRET`                           |
+| API providers  | non-live tokens plus loopback `DUFFEL_API_URL`, `STRIPE_API_URL`, Stripe webhook test secret   |
+| Cross-service  | `AGENT_SERVICE_URL`, `NESTJS_API_URL`, private Web `API_URL`                                   |
+| Feature flags  | booking readiness and any existing booking-confirmation flags required by selected public flow |
+| Network        | absolute `NODE_OPTIONS=--require=.../tests/ci/node-network-guard.cjs`                          |
+| Tests          | `SMOKE_API_URL`, `SMOKE_WEB_URL`, `SMOKE_AGENT_URL`, `SMOKE_MOCK_URL`                          |
 
 Exact values and redaction rules live in [contracts/test-harness.md](contracts/test-harness.md).
 
@@ -225,28 +225,28 @@ Exact values and redaction rules live in [contracts/test-harness.md](contracts/t
 
 ## File-by-File Change Plan
 
-| File | Planned change |
-|---|---|
-| `.github/workflows/ci.yml` | Filters, job, env, dependency predicate, setup/build/migrate/run/diagnostics/cleanup, aggregate dependency |
-| `scripts/ci/evaluate-ci-status.mjs` | Change-aware expected result for shared whole-stack job |
-| `scripts/ci/run-smoke-sanity.mjs` | Cross-platform process lifecycle and sequential suite gate |
-| `tests/ci/ci-workflow.contract.test.mjs` | Static graph, ordering, guards, cleanup, filter, aggregate truth table |
-| `tests/smoke/helpers/wait-for-ready.mjs` | Concurrent bounded polling and safe report |
-| `tests/smoke/helpers/test-utils.mjs` | HTTP/domain helpers, actor, claims, polling, cache normalization |
-| `tests/smoke/mocks/mock-server.mjs` | Validating Duffel/Stripe fixtures, safe logs/counters/control |
-| `tests/smoke/*.unit.test.mjs` | Helper/mock red-green coverage |
-| `tests/smoke/smoke.test.mjs` | Eight named shallow checks |
-| `tests/smoke/sanity.test.mjs` | Search/cache, booking, and Agent flows |
-| `tests/smoke/README.md` | Local/CI runbook, coverage, environment, timing, troubleshooting |
-| `apps/api/src/duffel/duffel.service.ts` + spec | Optional SDK/manual-fetch base URL with default parity |
-| `apps/api/src/common/stripe.service.ts` + spec | Optional parsed Stripe API URL with default parity |
-| `apps/api/src/health/agent-health.service.ts` + spec | No-LLM Agent liveness target and accepted response |
-| `apps/agent/src/agent/main.py` + health tests | Lightweight liveness endpoint that avoids guardrail/LLM probes |
-| `apps/web/app/health/upstream/route.ts` + spec | Dynamic, no-store, bounded Nest ping with sanitized 200/503 |
-| `context/architecture.md` | Replace planned state with implemented data flow, routes, job graph, seams |
-| `context/code-standards.md` | Record operational `/health/upstream` route exception and provider override safety rule |
-| `context/library-docs.md` | Document installed Duffel `basePath` and Stripe endpoint override pattern |
-| `context/progress-checker.md` | Feature/task completion and exact verification evidence |
+| File                                                 | Planned change                                                                                             |
+| ---------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
+| `.github/workflows/ci.yml`                           | Filters, job, env, dependency predicate, setup/build/migrate/run/diagnostics/cleanup, aggregate dependency |
+| `scripts/ci/evaluate-ci-status.mjs`                  | Change-aware expected result for shared whole-stack job                                                    |
+| `scripts/ci/run-smoke-sanity.mjs`                    | Cross-platform process lifecycle and sequential suite gate                                                 |
+| `tests/ci/ci-workflow.contract.test.mjs`             | Static graph, ordering, guards, cleanup, filter, aggregate truth table                                     |
+| `tests/smoke/helpers/wait-for-ready.mjs`             | Concurrent bounded polling and safe report                                                                 |
+| `tests/smoke/helpers/test-utils.mjs`                 | HTTP/domain helpers, actor, claims, polling, cache normalization                                           |
+| `tests/smoke/mocks/mock-server.mjs`                  | Validating Duffel/Stripe fixtures, safe logs/counters/control                                              |
+| `tests/smoke/*.unit.test.mjs`                        | Helper/mock red-green coverage                                                                             |
+| `tests/smoke/smoke.test.mjs`                         | Eight named shallow checks                                                                                 |
+| `tests/smoke/sanity.test.mjs`                        | Search/cache, booking, and Agent flows                                                                     |
+| `tests/smoke/README.md`                              | Local/CI runbook, coverage, environment, timing, troubleshooting                                           |
+| `apps/api/src/duffel/duffel.service.ts` + spec       | Optional SDK/manual-fetch base URL with default parity                                                     |
+| `apps/api/src/common/stripe.service.ts` + spec       | Optional parsed Stripe API URL with default parity                                                         |
+| `apps/api/src/health/agent-health.service.ts` + spec | No-LLM Agent liveness target and accepted response                                                         |
+| `apps/agent/src/agent/main.py` + health tests        | Lightweight liveness endpoint that avoids guardrail/LLM probes                                             |
+| `apps/web/app/health/upstream/route.ts` + spec       | Dynamic, no-store, bounded Nest ping with sanitized 200/503                                                |
+| `context/architecture.md`                            | Replace planned state with implemented data flow, routes, job graph, seams                                 |
+| `context/code-standards.md`                          | Record operational `/health/upstream` route exception and provider override safety rule                    |
+| `context/library-docs.md`                            | Document installed Duffel `basePath` and Stripe endpoint override pattern                                  |
+| `context/progress-checker.md`                        | Feature/task completion and exact verification evidence                                                    |
 
 ## Rollout and Rollback
 
@@ -258,27 +258,27 @@ Exact values and redaction rules live in [contracts/test-harness.md](contracts/t
 
 ## Risks and Mitigations
 
-| Risk | Mitigation |
-|---|---|
-| Mock fixture drifts from provider wrapper request shape | Validate key fields and keep route tests adjacent; fail unknown routes |
-| Agent detailed health is degraded without Mimo | Use no-LLM liveness for reachability; never call chat |
-| Provider override accidentally reaches real host | Default-parity unit tests, loopback validation in harness, Node network guard |
-| Cache assertion is flaky | Use mock count and cache metadata, never timing |
-| Async confirmation exceeds sanity budget | Bounded short poll with diagnostic last state; deterministic mock responses |
-| GitHub skip semantics hide failure | Explicit change-aware `always()` predicate and evaluator truth-table tests |
-| Cleanup kills unrelated local processes | Track exact child handles/PIDs; never pattern-kill globally |
-| Local reset destroys developer data | Parse URL and refuse any database other than exact `smoke_test` |
-| Logs leak actor/provider data | Allowlisted diagnostic fields and redaction tests |
+| Risk                                                    | Mitigation                                                                    |
+| ------------------------------------------------------- | ----------------------------------------------------------------------------- |
+| Mock fixture drifts from provider wrapper request shape | Validate key fields and keep route tests adjacent; fail unknown routes        |
+| Agent detailed health is degraded without Mimo          | Use no-LLM liveness for reachability; never call chat                         |
+| Provider override accidentally reaches real host        | Default-parity unit tests, loopback validation in harness, Node network guard |
+| Cache assertion is flaky                                | Use mock count and cache metadata, never timing                               |
+| Async confirmation exceeds sanity budget                | Bounded short poll with diagnostic last state; deterministic mock responses   |
+| GitHub skip semantics hide failure                      | Explicit change-aware `always()` predicate and evaluator truth-table tests    |
+| Cleanup kills unrelated local processes                 | Track exact child handles/PIDs; never pattern-kill globally                   |
+| Local reset destroys developer data                     | Parse URL and refuse any database other than exact `smoke_test`               |
+| Logs leak actor/provider data                           | Allowlisted diagnostic fields and redaction tests                             |
 
 ## Complexity Tracking
 
 No constitutional violation exists. The limited complexity is justified:
 
-| Complexity | Why needed | Simpler alternative rejected because |
-|---|---|---|
-| One Node process orchestrator | Same lifecycle and cleanup semantics must work in Linux CI and local Windows | Inline shell diverges and is hard to test safely |
-| Optional provider endpoint configuration | Standalone validating mocks cannot receive existing SDK calls otherwise | Internal canned responses do not verify provider contracts or cache suppression |
-| Separate Web upstream health route | Static homepage cannot prove SSR/server-to-server API connectivity | Adding API fetch to homepage couples user availability to health probing |
+| Complexity                               | Why needed                                                                   | Simpler alternative rejected because                                            |
+| ---------------------------------------- | ---------------------------------------------------------------------------- | ------------------------------------------------------------------------------- |
+| One Node process orchestrator            | Same lifecycle and cleanup semantics must work in Linux CI and local Windows | Inline shell diverges and is hard to test safely                                |
+| Optional provider endpoint configuration | Standalone validating mocks cannot receive existing SDK calls otherwise      | Internal canned responses do not verify provider contracts or cache suppression |
+| Separate Web upstream health route       | Static homepage cannot prove SSR/server-to-server API connectivity           | Adding API fetch to homepage couples user availability to health probing        |
 
 ## Phase 1 Design Completion
 
