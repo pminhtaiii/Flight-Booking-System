@@ -131,23 +131,33 @@ describe('whole-stack sanity suite: flight search & cache', { timeout: SUITE_TIM
           'Test actor must be authenticated before flight search',
         );
 
-        await resetMockServer(MOCK_BASE);
-
-        const runOffsetDays =
+        let candidateOffset =
           14 + ((Math.floor(Date.now() / 1000) + Math.floor(Math.random() * 500)) % 2500) + 1;
-        searchQuery = buildSearchQuery({
-          origin: 'SGN',
-          destination: 'HAN',
-          departureDate: getFutureDate(runOffsetDays),
-          adults: 1,
-          cabinClass: 'economy',
-        });
+        let searchResponse = null;
 
-        const searchResponse = await requestJson(`${API_BASE}/flights/search`, {
-          method: 'POST',
-          token: sharedContext.testActor.token,
-          body: searchQuery,
-        });
+        for (let attempt = 0; attempt < 10; attempt += 1) {
+          searchQuery = buildSearchQuery({
+            origin: 'SGN',
+            destination: 'HAN',
+            departureDate: getFutureDate(candidateOffset),
+            adults: 1,
+            cabinClass: 'economy',
+          });
+
+          await resetMockServer(MOCK_BASE);
+
+          searchResponse = await requestJson(`${API_BASE}/flights/search`, {
+            method: 'POST',
+            token: sharedContext.testActor.token,
+            body: searchQuery,
+          });
+
+          if (searchResponse?.meta?.cached === false) {
+            break;
+          }
+
+          candidateOffset += 1;
+        }
 
         assert.ok(searchResponse, 'Search response must not be null or undefined');
         assert.ok(Array.isArray(searchResponse.results), 'results must be an array');

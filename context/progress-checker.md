@@ -29,8 +29,7 @@ Update this file after every completed feature. Any AI agent reading this should
     - Created `tests/smoke/sanity.test.mjs` using pure Node.js built-ins (`node:test`, `node:assert/strict`, `fetch`) and local helper `tests/smoke/helpers/test-utils.mjs`.
     - Exported module-level `sharedContext = { offerId: null, offerPassengerId: null, searchOffer: null, testActor: null }` for downstream test continuity.
     - Authenticates unique test actor via `createUniqueTestActor()`, `POST /auth/register`, and `POST /auth/login`.
-    - Resets mock server via `resetMockServer(MOCK_BASE)`.
-    - Dispatches authenticated `POST /flights/search` for SGN -> HAN with dynamic future date computed from timestamp and random offset (`runOffsetDays`) preventing cold cache false positives on repeated runs within TTL.
+    - Dispatches authenticated `POST /flights/search` for SGN -> HAN with hardened cold-cache retry loop (up to 10 attempts starting from randomized `Date.now() + Math.random()` candidate offset, resetting mock server and advancing departure date if `meta.cached` collision occurs) guaranteeing initial search exercises fresh supplier request (`meta.cached === false`) and cold-to-warm transition even on repeated runs within the 900s Redis TTL.
     - Asserts 200, results array length >= 1, and required offer field presence (`id`, `airline`, `flightNumber`, `departureAirport`, `arrivalAirport`, `departureTime`, `arrivalTime`, `duration`, `price`, `currency`, `segments`) via `assertResponseShape`.
     - Asserts meta envelope fields: `meta.searchHash` non-empty string, `meta.cached === false`, `meta.totalResults` (or `meta.count`) >= 1.
   - **T030: Redis Cache Suppression & Search Hash Parity in `sanity.test.mjs`**:
