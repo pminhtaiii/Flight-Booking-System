@@ -79,7 +79,7 @@ describe('AgentHealthService', () => {
       });
     });
 
-    it('should return down without statusCode or internal leaks when agent returns non-200 (500)', async () => {
+    it('should return down with statusCode and without internal leaks when agent returns non-200 (500)', async () => {
       global.fetch = jest.fn().mockResolvedValue({
         ok: false,
         status: 500,
@@ -89,8 +89,8 @@ describe('AgentHealthService', () => {
       const result = await service.checkAgentHealth();
       expect(result).toEqual({
         status: 'down',
+        statusCode: 500,
       });
-      expect(result).not.toHaveProperty('statusCode');
       expect(result).not.toHaveProperty('details');
     });
 

@@ -25,6 +25,7 @@ export class AgentHealthService {
       if (!response.ok) {
         return {
           status: 'down',
+          statusCode: response.status,
         };
       }
 

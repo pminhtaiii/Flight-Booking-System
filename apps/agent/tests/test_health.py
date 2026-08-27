@@ -32,7 +32,6 @@ def test_health_live_zero_inference_guarantee(monkeypatch):
         mock_http_get.assert_not_called()
 
 
-
 def test_health_success(monkeypatch):
     # Mock nestjsApi, llm, and redis check responses
     mock_redis = MagicMock()

@@ -55,13 +55,14 @@ describe('AgentHealthService (Unit)', () => {
     }
   });
 
-  test('should return down without statusCode when agent returns non-200 (500)', async () => {
+  test('should return down with statusCode when agent returns non-200 (500)', async () => {
     global.fetch = async () => new Response('Internal Server Error', { status: 500 });
 
     try {
       const result = await service.checkAgentHealth();
       assert.deepEqual(result, {
         status: 'down',
+        statusCode: 500,
       });
     } finally {
       global.fetch = originalFetch;
