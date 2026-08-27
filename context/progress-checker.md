@@ -6,14 +6,38 @@ Update this file after every completed feature. Any AI agent reading this should
 
 ### Current Status
 
-**Feature:** Deepen Codebase Architecture (Feature 019) — COMPLETE (100%)
-**Last completed:** Phase 9: Polish, Cross-Cutting Verification, and System Completion (2026-08-26).
-**In progress:** CI/CD Pipeline Enhancement — Smoke & Sanity Test Suite (design decisions captured, implementation pending).
-**Next:** Implement smoke & sanity tests per `docs/adr/research-cicd-smoke-sanity-decisions.md`, then Dockerfiles + SAST/DAST scanning.
+**Feature:** Whole-Stack Smoke and Sanity CI (Feature 020) — Phase 1: Setup (Shared Infrastructure) COMPLETE
+**Last completed:** Phase 1: Setup (Shared Infrastructure) (2026-08-27).
+**In progress:** Phase 2: Foundational Contracts and Test Seams (Tasks T005–T020).
+**Next:** Implement provider override contracts (Duffel/Stripe), no-LLM Agent and upstream health endpoints, mock server, and test-utils helpers.
 
 ---
 
 ## Progress by Feature
+
+### [ ] Feature: Whole-Stack Smoke and Sanity CI (Feature 020) — Phase 1: Setup (Shared Infrastructure)
+
+- [x] Phase 1 / Setup (Shared Infrastructure) (2026-08-27):
+  - **T001: Authoritative Smoke & Sanity Test Harness Documentation (`tests/smoke/README.md`)**:
+    - Authored comprehensive test harness guide covering zero-dependency design (`node:test`, `fetch`, `node:http`), sequential lifecycle (Builds $\to$ Boot $\to$ Polling $\to$ Smoke $\to$ Sanity $\to$ Cleanup), CLI & pnpm scripts, environment variables table matching `contracts/test-harness.md`, ephemeral CI & dedicated `smoke_test` database isolation rules, timing budgets ($\le$120s readiness, <15s smoke, <60s sanity), and diagnostics/troubleshooting.
+  - **T002: Zero-Dependency Scripts in Root `package.json`**:
+    - Added discoverable scripts:
+      - `test:smoke`: `node --test --test-reporter=spec tests/smoke/smoke.test.mjs`
+      - `test:sanity`: `node --test --test-reporter=spec tests/smoke/sanity.test.mjs`
+      - `test:smoke:units`: `node --test tests/smoke/wait-for-ready.unit.test.mjs tests/smoke/mock-server.unit.test.mjs tests/smoke/test-utils.unit.test.mjs`
+      - `test:smoke:all`: `node scripts/ci/run-smoke-sanity.mjs --mode=local`
+  - **T003: Ignore Run-Scoped Smoke Diagnostics (`.gitignore`)**:
+    - Excluded `.smoke-diagnostics/` from Git tracking to ensure diagnostic outputs and process logs are never committed.
+  - **T004: Environment Documentation Across Services (`apps/api/.env.example`, `apps/web/.env.example`, `apps/agent/.env.example`)**:
+    - Documented `DUFFEL_API_URL`, `STRIPE_API_URL`, and `AGENT_SERVICE_URL` in `apps/api/.env.example` with clear comments that absent variables preserve production defaults.
+    - Documented server-side `API_URL` and public fallback `NEXT_PUBLIC_API_URL` with loopback formatting in `apps/web/.env.example`.
+    - Documented loopback-safe service URLs (`NESTJS_API_URL`, `FRONTEND_URL`, `MIMO_API_URL`) in `apps/agent/.env.example`.
+  - **Verification & Code Review**:
+    - Syntax: `package.json` verified valid JSON (`JSON.parse` exit 0).
+    - Diagnostics exclusion verified (`git check-ignore -v .smoke-diagnostics/dummy.log`).
+    - Prettier checked cleanly on all touched files.
+    - Static CI contract suite passed (13/13 passing in `tests/ci/ci-workflow.contract.test.mjs`).
+    - Standards & Spec dual-axis code review completed via subagents.
 
 ### [x] Feature: Deepen Codebase Architecture (Feature 019) — Phase 9: Polish, Cross-Cutting Verification, and System Completion
 

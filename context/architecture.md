@@ -74,6 +74,10 @@
 │   └── shared/                        → Shared library for types and constants
 │       └── src/types/                 → Strict Zod schemas & inferred TypeScript types
 │
+├── tests/
+│   ├── ci/                            → CI workflow contract & network guard tests
+│   └── smoke/                         → Authoritative whole-stack smoke & sanity test harness
+│
 ├── docs/
 │   ├── adr/                           → Architectural Decision Records
 │   └── runbooks/                      → Authoritative operational runbooks
@@ -835,7 +839,7 @@ A whole-stack smoke and sanity test suite will be added as a single `smoke-and-s
   3. **Agent Gateway**: Direct agent health, API→Agent service auth, mocked agent responses (no LLM), negative auth tests (401/403).
 - **Mock Server**: Standalone `node:http` server under `tests/smoke/mocks/` serving canned Duffel and Stripe responses. Validates incoming request fields, fails on unknown routes (404), logs all requests with timestamps for CI diagnostics, and routes on method + pathname. Configurable via `DUFFEL_API_URL` / `STRIPE_API_URL` environment variables — zero production code changes. Network guards remain active as defense-in-depth.
 - **Test Data Isolation**: Fresh ephemeral Postgres database per CI run (service container destroyed on job completion). Local runs use a dedicated `smoke_test` database with drop-and-recreate.
-- **Trigger**: PRs to `development` only. Post-deployment smoke tests deferred until CD pipeline exists.
+- **Trigger**: PRs to `development` only. Application, harness, workflow, and shared-infrastructure changes are eligible; `docker-compose.yml` is included in the API, Web, and Agent path filters so a Compose-only change must exercise the whole stack. Post-deployment smoke tests are deferred until CD exists.
 - **Reporting**: `node --test --test-reporter=spec` for human-readable output in GitHub Actions logs.
 - **Grilling Decisions**: Full design rationale documented in `docs/adr/research-cicd-smoke-sanity-decisions.md`.
 
@@ -932,4 +936,3 @@ Feature 019 restructures high-leverage boundaries without changing public produc
   - **Clean Umbrella Module Composition**: Refactored `AgentGatewayModule` into an umbrella composition module importing and re-exporting capability submodules (`AttestedFlightSearchModule`, `AgentBookingReadinessModule`, `SafeBookingReadModule`, `TravelerPreferencesModule`, `AgentAuthModule`, `AgentToolAuditModule`) alongside external consumer providers (`SelectionAttestationService`, `BookingAgentProjectionService`). Eliminated unused `CacheModule` and empty `controllers` array.
   - **Zero Production References**: Monorepo static audit confirmed exactly 0 remaining references to `AgentGatewayService` and `AgentGatewayController`.
   - **Comprehensive Verification**: 7 capability unit suites (82/82 tests PASS), 3 gateway/characterization E2E suites (75/75 tests PASS), full Python agent pytest suite (455/455 tests PASS), and clean ESLint/TypeScript compilation across the entire monorepo.
-
