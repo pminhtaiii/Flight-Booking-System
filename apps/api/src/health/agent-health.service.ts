@@ -31,15 +31,11 @@ export class AgentHealthService {
 
       // Parse and safely narrow unknown payload without unsafe casting
       const rawJson: unknown = await response.json();
-      if (
-        rawJson &&
-        typeof rawJson === 'object' &&
-        !Array.isArray(rawJson) &&
-        (rawJson as Record<string, unknown>).status === 'ok'
-      ) {
+      if (rawJson && typeof rawJson === 'object' && !Array.isArray(rawJson)) {
+        const details = rawJson as Record<string, unknown>;
         return {
-          status: 'up',
-          details: rawJson as Record<string, unknown>,
+          status: details.status === 'ok' ? 'up' : 'down',
+          details,
         };
       }
 

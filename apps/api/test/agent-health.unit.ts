@@ -35,6 +35,7 @@ describe('AgentHealthService (Unit)', () => {
       const result = await service.checkAgentHealth();
       assert.deepEqual(result, {
         status: 'down',
+        details,
       });
     } finally {
       global.fetch = originalFetch;
@@ -49,6 +50,7 @@ describe('AgentHealthService (Unit)', () => {
       const result = await service.checkAgentHealth();
       assert.deepEqual(result, {
         status: 'down',
+        details,
       });
     } finally {
       global.fetch = originalFetch;
@@ -73,6 +75,19 @@ describe('AgentHealthService (Unit)', () => {
     global.fetch = async () => {
       throw new Error('ECONNREFUSED');
     };
+
+    try {
+      const result = await service.checkAgentHealth();
+      assert.deepEqual(result, {
+        status: 'down',
+      });
+    } finally {
+      global.fetch = originalFetch;
+    }
+  });
+
+  test('should return down without details when payload is not an object or empty', async () => {
+    global.fetch = async () => new Response(JSON.stringify(null), { status: 200 });
 
     try {
       const result = await service.checkAgentHealth();

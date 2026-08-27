@@ -103,7 +103,7 @@ describe('AgentHealthService', () => {
       });
     });
 
-    it("should return down when payload has status 'degraded'", async () => {
+    it("should return down with details when payload has status 'degraded'", async () => {
       const details = {
         status: 'degraded',
         dependencies: {
@@ -119,15 +119,15 @@ describe('AgentHealthService', () => {
       const result = await service.checkAgentHealth();
       expect(result).toEqual({
         status: 'down',
+        details,
       });
-      expect(result).not.toHaveProperty('details');
     });
 
-    it('should return down when payload does not contain status ok or is empty', async () => {
+    it('should return down without details when payload is not an object or empty', async () => {
       global.fetch = jest.fn().mockResolvedValue({
         ok: true,
         status: 200,
-        json: async () => ({}),
+        json: async () => null,
       } as unknown as Response);
 
       const result = await service.checkAgentHealth();
