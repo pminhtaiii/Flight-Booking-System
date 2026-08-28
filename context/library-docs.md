@@ -155,23 +155,108 @@ async createOrder(flightOffer: FlightOffer, travelers: Traveler[]): Promise<Orde
 
 ---
 
-## Stripe
+## Duffel API (@duffel/api)
 
-### Service Setup
+### Service Setup & Provider Override
 
 ```typescript
-// src/payments/payments.service.ts
-import Stripe from 'stripe';
-import { Injectable } from '@nestjs/common';
+// src/duffel/duffel.service.ts
+import { Duffel } from '@duffel/api';
+import { Injectable, Logger } from '@nestjs/common';
+import { CacheService } from '@/cache/cache.service';
 
 @Injectable()
-export class PaymentsService {
+export class DuffelService {
+  private readonly logger = new Logger(DuffelService.name);
+  private readonly duffel: Duffel;
+  private readonly basePath: string;
+
+  constructor(private readonly cacheService: CacheService) {
+    const token = process.env.DUFFEL_ACCESS_TOKEN || '';
+    const rawApiUrl = process.env.DUFFEL_API_URL;
+
+    if (rawApiUrl && rawApiUrl.trim() !== '') {
+      const parsed = new URL(rawApiUrl.trim());
+      if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+        throw new Error(
+          `Unsupported DUFFEL_API_URL protocol: ${parsed.protocol}. Only http: and https: are allowed.`,
+        );
+      }
+      this.basePath = `${parsed.origin}${parsed.pathname === '/' ? '' : parsed.pathname}`.replace(/\/+$/, '');
+    } else {
+      this.basePath = 'https://api.duffel.com';
+    }
+
+    this.duffel = new Duffel({
+      token,
+      basePath: this.basePath,
+    });
+  }
+}
+```
+
+**Rules:**
+
+- Default endpoint is `https://api.duffel.com` when `DUFFEL_API_URL` is absent or empty.
+- Providing `DUFFEL_API_URL` overrides the SDK endpoint by passing `basePath` to `new Duffel({ token, basePath })`.
+- Constructor performs fast-fail validation using `new URL(rawApiUrl)` and restricts protocol to `http:` or `https:`. Malformed URLs or unsupported protocols fail fast immediately.
+- Trailing slashes are normalized cleanly, and manual fetch calls in `createOrder` prepend `this.basePath`.
+- Fully compatible with `mock-server.mjs` on loopback for zero-dependency CI smoke suites.
+
+---
+
+## Stripe
+
+### Service Setup & Provider Override
+
+```typescript
+// src/common/stripe.service.ts
+import Stripe from 'stripe';
+import { Injectable, Logger } from '@nestjs/common';
+
+@Injectable()
+export class StripeService {
   private readonly stripe: Stripe;
+  private readonly logger = new Logger(StripeService.name);
 
   constructor() {
-    this.stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-      apiVersion: '2024-06-20',
-    });
+    const apiKey = process.env.STRIPE_SECRET_KEY;
+    if (!apiKey) {
+      this.logger.error('STRIPE_SECRET_KEY environment variable is not defined');
+      throw new Error('STRIPE_SECRET_KEY is missing');
+    }
+
+    const rawUrl = process.env.STRIPE_API_URL;
+    if (rawUrl && rawUrl.trim() !== '') {
+      let parsed: URL;
+      try {
+        parsed = new URL(rawUrl);
+      } catch {
+        this.logger.error('Invalid STRIPE_API_URL provided');
+        throw new Error('Invalid STRIPE_API_URL');
+      }
+
+      if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+        this.logger.error(`Unsupported STRIPE_API_URL protocol: ${parsed.protocol}`);
+        throw new Error(`Unsupported STRIPE_API_URL protocol: ${parsed.protocol}`);
+      }
+
+      const stripeConfig: Stripe.StripeConfig = {
+        apiVersion: '2026-05-27.dahlia' as Stripe.StripeConfig['apiVersion'],
+        protocol: parsed.protocol.replace(':', '') as 'http' | 'https',
+        host: parsed.hostname,
+      };
+
+      if (parsed.port && parsed.port.trim() !== '') {
+        stripeConfig.port = Number(parsed.port);
+      }
+
+      this.stripe = new Stripe(apiKey, stripeConfig);
+    } else {
+      this.stripe = new Stripe(apiKey, {
+        apiVersion: '2026-05-27.dahlia' as Stripe.StripeConfig['apiVersion'],
+      });
+    }
   }
 }
 ```
@@ -204,11 +289,15 @@ async handleWebhook(@Req() req: RawBodyRequest<Request>, @Headers('stripe-signat
 **Rules:**
 
 - Use Payment Intents API — card data NEVER touches our server (Stripe Elements handles it)
-- Always verify webhook signature before processing
-- Frontend uses `@stripe/react-stripe-js` with `NEXT_PUBLIC_STRIPE_PUBLIC_KEY`
-- Backend uses `STRIPE_SECRET_KEY` — never expose to frontend
-- All payment state changes written to `audit_logs` table
-- Use Stripe test mode for all development — never use live keys locally
+- Default endpoint is `https://api.stripe.com` when `STRIPE_API_URL` is absent or empty.
+- Providing `STRIPE_API_URL` configures `protocol`, `host`, and `port` on `Stripe.StripeConfig` with `apiVersion: '2026-05-27.dahlia'`.
+- Fast-fail URL validation throws immediately on malformed URLs or non-`http:`/`https:` protocols during constructor execution.
+- Compatible with loopback `mock-server.mjs` serving form-encoded payment intent and capture fixtures.
+- Always verify webhook signature before processing.
+- Frontend uses `@stripe/react-stripe-js` with `NEXT_PUBLIC_STRIPE_PUBLIC_KEY`.
+- Backend uses `STRIPE_SECRET_KEY` — never expose to frontend.
+- All payment state changes written to `audit_logs` table.
+- Use Stripe test mode for all development — never use live keys locally.
 
 ---
 

@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import crypto from 'node:crypto';
 import test from 'node:test';
 
 import { createMockServer } from './mocks/mock-server.mjs';
@@ -589,3 +590,189 @@ test('rejects POST /v1/payment_intents/:id/capture with 400 for malformed paymen
   assert.equal(response.status, 400);
   assert.deepEqual(await response.json(), { error: 'Malformed payment intent ID' });
 });
+
+test('derives stable SHA-256 payment intent ID and matching client_secret from metadata[bookingIntentId]', async (t) => {
+  const { mock, url } = await startMock();
+  t.after(() => stopMock(mock));
+
+  const bookingIntentId = 'intent_order_test_456';
+  const expectedHash = crypto.createHash('sha256').update(bookingIntentId).digest('hex').slice(0, 12);
+  const expectedId = `pi_mock_${expectedHash}`;
+
+  const response = await fetch(`${url}/v1/payment_intents`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({
+      amount: '12550',
+      currency: 'usd',
+      capture_method: 'manual',
+      'metadata[bookingIntentId]': bookingIntentId,
+    }),
+  });
+
+  assert.equal(response.status, 200);
+  assert.deepEqual(await response.json(), {
+    id: expectedId,
+    object: 'payment_intent',
+    amount: 12550,
+    currency: 'usd',
+    status: 'requires_capture',
+    capture_method: 'manual',
+    client_secret: `${expectedId}_secret`,
+  });
+});
+
+test('yields identical and stable payment intent IDs across repeated requests with identical metadata[bookingIntentId]', async (t) => {
+  const { mock, url } = await startMock();
+  t.after(() => stopMock(mock));
+
+  const bookingIntentId = 'intent_order_idempotent_789';
+  const payload = new URLSearchParams({
+    amount: '12550',
+    currency: 'usd',
+    capture_method: 'manual',
+    'metadata[bookingIntentId]': bookingIntentId,
+  });
+
+  const response1 = await fetch(`${url}/v1/payment_intents`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/x-www-form-urlencoded' },
+    body: payload,
+  });
+  const response2 = await fetch(`${url}/v1/payment_intents`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/x-www-form-urlencoded' },
+    body: payload,
+  });
+
+  assert.equal(response1.status, 200);
+  assert.equal(response2.status, 200);
+  const body1 = await response1.json();
+  const body2 = await response2.json();
+
+  assert.equal(body1.id, body2.id);
+  assert.equal(body1.client_secret, body2.client_secret);
+  assert.match(body1.id, /^pi_mock_[0-9a-f]{12}$/);
+  assert.equal(body1.client_secret, `${body1.id}_secret`);
+});
+
+test('falls back to metadata[bookingId] to derive SHA-256 payment intent ID and client_secret when bookingIntentId is absent', async (t) => {
+  const { mock, url } = await startMock();
+  t.after(() => stopMock(mock));
+
+  const bookingId = 'booking_legacy_fallback_101';
+  const expectedHash = crypto.createHash('sha256').update(bookingId).digest('hex').slice(0, 12);
+  const expectedId = `pi_mock_${expectedHash}`;
+
+  const response = await fetch(`${url}/v1/payment_intents`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({
+      amount: '8900',
+      currency: 'eur',
+      capture_method: 'manual',
+      'metadata[bookingId]': bookingId,
+    }),
+  });
+
+  assert.equal(response.status, 200);
+  assert.deepEqual(await response.json(), {
+    id: expectedId,
+    object: 'payment_intent',
+    amount: 8900,
+    currency: 'eur',
+    status: 'requires_capture',
+    capture_method: 'manual',
+    client_secret: `${expectedId}_secret`,
+  });
+});
+
+test('generates distinct payment intent IDs and client secrets across distinct booking intent IDs', async (t) => {
+  const { mock, url } = await startMock();
+  t.after(() => stopMock(mock));
+
+  const intentIdA = 'intent_alpha_111';
+  const intentIdB = 'intent_beta_222';
+
+  const resA = await fetch(`${url}/v1/payment_intents`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({
+      amount: '12550',
+      currency: 'usd',
+      capture_method: 'manual',
+      'metadata[bookingIntentId]': intentIdA,
+    }),
+  });
+  const resB = await fetch(`${url}/v1/payment_intents`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({
+      amount: '12550',
+      currency: 'usd',
+      capture_method: 'manual',
+      'metadata[bookingIntentId]': intentIdB,
+    }),
+  });
+
+  assert.equal(resA.status, 200);
+  assert.equal(resB.status, 200);
+  const dataA = await resA.json();
+  const dataB = await resB.json();
+
+  assert.notEqual(dataA.id, dataB.id);
+  assert.notEqual(dataA.client_secret, dataB.client_secret);
+  assert.match(dataA.id, /^pi_mock_[0-9a-f]{12}$/);
+  assert.match(dataB.id, /^pi_mock_[0-9a-f]{12}$/);
+  assert.equal(dataA.client_secret, `${dataA.id}_secret`);
+  assert.equal(dataB.client_secret, `${dataB.id}_secret`);
+});
+
+test('defaults payment intent ID to pi_mock_123 when metadata ID is missing or 123', async (t) => {
+  const { mock, url } = await startMock();
+  t.after(() => stopMock(mock));
+
+  // 1. Missing metadata
+  const missingMetaRes = await fetch(`${url}/v1/payment_intents`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({ amount: '12550', currency: 'usd', capture_method: 'manual' }),
+  });
+  assert.equal(missingMetaRes.status, 200);
+  const missingMetaData = await missingMetaRes.json();
+  assert.equal(missingMetaData.id, 'pi_mock_123');
+  assert.equal(missingMetaData.client_secret, 'pi_mock_123_secret');
+
+  // 2. metadata[bookingIntentId] is '123'
+  const literalIntent123Res = await fetch(`${url}/v1/payment_intents`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({
+      amount: '12550',
+      currency: 'usd',
+      capture_method: 'manual',
+      'metadata[bookingIntentId]': '123',
+    }),
+  });
+  assert.equal(literalIntent123Res.status, 200);
+  const literalIntent123Data = await literalIntent123Res.json();
+  assert.equal(literalIntent123Data.id, 'pi_mock_123');
+  assert.equal(literalIntent123Data.client_secret, 'pi_mock_123_secret');
+
+  // 3. metadata[bookingId] is '123'
+  const literalBooking123Res = await fetch(`${url}/v1/payment_intents`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({
+      amount: '12550',
+      currency: 'usd',
+      capture_method: 'manual',
+      'metadata[bookingId]': '123',
+    }),
+  });
+  assert.equal(literalBooking123Res.status, 200);
+  const literalBooking123Data = await literalBooking123Res.json();
+  assert.equal(literalBooking123Data.id, 'pi_mock_123');
+  assert.equal(literalBooking123Data.client_secret, 'pi_mock_123_secret');
+});
+

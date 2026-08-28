@@ -204,15 +204,15 @@ function sanitizeUnknownPathname(pathname) {
   );
 }
 
-function buildPaymentIntent(status, amount = 12550, currency = 'usd') {
+function buildPaymentIntent(status, amount = 12550, currency = 'usd', id = 'pi_mock_123') {
   return {
-    id: 'pi_mock_123',
+    id,
     object: 'payment_intent',
     amount,
     currency,
     status,
     capture_method: 'manual',
-    client_secret: 'pi_mock_123_secret',
+    client_secret: `${id}_secret`,
   };
 }
 
@@ -392,8 +392,18 @@ export function createMockServer() {
       }
       const amount = Number(parsed.value.get('amount'));
       const currency = parsed.value.get('currency');
+      const bookingIntentId =
+        (typeof parsed.value?.get === 'function'
+          ? parsed.value.get('metadata[bookingIntentId]') ?? parsed.value.get('metadata[bookingId]')
+          : null) ??
+        parsed.data?.metadata?.bookingIntentId ??
+        parsed.data?.metadata?.bookingId;
+      const intentId =
+        bookingIntentId && bookingIntentId !== '123'
+          ? `pi_mock_${crypto.createHash('sha256').update(bookingIntentId).digest('hex').slice(0, 12)}`
+          : 'pi_mock_123';
       record(request.method, pathname, 200);
-      sendJson(response, 200, buildPaymentIntent('requires_capture', amount, currency));
+      sendJson(response, 200, buildPaymentIntent('requires_capture', amount, currency, intentId));
       return;
     }
 
