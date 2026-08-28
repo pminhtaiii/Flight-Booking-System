@@ -1,0 +1,73 @@
+openapi: 3.0.3
+info:
+  title: Dashboard Summary Contract
+  version: 1.0.0
+paths:
+  /api/dashboard/summary:
+    get:
+      summary: Get the authenticated traveler's booking dashboard summary
+      operationId: getDashboardSummary
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Owner-scoped booking metrics and recent bookings
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DashboardSummary'
+        '401':
+          description: Missing, invalid, or expired bearer token
+        '500':
+          description: Safe internal failure response
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  schemas:
+    DashboardStats:
+      type: object
+      additionalProperties: false
+      required: [totalBookings, upcomingBookings, completedBookings, cancelledBookings]
+      properties:
+        totalBookings: { type: integer, minimum: 0 }
+        upcomingBookings: { type: integer, minimum: 0 }
+        completedBookings: { type: integer, minimum: 0 }
+        cancelledBookings: { type: integer, minimum: 0 }
+    DashboardRecentBooking:
+      type: object
+      additionalProperties: false
+      required: [id, status, createdAt, departureAt, originCode, destinationCode, airlineCode, flightNumber]
+      properties:
+        id: { type: string, format: uuid }
+        status:
+          type: string
+          enum:
+            - PROCESSING
+            - CONFIRMED
+            - FAILED
+            - COMPLETED
+            - CANCELLATION_PENDING
+            - CANCELLED_PENDING_REFUND
+            - CANCELLED_AND_REFUNDED
+            - CANCELLED_NO_REFUND
+            - REFUND_FAILED_NEEDS_ATTENTION
+        createdAt: { type: string, format: date-time }
+        departureAt: { type: string, format: date-time, nullable: true }
+        originCode: { type: string, nullable: true }
+        destinationCode: { type: string, nullable: true }
+        airlineCode: { type: string, nullable: true }
+        flightNumber: { type: string, nullable: true }
+    DashboardSummary:
+      type: object
+      additionalProperties: false
+      required: [stats, recentBookings, generatedAt]
+      properties:
+        stats: { $ref: '#/components/schemas/DashboardStats' }
+        recentBookings:
+          type: array
+          maxItems: 5
+          items: { $ref: '#/components/schemas/DashboardRecentBooking' }
+        generatedAt: { type: string, format: date-time }
