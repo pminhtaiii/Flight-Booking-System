@@ -6,14 +6,44 @@ Update this file after every completed feature. Any AI agent reading this should
 
 ### Current Status
 
-**Feature:** Whole-Stack Smoke and Sanity CI (Feature 020) — COMPLETED (100% across Phases 1–6, Tasks T001–T057)
-**Last completed:** Phase 6 / Full documentation sync, local lifecycle verification (smoke 8/8 in 1.31s, sanity 12/12 in 5.52s, exit 0), pre-PR monorepo gate matrix validation, and dual-axis code review (2026-08-28).
-**In progress:** None (Feature 020 sign-off complete).
-**Next:** Production rollout / Next scheduled feature.
+**Feature:** Authenticated Booking Dashboard (Feature 021) — Phase 1: Setup and Decision Guardrails (Tasks T001–T004) — COMPLETED (100% Phase 1)
+**Last completed:** Phase 1 / Setup and Decision Guardrails (T001–T004): baseline and 41-file checklist (`specs/021-dashboard-building/implementation-notes.md`), OpenAPI contract checklist (`specs/021-dashboard-building/checklists/contract.md`), visual translation guardrails (`specs/021-dashboard-building/checklists/visual.md`), Next.js 14.2.3 constraints verification, dual-axis code reviews (0 issues), and verification gates passing (2026-08-28).
+**In progress:** Phase 2: Foundational Shared Contract (Tasks T005–T008).
+**Next:** Phase 2 (Shared Zod schemas, inferred types, `DashboardOutcome` failure union, and barrel export).
 
 ---
 
 ## Progress by Feature
+
+### [ ] Feature: Authenticated Booking Dashboard (Feature 021)
+
+- [x] Phase 1: Setup and Decision Guardrails (T001–T004) (2026-08-28):
+  - **T001: Execution Baseline & Affected-File Checklist (`specs/021-dashboard-building/implementation-notes.md`)**:
+    - Recorded feature baseline (branch `021-dashboard-building`, SHA `2af59d3`, Node 20+, pnpm 11.9.0, Next.js 14.2.3, NestJS 10.4.22, Prisma 5.22.0, TypeScript 5.4.5, Zod 3.23.8).
+    - Established exhaustive 41-file tracking inventory across `packages/shared`, `apps/api`, `apps/web`, and `specs/context`.
+    - Documented core architecture: direct Prisma read model (4 counts + 1 findMany concurrently via `Promise.all`), zero Redis dashboard cache (`cache: 'no-store'`), server-only data loader boundary, root `/` auth-aware server redirect, and canonical 4 metric definitions (handling past confirmed travel + 5 cancellation statuses).
+  - **T002: OpenAPI Contract Conformance Checklist (`specs/021-dashboard-building/checklists/contract.md`)**:
+    - Authored comprehensive contract checklist derived from `contracts/dashboard-summary.openapi.yaml`.
+    - Formulated schema validation rules for `DashboardStats` (non-negative integer metrics, single clock instant `now`), `DashboardRecentBooking` (UUID v4, 9 canonical lifecycle statuses, ISO timestamps, nullable route/airline projections, allowlisted snapshot parsing, `take: 5`, `createdAt DESC` sort), and `DashboardSummary` aggregate.
+    - Encoded strict Zero-Leakage Privacy Invariants: 0 PII, 0 payment tokens/secrets, 0 raw supplier snapshots, 0 leaked JWTs/backend hostnames, 0 raw database/stack trace errors.
+    - Defined web boundary result contract `DashboardOutcome` tagged failure union (`UNAUTHENTICATED`, `FORBIDDEN`, `UPSTREAM_UNAVAILABLE`, `INVALID_RESPONSE`).
+  - **T003: Visual Translation Guardrail Checklist (`specs/021-dashboard-building/checklists/visual.md`)**:
+    - Established Tokenization-First Strategy in `apps/web/app/globals.css` with dark/light CSS custom properties and `@supports not (backdrop-filter: blur(1px))` fallbacks. Zero hardcoded colors, inline styles, or raw Tailwind colors in production components.
+    - Documented removed prototype mock elements: replaced fake Disruption Shield % with canonical Cancelled Bookings count; stripped fake fare-drop and seat recommendation cards; stripped prototype disclaimer banner and variant switcher controls; eliminated mock `/prototype/*` links.
+    - Documented supported production destinations: Quick Search `/search` parameter handoff, Quick Actions (`/search`, `/bookings?tab=upcoming`, `/bookings?tab=past`, and `/profile` conditionally rendered when `isBookingReadinessEnabled()` is true), and global `ChatWidget` integration.
+    - Defined responsive layouts (Desktop >=1024px sidebar + sticky topbar; Mobile 360px & Tablet 768px stacked layouts with `overflow-x: hidden` zero horizontal scroll) and WCAG 2.1 AA accessibility (landmarks, contrast >=4.5:1, `:focus-visible` rings, reduced motion).
+  - **T004: Next.js 14.2.3 Route & Session Constraint Verification (`specs/021-dashboard-building/implementation-notes.md`)**:
+    - Verified `getServerSession(authOptions)` interop in Server Components and server-only modules.
+    - Verified `redirect()` from `next/navigation` throwing `NEXT_REDIRECT` and documented catch-block safety.
+    - Verified dynamic fetch `{ cache: 'no-store', headers: { Authorization: \`Bearer \${token}\` } }` and Zero Client Credential Invariant (0 tokens/URLs in browser props/state).
+    - Verified `loading.tsx` server skeleton and `error.tsx` client error boundary contracts.
+    - Verified Windows local port 3101 HTTP mock fixture pattern for Playwright browser tests.
+  - **Phase 1 Verification & Quality Sign-Off**:
+    - Static CI Workflow Contract: 20/20 PASS (`node --test tests/ci/ci-workflow.contract.test.mjs`).
+    - Smoke Harness Unit Suite: 60/60 PASS (`pnpm test:smoke:units`).
+    - API ESLint Gate: 0 errors / 0 warnings (`pnpm exec eslint "apps/api/**/*.ts" "packages/shared/**/*.ts" --max-warnings 0`).
+    - Web Next Lint Gate: 0 errors / 0 warnings (`pnpm --filter @web/frontend lint`).
+    - Standards & Spec dual-axis subagent code reviews completed with 0 P0/P1/P2/P3 issues.
 
 ### [x] Feature: Whole-Stack Smoke and Sanity CI (Feature 020) — Phase 6: Polish and Cross-Cutting Verification (T051–T057)
 
