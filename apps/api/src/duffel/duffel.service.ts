@@ -811,6 +811,8 @@ export class DuffelService {
       gender?: string;
       title?: string;
       dateOfBirth?: string | Date;
+      born_on?: string;
+      bornOn?: string | Date;
       givenName?: string;
       given_name?: string;
       familyName?: string;
@@ -818,6 +820,7 @@ export class DuffelService {
       phoneNumber?: string;
       phone_number?: string;
       email?: string;
+      identity_documents?: unknown[];
     }[],
     services?: { id: string; quantity: number }[] | Record<string, unknown>,
     metadata?: Record<string, unknown> | string,
@@ -918,11 +921,12 @@ export class DuffelService {
         }
 
         let born_on = '';
-        if (p.dateOfBirth) {
-          if (p.dateOfBirth instanceof Date) {
-            born_on = p.dateOfBirth.toISOString().split('T')[0];
-          } else if (typeof p.dateOfBirth === 'string') {
-            born_on = p.dateOfBirth.split('T')[0];
+        const rawDob = p.born_on || p.bornOn || p.dateOfBirth;
+        if (rawDob) {
+          if (rawDob instanceof Date) {
+            born_on = rawDob.toISOString().split('T')[0];
+          } else if (typeof rawDob === 'string') {
+            born_on = rawDob.split('T')[0];
           }
         }
         const phone_number = p.phoneNumber || p.phone_number;
@@ -949,7 +953,7 @@ export class DuffelService {
           );
         }
 
-        return {
+        const duffelPassenger: Record<string, unknown> = {
           id: matchedOfferPassenger.id,
           given_name: givenName,
           family_name: familyName,
@@ -959,6 +963,12 @@ export class DuffelService {
           phone_number,
           email,
         };
+
+        if (p.identity_documents && Array.isArray(p.identity_documents) && p.identity_documents.length > 0) {
+          duffelPassenger.identity_documents = p.identity_documents;
+        }
+
+        return duffelPassenger;
       });
 
       const timeoutMs = 30000;
