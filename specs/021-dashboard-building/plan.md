@@ -55,7 +55,7 @@ PASS. The contract, data model and quickstart retain the same boundaries. The on
 5. **Direct read model**: `DashboardService` injects only `PrismaService`, captures one clock value, and executes four counts plus one `findMany` concurrently. Completed counts include canonical `COMPLETED` plus unreconciled past `CONFIRMED`; cancelled counts use the five canonical cancellation/refund lifecycle states. A pure mapper extracts allowlisted display fields from `flightSnapshot`; malformed optional fields become `null`.
 6. **No dynamic dashboard cache**: every page navigation fetches fresh data. There is no Redis dependency, tag revalidation or client polling.
 7. **Feature-scoped navigation**: implement the approved desktop sidebar and sticky top bar inside `DashboardShell` only, with a compact mobile navigation replacement. Do not refactor the global layout or force other routes to adopt a sidebar.
-8. **Only real actions**: quick actions target `/search`, `/bookings?tab=upcoming`, `/bookings?tab=past`, and `/profile`. The existing global `ChatWidget` remains available independently; generic chat and disruption-center routes are deferred because they do not exist.
+8. **Only available actions**: quick actions always target `/search`, `/bookings?tab=upcoming`, and `/bookings?tab=past`. The `/dashboard` Server Component evaluates the existing `isBookingReadinessEnabled()` helper and exposes `/profile` only when the traveler-profile workspace is enabled; the dashboard feature itself remains independently deployable. The existing global `ChatWidget` remains available, while generic chat and disruption-center routes stay deferred because they do not exist.
 
 ## Project Structure
 
@@ -109,7 +109,11 @@ apps/web/components/dashboard/
 ├── DashboardStats.tsx
 ├── DashboardRecentBookings.tsx
 ├── DashboardQuickActions.tsx
-└── DashboardQuickSearch.tsx
+├── DashboardQuickSearch.tsx
+├── dashboard-actions.ts
+├── dashboard-actions.spec.ts
+├── dashboard-search.ts
+└── dashboard-search.spec.ts
 
 apps/web/components/search/
 └── SearchFormClient.tsx         # Add typed initial-value support
@@ -145,7 +149,7 @@ apps/web/tests/
 ### Phase 2 - Hub actions and route integration
 
 - Implement quick-search validation/navigation using the existing production flight-search route and its accepted state format.
-- Wire quick actions to `/search`, `/bookings?tab=upcoming`, `/bookings?tab=past`, and `/profile`; keep the existing global assistant widget available and omit the unavailable generic disruption center rather than link to a prototype.
+- Derive quick actions through a pure helper: always include `/search`, `/bookings?tab=upcoming`, and `/bookings?tab=past`, add `/profile` only when `isBookingReadinessEnabled()` is true, keep the global assistant widget available, and omit the unavailable generic disruption center.
 - Verify keyboard interactions, focus visibility, accessible labels and mobile navigation.
 
 ### Phase 3 - Entry routing and end-to-end verification
@@ -174,7 +178,7 @@ Browser -> Next.js /dashboard Server Component
 - **Service unit**: exact Prisma filters, one clock boundary, canonical completed/cancellation status sets, null departures, `take: 5`, descending order and safe snapshot mapping.
 - **Controller unit/API E2E**: JWT required, user identity forwarded, tenant isolation and exact response contract.
 - **Web loader unit**: missing session, 401/403/5xx, timeout, malformed JSON, schema mismatch, no-store and zero credential leakage.
-- **Page/browser**: start an in-process local API fixture on the configured port so Server Component fetches can exercise valid, 401, malformed and unavailable responses; cover root redirects, auth gate, populated/empty/error states, quick actions, search handoff, recent links, 360/768/desktop layouts, keyboard focus and reduced motion.
+- **Page/browser**: start an in-process local API fixture on the configured port so Server Component fetches can exercise valid, 401, malformed and unavailable responses; cover root redirects, auth gate, populated/empty/error states, profile-action presence/absence for both booking-readiness flag values, quick actions, search handoff, recent links, 360/768/desktop layouts, keyboard focus and reduced motion.
 - **Regression gates**: shared/API/web lint and typecheck, targeted Jest/Node/Playwright suites, then Next production build.
 
 ## Risks and Mitigations

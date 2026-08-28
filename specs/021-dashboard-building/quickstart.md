@@ -69,7 +69,8 @@ Expected: all commands exit 0.
 2. Verify Total, Upcoming, Completed and Cancelled cards and at most five recent owner bookings.
 3. Verify no Disruption Shield percentage, fake insight claim, prototype banner/switcher or prototype-only link.
 4. Exercise quick search, actions and recent detail links.
-5. Check 360 px, 768 px and desktop layouts plus keyboard focus.
-6. Stop the API and confirm a safe retry state with no fabricated counts.
+5. Run with `NEXT_PUBLIC_FEATURE_FLAG_BOOKING_READINESS=false` and confirm no Profile action is rendered; repeat with `true` and confirm Profile reaches the live `/profile` workspace.
+6. Check 360 px, 768 px and desktop layouts plus keyboard focus.
+7. Stop the API and confirm a safe retry state with no fabricated counts.
 
 See [dashboard-summary.openapi.yaml](contracts/dashboard-summary.openapi.yaml) and [data-model.md](data-model.md).

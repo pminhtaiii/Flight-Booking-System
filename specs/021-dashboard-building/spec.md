@@ -29,7 +29,7 @@ As an authenticated traveler, I can open `/dashboard` and immediately see curren
 
 ### User Story 2 - Start the next travel task (Priority: P2)
 
-As an authenticated traveler, I can use the dashboard's quick-search and action areas to continue to supported production experiences such as flight search, upcoming or past booking management, and traveler profile without navigating through unrelated screens; the globally available travel assistant remains accessible through its existing widget.
+As an authenticated traveler, I can use the dashboard's quick-search and action areas to continue to flight search, upcoming or past booking management, and—when booking readiness is enabled—the live traveler-profile workspace; the globally available travel assistant remains accessible through its existing widget.
 
 **Why this priority**: The approved prototype makes the dashboard a working hub, not a passive report.
 
@@ -40,6 +40,8 @@ As an authenticated traveler, I can use the dashboard's quick-search and action 
 1. **Given** valid origin, destination, and departure inputs, **When** the user submits quick search, **Then** the app navigates to the production flight-search flow with those values preserved.
 2. **Given** the dashboard, **When** the user activates a quick action, **Then** the destination is a production route and the action is keyboard accessible.
 3. **Given** a recent booking, **When** the user selects it, **Then** they reach the owned booking detail route.
+4. **Given** booking readiness is disabled, **When** the dashboard renders, **Then** the Profile quick action is omitted while search and booking actions remain available.
+5. **Given** booking readiness is enabled, **When** the dashboard renders, **Then** the Profile quick action is visible and links to the live traveler-profile workspace.
 
 ---
 
@@ -87,7 +89,7 @@ As a visitor or traveler, I get the correct entry experience: authenticated user
 - **FR-010**: `/dashboard` MUST be an authenticated Server Component and MUST render through a typed `DashboardShell` interface.
 - **FR-011**: The production UI MUST translate the approved Wayfinder glassmorphic visual hierarchy into existing semantic design tokens; it MUST NOT copy hardcoded prototype hex values or raw Tailwind color classes.
 - **FR-012**: The fourth stat card MUST display cancelled bookings. The prototype-only Disruption Shield percentage and static AI insight claims MUST NOT be presented as live data.
-- **FR-013**: The dashboard MUST provide functional quick actions only for existing production destinations: flight search, upcoming bookings, past bookings, and traveler profile. The existing global `ChatWidget` remains the assistant entry point; the absent generic disruption-center and `/chat` routes MUST NOT be invented or replaced with prototype links.
+- **FR-013**: The dashboard MUST always provide quick actions for flight search, upcoming bookings, and past bookings. It MUST provide the traveler-profile action only when `isBookingReadinessEnabled()` returns true; dashboard rollout itself MUST NOT require booking readiness. The existing global `ChatWidget` remains the assistant entry point, and absent generic disruption-center or `/chat` routes MUST NOT be invented or replaced with prototype links.
 - **FR-014**: The quick-search control MUST preserve valid origin, destination, and departure values when entering the production search flow.
 - **FR-015**: Recent-booking items MUST link to `/bookings/[bookingId]` and the complete-list affordance MUST link to `/bookings`.
 - **FR-016**: The root route MUST redirect authenticated users to `/dashboard` while preserving the marketing page for unauthenticated visitors.
@@ -117,6 +119,7 @@ As a visitor or traveler, I get the correct entry experience: authenticated user
 - **SC-006**: The production dashboard has no prototype banner/switcher, no prototype-only links, and no hardcoded color values in dashboard production components/styles.
 - **SC-007**: At 360 px, 768 px, and desktop widths, all dashboard content remains readable without horizontal overflow and all primary actions are keyboard reachable.
 - **SC-008**: The API unit/contract tests, web unit tests, dashboard Playwright tests, lint, typecheck, and production build pass.
+- **SC-009**: With booking readiness disabled, zero dashboard links lead to the disabled profile fallback; with it enabled, the Profile action is present and reaches `/profile`.
 
 ## Assumptions
 

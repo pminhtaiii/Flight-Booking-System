@@ -87,17 +87,17 @@
 
 ### Tests for User Story 2
 
-- [ ] T030 [P] [US2] Extend the in-process dashboard fixture and Playwright coverage for quick-search validation, preserved search values, keyboard submission, exact production action destinations, and absence of `/prototype/*` links in `apps/web/tests/dashboard.spec.ts`
-- [ ] T031 [P] [US2] Add unit tests for origin/destination/date normalization, same-airport rejection, past-date rejection, and search URL creation in `apps/web/components/dashboard/dashboard-search.spec.ts`
+- [ ] T030 [P] [US2] Extend the in-process dashboard fixture and Playwright coverage for quick-search validation, preserved search values, keyboard submission, exact production action destinations, Profile action presence when booking readiness is enabled, Profile action absence when disabled, and absence of `/prototype/*` links in `apps/web/tests/dashboard.spec.ts`
+- [ ] T031 [P] [US2] Add unit tests for search normalization/URL creation in `apps/web/components/dashboard/dashboard-search.spec.ts` and for Profile action omission/inclusion when booking readiness is false/true in `apps/web/components/dashboard/dashboard-actions.spec.ts`
 
 ### Implementation for User Story 2
 
 - [ ] T032 [US2] Implement pure quick-search normalization, validation, and production search URL construction in `apps/web/components/dashboard/dashboard-search.ts`
 - [ ] T033 [US2] Implement accessible quick-search controls in `apps/web/components/dashboard/DashboardQuickSearch.tsx`, add typed initial-value props in `apps/web/components/search/SearchFormClient.tsx`, and consume sanitized dashboard query parameters in `apps/web/app/search/page.tsx`
-- [ ] T034 [P] [US2] Implement semantic quick-action tiles targeting only `/search`, `/bookings?tab=upcoming`, `/bookings?tab=past`, and `/profile`, while leaving the global assistant widget independent and omitting the unavailable disruption-center route, in `apps/web/components/dashboard/DashboardQuickActions.tsx`
-- [ ] T035 [US2] Integrate quick search and supported quick actions into the approved shell hierarchy in `apps/web/components/dashboard/DashboardShell.tsx`
+- [ ] T034 [P] [US2] Implement a pure flag-aware action builder that always returns `/search`, `/bookings?tab=upcoming`, and `/bookings?tab=past` and conditionally returns `/profile` in `apps/web/components/dashboard/dashboard-actions.ts`, then render those actions in `apps/web/components/dashboard/DashboardQuickActions.tsx`
+- [ ] T035 [US2] Evaluate `isBookingReadinessEnabled()` in `apps/web/app/dashboard/page.tsx`, pass the resulting profile-action availability through `apps/web/components/dashboard/DashboardShell.tsx`, and integrate quick search plus the derived action set
 - [ ] T036 [US2] Add responsive and focus styles for quick-search/action controls using semantic tokens in `apps/web/app/dashboard/dashboard.module.css`
-- [ ] T037 [US2] Make US2 unit and Playwright tests pass and record exact supported/omitted destinations in `specs/021-dashboard-building/implementation-notes.md`
+- [ ] T037 [US2] Make US2 unit and Playwright tests pass and record the always-available destinations plus the flag-conditioned Profile inclusion/omission in `specs/021-dashboard-building/implementation-notes.md`
 
 **Checkpoint**: US2 independently proves every presented action works and no mock/prototype destination remains.
 
@@ -190,7 +190,7 @@ Task T013: Browser acceptance tests in apps/web/tests/dashboard.spec.ts
 
 ```text
 Task T030: Browser action/search scenarios in apps/web/tests/dashboard.spec.ts
-Task T031: Pure search normalization tests in apps/web/components/dashboard/dashboard-search.spec.ts
+Task T031: Pure search and feature-flagged action derivation tests in apps/web/components/dashboard/dashboard-search.spec.ts and apps/web/components/dashboard/dashboard-actions.spec.ts
 ```
 
 ## Parallel Example: User Story 3
