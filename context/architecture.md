@@ -827,21 +827,30 @@ The repository uses a single GitHub Actions pull request CI workflow at `.github
 - **Correctness vs. Performance**: Blocking API E2E runs exclude `[.-]performance.e2e-spec.ts` wall-clock benchmarks, which remain available through the opt-in `test:e2e:performance` command for controlled benchmark environments.
 - **Status Evaluation**: The terminal `ci-status` job runs `evaluate-ci-status.mjs` with `always()`, verifying that all relevant service jobs succeeded, irrelevant jobs were safely skipped, and detection ran cleanly. Branch protection requires only `ci-status`.
 
-### Smoke & Sanity Test Suite (Planned)
+### Subsystem 8: Whole-Stack Smoke & Sanity CI Pipeline
 
-A whole-stack smoke and sanity test suite will be added as a single `smoke-and-sanity` CI job that runs after all upstream gate, test, and build jobs pass. The suite uses `node:test` + built-in `fetch` for framework-agnostic black-box HTTP assertions against a full running stack. Tests live under `tests/smoke/` (separate from `tests/ci/` infrastructure and service-specific test directories).
+The whole-stack smoke and sanity test suite runs as a single `smoke-and-sanity` CI job in `.github/workflows/ci.yml` after all upstream gate, test, and build jobs pass. The suite uses pure `node:test` and built-in `fetch` for framework-agnostic black-box HTTP assertions against a fully running multi-service stack. Tests and helpers live under `tests/smoke/` and `scripts/ci/run-smoke-sanity.mjs`.
 
-- **Stack Boot**: Docker Compose for Postgres + Redis (existing `docker-compose.yml`), application services (NestJS, Next.js, FastAPI Agent) as background processes. No Dockerfiles required. A `wait-for-ready.mjs` helper polls all service health endpoints concurrently with a 120-second overall timeout and per-service diagnostic output.
-- **Smoke Tests** (8 checks, <15s): Health endpoints for all 3 services, DB/Redis connectivity via NestJS health, frontend→API SSR communication, API→Agent service auth handshake (no LLM), and auth register→login→JWT round-trip. If smoke fails, sanity tests are skipped.
-- **Sanity Tests** (3 cross-service flows, <60s, happy path only):
-  1. **Flight Search**: Auth → search with mocked Duffel → verify response shape. Cache verification is a separate sanity test.
-  2. **Booking Lifecycle**: Profile → readiness → intent → payment (mocked Stripe) → PNR (mocked Duffel) → verify `CONFIRMED` status.
-  3. **Agent Gateway**: Direct agent health, API→Agent service auth, mocked agent responses (no LLM), negative auth tests (401/403).
-- **Mock Server**: Standalone `node:http` server under `tests/smoke/mocks/` serving canned Duffel and Stripe responses. Validates incoming request fields, fails on unknown routes (404), logs all requests with timestamps for CI diagnostics, and routes on method + pathname. Configurable via `DUFFEL_API_URL` / `STRIPE_API_URL` environment variables — zero production code changes. Network guards remain active as defense-in-depth.
-- **Test Data Isolation**: Fresh ephemeral Postgres database per CI run (service container destroyed on job completion). Local runs use a dedicated `smoke_test` database with drop-and-recreate.
-- **Trigger**: PRs to `development` only. Application, harness, workflow, and shared-infrastructure changes are eligible; `docker-compose.yml` is included in the API, Web, and Agent path filters so a Compose-only change must exercise the whole stack. Post-deployment smoke tests are deferred until CD exists.
-- **Reporting**: `node --test --test-reporter=spec` for human-readable output in GitHub Actions logs.
-- **Grilling Decisions**: Full design rationale documented in `docs/adr/research-cicd-smoke-sanity-decisions.md`.
+1. **CI Pipeline Graph & Routing**:
+   - `detect-changes` evaluates changes via `dorny/paths-filter` and actionlint.
+   - The `smoke-and-sanity` job is triggered whenever any application service path changes (`apps/api/**`, `apps/web/**`, `apps/agent/**`, `packages/shared/**`) or shared infrastructure changes (`docker-compose.yml`, `tests/smoke/**`, `scripts/ci/run-smoke-sanity.mjs`).
+   - Terminal summary `ci-status` evaluates overall workflow status using `evaluate-ci-status.mjs` with `always()`, ensuring required gates succeeded and skips were intentional. Branch protection requires only `ci-status`.
+
+2. **Loopback Provider Override Seams**:
+   - Zero production bypasses or mock hooks in application logic. Production services cleanly accept loopback provider overrides:
+   - **Duffel API Override**: `DUFFEL_API_URL` overrides default `https://api.duffel.com` in `DuffelService` (`apps/api/src/duffel/duffel.service.ts`). Instantiation validates `http:` or `https:` protocol and normalizes trailing slashes before passing `basePath` to `new Duffel({ token, basePath })`. Manual fetch calls in `createOrder` prepend `this.basePath`.
+   - **Stripe API Override**: `STRIPE_API_URL` overrides default `https://api.stripe.com` in `StripeService` (`apps/api/src/common/stripe.service.ts`). Instantiation parses the URL, validates protocol (`http:` or `https:`), extracts hostname and optional port, and configures `new Stripe(apiKey, { apiVersion: '2026-05-27.dahlia', protocol, host, port })`. Absent environment variables strictly preserve production SDK endpoints.
+
+3. **Cross-Service Health Topology**:
+   - **FastAPI Agent Service**: Exposes `GET /health/live` as a lightweight, zero-inference, no-LLM endpoint that bypasses JWT and API key authentication to report immediate process liveness.
+   - **Next.js Web Service**: Exposes `GET /health/upstream` (`apps/web/app/health/upstream/route.ts`) as a dynamic route handler (`force-dynamic`, `Cache-Control: private, no-store`) performing a bounded 2000ms server-to-server health ping to NestJS `GET /api/health/ping` via private `API_URL`.
+   - **NestJS API Service**: Exposes `GET /api/health/agent` using `AgentHealthService` (`apps/api/src/health/agent-health.service.ts`), which pings FastAPI Agent `GET /health/live` with a bounded 2000ms timeout and sanitized error logging.
+
+4. **Zero-Dependency Test Harness Architecture**:
+   - **Readiness Polling (`tests/smoke/helpers/wait-for-ready.mjs`)**: Concurrently polls health endpoints for all services (Mock Server, NestJS API, FastAPI Agent, Next.js Web) with exponential backoff and a strict 120-second deadline. Hung probes cannot block teardown.
+   - **Mock Provider Server (`tests/smoke/mocks/mock-server.mjs`)**: Pure `node:http` standalone server providing deterministic Duffel and Stripe fixtures on a loopback port. Enforces strict method/route routing, request body validation, and 404 responses on unknown routes with sanitized request logging.
+   - **Test Utilities (`tests/smoke/helpers/test-utils.mjs`)**: Pure ES module utilities for generating unique test actors, creating auth bearer headers, signing HMAC-SHA256 user claim tokens (`signHmacClaimToken`), polling payment statuses (`pollPaymentStatus`), and enforcing centralized redaction (`redactSensitive`).
+   - **Lifecycle Orchestrator (`scripts/ci/run-smoke-sanity.mjs`)**: Central execution harness that coordinates child process spawning (Mock, API, Agent, Web), manages PID/process-group ownership across POSIX and Windows, streams diagnostic logs to `.smoke-diagnostics/<run-id>/`, executes smoke checks before sanity tests (skipping sanity on smoke failure), and enforces fail-safe bounded cleanup on exit, SIGINT, or SIGTERM.
 
 ---
 

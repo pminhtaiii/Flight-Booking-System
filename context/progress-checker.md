@@ -6,14 +6,48 @@ Update this file after every completed feature. Any AI agent reading this should
 
 ### Current Status
 
-**Feature:** Whole-Stack Smoke and Sanity CI (Feature 020) — Phase 5: User Story 3 - Local & CI Orchestration (T042–T050) COMPLETED
-**Last completed:** Phase 5 / CI health-check timeout stabilization and full smoke/sanity verification (2026-08-28).
-**In progress:** Phase 6: Polish and Cross-Cutting Verification (T051–T057).
-**Next:** Phase 6: Polish and Cross-Cutting Verification (T051–T057).
+**Feature:** Whole-Stack Smoke and Sanity CI (Feature 020) — COMPLETED (100% across Phases 1–6, Tasks T001–T057)
+**Last completed:** Phase 6 / Full documentation sync, local lifecycle verification (smoke 8/8 in 1.31s, sanity 12/12 in 5.52s, exit 0), pre-PR monorepo gate matrix validation, and dual-axis code review (2026-08-28).
+**In progress:** None (Feature 020 sign-off complete).
+**Next:** Production rollout / Next scheduled feature.
 
 ---
 
 ## Progress by Feature
+
+### [x] Feature: Whole-Stack Smoke and Sanity CI (Feature 020) — Phase 6: Polish and Cross-Cutting Verification (T051–T057)
+
+- [x] Phase 6: Polish and Cross-Cutting Verification (T051–T057) (2026-08-28):
+  - **T051: Architecture Documentation Sync (`context/architecture.md`)**:
+    - Replaced planned smoke/sanity section with `Subsystem 8: Whole-Stack Smoke & Sanity CI Pipeline`.
+    - Documented CI pipeline graph (`detect-changes` -> `smoke-and-sanity` -> `ci-status`), loopback provider override seams (`DUFFEL_API_URL`, `STRIPE_API_URL`), cross-service health routes (`/health/live`, `/health/upstream`, `/api/health/agent`), and 4-tier zero-dependency test harness architecture (`wait-for-ready.mjs`, `mock-server.mjs`, `test-utils.mjs`, `run-smoke-sanity.mjs`).
+  - **T052: Coding Standards Documentation Sync (`context/code-standards.md`)**:
+    - Documented operational Route Handler exception for `apps/web/app/health/upstream/route.ts` (`force-dynamic`, `Cache-Control: private, no-store`, 2000ms timeout, server-only `API_URL` preserving Zero-Client-Credential invariant).
+    - Documented Provider Override Safety Rules: default safety invariant (absent env strictly preserves production SDK endpoints `https://api.duffel.com` and `https://api.stripe.com`), fast-fail URL constructor validation via `new URL()`, protocol restriction (`http:`, `https:`), and trailing slash normalization.
+    - Documented negative privacy rules for test harnesses and diagnostics (centralized `redactSensitive` across tokens, passwords, card numbers, secrets, and PII).
+  - **T053: Library Documentation Sync (`context/library-docs.md`)**:
+    - Documented installed `@duffel/api` SDK constructor configuration via `new Duffel({ token, basePath })` with `basePath` override and trailing slash normalization.
+    - Documented installed `stripe` SDK constructor connection options via `new Stripe(key, { apiVersion: '2026-05-27.dahlia', protocol, host, port })` with `STRIPE_API_URL` override parsing.
+    - Documented fast-fail URL validation patterns and test mock server compatibility.
+  - **T055: Quickstart Verification Documentation (`specs/020-smoke-sanity-tests/quickstart.md`)**:
+    - Updated quickstart guide with verified runnable commands, static checks, unit harness suites, full local lifecycle execution, and pre-PR gate matrix with exit code 0 status.
+  - **T056: Full Local Smoke-and-Sanity Lifecycle Execution (`node scripts/ci/run-smoke-sanity.mjs --mode=local`)**:
+    - Executed complete local orchestrator against dedicated `smoke_test` database.
+    - Verified all 4 services (mock, API, Agent, Web) spawned cleanly and resolved concurrent readiness probes.
+    - Whole-stack smoke suite passed all 8 checks in 1.31s (budget: <15s).
+    - Whole-stack sanity suite passed all 12 checks in 5.52s (budget: <60s).
+    - Verified zero LLM/chat mock requests recorded during sanity execution.
+    - Verified all child processes cleanly terminated and cleaned up in `finally` block with exit code 0.
+  - **T057: Pre-PR Monorepo Gate Matrix Validation**:
+    - Static CI Workflow & Evaluator Contracts: 26/26 tests passed (`node --test tests/ci/ci-workflow.contract.test.mjs tests/ci/evaluate-ci-status.test.mjs`).
+    - Smoke Harness Unit Suite: 55/55 tests passed (`pnpm test:smoke:units`).
+    - API Gate & Strict Typecheck: ESLint 0 errors / 0 warnings (`pnpm exec eslint "apps/api/**/*.ts" "packages/shared/**/*.ts" --max-warnings 0`), `tsc -p tsconfig.json --noEmit` exit code 0.
+    - API Unit Tests: 87/87 test suites, 944/944 tests passed with loopback network guard (`pnpm --filter @api/backend test -- --runInBand`).
+    - Web Gate, Typecheck & Production Build: `next lint` clean, `tsc --noEmit` exit 0, `next build` static/dynamic page generation clean (exit code 0).
+    - Agent Gate & Pytest Suite: `ruff check` and `ruff format --check` clean across 121 files, 457/457 tests passed (`pytest apps/agent/tests -m "not redis_integration"`).
+  - **T054: Feature 020 Complete Sign-Off**:
+    - Marked Feature 020 100% complete across all 6 phases (T001–T057).
+    - Dual-axis Standards and Spec code reviews completed with 0 P0/P1/P2/P3 issues.
 
 ### [x] Feature: Whole-Stack Smoke and Sanity CI (Feature 020) — Phase 5: User Story 3 - Local & CI Orchestration (T042–T050)
 

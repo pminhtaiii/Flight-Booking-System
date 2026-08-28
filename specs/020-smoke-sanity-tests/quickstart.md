@@ -14,7 +14,7 @@ No Duffel, Stripe, Mimo, or deployment secret is required. Use only documented n
 
 ```powershell
 node --test tests/ci/ci-workflow.contract.test.mjs
-node --test tests/smoke/wait-for-ready.unit.test.mjs tests/smoke/mock-server.unit.test.mjs
+node --test tests/smoke/wait-for-ready.unit.test.mjs tests/smoke/mock-server.unit.test.mjs tests/smoke/test-utils.unit.test.mjs tests/smoke/run-smoke-sanity.unit.test.mjs
 ```
 
 Expected: exit code 0. The workflow contract verifies that `docker-compose.yml` is present in the API, Web, and Agent filters, a Compose-only change sets all three outputs to true, and both `smoke-and-sanity` and `ci-status` require success. It also verifies dependency routing, smoke-before-sanity ordering, the network guard, and cleanup.
@@ -81,6 +81,7 @@ Do not run sanity after a smoke failure when reproducing CI behavior.
 
 ```powershell
 node --test tests/ci/ci-workflow.contract.test.mjs
+node --test tests/smoke/wait-for-ready.unit.test.mjs tests/smoke/mock-server.unit.test.mjs tests/smoke/test-utils.unit.test.mjs tests/smoke/run-smoke-sanity.unit.test.mjs
 pnpm exec eslint "apps/api/**/*.ts" "packages/shared/**/*.ts" --max-warnings 0
 pnpm --filter @api/backend exec tsc -p tsconfig.json --noEmit
 pnpm --filter @web/frontend lint

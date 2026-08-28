@@ -138,13 +138,13 @@
 
 **Purpose**: Synchronize repository guidance and execute all proportional gates before implementation completion.
 
-- [ ] T051 [P] Replace the planned smoke/sanity section with the implemented job graph, routes, provider seams, and runtime data flow in `context/architecture.md`
-- [ ] T052 [P] Document the operational Web health route exception and provider override default-safety convention in `context/code-standards.md`
-- [ ] T053 [P] Document installed Duffel `basePath` and Stripe endpoint override usage in `context/library-docs.md`
-- [ ] T054 Update Feature 020 task state and exact verification evidence in `context/progress-checker.md`
-- [ ] T055 Run the feature static/unit gates and record exit codes in `specs/020-smoke-sanity-tests/quickstart.md`
-- [ ] T056 Run the complete local smoke-and-sanity lifecycle, require final exit code 0, verify timing budgets and cleanup, and record evidence in `context/progress-checker.md`
-- [ ] T057 Run the change-aware API, Web, and Agent pre-PR gate matrix from `AGENTS.md` and resolve regressions without weakening tests in `context/progress-checker.md`
+- [x] T051 [P] Replace the planned smoke/sanity section with the implemented job graph, routes, provider seams, and runtime data flow in `context/architecture.md`
+- [x] T052 [P] Document the operational Web health route exception and provider override default-safety convention in `context/code-standards.md`
+- [x] T053 [P] Document installed Duffel `basePath` and Stripe endpoint override usage in `context/library-docs.md`
+- [x] T054 Update Feature 020 task state and exact verification evidence in `context/progress-checker.md`
+- [x] T055 Run the feature static/unit gates and record exit codes in `specs/020-smoke-sanity-tests/quickstart.md`
+- [x] T056 Run the complete local smoke-and-sanity lifecycle, require final exit code 0, verify timing budgets and cleanup, and record evidence in `context/progress-checker.md`
+- [x] T057 Run the change-aware API, Web, and Agent pre-PR gate matrix from `AGENTS.md` and resolve regressions without weakening tests in `context/progress-checker.md`
 
 ---
 
