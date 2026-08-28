@@ -53,6 +53,18 @@ export function evaluateCiStatus(results) {
     }
   }
 
+  const anyDomainChanged = DETECTION_OUTPUTS.some(
+    (service) => getDetectionOutput(results, service) === 'true',
+  );
+  const expectedSmokeAndSanityConclusion = anyDomainChanged ? 'success' : 'skipped';
+  const smokeAndSanityConclusion = getConclusion(results, 'smoke-and-sanity');
+
+  if (smokeAndSanityConclusion !== expectedSmokeAndSanityConclusion) {
+    return fail(
+      `smoke-and-sanity concluded ${String(smokeAndSanityConclusion)}, expected ${expectedSmokeAndSanityConclusion} because ${anyDomainChanged ? 'at least one domain changed' : 'all domains are unchanged'}`,
+    );
+  }
+
   return { passed: true, reason: 'all required CI jobs reached their expected conclusions' };
 }
 
@@ -70,6 +82,7 @@ function parseCliInput(argv, stdin) {
       'web-build': process.env.WEB_BUILD_RESULT,
       'agent-gate': process.env.AGENT_GATE_RESULT,
       'agent-tests': process.env.AGENT_TESTS_RESULT,
+      'smoke-and-sanity': process.env.SMOKE_AND_SANITY_RESULT,
     };
   }
   const input = argv[2] ?? stdin.trim();
