@@ -447,6 +447,32 @@ jobs:
       }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    env:
+      NODE_ENV: test
+      DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/smoke_test?schema=public
+      REDIS_URL: redis://127.0.0.1:6379/0
+      JWT_SECRET: ci-not-a-secret-jwt
+      AGENT_SERVICE_API_KEY: ci-not-a-secret-agent-key
+      CLAIM_TOKEN_SECRET: ci-not-a-secret-claim-key
+      ATTESTATION_SECRET: ci-not-a-secret-attestation
+      ENCRYPTION_KEY: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+      CHAT_ENCRYPTION_KEY: bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+      STRIPE_SECRET_KEY: sk_test_ci_not_a_secret
+      STRIPE_WEBHOOK_SECRET: whsec_ci_not_a_secret
+      DUFFEL_ACCESS_TOKEN: duffel_test_ci_not_a_secret
+      NEXTAUTH_SECRET: ci-non-production-secret
+      NEXTAUTH_URL: http://127.0.0.1:3000
+      NEXT_PUBLIC_API_URL: http://127.0.0.1:3001
+      NEXT_PUBLIC_AGENT_URL: http://127.0.0.1:3002
+      NEXT_PUBLIC_FEATURE_FLAG_BOOKING_READINESS: 'true'
+      NEXT_PUBLIC_FEATURE_FLAG_CHAT_HANDOFF: 'true'
+      SMOKE_MOCK_URL: http://127.0.0.1:4010
+      DUFFEL_API_URL: http://127.0.0.1:4010
+      STRIPE_API_URL: http://127.0.0.1:4010
+      AGENT_SERVICE_URL: http://127.0.0.1:3002
+      NESTJS_API_URL: http://127.0.0.1:3001/api
+      API_URL: http://127.0.0.1:3001
+      TIKTOKEN_CACHE_DIR: ${{ github.workspace }}/.tiktoken_cache
     steps:
       - name: Use LF checkout behavior
         run: git config --global core.autocrlf input
@@ -493,11 +519,12 @@ jobs:
           NODE_OPTIONS: --require=${{ github.workspace }}/tests/ci/node-network-guard.cjs
           DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/smoke_test?schema=public
           REDIS_URL: redis://127.0.0.1:6379/0
-          DUFFEL_API_URL: http://127.0.0.1:4000/duffel
-          STRIPE_API_URL: http://127.0.0.1:4000/stripe
+          DUFFEL_API_URL: http://127.0.0.1:4010
+          STRIPE_API_URL: http://127.0.0.1:4010
           AGENT_SERVICE_URL: http://127.0.0.1:3002
           NESTJS_API_URL: http://127.0.0.1:3001/api
           API_URL: http://127.0.0.1:3001
+          SMOKE_MOCK_URL: http://127.0.0.1:4010
           JWT_SECRET: ci-not-a-secret-jwt
           AGENT_SERVICE_API_KEY: ci-not-a-secret-agent-key
           CLAIM_TOKEN_SECRET: ci-not-a-secret-claim-key
