@@ -28,8 +28,8 @@ export class HealthController {
           await tx.$queryRaw`SELECT 1`;
         },
         {
-          maxWait: 150,
-          timeout: 150,
+          maxWait: 2000,
+          timeout: 500,
         },
       );
     } catch (error) {

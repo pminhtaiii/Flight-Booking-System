@@ -174,7 +174,7 @@ describe('Health Check (E2E)', () => {
       });
   });
 
-  it('GET /health - should return status 503 within 150ms if database query times out (> 100ms delay)', async () => {
+  it('GET /health - should return status 503 within 750ms if database query stalls', async () => {
     // Measure a base normal request duration right before the timeout request to get current environmental overhead
     dbMockSpy.mockImplementationOnce(
       () => Promise.resolve([1]) as unknown as Prisma.PrismaPromise<unknown>,
@@ -204,11 +204,11 @@ describe('Health Check (E2E)', () => {
       },
     });
 
-    // The net duration added by the timeout (100ms) should be less than 250ms.
+    // Keep the failure bounded while allowing a busy CI database enough time to
+    // complete the lightweight transaction without a false-negative health result.
     const netDuration = duration - baseDuration;
-    expect(netDuration).toBeLessThan(250);
+    expect(netDuration).toBeLessThan(750);
   });
 });
-
 
 

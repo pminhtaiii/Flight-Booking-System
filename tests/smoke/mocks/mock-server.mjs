@@ -1,3 +1,4 @@
+import crypto from 'node:crypto';
 import http from 'node:http';
 import { pathToFileURL } from 'node:url';
 
@@ -333,7 +334,8 @@ export function createMockServer() {
   }
 
   const server = http.createServer(async (request, response) => {
-    const pathname = new URL(request.url ?? '/', 'http://127.0.0.1').pathname;
+    const rawPathname = new URL(request.url ?? '/', 'http://127.0.0.1').pathname;
+    const pathname = rawPathname.length > 1 ? rawPathname.replace(/\/+$/, '') : rawPathname;
 
     if (request.method === 'GET' && pathname === '/__mock/health') {
       record(request.method, pathname, 200);
@@ -455,9 +457,17 @@ export function createMockServer() {
         sendJson(response, 400, { error: 'Malformed request body' });
         return;
       }
+      const email =
+        (typeof parsed.value?.get === 'function' ? parsed.value.get('email') : null) ??
+        parsed.data?.email ??
+        parsed.value?.email;
+      const customerId =
+        email && email !== 'traveler@example.com'
+          ? `cus_mock_${crypto.createHash('sha256').update(email).digest('hex').slice(0, 12)}`
+          : 'cus_mock_123';
       record(request.method, pathname, 200);
       sendJson(response, 200, {
-        id: 'cus_mock_123',
+        id: customerId,
         object: 'customer',
       });
       return;

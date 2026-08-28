@@ -12,6 +12,8 @@ const evaluatorPath = resolve(root, 'scripts/ci/evaluate-ci-status.mjs');
 const workflowPath = resolve(root, '.github/workflows/ci.yml');
 const services = SERVICE_CHAINS;
 const jobIds = ['detect-changes', ...Object.values(services).flat()];
+const smokeAndSanityJob = 'smoke-and-sanity';
+const workflowJobIds = [...jobIds, smokeAndSanityJob];
 
 function validResults(changes = {}) {
   const results = {
@@ -19,6 +21,9 @@ function validResults(changes = {}) {
     web: changes.web ? 'true' : 'false',
     agent: changes.agent ? 'true' : 'false',
     'detect-changes': 'success',
+    [smokeAndSanityJob]: ['api', 'web', 'agent'].some((service) => changes[service])
+      ? 'success'
+      : 'skipped',
   };
 
   for (const [service, jobs] of Object.entries(services)) {
@@ -54,6 +59,104 @@ function stepBlock(job, stepName) {
   );
   assert.ok(match, `expected ${stepName} step`);
   return match[0];
+}
+
+function filterBlock(detect, filterName) {
+  const match = detect.match(
+    new RegExp(
+      `^            ${filterName}:[ \\t]*\\n([\\s\\S]*?)(?=^            [\\w-]+:[ \\t]*$|^  [\\w-]+:[ \\t]*$|$(?![\\s\\S]))`,
+      'm',
+    ),
+  );
+  assert.ok(match, `expected ${filterName} routing filter`);
+  return match[0];
+}
+
+function workflowSteps(job) {
+  const stepsIndex = job.indexOf('    steps:\n');
+  assert.notEqual(stepsIndex, -1, 'expected workflow job steps');
+
+  const steps = job.slice(stepsIndex);
+  const matches = [
+    ...steps.matchAll(
+      /^      - name:\s+(.+?)\s*\n([\s\S]*?)(?=^      - name:|$(?![\s\S]))/gm,
+    ),
+  ];
+  assert.ok(matches.length > 0, 'expected named workflow steps');
+  return matches.map(([block, name]) => ({ block, name }));
+}
+
+function stepContaining(job, pattern, description) {
+  const matches = workflowSteps(job).filter(({ block }) => pattern.test(block));
+  assert.equal(matches.length, 1, description);
+  return matches[0].block;
+}
+
+function jobIfExpression(job) {
+  const match = job.match(/^    if:\s*(?:>-\s*\n)?\s*\$\{\{([\s\S]*?)\}\}\s*$/m);
+  assert.ok(match, 'expected a GitHub Actions if expression');
+  return match[1].replace(/\s+/g, ' ').trim();
+}
+
+function parenthesizedGroups(expression) {
+  const groups = [];
+  const starts = [];
+  for (const [index, character] of [...expression].entries()) {
+    if (character === '(') {
+      starts.push(index);
+    } else if (character === ')') {
+      const start = starts.pop();
+      if (start !== undefined) {
+        groups.push(expression.slice(start + 1, index));
+      }
+    }
+  }
+  return groups;
+}
+
+function assertChangeAwareSharedJobPredicate(expression) {
+  const candidates = [expression, ...parenthesizedGroups(expression)];
+  const outputTrue = (service) =>
+    new RegExp(`needs\\.detect-changes\\.outputs\\.${service}\\s*==\\s*['"]true['"]`);
+  const unchanged = (service) =>
+    new RegExp(
+      `needs\\.detect-changes\\.outputs\\.${service}\\s*(?:!=\\s*['"]true['"]|==\\s*['"]false['"])`,
+    );
+  const terminalSuccess = (job) => new RegExp(`needs\\.${job}\\.result\\s*==\\s*['"]success['"]`);
+
+  assert.match(
+    expression,
+    /always\(\)/,
+    'the shared job predicate must still evaluate after prerequisite jobs finish',
+  );
+  assert.match(
+    expression,
+    /needs\.detect-changes\.result\s*==\s*['"]success['"]/,
+    'the shared job predicate must require successful change detection',
+  );
+  assert.ok(
+    candidates.some(
+      (candidate) =>
+        candidate.includes('||') && ['api', 'web', 'agent'].every((service) => outputTrue(service).test(candidate)),
+    ),
+    'the shared job predicate must require at least one changed domain',
+  );
+
+  for (const [service, terminals] of Object.entries({
+    api: ['api-unit-tests', 'api-e2e-tests'],
+    web: ['web-build'],
+    agent: ['agent-tests'],
+  })) {
+    assert.ok(
+      candidates.some(
+        (candidate) =>
+          unchanged(service).test(candidate) &&
+          candidate.includes('||') &&
+          terminals.every((terminal) => terminalSuccess(terminal).test(candidate)),
+      ),
+      `${service} must permit an unchanged domain or require all of its terminal jobs to succeed`,
+    );
+  }
 }
 
 function assertContains(block, pattern, description) {
@@ -117,7 +220,7 @@ test('evaluator accepts nested GitHub-summary shaped results and never throws fo
   const flat = validResults({ api: true, agent: true });
   const nested = {
     outputs: { api: flat.api, web: flat.web, agent: flat.agent },
-    jobs: Object.fromEntries(jobIds.map((job) => [job, flat[job]])),
+    jobs: Object.fromEntries(workflowJobIds.map((job) => [job, flat[job]])),
   };
   assert.equal(evaluateCiStatus(nested).passed, true);
 
@@ -153,6 +256,7 @@ test('evaluator CLI emits JSON and fails closed', () => {
       WEB_BUILD_RESULT: 'skipped',
       AGENT_GATE_RESULT: 'skipped',
       AGENT_TESTS_RESULT: 'skipped',
+      SMOKE_AND_SANITY_RESULT: 'skipped',
     },
   });
   assert.equal(envPassing.status, 0);
@@ -407,4 +511,198 @@ test('workflow defines the required job graph, routing matrix, and fail-closed s
     );
   }
   assertContains(summary, /evaluate-ci-status\.mjs/, 'ci-status must invoke the shared evaluator');
+});
+
+test('smoke-and-sanity is a shared workflow job, not a service-chain terminal', () => {
+  assert.ok(
+    workflowJobIds.includes(smokeAndSanityJob),
+    'the tested workflow job set must include smoke-and-sanity',
+  );
+  assert.ok(
+    !Object.values(services).flat().includes(smokeAndSanityJob),
+    'smoke-and-sanity must remain outside SERVICE_CHAINS because it is shared infrastructure',
+  );
+
+  jobBlock(workflow(), smokeAndSanityJob);
+});
+
+test('Compose-only shared-infrastructure routing makes every domain applicable', () => {
+  const detect = jobBlock(workflow(), 'detect-changes');
+  const sharedPaths = [
+    'tests/smoke/**',
+    'scripts/ci/run-smoke-sanity.mjs',
+    'docker-compose.yml',
+  ];
+
+  for (const service of ['api', 'web', 'agent']) {
+    const filter = filterBlock(detect, service);
+    for (const path of sharedPaths) {
+      assert.ok(
+        filter.includes(path),
+        `${service} routing must include ${path} so shared stack changes cannot be skipped`,
+      );
+    }
+  }
+});
+
+test('Compose-only routing requires a successful shared smoke-and-sanity result', () => {
+  const composeOnly = validResults({ api: true, web: true, agent: true });
+
+  assert.equal(
+    evaluateCiStatus({ ...composeOnly, [smokeAndSanityJob]: 'success' }).passed,
+    true,
+    'a Compose-only change with successful prerequisite and shared jobs must pass',
+  );
+
+  for (const result of ['skipped', 'cancelled', 'failure', undefined]) {
+    assert.equal(
+      evaluateCiStatus({ ...composeOnly, [smokeAndSanityJob]: result }).passed,
+      false,
+      `a Compose-only change must reject smoke-and-sanity=${String(result)}`,
+    );
+  }
+
+  assert.equal(
+    evaluateCiStatus({ ...validResults(), [smokeAndSanityJob]: 'skipped' }).passed,
+    true,
+    'an unchanged repository must retain the valid shared-job skipped path',
+  );
+});
+
+test('smoke-and-sanity is an always-evaluated, change-aware dependency gate', () => {
+  const shared = jobBlock(workflow(), smokeAndSanityJob);
+  const predicate = jobIfExpression(shared);
+
+  for (const requirement of [
+    /^    runs-on:\s+ubuntu-latest\s*$/m,
+    /^    timeout-minutes:\s+\d+\s*$/m,
+  ]) {
+    assertContains(shared, requirement, `smoke-and-sanity must include ${requirement}`);
+  }
+
+  for (const dependency of [
+    'detect-changes',
+    'api-unit-tests',
+    'api-e2e-tests',
+    'web-build',
+    'agent-tests',
+  ]) {
+    assertContains(
+      shared,
+      new RegExp(`^    needs:\\s+\\[[^\\]]*${dependency}[^\\]]*\\]\\s*$|^\\s+- ${dependency}\\s*$`, 'm'),
+      `smoke-and-sanity must need ${dependency}`,
+    );
+  }
+
+  assertChangeAwareSharedJobPredicate(predicate);
+  assert.throws(
+    () =>
+      assertChangeAwareSharedJobPredicate(
+        "always() && needs.detect-changes.result == 'success' && (needs.detect-changes.outputs.api == 'true' || needs.detect-changes.outputs.web == 'true' || needs.detect-changes.outputs.agent == 'true') && needs.api-unit-tests.result == 'success' && needs.api-e2e-tests.result == 'success' && needs.web-build.result == 'success' && needs.agent-tests.result == 'success'",
+      ),
+    /must permit an unchanged domain/,
+    'a predicate that requires every terminal even for unchanged domains must be rejected',
+  );
+});
+
+test('smoke-and-sanity provisions the locked loopback stack and invokes only the orchestrator', () => {
+  const shared = jobBlock(workflow(), smokeAndSanityJob);
+
+  for (const requirement of [
+    /pnpm\/action-setup@[a-f0-9]{40}/i,
+    /version:\s*10\.34\.5/,
+    /actions\/setup-node@[a-f0-9]{40}/i,
+    /node-version:\s*20/,
+    /astral-sh\/setup-uv@[a-f0-9]{40}/i,
+    /version:\s*0\.12\.0/,
+    /python-version:\s*['"]3\.11['"]?/,
+    /pnpm install --frozen-lockfile/,
+    /uv sync --locked --package agent/,
+    /docker compose up -d/,
+    /pnpm build:shared/,
+    /prisma generate/,
+    /prisma migrate deploy/,
+    /pnpm --filter @api\/backend build/,
+    /pnpm --filter @web\/frontend build/,
+  ]) {
+    assertContains(shared, requirement, `smoke-and-sanity must include ${requirement}`);
+  }
+
+  const orchestrator = stepContaining(
+    shared,
+    /node scripts\/ci\/run-smoke-sanity\.mjs --mode=ci/,
+    'expected exactly one smoke-and-sanity orchestrator step',
+  );
+  assertContains(
+    orchestrator,
+    /^        run:\s+node scripts\/ci\/run-smoke-sanity\.mjs --mode=ci\s*$/m,
+    'the orchestrator step must run the exact CI command without appended flags',
+  );
+  for (const requirement of [
+    /NODE_OPTIONS:\s*--require=\$\{\{ github\.workspace \}\}\/tests\/ci\/node-network-guard\.cjs/,
+    /DATABASE_URL:.*127\.0\.0\.1/,
+    /REDIS_URL:.*127\.0\.0\.1/,
+    /DUFFEL_API_URL:.*127\.0\.0\.1/,
+    /STRIPE_API_URL:.*127\.0\.0\.1/,
+    /AGENT_SERVICE_URL:.*127\.0\.0\.1/,
+    /NESTJS_API_URL:.*127\.0\.0\.1/,
+    /API_URL:.*127\.0\.0\.1/,
+  ]) {
+    assertContains(
+      orchestrator,
+      requirement,
+      `the orchestrator step must set ${requirement} locally`,
+    );
+  }
+
+  assert.doesNotMatch(
+    shared,
+    /node --test(?:\s+--test-reporter=spec)?\s+tests\/smoke\/(?:smoke|sanity)\.test\.mjs/,
+    'the orchestrator, rather than inline suite commands, must enforce readiness then smoke then sanity',
+  );
+});
+
+test('smoke-and-sanity diagnostics are always-run and privacy-safe', () => {
+  const shared = jobBlock(workflow(), smokeAndSanityJob);
+  const diagnostics = stepContaining(
+    shared,
+    /docker compose ps/,
+    'expected exactly one diagnostics step that inspects Compose services',
+  );
+  const teardown = stepContaining(
+    shared,
+    /docker compose down/,
+    'expected exactly one teardown step that stops Compose services',
+  );
+
+  assertContains(
+    diagnostics,
+    /^        if:\s*\$\{\{\s*always\(\)\s*\}\}\s*$/m,
+    'smoke-and-sanity must always collect Compose diagnostics',
+  );
+  assert.doesNotMatch(
+    diagnostics,
+    /\bdocker\s+compose\s+logs\b|\b(?:tail|head|cat|less|more|sed|awk)\b[^\r\n]*(?:\*\.log\b|(?:stdout|stderr)\.log\b|\.smoke-diagnostics)/i,
+    'the diagnostics step must not print raw Compose or service/mock log bodies automatically',
+  );
+  assertContains(
+    teardown,
+    /^        if:\s*\$\{\{\s*always\(\)\s*\}\}\s*$/m,
+    'smoke-and-sanity must always tear down its Compose services',
+  );
+});
+
+test('ci-status consumes the shared smoke-and-sanity result', () => {
+  const summary = jobBlock(workflow(), 'ci-status');
+
+  assertContains(
+    summary,
+    new RegExp(`^    needs:\\s+\\[[^\\]]*${smokeAndSanityJob}[^\\]]*\\]\\s*$|^\\s+- ${smokeAndSanityJob}\\s*$`, 'm'),
+    'ci-status must wait for smoke-and-sanity',
+  );
+  assertContains(
+    summary,
+    /SMOKE_AND_SANITY_RESULT:\s*\$\{\{\s*needs\.smoke-and-sanity\.result\s*\}\}/,
+    'ci-status must pass the shared job conclusion to the evaluator',
+  );
 });

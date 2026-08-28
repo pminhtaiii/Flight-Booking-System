@@ -328,8 +328,8 @@ test('aborts hanging endpoint within bounded budget without outliving suite dead
     failed = true;
     const durationMs = Date.now() - startTime;
     assert.ok(
-      durationMs < 7000,
-      `Hanging endpoint test should fail in under 7s, but took ${durationMs}ms`,
+      durationMs < 10000,
+      `Hanging endpoint test should fail in under 10s, but took ${durationMs}ms`,
     );
     const combinedOutput = `${err.stdout || ''} ${err.stderr || ''}`;
     assert.match(

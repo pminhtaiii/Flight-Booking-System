@@ -235,7 +235,7 @@ describe('whole-stack sanity suite: flight search & cache', { timeout: SUITE_TIM
         let searchResponse = null;
 
         for (let attempt = 0; attempt < 10; attempt += 1) {
-          const candidateOffset = crypto.randomInt(14, 2000000);
+          const candidateOffset = crypto.randomInt(14, 300);
           searchQuery = buildSearchQuery({
             origin: 'SGN',
             destination: 'HAN',

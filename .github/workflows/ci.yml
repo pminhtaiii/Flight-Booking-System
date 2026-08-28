@@ -53,6 +53,9 @@ jobs:
               - '.gitattributes'
               - 'tests/ci/**'
               - 'scripts/ci/**'
+              - 'tests/smoke/**'
+              - 'scripts/ci/run-smoke-sanity.mjs'
+              - 'docker-compose.yml'
               - 'package.json'
               - 'pnpm-lock.yaml'
               - 'pnpm-workspace.yaml'
@@ -65,6 +68,9 @@ jobs:
               - '.gitattributes'
               - 'tests/ci/**'
               - 'scripts/ci/**'
+              - 'tests/smoke/**'
+              - 'scripts/ci/run-smoke-sanity.mjs'
+              - 'docker-compose.yml'
               - 'package.json'
               - 'pnpm-lock.yaml'
               - 'pnpm-workspace.yaml'
@@ -77,6 +83,9 @@ jobs:
               - '.gitattributes'
               - 'tests/ci/**'
               - 'scripts/ci/**'
+              - 'tests/smoke/**'
+              - 'scripts/ci/run-smoke-sanity.mjs'
+              - 'docker-compose.yml'
               - 'pyproject.toml'
               - 'uv.lock'
 
@@ -425,6 +434,121 @@ jobs:
           TIKTOKEN_CACHE_DIR: ${{ github.workspace }}/.tiktoken_cache
         run: uv run --package agent pytest apps/agent/tests -m redis_integration --strict-markers
 
+  smoke-and-sanity:
+    needs: [detect-changes, api-unit-tests, api-e2e-tests, web-build, agent-tests]
+    if: >-
+      ${{
+        always() &&
+        needs.detect-changes.result == 'success' &&
+        (needs.detect-changes.outputs.api == 'true' || needs.detect-changes.outputs.web == 'true' || needs.detect-changes.outputs.agent == 'true') &&
+        (needs.detect-changes.outputs.api != 'true' || (needs.api-unit-tests.result == 'success' && needs.api-e2e-tests.result == 'success')) &&
+        (needs.detect-changes.outputs.web != 'true' || needs.web-build.result == 'success') &&
+        (needs.detect-changes.outputs.agent != 'true' || needs.agent-tests.result == 'success')
+      }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      NODE_ENV: test
+      DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/smoke_test?schema=public
+      REDIS_URL: redis://127.0.0.1:6379/0
+      JWT_SECRET: ci-not-a-secret-jwt
+      AGENT_SERVICE_API_KEY: ci-not-a-secret-agent-key
+      CLAIM_TOKEN_SECRET: ci-not-a-secret-claim-key
+      ATTESTATION_SECRET: ci-not-a-secret-attestation
+      ENCRYPTION_KEY: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+      CHAT_ENCRYPTION_KEY: bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+      STRIPE_SECRET_KEY: sk_test_ci_not_a_secret
+      STRIPE_WEBHOOK_SECRET: whsec_ci_not_a_secret
+      DUFFEL_ACCESS_TOKEN: duffel_test_ci_not_a_secret
+      NEXTAUTH_SECRET: ci-non-production-secret
+      NEXTAUTH_URL: http://127.0.0.1:3000
+      NEXT_PUBLIC_API_URL: http://127.0.0.1:3001
+      NEXT_PUBLIC_AGENT_URL: http://127.0.0.1:3002
+      NEXT_PUBLIC_FEATURE_FLAG_BOOKING_READINESS: 'true'
+      NEXT_PUBLIC_FEATURE_FLAG_CHAT_HANDOFF: 'true'
+      FEATURE_FLAG_BOOKING_READINESS: 'true'
+      FEATURE_FLAG_CHAT_HANDOFF_ISSUE: 'true'
+      FEATURE_FLAG_CHAT_HANDOFF_ACCEPT: 'true'
+      SMOKE_MOCK_URL: http://127.0.0.1:4010
+      DUFFEL_API_URL: http://127.0.0.1:4010
+      STRIPE_API_URL: http://127.0.0.1:4010
+      AGENT_SERVICE_URL: http://127.0.0.1:3002
+      NESTJS_API_URL: http://127.0.0.1:3001/api
+      API_URL: http://127.0.0.1:3001
+      TIKTOKEN_CACHE_DIR: ${{ github.workspace }}/.tiktoken_cache
+    steps:
+      - name: Use LF checkout behavior
+        run: git config --global core.autocrlf input
+      - name: Checkout pull request
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Set up pnpm 10.34.5
+        uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
+        with:
+          version: 10.34.5
+      - name: Set up Node 20
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 20
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+      - name: Set up uv 0.12.0 and Python 3.11
+        uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
+        with:
+          version: 0.12.0
+          python-version: '3.11'
+          enable-cache: true
+          cache-dependency-glob: uv.lock
+      - name: Install Python 3.11
+        run: uv python install 3.11
+      - name: Install Node dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Install Agent dependencies from root lock
+        run: uv sync --locked --package agent
+      - name: Start Compose services
+        run: docker compose up -d
+      - name: Build shared package, generate Prisma Client, and deploy migrations
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/smoke_test?schema=public
+        run: |
+          pnpm build:shared
+          pnpm --filter @api/backend exec prisma generate
+          pnpm --filter @api/backend exec prisma migrate deploy
+          pnpm --filter @api/backend exec prisma db seed
+      - name: Build API and Web applications
+        run: |
+          pnpm --filter @api/backend build
+          pnpm --filter @web/frontend build
+      - name: Run smoke and sanity orchestrator
+        env:
+          NODE_OPTIONS: --require=${{ github.workspace }}/tests/ci/node-network-guard.cjs
+          DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/smoke_test?schema=public
+          REDIS_URL: redis://127.0.0.1:6379/0
+          DUFFEL_API_URL: http://127.0.0.1:4010
+          STRIPE_API_URL: http://127.0.0.1:4010
+          AGENT_SERVICE_URL: http://127.0.0.1:3002
+          NESTJS_API_URL: http://127.0.0.1:3001/api
+          API_URL: http://127.0.0.1:3001
+          SMOKE_MOCK_URL: http://127.0.0.1:4010
+          JWT_SECRET: ci-not-a-secret-jwt
+          AGENT_SERVICE_API_KEY: ci-not-a-secret-agent-key
+          CLAIM_TOKEN_SECRET: ci-not-a-secret-claim-key
+          STRIPE_SECRET_KEY: sk_test_ci_not_a_secret
+          STRIPE_WEBHOOK_SECRET: whsec_ci_not_a_secret
+          DUFFEL_ACCESS_TOKEN: duffel_test_ci_not_a_secret
+          FEATURE_FLAG_BOOKING_READINESS: 'true'
+          FEATURE_FLAG_CHAT_HANDOFF_ISSUE: 'true'
+          FEATURE_FLAG_CHAT_HANDOFF_ACCEPT: 'true'
+          TIKTOKEN_CACHE_DIR: ${{ github.workspace }}/.tiktoken_cache
+        run: node scripts/ci/run-smoke-sanity.mjs --mode=ci
+      - name: Collect Compose diagnostics
+        if: ${{ always() }}
+        run: docker compose ps
+      - name: Tear down Compose services
+        if: ${{ always() }}
+        run: docker compose down
+
   ci-status:
     if: ${{ always() }}
     needs:
@@ -437,6 +561,7 @@ jobs:
         web-build,
         agent-gate,
         agent-tests,
+        smoke-and-sanity,
       ]
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -452,6 +577,7 @@ jobs:
       WEB_BUILD_RESULT: ${{ needs.web-build.result }}
       AGENT_GATE_RESULT: ${{ needs.agent-gate.result }}
       AGENT_TESTS_RESULT: ${{ needs.agent-tests.result }}
+      SMOKE_AND_SANITY_RESULT: ${{ needs.smoke-and-sanity.result }}
     steps:
       - name: Use LF checkout behavior
         run: git config --global core.autocrlf input

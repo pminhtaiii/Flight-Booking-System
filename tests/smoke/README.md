@@ -53,23 +53,24 @@ The sanity suite is structured into three discrete, sequential flow groups execu
 
 ### Implemented Harness Commands
 
-The test harness exposes three runnable root scripts in `package.json`:
+The test harness exposes four runnable root scripts in `package.json`:
 
 - **`pnpm test:smoke:units`**: Introduced in Phase 2 (Foundational Contracts & Test Seams)
 - **`pnpm test:smoke`**: Introduced in Phase 3 (User Story 1: Whole-Stack Readiness Gate)
 - **`pnpm test:sanity`**: Introduced in Phase 4 (User Story 2: Deterministic Business Flows) — executes deterministic business flows (search/cache suppression, booking happy path, agent gateway dual-guard auth) in < 60s
+- **`pnpm test:smoke:all`**: Introduced in Phase 5 (User Story 3: Orchestration & Reproducibility) — executes complete lifecycle (boot, ready, smoke, sanity, cleanup)
 
 | Command                 | Underlying Execution                                                                                                              | Description                                                                                                                | Target Phase / Status |
 | ----------------------- | --------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- | --------------------- |
 | `pnpm test:smoke:units` | `node --test tests/smoke/wait-for-ready.unit.test.mjs tests/smoke/mock-server.unit.test.mjs tests/smoke/test-utils.unit.test.mjs` | Runs unit test suites for harness utilities, mock server, and readiness polling                                            | Phase 2 (Implemented) |
 | `pnpm test:smoke`       | `node --test --test-reporter=spec tests/smoke/smoke.test.mjs`                                                                     | Runs 8 whole-stack smoke checks against an already running stack                                                           | Phase 3 (Implemented) |
 | `pnpm test:sanity`      | `node --test --test-reporter=spec tests/smoke/sanity.test.mjs`                                                                    | Runs deterministic business flow sanity checks (search/cache suppression, booking happy path, agent gateway auth) in < 60s | Phase 4 (Implemented) |
-| `pnpm test:smoke:all`   | `node scripts/ci/run-smoke-sanity.mjs --mode=local`                                                                               | Runs complete orchestrator lifecycle (boot, ready, smoke, sanity, cleanup) in local mode                                   | Phase 5 (Planned)     |
+| `pnpm test:smoke:all`   | `node scripts/ci/run-smoke-sanity.mjs --mode=local`                                                                               | Runs complete orchestrator lifecycle (boot, ready, smoke, sanity, cleanup) in local mode                                   | Phase 5 (Implemented) |
 
 ### Full Orchestrator Scripts
 
 > [!NOTE]
-> The automated lifecycle orchestrator (`scripts/ci/run-smoke-sanity.mjs` and `pnpm test:smoke:all`) is defined for Phase 5 (User Story 3). In the current Phase 4 revision, developers can run services manually or via existing startup scripts, then execute smoke and sanity checks against the running stack using `pnpm test:smoke` and `pnpm test:sanity`.
+> The automated lifecycle orchestrator (`scripts/ci/run-smoke-sanity.mjs` and `pnpm test:smoke:all`) is implemented for Phase 5 (User Story 3). Developers can execute the full automated boot/readiness/smoke/sanity/cleanup lifecycle with `pnpm test:smoke:all` or execute smoke and sanity checks against a running stack using `pnpm test:smoke` and `pnpm test:sanity`.
 
 The orchestrator manages the full lifecycle: log directory initialization, process boot, readiness polling, smoke execution, conditional sanity execution, diagnostic capture, and process cleanup.
 
