@@ -6,14 +6,289 @@ Update this file after every completed feature. Any AI agent reading this should
 
 ### Current Status
 
-**Feature:** Deepen Codebase Architecture (Feature 019) — COMPLETE (100%)
-**Last completed:** Phase 9: Polish, Cross-Cutting Verification, and System Completion (2026-08-26).
-**In progress:** None.
-**Next:** Production Deployment / Feature 020.
+**Feature:** Whole-Stack Smoke and Sanity CI (Feature 020) — COMPLETED (100% across Phases 1–6, Tasks T001–T057)
+**Last completed:** Phase 6 / Full documentation sync, local lifecycle verification (smoke 8/8 in 1.31s, sanity 12/12 in 5.52s, exit 0), pre-PR monorepo gate matrix validation, and dual-axis code review (2026-08-28).
+**In progress:** None (Feature 020 sign-off complete).
+**Next:** Production rollout / Next scheduled feature.
 
 ---
 
 ## Progress by Feature
+
+### [x] Feature: Whole-Stack Smoke and Sanity CI (Feature 020) — Phase 6: Polish and Cross-Cutting Verification (T051–T057)
+
+- [x] Phase 6: Polish and Cross-Cutting Verification (T051–T057) (2026-08-28):
+  - **T051: Architecture Documentation Sync (`context/architecture.md`)**:
+    - Replaced planned smoke/sanity section with `Subsystem 8: Whole-Stack Smoke & Sanity CI Pipeline`.
+    - Documented CI pipeline graph (`detect-changes` -> `smoke-and-sanity` -> `ci-status`), loopback provider override seams (`DUFFEL_API_URL`, `STRIPE_API_URL`), cross-service health routes (`/health/live`, `/health/upstream`, `/api/health/agent`), and 4-tier zero-dependency test harness architecture (`wait-for-ready.mjs`, `mock-server.mjs`, `test-utils.mjs`, `run-smoke-sanity.mjs`).
+  - **T052: Coding Standards Documentation Sync (`context/code-standards.md`)**:
+    - Documented operational Route Handler exception for `apps/web/app/health/upstream/route.ts` (`force-dynamic`, `Cache-Control: private, no-store`, 2000ms timeout, server-only `API_URL` preserving Zero-Client-Credential invariant).
+    - Documented Provider Override Safety Rules: default safety invariant (absent env strictly preserves production SDK endpoints `https://api.duffel.com` and `https://api.stripe.com`), fast-fail URL constructor validation via `new URL()`, protocol restriction (`http:`, `https:`), and trailing slash normalization.
+    - Documented negative privacy rules for test harnesses and diagnostics (centralized `redactSensitive` across tokens, passwords, card numbers, secrets, and PII).
+  - **T053: Library Documentation Sync (`context/library-docs.md`)**:
+    - Documented installed `@duffel/api` SDK constructor configuration via `new Duffel({ token, basePath })` with `basePath` override and trailing slash normalization.
+    - Documented installed `stripe` SDK constructor connection options via `new Stripe(key, { apiVersion: '2026-05-27.dahlia', protocol, host, port })` with `STRIPE_API_URL` override parsing.
+    - Documented fast-fail URL validation patterns and test mock server compatibility.
+  - **T055: Quickstart Verification Documentation (`specs/020-smoke-sanity-tests/quickstart.md`)**:
+    - Updated quickstart guide with verified runnable commands, static checks, unit harness suites, full local lifecycle execution, and pre-PR gate matrix with exit code 0 status.
+  - **T056: Full Local Smoke-and-Sanity Lifecycle Execution (`node scripts/ci/run-smoke-sanity.mjs --mode=local`)**:
+    - Executed complete local orchestrator against dedicated `smoke_test` database.
+    - Verified all 4 services (mock, API, Agent, Web) spawned cleanly and resolved concurrent readiness probes.
+    - Whole-stack smoke suite passed all 8 checks in 1.31s (budget: <15s).
+    - Whole-stack sanity suite passed all 12 checks in 5.52s (budget: <60s).
+    - Verified zero LLM/chat mock requests recorded during sanity execution.
+    - Verified all child processes cleanly terminated and cleaned up in `finally` block with exit code 0.
+  - **T057: Pre-PR Monorepo Gate Matrix Validation**:
+    - Static CI Workflow & Evaluator Contracts: 26/26 tests passed (`node --test tests/ci/ci-workflow.contract.test.mjs tests/ci/evaluate-ci-status.test.mjs`).
+    - Smoke Harness Unit Suite: 55/55 tests passed (`pnpm test:smoke:units`).
+    - API Gate & Strict Typecheck: ESLint 0 errors / 0 warnings (`pnpm exec eslint "apps/api/**/*.ts" "packages/shared/**/*.ts" --max-warnings 0`), `tsc -p tsconfig.json --noEmit` exit code 0.
+    - API Unit Tests: 87/87 test suites, 944/944 tests passed with loopback network guard (`pnpm --filter @api/backend test -- --runInBand`).
+    - Web Gate, Typecheck & Production Build: `next lint` clean, `tsc --noEmit` exit 0, `next build` static/dynamic page generation clean (exit code 0).
+    - Agent Gate & Pytest Suite: `ruff check` and `ruff format --check` clean across 121 files, 457/457 tests passed (`pytest apps/agent/tests -m "not redis_integration"`).
+  - **T054: Feature 020 Complete Sign-Off**:
+    - Marked Feature 020 100% complete across all 6 phases (T001–T057).
+    - Dual-axis Standards and Spec code reviews completed with 0 P0/P1/P2/P3 issues.
+
+### [x] Feature: Whole-Stack Smoke and Sanity CI (Feature 020) — Phase 5: User Story 3 - Local & CI Orchestration (T042–T050)
+
+- [x] Phase 5: User Story 3 - Local & CI Orchestration (T042–T050) (2026-08-28):
+  - **Post-push CI stabilization (`apps/api/src/health/health.controller.ts`, `apps/api/test/health.e2e-spec.ts`)**: Rebalanced the database health transaction to a 2-second pool-acquisition wait with a bounded 500ms query/transaction timeout. This avoids false database-down results under CI load while still returning stalled-query failures within 750ms. Verified the conflicting health and operational drill contracts together (13/13), plus the full smoke suite (8/8) and sanity suite (12/12).
+  - **T042 & T044: Full-Stack Lifecycle Orchestrator (`scripts/ci/run-smoke-sanity.mjs`, `tests/smoke/run-smoke-sanity.unit.test.mjs`)**: Spawns mock server, NestJS API (with `cwd: apps/api`), FastAPI Agent, and Next.js Web server; runs diagnostic logging under `.smoke-diagnostics/<run-id>/`; sequences smoke before sanity with bounded async cleanup.
+  - **T043 & T045: Guarded Database Reset (`scripts/ci/run-smoke-sanity.mjs`)**: `--reset-db` strictly guarded to database named `smoke_test`.
+  - **T046: Workflow Contract Tests (`tests/ci/ci-workflow.contract.test.mjs`)**: 20 contract assertions for all-service filters, locked bootstrap, diagnostics, cleanup, and evaluation.
+  - **T047 & T048: Change-Aware CI Evaluator (`scripts/ci/evaluate-ci-status.mjs`, `tests/ci/evaluate-ci-status.test.mjs`)**: Enforces required conclusion for `smoke-and-sanity` based on changed domains.
+  - **T049: Shared CI Job & Aggregate Status (`.github/workflows/ci.yml`)**: Added shared `smoke-and-sanity` job, all-service change filters (`tests/smoke/**`, `scripts/ci/run-smoke-sanity.mjs`, `docker-compose.yml`), locked setup, Compose infra, orchestrator execution, always-run diagnostics and cleanup, wired `SMOKE_AND_SANITY_RESULT` into `ci-status`.
+  - **T050: Harness Runbook & Command Documentation (`tests/smoke/README.md`)**: Fully documented four runnable harness scripts (`test:smoke:units`, `test:smoke`, `test:sanity`, `test:smoke:all`), local dedicated database setup with `smoke_test`, timing budgets, and diagnostic troubleshooting.
+
+### [x] Feature: Whole-Stack Smoke and Sanity CI (Feature 020) — Phase 4: User Story 2 - Deterministic Business Flows (Slice 3: Agent Communication & Authorization)
+
+- [x] Phase 4 / Slice 3: Agent Communication & Authorization (T037–T041) (2026-08-28):
+  - **T037: Direct Agent Health & API-to-Agent Liveness Checks (`tests/smoke/sanity.test.mjs`)**:
+    - Resolved `AGENT_BASE = (process.env.SMOKE_AGENT_URL || 'http://127.0.0.1:3002').replace(/\/+$/, '')`.
+    - Dispatched `GET /health/live` to FastAPI Agent and asserted HTTP 200 with `{ "status": "ok" }`.
+    - Dispatched `GET /api/health/agent` to NestJS backend and asserted HTTP 200 with `{ "status": "ok", "dependency": "agent", "details": { "status": "ok" } }` via `requestRaw` with zero LLM inference.
+  - **T038: Authorized Agent Gateway Request (`tests/smoke/sanity.test.mjs`)**:
+    - Resolved non-production shared secrets `AGENT_API_KEY` (`process.env.AGENT_SERVICE_API_KEY || 'agent-service-key-smoke'`) and `CLAIM_TOKEN_SECRET` (`process.env.CLAIM_TOKEN_SECRET || 'claim-token-secret-smoke'`).
+    - Generated valid HMAC-SHA256 user claim token for `sharedContext.testActor.userId` using `signHmacClaimToken` matching `ClaimTokenService`.
+    - Dispatched `GET /api/agent-gateway/users/preferences` with headers `'x-agent-api-key': AGENT_API_KEY` and `'x-user-claim': claimToken`.
+    - Asserts HTTP 200 and verified user preferences payload shape without requiring client JWT bearer tokens.
+  - **T039: Gateway 401 & 403 Negative Authorization Assertions (`tests/smoke/sanity.test.mjs`)**:
+    - Verified missing `X-Agent-API-Key` returns HTTP 401 with `code: 'INVALID_API_KEY'`.
+    - Verified invalid/wrong `X-Agent-API-Key` returns HTTP 401 with `code: 'INVALID_API_KEY'`.
+    - Verified missing `X-User-Claim` returns HTTP 401 with `code: 'INVALID_CLAIM_TOKEN'`.
+    - Generated validly signed HMAC claim token for a non-existent UUID (`crypto.randomUUID()`) and verified request returns HTTP 403 (`ForbiddenException`) with `code: 'USER_INACTIVE'`.
+  - **T040: Suite Timing Budget & Zero-LLM Invariant Verification (`tests/smoke/sanity.test.mjs`)**:
+    - Audited mock provider server request logs via `getMockRequests(MOCK_BASE)` and asserted 0 requests to any endpoints matching `chat`, `completions`, `mimo`, or `llm`.
+    - Enforced 60-second sanity budget (`SUITE_TIMEOUT_MS = 60000`) and logged `[sanity] full suite finished in ${totalElapsed}ms` diagnostic.
+  - **T041: Sanity Harness Documentation (`tests/smoke/README.md`)**:
+    - Documented all 3 sanity flow groups: Flight Search & Cache Suppression, Confirmed Booking Happy Path, and Agent Communication & Gateway Authorization.
+    - Added comprehensive Gateway Security & Authorization Error Semantics section documenting dual-guard security model (`AgentApiKeyGuard`, `ClaimTokenGuard`), header specifications, 401/403 negative error matrix, and negative privacy guarantees.
+    - Updated commands table with `pnpm test:sanity` and diagnostic troubleshooting guide.
+  - **Issue 1 & Issue 2 Fixes & Task Reset**:
+    - Added `"test:sanity"` script to root `package.json` (`node --test --test-reporter=spec tests/smoke/sanity.test.mjs`).
+    - Updated mock server pathname sanitization in `tests/smoke/mocks/mock-server.mjs` (`safeDiagnosticSegments`, `auditForbiddenKeywords`, and `sanitizeUnknownPathname`) to preserve LLM audit keywords (`chat`, `completions`, `mimo`, `llm`) to prevent zero-LLM audit evasion, validated with a dedicated unit test in `tests/smoke/mock-server.unit.test.mjs`.
+    - Reset tasks T042–T050 in `specs/020-smoke-sanity-tests/tasks.md` to uncompleted (`[ ]`) pending Phase 5 implementation.
+  - **Verification & Review**:
+    - Passed all 55 smoke harness unit tests (`pnpm test:smoke:units`).
+    - Verified syntax with `node --check tests/smoke/sanity.test.mjs` (exit 0).
+    - Verified ESLint on `tests/smoke/sanity.test.mjs` (0 errors, 0 warnings).
+    - Confirmed RED failure behavior when executed against an unstarted stack.
+    - Completed Standards and Spec reviews.
+
+### [x] Feature: Whole-Stack Smoke and Sanity CI (Feature 020) — Phase 4: User Story 2 - Deterministic Business Flows (Slice 2: Confirmed Booking Happy Path)
+
+- [x] Phase 4 / Slice 2: Confirmed Booking Happy Path (T032–T036) (2026-08-27):
+  - **T032: Stripe SDK Fixtures in Mock Server (`tests/smoke/mocks/mock-server.mjs`)**:
+    - Implemented form-encoded Stripe customer creation route `POST /v1/customers` returning `{ id: 'cus_mock_123', object: 'customer' }`.
+    - Implemented Stripe payment intent retrieve route `GET /v1/payment_intents/:id` validating `pi_` ID prefix and path format (returning 400 on malformed/missing ID, and 200 with `{ id, object: 'payment_intent', status: 'requires_capture', amount: 12550, currency: 'usd', capture_method: 'manual', client_secret: ... }`).
+    - Implemented generalized Stripe capture route `POST /v1/payment_intents/:id/capture` matching any valid `pi_` ID prefix and form body, returning 200 with `status: 'succeeded'`.
+    - Allowlisted `'customers'` in `safeDiagnosticSegments` for zero-leakage diagnostics.
+    - Added unit tests in `tests/smoke/mock-server.unit.test.mjs` asserting 200 fixture shapes, malformed percent escape rejection, 400 on malformed ID, and safe request recording in `/__mock/requests`. Verified 30/30 mock-server unit tests pass.
+  - **T033: Traveler Profile Upsert & Advisory Booking Readiness in `sanity.test.mjs`**:
+    - Queries current user profile via `GET /api/profile` to capture current revision (defaults to 0).
+    - Submits profile update via `PATCH /api/profile` with `expectedRevision: currentRevision`, identity (name matching test actor), contact, and travel document (passport number `P12345678`, expiry `2030-01-01`, issuing country `VN`, nationality `VN`).
+    - Asserts HTTP 200, revision incremented (`updatedProfile.revision > currentRevision`), and `profileId` is present.
+    - Dispatches advisory readiness request `POST /api/bookings/intents/readiness` with `flightOfferId: sharedContext.offerId`, passenger matching `sharedContext.offerPassengerId`, and traveler profile source (`travelerProfileId`, `expectedProfileRevision`).
+    - Asserts HTTP 200 and `readinessResult.ready === true` (or `status === 'READY'`).
+  - **T034: Canonical Booking Intent Creation in `sanity.test.mjs`**:
+    - Dispatches canonical `POST /api/bookings/intents` (plural) consuming search-derived `flightOfferId: sharedContext.offerId`, passenger matching `sharedContext.offerPassengerId`, and traveler profile reference.
+    - Asserts HTTP 201, `intentResponse.id` is valid UUID v4, status is valid lifecycle state (`DRAFT`, `PENDING`, or `AWAITING_PAYMENT`), and `flightOfferId === sharedContext.offerId`.
+    - Preserves `sharedContext.intentId = intentResponse.id` for payment execution.
+  - **T035: Idempotent Payment Creation & Confirmation in `sanity.test.mjs`**:
+    - Generates client booking UUID: `sharedContext.bookingId = crypto.randomUUID()`.
+    - Dispatches `POST /api/bookings/payment/create` with header `'Idempotency-Key': createIdempotencyKey` and body `{ bookingIntentId: sharedContext.intentId }`. Asserts 201 and extracts `sharedContext.paymentId`.
+    - Dispatches `POST /api/bookings/payment/confirm` with distinct fresh header `'Idempotency-Key': confirmIdempotencyKey` and body `{ bookingId: sharedContext.bookingId, paymentId: sharedContext.paymentId }`.
+    - Asserts HTTP 200 or 202 (`ACCEPTED`) and preserves confirmation response.
+  - **T036: Bounded Payment Status Polling & Confirmed Booking Verification in `sanity.test.mjs`**:
+    - Implemented bounded status polling if confirmation returned `status === 'PENDING'` via `pollPaymentStatus` (`GET /api/bookings/payment/:paymentId/status`, `maxAttempts: 10`, `intervalMs: 500`, bounded by remaining suite timeout). Asserts status resolves to `SUCCEEDED`.
+    - Dispatches authenticated `GET /api/bookings/${sharedContext.bookingId}`.
+    - Asserts HTTP 200 and `booking.status === 'CONFIRMED'`.
+    - Asserts booking reference (`booking.pnrReference || booking.bookingReference`) matches Duffel mock order reference `'MOCK123'`.
+    - Asserts `totalAmount || totalPrice` presence.
+  - **Verification & Review**:
+    - Passed all 54 smoke harness unit tests (`pnpm test:smoke:units`).
+    - Verified syntax with `node --check tests/smoke/sanity.test.mjs`.
+    - Dual-axis code review passed with 100% compliance across Standards and Spec axes.
+
+### [x] Feature: Whole-Stack Smoke and Sanity CI (Feature 020) — Phase 4: User Story 2 - Deterministic Business Flows (Slice 1: Search & Cache)
+
+- [x] Phase 4 / Slice 1: Flight Search & Cache Sanity Flows (T028–T031) (2026-08-27):
+  - **T028: Deterministic Duffel Offer Detail Fixture & Route in `mock-server.mjs`**:
+    - Implemented `GET /air/offers/:id` route in `tests/smoke/mocks/mock-server.mjs` with exact path and format validation.
+    - Rejects missing ID or malformed IDs (not starting with `off_` or missing suffix like `off_`) with HTTP 400 `{ error: 'Malformed offer ID' }`.
+    - Rejects unknown offer IDs with HTTP 404 `{ error: 'Offer not found' }`.
+    - Returns deterministic HTTP 200 Duffel offer fixture for `off_mock_123` with VN operating carrier, USD 125.50 amount, passenger `pas_mock_1`, and `available_services: []`. Dynamically mirrors `lastCreatedOffer` when created via `POST /air/offer_requests`.
+    - Allowlisted `'offers'` in `safeDiagnosticSegments` for zero-leakage diagnostics.
+    - Added unit tests in `tests/smoke/mock-server.unit.test.mjs` asserting 200 fixture shape, 400 on malformed/empty/missing-suffix IDs, 404 on unknown IDs, and safe request recording in `/__mock/requests`. Verified 23/23 tests pass.
+  - **T029: Authenticated Flight Search Contract Assertion in `sanity.test.mjs`**:
+    - Created `tests/smoke/sanity.test.mjs` using pure Node.js built-ins (`node:test`, `node:assert/strict`, `fetch`) and local helper `tests/smoke/helpers/test-utils.mjs`.
+    - Exported module-level `sharedContext = { offerId: null, offerPassengerId: null, searchOffer: null, testActor: null }` for downstream test continuity.
+    - Authenticates unique test actor via `createUniqueTestActor()`, `POST /auth/register`, and `POST /auth/login`.
+    - Dispatches authenticated `POST /flights/search` for SGN -> HAN with hardened cold-cache retry loop (up to 10 attempts selecting independent high-entropy `crypto.randomInt(14, 2000000)` candidate offsets on every attempt, resetting mock server if `meta.cached` collision occurs) guaranteeing initial search exercises fresh supplier request (`meta.cached === false`) and cold-to-warm transition even on repeated or concurrent runs within the 900s Redis TTL without clustering or sequential cache stepping.
+    - Asserts 200, results array length >= 1, and required offer field presence (`id`, `airline`, `flightNumber`, `departureAirport`, `arrivalAirport`, `departureTime`, `arrivalTime`, `duration`, `price`, `currency`, `segments`) via `assertResponseShape`.
+    - Asserts meta envelope fields: `meta.searchHash` non-empty string, `meta.cached === false`, `meta.totalResults` (or `meta.count`) >= 1.
+  - **T030: Redis Cache Suppression & Search Hash Parity in `sanity.test.mjs`**:
+    - Inspects mock server requests via `getMockRequests(MOCK_BASE)` asserting exactly 1 `POST /air/offer_requests` call.
+    - Re-submits identical flight search payload with actor's auth token.
+    - Asserts `meta.cached === true`.
+    - Verifies search hash parity and payload comparability via `normalizeCacheEnvelope(firstResponse)` and `normalizeCacheEnvelope(cachedResponse)`.
+    - Asserts `cachedResponse.results.length === firstResponse.results.length` and `cachedResponse.results[0].id === firstResponse.results[0].id`.
+    - Queries mock server again proving `POST /air/offer_requests` count remains exactly 1 (0 additional supplier calls).
+  - **T031: Capture Authoritative Offer Passenger Identifier in `sanity.test.mjs`**:
+    - Calls `GET /flights/${firstOfferId}` with actor bearer token and bounded 5s polling window.
+    - Hardened `flights.service.ts` (`getFlightDetail`) and `duffel.service.ts` (`searchFlights`) to only take test-mode bypass when `DUFFEL_API_URL` is unconfigured (`!hasDuffelApiUrl`).
+    - Validates 200 response with `passengers` array having at least 1 passenger.
+    - Asserts `passengers[0].id` is a non-empty string (`pas_mock_1`).
+    - Queries mock server via `getMockRequests(MOCK_BASE)` and asserts at least 1 `GET /air/offers/${supplierOfferId}` call recorded.
+    - Stores `sharedContext.offerId`, `sharedContext.offerPassengerId`, and `sharedContext.searchOffer` for downstream booking flows.
+  - **Zero Leaks & Safety Controls**:
+    - Enforced 60-second suite budget (`SUITE_TIMEOUT_MS = 60000`) with safe `runSafeCheck` runner sanitizing errors via `redactSensitive`.
+    - Verified all 47 smoke unit tests pass (`pnpm test:smoke:units`).
+    - Verified CI contract tests pass (`node --test tests/ci/ci-workflow.contract.test.mjs`).
+    - Passed Prettier and ESLint with 0 errors and 0 warnings.
+
+### [x] Feature: Whole-Stack Smoke and Sanity CI (Feature 020) — Phase 3: User Story 1 - Whole-Stack Readiness Gate
+
+- [x] Phase 3: Whole-Stack Smoke Gate (T021–T027) (2026-08-27):
+  - **T021–T024: 8 Named Whole-Stack Readiness Checks (`tests/smoke/smoke.test.mjs`)**:
+    - Created `tests/smoke/smoke.test.mjs` with zero external dependencies, importing only Node built-ins (`node:test`, `node:assert/strict`, `fetch`) and local helper `tests/smoke/helpers/test-utils.mjs`.
+    - Configured loopback URLs with default fallback precedence: `SMOKE_API_URL` (default `http://127.0.0.1:3001/api`), `SMOKE_WEB_URL` (default `http://127.0.0.1:3000`), `SMOKE_AGENT_URL` (default `http://127.0.0.1:3002`).
+    - Implemented Check 1: 'API health and dependency shape' (`GET ${API_BASE}/health` -> 200, status `ok`, dependencies object with `database` and `redis`).
+    - Implemented Check 2: 'Next.js homepage HTML' (`GET ${WEB_BASE}/` -> 200, html contains `wayfinder` or `landing-title`).
+    - Implemented Check 3: 'Agent health HTTP reachability' (`GET ${AGENT_BASE}/health` -> 200, status `ok` or `degraded`).
+    - Implemented Check 4: 'PostgreSQL readiness' (derived from `GET ${API_BASE}/health` -> `dependencies.database === 'up'`).
+    - Implemented Check 5: 'Redis readiness' (derived from `GET ${API_BASE}/health` -> `dependencies.redis === 'up'`).
+    - Implemented Check 6: 'Web upstream reachability' (`GET ${WEB_BASE}/health/upstream` -> 200, body `{ status: 'ok', upstream: 'up' }`).
+    - Implemented Check 7: 'API-to-Agent reachability' (`GET ${API_BASE}/health/agent` -> 200, status `ok`).
+    - Implemented Check 8: 'Authentication round-trip' (unique actor generation via `createUniqueTestActor`, `POST /auth/register` returning 201 with token/id/email, `POST /auth/login` returning 200 with token/id/email, authenticated `GET /auth/me` with Bearer header via `authBearer` returning matching id/email).
+  - **T025: 15-Second Budget & Zero Token/PII Leakage Negative Privacy**:
+    - Enforced 15-second suite and check budget (`SUITE_TIMEOUT_MS = 15000`) with test/suite timeout configuration, duration tracking, and assertion guards. Emitted per-check and suite elapsed timing diagnostics via `t.diagnostic(...)`.
+    - Wrapped check execution in safe runner that sanitizes `err.message` and `err.stack` via `redactSensitive`, guaranteeing zero token, password, credential, or PII leakage across assertion failures.
+  - **T026: Local Stack Validation & Contract Hardening**:
+    - Verified all 8 checks against simulated harness endpoints in `tests/smoke/smoke-simulation.test.mjs` (all 8 checks passed in 489ms, verified failure on PostgreSQL down, verified failure on missing homepage marker, and verified negative privacy with zero leakage of passwords and secrets).
+    - Verified against unstarted stack via `node --test tests/smoke/smoke.test.mjs` confirming RED failure (0/8 passed, 8/8 failed with ECONNREFUSED with safe diagnostics and zero token/password leakage).
+    - Verified full monorepo production build via `pnpm build` cleanly succeeds.
+  - **T027: Documentation & Script Registration**:
+    - Registered `"test:smoke": "node --test --test-reporter=spec tests/smoke/smoke.test.mjs"` in root `package.json`.
+    - Updated `tests/smoke/README.md` with standalone smoke command, exact 8-check mapping table, execution timing budget (<15s), diagnostic log inspection, and troubleshooting guide.
+    - Updated `specs/020-smoke-sanity-tests/tasks.md` marking T021–T027 complete.
+
+### [x] Feature: Whole-Stack Smoke and Sanity CI (Feature 020) — Phase 2: Foundational Contracts and Test Seams
+
+- [x] Phase 2 / Slice 3: Dependency-Free Harness Utilities (T015–T020) (2026-08-27):
+  - **T015: Failing Unit Tests for Concurrent Readiness Poller (`tests/smoke/wait-for-ready.unit.test.mjs`)**:
+    - Added unit tests covering concurrent probe dispatch (all probes initiated before pending ones settle), staggered probe resolution handling, shared global timeout enforcement across probes, structured safe diagnostic failure report on deadline exceeded (`ReadinessTimeoutError` / `READINESS_TIMEOUT` with elapsedMs, attempts, lastStatus, and lastError per unready service), non-settling probe termination on deadline, and clock interface validation.
+    - RED verification confirmed: failed with module not found / assertions.
+  - **T016: Concurrent Readiness Poller Implementation (`tests/smoke/helpers/wait-for-ready.mjs`)**:
+    - Implemented pure `waitForReady({ probes, intervalMs = 2000, timeoutMs = 120000, fetchImpl, clock })` with concurrent async polling loops, shared cancellation deadline, timer-capable clock validation, and structured safe diagnostic errors.
+    - GREEN verification confirmed: 6/6 tests passed in `wait-for-ready.unit.test.mjs`.
+  - **T017: Failing Unit Tests for Validating Local Mock Server (`tests/smoke/mock-server.unit.test.mjs`)**:
+    - Added unit tests for exact method + pathname routing, Duffel flight offer search (`POST /air/offer_requests`) with JSON and required fields validation (`slices`, `passengers`, `cabin_class`), Duffel instant order creation (`POST /air/orders`) and deterministic retrieved order (`GET /air/orders/ord_mock_123`), Stripe PaymentIntent creation (`POST /v1/payment_intents`) with form-urlencoded validation and capture (`POST /v1/payment_intents/pi_mock_123/capture`), loopback control endpoints (`GET /__mock/health`, `POST /__mock/reset`, `GET /__mock/requests` with zero PII or raw bodies recorded), malformed percent escape rejection, wrong HTTP method rejection, and safe unknown pathname segment allowlisting/redaction.
+    - RED verification confirmed: failed with module not found / status mismatches.
+  - **T018: Validating Local Mock Server Implementation (`tests/smoke/mocks/mock-server.mjs`)**:
+    - Implemented standalone dependency-free `node:http` mock server with exact method/path routing, deterministic Duffel/Stripe fixtures, form and JSON body parsers with malformed percent-escape sanitization, memory-only resettable request counters and safe diagnostics log, loopback-only binding (`127.0.0.1`), and safe CLI entrypoint guarded against execution during import.
+    - GREEN verification confirmed: 17/17 tests passed in `mock-server.unit.test.mjs`.
+  - **T019: Failing Unit Tests for Harness Test Utilities (`tests/smoke/test-utils.unit.test.mjs`)**:
+    - Added unit tests covering unique test actor generation (`createUniqueTestActor`), HMAC-SHA256 user claim token signing and verification matching NestJS `ClaimTokenService` binary format, bearer authorization header helper (`authBearer`), safe JSON HTTP client (`requestJson`) with automatic serialization, custom header injection, `AbortController` timeout handling, and redacted error diagnostics (zero bearer tokens, passwords, or raw bodies in thrown errors), date generator (`getFutureDate`), payload builders (`buildSearchQuery`, `buildTravelerProfile`, `buildBookingIntent`, `buildPaymentPayload`, `buildPaymentConfirmationPayload`), cache envelope normalization (`normalizeCacheEnvelope`), loopback mock control helpers (`resetMockServer`, `getMockRequests`), bounded payment polling (`pollPaymentStatus`) with injectable clocks and allowlisted safe timeout diagnostics, safe response shape assertions (`assertResponseShape`), and centralized sensitive string redaction (`redactSensitive`).
+    - RED verification confirmed: failed with module not found / missing exports.
+  - **T020: Harness Test Utilities Implementation (`tests/smoke/helpers/test-utils.mjs`)**:
+    - Implemented zero-dependency pure ES module utilities using `node:crypto`, `node:assert`, and built-in `fetch`, enforcing negative privacy across all helpers and diagnostics.
+    - GREEN verification confirmed: 17/17 tests passed in `test-utils.unit.test.mjs`.
+  - **Phase 2 Slice 3 Script Registration & Integration Verification**:
+    - Registered `"test:smoke:units"` in root `package.json`: `node --test tests/smoke/wait-for-ready.unit.test.mjs tests/smoke/mock-server.unit.test.mjs tests/smoke/test-utils.unit.test.mjs`.
+    - Executed `pnpm test:smoke:units`: 40/40 tests passed across all 3 suites (0 failures, duration ~3.5s).
+    - Verified static CI workflow contract remains green: `node --test tests/ci/ci-workflow.contract.test.mjs` (13/13 passed).
+
+- [x] Phase 2 / Slice 2: Cross-Service Health Contracts (T009–T014) (2026-08-27):
+  - **T009: Failing Unit Tests for Agent No-LLM Liveness (`apps/agent/tests/test_health.py`)**:
+    - Added unit tests for reachability of `GET /health/live` returning HTTP 200 `{"status": "ok"}`, zero-inference guarantee (succeeds with unset `MIMO_API_KEY`, unreachable `MIMO_API_URL`, uninitialized guardrails, offline Redis, with zero network calls asserted via `httpx.AsyncClient.get`), and existing `GET /health` isolation.
+    - RED verification confirmed: 2 tests failed with 404, 4 existing passed.
+  - **T012: Agent No-LLM Liveness Route Implementation (`apps/agent/src/agent/main.py`)**:
+    - Added `/health/live` to `exclude_paths` in `JWTAuthMiddleware` and implemented `@app.get("/health/live")` returning `{"status": "ok"}` with explicit return type annotation and zero inference/network/Redis calls.
+    - GREEN verification confirmed: 6/6 tests passed in `test_health.py`.
+  - **T010: Failing Unit Tests for API-to-Agent Health Client (`apps/api/src/health/agent-health.service.spec.ts`)**:
+    - Added unit tests for target URL `${agentUrl}/health/live` (not `/health`), trailing slash normalization, success mapping (`{ status: 'up', details: { status: 'ok' } }`), 2000ms timeout/abort handling (`{ status: 'down' }`), non-200 / 500 error mapping (`{ status: 'down', statusCode: 500 }` without internal leakage of bodies, headers, or stack traces), `ECONNREFUSED` handling, degraded/empty payload handling, and zero leakage of URLs, tokens, headers, or stack traces.
+    - RED verification confirmed: 5 tests failed, 4 passed.
+  - **T013: API-to-Agent Health Client Implementation (`apps/api/src/health/agent-health.service.ts`)**:
+    - Updated `checkAgentHealth` target to `${agentUrl.replace(/\/+$/, '')}/health/live` with bounded 2000ms `AbortController` timeout, safe JSON narrowing from unknown without unsafe casts, preserved upstream `statusCode` on non-2xx HTTP responses and retained parsed `details` for degraded payloads for contract compatibility with `HealthController` and `multi-service-health.e2e-spec.ts`, and sanitized logger with `[checkAgentHealth]` context prefix omitting raw error messages. Synchronized `apps/api/test/agent-health.unit.ts`.
+    - GREEN verification confirmed: 9/9 tests passed in `agent-health.service.spec.ts`, 7/7 passed in `agent-health.unit.ts`, and 17/17 passed in `multi-service-health.e2e-spec.ts`.
+  - **T011: Failing Tests for Web Upstream Health Route (`apps/web/app/health/upstream/route.spec.ts`)**:
+    - Created `node:test` suite covering `Cache-Control: no-store` header on 200 and 503 responses, success mapping (HTTP 200 `{ status: "ok", upstream: "up" }`), failure mapping (HTTP 503 `{ status: "degraded", upstream: "down" }` on connection error, timeout, non-200, or invalid JSON), private URL resolution precedence (`API_URL` > `NEXT_PUBLIC_API_URL` > fallback `http://127.0.0.1:3001`), `/api` and trailing slash trimming, and zero leakage of credentials/URLs.
+    - RED verification confirmed: failed with module not found (exit code 1).
+  - **T014: Web Upstream Route Handler Implementation (`apps/web/app/health/upstream/route.ts`)**:
+    - Implemented dynamic Next.js Route Handler with `export const dynamic = 'force-dynamic'`, 2000ms `AbortController` timeout targeting `${apiUrl}/api/health/ping`, safe JSON payload narrowing, deduplicated `degradedResponse()` helper returning 503, and `Cache-Control: no-store` header on all responses.
+    - Documented Route Handler exception in `context/code-standards.md`.
+    - GREEN verification confirmed: 8/8 tests passed in `route.spec.ts`.
+  - **Verification & Code Review Gate**:
+    - Agent tests: `Push-Location apps/agent; $env:UV_CACHE_DIR = 'C:\Booking Systems\.t093-uv-cache'; uv run pytest tests/test_health.py; Pop-Location` (6/6 passed in 18s).
+    - API tests: `pnpm --filter @api/backend test -- src/health/agent-health.service.spec.ts` (9/9 passed).
+    - Web tests: `& '.\node_modules\.bin\tsx.CMD' --test apps/web/app/health/upstream/route.spec.ts` (8/8 passed in 1.6s).
+    - API Typecheck: `pnpm --filter @api/backend exec tsc -p tsconfig.json --noEmit` (0 errors, exit 0).
+    - Web Typecheck: `pnpm --filter @web/frontend typecheck` (0 errors, exit 0).
+    - TypeScript ESLint: `pnpm exec eslint "apps/api/src/health/**/*.ts" "apps/web/app/health/**/*.ts" --max-warnings 0` (0 errors, 0 warnings).
+    - Agent Ruff check: `uv run --package agent ruff check apps/agent` (All checks passed, 0 errors).
+    - CI Contract: `node --test tests/ci/ci-workflow.contract.test.mjs` (13/13 passed).
+    - Parallel Standards & Spec reviews completed; all P0/P1/P2 findings resolved.
+
+- [x] Phase 2 / Slice 1: Provider Override Contracts (T005–T008) (2026-08-27):
+  - **T005: Failing Unit Tests for Duffel Provider Override (`apps/api/src/duffel/duffel.service.spec.ts`)**:
+    - Added unit tests for default parity (`basePath: 'https://api.duffel.com'`), valid loopback override (`http://127.0.0.1:4010`), trailing slash normalization (`http://127.0.0.1:4010/`), invalid URL syntax rejection, unsupported protocol rejection (`ftp:`), and manual HTTP order creation prepending configured `basePath`.
+    - RED verification confirmed: 5 new tests failed, 7 existing passed.
+  - **T007: Duffel Provider Override Implementation (`apps/api/src/duffel/duffel.service.ts`)**:
+    - Parsed `process.env.DUFFEL_API_URL` via `new URL()`, enforced `http:`/`https:`, normalized trailing slashes, defaulted to `'https://api.duffel.com'`, passed `basePath` to SDK `Duffel` constructor, and preserved `this.basePath` in `createOrder` manual fetch.
+    - GREEN verification confirmed: 12/12 tests passed in `duffel.service.spec.ts`.
+  - **T006: Failing Unit Tests for Stripe Provider Override (`apps/api/src/common/stripe.service.spec.ts`)**:
+    - Added unit tests for default parity (`api.stripe.com`, `https`), parsed loopback override (`protocol: 'http'`, `host: '127.0.0.1'`, `port: 4010`), URL without explicit port, invalid URL rejection, and unsupported protocol rejection (`ws:`, `ftp:`).
+    - RED verification confirmed: 4 new tests failed, 2 passed.
+  - **T008: Stripe Provider Override Implementation (`apps/api/src/common/stripe.service.ts`)**:
+    - Parsed `process.env.STRIPE_API_URL` via `new URL()`, enforced `http:`/`https:`, mapped `protocol`, `hostname`, and optional `port`, and preserved default `new Stripe(apiKey, { apiVersion: '2026-05-27.dahlia' })` when absent.
+    - GREEN verification confirmed: 6/6 tests passed in `stripe.service.spec.ts`.
+  - **Verification & Code Review Gate**:
+    - Unit Tests: `pnpm --filter @api/backend test -- src/duffel/duffel.service.spec.ts src/common/stripe.service.spec.ts` (18/18 passed, exit 0).
+    - Strict Typecheck: `pnpm --filter @api/backend exec tsc -p tsconfig.json --noEmit` (0 errors, exit 0).
+    - ESLint: `pnpm exec eslint "apps/api/src/duffel/**/*.ts" "apps/api/src/common/**/*.ts" --max-warnings 0` (0 errors, 0 warnings, exit 0).
+    - CI Contract: `node --test tests/ci/ci-workflow.contract.test.mjs` (13/13 passed, exit 0).
+    - Standards & Spec dual-axis review completed via subagents with 0 P0/P1 issues.
+
+### [x] Feature: Whole-Stack Smoke and Sanity CI (Feature 020) — Phase 1: Setup (Shared Infrastructure)
+
+- [x] Phase 1 / Setup (Shared Infrastructure) (2026-08-27):
+  - **T001: Authoritative Smoke & Sanity Test Harness Documentation (`tests/smoke/README.md`)**:
+    - Authored comprehensive test harness guide covering zero-dependency design (`node:test`, `fetch`, `node:http`), sequential lifecycle (Builds $\to$ Boot $\to$ Polling $\to$ Smoke $\to$ Sanity $\to$ Cleanup), CLI & pnpm scripts, environment variables table matching `contracts/test-harness.md`, ephemeral CI & dedicated `smoke_test` database isolation rules, timing budgets ($\le$120s readiness, <15s smoke, <60s sanity), and diagnostics/troubleshooting.
+  - **T002: Zero-Dependency Script Specifications & Roadmap**:
+    - Defined authoritative command contracts in `tests/smoke/README.md` scheduled for incremental registration in `package.json` across phases (Phase 2: `test:smoke:units`, Phase 3: `test:smoke`, Phase 4: `test:sanity`, Phase 5: `test:smoke:all`) to eliminate false-green or missing-entrypoint execution before suites are implemented.
+  - **T003: Ignore Run-Scoped Smoke Diagnostics (`.gitignore`)**:
+    - Excluded `.smoke-diagnostics/` from Git tracking to ensure diagnostic outputs and process logs are never committed.
+  - **T004: Environment Documentation Across Services (`apps/api/.env.example`, `apps/web/.env.example`, `apps/agent/.env.example`)**:
+    - Documented `DUFFEL_API_URL`, `STRIPE_API_URL`, and `AGENT_SERVICE_URL` in `apps/api/.env.example` with clear comments that absent variables preserve production defaults.
+    - Documented server-side `API_URL` and public fallback `NEXT_PUBLIC_API_URL` with loopback formatting in `apps/web/.env.example`.
+    - Documented loopback-safe service URLs (`NESTJS_API_URL`, `FRONTEND_URL`, `MIMO_API_URL`) in `apps/agent/.env.example`.
+  - **Verification & Code Review**:
+    - Syntax: `package.json` verified valid JSON (`JSON.parse` exit 0).
+    - Diagnostics exclusion verified (`git check-ignore -v .smoke-diagnostics/dummy.log`).
+    - Prettier checked cleanly on all touched files.
+    - Static CI contract suite passed (13/13 passing in `tests/ci/ci-workflow.contract.test.mjs`).
+    - Standards & Spec dual-axis code review completed via subagents.
 
 ### [x] Feature: Deepen Codebase Architecture (Feature 019) — Phase 9: Polish, Cross-Cutting Verification, and System Completion
 
@@ -234,7 +509,6 @@ Update this file after every completed feature. Any AI agent reading this should
     - TypeScript strict typecheck (`tsc --noEmit`): 0 errors.
     - Two-Axis Code Review: Standards Review & Spec Review completed with 0 remaining P0/P1 issues.
 
-
 ### [x] Feature: Deepen Codebase Architecture (Feature 019) — Slice 5A: Narrow Shared Contracts for Flight Search & Booking Management
 
 - [x] Slice 5A / Provider-free shared web-seam contracts (2026-08-25):
@@ -305,7 +579,6 @@ Update this file after every completed feature. Any AI agent reading this should
 
 ### [x] Feature: Deepen Codebase Architecture (Feature 019) — Slice 4A: Authoritative Chat Turn Event Models & Golden Contract Tests
 
-
 - [x] Slice 4A / Authoritative Chat Turn Event Models & Golden Contract Tests (2026-08-24):
   - **Authoritative Event Models (`apps/agent/src/agent/chat_turn/`)**:
     - Created `events.py` defining strict Pydantic v2 payload models with `ConfigDict(extra="forbid")`: `TokenPayload`, `ToolCallPayload`, `ToolResultPayload`, `FlightResultsPayload`, `ActionHandoffPayload`, `ActionRequiredPayload`, `DonePayload`, `ErrorPayload`.
@@ -356,7 +629,7 @@ Update this file after every completed feature. Any AI agent reading this should
     - ESLint: 0 errors, 0 warnings; TypeScript Typecheck (API & Web): 0 errors; Agent Ruff: 0 errors.
 
 ### [x] Feature: Deepen Codebase Architecture (Feature 019) — Slice 3B: Cut Over Callers to TrustedSearchSnapshotLifecycle & Decommission Legacy Shims
- 
+
 - [x] Slice 3B / Cut Over Callers to TrustedSearchSnapshotLifecycle & Decommission Legacy Shims (2026-08-24):
   - **Agent Tool Caller Cut-Over (`apps/agent/src/agent/tools/`)**:
     - Rewired `search_flights.py` to use `TrustedSearchSnapshotLifecycle.create_or_replace()` and `lifecycle.project_for_llm()`, ensuring only sanitized projection results without Duffel IDs or internal IDs reach LLM summaries. Enforced fail-closed security handling.
@@ -412,7 +685,6 @@ Update this file after every completed feature. Any AI agent reading this should
     - Full API Unit Suite: 82/82 suites (906/906 tests) PASS.
     - ESLint: 0 errors, 0 warnings; TypeScript Typecheck: 0 errors; Web Typecheck: 0 errors; API Build succeeds.
 
-
 ### [x] Feature: Deepen Codebase Architecture (Feature 019) — Slice 2B: Extract Booking Management Module
 
 - [x] Slice 2B / Extract Booking Management Module (2026-08-23):
@@ -437,7 +709,6 @@ Update this file after every completed feature. Any AI agent reading this should
     - Full API Unit Suite: 81/81 suites (857/857 tests) PASS.
     - Full API E2E Suite: 57/57 suites (495/495 tests) PASS.
     - ESLint: 0 errors, 0 warnings; TypeScript Typecheck: 0 errors; NestJS build succeeds.
-
 
 ### [x] Feature: Deepen Codebase Architecture (Feature 019) — Slice 1D: Contract Schema & Final Gate 1 Validation
 
@@ -593,7 +864,6 @@ Update this file after every completed feature. Any AI agent reading this should
     - Runbook Section 4 updated to query actual health snapshot endpoints (`/health/booking-readiness` latency percentiles) and standardized counters.
     - Performance test teardown hardened with safe offer dereferencing and try/finally cleanup.
 
-
 - [x] Phase 12 / Operations Runbook & Operational Governance (Task T076) (2026-08-19):
   - **Comprehensive Operations Runbook (`docs/runbooks/booking-readiness.md`)**:
     - System topology & decision ownership (Profile, pure evaluator, advisory readiness, atomic intent creation, final validator, Duffel/Stripe boundaries).
@@ -606,7 +876,6 @@ Update this file after every completed feature. Any AI agent reading this should
     - Backfill governance & quarantine management (Daily midnight cron, `PassportExpiryBackfillService`, optimistic CAS, decrypt/compare verification, 10% abort threshold).
     - Privacy & cryptographic invariants (Record-bound AES-256-GCM context-bound AAD `{ snapshotVersion, intentId, position, fieldName }`, masked summary projections, zero-PII guarantee).
     - Emergency rollback procedures (Decision matrix, dual-write compatibility, instant feature flag disabling, graceful degradation to legacy checkout).
-
 
 - [x] Phase 8B / Canonical Plural Routes, Safe DTO Masking & Web Checkout Migration (Tasks T047, T048, T050–T054, T078, T079) (2026-08-19):
   - **Canonical Plural Intent Routes & Safe DTO Masking (`apps/api/src/booking-intent/`)**:
@@ -808,7 +1077,6 @@ Update this file after every completed feature. Any AI agent reading this should
   - [x] T102 / Approved Plaintext Cleanup: applied migration `20260805010000_chat_message_plaintext_cleanup` dropping legacy plaintext columns `title` on `chat_sessions` and `content` on `chat_messages`; verified strict record-bound AES-256-GCM authenticated encryption/decryption with zero fallback across API and Gateway; verified 4/4 chat-plaintext-cleanup E2E tests, 3/3 privacy corpus E2E tests, 18/18 chat E2E tests, 264/264 agent pytest suites, and Next.js production build.
 
 ### [ ] Feature: Traveler Profile & Booking Readiness (Feature 16)
-
 
 - [x] Phase 1 / PR 1: Setup — Shared Contracts, Flags, and Observability Vocabulary (implemented shared types for traveler profiles, passenger sources, readiness scopes, results, reason codes, profile sections, and masked summaries; added API and web feature flags `FEATURE_FLAG_BOOKING_READINESS` and `NEXT_PUBLIC_FEATURE_FLAG_BOOKING_READINESS` defaulting to false; created client helper `apps/web/lib/featureFlags.ts`; defined PII-safe operation names, metric names, and allowed metadata keys in `booking-readiness-observability.types.ts`; verified with configuration schema parser tests and contract allowlist validation tests)
 - [x] Phase 2 / PR 2: Additive Schema, Bound Encryption, and Migration Safety (implemented additive traveler profile and passenger snapshot database models and applied SQL migration safely preserving legacy data; added record-bound versioned AES-256-GCM encryption helper methods to EncryptionService with backward-compatibility for legacy unbound ciphertext; created idempotent data-quality backfill service with revision-checking CAS updates, mismatched-date validation quarantine, and abort thresholds; registered ProfileModule, PassportExpiryBackfillController, and a daily scheduled cron task for backfill execution; secured backfill encryption with context-bound AAD keys tied to travelerProfileId and fieldName; verified with a comprehensive migration compatibility E2E test suite, unit tests, and controller integration tests)

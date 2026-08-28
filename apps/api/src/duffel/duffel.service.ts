@@ -54,7 +54,7 @@ export class DuffelService {
   private readonly duffel: Duffel;
   private readonly duffelToken: string;
   private readonly apiVersion = 'v2';
-  private readonly basePath = 'https://api.duffel.com';
+  private readonly basePath: string;
 
   constructor(private readonly cacheService: CacheService) {
     const token = process.env.DUFFEL_ACCESS_TOKEN;
@@ -65,9 +65,21 @@ export class DuffelService {
       this.logger.warn('DUFFEL_ACCESS_TOKEN is missing or invalid in production/development runtime.');
     }
 
+    const rawApiUrl = process.env.DUFFEL_API_URL;
+    if (rawApiUrl && rawApiUrl.trim() !== '') {
+      const parsed = new URL(rawApiUrl.trim());
+      if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+        throw new Error(`Unsupported DUFFEL_API_URL protocol: ${parsed.protocol}. Only http: and https: are allowed.`);
+      }
+      this.basePath = `${parsed.origin}${parsed.pathname === '/' ? '' : parsed.pathname}`.replace(/\/+$/, '');
+    } else {
+      this.basePath = 'https://api.duffel.com';
+    }
+
     this.duffelToken = token || '';
     this.duffel = new Duffel({
       token: this.duffelToken,
+      basePath: this.basePath,
     });
   }
 
@@ -185,7 +197,8 @@ export class DuffelService {
       }
 
       // 4. Create Duffel offer request
-      if (!isJest && (process.env.NODE_ENV === 'test' || token === 'mock')) {
+      const hasDuffelApiUrl = Boolean(process.env.DUFFEL_API_URL && process.env.DUFFEL_API_URL.trim() !== '');
+      if (!isJest && !hasDuffelApiUrl && (process.env.NODE_ENV === 'test' || token === 'mock')) {
         this.logger.log(`Mocking Duffel API response for test environment. NODE_ENV: ${process.env.NODE_ENV}`);
         
         const mockPassengers: Array<{ id: string; type: 'adult' | 'child' | 'infant_without_seat' }> = [];
@@ -798,6 +811,8 @@ export class DuffelService {
       gender?: string;
       title?: string;
       dateOfBirth?: string | Date;
+      born_on?: string;
+      bornOn?: string | Date;
       givenName?: string;
       given_name?: string;
       familyName?: string;
@@ -805,6 +820,7 @@ export class DuffelService {
       phoneNumber?: string;
       phone_number?: string;
       email?: string;
+      identity_documents?: unknown[];
     }[],
     services?: { id: string; quantity: number }[] | Record<string, unknown>,
     metadata?: Record<string, unknown> | string,
@@ -905,11 +921,12 @@ export class DuffelService {
         }
 
         let born_on = '';
-        if (p.dateOfBirth) {
-          if (p.dateOfBirth instanceof Date) {
-            born_on = p.dateOfBirth.toISOString().split('T')[0];
-          } else if (typeof p.dateOfBirth === 'string') {
-            born_on = p.dateOfBirth.split('T')[0];
+        const rawDob = p.born_on || p.bornOn || p.dateOfBirth;
+        if (rawDob) {
+          if (rawDob instanceof Date) {
+            born_on = rawDob.toISOString().split('T')[0];
+          } else if (typeof rawDob === 'string') {
+            born_on = rawDob.split('T')[0];
           }
         }
         const phone_number = p.phoneNumber || p.phone_number;
@@ -936,7 +953,7 @@ export class DuffelService {
           );
         }
 
-        return {
+        const duffelPassenger: Record<string, unknown> = {
           id: matchedOfferPassenger.id,
           given_name: givenName,
           family_name: familyName,
@@ -946,6 +963,12 @@ export class DuffelService {
           phone_number,
           email,
         };
+
+        if (p.identity_documents && Array.isArray(p.identity_documents) && p.identity_documents.length > 0) {
+          duffelPassenger.identity_documents = p.identity_documents;
+        }
+
+        return duffelPassenger;
       });
 
       const timeoutMs = 30000;

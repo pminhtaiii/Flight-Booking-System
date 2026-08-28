@@ -74,6 +74,10 @@
 │   └── shared/                        → Shared library for types and constants
 │       └── src/types/                 → Strict Zod schemas & inferred TypeScript types
 │
+├── tests/
+│   ├── ci/                            → CI workflow contract & network guard tests
+│   └── smoke/                         → Authoritative whole-stack smoke & sanity test harness
+│
 ├── docs/
 │   ├── adr/                           → Architectural Decision Records
 │   └── runbooks/                      → Authoritative operational runbooks
@@ -823,6 +827,31 @@ The repository uses a single GitHub Actions pull request CI workflow at `.github
 - **Correctness vs. Performance**: Blocking API E2E runs exclude `[.-]performance.e2e-spec.ts` wall-clock benchmarks, which remain available through the opt-in `test:e2e:performance` command for controlled benchmark environments.
 - **Status Evaluation**: The terminal `ci-status` job runs `evaluate-ci-status.mjs` with `always()`, verifying that all relevant service jobs succeeded, irrelevant jobs were safely skipped, and detection ran cleanly. Branch protection requires only `ci-status`.
 
+### Subsystem 8: Whole-Stack Smoke & Sanity CI Pipeline
+
+The whole-stack smoke and sanity test suite runs as a single `smoke-and-sanity` CI job in `.github/workflows/ci.yml` after all upstream gate, test, and build jobs pass. The suite uses pure `node:test` and built-in `fetch` for framework-agnostic black-box HTTP assertions against a fully running multi-service stack. Tests and helpers live under `tests/smoke/` and `scripts/ci/run-smoke-sanity.mjs`.
+
+1. **CI Pipeline Graph & Routing**:
+   - `detect-changes` evaluates changes via `dorny/paths-filter` and actionlint.
+   - The `smoke-and-sanity` job is triggered whenever any application service path changes (`apps/api/**`, `apps/web/**`, `apps/agent/**`, `packages/shared/**`) or shared infrastructure changes (`docker-compose.yml`, `tests/smoke/**`, `scripts/ci/run-smoke-sanity.mjs`).
+   - Terminal summary `ci-status` evaluates overall workflow status using `evaluate-ci-status.mjs` with `always()`, ensuring required gates succeeded and skips were intentional. Branch protection requires only `ci-status`.
+
+2. **Loopback Provider Override Seams**:
+   - Zero production bypasses or mock hooks in application logic. Production services cleanly accept loopback provider overrides:
+   - **Duffel API Override**: `DUFFEL_API_URL` overrides default `https://api.duffel.com` in `DuffelService` (`apps/api/src/duffel/duffel.service.ts`). Instantiation validates `http:` or `https:` protocol and normalizes trailing slashes before passing `basePath` to `new Duffel({ token, basePath })`. Manual fetch calls in `createOrder` prepend `this.basePath`.
+   - **Stripe API Override**: `STRIPE_API_URL` overrides default `https://api.stripe.com` in `StripeService` (`apps/api/src/common/stripe.service.ts`). Instantiation parses the URL, validates protocol (`http:` or `https:`), extracts hostname and optional port, and configures `new Stripe(apiKey, { apiVersion: '2026-05-27.dahlia', protocol, host, port })`. Absent environment variables strictly preserve production SDK endpoints.
+
+3. **Cross-Service Health Topology**:
+   - **FastAPI Agent Service**: Exposes `GET /health/live` as a lightweight, zero-inference, no-LLM endpoint that bypasses JWT and API key authentication to report immediate process liveness.
+   - **Next.js Web Service**: Exposes `GET /health/upstream` (`apps/web/app/health/upstream/route.ts`) as a dynamic route handler (`force-dynamic`, `Cache-Control: private, no-store`) performing a bounded 2000ms server-to-server health ping to NestJS `GET /api/health/ping` via private `API_URL`.
+   - **NestJS API Service**: Exposes `GET /api/health/agent` using `AgentHealthService` (`apps/api/src/health/agent-health.service.ts`), which pings FastAPI Agent `GET /health/live` with a bounded 2000ms timeout and sanitized error logging.
+
+4. **Zero-Dependency Test Harness Architecture**:
+   - **Readiness Polling (`tests/smoke/helpers/wait-for-ready.mjs`)**: Concurrently polls health endpoints for all services (Mock Server, NestJS API, FastAPI Agent, Next.js Web) with exponential backoff and a strict 120-second deadline. Hung probes cannot block teardown.
+   - **Mock Provider Server (`tests/smoke/mocks/mock-server.mjs`)**: Pure `node:http` standalone server providing deterministic Duffel and Stripe fixtures on a loopback port. Enforces strict method/route routing, request body validation, and 404 responses on unknown routes with sanitized request logging.
+   - **Test Utilities (`tests/smoke/helpers/test-utils.mjs`)**: Pure ES module utilities for generating unique test actors, creating auth bearer headers, signing HMAC-SHA256 user claim tokens (`signHmacClaimToken`), polling payment statuses (`pollPaymentStatus`), and enforcing centralized redaction (`redactSensitive`).
+   - **Lifecycle Orchestrator (`scripts/ci/run-smoke-sanity.mjs`)**: Central execution harness that coordinates child process spawning (Mock, API, Agent, Web), manages PID/process-group ownership across POSIX and Windows, streams diagnostic logs to `.smoke-diagnostics/<run-id>/`, executes smoke checks before sanity tests (skipping sanity on smoke failure), and enforces fail-safe bounded cleanup on exit, SIGINT, or SIGTERM.
+
 ---
 
 ## Feature 019 — Architecture Deepening & Safety Rails
@@ -857,6 +886,7 @@ The repository uses a single GitHub Actions pull request CI workflow at `.github
 - Scoped characterization and static privacy audits verify zero `useSession`, zero `accessToken`, and zero `NEXT_PUBLIC_API_URL` leakage across all 13 booking management files.
 
 Feature 019 restructures high-leverage boundaries without changing public product behavior:
+
 - **Slice 0 (Baseline Characterization & Safety Rails)**:
   - Establishes immutable automated characterization suites across `apps/api/test/characterization/`, `apps/agent/tests/characterization/`, and `apps/web/tests/characterization/` with 0 production business logic modifications.
   - Characterizes all 4 refund triggers (Inline, Webhook, Sweeper Cron, Admin Manual) to prove identical outcomes, status transitions, and balanced double-entry ledger records.
@@ -916,4 +946,3 @@ Feature 019 restructures high-leverage boundaries without changing public produc
   - **Clean Umbrella Module Composition**: Refactored `AgentGatewayModule` into an umbrella composition module importing and re-exporting capability submodules (`AttestedFlightSearchModule`, `AgentBookingReadinessModule`, `SafeBookingReadModule`, `TravelerPreferencesModule`, `AgentAuthModule`, `AgentToolAuditModule`) alongside external consumer providers (`SelectionAttestationService`, `BookingAgentProjectionService`). Eliminated unused `CacheModule` and empty `controllers` array.
   - **Zero Production References**: Monorepo static audit confirmed exactly 0 remaining references to `AgentGatewayService` and `AgentGatewayController`.
   - **Comprehensive Verification**: 7 capability unit suites (82/82 tests PASS), 3 gateway/characterization E2E suites (75/75 tests PASS), full Python agent pytest suite (455/455 tests PASS), and clean ESLint/TypeScript compilation across the entire monorepo.
-

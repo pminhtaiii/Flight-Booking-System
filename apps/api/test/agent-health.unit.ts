@@ -86,7 +86,20 @@ describe('AgentHealthService (Unit)', () => {
     }
   });
 
-  test('should use customUrl parameter if provided', async () => {
+  test('should return down without details when payload is not an object or empty', async () => {
+    global.fetch = async () => new Response(JSON.stringify(null), { status: 200 });
+
+    try {
+      const result = await service.checkAgentHealth();
+      assert.deepEqual(result, {
+        status: 'down',
+      });
+    } finally {
+      global.fetch = originalFetch;
+    }
+  });
+
+  test('should use customUrl parameter with /health/live and normalize trailing slashes', async () => {
     let requestedUrl = '';
     global.fetch = async (url: RequestInfo | URL) => {
       requestedUrl = String(url);
@@ -94,8 +107,8 @@ describe('AgentHealthService (Unit)', () => {
     };
 
     try {
-      await service.checkAgentHealth('http://custom-agent:4000/');
-      assert.equal(requestedUrl, 'http://custom-agent:4000/health');
+      await service.checkAgentHealth('http://custom-agent:4000///');
+      assert.equal(requestedUrl, 'http://custom-agent:4000/health/live');
     } finally {
       global.fetch = originalFetch;
     }

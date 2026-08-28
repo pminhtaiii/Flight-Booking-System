@@ -138,6 +138,7 @@ export class FlightsService {
 - **Next.js is the frontend only** — all API calls go to the NestJS backend, not `app/api/` route handlers (with strict Decision 6 exceptions below)
 - Minimal `app/api/` usage — only for NextAuth.js auth routes, Stripe webhook receivers, and thin same-origin booking management route handlers
 - **Feature 017 handoff exception** — `CheckoutHandoffCard` may POST its in-memory credential only to same-origin `/checkout/handoff`; native hidden form fields are forbidden because they expose the credential in the DOM, and no response data fetching or business logic belongs in the Client Component
+- **Feature 020 upstream health probe exception** — `GET /health/upstream` (`apps/web/app/health/upstream/route.ts`) is a minimal server-side Route Handler used by whole-stack orchestrators and CI readiness probes to verify Next.js $\to$ NestJS backend reachability (`/api/health/ping`) via private `API_URL` without coupling user availability to health probing or exposing backend URLs to client browsers
 - Never put business logic in the Next.js layer — it belongs in NestJS services
 
 ### Decision 6 Exception: Thin Same-Origin Route Handlers
@@ -174,6 +175,14 @@ To ensure client bundle and browser runtime isolation:
     2. Thin same-origin Route Handlers (`/api/booking-management/*` for interactive booking commands and polling).
 - **Automated Verification**:
   - Monorepo automated static characterization audits continuously verify 0 occurrences of `useSession`, 0 occurrences of `accessToken`, and 0 occurrences of `NEXT_PUBLIC_API_URL` across all booking management Client Components.
+
+### Operational Route Handler Exception: Upstream Health Probe
+
+`apps/web/app/health/upstream/route.ts` provides an operational health probe for whole-stack orchestrators and CI readiness probes without exposing backend credentials:
+- Must declare `export const dynamic = 'force-dynamic'`.
+- Must return `headers: { 'Cache-Control': 'private, no-store' }` (or `no-store`) on all responses (200 OK or 503 degraded).
+- Executes a bounded server-to-server health ping to NestJS backend `GET /api/health/ping` via private `API_URL` with an `AbortController` timeout of 2000ms.
+- Reads private `API_URL` on the server only, strictly preserving the Zero-Client-Credential invariant and keeping health probe availability decoupled from user sessions.
 
 ---
 
@@ -305,6 +314,21 @@ Conventions for Stripe payment processing:
 
 ---
 
+## Provider Override Safety Rules (Duffel & Stripe)
+
+When configuring loopback provider overrides (`DUFFEL_API_URL`, `STRIPE_API_URL`) for local development, test harnesses, and CI smoke suites:
+
+- **Default Safety Invariant**:
+  - Absent or empty environment variables (`DUFFEL_API_URL`, `STRIPE_API_URL`) must strictly preserve production SDK endpoints (`https://api.duffel.com`, `https://api.stripe.com`).
+  - Mocks or loopback overrides must NEVER activate by default in production or development without explicit environment variable overrides.
+- **Fast-Fail URL Validation**:
+  - Services (`DuffelService`, `StripeService`) must validate override URLs immediately during constructor instantiation.
+  - Non-empty URLs must be syntactically valid via `new URL(url)` and restrict protocols strictly to `http:` or `https:`.
+  - Malformed URLs or unsupported protocols (e.g., `ftp:`, `javascript:`, `file:`) must throw an error immediately, failing service startup fast.
+  - Trailing slashes must be normalized cleanly before SDK initialization or manual endpoint path concatenation.
+
+---
+
 ## AI Agent Code (LangChain.js)
 
 ```typescript
@@ -404,6 +428,21 @@ Audit log entries must include: `timestamp`, `user_id`, `action`, `resource_type
 
 ---
 
+## Test Harness & Diagnostics Privacy Rules
+
+Whole-stack test harnesses, mock servers, CI orchestrators, and assertion utilities (`tests/smoke/`, `scripts/ci/run-smoke-sanity.mjs`) must adhere to strict negative privacy enforcement:
+
+- **Centralized Redaction (`redactSensitive`)**:
+  - All test utilities, assertion failure messages, and HTTP diagnostic logs must route output through centralized `redactSensitive` sanitization.
+  - Bearer tokens (`Bearer ...`), JWT credentials, user passwords, customer credit card numbers, HMAC claim secrets, and PII must never appear in test failure outputs, CI console logs, or artifact diagnostics.
+- **Mock Server Logging Safety**:
+  - `mock-server.mjs` must never log raw request bodies, cardholder data, customer credentials, or authorization headers.
+  - Unknown route warnings must sanitize dynamic path segments to prevent token or query parameter leakage.
+- **Diagnostics Directory Hygiene**:
+  - Test run diagnostics written to `.smoke-diagnostics/<run-id>/` must contain only allowlisted lifecycle events and sanitized process streams.
+
+---
+
 ## Environment Variables
 
 All environment variables defined in `.env.local` for development. Never hardcode any key, URL, or secret anywhere in the codebase.
@@ -425,12 +464,12 @@ All environment variables defined in `.env.local` for development. Never hardcod
 
 ### AI Agent Service (FastAPI)
 
-| Variable                                | Used In                    |
-| --------------------------------------- | -------------------------- |
-| `SESSION_LOCK_TTL_MS`                   | agent/config.py (Redis)    |
-| `SESSION_LOCK_REFRESH_INTERVAL_SECONDS` | agent/config.py (Redis)    |
-| `AGENT_SERVICE_API_KEY`                 | Gateway protection         |
-| `CLAIM_TOKEN_SECRET`                    | User claim verification    |
+| Variable                                | Used In                 |
+| --------------------------------------- | ----------------------- |
+| `SESSION_LOCK_TTL_MS`                   | agent/config.py (Redis) |
+| `SESSION_LOCK_REFRESH_INTERVAL_SECONDS` | agent/config.py (Redis) |
+| `AGENT_SERVICE_API_KEY`                 | Gateway protection      |
+| `CLAIM_TOKEN_SECRET`                    | User claim verification |
 
 ### Next.js Frontend
 

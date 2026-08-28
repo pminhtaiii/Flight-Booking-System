@@ -9,6 +9,29 @@ from agent.main import app
 client = TestClient(app)
 
 
+def test_health_live_success():
+    response = client.get("/health/live")
+    assert response.status_code == 200
+    assert response.json() == {"status": "ok"}
+
+
+def test_health_live_zero_inference_guarantee(monkeypatch):
+    with (
+        patch("httpx.AsyncClient.get", new_callable=AsyncMock) as mock_http_get,
+        patch("agent.main.settings") as mock_settings,
+        patch("agent.infrastructure.redis.get_redis_client", return_value=None),
+    ):
+        mock_settings.MIMO_API_KEY = None
+        mock_settings.MIMO_API_URL = "http://unreachable-mimo:9999"
+        mock_settings.NESTJS_API_URL = "http://unreachable-nestjs:9999"
+        monkeypatch.setattr(app.state, "guardrails", None, raising=False)
+
+        response = client.get("/health/live")
+        assert response.status_code == 200
+        assert response.json() == {"status": "ok"}
+        mock_http_get.assert_not_called()
+
+
 def test_health_success(monkeypatch):
     # Mock nestjsApi, llm, and redis check responses
     mock_redis = MagicMock()
