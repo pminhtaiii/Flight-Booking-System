@@ -24,12 +24,12 @@ export class HealthController {
     try {
       await this.prisma.$transaction(
         async (tx) => {
-          await tx.$executeRawUnsafe('SET LOCAL statement_timeout = 2000');
+          await tx.$executeRawUnsafe('SET LOCAL statement_timeout = 500');
           await tx.$queryRaw`SELECT 1`;
         },
         {
           maxWait: 2000,
-          timeout: 2000,
+          timeout: 500,
         },
       );
     } catch (error) {
