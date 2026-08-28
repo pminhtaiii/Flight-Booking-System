@@ -341,6 +341,17 @@ test('redacts non-keyword sensitive-looking unknown pathname segments', async (t
   assert.equal(JSON.stringify(snapshot).includes(sensitiveSegment), false);
 });
 
+test('preserves audit-sensitive LLM pathname segments to prevent zero-LLM audit evasion', async (t) => {
+  const { mock, url } = await startMock();
+  t.after(() => stopMock(mock));
+
+  const response = await fetch(`${url}/v1/chat/completions`);
+
+  assert.equal(response.status, 404);
+  const snapshot = await (await fetch(`${url}/__mock/requests`)).json();
+  assert.equal(snapshot.requests[0].pathname, '/v1/chat/completions');
+});
+
 test('returns deterministic Duffel offer detail fixture for GET /air/offers/off_mock_123', async (t) => {
   const { mock, url } = await startMock();
   t.after(() => stopMock(mock));

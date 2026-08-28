@@ -17,10 +17,14 @@ import {
   redactSensitive,
   requestJson as baseRequestJson,
   resetMockServer,
+  signHmacClaimToken,
 } from './helpers/test-utils.mjs';
 
 const API_BASE = (process.env.SMOKE_API_URL || 'http://127.0.0.1:3001/api').replace(/\/+$/, '');
 const MOCK_BASE = (process.env.SMOKE_MOCK_URL || 'http://127.0.0.1:4010').replace(/\/+$/, '');
+const AGENT_BASE = (process.env.SMOKE_AGENT_URL || 'http://127.0.0.1:3002').replace(/\/+$/, '');
+const AGENT_API_KEY = process.env.AGENT_SERVICE_API_KEY || 'agent-service-key-smoke';
+const CLAIM_TOKEN_SECRET = process.env.CLAIM_TOKEN_SECRET || 'claim-token-secret-smoke';
 
 const SUITE_TIMEOUT_MS = 60000;
 const suiteStartTime = Date.now();
@@ -51,6 +55,91 @@ function requestJson(url, options = {}) {
     timeoutMs,
     signal: options.signal || currentTestSignal,
   });
+}
+
+async function requestRaw(url, options = {}) {
+  const method = options.method || 'GET';
+  const timeoutMs = getRemainingTimeoutMs(options.timeoutMs ?? 10000);
+  const controller = new AbortController();
+  let timedOut = false;
+  const timer = setTimeout(() => {
+    timedOut = true;
+    controller.abort();
+  }, timeoutMs);
+
+  const signalToListen = options.signal || currentTestSignal;
+  let onAbort = null;
+  if (signalToListen) {
+    if (signalToListen.aborted) {
+      controller.abort(signalToListen.reason);
+    } else {
+      onAbort = () => controller.abort(signalToListen.reason);
+      signalToListen.addEventListener('abort', onAbort, { once: true });
+    }
+  }
+
+  const headers = {
+    Accept: 'application/json',
+    ...(options.headers || {}),
+  };
+
+  if (options.token) {
+    headers['Authorization'] = `Bearer ${options.token}`;
+  }
+
+  let body = options.body;
+  if (body !== undefined && typeof body === 'object' && body !== null) {
+    if (!(body instanceof Uint8Array) && !(body instanceof URLSearchParams)) {
+      body = JSON.stringify(body);
+      if (!headers['Content-Type']) {
+        headers['Content-Type'] = 'application/json';
+      }
+    }
+  }
+
+  try {
+    const fetchImpl = options.fetchImpl || globalThis.fetch;
+    const response = await fetchImpl(url, {
+      ...options,
+      method,
+      headers,
+      body,
+      signal: controller.signal,
+    });
+
+    let data = null;
+    if (response.status !== 204) {
+      const text = await response.text();
+      if (text && text.trim().length > 0) {
+        try {
+          data = JSON.parse(text);
+        } catch {
+          data = null;
+        }
+      }
+    }
+
+    return {
+      status: response.status,
+      ok: response.ok,
+      data,
+      headers: response.headers,
+    };
+  } catch (err) {
+    if (timedOut) {
+      const timeoutErr = new Error(
+        `Request timed out after ${timeoutMs}ms: ${method} ${redactSensitive(String(url))}`,
+      );
+      timeoutErr.code = 'ETIMEDOUT';
+      throw sanitizeError(timeoutErr);
+    }
+    throw sanitizeError(err);
+  } finally {
+    clearTimeout(timer);
+    if (signalToListen && onAbort) {
+      signalToListen.removeEventListener('abort', onAbort);
+    }
+  }
 }
 
 function sanitizeError(err) {
@@ -127,6 +216,7 @@ describe('whole-stack sanity suite: flight search & cache', { timeout: SUITE_TIM
 
         actor.token = loginData.token;
         actor.userId = userId;
+        actor.id = userId;
         sharedContext.testActor = actor;
       });
     },
@@ -639,6 +729,224 @@ describe('whole-stack sanity suite: flight search & cache', { timeout: SUITE_TIM
 
         const totalAmount = booking.totalAmount || booking.totalPrice;
         assert.ok(totalAmount, 'Booking must have totalAmount or totalPrice');
+      });
+    },
+  );
+
+  test(
+    'T037: direct agent health and api-to-agent no-llm liveness checks',
+    { timeout: SUITE_TIMEOUT_MS },
+    async (t) => {
+      await runSafeCheck(t, async () => {
+        const directRes = await requestRaw(`${AGENT_BASE}/health/live`, {
+          method: 'GET',
+        });
+        assert.equal(
+          directRes.status,
+          200,
+          `Direct agent /health/live must return HTTP 200 (observed: ${directRes.status})`,
+        );
+        assert.deepEqual(
+          directRes.data,
+          { status: 'ok' },
+          `Direct agent /health/live data must equal { status: 'ok' } (observed: ${JSON.stringify(directRes.data)})`,
+        );
+
+        const apiRes = await requestRaw(`${API_BASE}/health/agent`, {
+          method: 'GET',
+        });
+        assert.equal(
+          apiRes.status,
+          200,
+          `API /health/agent must return HTTP 200 (observed: ${apiRes.status})`,
+        );
+        assert.equal(apiRes.data?.status, 'ok', 'API /health/agent status must be "ok"');
+        assert.equal(
+          apiRes.data?.dependency,
+          'agent',
+          'API /health/agent dependency must be "agent"',
+        );
+        assert.equal(
+          apiRes.data?.details?.status,
+          'ok',
+          'API /health/agent details.status must be "ok"',
+        );
+      });
+    },
+  );
+
+  test(
+    'T038: authorized agent gateway request with valid api key and signed claim',
+    { timeout: SUITE_TIMEOUT_MS },
+    async (t) => {
+      await runSafeCheck(t, async () => {
+        const actorUserId = sharedContext.testActor?.id || sharedContext.testActor?.userId;
+        assert.ok(actorUserId, 'actorUserId must exist before querying agent gateway');
+
+        const claimToken = signHmacClaimToken(
+          { userId: actorUserId, iat: Math.floor(Date.now() / 1000) },
+          CLAIM_TOKEN_SECRET,
+        );
+
+        const res = await requestRaw(`${API_BASE}/agent-gateway/users/preferences`, {
+          method: 'GET',
+          headers: {
+            'x-agent-api-key': AGENT_API_KEY,
+            'x-user-claim': claimToken,
+          },
+        });
+
+        assert.equal(
+          res.status,
+          200,
+          `Agent gateway preferences query must return HTTP 200 (observed: ${res.status})`,
+        );
+        assert.ok(
+          typeof res.data === 'object' && res.data !== null,
+          `Returned preferences data must be an object (observed: ${typeof res.data})`,
+        );
+        assert.ok(
+          'seatPreference' in res.data ||
+            'classPreference' in res.data ||
+            'dietaryNeeds' in res.data ||
+            'preferredAirlines' in res.data,
+          'Returned preferences data must contain preference fields',
+        );
+      });
+    },
+  );
+
+  test(
+    'T039: gateway 401 and 403 negative authorization assertions',
+    { timeout: SUITE_TIMEOUT_MS },
+    async (t) => {
+      await runSafeCheck(t, async () => {
+        const actorUserId = sharedContext.testActor?.id || sharedContext.testActor?.userId;
+        assert.ok(actorUserId, 'actorUserId must exist before negative authorization assertions');
+
+        const claimToken = signHmacClaimToken(
+          { userId: actorUserId, iat: Math.floor(Date.now() / 1000) },
+          CLAIM_TOKEN_SECRET,
+        );
+
+        // Missing API key (401)
+        const missingApiKeyRes = await requestRaw(
+          `${API_BASE}/agent-gateway/users/preferences`,
+          {
+            method: 'GET',
+            headers: {
+              'x-user-claim': claimToken,
+            },
+          },
+        );
+        assert.equal(
+          missingApiKeyRes.status,
+          401,
+          `Missing API key must return HTTP 401 (observed: ${missingApiKeyRes.status})`,
+        );
+        assert.equal(
+          missingApiKeyRes.data?.code,
+          'INVALID_API_KEY',
+          `Missing API key code must be INVALID_API_KEY (observed: ${missingApiKeyRes.data?.code})`,
+        );
+
+        // Wrong API key (401)
+        const wrongApiKeyRes = await requestRaw(
+          `${API_BASE}/agent-gateway/users/preferences`,
+          {
+            method: 'GET',
+            headers: {
+              'x-agent-api-key': 'invalid-or-wrong-api-key',
+              'x-user-claim': claimToken,
+            },
+          },
+        );
+        assert.equal(
+          wrongApiKeyRes.status,
+          401,
+          `Wrong API key must return HTTP 401 (observed: ${wrongApiKeyRes.status})`,
+        );
+        assert.equal(
+          wrongApiKeyRes.data?.code,
+          'INVALID_API_KEY',
+          `Wrong API key code must be INVALID_API_KEY (observed: ${wrongApiKeyRes.data?.code})`,
+        );
+
+        // Missing claim token (401)
+        const missingClaimRes = await requestRaw(
+          `${API_BASE}/agent-gateway/users/preferences`,
+          {
+            method: 'GET',
+            headers: {
+              'x-agent-api-key': AGENT_API_KEY,
+            },
+          },
+        );
+        assert.equal(
+          missingClaimRes.status,
+          401,
+          `Missing claim token must return HTTP 401 (observed: ${missingClaimRes.status})`,
+        );
+        assert.equal(
+          missingClaimRes.data?.code,
+          'INVALID_CLAIM_TOKEN',
+          `Missing claim token code must be INVALID_CLAIM_TOKEN (observed: ${missingClaimRes.data?.code})`,
+        );
+
+        // Non-existent / Inactive user (403)
+        const forgedClaimToken = signHmacClaimToken(
+          { userId: crypto.randomUUID(), iat: Math.floor(Date.now() / 1000) },
+          CLAIM_TOKEN_SECRET,
+        );
+        const inactiveUserRes = await requestRaw(
+          `${API_BASE}/agent-gateway/users/preferences`,
+          {
+            method: 'GET',
+            headers: {
+              'x-agent-api-key': AGENT_API_KEY,
+              'x-user-claim': forgedClaimToken,
+            },
+          },
+        );
+        assert.equal(
+          inactiveUserRes.status,
+          403,
+          `Non-existent user must return HTTP 403 (observed: ${inactiveUserRes.status})`,
+        );
+        assert.equal(
+          inactiveUserRes.data?.code,
+          'USER_INACTIVE',
+          `Non-existent user code must be USER_INACTIVE (observed: ${inactiveUserRes.data?.code})`,
+        );
+      });
+    },
+  );
+
+  test(
+    'T040: suite timing budget and zero-llm invariant verification',
+    { timeout: SUITE_TIMEOUT_MS },
+    async (t) => {
+      await runSafeCheck(t, async () => {
+        const mockData = await getMockRequests(MOCK_BASE);
+        const recorded = mockData?.requests || [];
+        const forbiddenPatterns = ['chat', 'completions', 'mimo', 'llm'];
+        const violatingRequests = recorded.filter((req) => {
+          const pathname = (req?.pathname || '').toLowerCase();
+          return forbiddenPatterns.some((pattern) => pathname.includes(pattern));
+        });
+
+        assert.equal(
+          violatingRequests.length,
+          0,
+          `Zero-LLM invariant violated: requests matching forbidden patterns detected: ${JSON.stringify(violatingRequests)}`,
+        );
+
+        const totalElapsed = Date.now() - suiteStartTime;
+        t.diagnostic(`[sanity] full suite finished in ${totalElapsed}ms`);
+        assert.ok(
+          totalElapsed < SUITE_TIMEOUT_MS,
+          `Sanity suite exceeded 60-second budget: ${totalElapsed}ms >= ${SUITE_TIMEOUT_MS}ms`,
+        );
       });
     },
   );

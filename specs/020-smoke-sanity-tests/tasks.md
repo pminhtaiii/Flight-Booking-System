@@ -99,11 +99,11 @@
 
 ### Agent communication and authorization
 
-- [ ] T037 [US2] Add failing direct Agent health and API-to-Agent no-LLM liveness assertions in `tests/smoke/sanity.test.mjs`
-- [ ] T038 [US2] Add failing valid `X-Agent-API-Key` plus signed active-user claim gateway assertion in `tests/smoke/sanity.test.mjs`
-- [ ] T039 [US2] Add failing missing-key and wrong-key 401 assertions plus valid-key unauthorized-user 403 assertion in `tests/smoke/sanity.test.mjs`
-- [ ] T040 [US2] Enforce the 60-second sanity budget and verify the selected routes cause zero chat/LLM mock requests in `tests/smoke/sanity.test.mjs`
-- [ ] T041 [US2] Document the sanity flow inputs, cache comparison rule, async confirmation behavior, and actual 401/403 semantics in `tests/smoke/README.md`
+- [x] T037 [US2] Add failing direct Agent health and API-to-Agent no-LLM liveness assertions in `tests/smoke/sanity.test.mjs`
+- [x] T038 [US2] Add failing valid `X-Agent-API-Key` plus signed active-user claim gateway assertion in `tests/smoke/sanity.test.mjs`
+- [x] T039 [US2] Add failing missing-key and wrong-key 401 assertions plus valid-key unauthorized-user 403 assertion in `tests/smoke/sanity.test.mjs`
+- [x] T040 [US2] Enforce the 60-second sanity budget and verify the selected routes cause zero chat/LLM mock requests in `tests/smoke/sanity.test.mjs`
+- [x] T041 [US2] Document the sanity flow inputs, cache comparison rule, async confirmation behavior, and actual 401/403 semantics in `tests/smoke/README.md`
 
 **Checkpoint**: Search/cache, confirmed booking, and Agent checks are independently named, deterministic, and green after smoke.
 
@@ -117,15 +117,15 @@
 
 ### Orchestrator and database safety
 
-- [x] T042 [P] [US3] Add failing process-start, premature-exit, smoke-gates-sanity, signal, bounded-cleanup, and exact-child-ownership tests in `tests/smoke/run-smoke-sanity.unit.test.mjs`
-- [x] T043 [P] [US3] Add failing loopback URL and exact `smoke_test` local-reset guard tests in `tests/smoke/run-smoke-sanity.unit.test.mjs`
+- [ ] T042 [P] [US3] Add failing process-start, premature-exit, smoke-gates-sanity, signal, bounded-cleanup, and exact-child-ownership tests in `tests/smoke/run-smoke-sanity.unit.test.mjs`
+- [ ] T043 [P] [US3] Add failing loopback URL and exact `smoke_test` local-reset guard tests in `tests/smoke/run-smoke-sanity.unit.test.mjs`
 - [ ] T044 [US3] Implement mock/API/Agent/Web spawning, per-process safe logs, readiness, spec-reporter smoke→sanity sequencing, signal handling, and exact-child cleanup in `scripts/ci/run-smoke-sanity.mjs` (depends on T042)
 - [ ] T045 [US3] Implement an explicit local database reset mode that parses `DATABASE_URL` and refuses any database name other than `smoke_test` in `scripts/ci/run-smoke-sanity.mjs` (depends on T043)
 
 ### Workflow graph and aggregate result
 
-- [x] T046 [P] [US3] Add failing workflow-contract assertions for all-service smoke path filters including `docker-compose.yml`, the Compose-only all-domains-true case, exact terminal needs, change-aware `always()` predicate, locked setup/build/migration order, readiness-before-smoke, smoke-before-sanity, spec reporter, network guard, diagnostics, cleanup, timeout, and `ci-status` wiring in `tests/ci/ci-workflow.contract.test.mjs`
-- [x] T047 [P] [US3] Add a failing truth-table test for expected success/skipped/failure/cancelled `SMOKE_AND_SANITY_RESULT` states, including Compose-only eligibility, in `tests/ci/evaluate-ci-status.test.mjs`
+- [ ] T046 [P] [US3] Add failing workflow-contract assertions for all-service smoke path filters including `docker-compose.yml`, the Compose-only all-domains-true case, exact terminal needs, change-aware `always()` predicate, locked setup/build/migration order, readiness-before-smoke, smoke-before-sanity, spec reporter, network guard, diagnostics, cleanup, timeout, and `ci-status` wiring in `tests/ci/ci-workflow.contract.test.mjs`
+- [ ] T047 [P] [US3] Add a failing truth-table test for expected success/skipped/failure/cancelled `SMOKE_AND_SANITY_RESULT` states, including Compose-only eligibility, in `tests/ci/evaluate-ci-status.test.mjs`
 - [ ] T048 [US3] Extend change-aware aggregate evaluation and safe failure messages so infrastructure changes cannot take the all-domains-false skip path in `scripts/ci/evaluate-ci-status.mjs` (depends on T047)
 - [ ] T049 [US3] Add the single `smoke-and-sanity` job, all-service filters including `docker-compose.yml`, locked setup, Compose infra, builds/migration, non-secret loopback env, orchestrator invocation, always-run diagnostics/cleanup, and aggregate env/needs in `.github/workflows/ci.yml` (depends on T044, T046, T048)
 - [ ] T050 [US3] Complete local reset/start/run/cleanup commands, CI parity, expected timings, redaction rules, and troubleshooting in `tests/smoke/README.md`

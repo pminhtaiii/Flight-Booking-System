@@ -6,14 +6,49 @@ Update this file after every completed feature. Any AI agent reading this should
 
 ### Current Status
 
-**Feature:** Whole-Stack Smoke and Sanity CI (Feature 020) — Phase 4 / Slice 2: Confirmed Booking Happy Path (T032–T036) COMPLETE
-**Last completed:** Phase 4 / Slice 2: Confirmed Booking Happy Path (T032–T036) (2026-08-27).
-**In progress:** Phase 4 / Slice 3: Agent Communication & Authorization (T037–T040).
-**Next:** Phase 5: Local & CI Orchestration (T041–T045).
+**Feature:** Whole-Stack Smoke and Sanity CI (Feature 020) — Phase 4: User Story 2 - Deterministic Business Flows (T028–T041) COMPLETE
+**Last completed:** Phase 4 / Slice 3: Agent Communication & Authorization (T037–T041) (2026-08-28).
+**In progress:** Phase 5: User Story 3 - Local & CI Orchestration (T042–T050).
+**Next:** Phase 6: Polish and Cross-Cutting Verification (T051–T057).
 
 ---
 
 ## Progress by Feature
+
+### [x] Feature: Whole-Stack Smoke and Sanity CI (Feature 020) — Phase 4: User Story 2 - Deterministic Business Flows (Slice 3: Agent Communication & Authorization)
+
+- [x] Phase 4 / Slice 3: Agent Communication & Authorization (T037–T041) (2026-08-28):
+  - **T037: Direct Agent Health & API-to-Agent Liveness Checks (`tests/smoke/sanity.test.mjs`)**:
+    - Resolved `AGENT_BASE = (process.env.SMOKE_AGENT_URL || 'http://127.0.0.1:3002').replace(/\/+$/, '')`.
+    - Dispatched `GET /health/live` to FastAPI Agent and asserted HTTP 200 with `{ "status": "ok" }`.
+    - Dispatched `GET /api/health/agent` to NestJS backend and asserted HTTP 200 with `{ "status": "ok", "dependency": "agent", "details": { "status": "ok" } }` via `requestRaw` with zero LLM inference.
+  - **T038: Authorized Agent Gateway Request (`tests/smoke/sanity.test.mjs`)**:
+    - Resolved non-production shared secrets `AGENT_API_KEY` (`process.env.AGENT_SERVICE_API_KEY || 'agent-service-key-smoke'`) and `CLAIM_TOKEN_SECRET` (`process.env.CLAIM_TOKEN_SECRET || 'claim-token-secret-smoke'`).
+    - Generated valid HMAC-SHA256 user claim token for `sharedContext.testActor.userId` using `signHmacClaimToken` matching `ClaimTokenService`.
+    - Dispatched `GET /api/agent-gateway/users/preferences` with headers `'x-agent-api-key': AGENT_API_KEY` and `'x-user-claim': claimToken`.
+    - Asserts HTTP 200 and verified user preferences payload shape without requiring client JWT bearer tokens.
+  - **T039: Gateway 401 & 403 Negative Authorization Assertions (`tests/smoke/sanity.test.mjs`)**:
+    - Verified missing `X-Agent-API-Key` returns HTTP 401 with `code: 'INVALID_API_KEY'`.
+    - Verified invalid/wrong `X-Agent-API-Key` returns HTTP 401 with `code: 'INVALID_API_KEY'`.
+    - Verified missing `X-User-Claim` returns HTTP 401 with `code: 'INVALID_CLAIM_TOKEN'`.
+    - Generated validly signed HMAC claim token for a non-existent UUID (`crypto.randomUUID()`) and verified request returns HTTP 403 (`ForbiddenException`) with `code: 'USER_INACTIVE'`.
+  - **T040: Suite Timing Budget & Zero-LLM Invariant Verification (`tests/smoke/sanity.test.mjs`)**:
+    - Audited mock provider server request logs via `getMockRequests(MOCK_BASE)` and asserted 0 requests to any endpoints matching `chat`, `completions`, `mimo`, or `llm`.
+    - Enforced 60-second sanity budget (`SUITE_TIMEOUT_MS = 60000`) and logged `[sanity] full suite finished in ${totalElapsed}ms` diagnostic.
+  - **T041: Sanity Harness Documentation (`tests/smoke/README.md`)**:
+    - Documented all 3 sanity flow groups: Flight Search & Cache Suppression, Confirmed Booking Happy Path, and Agent Communication & Gateway Authorization.
+    - Added comprehensive Gateway Security & Authorization Error Semantics section documenting dual-guard security model (`AgentApiKeyGuard`, `ClaimTokenGuard`), header specifications, 401/403 negative error matrix, and negative privacy guarantees.
+    - Updated commands table with `pnpm test:sanity` and diagnostic troubleshooting guide.
+  - **Issue 1 & Issue 2 Fixes & Task Reset**:
+    - Added `"test:sanity"` script to root `package.json` (`node --test --test-reporter=spec tests/smoke/sanity.test.mjs`).
+    - Updated mock server pathname sanitization in `tests/smoke/mocks/mock-server.mjs` (`safeDiagnosticSegments`, `auditForbiddenKeywords`, and `sanitizeUnknownPathname`) to preserve LLM audit keywords (`chat`, `completions`, `mimo`, `llm`) to prevent zero-LLM audit evasion, validated with a dedicated unit test in `tests/smoke/mock-server.unit.test.mjs`.
+    - Reset tasks T042–T050 in `specs/020-smoke-sanity-tests/tasks.md` to uncompleted (`[ ]`) pending Phase 5 implementation.
+  - **Verification & Review**:
+    - Passed all 55 smoke harness unit tests (`pnpm test:smoke:units`).
+    - Verified syntax with `node --check tests/smoke/sanity.test.mjs` (exit 0).
+    - Verified ESLint on `tests/smoke/sanity.test.mjs` (0 errors, 0 warnings).
+    - Confirmed RED failure behavior when executed against an unstarted stack.
+    - Completed Standards and Spec reviews.
 
 ### [x] Feature: Whole-Stack Smoke and Sanity CI (Feature 020) — Phase 4: User Story 2 - Deterministic Business Flows (Slice 2: Confirmed Booking Happy Path)
 
