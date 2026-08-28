@@ -177,7 +177,7 @@ test('builds owned mock, API, agent, and web definitions with isolated diagnosti
   assert.equal(byName.mock.env.MOCK_PORT, '4010');
   assert.equal(byName.api.command, process.execPath);
   assert.deepEqual(byName.api.args, ['/workspace/apps/api/dist/main.js']);
-  assert.equal(byName.api.cwd, '/workspace');
+  assert.equal(byName.api.cwd, '/workspace/apps/api');
   assert.equal(byName.agent.command, 'uv');
   assert.deepEqual(byName.agent.args, [
     'run',

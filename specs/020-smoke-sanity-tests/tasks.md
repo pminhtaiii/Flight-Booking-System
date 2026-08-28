@@ -128,7 +128,7 @@
 - [x] T047 [P] [US3] Add a failing truth-table test for expected success/skipped/failure/cancelled `SMOKE_AND_SANITY_RESULT` states, including Compose-only eligibility, in `tests/ci/evaluate-ci-status.test.mjs`
 - [x] T048 [US3] Extend change-aware aggregate evaluation and safe failure messages so infrastructure changes cannot take the all-domains-false skip path in `scripts/ci/evaluate-ci-status.mjs` (depends on T047)
 - [x] T049 [US3] Add the single `smoke-and-sanity` job, all-service filters including `docker-compose.yml`, locked setup, Compose infra, builds/migration, non-secret loopback env, orchestrator invocation, always-run diagnostics/cleanup, and aggregate env/needs in `.github/workflows/ci.yml` (depends on T044, T046, T048)
-- [ ] T050 [US3] Complete local reset/start/run/cleanup commands, CI parity, expected timings, redaction rules, and troubleshooting in `tests/smoke/README.md`
+- [x] T050 [US3] Complete local reset/start/run/cleanup commands, CI parity, expected timings, redaction rules, and troubleshooting in `tests/smoke/README.md`
 
 **Checkpoint**: The same contract is reproducible locally and enforced by PR CI with correct skipped-job semantics.
 

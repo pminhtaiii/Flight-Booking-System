@@ -236,7 +236,7 @@ export function createProcessDefinitions({
       name: 'api',
       command: process.execPath,
       args: [joinFromRoot(rootDir, 'apps', 'api', 'dist', 'main.js')],
-      cwd: rootDir,
+      cwd: joinFromRoot(rootDir, 'apps', 'api'),
       env: {
         ...env,
         AGENT_SERVICE_URL: stripTrailingSlashes(agentUrl.href),
