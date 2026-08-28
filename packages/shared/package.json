@@ -17,6 +17,10 @@
       "types": "./dist/types/booking-management.types.d.ts",
       "default": "./dist/types/booking-management.types.js"
     },
+    "./dashboard.types": {
+      "types": "./dist/types/dashboard.types.d.ts",
+      "default": "./dist/types/dashboard.types.js"
+    },
     "./*": {
       "types": "./dist/*.d.ts",
       "default": "./dist/*.js"
@@ -28,7 +32,7 @@
   },
   "scripts": {
     "build": "tsc",
-    "test": "pnpm run build && node --test dist/types/flight-search.types.spec.js dist/types/booking-management.types.spec.js",
+    "test": "pnpm run build && node --test dist/types/flight-search.types.spec.js dist/types/booking-management.types.spec.js dist/types/dashboard.types.spec.js",
     "dev": "tsc -w"
   },
   "dependencies": {

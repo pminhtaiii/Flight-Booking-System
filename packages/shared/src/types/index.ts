@@ -66,5 +66,4 @@ export * from './traveler-profile.types';
 export * from './chat.types';
 export * from './flight-search.types';
 export * from './booking-management.types';
-
-
+export * from './dashboard.types';

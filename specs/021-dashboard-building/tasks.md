@@ -30,10 +30,10 @@
 
 **Critical**: Finish this phase before any story implementation.
 
-- [ ] T005 Write failing Zod contract tests for valid summaries, non-negative counts, canonical statuses, ISO timestamps, exact object keys, nullable display fields, and a maximum of five recent records in `packages/shared/src/types/dashboard.types.spec.ts`
-- [ ] T006 Implement `DashboardStatsSchema`, `DashboardRecentBookingSchema`, `DashboardSummarySchema`, inferred types, and the `DashboardOutcome` failure union in `packages/shared/src/types/dashboard.types.ts`
-- [ ] T007 Export the dashboard contract through the shared type barrel in `packages/shared/src/types/index.ts`
-- [ ] T008 Add the compiled dashboard schema spec to the shared package test command in `packages/shared/package.json`, run it, and record the command/result in `specs/021-dashboard-building/implementation-notes.md`
+- [x] T005 Write failing Zod contract tests for valid summaries, non-negative counts, canonical statuses, ISO timestamps, exact object keys, nullable display fields, and a maximum of five recent records in `packages/shared/src/types/dashboard.types.spec.ts`
+- [x] T006 Implement `DashboardStatsSchema`, `DashboardRecentBookingSchema`, `DashboardSummarySchema`, inferred types, and the `DashboardOutcome` failure union in `packages/shared/src/types/dashboard.types.ts`
+- [x] T007 Export the dashboard contract through the shared type barrel in `packages/shared/src/types/index.ts`
+- [x] T008 Add the compiled dashboard schema spec to the shared package test command in `packages/shared/package.json`, run it, and record the command/result in `specs/021-dashboard-building/implementation-notes.md`
 
 **Checkpoint**: API and web can import the same validated contract.
 

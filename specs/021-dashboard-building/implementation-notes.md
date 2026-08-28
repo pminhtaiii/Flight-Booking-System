@@ -1,9 +1,9 @@
 # Implementation Notes: Authenticated Booking Dashboard
 
 **Feature Branch**: `021-dashboard-building`  
-**Base Commit SHA**: `2af59d3` (*fixing the plans*)  
+**Base Commit SHA**: `2af59d3` (_fixing the plans_)  
 **Created**: 2026-08-28  
-**Status**: In Progress  
+**Status**: In Progress
 
 ---
 
@@ -13,19 +13,19 @@ This section establishes the execution baseline, tooling matrix, and runtime req
 
 ### 1.1 Source Control & Environment
 
-| Parameter | Value | Notes |
-| :--- | :--- | :--- |
-| **Feature Branch** | `021-dashboard-building` | Dedicated feature branch branched from `development` |
-| **Base Commit SHA** | `2af59d3` | Baseline commit containing finalized and approved spec/plan artifacts |
-| **Monorepo Package Manager** | `pnpm 11.9.0` | Workspace-aware monorepo package orchestration |
-| **Node.js Engine** | `Node.js 20+` (`v24.14.0` local) | LTS execution target with native `fetch` and ESM support |
-| **Next.js Framework** | `14.2.3` | App Router paradigm (`apps/web`) |
-| **NestJS Framework** | `10.4.22` | Backend modular architecture (`apps/api`) |
-| **Prisma ORM** | `5.22.0` | PostgreSQL client & type generation (`apps/api`) |
-| **React** | `18.2.0` | React Server Components & client boundary components |
-| **TypeScript** | `5.4.5` | Strict type checking across workspace |
-| **Schema Validation** | `Zod 3.23.8` | Canonical runtime contract definition & validation |
-| **CSS & Styling** | CSS Modules + Tailwind CSS v4 Alpha | Semantic CSS variables; zero hardcoded color literals |
+| Parameter                    | Value                               | Notes                                                                 |
+| :--------------------------- | :---------------------------------- | :-------------------------------------------------------------------- |
+| **Feature Branch**           | `021-dashboard-building`            | Dedicated feature branch branched from `development`                  |
+| **Base Commit SHA**          | `2af59d3`                           | Baseline commit containing finalized and approved spec/plan artifacts |
+| **Monorepo Package Manager** | `pnpm 11.9.0`                       | Workspace-aware monorepo package orchestration                        |
+| **Node.js Engine**           | `Node.js 20+` (`v24.14.0` local)    | LTS execution target with native `fetch` and ESM support              |
+| **Next.js Framework**        | `14.2.3`                            | App Router paradigm (`apps/web`)                                      |
+| **NestJS Framework**         | `10.4.22`                           | Backend modular architecture (`apps/api`)                             |
+| **Prisma ORM**               | `5.22.0`                            | PostgreSQL client & type generation (`apps/api`)                      |
+| **React**                    | `18.2.0`                            | React Server Components & client boundary components                  |
+| **TypeScript**               | `5.4.5`                             | Strict type checking across workspace                                 |
+| **Schema Validation**        | `Zod 3.23.8`                        | Canonical runtime contract definition & validation                    |
+| **CSS & Styling**            | CSS Modules + Tailwind CSS v4 Alpha | Semantic CSS variables; zero hardcoded color literals                 |
 
 ---
 
@@ -35,10 +35,10 @@ Comprehensive inventory of all files targeted for creation, modification, or ver
 
 ### 2.1 Shared Package (`packages/shared/`)
 
-- [ ] [`packages/shared/src/types/dashboard.types.ts`](file:///c:/Booking%20Systems/packages/shared/src/types/dashboard.types.ts): Define `DashboardStatsSchema`, `DashboardRecentBookingSchema`, `DashboardSummarySchema`, inferred TypeScript types (`DashboardStats`, `DashboardRecentBooking`, `DashboardSummary`), and the `DashboardOutcome` tagged failure union.
-- [ ] [`packages/shared/src/types/dashboard.types.spec.ts`](file:///c:/Booking%20Systems/packages/shared/src/types/dashboard.types.spec.ts): Unit and contract tests for dashboard schemas (valid shapes, non-negative bounds, max 5 recent items, ISO timestamp formats, reject extraneous/PII fields).
-- [ ] [`packages/shared/src/types/index.ts`](file:///c:/Booking%20Systems/packages/shared/src/types/index.ts): Barrel export of dashboard schemas and types.
-- [ ] [`packages/shared/package.json`](file:///c:/Booking%20Systems/packages/shared/package.json): Update test scripts to include dashboard schema specifications in package test runner.
+- [x] [`packages/shared/src/types/dashboard.types.ts`](file:///c:/Booking%20Systems/packages/shared/src/types/dashboard.types.ts): Define `DashboardStatsSchema`, `DashboardRecentBookingSchema`, `DashboardSummarySchema`, inferred TypeScript types (`DashboardStats`, `DashboardRecentBooking`, `DashboardSummary`), and the `DashboardOutcome` tagged failure union.
+- [x] [`packages/shared/src/types/dashboard.types.spec.ts`](file:///c:/Booking%20Systems/packages/shared/src/types/dashboard.types.spec.ts): Unit and contract tests for dashboard schemas (valid shapes, non-negative bounds, max 5 recent items, ISO timestamp formats, reject extraneous/PII fields).
+- [x] [`packages/shared/src/types/index.ts`](file:///c:/Booking%20Systems/packages/shared/src/types/index.ts): Barrel export of dashboard schemas and types.
+- [x] [`packages/shared/package.json`](file:///c:/Booking%20Systems/packages/shared/package.json): Update test scripts to include dashboard schema specifications in package test runner.
 
 ### 2.2 Backend API Service (`apps/api/`)
 
@@ -91,6 +91,7 @@ Comprehensive inventory of all files targeted for creation, modification, or ver
 ## 3. Core Architectural Decisions
 
 ### 3.1 Direct Prisma Read Model
+
 - **Isolated Service Boundary**: `DashboardService` injects only [`PrismaService`](file:///c:/Booking%20Systems/apps/api/src/prisma/prisma.service.ts). It does not depend on `BookingManagementService`, `ProfileService`, or payment modules.
 - **Single Clock Instant (`now`)**: To eliminate time-boundary drift between count filters, `const now = new Date()` is captured once per request and passed identically to all query filters.
 - **Concurrent Indexed Execution**: Five database queries run in parallel via `Promise.all`:
@@ -102,11 +103,13 @@ Comprehensive inventory of all files targeted for creation, modification, or ver
 - **Pure Snapshot Display Mapper**: `flightSnapshot` is JSON-parsed defensively through an allowlisted field extractor. Malformed or missing snapshot data falls back to `null` display fields. Raw provider IDs, pricing data, and passenger PII are completely omitted from the projection.
 
 ### 3.2 Zero Redis Dashboard Cache
+
 - **Direct PostgreSQL Read**: Realistic user volume is 1–100 bookings. Indexed queries on `(userId, status)` execute in < 2ms.
 - **Cache Invalidation Avoidance**: Omitting Redis eliminates complex cache invalidation across booking creation, payment confirmation, cancellation, and schedule disruption handlers.
 - **Real-Time Freshness**: Next.js Server Components query with `cache: 'no-store'`, guaranteeing immediate reflect of user actions upon navigation.
 
 ### 3.3 Single Server Data Boundary (`apps/web/lib/server/dashboard.ts`)
+
 - **Server-Only Enforcement**: Guarded by `import 'server-only'` to prevent bundling into client-side code.
 - **JWT Forwarding**: Extracts the session access token via `getServerSession(authOptions)` and sends `Authorization: Bearer ${token}` server-to-server.
 - **Bounded Latency**: Uses `AbortController` with a 10,000 ms timeout to prevent hung requests.
@@ -114,11 +117,13 @@ Comprehensive inventory of all files targeted for creation, modification, or ver
 - **Typed Outcome Result**: Returns a discriminated union `DashboardOutcome<DashboardSummary>` (`{ ok: true, data }` or `{ ok: false, reason, message, retryable }`).
 
 ### 3.4 Root (`/`) Auth-Aware Server Redirect
+
 - **Instant Hub Routing**: `apps/web/app/page.tsx` checks `getServerSession(authOptions)`.
 - If an active session with valid `accessToken` exists, it immediately invokes `redirect('/dashboard')`.
 - If unauthenticated, it renders `<LandingPage />` with zero client-side flicker.
 
 ### 3.5 Metric Definitions & Canonical Lifecycles
+
 - **No Nonexistent Enums**: Avoids referencing nonexistent `BookingStatus.CANCELLED`.
 - **Accurate Cancellation Count**: Covers all five canonical cancellation lifecycle states:
   - `CANCELLATION_PENDING`
@@ -134,7 +139,9 @@ Comprehensive inventory of all files targeted for creation, modification, or ver
 ## 4. Next.js 14.2.3 Route & Session Constraint Verification (Task T004)
 
 ### 4.1 Server Component Session Loading
+
 In Next.js 14.2.3 and NextAuth 4.x, `getServerSession` must be used inside Server Components and server-only modules. Due to ESM/CJS interop in modern Node.js runtimes:
+
 ```typescript
 import * as NextAuth from 'next-auth';
 import { authOptions } from '@/lib/auth';
@@ -144,7 +151,11 @@ export async function getAccessToken(): Promise<string | null> {
     const sessionFn =
       typeof NextAuth.getServerSession === 'function'
         ? NextAuth.getServerSession
-        : (NextAuth as unknown as { default?: { getServerSession: typeof NextAuth.getServerSession } }).default?.getServerSession;
+        : (
+            NextAuth as unknown as {
+              default?: { getServerSession: typeof NextAuth.getServerSession };
+            }
+          ).default?.getServerSession;
     if (!sessionFn) return null;
     const session = await sessionFn(authOptions);
     if (!session || typeof session !== 'object' || !('accessToken' in session)) return null;
@@ -157,8 +168,10 @@ export async function getAccessToken(): Promise<string | null> {
 ```
 
 ### 4.2 Route Handlers & Server Navigation (`redirect()`)
+
 - **`NEXT_REDIRECT` Exception Handling**: In Next.js 14 App Router, `redirect()` from `next/navigation` works by throwing a special internal error with `digest: 'NEXT_REDIRECT;...'`.
 - **Critical Rule**: Never swallow exceptions from `redirect()` in broad `try { ... } catch (e) { ... }` blocks.
+
 ```typescript
 import { redirect } from 'next/navigation';
 
@@ -171,7 +184,9 @@ export default async function DashboardPage() {
   // ...
 }
 ```
+
 If a `try/catch` is necessary around async operations in the page:
+
 ```typescript
 try {
   const outcome = await getDashboardSummary();
@@ -185,8 +200,10 @@ try {
 ```
 
 ### 4.3 Dynamic Data Fetching (`cache: 'no-store'`)
+
 - Dynamic user-scoped data must never be cached by Next.js Data Cache.
 - All server fetch calls to the NestJS API must explicitly specify:
+
 ```typescript
 const response = await fetch(`${apiUrl()}/api/dashboard/summary`, {
   method: 'GET',
@@ -200,6 +217,7 @@ const response = await fetch(`${apiUrl()}/api/dashboard/summary`, {
 ```
 
 ### 4.4 Zero Client Credential Invariant
+
 - Next.js Client Components (marked with `'use client'`) must never receive JWT access tokens, API secrets, or private backend URLs (`API_URL`) via props or context.
 - The Server Component (`apps/web/app/dashboard/page.tsx`) handles all authentication checks and server-side data fetching.
 - `DashboardShell` and its child components receive strictly sanitized, validated display models:
@@ -208,11 +226,13 @@ const response = await fetch(`${apiUrl()}/api/dashboard/summary`, {
   - `isProfileEnabled: boolean`
 
 ### 4.5 Loading and Error Boundaries Contract
+
 - **`loading.tsx`**: Server-rendered React component rendered automatically while `page.tsx` async promise resolves. Uses semantic glassmorphic skeleton placeholders matching the exact dimensions of `DashboardShell`.
 - **`error.tsx`**: Must be a Client Component (`'use client'`). Next.js passes `error: Error & { digest?: string }` and `reset: () => void`.
 - Sanitization: `error.tsx` must display user-friendly recovery instructions with a "Try Again" action calling `reset()`. It must never render raw error messages, network URLs, HTTP status codes, or stack traces in production.
 
 ### 4.6 Browser & E2E Testing Constraints (Windows & CI)
+
 - **Local Port 3101 Fixture**: To ensure deterministic, opaque-box browser testing without requiring a live NestJS daemon or mutating backend databases during Playwright execution, `apps/web/tests/dashboard.spec.ts` utilizes an in-process mock HTTP server listening on port `3101` (`http://127.0.0.1:3101`).
 - **Fixture Keying**: The mock server evaluates incoming `Authorization: Bearer <scenario-token>` headers to serve scenarios:
   - `token-populated`: Returns 4 stats and 5 recent bookings.
@@ -231,27 +251,44 @@ const response = await fetch(`${apiUrl()}/api/dashboard/summary`, {
 
 ## 5. Verification & Execution Evidence
 
-*(Sections below will be populated as implementation tasks progress)*
+_(Sections below will be populated as implementation tasks progress)_
 
 ### 5.1 Shared Contract Test Execution (Task T008)
-- Command: `pnpm --filter @shared/contracts test`
-- Exit Code: *Pending execution*
+- **Command**: `pnpm --filter @shared/types test`
+- **Result**: `67/67 PASS` across 12 test suites (0 failures, 0 skipped)
+- **Duration**: ~3.7s
+- **Exit Code**: `0`
+- **Coverage**:
+  - Valid `DashboardSummary` parsing with populated and null-projected display models.
+  - Strict key enforcement (`.strict()`) on `DashboardStatsSchema`, `DashboardRecentBookingSchema`, and `DashboardSummarySchema`.
+  - Non-negative integer validation on all 4 metric counters (`totalBookings`, `upcomingBookings`, `completedBookings`, `cancelledBookings`).
+  - Canonical 9-status lifecycle enum validation (`PROCESSING`, `CONFIRMED`, `FAILED`, `COMPLETED`, `CANCELLATION_PENDING`, `CANCELLED_PENDING_REFUND`, `CANCELLED_AND_REFUNDED`, `CANCELLED_NO_REFUND`, `REFUND_FAILED_NEEDS_ATTENTION`).
+  - Nullable projections for `departureAt`, `originCode`, `destinationCode`, `airlineCode`, `flightNumber`.
+  - Recent booking array cap (`max(5)`).
+  - ISO 8601 UTC and offset datetime parsing (`{ offset: true }`).
+  - UUID v4 format validation.
+  - `DashboardOutcome` discriminated union across all 4 canonical failure reasons (`UNAUTHENTICATED`, `FORBIDDEN`, `UPSTREAM_UNAVAILABLE`, `INVALID_RESPONSE`) and `retryable` boolean flag.
+  - Static type inference parity assertions (`Assert<Equal<...>>`).
 
 ### 5.2 API Service & Integration Test Execution (Task T019)
+
 - Command: `pnpm --filter @api/backend test -- src/dashboard/`
-- Exit Code: *Pending execution*
+- Exit Code: _Pending execution_
 - Command: `npm run test:e2e --workspace=apps/api -- test/dashboard.e2e-spec.ts`
-- Exit Code: *Pending execution*
+- Exit Code: _Pending execution_
 
 ### 5.3 Web Server Loader & UI Unit Test Execution (Task T029 / T037)
+
 - Command: `pnpm --filter @web/frontend test`
-- Exit Code: *Pending execution*
+- Exit Code: _Pending execution_
 
 ### 5.4 Playwright Browser Suite Execution (Task T043)
+
 - Command: `npx playwright test apps/web/tests/dashboard.spec.ts --config=apps/web/tests/playwright.config.ts`
-- Exit Code: *Pending execution*
+- Exit Code: _Pending execution_
 
 ### 5.5 Monorepo Quality Gate Matrix (Task T047)
+
 - Contract: `pnpm --filter @shared/contracts test`
 - API Lint & Typecheck: `pnpm exec eslint "apps/api/**/*.ts" "packages/shared/**/*.ts" --max-warnings 0` && `pnpm --filter @api/backend exec tsc -p tsconfig.json --noEmit`
 - Web Lint, Typecheck & Build: `pnpm --filter @web/frontend lint` && `pnpm --filter @web/frontend typecheck` && `pnpm --filter @web/frontend build`
