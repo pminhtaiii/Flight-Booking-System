@@ -6,14 +6,23 @@ Update this file after every completed feature. Any AI agent reading this should
 
 ### Current Status
 
-**Feature:** Whole-Stack Smoke and Sanity CI (Feature 020) — Phase 4: User Story 2 - Deterministic Business Flows (T028–T041) COMPLETE
-**Last completed:** Phase 4 / Slice 3: Agent Communication & Authorization (T037–T041) (2026-08-28).
-**In progress:** Phase 5: User Story 3 - Local & CI Orchestration (T042–T050).
+**Feature:** Whole-Stack Smoke and Sanity CI (Feature 020) — Phase 5: User Story 3 - Local & CI Orchestration (T042–T049) IN PROGRESS (T050 remaining)
+**Last completed:** Phase 5 / CI Workflow Job & Gate Integration (T049) (2026-08-28).
+**In progress:** Phase 5: User Story 3 - Local & CI Orchestration (T050 documentation).
 **Next:** Phase 6: Polish and Cross-Cutting Verification (T051–T057).
 
 ---
 
 ## Progress by Feature
+
+### [ ] Feature: Whole-Stack Smoke and Sanity CI (Feature 020) — Phase 5: User Story 3 - Local & CI Orchestration (T042–T049)
+
+- [x] Phase 5: User Story 3 - Local & CI Orchestration (T042–T049) (2026-08-28):
+  - **T042 & T044: Full-Stack Lifecycle Orchestrator (`scripts/ci/run-smoke-sanity.mjs`, `tests/smoke/run-smoke-sanity.unit.test.mjs`)**: Spawns mock server, NestJS API, FastAPI Agent, and Next.js Web server; runs diagnostic logging under `.smoke-diagnostics/<run-id>/`; sequences smoke before sanity with bounded async cleanup.
+  - **T043 & T045: Guarded Database Reset (`scripts/ci/run-smoke-sanity.mjs`)**: `--reset-db` strictly guarded to database named `smoke_test`.
+  - **T046: Workflow Contract Tests (`tests/ci/ci-workflow.contract.test.mjs`)**: 20 contract assertions for all-service filters, locked bootstrap, diagnostics, cleanup, and evaluation.
+  - **T047 & T048: Change-Aware CI Evaluator (`scripts/ci/evaluate-ci-status.mjs`, `tests/ci/evaluate-ci-status.test.mjs`)**: Enforces required conclusion for `smoke-and-sanity` based on changed domains.
+  - **T049: Shared CI Job & Aggregate Status (`.github/workflows/ci.yml`)**: Added shared `smoke-and-sanity` job, all-service change filters (`tests/smoke/**`, `scripts/ci/run-smoke-sanity.mjs`, `docker-compose.yml`), locked setup, Compose infra, orchestrator execution, always-run diagnostics and cleanup, wired `SMOKE_AND_SANITY_RESULT` into `ci-status`.
 
 ### [x] Feature: Whole-Stack Smoke and Sanity CI (Feature 020) — Phase 4: User Story 2 - Deterministic Business Flows (Slice 3: Agent Communication & Authorization)
 
