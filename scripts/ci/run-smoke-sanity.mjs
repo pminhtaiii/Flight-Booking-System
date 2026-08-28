@@ -242,6 +242,9 @@ export function createProcessDefinitions({
         AGENT_SERVICE_URL: stripTrailingSlashes(agentUrl.href),
         DUFFEL_API_URL: stripTrailingSlashes(mockUrl.href),
         STRIPE_API_URL: stripTrailingSlashes(mockUrl.href),
+        FEATURE_FLAG_BOOKING_READINESS: env.FEATURE_FLAG_BOOKING_READINESS || 'true',
+        FEATURE_FLAG_CHAT_HANDOFF_ACCEPT: env.FEATURE_FLAG_CHAT_HANDOFF_ACCEPT || 'true',
+        FEATURE_FLAG_CHAT_HANDOFF_ISSUE: env.FEATURE_FLAG_CHAT_HANDOFF_ISSUE || 'true',
       },
     }),
     withLogs({

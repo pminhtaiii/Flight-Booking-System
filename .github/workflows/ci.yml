@@ -466,6 +466,9 @@ jobs:
       NEXT_PUBLIC_AGENT_URL: http://127.0.0.1:3002
       NEXT_PUBLIC_FEATURE_FLAG_BOOKING_READINESS: 'true'
       NEXT_PUBLIC_FEATURE_FLAG_CHAT_HANDOFF: 'true'
+      FEATURE_FLAG_BOOKING_READINESS: 'true'
+      FEATURE_FLAG_CHAT_HANDOFF_ISSUE: 'true'
+      FEATURE_FLAG_CHAT_HANDOFF_ACCEPT: 'true'
       SMOKE_MOCK_URL: http://127.0.0.1:4010
       DUFFEL_API_URL: http://127.0.0.1:4010
       STRIPE_API_URL: http://127.0.0.1:4010
@@ -534,6 +537,9 @@ jobs:
           STRIPE_SECRET_KEY: sk_test_ci_not_a_secret
           STRIPE_WEBHOOK_SECRET: whsec_ci_not_a_secret
           DUFFEL_ACCESS_TOKEN: duffel_test_ci_not_a_secret
+          FEATURE_FLAG_BOOKING_READINESS: 'true'
+          FEATURE_FLAG_CHAT_HANDOFF_ISSUE: 'true'
+          FEATURE_FLAG_CHAT_HANDOFF_ACCEPT: 'true'
           TIKTOKEN_CACHE_DIR: ${{ github.workspace }}/.tiktoken_cache
         run: node scripts/ci/run-smoke-sanity.mjs --mode=ci
       - name: Collect Compose diagnostics
