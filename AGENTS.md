@@ -60,6 +60,7 @@ When the task involves writing, running, or verifying E2E tests:
    - Backend API E2E tests: run `npm run test:e2e --workspace=apps/api`
    - Frontend Playwright E2E tests: run `npx playwright test --config=apps/web/tests/playwright.config.ts`
    - **Verified T093 workflow (PowerShell)**: use the direct workspace binaries below. The T093 Playwright configuration starts the installed Next CLI directly so Windows does not recurse into an implicit `pnpm install`.
+
      ```powershell
      docker compose up -d
 
@@ -103,7 +104,9 @@ When the task involves writing, running, or verifying E2E tests:
        --config='apps/web/tests/playwright.config.ts' `
        --reporter=line
      ```
+
      On Windows, run the full Playwright command in an environment that permits local service access and `taskkill` cleanup of Playwright-owned web-server trees; otherwise the assertions may finish while the runner hangs during teardown. Do not report T093 as passing without the final Playwright exit code `0`.
+
 4. **Mocking & Test Strategy**:
    - Follow the opaque-box verification strategies defined in [TEST_INFRA.md](file:///c:/Booking%20Systems/TEST_INFRA.md).
    - Use time acceleration (`POST /auth/test/reset-lockout` when `NODE_ENV === 'test'`) and database assertions.
@@ -143,6 +146,7 @@ The repository enforces automated continuous integration via `.github/workflows/
 
 1. **Inspecting Live GitHub Actions Runner Status & Failed Steps**:
    To diagnose CI run failures, inspect runner states, and pinpoint failing step names directly from the shell without requiring `gh` authentication on the public repository, run the following Node one-liner:
+
    ```powershell
    node -e "
    async function check() {
@@ -176,9 +180,10 @@ The repository enforces automated continuous integration via `.github/workflows/
    - **Agent Gate & Tests**: `$env:UV_CACHE_DIR = "c:\Booking Systems\.t093-uv-cache"`; `uv run --package agent ruff check apps/agent` && `uv run --package agent ruff format --check apps/agent`; with `$env:PYTHONPATH = "$PWD/tests/ci/python;$PWD/apps/agent/src"` run `uv run --package agent pytest apps/agent/tests -m "not redis_integration"`
    - **Branch Protection Requirement**: Only require `ci-status` on branch protection rules for `development`.
 
-
 <!-- SPECKIT START -->
+
 For additional context about technologies to be used, project structure,
 shell commands, and other important information, read the current plan
-at specs/020-smoke-sanity-tests/plan.md
+at specs/021-dashboard-building/plan.md
+
 <!-- SPECKIT END -->

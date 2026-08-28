@@ -17,10 +17,10 @@
 
 **Purpose**: Establish implementation references and prevent prototype mock semantics from leaking into production.
 
-- [ ] T001 Record the feature execution baseline and affected-file checklist in `specs/021-dashboard-building/implementation-notes.md`
-- [ ] T002 [P] Add a dashboard contract conformance checklist derived from the OpenAPI artifact to `specs/021-dashboard-building/checklists/contract.md`
-- [ ] T003 [P] Add a visual translation checklist covering tokenization, removed prototype controls, supported production routes, responsive states, and accessibility to `specs/021-dashboard-building/checklists/visual.md`
-- [ ] T004 Confirm the installed Next.js 14.2.3 route/session APIs against available local documentation or installed types and record any repository-specific constraints in `specs/021-dashboard-building/implementation-notes.md`
+- [x] T001 Record the feature execution baseline and affected-file checklist in `specs/021-dashboard-building/implementation-notes.md`
+- [x] T002 [P] Add a dashboard contract conformance checklist derived from the OpenAPI artifact to `specs/021-dashboard-building/checklists/contract.md`
+- [x] T003 [P] Add a visual translation checklist covering tokenization, removed prototype controls, supported production routes, responsive states, and accessibility to `specs/021-dashboard-building/checklists/visual.md`
+- [x] T004 Confirm the installed Next.js 14.2.3 route/session APIs against available local documentation or installed types and record any repository-specific constraints in `specs/021-dashboard-building/implementation-notes.md`
 
 ---
 
