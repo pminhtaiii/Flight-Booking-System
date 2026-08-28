@@ -175,14 +175,29 @@ const safeDiagnosticSegments = new Set([
   'capture',
   'not-a-provider-route',
   'unsupported',
+  'chat',
+  'completions',
+  'mimo',
+  'llm',
+  'models',
 ]);
+
+const auditForbiddenKeywords = ['chat', 'completions', 'mimo', 'llm'];
 
 function sanitizeUnknownPathname(pathname) {
   return (
     pathname
       .split('/')
       .map((segment) => {
-        return segment === '' || safeDiagnosticSegments.has(segment) ? segment : '<redacted>';
+        const lower = segment.toLowerCase();
+        if (
+          segment === '' ||
+          safeDiagnosticSegments.has(segment) ||
+          auditForbiddenKeywords.some((keyword) => lower.includes(keyword))
+        ) {
+          return segment;
+        }
+        return '<redacted>';
       })
       .join('/') || '/'
   );

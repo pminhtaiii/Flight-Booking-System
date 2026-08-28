@@ -39,8 +39,12 @@ Update this file after every completed feature. Any AI agent reading this should
     - Documented all 3 sanity flow groups: Flight Search & Cache Suppression, Confirmed Booking Happy Path, and Agent Communication & Gateway Authorization.
     - Added comprehensive Gateway Security & Authorization Error Semantics section documenting dual-guard security model (`AgentApiKeyGuard`, `ClaimTokenGuard`), header specifications, 401/403 negative error matrix, and negative privacy guarantees.
     - Updated commands table with `pnpm test:sanity` and diagnostic troubleshooting guide.
+  - **Issue 1 & Issue 2 Fixes & Task Reset**:
+    - Added `"test:sanity"` script to root `package.json` (`node --test --test-reporter=spec tests/smoke/sanity.test.mjs`).
+    - Updated mock server pathname sanitization in `tests/smoke/mocks/mock-server.mjs` (`safeDiagnosticSegments`, `auditForbiddenKeywords`, and `sanitizeUnknownPathname`) to preserve LLM audit keywords (`chat`, `completions`, `mimo`, `llm`) to prevent zero-LLM audit evasion, validated with a dedicated unit test in `tests/smoke/mock-server.unit.test.mjs`.
+    - Reset tasks T042–T050 in `specs/020-smoke-sanity-tests/tasks.md` to uncompleted (`[ ]`) pending Phase 5 implementation.
   - **Verification & Review**:
-    - Passed all 54 smoke harness unit tests (`pnpm test:smoke:units`).
+    - Passed all 55 smoke harness unit tests (`pnpm test:smoke:units`).
     - Verified syntax with `node --check tests/smoke/sanity.test.mjs` (exit 0).
     - Verified ESLint on `tests/smoke/sanity.test.mjs` (0 errors, 0 warnings).
     - Confirmed RED failure behavior when executed against an unstarted stack.
