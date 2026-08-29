@@ -21,7 +21,7 @@ interface AuthenticatedRequest extends Request {
   user?: AuthenticatedUser;
 }
 
-@Controller(['dashboard', 'api/dashboard'])
+@Controller('dashboard')
 @UseGuards(JwtAuthGuard)
 export class DashboardController {
   constructor(private readonly dashboardService: DashboardService) {}

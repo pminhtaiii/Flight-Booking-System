@@ -48,7 +48,7 @@ export class DashboardService {
         this.prisma.booking.findMany({
           where: { userId },
           take: 5,
-          orderBy: [{ createdAt: 'desc' }],
+          orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
         }),
       ]);
 
