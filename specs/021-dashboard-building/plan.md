@@ -32,15 +32,15 @@ Deliver `/dashboard` as the authenticated hub using one owner-scoped NestJS aggr
 
 ### Pre-design gate
 
-| Principle | Result | Evidence |
-|---|---|---|
-| Flight-first architecture | PASS | Dashboard exposes booking/flight activity and production travel actions only; hotel/dining/trip aggregates remain out of scope. |
-| Deterministic transaction boundary | PASS | Metrics are deterministic PostgreSQL reads. No AI output participates in booking/payment state or dashboard truth. |
-| API budget discipline | PASS | No Duffel or other external API call is added. The endpoint uses existing local snapshots and indexed queries. |
-| Observability and operational visibility | PASS | Existing structured request pipeline is reused; tests cover failures without logging response payloads or PII. |
-| Incremental delivery | PASS | US1 is a complete live dashboard MVP; US2 and US3 add hub actions and entry/resilience without invalidating US1. |
-| Security requirements | PASS | JWT-derived ownership, no client token exposure, allowlisted projections, Zod validation and no payment/PII fields. |
-| Complexity discipline | PASS | A thin dedicated module and direct Prisma reads are the simplest boundary matching the aggregate contract. |
+| Principle                                | Result | Evidence                                                                                                                        |
+| ---------------------------------------- | ------ | ------------------------------------------------------------------------------------------------------------------------------- |
+| Flight-first architecture                | PASS   | Dashboard exposes booking/flight activity and production travel actions only; hotel/dining/trip aggregates remain out of scope. |
+| Deterministic transaction boundary       | PASS   | Metrics are deterministic PostgreSQL reads. No AI output participates in booking/payment state or dashboard truth.              |
+| API budget discipline                    | PASS   | No Duffel or other external API call is added. The endpoint uses existing local snapshots and indexed queries.                  |
+| Observability and operational visibility | PASS   | Existing structured request pipeline is reused; tests cover failures without logging response payloads or PII.                  |
+| Incremental delivery                     | PASS   | US1 is a complete live dashboard MVP; US2 and US3 add hub actions and entry/resilience without invalidating US1.                |
+| Security requirements                    | PASS   | JWT-derived ownership, no client token exposure, allowlisted projections, Zod validation and no payment/PII fields.             |
+| Complexity discipline                    | PASS   | A thin dedicated module and direct Prisma reads are the simplest boundary matching the aggregate contract.                      |
 
 ### Post-design gate
 
@@ -183,13 +183,13 @@ Browser -> Next.js /dashboard Server Component
 
 ## Risks and Mitigations
 
-| Risk | Mitigation |
-|---|---|
-| Historical `flightSnapshot` shapes vary | Use a pure allowlist mapper; nullable display fields; fixtures for malformed/legacy shapes. |
-| Stats drift at the current-time boundary | Capture one `now` and pass it to all filters; test equality explicitly. |
-| Prototype conflicts with current global navigation/tokens | Preserve hierarchy, add semantic tokens, reuse production routes, document intentional deviations. |
-| Authenticated root detection adds server work | Use existing NextAuth session only; do not call the dashboard API from `/`. |
-| Endpoint becomes a dumping ground | Limit scope to booking summary + five recent records; future aggregates require separate decisions. |
+| Risk                                                      | Mitigation                                                                                          |
+| --------------------------------------------------------- | --------------------------------------------------------------------------------------------------- |
+| Historical `flightSnapshot` shapes vary                   | Use a pure allowlist mapper; nullable display fields; fixtures for malformed/legacy shapes.         |
+| Stats drift at the current-time boundary                  | Capture one `now` and pass it to all filters; test equality explicitly.                             |
+| Prototype conflicts with current global navigation/tokens | Preserve hierarchy, add semantic tokens, reuse production routes, document intentional deviations.  |
+| Authenticated root detection adds server work             | Use existing NextAuth session only; do not call the dashboard API from `/`.                         |
+| Endpoint becomes a dumping ground                         | Limit scope to booking summary + five recent records; future aggregates require separate decisions. |
 
 ## Complexity Tracking
 
