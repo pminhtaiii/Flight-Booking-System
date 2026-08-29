@@ -184,6 +184,16 @@ async function authenticateSession(page: Page, scenarioToken: string): Promise<v
   });
 }
 
+async function setMockScenario(page: Page, scenario: string): Promise<void> {
+  await page.context().addCookies([
+    {
+      name: 'mock-scenario',
+      value: scenario,
+      url: 'http://127.0.0.1:3000',
+    },
+  ]);
+}
+
 test.describe('Dashboard Feature Acceptance (E2E)', () => {
   test('1. Populated Dashboard Overview: renders 4 metric cards and 5 recent booking items with navigation links', async ({
     page,
@@ -191,7 +201,6 @@ test.describe('Dashboard Feature Acceptance (E2E)', () => {
     await authenticateSession(page, 'token-populated');
     await page.goto('/dashboard');
 
-    // 1. Assert 4 metric cards with exact text / counts
     await expect(page.getByText('Total Bookings')).toBeVisible();
     // Exact metric counts were user-approved on 2026-08-29 because required flight numbers contain these digit substrings.
     await expect(page.getByText('12', { exact: true })).toBeVisible();
@@ -205,7 +214,6 @@ test.describe('Dashboard Feature Acceptance (E2E)', () => {
     await expect(page.getByText('Cancelled Bookings')).toBeVisible();
     await expect(page.getByText('1', { exact: true })).toBeVisible();
 
-    // 2. Assert 5 recent booking items with route codes, flight numbers, and status badges
     await expect(page.getByText('SGN').first()).toBeVisible();
     await expect(page.getByText('HAN').first()).toBeVisible();
     await expect(page.getByText('VN123')).toBeVisible();
@@ -226,13 +234,11 @@ test.describe('Dashboard Feature Acceptance (E2E)', () => {
     await expect(page.getByText('DXB').first()).toBeVisible();
     await expect(page.getByText('EK074')).toBeVisible();
 
-    // 3. Assert selecting a recent booking item navigates to /bookings/[bookingId]
     const bookingLink = page
       .locator('a[href*="/bookings/8a7466ab-78bd-4a45-8e9e-9b3c62269a91"]')
       .first();
     await expect(bookingLink).toBeVisible();
 
-    // 4. Assert header link navigates to /bookings list view
     const allBookingsLink = page.locator('a[href="/bookings"]').first();
     await expect(allBookingsLink).toBeVisible();
   });
@@ -243,17 +249,14 @@ test.describe('Dashboard Feature Acceptance (E2E)', () => {
     await authenticateSession(page, 'token-empty');
     await page.goto('/dashboard');
 
-    // 1. Assert all 4 metric labels are visible
     await expect(page.getByText('Total Bookings')).toBeVisible();
     await expect(page.getByText('Upcoming Bookings')).toBeVisible();
     await expect(page.getByText('Completed Bookings')).toBeVisible();
     await expect(page.getByText('Cancelled Bookings')).toBeVisible();
 
-    // 2. Assert zero counts displayed
     const zeroMetrics = page.getByText('0');
     await expect(zeroMetrics.first()).toBeVisible();
 
-    // 3. Assert empty state message and Search Flights CTA linking to /search
     await expect(page.getByText(/no bookings/i).first()).toBeVisible();
     const searchFlightsCta = page.getByRole('link', { name: /search flights/i }).first();
     await expect(searchFlightsCta).toBeVisible();
@@ -266,37 +269,234 @@ test.describe('Dashboard Feature Acceptance (E2E)', () => {
     await authenticateSession(page, 'token-populated');
     await page.goto('/dashboard');
 
-    // Assert absence of Disruption Shield percentage / claims
     await expect(page.getByText(/disruption shield/i)).toHaveCount(0);
     await expect(page.getByText(/shield protection/i)).toHaveCount(0);
     await expect(page.getByText(/88%/)).toHaveCount(0);
 
-    // Assert absence of fake fare-drop alerts
     await expect(page.getByText(/fare.?drop/i)).toHaveCount(0);
 
-    // Assert absence of static seat recommendation cards
     await expect(page.getByText(/seat recommendation/i)).toHaveCount(0);
     await expect(page.getByText(/recommended seat/i)).toHaveCount(0);
 
-    // Assert absence of prototype disclaimer banners
     await expect(page.getByText(/wayfinder prototype/i)).toHaveCount(0);
     await expect(page.getByText(/prototype mode/i)).toHaveCount(0);
     await expect(page.getByText(/this is a prototype/i)).toHaveCount(0);
 
-    // Assert absence of prototype variant switchers
     await expect(page.getByText(/variant switcher/i)).toHaveCount(0);
     await expect(page.getByText(/switch variant/i)).toHaveCount(0);
 
-    // Assert absence of any links pointing to /prototype/*
-    await expect(page.locator('a[href^="/prototype"]')).toHaveCount(0);
+    await expect(page.locator('a[href^="/prototype"], a[href*="/prototype/"]')).toHaveCount(0);
   });
 
-  test('4. Unauthenticated Redirect: redirects anonymous user directly to login page', async ({
+  test('4. Direct Dashboard Unauthenticated Access: redirects anonymous user to login page preserving callbackUrl', async ({
     page,
     context,
   }) => {
     await context.clearCookies();
     await page.goto('/dashboard');
-    await expect(page).toHaveURL(/\/login/);
+    await expect(page).toHaveURL(/\/login\?callbackUrl=(%2F|\/)dashboard/);
+  });
+
+  test('5. Expired Session Redirect: redirects user with expired backend token to login page with callbackUrl', async ({
+    page,
+  }) => {
+    await authenticateSession(page, 'token-expired');
+    await page.goto('/dashboard');
+    await expect(page).toHaveURL(/\/login\?callbackUrl=(%2F|\/)dashboard/);
+  });
+
+  test('6. Root Entry Redirection - Authenticated: redirects authenticated traveler from / to /dashboard', async ({
+    page,
+  }) => {
+    await authenticateSession(page, 'token-populated');
+    await page.goto('/');
+    await expect(page).toHaveURL(/\/dashboard\/?$/);
+  });
+
+  test('7. Root Entry Redirection - Anonymous: preserves marketing landing page on / for anonymous visitor', async ({
+    page,
+    context,
+  }) => {
+    await context.clearCookies();
+    await page.goto('/');
+    await expect(page).toHaveURL(/\/$/);
+    await expect(page.getByText(/From “I need to go” to cleared for takeoff/i)).toBeVisible();
+  });
+
+  test('8. Upstream API Failure Recovery: renders safe error boundary on 500 server error with zero secret leakage', async ({
+    page,
+  }) => {
+    await authenticateSession(page, 'token-server-error');
+    await page.goto('/dashboard');
+
+    await expect(page.getByRole('heading', { name: /Unable to load dashboard/i })).toBeVisible();
+    await expect(page.getByRole('button', { name: /Try Again/i })).toBeVisible();
+
+    const pageText = await page.innerText('body');
+    expect(pageText).not.toContain('token-server-error');
+    expect(pageText).not.toContain('Internal Server Error');
+    expect(pageText).not.toContain('3101');
+  });
+
+  test('9. Upstream Malformed Response Recovery: renders error boundary on invalid payload with zero raw data leakage', async ({
+    page,
+  }) => {
+    await authenticateSession(page, 'token-malformed');
+    await page.goto('/dashboard');
+
+    await expect(page.getByRole('heading', { name: /Unable to load dashboard/i })).toBeVisible();
+    await expect(page.getByRole('button', { name: /Try Again/i })).toBeVisible();
+
+    const pageText = await page.innerText('body');
+    expect(pageText).not.toContain('token-malformed');
+    expect(pageText).not.toContain('totalBookings');
+  });
+
+  test('10. Viewport Geometry: renders without horizontal overflow across mobile, tablet, and desktop', async ({
+    page,
+  }) => {
+    await authenticateSession(page, 'token-populated');
+
+    const viewports = [
+      { name: 'Mobile (360x800)', width: 360, height: 800 },
+      { name: 'Tablet (768x1024)', width: 768, height: 1024 },
+      { name: 'Desktop (1280x800)', width: 1280, height: 800 },
+    ];
+
+    for (const vp of viewports) {
+      await page.setViewportSize({ width: vp.width, height: vp.height });
+      await page.goto('/dashboard');
+      const hasOverflow = await page.evaluate(() => {
+        return document.documentElement.scrollWidth > document.documentElement.clientWidth;
+      });
+      expect(hasOverflow).toBe(false);
+    }
+  });
+
+  test('11. Landmark & Keyboard Focus Traversal: verifies landmarks and keyboard tabbing through interactive elements', async ({
+    page,
+  }) => {
+    await authenticateSession(page, 'token-populated');
+    await page.goto('/dashboard');
+
+    await expect(page.locator('main')).toBeVisible();
+
+    await page.keyboard.press('Tab');
+    const focusedTag = await page.evaluate(() => document.activeElement?.tagName);
+    expect(focusedTag).toBeTruthy();
+    expect(focusedTag).not.toBe('BODY');
+
+    const interactiveCount = await page.evaluate(() => {
+      const focusable = document.querySelectorAll(
+        'a[href], button:not([disabled]), input:not([disabled]), [tabindex]:not([tabindex="-1"])',
+      );
+      return focusable.length;
+    });
+    expect(interactiveCount).toBeGreaterThan(0);
+  });
+
+  test('12. Reduced Motion Accessibility: enforces instant or bounded animations when reduced motion is preferred', async ({
+    page,
+  }) => {
+    await authenticateSession(page, 'token-populated');
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    await page.goto('/dashboard');
+
+    const motionDurations = await page.evaluate(() => {
+      const elements = Array.from(
+        document.querySelectorAll('article, a[href], button:not([disabled])'),
+      );
+      return elements.map((el) => {
+        const style = window.getComputedStyle(el);
+        return {
+          animationDuration: style.animationDuration,
+          transitionDuration: style.transitionDuration,
+        };
+      });
+    });
+
+    const parseSeconds = (dur: string): number => {
+      if (!dur || dur === 'none') return 0;
+      if (dur.endsWith('ms')) return parseFloat(dur) / 1000;
+      if (dur.endsWith('s')) return parseFloat(dur);
+      return parseFloat(dur) || 0;
+    };
+
+    expect(motionDurations.length).toBeGreaterThan(0);
+    for (const motion of motionDurations) {
+      expect(parseSeconds(motion.animationDuration)).toBeLessThanOrEqual(0.01);
+      expect(parseSeconds(motion.transitionDuration)).toBeLessThanOrEqual(0.01);
+    }
+  });
+
+  test('13. Quick Search: submits airport and date inputs to the production search route with defaults', async ({
+    page,
+  }) => {
+    await authenticateSession(page, 'token-populated');
+    await page.goto('/dashboard');
+
+    await page.getByLabel('Departure airport code').fill('SGN');
+    await page.getByLabel('Arrival airport code').fill('HAN');
+    await page.getByLabel('Departure date').fill('2099-09-01');
+    await page.getByRole('button', { name: 'Search Flights' }).click();
+
+    await expect(page).toHaveURL(/\/search/);
+    const searchParams = new URL(page.url()).searchParams;
+    expect(new URL(page.url()).pathname).toBe('/search');
+    expect(searchParams.get('origin')).toBe('SGN');
+    expect(searchParams.get('destination')).toBe('HAN');
+    expect(searchParams.get('departureDate')).toBe('2099-09-01');
+    expect(searchParams.get('adults')).toBe('1');
+    expect(searchParams.get('cabinClass')).toBe('economy');
+  });
+
+  test('14. Quick Action Search Flights: navigates to search', async ({ page }) => {
+    await authenticateSession(page, 'token-populated');
+    await page.goto('/dashboard');
+
+    const quickActions = page.getByRole('region', { name: 'Quick Actions' });
+    await quickActions.getByRole('link', { name: 'Search Flights' }).click();
+
+    await expect(page).toHaveURL(/\/search$/);
+  });
+
+  test('15. Quick Action Upcoming Trips: navigates to upcoming bookings', async ({ page }) => {
+    await authenticateSession(page, 'token-populated');
+    await page.goto('/dashboard');
+
+    const quickActions = page.getByRole('region', { name: 'Quick Actions' });
+    await quickActions.getByRole('link', { name: 'Upcoming Trips' }).click();
+
+    await expect(page).toHaveURL(/\/bookings\?tab=upcoming$/);
+  });
+
+  test('16. Quick Action Past Bookings: navigates to past bookings', async ({ page }) => {
+    await authenticateSession(page, 'token-populated');
+    await page.goto('/dashboard');
+
+    const quickActions = page.getByRole('region', { name: 'Quick Actions' });
+    await quickActions.getByRole('link', { name: 'Past Bookings' }).click();
+
+    await expect(page).toHaveURL(/\/bookings\?tab=past$/);
+  });
+
+  test('17. Traveler Profile disabled: omits the profile action', async ({ page }) => {
+    await authenticateSession(page, 'token-populated');
+    await setMockScenario(page, 'dashboard-readiness-disabled');
+    await page.goto('/dashboard');
+
+    const quickActions = page.getByRole('region', { name: 'Quick Actions' });
+    await expect(quickActions.getByRole('link', { name: 'Traveler Profile' })).toHaveCount(0);
+  });
+
+  test('18. Traveler Profile enabled: exposes the profile action', async ({ page }) => {
+    await authenticateSession(page, 'token-populated');
+    await setMockScenario(page, 'dashboard-readiness-enabled');
+    await page.goto('/dashboard');
+
+    const quickActions = page.getByRole('region', { name: 'Quick Actions' });
+    const profileAction = quickActions.getByRole('link', { name: 'Traveler Profile' });
+    await expect(profileAction).toBeVisible();
+    await expect(profileAction).toHaveAttribute('href', '/profile');
   });
 });

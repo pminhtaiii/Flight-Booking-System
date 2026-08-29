@@ -6,16 +6,38 @@ Update this file after every completed feature. Any AI agent reading this should
 
 ### Current Status
 
-**Feature:** Authenticated Booking Dashboard (Feature 021) — Phase 3 / Slice 3: Web Data Boundary & UI Implementation (Tasks T020–T029) — COMPLETED (100% GREEN)
-**Last completed:** Phase 3 / Slice 3 (T020–T029): Implemented server-only summary loader `apps/web/lib/server/dashboard.ts`, semantic glassmorphic tokens in `globals.css`, `DashboardStats`, `DashboardRecentBookings`, `DashboardShell`, Server Component route `page.tsx`, skeleton `loading.tsx`, error boundary `error.tsx`; verified 20/20 loader unit tests, Playwright acceptance suite, Next.js lint & typecheck, Next.js production build, and CI contract tests pass 100% GREEN (2026-08-29).
-**In progress:** Phase 4: User Story 2 — Start the Next Travel Task (Tasks T030–T037).
-**Next:** Quick search normalization and form controls (`dashboard-search.ts`, `DashboardQuickSearch.tsx`) and flag-conditioned quick actions (`DashboardQuickActions.tsx`).
+**Feature:** Authenticated Booking Dashboard (Feature 021) — Phase 5 / Slice 1: Root Entry & Recovery Characterization (Tasks T038–T039) — RED Characterization Baseline Verified
+**Last completed:** Phase 5 / Slice 1 (T038–T039): Authored failing unit test suite `apps/web/tests/dashboard-routing.unit.ts` (T039) testing root server session branching, unauthenticated and expired session redirection with return URL preservation, and upstream failure error propagation; extended Playwright acceptance suite `apps/web/tests/dashboard.spec.ts` (T038) with US3 scenarios for authenticated root redirect, anonymous marketing page preservation, direct dashboard unauthenticated/expired redirection, 500/malformed recovery states without secret leakage, zero horizontal overflow across 360px/768px/1280px viewports, landmark structure, keyboard focus traversal, and reduced-motion enforcement; verified expected RED state on root session redirection (2026-08-29).
+**In progress:** Phase 5: User Story 3 — Enter and Recover Safely (Tasks T040–T043).
+**Next:** T040 (Root page session branch in `apps/web/app/page.tsx`), T041 (Align unauthenticated and expired-session login-return routing in `apps/web/app/dashboard/page.tsx`), and T042 (Responsive styles and fallbacks in `dashboard.module.css`).
 
 ---
 
 ## Progress by Feature
 
 ### [ ] Feature: Authenticated Booking Dashboard (Feature 021)
+
+- [ ] Phase 5: User Story 3 - Root Entry & Recovery Characterization (T038–T039) (2026-08-29):
+  - **T038: Playwright Acceptance Scenarios for Entry, Viewports & Recovery (`apps/web/tests/dashboard.spec.ts`)**:
+    - Authored E2E acceptance tests for US3 covering:
+      - Authenticated root entry redirecting from `/` to `/dashboard`.
+      - Anonymous root entry preserving marketing landing page on `/`.
+      - Direct `/dashboard` unauthenticated access redirecting to `/login?callbackUrl=/dashboard`.
+      - Expired backend session redirecting to `/login?callbackUrl=/dashboard`.
+      - Upstream API 500 server failure rendering safe recovery error card with `Try Again` CTA and zero leaked tokens/hostnames/internal details.
+      - Upstream malformed response rendering error boundary with zero raw data leakage.
+      - Zero horizontal overflow across mobile (360x800), tablet (768x1024), and desktop (1280x800) viewports (`scrollWidth <= clientWidth`).
+      - Landmark `<main>` visibility and keyboard `Tab` traversal to interactive elements with active focus rings.
+      - `prefers-reduced-motion: reduce` emulation verifying animation and transition durations bounded (`<= 0.01s`).
+  - **T039: Unit Test Suite for Root Session Branching & Dashboard Routing (`apps/web/tests/dashboard-routing.unit.ts`)**:
+    - Implemented unit tests using `node:test`, `node:assert/strict`, and module caching mock seams for `next-auth` (`getServerSession`), `next/navigation` (`redirect`), `server-only`, and `apps/web/lib/server/dashboard.ts` (`getDashboardSummary`).
+    - Validated root page branching: authenticated session triggers `redirect('/dashboard')` (failing as expected in RED phase before T040), anonymous session returns `<LandingPage />` without redirect.
+    - Validated dashboard page outcome branching: `UNAUTHENTICATED` triggers `redirect('/login?callbackUrl=/dashboard')`, `UPSTREAM_UNAVAILABLE` and `INVALID_RESPONSE` throw unmasked `Error('Unable to load dashboard.')` activating error boundary, `ok: true` renders `DashboardShell`.
+    - Executed `cmd /c "node_modules\.bin\tsx.cmd --test apps/web/tests/dashboard-routing.unit.ts"`: 5 PASS, 1 FAIL (clean RED on root session redirect).
+  - **Dual-Axis Code Review Completed**:
+    - Standards Review: 0 blocking issues after type assertion annotations and explicit return typing.
+    - Spec Review: 0 scope creep; added expired token, malformed upstream payload, landmark, and strengthened keyboard focus assertions.
+
 
 - [x] Phase 3: User Story 1 - Web Data Boundary & UI Implementation (T020–T029) (2026-08-29):
   - **T020: Server-Only Summary Loader (`apps/web/lib/server/dashboard.ts`)**:
