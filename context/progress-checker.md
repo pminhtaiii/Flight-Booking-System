@@ -32,7 +32,8 @@ Update this file after every completed feature. Any AI agent reading this should
     - Exported all dashboard schemas and inferred types via `export * from './dashboard.types';`.
     - Registered subpath export `"./dashboard.types"` in `packages/shared/package.json`.
   - **T008: Test Script Registration & Verification Execution (`packages/shared/package.json`)**:
-    - Updated `"test"` script in `packages/shared/package.json` to include compiled `dist/types/dashboard.types.spec.js`.
+    - Updated `"test"` script in `packages/shared/package.json` to include compiled `dist/types/dashboard.types.spec.js` and added `"test:shared"` to root `package.json`.
+    - Integrated `pnpm --filter @shared/types test` into GitHub Actions `api-gate` and static contract verification test suite.
     - Executed `pnpm --filter @shared/types test`: 67/67 unit tests passed across 12 suites with exit code 0.
     - Verified downstream typechecks: `@api/backend` `tsc -p tsconfig.json --noEmit` PASS (exit code 0), `@web/frontend` `typecheck` PASS (exit code 0).
     - Verified static CI workflow contract: `node --test tests/ci/ci-workflow.contract.test.mjs` (20/20 PASS).
