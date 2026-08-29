@@ -6,16 +6,38 @@ Update this file after every completed feature. Any AI agent reading this should
 
 ### Current Status
 
-**Feature:** Authenticated Booking Dashboard (Feature 021) — Phase 1: Setup and Decision Guardrails (Tasks T001–T004) — COMPLETED (100% Phase 1)
-**Last completed:** Phase 1 / Setup and Decision Guardrails (T001–T004): baseline and 41-file checklist (`specs/021-dashboard-building/implementation-notes.md`), OpenAPI contract checklist (`specs/021-dashboard-building/checklists/contract.md`), visual translation guardrails (`specs/021-dashboard-building/checklists/visual.md`), Next.js 14.2.3 constraints verification, dual-axis code reviews (0 issues), and verification gates passing (2026-08-28).
-**In progress:** Phase 2: Foundational Shared Contract (Tasks T005–T008).
-**Next:** Phase 2 (Shared Zod schemas, inferred types, `DashboardOutcome` failure union, and barrel export).
+**Feature:** Authenticated Booking Dashboard (Feature 021) — Phase 2: Foundational Shared Contract (Tasks T005–T008) — COMPLETED (100% Phase 2)
+**Last completed:** Phase 2 / Foundational Shared Contract (T005–T008): shared Zod contracts (`DashboardStatsSchema`, `DashboardRecentBookingSchema`, `DashboardSummarySchema`, `DashboardOutcomeSchema`), inferred TypeScript types, canonical 9-status lifecycle enum, comprehensive contract unit suite (`packages/shared/src/types/dashboard.types.spec.ts`), barrel exports in `packages/shared/src/types/index.ts`, test runner registration in `package.json`, and 67/67 passing tests across 12 suites (2026-08-29).
+**In progress:** Phase 3: User Story 1 - View a Trustworthy Booking Overview (Tasks T009–T029).
+**Next:** Phase 3 (US1: Service direct Prisma read model, controller, module registration, server-only summary loader, and glassmorphic UI shell).
 
 ---
 
 ## Progress by Feature
 
 ### [ ] Feature: Authenticated Booking Dashboard (Feature 021)
+
+- [x] Phase 2: Foundational Shared Contract (T005–T008) (2026-08-29):
+  - **T005: Contract Unit Test Suite (`packages/shared/src/types/dashboard.types.spec.ts`)**:
+    - Implemented exhaustive `node:test` and `node:assert/strict` unit suite verifying valid payloads, strict key enforcement (`.strict()`), non-negative integer bounds on all 4 metric counters, canonical 9-status lifecycle enum, nullable projections (`departureAt`, `originCode`, `destinationCode`, `airlineCode`, `flightNumber`), `max(5)` recent booking array cap, ISO 8601 UTC and offset datetime parsing (`{ offset: true }`), UUID v4 format validation, and `DashboardOutcome` discriminated union across all 4 canonical failure reasons (`UNAUTHENTICATED`, `FORBIDDEN`, `UPSTREAM_UNAVAILABLE`, `INVALID_RESPONSE`).
+    - Verified compile-time static type inference parity assertions (`Assert<Equal<...>>`) against hand-written type contracts.
+    - Verified strict RED state failure before implementation (`Cannot find module './dashboard.types'`).
+  - **T006: Shared Zod Schema & Outcome Type Implementation (`packages/shared/src/types/dashboard.types.ts`)**:
+    - Defined and exported `DashboardBookingStatusEnum` and `DashboardBookingStatus` covering the exact 9-value lifecycle enum.
+    - Defined and exported `DashboardStatsSchema` and `DashboardStats` validating non-negative integers with `.strict()`.
+    - Defined and exported `DashboardRecentBookingSchema` and `DashboardRecentBooking` with UUID v4, canonical status, ISO 8601 timestamps, nullable string/datetime display projections, and `.strict()`.
+    - Defined and exported `DashboardSummarySchema` and `DashboardSummary` validating aggregate `stats`, `recentBookings.max(5)`, and `generatedAt` with `.strict()`.
+    - Defined and exported `DashboardFailureReasonEnum`, `DashboardOutcomeSchema`, and `DashboardOutcome` discriminated union with `retryable: boolean` and zero stack trace/credential leakage.
+  - **T007: Shared Barrel Export (`packages/shared/src/types/index.ts`)**:
+    - Exported all dashboard schemas and inferred types via `export * from './dashboard.types';`.
+    - Registered subpath export `"./dashboard.types"` in `packages/shared/package.json`.
+  - **T008: Test Script Registration & Verification Execution (`packages/shared/package.json`)**:
+    - Updated `"test"` script in `packages/shared/package.json` to include compiled `dist/types/dashboard.types.spec.js` and added `"test:shared"` to root `package.json`.
+    - Integrated `pnpm --filter @shared/types test` into GitHub Actions `api-gate` and static contract verification test suite.
+    - Executed `pnpm --filter @shared/types test`: 67/67 unit tests passed across 12 suites with exit code 0.
+    - Verified downstream typechecks: `@api/backend` `tsc -p tsconfig.json --noEmit` PASS (exit code 0), `@web/frontend` `typecheck` PASS (exit code 0).
+    - Verified static CI workflow contract: `node --test tests/ci/ci-workflow.contract.test.mjs` (20/20 PASS).
+    - Dual-axis Standards Review and Spec Review completed with 0 P0/P1 issues.
 
 - [x] Phase 1: Setup and Decision Guardrails (T001–T004) (2026-08-28):
   - **T001: Execution Baseline & Affected-File Checklist (`specs/021-dashboard-building/implementation-notes.md`)**:

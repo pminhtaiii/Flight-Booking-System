@@ -351,6 +351,16 @@ test('workflow pins actions, disables credential persistence, and avoids unsafe 
 
 test('workflow preserves service-specific validation and network boundaries', () => {
   const source = workflow();
+  const apiGate = jobBlock(source, 'api-gate');
+  for (const requirement of [
+    /eslint/,
+    /pnpm --filter @shared\/types test/,
+    /prisma generate/,
+    /tsc --noEmit/,
+  ]) {
+    assertContains(apiGate, requirement, `API gate must include ${requirement}`);
+  }
+
   const apiE2e = jobBlock(source, 'api-e2e-tests');
   for (const requirement of [
     /postgres:16-alpine/,

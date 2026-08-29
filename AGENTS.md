@@ -174,7 +174,7 @@ The repository enforces automated continuous integration via `.github/workflows/
 2. **Pre-PR Local Gate Validation Matrix**:
    Always verify the change-aware service chains locally before opening or updating PRs:
    - **Static Contract**: `node --test tests/ci/ci-workflow.contract.test.mjs`
-   - **API Gate**: `pnpm exec eslint "apps/api/**/*.ts" "packages/shared/**/*.ts" --max-warnings 0` && `pnpm --filter @api/backend exec tsc -p tsconfig.json --noEmit`
+   - **API Gate**: `pnpm exec eslint "apps/api/**/*.ts" "packages/shared/**/*.ts" --max-warnings 0` && `pnpm --filter @shared/types test` && `pnpm --filter @api/backend exec tsc -p tsconfig.json --noEmit`
    - **API Unit Tests**: `$env:NODE_OPTIONS = "--require=$PWD/tests/ci/node-network-guard.cjs"`; `pnpm --filter @api/backend test -- --runInBand`
    - **Web Gate & Build**: `pnpm --filter @web/frontend lint` && `pnpm --filter @web/frontend typecheck` && `pnpm --filter @web/frontend build`
    - **Agent Gate & Tests**: `$env:UV_CACHE_DIR = "c:\Booking Systems\.t093-uv-cache"`; `uv run --package agent ruff check apps/agent` && `uv run --package agent ruff format --check apps/agent`; with `$env:PYTHONPATH = "$PWD/tests/ci/python;$PWD/apps/agent/src"` run `uv run --package agent pytest apps/agent/tests -m "not redis_integration"`

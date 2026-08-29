@@ -117,8 +117,8 @@ jobs:
         run: pnpm install --frozen-lockfile
       - name: Lint API and shared code
         run: pnpm exec eslint "apps/api/**/*.ts" "packages/shared/**/*.ts" --max-warnings 0
-      - name: Build shared package
-        run: pnpm build:shared
+      - name: Run shared package contract tests
+        run: pnpm --filter @shared/types test
       - name: Generate Prisma Client
         run: pnpm --filter @api/backend exec prisma generate
       - name: Typecheck API
