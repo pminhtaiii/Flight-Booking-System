@@ -389,8 +389,30 @@ describe('Dashboard (E2E)', () => {
         },
       });
 
+      const intentForPayment = await prisma.bookingIntent.create({
+        data: {
+          userId: userA.id,
+          duffelOfferId: `off-${crypto.randomUUID()}`,
+          status: 'AWAITING_PAYMENT',
+          originalPrice: new Prisma.Decimal('125.50'),
+          confirmedPrice: new Prisma.Decimal('125.50'),
+          currency: 'USD',
+          pricedAt: new Date(),
+          origin: 'SGN',
+          destination: 'HAN',
+          departureDate: new Date('2026-12-01'),
+          cabinClass: 'economy',
+          adults: 1,
+          children: 0,
+          infants: 0,
+          rawOfferSnapshot: { offerId: 'off-test' },
+          intentExpiresAt: new Date(Date.now() + 60 * 60 * 1000),
+        },
+      });
+
       const payment = await prisma.payment.create({
         data: {
+          bookingIntentId: intentForPayment.id,
           attemptNumber: 1,
           idempotencyKeyId: key.id,
           stripePaymentIntentId: 'pi_sensitive_stripe_99999',
