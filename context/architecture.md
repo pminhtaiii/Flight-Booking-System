@@ -50,6 +50,7 @@
 │   │   │   ├── booking-management/    → Owner read models, disruption & revision queries
 │   │   │   ├── cancellation/          → Cancellation quotes, locks & obligation generation
 │   │   │   ├── chat/                  → Chat persistence & AgentChatController (JTI checks)
+│   │   │   ├── dashboard/             → Direct Prisma booking summary read model & stats
 │   │   │   ├── payment/               → Payment processing & trigger coordinators
 │   │   │   ├── refund/                → RefundTransactionService & capacity reservation
 │   │   │   └── refund-settlement/     → Provider-blind atomic ledger & projection settlement

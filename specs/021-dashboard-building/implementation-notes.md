@@ -42,26 +42,26 @@ Comprehensive inventory of all files targeted for creation, modification, or ver
 
 ### 2.2 Backend API Service (`apps/api/`)
 
-- [ ] [`apps/api/src/dashboard/dashboard.controller.ts`](file:///c:/Booking%20Systems/apps/api/src/dashboard/dashboard.controller.ts): Implement `DashboardController` exposing `GET /dashboard/summary` protected by `JwtAuthGuard`, resolving user ID from `req.user.id`.
+- [x] [`apps/api/src/dashboard/dashboard.controller.ts`](file:///c:/Booking%20Systems/apps/api/src/dashboard/dashboard.controller.ts): Implement `DashboardController` exposing `GET /dashboard/summary` protected by `JwtAuthGuard`, resolving user ID from `req.user.id`.
 - [x] [`apps/api/src/dashboard/dashboard.controller.spec.ts`](file:///c:/Booking%20Systems/apps/api/src/dashboard/dashboard.controller.spec.ts): Unit tests for `DashboardController` ensuring authentication guard attachment, user ID forwarding, and response passing.
-- [ ] [`apps/api/src/dashboard/dashboard.module.ts`](file:///c:/Booking%20Systems/apps/api/src/dashboard/dashboard.module.ts): Declare `DashboardModule` importing `PrismaModule` and providing `DashboardService` + `DashboardController`.
-- [ ] [`apps/api/src/dashboard/dashboard.service.ts`](file:///c:/Booking%20Systems/apps/api/src/dashboard/dashboard.service.ts): Implement `DashboardService` querying Prisma directly (4 counts + 1 findMany) with a single captured `now` timestamp and pure snapshot mapper.
+- [x] [`apps/api/src/dashboard/dashboard.module.ts`](file:///c:/Booking%20Systems/apps/api/src/dashboard/dashboard.module.ts): Declare `DashboardModule` importing `PrismaModule` and providing `DashboardService` + `DashboardController`.
+- [x] [`apps/api/src/dashboard/dashboard.service.ts`](file:///c:/Booking%20Systems/apps/api/src/dashboard/dashboard.service.ts): Implement `DashboardService` querying Prisma directly (4 counts + 1 findMany) with a single captured `now` timestamp and pure snapshot mapper.
 - [x] [`apps/api/src/dashboard/dashboard.service.spec.ts`](file:///c:/Booking%20Systems/apps/api/src/dashboard/dashboard.service.spec.ts): Unit tests for `DashboardService` covering metric queries, time boundaries, canonical status mappings, descending sort, `take: 5`, and malformed snapshot resilience.
-- [ ] [`apps/api/src/app.module.ts`](file:///c:/Booking%20Systems/apps/api/src/app.module.ts): Register `DashboardModule` in the root application imports graph.
-- [ ] [`apps/api/src/app.module.spec.ts`](file:///c:/Booking%20Systems/apps/api/src/app.module.spec.ts): Verify `AppModule` compilation with `DashboardModule` registered.
+- [x] [`apps/api/src/app.module.ts`](file:///c:/Booking%20Systems/apps/api/src/app.module.ts): Register `DashboardModule` in the root application imports graph.
+- [x] [`apps/api/src/app.module.spec.ts`](file:///c:/Booking%20Systems/apps/api/src/app.module.spec.ts): Verify `AppModule` compilation with `DashboardModule` registered.
 - [x] [`apps/api/test/dashboard.e2e-spec.ts`](file:///c:/Booking%20Systems/apps/api/test/dashboard.e2e-spec.ts): Integration E2E tests for `GET /api/dashboard/summary` verifying JWT authentication, tenant isolation across multiple users, exact contract shapes, and 401 unauthenticated behavior.
 
 ### 2.3 Frontend Web Application (`apps/web/`)
 
 - [ ] [`apps/web/app/page.tsx`](file:///c:/Booking%20Systems/apps/web/app/page.tsx): Convert landing page to an async Server Component checking session; redirects authenticated users to `/dashboard` while rendering `LandingPage` for anonymous visitors.
-- [ ] [`apps/web/app/globals.css`](file:///c:/Booking%20Systems/apps/web/app/globals.css): Define semantic CSS tokens for dashboard glassmorphic surfaces, typography, stats, borders, and interactive states (light/dark/fallback modes).
-- [ ] [`apps/web/app/dashboard/dashboard.module.css`](file:///c:/Booking%20Systems/apps/web/app/dashboard/dashboard.module.css): Scoped CSS Module providing layout grid, responsive breakpoints (360px, 768px, 1200px+), sidebar layout, and backdrop-filter fallbacks.
-- [ ] [`apps/web/app/dashboard/error.tsx`](file:///c:/Booking%20Systems/apps/web/app/dashboard/error.tsx): Client error boundary component adhering to Next.js contract (`error`, `reset`) with clean user messaging and no credential/stack trace leaks.
-- [ ] [`apps/web/app/dashboard/loading.tsx`](file:///c:/Booking%20Systems/apps/web/app/dashboard/loading.tsx): Server-rendered skeleton loading component matching exact layout geometry of `DashboardShell`.
-- [ ] [`apps/web/app/dashboard/page.tsx`](file:///c:/Booking%20Systems/apps/web/app/dashboard/page.tsx): Authenticated Server Component route fetching summary via `getDashboardSummary()`, handling expired tokens, evaluating `isBookingReadinessEnabled()`, and passing data to `DashboardShell`.
-- [ ] [`apps/web/components/dashboard/DashboardShell.tsx`](file:///c:/Booking%20Systems/apps/web/components/dashboard/DashboardShell.tsx): Production shell component composing desktop sidebar, sticky topbar, compact mobile navigation, hero banner, quick search, stats grid, quick actions, and recent activity timeline.
-- [ ] [`apps/web/components/dashboard/DashboardStats.tsx`](file:///c:/Booking%20Systems/apps/web/components/dashboard/DashboardStats.tsx): 2x2 responsive stat cards rendering Total, Upcoming, Completed, and Cancelled bookings with semantic tokens and icons.
-- [ ] [`apps/web/components/dashboard/DashboardRecentBookings.tsx`](file:///c:/Booking%20Systems/apps/web/components/dashboard/DashboardRecentBookings.tsx): Recent activity feed rendering up to 5 bookings with status chips, route indicators, dates, and links to `/bookings/[bookingId]` and `/bookings`.
+- [x] [`apps/web/app/globals.css`](file:///c:/Booking%20Systems/apps/web/app/globals.css): Define semantic CSS tokens for dashboard glassmorphic surfaces, typography, stats, borders, and interactive states (light/dark/fallback modes).
+- [x] [`apps/web/app/dashboard/dashboard.module.css`](file:///c:/Booking%20Systems/apps/web/app/dashboard/dashboard.module.css): Scoped CSS Module providing layout grid, responsive breakpoints (360px, 768px, 1200px+), sidebar layout, and backdrop-filter fallbacks.
+- [x] [`apps/web/app/dashboard/error.tsx`](file:///c:/Booking%20Systems/apps/web/app/dashboard/error.tsx): Client error boundary component adhering to Next.js contract (`error`, `reset`) with clean user messaging and no credential/stack trace leaks.
+- [x] [`apps/web/app/dashboard/loading.tsx`](file:///c:/Booking%20Systems/apps/web/app/dashboard/loading.tsx): Server-rendered skeleton loading component matching exact layout geometry of `DashboardShell`.
+- [x] [`apps/web/app/dashboard/page.tsx`](file:///c:/Booking%20Systems/apps/web/app/dashboard/page.tsx): Authenticated Server Component route fetching summary via `getDashboardSummary()`, handling expired tokens, evaluating `isBookingReadinessEnabled()`, and passing data to `DashboardShell`.
+- [x] [`apps/web/components/dashboard/DashboardShell.tsx`](file:///c:/Booking%20Systems/apps/web/components/dashboard/DashboardShell.tsx): Production shell component composing desktop sidebar, sticky topbar, compact mobile navigation, hero banner, quick search, stats grid, quick actions, and recent activity timeline.
+- [x] [`apps/web/components/dashboard/DashboardStats.tsx`](file:///c:/Booking%20Systems/apps/web/components/dashboard/DashboardStats.tsx): 2x2 responsive stat cards rendering Total, Upcoming, Completed, and Cancelled bookings with semantic tokens and icons.
+- [x] [`apps/web/components/dashboard/DashboardRecentBookings.tsx`](file:///c:/Booking%20Systems/apps/web/components/dashboard/DashboardRecentBookings.tsx): Recent activity feed rendering up to 5 bookings with status chips, route indicators, dates, and links to `/bookings/[bookingId]` and `/bookings`.
 - [ ] [`apps/web/components/dashboard/DashboardQuickActions.tsx`](file:///c:/Booking%20Systems/apps/web/components/dashboard/DashboardQuickActions.tsx): 2x2 quick action grid linking to production travel tasks (`/search`, `/bookings?tab=upcoming`, `/bookings?tab=past`, and conditionally `/profile`).
 - [ ] [`apps/web/components/dashboard/DashboardQuickSearch.tsx`](file:///c:/Booking%20Systems/apps/web/components/dashboard/DashboardQuickSearch.tsx): Accessible inline search form validating origin, destination, and departure date before routing to `/search`.
 - [ ] [`apps/web/components/dashboard/dashboard-actions.ts`](file:///c:/Booking%20Systems/apps/web/components/dashboard/dashboard-actions.ts): Pure utility deriving available quick actions based on the `isBookingReadinessEnabled` flag.
@@ -70,7 +70,7 @@ Comprehensive inventory of all files targeted for creation, modification, or ver
 - [ ] [`apps/web/components/dashboard/dashboard-search.spec.ts`](file:///c:/Booking%20Systems/apps/web/components/dashboard/dashboard-search.spec.ts): Unit tests for search query building and validation logic.
 - [ ] [`apps/web/components/search/SearchFormClient.tsx`](file:///c:/Booking%20Systems/apps/web/components/search/SearchFormClient.tsx): Support optional initial values (`initialOrigin`, `initialDestination`, `initialDepartureDate`) from search parameters.
 - [ ] [`apps/web/app/search/page.tsx`](file:///c:/Booking%20Systems/apps/web/app/search/page.tsx): Pass sanitized search query parameters into `SearchFormClient`.
-- [ ] [`apps/web/lib/server/dashboard.ts`](file:///c:/Booking%20Systems/apps/web/lib/server/dashboard.ts): Server-only data loader acquiring JWT session, calling `GET /api/dashboard/summary` with `cache: 'no-store'`, 10s `AbortController` timeout, safe parsing via `DashboardSummarySchema`, and returning `DashboardOutcome`.
+- [x] [`apps/web/lib/server/dashboard.ts`](file:///c:/Booking%20Systems/apps/web/lib/server/dashboard.ts): Server-only data loader acquiring JWT session, calling `GET /api/dashboard/summary` with `cache: 'no-store'`, 10s `AbortController` timeout, safe parsing via `DashboardSummarySchema`, and returning `DashboardOutcome`.
 - [x] [`apps/web/lib/server/dashboard.spec.ts`](file:///c:/Booking%20Systems/apps/web/lib/server/dashboard.spec.ts): Unit tests for `getDashboardSummary` under success, 401, 403, 500, timeout, malformed payload, and unauthenticated conditions.
 - [x] [`apps/web/tests/dashboard.spec.ts`](file:///c:/Booking%20Systems/apps/web/tests/dashboard.spec.ts): Playwright browser tests covering populated state, empty state, navigation links, quick search handoff, flag toggles, root redirect, login redirect, error recovery, responsive viewports (360px, 768px, 1280px), and keyboard focus.
 - [ ] [`apps/web/tests/dashboard-routing.unit.ts`](file:///c:/Booking%20Systems/apps/web/tests/dashboard-routing.unit.ts): Page routing unit tests covering root page redirect and dashboard session gating.
@@ -273,20 +273,59 @@ _(Sections below will be populated as implementation tasks progress)_
 
 ### 5.2 API Service & Integration Test Execution (Task T019)
 
-- Command: `pnpm --filter @api/backend test -- src/dashboard/`
-- Exit Code: _Pending execution_
-- Command: `npm run test:e2e --workspace=apps/api -- test/dashboard.e2e-spec.ts`
-- Exit Code: _Pending execution_
+- **Unit & Controller Tests**:
+  - **Command**: `pnpm --filter @api/backend test -- src/dashboard/dashboard.service.spec.ts src/dashboard/dashboard.controller.spec.ts src/app.module.spec.ts`
+  - **Result**: `36/36 PASS` across 3 test suites (0 failures, 0 skipped)
+    - `src/dashboard/dashboard.service.spec.ts`: 14/14 tests pass
+    - `src/dashboard/dashboard.controller.spec.ts`: 7/7 tests pass
+    - `src/app.module.spec.ts`: 15/15 tests pass
+  - **Exit Code**: `0`
+- **API E2E Integration Suite**:
+  - **Command**: `pnpm --filter @api/backend test:e2e -- test/dashboard.e2e-spec.ts`
+  - **Result**: `7/7 PASS` across 1 test suite (0 failures, 0 skipped)
+    - HTTP 401 Unauthorized (missing header & invalid token)
+    - User A vs User B strict tenant isolation
+    - Empty state parity for user without bookings
+    - Recent 5 limit and descending `createdAt` ordering
+    - Negative privacy invariants (0 PII, 0 secrets, 0 raw snapshots, 0 supplier IDs)
+    - Private no-store Cache-Control header verification
+  - **Exit Code**: `0`
+- **Static Gate & Linting**:
+  - **Typecheck**: `pnpm --filter @api/backend exec tsc -p tsconfig.json --noEmit` -> Exit `0` (0 errors)
+  - **ESLint**: `pnpm exec eslint "apps/api/src/dashboard/**/*.ts" --max-warnings 0` -> Exit `0` (0 warnings)
+  - **CI Workflow Contract**: `node --test tests/ci/ci-workflow.contract.test.mjs` -> `20/20 PASS`, Exit `0`
 
-### 5.3 Web Server Loader & UI Unit Test Execution (Task T029 / T037)
+### 5.3 Web Server Loader & UI Unit Test Execution (Task T029)
 
-- Command: `pnpm --filter @web/frontend test`
-- Exit Code: _Pending execution_
+- **Server Loader Unit Tests**:
+  - **Command**: `& '.\node_modules\.bin\tsx.CMD' --test apps/web/lib/server/dashboard.spec.ts`
+  - **Result**: `20/20 PASS` across 7 test suites (0 failures, 0 skipped, duration ~3.1s)
+  - **Exit Code**: `0`
+  - **Coverage**:
+    - Unauthenticated session detection (null, missing accessToken, empty accessToken).
+    - Bearer token header forwarding, `cache: 'no-store'`, dynamic API URL resolution, and trailing slash trimming.
+    - 10s `AbortController` timeout handling mapped to `UPSTREAM_UNAVAILABLE` (retryable: true).
+    - HTTP status code mapping (401 -> `UNAUTHENTICATED`, 403 -> `FORBIDDEN`, 500/502/503/504 -> `UPSTREAM_UNAVAILABLE`).
+    - Zod schema validation rejecting malformed JSON, missing stats, negative counts, invalid status enums, invalid ISO dates, >5 items, and extra keys violating `.strict()`.
+    - Zero credential / stack trace leakage across all failure branches.
+- **Next.js Lint & Typecheck**:
+  - **Lint**: `pnpm --filter @web/frontend lint` -> Exit `0` (0 errors)
+  - **Typecheck**: `pnpm --filter @web/frontend typecheck` -> Exit `0` (0 errors)
+- **Next.js Production Build**:
+  - **Command**: `pnpm --filter @web/frontend build`
+  - **Result**: Compiled successfully, static and dynamic pages generated (`ƒ /dashboard` Server Component route: 1.31 kB, First Load JS: 95.2 kB).
+  - **Exit Code**: `0`
+- **Playwright Dashboard Feature Acceptance (E2E)**:
+  - **Command**: `npx playwright test apps/web/tests/dashboard.spec.ts --config=apps/web/tests/playwright.config.ts`
+  - **Result**: 4/4 scenarios pass (Populated Overview with 4 cards and 5 items, Empty State with Search CTA, Zero-Mock Anti-Prototype Guardrail, Unauthenticated Redirect to `/login`).
+- **CI Workflow Contract**:
+  - **Command**: `node --test tests/ci/ci-workflow.contract.test.mjs`
+  - **Result**: `20/20 PASS`, Exit `0`
 
 ### 5.4 Playwright Browser Suite Execution (Task T043)
 
 - Command: `npx playwright test apps/web/tests/dashboard.spec.ts --config=apps/web/tests/playwright.config.ts`
-- Exit Code: _Pending execution_
+- Exit Code: _Pending US2/US3 extensions_
 
 ### 5.5 Monorepo Quality Gate Matrix (Task T047)
 

@@ -55,25 +55,25 @@
 
 ### API and Contract Implementation for User Story 1
 
-- [ ] T014 [US1] Implement a pure allowlisted historical/current flight-snapshot display mapper and direct Prisma summary queries in `apps/api/src/dashboard/dashboard.service.ts`
-- [ ] T015 [US1] Implement authenticated `GET /dashboard/summary` controller behavior with request-derived user identity and private no-store response semantics in `apps/api/src/dashboard/dashboard.controller.ts`
-- [ ] T016 [US1] Register only `PrismaModule`, `DashboardService`, and `DashboardController` in `apps/api/src/dashboard/dashboard.module.ts`
-- [ ] T017 [US1] Add `DashboardModule` to the application dependency graph in `apps/api/src/app.module.ts`
-- [ ] T018 [US1] Update module-graph expectations to cover `DashboardModule` without adding booking-management, profile, payment, or cache dependencies in `apps/api/src/app.module.spec.ts`
-- [ ] T019 [US1] Make service/controller/API tests pass and capture the verified results in `specs/021-dashboard-building/implementation-notes.md`
+- [x] T014 [US1] Implement a pure allowlisted historical/current flight-snapshot display mapper and direct Prisma summary queries in `apps/api/src/dashboard/dashboard.service.ts`
+- [x] T015 [US1] Implement authenticated `GET /dashboard/summary` controller behavior with request-derived user identity and private no-store response semantics in `apps/api/src/dashboard/dashboard.controller.ts`
+- [x] T016 [US1] Register only `PrismaModule`, `DashboardService`, and `DashboardController` in `apps/api/src/dashboard/dashboard.module.ts`
+- [x] T017 [US1] Add `DashboardModule` to the application dependency graph in `apps/api/src/app.module.ts`
+- [x] T018 [US1] Update module-graph expectations to cover `DashboardModule` without adding booking-management, profile, payment, or cache dependencies in `apps/api/src/app.module.spec.ts`
+- [x] T019 [US1] Make service/controller/API tests pass and capture the verified results in `specs/021-dashboard-building/implementation-notes.md`
 
 ### Web Data Boundary and UI Implementation for User Story 1
 
-- [ ] T020 [US1] Implement the server-only session-aware, bounded, no-store summary loader and typed failure mapping in `apps/web/lib/server/dashboard.ts`
-- [ ] T021 [P] [US1] Add semantic light/dark/fallback dashboard surface, text, focus, action, and status tokens without hardcoded production component colors in `apps/web/app/globals.css`
-- [ ] T022 [P] [US1] Implement the four-card booking-only metric view with semantic icons and labels in `apps/web/components/dashboard/DashboardStats.tsx`
-- [ ] T023 [P] [US1] Implement the owner-safe recent timeline, empty state, relative/absolute date semantics, and booking detail/list links in `apps/web/components/dashboard/DashboardRecentBookings.tsx`
-- [ ] T024 [US1] Compose the approved Wayfinder hierarchy, dashboard-scoped desktop sidebar/sticky top bar, and compact mobile navigation through a display-only typed interface in `apps/web/components/dashboard/DashboardShell.tsx`
-- [ ] T025 [US1] Translate the approved responsive glassmorphic layout into token-based styles with no inline color styles, prototype banner, or variant switcher in `apps/web/app/dashboard/dashboard.module.css`
-- [ ] T026 [US1] Implement the authenticated dashboard Server Component, expired-session redirect, and non-fabricated upstream error branch in `apps/web/app/dashboard/page.tsx`
-- [ ] T027 [US1] Add a server-rendered responsive skeleton matching final layout geometry in `apps/web/app/dashboard/loading.tsx`
-- [ ] T028 [US1] Add the required `'use client'` Next.js error-boundary contract with typed `error` and `reset` props plus a safe retry UI that exposes no transport details in `apps/web/app/dashboard/error.tsx`
-- [ ] T029 [US1] Make loader and US1 Playwright tests pass and record the MVP evidence in `specs/021-dashboard-building/implementation-notes.md`
+- [x] T020 [US1] Implement the server-only session-aware, bounded, no-store summary loader and typed failure mapping in `apps/web/lib/server/dashboard.ts`
+- [x] T021 [P] [US1] Add semantic light/dark/fallback dashboard surface, text, focus, action, and status tokens without hardcoded production component colors in `apps/web/app/globals.css`
+- [x] T022 [P] [US1] Implement the four-card booking-only metric view with semantic icons and labels in `apps/web/components/dashboard/DashboardStats.tsx`
+- [x] T023 [P] [US1] Implement the owner-safe recent timeline, empty state, relative/absolute date semantics, and booking detail/list links in `apps/web/components/dashboard/DashboardRecentBookings.tsx`
+- [x] T024 [US1] Compose the approved Wayfinder hierarchy, dashboard-scoped desktop sidebar/sticky top bar, and compact mobile navigation through a display-only typed interface in `apps/web/components/dashboard/DashboardShell.tsx`
+- [x] T025 [US1] Translate the approved responsive glassmorphic layout into token-based styles with no inline color styles, prototype banner, or variant switcher in `apps/web/app/dashboard/dashboard.module.css`
+- [x] T026 [US1] Implement the authenticated dashboard Server Component, expired-session redirect, and non-fabricated upstream error branch in `apps/web/app/dashboard/page.tsx`
+- [x] T027 [US1] Add a server-rendered responsive skeleton matching final layout geometry in `apps/web/app/dashboard/loading.tsx`
+- [x] T028 [US1] Add the required `'use client'` Next.js error-boundary contract with typed `error` and `reset` props plus a safe retry UI that exposes no transport details in `apps/web/app/dashboard/error.tsx`
+- [x] T029 [US1] Make loader and US1 Playwright tests pass and record the MVP evidence in `specs/021-dashboard-building/implementation-notes.md`
 
 **Checkpoint**: US1 independently resolves the dashboard 404 and provides a secure, live, visually approved booking overview.
 
