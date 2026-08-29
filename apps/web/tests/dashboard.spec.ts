@@ -193,16 +193,17 @@ test.describe('Dashboard Feature Acceptance (E2E)', () => {
 
     // 1. Assert 4 metric cards with exact text / counts
     await expect(page.getByText('Total Bookings')).toBeVisible();
-    await expect(page.getByText('12')).toBeVisible();
+    // Exact metric counts were user-approved on 2026-08-29 because required flight numbers contain these digit substrings.
+    await expect(page.getByText('12', { exact: true })).toBeVisible();
 
     await expect(page.getByText('Upcoming Bookings')).toBeVisible();
-    await expect(page.getByText('3')).toBeVisible();
+    await expect(page.getByText('3', { exact: true })).toBeVisible();
 
     await expect(page.getByText('Completed Bookings')).toBeVisible();
-    await expect(page.getByText('8')).toBeVisible();
+    await expect(page.getByText('8', { exact: true })).toBeVisible();
 
     await expect(page.getByText('Cancelled Bookings')).toBeVisible();
-    await expect(page.getByText('1')).toBeVisible();
+    await expect(page.getByText('1', { exact: true })).toBeVisible();
 
     // 2. Assert 5 recent booking items with route codes, flight numbers, and status badges
     await expect(page.getByText('SGN').first()).toBeVisible();
