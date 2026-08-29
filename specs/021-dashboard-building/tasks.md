@@ -55,12 +55,12 @@
 
 ### API and Contract Implementation for User Story 1
 
-- [ ] T014 [US1] Implement a pure allowlisted historical/current flight-snapshot display mapper and direct Prisma summary queries in `apps/api/src/dashboard/dashboard.service.ts`
-- [ ] T015 [US1] Implement authenticated `GET /dashboard/summary` controller behavior with request-derived user identity and private no-store response semantics in `apps/api/src/dashboard/dashboard.controller.ts`
-- [ ] T016 [US1] Register only `PrismaModule`, `DashboardService`, and `DashboardController` in `apps/api/src/dashboard/dashboard.module.ts`
-- [ ] T017 [US1] Add `DashboardModule` to the application dependency graph in `apps/api/src/app.module.ts`
-- [ ] T018 [US1] Update module-graph expectations to cover `DashboardModule` without adding booking-management, profile, payment, or cache dependencies in `apps/api/src/app.module.spec.ts`
-- [ ] T019 [US1] Make service/controller/API tests pass and capture the verified results in `specs/021-dashboard-building/implementation-notes.md`
+- [x] T014 [US1] Implement a pure allowlisted historical/current flight-snapshot display mapper and direct Prisma summary queries in `apps/api/src/dashboard/dashboard.service.ts`
+- [x] T015 [US1] Implement authenticated `GET /dashboard/summary` controller behavior with request-derived user identity and private no-store response semantics in `apps/api/src/dashboard/dashboard.controller.ts`
+- [x] T016 [US1] Register only `PrismaModule`, `DashboardService`, and `DashboardController` in `apps/api/src/dashboard/dashboard.module.ts`
+- [x] T017 [US1] Add `DashboardModule` to the application dependency graph in `apps/api/src/app.module.ts`
+- [x] T018 [US1] Update module-graph expectations to cover `DashboardModule` without adding booking-management, profile, payment, or cache dependencies in `apps/api/src/app.module.spec.ts`
+- [x] T019 [US1] Make service/controller/API tests pass and capture the verified results in `specs/021-dashboard-building/implementation-notes.md`
 
 ### Web Data Boundary and UI Implementation for User Story 1
 

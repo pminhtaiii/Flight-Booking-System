@@ -42,13 +42,13 @@ Comprehensive inventory of all files targeted for creation, modification, or ver
 
 ### 2.2 Backend API Service (`apps/api/`)
 
-- [ ] [`apps/api/src/dashboard/dashboard.controller.ts`](file:///c:/Booking%20Systems/apps/api/src/dashboard/dashboard.controller.ts): Implement `DashboardController` exposing `GET /dashboard/summary` protected by `JwtAuthGuard`, resolving user ID from `req.user.id`.
+- [x] [`apps/api/src/dashboard/dashboard.controller.ts`](file:///c:/Booking%20Systems/apps/api/src/dashboard/dashboard.controller.ts): Implement `DashboardController` exposing `GET /dashboard/summary` protected by `JwtAuthGuard`, resolving user ID from `req.user.id`.
 - [x] [`apps/api/src/dashboard/dashboard.controller.spec.ts`](file:///c:/Booking%20Systems/apps/api/src/dashboard/dashboard.controller.spec.ts): Unit tests for `DashboardController` ensuring authentication guard attachment, user ID forwarding, and response passing.
-- [ ] [`apps/api/src/dashboard/dashboard.module.ts`](file:///c:/Booking%20Systems/apps/api/src/dashboard/dashboard.module.ts): Declare `DashboardModule` importing `PrismaModule` and providing `DashboardService` + `DashboardController`.
-- [ ] [`apps/api/src/dashboard/dashboard.service.ts`](file:///c:/Booking%20Systems/apps/api/src/dashboard/dashboard.service.ts): Implement `DashboardService` querying Prisma directly (4 counts + 1 findMany) with a single captured `now` timestamp and pure snapshot mapper.
+- [x] [`apps/api/src/dashboard/dashboard.module.ts`](file:///c:/Booking%20Systems/apps/api/src/dashboard/dashboard.module.ts): Declare `DashboardModule` importing `PrismaModule` and providing `DashboardService` + `DashboardController`.
+- [x] [`apps/api/src/dashboard/dashboard.service.ts`](file:///c:/Booking%20Systems/apps/api/src/dashboard/dashboard.service.ts): Implement `DashboardService` querying Prisma directly (4 counts + 1 findMany) with a single captured `now` timestamp and pure snapshot mapper.
 - [x] [`apps/api/src/dashboard/dashboard.service.spec.ts`](file:///c:/Booking%20Systems/apps/api/src/dashboard/dashboard.service.spec.ts): Unit tests for `DashboardService` covering metric queries, time boundaries, canonical status mappings, descending sort, `take: 5`, and malformed snapshot resilience.
-- [ ] [`apps/api/src/app.module.ts`](file:///c:/Booking%20Systems/apps/api/src/app.module.ts): Register `DashboardModule` in the root application imports graph.
-- [ ] [`apps/api/src/app.module.spec.ts`](file:///c:/Booking%20Systems/apps/api/src/app.module.spec.ts): Verify `AppModule` compilation with `DashboardModule` registered.
+- [x] [`apps/api/src/app.module.ts`](file:///c:/Booking%20Systems/apps/api/src/app.module.ts): Register `DashboardModule` in the root application imports graph.
+- [x] [`apps/api/src/app.module.spec.ts`](file:///c:/Booking%20Systems/apps/api/src/app.module.spec.ts): Verify `AppModule` compilation with `DashboardModule` registered.
 - [x] [`apps/api/test/dashboard.e2e-spec.ts`](file:///c:/Booking%20Systems/apps/api/test/dashboard.e2e-spec.ts): Integration E2E tests for `GET /api/dashboard/summary` verifying JWT authentication, tenant isolation across multiple users, exact contract shapes, and 401 unauthenticated behavior.
 
 ### 2.3 Frontend Web Application (`apps/web/`)
@@ -273,10 +273,27 @@ _(Sections below will be populated as implementation tasks progress)_
 
 ### 5.2 API Service & Integration Test Execution (Task T019)
 
-- Command: `pnpm --filter @api/backend test -- src/dashboard/`
-- Exit Code: _Pending execution_
-- Command: `npm run test:e2e --workspace=apps/api -- test/dashboard.e2e-spec.ts`
-- Exit Code: _Pending execution_
+- **Unit & Controller Tests**:
+  - **Command**: `pnpm --filter @api/backend test -- src/dashboard/dashboard.service.spec.ts src/dashboard/dashboard.controller.spec.ts src/app.module.spec.ts`
+  - **Result**: `36/36 PASS` across 3 test suites (0 failures, 0 skipped)
+    - `src/dashboard/dashboard.service.spec.ts`: 14/14 tests pass
+    - `src/dashboard/dashboard.controller.spec.ts`: 7/7 tests pass
+    - `src/app.module.spec.ts`: 15/15 tests pass
+  - **Exit Code**: `0`
+- **API E2E Integration Suite**:
+  - **Command**: `pnpm --filter @api/backend test:e2e -- test/dashboard.e2e-spec.ts`
+  - **Result**: `7/7 PASS` across 1 test suite (0 failures, 0 skipped)
+    - HTTP 401 Unauthorized (missing header & invalid token)
+    - User A vs User B strict tenant isolation
+    - Empty state parity for user without bookings
+    - Recent 5 limit and descending `createdAt` ordering
+    - Negative privacy invariants (0 PII, 0 secrets, 0 raw snapshots, 0 supplier IDs)
+    - Private no-store Cache-Control header verification
+  - **Exit Code**: `0`
+- **Static Gate & Linting**:
+  - **Typecheck**: `pnpm --filter @api/backend exec tsc -p tsconfig.json --noEmit` -> Exit `0` (0 errors)
+  - **ESLint**: `pnpm exec eslint "apps/api/src/dashboard/**/*.ts" --max-warnings 0` -> Exit `0` (0 warnings)
+  - **CI Workflow Contract**: `node --test tests/ci/ci-workflow.contract.test.mjs` -> `20/20 PASS`, Exit `0`
 
 ### 5.3 Web Server Loader & UI Unit Test Execution (Task T029 / T037)
 
