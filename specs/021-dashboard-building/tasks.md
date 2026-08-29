@@ -47,11 +47,11 @@
 
 ### Tests for User Story 1
 
-- [ ] T009 [P] [US1] Write failing `DashboardService` tests for owner/time filters, canonical `COMPLETED` plus stale-past-`CONFIRMED` counting, all five cancellation-family statuses, one captured clock boundary, null departures, concurrent five-query execution, `take: 5`, descending ordering, and malformed snapshot projection in `apps/api/src/dashboard/dashboard.service.spec.ts`
-- [ ] T010 [P] [US1] Write failing controller tests for `JwtAuthGuard`, authenticated user forwarding, and exact summary return behavior in `apps/api/src/dashboard/dashboard.controller.spec.ts`
-- [ ] T011 [P] [US1] Write failing API integration tests for 401 behavior, user A/user B isolation, metric definitions, recent ordering/limit, and prohibited-field absence in `apps/api/test/dashboard.e2e-spec.ts`
-- [ ] T012 [P] [US1] Write failing server-loader tests for missing sessions, bearer forwarding, `cache: 'no-store'`, timeout, status mapping, malformed JSON, schema rejection, and successful parsing in `apps/web/lib/server/dashboard.spec.ts`
-- [ ] T013 [P] [US1] Add an in-process local port-3101 dashboard-summary fixture keyed by bearer-token scenario and failing Playwright scenarios for populated metrics, five recent records, recent-detail links, empty state, no prototype controls, and no fake insight/shield content in `apps/web/tests/dashboard.spec.ts`
+- [x] T009 [P] [US1] Write failing `DashboardService` tests for owner/time filters, canonical `COMPLETED` plus stale-past-`CONFIRMED` counting, all five cancellation-family statuses, one captured clock boundary, null departures, concurrent five-query execution, `take: 5`, descending ordering, and malformed snapshot projection in `apps/api/src/dashboard/dashboard.service.spec.ts`
+- [x] T010 [P] [US1] Write failing controller tests for `JwtAuthGuard`, authenticated user forwarding, and exact summary return behavior in `apps/api/src/dashboard/dashboard.controller.spec.ts`
+- [x] T011 [P] [US1] Write failing API integration tests for 401 behavior, user A/user B isolation, metric definitions, recent ordering/limit, and prohibited-field absence in `apps/api/test/dashboard.e2e-spec.ts`
+- [x] T012 [P] [US1] Write failing server-loader tests for missing sessions, bearer forwarding, `cache: 'no-store'`, timeout, status mapping, malformed JSON, schema rejection, and successful parsing in `apps/web/lib/server/dashboard.spec.ts`
+- [x] T013 [P] [US1] Add an in-process local port-3101 dashboard-summary fixture keyed by bearer-token scenario and failing Playwright scenarios for populated metrics, five recent records, recent-detail links, empty state, no prototype controls, and no fake insight/shield content in `apps/web/tests/dashboard.spec.ts`
 
 ### API and Contract Implementation for User Story 1
 

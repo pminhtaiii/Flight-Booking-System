@@ -43,13 +43,13 @@ Comprehensive inventory of all files targeted for creation, modification, or ver
 ### 2.2 Backend API Service (`apps/api/`)
 
 - [ ] [`apps/api/src/dashboard/dashboard.controller.ts`](file:///c:/Booking%20Systems/apps/api/src/dashboard/dashboard.controller.ts): Implement `DashboardController` exposing `GET /dashboard/summary` protected by `JwtAuthGuard`, resolving user ID from `req.user.id`.
-- [ ] [`apps/api/src/dashboard/dashboard.controller.spec.ts`](file:///c:/Booking%20Systems/apps/api/src/dashboard/dashboard.controller.spec.ts): Unit tests for `DashboardController` ensuring authentication guard attachment, user ID forwarding, and response passing.
+- [x] [`apps/api/src/dashboard/dashboard.controller.spec.ts`](file:///c:/Booking%20Systems/apps/api/src/dashboard/dashboard.controller.spec.ts): Unit tests for `DashboardController` ensuring authentication guard attachment, user ID forwarding, and response passing.
 - [ ] [`apps/api/src/dashboard/dashboard.module.ts`](file:///c:/Booking%20Systems/apps/api/src/dashboard/dashboard.module.ts): Declare `DashboardModule` importing `PrismaModule` and providing `DashboardService` + `DashboardController`.
 - [ ] [`apps/api/src/dashboard/dashboard.service.ts`](file:///c:/Booking%20Systems/apps/api/src/dashboard/dashboard.service.ts): Implement `DashboardService` querying Prisma directly (4 counts + 1 findMany) with a single captured `now` timestamp and pure snapshot mapper.
-- [ ] [`apps/api/src/dashboard/dashboard.service.spec.ts`](file:///c:/Booking%20Systems/apps/api/src/dashboard/dashboard.service.spec.ts): Unit tests for `DashboardService` covering metric queries, time boundaries, canonical status mappings, descending sort, `take: 5`, and malformed snapshot resilience.
+- [x] [`apps/api/src/dashboard/dashboard.service.spec.ts`](file:///c:/Booking%20Systems/apps/api/src/dashboard/dashboard.service.spec.ts): Unit tests for `DashboardService` covering metric queries, time boundaries, canonical status mappings, descending sort, `take: 5`, and malformed snapshot resilience.
 - [ ] [`apps/api/src/app.module.ts`](file:///c:/Booking%20Systems/apps/api/src/app.module.ts): Register `DashboardModule` in the root application imports graph.
 - [ ] [`apps/api/src/app.module.spec.ts`](file:///c:/Booking%20Systems/apps/api/src/app.module.spec.ts): Verify `AppModule` compilation with `DashboardModule` registered.
-- [ ] [`apps/api/test/dashboard.e2e-spec.ts`](file:///c:/Booking%20Systems/apps/api/test/dashboard.e2e-spec.ts): Integration E2E tests for `GET /api/dashboard/summary` verifying JWT authentication, tenant isolation across multiple users, exact contract shapes, and 401 unauthenticated behavior.
+- [x] [`apps/api/test/dashboard.e2e-spec.ts`](file:///c:/Booking%20Systems/apps/api/test/dashboard.e2e-spec.ts): Integration E2E tests for `GET /api/dashboard/summary` verifying JWT authentication, tenant isolation across multiple users, exact contract shapes, and 401 unauthenticated behavior.
 
 ### 2.3 Frontend Web Application (`apps/web/`)
 
@@ -71,8 +71,8 @@ Comprehensive inventory of all files targeted for creation, modification, or ver
 - [ ] [`apps/web/components/search/SearchFormClient.tsx`](file:///c:/Booking%20Systems/apps/web/components/search/SearchFormClient.tsx): Support optional initial values (`initialOrigin`, `initialDestination`, `initialDepartureDate`) from search parameters.
 - [ ] [`apps/web/app/search/page.tsx`](file:///c:/Booking%20Systems/apps/web/app/search/page.tsx): Pass sanitized search query parameters into `SearchFormClient`.
 - [ ] [`apps/web/lib/server/dashboard.ts`](file:///c:/Booking%20Systems/apps/web/lib/server/dashboard.ts): Server-only data loader acquiring JWT session, calling `GET /api/dashboard/summary` with `cache: 'no-store'`, 10s `AbortController` timeout, safe parsing via `DashboardSummarySchema`, and returning `DashboardOutcome`.
-- [ ] [`apps/web/lib/server/dashboard.spec.ts`](file:///c:/Booking%20Systems/apps/web/lib/server/dashboard.spec.ts): Unit tests for `getDashboardSummary` under success, 401, 403, 500, timeout, malformed payload, and unauthenticated conditions.
-- [ ] [`apps/web/tests/dashboard.spec.ts`](file:///c:/Booking%20Systems/apps/web/tests/dashboard.spec.ts): Playwright browser tests covering populated state, empty state, navigation links, quick search handoff, flag toggles, root redirect, login redirect, error recovery, responsive viewports (360px, 768px, 1280px), and keyboard focus.
+- [x] [`apps/web/lib/server/dashboard.spec.ts`](file:///c:/Booking%20Systems/apps/web/lib/server/dashboard.spec.ts): Unit tests for `getDashboardSummary` under success, 401, 403, 500, timeout, malformed payload, and unauthenticated conditions.
+- [x] [`apps/web/tests/dashboard.spec.ts`](file:///c:/Booking%20Systems/apps/web/tests/dashboard.spec.ts): Playwright browser tests covering populated state, empty state, navigation links, quick search handoff, flag toggles, root redirect, login redirect, error recovery, responsive viewports (360px, 768px, 1280px), and keyboard focus.
 - [ ] [`apps/web/tests/dashboard-routing.unit.ts`](file:///c:/Booking%20Systems/apps/web/tests/dashboard-routing.unit.ts): Page routing unit tests covering root page redirect and dashboard session gating.
 
 ### 2.4 Context & Specification Documentation
@@ -254,6 +254,7 @@ const response = await fetch(`${apiUrl()}/api/dashboard/summary`, {
 _(Sections below will be populated as implementation tasks progress)_
 
 ### 5.1 Shared Contract Test Execution (Task T008)
+
 - **Command**: `pnpm --filter @shared/types test`
 - **Result**: `67/67 PASS` across 12 test suites (0 failures, 0 skipped)
 - **Duration**: ~3.7s

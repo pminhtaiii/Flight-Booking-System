@@ -4,7 +4,7 @@
 **Task**: T002 - Dashboard Contract Conformance Checklist  
 **Source OpenAPI Contract**: [contracts/dashboard-summary.openapi.yaml](../contracts/dashboard-summary.openapi.yaml)  
 **Data Model**: [data-model.md](../data-model.md)  
-**Implementation Plan**: [plan.md](../plan.md)  
+**Implementation Plan**: [plan.md](../plan.md)
 
 ---
 
@@ -23,6 +23,7 @@ All implementations across `packages/shared`, `apps/api`, and `apps/web` must co
 The `DashboardStats` object contains four owner-scoped booking metric counters.
 
 #### Schema Invariants
+
 - `totalBookings`: Required non-negative integer (`type: integer`, `minimum: 0`).
 - `upcomingBookings`: Required non-negative integer (`type: integer`, `minimum: 0`).
 - `completedBookings`: Required non-negative integer (`type: integer`, `minimum: 0`).
@@ -30,6 +31,7 @@ The `DashboardStats` object contains four owner-scoped booking metric counters.
 - `additionalProperties: false` (strict object shape with no unrecognized properties).
 
 #### Query Derivation & Canonical Status Mappings
+
 - **Clock Synchronization**: The service must capture exactly one `now` (`Date`) timestamp per request and reuse this identical instant across all time-based metric filters and `generatedAt`.
 - **`totalBookings`**:
   - Filter: `{ userId }`
@@ -47,6 +49,7 @@ The `DashboardStats` object contains four owner-scoped booking metric counters.
   - Critical Invariant: The codebase and schema do not contain a generic `BookingStatus.CANCELLED`. Attempting to reference `CANCELLED` is a defect.
 
 #### Stats Conformance Checklist
+
 - [ ] `totalBookings` is an integer `>= 0`.
 - [ ] `upcomingBookings` is an integer `>= 0`.
 - [ ] `completedBookings` is an integer `>= 0`.
@@ -65,6 +68,7 @@ The `DashboardStats` object contains four owner-scoped booking metric counters.
 `DashboardRecentBooking` defines a sanitized, PII-safe projection of an individual booking for dashboard display.
 
 #### Schema Invariants
+
 - `id`: Required string matching UUID v4 format (`format: uuid`).
 - `status`: Required string matching the exact 9-value `BookingStatus` enum:
   1. `PROCESSING`
@@ -85,16 +89,19 @@ The `DashboardStats` object contains four owner-scoped booking metric counters.
 - `additionalProperties: false` (strict object shape with no unrecognized properties).
 
 #### Defensive Snapshot Projection Rules
+
 - Flight metadata (`originCode`, `destinationCode`, `airlineCode`, `flightNumber`) is extracted from the `Booking.flightSnapshot` JSON blob using an allowlist parser.
 - If `flightSnapshot` is missing, malformed, empty, or lacks expected fields, the corresponding display properties must resolve safely to `null`.
 - Snapshot parsing must never throw an unhandled exception or cause an endpoint 500 failure.
 
 #### Ordering and Limits
+
 - Ordered strictly by `createdAt` descending (`DESC`), with `id` descending as a deterministic tiebreaker.
 - Capped at a maximum of 5 records (`take: 5`).
 - Zero records returns an empty array `[]` (not `null` or missing).
 
 #### Recent Booking Conformance Checklist
+
 - [ ] `id` validates as a valid UUID format string.
 - [ ] `status` is restricted to the exact 9 canonical lifecycle enum values.
 - [ ] `createdAt` is a valid ISO 8601 date-time string.
@@ -110,12 +117,14 @@ The `DashboardStats` object contains four owner-scoped booking metric counters.
 `DashboardSummary` is the root response object for `GET /api/dashboard/summary`.
 
 #### Schema Invariants
+
 - `stats`: Required `DashboardStats` object.
 - `recentBookings`: Required array of `DashboardRecentBooking` items, capped at `maxItems: 5`.
 - `generatedAt`: Required ISO 8601 date-time string (`format: date-time`), representing the exact clock timestamp used for metric derivations.
 - `additionalProperties: false` (strict object shape with no unrecognized properties).
 
 #### Summary Conformance Checklist
+
 - [ ] `stats` strictly conforms to `DashboardStatsSchema`.
 - [ ] `recentBookings` is an array containing 0 to 5 valid `DashboardRecentBooking` objects.
 - [ ] `generatedAt` is a valid ISO 8601 timestamp string.
@@ -129,16 +138,17 @@ The dashboard endpoint operates under strict Zero-Leakage data privacy constrain
 
 ### 3.1 Prohibited Data Categories
 
-| Category | Prohibited Fields / Items | Rationale / Enforcement |
-|---|---|---|
-| **Passenger PII** | Passenger full names, first/last names, email addresses, phone numbers, passport numbers, national IDs, dates of birth, gender, loyalty account numbers | Not needed for high-level dashboard metrics; prevents accidental client exposure. |
-| **Payment Secrets & Financials** | Stripe payment intent IDs, client secrets, payment method tokens, credit card numbers, billing addresses, transaction amounts, refund transaction references | Financial security and PCI compliance. Pricing/payment data belongs in checkout/receipt endpoints only. |
-| **Raw Supplier Payloads** | Full `flightSnapshot` JSON blob, Duffel offer IDs, Duffel order IDs, provider raw responses, internal baggage/seat JSON | External provider details and oversized payload blobs must not leak to the client. |
-| **Tenant & Identity Leakage** | `Booking.userId`, user profile records, cross-tenant records | The endpoint derives identity exclusively from the validated JWT token; tenant IDs must never be echoed in responses. |
-| **Infrastructure & Internal URLs** | Internal backend hostnames, database connection strings, microservice URLs, JWT tokens, environment flags | System topology obfuscation. |
-| **Sensitive Error Traces** | Prisma query errors, SQL state codes, stack traces, internal gateway failure messages | All error responses must map to safe, sanitized user-facing messages. |
+| Category                           | Prohibited Fields / Items                                                                                                                                    | Rationale / Enforcement                                                                                               |
+| ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------- |
+| **Passenger PII**                  | Passenger full names, first/last names, email addresses, phone numbers, passport numbers, national IDs, dates of birth, gender, loyalty account numbers      | Not needed for high-level dashboard metrics; prevents accidental client exposure.                                     |
+| **Payment Secrets & Financials**   | Stripe payment intent IDs, client secrets, payment method tokens, credit card numbers, billing addresses, transaction amounts, refund transaction references | Financial security and PCI compliance. Pricing/payment data belongs in checkout/receipt endpoints only.               |
+| **Raw Supplier Payloads**          | Full `flightSnapshot` JSON blob, Duffel offer IDs, Duffel order IDs, provider raw responses, internal baggage/seat JSON                                      | External provider details and oversized payload blobs must not leak to the client.                                    |
+| **Tenant & Identity Leakage**      | `Booking.userId`, user profile records, cross-tenant records                                                                                                 | The endpoint derives identity exclusively from the validated JWT token; tenant IDs must never be echoed in responses. |
+| **Infrastructure & Internal URLs** | Internal backend hostnames, database connection strings, microservice URLs, JWT tokens, environment flags                                                    | System topology obfuscation.                                                                                          |
+| **Sensitive Error Traces**         | Prisma query errors, SQL state codes, stack traces, internal gateway failure messages                                                                        | All error responses must map to safe, sanitized user-facing messages.                                                 |
 
 ### 3.2 Security Conformance Checklist
+
 - [ ] `Booking.userId` is used only as a query filter and is never exposed in the response payload.
 - [ ] No passenger information (`passengers` relation or fields) is selected or projected.
 - [ ] No payment record (`payments` relation, tokens, or amounts) is selected or projected.
@@ -170,16 +180,17 @@ export type DashboardOutcome =
 
 ### 4.2 Failure Reason Mapping Table
 
-| HTTP Status / Trigger | Outcome `reason` | `retryable` | User-Facing `message` | Client Action |
-|---|---|---|---|---|
-| No active NextAuth session | `UNAUTHENTICATED` | `false` | `"Authentication required. Please log in."` | Redirect to `/login` |
-| HTTP 401 Unauthorized | `UNAUTHENTICATED` | `false` | `"Your session has expired. Please sign in again."` | Redirect to `/login?callbackUrl=/dashboard` |
-| HTTP 403 Forbidden | `FORBIDDEN` | `false` | `"Access denied. You do not have permission to view this resource."` | Render forbidden error state |
-| HTTP 500 / 502 / 503 / 504 | `UPSTREAM_UNAVAILABLE` | `true` | `"The dashboard service is temporarily unavailable. Please try again."` | Render retryable error banner |
-| Fetch timeout (>= 10s) / Network error | `UPSTREAM_UNAVAILABLE` | `true` | `"Connection timed out. Please check your network and try again."` | Render retryable error banner |
-| JSON syntax error / Invalid schema | `INVALID_RESPONSE` | `false` | `"Unable to load dashboard data due to an unexpected format."` | Render generic error state |
+| HTTP Status / Trigger                  | Outcome `reason`       | `retryable` | User-Facing `message`                                                   | Client Action                               |
+| -------------------------------------- | ---------------------- | ----------- | ----------------------------------------------------------------------- | ------------------------------------------- |
+| No active NextAuth session             | `UNAUTHENTICATED`      | `false`     | `"Authentication required. Please log in."`                             | Redirect to `/login`                        |
+| HTTP 401 Unauthorized                  | `UNAUTHENTICATED`      | `false`     | `"Your session has expired. Please sign in again."`                     | Redirect to `/login?callbackUrl=/dashboard` |
+| HTTP 403 Forbidden                     | `FORBIDDEN`            | `false`     | `"Access denied. You do not have permission to view this resource."`    | Render forbidden error state                |
+| HTTP 500 / 502 / 503 / 504             | `UPSTREAM_UNAVAILABLE` | `true`      | `"The dashboard service is temporarily unavailable. Please try again."` | Render retryable error banner               |
+| Fetch timeout (>= 10s) / Network error | `UPSTREAM_UNAVAILABLE` | `true`      | `"Connection timed out. Please check your network and try again."`      | Render retryable error banner               |
+| JSON syntax error / Invalid schema     | `INVALID_RESPONSE`     | `false`     | `"Unable to load dashboard data due to an unexpected format."`          | Render generic error state                  |
 
 ### 4.3 Web Outcome Conformance Checklist
+
 - [ ] `DashboardOutcome` is a discriminated union on `ok: true | false`.
 - [ ] On `ok: true`, `data` conforms to `DashboardSummary`.
 - [ ] On `ok: false`, `reason` is strictly one of `'UNAUTHENTICATED'`, `'FORBIDDEN'`, `'UPSTREAM_UNAVAILABLE'`, `'INVALID_RESPONSE'`.
@@ -193,6 +204,7 @@ export type DashboardOutcome =
 ## 5. Verification & Test Coverage Matrix
 
 ### 5.1 Shared Package Zod Tests (`packages/shared/src/types/dashboard.types.spec.ts`)
+
 - [ ] Validates valid `DashboardSummary` payloads.
 - [ ] Rejects negative numbers for `totalBookings`, `upcomingBookings`, `completedBookings`, `cancelledBookings`.
 - [ ] Rejects non-integer values (e.g. floats, strings) for count fields.
@@ -204,6 +216,7 @@ export type DashboardOutcome =
 - [ ] Rejects unexpected extra properties in `DashboardStats`, `DashboardRecentBooking`, and `DashboardSummary`.
 
 ### 5.2 API Unit & Integration Tests (`apps/api/src/dashboard/`, `apps/api/test/`)
+
 - [ ] `dashboard.service.spec.ts`:
   - [ ] Computes `totalBookings` across all user bookings.
   - [ ] Computes `upcomingBookings` with `status: CONFIRMED` and `departureAt >= now`.
@@ -226,6 +239,7 @@ export type DashboardOutcome =
   - [ ] Verifies zero-data scenario returns all metrics as 0 and `recentBookings: []`.
 
 ### 5.3 Web Server Loader Tests (`apps/web/lib/server/dashboard.spec.ts`)
+
 - [ ] Returns `{ ok: false, reason: 'UNAUTHENTICATED' }` when session is missing.
 - [ ] Passes bearer token in `Authorization` header to upstream API.
 - [ ] Returns `{ ok: true, data: ... }` when API returns 200 and schema validation passes.

@@ -6,16 +6,65 @@ Update this file after every completed feature. Any AI agent reading this should
 
 ### Current Status
 
-**Feature:** Authenticated Booking Dashboard (Feature 021) — Phase 2: Foundational Shared Contract (Tasks T005–T008) — COMPLETED (100% Phase 2)
-**Last completed:** Phase 2 / Foundational Shared Contract (T005–T008): shared Zod contracts (`DashboardStatsSchema`, `DashboardRecentBookingSchema`, `DashboardSummarySchema`, `DashboardOutcomeSchema`), inferred TypeScript types, canonical 9-status lifecycle enum, comprehensive contract unit suite (`packages/shared/src/types/dashboard.types.spec.ts`), barrel exports in `packages/shared/src/types/index.ts`, test runner registration in `package.json`, and 67/67 passing tests across 12 suites (2026-08-29).
-**In progress:** Phase 3: User Story 1 - View a Trustworthy Booking Overview (Tasks T009–T029).
-**Next:** Phase 3 (US1: Service direct Prisma read model, controller, module registration, server-only summary loader, and glassmorphic UI shell).
+**Feature:** Authenticated Booking Dashboard (Feature 021) — Phase 3 / Slice 1: User Story 1 Characterization & Unit/E2E Tests (Tasks T009–T013) — COMPLETED (RED Baseline Established)
+**Last completed:** Phase 3 / Slice 1 (T009–T013): Authored failing test suites across NestJS API (`dashboard.service.spec.ts`, `dashboard.controller.spec.ts`, `dashboard.e2e-spec.ts`) and Next.js Web (`lib/server/dashboard.spec.ts`, `tests/dashboard.spec.ts`) establishing strict characterization tests for metrics computation, tenant isolation, snapshot mapping, server loader resilience, and Playwright UI scenarios before production implementation (2026-08-29).
+**In progress:** Phase 3: User Story 1 - View a Trustworthy Booking Overview (Tasks T014–T029).
+**Next:** Phase 3 / Slice 2 (US1: Service direct Prisma read model, controller, module registration, server-only summary loader, and glassmorphic UI shell).
 
 ---
 
 ## Progress by Feature
 
 ### [ ] Feature: Authenticated Booking Dashboard (Feature 021)
+
+- [x] Phase 3: User Story 1 - Characterization & Unit/E2E Tests (T009–T013) (2026-08-29):
+  - **T009: Failing `DashboardService` Unit Tests (`apps/api/src/dashboard/dashboard.service.spec.ts`)**:
+    - Implemented exhaustive Jest test suite asserting single clock instant (`now = new Date()`) shared across `upcomingBookings` (`departureAt: { gte: now }`), `completedBookings` (`departureAt: { lt: now }`), and `generatedAt: now.toISOString()`.
+    - Validated all 4 computed metrics (`totalBookings`, `upcomingBookings`, `completedBookings` with canonical `COMPLETED` + past `CONFIRMED`, `cancelledBookings` across all 5 canonical cancellation statuses: `CANCELLATION_PENDING`, `CANCELLED_PENDING_REFUND`, `CANCELLED_AND_REFUNDED`, `CANCELLED_NO_REFUND`, `REFUND_FAILED_NEEDS_ATTENTION`).
+    - Validated null departure exclusion from upcoming/completed while included in total.
+    - Validated boundary comparison equality (`departureAt === now` counts as upcoming, not completed).
+    - Validated concurrent query execution (4 counts + 1 `findMany` in a single `Promise.all` batch with max concurrency = 5).
+    - Validated `take: 5` ceiling and `createdAt DESC` ordering.
+    - Validated defensive snapshot display mapper (segments, slices, flat shapes, and 11 corrupt/empty snapshot variants safely resolving to `null` without throwing).
+    - Validated strict tenant isolation (`userId` filter applied on all 5 queries and 0 sensitive fields returned).
+    - Verified clean RED compilation failure (`Cannot find module './dashboard.service'`).
+  - **T010: Failing `DashboardController` Unit Tests (`apps/api/src/dashboard/dashboard.controller.spec.ts`)**:
+    - Implemented Jest test suite asserting `@UseGuards(JwtAuthGuard)` metadata presence on controller.
+    - Validated `req.user.id` and `req.user.sub` extraction and delegation to `dashboardService.getSummary(userId)`.
+    - Validated `Cache-Control: no-store, private` header setting on response.
+    - Validated exact `DashboardSummary` shape matching `@shared/types`.
+    - Validated rejection with `UnauthorizedException` when `req.user` is missing or empty.
+    - Verified clean RED compilation failure (`Cannot find module './dashboard.controller'`).
+  - **T011: Failing API Integration E2E Tests (`apps/api/test/dashboard.e2e-spec.ts`)**:
+    - Implemented Supertest E2E integration test suite against NestJS test application.
+    - Validated HTTP 401 Unauthorized for missing or invalid Bearer tokens on `GET /api/dashboard/summary`.
+    - Validated strict User A vs User B tenant isolation across multi-status bookings (0 leaked counts, 0 leaked booking IDs).
+    - Validated empty state parity for newly registered users (0s across all metrics, `recentBookings: []`, valid `generatedAt` ISO timestamp).
+    - Validated recent 5 limit and descending `createdAt` ordering when user has 8 bookings.
+    - Validated strict Negative Privacy Invariants (0 passport numbers, 0 credit card numbers, 0 payment IDs, 0 Stripe intent IDs, 0 Duffel order/offer IDs, 0 `userId`, 0 raw snapshots, with allowlisted keys only).
+    - Validated `Cache-Control: no-store, private` headers on HTTP response.
+  - **T012: Failing Web Server Loader Unit Tests (`apps/web/lib/server/dashboard.spec.ts`)**:
+    - Implemented `node:test` and `node:assert/strict` unit test suite for `getDashboardSummary()`.
+    - Validated unauthenticated session handling (`{ ok: false, reason: 'UNAUTHENTICATED', retryable: false }`) with 0 network calls when session is null or missing/empty token.
+    - Validated Bearer token forwarding, `cache: 'no-store'`, private URL resolution (`API_URL` -> `NEXT_PUBLIC_API_URL` -> localhost), and trailing slash normalization.
+    - Validated 10,000ms `AbortController` timeout mapping to `{ ok: false, reason: 'UPSTREAM_UNAVAILABLE', retryable: true }`.
+    - Validated HTTP status code mapping (401 -> `UNAUTHENTICATED`, 403 -> `FORBIDDEN`, 500/502/503/504 -> `UPSTREAM_UNAVAILABLE`).
+    - Validated Zod schema safe-parsing rejecting malformed JSON, negative counts, invalid status enums, invalid ISO dates, >5 items, and extra keys violating `.strict()`.
+    - Validated Zero Credential / Stack Trace Leakage across all failure branches.
+    - Verified clean RED failure (`Cannot find module './dashboard.ts'`).
+  - **T013: Failing Playwright E2E Scenarios (`apps/web/tests/dashboard.spec.ts`)**:
+    - Implemented Playwright browser acceptance tests with an in-process scenario-keyed HTTP fixture on port 3101.
+    - Implemented populated overview scenarios verifying 4 metric cards (12, 3, 8, 1), 5 recent booking items with route codes and flight numbers, item link to `/bookings/[bookingId]`, and header link to `/bookings`.
+    - Implemented empty dashboard scenario verifying 0 metrics, empty state message, and primary Search Flights CTA linking to `/search`.
+    - Implemented Zero-Mock Anti-Prototype Guardrail verifying strict absence of Disruption Shield %, fake fare-drop alerts, static seat recommendations, prototype disclaimer banners, prototype variant switchers, and `/prototype/*` links.
+    - Implemented unauthenticated redirect scenario verifying anonymous user redirect to `/login`.
+  - **Phase 3 Slice 1 Verification & Review Sign-Off**:
+    - Shared Contracts: 67/67 PASS (`pnpm --filter @shared/types test`).
+    - Static CI Workflow Contract: 20/20 PASS (`node --test tests/ci/ci-workflow.contract.test.mjs`).
+    - API ESLint Gate: 0 errors / 0 warnings (`pnpm exec eslint "apps/api/**/*.ts" "packages/shared/**/*.ts" --max-warnings 0`).
+    - Web Next Lint Gate: 0 errors / 0 warnings (`pnpm --filter @web/frontend lint`).
+    - Prettier formatting check: clean across all workspaces (`pnpm format --check`).
+    - Dual-axis Standards Review and Spec Review completed with 0 P0/P1 issues.
 
 - [x] Phase 2: Foundational Shared Contract (T005–T008) (2026-08-29):
   - **T005: Contract Unit Test Suite (`packages/shared/src/types/dashboard.types.spec.ts`)**:

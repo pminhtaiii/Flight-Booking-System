@@ -2,7 +2,7 @@
 
 **Feature Branch**: `021-dashboard-building`  
 **Related Spec**: [spec.md](../spec.md) | **Plan**: [plan.md](../plan.md) | **ADR Reference**: [docs/adr/research-dashboard-decisions.md](../../../docs/adr/research-dashboard-decisions.md)  
-**Target File**: `specs/021-dashboard-building/checklists/visual.md`  
+**Target File**: `specs/021-dashboard-building/checklists/visual.md`
 
 ---
 
@@ -55,7 +55,8 @@ All dashboard components consume CSS variables scoped to the dashboard surface a
   --dashboard-card-bg: rgba(255, 255, 255, 0.65);
   --dashboard-card-hover: rgba(255, 255, 255, 0.85);
   --dashboard-card-shadow: 0 4px 12px rgba(0, 0, 0, 0.03), 0 1px 3px rgba(0, 0, 0, 0.02);
-  --dashboard-card-shadow-hover: 0 12px 24px -4px rgba(153, 204, 255, 0.35), 0 4px 8px -2px rgba(153, 204, 255, 0.2);
+  --dashboard-card-shadow-hover:
+    0 12px 24px -4px rgba(153, 204, 255, 0.35), 0 4px 8px -2px rgba(153, 204, 255, 0.2);
   --dashboard-focus-ring: #2b628f;
   --dashboard-focus-ring-glow: rgba(153, 204, 255, 0.6);
 
@@ -101,7 +102,8 @@ All dashboard components consume CSS variables scoped to the dashboard surface a
   --dashboard-card-bg: rgba(23, 38, 60, 0.7);
   --dashboard-card-hover: rgba(30, 49, 77, 0.85);
   --dashboard-card-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
-  --dashboard-card-shadow-hover: 0 12px 24px -4px rgba(0, 0, 0, 0.5), 0 4px 8px -2px rgba(153, 204, 255, 0.1);
+  --dashboard-card-shadow-hover:
+    0 12px 24px -4px rgba(0, 0, 0, 0.5), 0 4px 8px -2px rgba(153, 204, 255, 0.1);
   --dashboard-focus-ring: #99ccff;
   --dashboard-focus-ring-glow: rgba(153, 204, 255, 0.4);
 
@@ -141,6 +143,7 @@ For user agents or operating systems with reduced transparency or lacking `backd
 
 > [!CAUTION]
 > **Zero-Tolerance Styling Violations**:
+>
 > 1. **No Hardcoded Hex/RGBA Literals**: Never write hex codes (e.g., `#2b628f`, `#0051d5`, `#111c2d`) or direct rgba values in `apps/web/app/dashboard/dashboard.module.css` or component files.
 > 2. **No Inline Color Styles**: Never pass inline styles like `style={{ color: '#0051d5' }}` or `style={{ background: '...' }}`.
 > 3. **No Raw Tailwind Color Utility Classes**: Never use utility classes like `bg-blue-500`, `text-slate-900`, `bg-white/65`, or `border-emerald-600`. All classes must reference semantic theme tokens or CSS Module rules.
@@ -151,14 +154,14 @@ For user agents or operating systems with reduced transparency or lacking `backd
 
 The production dashboard implements only validated data contracts. The following elements present in the prototype must be completely stripped or replaced:
 
-| Prototype Element | Prototype Representation | Production Replacement | Reason & Architecture Boundary |
-| :--- | :--- | :--- | :--- |
-| **Disruption Shield Metric** | Card 4 showing `100% Active / Protected` with animated radial blue glow | **`Cancelled Bookings` count** (e.g. `1`) derived from `stats.cancelledBookings` | Disruption Shield is an unmodeled marketing concept; metric represents actual canonical cancelled bookings. |
-| **Fake Fare-Drop Alerts** | AI Route Match card: *"Tokyo Autumn Fares Dropped 18%"* | **Omitted completely** from production dashboard | No backend AI advisory or fare-drop tracking service exists in current milestones. |
-| **Fake Seat Recommendation** | Seat Recommendation card: *"Window Seat 14A Available"* | **Omitted completely** from production dashboard | Seat inventory push telemetry is not backed by a live aggregate contract. |
-| **Prototype Banner** | Fixed top bar: *"Wayfinder Dashboard Prototype · Stitch Screen..."* | **Omitted completely** | Internal prototyping telemetry banner only. |
-| **Variant Switcher Controls** | Floating pill widget: `?variant=glassmorphic`, `command`, `zenith` | **Omitted completely** | Single canonical layout implemented; variants are prototype research only. |
-| **Mock Links (`/prototype/*`)** | Links pointing to `/prototype/chat` and `/prototype/dashboard` | Replaced with verified production routes (`/search`, `/bookings`, `/profile`) | Prevents broken navigation loops and prototype leaks. |
+| Prototype Element               | Prototype Representation                                                | Production Replacement                                                           | Reason & Architecture Boundary                                                                              |
+| :------------------------------ | :---------------------------------------------------------------------- | :------------------------------------------------------------------------------- | :---------------------------------------------------------------------------------------------------------- |
+| **Disruption Shield Metric**    | Card 4 showing `100% Active / Protected` with animated radial blue glow | **`Cancelled Bookings` count** (e.g. `1`) derived from `stats.cancelledBookings` | Disruption Shield is an unmodeled marketing concept; metric represents actual canonical cancelled bookings. |
+| **Fake Fare-Drop Alerts**       | AI Route Match card: _"Tokyo Autumn Fares Dropped 18%"_                 | **Omitted completely** from production dashboard                                 | No backend AI advisory or fare-drop tracking service exists in current milestones.                          |
+| **Fake Seat Recommendation**    | Seat Recommendation card: _"Window Seat 14A Available"_                 | **Omitted completely** from production dashboard                                 | Seat inventory push telemetry is not backed by a live aggregate contract.                                   |
+| **Prototype Banner**            | Fixed top bar: _"Wayfinder Dashboard Prototype · Stitch Screen..."_     | **Omitted completely**                                                           | Internal prototyping telemetry banner only.                                                                 |
+| **Variant Switcher Controls**   | Floating pill widget: `?variant=glassmorphic`, `command`, `zenith`      | **Omitted completely**                                                           | Single canonical layout implemented; variants are prototype research only.                                  |
+| **Mock Links (`/prototype/*`)** | Links pointing to `/prototype/chat` and `/prototype/dashboard`          | Replaced with verified production routes (`/search`, `/bookings`, `/profile`)    | Prevents broken navigation loops and prototype leaks.                                                       |
 
 ---
 
@@ -186,6 +189,7 @@ Every interactive element on the production dashboard must connect to a function
 ```
 
 ### 4.1 Quick Search Form Contract
+
 - **Fields**: Origin (IATA string), Destination (IATA string), Departure Date (`YYYY-MM-DD`).
 - **Validation Rules**:
   1. Origin and Destination must not be empty.
@@ -195,6 +199,7 @@ Every interactive element on the production dashboard must connect to a function
 - **Search Form Hydration**: `SearchFormClient.tsx` accepts initial values from search query parameters to eliminate duplicate user input.
 
 ### 4.2 Quick Actions Matrix
+
 - **Action 1: Search Flights**: Links to `/search`. Always rendered.
 - **Action 2: Manage Itinerary**: Links to `/bookings?tab=upcoming` (or `/bookings`). Always rendered.
 - **Action 3: Past Trips / History**: Links to `/bookings?tab=past`. Always rendered.
@@ -202,11 +207,13 @@ Every interactive element on the production dashboard must connect to a function
   - When `isBookingReadinessEnabled()` is `false`, the Profile quick action tile is omitted from the grid entirely. The dashboard layout dynamically spans or flows without visual gaps.
 
 ### 4.3 Travel Assistant Integration
+
 - The global `ChatWidget` is already mounted at the application root layout.
 - The dashboard does not render broken `/prototype/chat` links or standalone disruption tiles.
 - The assistant is naturally accessed through the floating widget interface.
 
 ### 4.4 Recent Activity Timeline
+
 - Each booking row displays:
   - Route codes (e.g. `SGN → HND`).
   - Flight number pill (e.g. `VN 300` or `Flight #{bookingId.slice(-4)}` fallback).
@@ -216,7 +223,7 @@ Every interactive element on the production dashboard must connect to a function
     - `CANCELLED` (and canonical cancellation variants): Red badge (`--dashboard-status-cancelled-*`).
   - Formatted departure date or relative countdown (e.g. `Departs in 4 days`, `Aug 18, 2026`).
 - **Row Click / Action**: Navigates to the owned booking detail page `/bookings/[bookingId]`.
-- **Card Header Link**: *"All bookings →"* navigates to `/bookings`.
+- **Card Header Link**: _"All bookings →"_ navigates to `/bookings`.
 
 ---
 
@@ -262,6 +269,7 @@ Mobile / Compact Layout (< 1024px down to 360px)
 ```
 
 ### 5.1 Breakpoint Specifications
+
 1. **Desktop (`>= 1024px`)**:
    - Dedicated left `SideNavBar` (`width: 260px; position: sticky; top: 0; height: 100vh`).
    - Main content column with sticky `TopNavBar` (`height: 64px`).
@@ -286,6 +294,7 @@ Mobile / Compact Layout (< 1024px down to 360px)
 The dashboard must achieve full WCAG 2.1 AA compliance across all components and viewports.
 
 ### 6.1 Semantic Landmarks & Hierarchy
+
 - `<aside>`: Dedicated left navigation sidebar with `aria-label="Dashboard navigation"`.
 - `<header>`: Top navigation bar containing search and user profile triggers.
 - `<main id="main-content">`: Main dashboard content area.
@@ -293,6 +302,7 @@ The dashboard must achieve full WCAG 2.1 AA compliance across all components and
 - `<nav>`: Navigation item groups and mobile bottom tab bar.
 
 ### 6.2 Contrast Requirements (WCAG 2.1 AA)
+
 - **Normal Text (< 18pt / 24px normal or < 14pt / 18.66px bold)**: Minimum contrast ratio of **4.5:1** against the background.
   - `--dashboard-text-primary` (`#111c2d` on `#f0f4fc` / `#ffffff`): Ratio > 12:1 (PASS).
   - `--dashboard-text-secondary` (`#41474f` on glass surface): Ratio > 7:1 (PASS).
@@ -300,26 +310,33 @@ The dashboard must achieve full WCAG 2.1 AA compliance across all components and
   - Status badges, interactive icons, and borders must meet or exceed 3.0:1 against adjacent surfaces.
 
 ### 6.3 Focus Visibility & Keyboard Navigation
+
 - All interactive elements (`<button>`, `<a>`, `<input>`) must support standard keyboard navigation (`Tab`, `Shift+Tab`, `Enter`, `Space`).
 - Focus states must implement high-contrast focus rings using `:focus-visible`:
   ```css
   .interactiveElement:focus-visible {
     outline: none;
-    box-shadow: 0 0 0 2px var(--dashboard-surface), 0 0 0 4px var(--dashboard-focus-ring);
+    box-shadow:
+      0 0 0 2px var(--dashboard-surface),
+      0 0 0 4px var(--dashboard-focus-ring);
   }
   ```
 - No keyboard traps in quick search dropdowns or sidebar navigation.
 
 ### 6.4 Accessible Naming & Screen Readers
+
 - Icon-only buttons (e.g. notification bell, mobile search toggle) must include `aria-label` (e.g., `aria-label="View notifications"`).
 - Status pills must include text content or visually hidden text (e.g., `<span className="sr-only">Status: </span>Confirmed`).
 - Form inputs in Quick Search must have explicit `<label>` tags or `aria-label` attributes (`aria-label="Departure airport code"`, `aria-label="Arrival airport code"`, `aria-label="Departure date"`).
 
 ### 6.5 Motion & Reduced Motion Safeguards
+
 - All glass shimmer effects, hover lifts (`transform: translateY(-2px)`), and transitions must honor user motion preferences:
   ```css
   @media (prefers-reduced-motion: reduce) {
-    *, ::before, ::after {
+    *,
+    ::before,
+    ::after {
       animation-duration: 0.01ms !important;
       animation-iteration-count: 1 !important;
       transition-duration: 0.01ms !important;
@@ -337,57 +354,57 @@ The following checklist tables must be verified by automated tests and visual in
 
 ### Phase 1: Design Tokens & CSS Standards Audit
 
-| Check ID | Verification Item | Target File(s) | Criteria | Status |
-| :--- | :--- | :--- | :--- | :---: |
-| **V-TOK-01** | Semantic CSS Variables Declared | `apps/web/app/globals.css` | `--dashboard-surface`, `--dashboard-glass`, `--dashboard-border`, `--dashboard-accent`, etc. present in `:root` and `:root.dark`. | [ ] |
-| **V-TOK-02** | No Hardcoded Color Literals | `apps/web/app/dashboard/*.module.css` | Zero occurrences of raw hex (`#...`), `rgb(...)`, or `hsl(...)` color strings in CSS modules. | [ ] |
-| **V-TOK-03** | No Inline Color Styles | `apps/web/components/dashboard/*.tsx` | Zero `style={{ color: ... }}` or inline background definitions in JSX elements. | [ ] |
-| **V-TOK-04** | No Raw Tailwind Color Utilities | `apps/web/components/dashboard/*.tsx` | Zero `bg-blue-500`, `text-slate-900`, `border-emerald-600` classes in JSX. | [ ] |
-| **V-TOK-05** | Backdrop Filter Fallbacks | `apps/web/app/globals.css` | Solid color fallbacks provided inside `@supports not (backdrop-filter: blur(1px))`. | [ ] |
+| Check ID     | Verification Item               | Target File(s)                        | Criteria                                                                                                                          | Status |
+| :----------- | :------------------------------ | :------------------------------------ | :-------------------------------------------------------------------------------------------------------------------------------- | :----: |
+| **V-TOK-01** | Semantic CSS Variables Declared | `apps/web/app/globals.css`            | `--dashboard-surface`, `--dashboard-glass`, `--dashboard-border`, `--dashboard-accent`, etc. present in `:root` and `:root.dark`. |  [ ]   |
+| **V-TOK-02** | No Hardcoded Color Literals     | `apps/web/app/dashboard/*.module.css` | Zero occurrences of raw hex (`#...`), `rgb(...)`, or `hsl(...)` color strings in CSS modules.                                     |  [ ]   |
+| **V-TOK-03** | No Inline Color Styles          | `apps/web/components/dashboard/*.tsx` | Zero `style={{ color: ... }}` or inline background definitions in JSX elements.                                                   |  [ ]   |
+| **V-TOK-04** | No Raw Tailwind Color Utilities | `apps/web/components/dashboard/*.tsx` | Zero `bg-blue-500`, `text-slate-900`, `border-emerald-600` classes in JSX.                                                        |  [ ]   |
+| **V-TOK-05** | Backdrop Filter Fallbacks       | `apps/web/app/globals.css`            | Solid color fallbacks provided inside `@supports not (backdrop-filter: blur(1px))`.                                               |  [ ]   |
 
 ### Phase 2: Mock Element Removal Audit
 
-| Check ID | Verification Item | Target File(s) | Criteria | Status |
-| :--- | :--- | :--- | :--- | :---: |
-| **V-MOK-01** | Cancelled Bookings Stat Replaces Shield | `DashboardStats.tsx` | Card 4 displays `cancelledBookings` count; Disruption Shield percentage and glow card are removed. | [ ] |
-| **V-MOK-02** | Static Fare Drop Card Removed | `DashboardShell.tsx` | "Tokyo Autumn Fares Dropped 18%" card is removed from production component. | [ ] |
-| **V-MOK-03** | Static Seat Recommendation Removed | `DashboardShell.tsx` | "Window Seat 14A Available" card is removed from production component. | [ ] |
-| **V-MOK-04** | Prototype Tag Banner Removed | `DashboardShell.tsx` | Top prototype disclaimer banner is removed from production view. | [ ] |
-| **V-MOK-05** | Variant Switcher Removed | `DashboardShell.tsx` | Floating variant navigation switcher (`?variant=...`) is removed. | [ ] |
-| **V-MOK-06** | Zero `/prototype/*` Hyperlinks | All dashboard components | Codebase grep confirms zero links to `/prototype/chat` or `/prototype/dashboard`. | [ ] |
+| Check ID     | Verification Item                       | Target File(s)           | Criteria                                                                                           | Status |
+| :----------- | :-------------------------------------- | :----------------------- | :------------------------------------------------------------------------------------------------- | :----: |
+| **V-MOK-01** | Cancelled Bookings Stat Replaces Shield | `DashboardStats.tsx`     | Card 4 displays `cancelledBookings` count; Disruption Shield percentage and glow card are removed. |  [ ]   |
+| **V-MOK-02** | Static Fare Drop Card Removed           | `DashboardShell.tsx`     | "Tokyo Autumn Fares Dropped 18%" card is removed from production component.                        |  [ ]   |
+| **V-MOK-03** | Static Seat Recommendation Removed      | `DashboardShell.tsx`     | "Window Seat 14A Available" card is removed from production component.                             |  [ ]   |
+| **V-MOK-04** | Prototype Tag Banner Removed            | `DashboardShell.tsx`     | Top prototype disclaimer banner is removed from production view.                                   |  [ ]   |
+| **V-MOK-05** | Variant Switcher Removed                | `DashboardShell.tsx`     | Floating variant navigation switcher (`?variant=...`) is removed.                                  |  [ ]   |
+| **V-MOK-06** | Zero `/prototype/*` Hyperlinks          | All dashboard components | Codebase grep confirms zero links to `/prototype/chat` or `/prototype/dashboard`.                  |  [ ]   |
 
 ### Phase 3: Route Integration & Handoff Audit
 
-| Check ID | Verification Item | Target File(s) | Criteria | Status |
-| :--- | :--- | :--- | :--- | :---: |
-| **V-RTE-01** | Quick Search Handoff | `DashboardQuickSearch.tsx` | Submits to `/search?origin=...&destination=...&departureDate=...` with preserved values. | [ ] |
-| **V-RTE-02** | Same-Airport Search Rejection | `dashboard-search.ts` | Displays validation error when Origin equals Destination; does not navigate. | [ ] |
-| **V-RTE-03** | Past Date Search Rejection | `dashboard-search.ts` | Displays validation error when Departure Date is before today; does not navigate. | [ ] |
-| **V-RTE-04** | Quick Action: Search Flights | `DashboardQuickActions.tsx` | Navigates to `/search`. | [ ] |
-| **V-RTE-05** | Quick Action: Manage Itinerary | `DashboardQuickActions.tsx` | Navigates to `/bookings?tab=upcoming` (or `/bookings`). | [ ] |
-| **V-RTE-06** | Quick Action: Past Trips | `DashboardQuickActions.tsx` | Navigates to `/bookings?tab=past`. | [ ] |
-| **V-RTE-07** | Quick Action: Profile Gating (Flag ON) | `DashboardQuickActions.tsx` | When `isBookingReadinessEnabled()` is `true`, Traveler Profile card renders and links to `/profile`. | [ ] |
-| **V-RTE-08** | Quick Action: Profile Omission (Flag OFF) | `DashboardQuickActions.tsx` | When `isBookingReadinessEnabled()` is `false`, Traveler Profile card is omitted completely. | [ ] |
-| **V-RTE-09** | Recent Booking Detail Links | `DashboardRecentBookings.tsx` | Recent item click navigates to `/bookings/[bookingId]`. | [ ] |
-| **V-RTE-10** | All Bookings Link | `DashboardRecentBookings.tsx` | "All bookings →" header link navigates to `/bookings`. | [ ] |
+| Check ID     | Verification Item                         | Target File(s)                | Criteria                                                                                             | Status |
+| :----------- | :---------------------------------------- | :---------------------------- | :--------------------------------------------------------------------------------------------------- | :----: |
+| **V-RTE-01** | Quick Search Handoff                      | `DashboardQuickSearch.tsx`    | Submits to `/search?origin=...&destination=...&departureDate=...` with preserved values.             |  [ ]   |
+| **V-RTE-02** | Same-Airport Search Rejection             | `dashboard-search.ts`         | Displays validation error when Origin equals Destination; does not navigate.                         |  [ ]   |
+| **V-RTE-03** | Past Date Search Rejection                | `dashboard-search.ts`         | Displays validation error when Departure Date is before today; does not navigate.                    |  [ ]   |
+| **V-RTE-04** | Quick Action: Search Flights              | `DashboardQuickActions.tsx`   | Navigates to `/search`.                                                                              |  [ ]   |
+| **V-RTE-05** | Quick Action: Manage Itinerary            | `DashboardQuickActions.tsx`   | Navigates to `/bookings?tab=upcoming` (or `/bookings`).                                              |  [ ]   |
+| **V-RTE-06** | Quick Action: Past Trips                  | `DashboardQuickActions.tsx`   | Navigates to `/bookings?tab=past`.                                                                   |  [ ]   |
+| **V-RTE-07** | Quick Action: Profile Gating (Flag ON)    | `DashboardQuickActions.tsx`   | When `isBookingReadinessEnabled()` is `true`, Traveler Profile card renders and links to `/profile`. |  [ ]   |
+| **V-RTE-08** | Quick Action: Profile Omission (Flag OFF) | `DashboardQuickActions.tsx`   | When `isBookingReadinessEnabled()` is `false`, Traveler Profile card is omitted completely.          |  [ ]   |
+| **V-RTE-09** | Recent Booking Detail Links               | `DashboardRecentBookings.tsx` | Recent item click navigates to `/bookings/[bookingId]`.                                              |  [ ]   |
+| **V-RTE-10** | All Bookings Link                         | `DashboardRecentBookings.tsx` | "All bookings →" header link navigates to `/bookings`.                                               |  [ ]   |
 
 ### Phase 4: Responsive & Viewport Layout Audit
 
-| Check ID | Verification Item | Viewport Width | Criteria | Status |
-| :--- | :--- | :--- | :--- | :---: |
-| **V-RSP-01** | Desktop Sidebar & 2x2 Grids | `1440px` & `1024px` | Fixed sidebar (260px) + sticky top bar + 2x2 stats & actions grids render cleanly. | [ ] |
-| **V-RSP-02** | Tablet Stacking | `768px` | Sidebar transitions to compact/top nav; split grids stack vertically without truncation. | [ ] |
-| **V-RSP-03** | Mobile Narrow Layout | `360px` | Sidebar hidden; sticky mobile header/bottom nav active; search inputs stack cleanly. | [ ] |
-| **V-RSP-04** | Zero Horizontal Overflow | `360px`, `768px`, `1440px` | `document.documentElement.scrollWidth === window.innerWidth`; no horizontal scrollbar. | [ ] |
+| Check ID     | Verification Item           | Viewport Width             | Criteria                                                                                 | Status |
+| :----------- | :-------------------------- | :------------------------- | :--------------------------------------------------------------------------------------- | :----: |
+| **V-RSP-01** | Desktop Sidebar & 2x2 Grids | `1440px` & `1024px`        | Fixed sidebar (260px) + sticky top bar + 2x2 stats & actions grids render cleanly.       |  [ ]   |
+| **V-RSP-02** | Tablet Stacking             | `768px`                    | Sidebar transitions to compact/top nav; split grids stack vertically without truncation. |  [ ]   |
+| **V-RSP-03** | Mobile Narrow Layout        | `360px`                    | Sidebar hidden; sticky mobile header/bottom nav active; search inputs stack cleanly.     |  [ ]   |
+| **V-RSP-04** | Zero Horizontal Overflow    | `360px`, `768px`, `1440px` | `document.documentElement.scrollWidth === window.innerWidth`; no horizontal scrollbar.   |  [ ]   |
 
 ### Phase 5: Accessibility (WCAG 2.1 AA) Audit
 
-| Check ID | Verification Item | Target Area | Criteria | Status |
-| :--- | :--- | :--- | :--- | :---: |
-| **V-A11Y-01** | Semantic HTML Landmarks | Layout & Shell | `<aside>`, `<header>`, `<main>`, `<section>`, `<nav>` tags used appropriately. | [ ] |
-| **V-A11Y-02** | Color Contrast (Body Text) | Typography | Contrast ratio >= 4.5:1 between text and background in both light and dark modes. | [ ] |
-| **V-A11Y-03** | Color Contrast (Large/Icons) | Badges & Icons | Contrast ratio >= 3.0:1 for graphical elements, status pills, and focus rings. | [ ] |
-| **V-A11Y-04** | Visible Keyboard Focus Rings | Interactive Elements | `:focus-visible` ring (`--dashboard-focus-ring`) visible on all buttons, links, and inputs. | [ ] |
-| **V-A11Y-05** | Icon Button Accessible Names | TopNav & Action buttons | All icon-only buttons have explicit `aria-label` attributes. | [ ] |
-| **V-A11Y-06** | Form Input Labels | Quick Search Form | All search inputs have accessible labels or `aria-label` attributes. | [ ] |
-| **V-A11Y-07** | Reduced Motion Honored | Animations & Transitions | `@media (prefers-reduced-motion: reduce)` disables hover lifts, shimmers, and transitions. | [ ] |
+| Check ID      | Verification Item            | Target Area              | Criteria                                                                                    | Status |
+| :------------ | :--------------------------- | :----------------------- | :------------------------------------------------------------------------------------------ | :----: |
+| **V-A11Y-01** | Semantic HTML Landmarks      | Layout & Shell           | `<aside>`, `<header>`, `<main>`, `<section>`, `<nav>` tags used appropriately.              |  [ ]   |
+| **V-A11Y-02** | Color Contrast (Body Text)   | Typography               | Contrast ratio >= 4.5:1 between text and background in both light and dark modes.           |  [ ]   |
+| **V-A11Y-03** | Color Contrast (Large/Icons) | Badges & Icons           | Contrast ratio >= 3.0:1 for graphical elements, status pills, and focus rings.              |  [ ]   |
+| **V-A11Y-04** | Visible Keyboard Focus Rings | Interactive Elements     | `:focus-visible` ring (`--dashboard-focus-ring`) visible on all buttons, links, and inputs. |  [ ]   |
+| **V-A11Y-05** | Icon Button Accessible Names | TopNav & Action buttons  | All icon-only buttons have explicit `aria-label` attributes.                                |  [ ]   |
+| **V-A11Y-06** | Form Input Labels            | Quick Search Form        | All search inputs have accessible labels or `aria-label` attributes.                        |  [ ]   |
+| **V-A11Y-07** | Reduced Motion Honored       | Animations & Transitions | `@media (prefers-reduced-motion: reduce)` disables hover lifts, shimmers, and transitions.  |  [ ]   |
