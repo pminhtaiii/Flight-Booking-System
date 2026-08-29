@@ -184,6 +184,16 @@ async function authenticateSession(page: Page, scenarioToken: string): Promise<v
   });
 }
 
+async function setMockScenario(page: Page, scenario: string): Promise<void> {
+  await page.context().addCookies([
+    {
+      name: 'mock-scenario',
+      value: scenario,
+      url: 'http://127.0.0.1:3000',
+    },
+  ]);
+}
+
 test.describe('Dashboard Feature Acceptance (E2E)', () => {
   test('1. Populated Dashboard Overview: renders 4 metric cards and 5 recent booking items with navigation links', async ({
     page,
@@ -275,7 +285,7 @@ test.describe('Dashboard Feature Acceptance (E2E)', () => {
     await expect(page.getByText(/variant switcher/i)).toHaveCount(0);
     await expect(page.getByText(/switch variant/i)).toHaveCount(0);
 
-    await expect(page.locator('a[href^="/prototype"]')).toHaveCount(0);
+    await expect(page.locator('a[href^="/prototype"], a[href*="/prototype/"]')).toHaveCount(0);
   });
 
   test('4. Direct Dashboard Unauthenticated Access: redirects anonymous user to login page preserving callbackUrl', async ({
@@ -300,7 +310,7 @@ test.describe('Dashboard Feature Acceptance (E2E)', () => {
   }) => {
     await authenticateSession(page, 'token-populated');
     await page.goto('/');
-    await expect(page).toHaveURL(/.*\/dashboard/);
+    await expect(page).toHaveURL(/\/dashboard\/?$/);
   });
 
   test('7. Root Entry Redirection - Anonymous: preserves marketing landing page on / for anonymous visitor', async ({
@@ -392,13 +402,17 @@ test.describe('Dashboard Feature Acceptance (E2E)', () => {
     await page.emulateMedia({ reducedMotion: 'reduce' });
     await page.goto('/dashboard');
 
-    const motionDuration = await page.evaluate(() => {
-      const card = document.querySelector('section') || document.body;
-      const style = window.getComputedStyle(card);
-      return {
-        animationDuration: style.animationDuration,
-        transitionDuration: style.transitionDuration,
-      };
+    const motionDurations = await page.evaluate(() => {
+      const elements = Array.from(
+        document.querySelectorAll('article, a[href], button:not([disabled])'),
+      );
+      return elements.map((el) => {
+        const style = window.getComputedStyle(el);
+        return {
+          animationDuration: style.animationDuration,
+          transitionDuration: style.transitionDuration,
+        };
+      });
     });
 
     const parseSeconds = (dur: string): number => {
@@ -408,7 +422,81 @@ test.describe('Dashboard Feature Acceptance (E2E)', () => {
       return parseFloat(dur) || 0;
     };
 
-    expect(parseSeconds(motionDuration.animationDuration)).toBeLessThanOrEqual(0.01);
-    expect(parseSeconds(motionDuration.transitionDuration)).toBeLessThanOrEqual(0.01);
+    expect(motionDurations.length).toBeGreaterThan(0);
+    for (const motion of motionDurations) {
+      expect(parseSeconds(motion.animationDuration)).toBeLessThanOrEqual(0.01);
+      expect(parseSeconds(motion.transitionDuration)).toBeLessThanOrEqual(0.01);
+    }
+  });
+
+  test('13. Quick Search: submits airport and date inputs to the production search route with defaults', async ({
+    page,
+  }) => {
+    await authenticateSession(page, 'token-populated');
+    await page.goto('/dashboard');
+
+    await page.getByLabel('Departure airport code').fill('SGN');
+    await page.getByLabel('Arrival airport code').fill('HAN');
+    await page.getByLabel('Departure date').fill('2099-09-01');
+    await page.getByRole('button', { name: 'Search Flights' }).click();
+
+    await expect(page).toHaveURL(/\/search/);
+    const searchParams = new URL(page.url()).searchParams;
+    expect(new URL(page.url()).pathname).toBe('/search');
+    expect(searchParams.get('origin')).toBe('SGN');
+    expect(searchParams.get('destination')).toBe('HAN');
+    expect(searchParams.get('departureDate')).toBe('2099-09-01');
+    expect(searchParams.get('adults')).toBe('1');
+    expect(searchParams.get('cabinClass')).toBe('economy');
+  });
+
+  test('14. Quick Action Search Flights: navigates to search', async ({ page }) => {
+    await authenticateSession(page, 'token-populated');
+    await page.goto('/dashboard');
+
+    const quickActions = page.getByRole('region', { name: 'Quick Actions' });
+    await quickActions.getByRole('link', { name: 'Search Flights' }).click();
+
+    await expect(page).toHaveURL(/\/search$/);
+  });
+
+  test('15. Quick Action Upcoming Trips: navigates to upcoming bookings', async ({ page }) => {
+    await authenticateSession(page, 'token-populated');
+    await page.goto('/dashboard');
+
+    const quickActions = page.getByRole('region', { name: 'Quick Actions' });
+    await quickActions.getByRole('link', { name: 'Upcoming Trips' }).click();
+
+    await expect(page).toHaveURL(/\/bookings\?tab=upcoming$/);
+  });
+
+  test('16. Quick Action Past Bookings: navigates to past bookings', async ({ page }) => {
+    await authenticateSession(page, 'token-populated');
+    await page.goto('/dashboard');
+
+    const quickActions = page.getByRole('region', { name: 'Quick Actions' });
+    await quickActions.getByRole('link', { name: 'Past Bookings' }).click();
+
+    await expect(page).toHaveURL(/\/bookings\?tab=past$/);
+  });
+
+  test('17. Traveler Profile disabled: omits the profile action', async ({ page }) => {
+    await authenticateSession(page, 'token-populated');
+    await setMockScenario(page, 'dashboard-readiness-disabled');
+    await page.goto('/dashboard');
+
+    const quickActions = page.getByRole('region', { name: 'Quick Actions' });
+    await expect(quickActions.getByRole('link', { name: 'Traveler Profile' })).toHaveCount(0);
+  });
+
+  test('18. Traveler Profile enabled: exposes the profile action', async ({ page }) => {
+    await authenticateSession(page, 'token-populated');
+    await setMockScenario(page, 'dashboard-readiness-enabled');
+    await page.goto('/dashboard');
+
+    const quickActions = page.getByRole('region', { name: 'Quick Actions' });
+    const profileAction = quickActions.getByRole('link', { name: 'Traveler Profile' });
+    await expect(profileAction).toBeVisible();
+    await expect(profileAction).toHaveAttribute('href', '/profile');
   });
 });

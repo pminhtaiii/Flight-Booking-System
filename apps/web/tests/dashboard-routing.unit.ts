@@ -14,6 +14,9 @@ const __dirname = path.dirname(__filename);
 const testRequire = createRequire(import.meta.url);
 
 // Mock CSS and stylesheet imports for Node.js test environment
+const originalCssHandler = require.extensions['.css'];
+const originalScssHandler = require.extensions['.scss'];
+
 const cssHandler = (module: NodeModule): void => {
   module.exports = new Proxy(
     {},
@@ -113,6 +116,18 @@ testRequire.cache[dashboardLibPath] = {
 } as NodeModule;
 
 after(() => {
+  if (originalCssHandler) {
+    require.extensions['.css'] = originalCssHandler;
+  } else {
+    delete require.extensions['.css'];
+  }
+
+  if (originalScssHandler) {
+    require.extensions['.scss'] = originalScssHandler;
+  } else {
+    delete require.extensions['.scss'];
+  }
+
   if (originalNextAuthModule) {
     testRequire.cache[nextAuthPath] = originalNextAuthModule;
   } else {
