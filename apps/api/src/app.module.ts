@@ -32,6 +32,7 @@ import { DataDriftSentinelModule } from './common/sentinel/data-drift-sentinel.m
 import { BookingReadinessMetricsModule } from './common/observability/booking-readiness-metrics.module';
 import { RefundModule } from './refund/refund.module';
 import { RefundSettlementModule } from './refund-settlement/refund-settlement.module';
+import { DashboardModule } from './dashboard/dashboard.module';
 
 import { StripeModule } from './common/stripe.module';
 
@@ -114,6 +115,7 @@ export const envSchema = z.object({
     BookingReadinessMetricsModule,
     RefundModule,
     RefundSettlementModule,
+    DashboardModule,
   ],
   controllers: [],
   providers: [],
