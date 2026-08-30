@@ -226,10 +226,7 @@ describe('Refund Characterization (E2E)', () => {
     });
   }
 
-  async function createCancellationRefundObligation(
-    bookingId: string,
-    paymentId: string,
-  ) {
+  async function createCancellationRefundObligation(bookingId: string, paymentId: string) {
     return prisma.cancellationRefundObligation.create({
       data: {
         bookingId,
@@ -905,11 +902,18 @@ describe('Refund Characterization (E2E)', () => {
       const offer1 = await createFlightOffer();
       const intent1 = await createBookingIntent(regularUser.id, offer1.id);
       const key1 = await createIdempotencyKey(regularUser.id, 'inv1');
-      const payment1 = await createPayment(intent1.id, key1.id, { amount: 10000, status: PaymentStatus.SUCCEEDED });
-      const booking1 = await createBooking(regularUser.id, intent1.id, payment1.id, { status: BookingStatus.CANCELLED_PENDING_REFUND });
+      const payment1 = await createPayment(intent1.id, key1.id, {
+        amount: 10000,
+        status: PaymentStatus.SUCCEEDED,
+      });
+      const booking1 = await createBooking(regularUser.id, intent1.id, payment1.id, {
+        status: BookingStatus.CANCELLED_PENDING_REFUND,
+      });
       await createCancellationRefundObligation(booking1.id, payment1.id);
 
-      const stripeSpy = jest.spyOn(stripeService, 'createRefund').mockResolvedValue({ id: 're_inv_1' } as any);
+      const stripeSpy = jest
+        .spyOn(stripeService, 'createRefund')
+        .mockResolvedValue({ id: 're_inv_1' } as any);
       await paymentRefundService.processCancellationRefund({
         bookingId: booking1.id,
         paymentId: payment1.id,
@@ -922,11 +926,24 @@ describe('Refund Characterization (E2E)', () => {
       const offer2 = await createFlightOffer();
       const intent2 = await createBookingIntent(regularUser.id, offer2.id);
       const key2 = await createIdempotencyKey(regularUser.id, 'inv2');
-      const payment2 = await createPayment(intent2.id, key2.id, { amount: 10000, status: PaymentStatus.SUCCEEDED });
-      const booking2 = await createBooking(regularUser.id, intent2.id, payment2.id, { status: BookingStatus.CANCELLED_PENDING_REFUND });
+      const payment2 = await createPayment(intent2.id, key2.id, {
+        amount: 10000,
+        status: PaymentStatus.SUCCEEDED,
+      });
+      const booking2 = await createBooking(regularUser.id, intent2.id, payment2.id, {
+        status: BookingStatus.CANCELLED_PENDING_REFUND,
+      });
       const obligation2 = await createCancellationRefundObligation(booking2.id, payment2.id);
-      const stripeSpy2 = jest.spyOn(stripeService, 'createRefund').mockResolvedValue({ id: 're_inv_2' } as any);
-      const ref2 = await paymentRefundService.initiateRefund(payment2.id, { amount: 10000, reason: 'customer_request' }, `inv-wh-${Date.now()}`, regularUser.id, 'USER');
+      const stripeSpy2 = jest
+        .spyOn(stripeService, 'createRefund')
+        .mockResolvedValue({ id: 're_inv_2' } as any);
+      const ref2 = await paymentRefundService.initiateRefund(
+        payment2.id,
+        { amount: 10000, reason: 'customer_request' },
+        `inv-wh-${Date.now()}`,
+        regularUser.id,
+        'USER',
+      );
       stripeSpy2.mockRestore();
       await prisma.refund.update({
         where: { id: ref2.refundId },
@@ -938,15 +955,26 @@ describe('Refund Characterization (E2E)', () => {
       await paymentWebhookService.handleWebhookEvent({
         id: `evt_inv_2_${Date.now()}`,
         type: 'charge.refunded',
-        data: { object: { payment_intent: payment2.stripePaymentIntentId, amount_refunded: 10000, refunds: { data: [{ id: 're_inv_2', amount: 10000 }] } } },
+        data: {
+          object: {
+            payment_intent: payment2.stripePaymentIntentId,
+            amount_refunded: 10000,
+            refunds: { data: [{ id: 're_inv_2', amount: 10000 }] },
+          },
+        },
       });
 
       // Trigger 3 (Sweeper)
       const offer3 = await createFlightOffer();
       const intent3 = await createBookingIntent(regularUser.id, offer3.id);
       const key3 = await createIdempotencyKey(regularUser.id, 'inv3');
-      const payment3 = await createPayment(intent3.id, key3.id, { amount: 10000, status: PaymentStatus.REFUND_PENDING });
-      const booking3 = await createBooking(regularUser.id, intent3.id, payment3.id, { status: BookingStatus.CANCELLED_PENDING_REFUND });
+      const payment3 = await createPayment(intent3.id, key3.id, {
+        amount: 10000,
+        status: PaymentStatus.REFUND_PENDING,
+      });
+      const booking3 = await createBooking(regularUser.id, intent3.id, payment3.id, {
+        status: BookingStatus.CANCELLED_PENDING_REFUND,
+      });
       const obligation3 = await createCancellationRefundObligation(booking3.id, payment3.id);
       await prisma.refund.create({
         data: {
@@ -962,7 +990,9 @@ describe('Refund Characterization (E2E)', () => {
           idempotencyKeyCreatedAt: new Date(),
         },
       });
-      const stripeSpy3 = jest.spyOn(stripeService, 'createRefund').mockResolvedValue({ id: 're_inv_3' } as any);
+      const stripeSpy3 = jest
+        .spyOn(stripeService, 'createRefund')
+        .mockResolvedValue({ id: 're_inv_3' } as any);
       await paymentCronService.handleCancellationRefundRecovery();
       stripeSpy3.mockRestore();
 
@@ -970,8 +1000,13 @@ describe('Refund Characterization (E2E)', () => {
       const offer4 = await createFlightOffer();
       const intent4 = await createBookingIntent(regularUser.id, offer4.id);
       const key4 = await createIdempotencyKey(regularUser.id, 'inv4');
-      const payment4 = await createPayment(intent4.id, key4.id, { amount: 10000, status: PaymentStatus.REFUND_PENDING });
-      const booking4 = await createBooking(regularUser.id, intent4.id, payment4.id, { status: BookingStatus.CANCELLED_PENDING_REFUND });
+      const payment4 = await createPayment(intent4.id, key4.id, {
+        amount: 10000,
+        status: PaymentStatus.REFUND_PENDING,
+      });
+      const booking4 = await createBooking(regularUser.id, intent4.id, payment4.id, {
+        status: BookingStatus.CANCELLED_PENDING_REFUND,
+      });
       const obligation4 = await createCancellationRefundObligation(booking4.id, payment4.id);
       const refund4 = await prisma.refund.create({
         data: {

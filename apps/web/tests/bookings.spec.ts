@@ -3,13 +3,16 @@ import { expect, test } from '@playwright/test';
 const bookingId = '8a7466ab-78bd-4a45-8e9e-9b3c62269a9a';
 
 test.describe('My Bookings list', () => {
-  test('lets a newly registered traveler switch tabs and shows the empty-state search action', async ({ page, request, context }) => {
-    page.on('console', msg => console.log('[Browser Console]', msg.text()));
-    page.on('pageerror', err => console.log('[Browser PageError]', err.message));
-
-    await request.post('http://127.0.0.1:3001/api/auth/test/reset-lockout', {
-      data: { clearAll: true },
-    }).catch(err => console.log('[ResetLockout Connection Error]', err));
+  test('lets a newly registered traveler switch tabs and shows the empty-state search action', async ({
+    page,
+    request,
+    context,
+  }) => {
+    await request
+      .post('http://127.0.0.1:3001/api/auth/test/reset-lockout', {
+        data: { clearAll: true },
+      })
+      .catch(() => {});
 
     await context.clearCookies();
 
@@ -19,20 +22,20 @@ test.describe('My Bookings list', () => {
     await page.getByRole('textbox', { name: 'Password' }).fill('Password123!');
     await page.getByRole('button', { name: 'Create account' }).click();
 
-    // Check for page validation or API errors on failure
-    const errorAlert = page.locator('form [role="alert"]');
-    if (await errorAlert.count() > 0) {
-      console.log('[Register Form Alert Text]', await errorAlert.textContent());
-    }
-
     await expect(page).toHaveURL(/.*127.0.0.1:3000\/$/, { timeout: 30000 });
 
     await page.goto('http://127.0.0.1:3000/bookings');
 
     await expect(page.getByRole('heading', { name: 'My Bookings' })).toBeVisible();
-    await expect(page.getByRole('tab', { name: 'Upcoming' })).toHaveAttribute('aria-selected', 'true');
+    await expect(page.getByRole('tab', { name: 'Upcoming' })).toHaveAttribute(
+      'aria-selected',
+      'true',
+    );
     await expect(page.getByText('No bookings yet — start planning your next trip.')).toBeVisible();
-    await expect(page.getByRole('link', { name: 'Search Flights' }).first()).toHaveAttribute('href', '/search');
+    await expect(page.getByRole('link', { name: 'Search Flights' }).first()).toHaveAttribute(
+      'href',
+      '/search',
+    );
 
     await page.getByRole('tab', { name: 'Past' }).click();
     await expect(page).toHaveURL(/\/bookings\?tab=past&page=1$/);
@@ -42,12 +45,14 @@ test.describe('My Bookings list', () => {
 });
 
 test('renders a confirmed booking snapshot and confirmation banner', async ({ page, context }) => {
-  await context.addCookies([{
-    name: 'mock-scenario',
-    value: 'confirmed-booking',
-    domain: '127.0.0.1',
-    path: '/',
-  }]);
+  await context.addCookies([
+    {
+      name: 'mock-scenario',
+      value: 'confirmed-booking',
+      domain: '127.0.0.1',
+      path: '/',
+    },
+  ]);
 
   await page.goto(`/bookings/${bookingId}?confirmed=true`);
 
@@ -57,13 +62,18 @@ test('renders a confirmed booking snapshot and confirmation banner', async ({ pa
   await expect(page.getByText('Ada Lovelace')).toBeVisible();
 });
 
-test('does not show the confirmation banner after the confirmation query is absent', async ({ page, context }) => {
-  await context.addCookies([{
-    name: 'mock-scenario',
-    value: 'confirmed-booking',
-    domain: '127.0.0.1',
-    path: '/',
-  }]);
+test('does not show the confirmation banner after the confirmation query is absent', async ({
+  page,
+  context,
+}) => {
+  await context.addCookies([
+    {
+      name: 'mock-scenario',
+      value: 'confirmed-booking',
+      domain: '127.0.0.1',
+      path: '/',
+    },
+  ]);
 
   await page.goto(`/bookings/${bookingId}`);
 
@@ -71,47 +81,71 @@ test('does not show the confirmation banner after the confirmation query is abse
   await expect(page.getByText('PNR123').first()).toBeVisible();
 });
 
-test('renders a processing booking state while the reservation is pending', async ({ page, context }) => {
-  await context.addCookies([{
-    name: 'mock-scenario',
-    value: 'processing-booking',
-    domain: '127.0.0.1',
-    path: '/',
-  }]);
+test('renders a processing booking state while the reservation is pending', async ({
+  page,
+  context,
+}) => {
+  await context.addCookies([
+    {
+      name: 'mock-scenario',
+      value: 'processing-booking',
+      domain: '127.0.0.1',
+      path: '/',
+    },
+  ]);
 
   await page.goto(`/bookings/${bookingId}`);
 
-  await expect(page.getByRole('heading', { name: 'Your booking is being processed' })).toBeVisible();
-  await expect(page.getByText('Please refresh this page shortly to check its status.')).toBeVisible();
+  await expect(
+    page.getByRole('heading', { name: 'Your booking is being processed' }),
+  ).toBeVisible();
+  await expect(
+    page.getByText('Please refresh this page shortly to check its status.'),
+  ).toBeVisible();
 });
 
-test('explains an expired offer and provides a route-aware retry without assuming a charge', async ({ page, context }) => {
-  await context.addCookies([{
-    name: 'mock-scenario',
-    value: 'expired-offer',
-    domain: '127.0.0.1',
-    path: '/',
-  }]);
+test('explains an expired offer and provides a route-aware retry without assuming a charge', async ({
+  page,
+  context,
+}) => {
+  await context.addCookies([
+    {
+      name: 'mock-scenario',
+      value: 'expired-offer',
+      domain: '127.0.0.1',
+      path: '/',
+    },
+  ]);
 
   await page.goto(`/bookings/${bookingId}`);
 
   await expect(page.getByText('This offer is no longer available.')).toBeVisible();
   await expect(page.getByText('No charge was made to your card.')).toBeVisible();
-  await expect(page.getByRole('link', { name: 'Search flights again' })).toHaveAttribute('href', '/search?origin=LHR&destination=JFK');
+  await expect(page.getByRole('link', { name: 'Search flights again' })).toHaveAttribute(
+    'href',
+    '/search?origin=LHR&destination=JFK',
+  );
 });
 
 test('routes price changes back to the original flight detail', async ({ page, context }) => {
-  await context.addCookies([{
-    name: 'mock-scenario',
-    value: 'price-changed',
-    domain: '127.0.0.1',
-    path: '/',
-  }]);
+  await context.addCookies([
+    {
+      name: 'mock-scenario',
+      value: 'price-changed',
+      domain: '127.0.0.1',
+      path: '/',
+    },
+  ]);
 
   await page.goto(`/bookings/${bookingId}`);
 
-  await expect(page.getByText("A hold was placed on your card — we're working to release it.")).toBeVisible();
-  await expect(page.getByRole('link', { name: 'Review this flight' })).toHaveAttribute('href', '/search/offer-123');
+  await expect(
+    page.getByText("A hold was placed on your card — we're working to release it."),
+  ).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Review this flight' })).toHaveAttribute(
+    'href',
+    '/search/offer-123',
+  );
 });
 
 test('redirects unauthenticated request to login page', async ({ page, context }) => {

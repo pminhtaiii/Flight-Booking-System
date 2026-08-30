@@ -30,6 +30,7 @@
 **Purpose**: Prisma schema updates, migrations, custom Stripe SDK service, finite state machine validator, and request idempotency locking.
 
 ### Database Schema & Types
+
 - [ ] T004 Add payment enums (`PaymentStatus`, `RefundStatus`, `RefundTriggerType`, `LedgerEntryType`, `PaymentEventSource`) to `apps/api/prisma/schema.prisma`
 - [ ] T005 Add `Payment`, `IdempotencyKey`, `PaymentEvent`, `LedgerEntry`, `Refund`, and `PaymentMethod` models to `apps/api/prisma/schema.prisma`
 - [ ] T006 Extend existing `User` and `BookingIntent` models with payment fields and relations in `apps/api/prisma/schema.prisma`
@@ -37,15 +38,18 @@
 - [ ] T008 [P] Define shared payment types and status enums in `packages/shared/src/types/payment.types.ts`
 
 ### Stripe SDK Wrapper
+
 - [ ] T009 Create `StripeService` wrapper class in `apps/api/src/common/stripe.service.ts`
 - [ ] T010 Implement client initialization and core wrapper methods (`createPaymentIntent`, `capturePaymentIntent`, `cancelPaymentIntent`, `createCustomer`, `retrievePaymentIntent`, `createRefund`, `constructWebhookEvent`) in `apps/api/src/common/stripe.service.ts`
 
 ### Payment State Machine
+
 - [ ] T011 Create `PaymentStateMachine` helper with pure function `canTransition` and state transitions mapper in `apps/api/src/payment/payment-state-machine.ts`
 - [ ] T012 Implement transition enforcement error checks and dispute helpers (`getPreDisputeStatus`, `resolveDisputeStatus`) in `apps/api/src/payment/payment-state-machine.ts`
 - [ ] T013 [P] Add state machine unit tests covering all valid/invalid transitions in `apps/api/src/payment/payment-state-machine.spec.ts`
 
 ### Idempotency Key Service
+
 - [ ] T014 Create idempotency decorator `@IdempotencyKey()` and header extractor in `apps/api/src/payment/payment-idempotency.service.ts`
 - [ ] T015 Implement `acquireOrReplay`, `updateRecoveryPoint`, `completeKey`, `getResumePoint`, and `isLocked` in `apps/api/src/payment/payment-idempotency.service.ts`
 

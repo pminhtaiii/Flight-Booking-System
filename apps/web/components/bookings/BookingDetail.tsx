@@ -56,11 +56,11 @@ export function BookingDetail({ booking: initialBooking }: BookingDetailProps) {
       if (res.ok) {
         const data: CancellationStatusView = await res.json();
         setCancellationStatus(data);
-        
+
         // If status changed to a completed state from a pending state, refresh the parent
         if (
-          booking.status !== data.bookingStatus && 
-          data.bookingStatus !== 'CANCELLATION_PENDING' && 
+          booking.status !== data.bookingStatus &&
+          data.bookingStatus !== 'CANCELLATION_PENDING' &&
           data.bookingStatus !== 'CANCELLED_PENDING_REFUND'
         ) {
           router.refresh();
@@ -74,10 +74,17 @@ export function BookingDetail({ booking: initialBooking }: BookingDetailProps) {
   useEffect(() => {
     if (!booking) return;
     let interval: NodeJS.Timeout;
-    if (booking.status === 'CANCELLATION_PENDING' || booking.status === 'CANCELLED_PENDING_REFUND') {
+    if (
+      booking.status === 'CANCELLATION_PENDING' ||
+      booking.status === 'CANCELLED_PENDING_REFUND'
+    ) {
       fetchCancellationStatus();
       interval = setInterval(fetchCancellationStatus, 5000);
-    } else if (booking.status === 'REFUND_FAILED_NEEDS_ATTENTION' || booking.status === 'CANCELLED_AND_REFUNDED' || booking.status === 'CANCELLED_NO_REFUND') {
+    } else if (
+      booking.status === 'REFUND_FAILED_NEEDS_ATTENTION' ||
+      booking.status === 'CANCELLED_AND_REFUNDED' ||
+      booking.status === 'CANCELLED_NO_REFUND'
+    ) {
       fetchCancellationStatus();
     }
     return () => {
@@ -115,7 +122,7 @@ export function BookingDetail({ booking: initialBooking }: BookingDetailProps) {
     try {
       const res = await fetch(`/api/booking-management/bookings/${booking.id}/cancel`, {
         method: 'POST',
-        headers: { 
+        headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ quoteId: quote.quoteId }),
@@ -143,11 +150,14 @@ export function BookingDetail({ booking: initialBooking }: BookingDetailProps) {
     setActionSuccess(null);
 
     try {
-      const res = await fetch(`/api/booking-management/bookings/${booking.id}/disruptions/${action}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ revisionId: activeRevisionId }),
-      });
+      const res = await fetch(
+        `/api/booking-management/bookings/${booking.id}/disruptions/${action}`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ revisionId: activeRevisionId }),
+        },
+      );
 
       if (res.status === 409) {
         setConflictError('A newer change exists and must be reviewed.');
@@ -159,7 +169,9 @@ export function BookingDetail({ booking: initialBooking }: BookingDetailProps) {
         throw new Error(`Failed to ${action} disruption`);
       }
 
-      setActionSuccess(`Successfully ${action === 'acknowledge' ? 'acknowledged' : 'accepted'} the changes.`);
+      setActionSuccess(
+        `Successfully ${action === 'acknowledge' ? 'acknowledged' : 'accepted'} the changes.`,
+      );
       router.refresh();
     } catch (err: any) {
       setConflictError(err.message || 'An error occurred. Please try again.');
@@ -194,23 +206,29 @@ export function BookingDetail({ booking: initialBooking }: BookingDetailProps) {
   const segments = booking.itinerary?.segments ?? [];
   const passengers = booking.passengers ?? [];
 
-  const isCancellable = booking.status === 'CONFIRMED' && 
+  const isCancellable =
+    booking.status === 'CONFIRMED' &&
     Boolean(booking.cancellation?.deadline && new Date(booking.cancellation.deadline) > new Date());
 
-  const activeDisruptionStatus = (booking.disruption?.status as DisruptionStatus) ?? DisruptionStatus.NONE;
+  const activeDisruptionStatus =
+    (booking.disruption?.status as DisruptionStatus) ?? DisruptionStatus.NONE;
   const isDisrupted = activeDisruptionStatus !== DisruptionStatus.NONE;
 
   return (
     <section aria-labelledby="booking-detail-title" className="card space-y-6 relative">
       <div className="flex items-center justify-between gap-4">
         <div>
-          <h2 id="booking-detail-title" className="text-xl font-bold text-text-primary">Flight details</h2>
-          {booking.pnrReference && <p className="mt-1 text-sm text-text-secondary">PNR: {booking.pnrReference}</p>}
+          <h2 id="booking-detail-title" className="text-xl font-bold text-text-primary">
+            Flight details
+          </h2>
+          {booking.pnrReference && (
+            <p className="mt-1 text-sm text-text-secondary">PNR: {booking.pnrReference}</p>
+          )}
         </div>
         <div className="flex flex-col items-end gap-2">
           <BookingStatusBadge status={booking.status as any} />
           {isCancellable && (
-            <button 
+            <button
               onClick={handleOpenCancelModal}
               className="text-sm px-3 py-1 rounded bg-bg-cancelled text-text-cancelled border border-danger-border hover:bg-bg-cancelled/80"
             >
@@ -240,7 +258,8 @@ export function BookingDetail({ booking: initialBooking }: BookingDetailProps) {
       )}
 
       {/* Traveller Disruption Actions */}
-      {(activeDisruptionStatus === DisruptionStatus.DETECTED || activeDisruptionStatus === DisruptionStatus.ACKNOWLEDGED) && (
+      {(activeDisruptionStatus === DisruptionStatus.DETECTED ||
+        activeDisruptionStatus === DisruptionStatus.ACKNOWLEDGED) && (
         <div className="bg-bg-secondary p-5 rounded-xl border border-card-border space-y-4">
           <h3 className="font-bold text-text-primary text-sm">Review Required</h3>
           <p className="text-xs text-text-secondary">
@@ -280,43 +299,74 @@ export function BookingDetail({ booking: initialBooking }: BookingDetailProps) {
         </div>
       )}
 
-      {cancellationStatus && (booking.status === 'CANCELLATION_PENDING' || booking.status === 'CANCELLED_PENDING_REFUND' || booking.status === 'REFUND_FAILED_NEEDS_ATTENTION' || booking.status === 'CANCELLED_AND_REFUNDED' || booking.status === 'CANCELLED_NO_REFUND') && (
-        <div className="bg-bg-secondary p-4 rounded-lg border border-border-primary">
-          <h3 className="font-semibold text-text-primary mb-2">Cancellation Status</h3>
-          <p className="text-sm text-text-secondary mb-1">Status: <span className="font-medium text-text-primary">{cancellationStatus.bookingStatus}</span></p>
-          
-          {cancellationStatus.customerRefundAmount && (
-            <p className="text-sm text-text-secondary mb-1">Expected Refund: <span className="font-medium text-text-primary">{currencyFormatter(cancellationStatus.customerRefundAmount, booking.currency)}</span></p>
-          )}
-          
-          {booking.status === 'REFUND_FAILED_NEEDS_ATTENTION' && cancellationStatus && (
-            <div className="mt-4 p-3 bg-danger-border/10 border border-danger-border rounded">
-              <p className="text-sm font-semibold text-text-cancelled mb-2">
-                {cancellationStatus.escalationMessage || 'Refund requires attention. Please contact support.'}
+      {cancellationStatus &&
+        (booking.status === 'CANCELLATION_PENDING' ||
+          booking.status === 'CANCELLED_PENDING_REFUND' ||
+          booking.status === 'REFUND_FAILED_NEEDS_ATTENTION' ||
+          booking.status === 'CANCELLED_AND_REFUNDED' ||
+          booking.status === 'CANCELLED_NO_REFUND') && (
+          <div className="bg-bg-secondary p-4 rounded-lg border border-border-primary">
+            <h3 className="font-semibold text-text-primary mb-2">Cancellation Status</h3>
+            <p className="text-sm text-text-secondary mb-1">
+              Status:{' '}
+              <span className="font-medium text-text-primary">
+                {cancellationStatus.bookingStatus}
+              </span>
+            </p>
+
+            {cancellationStatus.customerRefundAmount && (
+              <p className="text-sm text-text-secondary mb-1">
+                Expected Refund:{' '}
+                <span className="font-medium text-text-primary">
+                  {currencyFormatter(cancellationStatus.customerRefundAmount, booking.currency)}
+                </span>
               </p>
-              <ul className="text-xs text-text-secondary space-y-1">
-                {cancellationStatus.refundStatus && <li>Refund Status: {cancellationStatus.refundStatus}</li>}
-                {cancellationStatus.nextRetryAt && <li>Next Retry: {cancellationStatus.nextRetryAt}</li>}
-              </ul>
-            </div>
-          )}
-        </div>
-      )}
+            )}
+
+            {booking.status === 'REFUND_FAILED_NEEDS_ATTENTION' && cancellationStatus && (
+              <div className="mt-4 p-3 bg-danger-border/10 border border-danger-border rounded">
+                <p className="text-sm font-semibold text-text-cancelled mb-2">
+                  {cancellationStatus.escalationMessage ||
+                    'Refund requires attention. Please contact support.'}
+                </p>
+                <ul className="text-xs text-text-secondary space-y-1">
+                  {cancellationStatus.refundStatus && (
+                    <li>Refund Status: {cancellationStatus.refundStatus}</li>
+                  )}
+                  {cancellationStatus.nextRetryAt && (
+                    <li>Next Retry: {cancellationStatus.nextRetryAt}</li>
+                  )}
+                </ul>
+              </div>
+            )}
+          </div>
+        )}
 
       {segments.length > 0 && (
         <div className="space-y-4">
           {segments.map((segment: any) => (
-            <article key={`${segment.flightNumber}-${segment.departureAt}`} className="rounded-lg border border-card-border p-4">
-              <p className="font-semibold text-text-primary">{segment.airline?.name} {segment.flightNumber}</p>
+            <article
+              key={`${segment.flightNumber}-${segment.departureAt}`}
+              className="rounded-lg border border-card-border p-4"
+            >
+              <p className="font-semibold text-text-primary">
+                {segment.airline?.name} {segment.flightNumber}
+              </p>
               <p className="mt-1 text-sm text-text-secondary">
-                {segment.departureAirport?.city} ({segment.departureAirport?.iataCode}) to {segment.arrivalAirport?.city} ({segment.arrivalAirport?.iataCode})
+                {segment.departureAirport?.city} ({segment.departureAirport?.iataCode}) to{' '}
+                {segment.arrivalAirport?.city} ({segment.arrivalAirport?.iataCode})
               </p>
               <p className="mt-2 text-sm text-text-secondary">
-                {new Date(segment.departureAt).toLocaleString('en-GB')} – {new Date(segment.arrivalAt).toLocaleString('en-GB')}
+                {new Date(segment.departureAt).toLocaleString('en-GB')} –{' '}
+                {new Date(segment.arrivalAt).toLocaleString('en-GB')}
               </p>
             </article>
           ))}
-          {booking.itinerary?.baggageAllowance && <p className="text-sm text-text-secondary">Baggage: {booking.itinerary.baggageAllowance}</p>}
+          {booking.itinerary?.baggageAllowance && (
+            <p className="text-sm text-text-secondary">
+              Baggage: {booking.itinerary.baggageAllowance}
+            </p>
+          )}
         </div>
       )}
 
@@ -324,46 +374,64 @@ export function BookingDetail({ booking: initialBooking }: BookingDetailProps) {
         <div>
           <h3 className="font-semibold text-text-primary">Passengers</h3>
           <ul className="mt-2 space-y-2 text-sm text-text-secondary">
-            {passengers.map((passenger: any) => <li key={`${passenger.firstName}-${passenger.lastName}`}>{passenger.firstName} {passenger.lastName}</li>)}
+            {passengers.map((passenger: any) => (
+              <li key={`${passenger.firstName}-${passenger.lastName}`}>
+                {passenger.firstName} {passenger.lastName}
+              </li>
+            ))}
           </ul>
         </div>
       )}
 
-      {booking.ancillarySummary && (booking.ancillarySummary.seats?.length > 0 || booking.ancillarySummary.baggage?.length > 0) && (
-        <div className="border-t border-card-border pt-4">
-          <h3 className="font-semibold text-text-primary">Extras Purchased</h3>
-          <div className="mt-2 space-y-3 text-sm text-text-secondary">
-            {booking.ancillarySummary.seats && booking.ancillarySummary.seats.length > 0 && (
-              <div>
-                <h4 className="font-medium text-text-primary text-xs uppercase tracking-wider mb-1">Seats</h4>
-                <ul className="list-disc list-inside space-y-1 pl-1">
-                  {booking.ancillarySummary.seats.map((seat: any, idx: number) => (
-                    <li key={`seat-${idx}`}>
-                      {seat.passengerName || 'Passenger'}: Seat {seat.seatDesignator} ({currencyFormatter(seat.amount, seat.currency)})
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
-            {booking.ancillarySummary.baggage && booking.ancillarySummary.baggage.length > 0 && (
-              <div>
-                <h4 className="font-medium text-text-primary text-xs uppercase tracking-wider mb-1">Baggage</h4>
-                <ul className="list-disc list-inside space-y-1 pl-1">
-                  {booking.ancillarySummary.baggage.map((bag: any, idx: number) => (
-                    <li key={`bag-${idx}`}>
-                      {bag.passengerName || 'Passenger'}: {bag.quantity}x {bag.type} ({currencyFormatter((Number(bag.amount) * bag.quantity).toString(), bag.currency)})
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
+      {booking.ancillarySummary &&
+        (booking.ancillarySummary.seats?.length > 0 ||
+          booking.ancillarySummary.baggage?.length > 0) && (
+          <div className="border-t border-card-border pt-4">
+            <h3 className="font-semibold text-text-primary">Extras Purchased</h3>
+            <div className="mt-2 space-y-3 text-sm text-text-secondary">
+              {booking.ancillarySummary.seats && booking.ancillarySummary.seats.length > 0 && (
+                <div>
+                  <h4 className="font-medium text-text-primary text-xs uppercase tracking-wider mb-1">
+                    Seats
+                  </h4>
+                  <ul className="list-disc list-inside space-y-1 pl-1">
+                    {booking.ancillarySummary.seats.map((seat: any, idx: number) => (
+                      <li key={`seat-${idx}`}>
+                        {seat.passengerName || 'Passenger'}: Seat {seat.seatDesignator} (
+                        {currencyFormatter(seat.amount, seat.currency)})
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+              {booking.ancillarySummary.baggage && booking.ancillarySummary.baggage.length > 0 && (
+                <div>
+                  <h4 className="font-medium text-text-primary text-xs uppercase tracking-wider mb-1">
+                    Baggage
+                  </h4>
+                  <ul className="list-disc list-inside space-y-1 pl-1">
+                    {booking.ancillarySummary.baggage.map((bag: any, idx: number) => (
+                      <li key={`bag-${idx}`}>
+                        {bag.passengerName || 'Passenger'}: {bag.quantity}x {bag.type} (
+                        {currencyFormatter(
+                          (Number(bag.amount) * bag.quantity).toString(),
+                          bag.currency,
+                        )}
+                        )
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
           </div>
-        </div>
-      )}
+        )}
 
       <div className="border-t border-card-border pt-4">
         <h3 className="font-semibold text-text-primary">Payment summary</h3>
-        <p className="mt-1 text-sm text-text-secondary">Total paid: {currencyFormatter(booking.totalAmount, booking.currency)}</p>
+        <p className="mt-1 text-sm text-text-secondary">
+          Total paid: {currencyFormatter(booking.totalAmount, booking.currency)}
+        </p>
       </div>
 
       {/* Itinerary Revision History */}
@@ -375,13 +443,13 @@ export function BookingDetail({ booking: initialBooking }: BookingDetailProps) {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
           <div className="bg-background border border-border-primary rounded-xl p-6 max-w-md w-full shadow-2xl">
             <h3 className="text-xl font-bold text-text-primary mb-4">Cancel Booking</h3>
-            
+
             {loadingQuote ? (
               <p className="text-text-secondary">Fetching cancellation quote...</p>
             ) : error ? (
               <div>
                 <p className="text-text-cancelled mb-4">{error}</p>
-                <button 
+                <button
                   onClick={() => setShowCancelModal(false)}
                   className="px-4 py-2 bg-bg-secondary text-text-primary rounded hover:bg-border-primary transition-colors"
                 >
@@ -393,15 +461,24 @@ export function BookingDetail({ booking: initialBooking }: BookingDetailProps) {
                 <div className="bg-bg-secondary p-4 rounded-lg space-y-2">
                   <div className="flex justify-between text-sm">
                     <span className="text-text-secondary">Total Paid:</span>
-                    <span className="font-medium text-text-primary">{currencyFormatter(booking.totalAmount, booking.currency)}</span>
+                    <span className="font-medium text-text-primary">
+                      {currencyFormatter(booking.totalAmount, booking.currency)}
+                    </span>
                   </div>
                   <div className="flex justify-between text-sm">
                     <span className="text-text-secondary">Refund Amount:</span>
-                    <span className="font-medium text-text-primary">{currencyFormatter(quote.refundAmount, quote.currency)}</span>
+                    <span className="font-medium text-text-primary">
+                      {currencyFormatter(quote.refundAmount, quote.currency)}
+                    </span>
                   </div>
                   <div className="flex justify-between text-sm text-text-cancelled">
                     <span>Penalty / Fees:</span>
-                    <span>{currencyFormatter((Number(booking.totalAmount) - Number(quote.refundAmount)).toString(), quote.currency)}</span>
+                    <span>
+                      {currencyFormatter(
+                        (Number(booking.totalAmount) - Number(quote.refundAmount)).toString(),
+                        quote.currency,
+                      )}
+                    </span>
                   </div>
                   {quote.refundTo && (
                     <div className="flex justify-between text-sm">
@@ -412,32 +489,40 @@ export function BookingDetail({ booking: initialBooking }: BookingDetailProps) {
                   {quote.nonRefundableAncillaryAmount && (
                     <div className="flex justify-between text-sm text-text-cancelled">
                       <span>Non-refundable Extras:</span>
-                      <span>{currencyFormatter(quote.nonRefundableAncillaryAmount, quote.nonRefundableAncillaryCurrency || quote.currency || booking.currency)}</span>
+                      <span>
+                        {currencyFormatter(
+                          quote.nonRefundableAncillaryAmount,
+                          quote.nonRefundableAncillaryCurrency ||
+                            quote.currency ||
+                            booking.currency,
+                        )}
+                      </span>
                     </div>
                   )}
                 </div>
 
                 <label className="flex items-start gap-2 cursor-pointer mt-4">
-                  <input 
-                    type="checkbox" 
+                  <input
+                    type="checkbox"
                     className="mt-1"
                     checked={confirmCancel}
                     onChange={(e) => setConfirmCancel(e.target.checked)}
                   />
                   <span className="text-sm text-text-secondary">
-                    I understand that this action cannot be undone and the refund amount is subject to airline policies.
+                    I understand that this action cannot be undone and the refund amount is subject
+                    to airline policies.
                   </span>
                 </label>
 
                 <div className="flex justify-end gap-3 mt-6">
-                  <button 
+                  <button
                     onClick={() => setShowCancelModal(false)}
                     disabled={cancelling}
                     className="px-4 py-2 bg-bg-secondary text-text-primary rounded hover:bg-border-primary transition-colors disabled:opacity-50"
                   >
                     Go Back
                   </button>
-                  <button 
+                  <button
                     onClick={handleConfirmCancellation}
                     disabled={!confirmCancel || cancelling}
                     className="px-4 py-2 bg-danger-border text-white rounded hover:bg-red-600 transition-colors disabled:opacity-50"

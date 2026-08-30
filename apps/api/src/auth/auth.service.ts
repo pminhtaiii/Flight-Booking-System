@@ -76,13 +76,13 @@ export class AuthService {
       });
 
       const token = this.jwtService.sign(
-        { 
-          id: result.id, 
+        {
+          id: result.id,
           email: result.email,
           sub: result.id,
           jti: crypto.randomUUID(),
         },
-        { 
+        {
           expiresIn: '24h',
           issuer: 'booking-systems-api',
           audience: 'booking-systems-clients',
@@ -179,13 +179,13 @@ export class AuthService {
     });
 
     const token = this.jwtService.sign(
-      { 
-        id: updatedUser.id, 
+      {
+        id: updatedUser.id,
         email: updatedUser.email,
         sub: updatedUser.id,
         jti: crypto.randomUUID(),
       },
-      { 
+      {
         expiresIn: '24h',
         issuer: 'booking-systems-api',
         audience: 'booking-systems-clients',
@@ -231,7 +231,11 @@ export class AuthService {
     });
   }
 
-  async validateUserAccess(userId: string, jti?: string | null, token?: string | null): Promise<{ allowed: boolean; userId: string }> {
+  async validateUserAccess(
+    userId: string,
+    jti?: string | null,
+    token?: string | null,
+  ): Promise<{ allowed: boolean; userId: string }> {
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
     });

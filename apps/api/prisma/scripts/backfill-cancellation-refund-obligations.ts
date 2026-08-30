@@ -1,10 +1,4 @@
-import {
-  PrismaClient,
-  BookingStatus,
-  RefundStatus,
-  LedgerEntryType,
-  Prisma,
-} from '@prisma/client';
+import { PrismaClient, BookingStatus, RefundStatus, LedgerEntryType, Prisma } from '@prisma/client';
 import { Logger } from '@nestjs/common';
 
 export type BackfillStats = {
@@ -178,7 +172,9 @@ const DATA_QUALITY_OR_INVARIANT_QUARANTINE_REASONS = new Set<QuarantineReason>([
   'NON_TERMINAL_REFUND_LEDGER_LINK',
 ]);
 
-export function toMinorUnits(amount: Prisma.Decimal | number | string | null | undefined): number | null {
+export function toMinorUnits(
+  amount: Prisma.Decimal | number | string | null | undefined,
+): number | null {
   if (amount === null || amount === undefined) {
     return null;
   }
@@ -261,7 +257,8 @@ export async function backfillCancellationRefundObligations(
   const prisma = options?.prisma ?? new PrismaClient();
   const shouldDisconnect = !options?.prisma;
   const chunkSize = options?.chunkSize ?? 50;
-  const logger: BackfillLogger = options?.logger ?? new Logger('CancellationRefundObligationBackfill');
+  const logger: BackfillLogger =
+    options?.logger ?? new Logger('CancellationRefundObligationBackfill');
 
   const stats: BackfillStats = {
     processedBookings: 0,
@@ -344,10 +341,7 @@ export async function backfillCancellationRefundObligations(
             continue;
           }
 
-          if (
-            legacyRefund?.paymentId &&
-            booking.paymentId !== legacyRefund.paymentId
-          ) {
+          if (legacyRefund?.paymentId && booking.paymentId !== legacyRefund.paymentId) {
             quarantine('LEGACY_REFUND_PAYMENT_MISMATCH');
             continue;
           }
@@ -441,10 +435,7 @@ export async function backfillCancellationRefundObligations(
             obligationId = created.id;
           }
 
-          if (
-            legacyRefund &&
-            legacyRefund.cancellationRefundObligationId !== obligationId
-          ) {
+          if (legacyRefund && legacyRefund.cancellationRefundObligationId !== obligationId) {
             await prisma.refund.update({
               where: { id: legacyRefund.id },
               data: {

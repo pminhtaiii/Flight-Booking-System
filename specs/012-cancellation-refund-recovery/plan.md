@@ -14,14 +14,14 @@ escalate to manual attention and notify the traveller.
 
 ## Technical Context
 
-| Area | Decision |
-| --- | --- |
-| Runtime | NestJS, Next.js App Router, Prisma/PostgreSQL, Stripe, Duffel |
-| Transaction boundary | No AI involvement; every external action has an audit record and correlation ID |
-| Concurrency | Conditional Prisma writes (CAS); never hold a DB transaction across an external HTTP call |
-| Supplier recovery | Remote-first Duffel order/quote verification after a crash or stale claim |
-| Refund safety | One logical refund + one Stripe idempotency key; stop at 22 hours |
-| Observability | Structured PII-safe logs, metrics for claims/retries/escalations, audit events and alerts |
+| Area                 | Decision                                                                                  |
+| -------------------- | ----------------------------------------------------------------------------------------- |
+| Runtime              | NestJS, Next.js App Router, Prisma/PostgreSQL, Stripe, Duffel                             |
+| Transaction boundary | No AI involvement; every external action has an audit record and correlation ID           |
+| Concurrency          | Conditional Prisma writes (CAS); never hold a DB transaction across an external HTTP call |
+| Supplier recovery    | Remote-first Duffel order/quote verification after a crash or stale claim                 |
+| Refund safety        | One logical refund + one Stripe idempotency key; stop at 22 hours                         |
+| Observability        | Structured PII-safe logs, metrics for claims/retries/escalations, audit events and alerts |
 
 ## Constitution Check
 

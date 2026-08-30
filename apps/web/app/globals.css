@@ -1,6 +1,51 @@
 @import "tailwindcss";
 
 :root {
+  /* Dashboard semantic tokens */
+  --dashboard-page-bg: linear-gradient(135deg, #ebf4ff 0%, #f8fafc 100%);
+  --dashboard-surface: rgba(240, 243, 255, 0.85);
+  --dashboard-surface-subtle: rgba(240, 243, 255, 0.6);
+  --dashboard-glass: rgba(255, 255, 255, 0.65);
+  --dashboard-glass-hover: rgba(255, 255, 255, 0.85);
+  --dashboard-border: rgba(193, 199, 208, 0.4);
+  --dashboard-border-subtle: rgba(193, 199, 208, 0.24);
+  --dashboard-glass-border: rgba(255, 255, 255, 0.5);
+  --dashboard-glass-border-hover: rgba(153, 204, 255, 0.6);
+  --dashboard-text-primary: #111c2d;
+  --dashboard-text-secondary: #41474f;
+  --dashboard-text-muted: #64748b;
+  --dashboard-heading-gradient: linear-gradient(90deg, #2b628f 0%, #0051d5 100%);
+  --dashboard-accent: #2b628f;
+  --dashboard-accent-hover: #034a76;
+  --dashboard-accent-glow: rgba(153, 204, 255, 0.4);
+  --dashboard-action-primary: #0051d5;
+  --dashboard-action-primary-bg: rgba(153, 204, 255, 0.4);
+  --dashboard-action-secondary-bg: rgba(49, 107, 243, 0.2);
+  --dashboard-action-tertiary-bg: rgba(247, 189, 107, 0.35);
+  --dashboard-card-bg: rgba(255, 255, 255, 0.65);
+  --dashboard-card-hover: rgba(255, 255, 255, 0.85);
+  --dashboard-card-shadow: 0 4px 12px rgba(0, 0, 0, 0.03), 0 1px 3px rgba(0, 0, 0, 0.02);
+  --dashboard-card-shadow-hover:
+    0 12px 24px -4px rgba(153, 204, 255, 0.35), 0 4px 8px -2px rgba(153, 204, 255, 0.2);
+  --dashboard-stat-total: #2b628f;
+  --dashboard-stat-upcoming: #0051d5;
+  --dashboard-stat-completed: #078838;
+  --dashboard-stat-cancelled: #93000a;
+  --dashboard-status-confirmed-bg: #e6f7ec;
+  --dashboard-status-confirmed-text: #078838;
+  --dashboard-status-confirmed-border: rgba(7, 136, 56, 0.2);
+  --dashboard-status-completed-bg: #e7eeff;
+  --dashboard-status-completed-text: #2b628f;
+  --dashboard-status-completed-border: rgba(43, 98, 143, 0.2);
+  --dashboard-status-cancelled-bg: #ffdad6;
+  --dashboard-status-cancelled-text: #93000a;
+  --dashboard-status-cancelled-border: rgba(147, 0, 10, 0.2);
+  --dashboard-status-pending-bg: #fff4d6;
+  --dashboard-status-pending-text: #8a4b00;
+  --dashboard-status-pending-border: rgba(138, 75, 0, 0.2);
+  --dashboard-focus-ring: #2b628f;
+  --dashboard-focus-ring-glow: rgba(153, 204, 255, 0.6);
+
   --theme-secondary: #FFFFFF;
   --theme-secondary-border: #E7EAF3;
   --theme-secondary-foreground: #101828;
@@ -40,6 +85,51 @@
 }
 
 :root.dark {
+  /* Dashboard semantic tokens */
+  --dashboard-page-bg: linear-gradient(135deg, #0b1320 0%, #111c2d 100%);
+  --dashboard-surface: rgba(17, 28, 45, 0.85);
+  --dashboard-surface-subtle: rgba(17, 28, 45, 0.6);
+  --dashboard-glass: rgba(23, 38, 60, 0.7);
+  --dashboard-glass-hover: rgba(30, 49, 77, 0.85);
+  --dashboard-border: rgba(75, 95, 122, 0.35);
+  --dashboard-border-subtle: rgba(75, 95, 122, 0.22);
+  --dashboard-glass-border: rgba(153, 204, 255, 0.15);
+  --dashboard-glass-border-hover: rgba(153, 204, 255, 0.4);
+  --dashboard-text-primary: #f0f4fc;
+  --dashboard-text-secondary: #9cb1cf;
+  --dashboard-text-muted: #627b9f;
+  --dashboard-heading-gradient: linear-gradient(90deg, #99ccff 0%, #60a5fa 100%);
+  --dashboard-accent: #99ccff;
+  --dashboard-accent-hover: #cee5ff;
+  --dashboard-accent-glow: rgba(153, 204, 255, 0.2);
+  --dashboard-action-primary: #99ccff;
+  --dashboard-action-primary-bg: rgba(43, 98, 143, 0.4);
+  --dashboard-action-secondary-bg: rgba(37, 99, 235, 0.3);
+  --dashboard-action-tertiary-bg: rgba(180, 83, 9, 0.3);
+  --dashboard-card-bg: rgba(23, 38, 60, 0.7);
+  --dashboard-card-hover: rgba(30, 49, 77, 0.85);
+  --dashboard-card-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  --dashboard-card-shadow-hover:
+    0 12px 24px -4px rgba(0, 0, 0, 0.5), 0 4px 8px -2px rgba(153, 204, 255, 0.1);
+  --dashboard-stat-total: #99ccff;
+  --dashboard-stat-upcoming: #93c5fd;
+  --dashboard-stat-completed: #34d399;
+  --dashboard-stat-cancelled: #fca5a5;
+  --dashboard-status-confirmed-bg: rgba(6, 95, 70, 0.4);
+  --dashboard-status-confirmed-text: #34d399;
+  --dashboard-status-confirmed-border: rgba(52, 211, 153, 0.3);
+  --dashboard-status-completed-bg: rgba(30, 58, 138, 0.4);
+  --dashboard-status-completed-text: #93c5fd;
+  --dashboard-status-completed-border: rgba(147, 197, 253, 0.3);
+  --dashboard-status-cancelled-bg: rgba(127, 29, 29, 0.4);
+  --dashboard-status-cancelled-text: #fca5a5;
+  --dashboard-status-cancelled-border: rgba(252, 165, 165, 0.3);
+  --dashboard-status-pending-bg: rgba(120, 83, 9, 0.4);
+  --dashboard-status-pending-text: #fbbf24;
+  --dashboard-status-pending-border: rgba(251, 191, 36, 0.3);
+  --dashboard-focus-ring: #99ccff;
+  --dashboard-focus-ring-glow: rgba(153, 204, 255, 0.4);
+
   --theme-secondary: #1F2937;
   --theme-secondary-border: #374151;
   --theme-secondary-foreground: #F9FAFB;
@@ -76,6 +166,74 @@
   --theme-match-bar-weak: #FF8904;
   --theme-user-bubble-shadow: rgba(0, 0, 0, 0.4);
   --theme-chat-card-shadow: rgba(0, 0, 0, 0.4);
+}
+
+@supports not (backdrop-filter: blur(1px)) {
+  :root {
+    --dashboard-surface: #f0f3ff;
+    --dashboard-surface-subtle: #f8fafc;
+    --dashboard-glass: #ffffff;
+    --dashboard-glass-hover: #f1f5f9;
+    --dashboard-card-bg: #ffffff;
+    --dashboard-card-hover: #f1f5f9;
+  }
+
+  :root.dark {
+    --dashboard-surface: #111c2d;
+    --dashboard-surface-subtle: #17263c;
+    --dashboard-glass: #17263c;
+    --dashboard-glass-hover: #1e314d;
+    --dashboard-card-bg: #17263c;
+    --dashboard-card-hover: #1e314d;
+  }
+}
+
+@media (forced-colors: active) {
+  :root,
+  :root.dark {
+    --dashboard-page-bg: Canvas;
+    --dashboard-surface: Canvas;
+    --dashboard-surface-subtle: Canvas;
+    --dashboard-border: ButtonText;
+    --dashboard-border-subtle: ButtonText;
+    --dashboard-glass: Canvas;
+    --dashboard-glass-hover: Canvas;
+    --dashboard-glass-border: ButtonText;
+    --dashboard-glass-border-hover: Highlight;
+    --dashboard-text-primary: CanvasText;
+    --dashboard-text-secondary: CanvasText;
+    --dashboard-text-muted: CanvasText;
+    --dashboard-heading-gradient: none;
+    --dashboard-accent: LinkText;
+    --dashboard-accent-hover: LinkText;
+    --dashboard-accent-glow: transparent;
+    --dashboard-action-primary: LinkText;
+    --dashboard-action-primary-bg: Canvas;
+    --dashboard-action-secondary-bg: Canvas;
+    --dashboard-action-tertiary-bg: Canvas;
+    --dashboard-card-bg: Canvas;
+    --dashboard-card-hover: Canvas;
+    --dashboard-card-shadow: none;
+    --dashboard-card-shadow-hover: none;
+    --dashboard-stat-total: CanvasText;
+    --dashboard-stat-upcoming: CanvasText;
+    --dashboard-stat-completed: CanvasText;
+    --dashboard-stat-cancelled: CanvasText;
+    --dashboard-status-confirmed-bg: Canvas;
+    --dashboard-status-confirmed-text: CanvasText;
+    --dashboard-status-confirmed-border: ButtonText;
+    --dashboard-status-completed-bg: Canvas;
+    --dashboard-status-completed-text: CanvasText;
+    --dashboard-status-completed-border: ButtonText;
+    --dashboard-status-cancelled-bg: Canvas;
+    --dashboard-status-cancelled-text: CanvasText;
+    --dashboard-status-cancelled-border: ButtonText;
+    --dashboard-status-pending-bg: Canvas;
+    --dashboard-status-pending-text: CanvasText;
+    --dashboard-status-pending-border: ButtonText;
+    --dashboard-focus-ring: Highlight;
+    --dashboard-focus-ring-glow: transparent;
+  }
 }
 
 @theme {

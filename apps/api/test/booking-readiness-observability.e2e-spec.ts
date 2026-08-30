@@ -1,7 +1,8 @@
 import * as crypto from 'crypto';
 
 process.env.ENCRYPTION_KEY = process.env.ENCRYPTION_KEY || crypto.randomBytes(32).toString('hex');
-process.env.CHAT_ENCRYPTION_KEY = process.env.CHAT_ENCRYPTION_KEY || crypto.randomBytes(32).toString('hex');
+process.env.CHAT_ENCRYPTION_KEY =
+  process.env.CHAT_ENCRYPTION_KEY || crypto.randomBytes(32).toString('hex');
 process.env.STRIPE_SECRET_KEY = 'sk_test_fake';
 process.env.STRIPE_WEBHOOK_SECRET = 'whsec_test_fake';
 process.env.FEATURE_FLAG_BOOKING_READINESS = 'true';
@@ -97,9 +98,15 @@ describe('Booking Readiness Observability (E2E) - Tasks T073 & T074', () => {
     jwtService = moduleFixture.get<JwtService>(JwtService);
     duffelService = moduleFixture.get<DuffelService>(DuffelService);
     encryptionService = moduleFixture.get<EncryptionService>(EncryptionService);
-    metricsService = moduleFixture.get<BookingReadinessMetricsService>(BookingReadinessMetricsService);
-    backfillService = moduleFixture.get<PassportExpiryBackfillService>(PassportExpiryBackfillService);
-    finalValidatorService = moduleFixture.get<BookingPassengerFinalValidatorService>(BookingPassengerFinalValidatorService);
+    metricsService = moduleFixture.get<BookingReadinessMetricsService>(
+      BookingReadinessMetricsService,
+    );
+    backfillService = moduleFixture.get<PassportExpiryBackfillService>(
+      PassportExpiryBackfillService,
+    );
+    finalValidatorService = moduleFixture.get<BookingPassengerFinalValidatorService>(
+      BookingPassengerFinalValidatorService,
+    );
 
     // Clean tables for isolated run
     await prisma.chatHandoff.deleteMany({});
@@ -195,7 +202,9 @@ describe('Booking Readiness Observability (E2E) - Tasks T073 & T074', () => {
   afterAll(async () => {
     if (prisma && testUser?.id) {
       await prisma.auditLog.deleteMany({ where: { userId: testUser.id } });
-      await prisma.bookingIntentPassenger.deleteMany({ where: { intent: { userId: testUser.id } } });
+      await prisma.bookingIntentPassenger.deleteMany({
+        where: { intent: { userId: testUser.id } },
+      });
       await prisma.bookingIntent.deleteMany({ where: { userId: testUser.id } });
       await prisma.travelerProfile.deleteMany({ where: { userId: testUser.id } });
       await prisma.user.deleteMany({ where: { id: testUser.id } });
@@ -206,9 +215,7 @@ describe('Booking Readiness Observability (E2E) - Tasks T073 & T074', () => {
 
   describe('1. Standardized Health Snapshot Endpoints', () => {
     it('GET /health/booking-readiness returns 200 with complete snapshot and zero PII', async () => {
-      const res = await request(app.getHttpServer())
-        .get('/health/booking-readiness')
-        .expect(200);
+      const res = await request(app.getHttpServer()).get('/health/booking-readiness').expect(200);
 
       healthResponseBody = JSON.stringify(res.body);
 
@@ -241,19 +248,25 @@ describe('Booking Readiness Observability (E2E) - Tasks T073 & T074', () => {
 
   describe('2. Traveler Profile Metrics (Reads, Updates, CAS Conflicts)', () => {
     it('increments traveler_profile_reads_total on GET /api/profile', async () => {
-      const initialReads = metricsService.getMetric(BOOKING_READINESS_METRIC_COUNTERS.TRAVELER_PROFILE_READS);
+      const initialReads = metricsService.getMetric(
+        BOOKING_READINESS_METRIC_COUNTERS.TRAVELER_PROFILE_READS,
+      );
 
       await request(app.getHttpServer())
         .get('/api/profile')
         .set('Authorization', `Bearer ${testToken}`)
         .expect(200);
 
-      const readsAfter = metricsService.getMetric(BOOKING_READINESS_METRIC_COUNTERS.TRAVELER_PROFILE_READS);
+      const readsAfter = metricsService.getMetric(
+        BOOKING_READINESS_METRIC_COUNTERS.TRAVELER_PROFILE_READS,
+      );
       expect(readsAfter).toBe(initialReads + 1);
     });
 
     it('increments traveler_profile_updates_total on initial profile creation and updates', async () => {
-      const initialUpdates = metricsService.getMetric(BOOKING_READINESS_METRIC_COUNTERS.TRAVELER_PROFILE_UPDATES);
+      const initialUpdates = metricsService.getMetric(
+        BOOKING_READINESS_METRIC_COUNTERS.TRAVELER_PROFILE_UPDATES,
+      );
 
       const res = await request(app.getHttpServer())
         .patch('/api/profile')
@@ -282,13 +295,17 @@ describe('Booking Readiness Observability (E2E) - Tasks T073 & T074', () => {
         })
         .expect(200);
 
-      const updatesAfter = metricsService.getMetric(BOOKING_READINESS_METRIC_COUNTERS.TRAVELER_PROFILE_UPDATES);
+      const updatesAfter = metricsService.getMetric(
+        BOOKING_READINESS_METRIC_COUNTERS.TRAVELER_PROFILE_UPDATES,
+      );
       expect(updatesAfter).toBe(initialUpdates + 1);
       expect(res.body.revision).toBe(1);
     });
 
     it('increments traveler_profile_conflicts_total when CAS revision mismatch occurs', async () => {
-      const initialConflicts = metricsService.getMetric(BOOKING_READINESS_METRIC_COUNTERS.TRAVELER_PROFILE_CONFLICTS);
+      const initialConflicts = metricsService.getMetric(
+        BOOKING_READINESS_METRIC_COUNTERS.TRAVELER_PROFILE_CONFLICTS,
+      );
 
       const res = await request(app.getHttpServer())
         .patch('/api/profile')
@@ -305,7 +322,9 @@ describe('Booking Readiness Observability (E2E) - Tasks T073 & T074', () => {
         })
         .expect(409);
 
-      const conflictsAfter = metricsService.getMetric(BOOKING_READINESS_METRIC_COUNTERS.TRAVELER_PROFILE_CONFLICTS);
+      const conflictsAfter = metricsService.getMetric(
+        BOOKING_READINESS_METRIC_COUNTERS.TRAVELER_PROFILE_CONFLICTS,
+      );
       expect(conflictsAfter).toBe(initialConflicts + 1);
       expect(res.body.message).toBe('PROFILE_UPDATE_CONFLICT');
     });
@@ -313,8 +332,12 @@ describe('Booking Readiness Observability (E2E) - Tasks T073 & T074', () => {
 
   describe('3. Advisory Readiness Checks & Evaluations Metrics', () => {
     it('increments booking_readiness_checks_total and booking_readiness_evaluations_total on advisory checks', async () => {
-      const initialChecks = metricsService.getMetric(BOOKING_READINESS_METRIC_COUNTERS.BOOKING_READINESS_CHECKS);
-      const initialEvals = metricsService.getMetric(BOOKING_READINESS_METRIC_COUNTERS.BOOKING_READINESS_EVALUATIONS);
+      const initialChecks = metricsService.getMetric(
+        BOOKING_READINESS_METRIC_COUNTERS.BOOKING_READINESS_CHECKS,
+      );
+      const initialEvals = metricsService.getMetric(
+        BOOKING_READINESS_METRIC_COUNTERS.BOOKING_READINESS_EVALUATIONS,
+      );
 
       const profile = await prisma.travelerProfile.findUnique({ where: { userId: testUser.id } });
       expect(profile).toBeDefined();
@@ -341,8 +364,12 @@ describe('Booking Readiness Observability (E2E) - Tasks T073 & T074', () => {
 
       expect(res.body.ready).toBe(true);
 
-      const checksAfter = metricsService.getMetric(BOOKING_READINESS_METRIC_COUNTERS.BOOKING_READINESS_CHECKS);
-      const evalsAfter = metricsService.getMetric(BOOKING_READINESS_METRIC_COUNTERS.BOOKING_READINESS_EVALUATIONS);
+      const checksAfter = metricsService.getMetric(
+        BOOKING_READINESS_METRIC_COUNTERS.BOOKING_READINESS_CHECKS,
+      );
+      const evalsAfter = metricsService.getMetric(
+        BOOKING_READINESS_METRIC_COUNTERS.BOOKING_READINESS_EVALUATIONS,
+      );
 
       expect(checksAfter).toBe(initialChecks + 1);
       expect(evalsAfter).toBe(initialEvals + 1);
@@ -438,7 +465,9 @@ describe('Booking Readiness Observability (E2E) - Tasks T073 & T074', () => {
     });
 
     it('increments booking_intent_creations_total on successful intent creation', async () => {
-      const initialCreations = metricsService.getMetric(BOOKING_READINESS_METRIC_COUNTERS.BOOKING_INTENT_CREATIONS);
+      const initialCreations = metricsService.getMetric(
+        BOOKING_READINESS_METRIC_COUNTERS.BOOKING_INTENT_CREATIONS,
+      );
 
       const duffelSpy = jest.spyOn(duffelService['duffel'].offers, 'get').mockResolvedValue({
         data: {
@@ -479,7 +508,9 @@ describe('Booking Readiness Observability (E2E) - Tasks T073 & T074', () => {
       intentResponseBody = JSON.stringify(res.body);
       duffelSpy.mockRestore();
 
-      const creationsAfter = metricsService.getMetric(BOOKING_READINESS_METRIC_COUNTERS.BOOKING_INTENT_CREATIONS);
+      const creationsAfter = metricsService.getMetric(
+        BOOKING_READINESS_METRIC_COUNTERS.BOOKING_INTENT_CREATIONS,
+      );
       expect(creationsAfter).toBe(initialCreations + 1);
       expect(res.body.intentId).toBeDefined();
     });
@@ -598,7 +629,9 @@ describe('Booking Readiness Observability (E2E) - Tasks T073 & T074', () => {
 
   describe('6. Passport Expiry Backfill Metrics', () => {
     it('increments passport_expiry_backfill_runs_total and passport_expiry_backfill_quarantined_total', async () => {
-      const initialRuns = metricsService.getMetric(BOOKING_READINESS_METRIC_COUNTERS.PASSPORT_EXPIRY_BACKFILL_RUNS);
+      const initialRuns = metricsService.getMetric(
+        BOOKING_READINESS_METRIC_COUNTERS.PASSPORT_EXPIRY_BACKFILL_RUNS,
+      );
       const initialQuarantined = metricsService.getMetric(
         BOOKING_READINESS_METRIC_COUNTERS.PASSPORT_EXPIRY_BACKFILL_QUARANTINED,
       );
@@ -627,11 +660,15 @@ describe('Booking Readiness Observability (E2E) - Tasks T073 & T074', () => {
       const res = await backfillService.backfill({ batchSize: 10 });
       expect(res.processed).toBeGreaterThanOrEqual(1);
 
-      const afterRuns = metricsService.getMetric(BOOKING_READINESS_METRIC_COUNTERS.PASSPORT_EXPIRY_BACKFILL_RUNS);
+      const afterRuns = metricsService.getMetric(
+        BOOKING_READINESS_METRIC_COUNTERS.PASSPORT_EXPIRY_BACKFILL_RUNS,
+      );
       expect(afterRuns).toBe(initialRuns + 1);
 
       // Verify quarantine incrementing by recording a quarantine event
-      metricsService.increment(BOOKING_READINESS_METRIC_COUNTERS.PASSPORT_EXPIRY_BACKFILL_QUARANTINED);
+      metricsService.increment(
+        BOOKING_READINESS_METRIC_COUNTERS.PASSPORT_EXPIRY_BACKFILL_QUARANTINED,
+      );
       const afterQuarantine = metricsService.getMetric(
         BOOKING_READINESS_METRIC_COUNTERS.PASSPORT_EXPIRY_BACKFILL_QUARANTINED,
       );
@@ -729,9 +766,7 @@ describe('Booking Readiness Observability (E2E) - Tasks T073 & T074', () => {
         .spyOn(prisma, '$transaction')
         .mockRejectedValueOnce(new Error('DB Timeout'));
 
-      const res = await request(app.getHttpServer())
-        .get('/health/booking-readiness')
-        .expect(503);
+      const res = await request(app.getHttpServer()).get('/health/booking-readiness').expect(503);
 
       prismaSpy.mockRestore();
 
@@ -742,9 +777,7 @@ describe('Booking Readiness Observability (E2E) - Tasks T073 & T074', () => {
     it('returns 503 degraded when redis check fails in health endpoint', async () => {
       const cacheSpy = jest.spyOn(cacheService, 'checkHealth').mockResolvedValueOnce('down');
 
-      const res = await request(app.getHttpServer())
-        .get('/health/booking-readiness')
-        .expect(503);
+      const res = await request(app.getHttpServer()).get('/health/booking-readiness').expect(503);
 
       cacheSpy.mockRestore();
 
@@ -760,9 +793,7 @@ describe('Booking Readiness Observability (E2E) - Tasks T073 & T074', () => {
         '125',
       );
 
-      const res = await request(app.getHttpServer())
-        .get('/health/booking-readiness')
-        .expect(200);
+      const res = await request(app.getHttpServer()).get('/health/booking-readiness').expect(200);
 
       expect(res.body.status).toBe('ok');
       expect(res.body.metrics.distributed_e2e_counter).toBeGreaterThanOrEqual(50);

@@ -62,7 +62,9 @@ describe('Agent Gateway Characterization (E2E)', () => {
 
     prisma = moduleFixture.get<PrismaService>(PrismaService);
     duffelService = moduleFixture.get<DuffelService>(DuffelService);
-    attestationService = moduleFixture.get<SelectionAttestationService>(SelectionAttestationService);
+    attestationService = moduleFixture.get<SelectionAttestationService>(
+      SelectionAttestationService,
+    );
 
     // Mock Duffel flight search
     jest.spyOn(duffelService, 'searchFlights').mockImplementation(async (query: any) => {
@@ -153,8 +155,24 @@ describe('Agent Gateway Characterization (E2E)', () => {
 
     await prisma.airport.createMany({
       data: [
-        { iataCode: 'SGN', name: 'Tan Son Nhat', city: 'Ho Chi Minh', country: 'VN', latitude: 10.82, longitude: 106.65, type: 'LARGE_AIRPORT' },
-        { iataCode: 'HAN', name: 'Noi Bai', city: 'Hanoi', country: 'VN', latitude: 21.22, longitude: 105.80, type: 'LARGE_AIRPORT' },
+        {
+          iataCode: 'SGN',
+          name: 'Tan Son Nhat',
+          city: 'Ho Chi Minh',
+          country: 'VN',
+          latitude: 10.82,
+          longitude: 106.65,
+          type: 'LARGE_AIRPORT',
+        },
+        {
+          iataCode: 'HAN',
+          name: 'Noi Bai',
+          city: 'Hanoi',
+          country: 'VN',
+          latitude: 21.22,
+          longitude: 105.8,
+          type: 'LARGE_AIRPORT',
+        },
       ],
     });
 
@@ -248,7 +266,11 @@ describe('Agent Gateway Characterization (E2E)', () => {
         .expect(401);
 
       // Invalid signature
-      const invalidSignatureToken = mintClaimToken(userA.id, Math.floor(Date.now() / 1000), 'wrong-secret');
+      const invalidSignatureToken = mintClaimToken(
+        userA.id,
+        Math.floor(Date.now() / 1000),
+        'wrong-secret',
+      );
       await request(app.getHttpServer())
         .get('/api/agent-gateway/flights/search')
         .set('X-Agent-API-Key', apiKey)

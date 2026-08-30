@@ -27,7 +27,9 @@ describe('BookingReadinessMetricsService', () => {
     };
 
     mockPrismaService = {
-      $transaction: jest.fn().mockResolvedValue(undefined) as unknown as jest.Mocked<PrismaService>['$transaction'],
+      $transaction: jest
+        .fn()
+        .mockResolvedValue(undefined) as unknown as jest.Mocked<PrismaService>['$transaction'],
     };
 
     mockConfigService = {
@@ -128,10 +130,12 @@ describe('BookingReadinessMetricsService', () => {
 
   describe('3. Distributed Metrics Merging in Health Snapshot', () => {
     it('merges distributed counters from cache into health snapshot', async () => {
-      mockCacheService.keys = jest.fn().mockResolvedValue([
-        'metrics:booking_readiness:counter:traveler_profile_reads_total',
-        'metrics:booking_readiness:counter:custom_metric_total',
-      ]);
+      mockCacheService.keys = jest
+        .fn()
+        .mockResolvedValue([
+          'metrics:booking_readiness:counter:traveler_profile_reads_total',
+          'metrics:booking_readiness:counter:custom_metric_total',
+        ]);
       mockCacheService.get = jest.fn().mockImplementation(async (key: string) => {
         if (key === 'metrics:booking_readiness:counter:traveler_profile_reads_total') return '42';
         if (key === 'metrics:booking_readiness:counter:custom_metric_total') return '15';
@@ -144,9 +148,9 @@ describe('BookingReadinessMetricsService', () => {
     });
 
     it('merges distributed latency samples from cache into health snapshot', async () => {
-      mockCacheService.keys = jest.fn().mockResolvedValue([
-        'metrics:booking_readiness:latency:distributed_op',
-      ]);
+      mockCacheService.keys = jest
+        .fn()
+        .mockResolvedValue(['metrics:booking_readiness:latency:distributed_op']);
       mockCacheService.lrange = jest.fn().mockResolvedValue(['10', '20', '30', '40', '50']);
 
       const snapshot = await service.getHealthSnapshot();
@@ -170,7 +174,9 @@ describe('BookingReadinessMetricsService', () => {
     });
 
     it('returns status degraded when database is down', async () => {
-      mockPrismaService.$transaction = jest.fn().mockRejectedValue(new Error('DB Connection Timeout'));
+      mockPrismaService.$transaction = jest
+        .fn()
+        .mockRejectedValue(new Error('DB Connection Timeout'));
 
       const snapshot = await service.getHealthSnapshot();
       expect(snapshot.status).toBe('degraded');

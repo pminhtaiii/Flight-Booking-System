@@ -2,13 +2,13 @@
 
 Existing `/api/agent-gateway/...` paths, guards, status codes, and safe response bodies remain compatible while ownership moves to these modules:
 
-| Capability | Owns |
-|---|---|
-| Attested Flight Search | Legacy-compatible search, V2 attested search, mapping, selection attestation, privacy-safe audit |
-| Agent Booking Readiness | Readiness evaluation projection and observability |
-| Safe Booking Read | Summary/detail two-tier projection and temporarily retained legacy endpoint |
-| Traveler Preferences | Allowlisted preference projection |
-| Agent Chat (Chat module) | Access/revocation, session/message/memory persistence, fencing, deletion |
+| Capability               | Owns                                                                                             |
+| ------------------------ | ------------------------------------------------------------------------------------------------ |
+| Attested Flight Search   | Legacy-compatible search, V2 attested search, mapping, selection attestation, privacy-safe audit |
+| Agent Booking Readiness  | Readiness evaluation projection and observability                                                |
+| Safe Booking Read        | Summary/detail two-tier projection and temporarily retained legacy endpoint                      |
+| Traveler Preferences     | Allowlisted preference projection                                                                |
+| Agent Chat (Chat module) | Access/revocation, session/message/memory persistence, fencing, deletion                         |
 
 ## Audit contract
 

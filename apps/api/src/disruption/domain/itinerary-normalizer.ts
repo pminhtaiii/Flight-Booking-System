@@ -55,14 +55,18 @@ export function normalizeDuffelOrder(order: DuffelOrder): NormalizedSegment[] {
     for (let segmentOrder = 0; segmentOrder < slice.segments.length; segmentOrder++) {
       const seg = slice.segments[segmentOrder];
       if (!seg) continue;
-      
-      const operatingIata = seg.operating_carrier?.iata_code || seg.marketing_carrier?.iata_code || 'XX';
+
+      const operatingIata =
+        seg.operating_carrier?.iata_code || seg.marketing_carrier?.iata_code || 'XX';
       const marketingIata = seg.marketing_carrier?.iata_code || 'XX';
       const airlineName = seg.operating_carrier?.name || seg.marketing_carrier?.name || 'Unknown';
       const flightNum = seg.marketing_carrier_flight_number || '0000';
 
       const origin = seg.origin as DuffelPlace & { city_name?: string; city?: { name?: string } };
-      const destination = seg.destination as DuffelPlace & { city_name?: string; city?: { name?: string } };
+      const destination = seg.destination as DuffelPlace & {
+        city_name?: string;
+        city?: { name?: string };
+      };
 
       result.push({
         sliceOrder,
@@ -86,7 +90,7 @@ export function normalizeDuffelOrder(order: DuffelOrder): NormalizedSegment[] {
         arrivalAt: seg.arriving_at,
         arrivalLocalDate: extractLocalDate(seg.arriving_at),
         durationMinutes: parseIsoDurationToMinutes(seg.duration),
-        aircraftType: seg.aircraft?.name || null
+        aircraftType: seg.aircraft?.name || null,
       });
     }
   }
@@ -124,7 +128,7 @@ export function normalizeFlightSegments(segments: FlightSegmentSnapshot[]): Norm
       arrivalAt: seg.arrivalAt,
       arrivalLocalDate: extractLocalDate(seg.arrivalAt),
       durationMinutes: parseIsoDurationToMinutes(seg.duration),
-      aircraftType: seg.aircraftType || null
+      aircraftType: seg.aircraftType || null,
     };
   });
 }

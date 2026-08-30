@@ -3,7 +3,8 @@ import { randomBytes } from 'node:crypto';
 import path from 'path';
 
 const t093RealFlow = process.env.T093_REAL_FLOW === 'true';
-const flightSearchFixtureApiUrl = process.env.FLIGHT_SEARCH_FIXTURE_API_URL || 'http://127.0.0.1:3101';
+const flightSearchFixtureApiUrl =
+  process.env.FLIGHT_SEARCH_FIXTURE_API_URL || 'http://127.0.0.1:3101';
 const generatedSecret = (): string => randomBytes(32).toString('base64url');
 const t093Secrets = {
   agent: process.env.AGENT_SERVICE_API_KEY || generatedSecret(),
@@ -34,6 +35,7 @@ export default defineConfig({
   testDir: './',
   fullyParallel: false,
   workers: 1,
+  timeout: 60000,
   expect: {
     timeout: 30000,
   },
@@ -43,7 +45,12 @@ export default defineConfig({
     trace: 'on-first-retry',
     actionTimeout: 30000,
     launchOptions: {
-      args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--disable-gpu'],
+      args: [
+        '--no-sandbox',
+        '--disable-setuid-sandbox',
+        '--disable-dev-shm-usage',
+        '--disable-gpu',
+      ],
     },
   },
   projects: [
@@ -97,8 +104,7 @@ export default defineConfig({
             cwd: path.resolve(__dirname, '../../agent'),
           },
           {
-            command:
-              'uv run uvicorn agent.main:app --app-dir src --host 127.0.0.1 --port 3002',
+            command: 'uv run uvicorn agent.main:app --app-dir src --host 127.0.0.1 --port 3002',
             url: 'http://127.0.0.1:3002/health',
             reuseExistingServer: false,
             timeout: 600000,

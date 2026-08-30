@@ -1,9 +1,4 @@
-import {
-  ForbiddenException,
-  Injectable,
-  Logger,
-  NotFoundException,
-} from '@nestjs/common';
+import { ForbiddenException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { BookingStatus } from '@prisma/client';
 import { PrismaService } from '@/prisma/prisma.service';
 import { BookingLifecycleService } from '@/booking-lifecycle/booking-lifecycle.service';
@@ -246,9 +241,8 @@ export class BookingManagementService {
       customerRefundAmount: booking.customerRefundAmount
         ? booking.customerRefundAmount.toString()
         : null,
-      duffelCancellationQuoteId: parseDuffelCancellationQuoteId(
-        booking.duffelCancellationQuoteId,
-      ).quoteId,
+      duffelCancellationQuoteId: parseDuffelCancellationQuoteId(booking.duffelCancellationQuoteId)
+        .quoteId,
       createdAt: booking.createdAt.toISOString(),
       updatedAt: booking.updatedAt.toISOString(),
       ancillarySummary,
@@ -337,9 +331,7 @@ export class BookingManagementService {
                 ? seg.departureAt.toISOString()
                 : String(seg.departureAt),
             arrivalAt:
-              seg.arrivalAt instanceof Date
-                ? seg.arrivalAt.toISOString()
-                : String(seg.arrivalAt),
+              seg.arrivalAt instanceof Date ? seg.arrivalAt.toISOString() : String(seg.arrivalAt),
             duration: `PT${seg.durationMinutes}M`,
             aircraftType: seg.aircraftType ?? undefined,
             duffelSegmentId: seg.duffelSegmentId ?? undefined,
@@ -353,9 +345,7 @@ export class BookingManagementService {
 
         // Re-calculate timings from revision segments if not present in DB
         if (!currentItinerary.nextUnflownDepartureAt || !currentItinerary.finalArrivalAt) {
-          const sorted = [...latestRevision.segments].sort(
-            (a, b) => a.globalOrder - b.globalOrder,
-          );
+          const sorted = [...latestRevision.segments].sort((a, b) => a.globalOrder - b.globalOrder);
           if (sorted.length > 0) {
             if (!currentItinerary.finalArrivalAt) {
               const lastArr = sorted[sorted.length - 1].arrivalAt;
@@ -393,8 +383,7 @@ export class BookingManagementService {
             : [],
           incrementalSummary: incDiff?.presentationSummary || {},
           cumulativeSummary: cumDiff?.presentationSummary || {},
-          stabilizationWarning:
-            activeRevision?.notificationOutbox?.stabilizationWarning ?? false,
+          stabilizationWarning: activeRevision?.notificationOutbox?.stabilizationWarning ?? false,
           resolvedReason:
             booking.disruptionResolvedReason as unknown as DisruptionResolvedReason | null,
           resolvedAt:
@@ -408,10 +397,7 @@ export class BookingManagementService {
     return { currentItinerary, disruption };
   }
 
-  private sortBookings(
-    bookings: BookingWithRelations[],
-    tab: BookingTab,
-  ): BookingWithRelations[] {
+  private sortBookings(bookings: BookingWithRelations[], tab: BookingTab): BookingWithRelations[] {
     return [...bookings].sort((left, right) => {
       if (tab === 'past') {
         return (right.departureAt?.getTime() ?? 0) - (left.departureAt?.getTime() ?? 0);

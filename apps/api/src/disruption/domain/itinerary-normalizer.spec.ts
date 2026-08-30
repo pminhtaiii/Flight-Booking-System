@@ -12,26 +12,41 @@ describe('ItineraryNormalizer', () => {
             id: 'sli_outbound',
             duration: 'PT8H30M',
             origin: { iata_code: 'LHR', name: 'Heathrow', city_name: 'London', type: 'airport' },
-            destination: { iata_code: 'JFK', name: 'John F. Kennedy', city_name: 'New York', type: 'airport' },
+            destination: {
+              iata_code: 'JFK',
+              name: 'John F. Kennedy',
+              city_name: 'New York',
+              type: 'airport',
+            },
             segments: [
               {
                 id: 'seg_outbound_1',
                 duration: 'PT8H30M',
                 departing_at: '2026-10-01T10:00:00+01:00',
                 arriving_at: '2026-10-01T13:30:00-04:00',
-                origin: { iata_code: 'LHR', name: 'Heathrow', city_name: 'London', type: 'airport' },
-                destination: { iata_code: 'JFK', name: 'John F. Kennedy', city_name: 'New York', type: 'airport' },
+                origin: {
+                  iata_code: 'LHR',
+                  name: 'Heathrow',
+                  city_name: 'London',
+                  type: 'airport',
+                },
+                destination: {
+                  iata_code: 'JFK',
+                  name: 'John F. Kennedy',
+                  city_name: 'New York',
+                  type: 'airport',
+                },
                 origin_terminal: '5',
                 destination_terminal: '4',
                 operating_carrier: { id: 'air_ba', name: 'British Airways', iata_code: 'BA' },
                 marketing_carrier: { id: 'air_ba', name: 'British Airways', iata_code: 'BA' },
                 marketing_carrier_flight_number: '177',
-                aircraft: { id: 'arc_777', name: 'Boeing 777', iata_code: '777' }
-              }
-            ]
-          }
+                aircraft: { id: 'arc_777', name: 'Boeing 777', iata_code: '777' },
+              },
+            ],
+          },
         ],
-        passengers: []
+        passengers: [],
       } as unknown as DuffelOrder;
 
       const result = normalizeDuffelOrder(mockOrder);
@@ -59,7 +74,7 @@ describe('ItineraryNormalizer', () => {
         arrivalAt: '2026-10-01T13:30:00-04:00',
         arrivalLocalDate: '2026-10-01',
         durationMinutes: 510,
-        aircraftType: 'Boeing 777'
+        aircraftType: 'Boeing 777',
       });
     });
 
@@ -79,11 +94,11 @@ describe('ItineraryNormalizer', () => {
                 origin: { iata_code: 'LHR', name: 'Heathrow' },
                 destination: { iata_code: 'CDG', name: 'Charles de Gaulle' },
                 marketing_carrier: { name: 'Air France', iata_code: 'AF' },
-                marketing_carrier_flight_number: '1234'
-              }
-            ]
-          }
-        ]
+                marketing_carrier_flight_number: '1234',
+              },
+            ],
+          },
+        ],
       } as unknown as DuffelOrder;
 
       const result = normalizeDuffelOrder(mockOrder);
@@ -99,7 +114,12 @@ describe('ItineraryNormalizer', () => {
           airline: { name: 'British Airways', iataCode: 'BA' },
           flightNumber: '177',
           departureAirport: { iataCode: 'LHR', name: 'Heathrow', city: 'London', terminal: '5' },
-          arrivalAirport: { iataCode: 'JFK', name: 'John F. Kennedy', city: 'New York', terminal: '4' },
+          arrivalAirport: {
+            iataCode: 'JFK',
+            name: 'John F. Kennedy',
+            city: 'New York',
+            terminal: '4',
+          },
           departureAt: '2026-10-01T10:00:00+01:00',
           arrivalAt: '2026-10-01T13:30:00-04:00',
           duration: 'PT8H30M',
@@ -107,8 +127,8 @@ describe('ItineraryNormalizer', () => {
           duffelSegmentId: 'seg_outbound_1',
           sliceOrder: 0,
           segmentOrder: 0,
-          globalOrder: 0
-        }
+          globalOrder: 0,
+        },
       ];
 
       const result = normalizeFlightSegments(mockSegments);
@@ -136,7 +156,7 @@ describe('ItineraryNormalizer', () => {
         arrivalAt: '2026-10-01T13:30:00-04:00',
         arrivalLocalDate: '2026-10-01',
         durationMinutes: 510,
-        aircraftType: 'Boeing 777'
+        aircraftType: 'Boeing 777',
       });
     });
 
@@ -149,8 +169,8 @@ describe('ItineraryNormalizer', () => {
           arrivalAirport: { iataCode: 'LHR', name: 'Heathrow', city: 'London' },
           departureAt: '2026-10-02T18:00:00Z',
           arrivalAt: '2026-10-03T06:00:00Z',
-          duration: 'PT7H0M'
-        }
+          duration: 'PT7H0M',
+        },
       ];
 
       const result = normalizeFlightSegments(mockLegacySegments);
@@ -178,7 +198,7 @@ describe('ItineraryNormalizer', () => {
         arrivalAt: '2026-10-03T06:00:00Z',
         arrivalLocalDate: '2026-10-03',
         durationMinutes: 420,
-        aircraftType: null
+        aircraftType: null,
       });
     });
   });

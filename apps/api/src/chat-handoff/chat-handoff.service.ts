@@ -136,7 +136,9 @@ function lastFlightSegment(rawOffer: unknown): JsonRecord | null {
   return isJsonRecord(lastSegment) ? lastSegment : null;
 }
 
-function handoffPassengers(rawOffer: JsonRecord | null): Array<{ id: string; type: 'ADULT' | 'CHILD' | 'INFANT' }> | null {
+function handoffPassengers(
+  rawOffer: JsonRecord | null,
+): Array<{ id: string; type: 'ADULT' | 'CHILD' | 'INFANT' }> | null {
   if (!rawOffer || !Array.isArray(rawOffer.passengers)) return null;
   const passengers = rawOffer.passengers.map((passenger) => {
     if (!isJsonRecord(passenger)) return null;
@@ -155,7 +157,10 @@ function handoffPassengers(rawOffer: JsonRecord | null): Array<{ id: string; typ
 @Injectable()
 export class ChatHandoffService {
   private readonly logger = new Logger(ChatHandoffService.name);
-  private readonly activeClaimAttempts = new Map<string, Promise<{ handoff: ResolvedChatHandoff; claimToken: string }>>();
+  private readonly activeClaimAttempts = new Map<
+    string,
+    Promise<{ handoff: ResolvedChatHandoff; claimToken: string }>
+  >();
   private readonly claimedTokens = new Map<string, number>();
   private readonly inFlightClaims = new Map<string, InFlightReservation>();
   private readonly flightOfferCache = new Map<string, FlightOffer>();
@@ -172,8 +177,12 @@ export class ChatHandoffService {
     if (!token || typeof token !== 'string' || !token.startsWith('chk_handoff_')) return false;
     const tokenHash = this.tokenService.hashToken(token);
     const attemptKey = userId ? `${userId}:${tokenHash}` : tokenHash;
-    const claimedUntil = this.claimedTokens.get(attemptKey) ?? (userId ? this.claimedTokens.get(tokenHash) : undefined);
-    const inFlight = this.inFlightClaims.get(attemptKey) ?? (userId ? this.inFlightClaims.get(tokenHash) : undefined);
+    const claimedUntil =
+      this.claimedTokens.get(attemptKey) ??
+      (userId ? this.claimedTokens.get(tokenHash) : undefined);
+    const inFlight =
+      this.inFlightClaims.get(attemptKey) ??
+      (userId ? this.inFlightClaims.get(tokenHash) : undefined);
     return (
       (claimedUntil !== undefined && claimedUntil > Date.now()) ||
       (inFlight !== undefined && inFlight.expiresAt > Date.now()) ||
@@ -190,12 +199,17 @@ export class ChatHandoffService {
   }
 
   tryAcquireInFlight(token: string, userId?: string, ttlMs = 30000): string | null {
-    if (!token || typeof token !== 'string' || !token.startsWith('chk_handoff_')) return crypto.randomUUID();
+    if (!token || typeof token !== 'string' || !token.startsWith('chk_handoff_'))
+      return crypto.randomUUID();
     const tokenHash = this.tokenService.hashToken(token);
     const attemptKey = userId ? `${userId}:${tokenHash}` : tokenHash;
     const now = Date.now();
-    const claimedUntil = this.claimedTokens.get(attemptKey) ?? (userId ? this.claimedTokens.get(tokenHash) : undefined);
-    const inFlight = this.inFlightClaims.get(attemptKey) ?? (userId ? this.inFlightClaims.get(tokenHash) : undefined);
+    const claimedUntil =
+      this.claimedTokens.get(attemptKey) ??
+      (userId ? this.claimedTokens.get(tokenHash) : undefined);
+    const inFlight =
+      this.inFlightClaims.get(attemptKey) ??
+      (userId ? this.inFlightClaims.get(tokenHash) : undefined);
 
     if (
       (claimedUntil !== undefined && claimedUntil > now) ||
@@ -276,14 +290,18 @@ export class ChatHandoffService {
     try {
       payloadStr = Buffer.from(payloadBase64, 'base64url').toString('utf8');
     } catch (err) {
-      this.logger.warn(`[create] Invalid attestation payload base64: ${err instanceof Error ? err.message : 'unknown'}`);
+      this.logger.warn(
+        `[create] Invalid attestation payload base64: ${err instanceof Error ? err.message : 'unknown'}`,
+      );
       throw new UnauthorizedException('Invalid attestation payload');
     }
     let payload: AttestationPayload;
     try {
       payload = JSON.parse(payloadStr) as AttestationPayload;
     } catch (err) {
-      this.logger.warn(`[create] Invalid attestation payload JSON: ${err instanceof Error ? err.message : 'unknown'}`);
+      this.logger.warn(
+        `[create] Invalid attestation payload JSON: ${err instanceof Error ? err.message : 'unknown'}`,
+      );
       throw new UnauthorizedException('Invalid attestation payload');
     }
     const {
@@ -343,7 +361,9 @@ export class ChatHandoffService {
           this.setCachedFlightOffer(flightOfferId, lookup);
         }
       } catch (err) {
-        this.logger.warn(`[create] chat_handoff_offer_lookup_failed: ${err instanceof Error ? err.message : 'unknown'}`);
+        this.logger.warn(
+          `[create] chat_handoff_offer_lookup_failed: ${err instanceof Error ? err.message : 'unknown'}`,
+        );
       }
     }
 
@@ -389,7 +409,11 @@ export class ChatHandoffService {
     }
 
     const maxTtlTime = Date.now() + 15 * 60 * 1000;
-    const effectiveExpiryTime = Math.min(attestationExpiry.getTime(), offerExpiry.getTime(), maxTtlTime);
+    const effectiveExpiryTime = Math.min(
+      attestationExpiry.getTime(),
+      offerExpiry.getTime(),
+      maxTtlTime,
+    );
     const expiresAt = new Date(effectiveExpiryTime);
     if (!Number.isFinite(expiresAt.getTime()) || expiresAt <= new Date()) {
       throw new GoneException({
@@ -797,9 +821,7 @@ export class ChatHandoffService {
       });
     }
 
-    const tokenHash = token.startsWith('chk_handoff_')
-      ? this.tokenService.hashToken(token)
-      : token;
+    const tokenHash = token.startsWith('chk_handoff_') ? this.tokenService.hashToken(token) : token;
 
     const attemptKey = `${userId}:${tokenHash}`;
     const claimedUntil = this.claimedTokens.get(attemptKey);
@@ -864,7 +886,9 @@ export class ChatHandoffService {
         claimed = claimedRows[0];
       }
     } catch (error) {
-      this.logger.error(`[resolveAndAcquireClaimOnce] chat_handoff_claim_query_failed: ${error instanceof Error ? error.message : 'unknown'}`);
+      this.logger.error(
+        `[resolveAndAcquireClaimOnce] chat_handoff_claim_query_failed: ${error instanceof Error ? error.message : 'unknown'}`,
+      );
       throw error;
     }
 
@@ -901,7 +925,9 @@ export class ChatHandoffService {
           this.setCachedFlightOffer(claimed.flightOfferId, loadedFlightOffer);
         }
       } catch (err) {
-        this.logger.warn(`[resolveAndAcquireClaimOnce] chat_handoff_offer_lookup_failed: ${err instanceof Error ? err.message : 'unknown'}`);
+        this.logger.warn(
+          `[resolveAndAcquireClaimOnce] chat_handoff_offer_lookup_failed: ${err instanceof Error ? err.message : 'unknown'}`,
+        );
       }
     }
 
@@ -911,15 +937,12 @@ export class ChatHandoffService {
       chatSession: { userId, deletedAt: null },
     } as unknown as ResolvedChatHandoff;
 
-    this.recordTelemetry(
-      'handoff_resolve',
-      'resolved',
-      Date.now() - startedAt,
-      context,
-      userId,
-      { outcome: 'resolved' },
-    ).catch((err) =>
-      this.logger.warn(`[resolveAndAcquireClaimOnce] chat_handoff_telemetry_failed: ${err instanceof Error ? err.message : 'unknown'}`),
+    this.recordTelemetry('handoff_resolve', 'resolved', Date.now() - startedAt, context, userId, {
+      outcome: 'resolved',
+    }).catch((err) =>
+      this.logger.warn(
+        `[resolveAndAcquireClaimOnce] chat_handoff_telemetry_failed: ${err instanceof Error ? err.message : 'unknown'}`,
+      ),
     );
 
     return { handoff, claimToken };
@@ -961,29 +984,33 @@ export class ChatHandoffService {
           correlationId: event.correlation_id,
         });
         void Promise.resolve(auditWrite).catch((err) => {
-          this.logger.warn(`[recordTelemetry] chat_handoff_telemetry_failed: ${err instanceof Error ? err.message : 'unknown'}`);
+          this.logger.warn(
+            `[recordTelemetry] chat_handoff_telemetry_failed: ${err instanceof Error ? err.message : 'unknown'}`,
+          );
         });
       }
     } catch (err) {
       // Telemetry must never change the handoff result or expose raw failures.
-      this.logger.warn(`[recordTelemetry] chat_handoff_telemetry_failed: ${err instanceof Error ? err.message : 'unknown'}`);
+      this.logger.warn(
+        `[recordTelemetry] chat_handoff_telemetry_failed: ${err instanceof Error ? err.message : 'unknown'}`,
+      );
     }
   }
 
   /**
    * Acquires a temporary claim over a handoff record to prevent concurrent checkouts.
    */
-  async acquireClaim(handoffId: string, userId: string, ttlMs: number, context: ChatTelemetryContext = {}): Promise<string> {
+  async acquireClaim(
+    handoffId: string,
+    userId: string,
+    ttlMs: number,
+    context: ChatTelemetryContext = {},
+  ): Promise<string> {
     const claimToken = await this.tryAcquireClaim(handoffId, userId, ttlMs);
     if (!claimToken) {
-      void this.recordTelemetry(
-        'handoff_claim_conflict',
-        'conflict',
-        0,
-        context,
-        userId,
-        { outcome: 'conflict' },
-      ).catch(() => {});
+      void this.recordTelemetry('handoff_claim_conflict', 'conflict', 0, context, userId, {
+        outcome: 'conflict',
+      }).catch(() => {});
       throw new ConflictException('Failed to acquire handoff claim');
     }
     return claimToken;

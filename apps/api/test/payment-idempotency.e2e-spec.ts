@@ -191,12 +191,13 @@ describe('Payment Idempotency (E2E)', () => {
     if (obj !== null && typeof obj === 'object') {
       return Object.keys(obj as Record<string, unknown>)
         .sort()
-        .reduce((acc, key) => {
-          (acc as Record<string, unknown>)[key] = sortKeys(
-            (obj as Record<string, unknown>)[key],
-          );
-          return acc;
-        }, {} as Record<string, unknown>);
+        .reduce(
+          (acc, key) => {
+            (acc as Record<string, unknown>)[key] = sortKeys((obj as Record<string, unknown>)[key]);
+            return acc;
+          },
+          {} as Record<string, unknown>,
+        );
     }
     return obj;
   }

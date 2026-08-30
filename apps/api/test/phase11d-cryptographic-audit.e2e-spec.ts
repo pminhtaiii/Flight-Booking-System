@@ -3,7 +3,9 @@ import * as crypto from 'crypto';
 const encryptionKey = crypto.randomBytes(32).toString('hex');
 const chatEncryptionKey = crypto.randomBytes(32).toString('hex');
 
-process.env.DATABASE_URL = process.env.DATABASE_URL || 'postgresql://postgres:postgres@127.0.0.1:5432/flight_booking?schema=public';
+process.env.DATABASE_URL =
+  process.env.DATABASE_URL ||
+  'postgresql://postgres:postgres@127.0.0.1:5432/flight_booking?schema=public';
 process.env.REDIS_URL = process.env.REDIS_URL || 'redis://127.0.0.1:6379';
 process.env.ENCRYPTION_KEY = encryptionKey;
 process.env.CHAT_ENCRYPTION_KEY = chatEncryptionKey;
@@ -46,7 +48,11 @@ const SENSITIVE_PRIVACY_CORPUS = [
   'Plaintext sensitive customer flight booking conversation between Alice and Bob',
 ] as const;
 
-function mintClaimToken(userId: string, iat: number, secret = 'test-claim-token-secret-must-be-long-enough'): string {
+function mintClaimToken(
+  userId: string,
+  iat: number,
+  secret = 'test-claim-token-secret-must-be-long-enough',
+): string {
   const payload = { userId, iat };
   const payloadStr = JSON.stringify(payload);
   const signature = crypto.createHmac('sha256', secret).update(payloadStr).digest();
@@ -97,7 +103,9 @@ describe('Phase 11D: Comprehensive Cryptographic and Data Privacy Final Audit (e
       .compile();
 
     app = moduleFixture.createNestApplication();
-    app.useGlobalPipes(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, transform: true }));
+    app.useGlobalPipes(
+      new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, transform: true }),
+    );
     app.useGlobalFilters(new HttpExceptionFilter());
     app.setGlobalPrefix('api', { exclude: ['health'] });
     await app.init();
@@ -509,7 +517,10 @@ describe('Phase 11D: Comprehensive Cryptographic and Data Privacy Final Audit (e
       const fetchedSession = await chatService.getSession(testUserId, testSessionId);
       expect(fetchedSession.title).toBe(SENSITIVE_TITLE);
 
-      const fetchedMessages = await chatService.listMessages(testUserId, testSessionId, { limit: 10, direction: 'before' });
+      const fetchedMessages = await chatService.listMessages(testUserId, testSessionId, {
+        limit: 10,
+        direction: 'before',
+      });
       const foundMessage = fetchedMessages.messages.find((m) => m.id === testMessageId);
       expect(foundMessage).toBeDefined();
       expect(foundMessage!.content).toBe(SENSITIVE_CONTENT);
@@ -538,9 +549,7 @@ describe('Phase 11D: Comprehensive Cryptographic and Data Privacy Final Audit (e
         contentKeyVersion: 1,
       };
 
-      await expect(
-        cryptoService.decryptMessageContent(tamperedMessage as any),
-      ).rejects.toThrow();
+      await expect(cryptoService.decryptMessageContent(tamperedMessage as any)).rejects.toThrow();
     });
   });
 

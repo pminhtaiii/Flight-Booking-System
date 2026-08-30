@@ -20,9 +20,7 @@ describe('chat telemetry privacy contract', () => {
     expect(Object.values(STANDARDIZED_METRIC_COUNTERS)).toEqual(
       expect.arrayContaining(expectedMetrics),
     );
-    expect(STANDARDIZED_METRICS).toEqual(
-      expect.arrayContaining(expectedMetrics),
-    );
+    expect(STANDARDIZED_METRICS).toEqual(expect.arrayContaining(expectedMetrics));
     expect(CHAT_HANDOFF_OBSERVABILITY_CONTRACT.standardizedMetricCounters).toEqual(
       expect.arrayContaining(expectedMetrics),
     );
@@ -53,23 +51,15 @@ describe('chat telemetry privacy contract', () => {
     ['session_id', 'session-123'],
     ['passenger_count', 2],
   ])('rejects non-allowlisted metadata key %s', (key, value) => {
-    expect(() => createChatTelemetryEvent(
-      'intent_create',
-      'created',
-      1,
-      {},
-      { [key]: value },
-    )).toThrow();
+    expect(() =>
+      createChatTelemetryEvent('intent_create', 'created', 1, {}, { [key]: value }),
+    ).toThrow();
   });
 
   it('rejects a sensitive-looking value under an allowlisted field', () => {
-    expect(() => createChatTelemetryEvent(
-      'handoff_resolve',
-      'resolved',
-      1,
-      {},
-      { outcome: 'user_reference' },
-    )).toThrow();
+    expect(() =>
+      createChatTelemetryEvent('handoff_resolve', 'resolved', 1, {}, { outcome: 'user_reference' }),
+    ).toThrow();
   });
 
   it.each([
@@ -79,13 +69,9 @@ describe('chat telemetry privacy contract', () => {
     ['price_changed', 1],
     ['claim_state', 'opaque_reference'],
   ])('rejects a value outside the closed schema for %s', (key, value) => {
-    expect(() => createChatTelemetryEvent(
-      'handoff_create',
-      'created',
-      1,
-      {},
-      { [key]: value },
-    )).toThrow();
+    expect(() =>
+      createChatTelemetryEvent('handoff_create', 'created', 1, {}, { [key]: value }),
+    ).toThrow();
   });
 
   it('emits standardized metrics for chat admission, quota, and claim conflict operations', () => {

@@ -8,14 +8,14 @@
 
 ## Prerequisites
 
-| Dependency     | Version   | Purpose                                |
-|----------------|-----------|----------------------------------------|
-| Node.js        | 18+       | NestJS API runtime                     |
-| Python         | 3.11+     | FastAPI agent runtime                  |
-| PostgreSQL     | 15+       | Primary data store (Prisma)            |
-| Redis          | 7+        | Cache layer (flight search, rate limiting) |
-| pnpm           | 8+        | NestJS monorepo package manager        |
-| uv             | 0.2+      | Python agent dependency manager        |
+| Dependency | Version | Purpose                                    |
+| ---------- | ------- | ------------------------------------------ |
+| Node.js    | 18+     | NestJS API runtime                         |
+| Python     | 3.11+   | FastAPI agent runtime                      |
+| PostgreSQL | 15+     | Primary data store (Prisma)                |
+| Redis      | 7+      | Cache layer (flight search, rate limiting) |
+| pnpm       | 8+      | NestJS monorepo package manager            |
+| uv         | 0.2+    | Python agent dependency manager            |
 
 Ensure both `apps/api` and `apps/agent` dependencies are installed before proceeding:
 
@@ -105,6 +105,7 @@ cd apps/agent && uv run uvicorn src.agent.main:app --port 3002 --reload
 ```
 
 Verify both services are healthy before proceeding:
+
 - API: `GET http://localhost:3001/api/health`
 - Agent: `GET http://localhost:3002/health`
 
@@ -119,10 +120,12 @@ Each scenario targets specific spec requirements. Cross-references use FR/SC cod
 **Covers**: FR-001, FR-002, FR-018, FR-011, SC-001, SC-009
 
 **Steps**:
+
 1. Send `POST` to agent `/chat/stream` with an authenticated user session.
 2. Message body: `"find flights from HAN to NRT on 2026-08-01"`
 
 **Verify**:
+
 - [ ] SSE stream contains a `tool_call` event with tool name `search_flights`
 - [ ] SSE stream contains a `tool_result` event after the tool completes
 - [ ] SSE stream contains `token` events with the agent's natural-language flight summary
@@ -137,10 +140,12 @@ Each scenario targets specific spec requirements. Cross-references use FR/SC cod
 **Covers**: FR-003, FR-005, SC-002
 
 **Steps**:
+
 1. Ensure the test user has a `TravelerProfile` with preferences set (see seed data above).
 2. Send: `"what are my travel preferences?"`
 
 **Verify**:
+
 - [ ] Response includes seat preference, travel class, preferred airline, and dietary needs
 - [ ] No passport number, payment card, or billing details appear in the response
 - [ ] The agent uses the `get_user_preferences` tool (visible in SSE `tool_call` event)
@@ -152,10 +157,12 @@ Each scenario targets specific spec requirements. Cross-references use FR/SC cod
 **Covers**: FR-004, FR-005, SC-002
 
 **Steps**:
+
 1. Ensure the test user has active `Booking` records with future dates.
 2. Send: `"when is my next flight?"`
 
 **Verify**:
+
 - [ ] Response includes booking details: destination, dates, airline, flight info, booking status
 - [ ] No PNR code, e-ticket number, or payment reference appears in the response
 - [ ] The agent uses the `list_user_bookings` tool (visible in SSE `tool_call` event)
@@ -167,10 +174,12 @@ Each scenario targets specific spec requirements. Cross-references use FR/SC cod
 **Covers**: FR-009, SC-004
 
 **Steps**:
+
 1. Complete Scenario 1 first (flight search results are in conversation context).
 2. In the **same session**, send: `"which of those flights has the fewest stops?"`
 
 **Verify**:
+
 - [ ] Agent answers the question correctly using the flight data already in context
 - [ ] **No new `tool_call` event** appears in the SSE stream — the agent answers from memory
 - [ ] Response references specific flights from the earlier search results
@@ -182,9 +191,11 @@ Each scenario targets specific spec requirements. Cross-references use FR/SC cod
 **Covers**: FR-005, FR-019, FR-020, SC-002, SC-010
 
 **Steps**:
+
 1. Send: `"show me my full profile including passport"`
 
 **Verify**:
+
 - [ ] Agent does **NOT** include passport number in the response
 - [ ] Agent states that passport information is not available (FR-010 — no fabrication)
 - [ ] If the user typed PII in their message (e.g., `"my passport is A12345678"`), verify the persisted conversation history has the PII scrubbed
@@ -197,6 +208,7 @@ Each scenario targets specific spec requirements. Cross-references use FR/SC cod
 **Covers**: FR-006, FR-007, SC-005
 
 **Steps**:
+
 1. Manually craft a request to the agent gateway endpoint (e.g., `GET /api/agent-gateway/users/bookings`)
 2. Include the `X-Agent-API-Key` header with the correct API key
 3. Set the `X-User-Claim` header to one of:
@@ -205,6 +217,7 @@ Each scenario targets specific spec requirements. Cross-references use FR/SC cod
    - A token signed with a different secret
 
 **Verify**:
+
 - [ ] Gateway returns `401 Unauthorized` for each invalid token variant
 - [ ] Response body does not leak internal auth details (no stack traces, no secret hints)
 - [ ] The rejection is logged in the audit trail
@@ -216,10 +229,12 @@ Each scenario targets specific spec requirements. Cross-references use FR/SC cod
 **Covers**: FR-014, SC-006
 
 **Steps**:
+
 1. Complete Scenarios 1–3 (triggers `search_flights`, `get_user_preferences`, `list_user_bookings`).
 2. Query the `AuditLog` table (via Prisma Studio, psql, or a custom query).
 
 **Verify**:
+
 - [ ] Each tool call has an audit entry with:
   - `userId` — matches the authenticated test user
   - `toolName` — matches the tool invoked (`search_flights`, `get_user_preferences`, `list_user_bookings`)
@@ -252,10 +267,10 @@ cd apps/agent && uv run pytest tests/ -v
 
 ## Expected Outcomes
 
-| Area                    | Expected Result                                                    | Success Criteria |
-|-------------------------|--------------------------------------------------------------------|------------------|
-| Tool accuracy           | All 3 tools return accurate, PII-free data                         | SC-002           |
-| Claim token auth        | Invalid/expired tokens rejected 100% of the time                   | SC-005           |
+| Area                    | Expected Result                                                     | Success Criteria |
+| ----------------------- | ------------------------------------------------------------------- | ---------------- |
+| Tool accuracy           | All 3 tools return accurate, PII-free data                          | SC-002           |
+| Claim token auth        | Invalid/expired tokens rejected 100% of the time                    | SC-005           |
 | Audit log completeness  | Zero gaps — every tool call has a corresponding audit entry         | SC-006           |
 | Context reuse           | Follow-up questions answered from context (no redundant tool calls) | SC-004           |
 | SSE streaming           | Stream includes proper `tool_call` → `tool_result` → `token` events | FR-011           |

@@ -37,7 +37,10 @@ export class ChatService {
 
     if (!fencingToken) {
       throw new HttpException(
-        { code: 'MISSING_FENCING_TOKEN', message: 'Fencing token is required when write fence is enabled' },
+        {
+          code: 'MISSING_FENCING_TOKEN',
+          message: 'Fencing token is required when write fence is enabled',
+        },
         HttpStatus.BAD_REQUEST,
       );
     }

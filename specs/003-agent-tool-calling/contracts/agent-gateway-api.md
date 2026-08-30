@@ -14,18 +14,18 @@ The Agent Gateway exposes 3 read-only REST endpoints under `/api/agent-gateway/`
 
 **Common Headers** (required on all endpoints):
 
-| Header           | Type   | Required | Description                                          |
-|------------------|--------|----------|------------------------------------------------------|
-| `X-Agent-API-Key`| string | ✅       | Static shared secret for service-to-service auth     |
-| `X-User-Claim`   | string | ✅       | HMAC-SHA256 signed claim token identifying the user  |
+| Header            | Type   | Required | Description                                         |
+| ----------------- | ------ | -------- | --------------------------------------------------- |
+| `X-Agent-API-Key` | string | ✅       | Static shared secret for service-to-service auth    |
+| `X-User-Claim`    | string | ✅       | HMAC-SHA256 signed claim token identifying the user |
 
 **Common Error Responses**:
 
-| Status | Code                    | When                                                   |
-|--------|-------------------------|--------------------------------------------------------|
-| 401    | `INVALID_API_KEY`       | `X-Agent-API-Key` missing or does not match            |
-| 401    | `INVALID_CLAIM_TOKEN`   | `X-User-Claim` missing, malformed, tampered, or expired|
-| 403    | `USER_INACTIVE`         | Authenticated user's account is inactive or deleted    |
+| Status | Code                  | When                                                    |
+| ------ | --------------------- | ------------------------------------------------------- |
+| 401    | `INVALID_API_KEY`     | `X-Agent-API-Key` missing or does not match             |
+| 401    | `INVALID_CLAIM_TOKEN` | `X-User-Claim` missing, malformed, tampered, or expired |
+| 403    | `USER_INACTIVE`       | Authenticated user's account is inactive or deleted     |
 
 ---
 
@@ -39,12 +39,12 @@ Search for flights via Amadeus. Returns a maximum of 5 PII-free results in the d
 
 ### Query Parameters
 
-| Param        | Type    | Required | Constraints                  | Example      |
-|--------------|---------|----------|------------------------------|--------------|
-| `origin`     | string  | ✅       | 3-char IATA airport code     | `HAN`        |
-| `destination`| string  | ✅       | 3-char IATA airport code     | `NRT`        |
-| `date`       | string  | ✅       | `YYYY-MM-DD`, must be future | `2026-07-15` |
-| `passengers` | integer | ✅       | 1–9                         | `2`          |
+| Param         | Type    | Required | Constraints                  | Example      |
+| ------------- | ------- | -------- | ---------------------------- | ------------ |
+| `origin`      | string  | ✅       | 3-char IATA airport code     | `HAN`        |
+| `destination` | string  | ✅       | 3-char IATA airport code     | `NRT`        |
+| `date`        | string  | ✅       | `YYYY-MM-DD`, must be future | `2026-07-15` |
+| `passengers`  | integer | ✅       | 1–9                          | `2`          |
 
 ### Success Response — `200 OK`
 
@@ -75,14 +75,14 @@ Returns an array of **max 5** `FlightResult` objects.
 
 ### Error Responses
 
-| Status | Code                 | When                                         |
-|--------|----------------------|----------------------------------------------|
-| 400    | `VALIDATION_ERROR`   | Missing/invalid params (bad IATA, bad date, passengers out of range) |
-| 401    | `INVALID_API_KEY`    | See common errors                            |
-| 401    | `INVALID_CLAIM_TOKEN`| See common errors                            |
-| 403    | `USER_INACTIVE`      | See common errors                            |
-| 429    | `RATE_LIMIT_EXCEEDED`| Too many requests — Amadeus budget protection|
-| 502    | `UPSTREAM_UNAVAILABLE`| Amadeus API unreachable or returned error   |
+| Status | Code                   | When                                                                 |
+| ------ | ---------------------- | -------------------------------------------------------------------- |
+| 400    | `VALIDATION_ERROR`     | Missing/invalid params (bad IATA, bad date, passengers out of range) |
+| 401    | `INVALID_API_KEY`      | See common errors                                                    |
+| 401    | `INVALID_CLAIM_TOKEN`  | See common errors                                                    |
+| 403    | `USER_INACTIVE`        | See common errors                                                    |
+| 429    | `RATE_LIMIT_EXCEEDED`  | Too many requests — Amadeus budget protection                        |
+| 502    | `UPSTREAM_UNAVAILABLE` | Amadeus API unreachable or returned error                            |
 
 ### Example
 
@@ -109,7 +109,7 @@ X-User-Claim: eyJ1c2VySWQiOiI1NTBl...signature
       "arrivalTime": "2026-07-15T15:00:00+09:00",
       "duration": 330,
       "stops": 0,
-      "price": 452.00,
+      "price": 452.0,
       "currency": "USD",
       "fareClass": "Economy",
       "baggageAllowance": "23kg checked + 7kg carry-on"
@@ -123,7 +123,7 @@ X-User-Claim: eyJ1c2VySWQiOiI1NTBl...signature
       "arrivalTime": "2026-07-15T17:45:00+09:00",
       "duration": 390,
       "stops": 1,
-      "price": 389.00,
+      "price": 389.0,
       "currency": "USD",
       "fareClass": "Economy",
       "baggageAllowance": "23kg checked + 7kg carry-on"
@@ -162,12 +162,12 @@ None. User identity is derived from `X-User-Claim`.
 
 ### Error Responses
 
-| Status | Code                 | When                                         |
-|--------|----------------------|----------------------------------------------|
-| 401    | `INVALID_API_KEY`    | See common errors                            |
-| 401    | `INVALID_CLAIM_TOKEN`| See common errors                            |
-| 403    | `USER_INACTIVE`      | See common errors                            |
-| 404    | `PROFILE_NOT_FOUND`  | User has no traveler profile on file         |
+| Status | Code                  | When                                 |
+| ------ | --------------------- | ------------------------------------ |
+| 401    | `INVALID_API_KEY`     | See common errors                    |
+| 401    | `INVALID_CLAIM_TOKEN` | See common errors                    |
+| 403    | `USER_INACTIVE`       | See common errors                    |
+| 404    | `PROFILE_NOT_FOUND`   | User has no traveler profile on file |
 
 ### Example
 
@@ -248,11 +248,11 @@ Returns an array of `BookingResult` objects.
 
 ### Error Responses
 
-| Status | Code                 | When                                         |
-|--------|----------------------|----------------------------------------------|
-| 401    | `INVALID_API_KEY`    | See common errors                            |
-| 401    | `INVALID_CLAIM_TOKEN`| See common errors                            |
-| 403    | `USER_INACTIVE`      | See common errors                            |
+| Status | Code                  | When              |
+| ------ | --------------------- | ----------------- |
+| 401    | `INVALID_API_KEY`     | See common errors |
+| 401    | `INVALID_CLAIM_TOKEN` | See common errors |
+| 403    | `USER_INACTIVE`       | See common errors |
 
 ### Example
 
@@ -281,7 +281,7 @@ X-User-Claim: eyJ1c2VySWQiOiI1NTBl...signature
       "duration": 330,
       "stops": 0,
       "fareClass": "Business",
-      "price": 1250.00,
+      "price": 1250.0,
       "currency": "USD",
       "passengers": 1,
       "baggageAllowance": "32kg checked + 7kg carry-on",
@@ -298,7 +298,7 @@ X-User-Claim: eyJ1c2VySWQiOiI1NTBl...signature
       "duration": 330,
       "stops": 0,
       "fareClass": "Business",
-      "price": 1180.00,
+      "price": 1180.0,
       "currency": "USD",
       "passengers": 1,
       "baggageAllowance": "32kg checked + 7kg carry-on",
@@ -316,8 +316,8 @@ X-User-Claim: eyJ1c2VySWQiOiI1NTBl...signature
 
 These fields exist in the database but are **structurally excluded** from all gateway responses:
 
-| Field              | Source Table     | Why Excluded              |
-|--------------------|-----------------|---------------------------|
+| Field              | Source Table    | Why Excluded              |
+| ------------------ | --------------- | ------------------------- |
 | `passportNumber`   | TravelerProfile | Personal identification   |
 | `paymentMethods`   | User            | Financial data            |
 | `pnrCode`          | Booking         | Booking system identifier |

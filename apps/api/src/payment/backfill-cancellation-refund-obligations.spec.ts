@@ -1,10 +1,4 @@
-import {
-  PrismaClient,
-  BookingStatus,
-  RefundStatus,
-  LedgerEntryType,
-  Prisma,
-} from '@prisma/client';
+import { PrismaClient, BookingStatus, RefundStatus, LedgerEntryType, Prisma } from '@prisma/client';
 import {
   backfillCancellationRefundObligations,
   BackfillLogger,
@@ -72,9 +66,7 @@ describe('backfillCancellationRefundObligations unit tests', () => {
       },
       $queryRaw: jest.fn((query: unknown) => {
         const sqlQuery = query as { strings?: readonly string[] };
-        const isSchemaGuard = sqlQuery.strings
-          ?.join('')
-          .includes('information_schema.columns');
+        const isSchemaGuard = sqlQuery.strings?.join('').includes('information_schema.columns');
 
         return Promise.resolve(isSchemaGuard ? [{ hasBookingId: true }] : []);
       }),
@@ -133,13 +125,9 @@ describe('backfillCancellationRefundObligations unit tests', () => {
       },
     ];
 
-    mockPrisma.booking.findMany
-      .mockResolvedValueOnce([mockBooking])
-      .mockResolvedValueOnce([]);
+    mockPrisma.booking.findMany.mockResolvedValueOnce([mockBooking]).mockResolvedValueOnce([]);
 
-    mockPrisma.refund.findMany
-      .mockResolvedValueOnce([mockRefund])
-      .mockResolvedValueOnce([]);
+    mockPrisma.refund.findMany.mockResolvedValueOnce([mockRefund]).mockResolvedValueOnce([]);
 
     mockPrisma.cancellationRefundObligation.create.mockResolvedValue({
       id: 'obligation-1',
@@ -199,9 +187,7 @@ describe('backfillCancellationRefundObligations unit tests', () => {
     });
 
     await expect(result).rejects.toBeInstanceOf(LegacyRefundBookingIdColumnMissingError);
-    await expect(result).rejects.toThrow(
-      'requires the pre-contract refunds.bookingId column',
-    );
+    await expect(result).rejects.toThrow('requires the pre-contract refunds.bookingId column');
 
     expect(mockPrisma.booking.findMany).not.toHaveBeenCalled();
     expect(mockPrisma.refund.findMany).not.toHaveBeenCalled();
@@ -270,13 +256,9 @@ describe('backfillCancellationRefundObligations unit tests', () => {
       },
     ];
 
-    mockPrisma.booking.findMany
-      .mockResolvedValueOnce([mockBooking])
-      .mockResolvedValueOnce([]);
+    mockPrisma.booking.findMany.mockResolvedValueOnce([mockBooking]).mockResolvedValueOnce([]);
 
-    mockPrisma.refund.findMany
-      .mockResolvedValueOnce([mockRefund])
-      .mockResolvedValueOnce([]);
+    mockPrisma.refund.findMany.mockResolvedValueOnce([mockRefund]).mockResolvedValueOnce([]);
 
     mockPrisma.ledgerEntry.findMany.mockResolvedValueOnce(mockLinkedLedger);
 
@@ -308,9 +290,7 @@ describe('backfillCancellationRefundObligations unit tests', () => {
       cancellationRefund: null,
     };
 
-    mockPrisma.booking.findMany
-      .mockResolvedValueOnce([mockBooking])
-      .mockResolvedValueOnce([]);
+    mockPrisma.booking.findMany.mockResolvedValueOnce([mockBooking]).mockResolvedValueOnce([]);
     mockPrisma.refund.findMany.mockResolvedValueOnce([]);
 
     const stats = await backfillCancellationRefundObligations({
@@ -342,9 +322,7 @@ describe('backfillCancellationRefundObligations unit tests', () => {
       cancellationRefund: null,
     };
 
-    mockPrisma.booking.findMany
-      .mockResolvedValueOnce([mockBooking])
-      .mockResolvedValueOnce([]);
+    mockPrisma.booking.findMany.mockResolvedValueOnce([mockBooking]).mockResolvedValueOnce([]);
     mockPrisma.refund.findMany.mockResolvedValueOnce([]);
 
     const stats = await backfillCancellationRefundObligations({
@@ -388,9 +366,7 @@ describe('backfillCancellationRefundObligations unit tests', () => {
       cancellationRefund: null,
     };
 
-    mockPrisma.booking.findMany
-      .mockResolvedValueOnce([mockBooking])
-      .mockResolvedValueOnce([]);
+    mockPrisma.booking.findMany.mockResolvedValueOnce([mockBooking]).mockResolvedValueOnce([]);
     mockPrisma.refund.findMany.mockResolvedValueOnce([]);
 
     const stats = await backfillCancellationRefundObligations({
@@ -422,9 +398,7 @@ describe('backfillCancellationRefundObligations unit tests', () => {
       cancellationRefund: null,
     };
 
-    mockPrisma.booking.findMany
-      .mockResolvedValueOnce([mockBooking])
-      .mockResolvedValueOnce([]);
+    mockPrisma.booking.findMany.mockResolvedValueOnce([mockBooking]).mockResolvedValueOnce([]);
     mockPrisma.refund.aggregate.mockResolvedValueOnce({
       _sum: { amount: 15000 },
     });
@@ -458,9 +432,7 @@ describe('backfillCancellationRefundObligations unit tests', () => {
     };
 
     mockPrisma.booking.findMany.mockResolvedValueOnce([]);
-    mockPrisma.refund.findMany
-      .mockResolvedValueOnce([mockRefund])
-      .mockResolvedValueOnce([]);
+    mockPrisma.refund.findMany.mockResolvedValueOnce([mockRefund]).mockResolvedValueOnce([]);
 
     mockPrisma.ledgerEntry.findMany
       .mockResolvedValueOnce([]) // linked
@@ -494,9 +466,7 @@ describe('backfillCancellationRefundObligations unit tests', () => {
     };
 
     mockPrisma.booking.findMany.mockResolvedValueOnce([]);
-    mockPrisma.refund.findMany
-      .mockResolvedValueOnce([mockRefund])
-      .mockResolvedValueOnce([]);
+    mockPrisma.refund.findMany.mockResolvedValueOnce([mockRefund]).mockResolvedValueOnce([]);
 
     mockPrisma.ledgerEntry.findMany.mockResolvedValueOnce([
       { id: 'le-1', refundTransactionId: 'refund-failed' },
@@ -530,9 +500,7 @@ describe('backfillCancellationRefundObligations unit tests', () => {
       cancellationRefund: null,
     };
 
-    mockPrisma.booking.findMany
-      .mockResolvedValueOnce([mockBooking])
-      .mockResolvedValueOnce([]);
+    mockPrisma.booking.findMany.mockResolvedValueOnce([mockBooking]).mockResolvedValueOnce([]);
     mockPrisma.refund.findMany.mockResolvedValueOnce([]);
 
     const stats = await backfillCancellationRefundObligations({
@@ -804,9 +772,7 @@ describe('backfillCancellationRefundObligations unit tests', () => {
     };
 
     mockPrisma.booking.findMany.mockResolvedValueOnce([]);
-    mockPrisma.refund.findMany
-      .mockResolvedValueOnce([mockRefund])
-      .mockResolvedValueOnce([]);
+    mockPrisma.refund.findMany.mockResolvedValueOnce([mockRefund]).mockResolvedValueOnce([]);
     mockPrisma.cancellationRefundObligation.findUnique.mockResolvedValueOnce(mockObligation);
     mockPrisma.$queryRaw
       .mockResolvedValueOnce([{ hasBookingId: true }])
@@ -871,9 +837,7 @@ describe('backfillCancellationRefundObligations unit tests', () => {
     };
 
     mockPrisma.booking.findMany.mockResolvedValueOnce([]);
-    mockPrisma.refund.findMany
-      .mockResolvedValueOnce([mockRefund])
-      .mockResolvedValueOnce([]);
+    mockPrisma.refund.findMany.mockResolvedValueOnce([mockRefund]).mockResolvedValueOnce([]);
 
     mockPrisma.ledgerEntry.findMany
       .mockResolvedValueOnce([])

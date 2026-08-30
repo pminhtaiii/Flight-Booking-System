@@ -43,21 +43,21 @@ export function ItineraryChangeSummary({
   const inc = incrementalSummary as PresentationSummary | null;
   const cum = cumulativeSummary as PresentationSummary | null;
 
-  const hasIncChanges = inc && (
-    inc.isRoutingChanged || 
-    inc.hasStopsChanged || 
-    (inc.addedSegmentsCount ?? 0) > 0 || 
-    (inc.removedSegmentsCount ?? 0) > 0 ||
-    inc.sliceSummaries?.some(s => s.finalArrivalShiftMinutes !== 0)
-  );
+  const hasIncChanges =
+    inc &&
+    (inc.isRoutingChanged ||
+      inc.hasStopsChanged ||
+      (inc.addedSegmentsCount ?? 0) > 0 ||
+      (inc.removedSegmentsCount ?? 0) > 0 ||
+      inc.sliceSummaries?.some((s) => s.finalArrivalShiftMinutes !== 0));
 
-  const hasCumChanges = cum && (
-    cum.isRoutingChanged || 
-    cum.hasStopsChanged || 
-    (cum.addedSegmentsCount ?? 0) > 0 || 
-    (cum.removedSegmentsCount ?? 0) > 0 ||
-    cum.sliceSummaries?.some(s => s.finalArrivalShiftMinutes !== 0)
-  );
+  const hasCumChanges =
+    cum &&
+    (cum.isRoutingChanged ||
+      cum.hasStopsChanged ||
+      (cum.addedSegmentsCount ?? 0) > 0 ||
+      (cum.removedSegmentsCount ?? 0) > 0 ||
+      cum.sliceSummaries?.some((s) => s.finalArrivalShiftMinutes !== 0));
 
   if (!hasIncChanges && !hasCumChanges) {
     return null;
@@ -87,25 +87,35 @@ export function ItineraryChangeSummary({
               )}
               {inc.hasStopsChanged && (
                 <p className="text-sm text-text-secondary">
-                  Number of connection stops changed ({inc.removedSegmentsCount ? `-${inc.removedSegmentsCount}` : ''} {inc.addedSegmentsCount ? `+${inc.addedSegmentsCount}` : ''}).
+                  Number of connection stops changed (
+                  {inc.removedSegmentsCount ? `-${inc.removedSegmentsCount}` : ''}{' '}
+                  {inc.addedSegmentsCount ? `+${inc.addedSegmentsCount}` : ''}).
                 </p>
               )}
               {inc.sliceSummaries && inc.sliceSummaries.length > 0 && (
                 <div className="space-y-2">
-                  <p className="text-xs font-semibold text-text-muted uppercase tracking-wider">Arrival Time Shift:</p>
+                  <p className="text-xs font-semibold text-text-muted uppercase tracking-wider">
+                    Arrival Time Shift:
+                  </p>
                   <ul className="space-y-1.5">
                     {inc.sliceSummaries.map((slice) => (
-                      <li key={slice.sliceOrder} className="flex justify-between text-sm items-center">
+                      <li
+                        key={slice.sliceOrder}
+                        className="flex justify-between text-sm items-center"
+                      >
                         <span className="text-text-secondary flex items-center gap-1">
-                          {slice.originIata} <ArrowRight className="h-3 w-3 text-text-muted" /> {slice.destinationIata}
+                          {slice.originIata} <ArrowRight className="h-3 w-3 text-text-muted" />{' '}
+                          {slice.destinationIata}
                         </span>
-                        <span className={`font-semibold ${
-                          (slice.finalArrivalShiftMinutes ?? 0) === 0 
-                            ? 'text-text-secondary' 
-                            : Math.abs(slice.finalArrivalShiftMinutes ?? 0) > 120 
-                            ? 'text-text-cancelled' 
-                            : 'text-text-pending'
-                        }`}>
+                        <span
+                          className={`font-semibold ${
+                            (slice.finalArrivalShiftMinutes ?? 0) === 0
+                              ? 'text-text-secondary'
+                              : Math.abs(slice.finalArrivalShiftMinutes ?? 0) > 120
+                                ? 'text-text-cancelled'
+                                : 'text-text-pending'
+                          }`}
+                        >
                           {formatShiftMinutes(slice.finalArrivalShiftMinutes)}
                         </span>
                       </li>
@@ -138,20 +148,28 @@ export function ItineraryChangeSummary({
               )}
               {cum.sliceSummaries && cum.sliceSummaries.length > 0 && (
                 <div className="space-y-2">
-                  <p className="text-xs font-semibold text-text-muted uppercase tracking-wider">Cumulative Shift:</p>
+                  <p className="text-xs font-semibold text-text-muted uppercase tracking-wider">
+                    Cumulative Shift:
+                  </p>
                   <ul className="space-y-1.5">
                     {cum.sliceSummaries.map((slice) => (
-                      <li key={slice.sliceOrder} className="flex justify-between text-sm items-center">
+                      <li
+                        key={slice.sliceOrder}
+                        className="flex justify-between text-sm items-center"
+                      >
                         <span className="text-text-secondary flex items-center gap-1">
-                          {slice.originIata} <ArrowRight className="h-3 w-3 text-text-muted" /> {slice.destinationIata}
+                          {slice.originIata} <ArrowRight className="h-3 w-3 text-text-muted" />{' '}
+                          {slice.destinationIata}
                         </span>
-                        <span className={`font-semibold ${
-                          (slice.finalArrivalShiftMinutes ?? 0) === 0 
-                            ? 'text-text-secondary' 
-                            : Math.abs(slice.finalArrivalShiftMinutes ?? 0) > 120 
-                            ? 'text-text-cancelled' 
-                            : 'text-text-pending'
-                        }`}>
+                        <span
+                          className={`font-semibold ${
+                            (slice.finalArrivalShiftMinutes ?? 0) === 0
+                              ? 'text-text-secondary'
+                              : Math.abs(slice.finalArrivalShiftMinutes ?? 0) > 120
+                                ? 'text-text-cancelled'
+                                : 'text-text-pending'
+                          }`}
+                        >
                           {formatShiftMinutes(slice.finalArrivalShiftMinutes)}
                         </span>
                       </li>
@@ -165,7 +183,10 @@ export function ItineraryChangeSummary({
       </div>
 
       <div className="text-xs text-text-muted border-t border-card-border pt-3">
-        <p>Original booking schedule is preserved for comparison. All times display in local time zones.</p>
+        <p>
+          Original booking schedule is preserved for comparison. All times display in local time
+          zones.
+        </p>
       </div>
     </div>
   );

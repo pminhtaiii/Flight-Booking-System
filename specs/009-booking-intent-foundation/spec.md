@@ -1,10 +1,11 @@
 # Feature Specification: Booking Intent Foundation
+
 **Feature Branch**: `009-booking-intent-foundation`
 **Created**: 2026-07-10
 **Status**: Draft
 **Input**: Grilling session decisions from `research/booking-workflow-decisions.md`
 
-## User Scenarios & Testing *(mandatory)*
+## User Scenarios & Testing _(mandatory)_
 
 ### User Story 1 - Create Booking Intent from Flight Offer (Priority: P1)
 
@@ -15,6 +16,7 @@ A logged-in user viewing a flight offer clicks "Book this Flight." The system va
 **Independent Test**: Select a flight offer from search results, submit passenger details for 2 adults, verify the system creates a `BookingIntent` with `PENDING` status and a `BookingIntentPassenger` row per passenger with a confirmed pricing snapshot.
 
 **Acceptance Scenarios**:
+
 1. **Given** a logged-in user on the flight detail page, **When** they submit valid passenger details (name, DOB, nationality, and passport data where they choose to provide it — passport is not required by this feature; see Non-Functional Requirements) for all passengers, **Then** the system calls Duffel to re-price the offer, creates a `BookingIntent` with status `PENDING`, and returns the confirmed price + intent ID.
 2. **Given** a booking intent is being created, **When** the Duffel re-pricing returns a different price than the original search, **Then** the response includes `priceChanged: true` with both the original and confirmed prices so the user can decide whether to proceed.
 3. **Given** a logged-in user with a `TravelerProfile`, **When** they initiate a booking, **Then** the primary passenger's form is pre-filled with data from their profile (name, DOB, passport, nationality) and they only need to enter missing fields.
@@ -32,6 +34,7 @@ The system automatically manages stale booking intents using a two-phase cleanup
 **Independent Test**: Create a `BookingIntent` with `PENDING` status and a `createdAt` timestamp older than the TTL. Run the cleanup cron. Verify the intent is marked `EXPIRED` (not deleted). Wait for the grace period. Run cleanup again. Verify the intent is hard-deleted.
 
 **Acceptance Scenarios**:
+
 1. **Given** a `BookingIntent` with status `PENDING` created more than 30 minutes ago, **When** the Phase 1 cron runs, **Then** the intent's status is updated to `EXPIRED` and a structured log is emitted.
 2. **Given** a `BookingIntent` with status `EXPIRED` last updated more than 24 hours ago, **When** the Phase 2 cron runs, **Then** the intent and its associated `BookingIntentPassenger` rows are hard-deleted via cascading delete.
 3. **Given** a `BookingIntent` with status `PENDING` created less than 30 minutes ago, **When** the Phase 1 cron runs, **Then** the intent is untouched.
@@ -48,6 +51,7 @@ A user who has created a booking intent can retrieve it to review passenger deta
 **Independent Test**: Create a booking intent, then fetch it by ID. Verify all passenger details, pricing snapshot, and flight reference data are returned correctly.
 
 **Acceptance Scenarios**:
+
 1. **Given** a logged-in user with an existing `BookingIntent` in `PENDING` status, **When** they request the intent by ID, **Then** the system returns all passenger details (with passport data decrypted for the owning user), pricing snapshot, and flight reference.
 2. **Given** a logged-in user requesting a booking intent belonging to a different user, **When** the request is processed, **Then** the system returns 403 Forbidden.
 3. **Given** a booking intent with status `EXPIRED`, **When** the user requests it, **Then** the system returns 410 Gone with a message indicating the intent has expired and they should search again.
@@ -60,6 +64,7 @@ A user who has created a booking intent can retrieve it to review passenger deta
 ## Scope & Boundaries
 
 ### In Scope
+
 - `BookingIntent` and `BookingIntentPassenger` Prisma models + migration
 - `BookingIntentModule` NestJS module (controller, service, DTOs)
 - Duffel offer re-pricing at intent creation (reuse existing `offers.get()`, always sourced from the linked `FlightOffer` record)
@@ -71,6 +76,7 @@ A user who has created a booking intent can retrieve it to review passenger deta
 - API endpoints: `POST /bookings/intent`, `GET /bookings/intent/:id`, `GET /bookings/intent/prefill`
 
 ### Out of Scope
+
 - Payment processing (Feature B)
 - PNR creation / Duffel order creation (Feature B)
 - Frontend booking form UI (Feature B)
@@ -80,6 +86,7 @@ A user who has created a booking intent can retrieve it to review passenger deta
 - Email/SMS notifications (Feature B)
 
 ### Deferred Decisions (Documented)
+
 - **GDPR erasure cascade & retention**: Whether PII deletion must cascade into intent/booking rows is a legal/compliance decision. The system design supports cascading deletion, and a default 7-year retention window for `COMPLETED` intents is proposed in [research.md](./research.md) → R7, pending legal confirmation.
 - **Companion profiles**: Extending `TravelerProfile` to 1:many (`SavedTraveler`) for pre-filling non-primary passengers. Important UX improvement, deferred to a separate feature.
 - **Frontend UX structure**: Multi-step wizard vs. single page for the booking form. Deferred to Feature B.

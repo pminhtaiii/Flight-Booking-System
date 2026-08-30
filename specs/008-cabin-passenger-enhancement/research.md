@@ -11,6 +11,7 @@
 **Rationale**: Duffel optimizes search results internally for the requested cabin. Post-filtering wastes API budget and may miss premium cabin offers only returned when explicitly requested.
 
 **Alternatives considered**:
+
 - Post-filtering (request all cabins, filter client-side) — budget-inefficient, inaccurate for rare cabins.
 
 ---
@@ -22,6 +23,7 @@
 **Rationale**: Regional feeder flights often lack premium cabins. Discarding entire itineraries is too aggressive and kills valid multi-leg journeys. Industry standard is to keep and warn.
 
 **Alternatives considered**:
+
 - Strict discard — too aggressive, yields zero results on complex routes.
 - Threshold-based filtering — incorporated into the three-tier status instead.
 
@@ -32,6 +34,7 @@
 **Decision**: Deterministic, single-rule classification: `full` / `mixed` / `downgraded`.
 
 **Algorithm**:
+
 ```
 1. Find the longest-duration segment across all slices
 2. If that segment's cabinClass ≠ requestedCabinClass → "downgraded"
@@ -43,6 +46,7 @@
 **Rationale**: No magic thresholds, no tunables, no ambiguity from segment ordering. "Longest segment" alone resolves feeder-leg-vs-main-flight correctly without requiring a buffer multiplier.
 
 **Alternatives considered**:
+
 - Two-tier (full/mixed only) — user said keep `downgraded` because "feeder in economy but long-haul in business" is fundamentally different from "main flight itself is economy".
 - 2× duration buffer for "primary segment" detection — rejected by user as an unjustifiable tunable constant.
 
@@ -55,6 +59,7 @@
 **Rationale**: Eliminates cache-key ordering issues by construction. Simple to validate. Covers adult/child/infant which is the aviation industry standard.
 
 **Alternatives considered**:
+
 - Structured array `passengers: { type, count }[]` — more flexible but introduces ordering-dependent cache keys requiring normalization.
 
 ---
@@ -74,6 +79,7 @@
 **Rationale**: Different cabins genuinely return different offers — separate cache entries are correct. Flat fields = deterministic ordering by construction (no normalization needed). Budget impact accepted — 2,000/month is sufficient for development/early production.
 
 **Alternatives considered**:
+
 - Cache warming for popular combinations — rejected as premature optimization.
 - Raising budget limits — not needed yet.
 
@@ -86,6 +92,7 @@
 **Rationale**: Early development stage — clean migration is trivial. Flat columns enable rich analytics queries (`GROUP BY cabinClass`, `WHERE children > 0`) without JSON extraction.
 
 **Alternatives considered**:
+
 - JSON `passengerBreakdown` column — rejected as a code smell for known-shape structured data.
 - Keep `passengers` as denormalized total — not needed, can be computed as `adults + children + infants`.
 

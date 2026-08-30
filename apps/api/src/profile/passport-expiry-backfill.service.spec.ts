@@ -42,7 +42,12 @@ describe('PassportExpiryBackfillService', () => {
 
   it('performs shadowing by targeting only profiles with non-null expiry and null ciphertext shadow', async () => {
     const mockProfiles = [
-      { id: '1', revision: 1, passportExpiry: new Date('2026-08-01'), passportExpiryCiphertext: null },
+      {
+        id: '1',
+        revision: 1,
+        passportExpiry: new Date('2026-08-01'),
+        passportExpiryCiphertext: null,
+      },
     ];
     jest.spyOn(prisma.travelerProfile, 'findMany').mockResolvedValue(mockProfiles as any);
     jest.spyOn(prisma.travelerProfile, 'updateMany').mockResolvedValue({ count: 1 });
@@ -72,7 +77,12 @@ describe('PassportExpiryBackfillService', () => {
 
   it('handles CAS revision checks and increments skipped when updateMany affects 0 rows', async () => {
     const mockProfiles = [
-      { id: '1', revision: 1, passportExpiry: new Date('2026-08-01'), passportExpiryCiphertext: null },
+      {
+        id: '1',
+        revision: 1,
+        passportExpiry: new Date('2026-08-01'),
+        passportExpiryCiphertext: null,
+      },
     ];
     jest.spyOn(prisma.travelerProfile, 'findMany').mockResolvedValue(mockProfiles as any);
     jest.spyOn(prisma.travelerProfile, 'updateMany').mockResolvedValue({ count: 0 }); // Concurrent change
@@ -98,7 +108,12 @@ describe('PassportExpiryBackfillService', () => {
 
   it('quarantines profile if decrypted date does not match legacy date (mismatched date)', async () => {
     const mockProfiles = [
-      { id: '1', revision: 1, passportExpiry: new Date('2026-08-01'), passportExpiryCiphertext: null },
+      {
+        id: '1',
+        revision: 1,
+        passportExpiry: new Date('2026-08-01'),
+        passportExpiryCiphertext: null,
+      },
     ];
     jest.spyOn(prisma.travelerProfile, 'findMany').mockResolvedValue(mockProfiles as any);
     jest.spyOn(prisma.travelerProfile, 'updateMany').mockResolvedValue({ count: 1 });
@@ -114,7 +129,12 @@ describe('PassportExpiryBackfillService', () => {
 
   it('quarantines profile if decryption throws an error (bad tag/key)', async () => {
     const mockProfiles = [
-      { id: '1', revision: 1, passportExpiry: new Date('2026-08-01'), passportExpiryCiphertext: null },
+      {
+        id: '1',
+        revision: 1,
+        passportExpiry: new Date('2026-08-01'),
+        passportExpiryCiphertext: null,
+      },
     ];
     jest.spyOn(prisma.travelerProfile, 'findMany').mockResolvedValue(mockProfiles as any);
     jest.spyOn(prisma.travelerProfile, 'updateMany').mockResolvedValue({ count: 1 });
@@ -134,18 +154,44 @@ describe('PassportExpiryBackfillService', () => {
     // 5 profiles: 2 succeed, 2 quarantined (mismatched), 1 skipped.
     // Total attempted = 4. Quarantined = 2. Ratio = 2/4 = 50%
     const mockProfiles = [
-      { id: '1', revision: 1, passportExpiry: new Date('2026-08-01'), passportExpiryCiphertext: null },
-      { id: '2', revision: 1, passportExpiry: new Date('2026-08-02'), passportExpiryCiphertext: null },
-      { id: '3', revision: 1, passportExpiry: new Date('2026-08-03'), passportExpiryCiphertext: null },
-      { id: '4', revision: 1, passportExpiry: new Date('2026-08-04'), passportExpiryCiphertext: null },
-      { id: '5', revision: 1, passportExpiry: new Date('2026-08-05'), passportExpiryCiphertext: null },
+      {
+        id: '1',
+        revision: 1,
+        passportExpiry: new Date('2026-08-01'),
+        passportExpiryCiphertext: null,
+      },
+      {
+        id: '2',
+        revision: 1,
+        passportExpiry: new Date('2026-08-02'),
+        passportExpiryCiphertext: null,
+      },
+      {
+        id: '3',
+        revision: 1,
+        passportExpiry: new Date('2026-08-03'),
+        passportExpiryCiphertext: null,
+      },
+      {
+        id: '4',
+        revision: 1,
+        passportExpiry: new Date('2026-08-04'),
+        passportExpiryCiphertext: null,
+      },
+      {
+        id: '5',
+        revision: 1,
+        passportExpiry: new Date('2026-08-05'),
+        passportExpiryCiphertext: null,
+      },
     ];
     jest.spyOn(prisma.travelerProfile, 'findMany').mockResolvedValue(mockProfiles as any);
 
     // Profile 1 and 2 succeed: update count 1, decrypt matches
     // Profile 3 and 4 quarantine: update count 1, decrypt mismatches
     // Profile 5 skips: update count 0
-    jest.spyOn(prisma.travelerProfile, 'updateMany')
+    jest
+      .spyOn(prisma.travelerProfile, 'updateMany')
       .mockResolvedValueOnce({ count: 1 })
       .mockResolvedValueOnce({ count: 1 })
       .mockResolvedValueOnce({ count: 1 })
@@ -153,15 +199,16 @@ describe('PassportExpiryBackfillService', () => {
       .mockResolvedValueOnce({ count: 0 });
 
     jest.spyOn(encryptionService, 'encryptBound').mockReturnValue('v1:encrypted');
-    jest.spyOn(encryptionService, 'decryptBound')
+    jest
+      .spyOn(encryptionService, 'decryptBound')
       .mockReturnValueOnce('2026-08-01') // matches 1
       .mockReturnValueOnce('2026-08-02') // matches 2
       .mockReturnValueOnce('2027-08-03') // mismatch 3
       .mockReturnValueOnce('2027-08-04'); // mismatch 4
 
     // threshold is 10% (0.1), so 50% should abort!
-    await expect(
-      service.backfill({ batchSize: 10, abortThresholdRatio: 0.1 }),
-    ).rejects.toThrow(/Backfill aborted due to high quarantine ratio/);
+    await expect(service.backfill({ batchSize: 10, abortThresholdRatio: 0.1 })).rejects.toThrow(
+      /Backfill aborted due to high quarantine ratio/,
+    );
   });
 });

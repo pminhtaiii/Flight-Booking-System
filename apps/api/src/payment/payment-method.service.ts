@@ -1,9 +1,4 @@
-import {
-  Injectable,
-  Logger,
-  NotFoundException,
-  ForbiddenException,
-} from '@nestjs/common';
+import { Injectable, Logger, NotFoundException, ForbiddenException } from '@nestjs/common';
 import { PrismaService } from '@/prisma/prisma.service';
 import { StripeService } from '@/common/stripe.service';
 
@@ -40,13 +35,8 @@ export class PaymentMethodService {
     };
   }
 
-  async saveMethod(
-    userId: string,
-    stripeCustomerId: string,
-    stripePaymentIntentId: string,
-  ) {
-    const paymentIntent =
-      await this.stripeService.retrievePaymentIntent(stripePaymentIntentId);
+  async saveMethod(userId: string, stripeCustomerId: string, stripePaymentIntentId: string) {
+    const paymentIntent = await this.stripeService.retrievePaymentIntent(stripePaymentIntentId);
 
     const savedWithConsent = paymentIntent.setup_future_usage === 'off_session';
     if (!savedWithConsent) {
@@ -62,9 +52,7 @@ export class PaymentMethodService {
         : paymentIntent.payment_method?.id;
 
     if (!paymentMethodId) {
-      this.logger.warn(
-        `No payment method attached to PaymentIntent ${stripePaymentIntentId}`,
-      );
+      this.logger.warn(`No payment method attached to PaymentIntent ${stripePaymentIntentId}`);
       return;
     }
 
@@ -113,9 +101,7 @@ export class PaymentMethodService {
     }
 
     try {
-      await this.stripeService.detachPaymentMethod(
-        method.stripePaymentMethodId,
-      );
+      await this.stripeService.detachPaymentMethod(method.stripePaymentMethodId);
     } catch (err: unknown) {
       this.logger.warn(
         `Failed to detach Stripe payment method ${method.stripePaymentMethodId}: ${err instanceof Error ? err.message : String(err)}`,

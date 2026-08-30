@@ -208,29 +208,26 @@ async function bootstrap(): Promise<void> {
   });
   expressApp.get('/test/t093/evidence', async (_request: unknown, response: JsonResponse) => {
     try {
-      const [
-        bookingIntentCount,
-        consumedHandoffCount,
-        encryptedChatMessageCount,
-      ] = await Promise.all([
-        prisma.bookingIntent.count({
-          where: { createdAt: { gte: evidenceStartedAt } },
-        }),
-        prisma.chatHandoff.count({
-          where: {
-            createdAt: { gte: evidenceStartedAt },
-            consumedAt: { not: null },
-          },
-        }),
-        prisma.chatMessage.count({
-          where: {
-            createdAt: { gte: evidenceStartedAt },
-            contentCiphertext: { not: null },
-            contentNonce: { not: null },
-            contentAuthTag: { not: null },
-          },
-        }),
-      ]);
+      const [bookingIntentCount, consumedHandoffCount, encryptedChatMessageCount] =
+        await Promise.all([
+          prisma.bookingIntent.count({
+            where: { createdAt: { gte: evidenceStartedAt } },
+          }),
+          prisma.chatHandoff.count({
+            where: {
+              createdAt: { gte: evidenceStartedAt },
+              consumedAt: { not: null },
+            },
+          }),
+          prisma.chatMessage.count({
+            where: {
+              createdAt: { gte: evidenceStartedAt },
+              contentCiphertext: { not: null },
+              contentNonce: { not: null },
+              contentAuthTag: { not: null },
+            },
+          }),
+        ]);
 
       response.json({
         supplierCalls: counters.supplierCalls,

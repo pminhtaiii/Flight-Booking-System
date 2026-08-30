@@ -39,7 +39,12 @@ export class SelectionAttestationService {
 
     const validKeys: string[] = [];
     for (const key of candidateKeys) {
-      if (key && typeof key === 'string' && key.trim().length > 0 && !validKeys.includes(key.trim())) {
+      if (
+        key &&
+        typeof key === 'string' &&
+        key.trim().length > 0 &&
+        !validKeys.includes(key.trim())
+      ) {
         validKeys.push(key.trim());
       }
     }
@@ -180,10 +185,7 @@ export class SelectionAttestationService {
     }
 
     for (const key of keys) {
-      const expectedSignature = crypto
-        .createHmac('sha256', key)
-        .update(payloadStr)
-        .digest('hex');
+      const expectedSignature = crypto.createHmac('sha256', key).update(payloadStr).digest('hex');
 
       try {
         const expectedBuffer = Buffer.from(expectedSignature, 'hex');

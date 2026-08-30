@@ -20,7 +20,6 @@ import {
   AncillaryRepriceOutput,
 } from '@shared/types';
 
-
 export type DuffelRecoveredOrder = {
   id: string;
   order_id: string;
@@ -62,16 +61,23 @@ export class DuffelService {
     const isTestEnv = process.env.NODE_ENV === 'test' || isJest;
 
     if (!isTestEnv && (!token || token === '' || token === 'mock')) {
-      this.logger.warn('DUFFEL_ACCESS_TOKEN is missing or invalid in production/development runtime.');
+      this.logger.warn(
+        'DUFFEL_ACCESS_TOKEN is missing or invalid in production/development runtime.',
+      );
     }
 
     const rawApiUrl = process.env.DUFFEL_API_URL;
     if (rawApiUrl && rawApiUrl.trim() !== '') {
       const parsed = new URL(rawApiUrl.trim());
       if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
-        throw new Error(`Unsupported DUFFEL_API_URL protocol: ${parsed.protocol}. Only http: and https: are allowed.`);
+        throw new Error(
+          `Unsupported DUFFEL_API_URL protocol: ${parsed.protocol}. Only http: and https: are allowed.`,
+        );
       }
-      this.basePath = `${parsed.origin}${parsed.pathname === '/' ? '' : parsed.pathname}`.replace(/\/+$/, '');
+      this.basePath = `${parsed.origin}${parsed.pathname === '/' ? '' : parsed.pathname}`.replace(
+        /\/+$/,
+        '',
+      );
     } else {
       this.basePath = 'https://api.duffel.com';
     }
@@ -83,7 +89,11 @@ export class DuffelService {
     });
   }
 
-  mapPassengersToDuffel(adults: number, children = 0, infants = 0): Array<{ type: 'adult' | 'child' | 'infant_without_seat' }> {
+  mapPassengersToDuffel(
+    adults: number,
+    children = 0,
+    infants = 0,
+  ): Array<{ type: 'adult' | 'child' | 'infant_without_seat' }> {
     const passengers: Array<{ type: 'adult' | 'child' | 'infant_without_seat' }> = [];
     for (let i = 0; i < adults; i++) {
       passengers.push({ type: 'adult' });
@@ -120,7 +130,8 @@ export class DuffelService {
         if (!token || token === '' || token === 'mock') {
           throw new HttpException(
             {
-              message: 'Duffel Access Token is missing or invalid in production/development runtime.',
+              message:
+                'Duffel Access Token is missing or invalid in production/development runtime.',
               code: 'CONFIGURATION_ERROR',
             },
             HttpStatus.INTERNAL_SERVER_ERROR,
@@ -169,7 +180,9 @@ export class DuffelService {
       const currentBudget = currentBudgetStr ? parseInt(currentBudgetStr, 10) : 0;
 
       if (currentBudget >= callerLimit || currentBudget >= totalLimit) {
-        this.logger.warn(`Duffel search throttled. Budget key: ${budgetKey}, Current: ${currentBudget}, Limits: (Caller: ${callerLimit}, Total: ${totalLimit})`);
+        this.logger.warn(
+          `Duffel search throttled. Budget key: ${budgetKey}, Current: ${currentBudget}, Limits: (Caller: ${callerLimit}, Total: ${totalLimit})`,
+        );
         throw new HttpException(
           {
             message: 'Flight search capacity temporarily reached. Please try again later.',
@@ -185,7 +198,9 @@ export class DuffelService {
 
       const newBudget = await this.cacheService.incr(budgetKey, ttlSeconds);
       if (newBudget > callerLimit || newBudget > totalLimit) {
-        this.logger.warn(`Duffel search throttled after increment. Budget key: ${budgetKey}, New: ${newBudget}, Limits: (Caller: ${callerLimit}, Total: ${totalLimit})`);
+        this.logger.warn(
+          `Duffel search throttled after increment. Budget key: ${budgetKey}, New: ${newBudget}, Limits: (Caller: ${callerLimit}, Total: ${totalLimit})`,
+        );
         await this.cacheService.decr(budgetKey);
         throw new HttpException(
           {
@@ -197,11 +212,18 @@ export class DuffelService {
       }
 
       // 4. Create Duffel offer request
-      const hasDuffelApiUrl = Boolean(process.env.DUFFEL_API_URL && process.env.DUFFEL_API_URL.trim() !== '');
+      const hasDuffelApiUrl = Boolean(
+        process.env.DUFFEL_API_URL && process.env.DUFFEL_API_URL.trim() !== '',
+      );
       if (!isJest && !hasDuffelApiUrl && (process.env.NODE_ENV === 'test' || token === 'mock')) {
-        this.logger.log(`Mocking Duffel API response for test environment. NODE_ENV: ${process.env.NODE_ENV}`);
-        
-        const mockPassengers: Array<{ id: string; type: 'adult' | 'child' | 'infant_without_seat' }> = [];
+        this.logger.log(
+          `Mocking Duffel API response for test environment. NODE_ENV: ${process.env.NODE_ENV}`,
+        );
+
+        const mockPassengers: Array<{
+          id: string;
+          type: 'adult' | 'child' | 'infant_without_seat';
+        }> = [];
         for (let i = 0; i < normalizedQuery.adults; i++) {
           mockPassengers.push({ id: `pas_mock_${mockPassengers.length + 1}`, type: 'adult' });
         }
@@ -209,23 +231,46 @@ export class DuffelService {
           mockPassengers.push({ id: `pas_mock_${mockPassengers.length + 1}`, type: 'child' });
         }
         for (let i = 0; i < normalizedQuery.infants; i++) {
-          mockPassengers.push({ id: `pas_mock_${mockPassengers.length + 1}`, type: 'infant_without_seat' });
+          mockPassengers.push({
+            id: `pas_mock_${mockPassengers.length + 1}`,
+            type: 'infant_without_seat',
+          });
         }
 
         const slices: Record<string, unknown>[] = [
           {
             id: 'sli_mock_1',
             duration: 'PT2H10M',
-            origin: { id: normalizedQuery.origin, name: `${normalizedQuery.origin} Airport`, iata_code: normalizedQuery.origin, type: 'airport' },
-            destination: { id: normalizedQuery.destination, name: `${normalizedQuery.destination} Airport`, iata_code: normalizedQuery.destination, type: 'airport' },
+            origin: {
+              id: normalizedQuery.origin,
+              name: `${normalizedQuery.origin} Airport`,
+              iata_code: normalizedQuery.origin,
+              type: 'airport',
+            },
+            destination: {
+              id: normalizedQuery.destination,
+              name: `${normalizedQuery.destination} Airport`,
+              iata_code: normalizedQuery.destination,
+              type: 'airport',
+            },
             segments: [
               {
                 id: 'seg_mock_1',
                 duration: 'PT2H10M',
                 departing_at: `${normalizedQuery.departureDate}T08:00:00`,
                 arriving_at: `${normalizedQuery.departureDate}T10:10:00`,
-                origin: { id: normalizedQuery.origin, name: `${normalizedQuery.origin} Airport`, iata_code: normalizedQuery.origin, type: 'airport' },
-                destination: { id: normalizedQuery.destination, name: `${normalizedQuery.destination} Airport`, iata_code: normalizedQuery.destination, type: 'airport' },
+                origin: {
+                  id: normalizedQuery.origin,
+                  name: `${normalizedQuery.origin} Airport`,
+                  iata_code: normalizedQuery.origin,
+                  type: 'airport',
+                },
+                destination: {
+                  id: normalizedQuery.destination,
+                  name: `${normalizedQuery.destination} Airport`,
+                  iata_code: normalizedQuery.destination,
+                  type: 'airport',
+                },
                 operating_carrier: { id: 'VN', name: 'Vietnam Airlines', iata_code: 'VN' },
                 marketing_carrier: { id: 'VN', name: 'Vietnam Airlines', iata_code: 'VN' },
                 marketing_carrier_flight_number: '123',
@@ -233,29 +278,47 @@ export class DuffelService {
                 passengers: mockPassengers.map((p) => ({
                   passenger_id: p.id,
                   cabin_class: normalizedQuery.cabinClass,
-                  baggages: [
-                    { type: 'checked', quantity: 1 }
-                  ]
-                }))
-              }
-            ]
-          }
+                  baggages: [{ type: 'checked', quantity: 1 }],
+                })),
+              },
+            ],
+          },
         ];
 
         if (normalizedQuery.returnDate) {
           slices.push({
             id: 'sli_mock_2',
             duration: 'PT2H10M',
-            origin: { id: normalizedQuery.destination, name: `${normalizedQuery.destination} Airport`, iata_code: normalizedQuery.destination, type: 'airport' },
-            destination: { id: normalizedQuery.origin, name: `${normalizedQuery.origin} Airport`, iata_code: normalizedQuery.origin, type: 'airport' },
+            origin: {
+              id: normalizedQuery.destination,
+              name: `${normalizedQuery.destination} Airport`,
+              iata_code: normalizedQuery.destination,
+              type: 'airport',
+            },
+            destination: {
+              id: normalizedQuery.origin,
+              name: `${normalizedQuery.origin} Airport`,
+              iata_code: normalizedQuery.origin,
+              type: 'airport',
+            },
             segments: [
               {
                 id: 'seg_mock_2',
                 duration: 'PT2H10M',
                 departing_at: `${normalizedQuery.returnDate}T15:00:00`,
                 arriving_at: `${normalizedQuery.returnDate}T17:10:00`,
-                origin: { id: normalizedQuery.destination, name: `${normalizedQuery.destination} Airport`, iata_code: normalizedQuery.destination, type: 'airport' },
-                destination: { id: normalizedQuery.origin, name: `${normalizedQuery.origin} Airport`, iata_code: normalizedQuery.origin, type: 'airport' },
+                origin: {
+                  id: normalizedQuery.destination,
+                  name: `${normalizedQuery.destination} Airport`,
+                  iata_code: normalizedQuery.destination,
+                  type: 'airport',
+                },
+                destination: {
+                  id: normalizedQuery.origin,
+                  name: `${normalizedQuery.origin} Airport`,
+                  iata_code: normalizedQuery.origin,
+                  type: 'airport',
+                },
                 operating_carrier: { id: 'VN', name: 'Vietnam Airlines', iata_code: 'VN' },
                 marketing_carrier: { id: 'VN', name: 'Vietnam Airlines', iata_code: 'VN' },
                 marketing_carrier_flight_number: '124',
@@ -263,12 +326,10 @@ export class DuffelService {
                 passengers: mockPassengers.map((p) => ({
                   passenger_id: p.id,
                   cabin_class: normalizedQuery.cabinClass,
-                  baggages: [
-                    { type: 'checked', quantity: 1 }
-                  ]
-                }))
-              }
-            ]
+                  baggages: [{ type: 'checked', quantity: 1 }],
+                })),
+              },
+            ],
           });
         }
 
@@ -278,7 +339,7 @@ export class DuffelService {
             total_amount: '125.50',
             total_currency: 'USD',
             slices: slices.map((s) => {
-              const segments = (s.segments as Record<string, unknown>[] || []);
+              const segments = (s.segments as Record<string, unknown>[]) || [];
               return {
                 ...s,
                 segments: segments.map((seg) => ({
@@ -288,15 +349,15 @@ export class DuffelService {
               };
             }),
             passengers: mockPassengers,
-            passenger_identity_documents_required: false
-          }
+            passenger_identity_documents_required: false,
+          },
         ];
 
         const offerRequest = {
           id: 'or_mock_123',
           slices,
           passengers: mockPassengers,
-          offers
+          offers,
         } as unknown as DuffelOfferRequest;
 
         // Cache raw response in Redis
@@ -334,12 +395,18 @@ export class DuffelService {
         normalizedQuery.infants,
       );
 
-      this.logger.log(`Calling Duffel API to create offer request. Slices: ${slices.length}, Passengers: ${passengers.length}`);
+      this.logger.log(
+        `Calling Duffel API to create offer request. Slices: ${slices.length}, Passengers: ${passengers.length}`,
+      );
       const duffelResponse = await this.duffel.offerRequests.create({
         slices,
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         passengers: passengers as any,
-        cabin_class: normalizedQuery.cabinClass as 'first' | 'business' | 'premium_economy' | 'economy',
+        cabin_class: normalizedQuery.cabinClass as
+          | 'first'
+          | 'business'
+          | 'premium_economy'
+          | 'economy',
       });
 
       const offerRequest = duffelResponse.data as unknown as DuffelOfferRequest;
@@ -353,13 +420,19 @@ export class DuffelService {
         searchHash: sha256,
       };
     } catch (err: unknown) {
-      this.logger.error(`Error in searchFlights: ${err instanceof Error ? err.message : String(err)}`, err instanceof Error ? err.stack : undefined);
+      this.logger.error(
+        `Error in searchFlights: ${err instanceof Error ? err.message : String(err)}`,
+        err instanceof Error ? err.stack : undefined,
+      );
       if (err instanceof HttpException) {
         throw err;
       }
       throw new HttpException(
         {
-          message: err instanceof Error ? err.message : 'Upstream flight search service is temporarily unavailable',
+          message:
+            err instanceof Error
+              ? err.message
+              : 'Upstream flight search service is temporarily unavailable',
           code: 'UPSTREAM_UNAVAILABLE',
         },
         HttpStatus.BAD_GATEWAY,
@@ -389,7 +462,9 @@ export class DuffelService {
           this.logger.log(`Ancillary catalog cache MISS/STALE for offer ${offerId} (TTL: ${ttl}s)`);
         }
       } catch (cacheErr: unknown) {
-        this.logger.warn(`Failed to read cache for offer ${offerId}: ${cacheErr instanceof Error ? cacheErr.message : String(cacheErr)}. Falling back to supplier fetch.`);
+        this.logger.warn(
+          `Failed to read cache for offer ${offerId}: ${cacheErr instanceof Error ? cacheErr.message : String(cacheErr)}. Falling back to supplier fetch.`,
+        );
       }
     } else {
       this.logger.log(`Ancillary catalog force refresh requested for offer ${offerId}`);
@@ -527,7 +602,9 @@ export class DuffelService {
                 !service.metadata ||
                 !service.metadata.type
               ) {
-                this.logger.warn(`Quarantined incomplete baggage service: ${service.id || 'missing-id'}`);
+                this.logger.warn(
+                  `Quarantined incomplete baggage service: ${service.id || 'missing-id'}`,
+                );
                 continue;
               }
 
@@ -559,7 +636,9 @@ export class DuffelService {
         };
 
         const latency = Date.now() - startTime;
-        this.logger.log(`Successfully fetched seatmaps/services for offer ${offerId} from supplier. Latency: ${latency}ms`);
+        this.logger.log(
+          `Successfully fetched seatmaps/services for offer ${offerId} from supplier. Latency: ${latency}ms`,
+        );
       } catch (err: unknown) {
         if (err instanceof DuffelTimeoutError) {
           this.logger.error(`Fetch timed out for offer ${offerId} (timeout: ${timeoutMs}ms)`);
@@ -573,7 +652,10 @@ export class DuffelService {
         }
 
         const error = err as unknown as { message?: string; status?: number; stack?: string };
-        this.logger.error(`Failed to fetch seatmaps/services for offer ${offerId}: ${error.message || String(error)}`, error.stack);
+        this.logger.error(
+          `Failed to fetch seatmaps/services for offer ${offerId}: ${error.message || String(error)}`,
+          error.stack,
+        );
 
         if (error.status === 429) {
           throw new HttpException(
@@ -602,7 +684,9 @@ export class DuffelService {
     try {
       await this.cacheService.set(cacheKey, JSON.stringify(catalog), 60);
     } catch (cacheErr: unknown) {
-      this.logger.warn(`Failed to write cache for offer ${offerId}: ${cacheErr instanceof Error ? cacheErr.message : String(cacheErr)}`);
+      this.logger.warn(
+        `Failed to write cache for offer ${offerId}: ${cacheErr instanceof Error ? cacheErr.message : String(cacheErr)}`,
+      );
     }
 
     return catalog;
@@ -634,13 +718,15 @@ export class DuffelService {
                       currency: srv.total_currency,
                     });
                   } else {
-                    this.logger.warn(`Quarantined incomplete seat service: ${srv.id || 'missing-id'} in seat ${element.designator}`);
+                    this.logger.warn(
+                      `Quarantined incomplete seat service: ${srv.id || 'missing-id'} in seat ${element.designator}`,
+                    );
                   }
                 }
                 normalizedElement.availableServices = validServices;
               }
               return normalizedElement;
-            })
+            }),
           ),
         })),
       })),
@@ -691,7 +777,7 @@ export class DuffelService {
           };
         });
 
-        const base = 420.00;
+        const base = 420.0;
         const grand = base + servicesTotal;
 
         return {
@@ -711,7 +797,9 @@ export class DuffelService {
       const pricedOffer = response.data as unknown as DuffelPricedOffer;
 
       const delta = Number(pricedOffer.total_amount) - Number(pricedOffer.base_amount);
-      this.logger.log(`Priced offer ${offerId} successfully. Base: ${pricedOffer.base_amount}, Grand: ${pricedOffer.total_amount}, Currency: ${pricedOffer.total_currency}, Service line delta: ${delta.toFixed(2)}`);
+      this.logger.log(
+        `Priced offer ${offerId} successfully. Base: ${pricedOffer.base_amount}, Grand: ${pricedOffer.total_amount}, Currency: ${pricedOffer.total_currency}, Service line delta: ${delta.toFixed(2)}`,
+      );
 
       return {
         totalAmount: pricedOffer.total_amount,
@@ -725,8 +813,17 @@ export class DuffelService {
         invalidServiceIdentities: [],
       };
     } catch (err: unknown) {
-      const error = err as unknown as { message?: string; status?: number; statusCode?: number; stack?: string; errors?: Array<{ message?: string; detail?: string }> };
-      this.logger.error(`Error repricing offer ${offerId}: ${error.message || String(error)}`, error.stack);
+      const error = err as unknown as {
+        message?: string;
+        status?: number;
+        statusCode?: number;
+        stack?: string;
+        errors?: Array<{ message?: string; detail?: string }>;
+      };
+      this.logger.error(
+        `Error repricing offer ${offerId}: ${error.message || String(error)}`,
+        error.stack,
+      );
 
       if (error.status === 400 || error.statusCode === 400 || error.message?.includes('400')) {
         const errorMsg = error.message || '';
@@ -754,7 +851,9 @@ export class DuffelService {
           invalidServiceIdentities.push(...allIntendedIds);
         }
 
-        this.logger.warn(`Repricing failed for offer ${offerId} with invalid services: ${invalidServiceIdentities.join(', ')}`);
+        this.logger.warn(
+          `Repricing failed for offer ${offerId} with invalid services: ${invalidServiceIdentities.join(', ')}`,
+        );
 
         return {
           totalAmount: '0.00',
@@ -851,10 +950,7 @@ export class DuffelService {
       };
 
       if (!offer || !offer.passengers) {
-        throw new HttpException(
-          'Duffel offer or passenger list not found.',
-          HttpStatus.NOT_FOUND,
-        );
+        throw new HttpException('Duffel offer or passenger list not found.', HttpStatus.NOT_FOUND);
       }
 
       const mapType = (t: string) => {
@@ -893,17 +989,11 @@ export class DuffelService {
         const familyName = p.familyName || p.family_name;
 
         if (!givenName) {
-          throw new HttpException(
-            'Given name is required for passenger.',
-            HttpStatus.BAD_REQUEST,
-          );
+          throw new HttpException('Given name is required for passenger.', HttpStatus.BAD_REQUEST);
         }
 
         if (!familyName) {
-          throw new HttpException(
-            'Family name is required for passenger.',
-            HttpStatus.BAD_REQUEST,
-          );
+          throw new HttpException('Family name is required for passenger.', HttpStatus.BAD_REQUEST);
         }
 
         let gender: 'm' | 'f' | 'u' = 'u';
@@ -964,7 +1054,11 @@ export class DuffelService {
           email,
         };
 
-        if (p.identity_documents && Array.isArray(p.identity_documents) && p.identity_documents.length > 0) {
+        if (
+          p.identity_documents &&
+          Array.isArray(p.identity_documents) &&
+          p.identity_documents.length > 0
+        ) {
           duffelPassenger.identity_documents = p.identity_documents;
         }
 
@@ -993,14 +1087,16 @@ export class DuffelService {
         const basePath = this.basePath;
         const key = finalIdempotencyKey || crypto.randomUUID();
 
-        this.logger.log(`Creating Duffel order with ${finalServices?.length || 0} services, offer ID ${duffelOfferId}`);
+        this.logger.log(
+          `Creating Duffel order with ${finalServices?.length || 0} services, offer ID ${duffelOfferId}`,
+        );
 
         const orderPromise = (async () => {
           const res = await fetch(`${basePath}/air/orders`, {
             method: 'POST',
             signal: controller.signal,
             headers: {
-              'Authorization': `Bearer ${token}`,
+              Authorization: `Bearer ${token}`,
               'Duffel-Version': apiVersion,
               'Content-Type': 'application/json',
               'Idempotency-Key': `${key}-duffel-order`,
@@ -1016,7 +1112,7 @@ export class DuffelService {
             }),
           });
 
-          const body = await res.json() as any;
+          const body = (await res.json()) as any;
           if (!res.ok || (body && body.errors)) {
             const err = new Error(body?.errors?.[0]?.message || 'Failed to create Duffel order');
             (err as any).status = res.status;
@@ -1070,7 +1166,8 @@ export class DuffelService {
         if (!token || token === '' || token === 'mock') {
           throw new HttpException(
             {
-              message: 'Duffel Access Token is missing or invalid in production/development runtime.',
+              message:
+                'Duffel Access Token is missing or invalid in production/development runtime.',
               code: 'CONFIGURATION_ERROR',
             },
             HttpStatus.INTERNAL_SERVER_ERROR,
@@ -1079,7 +1176,9 @@ export class DuffelService {
       }
 
       if (isTestEnv || token === 'mock') {
-        this.logger.log(`Mocking Duffel cancellation quote for test environment. OrderId: ${duffelOrderId}`);
+        this.logger.log(
+          `Mocking Duffel cancellation quote for test environment. OrderId: ${duffelOrderId}`,
+        );
         return {
           id: `oc_mock_${duffelOrderId}`,
           order_id: duffelOrderId,
@@ -1096,7 +1195,10 @@ export class DuffelService {
       return quote.data;
     } catch (err: unknown) {
       const error = err as Error;
-      this.logger.error(`Failed to create cancellation quote for Duffel order ${duffelOrderId}: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to create cancellation quote for Duffel order ${duffelOrderId}: ${error.message}`,
+        error.stack,
+      );
       if (err instanceof HttpException) {
         throw err;
       }
@@ -1125,7 +1227,10 @@ export class DuffelService {
       };
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : String(err);
-      this.logger.error(`Failed to retrieve Duffel order ${duffelOrderId}: ${message}`, err instanceof Error ? err.stack : undefined);
+      this.logger.error(
+        `Failed to retrieve Duffel order ${duffelOrderId}: ${message}`,
+        err instanceof Error ? err.stack : undefined,
+      );
       if (err instanceof HttpException) {
         throw err;
       }
@@ -1145,7 +1250,10 @@ export class DuffelService {
       return order;
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : String(err);
-      this.logger.error(`Failed to retrieve complete Duffel order ${duffelOrderId}: ${message}`, err instanceof Error ? err.stack : undefined);
+      this.logger.error(
+        `Failed to retrieve complete Duffel order ${duffelOrderId}: ${message}`,
+        err instanceof Error ? err.stack : undefined,
+      );
       if (err instanceof HttpException) {
         throw err;
       }
@@ -1175,7 +1283,10 @@ export class DuffelService {
       };
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : String(err);
-      this.logger.error(`Failed to confirm Duffel cancellation quote ${quoteId}: ${message}`, err instanceof Error ? err.stack : undefined);
+      this.logger.error(
+        `Failed to confirm Duffel cancellation quote ${quoteId}: ${message}`,
+        err instanceof Error ? err.stack : undefined,
+      );
       if (err instanceof HttpException) {
         throw err;
       }
@@ -1198,7 +1309,10 @@ export class DuffelService {
       return confirmed.data;
     } catch (err: unknown) {
       const error = err as Error;
-      this.logger.error(`Failed to cancel Duffel order ${duffelOrderId}: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to cancel Duffel order ${duffelOrderId}: ${error.message}`,
+        error.stack,
+      );
       throw new HttpException(
         {
           code: 'UPSTREAM_CANCEL_FAILED',
@@ -1229,7 +1343,10 @@ export class DuffelService {
     return result;
   }
 
-  mapDuffelOrderToSnapshots(duffelOrder: unknown): { flightSnapshot: FlightSnapshot; passengerSnapshot: PassengerSnapshot } {
+  mapDuffelOrderToSnapshots(duffelOrder: unknown): {
+    flightSnapshot: FlightSnapshot;
+    passengerSnapshot: PassengerSnapshot;
+  } {
     const order = duffelOrder as {
       slices?: Array<{
         duration?: string;
@@ -1238,8 +1355,18 @@ export class DuffelService {
           duration?: string;
           departing_at?: string;
           arriving_at?: string;
-          origin?: { name?: string; iata_code?: string; city_name?: string; city?: { name?: string } };
-          destination?: { name?: string; iata_code?: string; city_name?: string; city?: { name?: string } };
+          origin?: {
+            name?: string;
+            iata_code?: string;
+            city_name?: string;
+            city?: { name?: string };
+          };
+          destination?: {
+            name?: string;
+            iata_code?: string;
+            city_name?: string;
+            city?: { name?: string };
+          };
           origin_terminal?: string | null;
           destination_terminal?: string | null;
           operating_carrier?: { name?: string; iata_code?: string };
@@ -1265,7 +1392,7 @@ export class DuffelService {
     let stops = 0;
     let cabinClass = 'economy';
     const segments: Array<FlightSnapshot['segments'][number]> = [];
-    
+
     if (order.slices && Array.isArray(order.slices)) {
       let totalMinutes = 0;
       let globalOrder = 0;
@@ -1277,53 +1404,63 @@ export class DuffelService {
         if (slice.segments && Array.isArray(slice.segments)) {
           stops += Math.max(0, slice.segments.length - 1);
           for (let segmentOrder = 0; segmentOrder < slice.segments.length; segmentOrder++) {
-             const seg = slice.segments[segmentOrder];
-             cabinClass = seg.passengers?.[0]?.cabin_class || cabinClass;
-             segments.push({
-               airline: {
-                 name: seg.operating_carrier?.name || seg.marketing_carrier?.name || 'Unknown',
-                 iataCode: seg.operating_carrier?.iata_code || seg.marketing_carrier?.iata_code || 'XX',
-               },
-               flightNumber: seg.marketing_carrier_flight_number || '0000',
-               departureAirport: {
-                 iataCode: seg.origin?.iata_code || '',
-                 name: seg.origin?.name || '',
-                 city: seg.origin?.city_name || seg.origin?.city?.name || seg.origin?.name || '',
-                 terminal: seg.origin_terminal ?? undefined,
-               },
-               arrivalAirport: {
-                 iataCode: seg.destination?.iata_code || '',
-                 name: seg.destination?.name || '',
-                 city: seg.destination?.city_name || seg.destination?.city?.name || seg.destination?.name || '',
-                 terminal: seg.destination_terminal ?? undefined,
-               },
-               departureAt: seg.departing_at || '',
-               arrivalAt: seg.arriving_at || '',
-               duration: seg.duration || '',
-               aircraftType: seg.aircraft?.name,
-               duffelSegmentId: seg.id,
-               sliceOrder,
-               segmentOrder,
-               globalOrder: globalOrder++,
-             });
+            const seg = slice.segments[segmentOrder];
+            cabinClass = seg.passengers?.[0]?.cabin_class || cabinClass;
+            segments.push({
+              airline: {
+                name: seg.operating_carrier?.name || seg.marketing_carrier?.name || 'Unknown',
+                iataCode:
+                  seg.operating_carrier?.iata_code || seg.marketing_carrier?.iata_code || 'XX',
+              },
+              flightNumber: seg.marketing_carrier_flight_number || '0000',
+              departureAirport: {
+                iataCode: seg.origin?.iata_code || '',
+                name: seg.origin?.name || '',
+                city: seg.origin?.city_name || seg.origin?.city?.name || seg.origin?.name || '',
+                terminal: seg.origin_terminal ?? undefined,
+              },
+              arrivalAirport: {
+                iataCode: seg.destination?.iata_code || '',
+                name: seg.destination?.name || '',
+                city:
+                  seg.destination?.city_name ||
+                  seg.destination?.city?.name ||
+                  seg.destination?.name ||
+                  '',
+                terminal: seg.destination_terminal ?? undefined,
+              },
+              departureAt: seg.departing_at || '',
+              arrivalAt: seg.arriving_at || '',
+              duration: seg.duration || '',
+              aircraftType: seg.aircraft?.name,
+              duffelSegmentId: seg.id,
+              sliceOrder,
+              segmentOrder,
+              globalOrder: globalOrder++,
+            });
           }
         }
       }
       totalDuration = this.formatMinutesToIsoDuration(totalMinutes);
     }
- 
+
     const flightSnapshot: FlightSnapshot = {
       segments,
       totalDuration,
       stops,
       cabinClass,
     };
- 
+
     const passengers: PassengerSnapshot['passengers'] = [];
     if (order.passengers && Array.isArray(order.passengers)) {
       for (const p of order.passengers) {
         passengers.push({
-          type: (p.type === 'infant_without_seat' || p.type === 'infant' ? 'INFANT' : (p.type === 'child' ? 'CHILD' : 'ADULT')),
+          type:
+            p.type === 'infant_without_seat' || p.type === 'infant'
+              ? 'INFANT'
+              : p.type === 'child'
+                ? 'CHILD'
+                : 'ADULT',
           title: p.title || undefined,
           firstName: p.given_name || 'Unknown',
           lastName: p.family_name || 'Unknown',
@@ -1331,7 +1468,7 @@ export class DuffelService {
         });
       }
     }
-    
+
     const firstPassenger = order.passengers?.[0];
     const passengerSnapshot: PassengerSnapshot = {
       passengers,

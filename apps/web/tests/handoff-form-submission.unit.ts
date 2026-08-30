@@ -7,7 +7,5 @@ test('adds the in-memory credential only when the browser builds the form body',
 
   appendHandoffCredential(formData, 'chk_handoff_v1_credential');
 
-  assert.deepEqual(Array.from(formData.entries()), [
-    ['handoffToken', 'chk_handoff_v1_credential'],
-  ]);
+  assert.deepEqual(Array.from(formData.entries()), [['handoffToken', 'chk_handoff_v1_credential']]);
 });

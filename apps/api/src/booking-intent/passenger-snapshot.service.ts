@@ -1,4 +1,8 @@
-import { Injectable, InternalServerErrorException, UnprocessableEntityException } from '@nestjs/common';
+import {
+  Injectable,
+  InternalServerErrorException,
+  UnprocessableEntityException,
+} from '@nestjs/common';
 import { Prisma, PassengerType } from '@prisma/client';
 import { EncryptionService } from '@/common/encryption.service';
 import type { ResolvedPassenger } from './passenger-source-resolver.service';
@@ -49,7 +53,10 @@ export class PassengerSnapshotService {
       throw this.incompleteSnapshot();
     }
 
-    const positionedPassengers = input.passengers.map((passenger, position) => ({ passenger, position }));
+    const positionedPassengers = input.passengers.map((passenger, position) => ({
+      passenger,
+      position,
+    }));
     const persistenceInput: Prisma.BookingIntentPassengerCreateManyInput[] = [];
     const maskedPassengers: MaskedPassengerSummary[] = [];
 
@@ -63,7 +70,10 @@ export class PassengerSnapshotService {
     return { persistenceInput, maskedPassengers };
   }
 
-  private validateCompletePassenger(passenger: ResolvedPassengerForSnapshot, scope: SnapshotScope): void {
+  private validateCompletePassenger(
+    passenger: ResolvedPassengerForSnapshot,
+    scope: SnapshotScope,
+  ): void {
     const requiredValues = [
       passenger.givenName,
       passenger.familyName,
@@ -105,7 +115,10 @@ export class PassengerSnapshotService {
       if (documentValues.some((value) => typeof value !== 'string' || value.trim() === '')) {
         throw this.incompleteSnapshot();
       }
-      if (!/^\d{4}-\d{2}-\d{2}$/.test(passenger.passportExpiry as string) || Number.isNaN(this.toDate(passenger.passportExpiry as string).getTime())) {
+      if (
+        !/^\d{4}-\d{2}-\d{2}$/.test(passenger.passportExpiry as string) ||
+        Number.isNaN(this.toDate(passenger.passportExpiry as string).getTime())
+      ) {
         throw this.incompleteSnapshot();
       }
     }
@@ -164,11 +177,16 @@ export class PassengerSnapshotService {
     };
   }
 
-  private toMaskedSummary(passenger: ResolvedPassengerForSnapshot, position: number): MaskedPassengerSummary {
+  private toMaskedSummary(
+    passenger: ResolvedPassengerForSnapshot,
+    position: number,
+  ): MaskedPassengerSummary {
     const maskedPassportSummary = passenger.passportNumber
       ? '•••• ' + passenger.passportNumber.slice(-4)
       : null;
-    const maskedContactSummary = `${this.maskEmail(passenger.email)} ${this.maskPhone(passenger.phoneCountryCode, passenger.phoneNumber)}`.trim() || null;
+    const maskedContactSummary =
+      `${this.maskEmail(passenger.email)} ${this.maskPhone(passenger.phoneCountryCode, passenger.phoneNumber)}`.trim() ||
+      null;
 
     return {
       passengerType: passenger.type,

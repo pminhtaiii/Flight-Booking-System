@@ -40,9 +40,13 @@ describe('Cancellation and refund recovery (E2E)', () => {
   let otherUser: TestUser;
 
   beforeAll(async (): Promise<void> => {
-    const moduleFixture: TestingModule = await Test.createTestingModule({ imports: [AppModule] }).compile();
+    const moduleFixture: TestingModule = await Test.createTestingModule({
+      imports: [AppModule],
+    }).compile();
     app = moduleFixture.createNestApplication({ rawBody: true });
-    app.useGlobalPipes(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, transform: true }));
+    app.useGlobalPipes(
+      new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, transform: true }),
+    );
     app.useGlobalFilters(new HttpExceptionFilter());
     app.setGlobalPrefix('api', { exclude: ['health'] });
 
@@ -98,13 +102,24 @@ describe('Cancellation and refund recovery (E2E)', () => {
   });
 
   async function createUser(email: string): Promise<TestUser> {
-    const user = await prisma.user.create({ data: { email, password: 'Password123!', status: 'ACTIVE' } });
-    return { id: user.id, email: user.email, token: jwtService.sign({ id: user.id, email: user.email }, { expiresIn: '1h' }) };
+    const user = await prisma.user.create({
+      data: { email, password: 'Password123!', status: 'ACTIVE' },
+    });
+    return {
+      id: user.id,
+      email: user.email,
+      token: jwtService.sign({ id: user.id, email: user.email }, { expiresIn: '1h' }),
+    };
   }
 
   async function createCancellationBooking(
     userId: string,
-    overrides: Partial<{ status: BookingStatus; deadline: Date; quoteId: string; refundAmount: string }> = {},
+    overrides: Partial<{
+      status: BookingStatus;
+      deadline: Date;
+      quoteId: string;
+      refundAmount: string;
+    }> = {},
   ): Promise<CancellationBooking> {
     const now = new Date();
     const intent = await prisma.bookingIntent.create({
@@ -167,7 +182,10 @@ describe('Cancellation and refund recovery (E2E)', () => {
     return { id: booking.id, paymentId: payment.id, quoteId };
   }
 
-  async function createScheduledRefund(booking: CancellationBooking, keyCreatedAt: Date): Promise<string> {
+  async function createScheduledRefund(
+    booking: CancellationBooking,
+    keyCreatedAt: Date,
+  ): Promise<string> {
     const obligation = await prisma.cancellationRefundObligation.upsert({
       where: { bookingId: booking.id },
       update: {},
@@ -230,10 +248,17 @@ describe('Cancellation and refund recovery (E2E)', () => {
       .set('Authorization', `Bearer ${owner.token}`)
       .expect(201);
 
-    expect(quoteResponse.body).toMatchObject({ bookingId: validBooking.id, quoteId: validBooking.quoteId, refundAmount: '100', refundable: true });
+    expect(quoteResponse.body).toMatchObject({
+      bookingId: validBooking.id,
+      quoteId: validBooking.quoteId,
+      refundAmount: '100',
+      refundable: true,
+    });
     expect(quoteSpy).not.toHaveBeenCalled();
 
-    const expiredBooking = await createCancellationBooking(owner.id, { deadline: new Date(Date.now() - 1_000) });
+    const expiredBooking = await createCancellationBooking(owner.id, {
+      deadline: new Date(Date.now() - 1_000),
+    });
     const confirmSpy = jest.spyOn(duffelService, 'confirmCancellationQuote');
     await request(app.getHttpServer())
       .post(`/api/bookings/${expiredBooking.id}/cancel`)
@@ -245,7 +270,15 @@ describe('Cancellation and refund recovery (E2E)', () => {
 
   it('converges concurrent cancellation confirmations on one supplier cancellation and refund', async (): Promise<void> => {
     const booking = await createCancellationBooking(owner.id);
-    const retrieveSpy = jest.spyOn(duffelService, 'retrieveOrder').mockResolvedValue({ id: 'ord-id', order_id: 'ord-id', status: 'ACTIVE', cancelled_at: null, cancellation_id: null });
+    const retrieveSpy = jest
+      .spyOn(duffelService, 'retrieveOrder')
+      .mockResolvedValue({
+        id: 'ord-id',
+        order_id: 'ord-id',
+        status: 'ACTIVE',
+        cancelled_at: null,
+        cancellation_id: null,
+      });
     const confirmSpy = jest.spyOn(duffelService, 'confirmCancellationQuote').mockResolvedValue({
       id: `cancel-${crypto.randomUUID()}`,
       order_id: `order-${crypto.randomUUID()}`,
@@ -255,17 +288,33 @@ describe('Cancellation and refund recovery (E2E)', () => {
       refundable: true,
       confirmed_at: new Date().toISOString(),
     });
-    const stripeSpy = jest.spyOn(stripeService, 'createRefund').mockResolvedValue({ id: `re-${crypto.randomUUID()}` } as never);
+    const stripeSpy = jest
+      .spyOn(stripeService, 'createRefund')
+      .mockResolvedValue({ id: `re-${crypto.randomUUID()}` } as never);
 
     const responses = await Promise.all([
-      request(app.getHttpServer()).post(`/api/bookings/${booking.id}/cancel`).set('Authorization', `Bearer ${owner.token}`).send({ quoteId: booking.quoteId }),
-      request(app.getHttpServer()).post(`/api/bookings/${booking.id}/cancel`).set('Authorization', `Bearer ${owner.token}`).send({ quoteId: booking.quoteId }),
+      request(app.getHttpServer())
+        .post(`/api/bookings/${booking.id}/cancel`)
+        .set('Authorization', `Bearer ${owner.token}`)
+        .send({ quoteId: booking.quoteId }),
+      request(app.getHttpServer())
+        .post(`/api/bookings/${booking.id}/cancel`)
+        .set('Authorization', `Bearer ${owner.token}`)
+        .send({ quoteId: booking.quoteId }),
     ]);
 
     expect(responses.map((response) => response.status).sort()).toEqual([201, 201]);
     for (const res of responses) {
-      expect([BookingStatus.CANCELLATION_PENDING, BookingStatus.CANCELLED_PENDING_REFUND, BookingStatus.CANCELLED_AND_REFUNDED]).toContain(res.body.bookingStatus);
-      expect([BookingStatus.CANCELLATION_PENDING, BookingStatus.CANCELLED_PENDING_REFUND, BookingStatus.CANCELLED_AND_REFUNDED]).toContain(res.body.cancellationStatus);
+      expect([
+        BookingStatus.CANCELLATION_PENDING,
+        BookingStatus.CANCELLED_PENDING_REFUND,
+        BookingStatus.CANCELLED_AND_REFUNDED,
+      ]).toContain(res.body.bookingStatus);
+      expect([
+        BookingStatus.CANCELLATION_PENDING,
+        BookingStatus.CANCELLED_PENDING_REFUND,
+        BookingStatus.CANCELLED_AND_REFUNDED,
+      ]).toContain(res.body.cancellationStatus);
       expect(['PENDING', 'SUCCEEDED']).toContain(res.body.refundStatus);
       expect(Number(res.body.refundAmount)).toBe(100);
     }
@@ -354,9 +403,19 @@ describe('Cancellation and refund recovery (E2E)', () => {
 
   it('uses remote supplier state during recovery instead of confirming the quote again', async (): Promise<void> => {
     const booking = await createCancellationBooking(owner.id);
-    jest.spyOn(duffelService, 'retrieveOrder').mockResolvedValue({ id: 'ord-id', order_id: 'ord-id', status: 'CANCELLED', cancelled_at: new Date().toISOString(), cancellation_id: `cancel-${crypto.randomUUID()}` });
+    jest
+      .spyOn(duffelService, 'retrieveOrder')
+      .mockResolvedValue({
+        id: 'ord-id',
+        order_id: 'ord-id',
+        status: 'CANCELLED',
+        cancelled_at: new Date().toISOString(),
+        cancellation_id: `cancel-${crypto.randomUUID()}`,
+      });
     const confirmSpy = jest.spyOn(duffelService, 'confirmCancellationQuote');
-    jest.spyOn(stripeService, 'createRefund').mockResolvedValue({ id: `re-${crypto.randomUUID()}` } as never);
+    jest
+      .spyOn(stripeService, 'createRefund')
+      .mockResolvedValue({ id: `re-${crypto.randomUUID()}` } as never);
 
     const response = await request(app.getHttpServer())
       .post(`/api/bookings/${booking.id}/cancel`)
@@ -366,13 +425,25 @@ describe('Cancellation and refund recovery (E2E)', () => {
 
     expect(response.body).toMatchObject({ bookingId: booking.id, refundStatus: 'SUCCEEDED' });
     expect(confirmSpy).not.toHaveBeenCalled();
-    expect((await prisma.booking.findUniqueOrThrow({ where: { id: booking.id } })).status).toBe(BookingStatus.CANCELLED_AND_REFUNDED);
+    expect((await prisma.booking.findUniqueOrThrow({ where: { id: booking.id } })).status).toBe(
+      BookingStatus.CANCELLED_AND_REFUNDED,
+    );
   });
 
   it('does not start a Stripe refund when supplier cancellation cannot be confirmed', async (): Promise<void> => {
     const booking = await createCancellationBooking(owner.id);
-    jest.spyOn(duffelService, 'retrieveOrder').mockResolvedValue({ id: 'ord-id', order_id: 'ord-id', status: 'ACTIVE', cancelled_at: null, cancellation_id: null });
-    jest.spyOn(duffelService, 'confirmCancellationQuote').mockRejectedValue({ statusCode: 400, code: 'QUOTE_INVALID' });
+    jest
+      .spyOn(duffelService, 'retrieveOrder')
+      .mockResolvedValue({
+        id: 'ord-id',
+        order_id: 'ord-id',
+        status: 'ACTIVE',
+        cancelled_at: null,
+        cancellation_id: null,
+      });
+    jest
+      .spyOn(duffelService, 'confirmCancellationQuote')
+      .mockRejectedValue({ statusCode: 400, code: 'QUOTE_INVALID' });
     const stripeSpy = jest.spyOn(stripeService, 'createRefund');
 
     await request(app.getHttpServer())
@@ -382,12 +453,22 @@ describe('Cancellation and refund recovery (E2E)', () => {
       .expect(502);
 
     expect(stripeSpy).not.toHaveBeenCalled();
-    expect((await prisma.booking.findUniqueOrThrow({ where: { id: booking.id } })).status).toBe(BookingStatus.CANCELLATION_PENDING);
+    expect((await prisma.booking.findUniqueOrThrow({ where: { id: booking.id } })).status).toBe(
+      BookingStatus.CANCELLATION_PENDING,
+    );
   });
 
   it('retries a transient Stripe failure and settles the cancellation exactly once', async (): Promise<void> => {
     const booking = await createCancellationBooking(owner.id);
-    jest.spyOn(duffelService, 'retrieveOrder').mockResolvedValue({ id: 'ord-id', order_id: 'ord-id', status: 'ACTIVE', cancelled_at: null, cancellation_id: null });
+    jest
+      .spyOn(duffelService, 'retrieveOrder')
+      .mockResolvedValue({
+        id: 'ord-id',
+        order_id: 'ord-id',
+        status: 'ACTIVE',
+        cancelled_at: null,
+        cancellation_id: null,
+      });
     jest.spyOn(duffelService, 'confirmCancellationQuote').mockResolvedValue({
       id: `cancel-${crypto.randomUUID()}`,
       order_id: `order-${crypto.randomUUID()}`,
@@ -420,11 +501,19 @@ describe('Cancellation and refund recovery (E2E)', () => {
   });
 
   it('CAS-claims due retries once and escalates a 22-hour-old refund without another Stripe call', async (): Promise<void> => {
-    const booking = await createCancellationBooking(owner.id, { status: BookingStatus.CANCELLED_PENDING_REFUND });
-    const refundId = await createScheduledRefund(booking, new Date(Date.now() - 22 * 60 * 60 * 1_000 - 1));
+    const booking = await createCancellationBooking(owner.id, {
+      status: BookingStatus.CANCELLED_PENDING_REFUND,
+    });
+    const refundId = await createScheduledRefund(
+      booking,
+      new Date(Date.now() - 22 * 60 * 60 * 1_000 - 1),
+    );
     const stripeSpy = jest.spyOn(stripeService, 'createRefund');
 
-    await Promise.all([paymentCronService.handleCancellationRefundRecovery(), paymentCronService.handleCancellationRefundRecovery()]);
+    await Promise.all([
+      paymentCronService.handleCancellationRefundRecovery(),
+      paymentCronService.handleCancellationRefundRecovery(),
+    ]);
 
     expect(stripeSpy).not.toHaveBeenCalled();
     const [refund, persistedBooking] = await Promise.all([
@@ -438,14 +527,22 @@ describe('Cancellation and refund recovery (E2E)', () => {
 
   it('resolves disruption and writes audit log when cancellation completes successfully', async (): Promise<void> => {
     const booking = await createCancellationBooking(owner.id);
-    
+
     // Set disruption status on the booking to verify it gets resolved
     await prisma.booking.update({
       where: { id: booking.id },
-      data: { disruptionStatus: 'DETECTED' }
+      data: { disruptionStatus: 'DETECTED' },
     });
 
-    jest.spyOn(duffelService, 'retrieveOrder').mockResolvedValue({ id: 'ord-id', order_id: 'ord-id', status: 'ACTIVE', cancelled_at: null, cancellation_id: null });
+    jest
+      .spyOn(duffelService, 'retrieveOrder')
+      .mockResolvedValue({
+        id: 'ord-id',
+        order_id: 'ord-id',
+        status: 'ACTIVE',
+        cancelled_at: null,
+        cancellation_id: null,
+      });
     jest.spyOn(duffelService, 'confirmCancellationQuote').mockResolvedValue({
       id: `cancel-${crypto.randomUUID()}`,
       order_id: `order-${crypto.randomUUID()}`,
@@ -455,7 +552,9 @@ describe('Cancellation and refund recovery (E2E)', () => {
       refundable: true,
       confirmed_at: new Date().toISOString(),
     });
-    jest.spyOn(stripeService, 'createRefund').mockResolvedValue({ id: `re-${crypto.randomUUID()}` } as never);
+    jest
+      .spyOn(stripeService, 'createRefund')
+      .mockResolvedValue({ id: `re-${crypto.randomUUID()}` } as never);
 
     await request(app.getHttpServer())
       .post(`/api/bookings/${booking.id}/cancel`)
@@ -479,16 +578,20 @@ describe('Cancellation and refund recovery (E2E)', () => {
   });
 
   it('does not allow a post-cancellation sync to modify/create revisions or change state', async (): Promise<void> => {
-    const booking = await createCancellationBooking(owner.id, { status: BookingStatus.CANCELLED_AND_REFUNDED });
-    
+    const booking = await createCancellationBooking(owner.id, {
+      status: BookingStatus.CANCELLED_AND_REFUNDED,
+    });
+
     const response = await request(app.getHttpServer())
       .post(`/api/disruptions/sync/${booking.id}`)
       .set('Authorization', `Bearer ${owner.token}`)
       .expect(200);
-    
+
     expect(response.body.status).toBe('SKIPPED_INELIGIBLE');
-    
-    const revisionsCount = await prisma.itineraryRevision.count({ where: { bookingId: booking.id } });
+
+    const revisionsCount = await prisma.itineraryRevision.count({
+      where: { bookingId: booking.id },
+    });
     expect(revisionsCount).toBe(0);
   });
 });

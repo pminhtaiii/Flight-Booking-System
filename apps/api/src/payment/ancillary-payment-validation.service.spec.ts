@@ -161,7 +161,8 @@ describe('AncillaryPaymentValidationService', () => {
     };
     const prisma = {
       $transaction: jest.fn(
-        async (callback: (tx: typeof transaction) => Promise<unknown>): Promise<unknown> => callback(transaction),
+        async (callback: (tx: typeof transaction) => Promise<unknown>): Promise<unknown> =>
+          callback(transaction),
       ),
       ancillarySelection: {
         updateMany: jest.fn().mockResolvedValue({ count: 1 }),

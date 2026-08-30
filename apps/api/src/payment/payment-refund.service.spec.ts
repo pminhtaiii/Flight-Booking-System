@@ -14,9 +14,21 @@ describe('PaymentRefundService', () => {
   let service: PaymentRefundService;
   const prisma = {
     payment: { findUnique: jest.fn(), update: jest.fn(), updateMany: jest.fn() },
-    booking: { findUnique: jest.fn(), findUniqueOrThrow: jest.fn(), update: jest.fn(), updateMany: jest.fn() },
+    booking: {
+      findUnique: jest.fn(),
+      findUniqueOrThrow: jest.fn(),
+      update: jest.fn(),
+      updateMany: jest.fn(),
+    },
     cancellationRefundObligation: { findUnique: jest.fn() },
-    refund: { findFirst: jest.fn(), findUnique: jest.fn(), findMany: jest.fn(), create: jest.fn(), update: jest.fn(), updateMany: jest.fn() },
+    refund: {
+      findFirst: jest.fn(),
+      findUnique: jest.fn(),
+      findMany: jest.fn(),
+      create: jest.fn(),
+      update: jest.fn(),
+      updateMany: jest.fn(),
+    },
     idempotencyKey: { findUnique: jest.fn(), create: jest.fn() },
     paymentEvent: { create: jest.fn() },
     ledgerEntry: { createMany: jest.fn() },
@@ -36,7 +48,9 @@ describe('PaymentRefundService', () => {
     jest.resetAllMocks();
     idempotency.acquireOrReplay.mockResolvedValue({ status: 'acquired' });
     idempotency.completeKey.mockResolvedValue(undefined);
-    prisma.$transaction.mockImplementation(async (callback: (tx: typeof prisma) => Promise<unknown>) => callback(prisma));
+    prisma.$transaction.mockImplementation(
+      async (callback: (tx: typeof prisma) => Promise<unknown>) => callback(prisma),
+    );
     prisma.payment.findUnique.mockResolvedValue({
       id: 'payment-1',
       stripePaymentIntentId: 'pi_1',
@@ -295,7 +309,9 @@ describe('PaymentRefundService', () => {
         .mockRejectedValueOnce({ statusCode: 429, message: 'rate limited' })
         .mockRejectedValueOnce({ statusCode: 500, message: 'upstream unavailable' })
         .mockRejectedValueOnce({ statusCode: 503, message: 'upstream unavailable' });
-      jest.spyOn(service as unknown as { delay: (milliseconds: number) => Promise<void> }, 'delay').mockResolvedValue();
+      jest
+        .spyOn(service as unknown as { delay: (milliseconds: number) => Promise<void> }, 'delay')
+        .mockResolvedValue();
 
       const result = await service.processCancellationRefund({
         bookingId: 'booking-1',

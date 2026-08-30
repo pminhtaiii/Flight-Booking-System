@@ -15,7 +15,9 @@ export function getAgentStreamEndpoint(): string {
     legacyDirectFlag?.trim().toLowerCase() === 'false' ||
     legacyEnableFlag?.trim().toLowerCase() === 'false'
   ) {
-    throw new Error('Legacy proxy transport is decommissioned. Direct-only streaming transport is mandatory.');
+    throw new Error(
+      'Legacy proxy transport is decommissioned. Direct-only streaming transport is mandatory.',
+    );
   }
 
   const baseUrl = process.env.NEXT_PUBLIC_AGENT_URL;

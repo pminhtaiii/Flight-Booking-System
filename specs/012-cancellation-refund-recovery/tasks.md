@@ -21,20 +21,21 @@ Tracking map for the Cancellation & Refund Management feature implementation acr
 
 ## Issue & PR Registry
 
-| PR | Branch Name | Title | Issue Link | PR Link | Blocked By | Status |
-|---|---|---|---|---|---|---|
-| **PR 0** | `012a-cancellation-refund-specs` | Documentation & Design Specs for Cancellation & Refund Management | [#67](https://github.com/pminhtaiii/Flight-Booking-System/issues/67) | [#68](https://github.com/pminhtaiii/Flight-Booking-System/pull/68) | None | Complete |
-| **PR 1** | `012b-schema-and-quote-api` | Schema Migration & Cancellation Quote API | [#62](https://github.com/pminhtaiii/Flight-Booking-System/issues/62) | Pending | #67 | Complete |
-| **PR 2** | `012c-cancellation-transaction` | Supplier-First Cancellation & Inline Refund Transaction | [#63](https://github.com/pminhtaiii/Flight-Booking-System/issues/63) | Pending | #62 | Complete |
-| **PR 3** | `012d-refund-recovery-worker` | Background Refund Recovery Worker & Admin Escalation | [#64](https://github.com/pminhtaiii/Flight-Booking-System/issues/64) | Pending | #63 | Complete |
-| **PR 4** | `012e-frontend-cancellation-ux` | Frontend Cancellation Experience & Time-Aware UX | [#65](https://github.com/pminhtaiii/Flight-Booking-System/issues/65) | Pending | #63 | Complete |
-| **PR 5** | `012f-e2e-test-suite` | End-to-End Verification & Test Suite | [#66](https://github.com/pminhtaiii/Flight-Booking-System/issues/66) | Pending | #64, #65 | Complete |
+| PR       | Branch Name                      | Title                                                             | Issue Link                                                           | PR Link                                                            | Blocked By | Status   |
+| -------- | -------------------------------- | ----------------------------------------------------------------- | -------------------------------------------------------------------- | ------------------------------------------------------------------ | ---------- | -------- |
+| **PR 0** | `012a-cancellation-refund-specs` | Documentation & Design Specs for Cancellation & Refund Management | [#67](https://github.com/pminhtaiii/Flight-Booking-System/issues/67) | [#68](https://github.com/pminhtaiii/Flight-Booking-System/pull/68) | None       | Complete |
+| **PR 1** | `012b-schema-and-quote-api`      | Schema Migration & Cancellation Quote API                         | [#62](https://github.com/pminhtaiii/Flight-Booking-System/issues/62) | Pending                                                            | #67        | Complete |
+| **PR 2** | `012c-cancellation-transaction`  | Supplier-First Cancellation & Inline Refund Transaction           | [#63](https://github.com/pminhtaiii/Flight-Booking-System/issues/63) | Pending                                                            | #62        | Complete |
+| **PR 3** | `012d-refund-recovery-worker`    | Background Refund Recovery Worker & Admin Escalation              | [#64](https://github.com/pminhtaiii/Flight-Booking-System/issues/64) | Pending                                                            | #63        | Complete |
+| **PR 4** | `012e-frontend-cancellation-ux`  | Frontend Cancellation Experience & Time-Aware UX                  | [#65](https://github.com/pminhtaiii/Flight-Booking-System/issues/65) | Pending                                                            | #63        | Complete |
+| **PR 5** | `012f-e2e-test-suite`            | End-to-End Verification & Test Suite                              | [#66](https://github.com/pminhtaiii/Flight-Booking-System/issues/66) | Pending                                                            | #64, #65   | Complete |
 
 ---
 
 ## PR Detailed Specifications
 
 ### [PR 0 / Issue #67 / PR #68] Documentation & Design Specs
+
 - **Branch**: `012a-cancellation-refund-specs`
 - **Target Branch**: `development`
 - **Scope**:
@@ -43,6 +44,7 @@ Tracking map for the Cancellation & Refund Management feature implementation acr
   - `specs/012-cancellation-refund-recovery/` (`PRD.md`, `plan.md`, `data-model.md`, `contracts/api.md`, `quickstart.md`, `tasks.md`).
 
 ### [PR 1 / Issue #62] Schema Migration & Cancellation Quote API
+
 - **Branch**: `012b-schema-and-quote-api`
 - **Target Branch**: `development`
 - **Scope**:
@@ -53,6 +55,7 @@ Tracking map for the Cancellation & Refund Management feature implementation acr
   - `POST /api/bookings/:bookingId/cancellation-quote` endpoint.
 
 ### [PR 2 / Issue #63] Supplier-First Cancellation & Inline Refund Transaction
+
 - **Branch**: `012c-cancellation-transaction`
 - **Scope**:
   - `POST /api/bookings/:bookingId/cancel` endpoint using CAS update (`UPDATE ... WHERE status = 'CONFIRMED' OR (status = 'CANCELLATION_PENDING' AND updatedAt < NOW() - INTERVAL '2 minutes')`).
@@ -61,6 +64,7 @@ Tracking map for the Cancellation & Refund Management feature implementation acr
   - Atomic `finalizeRefundSuccess()` transaction for `Refund`, `Payment`, `Booking`, and reverse ledger.
 
 ### [PR 3 / Issue #64] Background Refund Recovery Worker & Admin Escalation
+
 - **Branch**: `012d-refund-recovery-worker`
 - **Scope**:
   - Layer 2 `@Cron('*/1 * * * *')` worker in `PaymentCronService`.
@@ -69,6 +73,7 @@ Tracking map for the Cancellation & Refund Management feature implementation acr
   - `POST /api/admin/refunds/:refundId/resolve` endpoint.
 
 ### [PR 4 / Issue #65] Frontend Cancellation Experience & Time-Aware UX
+
 - **Branch**: `012e-frontend-cancellation-ux`
 - **Scope**:
   - "Cancel Booking" button on `BookingDetail.tsx` gated by `cancellationDeadline > NOW()`.
@@ -77,6 +82,7 @@ Tracking map for the Cancellation & Refund Management feature implementation acr
   - 48-hour time-aware support escalation message.
 
 ### [PR 5 / Issue #66] End-to-End Verification & Test Suite
+
 - **Branch**: `012f-e2e-test-suite`
 - **Scope**:
   - `apps/api/test/cancellation.e2e-spec.ts` (CAS concurrency, Duffel timeouts, Stripe transient blips, worker recovery, 22h stale keys).

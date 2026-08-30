@@ -20,7 +20,11 @@ export function RegisterForm(): JSX.Element {
     setIsSubmitting(true);
     try {
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
-      const response = await fetch(`${apiUrl}/api/auth/register`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email, password }) });
+      const response = await fetch(`${apiUrl}/api/auth/register`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password }),
+      });
       if (!response.ok) {
         const data: RegisterResponse = await response.json().catch(() => ({}));
         setError(data.message || 'We could not create your account. Please try again.');
@@ -40,5 +44,48 @@ export function RegisterForm(): JSX.Element {
     }
   }
 
-  return <form className={styles.form} onSubmit={handleSubmit} noValidate>{error ? <p className={styles.message} role="alert">{error}</p> : null}<div className={styles.field}><label className={styles.label} htmlFor="register-email">Email address</label><input className={styles.input} id="register-email" name="email" onChange={(event) => setEmail(event.target.value)} required type="email" value={email} /></div><div className={styles.field}><label className={styles.label} htmlFor="register-password">Password</label><input aria-describedby="password-requirements" className={styles.input} id="register-password" name="password" onChange={(event) => setPassword(event.target.value)} required type="password" value={password} /></div><p className={styles.requirements} id="password-requirements">Use at least 8 characters including uppercase, lowercase, a number, and a special character.</p><button className={styles.submit} disabled={isSubmitting} type="submit">{isSubmitting ? 'Creating account…' : 'Create account'}</button></form>;
+  return (
+    <form className={styles.form} onSubmit={handleSubmit} noValidate>
+      {error ? (
+        <p className={styles.message} role="alert">
+          {error}
+        </p>
+      ) : null}
+      <div className={styles.field}>
+        <label className={styles.label} htmlFor="register-email">
+          Email address
+        </label>
+        <input
+          className={styles.input}
+          id="register-email"
+          name="email"
+          onChange={(event) => setEmail(event.target.value)}
+          required
+          type="email"
+          value={email}
+        />
+      </div>
+      <div className={styles.field}>
+        <label className={styles.label} htmlFor="register-password">
+          Password
+        </label>
+        <input
+          aria-describedby="password-requirements"
+          className={styles.input}
+          id="register-password"
+          name="password"
+          onChange={(event) => setPassword(event.target.value)}
+          required
+          type="password"
+          value={password}
+        />
+      </div>
+      <p className={styles.requirements} id="password-requirements">
+        Use at least 8 characters including uppercase, lowercase, a number, and a special character.
+      </p>
+      <button className={styles.submit} disabled={isSubmitting} type="submit">
+        {isSubmitting ? 'Creating account…' : 'Create account'}
+      </button>
+    </form>
+  );
 }

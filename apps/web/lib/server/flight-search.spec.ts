@@ -28,7 +28,9 @@ const resolvePath = (specifier: string): string => {
 
 const nextAuthPath = resolvePath('next-auth');
 const originalNextAuthModule = testRequire.cache[nextAuthPath];
-testRequire.cache[nextAuthPath] = { exports: { getServerSession, default: { getServerSession } } } as NodeModule;
+testRequire.cache[nextAuthPath] = {
+  exports: { getServerSession, default: { getServerSession } },
+} as NodeModule;
 const serverOnlyPath = resolvePath('server-only');
 const originalServerOnlyModule = testRequire.cache[serverOnlyPath];
 testRequire.cache[serverOnlyPath] = { exports: {} } as NodeModule;
@@ -172,11 +174,20 @@ describe('flight-search server seam', () => {
           ],
         },
       ],
-      meta: { totalCount: 1, currency: 'USD', minPrice: 285, maxPrice: 285, airlines: ['Mock Horizon Air'] },
+      meta: {
+        totalCount: 1,
+        currency: 'USD',
+        minPrice: 285,
+        maxPrice: 285,
+        airlines: ['Mock Horizon Air'],
+      },
     });
     assert.match(requestedUrl, /^http:\/\/private-api\.example\/api\/flights\/search$/);
     assert.strictEqual(requestedInit?.method, 'POST');
-    assert.strictEqual((requestedInit?.headers as HeadersInit & { Authorization?: string }).Authorization, 'Bearer session-token');
+    assert.strictEqual(
+      (requestedInit?.headers as HeadersInit & { Authorization?: string }).Authorization,
+      'Bearer session-token',
+    );
     assert.strictEqual(JSON.stringify(outcome).includes('duffelOfferId'), false);
   });
 
@@ -293,7 +304,9 @@ describe('flight-search server seam', () => {
       let attempts = 0;
       globalThis.fetch = async (): Promise<Response> => {
         attempts += 1;
-        return new Response(JSON.stringify({ message: 'Provider implementation detail' }), { status });
+        return new Response(JSON.stringify({ message: 'Provider implementation detail' }), {
+          status,
+        });
       };
 
       const outcome = await searchFlights(validQuery);
@@ -345,7 +358,8 @@ describe('flight-search server seam', () => {
   });
 
   it('rejects malformed upstream results instead of forwarding them', async () => {
-    globalThis.fetch = async (): Promise<Response> => new Response(JSON.stringify({ results: [{ id: 'local-offer-001' }] }), { status: 200 });
+    globalThis.fetch = async (): Promise<Response> =>
+      new Response(JSON.stringify({ results: [{ id: 'local-offer-001' }] }), { status: 200 });
 
     const outcome = await searchFlights(validQuery);
 

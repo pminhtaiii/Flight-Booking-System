@@ -24,18 +24,20 @@ describe('ItineraryDiff', () => {
     arrivalAt: '2026-10-01T13:30:00-04:00',
     arrivalLocalDate: '2026-10-01',
     durationMinutes: 510,
-    aircraftType: 'Boeing 777'
+    aircraftType: 'Boeing 777',
   };
 
   it('should detect segment time shifts, terminal, and aircraft changes', () => {
     const prev = [baseSegment];
-    const curr: NormalizedSegment[] = [{
-      ...baseSegment,
-      departureAt: '2026-10-01T10:30:00+01:00', // shifted by +30m
-      arrivalAt: '2026-10-01T14:15:00-04:00', // shifted by +45m
-      departureTerminal: '3', // terminal changed
-      aircraftType: 'Boeing 787' // aircraft changed
-    }];
+    const curr: NormalizedSegment[] = [
+      {
+        ...baseSegment,
+        departureAt: '2026-10-01T10:30:00+01:00', // shifted by +30m
+        arrivalAt: '2026-10-01T14:15:00-04:00', // shifted by +45m
+        departureTerminal: '3', // terminal changed
+        aircraftType: 'Boeing 787', // aircraft changed
+      },
+    ];
 
     const result = computeItineraryDiff(prev, curr);
 
@@ -51,7 +53,7 @@ describe('ItineraryDiff', () => {
       arrivalTimeShiftMinutes: 45,
       departureTerminalChanged: true,
       arrivalTerminalChanged: false,
-      aircraftTypeChanged: true
+      aircraftTypeChanged: true,
     });
   });
 
@@ -59,7 +61,13 @@ describe('ItineraryDiff', () => {
     // 2-segment connection: LHR -> JFK -> MIA.
     // In baseline, final arrival at MIA is 18:00.
     // In current, final arrival at MIA is 19:30 (shift +90m).
-    const prev1 = { ...baseSegment, duffelSegmentId: 'seg_1', sliceOrder: 0, segmentOrder: 0, globalOrder: 0 };
+    const prev1 = {
+      ...baseSegment,
+      duffelSegmentId: 'seg_1',
+      sliceOrder: 0,
+      segmentOrder: 0,
+      globalOrder: 0,
+    };
     const prev2 = {
       ...baseSegment,
       duffelSegmentId: 'seg_2',
@@ -69,13 +77,13 @@ describe('ItineraryDiff', () => {
       departureAirportIata: 'JFK',
       arrivalAirportIata: 'MIA',
       departureAt: '2026-10-01T15:00:00-04:00',
-      arrivalAt: '2026-10-01T18:00:00-04:00'
+      arrivalAt: '2026-10-01T18:00:00-04:00',
     };
 
     const curr1 = { ...prev1 };
     const curr2 = {
       ...prev2,
-      arrivalAt: '2026-10-01T19:30:00-04:00' // final arrival moved by 90 minutes
+      arrivalAt: '2026-10-01T19:30:00-04:00', // final arrival moved by 90 minutes
     };
 
     const result = computeItineraryDiff([prev1, prev2], [curr1, curr2]);
@@ -88,7 +96,13 @@ describe('ItineraryDiff', () => {
   it('should calculate connection times, MCT violations, overlaps, and overnight connections', () => {
     // Segment 1: arrives at JFK on 13:30.
     // Segment 2: departs JFK on 14:00 (connection time: 30m, which is below MCT [60m]).
-    const prev1 = { ...baseSegment, duffelSegmentId: 'seg_1', sliceOrder: 0, segmentOrder: 0, globalOrder: 0 };
+    const prev1 = {
+      ...baseSegment,
+      duffelSegmentId: 'seg_1',
+      sliceOrder: 0,
+      segmentOrder: 0,
+      globalOrder: 0,
+    };
     const prev2 = {
       ...baseSegment,
       duffelSegmentId: 'seg_2',
@@ -98,13 +112,13 @@ describe('ItineraryDiff', () => {
       departureAirportIata: 'JFK',
       arrivalAirportIata: 'MIA',
       departureAt: '2026-10-01T15:00:00-04:00', // connection time is 90 mins (safe)
-      arrivalAt: '2026-10-01T18:00:00-04:00'
+      arrivalAt: '2026-10-01T18:00:00-04:00',
     };
 
     const curr1 = { ...prev1 };
     const curr2 = {
       ...prev2,
-      departureAt: '2026-10-01T14:00:00-04:00' // connection time becomes 30 minutes! (MCT violation)
+      departureAt: '2026-10-01T14:00:00-04:00', // connection time becomes 30 minutes! (MCT violation)
     };
 
     const result = computeItineraryDiff([prev1, prev2], [curr1, curr2]);
@@ -116,12 +130,18 @@ describe('ItineraryDiff', () => {
       currConnectionMinutes: 30,
       isBelowMct: true,
       isOverlapping: false,
-      isOvernightIntroduced: false
+      isOvernightIntroduced: false,
     });
   });
 
   it('should detect negative overlapping connection time', () => {
-    const prev1 = { ...baseSegment, duffelSegmentId: 'seg_1', sliceOrder: 0, segmentOrder: 0, globalOrder: 0 };
+    const prev1 = {
+      ...baseSegment,
+      duffelSegmentId: 'seg_1',
+      sliceOrder: 0,
+      segmentOrder: 0,
+      globalOrder: 0,
+    };
     const prev2 = {
       ...baseSegment,
       duffelSegmentId: 'seg_2',
@@ -131,13 +151,13 @@ describe('ItineraryDiff', () => {
       departureAirportIata: 'JFK',
       arrivalAirportIata: 'MIA',
       departureAt: '2026-10-01T15:00:00-04:00',
-      arrivalAt: '2026-10-01T18:00:00-04:00'
+      arrivalAt: '2026-10-01T18:00:00-04:00',
     };
 
     const curr1 = { ...prev1 };
     const curr2 = {
       ...prev2,
-      departureAt: '2026-10-01T13:00:00-04:00' // departs before arrival of curr1 (13:30) -> overlap!
+      departureAt: '2026-10-01T13:00:00-04:00', // departs before arrival of curr1 (13:30) -> overlap!
     };
 
     const result = computeItineraryDiff([prev1, prev2], [curr1, curr2]);
@@ -149,7 +169,13 @@ describe('ItineraryDiff', () => {
     // Prev:
     // Seg 1: LHR->JFK (arr 10-01 13:30)
     // Seg 2: JFK->MIA (dep 10-01 15:00) -> same day connection
-    const prev1 = { ...baseSegment, duffelSegmentId: 'seg_1', sliceOrder: 0, segmentOrder: 0, globalOrder: 0 };
+    const prev1 = {
+      ...baseSegment,
+      duffelSegmentId: 'seg_1',
+      sliceOrder: 0,
+      segmentOrder: 0,
+      globalOrder: 0,
+    };
     const prev2 = {
       ...baseSegment,
       duffelSegmentId: 'seg_2',
@@ -159,7 +185,7 @@ describe('ItineraryDiff', () => {
       departureAirportIata: 'JFK',
       arrivalAirportIata: 'MIA',
       departureAt: '2026-10-01T15:00:00-04:00',
-      departureLocalDate: '2026-10-01'
+      departureLocalDate: '2026-10-01',
     };
 
     // Curr:
@@ -169,7 +195,7 @@ describe('ItineraryDiff', () => {
     const curr2 = {
       ...prev2,
       departureAt: '2026-10-02T09:00:00-04:00',
-      departureLocalDate: '2026-10-02'
+      departureLocalDate: '2026-10-02',
     };
 
     const result = computeItineraryDiff([prev1, prev2], [curr1, curr2]);
@@ -178,10 +204,12 @@ describe('ItineraryDiff', () => {
 
   it('should detect slice routing changes', () => {
     const prev = [baseSegment];
-    const curr = [{
-      ...baseSegment,
-      departureAirportIata: 'LGW' // Routing changed!
-    }];
+    const curr = [
+      {
+        ...baseSegment,
+        departureAirportIata: 'LGW', // Routing changed!
+      },
+    ];
 
     const result = computeItineraryDiff(prev, curr);
     expect(result.isRoutingChanged).toBe(true);
@@ -190,11 +218,13 @@ describe('ItineraryDiff', () => {
 
   it('should build a safe presentation summary for the UI', () => {
     const prev = [baseSegment];
-    const curr = [{
-      ...baseSegment,
-      departureAt: '2026-10-01T10:30:00+01:00',
-      arrivalAt: '2026-10-01T14:00:00-04:00'
-    }];
+    const curr = [
+      {
+        ...baseSegment,
+        departureAt: '2026-10-01T10:30:00+01:00',
+        arrivalAt: '2026-10-01T14:00:00-04:00',
+      },
+    ];
 
     const result = computeItineraryDiff(prev, curr);
     expect(result.presentationSummary).toEqual({
@@ -202,12 +232,14 @@ describe('ItineraryDiff', () => {
       hasStopsChanged: false,
       addedSegmentsCount: 0,
       removedSegmentsCount: 0,
-      sliceSummaries: [{
-        sliceOrder: 0,
-        originIata: 'LHR',
-        destinationIata: 'JFK',
-        finalArrivalShiftMinutes: 30
-      }]
+      sliceSummaries: [
+        {
+          sliceOrder: 0,
+          originIata: 'LHR',
+          destinationIata: 'JFK',
+          finalArrivalShiftMinutes: 30,
+        },
+      ],
     });
   });
 });

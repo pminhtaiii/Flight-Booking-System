@@ -161,13 +161,13 @@ If fallback candidates are equally plausible or outside tolerance, keep them unm
 
 ## Resolved Technical Context
 
-| Area | Resolution |
-| --- | --- |
-| Runtime | Node.js 20+, TypeScript 5.4, NestJS 10, Next.js 14.2.3 App Router |
-| Data | PostgreSQL through Prisma (lockfile-resolved client/tooling; generate through pnpm workspace commands) |
-| Scheduling | Existing `@nestjs/schedule`; all jobs remain multi-instance safe through database claims |
-| External supplier | Installed Duffel SDK for complete order retrieval plus dedicated raw HMAC verifier for webhooks |
-| Testing | Jest unit/API E2E + Supertest, Playwright 1.41.2 after restoring config, redacted Duffel fixtures |
-| Scale | Batch 20 inbox/reconciliation work; 30-minute reconciliation; no new queue infrastructure |
-| Performance | webhook ack p95 <500 ms; processed change visible p95 <2 min; local booking reads p95 <200 ms |
-| Security | raw-body HMAC, replay tolerance, JWT ownership, ADMIN RBAC, PII-safe logging/API, 30-day raw payload retention |
+| Area              | Resolution                                                                                                     |
+| ----------------- | -------------------------------------------------------------------------------------------------------------- |
+| Runtime           | Node.js 20+, TypeScript 5.4, NestJS 10, Next.js 14.2.3 App Router                                              |
+| Data              | PostgreSQL through Prisma (lockfile-resolved client/tooling; generate through pnpm workspace commands)         |
+| Scheduling        | Existing `@nestjs/schedule`; all jobs remain multi-instance safe through database claims                       |
+| External supplier | Installed Duffel SDK for complete order retrieval plus dedicated raw HMAC verifier for webhooks                |
+| Testing           | Jest unit/API E2E + Supertest, Playwright 1.41.2 after restoring config, redacted Duffel fixtures              |
+| Scale             | Batch 20 inbox/reconciliation work; 30-minute reconciliation; no new queue infrastructure                      |
+| Performance       | webhook ack p95 <500 ms; processed change visible p95 <2 min; local booking reads p95 <200 ms                  |
+| Security          | raw-body HMAC, replay tolerance, JWT ownership, ADMIN RBAC, PII-safe logging/API, 30-day raw payload retention |

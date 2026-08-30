@@ -42,11 +42,9 @@ describe('BookingHandoffController', () => {
     );
 
     await expect(
-      controller.resolve(
-        { handoffToken: 'chk_handoff_v1_test' },
-        { user: {} },
-        { setHeader: jest.fn() } as unknown as Response,
-      ),
+      controller.resolve({ handoffToken: 'chk_handoff_v1_test' }, { user: {} }, {
+        setHeader: jest.fn(),
+      } as unknown as Response),
     ).rejects.toThrow(UnauthorizedException);
     expect(chatHandoffService.resolveSafe).not.toHaveBeenCalled();
   });

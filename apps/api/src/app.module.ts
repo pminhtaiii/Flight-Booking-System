@@ -32,48 +32,58 @@ import { DataDriftSentinelModule } from './common/sentinel/data-drift-sentinel.m
 import { BookingReadinessMetricsModule } from './common/observability/booking-readiness-metrics.module';
 import { RefundModule } from './refund/refund.module';
 import { RefundSettlementModule } from './refund-settlement/refund-settlement.module';
+import { DashboardModule } from './dashboard/dashboard.module';
 
 import { StripeModule } from './common/stripe.module';
 
 import { z } from 'zod';
 
-export const envSchema = z.object({
-  PORT: z.string().optional(),
-  DATABASE_URL: z.string().optional(),
-  REDIS_URL: z.string().optional(),
-  STRIPE_SECRET_KEY: z.string({
-    required_error: 'STRIPE_SECRET_KEY is required',
-  }),
-  STRIPE_WEBHOOK_SECRET: z.string({
-    required_error: 'STRIPE_WEBHOOK_SECRET is required',
-  }),
-  JWT_SECRET: z.string().optional(),
-  ENCRYPTION_KEY: z.string().optional(),
-  DUFFEL_WEBHOOK_SECRET: z.string().optional(),
-  FEATURE_FLAG_DISRUPTION_INGRESS: z.string().optional().default('false'),
-  FEATURE_FLAG_BOOKING_READINESS: z.string().optional().default('false'),
-  FEATURE_FLAG_DISRUPTION_PROCESSOR: z.string().optional().default('false'),
-  FEATURE_FLAG_DISRUPTION_RECONCILIATION: z.string().optional().default('false'),
-  FEATURE_FLAG_DISRUPTION_SURFACING: z.string().optional().default('false'),
-  FEATURE_FLAG_DISRUPTION_OUTBOX: z.string().optional().default('false'),
-  FEATURE_FLAG_CHAT_HANDOFF_ACCEPT: z.string().optional().default('false'),
-  FEATURE_FLAG_CHAT_HANDOFF_ISSUE: z.string().optional().default('false'),
-  FEATURE_FLAG_WRITE_FENCE: z.string().optional().default('false'),
-  CHAT_ENCRYPTION_KEY: z.string().optional(),
-  CHAT_ATTESTATION_KEY: z.string().optional(),
-  CHAT_HANDOFF_SECRET: z.string().optional(),
-  CHAT_HANDOFF_SECRET_V1: z.string().optional(),
-  CHAT_HANDOFF_SECRET_V2: z.string().optional(),
-  CHAT_HANDOFF_SECRET_V3: z.string().optional(),
-  CHAT_HANDOFF_CLAIM_TTL: z.coerce.number().optional().default(600),
-}).passthrough().refine(data => {
-  if (data.FEATURE_FLAG_CHAT_HANDOFF_ISSUE === 'true' && data.FEATURE_FLAG_CHAT_HANDOFF_ACCEPT !== 'true') {
-    return false;
-  }
-  return true;
-}, {
-  message: "Invalid config: ISSUE=true but ACCEPT=false",
-});
+export const envSchema = z
+  .object({
+    PORT: z.string().optional(),
+    DATABASE_URL: z.string().optional(),
+    REDIS_URL: z.string().optional(),
+    STRIPE_SECRET_KEY: z.string({
+      required_error: 'STRIPE_SECRET_KEY is required',
+    }),
+    STRIPE_WEBHOOK_SECRET: z.string({
+      required_error: 'STRIPE_WEBHOOK_SECRET is required',
+    }),
+    JWT_SECRET: z.string().optional(),
+    ENCRYPTION_KEY: z.string().optional(),
+    DUFFEL_WEBHOOK_SECRET: z.string().optional(),
+    FEATURE_FLAG_DISRUPTION_INGRESS: z.string().optional().default('false'),
+    FEATURE_FLAG_BOOKING_READINESS: z.string().optional().default('false'),
+    FEATURE_FLAG_DISRUPTION_PROCESSOR: z.string().optional().default('false'),
+    FEATURE_FLAG_DISRUPTION_RECONCILIATION: z.string().optional().default('false'),
+    FEATURE_FLAG_DISRUPTION_SURFACING: z.string().optional().default('false'),
+    FEATURE_FLAG_DISRUPTION_OUTBOX: z.string().optional().default('false'),
+    FEATURE_FLAG_CHAT_HANDOFF_ACCEPT: z.string().optional().default('false'),
+    FEATURE_FLAG_CHAT_HANDOFF_ISSUE: z.string().optional().default('false'),
+    FEATURE_FLAG_WRITE_FENCE: z.string().optional().default('false'),
+    CHAT_ENCRYPTION_KEY: z.string().optional(),
+    CHAT_ATTESTATION_KEY: z.string().optional(),
+    CHAT_HANDOFF_SECRET: z.string().optional(),
+    CHAT_HANDOFF_SECRET_V1: z.string().optional(),
+    CHAT_HANDOFF_SECRET_V2: z.string().optional(),
+    CHAT_HANDOFF_SECRET_V3: z.string().optional(),
+    CHAT_HANDOFF_CLAIM_TTL: z.coerce.number().optional().default(600),
+  })
+  .passthrough()
+  .refine(
+    (data) => {
+      if (
+        data.FEATURE_FLAG_CHAT_HANDOFF_ISSUE === 'true' &&
+        data.FEATURE_FLAG_CHAT_HANDOFF_ACCEPT !== 'true'
+      ) {
+        return false;
+      }
+      return true;
+    },
+    {
+      message: 'Invalid config: ISSUE=true but ACCEPT=false',
+    },
+  );
 
 @Module({
   imports: [
@@ -114,6 +124,7 @@ export const envSchema = z.object({
     BookingReadinessMetricsModule,
     RefundModule,
     RefundSettlementModule,
+    DashboardModule,
   ],
   controllers: [],
   providers: [],

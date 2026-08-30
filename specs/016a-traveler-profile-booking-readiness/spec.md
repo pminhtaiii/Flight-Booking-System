@@ -8,7 +8,7 @@
 
 **Input**: Accepted traveler-profile and booking-readiness decisions in `docs/adr/research-traveler-profile-booking-readiness.md` and canonical vocabulary in `CONTEXT.md`.
 
-## User Scenarios & Testing *(mandatory)*
+## User Scenarios & Testing _(mandatory)_
 
 ### User Story 1 - Maintain a Booking-Ready Profile (Priority: P1)
 
@@ -102,7 +102,7 @@ As a traveler, I am protected from booking with stale, corrupt, expired, or inco
 - The requested profile does not belong to the authenticated user; no profile data is revealed or used.
 - Repeated readiness requests have no persistence or supplier-booking side effects.
 
-## Requirements *(mandatory)*
+## Requirements _(mandatory)_
 
 ### Functional Requirements
 
@@ -137,7 +137,7 @@ As a traveler, I am protected from booking with stale, corrupt, expired, or inco
 - **Passenger Snapshot**: The immutable, protected copy of supplier-bound passenger information attached to a booking intent.
 - **Booking Intent**: The priced, time-bounded booking state that owns ordered passenger snapshots and continues into checkout.
 
-## Success Criteria *(mandatory)*
+## Success Criteria _(mandatory)_
 
 ### Measurable Outcomes
 

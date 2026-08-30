@@ -58,11 +58,11 @@ export class AirportsService {
   }
 
   async findCountriesByIataCodes(codes: readonly string[]): Promise<Map<string, string | null>> {
-    const normalizedCodes = [...new Set(
-      codes
-        .map((code) => code.trim().toUpperCase())
-        .filter((code) => /^[A-Z]{3}$/.test(code)),
-    )];
+    const normalizedCodes = [
+      ...new Set(
+        codes.map((code) => code.trim().toUpperCase()).filter((code) => /^[A-Z]{3}$/.test(code)),
+      ),
+    ];
 
     const missingCodes: string[] = [];
     const countries = new Map<string, string | null>();
@@ -110,7 +110,7 @@ export class AirportsService {
         LIMIT ${limit}
       `;
 
-      return results.map(r => ({
+      return results.map((r) => ({
         iataCode: r.iataCode,
         name: r.name,
         city: r.city,
@@ -121,7 +121,10 @@ export class AirportsService {
         distanceKm: Number(r.distanceKm),
       }));
     } catch (error) {
-      this.logger.error(`[findNearby] Failed to find nearby airports for lat=${lat}, lng=${lng}`, error);
+      this.logger.error(
+        `[findNearby] Failed to find nearby airports for lat=${lat}, lng=${lng}`,
+        error,
+      );
       throw error;
     }
   }

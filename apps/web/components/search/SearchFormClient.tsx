@@ -10,9 +10,12 @@ const isCabinClass = (value: string): value is FlightSearchQuery['cabinClass'] =
 
 const formatDuration = (duration: string): string => {
   const match = /^P(?:(\d+)D)?T(?:(\d+)H)?(?:(\d+)M)?(?:(\d+(?:\.\d+)?)S)?$/.exec(duration);
-  if (!match || match.slice(1).every((value: string | undefined): boolean => value === undefined)) return duration;
+  if (!match || match.slice(1).every((value: string | undefined): boolean => value === undefined))
+    return duration;
 
-  const [days, hours, minutes, seconds] = match.slice(1).map((value: string | undefined): number => Number(value ?? 0));
+  const [days, hours, minutes, seconds] = match
+    .slice(1)
+    .map((value: string | undefined): number => Number(value ?? 0));
   if (![days, hours, minutes, seconds].every(Number.isFinite)) return duration;
 
   const totalMinutes = days * 1_440 + hours * 60 + minutes + Math.ceil(seconds / 60);
@@ -21,14 +24,20 @@ const formatDuration = (duration: string): string => {
   return `${Math.floor(totalMinutes / 60)}h ${totalMinutes % 60}m`;
 };
 
-export function SearchFormClient() {
-  const [origin, setOrigin] = useState('');
-  const [destination, setDestination] = useState('');
-  const [departureDate, setDepartureDate] = useState('');
-  const [adults, setAdults] = useState(1);
-  const [children, setChildren] = useState(0);
-  const [infants, setInfants] = useState(0);
-  const [cabinClass, setCabinClass] = useState<FlightSearchQuery['cabinClass']>('economy');
+type SearchFormClientProps = {
+  initialValues?: Partial<FlightSearchQuery>;
+};
+
+export function SearchFormClient({ initialValues }: SearchFormClientProps): JSX.Element {
+  const [origin, setOrigin] = useState(initialValues?.origin ?? '');
+  const [destination, setDestination] = useState(initialValues?.destination ?? '');
+  const [departureDate, setDepartureDate] = useState(initialValues?.departureDate ?? '');
+  const [adults, setAdults] = useState(initialValues?.adults ?? 1);
+  const [children, setChildren] = useState(initialValues?.children ?? 0);
+  const [infants, setInfants] = useState(initialValues?.infants ?? 0);
+  const [cabinClass, setCabinClass] = useState<FlightSearchQuery['cabinClass']>(
+    initialValues?.cabinClass ?? 'economy',
+  );
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [offers, setOffers] = useState<FlightSearchOfferView[]>([]);
@@ -106,7 +115,10 @@ export function SearchFormClient() {
           </div>
 
           <div>
-            <label htmlFor="destination" className="block text-sm font-medium text-text-secondary mb-1">
+            <label
+              htmlFor="destination"
+              className="block text-sm font-medium text-text-secondary mb-1"
+            >
               Destination (IATA)
             </label>
             <input
@@ -125,7 +137,10 @@ export function SearchFormClient() {
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div>
-            <label htmlFor="departureDate" className="block text-sm font-medium text-text-secondary mb-1">
+            <label
+              htmlFor="departureDate"
+              className="block text-sm font-medium text-text-secondary mb-1"
+            >
               Departure Date
             </label>
             <input
@@ -139,7 +154,10 @@ export function SearchFormClient() {
           </div>
 
           <div>
-            <label htmlFor="cabinClass" className="block text-sm font-medium text-text-secondary mb-1">
+            <label
+              htmlFor="cabinClass"
+              className="block text-sm font-medium text-text-secondary mb-1"
+            >
               Cabin Class
             </label>
             <select
@@ -177,7 +195,10 @@ export function SearchFormClient() {
             />
           </div>
           <div>
-            <label htmlFor="children" className="block text-sm font-medium text-text-secondary mb-1">
+            <label
+              htmlFor="children"
+              className="block text-sm font-medium text-text-secondary mb-1"
+            >
               Children
             </label>
             <input
@@ -225,28 +246,43 @@ export function SearchFormClient() {
           <h2 className="text-xl font-bold text-text-primary">Flight Offers</h2>
           <div className="space-y-4">
             {offers.map((offer) => (
-              <div key={offer.id} className="card flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+              <div
+                key={offer.id}
+                className="card flex flex-col md:flex-row justify-between items-start md:items-center gap-4"
+              >
                 <div className="space-y-2">
                   <div className="flex items-center gap-2">
                     <span className="font-bold text-text-primary">{offer.airline}</span>
-                    <span className="text-xs text-text-muted font-normal">Flight {offer.flightNumber}</span>
+                    <span className="text-xs text-text-muted font-normal">
+                      Flight {offer.flightNumber}
+                    </span>
                   </div>
                   <div className="flex gap-8 text-sm">
                     <div>
                       <p className="font-semibold text-text-primary">{offer.origin}</p>
                       <p className="text-xs text-text-secondary">
-                        {new Date(offer.departureAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        {new Date(offer.departureAt).toLocaleTimeString([], {
+                          hour: '2-digit',
+                          minute: '2-digit',
+                        })}
                       </p>
                     </div>
                     <div className="flex flex-col items-center justify-center">
-                      <span className="text-xs text-text-muted">{offer.stops === 0 ? 'Non-stop' : `${offer.stops} stops`}</span>
+                      <span className="text-xs text-text-muted">
+                        {offer.stops === 0 ? 'Non-stop' : `${offer.stops} stops`}
+                      </span>
                       <div className="w-16 h-0.5 bg-secondary-border my-1"></div>
-                      <span className="text-xs text-text-muted">{formatDuration(offer.duration)}</span>
+                      <span className="text-xs text-text-muted">
+                        {formatDuration(offer.duration)}
+                      </span>
                     </div>
                     <div>
                       <p className="font-semibold text-text-primary">{offer.destination}</p>
                       <p className="text-xs text-text-secondary">
-                        {new Date(offer.arrivalAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        {new Date(offer.arrivalAt).toLocaleTimeString([], {
+                          hour: '2-digit',
+                          minute: '2-digit',
+                        })}
                       </p>
                     </div>
                   </div>
@@ -273,7 +309,9 @@ export function SearchFormClient() {
 
       {!loading && !error && offers.length === 0 && (
         <div className="card text-center p-8">
-          <p className="text-text-secondary">No flight offers search results yet. Enter search criteria and search.</p>
+          <p className="text-text-secondary">
+            No flight offers search results yet. Enter search criteria and search.
+          </p>
         </div>
       )}
     </div>

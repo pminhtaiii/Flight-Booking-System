@@ -1,7 +1,14 @@
 import 'reflect-metadata';
 import { BookingIntentService } from './booking-intent.service';
 import { DuffelTimeoutError } from '@/duffel/duffel.service';
-import { HttpException, HttpStatus, NotFoundException, ForbiddenException, GoneException, Logger } from '@nestjs/common';
+import {
+  HttpException,
+  HttpStatus,
+  NotFoundException,
+  ForbiddenException,
+  GoneException,
+  Logger,
+} from '@nestjs/common';
 import { PassengerSnapshotService } from './passenger-snapshot.service';
 import { PassengerSourceResolverService } from './passenger-source-resolver.service';
 
@@ -134,16 +141,22 @@ describe('BookingIntentService Refinements', () => {
       };
       prisma.travelerProfile = { findFirst: jest.fn() };
       prisma.bookingIntent = {
-        create: jest.fn().mockImplementation(({ data }) =>
-          Promise.resolve({ id: 'intent-1', status: 'PENDING', ...data }),
-        ),
+        create: jest
+          .fn()
+          .mockImplementation(({ data }) =>
+            Promise.resolve({ id: 'intent-1', status: 'PENDING', ...data }),
+          ),
       };
       prisma.bookingIntentPassenger = {
-        create: jest.fn().mockImplementation(({ data }) =>
-          Promise.resolve({ id: 'snapshot-passenger-1', ...data }),
-        ),
+        create: jest
+          .fn()
+          .mockImplementation(({ data }) =>
+            Promise.resolve({ id: 'snapshot-passenger-1', ...data }),
+          ),
       };
-      prisma.$transaction = jest.fn(async (callback: (tx: CanonicalPrismaMock) => Promise<unknown>) => callback(prisma));
+      prisma.$transaction = jest.fn(
+        async (callback: (tx: CanonicalPrismaMock) => Promise<unknown>) => callback(prisma),
+      );
       const duffel = {
         getOfferById: jest.fn().mockResolvedValue({
           total_amount: '150.00',
@@ -161,8 +174,14 @@ describe('BookingIntentService Refinements', () => {
       };
       const resolver = new PassengerSourceResolverService(prisma as never, encryption as never);
       const snapshot = new PassengerSnapshotService(encryption as never);
-      const readiness = { evaluateAuthoritativeReadiness: jest.fn().mockResolvedValue({ ready: true, scope: 'DOMESTIC' }) };
-      const Service = BookingIntentService as unknown as new (...args: unknown[]) => BookingIntentService;
+      const readiness = {
+        evaluateAuthoritativeReadiness: jest
+          .fn()
+          .mockResolvedValue({ ready: true, scope: 'DOMESTIC' }),
+      };
+      const Service = BookingIntentService as unknown as new (
+        ...args: unknown[]
+      ) => BookingIntentService;
       const service = new Service(prisma, duffel, audit, encryption, readiness, resolver, snapshot);
 
       const result = await service.createIntent('user-1', {
@@ -187,27 +206,29 @@ describe('BookingIntentService Refinements', () => {
         ],
       } as never);
 
-      expect(result.passengers[0]).toEqual(expect.objectContaining({
-        passengerType: 'ADULT',
-        passengerOrdinal: 1,
-        nameSummary: expect.stringMatching(/^G/),
-        documentSummary: {
-          documentType: null,
-          issuingCountry: null,
-          hasPassport: false,
+      expect(result.passengers[0]).toEqual(
+        expect.objectContaining({
+          passengerType: 'ADULT',
+          passengerOrdinal: 1,
+          nameSummary: expect.stringMatching(/^G/),
+          documentSummary: {
+            documentType: null,
+            issuingCountry: null,
+            hasPassport: false,
+            maskedPassportSummary: null,
+          },
+          contactSummary: {
+            email: expect.stringMatching(/^g/),
+            phone: expect.stringMatching(/^\+1/),
+            maskedContactSummary: expect.stringMatching(/^g.* \+1/),
+          },
           maskedPassportSummary: null,
-        },
-        contactSummary: {
-          email: expect.stringMatching(/^g/),
-          phone: expect.stringMatching(/^\+1/),
           maskedContactSummary: expect.stringMatching(/^g.* \+1/),
-        },
-        maskedPassportSummary: null,
-        maskedContactSummary: expect.stringMatching(/^g.* \+1/),
-        passportNumber: null,
-        passportExpiry: null,
-        preFilledFromProfile: false,
-      }));
+          passportNumber: null,
+          passportExpiry: null,
+          preFilledFromProfile: false,
+        }),
+      );
       expect(result.passengers[0]).not.toHaveProperty('givenName');
       expect(prisma.bookingIntentPassenger.create).toHaveBeenCalledWith({
         data: expect.objectContaining({
@@ -221,7 +242,8 @@ describe('BookingIntentService Refinements', () => {
         }),
       });
       const createdIntentId = (prisma.bookingIntent.create as jest.Mock).mock.calls[0][0].data.id;
-      const snapshotIntentId = (prisma.bookingIntentPassenger.create as jest.Mock).mock.calls[0][0].data.intentId;
+      const snapshotIntentId = (prisma.bookingIntentPassenger.create as jest.Mock).mock.calls[0][0]
+        .data.intentId;
       expect(snapshotIntentId).toBe(createdIntentId);
 
       const auditMetadata = JSON.stringify(audit.createLog.mock.calls[0][1].metadata);
@@ -268,19 +290,23 @@ describe('BookingIntentService Refinements', () => {
         passportExpiryCiphertext: null,
       };
       prisma.travelerProfile = {
-        findFirst: jest.fn()
-          .mockResolvedValueOnce(profile)
-          .mockResolvedValueOnce({ revision: 4 }),
+        findFirst: jest.fn().mockResolvedValueOnce(profile).mockResolvedValueOnce({ revision: 4 }),
       };
       prisma.bookingIntent = {
-        create: jest.fn().mockImplementation(({ data }) =>
-          Promise.resolve({ id: 'intent-1', status: 'PENDING', ...data }),
-        ),
+        create: jest
+          .fn()
+          .mockImplementation(({ data }) =>
+            Promise.resolve({ id: 'intent-1', status: 'PENDING', ...data }),
+          ),
       };
       prisma.bookingIntentPassenger = {
-        create: jest.fn().mockImplementation(({ data }) => Promise.resolve({ id: 'passenger-1', ...data })),
+        create: jest
+          .fn()
+          .mockImplementation(({ data }) => Promise.resolve({ id: 'passenger-1', ...data })),
       };
-      prisma.$transaction = jest.fn(async (callback: (tx: CanonicalPrismaMock) => Promise<unknown>) => callback(prisma));
+      prisma.$transaction = jest.fn(
+        async (callback: (tx: CanonicalPrismaMock) => Promise<unknown>) => callback(prisma),
+      );
 
       const duffel = {
         getOfferById: jest.fn().mockResolvedValue({
@@ -298,8 +324,14 @@ describe('BookingIntentService Refinements', () => {
       };
       const resolver = new PassengerSourceResolverService(prisma as never, encryption as never);
       const snapshot = new PassengerSnapshotService(encryption as never);
-      const readiness = { evaluateAuthoritativeReadiness: jest.fn().mockResolvedValue({ ready: true, scope: 'DOMESTIC' }) };
-      const service = new (BookingIntentService as unknown as new (...args: unknown[]) => BookingIntentService)(
+      const readiness = {
+        evaluateAuthoritativeReadiness: jest
+          .fn()
+          .mockResolvedValue({ ready: true, scope: 'DOMESTIC' }),
+      };
+      const service = new (BookingIntentService as unknown as new (
+        ...args: unknown[]
+      ) => BookingIntentService)(
         prisma,
         duffel,
         { createLog: jest.fn() },
@@ -345,17 +377,23 @@ describe('BookingIntentService Refinements', () => {
         flightOffer: { findUnique: jest.fn() },
         travelerProfile: { findFirst: jest.fn(), findUnique: jest.fn() },
         bookingIntent: {
-          create: jest.fn().mockImplementation(({ data }) =>
-            Promise.resolve({ id: data.id || 'intent-1', status: 'PENDING', ...data }),
-          ),
+          create: jest
+            .fn()
+            .mockImplementation(({ data }) =>
+              Promise.resolve({ id: data.id || 'intent-1', status: 'PENDING', ...data }),
+            ),
           findUnique: jest.fn(),
         },
         bookingIntentPassenger: {
-          create: jest.fn().mockImplementation(({ data }) =>
-            Promise.resolve({ id: `passenger-${Math.random()}`, ...data }),
-          ),
+          create: jest
+            .fn()
+            .mockImplementation(({ data }) =>
+              Promise.resolve({ id: `passenger-${Math.random()}`, ...data }),
+            ),
         },
-        $transaction: jest.fn(async (callback: (tx: CanonicalPrismaMock) => Promise<unknown>) => callback(prisma)),
+        $transaction: jest.fn(async (callback: (tx: CanonicalPrismaMock) => Promise<unknown>) =>
+          callback(prisma),
+        ),
       };
 
       duffel = {
@@ -375,7 +413,9 @@ describe('BookingIntentService Refinements', () => {
       encryption = {
         encrypt: jest.fn((val: string) => `enc-${val}`),
         decrypt: jest.fn((val: string) => `dec-${val}`),
-        encryptBound: jest.fn((val: string, ctx: Record<string, unknown>) => `bound-enc-${val}-${ctx.fieldName}`),
+        encryptBound: jest.fn(
+          (val: string, ctx: Record<string, unknown>) => `bound-enc-${val}-${ctx.fieldName}`,
+        ),
         decryptBound: jest.fn((val: string) => `bound-dec-${val}`),
       };
 
@@ -395,7 +435,9 @@ describe('BookingIntentService Refinements', () => {
 
       resolver = new PassengerSourceResolverService(prisma as never, encryption as never);
       snapshot = new PassengerSnapshotService(encryption as never);
-      const Service = BookingIntentService as unknown as new (...args: unknown[]) => BookingIntentService;
+      const Service = BookingIntentService as unknown as new (
+        ...args: unknown[]
+      ) => BookingIntentService;
       service = new Service(
         prisma as never,
         duffel as never,
@@ -612,7 +654,8 @@ describe('BookingIntentService Refinements', () => {
 
         // First call during resolver resolution returns revision 2;
         // Second call inside transaction in assertCanonicalProfileRevisions returns revision 3 (advancement race)
-        prisma.travelerProfile.findFirst = jest.fn()
+        prisma.travelerProfile.findFirst = jest
+          .fn()
           .mockResolvedValueOnce(initialProfile)
           .mockResolvedValueOnce({ revision: 3 });
 
@@ -668,8 +711,20 @@ describe('BookingIntentService Refinements', () => {
           ready: false,
           scope: 'INTERNATIONAL',
           passengers: [
-            { offerPassengerId: 'pas_adult_1', passengerOrdinal: 1, status: 'READY', missingFields: [], invalidFields: [] },
-            { offerPassengerId: 'pas_child_1', passengerOrdinal: 2, status: 'INCOMPLETE', missingFields: ['passportNumber'], invalidFields: [] },
+            {
+              offerPassengerId: 'pas_adult_1',
+              passengerOrdinal: 1,
+              status: 'READY',
+              missingFields: [],
+              invalidFields: [],
+            },
+            {
+              offerPassengerId: 'pas_child_1',
+              passengerOrdinal: 2,
+              status: 'INCOMPLETE',
+              missingFields: ['passportNumber'],
+              invalidFields: [],
+            },
           ],
           tripCompletionDate: '2026-08-10',
           advisoryBufferDays: 180,
@@ -760,8 +815,20 @@ describe('BookingIntentService Refinements', () => {
           ready: true,
           scope: 'INTERNATIONAL',
           passengers: [
-            { offerPassengerId: 'pas_adult_1', passengerOrdinal: 1, status: 'READY', missingFields: [], invalidFields: [] },
-            { offerPassengerId: 'pas_child_1', passengerOrdinal: 2, status: 'READY', missingFields: [], invalidFields: [] },
+            {
+              offerPassengerId: 'pas_adult_1',
+              passengerOrdinal: 1,
+              status: 'READY',
+              missingFields: [],
+              invalidFields: [],
+            },
+            {
+              offerPassengerId: 'pas_child_1',
+              passengerOrdinal: 2,
+              status: 'READY',
+              missingFields: [],
+              invalidFields: [],
+            },
           ],
           tripCompletionDate: '2026-08-10',
           advisoryBufferDays: 180,
@@ -769,51 +836,55 @@ describe('BookingIntentService Refinements', () => {
         const traceId = 'chat_0123456789abcdef0123456789abcdef';
         const correlationId = 'chat_fedcba9876543210fedcba9876543210';
 
-        const result = await service.createIntent('user-1', {
-          flightOfferId: 'offer-multi-valid',
-          passengers: [
-            {
-              offerPassengerId: 'pas_adult_1',
-              type: 'ADULT',
-              source: {
-                type: 'inline',
-                givenName: 'John',
-                familyName: 'VonNeumann',
-                dateOfBirth: '1903-12-28',
-                gender: 'male',
-                nationality: 'US',
-                documentType: 'passport',
-                passportNumber: 'US99887766',
-                passportExpiry: '2030-01-01',
-                issuingCountry: 'US',
-                email: 'john@princeton.test',
-                phoneCountryCode: '+1',
-                phoneNumber: '5551112222',
-                title: 'MR',
+        const result = await service.createIntent(
+          'user-1',
+          {
+            flightOfferId: 'offer-multi-valid',
+            passengers: [
+              {
+                offerPassengerId: 'pas_adult_1',
+                type: 'ADULT',
+                source: {
+                  type: 'inline',
+                  givenName: 'John',
+                  familyName: 'VonNeumann',
+                  dateOfBirth: '1903-12-28',
+                  gender: 'male',
+                  nationality: 'US',
+                  documentType: 'passport',
+                  passportNumber: 'US99887766',
+                  passportExpiry: '2030-01-01',
+                  issuingCountry: 'US',
+                  email: 'john@princeton.test',
+                  phoneCountryCode: '+1',
+                  phoneNumber: '5551112222',
+                  title: 'MR',
+                },
               },
-            },
-            {
-              offerPassengerId: 'pas_child_1',
-              type: 'CHILD',
-              source: {
-                type: 'inline',
-                givenName: 'Marina',
-                familyName: 'VonNeumann',
-                dateOfBirth: '2015-05-15',
-                gender: 'female',
-                nationality: 'US',
-                documentType: 'passport',
-                passportNumber: 'US33445566',
-                passportExpiry: '2030-01-01',
-                issuingCountry: 'US',
-                email: 'marina@princeton.test',
-                phoneCountryCode: '+1',
-                phoneNumber: '5551112222',
-                title: 'MISS',
+              {
+                offerPassengerId: 'pas_child_1',
+                type: 'CHILD',
+                source: {
+                  type: 'inline',
+                  givenName: 'Marina',
+                  familyName: 'VonNeumann',
+                  dateOfBirth: '2015-05-15',
+                  gender: 'female',
+                  nationality: 'US',
+                  documentType: 'passport',
+                  passportNumber: 'US33445566',
+                  passportExpiry: '2030-01-01',
+                  issuingCountry: 'US',
+                  email: 'marina@princeton.test',
+                  phoneCountryCode: '+1',
+                  phoneNumber: '5551112222',
+                  title: 'MISS',
+                },
               },
-            },
-          ],
-        } as never, { traceId, correlationId, ipAddress: '10.0.0.1' });
+            ],
+          } as never,
+          { traceId, correlationId, ipAddress: '10.0.0.1' },
+        );
 
         expect(result.intentId).toBeDefined();
         expect(result.passengers).toHaveLength(2);
@@ -915,16 +986,19 @@ describe('BookingIntentService Refinements', () => {
         } as never);
 
         // Verify the created passenger snapshot payload passed to DB create
-        const snapshotCreateCall = (prisma.bookingIntentPassenger.create as jest.Mock).mock.calls[0][0].data;
-        expect(snapshotCreateCall).toEqual(expect.objectContaining({
-          givenName: 'Margaret',
-          familyName: 'Heafield',
-          middleName: 'Hamilton',
-          gender: 'female',
-          email: 'margaret@apollo.test',
-          travelerProfileId: 'profile-snap-1',
-          snapshotVersion: 1,
-        }));
+        const snapshotCreateCall = (prisma.bookingIntentPassenger.create as jest.Mock).mock
+          .calls[0][0].data;
+        expect(snapshotCreateCall).toEqual(
+          expect.objectContaining({
+            givenName: 'Margaret',
+            familyName: 'Heafield',
+            middleName: 'Hamilton',
+            gender: 'female',
+            email: 'margaret@apollo.test',
+            travelerProfileId: 'profile-snap-1',
+            snapshotVersion: 1,
+          }),
+        );
 
         // Now simulate TravelerProfile being updated to completely different values or deleted
         prisma.travelerProfile.findFirst = jest.fn().mockResolvedValue({
@@ -1039,15 +1113,17 @@ describe('BookingIntentService Refinements', () => {
         expect(audit.createLog).toHaveBeenCalledTimes(1);
         const [txArg, auditPayload] = audit.createLog.mock.calls[0];
         expect(txArg).toBe(prisma);
-        expect(auditPayload).toEqual(expect.objectContaining({
-          userId: 'user-1',
-          action: 'booking_intent_created',
-          resourceType: 'BookingIntent',
-          resourceId: expect.any(String),
-          ipAddress: '192.168.1.50',
-          traceId,
-          correlationId,
-        }));
+        expect(auditPayload).toEqual(
+          expect.objectContaining({
+            userId: 'user-1',
+            action: 'booking_intent_created',
+            resourceType: 'BookingIntent',
+            resourceId: expect.any(String),
+            ipAddress: '192.168.1.50',
+            traceId,
+            correlationId,
+          }),
+        );
 
         // Validate metadata allowlist keys
         const metadata = auditPayload.metadata;
@@ -1131,19 +1207,21 @@ describe('BookingIntentService Refinements', () => {
 
         expect(readinessObservability.recordOutcome).toHaveBeenCalledTimes(1);
         const eventArg = readinessObservability.recordOutcome.mock.calls[0][0];
-        expect(eventArg).toEqual(expect.objectContaining({
-          operation: 'intent_create',
-          status: 'created',
-          context: {
-            traceId,
-            correlationId,
-          },
-          metadata: expect.objectContaining({
-            scope: 'INTERNATIONAL',
-            passengerCount: 1,
+        expect(eventArg).toEqual(
+          expect.objectContaining({
+            operation: 'intent_create',
             status: 'created',
+            context: {
+              traceId,
+              correlationId,
+            },
+            metadata: expect.objectContaining({
+              scope: 'INTERNATIONAL',
+              passengerCount: 1,
+              status: 'created',
+            }),
           }),
-        }));
+        );
 
         const metadataString = JSON.stringify(eventArg.metadata);
         expect(metadataString).not.toContain('Dorothy');
@@ -1174,34 +1252,31 @@ describe('BookingIntentService Refinements', () => {
           throw new Error('Observability sink down');
         });
 
-        const result = await service.createIntent(
-          'user-1',
-          {
-            flightOfferId: 'offer-obs-fail',
-            passengers: [
-              {
-                offerPassengerId: 'pas_001',
-                type: 'ADULT',
-                source: {
-                  type: 'inline',
-                  givenName: 'Dorothy',
-                  familyName: 'Vaughan',
-                  dateOfBirth: '1910-09-20',
-                  gender: 'female',
-                  nationality: 'US',
-                  documentType: 'passport',
-                  passportNumber: 'US123123123',
-                  passportExpiry: '2030-01-01',
-                  issuingCountry: 'US',
-                  email: 'dorothy@nasa.test',
-                  phoneCountryCode: '+1',
-                  phoneNumber: '5552223333',
-                  title: 'MS',
-                },
+        const result = await service.createIntent('user-1', {
+          flightOfferId: 'offer-obs-fail',
+          passengers: [
+            {
+              offerPassengerId: 'pas_001',
+              type: 'ADULT',
+              source: {
+                type: 'inline',
+                givenName: 'Dorothy',
+                familyName: 'Vaughan',
+                dateOfBirth: '1910-09-20',
+                gender: 'female',
+                nationality: 'US',
+                documentType: 'passport',
+                passportNumber: 'US123123123',
+                passportExpiry: '2030-01-01',
+                issuingCountry: 'US',
+                email: 'dorothy@nasa.test',
+                phoneCountryCode: '+1',
+                phoneNumber: '5552223333',
+                title: 'MS',
               },
-            ],
-          } as never,
-        );
+            },
+          ],
+        } as never);
 
         expect(result.intentId).toBeDefined();
         expect(prisma.bookingIntent.create).toHaveBeenCalled();
@@ -1225,34 +1300,31 @@ describe('BookingIntentService Refinements', () => {
         prisma.bookingIntent.create.mockRejectedValueOnce(new Error('DB transaction error'));
 
         await expect(
-          service.createIntent(
-            'user-1',
-            {
-              flightOfferId: 'offer-obs-rollback',
-              passengers: [
-                {
-                  offerPassengerId: 'pas_001',
-                  type: 'ADULT',
-                  source: {
-                    type: 'inline',
-                    givenName: 'Dorothy',
-                    familyName: 'Vaughan',
-                    dateOfBirth: '1910-09-20',
-                    gender: 'female',
-                    nationality: 'US',
-                    documentType: 'passport',
-                    passportNumber: 'US123123123',
-                    passportExpiry: '2030-01-01',
-                    issuingCountry: 'US',
-                    email: 'dorothy@nasa.test',
-                    phoneCountryCode: '+1',
-                    phoneNumber: '5552223333',
-                    title: 'MS',
-                  },
+          service.createIntent('user-1', {
+            flightOfferId: 'offer-obs-rollback',
+            passengers: [
+              {
+                offerPassengerId: 'pas_001',
+                type: 'ADULT',
+                source: {
+                  type: 'inline',
+                  givenName: 'Dorothy',
+                  familyName: 'Vaughan',
+                  dateOfBirth: '1910-09-20',
+                  gender: 'female',
+                  nationality: 'US',
+                  documentType: 'passport',
+                  passportNumber: 'US123123123',
+                  passportExpiry: '2030-01-01',
+                  issuingCountry: 'US',
+                  email: 'dorothy@nasa.test',
+                  phoneCountryCode: '+1',
+                  phoneNumber: '5552223333',
+                  title: 'MS',
                 },
-              ],
-            } as never,
-          ),
+              },
+            ],
+          } as never),
         ).rejects.toThrow('DB transaction error');
 
         expect(readinessObservability.recordOutcome).not.toHaveBeenCalled();
@@ -1272,22 +1344,14 @@ describe('BookingIntentService Refinements', () => {
       releaseClaim: jest.fn().mockRejectedValue(releaseError),
     };
     const loggerError = jest.spyOn(Logger.prototype, 'error').mockImplementation(() => undefined);
-    const Service = BookingIntentService as unknown as new (...args: unknown[]) => BookingIntentService;
-    const service = new Service(
-      prisma,
-      {},
-      {},
-      {},
-      undefined,
-      undefined,
-      undefined,
-      chatHandoff,
-    );
+    const Service = BookingIntentService as unknown as new (
+      ...args: unknown[]
+    ) => BookingIntentService;
+    const service = new Service(prisma, {}, {}, {}, undefined, undefined, undefined, chatHandoff);
 
-    await expect(service.createIntent(
-      'user-1',
-      { handoffToken: 'handoff-token', passengers: [] } as never,
-    )).rejects.toMatchObject({ status: HttpStatus.NOT_FOUND });
+    await expect(
+      service.createIntent('user-1', { handoffToken: 'handoff-token', passengers: [] } as never),
+    ).rejects.toMatchObject({ status: HttpStatus.NOT_FOUND });
 
     expect(loggerError).toHaveBeenCalledWith('chat_handoff_claim_release_failed');
     expect(JSON.stringify(loggerError.mock.calls)).not.toContain('internal.test');
@@ -1301,7 +1365,9 @@ describe('BookingIntentService Refinements', () => {
     const chatHandoff = {
       releaseInFlight: jest.fn(),
     };
-    const Service = BookingIntentService as unknown as new (...args: unknown[]) => BookingIntentService;
+    const Service = BookingIntentService as unknown as new (
+      ...args: unknown[]
+    ) => BookingIntentService;
     const service = new Service(
       prisma,
       {} as never,
@@ -1313,16 +1379,14 @@ describe('BookingIntentService Refinements', () => {
       chatHandoff,
     );
 
-    await expect(service.createIntent(
-      'user-1',
-      { flightOfferId: 'missing-offer', passengers: [] } as never,
-      {
+    await expect(
+      service.createIntent('user-1', { flightOfferId: 'missing-offer', passengers: [] } as never, {
         handoffFastFailReservation: {
           token: 'chk_handoff_v1_token',
           reservationId: 'reservation-1',
         },
-      },
-    )).rejects.toMatchObject({ status: HttpStatus.NOT_FOUND });
+      }),
+    ).rejects.toMatchObject({ status: HttpStatus.NOT_FOUND });
 
     expect(chatHandoff.releaseInFlight).toHaveBeenCalledWith(
       'chk_handoff_v1_token',
@@ -1432,10 +1496,10 @@ describe('BookingIntentService Refinements', () => {
 
     it('rejects a supplier passenger list that cannot map every local passenger', () => {
       expect(() =>
-        testable.extractDuffelPassengerIds(
-          { passengers: [{ id: 'pas_adult_1', type: 'adult' }] },
-          [{ type: 'ADULT' }, { type: 'CHILD' }],
-        ),
+        testable.extractDuffelPassengerIds({ passengers: [{ id: 'pas_adult_1', type: 'adult' }] }, [
+          { type: 'ADULT' },
+          { type: 'CHILD' },
+        ]),
       ).toThrow(HttpException);
     });
   });
@@ -1591,9 +1655,7 @@ describe('BookingIntentService Refinements', () => {
       it('throws NotFoundException if intent does not exist', async () => {
         mockPrisma.bookingIntent.findUnique.mockResolvedValueOnce(null);
 
-        await expect(service.getIntent('user-1', 'intent-1')).rejects.toThrow(
-          NotFoundException,
-        );
+        await expect(service.getIntent('user-1', 'intent-1')).rejects.toThrow(NotFoundException);
       });
 
       it('throws ForbiddenException if intent does not belong to the user', async () => {
@@ -1603,9 +1665,7 @@ describe('BookingIntentService Refinements', () => {
           status: 'PENDING',
         });
 
-        await expect(service.getIntent('user-1', 'intent-1')).rejects.toThrow(
-          ForbiddenException,
-        );
+        await expect(service.getIntent('user-1', 'intent-1')).rejects.toThrow(ForbiddenException);
       });
 
       it('throws GoneException if intent status is EXPIRED', async () => {
@@ -1615,9 +1675,7 @@ describe('BookingIntentService Refinements', () => {
           status: 'EXPIRED',
         });
 
-        await expect(service.getIntent('user-1', 'intent-1')).rejects.toThrow(
-          GoneException,
-        );
+        await expect(service.getIntent('user-1', 'intent-1')).rejects.toThrow(GoneException);
       });
 
       it('returns mapped intent DTO on success', async () => {
@@ -1630,8 +1688,8 @@ describe('BookingIntentService Refinements', () => {
           id: 'intent-1',
           userId: 'user-1',
           status: 'PENDING',
-          originalPrice: 150.00,
-          confirmedPrice: 160.00,
+          originalPrice: 150.0,
+          confirmedPrice: 160.0,
           priceChanged: true,
           currency: 'USD',
           pricedAt: mockPricedAt,
@@ -1650,7 +1708,7 @@ describe('BookingIntentService Refinements', () => {
               passportNumber: 'v1:encrypted-passport',
               passportExpiry: 'v1:encrypted-expiry',
               travelerProfileId: 'profile-1',
-            }
+            },
           ],
           origin: 'SGN',
           destination: 'HAN',
@@ -1702,7 +1760,7 @@ describe('BookingIntentService Refinements', () => {
               preFilledFromProfile: true,
               maskedPassportSummary: '•••• port',
               maskedContactSummary: null,
-            }
+            },
           ],
           flight: {
             origin: 'SGN',
@@ -1764,15 +1822,17 @@ describe('BookingIntentService Refinements', () => {
           position: 0,
           fieldName: 'passportNumber',
         });
-        expect(result.passengers[0]).toEqual(expect.objectContaining({
-          passportNumber: null,
-          passportExpiry: null,
-          maskedPassportSummary: '•••• port',
-          documentSummary: expect.objectContaining({
-            hasPassport: true,
+        expect(result.passengers[0]).toEqual(
+          expect.objectContaining({
+            passportNumber: null,
+            passportExpiry: null,
             maskedPassportSummary: '•••• port',
+            documentSummary: expect.objectContaining({
+              hasPassport: true,
+              maskedPassportSummary: '•••• port',
+            }),
           }),
-        }));
+        );
       });
     });
   });

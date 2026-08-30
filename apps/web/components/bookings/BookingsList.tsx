@@ -33,8 +33,12 @@ export function BookingsList({ data, tab, error }: BookingsListProps) {
     <section aria-labelledby="my-bookings-title" className="space-y-6">
       <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
         <div>
-          <h1 id="my-bookings-title" className="text-2xl font-bold text-text-primary">My Bookings</h1>
-          <p className="mt-1 text-sm text-text-secondary">View the latest status of every flight you have booked.</p>
+          <h1 id="my-bookings-title" className="text-2xl font-bold text-text-primary">
+            My Bookings
+          </h1>
+          <p className="mt-1 text-sm text-text-secondary">
+            View the latest status of every flight you have booked.
+          </p>
         </div>
         <div role="tablist" aria-label="Booking history" className="flex gap-2">
           {(['upcoming', 'past'] as const).map((tabName) => (
@@ -52,23 +56,47 @@ export function BookingsList({ data, tab, error }: BookingsListProps) {
         </div>
       </div>
 
-      {error && <p role="alert" className="card text-text-cancelled">{error}</p>}
+      {error && (
+        <p role="alert" className="card text-text-cancelled">
+          {error}
+        </p>
+      )}
       {!error && !data && <p className="card text-text-secondary">Loading your bookings…</p>}
       {!error && data && bookings.length === 0 && (
         <div className="card space-y-4 text-center">
           <p className="text-text-secondary">No bookings yet — start planning your next trip.</p>
-          <Link href="/search" className="btn-primary">Search Flights</Link>
+          <Link href="/search" className="btn-primary">
+            Search Flights
+          </Link>
         </div>
       )}
-      {!error && bookings.length > 0 && <div className="space-y-4">{bookings.map((booking) => <BookingCard key={booking.id} booking={booking} />)}</div>}
+      {!error && bookings.length > 0 && (
+        <div className="space-y-4">
+          {bookings.map((booking) => (
+            <BookingCard key={booking.id} booking={booking} />
+          ))}
+        </div>
+      )}
 
       {data && data.pagination.totalPages > 1 && (
         <nav aria-label="Booking pages" className="flex items-center justify-between gap-4">
-          <button type="button" onClick={() => updateQuery(tab, page - 1)} disabled={page === 1} className="btn-secondary disabled:cursor-not-allowed disabled:opacity-50">
+          <button
+            type="button"
+            onClick={() => updateQuery(tab, page - 1)}
+            disabled={page === 1}
+            className="btn-secondary disabled:cursor-not-allowed disabled:opacity-50"
+          >
             Previous
           </button>
-          <p className="text-sm text-text-secondary">Page {data.pagination.page} of {data.pagination.totalPages}</p>
-          <button type="button" onClick={() => updateQuery(tab, page + 1)} disabled={page >= data.pagination.totalPages} className="btn-secondary disabled:cursor-not-allowed disabled:opacity-50">
+          <p className="text-sm text-text-secondary">
+            Page {data.pagination.page} of {data.pagination.totalPages}
+          </p>
+          <button
+            type="button"
+            onClick={() => updateQuery(tab, page + 1)}
+            disabled={page >= data.pagination.totalPages}
+            className="btn-secondary disabled:cursor-not-allowed disabled:opacity-50"
+          >
             Next
           </button>
         </nav>

@@ -108,10 +108,7 @@ export class DuffelEventProcessor {
         OR: [
           {
             status: { in: ['PENDING', 'RETRY_SCHEDULED'] },
-            OR: [
-              { nextAttemptAt: null },
-              { nextAttemptAt: { lte: now } },
-            ],
+            OR: [{ nextAttemptAt: null }, { nextAttemptAt: { lte: now } }],
           },
           {
             status: 'PROCESSING',
@@ -119,10 +116,7 @@ export class DuffelEventProcessor {
           },
         ],
       },
-      orderBy: [
-        { nextAttemptAt: 'asc' },
-        { createdAt: 'asc' },
-      ],
+      orderBy: [{ nextAttemptAt: 'asc' }, { createdAt: 'asc' }],
       take: batchSize * 2,
     });
 
@@ -212,7 +206,12 @@ export class DuffelEventProcessor {
     }
   }
 
-  async handleFailure(eventId: string, token: string, error: Error, attempts: number): Promise<void> {
+  async handleFailure(
+    eventId: string,
+    token: string,
+    error: Error,
+    attempts: number,
+  ): Promise<void> {
     const nextMinutes = this.getRetryDelayMinutes(attempts);
     const now = new Date();
 
@@ -295,7 +294,9 @@ export class DuffelEventProcessor {
     const cutoff = new Date();
     cutoff.setDate(cutoff.getDate() - 30);
 
-    this.logger.log(`Starting raw payload redaction cleanup for events older than ${cutoff.toISOString()}`);
+    this.logger.log(
+      `Starting raw payload redaction cleanup for events older than ${cutoff.toISOString()}`,
+    );
 
     try {
       const result = await this.prisma.duffelWebhookEvent.updateMany({

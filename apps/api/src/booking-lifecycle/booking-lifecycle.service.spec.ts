@@ -1,5 +1,11 @@
 import { BadRequestException, ForbiddenException, NotFoundException } from '@nestjs/common';
-import { BookingFailureReason, BookingStatus, DisruptionActorType, DisruptionStatus, Prisma } from '@prisma/client';
+import {
+  BookingFailureReason,
+  BookingStatus,
+  DisruptionActorType,
+  DisruptionStatus,
+  Prisma,
+} from '@prisma/client';
 import { BookingLifecycleService } from './booking-lifecycle.service';
 import { BookingPipelineOutcome } from './booking-lifecycle.types';
 import { FlightSnapshot, PassengerSnapshot } from '@shared/booking-types';
@@ -308,13 +314,7 @@ describe('BookingLifecycleService', () => {
     it('throws BadRequestException if flightSnapshot has no segments', async () => {
       const invalidSnapshot = { ...flightSnapshot, segments: [] };
       await expect(
-        service.updateToConfirmed(
-          'b-1',
-          'PNR1',
-          'ord-1',
-          invalidSnapshot,
-          passengerSnapshot,
-        ),
+        service.updateToConfirmed('b-1', 'PNR1', 'ord-1', invalidSnapshot, passengerSnapshot),
       ).rejects.toThrow(BadRequestException);
     });
 
@@ -380,13 +380,7 @@ describe('BookingLifecycleService', () => {
       mockPrisma.booking.findUnique.mockResolvedValue(null);
 
       await expect(
-        service.updateToConfirmed(
-          'b-1',
-          'PNR1',
-          'ord-1',
-          flightSnapshot,
-          passengerSnapshot,
-        ),
+        service.updateToConfirmed('b-1', 'PNR1', 'ord-1', flightSnapshot, passengerSnapshot),
       ).rejects.toThrow(NotFoundException);
     });
   });
@@ -400,10 +394,7 @@ describe('BookingLifecycleService', () => {
         failureReason: BookingFailureReason.CAPTURE_FAILED,
       });
 
-      const result = await service.updateToFailed(
-        'b-1',
-        BookingFailureReason.CAPTURE_FAILED,
-      );
+      const result = await service.updateToFailed('b-1', BookingFailureReason.CAPTURE_FAILED);
 
       expect(result.status).toBe(BookingStatus.FAILED);
       expect(mockPrisma.booking.updateMany).toHaveBeenCalledWith({

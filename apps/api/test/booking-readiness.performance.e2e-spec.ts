@@ -3,7 +3,8 @@ import * as http from 'http';
 import { URL } from 'url';
 
 process.env.ENCRYPTION_KEY = process.env.ENCRYPTION_KEY || crypto.randomBytes(32).toString('hex');
-process.env.CHAT_ENCRYPTION_KEY = process.env.CHAT_ENCRYPTION_KEY || crypto.randomBytes(32).toString('hex');
+process.env.CHAT_ENCRYPTION_KEY =
+  process.env.CHAT_ENCRYPTION_KEY || crypto.randomBytes(32).toString('hex');
 process.env.FEATURE_FLAG_BOOKING_READINESS = 'true';
 process.env.FEATURE_FLAG_CHAT_HANDOFF_ISSUE = 'true';
 process.env.FEATURE_FLAG_CHAT_HANDOFF_ACCEPT = 'true';
@@ -390,7 +391,9 @@ describe('Booking Readiness Performance Benchmarks (E2E) - Task T075', () => {
     );
 
     if (!initialProfileRes.body?.profileId) {
-      throw new Error(`Failed to initialize traveler profile for performance test: ${initialProfileRes.status}`);
+      throw new Error(
+        `Failed to initialize traveler profile for performance test: ${initialProfileRes.status}`,
+      );
     }
 
     profile = {
@@ -480,7 +483,9 @@ describe('Booking Readiness Performance Benchmarks (E2E) - Task T075', () => {
 
   afterAll(async () => {
     // Print Benchmark Summary Table
-    console.log('\n==================================== BENCHMARK SUMMARY (Task T075) ====================================');
+    console.log(
+      '\n==================================== BENCHMARK SUMMARY (Task T075) ====================================',
+    );
     console.table([
       {
         Benchmark: '1. Profile Read (GET /api/profile)',
@@ -555,16 +560,23 @@ describe('Booking Readiness Performance Benchmarks (E2E) - Task T075', () => {
         p99_ms: benchmarkStats['benchmark4']?.p99.toFixed(2),
         Failures: benchmarkStats['benchmark4']?.failures ?? 0,
         Target_p95: 'N/A',
-        Status: benchmarkStats['benchmark4'] && benchmarkStats['benchmark4'].failures === 0 ? 'PASS' : 'FAIL',
+        Status:
+          benchmarkStats['benchmark4'] && benchmarkStats['benchmark4'].failures === 0
+            ? 'PASS'
+            : 'FAIL',
       },
     ]);
-    console.log('=======================================================================================================\n');
+    console.log(
+      '=======================================================================================================\n',
+    );
 
     // Cleanup resources
     try {
       if (prisma && testUser?.id) {
         await prisma.auditLog.deleteMany({ where: { userId: testUser.id } });
-        await prisma.bookingIntentPassenger.deleteMany({ where: { intent: { userId: testUser.id } } });
+        await prisma.bookingIntentPassenger.deleteMany({
+          where: { intent: { userId: testUser.id } },
+        });
         await prisma.bookingIntent.deleteMany({ where: { userId: testUser.id } });
         await prisma.travelerProfile.deleteMany({ where: { userId: testUser.id } });
         const offerIds = [internationalOffer?.id, domesticOffer?.id].filter(
@@ -645,7 +657,12 @@ describe('Booking Readiness Performance Benchmarks (E2E) - Task T075', () => {
             phoneNumber: '912345678',
           },
         };
-        const warmupRes = await patchJson<ProfileResponse>(endpoint, warmupPayload, authHeaders, httpAgent);
+        const warmupRes = await patchJson<ProfileResponse>(
+          endpoint,
+          warmupPayload,
+          authHeaders,
+          httpAgent,
+        );
         expect(warmupRes.status).toBe(200);
         if (warmupRes.body?.revision) {
           profile.revision = warmupRes.body.revision;
@@ -709,7 +726,12 @@ describe('Booking Readiness Performance Benchmarks (E2E) - Task T075', () => {
 
       // 10 Warmup requests
       for (let w = 0; w < WARMUP_COUNT; w++) {
-        const warmupRes = await postJson<ReadinessResponse>(endpoint, payload, authHeaders, httpAgent);
+        const warmupRes = await postJson<ReadinessResponse>(
+          endpoint,
+          payload,
+          authHeaders,
+          httpAgent,
+        );
         expect(warmupRes.status).toBe(200);
       }
 
@@ -862,7 +884,12 @@ describe('Booking Readiness Performance Benchmarks (E2E) - Task T075', () => {
             },
           ],
         };
-        const warmupRes = await postJson<IntentResponse>(endpoint, warmupPayload, authHeaders, httpAgent);
+        const warmupRes = await postJson<IntentResponse>(
+          endpoint,
+          warmupPayload,
+          authHeaders,
+          httpAgent,
+        );
         expect(warmupRes.status).toBe(201);
       }
 

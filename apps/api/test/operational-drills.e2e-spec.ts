@@ -57,13 +57,17 @@ describe('Operational Runbook Drills (E2E)', () => {
       .compile();
 
     app = moduleFixture.createNestApplication();
-    app.useGlobalPipes(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, transform: true }));
+    app.useGlobalPipes(
+      new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, transform: true }),
+    );
     app.useGlobalFilters(new HttpExceptionFilter());
     await app.init();
 
     prisma = moduleFixture.get<PrismaService>(PrismaService);
     configService = moduleFixture.get<ConfigService>(ConfigService);
-    attestationService = moduleFixture.get<SelectionAttestationService>(SelectionAttestationService);
+    attestationService = moduleFixture.get<SelectionAttestationService>(
+      SelectionAttestationService,
+    );
     tokenService = moduleFixture.get<ChatHandoffTokenService>(ChatHandoffTokenService);
     syncClaimService = moduleFixture.get<SyncClaimService>(SyncClaimService);
     cacheService = moduleFixture.get<CacheService>(CacheService);
@@ -162,7 +166,9 @@ describe('Operational Runbook Drills (E2E)', () => {
   describe('Drill 1: Redis Outage Resilience', () => {
     it('should maintain stable degraded reporting and protect resources during redis outage', async () => {
       // Simulate cache error / Redis disconnect in CacheService
-      const decrSpy = jest.spyOn(cacheService, 'decr').mockRejectedValue(new Error('Redis connection lost'));
+      const decrSpy = jest
+        .spyOn(cacheService, 'decr')
+        .mockRejectedValue(new Error('Redis connection lost'));
 
       await expect(cacheService.decr('drill:rate:user1')).rejects.toThrow('Redis connection lost');
 
@@ -237,7 +243,9 @@ describe('Operational Runbook Drills (E2E)', () => {
       configOverrides['ATTESTATION_SECRET_V1'] = 'attestation-secret-v1';
       configOverrides['ATTESTATION_SECRET'] = 'attestation-secret-v1';
 
-      const offers = [{ flightOfferId: validFlightOffer.id, duffelOfferId: validFlightOffer.duffelOfferId }];
+      const offers = [
+        { flightOfferId: validFlightOffer.id, duffelOfferId: validFlightOffer.duffelOfferId },
+      ];
       const expiresAt = new Date(Date.now() + 15 * 60000).toISOString();
 
       const attestationV1 = await attestationService.signSelectionAttestation(
@@ -283,7 +291,9 @@ describe('Operational Runbook Drills (E2E)', () => {
 
     it('should reject attestation when secret key has been completely revoked from ring', async () => {
       configOverrides['ATTESTATION_SECRET_V1'] = 'revoked-key';
-      const offers = [{ flightOfferId: validFlightOffer.id, duffelOfferId: validFlightOffer.duffelOfferId }];
+      const offers = [
+        { flightOfferId: validFlightOffer.id, duffelOfferId: validFlightOffer.duffelOfferId },
+      ];
       const expiresAt = new Date(Date.now() + 15 * 60000).toISOString();
 
       const attestationOld = await attestationService.signSelectionAttestation(

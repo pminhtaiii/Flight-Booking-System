@@ -127,9 +127,13 @@ describe('SafeBookingReadService', () => {
     });
 
     it('logs FAILURE audit when database query fails', async () => {
-      prismaService.bookingAgentProjection.findMany.mockRejectedValueOnce(new Error('DB query error'));
+      prismaService.bookingAgentProjection.findMany.mockRejectedValueOnce(
+        new Error('DB query error'),
+      );
 
-      await expect(service.getBookingSummaries('user-1', 'trace-err', 'corr-err')).rejects.toThrow('DB query error');
+      await expect(service.getBookingSummaries('user-1', 'trace-err', 'corr-err')).rejects.toThrow(
+        'DB query error',
+      );
 
       expect(agentToolAuditService.recordToolExecution).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -224,9 +228,9 @@ describe('SafeBookingReadService', () => {
     });
 
     it('rejects with NotFoundException BOOKING_REFERENCE_NOT_FOUND on malformed reference format', async () => {
-      await expect(
-        service.getBookingDetailByReference('user-1', 'invalid-ref'),
-      ).rejects.toThrow(NotFoundException);
+      await expect(service.getBookingDetailByReference('user-1', 'invalid-ref')).rejects.toThrow(
+        NotFoundException,
+      );
 
       try {
         await service.getBookingDetailByReference('user-1', 'bkref_short');
@@ -253,7 +257,10 @@ describe('SafeBookingReadService', () => {
 
       try {
         prismaService.bookingAgentProjection.findUnique.mockResolvedValueOnce(null);
-        await service.getBookingDetailByReference('user-1', 'bkref_99999999-9999-4999-8999-999999999999');
+        await service.getBookingDetailByReference(
+          'user-1',
+          'bkref_99999999-9999-4999-8999-999999999999',
+        );
       } catch (err: any) {
         expect(err.getResponse()).toMatchObject({ code: 'BOOKING_REFERENCE_NOT_FOUND' });
       }
@@ -276,7 +283,10 @@ describe('SafeBookingReadService', () => {
           airline: 'Vietnam Airlines',
           booking: { userId: 'user-2' },
         });
-        await service.getBookingDetailByReference('user-1', 'bkref_11111111-1111-4111-8111-111111111111');
+        await service.getBookingDetailByReference(
+          'user-1',
+          'bkref_11111111-1111-4111-8111-111111111111',
+        );
       } catch (err: any) {
         expect(err.getResponse()).toMatchObject({ code: 'BOOKING_REFERENCE_NOT_FOUND' });
       }
@@ -364,7 +374,9 @@ describe('SafeBookingReadService', () => {
     it('logs FAILURE audit when getUserBookings query fails', async () => {
       prismaService.booking.findMany.mockRejectedValueOnce(new Error('DB failure'));
 
-      await expect(service.getUserBookings('user-1', 'trace-err', 'corr-err')).rejects.toThrow('DB failure');
+      await expect(service.getUserBookings('user-1', 'trace-err', 'corr-err')).rejects.toThrow(
+        'DB failure',
+      );
 
       expect(agentToolAuditService.recordToolExecution).toHaveBeenCalledWith(
         expect.objectContaining({

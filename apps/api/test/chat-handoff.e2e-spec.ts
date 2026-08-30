@@ -82,11 +82,12 @@ function runAgentStreamProbe(
     );
     child.once('close', (code) => {
       const stderrText = Buffer.concat(stderr).toString('utf8');
-      const diagnostic = [
-        'nestjs_session_creation_failed',
-        'nestjs_memory_fetch_failed',
-        'user_message_persistence_failed',
-      ].find((marker) => stderrText.includes(marker)) ?? 'none';
+      const diagnostic =
+        [
+          'nestjs_session_creation_failed',
+          'nestjs_memory_fetch_failed',
+          'user_message_persistence_failed',
+        ].find((marker) => stderrText.includes(marker)) ?? 'none';
       resolve({
         exitCode: code ?? -1,
         output: Buffer.concat(stdout).toString('utf8'),
@@ -110,7 +111,7 @@ describe('ChatHandoff (E2E)', () => {
   let attestationService: SelectionAttestationService;
   let jwtService: JwtService;
   let nestjsBaseUrl: string;
-  
+
   let validUser: User;
   let validUserToken: string;
   let validSession: ChatSession;
@@ -161,7 +162,9 @@ describe('ChatHandoff (E2E)', () => {
         next();
       },
     );
-    app.useGlobalPipes(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, transform: true }));
+    app.useGlobalPipes(
+      new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, transform: true }),
+    );
     app.useGlobalFilters(new HttpExceptionFilter());
     await app.listen(0, '127.0.0.1');
     const address = app.getHttpServer().address();
@@ -169,9 +172,11 @@ describe('ChatHandoff (E2E)', () => {
       throw new Error('NestJS E2E server did not expose a loopback port');
     }
     nestjsBaseUrl = `http://127.0.0.1:${address.port}`;
-    
+
     prisma = moduleFixture.get<PrismaService>(PrismaService);
-    attestationService = moduleFixture.get<SelectionAttestationService>(SelectionAttestationService);
+    attestationService = moduleFixture.get<SelectionAttestationService>(
+      SelectionAttestationService,
+    );
     jwtService = moduleFixture.get<JwtService>(JwtService);
   });
 
@@ -280,7 +285,11 @@ describe('ChatHandoff (E2E)', () => {
       const expiresAt = new Date(Date.now() + 15 * 60000).toISOString();
       const offers = [{ flightOfferId: validFlightOffer.id, duffelOfferId: 'off_test123' }];
       const attestation = await attestationService.signSelectionAttestation(
-        validUser.id, validSession.id, 1, expiresAt, offers
+        validUser.id,
+        validSession.id,
+        1,
+        expiresAt,
+        offers,
       );
 
       await request(app.getHttpServer())
@@ -308,7 +317,11 @@ describe('ChatHandoff (E2E)', () => {
       const expiresAt = new Date(Date.now() + 15 * 60000).toISOString();
       const offers = [{ flightOfferId: validFlightOffer.id, duffelOfferId: 'off_test123' }];
       const attestation = await attestationService.signSelectionAttestation(
-        validUser.id, validSession.id, 1, expiresAt, offers
+        validUser.id,
+        validSession.id,
+        1,
+        expiresAt,
+        offers,
       );
       const mismatchedClaimToken = mintClaimToken(otherUser.id, Math.floor(Date.now() / 1000));
 
@@ -324,7 +337,11 @@ describe('ChatHandoff (E2E)', () => {
       const expiresAt = new Date(Date.now() + 15 * 60000).toISOString();
       const offers = [{ flightOfferId: validFlightOffer.id, duffelOfferId: 'off_test123' }];
       const attestation = await attestationService.signSelectionAttestation(
-        validUser.id, validSession.id, 1, expiresAt, offers
+        validUser.id,
+        validSession.id,
+        1,
+        expiresAt,
+        offers,
       );
       const claimToken = mintClaimToken(validUser.id, Math.floor(Date.now() / 1000));
 
@@ -337,7 +354,7 @@ describe('ChatHandoff (E2E)', () => {
           selectionAttestationHash: attestation,
           selectedOfferIndex: 1,
           userId: 'some-id',
-          chatSessionId: 'some-session'
+          chatSessionId: 'some-session',
         })
         .expect(400);
 
@@ -349,7 +366,7 @@ describe('ChatHandoff (E2E)', () => {
           selectionAttestationHash: attestation,
           selectedOfferIndex: 1,
           userId: 'some-id',
-          chatSessionId: 'some-session'
+          chatSessionId: 'some-session',
         })
         .expect(400);
     });
@@ -358,7 +375,11 @@ describe('ChatHandoff (E2E)', () => {
       const expiresAt = new Date(Date.now() + 15 * 60000).toISOString();
       const offers = [{ flightOfferId: validFlightOffer.id, duffelOfferId: 'off_test123' }];
       const attestation = await attestationService.signSelectionAttestation(
-        validUser.id, validSession.id, 1, expiresAt, offers
+        validUser.id,
+        validSession.id,
+        1,
+        expiresAt,
+        offers,
       );
       const claimToken = mintClaimToken(validUser.id, Math.floor(Date.now() / 1000));
 
@@ -368,7 +389,7 @@ describe('ChatHandoff (E2E)', () => {
         .set('X-User-Claim', claimToken)
         .send({
           selectionAttestationHash: attestation,
-          selectedOfferIndex: 1
+          selectedOfferIndex: 1,
         })
         .expect(201);
 
@@ -389,7 +410,11 @@ describe('ChatHandoff (E2E)', () => {
       const expiresAt = new Date(Date.now() + 15 * 60000).toISOString();
       const offers = [{ flightOfferId: validFlightOffer.id, duffelOfferId: 'off_test123' }];
       const attestation = await attestationService.signSelectionAttestation(
-        validUser.id, validSession.id, 1, expiresAt, offers
+        validUser.id,
+        validSession.id,
+        1,
+        expiresAt,
+        offers,
       );
       const claimToken = mintClaimToken(validUser.id, Math.floor(Date.now() / 1000));
 
@@ -399,7 +424,7 @@ describe('ChatHandoff (E2E)', () => {
         .set('X-User-Claim', claimToken)
         .send({
           selectionAttestationHash: attestation,
-          selectedOfferIndex: 1
+          selectedOfferIndex: 1,
         })
         .expect(201);
 
@@ -413,7 +438,11 @@ describe('ChatHandoff (E2E)', () => {
       const expiresAt = new Date(Date.now() + 15 * 60000).toISOString();
       const offers = [{ flightOfferId: validFlightOffer.id, duffelOfferId: 'off_test123' }];
       const attestation = await attestationService.signSelectionAttestation(
-        validUser.id, validSession.id, 1, expiresAt, offers
+        validUser.id,
+        validSession.id,
+        1,
+        expiresAt,
+        offers,
       );
       const claimToken = mintClaimToken(validUser.id, Math.floor(Date.now() / 1000));
 
@@ -423,7 +452,7 @@ describe('ChatHandoff (E2E)', () => {
         .set('X-User-Claim', claimToken)
         .send({
           selectionAttestationHash: attestation,
-          selectedOfferIndex: 1
+          selectedOfferIndex: 1,
         })
         .expect(201);
 
@@ -433,7 +462,7 @@ describe('ChatHandoff (E2E)', () => {
         .set('X-User-Claim', claimToken)
         .send({
           selectionAttestationHash: attestation,
-          selectedOfferIndex: 1
+          selectedOfferIndex: 1,
         })
         .expect(201);
 
@@ -450,7 +479,11 @@ describe('ChatHandoff (E2E)', () => {
       const expiresAt = new Date(Date.now() + 15 * 60000).toISOString();
       const offers = [{ flightOfferId: validFlightOffer.id, duffelOfferId: 'off_test123' }];
       const attestation = await attestationService.signSelectionAttestation(
-        validUser.id, validSession.id, 1, expiresAt, offers
+        validUser.id,
+        validSession.id,
+        1,
+        expiresAt,
+        offers,
       );
       const claimToken = mintClaimToken(validUser.id, Math.floor(Date.now() / 1000));
 
@@ -460,7 +493,7 @@ describe('ChatHandoff (E2E)', () => {
         .set('X-User-Claim', claimToken)
         .send({
           selectionAttestationHash: attestation,
-          selectedOfferIndex: 1
+          selectedOfferIndex: 1,
         })
         .expect(503);
 
@@ -471,7 +504,11 @@ describe('ChatHandoff (E2E)', () => {
       const expiresAt = new Date(Date.now() + 15 * 60000).toISOString();
       const offers = [{ flightOfferId: validFlightOffer.id, duffelOfferId: 'off_test123' }];
       const attestation = await attestationService.signSelectionAttestation(
-        validUser.id, validSession.id, 1, expiresAt, offers,
+        validUser.id,
+        validSession.id,
+        1,
+        expiresAt,
+        offers,
       );
       const claimToken = mintClaimToken(validUser.id, Math.floor(Date.now() / 1000));
       const traceId = `chat_${'a1'.repeat(16)}`;
@@ -524,7 +561,11 @@ describe('ChatHandoff (E2E)', () => {
       const expiresAt = new Date(Date.now() + 15 * 60000).toISOString();
       const offers = [{ flightOfferId: validFlightOffer.id, duffelOfferId: 'off_test123' }];
       const attestation = await attestationService.signSelectionAttestation(
-        validUser.id, validSession.id, 1, expiresAt, offers,
+        validUser.id,
+        validSession.id,
+        1,
+        expiresAt,
+        offers,
       );
       const traceId = `chat_${'c3'.repeat(16)}`;
       const correlationId = `chat_${'d4'.repeat(16)}`;
@@ -568,7 +609,9 @@ describe('ChatHandoff (E2E)', () => {
             return null;
           }
         })
-        .find((event) => event !== null && 'operation' in event && event.operation === 'handoff_create');
+        .find(
+          (event) => event !== null && 'operation' in event && event.operation === 'handoff_create',
+        );
       loggerLog.mockRestore();
 
       expect(telemetryEvent).toMatchObject({
@@ -655,10 +698,16 @@ describe('ChatHandoff (E2E)', () => {
       );
 
       const observedStages = {
-        access: observedGatewayTraces.some(({ path: requestPath }) => requestPath.includes('chat/access/check')),
-        memory: observedGatewayTraces.some(({ path: requestPath }) => requestPath.includes('/memory')),
+        access: observedGatewayTraces.some(({ path: requestPath }) =>
+          requestPath.includes('chat/access/check'),
+        ),
+        memory: observedGatewayTraces.some(({ path: requestPath }) =>
+          requestPath.includes('/memory'),
+        ),
         turn: observedGatewayTraces.some(({ path: requestPath }) => requestPath.includes('/turns')),
-        handoff: observedGatewayTraces.some(({ path: requestPath }) => requestPath.includes('chat-handoff')),
+        handoff: observedGatewayTraces.some(({ path: requestPath }) =>
+          requestPath.includes('chat-handoff'),
+        ),
       };
       expect({ probe, observedStages }).toEqual({
         probe: { exitCode: 0, output: '{"ok":true}', diagnostic: 'none' },
@@ -669,10 +718,18 @@ describe('ChatHandoff (E2E)', () => {
           observedTraceId === traceId && observedCorrelationId === correlationId,
       );
       expect(tracedRequests.length).toBeGreaterThanOrEqual(4);
-      expect(tracedRequests.some(({ path: requestPath }) => requestPath.includes('chat/access/check'))).toBe(true);
-      expect(tracedRequests.some(({ path: requestPath }) => requestPath.includes('/memory'))).toBe(true);
-      expect(tracedRequests.some(({ path: requestPath }) => requestPath.includes('/turns'))).toBe(true);
-      expect(tracedRequests.some(({ path: requestPath }) => requestPath.includes('chat-handoff'))).toBe(true);
+      expect(
+        tracedRequests.some(({ path: requestPath }) => requestPath.includes('chat/access/check')),
+      ).toBe(true);
+      expect(tracedRequests.some(({ path: requestPath }) => requestPath.includes('/memory'))).toBe(
+        true,
+      );
+      expect(tracedRequests.some(({ path: requestPath }) => requestPath.includes('/turns'))).toBe(
+        true,
+      );
+      expect(
+        tracedRequests.some(({ path: requestPath }) => requestPath.includes('chat-handoff')),
+      ).toBe(true);
 
       let auditRow: any = null;
       for (let attempt = 0; attempt < 20; attempt++) {
@@ -689,7 +746,11 @@ describe('ChatHandoff (E2E)', () => {
       const expiresAt = new Date(Date.now() - 15 * 60000).toISOString(); // Expired!
       const offers = [{ flightOfferId: validFlightOffer.id, duffelOfferId: 'off_test123' }];
       const attestation = await attestationService.signSelectionAttestation(
-        validUser.id, validSession.id, 1, expiresAt, offers
+        validUser.id,
+        validSession.id,
+        1,
+        expiresAt,
+        offers,
       );
       const claimToken = mintClaimToken(validUser.id, Math.floor(Date.now() / 1000));
 
@@ -699,7 +760,7 @@ describe('ChatHandoff (E2E)', () => {
         .set('X-User-Claim', claimToken)
         .send({
           selectionAttestationHash: attestation,
-          selectedOfferIndex: 1
+          selectedOfferIndex: 1,
         })
         .expect(401);
     });
@@ -712,7 +773,11 @@ describe('ChatHandoff (E2E)', () => {
       const expiresAt = new Date(Date.now() + 15 * 60000).toISOString();
       const offers = [{ flightOfferId: validFlightOffer.id, duffelOfferId: 'off_test123' }];
       const attestation = await attestationService.signSelectionAttestation(
-        validUser.id, validSession.id, 1, expiresAt, offers
+        validUser.id,
+        validSession.id,
+        1,
+        expiresAt,
+        offers,
       );
       const claimToken = mintClaimToken(validUser.id, Math.floor(Date.now() / 1000));
 
@@ -722,9 +787,9 @@ describe('ChatHandoff (E2E)', () => {
         .set('X-User-Claim', claimToken)
         .send({
           selectionAttestationHash: attestation,
-          selectedOfferIndex: 1
+          selectedOfferIndex: 1,
         });
-        
+
       createdToken = res.body.token;
     });
 
@@ -797,7 +862,7 @@ describe('ChatHandoff (E2E)', () => {
         .get(`/chat-handoff/resolve?token=${createdToken}`)
         .set('Authorization', `Bearer ${validUserToken}`)
         .expect(200);
-        
+
       expect(res.headers['cache-control']).toBe('no-store, private');
       expect(res.body.status).toBe('ACTIVE');
       expect(res.body.expiresAt).toBeDefined();
@@ -835,7 +900,7 @@ describe('ChatHandoff (E2E)', () => {
         .set('Authorization', `Bearer ${validUserToken}`)
         .send({ token: createdToken })
         .expect(200);
-        
+
       expect(res.headers['cache-control']).toBe('no-store, private');
       expect(res.body.status).toBe('ACTIVE');
       expect(res.body.expiresAt).toBeDefined();

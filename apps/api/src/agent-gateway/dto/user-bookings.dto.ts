@@ -5,7 +5,7 @@ export class BookingResultDto {
   origin!: string;
   destination!: string;
   departureTime!: string; // ISO 8601
-  arrivalTime!: string;   // ISO 8601
+  arrivalTime!: string; // ISO 8601
   duration!: number;
   stops!: number;
   fareClass?: string | null;

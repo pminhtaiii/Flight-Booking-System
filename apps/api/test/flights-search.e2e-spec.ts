@@ -36,9 +36,11 @@ describe('Flights Search (E2E)', () => {
   }
 
   beforeAll(async () => {
-    jest.useFakeTimers({
-      doNotFake: ['nextTick', 'setImmediate', 'clearImmediate', 'setInterval', 'setTimeout'],
-    }).setSystemTime(new Date('2026-07-08T12:00:00.000Z'));
+    jest
+      .useFakeTimers({
+        doNotFake: ['nextTick', 'setImmediate', 'clearImmediate', 'setInterval', 'setTimeout'],
+      })
+      .setSystemTime(new Date('2026-07-08T12:00:00.000Z'));
 
     const moduleFixture: TestingModule = await Test.createTestingModule({
       imports: [AppModule],
@@ -91,7 +93,6 @@ describe('Flights Search (E2E)', () => {
     await prisma.airport.deleteMany({});
     await prisma.auditLog.deleteMany({});
     await prisma.user.deleteMany({});
-
 
     // Clear cache
     const keys = await cacheService.keys('*');
@@ -308,16 +309,36 @@ describe('Flights Search (E2E)', () => {
         {
           id: 'sli_mock_1',
           duration: 'PT2H10M',
-          origin: { id: 'HAN', name: 'Noi Bai International Airport', iata_code: 'HAN', type: 'airport' },
-          destination: { id: 'SGN', name: 'Tan Son Nhat International Airport', iata_code: 'SGN', type: 'airport' },
+          origin: {
+            id: 'HAN',
+            name: 'Noi Bai International Airport',
+            iata_code: 'HAN',
+            type: 'airport',
+          },
+          destination: {
+            id: 'SGN',
+            name: 'Tan Son Nhat International Airport',
+            iata_code: 'SGN',
+            type: 'airport',
+          },
           segments: [
             {
               id: 'seg_mock_1',
               duration: 'PT2H10M',
               departing_at: '2026-07-15T08:00:00',
               arriving_at: '2026-07-15T10:10:00',
-              origin: { id: 'HAN', name: 'Noi Bai International Airport', iata_code: 'HAN', type: 'airport' },
-              destination: { id: 'SGN', name: 'Tan Son Nhat International Airport', iata_code: 'SGN', type: 'airport' },
+              origin: {
+                id: 'HAN',
+                name: 'Noi Bai International Airport',
+                iata_code: 'HAN',
+                type: 'airport',
+              },
+              destination: {
+                id: 'SGN',
+                name: 'Tan Son Nhat International Airport',
+                iata_code: 'SGN',
+                type: 'airport',
+              },
               operating_carrier: { id: 'VN', name: 'Vietnam Airlines', iata_code: 'VN' },
               marketing_carrier: { id: 'VN', name: 'Vietnam Airlines', iata_code: 'VN' },
               marketing_carrier_flight_number: '123',
@@ -326,18 +347,14 @@ describe('Flights Search (E2E)', () => {
                 {
                   passenger_id: 'pas_mock_1',
                   cabin_class: 'economy',
-                  baggages: [
-                    { type: 'checked', quantity: 1 }
-                  ]
-                }
-              ]
-            }
-          ]
-        }
+                  baggages: [{ type: 'checked', quantity: 1 }],
+                },
+              ],
+            },
+          ],
+        },
       ],
-      passengers: [
-        { id: 'pas_mock_1', type: 'adult' }
-      ],
+      passengers: [{ id: 'pas_mock_1', type: 'adult' }],
       offers: [
         {
           id: 'off_mock_123',
@@ -347,16 +364,36 @@ describe('Flights Search (E2E)', () => {
             {
               id: 'sli_mock_1',
               duration: 'PT2H10M',
-              origin: { id: 'HAN', name: 'Noi Bai International Airport', iata_code: 'HAN', type: 'airport' },
-              destination: { id: 'SGN', name: 'Tan Son Nhat International Airport', iata_code: 'SGN', type: 'airport' },
+              origin: {
+                id: 'HAN',
+                name: 'Noi Bai International Airport',
+                iata_code: 'HAN',
+                type: 'airport',
+              },
+              destination: {
+                id: 'SGN',
+                name: 'Tan Son Nhat International Airport',
+                iata_code: 'SGN',
+                type: 'airport',
+              },
               segments: [
                 {
                   id: 'seg_mock_1',
                   duration: 'PT2H10M',
                   departing_at: '2026-07-15T08:00:00',
                   arriving_at: '2026-07-15T10:10:00',
-                  origin: { id: 'HAN', name: 'Noi Bai International Airport', iata_code: 'HAN', type: 'airport' },
-                  destination: { id: 'SGN', name: 'Tan Son Nhat International Airport', iata_code: 'SGN', type: 'airport' },
+                  origin: {
+                    id: 'HAN',
+                    name: 'Noi Bai International Airport',
+                    iata_code: 'HAN',
+                    type: 'airport',
+                  },
+                  destination: {
+                    id: 'SGN',
+                    name: 'Tan Son Nhat International Airport',
+                    iata_code: 'SGN',
+                    type: 'airport',
+                  },
                   operating_carrier: { id: 'VN', name: 'Vietnam Airlines', iata_code: 'VN' },
                   marketing_carrier: { id: 'VN', name: 'Vietnam Airlines', iata_code: 'VN' },
                   marketing_carrier_flight_number: '123',
@@ -365,31 +402,26 @@ describe('Flights Search (E2E)', () => {
                     {
                       passenger_id: 'pas_mock_1',
                       cabin_class: 'economy',
-                      baggages: [
-                        { type: 'checked', quantity: 1 }
-                      ]
-                    }
-                  ]
-                }
-              ]
-            }
+                      baggages: [{ type: 'checked', quantity: 1 }],
+                    },
+                  ],
+                },
+              ],
+            },
           ],
-          passengers: [
-            { id: 'pas_mock_1', type: 'adult' }
-          ],
-          passenger_identity_documents_required: false
-        }
-      ]
+          passengers: [{ id: 'pas_mock_1', type: 'adult' }],
+          passenger_identity_documents_required: false,
+        },
+      ],
     };
 
     let duffelService: DuffelService;
 
     beforeEach(() => {
       duffelService = app.get<DuffelService>(DuffelService);
-      sdkSpy = jest.spyOn(duffelService['duffel'].offerRequests, 'create')
-        .mockResolvedValue({
-          data: mockDuffelResponse,
-        } as unknown as { data: DuffelOfferRequest });
+      sdkSpy = jest.spyOn(duffelService['duffel'].offerRequests, 'create').mockResolvedValue({
+        data: mockDuffelResponse,
+      } as unknown as { data: DuffelOfferRequest });
     });
 
     afterEach(() => {
@@ -424,7 +456,7 @@ describe('Flights Search (E2E)', () => {
       expect(offer.arrivalTime).toBe('2026-07-15T10:10:00');
       expect(offer.duration).toBe(130);
       expect(offer.stops).toBe(0);
-      expect(offer.price).toBe(125.50);
+      expect(offer.price).toBe(125.5);
       expect(offer.currency).toBe('USD');
       expect(offer.fareClass).toBe('Economy');
       expect(offer.baggageAllowance).toContain('1');
@@ -457,7 +489,7 @@ describe('Flights Search (E2E)', () => {
         expect(history!.infants).toBe(0);
         expect(history!.cabinClass).toBe('economy');
         expect(history!.resultCount).toBe(1);
-        expect(Number(history!.minPrice)).toBe(125.50);
+        expect(Number(history!.minPrice)).toBe(125.5);
 
         const offers = await prisma.flightOffer.findMany({
           where: { searchHash: history!.searchHash },
@@ -571,5 +603,3 @@ describe('Flights Search (E2E)', () => {
     });
   });
 });
-
-

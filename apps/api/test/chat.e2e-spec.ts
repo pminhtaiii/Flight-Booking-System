@@ -127,7 +127,13 @@ describe('Chat API (E2E)', () => {
     createdAt?: Date,
   ) {
     const messageId = crypto.randomUUID();
-    const enc = await cryptoService.encryptMessageContent(messageId, sessionId, sender, type, content);
+    const enc = await cryptoService.encryptMessageContent(
+      messageId,
+      sessionId,
+      sender,
+      type,
+      content,
+    );
     return prisma.chatMessage.create({
       data: {
         id: messageId,
@@ -194,12 +200,30 @@ describe('Chat API (E2E)', () => {
   describe('GET /chat/sessions', () => {
     it('should return paginated sessions sorted by lastActiveAt desc with messagePreview', async () => {
       // Create three sessions with different activity times
-      const session1 = await createEncryptedSession(userA.id, 'Session 1', new Date(Date.now() - 3000));
-      const session2 = await createEncryptedSession(userA.id, 'Session 2', new Date(Date.now() - 1000));
-      const session3 = await createEncryptedSession(userA.id, 'Session 3', new Date(Date.now() - 2000));
+      const session1 = await createEncryptedSession(
+        userA.id,
+        'Session 1',
+        new Date(Date.now() - 3000),
+      );
+      const session2 = await createEncryptedSession(
+        userA.id,
+        'Session 2',
+        new Date(Date.now() - 1000),
+      );
+      const session3 = await createEncryptedSession(
+        userA.id,
+        'Session 3',
+        new Date(Date.now() - 2000),
+      );
 
       // Add a message to session2 to act as messagePreview
-      await createEncryptedMessage(session2.id, MessageSender.USER, 'Hello World', MessageType.STANDARD, new Date());
+      await createEncryptedMessage(
+        session2.id,
+        MessageSender.USER,
+        'Hello World',
+        MessageType.STANDARD,
+        new Date(),
+      );
 
       // List limit = 2
       const res1 = await request(app.getHttpServer())
@@ -281,7 +305,11 @@ describe('Chat API (E2E)', () => {
 
   describe('POST /chat/sessions/:sessionId/messages', () => {
     it('should create message, update session lastActiveAt, write audit log and return 201', async () => {
-      const session = await createEncryptedSession(userA.id, 'Chat Session', new Date(Date.now() - 10000));
+      const session = await createEncryptedSession(
+        userA.id,
+        'Chat Session',
+        new Date(Date.now() - 10000),
+      );
 
       const res = await request(app.getHttpServer())
         .post(`/chat/sessions/${session.id}/messages`)

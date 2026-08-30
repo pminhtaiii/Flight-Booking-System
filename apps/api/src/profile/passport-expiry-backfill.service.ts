@@ -111,7 +111,9 @@ export class PassportExpiryBackfillService {
 
         if (isNaN(decryptedTime) || legacyTime !== decryptedTime) {
           quarantined++;
-          this.metricsService?.increment(BOOKING_READINESS_METRIC_COUNTERS.PASSPORT_EXPIRY_BACKFILL_QUARANTINED);
+          this.metricsService?.increment(
+            BOOKING_READINESS_METRIC_COUNTERS.PASSPORT_EXPIRY_BACKFILL_QUARANTINED,
+          );
           this.logger.warn({
             message: `Quarantine profile ${profile.id} due to date mismatch.`,
             profileId: profile.id,
@@ -124,7 +126,9 @@ export class PassportExpiryBackfillService {
         }
       } catch (err) {
         quarantined++;
-        this.metricsService?.increment(BOOKING_READINESS_METRIC_COUNTERS.PASSPORT_EXPIRY_BACKFILL_QUARANTINED);
+        this.metricsService?.increment(
+          BOOKING_READINESS_METRIC_COUNTERS.PASSPORT_EXPIRY_BACKFILL_QUARANTINED,
+        );
         this.logger.warn({
           message: `Quarantine profile ${profile.id} due to decryption failure.`,
           profileId: profile.id,

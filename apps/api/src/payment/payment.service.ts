@@ -74,10 +74,7 @@ function _canonicalOrderServices(selection: {
     quantities.set(seat.serviceId, (quantities.get(seat.serviceId) ?? 0) + 1);
   }
   for (const baggage of selection.baggageSelections) {
-    quantities.set(
-      baggage.serviceId,
-      (quantities.get(baggage.serviceId) ?? 0) + baggage.quantity,
-    );
+    quantities.set(baggage.serviceId, (quantities.get(baggage.serviceId) ?? 0) + baggage.quantity);
   }
 
   return [...quantities.entries()]
@@ -102,13 +99,9 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
-function isValidatedService(
-  value: unknown,
-): value is { serviceId: string; quantity: number } {
+function isValidatedService(value: unknown): value is { serviceId: string; quantity: number } {
   return (
-    isRecord(value) &&
-    typeof value.serviceId === 'string' &&
-    typeof value.quantity === 'number'
+    isRecord(value) && typeof value.serviceId === 'string' && typeof value.quantity === 'number'
   );
 }
 
@@ -192,7 +185,8 @@ function enrichRedactedDuffelOrder(duffelOrder: any, dbPassengers: any[], userEm
   const copy = JSON.parse(JSON.stringify(duffelOrder));
   if (Array.isArray(copy.passengers)) {
     copy.passengers.forEach((p: any, i: number) => {
-      const dbPass = dbPassengers.find((dbp: any) => dbp.duffelPassengerId === p.id) || dbPassengers[i];
+      const dbPass =
+        dbPassengers.find((dbp: any) => dbp.duffelPassengerId === p.id) || dbPassengers[i];
       if (dbPass) {
         if (!p.given_name || p.given_name === 'REDACTED') {
           p.given_name = dbPass.givenName;
@@ -242,7 +236,8 @@ export class PaymentService {
     userId: string,
     ipAddress: string,
   ): Promise<PaymentResponseDto> {
-    let paymentIntent: Awaited<ReturnType<StripeService['createPaymentIntent']>> | undefined = undefined;
+    let paymentIntent: Awaited<ReturnType<StripeService['createPaymentIntent']>> | undefined =
+      undefined;
     let paymentRecord: unknown = null;
     try {
       const requestHash = this.idempotencyService.computeHash(dto);
@@ -251,22 +246,14 @@ export class PaymentService {
       let recoveredReservation: PaymentReservation | undefined;
       let reuseAttemptNumber: number | undefined;
       let boundPaymentReplay = false;
-      if (
-        dto.ancillarySelectionId !== undefined ||
-        dto.ancillarySelectionVersion !== undefined
-      ) {
-        if (
-          dto.ancillarySelectionId === undefined ||
-          dto.ancillarySelectionVersion === undefined
-        ) {
+      if (dto.ancillarySelectionId !== undefined || dto.ancillarySelectionVersion !== undefined) {
+        if (dto.ancillarySelectionId === undefined || dto.ancillarySelectionVersion === undefined) {
           throw new BadRequestException(
             'Ancillary selection ID and version must be provided together',
           );
         }
         if (!this.ancillaryPaymentValidation) {
-          throw new InternalServerErrorException(
-            'Ancillary payment validation is unavailable',
-          );
+          throw new InternalServerErrorException('Ancillary payment validation is unavailable');
         }
         const boundPayment = await this.prisma.payment?.findFirst({
           where: {
@@ -303,11 +290,14 @@ export class PaymentService {
             const nowTime = Date.now();
             const validatedTime = new Date(recoveredReservation.validatedAt).getTime();
             const intentExpiresTime = new Date(recoveredReservation.intentExpiresAt).getTime();
-            const offerExpiresTime = recoveredReservation.offerExpiresAt ? new Date(recoveredReservation.offerExpiresAt).getTime() : null;
+            const offerExpiresTime = recoveredReservation.offerExpiresAt
+              ? new Date(recoveredReservation.offerExpiresAt).getTime()
+              : null;
 
-            const isStale = (nowTime - validatedTime > 60_000) ||
-                            (intentExpiresTime <= nowTime) ||
-                            (offerExpiresTime !== null && offerExpiresTime <= nowTime);
+            const isStale =
+              nowTime - validatedTime > 60_000 ||
+              intentExpiresTime <= nowTime ||
+              (offerExpiresTime !== null && offerExpiresTime <= nowTime);
 
             if (isStale) {
               reuseAttemptNumber = recoveredReservation.attemptNumber;
@@ -382,12 +372,14 @@ export class PaymentService {
         throw new BadRequestException('Booking intent is not in an allowed status for payment');
       }
 
+      const targetAncillarySelectionId =
+        dto.ancillarySelectionId || intent.currentAncillarySelectionId;
+      const targetAncillarySelectionVersion =
+        dto.ancillarySelectionVersion ?? intent.ancillaryVersion;
 
-
-      const targetAncillarySelectionId = dto.ancillarySelectionId || intent.currentAncillarySelectionId;
-      const targetAncillarySelectionVersion = dto.ancillarySelectionVersion ?? intent.ancillaryVersion;
-
-      let validated: Awaited<ReturnType<AncillaryPaymentValidationService['validateForPayment']>> | null = null;
+      let validated: Awaited<
+        ReturnType<AncillaryPaymentValidationService['validateForPayment']>
+      > | null = null;
       let amountInCents: number;
 
       if (
@@ -469,7 +461,9 @@ export class PaymentService {
             where: { ancillarySelectionId: txIntent.currentAncillarySelectionId },
           });
           if (seatCount > 0 || baggageCount > 0) {
-            throw new BadRequestException('Ancillary selections exist but were not included in the payment request');
+            throw new BadRequestException(
+              'Ancillary selections exist but were not included in the payment request',
+            );
           }
         }
 
@@ -506,7 +500,9 @@ export class PaymentService {
         }
 
         const nextAttemptCount =
-          recoveredReservation?.attemptNumber ?? reuseAttemptNumber ?? txIntent.paymentAttemptCount + 1;
+          recoveredReservation?.attemptNumber ??
+          reuseAttemptNumber ??
+          txIntent.paymentAttemptCount + 1;
         const amount =
           recoveredReservation?.amount ??
           (validatedAncillary
@@ -551,11 +547,13 @@ export class PaymentService {
             FOR UPDATE
           `;
           const selection = selections[0];
-          const validatedAtTime = selection?.validatedAt ? new Date(selection.validatedAt).getTime() : 0;
+          const validatedAtTime = selection?.validatedAt
+            ? new Date(selection.validatedAt).getTime()
+            : 0;
           if (
             selections.length !== 1 ||
             selection.status !== 'VALIDATED' ||
-            (Date.now() - validatedAtTime) > 60_000 ||
+            Date.now() - validatedAtTime > 60_000 ||
             selection.currency.toUpperCase() !== validatedAncillary.currency.toUpperCase() ||
             !authoritativeAmountsEqual(
               selection.validatedBaseAmount,
@@ -584,9 +582,15 @@ export class PaymentService {
               amount,
               currency,
               validatedAncillary,
-              intentExpiresAt: txIntent.intentExpiresAt ? new Date(txIntent.intentExpiresAt).toISOString() : new Date(Date.now() + 600000).toISOString(),
-              offerExpiresAt: txIntent.offerExpiresAt ? new Date(txIntent.offerExpiresAt).toISOString() : null,
-              validatedAt: selection.validatedAt ? new Date(selection.validatedAt).toISOString() : new Date().toISOString(),
+              intentExpiresAt: txIntent.intentExpiresAt
+                ? new Date(txIntent.intentExpiresAt).toISOString()
+                : new Date(Date.now() + 600000).toISOString(),
+              offerExpiresAt: txIntent.offerExpiresAt
+                ? new Date(txIntent.offerExpiresAt).toISOString()
+                : null,
+              validatedAt: selection.validatedAt
+                ? new Date(selection.validatedAt).toISOString()
+                : new Date().toISOString(),
             };
             const reserved = await tx.$executeRaw`
               WITH reserved_key AS (
@@ -630,7 +634,8 @@ export class PaymentService {
               code: 'ANCILLARY_VERSION_CONFLICT',
               intentId: dto.bookingIntentId,
               currentVersion: txIntent.ancillaryVersion,
-              message: 'Ancillary selection was updated after validation. Please revalidate before payment.',
+              message:
+                'Ancillary selection was updated after validation. Please revalidate before payment.',
             });
           }
         }
@@ -682,16 +687,16 @@ export class PaymentService {
 
       // 4. Create Stripe PaymentIntent
       amountInCents = result.amount;
-      const stripeMetadata: Record<string, string> = validatedAncillary || boundPaymentReplay
-        ? {
-            bookingIntentId: dto.bookingIntentId,
-            ancillarySelectionId:
-              validatedAncillary?.selectionId ?? dto.ancillarySelectionId!,
-            ancillarySelectionVersion: String(
-              validatedAncillary?.selectionVersion ?? dto.ancillarySelectionVersion,
-            ),
-          }
-        : { bookingIntentId: dto.bookingIntentId };
+      const stripeMetadata: Record<string, string> =
+        validatedAncillary || boundPaymentReplay
+          ? {
+              bookingIntentId: dto.bookingIntentId,
+              ancillarySelectionId: validatedAncillary?.selectionId ?? dto.ancillarySelectionId!,
+              ancillarySelectionVersion: String(
+                validatedAncillary?.selectionVersion ?? dto.ancillarySelectionVersion,
+              ),
+            }
+          : { bookingIntentId: dto.bookingIntentId };
       paymentIntent = await this.stripeService.createPaymentIntent(
         amountInCents,
         result.currency,
@@ -916,11 +921,14 @@ export class PaymentService {
           await this.stripeService.cancelPaymentIntent(paymentIntent.id);
         } catch (cancelErr) {
           this.logger.error(
-            `Failed to cancel Stripe PaymentIntent ${paymentIntent.id} after createPayment error: ${cancelErr instanceof Error ? cancelErr.message : String(cancelErr)}`
+            `Failed to cancel Stripe PaymentIntent ${paymentIntent.id} after createPayment error: ${cancelErr instanceof Error ? cancelErr.message : String(cancelErr)}`,
           );
         }
       }
-      this.logger.error(`Error in createPayment: ${error instanceof Error ? error.message : String(error)}`, error instanceof Error ? error.stack : undefined);
+      this.logger.error(
+        `Error in createPayment: ${error instanceof Error ? error.message : String(error)}`,
+        error instanceof Error ? error.stack : undefined,
+      );
       throw error;
     }
   }
@@ -937,12 +945,7 @@ export class PaymentService {
     let isFinished = false;
     const confirmPromise = (async () => {
       try {
-        const result = await this.executeConfirmPayment(
-          dto,
-          idempotencyKey,
-          userId,
-          traceContext,
-        );
+        const result = await this.executeConfirmPayment(dto, idempotencyKey, userId, traceContext);
         isFinished = true;
         return result;
       } catch (error) {
@@ -965,14 +968,17 @@ export class PaymentService {
       !isFinished
     ) {
       this.logger.log(`confirmPayment hit Tier 2 timeout (25s). Handoff to async polling.`);
-      
+
       confirmPromise.catch((err) => {
         this.logger.error(
           `Background confirmPayment execution failed for payment ${dto.paymentId}: ${err instanceof Error ? err.message : String(err)}`,
-          err instanceof Error ? err.stack : undefined
+          err instanceof Error ? err.stack : undefined,
         );
         this.handleBackgroundError(dto.paymentId, idempotencyKey, userId, err).catch((dbErr) => {
-          this.logger.error(`Failed to execute background error recovery: ${dbErr.message}`, dbErr.stack);
+          this.logger.error(
+            `Failed to execute background error recovery: ${dbErr.message}`,
+            dbErr.stack,
+          );
         });
       });
 
@@ -1046,11 +1052,11 @@ export class PaymentService {
         userId,
         dto.bookingId,
         payment.bookingIntentId,
-        payment.id
+        payment.id,
       );
 
       if (canonicalBooking.userId !== userId) {
-         throw new ForbiddenException('You do not own this booking');
+        throw new ForbiddenException('You do not own this booking');
       }
 
       // 4. Resume from recovery point
@@ -1071,7 +1077,9 @@ export class PaymentService {
 
           const duffelOrder = duffelEvent?.metadata as Record<string, unknown> | null;
           if (!duffelOrder) {
-            throw new InternalServerErrorException('Duffel order details not found in payment history.');
+            throw new InternalServerErrorException(
+              'Duffel order details not found in payment history.',
+            );
           }
 
           const successResponse = {
@@ -1107,15 +1115,21 @@ export class PaymentService {
             bookingStatus: bookingIntent?.status || 'CANCELLED',
           };
 
-          await this.idempotencyService.completeKey(idempotencyKey, HttpStatus.BAD_GATEWAY, failureResponse);
+          await this.idempotencyService.completeKey(
+            idempotencyKey,
+            HttpStatus.BAD_GATEWAY,
+            failureResponse,
+          );
           return failureResponse;
         }
       }
 
       // Step 1: Authorization Validation
       if (recoveryPoint === 'started') {
-        const paymentIntent = await this.stripeService.retrievePaymentIntent(payment.stripePaymentIntentId);
-        
+        const paymentIntent = await this.stripeService.retrievePaymentIntent(
+          payment.stripePaymentIntentId,
+        );
+
         if (paymentIntent.status === 'requires_capture') {
           if (payment.status === 'CREATED') {
             enforceTransition(payment.status, 'AUTHORIZED');
@@ -1151,7 +1165,9 @@ export class PaymentService {
             });
           }
         } else if (paymentIntent.status !== 'succeeded') {
-          throw new BadRequestException(`Stripe PaymentIntent is in invalid status: ${paymentIntent.status}`);
+          throw new BadRequestException(
+            `Stripe PaymentIntent is in invalid status: ${paymentIntent.status}`,
+          );
         }
 
         await this.idempotencyService.updateRecoveryPoint(idempotencyKey, 'stripe_authorized');
@@ -1189,13 +1205,10 @@ export class PaymentService {
         if (this.bookingPassengerFinalValidator) {
           try {
             const ephemeralPassengers =
-              this.bookingPassengerFinalValidator.validateAndMapPassengers(
-                bookingIntent,
-                {
-                  traceId: traceContext?.traceId,
-                  correlationId: traceContext?.correlationId,
-                },
-              );
+              this.bookingPassengerFinalValidator.validateAndMapPassengers(bookingIntent, {
+                traceId: traceContext?.traceId,
+                correlationId: traceContext?.correlationId,
+              });
             passengersToOrder = ephemeralPassengers;
 
             await this.auditService.createLog(this.prisma, {
@@ -1298,11 +1311,7 @@ export class PaymentService {
               code: reasonCode,
               bookingStatus: nextBookingStatus,
             };
-            await this.idempotencyService.completeKey(
-              idempotencyKey,
-              status,
-              failureResponse,
-            );
+            await this.idempotencyService.completeKey(idempotencyKey, status, failureResponse);
 
             throw new HttpException(failureResponse, status);
           }
@@ -1351,13 +1360,10 @@ export class PaymentService {
           const hasAncillaryBinding = payment.ancillarySelectionId !== null;
           const hasExactBoundSelection =
             orderPayment.ancillarySelectionId === payment.ancillarySelectionId &&
-            orderPayment.ancillarySelectionVersion ===
-              payment.ancillarySelectionVersion &&
+            orderPayment.ancillarySelectionVersion === payment.ancillarySelectionVersion &&
             (hasAncillaryBinding
-              ? orderPayment.ancillarySelection?.id ===
-                  payment.ancillarySelectionId &&
-                orderPayment.ancillarySelection.version ===
-                  payment.ancillarySelectionVersion &&
+              ? orderPayment.ancillarySelection?.id === payment.ancillarySelectionId &&
+                orderPayment.ancillarySelection.version === payment.ancillarySelectionVersion &&
                 orderPayment.ancillarySelection.status === 'PAYMENT_BOUND'
               : orderPayment.ancillarySelection === null);
           if (!hasExactBoundSelection) {
@@ -1381,12 +1387,16 @@ export class PaymentService {
             await this.stripeService.cancelPaymentIntent(payment.stripePaymentIntentId);
           } catch (stripeCancelError: unknown) {
             const stripeError = stripeCancelError as Error;
-            this.logger.error(`Stripe cancelPaymentIntent failed: ${stripeError.message}`, stripeError.stack);
+            this.logger.error(
+              `Stripe cancelPaymentIntent failed: ${stripeError.message}`,
+              stripeError.stack,
+            );
           }
 
           // Update Payment, BookingIntent, and Booking status atomically
           enforceTransition(payment.status, 'CANCELLED');
-          const nextBookingStatus = bookingIntent.paymentAttemptCount < 2 ? 'AWAITING_PAYMENT' : 'CANCELLED';
+          const nextBookingStatus =
+            bookingIntent.paymentAttemptCount < 2 ? 'AWAITING_PAYMENT' : 'CANCELLED';
           await this.prisma.$transaction(async (tx) => {
             await tx.payment.update({
               where: { id: payment.id },
@@ -1413,7 +1423,7 @@ export class PaymentService {
               undefined,
               undefined,
               undefined,
-              tx
+              tx,
             );
           });
 
@@ -1424,7 +1434,11 @@ export class PaymentService {
             error: `Duffel booking failed: ${error.message || 'Unknown error'}. Payment hold released.`,
             bookingStatus: nextBookingStatus,
           };
-          await this.idempotencyService.completeKey(idempotencyKey, HttpStatus.BAD_GATEWAY, failureResponse);
+          await this.idempotencyService.completeKey(
+            idempotencyKey,
+            HttpStatus.BAD_GATEWAY,
+            failureResponse,
+          );
 
           console.error('THROWN ERROR:', failureResponse.error);
           throw new HttpException(failureResponse, HttpStatus.BAD_GATEWAY);
@@ -1500,122 +1514,145 @@ export class PaymentService {
           }
 
           if (reconciledStatus !== 'succeeded') {
-
-          // Duffel order cancellation compensation
-          let duffelOrderId: string | undefined;
-          try {
-            const duffelEvent = await this.prisma.paymentEvent.findFirst({
-              where: {
-                paymentId: payment.id,
-                eventType: 'duffel_order_created',
-              },
-              orderBy: { createdAt: 'desc' },
-            });
-            const duffelOrder = duffelEvent?.metadata as Record<string, unknown> | null;
-            duffelOrderId = duffelOrder?.id as string | undefined;
-
-            if (duffelOrderId) {
-              await this.duffelService.cancelOrder(duffelOrderId);
-              this.logger.log(`Successfully cancelled Duffel order ${duffelOrderId} as compensation.`);
-            }
-          } catch (cancelError: unknown) {
-            const err = cancelError as Error;
-            this.logger.error(`Duffel order cancellation failed during compensation: ${err.message}`, err.stack);
-          }
-
-          // Release the Stripe authorization hold (cancel intent)
-          try {
-            await this.stripeService.cancelPaymentIntent(payment.stripePaymentIntentId);
-          } catch (stripeCancelError: unknown) {
-            const stripeError = stripeCancelError as Error;
-            this.logger.error(`Stripe cancelPaymentIntent failed during compensation: ${stripeError.message}`, stripeError.stack);
-          }
-
-          // Update BookingIntent status
-          const bookingIntent = await this.prisma.bookingIntent.findUnique({
-            where: { id: payment.bookingIntentId },
-          });
-          const nextBookingStatus = (bookingIntent?.paymentAttemptCount || 0) < 2 ? 'AWAITING_PAYMENT' : 'CANCELLED';
-
-          let flightSnap: FlightSnapshot | undefined;
-          let passSnap: PassengerSnapshot | undefined;
-          let departAt: Date | undefined;
-          try {
-            const duffelEvent = await this.prisma.paymentEvent.findFirst({
-              where: {
-                paymentId: payment.id,
-                eventType: 'duffel_order_created',
-              },
-              orderBy: { createdAt: 'desc' },
-            });
-            const rawOrder = duffelEvent?.metadata as any;
-            if (rawOrder) {
-              const fullBookingIntent = await this.prisma.bookingIntent.findUnique({
-                where: { id: payment.bookingIntentId },
-                include: { passengers: true, user: true },
+            // Duffel order cancellation compensation
+            let duffelOrderId: string | undefined;
+            try {
+              const duffelEvent = await this.prisma.paymentEvent.findFirst({
+                where: {
+                  paymentId: payment.id,
+                  eventType: 'duffel_order_created',
+                },
+                orderBy: { createdAt: 'desc' },
               });
-              let completeOrder = rawOrder;
-              try {
-                completeOrder = await this.duffelService.retrieveCompleteOrder(rawOrder.id);
-              } catch (err) {
-                this.logger.warn(`Failed to retrieve complete Duffel order ${rawOrder.id}, falling back to enrichment`, err);
-                completeOrder = fullBookingIntent && fullBookingIntent.user 
-                  ? enrichRedactedDuffelOrder(rawOrder, fullBookingIntent.passengers, fullBookingIntent.user.email) 
-                  : rawOrder;
+              const duffelOrder = duffelEvent?.metadata as Record<string, unknown> | null;
+              duffelOrderId = duffelOrder?.id as string | undefined;
+
+              if (duffelOrderId) {
+                await this.duffelService.cancelOrder(duffelOrderId);
+                this.logger.log(
+                  `Successfully cancelled Duffel order ${duffelOrderId} as compensation.`,
+                );
               }
-              const snaps = this.duffelService.mapDuffelOrderToSnapshots(completeOrder);
-              flightSnap = snaps.flightSnapshot;
-              passSnap = snaps.passengerSnapshot;
-              if (flightSnap?.segments?.[0]?.departureAt) {
-                departAt = new Date(flightSnap.segments[0].departureAt);
-              }
+            } catch (cancelError: unknown) {
+              const err = cancelError as Error;
+              this.logger.error(
+                `Duffel order cancellation failed during compensation: ${err.message}`,
+                err.stack,
+              );
             }
-          } catch (e: any) {
-            this.logger.warn(`Failed to recover Duffel order snapshots for booking ${canonicalBooking.id}: ${e.message}`, e.stack);
-          }
 
-          // Update Payment status, BookingIntent, and Booking status to FAILED atomically
-          enforceTransition(payment.status, 'CANCELLED');
-          await this.prisma.$transaction(async (tx) => {
-            await tx.payment.update({
-              where: { id: payment.id },
-              data: { status: 'CANCELLED' },
-            });
-            await tx.paymentEvent.create({
-              data: {
-                paymentId: payment.id,
-                eventType: 'payment_cancelled',
-                previousStatus: payment.status,
-                newStatus: 'CANCELLED',
-                amount: payment.amount,
-                source: 'API',
-                createdBy: userId,
-              },
-            });
-            await tx.bookingIntent.update({
+            // Release the Stripe authorization hold (cancel intent)
+            try {
+              await this.stripeService.cancelPaymentIntent(payment.stripePaymentIntentId);
+            } catch (stripeCancelError: unknown) {
+              const stripeError = stripeCancelError as Error;
+              this.logger.error(
+                `Stripe cancelPaymentIntent failed during compensation: ${stripeError.message}`,
+                stripeError.stack,
+              );
+            }
+
+            // Update BookingIntent status
+            const bookingIntent = await this.prisma.bookingIntent.findUnique({
               where: { id: payment.bookingIntentId },
-              data: { status: nextBookingStatus },
             });
-            await this.bookingLifecycleService.updateToFailed(
-              canonicalBooking.id,
-              BookingFailureReason.CAPTURE_FAILED,
-              flightSnap,
-              passSnap,
-              departAt,
-              tx
+            const nextBookingStatus =
+              (bookingIntent?.paymentAttemptCount || 0) < 2 ? 'AWAITING_PAYMENT' : 'CANCELLED';
+
+            let flightSnap: FlightSnapshot | undefined;
+            let passSnap: PassengerSnapshot | undefined;
+            let departAt: Date | undefined;
+            try {
+              const duffelEvent = await this.prisma.paymentEvent.findFirst({
+                where: {
+                  paymentId: payment.id,
+                  eventType: 'duffel_order_created',
+                },
+                orderBy: { createdAt: 'desc' },
+              });
+              const rawOrder = duffelEvent?.metadata as any;
+              if (rawOrder) {
+                const fullBookingIntent = await this.prisma.bookingIntent.findUnique({
+                  where: { id: payment.bookingIntentId },
+                  include: { passengers: true, user: true },
+                });
+                let completeOrder = rawOrder;
+                try {
+                  completeOrder = await this.duffelService.retrieveCompleteOrder(rawOrder.id);
+                } catch (err) {
+                  this.logger.warn(
+                    `Failed to retrieve complete Duffel order ${rawOrder.id}, falling back to enrichment`,
+                    err,
+                  );
+                  completeOrder =
+                    fullBookingIntent && fullBookingIntent.user
+                      ? enrichRedactedDuffelOrder(
+                          rawOrder,
+                          fullBookingIntent.passengers,
+                          fullBookingIntent.user.email,
+                        )
+                      : rawOrder;
+                }
+                const snaps = this.duffelService.mapDuffelOrderToSnapshots(completeOrder);
+                flightSnap = snaps.flightSnapshot;
+                passSnap = snaps.passengerSnapshot;
+                if (flightSnap?.segments?.[0]?.departureAt) {
+                  departAt = new Date(flightSnap.segments[0].departureAt);
+                }
+              }
+            } catch (e: any) {
+              this.logger.warn(
+                `Failed to recover Duffel order snapshots for booking ${canonicalBooking.id}: ${e.message}`,
+                e.stack,
+              );
+            }
+
+            // Update Payment status, BookingIntent, and Booking status to FAILED atomically
+            enforceTransition(payment.status, 'CANCELLED');
+            await this.prisma.$transaction(async (tx) => {
+              await tx.payment.update({
+                where: { id: payment.id },
+                data: { status: 'CANCELLED' },
+              });
+              await tx.paymentEvent.create({
+                data: {
+                  paymentId: payment.id,
+                  eventType: 'payment_cancelled',
+                  previousStatus: payment.status,
+                  newStatus: 'CANCELLED',
+                  amount: payment.amount,
+                  source: 'API',
+                  createdBy: userId,
+                },
+              });
+              await tx.bookingIntent.update({
+                where: { id: payment.bookingIntentId },
+                data: { status: nextBookingStatus },
+              });
+              await this.bookingLifecycleService.updateToFailed(
+                canonicalBooking.id,
+                BookingFailureReason.CAPTURE_FAILED,
+                flightSnap,
+                passSnap,
+                departAt,
+                tx,
+              );
+            });
+
+            // Update recovery point to completed and complete idempotency key
+            await this.idempotencyService.updateRecoveryPoint(idempotencyKey, 'completed');
+            const failureResponse = {
+              success: false,
+              error: `Stripe capture failed: ${error.message || 'Unknown error'}. Duffel order cancelled and hold released.`,
+              bookingStatus: nextBookingStatus,
+            };
+            await this.idempotencyService.completeKey(
+              idempotencyKey,
+              HttpStatus.BAD_GATEWAY,
+              failureResponse,
             );
-          });
 
-          // Update recovery point to completed and complete idempotency key
-          await this.idempotencyService.updateRecoveryPoint(idempotencyKey, 'completed');
-          const failureResponse = {
-            success: false,
-            error: `Stripe capture failed: ${error.message || 'Unknown error'}. Duffel order cancelled and hold released.`,
-            bookingStatus: nextBookingStatus,
-          };
-          await this.idempotencyService.completeKey(idempotencyKey, HttpStatus.BAD_GATEWAY, failureResponse);
-
-          throw new HttpException(failureResponse, HttpStatus.BAD_GATEWAY);
+            throw new HttpException(failureResponse, HttpStatus.BAD_GATEWAY);
           }
         }
 
@@ -1635,7 +1672,9 @@ export class PaymentService {
 
         const duffelOrder = duffelEvent?.metadata as Record<string, unknown> | null;
         if (!duffelOrder) {
-          throw new InternalServerErrorException('Duffel order details not found in payment history.');
+          throw new InternalServerErrorException(
+            'Duffel order details not found in payment history.',
+          );
         }
 
         const transactionId = crypto.randomUUID();
@@ -1667,7 +1706,7 @@ export class PaymentService {
               where: { id: payment.bookingIntentId },
               include: { passengers: true, user: true },
             });
-            
+
             await tx.bookingIntent.update({
               where: { id: payment.bookingIntentId },
               data: { status: 'CONFIRMED' },
@@ -1675,22 +1714,33 @@ export class PaymentService {
 
             let completeOrder: any = duffelOrder;
             try {
-              completeOrder = await this.duffelService.retrieveCompleteOrder(duffelOrder.id as string);
+              completeOrder = await this.duffelService.retrieveCompleteOrder(
+                duffelOrder.id as string,
+              );
             } catch (err) {
-              this.logger.warn(`Failed to retrieve complete Duffel order ${duffelOrder.id}, falling back to enrichment`, err);
-              completeOrder = bookingIntent && bookingIntent.user
-                ? enrichRedactedDuffelOrder(duffelOrder, bookingIntent.passengers, bookingIntent.user.email)
-                : duffelOrder;
+              this.logger.warn(
+                `Failed to retrieve complete Duffel order ${duffelOrder.id}, falling back to enrichment`,
+                err,
+              );
+              completeOrder =
+                bookingIntent && bookingIntent.user
+                  ? enrichRedactedDuffelOrder(
+                      duffelOrder,
+                      bookingIntent.passengers,
+                      bookingIntent.user.email,
+                    )
+                  : duffelOrder;
             }
 
-            const { flightSnapshot, passengerSnapshot } = this.duffelService.mapDuffelOrderToSnapshots(completeOrder);
+            const { flightSnapshot, passengerSnapshot } =
+              this.duffelService.mapDuffelOrderToSnapshots(completeOrder);
             await this.bookingLifecycleService.updateToConfirmed(
               canonicalBooking.id,
               duffelOrder.booking_reference as string,
               duffelOrder.id as string,
               flightSnapshot as any,
               passengerSnapshot as any,
-              tx
+              tx,
             );
 
             // Create double-entry ledger rows
@@ -1770,7 +1820,10 @@ export class PaymentService {
         return successResponse;
       }
     } catch (error) {
-      this.logger.error(`Error in confirmPayment: ${error instanceof Error ? error.message : String(error)}`, error instanceof Error ? error.stack : undefined);
+      this.logger.error(
+        `Error in confirmPayment: ${error instanceof Error ? error.message : String(error)}`,
+        error instanceof Error ? error.stack : undefined,
+      );
       throw error;
     }
   }
@@ -1802,8 +1855,6 @@ export class PaymentService {
     };
   }
 
-
-
   /**
    * Cleans up state and resolves background errors to prevent unhandled rejections
   /**
@@ -1828,16 +1879,24 @@ export class PaymentService {
         },
       });
 
-      if (!payment || payment.status === 'SUCCEEDED' || payment.status === 'CANCELLED' || payment.status === 'FAILED' || payment.status === 'EXPIRED') {
+      if (
+        !payment ||
+        payment.status === 'SUCCEEDED' ||
+        payment.status === 'CANCELLED' ||
+        payment.status === 'FAILED' ||
+        payment.status === 'EXPIRED'
+      ) {
         return;
       }
 
       let paymentIntent;
       try {
-        paymentIntent = await this.stripeService.retrievePaymentIntent(payment.stripePaymentIntentId);
+        paymentIntent = await this.stripeService.retrievePaymentIntent(
+          payment.stripePaymentIntentId,
+        );
       } catch (stripeErr: unknown) {
         this.logger.warn(
-          `Failed to retrieve Stripe PaymentIntent for payment ${paymentId}: ${stripeErr instanceof Error ? stripeErr.message : String(stripeErr)}`
+          `Failed to retrieve Stripe PaymentIntent for payment ${paymentId}: ${stripeErr instanceof Error ? stripeErr.message : String(stripeErr)}`,
         );
         return; // warn & return early (recoverable)
       }
@@ -1845,7 +1904,7 @@ export class PaymentService {
       const finalStatuses = ['succeeded', 'requires_capture', 'canceled'];
       if (!paymentIntent || !finalStatuses.includes(paymentIntent.status)) {
         this.logger.warn(
-          `Stripe PaymentIntent for payment ${paymentId} is in non-final status: ${paymentIntent?.status}. Warning & returning early.`
+          `Stripe PaymentIntent for payment ${paymentId} is in non-final status: ${paymentIntent?.status}. Warning & returning early.`,
         );
         return; // warn & return early (recoverable)
       }
@@ -1857,14 +1916,14 @@ export class PaymentService {
             await this.idempotencyService.updateRecoveryPoint(idempotencyKey, 'captured');
           } catch (updateErr: unknown) {
             this.logger.error(
-              `Failed to update recovery point to 'captured' for payment ${paymentId}: ${updateErr instanceof Error ? updateErr.message : String(updateErr)}`
+              `Failed to update recovery point to 'captured' for payment ${paymentId}: ${updateErr instanceof Error ? updateErr.message : String(updateErr)}`,
             );
           }
         }
 
         this.logger.error(
           `CRITICAL: Background confirmation failed after Stripe capture for payment ${paymentId}. Customer has been charged. Recovery point is '${recoveryPoint || 'started'}'. Retries will attempt to resume post-capture updates.`,
-          error instanceof Error ? error.stack : undefined
+          error instanceof Error ? error.stack : undefined,
         );
         return; // mark captured & return
       }
@@ -1908,11 +1967,12 @@ export class PaymentService {
         where: { id: payment.bookingIntentId },
         include: { passengers: true, user: true },
       });
-      const nextBookingStatus = (bookingIntent?.paymentAttemptCount || 0) < 2 ? 'AWAITING_PAYMENT' : 'CANCELLED';
+      const nextBookingStatus =
+        (bookingIntent?.paymentAttemptCount || 0) < 2 ? 'AWAITING_PAYMENT' : 'CANCELLED';
 
       // 2. Fetch canonical booking
       const booking = await this.prisma.booking.findFirst({
-        where: { paymentId: payment.id }
+        where: { paymentId: payment.id },
       });
 
       // 3. Try to extract snapshots if duffelEvent is present
@@ -1928,10 +1988,18 @@ export class PaymentService {
               try {
                 completeOrder = await this.duffelService.retrieveCompleteOrder(dOrder.id);
               } catch (err) {
-                this.logger.warn(`Failed to retrieve complete Duffel order ${dOrder.id}, falling back to enrichment`, err);
-                completeOrder = bookingIntent?.passengers && bookingIntent.user?.email
-                  ? enrichRedactedDuffelOrder(dOrder, bookingIntent.passengers, bookingIntent.user.email)
-                  : dOrder;
+                this.logger.warn(
+                  `Failed to retrieve complete Duffel order ${dOrder.id}, falling back to enrichment`,
+                  err,
+                );
+                completeOrder =
+                  bookingIntent?.passengers && bookingIntent.user?.email
+                    ? enrichRedactedDuffelOrder(
+                        dOrder,
+                        bookingIntent.passengers,
+                        bookingIntent.user.email,
+                      )
+                    : dOrder;
               }
               const snaps = this.duffelService.mapDuffelOrderToSnapshots(completeOrder);
               flightSnap = snaps.flightSnapshot;
@@ -1942,7 +2010,10 @@ export class PaymentService {
             }
           }
         } catch (e: any) {
-          this.logger.warn(`Failed to recover Duffel order snapshots in background handler: ${e.message}`, e.stack);
+          this.logger.warn(
+            `Failed to recover Duffel order snapshots in background handler: ${e.message}`,
+            e.stack,
+          );
         }
       }
 
@@ -1975,7 +2046,7 @@ export class PaymentService {
             flightSnap,
             passSnap,
             departAt,
-            tx
+            tx,
           );
         }
       });

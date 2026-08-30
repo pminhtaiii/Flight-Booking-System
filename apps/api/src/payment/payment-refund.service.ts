@@ -16,12 +16,7 @@ import { RefundPaymentDto } from '@/payment/dto/refund-payment.dto';
 import { RefundResolutionAction } from '@/payment/dto/resolve-refund.dto';
 import { RefundResponse } from '@shared/types/payment.types';
 import { enforceTransition } from '@/payment/payment-state-machine';
-import {
-  BookingStatus,
-  PaymentStatus,
-  RefundStatus,
-  RefundTriggerType,
-} from '@prisma/client';
+import { BookingStatus, PaymentStatus, RefundStatus, RefundTriggerType } from '@prisma/client';
 import * as crypto from 'crypto';
 
 @Injectable()
@@ -47,10 +42,7 @@ export class PaymentRefundService {
     userId: string,
     userRole: string,
   ): Promise<RefundResponse> {
-    const triggerType =
-      userRole === 'ADMIN'
-        ? RefundTriggerType.ADMIN
-        : RefundTriggerType.USER;
+    const triggerType = userRole === 'ADMIN' ? RefundTriggerType.ADMIN : RefundTriggerType.USER;
 
     try {
       // 1. Find Payment with bookingIntent
@@ -172,7 +164,9 @@ export class PaymentRefundService {
       }
 
       // Match specific Stripe refunds from the event to our REFUND_PENDING records
-      const stripeRefunds = (charge.refunds as Record<string, unknown>)?.data as Array<Record<string, unknown>> | undefined;
+      const stripeRefunds = (charge.refunds as Record<string, unknown>)?.data as
+        | Array<Record<string, unknown>>
+        | undefined;
       const stripeRefundIds = stripeRefunds?.map((r) => r.id as string) ?? [];
 
       if (stripeRefundIds.length === 0) {
@@ -199,9 +193,12 @@ export class PaymentRefundService {
       // bind one null-ID REFUND_PENDING row per unmatched ID. We update exactly one
       // row at a time (LIMIT 1 via sub-select) so two concurrent webhooks cannot both
       // claim the same null row.
-      const lateBindMatches: Array<{ id: string; amount: number; stripeRefundId?: string | null }> = [];
+      const lateBindMatches: Array<{ id: string; amount: number; stripeRefundId?: string | null }> =
+        [];
       for (const stripeId of unmatchedStripeIds) {
-        const claimed = await this.prisma.$queryRaw<Array<{ id: string; amount: number; stripeRefundId?: string | null }>>`
+        const claimed = await this.prisma.$queryRaw<
+          Array<{ id: string; amount: number; stripeRefundId?: string | null }>
+        >`
           UPDATE "refunds"
           SET    "stripeRefundId" = ${stripeId}
           WHERE  id = (
@@ -278,10 +275,7 @@ export class PaymentRefundService {
   /**
    * Triggers an automated/system-initiated refund (e.g., for failed Duffel bookings).
    */
-  async triggerAutomatedRefund(
-    paymentId: string,
-    reason: string,
-  ): Promise<RefundResponse> {
+  async triggerAutomatedRefund(paymentId: string, reason: string): Promise<RefundResponse> {
     try {
       const idempotencyKey = `refund:${paymentId}:${reason}:1`;
 
@@ -515,7 +509,10 @@ export class PaymentRefundService {
       return;
     }
 
-    if (!refund.idempotencyKeyCreatedAt || this.isIdempotencyKeyUnsafe(refund.idempotencyKeyCreatedAt)) {
+    if (
+      !refund.idempotencyKeyCreatedAt ||
+      this.isIdempotencyKeyUnsafe(refund.idempotencyKeyCreatedAt)
+    ) {
       await this.refundSettlementService.settleVerifiedOutcome({
         transactionId: refund.id,
         money: { amount: refund.amount, currency: refund.currency },
@@ -603,10 +600,12 @@ export class PaymentRefundService {
           data: {
             key: `cancellation-refund:${bookingId}:${crypto.randomUUID()}`,
             requestHash: crypto.randomUUID(),
-            customerId: (await tx.booking.findUniqueOrThrow({
-              where: { id: bookingId },
-              select: { userId: true },
-            })).userId,
+            customerId: (
+              await tx.booking.findUniqueOrThrow({
+                where: { id: bookingId },
+                select: { userId: true },
+              })
+            ).userId,
             requestPath: `/api/admin/refunds/${refund.id}/resolve`,
             expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
           },
@@ -630,7 +629,10 @@ export class PaymentRefundService {
           where: { id: bookingId },
           data: { status: BookingStatus.CANCELLED_PENDING_REFUND },
         });
-        return { refundStatus: RefundStatus.REFUND_RETRY_SCHEDULED, bookingStatus: BookingStatus.CANCELLED_PENDING_REFUND };
+        return {
+          refundStatus: RefundStatus.REFUND_RETRY_SCHEDULED,
+          bookingStatus: BookingStatus.CANCELLED_PENDING_REFUND,
+        };
       });
 
       await this.auditService.createLog(null, {
@@ -696,7 +698,13 @@ export class PaymentRefundService {
           },
         },
         payment: {
-          select: { id: true, status: true, stripePaymentIntentId: true, amount: true, currency: true },
+          select: {
+            id: true,
+            status: true,
+            stripePaymentIntentId: true,
+            amount: true,
+            currency: true,
+          },
         },
       },
       orderBy: { updatedAt: 'desc' },
@@ -715,7 +723,8 @@ export class PaymentRefundService {
   private toSafeStripeErrorCode(error: unknown): string {
     if (typeof error !== 'object' || error === null) return 'STRIPE_UNKNOWN_ERROR';
     const candidate = error as { statusCode?: unknown; code?: unknown };
-    if (typeof candidate.code === 'string' && /^[A-Z0-9_:-]{1,80}$/.test(candidate.code)) return candidate.code;
+    if (typeof candidate.code === 'string' && /^[A-Z0-9_:-]{1,80}$/.test(candidate.code))
+      return candidate.code;
     if (typeof candidate.statusCode === 'number') return `HTTP_${candidate.statusCode}`;
     return 'STRIPE_UNKNOWN_ERROR';
   }

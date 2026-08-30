@@ -28,7 +28,9 @@ function clampPassportAdvisoryBufferDays(value: number): number {
   return normalizedValue;
 }
 
-export function parseBookingReadinessConfig(env: BookingReadinessConfigEnv = process.env): BookingReadinessConfig {
+export function parseBookingReadinessConfig(
+  env: BookingReadinessConfigEnv = process.env,
+): BookingReadinessConfig {
   const rawValue = env.PASSPORT_ADVISORY_BUFFER_DAYS?.trim();
 
   if (!rawValue) {

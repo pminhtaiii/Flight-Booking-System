@@ -196,7 +196,9 @@ describe('Chat handoff performance (E2E)', () => {
       .compile();
 
     app = moduleFixture.createNestApplication();
-    app.useGlobalPipes(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, transform: true }));
+    app.useGlobalPipes(
+      new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, transform: true }),
+    );
     app.useGlobalFilters(new HttpExceptionFilter());
     app.setGlobalPrefix('api', { exclude: ['health'] });
     await app.init();
@@ -214,7 +216,9 @@ describe('Chat handoff performance (E2E)', () => {
     jwtService = moduleFixture.get<JwtService>(JwtService);
     duffelService = moduleFixture.get<DuffelService>(DuffelService);
     stripeService = moduleFixture.get<StripeService>(StripeService);
-    attestationService = moduleFixture.get<SelectionAttestationService>(SelectionAttestationService);
+    attestationService = moduleFixture.get<SelectionAttestationService>(
+      SelectionAttestationService,
+    );
     jwtStrategy = moduleFixture.get<JwtStrategy>(JwtStrategy);
     chatHandoffService = moduleFixture.get<ChatHandoffService>(ChatHandoffService);
 
@@ -243,15 +247,19 @@ describe('Chat handoff performance (E2E)', () => {
         rawOffer: {
           expires_at: new Date(Date.now() + 900_000).toISOString(),
           passengers: [{ id: 'pas_benchmark', type: 'adult' }],
-          slices: [{
-            segments: [{
-              origin: { iata_code: 'SGN' },
-              destination: { iata_code: 'HAN' },
-              departing_at: new Date(Date.now() + 86_400_000).toISOString(),
-              arriving_at: new Date(Date.now() + 90_000_000).toISOString(),
-              operating_carrier: { name: 'Benchmark Carrier' },
-            }],
-          }],
+          slices: [
+            {
+              segments: [
+                {
+                  origin: { iata_code: 'SGN' },
+                  destination: { iata_code: 'HAN' },
+                  departing_at: new Date(Date.now() + 86_400_000).toISOString(),
+                  arriving_at: new Date(Date.now() + 90_000_000).toISOString(),
+                  operating_carrier: { name: 'Benchmark Carrier' },
+                },
+              ],
+            },
+          ],
         },
         origin: 'SGN',
         destination: 'HAN',
@@ -297,9 +305,7 @@ describe('Chat handoff performance (E2E)', () => {
 
     // Pre-warm keep-alive HTTP connection pool
     await Promise.all(
-      Array.from({ length: SAMPLE_COUNT }, () =>
-        getJson(`${baseUrl}/health/ping`, httpAgent),
-      ),
+      Array.from({ length: SAMPLE_COUNT }, () => getJson(`${baseUrl}/health/ping`, httpAgent)),
     );
   });
 
@@ -440,46 +446,50 @@ describe('Chat handoff performance (E2E)', () => {
         authSamples.push(performance.now() - startedAt);
       }
     });
-    jest.spyOn(chatHandoffService, 'resolveAndAcquireClaim').mockImplementation(
-      async (token, userId, ttlMs, context) => {
+    jest
+      .spyOn(chatHandoffService, 'resolveAndAcquireClaim')
+      .mockImplementation(async (token, userId, ttlMs, context) => {
         const startedAt = performance.now();
         try {
           return await originalClaim(token, userId, ttlMs, context);
         } finally {
           claimSamples.push(performance.now() - startedAt);
         }
-      },
-    );
+      });
     const requestBody = {
       handoffToken,
-      passengers: [{
-        offerPassengerId: 'pas_benchmark',
-        type: PassengerType.ADULT,
-        source: {
-          type: 'inline',
-          givenName: 'Benchmark',
-          familyName: 'Passenger',
-          dateOfBirth: '1990-01-01',
-          gender: 'male',
-          nationality: 'VN',
-          email: 'benchmark@example.test',
-          phoneCountryCode: '+84',
-          phoneNumber: '912345678',
-          title: 'Mr',
+      passengers: [
+        {
+          offerPassengerId: 'pas_benchmark',
+          type: PassengerType.ADULT,
+          source: {
+            type: 'inline',
+            givenName: 'Benchmark',
+            familyName: 'Passenger',
+            dateOfBirth: '1990-01-01',
+            gender: 'male',
+            nationality: 'VN',
+            email: 'benchmark@example.test',
+            phoneCountryCode: '+84',
+            phoneNumber: '912345678',
+            title: 'Mr',
+          },
         },
-      }],
+      ],
     };
     const requestBodyJson = JSON.stringify(requestBody);
     const requestBodyLength = Buffer.byteLength(requestBodyJson);
     const parsed = new URL(baseUrl);
-    const intentsTarget = { hostname: parsed.hostname, port: parsed.port, path: '/api/bookings/intents' };
+    const intentsTarget = {
+      hostname: parsed.hostname,
+      port: parsed.port,
+      path: '/api/bookings/intents',
+    };
     const authHeaders = { Authorization: `Bearer ${userToken}` };
 
     // Pre-warm keep-alive HTTP connection pool
     await Promise.all(
-      Array.from({ length: SAMPLE_COUNT }, () =>
-        getJson(`${baseUrl}/health/ping`, httpAgent),
-      ),
+      Array.from({ length: SAMPLE_COUNT }, () => getJson(`${baseUrl}/health/ping`, httpAgent)),
     );
     await new Promise((resolve) => setTimeout(resolve, 100));
 
@@ -498,7 +508,9 @@ describe('Chat handoff performance (E2E)', () => {
     );
     const successful = responses.filter(({ response }) => response.status === 201);
     const expectedLosers = responses.filter(({ response }) => response.status === 409);
-    const unexpectedFailures = responses.filter(({ response }) => response.status !== 201 && response.status !== 409);
+    const unexpectedFailures = responses.filter(
+      ({ response }) => response.status !== 201 && response.status !== 409,
+    );
     const intentCount = await prisma.bookingIntent.count({ where: { userId } });
     const consumedHandoff = await prisma.chatHandoff.findFirst({
       where: { userId, consumedAt: { not: null } },

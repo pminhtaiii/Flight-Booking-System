@@ -6,7 +6,12 @@ import { PaymentIdempotencyService } from '@/payment/payment-idempotency.service
 import { DuffelService } from '@/duffel/duffel.service';
 import { AuditService } from '@/audit/audit.service';
 import { PaymentMethodService } from '@/payment/payment-method.service';
-import { HttpStatus, InternalServerErrorException, UnprocessableEntityException, HttpException } from '@nestjs/common';
+import {
+  HttpStatus,
+  InternalServerErrorException,
+  UnprocessableEntityException,
+  HttpException,
+} from '@nestjs/common';
 import { BookingPassengerFinalValidatorService } from '@/booking-intent/booking-passenger-final-validator.service';
 import { BookingFailureReason } from '@prisma/client';
 
@@ -44,7 +49,7 @@ describe('PaymentService - recoveryPoint === completed', () => {
     };
 
     mockStripe = {};
-    
+
     mockIdempotency = {
       computeHash: jest.fn().mockReturnValue('mock-hash'),
       acquireOrReplay: jest.fn().mockResolvedValue({ status: 'acquired' }),
@@ -56,12 +61,18 @@ describe('PaymentService - recoveryPoint === completed', () => {
     mockDuffel = {
       mapDuffelOrderToSnapshots: jest.fn().mockReturnValue({
         flightSnapshot: { segments: [{ departureAt: '2026-07-20T10:00:00Z' }] },
-        passengerSnapshot: { passengers: [] }
-      })
+        passengerSnapshot: { passengers: [] },
+      }),
     };
     mockAudit = {};
     mockPaymentMethod = { saveMethod: jest.fn() };
-    const mockBookingLifecycleService = { createBooking: jest.fn().mockResolvedValue({ id: '123e4567-e89b-42d3-a456-426614174000', userId: 'user-123' }), updateToConfirmed: jest.fn(), updateToFailed: jest.fn() };
+    const mockBookingLifecycleService = {
+      createBooking: jest
+        .fn()
+        .mockResolvedValue({ id: '123e4567-e89b-42d3-a456-426614174000', userId: 'user-123' }),
+      updateToConfirmed: jest.fn(),
+      updateToFailed: jest.fn(),
+    };
 
     service = new PaymentService(
       mockPrisma as unknown as PrismaService,
@@ -70,7 +81,7 @@ describe('PaymentService - recoveryPoint === completed', () => {
       mockDuffel as unknown as DuffelService,
       mockAudit as unknown as AuditService,
       mockPaymentMethod as unknown as PaymentMethodService,
-      mockBookingLifecycleService as any
+      mockBookingLifecycleService as any,
     );
   });
 
@@ -133,9 +144,9 @@ describe('PaymentService - recoveryPoint === completed', () => {
       mockIdempotency.getResumePoint.mockResolvedValueOnce('completed');
       mockPrisma.paymentEvent.findFirst.mockResolvedValueOnce(null);
 
-      await expect(
-        service.executeConfirmPayment(dto, idempotencyKey, userId),
-      ).rejects.toThrow(InternalServerErrorException);
+      await expect(service.executeConfirmPayment(dto, idempotencyKey, userId)).rejects.toThrow(
+        InternalServerErrorException,
+      );
     });
 
     it('returns failureResponse and completes key with BAD_GATEWAY if status is CANCELLED and duffel event exists', async () => {
@@ -166,14 +177,16 @@ describe('PaymentService - recoveryPoint === completed', () => {
         HttpStatus.BAD_GATEWAY,
         expect.objectContaining({
           success: false,
-          error: 'Stripe capture failed or background processing failed. Duffel order cancelled and hold released.',
+          error:
+            'Stripe capture failed or background processing failed. Duffel order cancelled and hold released.',
           bookingStatus: 'CANCELLED',
         }),
       );
 
       expect(response).toEqual({
         success: false,
-        error: 'Stripe capture failed or background processing failed. Duffel order cancelled and hold released.',
+        error:
+          'Stripe capture failed or background processing failed. Duffel order cancelled and hold released.',
         bookingStatus: 'CANCELLED',
       });
     });
@@ -235,7 +248,10 @@ describe('PaymentService - recoveryPoint === completed', () => {
         callback({
           payment: { update: jest.fn() },
           paymentEvent: { create: jest.fn() },
-          bookingIntent: { update: jest.fn(), findUnique: jest.fn().mockResolvedValue({ id: 'intent-123', userId: 'user-123' }) },
+          bookingIntent: {
+            update: jest.fn(),
+            findUnique: jest.fn().mockResolvedValue({ id: 'intent-123', userId: 'user-123' }),
+          },
           ledgerEntry: { createMany: jest.fn() },
         }),
       );
@@ -249,11 +265,7 @@ describe('PaymentService - recoveryPoint === completed', () => {
         'user-123',
       );
 
-      expect(mockPaymentMethod.saveMethod).toHaveBeenCalledWith(
-        'user-123',
-        'cus-123',
-        'pi-123',
-      );
+      expect(mockPaymentMethod.saveMethod).toHaveBeenCalledWith('user-123', 'cus-123', 'pi-123');
     });
   });
 
@@ -340,7 +352,10 @@ describe('PaymentService - recoveryPoint === completed', () => {
       await (service as any).handleBackgroundError(paymentId, idempotencyKey, userId, error);
 
       // Verify recovery point is NOT updated to 'captured'
-      expect(mockIdempotency.updateRecoveryPoint).not.toHaveBeenCalledWith(idempotencyKey, 'captured');
+      expect(mockIdempotency.updateRecoveryPoint).not.toHaveBeenCalledWith(
+        idempotencyKey,
+        'captured',
+      );
 
       // Verify compensation methods are called
       expect(mockDuffel.cancelOrder).toHaveBeenCalledWith('duffel-order-abc');
@@ -351,7 +366,7 @@ describe('PaymentService - recoveryPoint === completed', () => {
         expect.objectContaining({
           where: { id: paymentId },
           data: { status: 'CANCELLED' },
-        })
+        }),
       );
 
       // Verify bookingIntent status is updated
@@ -359,7 +374,7 @@ describe('PaymentService - recoveryPoint === completed', () => {
         expect.objectContaining({
           where: { id: 'intent-123' },
           data: { status: 'AWAITING_PAYMENT' },
-        })
+        }),
       );
     });
 
@@ -596,9 +611,15 @@ describe('PaymentService - recoveryPoint === completed', () => {
       mockIdempotency.updateRecoveryPoint.mockResolvedValue({});
       mockIdempotency.completeKey.mockResolvedValue({});
 
-      mockStripe.cancelPaymentIntent = jest.fn().mockResolvedValue({ id: 'pi_val_123', status: 'canceled' });
-      mockStripe.capturePaymentIntent = jest.fn().mockResolvedValue({ id: 'pi_val_123', status: 'succeeded' });
-      mockStripe.retrievePaymentIntent = jest.fn().mockResolvedValue({ id: 'pi_val_123', status: 'succeeded' });
+      mockStripe.cancelPaymentIntent = jest
+        .fn()
+        .mockResolvedValue({ id: 'pi_val_123', status: 'canceled' });
+      mockStripe.capturePaymentIntent = jest
+        .fn()
+        .mockResolvedValue({ id: 'pi_val_123', status: 'succeeded' });
+      mockStripe.retrievePaymentIntent = jest
+        .fn()
+        .mockResolvedValue({ id: 'pi_val_123', status: 'succeeded' });
 
       mockDuffel.createOrder = jest.fn().mockResolvedValue({
         id: 'ord_val_123',
@@ -609,7 +630,9 @@ describe('PaymentService - recoveryPoint === completed', () => {
       mockAudit.createLog = jest.fn().mockResolvedValue({});
 
       mockBookingLifecycleService = {
-        createBooking: jest.fn().mockResolvedValue({ id: 'booking-uuid-val', userId: 'user-val-123' }),
+        createBooking: jest
+          .fn()
+          .mockResolvedValue({ id: 'booking-uuid-val', userId: 'user-val-123' }),
         updateToConfirmed: jest.fn().mockResolvedValue({}),
         updateToFailed: jest.fn().mockResolvedValue({}),
       };
@@ -655,10 +678,10 @@ describe('PaymentService - recoveryPoint === completed', () => {
       });
 
       expect(mockValidator.validateAndMapPassengers).toHaveBeenCalledTimes(1);
-      expect(mockValidator.validateAndMapPassengers).toHaveBeenCalledWith(
-        mockBookingIntent,
-        { traceId: 'trace-123', correlationId: 'corr-123' },
-      );
+      expect(mockValidator.validateAndMapPassengers).toHaveBeenCalledWith(mockBookingIntent, {
+        traceId: 'trace-123',
+        correlationId: 'corr-123',
+      });
 
       expect(mockAudit.createLog).toHaveBeenCalledWith(
         mockPrisma,
@@ -767,10 +790,7 @@ describe('PaymentService - recoveryPoint === completed', () => {
       );
 
       // Updates recovery point to completed and completes idempotency key with 422
-      expect(mockIdempotency.updateRecoveryPoint).toHaveBeenCalledWith(
-        idempotencyKey,
-        'completed',
-      );
+      expect(mockIdempotency.updateRecoveryPoint).toHaveBeenCalledWith(idempotencyKey, 'completed');
       expect(mockIdempotency.completeKey).toHaveBeenCalledWith(
         idempotencyKey,
         HttpStatus.UNPROCESSABLE_ENTITY,
@@ -881,4 +901,3 @@ describe('PaymentService - recoveryPoint === completed', () => {
     });
   });
 });
-

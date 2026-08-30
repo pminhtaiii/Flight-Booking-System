@@ -30,15 +30,15 @@ Add interactive map visualization to the Flight Booking System, enabling users t
 
 ## Constitution Check
 
-*GATE: Must pass before Phase 0 research. Re-check after Phase 1 design.*
+_GATE: Must pass before Phase 0 research. Re-check after Phase 1 design._
 
-| Principle | Status | Notes |
-|-----------|--------|-------|
-| I. Flight-First Architecture | ✅ PASS | Map enhances the flight search experience — does not block or complicate the booking pipeline. Map is an overlay on existing pages. |
-| II. Deterministic Transaction Boundary | ✅ PASS | Map is purely visual/informational. No AI involvement, no transactional impact. Airport data is static and deterministic. |
-| III. API Budget Discipline | ✅ PASS | Zero Amadeus API calls for map/airport data. All airport geolocation served from local PostgreSQL seed. No external API consumption. |
-| IV. Observability & Operational Visibility | ✅ PASS | Airport endpoints will follow existing logging patterns. Health checks will include airport data availability. |
-| V. Incremental Delivery | ✅ PASS | Feature is sliced into 7 phases, each delivering a working increment. Phase 1 (data model) → Phase 2 (API) → Phase 3 (map component) → etc. |
+| Principle                                  | Status  | Notes                                                                                                                                       |
+| ------------------------------------------ | ------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| I. Flight-First Architecture               | ✅ PASS | Map enhances the flight search experience — does not block or complicate the booking pipeline. Map is an overlay on existing pages.         |
+| II. Deterministic Transaction Boundary     | ✅ PASS | Map is purely visual/informational. No AI involvement, no transactional impact. Airport data is static and deterministic.                   |
+| III. API Budget Discipline                 | ✅ PASS | Zero Amadeus API calls for map/airport data. All airport geolocation served from local PostgreSQL seed. No external API consumption.        |
+| IV. Observability & Operational Visibility | ✅ PASS | Airport endpoints will follow existing logging patterns. Health checks will include airport data availability.                              |
+| V. Incremental Delivery                    | ✅ PASS | Feature is sliced into 7 phases, each delivering a working increment. Phase 1 (data model) → Phase 2 (API) → Phase 3 (map component) → etc. |
 
 ## Project Structure
 
@@ -107,6 +107,7 @@ research/
 **Delivers**: Airport table in PostgreSQL, seeded with OurAirports data, shared type definitions.
 
 **Tasks**:
+
 1. Add `Airport` model to Prisma schema (iataCode, name, city, country, latitude, longitude, type, region)
 2. Create Prisma migration for the airports table
 3. Write seed script to parse OurAirports CSV → filter by IATA + type → batch insert
@@ -122,6 +123,7 @@ research/
 **Delivers**: NestJS AirportsModule with search, detail, nearby, and list endpoints.
 
 **Tasks**:
+
 1. Create `AirportsModule`, `AirportsController`, `AirportsService`
 2. Implement `GET /airports/search?q=` — case-insensitive IATA/name search with limit 10
 3. Implement `GET /airports/:iataCode` — single airport by IATA code
@@ -140,6 +142,7 @@ research/
 **Delivers**: Reusable MapContainer component with MapLibre GL JS rendering.
 
 **Tasks**:
+
 1. Install dependencies: `maplibre-gl`, `react-map-gl`
 2. Create `MapContainer.tsx` — "use client" component wrapping ReactMapGL
 3. Configure free tile source (OpenFreeMap or MapTiler)
@@ -157,6 +160,7 @@ research/
 **Delivers**: Airport markers on the map with click-to-view popups.
 
 **Tasks**:
+
 1. Create `AirportMarkerLayer.tsx` — renders markers from airport data
 2. Implement marker clustering using MapLibre's built-in cluster source
 3. Create `AirportPopup.tsx` — shows airport details on marker click
@@ -173,6 +177,7 @@ research/
 **Delivers**: Great-circle arc lines between airports showing flight routes.
 
 **Tasks**:
+
 1. Install `@turf/great-circle` and `@turf/helpers`
 2. Create `FlightRouteLayer.tsx` — renders GeoJSON LineString arcs
 3. Create `map-utils.ts` — great-circle computation, viewport bound calculation
@@ -190,6 +195,7 @@ research/
 **Delivers**: Map fully integrated into the flight search results page.
 
 **Tasks**:
+
 1. Add map panel to `/search` page layout (collapsible sidebar or split view)
 2. Wire search form selection → map marker placement (origin/destination preview)
 3. Wire search results → map route arc rendering
@@ -206,6 +212,7 @@ research/
 **Delivers**: Route map on flight details page, dark mode support, final polish.
 
 **Tasks**:
+
 1. Add map to `/search/[flightId]` page showing the specific flight route
 2. Distinguish markers: origin (green), stops (amber), destination (red)
 3. Show layover details on stop marker hover

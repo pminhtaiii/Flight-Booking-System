@@ -119,5 +119,8 @@ export type BookingReadinessScopeResult =
     }
   | {
       scope: 'UNKNOWN';
-      reason: Extract<BookingReadinessResultReasonCode, 'AIRPORT_COUNTRY_UNAVAILABLE' | 'ITINERARY_UNAVAILABLE'>;
+      reason: Extract<
+        BookingReadinessResultReasonCode,
+        'AIRPORT_COUNTRY_UNAVAILABLE' | 'ITINERARY_UNAVAILABLE'
+      >;
     };

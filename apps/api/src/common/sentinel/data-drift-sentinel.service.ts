@@ -189,7 +189,9 @@ export class DataDriftSentinelService {
     });
 
     const projectionBookingIds = new Set(existingProjections.map((p) => p.bookingId));
-    const missingProjectionCount = eligibleBookings.filter((b) => !projectionBookingIds.has(b.id)).length;
+    const missingProjectionCount = eligibleBookings.filter(
+      (b) => !projectionBookingIds.has(b.id),
+    ).length;
     const valid = missingProjectionCount === 0;
 
     if (!valid) {
@@ -208,7 +210,9 @@ export class DataDriftSentinelService {
   /**
    * Executes all above checks, performs healing, and returns aggregate telemetry/health summary.
    */
-  async runFullDriftSentinelAudit(referenceTime: Date = new Date()): Promise<FullDriftSentinelAuditSummary> {
+  async runFullDriftSentinelAudit(
+    referenceTime: Date = new Date(),
+  ): Promise<FullDriftSentinelAuditSummary> {
     const danglingClaims = await this.detectAndHealDanglingClaims(referenceTime);
     const consumedHandoffIntegrity = await this.verifyConsumedHandoffIntegrity();
     const bookingProjectionSync = await this.verifyBookingProjectionSync();

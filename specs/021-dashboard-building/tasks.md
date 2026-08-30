@@ -17,10 +17,10 @@
 
 **Purpose**: Establish implementation references and prevent prototype mock semantics from leaking into production.
 
-- [ ] T001 Record the feature execution baseline and affected-file checklist in `specs/021-dashboard-building/implementation-notes.md`
-- [ ] T002 [P] Add a dashboard contract conformance checklist derived from the OpenAPI artifact to `specs/021-dashboard-building/checklists/contract.md`
-- [ ] T003 [P] Add a visual translation checklist covering tokenization, removed prototype controls, supported production routes, responsive states, and accessibility to `specs/021-dashboard-building/checklists/visual.md`
-- [ ] T004 Confirm the installed Next.js 14.2.3 route/session APIs against available local documentation or installed types and record any repository-specific constraints in `specs/021-dashboard-building/implementation-notes.md`
+- [x] T001 Record the feature execution baseline and affected-file checklist in `specs/021-dashboard-building/implementation-notes.md`
+- [x] T002 [P] Add a dashboard contract conformance checklist derived from the OpenAPI artifact to `specs/021-dashboard-building/checklists/contract.md`
+- [x] T003 [P] Add a visual translation checklist covering tokenization, removed prototype controls, supported production routes, responsive states, and accessibility to `specs/021-dashboard-building/checklists/visual.md`
+- [x] T004 Confirm the installed Next.js 14.2.3 route/session APIs against available local documentation or installed types and record any repository-specific constraints in `specs/021-dashboard-building/implementation-notes.md`
 
 ---
 
@@ -30,10 +30,10 @@
 
 **Critical**: Finish this phase before any story implementation.
 
-- [ ] T005 Write failing Zod contract tests for valid summaries, non-negative counts, canonical statuses, ISO timestamps, exact object keys, nullable display fields, and a maximum of five recent records in `packages/shared/src/types/dashboard.types.spec.ts`
-- [ ] T006 Implement `DashboardStatsSchema`, `DashboardRecentBookingSchema`, `DashboardSummarySchema`, inferred types, and the `DashboardOutcome` failure union in `packages/shared/src/types/dashboard.types.ts`
-- [ ] T007 Export the dashboard contract through the shared type barrel in `packages/shared/src/types/index.ts`
-- [ ] T008 Add the compiled dashboard schema spec to the shared package test command in `packages/shared/package.json`, run it, and record the command/result in `specs/021-dashboard-building/implementation-notes.md`
+- [x] T005 Write failing Zod contract tests for valid summaries, non-negative counts, canonical statuses, ISO timestamps, exact object keys, nullable display fields, and a maximum of five recent records in `packages/shared/src/types/dashboard.types.spec.ts`
+- [x] T006 Implement `DashboardStatsSchema`, `DashboardRecentBookingSchema`, `DashboardSummarySchema`, inferred types, and the `DashboardOutcome` failure union in `packages/shared/src/types/dashboard.types.ts`
+- [x] T007 Export the dashboard contract through the shared type barrel in `packages/shared/src/types/index.ts`
+- [x] T008 Add the compiled dashboard schema spec to the shared package test command in `packages/shared/package.json`, run it, and record the command/result in `specs/021-dashboard-building/implementation-notes.md`
 
 **Checkpoint**: API and web can import the same validated contract.
 
@@ -47,33 +47,33 @@
 
 ### Tests for User Story 1
 
-- [ ] T009 [P] [US1] Write failing `DashboardService` tests for owner/time filters, canonical `COMPLETED` plus stale-past-`CONFIRMED` counting, all five cancellation-family statuses, one captured clock boundary, null departures, concurrent five-query execution, `take: 5`, descending ordering, and malformed snapshot projection in `apps/api/src/dashboard/dashboard.service.spec.ts`
-- [ ] T010 [P] [US1] Write failing controller tests for `JwtAuthGuard`, authenticated user forwarding, and exact summary return behavior in `apps/api/src/dashboard/dashboard.controller.spec.ts`
-- [ ] T011 [P] [US1] Write failing API integration tests for 401 behavior, user A/user B isolation, metric definitions, recent ordering/limit, and prohibited-field absence in `apps/api/test/dashboard.e2e-spec.ts`
-- [ ] T012 [P] [US1] Write failing server-loader tests for missing sessions, bearer forwarding, `cache: 'no-store'`, timeout, status mapping, malformed JSON, schema rejection, and successful parsing in `apps/web/lib/server/dashboard.spec.ts`
-- [ ] T013 [P] [US1] Add an in-process local port-3101 dashboard-summary fixture keyed by bearer-token scenario and failing Playwright scenarios for populated metrics, five recent records, recent-detail links, empty state, no prototype controls, and no fake insight/shield content in `apps/web/tests/dashboard.spec.ts`
+- [x] T009 [P] [US1] Write failing `DashboardService` tests for owner/time filters, canonical `COMPLETED` plus stale-past-`CONFIRMED` counting, all five cancellation-family statuses, one captured clock boundary, null departures, concurrent five-query execution, `take: 5`, descending ordering, and malformed snapshot projection in `apps/api/src/dashboard/dashboard.service.spec.ts`
+- [x] T010 [P] [US1] Write failing controller tests for `JwtAuthGuard`, authenticated user forwarding, and exact summary return behavior in `apps/api/src/dashboard/dashboard.controller.spec.ts`
+- [x] T011 [P] [US1] Write failing API integration tests for 401 behavior, user A/user B isolation, metric definitions, recent ordering/limit, and prohibited-field absence in `apps/api/test/dashboard.e2e-spec.ts`
+- [x] T012 [P] [US1] Write failing server-loader tests for missing sessions, bearer forwarding, `cache: 'no-store'`, timeout, status mapping, malformed JSON, schema rejection, and successful parsing in `apps/web/lib/server/dashboard.spec.ts`
+- [x] T013 [P] [US1] Add an in-process local port-3101 dashboard-summary fixture keyed by bearer-token scenario and failing Playwright scenarios for populated metrics, five recent records, recent-detail links, empty state, no prototype controls, and no fake insight/shield content in `apps/web/tests/dashboard.spec.ts`
 
 ### API and Contract Implementation for User Story 1
 
-- [ ] T014 [US1] Implement a pure allowlisted historical/current flight-snapshot display mapper and direct Prisma summary queries in `apps/api/src/dashboard/dashboard.service.ts`
-- [ ] T015 [US1] Implement authenticated `GET /dashboard/summary` controller behavior with request-derived user identity and private no-store response semantics in `apps/api/src/dashboard/dashboard.controller.ts`
-- [ ] T016 [US1] Register only `PrismaModule`, `DashboardService`, and `DashboardController` in `apps/api/src/dashboard/dashboard.module.ts`
-- [ ] T017 [US1] Add `DashboardModule` to the application dependency graph in `apps/api/src/app.module.ts`
-- [ ] T018 [US1] Update module-graph expectations to cover `DashboardModule` without adding booking-management, profile, payment, or cache dependencies in `apps/api/src/app.module.spec.ts`
-- [ ] T019 [US1] Make service/controller/API tests pass and capture the verified results in `specs/021-dashboard-building/implementation-notes.md`
+- [x] T014 [US1] Implement a pure allowlisted historical/current flight-snapshot display mapper and direct Prisma summary queries in `apps/api/src/dashboard/dashboard.service.ts`
+- [x] T015 [US1] Implement authenticated `GET /dashboard/summary` controller behavior with request-derived user identity and private no-store response semantics in `apps/api/src/dashboard/dashboard.controller.ts`
+- [x] T016 [US1] Register only `PrismaModule`, `DashboardService`, and `DashboardController` in `apps/api/src/dashboard/dashboard.module.ts`
+- [x] T017 [US1] Add `DashboardModule` to the application dependency graph in `apps/api/src/app.module.ts`
+- [x] T018 [US1] Update module-graph expectations to cover `DashboardModule` without adding booking-management, profile, payment, or cache dependencies in `apps/api/src/app.module.spec.ts`
+- [x] T019 [US1] Make service/controller/API tests pass and capture the verified results in `specs/021-dashboard-building/implementation-notes.md`
 
 ### Web Data Boundary and UI Implementation for User Story 1
 
-- [ ] T020 [US1] Implement the server-only session-aware, bounded, no-store summary loader and typed failure mapping in `apps/web/lib/server/dashboard.ts`
-- [ ] T021 [P] [US1] Add semantic light/dark/fallback dashboard surface, text, focus, action, and status tokens without hardcoded production component colors in `apps/web/app/globals.css`
-- [ ] T022 [P] [US1] Implement the four-card booking-only metric view with semantic icons and labels in `apps/web/components/dashboard/DashboardStats.tsx`
-- [ ] T023 [P] [US1] Implement the owner-safe recent timeline, empty state, relative/absolute date semantics, and booking detail/list links in `apps/web/components/dashboard/DashboardRecentBookings.tsx`
-- [ ] T024 [US1] Compose the approved Wayfinder hierarchy, dashboard-scoped desktop sidebar/sticky top bar, and compact mobile navigation through a display-only typed interface in `apps/web/components/dashboard/DashboardShell.tsx`
-- [ ] T025 [US1] Translate the approved responsive glassmorphic layout into token-based styles with no inline color styles, prototype banner, or variant switcher in `apps/web/app/dashboard/dashboard.module.css`
-- [ ] T026 [US1] Implement the authenticated dashboard Server Component, expired-session redirect, and non-fabricated upstream error branch in `apps/web/app/dashboard/page.tsx`
-- [ ] T027 [US1] Add a server-rendered responsive skeleton matching final layout geometry in `apps/web/app/dashboard/loading.tsx`
-- [ ] T028 [US1] Add the required `'use client'` Next.js error-boundary contract with typed `error` and `reset` props plus a safe retry UI that exposes no transport details in `apps/web/app/dashboard/error.tsx`
-- [ ] T029 [US1] Make loader and US1 Playwright tests pass and record the MVP evidence in `specs/021-dashboard-building/implementation-notes.md`
+- [x] T020 [US1] Implement the server-only session-aware, bounded, no-store summary loader and typed failure mapping in `apps/web/lib/server/dashboard.ts`
+- [x] T021 [P] [US1] Add semantic light/dark/fallback dashboard surface, text, focus, action, and status tokens without hardcoded production component colors in `apps/web/app/globals.css`
+- [x] T022 [P] [US1] Implement the four-card booking-only metric view with semantic icons and labels in `apps/web/components/dashboard/DashboardStats.tsx`
+- [x] T023 [P] [US1] Implement the owner-safe recent timeline, empty state, relative/absolute date semantics, and booking detail/list links in `apps/web/components/dashboard/DashboardRecentBookings.tsx`
+- [x] T024 [US1] Compose the approved Wayfinder hierarchy, dashboard-scoped desktop sidebar/sticky top bar, and compact mobile navigation through a display-only typed interface in `apps/web/components/dashboard/DashboardShell.tsx`
+- [x] T025 [US1] Translate the approved responsive glassmorphic layout into token-based styles with no inline color styles, prototype banner, or variant switcher in `apps/web/app/dashboard/dashboard.module.css`
+- [x] T026 [US1] Implement the authenticated dashboard Server Component, expired-session redirect, and non-fabricated upstream error branch in `apps/web/app/dashboard/page.tsx`
+- [x] T027 [US1] Add a server-rendered responsive skeleton matching final layout geometry in `apps/web/app/dashboard/loading.tsx`
+- [x] T028 [US1] Add the required `'use client'` Next.js error-boundary contract with typed `error` and `reset` props plus a safe retry UI that exposes no transport details in `apps/web/app/dashboard/error.tsx`
+- [x] T029 [US1] Make loader and US1 Playwright tests pass and record the MVP evidence in `specs/021-dashboard-building/implementation-notes.md`
 
 **Checkpoint**: US1 independently resolves the dashboard 404 and provides a secure, live, visually approved booking overview.
 
@@ -87,17 +87,17 @@
 
 ### Tests for User Story 2
 
-- [ ] T030 [P] [US2] Extend the in-process dashboard fixture and Playwright coverage for quick-search validation, preserved search values, keyboard submission, exact production action destinations, Profile action presence when booking readiness is enabled, Profile action absence when disabled, and absence of `/prototype/*` links in `apps/web/tests/dashboard.spec.ts`
-- [ ] T031 [P] [US2] Add unit tests for search normalization/URL creation in `apps/web/components/dashboard/dashboard-search.spec.ts` and for Profile action omission/inclusion when booking readiness is false/true in `apps/web/components/dashboard/dashboard-actions.spec.ts`
+- [x] T030 [P] [US2] Extend the in-process dashboard fixture and Playwright coverage for quick-search validation, preserved search values, keyboard submission, exact production action destinations, Profile action presence when booking readiness is enabled, Profile action absence when disabled, and absence of `/prototype/*` links in `apps/web/tests/dashboard.spec.ts`
+- [x] T031 [P] [US2] Add unit tests for search normalization/URL creation in `apps/web/components/dashboard/dashboard-search.spec.ts` and for Profile action omission/inclusion when booking readiness is false/true in `apps/web/components/dashboard/dashboard-actions.spec.ts`
 
 ### Implementation for User Story 2
 
-- [ ] T032 [US2] Implement pure quick-search normalization, validation, and production search URL construction in `apps/web/components/dashboard/dashboard-search.ts`
-- [ ] T033 [US2] Implement accessible quick-search controls in `apps/web/components/dashboard/DashboardQuickSearch.tsx`, add typed initial-value props in `apps/web/components/search/SearchFormClient.tsx`, and consume sanitized dashboard query parameters in `apps/web/app/search/page.tsx`
-- [ ] T034 [P] [US2] Implement a pure flag-aware action builder that always returns `/search`, `/bookings?tab=upcoming`, and `/bookings?tab=past` and conditionally returns `/profile` in `apps/web/components/dashboard/dashboard-actions.ts`, then render those actions in `apps/web/components/dashboard/DashboardQuickActions.tsx`
-- [ ] T035 [US2] Evaluate `isBookingReadinessEnabled()` in `apps/web/app/dashboard/page.tsx`, pass the resulting profile-action availability through `apps/web/components/dashboard/DashboardShell.tsx`, and integrate quick search plus the derived action set
-- [ ] T036 [US2] Add responsive and focus styles for quick-search/action controls using semantic tokens in `apps/web/app/dashboard/dashboard.module.css`
-- [ ] T037 [US2] Make US2 unit and Playwright tests pass and record the always-available destinations plus the flag-conditioned Profile inclusion/omission in `specs/021-dashboard-building/implementation-notes.md`
+- [x] T032 [US2] Implement pure quick-search normalization, validation, and production search URL construction in `apps/web/components/dashboard/dashboard-search.ts`
+- [x] T033 [US2] Implement accessible quick-search controls in `apps/web/components/dashboard/DashboardQuickSearch.tsx`, add typed initial-value props in `apps/web/components/search/SearchFormClient.tsx`, and consume sanitized dashboard query parameters in `apps/web/app/search/page.tsx`
+- [x] T034 [P] [US2] Implement a pure flag-aware action builder that always returns `/search`, `/bookings?tab=upcoming`, and `/bookings?tab=past` and conditionally returns `/profile` in `apps/web/components/dashboard/dashboard-actions.ts`, then render those actions in `apps/web/components/dashboard/DashboardQuickActions.tsx`
+- [x] T035 [US2] Evaluate `isBookingReadinessEnabled()` in `apps/web/app/dashboard/page.tsx`, pass the resulting profile-action availability through `apps/web/components/dashboard/DashboardShell.tsx`, and integrate quick search plus the derived action set
+- [x] T036 [US2] Add responsive and focus styles for quick-search/action controls using semantic tokens in `apps/web/app/dashboard/dashboard.module.css`
+- [x] T037 [US2] Make US2 unit and Playwright tests pass and record the always-available destinations plus the flag-conditioned Profile inclusion/omission in `specs/021-dashboard-building/implementation-notes.md`
 
 **Checkpoint**: US2 independently proves every presented action works and no mock/prototype destination remains.
 
@@ -111,15 +111,15 @@
 
 ### Tests for User Story 3
 
-- [ ] T038 [P] [US3] Extend the bearer-scenario dashboard fixture and Playwright coverage for authenticated root redirect, anonymous landing preservation, direct dashboard login redirect, expired-session messaging, malformed/unavailable upstream recovery, 360/768/desktop overflow, keyboard focus, and reduced-motion behavior in `apps/web/tests/dashboard.spec.ts`
-- [ ] T039 [P] [US3] Add page-level unit coverage for root session branching and dashboard outcome-to-render/redirect behavior in `apps/web/tests/dashboard-routing.unit.ts`
+- [x] T038 [P] [US3] Extend the bearer-scenario dashboard fixture and Playwright coverage for authenticated root redirect, anonymous landing preservation, direct dashboard login redirect, expired-session messaging, malformed/unavailable upstream recovery, 360/768/desktop overflow, keyboard focus, and reduced-motion behavior in `apps/web/tests/dashboard.spec.ts`
+- [x] T039 [P] [US3] Add page-level unit coverage for root session branching and dashboard outcome-to-render/redirect behavior in `apps/web/tests/dashboard-routing.unit.ts`
 
 ### Implementation for User Story 3
 
-- [ ] T040 [US3] Convert the root page to a server-side session branch that redirects authenticated users and preserves anonymous `LandingPage` rendering in `apps/web/app/page.tsx`
-- [ ] T041 [US3] Align dashboard unauthenticated and expired-session routing with existing secure login-return behavior in `apps/web/app/dashboard/page.tsx`
-- [ ] T042 [US3] Finalize compact navigation, no-horizontal-overflow, contrast, focus-visible, reduced-motion, and backdrop-filter fallback styles in `apps/web/app/dashboard/dashboard.module.css`
-- [ ] T043 [US3] Make US3 routing and browser tests pass and record viewport/accessibility evidence in `specs/021-dashboard-building/implementation-notes.md`
+- [x] T040 [US3] Convert the root page to a server-side session branch that redirects authenticated users and preserves anonymous `LandingPage` rendering in `apps/web/app/page.tsx`
+- [x] T041 [US3] Align dashboard unauthenticated and expired-session routing with existing secure login-return behavior in `apps/web/app/dashboard/page.tsx`
+- [x] T042 [US3] Finalize compact navigation, no-horizontal-overflow, contrast, focus-visible, reduced-motion, and backdrop-filter fallback styles in `apps/web/app/dashboard/dashboard.module.css`
+- [x] T043 [US3] Make US3 routing and browser tests pass and record viewport/accessibility evidence in `specs/021-dashboard-building/implementation-notes.md`
 
 **Checkpoint**: All three stories are independently functional and the dashboard is the safe authenticated entry hub.
 
@@ -129,12 +129,12 @@
 
 **Purpose**: Enforce cross-cutting privacy/design constraints and leave code, tests, and repository context synchronized.
 
-- [ ] T044 [P] Audit production dashboard source for hardcoded hex/rgba values, raw Tailwind color classes, inline color styles, prototype controls/routes, client tokens, backend URLs, raw snapshots, provider IDs, payment data, and passenger PII; record results in `specs/021-dashboard-building/checklists/visual.md`
-- [ ] T045 [P] Add the dashboard module, endpoint, web server boundary, root redirect, and no-cache rationale to `context/architecture.md`
-- [ ] T046 Update the dashboard-scoped sidebar decision and removed profile-banner/unsupported-insight assumptions in `context/project-overview.md`, then record feature status, exclusions, and verified results in `context/progress-checker.md`
-- [ ] T047 Run every automated command in `specs/021-dashboard-building/quickstart.md` and record exact exit codes in `specs/021-dashboard-building/implementation-notes.md`
-- [ ] T048 Perform the manual populated, empty, expired, unavailable, responsive, keyboard, dark-theme, and reduced-motion walkthrough from `specs/021-dashboard-building/quickstart.md`
-- [ ] T049 Reconcile completed tasks, deferred items, and remaining evidence links in `specs/021-dashboard-building/tasks.md`
+- [x] T044 [P] Audit production dashboard source for hardcoded hex/rgba values, raw Tailwind color classes, inline color styles, prototype controls/routes, client tokens, backend URLs, raw snapshots, provider IDs, payment data, and passenger PII; record results in `specs/021-dashboard-building/checklists/visual.md`
+- [x] T045 [P] Add the dashboard module, endpoint, web server boundary, root redirect, and no-cache rationale to `context/architecture.md`
+- [x] T046 Update the dashboard-scoped sidebar decision and removed profile-banner/unsupported-insight assumptions in `context/project-overview.md`, then record feature status, exclusions, and verified results in `context/progress-checker.md`
+- [x] T047 Run every automated command in `specs/021-dashboard-building/quickstart.md` and record exact exit codes in `specs/021-dashboard-building/implementation-notes.md`
+- [x] T048 Perform the manual populated, empty, expired, unavailable, responsive, keyboard, dark-theme, and reduced-motion walkthrough from `specs/021-dashboard-building/quickstart.md`
+- [x] T049 Reconcile completed tasks, deferred items, and remaining evidence links in `specs/021-dashboard-building/tasks.md`
 
 ---
 

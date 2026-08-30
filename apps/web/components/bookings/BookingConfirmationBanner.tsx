@@ -4,7 +4,10 @@ type BookingConfirmationBannerProps = {
 
 export function BookingConfirmationBanner({ pnrReference }: BookingConfirmationBannerProps) {
   return (
-    <section aria-labelledby="booking-confirmed-title" className="card border border-text-confirmed bg-bg-confirmed">
+    <section
+      aria-labelledby="booking-confirmed-title"
+      className="card border border-text-confirmed bg-bg-confirmed"
+    >
       <h1 id="booking-confirmed-title" className="text-xl font-bold text-text-confirmed">
         Booking confirmed
       </h1>

@@ -43,7 +43,8 @@ function setSafeHeaders(response: Response, headers: Record<string, string>): vo
   response.setHeader('Cache-Control', 'no-store, private');
   response.removeHeader('ETag');
   if (headers['x-trace-id']) response.setHeader('x-trace-id', headers['x-trace-id']);
-  if (headers['x-correlation-id']) response.setHeader('x-correlation-id', headers['x-correlation-id']);
+  if (headers['x-correlation-id'])
+    response.setHeader('x-correlation-id', headers['x-correlation-id']);
 }
 
 function assertCanonicalCreate(dto: CreateIntentDto): void {
@@ -84,7 +85,11 @@ export class BookingIntentController {
     userId: string,
     dto: CreateIntentDto,
     context?: Parameters<BookingIntentService['createIntent']>[2],
-  ): Promise<ReturnType<BookingIntentService['createIntent']> extends Promise<infer Response> ? Response : never> {
+  ): Promise<
+    ReturnType<BookingIntentService['createIntent']> extends Promise<infer Response>
+      ? Response
+      : never
+  > {
     return this.bookingIntentService.createIntent(userId, dto, context);
   }
 
@@ -135,7 +140,11 @@ export class BookingIntentController {
     @Res({ passthrough: true }) response: Response,
   ) {
     setSafeHeaders(response, headers);
-    return this.bookingIntentService.getAdvisoryReadiness(req.user.id, dto, requestContext(headers));
+    return this.bookingIntentService.getAdvisoryReadiness(
+      req.user.id,
+      dto,
+      requestContext(headers),
+    );
   }
 }
 
@@ -155,12 +164,14 @@ export class BookingIntentLegacyController {
     @Res({ passthrough: true }) response: Response,
   ) {
     setSafeHeaders(response, headers);
-    this.logger.warn(JSON.stringify({
-      operation: 'booking_intent_create_deprecated_route',
-      status: 'deprecated',
-      trace_id: headers['x-trace-id'] || null,
-      correlation_id: headers['x-correlation-id'] || null,
-    }));
+    this.logger.warn(
+      JSON.stringify({
+        operation: 'booking_intent_create_deprecated_route',
+        status: 'deprecated',
+        trace_id: headers['x-trace-id'] || null,
+        correlation_id: headers['x-correlation-id'] || null,
+      }),
+    );
 
     return this.bookingIntentService.createIntent(req.user.id, dto, {
       ...requestContext(headers),
@@ -177,12 +188,14 @@ export class BookingIntentLegacyController {
     @Res({ passthrough: true }) response: Response,
   ) {
     setSafeHeaders(response, headers);
-    this.logger.warn(JSON.stringify({
-      operation: 'booking_intent_prefill_deprecated_route',
-      status: 'deprecated',
-      trace_id: headers['x-trace-id'] || null,
-      correlation_id: headers['x-correlation-id'] || null,
-    }));
+    this.logger.warn(
+      JSON.stringify({
+        operation: 'booking_intent_prefill_deprecated_route',
+        status: 'deprecated',
+        trace_id: headers['x-trace-id'] || null,
+        correlation_id: headers['x-correlation-id'] || null,
+      }),
+    );
     return this.bookingIntentService.getPrefill(req.user.id);
   }
 
@@ -194,12 +207,14 @@ export class BookingIntentLegacyController {
     @Res({ passthrough: true }) response: Response,
   ) {
     setSafeHeaders(response, headers);
-    this.logger.warn(JSON.stringify({
-      operation: 'booking_intent_get_deprecated_route',
-      status: 'deprecated',
-      trace_id: headers['x-trace-id'] || null,
-      correlation_id: headers['x-correlation-id'] || null,
-    }));
+    this.logger.warn(
+      JSON.stringify({
+        operation: 'booking_intent_get_deprecated_route',
+        status: 'deprecated',
+        trace_id: headers['x-trace-id'] || null,
+        correlation_id: headers['x-correlation-id'] || null,
+      }),
+    );
     return this.bookingIntentService.getIntent(req.user.id, id);
   }
 }

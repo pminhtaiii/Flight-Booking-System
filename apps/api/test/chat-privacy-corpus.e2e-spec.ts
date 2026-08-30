@@ -62,7 +62,9 @@ describe('Chat and Handoff Privacy Corpus E2E & Boundary Safety', () => {
       .compile();
 
     app = moduleFixture.createNestApplication();
-    app.useGlobalPipes(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, transform: true }));
+    app.useGlobalPipes(
+      new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, transform: true }),
+    );
     app.useGlobalFilters(new HttpExceptionFilter());
     app.setGlobalPrefix('api', { exclude: ['health'] });
     await app.init();
@@ -127,7 +129,10 @@ describe('Chat and Handoff Privacy Corpus E2E & Boundary Safety', () => {
     const payload = { userId: secretUserId, iat: Math.floor(Date.now() / 1000) };
     const payloadStr = JSON.stringify(payload);
     const payloadB64 = Buffer.from(payloadStr).toString('base64url');
-    const sig = crypto.createHmac('sha256', process.env.CLAIM_TOKEN_SECRET!).update(payloadStr).digest('base64url');
+    const sig = crypto
+      .createHmac('sha256', process.env.CLAIM_TOKEN_SECRET!)
+      .update(payloadStr)
+      .digest('base64url');
     const validSigToken = `${payloadB64}.${sig}`;
 
     await expect(claimTokenService!.validateToken(validSigToken)).rejects.toThrow();

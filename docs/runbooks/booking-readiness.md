@@ -78,17 +78,17 @@ Feature 16 operations and site reliability engineering runbook. Establishes the 
 
 ### 1.2 Component Responsibility & Decision Ownership
 
-| Component | Responsibility / Scope | Prohibited Actions / Invariants |
-| :--- | :--- | :--- |
-| **Browser / UI** | Displays masked profile/intent state; collects form inputs; follows secure handoff links (`/profile?returnTo=...`). | Makes zero booking or readiness decisions; stores zero unmasked sensitive PII in local storage, session storage, or URLs. |
-| **FastAPI Agent** | Executes `check_booking_readiness` tool; emits metadata-only `ACTION_REQUIRED` SSE events. | Never receives or handles passenger PII; never writes database rows; never executes financial or supplier bookings directly. |
-| **Profile Service** | Enforces user ownership (`userId === token.sub`); executes revision CAS (`expectedRevision`); manages atomic document replacement. | Never logs decrypted document data; never leaks other users' profile records; never returns raw ciphertext. |
-| **Pure Evaluator** | Side-effect-free deterministic rule engine evaluating domestic vs international completeness, passport validity, and warnings. | Performs zero database, network, cache, or external API I/O; enforces zero hard 180-day passport blocking (advisory warning only). |
-| **Advisory Service** | Resolves flight segments, airport countries, and passenger sources; projects safe readiness shape with revision metadata. | Performs zero database writes; creates zero intent or snapshot rows; makes zero external supplier API calls. |
-| **Intent Service** | Executes authoritative validation in transactional boundary; captures immutable passenger snapshots; creates `BookingIntent`. | Creates zero partial state on rejection (atomic rollback); never permits unowned profile references or revision mismatches. |
-| **Final Validator** | Authenticates context-bound AES-256-GCM ciphertext; revalidates document expiry against live clock; creates ephemeral Duffel DTO. | Operates strictly within the winning payment claim lock; never logs decrypted PII; never proceeds if MAC tag or AAD fails. |
-| **Duffel Boundary** | Live offer verification and order booking (`duffel.orders.create`). | Called strictly once per confirmed transaction by deterministic NestJS service; never called during readiness checks. |
-| **Stripe Boundary** | Customer payment intent creation, authorization hold, and capture. | Payment authorization is voided/released immediately if final passenger validation fails before Duffel order creation. |
+| Component            | Responsibility / Scope                                                                                                             | Prohibited Actions / Invariants                                                                                                    |
+| :------------------- | :--------------------------------------------------------------------------------------------------------------------------------- | :--------------------------------------------------------------------------------------------------------------------------------- |
+| **Browser / UI**     | Displays masked profile/intent state; collects form inputs; follows secure handoff links (`/profile?returnTo=...`).                | Makes zero booking or readiness decisions; stores zero unmasked sensitive PII in local storage, session storage, or URLs.          |
+| **FastAPI Agent**    | Executes `check_booking_readiness` tool; emits metadata-only `ACTION_REQUIRED` SSE events.                                         | Never receives or handles passenger PII; never writes database rows; never executes financial or supplier bookings directly.       |
+| **Profile Service**  | Enforces user ownership (`userId === token.sub`); executes revision CAS (`expectedRevision`); manages atomic document replacement. | Never logs decrypted document data; never leaks other users' profile records; never returns raw ciphertext.                        |
+| **Pure Evaluator**   | Side-effect-free deterministic rule engine evaluating domestic vs international completeness, passport validity, and warnings.     | Performs zero database, network, cache, or external API I/O; enforces zero hard 180-day passport blocking (advisory warning only). |
+| **Advisory Service** | Resolves flight segments, airport countries, and passenger sources; projects safe readiness shape with revision metadata.          | Performs zero database writes; creates zero intent or snapshot rows; makes zero external supplier API calls.                       |
+| **Intent Service**   | Executes authoritative validation in transactional boundary; captures immutable passenger snapshots; creates `BookingIntent`.      | Creates zero partial state on rejection (atomic rollback); never permits unowned profile references or revision mismatches.        |
+| **Final Validator**  | Authenticates context-bound AES-256-GCM ciphertext; revalidates document expiry against live clock; creates ephemeral Duffel DTO.  | Operates strictly within the winning payment claim lock; never logs decrypted PII; never proceeds if MAC tag or AAD fails.         |
+| **Duffel Boundary**  | Live offer verification and order booking (`duffel.orders.create`).                                                                | Called strictly once per confirmed transaction by deterministic NestJS service; never called during readiness checks.              |
+| **Stripe Boundary**  | Customer payment intent creation, authorization hold, and capture.                                                                 | Payment authorization is voided/released immediately if final passenger validation fails before Duffel order creation.             |
 
 ---
 
@@ -96,13 +96,13 @@ Feature 16 operations and site reliability engineering runbook. Establishes the 
 
 ### 2.1 Feature Flags Specification
 
-| Environment Variable | Service Layer | Default | Safe State / Runtime Relationship |
-| :--- | :--- | :--- | :--- |
-| `FEATURE_FLAG_BOOKING_READINESS` | Backend NestJS API (`apps/api`) | `false` | Master backend switch. When `true`, enables `/api/profile`, `/api/bookings/intents/readiness`, plural `/api/bookings/intents`, and agent gateway readiness endpoints. When `false`, returns 404 FEATURE_DISABLED on new-only endpoints while legacy checkout continues. |
-| `NEXT_PUBLIC_FEATURE_FLAG_BOOKING_READINESS` | Frontend Next.js Web (`apps/web`) | `false` | Master frontend switch. When `true`, activates profile page UI (`/profile`), plural passenger checkout form, and masked review page. When `false`, falls back to legacy single-passenger checkout form. |
-| `PASSPORT_ADVISORY_BUFFER_DAYS` | Backend NestJS API (`apps/api`) | `180` | Configurable advisory window (clamped between 30 and 365 days). Passports expiring within this buffer after trip completion generate `PASSPORT_VALIDITY_REQUIRES_VERIFICATION` warning without blocking booking. |
-| `FEATURE_FLAG_CHAT_HANDOFF_ISSUE` | Backend NestJS / Python Agent | `false` | Chatbot handoff issuance toggle. Must be enabled only after booking readiness is verified in API. |
-| `FEATURE_FLAG_CHAT_HANDOFF_ACCEPT` | Backend NestJS API | `false` | Chatbot handoff acceptance toggle. Must be active before issuance. |
+| Environment Variable                         | Service Layer                     | Default | Safe State / Runtime Relationship                                                                                                                                                                                                                                       |
+| :------------------------------------------- | :-------------------------------- | :------ | :---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `FEATURE_FLAG_BOOKING_READINESS`             | Backend NestJS API (`apps/api`)   | `false` | Master backend switch. When `true`, enables `/api/profile`, `/api/bookings/intents/readiness`, plural `/api/bookings/intents`, and agent gateway readiness endpoints. When `false`, returns 404 FEATURE_DISABLED on new-only endpoints while legacy checkout continues. |
+| `NEXT_PUBLIC_FEATURE_FLAG_BOOKING_READINESS` | Frontend Next.js Web (`apps/web`) | `false` | Master frontend switch. When `true`, activates profile page UI (`/profile`), plural passenger checkout form, and masked review page. When `false`, falls back to legacy single-passenger checkout form.                                                                 |
+| `PASSPORT_ADVISORY_BUFFER_DAYS`              | Backend NestJS API (`apps/api`)   | `180`   | Configurable advisory window (clamped between 30 and 365 days). Passports expiring within this buffer after trip completion generate `PASSPORT_VALIDITY_REQUIRES_VERIFICATION` warning without blocking booking.                                                        |
+| `FEATURE_FLAG_CHAT_HANDOFF_ISSUE`            | Backend NestJS / Python Agent     | `false` | Chatbot handoff issuance toggle. Must be enabled only after booking readiness is verified in API.                                                                                                                                                                       |
+| `FEATURE_FLAG_CHAT_HANDOFF_ACCEPT`           | Backend NestJS API                | `false` | Chatbot handoff acceptance toggle. Must be active before issuance.                                                                                                                                                                                                      |
 
 ### 2.2 Controlled 5-Step Rollout Order
 
@@ -136,16 +136,17 @@ Feature 16 operations and site reliability engineering runbook. Establishes the 
 ### 2.3 Invalid & Unsafe Configuration Combinations
 
 - ❌ **INVALID**: `NEXT_PUBLIC_FEATURE_FLAG_BOOKING_READINESS=true` with backend `FEATURE_FLAG_BOOKING_READINESS=false`.
-  *Impact*: Web frontend attempts to invoke `/api/bookings/intents/readiness` and `/api/profile`, receiving 503 errors and crashing checkout flows.
+  _Impact_: Web frontend attempts to invoke `/api/bookings/intents/readiness` and `/api/profile`, receiving 503 errors and crashing checkout flows.
 - ❌ **INVALID**: `FEATURE_FLAG_CHAT_HANDOFF_ISSUE=true` with `FEATURE_FLAG_BOOKING_READINESS=false`.
-  *Impact*: Chat emits handoffs that cannot complete readiness evaluation or plural snapshot persistence.
+  _Impact_: Chat emits handoffs that cannot complete readiness evaluation or plural snapshot persistence.
 - ❌ **UNSAFE**: Setting `FEATURE_FLAG_BOOKING_READINESS=true` without a verified `ENCRYPTION_KEY` in environment.
-  *Impact*: `EncryptionService` fails fast on boot or throws `SNAPSHOT_INTEGRITY_FAILURE` during intent creation, blocking all checkouts.
+  _Impact_: `EncryptionService` fails fast on boot or throws `SNAPSHOT_INTEGRITY_FAILURE` during intent creation, blocking all checkouts.
 - ❌ **UNSAFE**: Prematurely dropping the legacy `passportExpiry` column before backfill completion and dual-write deprecation sign-off.
 
 ### 2.4 Instant Emergency Rollback
 
 To instantly roll back the feature without service interruption or database restoration:
+
 1. Set `NEXT_PUBLIC_FEATURE_FLAG_BOOKING_READINESS=false` in web deployment and deploy immediately.
 2. Set `FEATURE_FLAG_BOOKING_READINESS=false` in API deployment.
 3. Web application immediately reverts to legacy single-passenger checkout form with `useProfile` parameter.
@@ -160,27 +161,29 @@ To instantly roll back the feature without service interruption or database rest
 
 The system implements 11 standardized, PII-free Prometheus/OpenTelemetry metric counters declared in `BOOKING_READINESS_METRIC_COUNTERS` (`apps/api/src/common/observability/booking-readiness.metrics.ts`):
 
-| Metric Counter Identifier | Type | Trigger / Call Site | Operational Meaning & Anomaly Trigger |
-| :--- | :--- | :--- | :--- |
-| `traveler_profile_reads_total` | Counter | `GET /api/profile` | Total profile read requests. A drop to 0 indicates web-to-API routing failure. |
-| `traveler_profile_updates_total` | Counter | `PATCH /api/profile` | Total successful profile creations and revision increments. |
-| `traveler_profile_conflicts_total` | Counter | `PATCH /api/profile` (HTTP 409) | CAS revision conflicts (`PROFILE_UPDATE_CONFLICT`). Spike indicates concurrent multi-tab edits or stale client forms. |
-| `booking_readiness_checks_total` | Counter | `POST /api/bookings/intents/readiness` & Agent Gateway | Total advisory readiness checks requested by web and chat agents. |
-| `booking_readiness_evaluations_total` | Counter | `BookingReadinessEvaluator.evaluate` | Pure evaluator execution count across both advisory and authoritative paths. |
-| `booking_intent_creations_total` | Counter | `POST /api/bookings/intents` (HTTP 201) | Total successfully created booking intents with persisted passenger snapshots. |
-| `booking_intent_authoritative_rejections_total` | Counter | `POST /api/bookings/intents` (HTTP 422) | Authoritative intent creation rejections (`BOOKING_NOT_READY`). Spike indicates client bypassed advisory check. |
-| `booking_passenger_final_validation_total` | Counter | `BookingPassengerFinalValidatorService.validate` | Total final validation attempts executed immediately before Duffel order creation. |
-| `booking_passenger_final_validation_failures_total` | Counter | Final Validator Failure / Exception | Final validation failures (AAD mismatch, expired passport, corrupted snapshot). **Zero tolerance metric**. |
-| `passport_expiry_backfill_runs_total` | Counter | `PassportExpiryBackfillService.backfill` | Total scheduled or manual backfill job executions. |
-| `passport_expiry_backfill_quarantined_total` | Counter | Backfill Decrypt/Compare Mismatch | Profiles quarantined during backfill due to verification mismatch. Spike triggers job abort. |
+| Metric Counter Identifier                           | Type    | Trigger / Call Site                                    | Operational Meaning & Anomaly Trigger                                                                                 |
+| :-------------------------------------------------- | :------ | :----------------------------------------------------- | :-------------------------------------------------------------------------------------------------------------------- |
+| `traveler_profile_reads_total`                      | Counter | `GET /api/profile`                                     | Total profile read requests. A drop to 0 indicates web-to-API routing failure.                                        |
+| `traveler_profile_updates_total`                    | Counter | `PATCH /api/profile`                                   | Total successful profile creations and revision increments.                                                           |
+| `traveler_profile_conflicts_total`                  | Counter | `PATCH /api/profile` (HTTP 409)                        | CAS revision conflicts (`PROFILE_UPDATE_CONFLICT`). Spike indicates concurrent multi-tab edits or stale client forms. |
+| `booking_readiness_checks_total`                    | Counter | `POST /api/bookings/intents/readiness` & Agent Gateway | Total advisory readiness checks requested by web and chat agents.                                                     |
+| `booking_readiness_evaluations_total`               | Counter | `BookingReadinessEvaluator.evaluate`                   | Pure evaluator execution count across both advisory and authoritative paths.                                          |
+| `booking_intent_creations_total`                    | Counter | `POST /api/bookings/intents` (HTTP 201)                | Total successfully created booking intents with persisted passenger snapshots.                                        |
+| `booking_intent_authoritative_rejections_total`     | Counter | `POST /api/bookings/intents` (HTTP 422)                | Authoritative intent creation rejections (`BOOKING_NOT_READY`). Spike indicates client bypassed advisory check.       |
+| `booking_passenger_final_validation_total`          | Counter | `BookingPassengerFinalValidatorService.validate`       | Total final validation attempts executed immediately before Duffel order creation.                                    |
+| `booking_passenger_final_validation_failures_total` | Counter | Final Validator Failure / Exception                    | Final validation failures (AAD mismatch, expired passport, corrupted snapshot). **Zero tolerance metric**.            |
+| `passport_expiry_backfill_runs_total`               | Counter | `PassportExpiryBackfillService.backfill`               | Total scheduled or manual backfill job executions.                                                                    |
+| `passport_expiry_backfill_quarantined_total`        | Counter | Backfill Decrypt/Compare Mismatch                      | Profiles quarantined during backfill due to verification mismatch. Spike triggers job abort.                          |
 
 ### 3.2 Health Check Endpoints
 
 The API exposes dual health check endpoints (`apps/api/src/health/health.controller.ts`):
+
 - Canonical Root: `GET /health/booking-readiness`
 - API Prefix Mirror: `GET /api/health/booking-readiness`
 
 #### Response Contract (HTTP 200 OK):
+
 ```json
 {
   "status": "ok",
@@ -202,10 +205,46 @@ The API exposes dual health check endpoints (`apps/api/src/health/health.control
     "passport_expiry_backfill_quarantined_total": 0
   },
   "latency": {
-    "profile_read": { "count": 1420, "p50": 12, "p90": 28, "p95": 38, "p99": 65, "min": 4, "max": 110, "avg": 16.4 },
-    "readiness_advisory": { "count": 1850, "p50": 22, "p90": 54, "p95": 72, "p99": 115, "min": 8, "max": 180, "avg": 28.1 },
-    "intent_create": { "count": 298, "p50": 45, "p90": 98, "p95": 142, "p99": 210, "min": 20, "max": 285, "avg": 56.7 },
-    "final_passenger_validation": { "count": 295, "p50": 6, "p90": 14, "p95": 19, "p99": 32, "min": 2, "max": 48, "avg": 8.2 }
+    "profile_read": {
+      "count": 1420,
+      "p50": 12,
+      "p90": 28,
+      "p95": 38,
+      "p99": 65,
+      "min": 4,
+      "max": 110,
+      "avg": 16.4
+    },
+    "readiness_advisory": {
+      "count": 1850,
+      "p50": 22,
+      "p90": 54,
+      "p95": 72,
+      "p99": 115,
+      "min": 8,
+      "max": 180,
+      "avg": 28.1
+    },
+    "intent_create": {
+      "count": 298,
+      "p50": 45,
+      "p90": 98,
+      "p95": 142,
+      "p99": 210,
+      "min": 20,
+      "max": 285,
+      "avg": 56.7
+    },
+    "final_passenger_validation": {
+      "count": 295,
+      "p50": 6,
+      "p90": 14,
+      "p95": 19,
+      "p99": 32,
+      "min": 2,
+      "max": 48,
+      "avg": 8.2
+    }
   },
   "featureFlags": {
     "bookingReadiness": true
@@ -214,6 +253,7 @@ The API exposes dual health check endpoints (`apps/api/src/health/health.control
 ```
 
 #### Degraded Response Contract (HTTP 503 Service Unavailable):
+
 ```json
 {
   "status": "degraded",
@@ -232,6 +272,7 @@ The API exposes dual health check endpoints (`apps/api/src/health/health.control
 ### 3.3 Structured JSON Log Format
 
 All logs emit structured JSON adhering to the strict schema:
+
 ```json
 {
   "timestamp": "2026-08-19T14:32:01.124Z",
@@ -251,6 +292,7 @@ All logs emit structured JSON adhering to the strict schema:
 ### 3.4 Zero-PII Invariant Guarantee
 
 The following sensitive tokens and customer personal information **MUST NEVER** appear in logs, trace headers, audit metadata, Grafana metric labels, or HTTP error payloads:
+
 - `givenName`, `middleName`, `familyName` (Customer names)
 - `dateOfBirth`, `born_on` (Dates of birth)
 - `email`, `phoneCountryCode`, `phoneNumber` (Contact details)
@@ -281,15 +323,15 @@ The production monitoring dashboard `Flight Booking - Traveler Profile & Booking
 
 ### 4.2 Standard Alert Rules & Thresholds
 
-| Alert Name | Condition & Query / Metric Source | Severity | Paging Channel | Remediation Target |
-| :--- | :--- | :--- | :--- | :--- |
-| `BookingReadinessServiceDegraded` | `GET /health/booking-readiness` health snapshot returns `status == 'degraded'` (or `dependencies.database == 'down'` / `dependencies.redis == 'down'`) for 2m | Critical | PagerDuty P1 | Immediate triage (Playbook A / Service & DB failure). |
-| `SnapshotIntegrityFailureSpike` | `increase(booking_passenger_final_validation_failures_total[5m]) > 0` | Critical | PagerDuty P1 | Investigate cryptographic key mismatch or DB corruption (Playbook C). |
-| `ProfileCasConflictRateHigh` | `rate(traveler_profile_conflicts_total[5m]) / rate(traveler_profile_updates_total[5m]) > 0.10` for 10m | Warning | Slack #eng-flight-alerts | Inspect client form revision caching or retry storm. |
-| `AuthoritativeRejectionSurge` | `rate(booking_intent_authoritative_rejections_total[5m]) / rate(booking_readiness_checks_total[5m]) > 0.05` for 15m | Warning | Slack #eng-flight-alerts | Investigate frontend advisory bypass or client validation desync. |
-| `BackfillQuarantineSpike` | `increase(passport_expiry_backfill_quarantined_total[1h]) > 0` or backfill abort | High | PagerDuty P2 | Pause backfill cron; inspect data drift (Playbook C & Section 8). |
-| `AdvisoryReadinessLatencyP95High` | `GET /health/booking-readiness` latency percentiles `latency.readiness_advisory.p95 > 300` ms for 10m | High | Slack #eng-flight-perf | Inspect airport country cache and query execution plan. |
-| `ProfileReadLatencyP95High` | `GET /health/booking-readiness` latency percentiles `latency.profile_read.p95 > 500` ms for 10m | High | Slack #eng-flight-perf | Inspect PostgreSQL traveler_profiles index latency. |
+| Alert Name                        | Condition & Query / Metric Source                                                                                                                             | Severity | Paging Channel           | Remediation Target                                                    |
+| :-------------------------------- | :------------------------------------------------------------------------------------------------------------------------------------------------------------ | :------- | :----------------------- | :-------------------------------------------------------------------- |
+| `BookingReadinessServiceDegraded` | `GET /health/booking-readiness` health snapshot returns `status == 'degraded'` (or `dependencies.database == 'down'` / `dependencies.redis == 'down'`) for 2m | Critical | PagerDuty P1             | Immediate triage (Playbook A / Service & DB failure).                 |
+| `SnapshotIntegrityFailureSpike`   | `increase(booking_passenger_final_validation_failures_total[5m]) > 0`                                                                                         | Critical | PagerDuty P1             | Investigate cryptographic key mismatch or DB corruption (Playbook C). |
+| `ProfileCasConflictRateHigh`      | `rate(traveler_profile_conflicts_total[5m]) / rate(traveler_profile_updates_total[5m]) > 0.10` for 10m                                                        | Warning  | Slack #eng-flight-alerts | Inspect client form revision caching or retry storm.                  |
+| `AuthoritativeRejectionSurge`     | `rate(booking_intent_authoritative_rejections_total[5m]) / rate(booking_readiness_checks_total[5m]) > 0.05` for 15m                                           | Warning  | Slack #eng-flight-alerts | Investigate frontend advisory bypass or client validation desync.     |
+| `BackfillQuarantineSpike`         | `increase(passport_expiry_backfill_quarantined_total[1h]) > 0` or backfill abort                                                                              | High     | PagerDuty P2             | Pause backfill cron; inspect data drift (Playbook C & Section 8).     |
+| `AdvisoryReadinessLatencyP95High` | `GET /health/booking-readiness` latency percentiles `latency.readiness_advisory.p95 > 300` ms for 10m                                                         | High     | Slack #eng-flight-perf   | Inspect airport country cache and query execution plan.               |
+| `ProfileReadLatencyP95High`       | `GET /health/booking-readiness` latency percentiles `latency.profile_read.p95 > 500` ms for 10m                                                               | High     | Slack #eng-flight-perf   | Inspect PostgreSQL traveler_profiles index latency.                   |
 
 ---
 
@@ -299,13 +341,13 @@ The production monitoring dashboard `Flight Booking - Traveler Profile & Booking
 
 Measured across benchmark suites on production-equivalent environments with isolated PostgreSQL and Redis instances:
 
-| Operation | SLA Limit | Target Baseline | Measured p50 | Measured p90 | Measured p95 | Gate Status |
-| :--- | :--- | :--- | :--- | :--- | :--- | :--- |
-| **Profile Read (`GET /api/profile`)** | `< 500 ms` | `< 50 ms` | `12.4 ms` | `28.6 ms` | `38.2 ms` | **PASS** |
-| **Profile Update (`PATCH /api/profile`)** | `< 500 ms` | `< 80 ms` | `24.1 ms` | `52.8 ms` | `68.5 ms` | **PASS** |
-| **Advisory Readiness (`POST .../readiness`)** | `< 300 ms` | `< 100 ms` | `22.5 ms` | `54.2 ms` | `72.1 ms` | **PASS** |
-| **Intent Creation (`POST .../intents`)** | `< 300 ms` | `< 200 ms` | `45.3 ms` | `98.6 ms` | `142.4 ms` | **PASS** |
-| **Final Passenger Validation** | `< 100 ms` | `< 30 ms` | `6.2 ms` | `14.8 ms` | `19.4 ms` | **PASS** |
+| Operation                                     | SLA Limit  | Target Baseline | Measured p50 | Measured p90 | Measured p95 | Gate Status |
+| :-------------------------------------------- | :--------- | :-------------- | :----------- | :----------- | :----------- | :---------- |
+| **Profile Read (`GET /api/profile`)**         | `< 500 ms` | `< 50 ms`       | `12.4 ms`    | `28.6 ms`    | `38.2 ms`    | **PASS**    |
+| **Profile Update (`PATCH /api/profile`)**     | `< 500 ms` | `< 80 ms`       | `24.1 ms`    | `52.8 ms`    | `68.5 ms`    | **PASS**    |
+| **Advisory Readiness (`POST .../readiness`)** | `< 300 ms` | `< 100 ms`      | `22.5 ms`    | `54.2 ms`    | `72.1 ms`    | **PASS**    |
+| **Intent Creation (`POST .../intents`)**      | `< 300 ms` | `< 200 ms`      | `45.3 ms`    | `98.6 ms`    | `142.4 ms`   | **PASS**    |
+| **Final Passenger Validation**                | `< 100 ms` | `< 30 ms`       | `6.2 ms`     | `14.8 ms`    | `19.4 ms`    | **PASS**    |
 
 ### 5.2 Concurrency & Race Condition Verification
 
@@ -326,11 +368,13 @@ Measured across benchmark suites on production-equivalent environments with isol
 ### Playbook A: Database Degradation / Connection Pool Saturation
 
 #### Symptoms:
+
 - Health check `GET /health/booking-readiness` returns HTTP 503 with `"dependencies": { "database": "down" }`.
 - API logs show `PrismaClientInitializationError` or `Timed out fetching a connection from the pool`.
 - Profile reads and intent creation requests fail with HTTP 500.
 
 #### Step-by-Step Resolution:
+
 1. **Assess Blast Radius**:
    Check Grafana Panel 4. Determine if database failure is localized to read replicas or primary PostgreSQL node.
 2. **Inspect Active Connection Pool & Locks**:
@@ -356,12 +400,14 @@ Measured across benchmark suites on production-equivalent environments with isol
 ### Playbook B: Redis Cache Loss / Partition Recovery
 
 #### Symptoms:
+
 - Health check `GET /health/booking-readiness` returns HTTP 503 with `"status": "degraded"`, `"dependencies": { "redis": "down" }`.
 - Latency percentiles and distributed metrics fail to sync across API nodes.
 
 #### Step-by-Step Resolution:
+
 1. **Evaluate Impact**:
-   *Core Invariant*: PostgreSQL is the source of truth for all traveler profiles, booking intents, and passenger snapshots. Redis stores only ephemeral metrics, rate limits, and chat session leases.
+   _Core Invariant_: PostgreSQL is the source of truth for all traveler profiles, booking intents, and passenger snapshots. Redis stores only ephemeral metrics, rate limits, and chat session leases.
 2. **Confirm Fallback Operation**:
    Verify that `BookingReadinessMetricsService` falls back to in-memory metric buffers without crashing customer checkouts.
 3. **Restart Redis / Resolve Sentinel Failover**:
@@ -378,12 +424,14 @@ Measured across benchmark suites on production-equivalent environments with isol
 ### Playbook C: Corrupted / Tampered AAD Recovery & Snapshot Integrity Failure
 
 #### Symptoms:
+
 - Critical alert `SnapshotIntegrityFailureSpike` triggers.
 - `booking_passenger_final_validation_failures_total` increments.
 - API throws `SNAPSHOT_INTEGRITY_FAILURE` or `Unsupported state or unable to authenticate data`.
 - Payments are blocked immediately before Duffel order creation.
 
 #### Step-by-Step Resolution:
+
 1. **Halt Key Rotation / Configuration Changes**:
    Immediately verify if `ENCRYPTION_KEY` was rotated or deployed incorrectly across nodes.
 2. **Inspect Cryptographic Context Integrity**:
@@ -412,10 +460,12 @@ Measured across benchmark suites on production-equivalent environments with isol
 ### Playbook D: Supplier Timeout / Duffel 504 Degradation During Payment Hold
 
 #### Symptoms:
+
 - Final passenger validation succeeds, but Duffel API times out or returns HTTP 504 during `duffel.orders.create()`.
 - Customer checkout shows error while payment intent is in `stripe_authorized` state.
 
 #### Step-by-Step Resolution:
+
 1. **Inspect Idempotency & Order Boundary**:
    Check `PaymentService.executeConfirmPayment` execution log. The pipeline strictly encapsulates supplier order creation within the idempotency lock.
 2. **Confirm Automatic Void / Refund**:
@@ -445,11 +495,11 @@ Ciphertext Format:  v1:<iv_hex>:<auth_tag_hex>:<encrypted_hex>
 
 ### 7.2 Key Rotation Governance
 
-| Secret Name | Usage | Rotation Mechanism | Rollback Strategy |
-| :--- | :--- | :--- | :--- |
-| `ENCRYPTION_KEY` | AES-256-GCM field encryption for passport numbers and expiry dates. | Multi-version key ring support. Primary encryption key selected in priority order from `[ENCRYPTION_KEY_CURRENT, ENCRYPTION_KEY, ENCRYPTION_KEY_V2, ENCRYPTION_KEY_V1]`. Candidate decryption keys ring loaded from `[ENCRYPTION_KEY_CURRENT, ENCRYPTION_KEY, ENCRYPTION_KEY_PREVIOUS, ENCRYPTION_KEY_V2, ENCRYPTION_KEY_V1]`. All new writes use primary key; `decrypt` and `decryptBound` try primary then fallback across candidate ring. | Switch primary key back to previous key or remove new key from environment if verification fails. |
-| `JWT_SECRET` | Authentication tokens for API and web session. | Multi-secret JWT verifier ring (`JWT_SECRET_CURRENT`, `JWT_SECRET_PREVIOUS`). | Retain previous secret for 24-hour grace period before retiring. |
-| `CLAIM_TOKEN_SECRET` | HMAC-SHA256 signature for Python Agent to NestJS Gateway authentication. | Coordinated secret update supporting active and previous candidate signatures. | Revert agent and API config simultaneously. |
+| Secret Name          | Usage                                                                    | Rotation Mechanism                                                                                                                                                                                                                                                                                                                                                                                                                           | Rollback Strategy                                                                                 |
+| :------------------- | :----------------------------------------------------------------------- | :------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | :------------------------------------------------------------------------------------------------ |
+| `ENCRYPTION_KEY`     | AES-256-GCM field encryption for passport numbers and expiry dates.      | Multi-version key ring support. Primary encryption key selected in priority order from `[ENCRYPTION_KEY_CURRENT, ENCRYPTION_KEY, ENCRYPTION_KEY_V2, ENCRYPTION_KEY_V1]`. Candidate decryption keys ring loaded from `[ENCRYPTION_KEY_CURRENT, ENCRYPTION_KEY, ENCRYPTION_KEY_PREVIOUS, ENCRYPTION_KEY_V2, ENCRYPTION_KEY_V1]`. All new writes use primary key; `decrypt` and `decryptBound` try primary then fallback across candidate ring. | Switch primary key back to previous key or remove new key from environment if verification fails. |
+| `JWT_SECRET`         | Authentication tokens for API and web session.                           | Multi-secret JWT verifier ring (`JWT_SECRET_CURRENT`, `JWT_SECRET_PREVIOUS`).                                                                                                                                                                                                                                                                                                                                                                | Retain previous secret for 24-hour grace period before retiring.                                  |
+| `CLAIM_TOKEN_SECRET` | HMAC-SHA256 signature for Python Agent to NestJS Gateway authentication. | Coordinated secret update supporting active and previous candidate signatures.                                                                                                                                                                                                                                                                                                                                                               | Revert agent and API config simultaneously.                                                       |
 
 ### 7.3 Operator Key Rotation Procedure (ENCRYPTION_KEY)
 
@@ -476,12 +526,14 @@ Ciphertext Format:  v1:<iv_hex>:<auth_tag_hex>:<encrypted_hex>
 ### 8.1 Scheduled Cron Execution
 
 The `PassportExpiryBackfillService` runs automatically every day at midnight via `@Cron(CronExpression.EVERY_DAY_AT_MIDNIGHT)`:
+
 - **Batch Size**: Default 100 profiles per iteration.
 - **Target Selection**: Profiles where `passportExpiry IS NOT NULL` AND `passportExpiryCiphertext IS NULL`.
 
 ### 8.2 Optimistic Concurrency & Safe CAS
 
 To prevent overwriting concurrent traveler profile updates, the backfill updates rows using an optimistic predicate:
+
 ```typescript
 await this.prisma.travelerProfile.updateMany({
   where: {
@@ -495,11 +547,13 @@ await this.prisma.travelerProfile.updateMany({
   },
 });
 ```
+
 If the traveler updates their profile during backfill processing, `updateResult.count === 0`, and the backfill safely skips the row without error.
 
 ### 8.3 Quarantine Criteria and Abort Thresholds
 
 After generating the ciphertext, the service performs an immediate decrypt-and-compare sanity check:
+
 1. Decrypt ciphertext with context `{ travelerProfileId: profile.id, fieldName: 'passportExpiry' }`.
 2. Compare decrypted date timestamp against legacy date timestamp.
 3. If decryption fails or dates mismatch:
@@ -533,11 +587,12 @@ Booking Intent Passenger Snapshot AAD Context:
 }
 ```
 
-*Security Invariant*: Ciphertext cannot be copied between users, between different booking intents, between passenger positions in the same booking, or between document fields. Any tampering causes AES-GCM authentication tag verification to fail immediately.
+_Security Invariant_: Ciphertext cannot be copied between users, between different booking intents, between passenger positions in the same booking, or between document fields. Any tampering causes AES-GCM authentication tag verification to fail immediately.
 
 ### 9.2 Masked Summary Projections
 
 Intent queries (`GET /api/bookings/intents/:id`) and Review UI (`/checkout/[intentId]/review`) project strictly masked passenger summaries:
+
 - **Masked Passport**: `•••• 5678` (or `•••• ••••` if short). Full passport number is **NEVER** returned.
 - **Masked Contact**: `j•••@example.com` and `+1••••5678`.
 - **Date of Birth**: Completely omitted from intent response DTOs.
@@ -548,15 +603,16 @@ Intent queries (`GET /api/bookings/intents/:id`) and Review UI (`/checkout/[inte
 
 ### 10.1 Safe Rollback Decision Matrix
 
-| Trigger Event | Immediate Action | Secondary Action | Blast Radius |
-| :--- | :--- | :--- | :--- |
-| **High 5xx error rate on /api/profile** | Disable Web Flag `NEXT_PUBLIC_FEATURE_FLAG_BOOKING_READINESS=false`. | Disable API Flag `FEATURE_FLAG_BOOKING_READINESS=false`. | Profile editing disabled; checkout reverts to legacy form. |
-| **High failure rate on Intent Creation** | Disable Web Flag `NEXT_PUBLIC_FEATURE_FLAG_BOOKING_READINESS=false`. | Singular route `/api/bookings/intent` serves legacy checkout. | Checkout continues uninterrupted via legacy pipeline. |
-| **Cryptographic decryption failures** | Pause Backfill Cron; disable Chat Handoff issuance. | Verify `ENCRYPTION_KEY` across all API instances. | Zero financial loss; payment holds voided safely. |
+| Trigger Event                            | Immediate Action                                                     | Secondary Action                                              | Blast Radius                                               |
+| :--------------------------------------- | :------------------------------------------------------------------- | :------------------------------------------------------------ | :--------------------------------------------------------- |
+| **High 5xx error rate on /api/profile**  | Disable Web Flag `NEXT_PUBLIC_FEATURE_FLAG_BOOKING_READINESS=false`. | Disable API Flag `FEATURE_FLAG_BOOKING_READINESS=false`.      | Profile editing disabled; checkout reverts to legacy form. |
+| **High failure rate on Intent Creation** | Disable Web Flag `NEXT_PUBLIC_FEATURE_FLAG_BOOKING_READINESS=false`. | Singular route `/api/bookings/intent` serves legacy checkout. | Checkout continues uninterrupted via legacy pipeline.      |
+| **Cryptographic decryption failures**    | Pause Backfill Cron; disable Chat Handoff issuance.                  | Verify `ENCRYPTION_KEY` across all API instances.             | Zero financial loss; payment holds voided safely.          |
 
 ### 10.2 Graceful Degradation to Legacy Checkout
 
 When the feature flag is disabled:
+
 1. The Next.js web application hides the Profile navigation link and routes passenger entry through the legacy single-passenger form.
 2. The legacy form submits `useProfile: true | false` to `/api/bookings/intent`.
 3. The NestJS API translates `useProfile: true` on the primary passenger to the user's owned profile using dual-written legacy columns.

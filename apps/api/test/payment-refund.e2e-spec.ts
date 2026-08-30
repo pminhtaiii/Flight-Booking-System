@@ -76,7 +76,6 @@ describe('Payment Refund (E2E)', () => {
     await prisma.auditLog.deleteMany({});
     await prisma.user.deleteMany({});
 
-
     // Create admin and regular users
     const admin = await prisma.user.create({
       data: {
@@ -87,7 +86,10 @@ describe('Payment Refund (E2E)', () => {
       },
     });
     adminUser = { id: admin.id, email: admin.email };
-    adminToken = jwtService.sign({ id: admin.id, email: admin.email, role: 'ADMIN' }, { expiresIn: '24h' });
+    adminToken = jwtService.sign(
+      { id: admin.id, email: admin.email, role: 'ADMIN' },
+      { expiresIn: '24h' },
+    );
 
     const regular = await prisma.user.create({
       data: {
@@ -98,7 +100,10 @@ describe('Payment Refund (E2E)', () => {
       },
     });
     regularUser = { id: regular.id, email: regular.email };
-    regularToken = jwtService.sign({ id: regular.id, email: regular.email, role: 'USER' }, { expiresIn: '24h' });
+    regularToken = jwtService.sign(
+      { id: regular.id, email: regular.email, role: 'USER' },
+      { expiresIn: '24h' },
+    );
   });
 
   async function createFlightOffer() {
@@ -331,6 +336,3 @@ describe('Payment Refund (E2E)', () => {
     });
   });
 });
-
-
-

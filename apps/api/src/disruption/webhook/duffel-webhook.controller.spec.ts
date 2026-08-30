@@ -79,12 +79,20 @@ describe('DuffelWebhookController', () => {
       body: payload,
     } as unknown as Request;
 
-    mockInboxService.createEvent.mockResolvedValue({ id: 'uuid-123', supplierEventId: 'wev_1', status: 'PENDING' });
+    mockInboxService.createEvent.mockResolvedValue({
+      id: 'uuid-123',
+      supplierEventId: 'wev_1',
+      status: 'PENDING',
+    });
 
     const result = await controller.handleWebhook(mockReq, 't=123,v1=sig');
 
     expect(result).toEqual({ received: true });
-    expect(signatureService.verifySignature).toHaveBeenCalledWith((mockReq as unknown as { rawBody: Buffer }).rawBody, 't=123,v1=sig', 'test-secret');
+    expect(signatureService.verifySignature).toHaveBeenCalledWith(
+      (mockReq as unknown as { rawBody: Buffer }).rawBody,
+      't=123,v1=sig',
+      'test-secret',
+    );
     expect(inboxService.createEvent).toHaveBeenCalledWith(
       'wev_1',
       'idem_key',

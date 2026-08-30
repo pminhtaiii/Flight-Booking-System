@@ -18,7 +18,7 @@ export enum BookingReadinessMetric {
   GATEWAY_REQUEST_ERRORS = 'booking_readiness_gateway_request_errors_total',
   FINAL_VALIDATION_DURATION = 'booking_readiness_final_validation_duration_ms',
   FINAL_VALIDATION_ERRORS = 'booking_readiness_final_validation_errors_total',
-  
+
   READINESS_OUTCOMES = 'booking_readiness_outcomes_total',
   PROFILE_UPDATE_CONFLICT = 'booking_readiness_profile_update_conflict_total',
   PROFILE_CHANGED = 'booking_readiness_profile_changed_total',

@@ -2,12 +2,12 @@
 
 ## Authority Boundaries
 
-| Store | Owned data | Explicit exclusions |
-|---|---|---|
-| PostgreSQL / NestJS | Soft-deletable ChatSession, encrypted ChatMessage/title envelopes, temporary inventoried legacy plaintext through reversible observation, BookingAgentProjection, ChatHandoff lifecycle, audit records | No plaintext handoff token or encryption key material; no ChatMessage/title plaintext after approved Phase 17/T102 |
-| Redis / agent | Daily and burst counters, session lease, PII-free Trusted Search Snapshot | No message content, summary, token, passenger/contact/passport/payment data |
-| LangGraph AgentState | Per-turn messages and typed routing/snapshot/handoff state | No service secret, raw JWT, API key, claim secret, payment data |
-| Browser | Rendered messages and strict action-event state | No offer identifiers; token exists only transiently in the event/bootstrap POST and never in URL, browser storage, analytics, or readable cookies |
+| Store                | Owned data                                                                                                                                                                                             | Explicit exclusions                                                                                                                               |
+| -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------- |
+| PostgreSQL / NestJS  | Soft-deletable ChatSession, encrypted ChatMessage/title envelopes, temporary inventoried legacy plaintext through reversible observation, BookingAgentProjection, ChatHandoff lifecycle, audit records | No plaintext handoff token or encryption key material; no ChatMessage/title plaintext after approved Phase 17/T102                                |
+| Redis / agent        | Daily and burst counters, session lease, PII-free Trusted Search Snapshot                                                                                                                              | No message content, summary, token, passenger/contact/passport/payment data                                                                       |
+| LangGraph AgentState | Per-turn messages and typed routing/snapshot/handoff state                                                                                                                                             | No service secret, raw JWT, API key, claim secret, payment data                                                                                   |
+| Browser              | Rendered messages and strict action-event state                                                                                                                                                        | No offer identifiers; token exists only transiently in the event/bootstrap POST and never in URL, browser storage, analytics, or readable cookies |
 
 ## Existing Durable Entities
 
@@ -15,32 +15,32 @@
 
 Existing Prisma model gains soft deletion so consumed handoff audit linkage remains representable.
 
-| Field | Type | Rules |
-|---|---|---|
-| id | UUID | Primary key; used as correlation boundary, never accepted without owner validation |
-| userId | UUID | Required relation to User; all access scoped by `{id, userId}` |
-| titleCiphertext / titleNonce / titleAuthTag | nullable encrypted envelope | Record-bound AES-256-GCM title; prevents title-derived message/itinerary PII from remaining plaintext |
-| titleKeyVersion | nullable positive int | External application key version |
-| createdAt / updatedAt / lastActiveAt | timestamps | Existing lifecycle fields |
-| deletedAt | nullable timestamp | Null while active; deletion revokes active handoffs and hides the session from ordinary queries without breaking consumed audit linkage |
-| messages | ChatMessage[] | Durable raw messages and summaries |
-| handoffs | ChatHandoff[] | New relation; cascade/restrict behavior described below |
+| Field                                       | Type                        | Rules                                                                                                                                   |
+| ------------------------------------------- | --------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| id                                          | UUID                        | Primary key; used as correlation boundary, never accepted without owner validation                                                      |
+| userId                                      | UUID                        | Required relation to User; all access scoped by `{id, userId}`                                                                          |
+| titleCiphertext / titleNonce / titleAuthTag | nullable encrypted envelope | Record-bound AES-256-GCM title; prevents title-derived message/itinerary PII from remaining plaintext                                   |
+| titleKeyVersion                             | nullable positive int       | External application key version                                                                                                        |
+| createdAt / updatedAt / lastActiveAt        | timestamps                  | Existing lifecycle fields                                                                                                               |
+| deletedAt                                   | nullable timestamp          | Null while active; deletion revokes active handoffs and hides the session from ordinary queries without breaking consumed audit linkage |
+| messages                                    | ChatMessage[]               | Durable raw messages and summaries                                                                                                      |
+| handoffs                                    | ChatHandoff[]               | New relation; cascade/restrict behavior described below                                                                                 |
 
 ### ChatMessage
 
 Existing Prisma model is migrated from plaintext content to a record-bound authenticated-encryption envelope. Legacy plaintext column `content` dropped in approved Phase 8E / Phase 17 (T102).
 
-| Field | Type | Rules |
-|---|---|---|
-| id | UUID | Primary key |
-| sessionId | UUID | Required ChatSession relation |
-| sender | USER or AGENT | Agent-authored batch endpoint must not permit a browser to forge AGENT messages |
-| type | STANDARD or SUMMARY | Summary is additive; raw STANDARD messages remain |
+| Field             | Type                | Rules                                                                                               |
+| ----------------- | ------------------- | --------------------------------------------------------------------------------------------------- |
+| id                | UUID                | Primary key                                                                                         |
+| sessionId         | UUID                | Required ChatSession relation                                                                       |
+| sender            | USER or AGENT       | Agent-authored batch endpoint must not permit a browser to forge AGENT messages                     |
+| type              | STANDARD or SUMMARY | Summary is additive; raw STANDARD messages remain                                                   |
 | contentCiphertext | bytes/base64 string | AES-256-GCM ciphertext; associated data binds message id, session id, sender, type, and key version |
-| contentNonce | bytes/base64 string | Unique 96-bit random nonce per encryption operation |
-| contentAuthTag | bytes/base64 string | Authentication tag when not stored as part of ciphertext |
-| contentKeyVersion | positive int | Selects the external application encryption key; key material never enters PostgreSQL |
-| createdAt | timestamp | Immutable creation time |
+| contentNonce      | bytes/base64 string | Unique 96-bit random nonce per encryption operation                                                 |
+| contentAuthTag    | bytes/base64 string | Authentication tag when not stored as part of ciphertext                                            |
+| contentKeyVersion | positive int        | Selects the external application encryption key; key material never enters PostgreSQL               |
+| createdAt         | timestamp           | Immutable creation time                                                                             |
 
 Encryption and retention rules:
 
@@ -53,17 +53,17 @@ Encryption and retention rules:
 
 Add a one-to-one `BookingAgentProjection` owned by NestJS rather than adding chatbot fields to Booking or deriving them from broad snapshots:
 
-| Field | Type | Rules |
-|---|---|---|
-| bookingId | UUID | Private one-to-one Booking relation; never returned |
-| agentReference | String | Unique opaque `bkref_<uuid>` lookup key |
-| status | safe enum/string | Accepted summary status only |
-| airline / origin / destination | strings | Accepted display logistics |
-| departureAt / arrivalAt | timestamps | Accepted display logistics |
-| durationMinutes / stopCount | integers | Accepted summary logistics |
-| flightNumber / baggageSummary | nullable strings | Detail tier only |
-| refundable / changeable | nullable booleans | Friendly detail-tier conditions only |
-| createdAt / updatedAt | timestamps | Projection lifecycle |
+| Field                          | Type              | Rules                                               |
+| ------------------------------ | ----------------- | --------------------------------------------------- |
+| bookingId                      | UUID              | Private one-to-one Booking relation; never returned |
+| agentReference                 | String            | Unique opaque `bkref_<uuid>` lookup key             |
+| status                         | safe enum/string  | Accepted summary status only                        |
+| airline / origin / destination | strings           | Accepted display logistics                          |
+| departureAt / arrivalAt        | timestamps        | Accepted display logistics                          |
+| durationMinutes / stopCount    | integers          | Accepted summary logistics                          |
+| flightNumber / baggageSummary  | nullable strings  | Detail tier only                                    |
+| refundable / changeable        | nullable booleans | Friendly detail-tier conditions only                |
+| createdAt / updatedAt          | timestamps        | Projection lifecycle                                |
 
 The projection is populated transactionally at booking confirmation, updated on supplier synchronization, and backfilled before tool enablement. Agent gateway queries select only this table's allowlisted columns and include tests that fail if `flightSnapshot`, `passengerSnapshot`, payment, PNR, or provider payload columns are loaded.
 
@@ -78,29 +78,29 @@ Migration behavior:
 
 Suggested Prisma model shape:
 
-| Field | Type | Rules |
-|---|---|---|
-| id | UUID | Random primary key; participates in token derivation but is never exposed |
-| userId | UUID | Required User relation; indexed |
-| chatSessionId | UUID | Required ChatSession relation; indexed with userId |
-| flightOfferId | UUID | Required FlightOffer relation; prevents accepting arbitrary provider identifier |
-| duffelOfferIdHash | String | SHA-256 of normalized Duffel offer ID for binding/audit without persisting another plaintext copy; exact ID remains on FlightOffer |
-| snapshotVersion | Int | Positive version of the latest search snapshot |
-| snapshotFingerprint | String | HMAC/SHA-256 fingerprint of normalized snapshot identity, not its display content |
-| selectionAttestationHash | String | SHA-256 digest of the verified NestJS-signed attestation; plaintext attestation is not persisted on ChatHandoff |
-| selectedOfferIndex | Int | One-based index, 1 through snapshot result count |
-| tokenHash | String | Unique SHA-256 hash of normalized full token; plaintext never stored |
-| tokenKeyVersion | Int | Positive version for HMAC secret rotation |
-| idempotencyKeyHash | String | Unique hash of user/session/snapshot/result binding |
-| expiresAt | DateTime | Must be later than creation and no later than configured max/offer freshness |
-| claimedAt | nullable DateTime | Set by pre-supplier CAS claim |
-| claimTokenHash | nullable String | Hash of an internal random claim token held only by the winning request |
-| claimExpiresAt | nullable DateTime | Short lease bounding recovery after worker/supplier failure |
-| claimRecoverAfter | nullable DateTime | Expiry plus uncertainty buffer; takeover is forbidden before this time after refresh loss |
-| consumedAt | nullable DateTime | Set once by CAS when BookingIntent is created |
-| consumedByBookingIntentId | nullable UUID | Unique optional BookingIntent relation; set atomically with consumedAt |
-| createdAt | DateTime | Default now |
-| updatedAt | DateTime | Updated automatically |
+| Field                     | Type              | Rules                                                                                                                              |
+| ------------------------- | ----------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
+| id                        | UUID              | Random primary key; participates in token derivation but is never exposed                                                          |
+| userId                    | UUID              | Required User relation; indexed                                                                                                    |
+| chatSessionId             | UUID              | Required ChatSession relation; indexed with userId                                                                                 |
+| flightOfferId             | UUID              | Required FlightOffer relation; prevents accepting arbitrary provider identifier                                                    |
+| duffelOfferIdHash         | String            | SHA-256 of normalized Duffel offer ID for binding/audit without persisting another plaintext copy; exact ID remains on FlightOffer |
+| snapshotVersion           | Int               | Positive version of the latest search snapshot                                                                                     |
+| snapshotFingerprint       | String            | HMAC/SHA-256 fingerprint of normalized snapshot identity, not its display content                                                  |
+| selectionAttestationHash  | String            | SHA-256 digest of the verified NestJS-signed attestation; plaintext attestation is not persisted on ChatHandoff                    |
+| selectedOfferIndex        | Int               | One-based index, 1 through snapshot result count                                                                                   |
+| tokenHash                 | String            | Unique SHA-256 hash of normalized full token; plaintext never stored                                                               |
+| tokenKeyVersion           | Int               | Positive version for HMAC secret rotation                                                                                          |
+| idempotencyKeyHash        | String            | Unique hash of user/session/snapshot/result binding                                                                                |
+| expiresAt                 | DateTime          | Must be later than creation and no later than configured max/offer freshness                                                       |
+| claimedAt                 | nullable DateTime | Set by pre-supplier CAS claim                                                                                                      |
+| claimTokenHash            | nullable String   | Hash of an internal random claim token held only by the winning request                                                            |
+| claimExpiresAt            | nullable DateTime | Short lease bounding recovery after worker/supplier failure                                                                        |
+| claimRecoverAfter         | nullable DateTime | Expiry plus uncertainty buffer; takeover is forbidden before this time after refresh loss                                          |
+| consumedAt                | nullable DateTime | Set once by CAS when BookingIntent is created                                                                                      |
+| consumedByBookingIntentId | nullable UUID     | Unique optional BookingIntent relation; set atomically with consumedAt                                                             |
+| createdAt                 | DateTime          | Default now                                                                                                                        |
+| updatedAt                 | DateTime          | Updated automatically                                                                                                              |
 
 Recommended constraints and indexes:
 
@@ -186,52 +186,52 @@ Invalid transitions:
 
 Pydantic strict model returned by Router:
 
-| Field | Type | Rules |
-|---|---|---|
-| intent | enum | GENERAL, SEARCH, BOOKING_INQUIRY, CHECKOUT only |
-| confidence | float | Inclusive range 0.0–1.0; never trusted alone for checkout |
-| commitment | bool | True only for explicit readiness to proceed, not preference/curiosity |
-| selectionIndex | nullable int | One-based positive integer; only meaningful for checkout-like intent |
+| Field          | Type         | Rules                                                                 |
+| -------------- | ------------ | --------------------------------------------------------------------- |
+| intent         | enum         | GENERAL, SEARCH, BOOKING_INQUIRY, CHECKOUT only                       |
+| confidence     | float        | Inclusive range 0.0–1.0; never trusted alone for checkout             |
+| commitment     | bool         | True only for explicit readiness to proceed, not preference/curiosity |
+| selectionIndex | nullable int | One-based positive integer; only meaningful for checkout-like intent  |
 
 Unknown or extra properties fail validation. Raw reasoning is not requested or persisted.
 
 ### TrustedSearchResult
 
-| Field | Type | Browser/LLM exposure |
-|---|---|---|
-| offerIndex | positive int | Number may be displayed |
-| flightOfferId | UUID | Never |
-| duffelOfferId | string | Never |
-| airline | string | Allowed display |
-| origin / destination | IATA strings | Allowed display |
-| departureAt | ISO timestamp | Allowed display |
-| arrivalAt | ISO timestamp | Allowed display |
-| price | decimal string | Allowed for current search result display only |
-| currency | ISO 4217 | Allowed display |
+| Field                | Type           | Browser/LLM exposure                           |
+| -------------------- | -------------- | ---------------------------------------------- |
+| offerIndex           | positive int   | Number may be displayed                        |
+| flightOfferId        | UUID           | Never                                          |
+| duffelOfferId        | string         | Never                                          |
+| airline              | string         | Allowed display                                |
+| origin / destination | IATA strings   | Allowed display                                |
+| departureAt          | ISO timestamp  | Allowed display                                |
+| arrivalAt            | ISO timestamp  | Allowed display                                |
+| price                | decimal string | Allowed for current search result display only |
+| currency             | ISO 4217       | Allowed display                                |
 
 ### TrustedSearchSnapshot
 
-| Field | Type | Rules |
-|---|---|---|
-| schemaVersion | literal 1 | Reject unknown versions |
-| snapshotVersion | positive int | Increment on each successful session search |
-| userId | UUID | Must match authenticated request; not sent to model/browser |
-| sessionId | UUID | Must match owned ChatSession; not sent to model/browser |
-| createdAt / expiresAt | timestamps | TTL no longer than local offer freshness |
-| fingerprint | string | HMAC/hash over normalized identity fields |
-| selectionAttestation | signed opaque string | NestJS-issued, service-only binding of user/session/ordered offers/version/expiry; never sent to model/browser or persisted on ChatHandoff in plaintext |
-| results | 1–5 TrustedSearchResult[] | Result index unique and contiguous from 1 |
+| Field                 | Type                      | Rules                                                                                                                                                   |
+| --------------------- | ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| schemaVersion         | literal 1                 | Reject unknown versions                                                                                                                                 |
+| snapshotVersion       | positive int              | Increment on each successful session search                                                                                                             |
+| userId                | UUID                      | Must match authenticated request; not sent to model/browser                                                                                             |
+| sessionId             | UUID                      | Must match owned ChatSession; not sent to model/browser                                                                                                 |
+| createdAt / expiresAt | timestamps                | TTL no longer than local offer freshness                                                                                                                |
+| fingerprint           | string                    | HMAC/hash over normalized identity fields                                                                                                               |
+| selectionAttestation  | signed opaque string      | NestJS-issued, service-only binding of user/session/ordered offers/version/expiry; never sent to model/browser or persisted on ChatHandoff in plaintext |
+| results               | 1–5 TrustedSearchResult[] | Result index unique and contiguous from 1                                                                                                               |
 
 Redis serialization is strict JSON. Before accepting it into AgentState, verify schema version, owner/session, expiry, result count/indexes, fingerprint, and absence of forbidden keys.
 
 ### CheckoutSignal
 
-| Field | Type | Rules |
-|---|---|---|
-| requested | literal true | Present only after valid signal tool call |
-| offerIndex | positive int | Must resolve in current snapshot |
-| snapshotVersion | positive int | Copied from current snapshot |
-| snapshotFingerprint | string | Copied from validated snapshot |
+| Field               | Type         | Rules                                     |
+| ------------------- | ------------ | ----------------------------------------- |
+| requested           | literal true | Present only after valid signal tool call |
+| offerIndex          | positive int | Must resolve in current snapshot          |
+| snapshotVersion     | positive int | Copied from current snapshot              |
+| snapshotFingerprint | string       | Copied from validated snapshot            |
 
 No token or service response is part of the signal.
 

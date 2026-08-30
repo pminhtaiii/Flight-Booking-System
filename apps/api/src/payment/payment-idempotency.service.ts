@@ -24,7 +24,10 @@ export class PaymentIdempotencyService {
     requestHash: string,
     userId: string,
     requestPath: string,
-  ): Promise<{ status: 'acquired'; lockedAt: Date } | { status: 'replay'; responseCode: number; responseBody: string }> {
+  ): Promise<
+    | { status: 'acquired'; lockedAt: Date }
+    | { status: 'replay'; responseCode: number; responseBody: string }
+  > {
     const now = new Date();
     const existing = await this.prisma.idempotencyKey.findUnique({
       where: { key },
@@ -41,9 +44,10 @@ export class PaymentIdempotencyService {
         return {
           status: 'replay',
           responseCode: existing.responseCode!,
-          responseBody: typeof existing.responseBody === 'string'
-            ? existing.responseBody
-            : JSON.stringify(existing.responseBody),
+          responseBody:
+            typeof existing.responseBody === 'string'
+              ? existing.responseBody
+              : JSON.stringify(existing.responseBody),
         };
       }
 
@@ -94,7 +98,9 @@ export class PaymentIdempotencyService {
       const err = error as { code?: string };
       // Handle race condition on duplicate key check
       if (err.code === 'P2002') {
-        this.logger.warn(`Race condition met for key creation: ${key}. Re-evaluating existing key logic.`);
+        this.logger.warn(
+          `Race condition met for key creation: ${key}. Re-evaluating existing key logic.`,
+        );
         return this.handleExistingKeyAfterRace(key, requestHash, userId, requestPath, now);
       }
       throw error;
@@ -110,7 +116,10 @@ export class PaymentIdempotencyService {
     userId: string,
     requestPath: string,
     now: Date,
-  ): Promise<{ status: 'acquired'; lockedAt: Date } | { status: 'replay'; responseCode: number; responseBody: string }> {
+  ): Promise<
+    | { status: 'acquired'; lockedAt: Date }
+    | { status: 'replay'; responseCode: number; responseBody: string }
+  > {
     const existing = await this.prisma.idempotencyKey.findUnique({
       where: { key },
     });
@@ -129,9 +138,10 @@ export class PaymentIdempotencyService {
       return {
         status: 'replay',
         responseCode: existing.responseCode!,
-        responseBody: typeof existing.responseBody === 'string'
-          ? existing.responseBody
-          : JSON.stringify(existing.responseBody),
+        responseBody:
+          typeof existing.responseBody === 'string'
+            ? existing.responseBody
+            : JSON.stringify(existing.responseBody),
       };
     }
 

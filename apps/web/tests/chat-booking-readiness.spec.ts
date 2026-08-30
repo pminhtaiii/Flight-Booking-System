@@ -1,4 +1,4 @@
-import { expect, test, type Page, type Route } from '@playwright/test';
+import { expect, test, type Route } from '@playwright/test';
 
 const WEB_ORIGIN = 'http://127.0.0.1:3000';
 
@@ -174,26 +174,12 @@ const MOCK_MALICIOUS_TARGET_MISMATCH_PAYLOAD = {
   target: '/checkout/passengers',
 };
 
-async function loginAsNewUser(page: Page): Promise<string> {
-  const unique = Date.now() + Math.floor(Math.random() * 10000);
-  const email = `traveler${unique}@example.com`;
-  await page.goto(`${WEB_ORIGIN}/register`);
-  await page.fill('input[name="email"]', email);
-  await page.fill('input[name="password"]', 'Password123!');
-  await page.click('button[type="submit"]');
-  await expect(page).toHaveURL(/.*127\.0\.0\.1:3000\/$/, { timeout: 30000 });
-  await page.waitForLoadState('networkidle');
-  await expect.poll(async () => {
-    const cookies = await page.context().cookies();
-    return cookies.some((c) => c.name.includes('next-auth'));
-  }).toBe(true);
-  return email;
-}
-
 test.describe('Booking Readiness Chat Handoff', () => {
   test.setTimeout(90000);
 
-  test('ACTION_REQUIRED SSE event renders BookingActionCard with missing field reasons and passenger groupings', async ({ page }) => {
+  test('ACTION_REQUIRED SSE event renders BookingActionCard with missing field reasons and passenger groupings', async ({
+    page,
+  }) => {
     await page.route(/.*:3002\/chat\/stream/, async (route: Route) => {
       if (route.request().method() === 'OPTIONS') {
         return route.fulfill({
@@ -201,7 +187,8 @@ test.describe('Booking Readiness Chat Handoff', () => {
           headers: {
             'Access-Control-Allow-Origin': WEB_ORIGIN,
             'Access-Control-Allow-Methods': 'POST, OPTIONS',
-            'Access-Control-Allow-Headers': 'Authorization, Content-Type, X-Trace-Id, X-Correlation-Id',
+            'Access-Control-Allow-Headers':
+              'Authorization, Content-Type, X-Trace-Id, X-Correlation-Id',
           },
         });
       }
@@ -225,7 +212,9 @@ test.describe('Booking Readiness Chat Handoff', () => {
 
     // Verify title and explanation for international scope with travel doc issues
     await expect(card).toContainText('Passport Required for International Flight');
-    await expect(card).toContainText('International flights require verified passport details before booking can be confirmed.');
+    await expect(card).toContainText(
+      'International flights require verified passport details before booking can be confirmed.',
+    );
 
     // Verify passenger grouping
     await expect(card).toContainText('Passenger 1 (Adult)');
@@ -240,7 +229,9 @@ test.describe('Booking Readiness Chat Handoff', () => {
     await expect(actionButton).toHaveText('Complete profile');
   });
 
-  test('"Complete profile" navigates to /profile with validated returnTo parameter', async ({ page }) => {
+  test('"Complete profile" navigates to /profile with validated returnTo parameter', async ({
+    page,
+  }) => {
     await page.route(/.*:3002\/chat\/stream/, async (route: Route) => {
       if (route.request().method() === 'OPTIONS') {
         return route.fulfill({
@@ -248,7 +239,8 @@ test.describe('Booking Readiness Chat Handoff', () => {
           headers: {
             'Access-Control-Allow-Origin': WEB_ORIGIN,
             'Access-Control-Allow-Methods': 'POST, OPTIONS',
-            'Access-Control-Allow-Headers': 'Authorization, Content-Type, X-Trace-Id, X-Correlation-Id',
+            'Access-Control-Allow-Headers':
+              'Authorization, Content-Type, X-Trace-Id, X-Correlation-Id',
           },
         });
       }
@@ -283,10 +275,14 @@ test.describe('Booking Readiness Chat Handoff', () => {
     await completeButton.click();
 
     // Verify URL navigated to /profile with validated returnTo containing sessionId and autoResume=true
-    await expect(page).toHaveURL(/\/profile\?returnTo=%2F%3FsessionId%3Dsess_return_test%26autoResume%3Dtrue/);
+    await expect(page).toHaveURL(
+      /\/profile\?returnTo=%2F%3FsessionId%3Dsess_return_test%26autoResume%3Dtrue/,
+    );
   });
 
-  test('multi-passenger action card navigates directly to /checkout/passengers with offerId and returnTo', async ({ page }) => {
+  test('multi-passenger action card navigates directly to /checkout/passengers with offerId and returnTo', async ({
+    page,
+  }) => {
     await page.route(/.*:3002\/chat\/stream/, async (route: Route) => {
       if (route.request().method() === 'OPTIONS') {
         return route.fulfill({
@@ -294,7 +290,8 @@ test.describe('Booking Readiness Chat Handoff', () => {
           headers: {
             'Access-Control-Allow-Origin': WEB_ORIGIN,
             'Access-Control-Allow-Methods': 'POST, OPTIONS',
-            'Access-Control-Allow-Headers': 'Authorization, Content-Type, X-Trace-Id, X-Correlation-Id',
+            'Access-Control-Allow-Headers':
+              'Authorization, Content-Type, X-Trace-Id, X-Correlation-Id',
           },
         });
       }
@@ -336,14 +333,24 @@ test.describe('Booking Readiness Chat Handoff', () => {
     await checkoutButton.click();
 
     // Verify it navigated to checkout with offerId and safe returnTo
-    await expect(page).toHaveURL(/\/checkout\/passengers\?offerId=off_test_123&returnTo=%2F%3FofferId%3Doff_test_123%26sessionId%3Dsess_multi_123%26autoResume%3Dtrue/);
+    await expect(page).toHaveURL(
+      /\/checkout\/passengers\?offerId=off_test_123&returnTo=%2F%3FofferId%3Doff_test_123%26sessionId%3Dsess_multi_123%26autoResume%3Dtrue/,
+    );
   });
 
-  test('negative privacy assertion - zero passenger PII in chat DOM, storage, or console logs', async ({ page }) => {
+  test('negative privacy assertion - zero passenger PII in chat DOM, storage, or console logs', async ({
+    page,
+  }) => {
     const logs: string[] = [];
     page.on('console', (msg) => logs.push(msg.text()));
 
-    const CANARY_VALUES = ['Jane Doe', 'P12345', 'sensitive-token-secret', 'N12345678', '901234567'];
+    const CANARY_VALUES = [
+      'Jane Doe',
+      'P12345',
+      'sensitive-token-secret',
+      'N12345678',
+      '901234567',
+    ];
 
     await page.route(/.*:3002\/chat\/stream/, async (route: Route) => {
       if (route.request().method() === 'OPTIONS') {
@@ -352,7 +359,8 @@ test.describe('Booking Readiness Chat Handoff', () => {
           headers: {
             'Access-Control-Allow-Origin': WEB_ORIGIN,
             'Access-Control-Allow-Methods': 'POST, OPTIONS',
-            'Access-Control-Allow-Headers': 'Authorization, Content-Type, X-Trace-Id, X-Correlation-Id',
+            'Access-Control-Allow-Headers':
+              'Authorization, Content-Type, X-Trace-Id, X-Correlation-Id',
           },
         });
       }
@@ -380,10 +388,12 @@ test.describe('Booking Readiness Chat Handoff', () => {
     }
 
     // 2. Assert localStorage and sessionStorage contain zero PII canary values
-    const storageData = await page.evaluate(() => JSON.stringify({
-      localStorage: { ...window.localStorage },
-      sessionStorage: { ...window.sessionStorage },
-    }));
+    const storageData = await page.evaluate(() =>
+      JSON.stringify({
+        localStorage: { ...window.localStorage },
+        sessionStorage: { ...window.sessionStorage },
+      }),
+    );
     for (const canary of CANARY_VALUES) {
       expect(storageData).not.toContain(canary);
     }
@@ -395,7 +405,9 @@ test.describe('Booking Readiness Chat Handoff', () => {
     }
   });
 
-  test('fail-closed security assertion - malicious value-bearing payloads are rejected with 0 cards rendered', async ({ page }) => {
+  test('fail-closed security assertion - malicious value-bearing payloads are rejected with 0 cards rendered', async ({
+    page,
+  }) => {
     await page.route(/.*:3002\/chat\/stream/, async (route: Route) => {
       if (route.request().method() === 'OPTIONS') {
         return route.fulfill({
@@ -403,7 +415,8 @@ test.describe('Booking Readiness Chat Handoff', () => {
           headers: {
             'Access-Control-Allow-Origin': WEB_ORIGIN,
             'Access-Control-Allow-Methods': 'POST, OPTIONS',
-            'Access-Control-Allow-Headers': 'Authorization, Content-Type, X-Trace-Id, X-Correlation-Id',
+            'Access-Control-Allow-Headers':
+              'Authorization, Content-Type, X-Trace-Id, X-Correlation-Id',
           },
         });
       }
@@ -452,9 +465,11 @@ test.describe('Booking Readiness Chat Handoff', () => {
 
   test('profile correction and safe return-and-retry flow', async ({ page, request, context }) => {
     // Clear lockout before registering new user
-    await request.post('http://127.0.0.1:3001/api/auth/test/reset-lockout', {
-      data: { clearAll: true },
-    }).catch(() => {});
+    await request
+      .post('http://127.0.0.1:3001/api/auth/test/reset-lockout', {
+        data: { clearAll: true },
+      })
+      .catch(() => {});
     await context.clearCookies();
 
     // Register user
@@ -475,7 +490,8 @@ test.describe('Booking Readiness Chat Handoff', () => {
           headers: {
             'Access-Control-Allow-Origin': WEB_ORIGIN,
             'Access-Control-Allow-Methods': 'POST, OPTIONS',
-            'Access-Control-Allow-Headers': 'Authorization, Content-Type, X-Trace-Id, X-Correlation-Id',
+            'Access-Control-Allow-Headers':
+              'Authorization, Content-Type, X-Trace-Id, X-Correlation-Id',
           },
         });
       }
@@ -551,13 +567,21 @@ test.describe('Booking Readiness Chat Handoff', () => {
     await completeButton.click();
 
     // 4. Browser navigates to /profile with validated returnTo
-    await expect(page).toHaveURL(new RegExp(`/profile\\?returnTo=%2F%3FsessionId%3D${activeSessionId}%26autoResume%3Dtrue`), { timeout: 15000 });
-    await expect(page.getByRole('heading', { name: 'Keep every detail ready for takeoff.' })).toBeVisible({ timeout: 15000 });
+    await expect(page).toHaveURL(
+      new RegExp(`/profile\\?returnTo=%2F%3FsessionId%3D${activeSessionId}%26autoResume%3Dtrue`),
+      { timeout: 15000 },
+    );
+    await expect(
+      page.getByRole('heading', { name: 'Keep every detail ready for takeoff.' }),
+    ).toBeVisible({ timeout: 15000 });
 
     // 5. Verify back link exists with safe return target
     const backLink = page.getByRole('link', { name: /Back to previous workspace/i });
     await expect(backLink).toBeVisible();
-    await expect(backLink).toHaveAttribute('href', `/?sessionId=${activeSessionId}&autoResume=true`);
+    await expect(backLink).toHaveAttribute(
+      'href',
+      `/?sessionId=${activeSessionId}&autoResume=true`,
+    );
 
     // 6. User fills required profile fields on /profile
     await page.getByLabel('Title').selectOption('ms');
@@ -574,9 +598,16 @@ test.describe('Booking Readiness Chat Handoff', () => {
 
     // 8. User returns back to chat via return link
     await page.getByRole('link', { name: /Return and continue booking/i }).click();
-    await expect(page).toHaveURL(new RegExp(`.*\\/\\?sessionId=${activeSessionId}&autoResume=true`), { timeout: 15000 });
+    await expect(page).toHaveURL(
+      new RegExp(`.*\\/\\?sessionId=${activeSessionId}&autoResume=true`),
+      { timeout: 15000 },
+    );
 
     // 9. Verify stream re-check occurred automatically on chat widget mount with autoResume=true
-    await expect.poll(() => streamRequests.some((req) => req.message === 'resume' && req.sessionId === activeSessionId)).toBe(true);
+    await expect
+      .poll(() =>
+        streamRequests.some((req) => req.message === 'resume' && req.sessionId === activeSessionId),
+      )
+      .toBe(true);
   });
 });

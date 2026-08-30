@@ -213,11 +213,11 @@ I couldn't retrieve your bookings right now. Please try again in a moment.
 
 ## Tool Registry Summary
 
-| Tool                   | `requires_confirmation` | Parameters           | Gateway Endpoint                          |
-|------------------------|------------------------|----------------------|-------------------------------------------|
-| `search_flights`       | `false`                | origin, destination, date, passengers | `GET /api/agent-gateway/flights/search`  |
-| `get_user_preferences` | `false`                | none                 | `GET /api/agent-gateway/users/preferences`|
-| `list_user_bookings`   | `false`                | none                 | `GET /api/agent-gateway/users/bookings`   |
+| Tool                   | `requires_confirmation` | Parameters                            | Gateway Endpoint                           |
+| ---------------------- | ----------------------- | ------------------------------------- | ------------------------------------------ |
+| `search_flights`       | `false`                 | origin, destination, date, passengers | `GET /api/agent-gateway/flights/search`    |
+| `get_user_preferences` | `false`                 | none                                  | `GET /api/agent-gateway/users/preferences` |
+| `list_user_bookings`   | `false`                 | none                                  | `GET /api/agent-gateway/users/bookings`    |
 
 ---
 

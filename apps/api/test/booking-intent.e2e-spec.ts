@@ -93,7 +93,6 @@ describe('Booking Intent (E2E)', () => {
     await prisma.auditLog.deleteMany({});
     await prisma.user.deleteMany({});
 
-
     // Create test users
     const uA = await prisma.user.create({
       data: {
@@ -134,7 +133,7 @@ describe('Booking Intent (E2E)', () => {
         adults: 1,
         children: 0,
         infants: 0,
-        price: new Prisma.Decimal(100.00),
+        price: new Prisma.Decimal(100.0),
         currency: 'USD',
         ...data,
       },
@@ -145,13 +144,17 @@ describe('Booking Intent (E2E)', () => {
     return createMockFlightOffer({
       rawOffer: {
         passengers: [{ id: 'pas_001', type: 'adult' }],
-        slices: [{
-          segments: [{
-            origin: { iata_code: 'SGN' },
-            destination: { iata_code: 'HAN' },
-            arriving_at: '2026-08-01T12:00:00Z',
-          }],
-        }],
+        slices: [
+          {
+            segments: [
+              {
+                origin: { iata_code: 'SGN' },
+                destination: { iata_code: 'HAN' },
+                arriving_at: '2026-08-01T12:00:00Z',
+              },
+            ],
+          },
+        ],
         expires_at: new Date(Date.now() + 3600 * 1000).toISOString(),
       },
     });
@@ -170,10 +173,12 @@ describe('Booking Intent (E2E)', () => {
   }
 
   describe('POST /api/bookings/intent', () => {
-    it('creates intent with valid passengers (201), encrypts PII, writes audit log, doesn\'t return passport fields', async () => {
+    it("creates intent with valid passengers (201), encrypts PII, writes audit log, doesn't return passport fields", async () => {
       const offer = await createMockFlightOffer({ adults: 1 });
 
-      const duffelSpy = jest.spyOn(duffelService['duffel'].offers, 'get').mockResolvedValue(liveOfferResponse('125.50'));
+      const duffelSpy = jest
+        .spyOn(duffelService['duffel'].offers, 'get')
+        .mockResolvedValue(liveOfferResponse('125.50'));
 
       const res = await request(app.getHttpServer())
         .post('/api/bookings/intent')
@@ -249,7 +254,9 @@ describe('Booking Intent (E2E)', () => {
         },
       });
 
-      const duffelSpy = jest.spyOn(duffelService['duffel'].offers, 'get').mockResolvedValue(liveOfferResponse());
+      const duffelSpy = jest
+        .spyOn(duffelService['duffel'].offers, 'get')
+        .mockResolvedValue(liveOfferResponse());
 
       const res = await request(app.getHttpServer())
         .post('/api/bookings/intent')
@@ -279,7 +286,9 @@ describe('Booking Intent (E2E)', () => {
       });
 
       expect(intent!.passengers[0].nationality).toBe('VN');
-      expect(encryptionService.decrypt(intent!.passengers[0].passportNumber!)).toBe('MYPASSPORT123');
+      expect(encryptionService.decrypt(intent!.passengers[0].passportNumber!)).toBe(
+        'MYPASSPORT123',
+      );
       expect(encryptionService.decrypt(intent!.passengers[0].passportExpiry!)).toBe('2032-12-31');
     });
 
@@ -377,10 +386,14 @@ describe('Booking Intent (E2E)', () => {
     it('rolls back intent creation if audit log write fails inside transaction', async () => {
       const offer = await createMockFlightOffer({ adults: 1 });
 
-      const duffelSpy = jest.spyOn(duffelService['duffel'].offers, 'get').mockResolvedValue(liveOfferResponse());
+      const duffelSpy = jest
+        .spyOn(duffelService['duffel'].offers, 'get')
+        .mockResolvedValue(liveOfferResponse());
 
       // Force AuditService.createLog to fail
-      const auditSpy = jest.spyOn(auditService, 'createLog').mockRejectedValue(new Error('Audit DB Down'));
+      const auditSpy = jest
+        .spyOn(auditService, 'createLog')
+        .mockRejectedValue(new Error('Audit DB Down'));
 
       await request(app.getHttpServer())
         .post('/api/bookings/intent')
@@ -416,7 +429,9 @@ describe('Booking Intent (E2E)', () => {
       const duffelError = new Error('Offer expired') as any;
       duffelError.status = 410;
 
-      const duffelSpy = jest.spyOn(duffelService['duffel'].offers, 'get').mockRejectedValue(duffelError);
+      const duffelSpy = jest
+        .spyOn(duffelService['duffel'].offers, 'get')
+        .mockRejectedValue(duffelError);
 
       const res = await request(app.getHttpServer())
         .post('/api/bookings/intent')
@@ -469,8 +484,14 @@ describe('Booking Intent (E2E)', () => {
   describe('Canonical plural routes and deprecated singular aliases', () => {
     it('evaluates readiness, creates atomically, and returns the same safe shape from plural and singular GETs without dateOfBirth', async () => {
       const offer = await createCanonicalFlightOffer();
-      const airportCountrySpy = jest.spyOn(airportsService, 'findCountriesByIataCodes')
-        .mockResolvedValue(new Map([['SGN', 'VN'], ['HAN', 'VN']]));
+      const airportCountrySpy = jest
+        .spyOn(airportsService, 'findCountriesByIataCodes')
+        .mockResolvedValue(
+          new Map([
+            ['SGN', 'VN'],
+            ['HAN', 'VN'],
+          ]),
+        );
       const source = {
         type: 'inline',
         givenName: 'Ada',
@@ -496,38 +517,48 @@ describe('Booking Intent (E2E)', () => {
         .set('x-correlation-id', 'correlation-phase8')
         .send({
           flightOfferId: offer.id,
-          passengers: [{
-            offerPassengerId: 'pas_001',
-            passengerType: PassengerType.ADULT,
-            source,
-          }],
+          passengers: [
+            {
+              offerPassengerId: 'pas_001',
+              passengerType: PassengerType.ADULT,
+              source,
+            },
+          ],
         })
         .expect(200);
 
       expect(readiness.body.ready).toBe(true);
       expect(readiness.body.scope).toBe('DOMESTIC');
 
-      const duffelSpy = jest.spyOn(duffelService['duffel'].offers, 'get').mockResolvedValue(liveOfferResponse());
+      const duffelSpy = jest
+        .spyOn(duffelService['duffel'].offers, 'get')
+        .mockResolvedValue(liveOfferResponse());
       const createRes = await request(app.getHttpServer())
         .post('/api/bookings/intents')
         .set('Authorization', `Bearer ${tokenA}`)
         .set('x-trace-id', 'trace-phase8')
         .set('x-correlation-id', 'correlation-phase8')
-        .send({ flightOfferId: offer.id, readinessScope: readiness.body.scope, passengers: [requestPassenger] })
+        .send({
+          flightOfferId: offer.id,
+          readinessScope: readiness.body.scope,
+          passengers: [requestPassenger],
+        })
         .expect(201);
       duffelSpy.mockRestore();
 
       expect(createRes.headers['cache-control']).toBe('no-store, private');
       expect(createRes.headers['x-trace-id']).toBe('trace-phase8');
       expect(createRes.headers['x-correlation-id']).toBe('correlation-phase8');
-      expect(createRes.body.passengers[0]).toEqual(expect.objectContaining({
-        passengerType: 'ADULT',
-        nameSummary: expect.stringMatching(/^A/),
-        passportNumber: null,
-        passportExpiry: null,
-        maskedPassportSummary: null,
-        maskedContactSummary: expect.stringMatching(/^a.* \+1/),
-      }));
+      expect(createRes.body.passengers[0]).toEqual(
+        expect.objectContaining({
+          passengerType: 'ADULT',
+          nameSummary: expect.stringMatching(/^A/),
+          passportNumber: null,
+          passportExpiry: null,
+          maskedPassportSummary: null,
+          maskedContactSummary: expect.stringMatching(/^a.* \+1/),
+        }),
+      );
       expect(createRes.body.passengers[0]).not.toHaveProperty('givenName');
       expect(createRes.body.passengers[0]).not.toHaveProperty('dateOfBirth');
 
@@ -562,7 +593,10 @@ describe('Booking Intent (E2E)', () => {
     });
 
     it('creates canonical plural intent with mixed traveler_profile and inline passengers returning 201 and safe masked summary', async () => {
-      const encryptedPassport = encryptionService.encryptBound('VN98765432', { userId: userA.id, fieldName: 'passportNumber' });
+      const encryptedPassport = encryptionService.encryptBound('VN98765432', {
+        userId: userA.id,
+        fieldName: 'passportNumber',
+      });
       const profile = await prisma.travelerProfile.create({
         data: {
           userId: userA.id,
@@ -590,19 +624,29 @@ describe('Booking Intent (E2E)', () => {
             { id: 'pas_001', type: 'adult' },
             { id: 'pas_002', type: 'child' },
           ],
-          slices: [{
-            segments: [{
-              origin: { iata_code: 'SGN' },
-              destination: { iata_code: 'HAN' },
-              arriving_at: '2026-08-01T12:00:00Z',
-            }],
-          }],
+          slices: [
+            {
+              segments: [
+                {
+                  origin: { iata_code: 'SGN' },
+                  destination: { iata_code: 'HAN' },
+                  arriving_at: '2026-08-01T12:00:00Z',
+                },
+              ],
+            },
+          ],
           expires_at: new Date(Date.now() + 3600 * 1000).toISOString(),
         },
       });
 
-      const airportCountrySpy = jest.spyOn(airportsService, 'findCountriesByIataCodes')
-        .mockResolvedValue(new Map([['SGN', 'VN'], ['HAN', 'VN']]));
+      const airportCountrySpy = jest
+        .spyOn(airportsService, 'findCountriesByIataCodes')
+        .mockResolvedValue(
+          new Map([
+            ['SGN', 'VN'],
+            ['HAN', 'VN'],
+          ]),
+        );
 
       const duffelSpy = jest.spyOn(duffelService['duffel'].offers, 'get').mockResolvedValue({
         data: {
@@ -711,15 +755,17 @@ describe('Booking Intent (E2E)', () => {
         .set('Authorization', `Bearer ${tokenA}`)
         .send({
           flightOfferId: offer.id,
-          passengers: [{
-            type: PassengerType.ADULT,
-            useProfile: true,
-            givenName: 'Primary',
-            familyName: 'User',
-            dateOfBirth: '1995-05-05',
-            gender: 'female',
-            nationality: 'US',
-          }],
+          passengers: [
+            {
+              type: PassengerType.ADULT,
+              useProfile: true,
+              givenName: 'Primary',
+              familyName: 'User',
+              dateOfBirth: '1995-05-05',
+              gender: 'female',
+              nationality: 'US',
+            },
+          ],
         })
         .expect(400);
 
@@ -735,23 +781,25 @@ describe('Booking Intent (E2E)', () => {
         .set('Authorization', `Bearer ${tokenA}`)
         .send({
           flightOfferId: offer.id,
-          passengers: [{
-            type: PassengerType.ADULT,
-            offerPassengerId: 'pas_001',
-            useProfile: true,
-            source: {
-              type: 'inline',
-              givenName: 'Grace',
-              familyName: 'Hopper',
-              dateOfBirth: '1906-12-09',
-              gender: 'female',
-              nationality: 'US',
-              email: 'grace@example.test',
-              phoneCountryCode: '+1',
-              phoneNumber: '5550000000',
-              title: 'MS',
+          passengers: [
+            {
+              type: PassengerType.ADULT,
+              offerPassengerId: 'pas_001',
+              useProfile: true,
+              source: {
+                type: 'inline',
+                givenName: 'Grace',
+                familyName: 'Hopper',
+                dateOfBirth: '1906-12-09',
+                gender: 'female',
+                nationality: 'US',
+                email: 'grace@example.test',
+                phoneCountryCode: '+1',
+                phoneNumber: '5550000000',
+                title: 'MS',
+              },
             },
-          }],
+          ],
         })
         .expect(400);
 
@@ -771,7 +819,9 @@ describe('Booking Intent (E2E)', () => {
         },
       });
 
-      const duffelSpy = jest.spyOn(duffelService['duffel'].offers, 'get').mockResolvedValue(liveOfferResponse());
+      const duffelSpy = jest
+        .spyOn(duffelService['duffel'].offers, 'get')
+        .mockResolvedValue(liveOfferResponse());
 
       const res = await request(app.getHttpServer())
         .post('/api/bookings/intent')
@@ -841,7 +891,9 @@ describe('Booking Intent (E2E)', () => {
     it('retrieves own intent (200) with masked passenger summaries', async () => {
       const offer = await createMockFlightOffer({ adults: 1 });
 
-      const duffelSpy = jest.spyOn(duffelService['duffel'].offers, 'get').mockResolvedValue(liveOfferResponse());
+      const duffelSpy = jest
+        .spyOn(duffelService['duffel'].offers, 'get')
+        .mockResolvedValue(liveOfferResponse());
 
       const createRes = await request(app.getHttpServer())
         .post('/api/bookings/intent')
@@ -876,10 +928,12 @@ describe('Booking Intent (E2E)', () => {
       expect(getRes.body.passengers[0].documentSummary.hasPassport).toBe(true);
     });
 
-    it('returns 403 Forbidden when retrieving other user\'s intent', async () => {
+    it("returns 403 Forbidden when retrieving other user's intent", async () => {
       const offer = await createMockFlightOffer({ adults: 1 });
 
-      const duffelSpy = jest.spyOn(duffelService['duffel'].offers, 'get').mockResolvedValue(liveOfferResponse());
+      const duffelSpy = jest
+        .spyOn(duffelService['duffel'].offers, 'get')
+        .mockResolvedValue(liveOfferResponse());
 
       const createRes = await request(app.getHttpServer())
         .post('/api/bookings/intent')
@@ -911,7 +965,9 @@ describe('Booking Intent (E2E)', () => {
     it('returns 410 Gone when retrieving an expired intent', async () => {
       const offer = await createMockFlightOffer({ adults: 1 });
 
-      const duffelSpy = jest.spyOn(duffelService['duffel'].offers, 'get').mockResolvedValue(liveOfferResponse());
+      const duffelSpy = jest
+        .spyOn(duffelService['duffel'].offers, 'get')
+        .mockResolvedValue(liveOfferResponse());
 
       const createRes = await request(app.getHttpServer())
         .post('/api/bookings/intent')
@@ -998,7 +1054,9 @@ describe('Booking Intent (E2E)', () => {
     it('Phase 1 cleanup: updates PENDING intents to EXPIRED when expired (default and custom TTL)', async () => {
       const offer = await createMockFlightOffer({ adults: 1 });
 
-      const duffelSpy = jest.spyOn(duffelService['duffel'].offers, 'get').mockResolvedValue(liveOfferResponse());
+      const duffelSpy = jest
+        .spyOn(duffelService['duffel'].offers, 'get')
+        .mockResolvedValue(liveOfferResponse());
 
       // 1. Default TTL path
       const resDefault = await request(app.getHttpServer())
@@ -1053,7 +1111,9 @@ describe('Booking Intent (E2E)', () => {
         where: { id: resCustom.body.intentId },
       });
       const expectedExpiry = new Date(customIntentBefore!.createdAt.getTime() + 10 * 60 * 1000);
-      expect(Math.abs(customIntentBefore!.intentExpiresAt.getTime() - expectedExpiry.getTime())).toBeLessThan(5000);
+      expect(
+        Math.abs(customIntentBefore!.intentExpiresAt.getTime() - expectedExpiry.getTime()),
+      ).toBeLessThan(5000);
 
       // Artificially age custom intent
       await prisma.bookingIntent.update({
@@ -1065,8 +1125,12 @@ describe('Booking Intent (E2E)', () => {
       await cron.handleExpiration();
 
       // Verify both default and custom are EXPIRED
-      const defaultStatus = await prisma.bookingIntent.findUnique({ where: { id: resDefault.body.intentId } });
-      const customStatus = await prisma.bookingIntent.findUnique({ where: { id: resCustom.body.intentId } });
+      const defaultStatus = await prisma.bookingIntent.findUnique({
+        where: { id: resDefault.body.intentId },
+      });
+      const customStatus = await prisma.bookingIntent.findUnique({
+        where: { id: resCustom.body.intentId },
+      });
 
       expect(defaultStatus!.status).toBe('EXPIRED');
       expect(customStatus!.status).toBe('EXPIRED');
@@ -1077,13 +1141,14 @@ describe('Booking Intent (E2E)', () => {
       });
       expect(auditExpired).toBeDefined();
       expect((auditExpired!.metadata as any).count).toBe(2);
-
     });
 
     it('Phase 2 cleanup: hard-deletes EXPIRED intents after grace period (default and custom grace)', async () => {
       const offer = await createMockFlightOffer({ adults: 1 });
 
-      const duffelSpy = jest.spyOn(duffelService['duffel'].offers, 'get').mockResolvedValue(liveOfferResponse());
+      const duffelSpy = jest
+        .spyOn(duffelService['duffel'].offers, 'get')
+        .mockResolvedValue(liveOfferResponse());
 
       // Create two intents
       const res1 = await request(app.getHttpServer())
@@ -1150,7 +1215,9 @@ describe('Booking Intent (E2E)', () => {
       expect(int2).toBeDefined();
 
       // Verify cascading passenger deletion for the first intent
-      const passengerCount1 = await prisma.bookingIntentPassenger.count({ where: { intentId: res1.body.intentId } });
+      const passengerCount1 = await prisma.bookingIntentPassenger.count({
+        where: { intentId: res1.body.intentId },
+      });
       expect(passengerCount1).toBe(0);
 
       // Verify audit log for first deletion
@@ -1163,12 +1230,14 @@ describe('Booking Intent (E2E)', () => {
 
       // Set custom grace to 5h
       process.env.BOOKING_INTENT_GRACE_HOURS = '5';
-      
+
       // Trigger Phase 2 Cron again
       await cron.handleHardDelete();
 
       // Verify second intent is now deleted
-      const int2After = await prisma.bookingIntent.findUnique({ where: { id: res2.body.intentId } });
+      const int2After = await prisma.bookingIntent.findUnique({
+        where: { id: res2.body.intentId },
+      });
       expect(int2After).toBeNull();
 
       // Verify audit log for second deletion
@@ -1215,7 +1284,9 @@ describe('Booking Intent (E2E)', () => {
         },
       });
 
-      const duffelSpy = jest.spyOn(duffelService['duffel'].offers, 'get').mockResolvedValue(liveOfferResponse());
+      const duffelSpy = jest
+        .spyOn(duffelService['duffel'].offers, 'get')
+        .mockResolvedValue(liveOfferResponse());
 
       const res = await request(app.getHttpServer())
         .post('/api/bookings/intent')
@@ -1293,7 +1364,9 @@ describe('Booking Intent (E2E)', () => {
         },
       });
 
-      const duffelSpy = jest.spyOn(duffelService['duffel'].offers, 'get').mockResolvedValue(liveOfferResponse());
+      const duffelSpy = jest
+        .spyOn(duffelService['duffel'].offers, 'get')
+        .mockResolvedValue(liveOfferResponse());
 
       const res = await request(app.getHttpServer())
         .post('/api/bookings/intent')
@@ -1352,14 +1425,16 @@ describe('Booking Intent (E2E)', () => {
       });
 
       // We mock duffel get to also alter the DB state behind the scenes, making the claim expired!
-      const duffelSpy = jest.spyOn(duffelService['duffel'].offers, 'get').mockImplementation(async () => {
-        // Expire the claim that was just acquired!
-        await prisma.chatHandoff.update({
-          where: { id: handoffId },
-          data: { claimExpiresAt: new Date(Date.now() - 1000) },
+      const duffelSpy = jest
+        .spyOn(duffelService['duffel'].offers, 'get')
+        .mockImplementation(async () => {
+          // Expire the claim that was just acquired!
+          await prisma.chatHandoff.update({
+            where: { id: handoffId },
+            data: { claimExpiresAt: new Date(Date.now() - 1000) },
+          });
+          return liveOfferResponse();
         });
-        return liveOfferResponse();
-      });
 
       const res = await request(app.getHttpServer())
         .post('/api/bookings/intent')
@@ -1418,7 +1493,9 @@ describe('Booking Intent (E2E)', () => {
       });
 
       const { DuffelTimeoutError } = await import('@/duffel/duffel.service');
-      const duffelSpy = jest.spyOn(duffelService, 'getOfferById').mockRejectedValue(new DuffelTimeoutError());
+      const duffelSpy = jest
+        .spyOn(duffelService, 'getOfferById')
+        .mockRejectedValue(new DuffelTimeoutError());
 
       const res = await request(app.getHttpServer())
         .post('/api/bookings/intent')
@@ -1476,7 +1553,9 @@ describe('Booking Intent (E2E)', () => {
         },
       });
 
-      const duffelSpy = jest.spyOn(duffelService['duffel'].offers, 'get').mockResolvedValue(liveOfferResponse());
+      const duffelSpy = jest
+        .spyOn(duffelService['duffel'].offers, 'get')
+        .mockResolvedValue(liveOfferResponse());
 
       const requests = Array.from({ length: 100 }).map(() =>
         request(app.getHttpServer())
@@ -1494,13 +1573,13 @@ describe('Booking Intent (E2E)', () => {
                 nationality: 'US',
               },
             ],
-          })
+          }),
       );
 
       const responses = await Promise.all(requests);
 
-      const successCount = responses.filter(r => r.status === 201).length;
-      const conflictCount = responses.filter(r => r.status === 409).length;
+      const successCount = responses.filter((r) => r.status === 201).length;
+      const conflictCount = responses.filter((r) => r.status === 409).length;
 
       if (successCount === 0) {
         console.error('All requests failed! Sample error:', responses[0].status, responses[0].body);
@@ -1516,5 +1595,3 @@ describe('Booking Intent (E2E)', () => {
     });
   });
 });
-
-

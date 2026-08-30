@@ -66,9 +66,7 @@ function safeMetadata(metadata: Record<string, unknown> | undefined): Record<str
 export class BookingReadinessObservability {
   private readonly logger = new Logger('BookingReadinessObservability');
 
-  constructor(
-    @Optional() private readonly metricsService?: BookingReadinessMetricsService,
-  ) {}
+  constructor(@Optional() private readonly metricsService?: BookingReadinessMetricsService) {}
 
   recordOutcome(event: BookingReadinessObservabilityEvent): void {
     const operation = event.operation ?? BookingReadinessOperation.READINESS_ADVISORY;

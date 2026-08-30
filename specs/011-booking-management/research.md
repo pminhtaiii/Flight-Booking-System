@@ -11,6 +11,7 @@
 **Rationale**: Cart abandonment in travel is 60–80%. Creating records at `/payments/create` pollutes the bookings table with orphaned `PROCESSING` records for users who never complete payment — the exact problem `BookingIntent` with TTL cleanup solved.
 
 **Alternatives considered**:
+
 - Create at `/payments/create` → rejected (abandonment pollution)
 - Create after pipeline completes → rejected (client needs bookingId for escape hatch before response arrives)
 
@@ -21,6 +22,7 @@
 **Rationale**: In Approach A (synchronous pipeline), the HTTP response doesn't arrive until pipeline completes (3–30s). The checkout loading escalation's escape hatch needs a concrete `/bookings/[bookingId]` URL before the response. Client-generated UUID gives the client the ID before the request fires.
 
 **Security validation required**:
+
 1. Format validation (must be valid UUID v4)
 2. Uniqueness check (SELECT before INSERT)
 3. Ownership check (if exists, must belong to same user → 403 if not)
@@ -28,6 +30,7 @@
 5. Concurrency control: Catch DB-level unique primary key constraint violations (e.g., Prisma error P2002) to handle double-submit race conditions gracefully by running the same ownership/idempotency checks rather than failing with 500.
 
 **Alternatives considered**:
+
 - Two-phase confirm (init + execute) → rejected (two requests, complex idempotency)
 - Use BookingIntentId for escape hatch → rejected (indirect lookup, messy URL)
 
@@ -54,12 +57,14 @@
 **Rationale**: A confirmed booking is a historical record. Flight details at purchase time are contractual facts. The detail page must load from local DB with zero external API calls — Duffel availability, rate limits, and latency must not affect a page showing data the user already paid for.
 
 **Alternatives considered**:
+
 - Fetch from Duffel on demand → rejected (external dependency at render time)
 - Snapshot + optional refresh → rejected (complexity, deferred to future feature)
 
 ### R6: Existing Codebase Patterns
 
 **Findings from existing modules**:
+
 - **NestJS module pattern**: Follow `PaymentModule` structure (module, controller, service, DTOs)
 - **Prisma schema**: Extend existing schema with new Booking model, enums, relations
 - **Frontend pattern**: Next.js App Router pages in `apps/web/app/`, components in `apps/web/components/`

@@ -35,7 +35,9 @@ describe('Disruption Phase 3 (Sync & Concurrency E2E)', () => {
       .compile();
 
     app = moduleFixture.createNestApplication();
-    app.useGlobalPipes(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, transform: true }));
+    app.useGlobalPipes(
+      new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, transform: true }),
+    );
     await app.init();
 
     prisma = moduleFixture.get<PrismaService>(PrismaService);
@@ -136,7 +138,6 @@ describe('Disruption Phase 3 (Sync & Concurrency E2E)', () => {
     await prisma.airport.deleteMany({});
     await prisma.auditLog.deleteMany({});
     await prisma.user.deleteMany({});
-
   });
 
   it('should run a complete material sync and create outbox/audit/revision rows end-to-end', async () => {
@@ -204,5 +205,3 @@ describe('Disruption Phase 3 (Sync & Concurrency E2E)', () => {
     expect(auditEvents.some((e) => e.action === 'DETECTED')).toBe(true);
   });
 });
-
-

@@ -39,11 +39,9 @@ describe('BookingIntentCron', () => {
 
       expect(mockBookingIntentService.expireExpiredIntents).toHaveBeenCalled();
       expect(loggerLogSpy).toHaveBeenCalledWith(
-        expect.stringContaining('Starting booking intent expiration cron')
+        expect.stringContaining('Starting booking intent expiration cron'),
       );
-      expect(loggerLogSpy).toHaveBeenCalledWith(
-        expect.stringContaining('Expired 2 intents in')
-      );
+      expect(loggerLogSpy).toHaveBeenCalledWith(expect.stringContaining('Expired 2 intents in'));
     });
 
     it('logs error if expireExpiredIntents throws', async () => {
@@ -55,7 +53,7 @@ describe('BookingIntentCron', () => {
       expect(mockBookingIntentService.expireExpiredIntents).toHaveBeenCalled();
       expect(loggerErrorSpy).toHaveBeenCalledWith(
         expect.stringContaining('Error occurred during booking intent expiration execution:'),
-        error
+        error,
       );
     });
   });
@@ -70,10 +68,10 @@ describe('BookingIntentCron', () => {
 
       expect(mockBookingIntentService.deleteExpiredIntents).toHaveBeenCalled();
       expect(loggerLogSpy).toHaveBeenCalledWith(
-        expect.stringContaining('Starting booking intent hard-delete cron')
+        expect.stringContaining('Starting booking intent hard-delete cron'),
       );
       expect(loggerLogSpy).toHaveBeenCalledWith(
-        expect.stringContaining('Hard-deleted 1 intents in')
+        expect.stringContaining('Hard-deleted 1 intents in'),
       );
     });
 
@@ -86,7 +84,7 @@ describe('BookingIntentCron', () => {
       expect(mockBookingIntentService.deleteExpiredIntents).toHaveBeenCalled();
       expect(loggerErrorSpy).toHaveBeenCalledWith(
         expect.stringContaining('Error occurred during booking intent hard-delete execution:'),
-        error
+        error,
       );
     });
   });

@@ -1,9 +1,4 @@
-import {
-  BadRequestException,
-  Injectable,
-  Logger,
-  NotFoundException,
-} from '@nestjs/common';
+import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import {
   PaymentEventSource,
   PaymentStatus,
@@ -102,9 +97,7 @@ export class RefundTransactionService {
         typeof rawInput.reason !== 'string' ||
         rawInput.reason.trim().toLowerCase().startsWith('cancellation:')
       ) {
-        throw new BadRequestException(
-          'Direct refund requests cannot use cancellation semantics',
-        );
+        throw new BadRequestException('Direct refund requests cannot use cancellation semantics');
       }
 
       return {
@@ -301,9 +294,7 @@ export class RefundTransactionService {
           .filter((r) => ACTIVE_REFUND_STATUSES.includes(r.status))
           .reduce((sum, r) => sum + r.amount, 0);
         const remainingObligationCapacity =
-          obligation.totalAmount -
-          successfulObligationRefunds -
-          activeObligationReservations;
+          obligation.totalAmount - successfulObligationRefunds - activeObligationReservations;
 
         if (input.amount > remainingObligationCapacity) {
           this.logReservationTelemetry('REJECTED', 'OBLIGATION');
@@ -338,8 +329,7 @@ export class RefundTransactionService {
       const createdRefund = await tx.refund.create({
         data: {
           paymentId: input.paymentId,
-          cancellationRefundObligationId:
-            normalizedInput.cancellationRefundObligationId,
+          cancellationRefundObligationId: normalizedInput.cancellationRefundObligationId,
           idempotencyKeyId: idempotencyKeyRecord.id,
           amount: input.amount,
           currency: input.currency.toUpperCase(),

@@ -22,14 +22,14 @@ For checkout, deterministic code validates the latest owner/session-bound snapsh
 
 ## 2. Feature flags and rollout order
 
-| Capability                    | Configuration                                                                                                        | Safe state/relationship                                                                                                                                                                                                                                                                                                    |
-| ----------------------------- | -------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Multi-agent Router            | Agent `FEATURE_FLAG_CHAT_MULTI_AGENT`; web `NEXT_PUBLIC_FEATURE_FLAG_CHAT_MULTI_AGENT`                               | Present as rollout/config vocabulary but not wired as runtime gates in the current implementation. Keep issuance off while validating routing; do not treat changing either value alone as a cutover.                                                                                                                      |
-| Handoff acceptance            | API `FEATURE_FLAG_CHAT_HANDOFF_ACCEPT`; agent/web mirrors                                                            | The API flag gates resolve/readiness/consume policy and must be deployed before issuance. Agent/web values are currently config/exposure mirrors, not independent runtime enforcement.                                                                                                                                     |
-| Handoff issuance              | API/agent `FEATURE_FLAG_CHAT_HANDOFF_ISSUE`                                                                          | Must be off unless ACCEPT is on in both relevant services.                                                                                                                                                                                                                                                                 |
-| Direct streaming              | Direct-only canonical transport (`NEXT_PUBLIC_AGENT_URL`); legacy proxy toggles permanently retired in Phase 8D / T101 | Direct transport is permanent and canonical. All chat streaming routes directly from browser to FastAPI (`${NEXT_PUBLIC_AGENT_URL}/chat/stream`) with Bearer auth, strict CORS, and opaque trace/correlation ID propagation. Proxy fallback route has been deleted.                                                    |
-| Booking readiness             | API `FEATURE_FLAG_BOOKING_READINESS` and web counterpart                                                             | Must be on before a handoff may advance through canonical readiness/intent.                                                                                                                                                                                                                                                |
-| Encrypted persistence/fencing | `CHAT_ENCRYPTION_KEY` and `FEATURE_FLAG_WRITE_FENCE`                                                                 | Keep encryption configured and fencing enforced before direct/multi-instance rollout. These are safety controls, not routine cohort toggles.                                                                                                                                                                               |
+| Capability                    | Configuration                                                                                                          | Safe state/relationship                                                                                                                                                                                                                                             |
+| ----------------------------- | ---------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Multi-agent Router            | Agent `FEATURE_FLAG_CHAT_MULTI_AGENT`; web `NEXT_PUBLIC_FEATURE_FLAG_CHAT_MULTI_AGENT`                                 | Present as rollout/config vocabulary but not wired as runtime gates in the current implementation. Keep issuance off while validating routing; do not treat changing either value alone as a cutover.                                                               |
+| Handoff acceptance            | API `FEATURE_FLAG_CHAT_HANDOFF_ACCEPT`; agent/web mirrors                                                              | The API flag gates resolve/readiness/consume policy and must be deployed before issuance. Agent/web values are currently config/exposure mirrors, not independent runtime enforcement.                                                                              |
+| Handoff issuance              | API/agent `FEATURE_FLAG_CHAT_HANDOFF_ISSUE`                                                                            | Must be off unless ACCEPT is on in both relevant services.                                                                                                                                                                                                          |
+| Direct streaming              | Direct-only canonical transport (`NEXT_PUBLIC_AGENT_URL`); legacy proxy toggles permanently retired in Phase 8D / T101 | Direct transport is permanent and canonical. All chat streaming routes directly from browser to FastAPI (`${NEXT_PUBLIC_AGENT_URL}/chat/stream`) with Bearer auth, strict CORS, and opaque trace/correlation ID propagation. Proxy fallback route has been deleted. |
+| Booking readiness             | API `FEATURE_FLAG_BOOKING_READINESS` and web counterpart                                                               | Must be on before a handoff may advance through canonical readiness/intent.                                                                                                                                                                                         |
+| Encrypted persistence/fencing | `CHAT_ENCRYPTION_KEY` and `FEATURE_FLAG_WRITE_FENCE`                                                                   | Keep encryption configured and fencing enforced before direct/multi-instance rollout. These are safety controls, not routine cohort toggles.                                                                                                                        |
 
 Safe rollout: deploy code and additive schema inert; verify Redis and encrypted persistence; enable API ACCEPT; deploy/validate multi-agent routing and web `ACTION_HANDOFF` support with ISSUE off; enable booking readiness; enable ISSUE for an internal cohort; direct transport is canonical. Because several mirror flags are not runtime-wired, verify behavior at the public boundary instead of relying on configuration display.
 
@@ -170,6 +170,7 @@ Operational drills, health degradation, feature flag matrix, and key rotation ve
 ## 12. Phase 11B Verified Production Telemetry Baselines & Alert Rules
 
 ### 12.1 Performance & Latency Baselines (Warmed Benchmarks)
+
 - **Router Stream Entry Latency**: Measured p95 = `14.64 ms` (SLA limit < 100 ms) across 100 warmed requests in `apps/agent/tests/test_t098_agent_performance.py`.
 - **Redis Lua Admission Overhead**: Measured p95 = `2.66 ms` (SLA limit < 10 ms) across 100 requests.
 - **Handoff Token Creation (`POST /api/chat-handoff/tokens`)**: Measured p95 = `144.49 ms` (SLA limit < 300 ms) in `apps/api/test/chat-handoff-performance.e2e-spec.ts`.
@@ -177,7 +178,9 @@ Operational drills, health degradation, feature flag matrix, and key rotation ve
 - **100-Way CAS Consumption Concurrency**: 1 winner (201 Created), 99 losers (409 Conflict), exactly 1 canonical `BookingIntent`, 0 payment calls, claim CAS p95 = `45.87 ms`.
 
 ### 12.2 Standardized Metric Counters
+
 Mapped and verified in both NestJS API (`apps/api/src/common/observability/chat-observability.ts`) and FastAPI Python Agent (`apps/agent/src/agent/observability/chat_observability.py`):
+
 - `chat_messages_accepted_total`: Incremented on successful conversation turns.
 - `chat_messages_denied_total`: Incremented on rate limit, quota exhaustion, or authentication failures.
 - `quota_daily_utilization`: Tracks daily allocated vs consumed budget.
@@ -187,6 +190,7 @@ Mapped and verified in both NestJS API (`apps/api/src/common/observability/chat-
 - `handoff_claims_conflicted_total`: Incremented when losing concurrent requests hit 409 Conflict.
 
 ### 12.3 Automated Alert Verification Drills (`apps/api/test/alert-rules.e2e-spec.ts`)
+
 - **Alert 1 (Redis Outage)**: Verified 503 degraded control plane alert trigger on Redis disconnect.
 - **Alert 2 (5xx Error Rate)**: Verified alert trigger when error rate exceeds 2x baseline window over 300s.
 - **Alert 3 (Router Fallback Spike)**: Verified alert trigger on sudden surge in router fallback decisions.
@@ -194,6 +198,7 @@ Mapped and verified in both NestJS API (`apps/api/src/common/observability/chat-
 - **Trace Correlation**: Verified unified `x-trace-id` and `x-correlation-id` (`chat_<32 hex>`) across Browser → FastAPI → NestJS → Audit Logs.
 
 ### 12.4 Multi-Workspace Verification
+
 - `apps/api` Unit Tests: **72/72 suites passed, 681/681 unit tests passed**.
 - `apps/api` E2E Tests: **100% PASS** (`alert-rules.e2e-spec.ts`, `privacy-and-telemetry-audit.e2e-spec.ts`, `multi-service-health.e2e-spec.ts`, `chat-handoff-performance.e2e-spec.ts`, `chat-handoff-observability.e2e-spec.ts`, `payment.e2e-spec.ts`, `booking.e2e-spec.ts`, `cancellation.e2e-spec.ts`).
 - `apps/agent` Python Pytest: **336/336 passed**.
@@ -206,12 +211,14 @@ Mapped and verified in both NestJS API (`apps/api/src/common/observability/chat-
 Automated continuous privacy regression scanners enforce zero-leak guarantees across agent and API layers:
 
 ### 13.1 Agent Privacy Scanner (`apps/agent/tests/test_negative_privacy_audit.py`)
+
 - **Memory Manager Audit**: Token counting, sliding window prompt assembly, and async summarization executed without dumping raw chat secrets or PII to logs/telemetry.
 - **Trusted Snapshot Repository**: Raw snapshot serialization and client/LLM projection 100% strips private identifiers (`flightOfferId`, `duffelOfferId`, provider UUIDs). Redis keys adhere strictly to `chat:snapshot:{userId}:{sessionId}`.
 - **Telemetry Boundary**: Rejects 100% of forbidden privacy corpus across `operation`, `status`, `tool_name`, `error_class`, and `outcome`. Safe emission logs only `chat_telemetry_rejected`.
 - **SSE Stream Chunks**: Continuous scan of token chunks, tool calls, tool results, `ACTION_HANDOFF`, and `ACTION_REQUIRED` payloads guarantees zero forbidden corpus leakage.
 
 ### 13.2 API E2E Privacy Scanner (`apps/api/test/negative-privacy-audit.e2e-spec.ts`)
+
 - **PostgreSQL Schema Verification**: Confirms 0 plaintext `content` column on `chat_messages`, 0 `title` column on `chat_sessions`, 0 `token`/`duffelOfferId` columns on `chat_handoffs`.
 - **Direct Database Row Scanner**: Raw SQL queries on `chat_messages`, `chat_sessions`, `chat_handoffs`, and `audit_logs` verify ciphertext-only envelopes and zero raw token/PII persistence.
 - **Application Logs & Telemetry Streams**: Captures all application log streams and verifies zero matches for forbidden corpus.
@@ -224,10 +231,12 @@ Automated continuous privacy regression scanners enforce zero-leak guarantees ac
 Automated drills simulate dependency faults, supplier timeouts, abrupt client disconnects, and partition recovery:
 
 ### 14.1 Agent Chaos Simulation (`apps/agent/tests/test_chaos_simulation.py`)
+
 - **Redis Partition / Outage Drill**: Drops Redis connection during quota checks and mid-stream execution. Asserts stream fails closed with HTTP 503 `CHAT_CONTROL_PLANE_UNAVAILABLE` before LLM inference, zero compute leaked, zero burst reservations or daily quotas incremented.
 - **Abrupt Client Disconnect Drill**: Simulates client disconnect mid-stream (`asyncio.CancelledError`). Asserts active session lock is promptly released via `sse_generator` finally handler and `validate_active_fence` prevents stale turn persistence when lease is lost or taken over.
 
 ### 14.2 API Chaos Incident Drills (`apps/api/test/chaos-incident-drills.e2e-spec.ts`)
+
 - **Supplier Timeout & Recovery Drill**: Simulates Duffel 504 / timeout during `BookingIntentService.createIntent` pricing validation. Asserts watchdog cancels and `releaseClaim` in `finally` safely resets `claimedAt`, `claimTokenHash`, `claimExpiresAt`, `claimRecoverAfter` to null. Asserts 0 orphaned `CLAIMED` locks remain and retry succeeds upon supplier recovery.
 - **Expired Claim Recovery Drill**: Creates handoff with expired claim lease (> `claimRecoverAfter`). Asserts `resolveSafe` and `tryAcquireClaim` successfully recover and allow consumption.
 - **Redis Disconnect Resilience**: Asserts `CacheService` fallback and `LockoutService` rate-limiting handle Redis disconnects safely with degraded reporting.
@@ -250,21 +259,22 @@ Automated drills simulate dependency faults, supplier timeouts, abrupt client di
 
 ## 16. Final Feature 017 Operational Sign-Off & Verification Summary
 
-| Gate / Verification | Target | Result | Status |
-|---|---|---|---|
-| Stepwise Rollback Matrix | `ISSUE=false`, `ACCEPT=true`, `MULTI_AGENT=false` | 100% Graceful Fallback & Token Continuity | **PASS** |
-| Redis Partition / Outage | Fail-closed HTTP 503 before LLM inference | 0 Compute Leaked, 0 Quota Leaked | **PASS** |
-| Supplier Timeout & Claim Release | Clear claim to NULL in `finally` | 0 Orphaned Locks, Retry Reclaim OK | **PASS** |
-| Client Disconnect Fencing | Monotonic fencing check on persistence | Stale Turns Rejected, Lock Released | **PASS** |
-| Negative Privacy Corpus Audit | 0 PII / tokens across DB, logs, Redis | 0 Matches across All Stores | **PASS** |
-| Multi-Workspace Unit & E2E | 100% Pass Rate across API, Agent, Web | 360 Pytest, 72 API Suites, 25 Web Unit | **PASS** |
-| Next.js Production Build | 20/20 Routes Compiled Cleanly | 0 TypeScript/ESLint Errors | **PASS** |
+| Gate / Verification              | Target                                            | Result                                    | Status   |
+| -------------------------------- | ------------------------------------------------- | ----------------------------------------- | -------- |
+| Stepwise Rollback Matrix         | `ISSUE=false`, `ACCEPT=true`, `MULTI_AGENT=false` | 100% Graceful Fallback & Token Continuity | **PASS** |
+| Redis Partition / Outage         | Fail-closed HTTP 503 before LLM inference         | 0 Compute Leaked, 0 Quota Leaked          | **PASS** |
+| Supplier Timeout & Claim Release | Clear claim to NULL in `finally`                  | 0 Orphaned Locks, Retry Reclaim OK        | **PASS** |
+| Client Disconnect Fencing        | Monotonic fencing check on persistence            | Stale Turns Rejected, Lock Released       | **PASS** |
+| Negative Privacy Corpus Audit    | 0 PII / tokens across DB, logs, Redis             | 0 Matches across All Stores               | **PASS** |
+| Multi-Workspace Unit & E2E       | 100% Pass Rate across API, Agent, Web             | 360 Pytest, 72 API Suites, 25 Web Unit    | **PASS** |
+| Next.js Production Build         | 20/20 Routes Compiled Cleanly                     | 0 TypeScript/ESLint Errors                | **PASS** |
 
 ---
 
 ## 17. Phase 11D: Post-Rollout Decommissioning, Direct-Only Architecture Lockdown & Final Cryptographic Sign-Off (2026-08-17)
 
 ### 17.1 Permanent Archival of Observation Window Evidence & Latency Baselines
+
 - **Router Stream Entry Latency**: Measured p95 = `14.64 ms` (limit < 100 ms) over 100 warmed requests in `apps/agent/tests/test_t098_agent_performance.py`.
 - **Redis Lua Admission Overhead**: Measured p95 = `2.66 ms` (limit < 10 ms) across 100 requests.
 - **Handoff Token Creation (`POST /api/chat-handoff/tokens`)**: Measured p95 = `144.49 ms` (limit < 300 ms) in `apps/api/test/chat-handoff-performance.e2e-spec.ts`.
@@ -272,7 +282,9 @@ Automated drills simulate dependency faults, supplier timeouts, abrupt client di
 - **100-Way Concurrency CAS Lease**: Exactly 1 winner (201 Created), 99 losers (409 Conflict), 0 supplier leaks (`duffel.offers.get` called exactly once), 0 payment leaks, claim CAS p95 = `45.87 ms`.
 
 ### 17.2 Permanent Emergency Operational Rollback Playbooks
+
 The verified multi-phase rollback matrix is permanently codified as the standard operational incident response playbook:
+
 1. **Emergency Handoff Circuit Breaker (Step 1 Rollback)**:
    - Configure: `FEATURE_FLAG_CHAT_HANDOFF_ISSUE=false`, `FEATURE_FLAG_CHAT_HANDOFF_ACCEPT=true`.
    - Behavior: Immediately blocks new credential minting (503 Service Unavailable), while preserving graceful resolution, claiming, and booking creation for pre-issued unexpired tokens.
@@ -283,12 +295,15 @@ The verified multi-phase rollback matrix is permanently codified as the standard
    - Transitioning flags never mutates or purges `ChatHandoff`, `BookingAgentProjection`, or encrypted `ChatMessage` rows, maintaining full audit trail integrity.
 
 ### 17.3 Direct-Only Streaming Transport Lockdown
+
 - The temporary Next.js chat stream proxy (`/api/chat/stream`) is permanently decommissioned and removed.
 - Canonical transport is direct-only browser-to-agent streaming (`POST ${NEXT_PUBLIC_AGENT_URL}/chat/stream`).
 - **Fail-Fast Validation**: Both the Python agent configuration (`apps/agent/src/agent/config.py`) and Next.js web client (`apps/web/lib/chatStream.ts`) enforce fail-closed rejection when any legacy proxy flag (`FEATURE_FLAG_CHAT_DIRECT_STREAM='false'` or `NEXT_PUBLIC_FEATURE_FLAG_CHAT_DIRECT_STREAM='false'`) is provided, throwing a runtime error immediately at startup/request initialization.
 
 ### 17.4 Final Cryptographic Audit Sign-Off
+
 Automated E2E cryptographic and schema verification suite (`apps/api/test/phase11d-cryptographic-audit.e2e-spec.ts`) establishes permanent proof of security invariants:
+
 - **100% AES-256-GCM Encrypted Chat**: Zero plaintext `content` column on `chat_messages` and zero `title` column on `chat_sessions`. All message bodies and session titles use versioned, record-bound AES-256-GCM envelopes (`contentCiphertext`, `contentNonce`, `contentAuthTag`, `contentKeyVersion`) with strict fail-closed decryption and zero plaintext fallback.
 - **100% SHA-256 Hash-Only Tokens**: Zero `token`, `rawToken`, or `duffelOfferId` columns on `chat_handoffs`. All credentials, attestation digests, and provider offer IDs are stored strictly as SHA-256 / HMAC-SHA256 hashes (`tokenHash`, `selectionAttestationHash`, `duffelOfferIdHash`, `idempotencyKeyHash`).
 - **100% Safe Projection Isolation**: `booking_agent_projections` holds strictly allowlisted logistics with opaque high-entropy references (`bkref_<uuid>`). Zero PII, passenger names, contact emails, passport numbers, PNRs, financial amounts, payment IDs, or raw supplier snapshots exist in projection tables or queries.
@@ -299,21 +314,24 @@ Automated E2E cryptographic and schema verification suite (`apps/api/test/phase1
 ## 18. Phase 11E: Continuous Reliability, Automated Drift Detection & Key Rotation Automation (2026-08-17)
 
 ### 18.1 Automated Zero-Downtime Secret Rotation Rings
+
 Verified non-destructive zero-downtime secret rotation across all 4 credential rings in API (`apps/api/test/phase11e-key-rotation.e2e-spec.ts`) and Agent (`apps/agent/tests/test_phase11e_key_rotation.py`):
+
 - **Chat Access JWTs (`JWT_SECRET`)**: Supports multi-key ring resolution (`JWT_SECRET_CURRENT`, `JWT_SECRET`, `JWT_SECRET_PREVIOUS`, `JWT_SECRET_V2`, `JWT_SECRET_V1`). Incoming tokens signed under `_PREVIOUS` (Key V1) verify cleanly during grace periods while `_CURRENT` (Key V2) signs new tokens. Tokens signed with expired/unknown Key V0 are rejected (401).
 - **Chat Handoff Credentials (`CHAT_HANDOFF_SECRET`)**: Versioned tokens (`chk_handoff_v1_...` / `chk_handoff_v2_...`) dynamically resolve against the candidate key ring (`_CURRENT`, `_PREVIOUS`, `_V1`, `_V2`). Tokens generated with V1 resolve cleanly while V2 is active primary signer.
 - **Selection Attestations (`ATTESTATION_SECRET` / `SELECTION_ATTESTATION_SECRET`)**: Attestations (`sel_v1_...`) signed with V1 verify and resolve cleanly when V2 is active signer.
 - **User Claim Tokens (`CLAIM_TOKEN_SECRET`)**: Multi-secret HMAC-SHA256 signature verification in `ClaimTokenService` validates tokens signed with previous key while primary secret signs new gateway requests.
 
 ### 18.2 Automated Data-Quality & State Drift Sentinel (`apps/api/src/common/sentinel/data-drift-sentinel.service.ts`)
+
 Automated sentinel routines enforce continuous transactional and relational integrity (`apps/api/test/phase11e-data-sentinel.e2e-spec.ts`):
+
 - **Dangling Lease Auto-Healing**: Identifies orphaned `ChatHandoff` records in `CLAIMED` status where `claimExpiresAt < NOW()` or `claimRecoverAfter < NOW()` without final consumption, and atomically resets them back to clean unreserved `ISSUED` state.
 - **Authoritative Consumed Linkage**: Asserts 100% of consumed `ChatHandoff` records have a valid, existing `consumedBookingIntentId` in the `BookingIntent` table (0 unlinked consumed records).
 - **1:1 Booking Projection Sync**: Asserts 100% of confirmed/cancelled bookings have an exact 1:1 `BookingAgentProjection` record in sync with latest itinerary changes.
 - **PII-Safe Telemetry**: Sentinel operates strictly within transactional boundaries and emits counts/status without logging customer PII.
 
 ### 18.3 Soft-Delete Retention Lifecycle & Disaster Recovery Cryptographic Audit (`apps/api/test/phase11e-continuous-reliability.e2e-spec.ts`)
+
 - **Soft-Deleted `ChatSession` Handling**: Deleting a chat session (`deleteSession`) atomically revokes/invalidates all active unconsumed handoffs (`expiresAt` set to now, claims cleared) while strictly preserving consumed handoffs and their `consumedByBookingIntentId` audit linkage.
 - **DR Backup Cryptographic Integrity**: Simulated PostgreSQL backup dump restoration verifies that restored rows can be decrypted only by authorized services possessing the active `CHAT_ENCRYPTION_KEY` and context-bound AAD parameters (`ChatMessage:${id}:${sessionId}:${sender}:${type}:v1` and `ChatSession:${id}:v1`). Decryption fails closed if keys are altered or AAD is tampered.
-
-

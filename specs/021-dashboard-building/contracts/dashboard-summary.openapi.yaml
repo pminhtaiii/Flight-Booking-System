@@ -39,7 +39,8 @@ components:
     DashboardRecentBooking:
       type: object
       additionalProperties: false
-      required: [id, status, createdAt, departureAt, originCode, destinationCode, airlineCode, flightNumber]
+      required:
+        [id, status, createdAt, departureAt, originCode, destinationCode, airlineCode, flightNumber]
       properties:
         id: { type: string, format: uuid }
         status:

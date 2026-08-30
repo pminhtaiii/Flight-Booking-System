@@ -170,11 +170,11 @@ describe('DuffelService Ancillaries, Normalization, Caching & Repricing', () => 
       expect(seatMap.cabins).toHaveLength(1);
       expect(seatMap.cabins[0].cabinClass).toBe('economy');
       expect(seatMap.cabins[0].rows).toHaveLength(1);
-      
+
       const row = seatMap.cabins[0].rows[0];
       expect(row.rowNumber).toBe(1);
       expect(row.elements).toHaveLength(3);
-      
+
       // Seat 1A (Restricted)
       expect(row.elements[0]).toMatchObject({
         type: 'seat',
@@ -344,7 +344,7 @@ describe('DuffelService Ancillaries, Normalization, Caching & Repricing', () => 
 
   describe('repriceOffer', () => {
     const offerId = 'off_123';
-    
+
     it('deduplicates services by summing their quantities and returns repriced totals', async () => {
       const intendedServices = [
         { serviceId: 'ase_bag_1', quantity: 1 },
@@ -461,15 +461,21 @@ describe('DuffelService Ancillaries, Normalization, Caching & Repricing', () => 
         json: async () => ({ data: { id: 'ord_123' } }),
       });
 
-      const order = await service.createOrder(offerId, mockPassengers, services, { some: 'meta' }, 'idem_123');
+      const order = await service.createOrder(
+        offerId,
+        mockPassengers,
+        services,
+        { some: 'meta' },
+        'idem_123',
+      );
 
       expect(order).toEqual({ id: 'ord_123' });
       expect(mockFetch).toHaveBeenCalled();
-      
+
       const fetchCall = mockFetch.mock.calls[0];
       const url = fetchCall[0];
       const options = fetchCall[1];
-      
+
       expect(url).toContain('/air/orders');
       expect(options.method).toBe('POST');
       expect(options.headers['Idempotency-Key']).toBe('idem_123-duffel-order');
@@ -486,14 +492,19 @@ describe('DuffelService Ancillaries, Normalization, Caching & Repricing', () => 
         json: async () => ({ data: { id: 'ord_123' } }),
       });
 
-      const order = await service.createOrder(offerId, mockPassengers, { some: 'meta' }, 'idem_123');
+      const order = await service.createOrder(
+        offerId,
+        mockPassengers,
+        { some: 'meta' },
+        'idem_123',
+      );
 
       expect(order).toEqual({ id: 'ord_123' });
       expect(mockFetch).toHaveBeenCalled();
 
       const options = mockFetch.mock.calls[0][1];
       const body = JSON.parse(options.body);
-      
+
       expect(body.data.services).toBeUndefined();
       expect(body.data.metadata).toEqual({ some: 'meta' });
       expect(options.headers['Idempotency-Key']).toBe('idem_123-duffel-order');

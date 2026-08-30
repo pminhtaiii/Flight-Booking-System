@@ -66,16 +66,16 @@ Rules:
 
 Synchronous pre-stream failures:
 
-| Status | Code | Meaning |
-|---|---|---|
-| 400 | CHAT_REQUEST_INVALID | Malformed body or unsupported old confirmation field |
-| 401 | UNAUTHORIZED | Missing/invalid/expired JWT, required claim absent, revoked JTI, or inactive user |
-| 403 | ORIGIN_NOT_ALLOWED | Browser origin rejected |
-| 404 | CHAT_SESSION_NOT_FOUND | Owned session lookup fails; does not reveal foreign existence |
-| 409 | CHAT_SESSION_BUSY | Session queue/lease timeout or depth exceeded |
-| 429 | CHAT_BURST_LIMIT_EXCEEDED | Burst limit reached |
-| 429 | CHAT_DAILY_QUOTA_EXCEEDED | Daily budget exhausted before inference |
-| 503 | CHAT_CONTROL_PLANE_UNAVAILABLE | Redis required for quota/lock/snapshot unavailable |
+| Status | Code                           | Meaning                                                                           |
+| ------ | ------------------------------ | --------------------------------------------------------------------------------- |
+| 400    | CHAT_REQUEST_INVALID           | Malformed body or unsupported old confirmation field                              |
+| 401    | UNAUTHORIZED                   | Missing/invalid/expired JWT, required claim absent, revoked JTI, or inactive user |
+| 403    | ORIGIN_NOT_ALLOWED             | Browser origin rejected                                                           |
+| 404    | CHAT_SESSION_NOT_FOUND         | Owned session lookup fails; does not reveal foreign existence                     |
+| 409    | CHAT_SESSION_BUSY              | Session queue/lease timeout or depth exceeded                                     |
+| 429    | CHAT_BURST_LIMIT_EXCEEDED      | Burst limit reached                                                               |
+| 429    | CHAT_DAILY_QUOTA_EXCEEDED      | Daily budget exhausted before inference                                           |
+| 503    | CHAT_CONTROL_PLANE_UNAVAILABLE | Redis required for quota/lock/snapshot unavailable                                |
 
 ### Named SSE events retained
 
@@ -289,15 +289,15 @@ Validation:
 
 Errors:
 
-| Status | Code |
-|---|---|
-| 400 | HANDOFF_REQUEST_INVALID |
-| 401/403 | Existing service-auth errors |
-| 404 | CHAT_SESSION_NOT_FOUND or FLIGHT_OFFER_NOT_FOUND |
-| 409 | HANDOFF_SNAPSHOT_MISMATCH |
-| 409 | HANDOFF_ATTESTATION_INVALID |
-| 410 | HANDOFF_OFFER_STALE |
-| 503 | CHAT_HANDOFF_ISSUANCE_DISABLED |
+| Status  | Code                                             |
+| ------- | ------------------------------------------------ |
+| 400     | HANDOFF_REQUEST_INVALID                          |
+| 401/403 | Existing service-auth errors                     |
+| 404     | CHAT_SESSION_NOT_FOUND or FLIGHT_OFFER_NOT_FOUND |
+| 409     | HANDOFF_SNAPSHOT_MISMATCH                        |
+| 409     | HANDOFF_ATTESTATION_INVALID                      |
+| 410     | HANDOFF_OFFER_STALE                              |
+| 503     | CHAT_HANDOFF_ISSUANCE_DISABLED                   |
 
 ## User Checkout Handoff Contracts
 
@@ -342,15 +342,15 @@ The local/Duffel offer IDs and session ID are never returned. NestJS finds by to
 
 Errors:
 
-| Status | Code | Side effects |
-|---|---|---|
-| 400 | HANDOFF_TOKEN_INVALID | none |
-| 404 | HANDOFF_NOT_FOUND | none; used for foreign owner too |
-| 409 | HANDOFF_IN_PROGRESS | none |
-| 409 | HANDOFF_ALREADY_CONSUMED | none |
-| 410 | HANDOFF_EXPIRED | none |
-| 410 | HANDOFF_OFFER_STALE | none; client offers fresh search |
-| 503 | CHAT_HANDOFF_DISABLED | none |
+| Status | Code                     | Side effects                     |
+| ------ | ------------------------ | -------------------------------- |
+| 400    | HANDOFF_TOKEN_INVALID    | none                             |
+| 404    | HANDOFF_NOT_FOUND        | none; used for foreign owner too |
+| 409    | HANDOFF_IN_PROGRESS      | none                             |
+| 409    | HANDOFF_ALREADY_CONSUMED | none                             |
+| 410    | HANDOFF_EXPIRED          | none                             |
+| 410    | HANDOFF_OFFER_STALE      | none; client offers fresh search |
+| 503    | CHAT_HANDOFF_DISABLED    | none                             |
 
 ### POST `/api/bookings/intents/readiness` additive source
 

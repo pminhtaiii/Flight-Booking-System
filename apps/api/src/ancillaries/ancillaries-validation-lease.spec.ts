@@ -49,7 +49,9 @@ describe('AncillariesService validation lease', () => {
       bookingIntent: {
         findUnique: jest.fn().mockResolvedValue(intent),
       },
-      $transaction: jest.fn(async (callback: (value: typeof transaction) => Promise<unknown>) => callback(transaction)),
+      $transaction: jest.fn(async (callback: (value: typeof transaction) => Promise<unknown>) =>
+        callback(transaction),
+      ),
     };
     const catalog = {
       offerId: 'offer-1',

@@ -12,24 +12,24 @@ The plan also corrects two repository realities that the earlier design did not 
 
 ## Technical Context
 
-| Area | Decision |
-| --- | --- |
-| Language/runtime | Node.js 20+, TypeScript 5.4 |
-| Backend | NestJS 10, global `/api` prefix, raw-body capture already enabled |
-| Frontend | Next.js 14.2.3 App Router, React 18; Server Components for initial protected reads |
-| Storage | PostgreSQL through Prisma; schema is additive to current Feature 12 model |
-| Scheduling | Existing `@nestjs/schedule`; database leases make jobs multi-instance safe |
-| Supplier | Installed `@duffel/api`; full order retrieval is authoritative; custom raw HMAC verifier for webhook edge |
-| Shared contracts | `packages/shared` remains the DTO/type source of truth |
-| Tests | Jest unit/API E2E with Supertest, Playwright 1.41.2 after configuration restoration |
-| Webhook target | Durable ACK p95 <500 ms; no Duffel request in receiver |
-| Processing target | Webhook-triggered material revision visible p95 <2 minutes |
-| Reconciliation target | Eligible missed changes caught within 35 minutes when budget available |
-| Read target | Booking detail/history local-only, zero supplier calls, p95 <200 ms under existing load profile |
-| Batch/scale | Inbox and reconciliation batches of 20; no new queue service |
-| Concurrency | Owned five-minute Booking sync lease + inbox lease + unique `(bookingId, version)` fallback |
-| Security | HMAC raw bytes/replay tolerance, JWT ownership, ADMIN RBAC, PII-safe logs/DTOs, 30-day raw payload retention |
-| Rollout | Separate ingestion, processor, reconciliation, customer-surfacing, and outbox flags |
+| Area                  | Decision                                                                                                     |
+| --------------------- | ------------------------------------------------------------------------------------------------------------ |
+| Language/runtime      | Node.js 20+, TypeScript 5.4                                                                                  |
+| Backend               | NestJS 10, global `/api` prefix, raw-body capture already enabled                                            |
+| Frontend              | Next.js 14.2.3 App Router, React 18; Server Components for initial protected reads                           |
+| Storage               | PostgreSQL through Prisma; schema is additive to current Feature 12 model                                    |
+| Scheduling            | Existing `@nestjs/schedule`; database leases make jobs multi-instance safe                                   |
+| Supplier              | Installed `@duffel/api`; full order retrieval is authoritative; custom raw HMAC verifier for webhook edge    |
+| Shared contracts      | `packages/shared` remains the DTO/type source of truth                                                       |
+| Tests                 | Jest unit/API E2E with Supertest, Playwright 1.41.2 after configuration restoration                          |
+| Webhook target        | Durable ACK p95 <500 ms; no Duffel request in receiver                                                       |
+| Processing target     | Webhook-triggered material revision visible p95 <2 minutes                                                   |
+| Reconciliation target | Eligible missed changes caught within 35 minutes when budget available                                       |
+| Read target           | Booking detail/history local-only, zero supplier calls, p95 <200 ms under existing load profile              |
+| Batch/scale           | Inbox and reconciliation batches of 20; no new queue service                                                 |
+| Concurrency           | Owned five-minute Booking sync lease + inbox lease + unique `(bookingId, version)` fallback                  |
+| Security              | HMAC raw bytes/replay tolerance, JWT ownership, ADMIN RBAC, PII-safe logs/DTOs, 30-day raw payload retention |
+| Rollout               | Separate ingestion, processor, reconciliation, customer-surfacing, and outbox flags                          |
 
 No `NEEDS CLARIFICATION` items remain. Defaults not fixed by the ADR are resolved in [research.md](./research.md), including fallback match tolerance, retry schedule, UTC throttle boundary, retention, and frontend update behavior.
 
@@ -428,18 +428,18 @@ Customer surfacing stays disabled until Phases 1–6 pass bootstrap/current-itin
 
 ### Final verification matrix
 
-| Invariant | Proof |
-| --- | --- |
-| Valid webhook persisted before ACK, no Duffel call | HTTP E2E + latency measurement |
-| Duplicate/concurrent input creates one revision/outbox | DB-backed concurrency E2E |
-| Incremental and cumulative materiality exact | golden/property tests + E2E |
-| Current itinerary shown, original preserved | API E2E + Playwright |
-| Stale traveller/admin action cannot affect new revision | REST E2E + Playwright |
-| Cancellation wins and resolves atomically | cancellation/disruption race E2E |
-| Return leg remains monitored | reconciliation/completion E2E |
-| Retry/escalation/retention operational | processor/admin E2E |
-| No PII/raw payload leakage | structured log/API leakage tests |
-| Safe enable/disable/rollback | runbook rehearsal |
+| Invariant                                               | Proof                            |
+| ------------------------------------------------------- | -------------------------------- |
+| Valid webhook persisted before ACK, no Duffel call      | HTTP E2E + latency measurement   |
+| Duplicate/concurrent input creates one revision/outbox  | DB-backed concurrency E2E        |
+| Incremental and cumulative materiality exact            | golden/property tests + E2E      |
+| Current itinerary shown, original preserved             | API E2E + Playwright             |
+| Stale traveller/admin action cannot affect new revision | REST E2E + Playwright            |
+| Cancellation wins and resolves atomically               | cancellation/disruption race E2E |
+| Return leg remains monitored                            | reconciliation/completion E2E    |
+| Retry/escalation/retention operational                  | processor/admin E2E              |
+| No PII/raw payload leakage                              | structured log/API leakage tests |
+| Safe enable/disable/rollback                            | runbook rehearsal                |
 
 ### Exit criteria
 
@@ -476,15 +476,15 @@ Rollback disables in reverse operational order: outbox, customer UI, reconciliat
 
 ## Complexity Tracking
 
-| Complexity | Why needed | Simpler alternative rejected because |
-| --- | --- | --- |
-| Durable inbox table/processor | closes crash gap after provider ACK and handles at-least-once delivery | synchronous/fire-and-forget processing can lose events or cause retry storms |
-| Owned DB leases + unique revision fallback | multi-instance webhook/cron concurrency and stale worker safety | timestamp-only/unconditional release can clear another worker; decorator is not a distributed lock |
-| Normalized revisions plus original JSON snapshot | current read, audit, matching, history, and cumulative drift | overwriting original destroys evidence; JSON-only revisions are difficult to query/render safely |
-| Incremental and cumulative diff | latest explanation plus accumulated materiality | either baseline alone misses an approved user need |
-| Derived current/next/final Booking times | indexed round-trip reconciliation/completion | querying nested JSON is not a fair/budget-efficient scheduler seam |
-| Independent attention state and outbox | separates operational suppression from traveller lifecycle and future delivery | overloading disruption status hides what action is required |
-| Frontend foundation restoration | required files/config are absent from clean tree | planning edits to documentation-only components is not executable |
+| Complexity                                       | Why needed                                                                     | Simpler alternative rejected because                                                               |
+| ------------------------------------------------ | ------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------- |
+| Durable inbox table/processor                    | closes crash gap after provider ACK and handles at-least-once delivery         | synchronous/fire-and-forget processing can lose events or cause retry storms                       |
+| Owned DB leases + unique revision fallback       | multi-instance webhook/cron concurrency and stale worker safety                | timestamp-only/unconditional release can clear another worker; decorator is not a distributed lock |
+| Normalized revisions plus original JSON snapshot | current read, audit, matching, history, and cumulative drift                   | overwriting original destroys evidence; JSON-only revisions are difficult to query/render safely   |
+| Incremental and cumulative diff                  | latest explanation plus accumulated materiality                                | either baseline alone misses an approved user need                                                 |
+| Derived current/next/final Booking times         | indexed round-trip reconciliation/completion                                   | querying nested JSON is not a fair/budget-efficient scheduler seam                                 |
+| Independent attention state and outbox           | separates operational suppression from traveller lifecycle and future delivery | overloading disruption status hides what action is required                                        |
+| Frontend foundation restoration                  | required files/config are absent from clean tree                               | planning edits to documentation-only components is not executable                                  |
 
 All complexity maps to deterministic auditability, API-budget discipline, operational visibility, or a verified repository prerequisite. No extra deployable service is introduced.
 

@@ -29,7 +29,13 @@ export interface TravelerPreferences {
   dietaryNeeds?: string | null;
 }
 
-export type TravelerIdentityField = 'givenName' | 'middleName' | 'familyName' | 'dateOfBirth' | 'gender' | 'title';
+export type TravelerIdentityField =
+  | 'givenName'
+  | 'middleName'
+  | 'familyName'
+  | 'dateOfBirth'
+  | 'gender'
+  | 'title';
 export const TRAVELER_IDENTITY_FIELDS: TravelerIdentityField[] = [
   'givenName',
   'middleName',
@@ -46,7 +52,12 @@ export const TRAVELER_CONTACT_FIELDS: TravelerContactField[] = [
   'phoneNumber',
 ];
 
-export type TravelerDocumentField = 'documentType' | 'passportNumber' | 'passportExpiry' | 'issuingCountry' | 'nationality';
+export type TravelerDocumentField =
+  | 'documentType'
+  | 'passportNumber'
+  | 'passportExpiry'
+  | 'issuingCountry'
+  | 'nationality';
 export const TRAVELER_DOCUMENT_FIELDS: TravelerDocumentField[] = [
   'documentType',
   'passportNumber',

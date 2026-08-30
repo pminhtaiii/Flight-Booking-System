@@ -6,16 +6,16 @@
 
 Represents the single customer-refund amount owed because one Booking was cancelled. It is not a provider attempt and does not contain retry state.
 
-| Field | Type | Rules |
-|---|---|---|
-| `id` | UUID | Primary key |
-| `bookingId` | UUID | Required, unique FK to Booking; establishes Booking 1→0..1 obligation |
-| `paymentId` | UUID | Required FK to the Payment whose refundable capacity applies |
-| `totalAmount` | integer minor units | Required, non-negative; total customer amount owed |
+| Field                 | Type                | Rules                                                                              |
+| --------------------- | ------------------- | ---------------------------------------------------------------------------------- |
+| `id`                  | UUID                | Primary key                                                                        |
+| `bookingId`           | UUID                | Required, unique FK to Booking; establishes Booking 1→0..1 obligation              |
+| `paymentId`           | UUID                | Required FK to the Payment whose refundable capacity applies                       |
+| `totalAmount`         | integer minor units | Required, non-negative; total customer amount owed                                 |
 | `airlineRefundAmount` | integer minor units | Required, non-negative supplier amount for audit; may differ from original Payment |
-| `currency` | ISO 4217 string | Must match Payment and all linked transactions |
-| `createdAt` | timestamp | Creation timestamp |
-| `updatedAt` | timestamp | Last metadata update; fulfillment balances are not stored here |
+| `currency`            | ISO 4217 string     | Must match Payment and all linked transactions                                     |
+| `createdAt`           | timestamp           | Creation timestamp                                                                 |
+| `updatedAt`           | timestamp           | Last metadata update; fulfillment balances are not stored here                     |
 
 Relationships:
 
@@ -36,24 +36,24 @@ Validation invariants:
 
 The target domain name for the existing Prisma `Refund` record. During the additive rollout the physical table remains `refunds` via `@@map("refunds")`.
 
-| Field | Type | Rules |
-|---|---|---|
-| `id` | UUID | Primary key; internal transaction identity |
-| `paymentId` | UUID | Required FK to Payment |
-| `cancellationRefundObligationId` | UUID nullable | FK to obligation for cancellation-related transactions; null for other refund reasons |
-| `idempotencyKeyId` | UUID | Required unique FK; transaction-scoped, reused by retries |
-| `stripeRefundId` | string nullable | Unique provider reference once known; retain current name during migration |
-| `amount` | integer minor units | Required and positive |
-| `currency` | ISO 4217 string | Must match Payment and optional obligation |
-| `reason` | string nullable | Allowlisted operational reason |
-| `triggerType` | enum | Existing `USER`, `ADMIN`, or `SYSTEM_AUTOMATED` |
-| `triggeredByUserId` | UUID nullable | Actor for user/admin initiation |
-| `requiresReview` | boolean | Existing automated-review marker |
-| `status` | RefundStatus | Operational transaction lifecycle |
-| `airlineRefundAmount` | integer nullable | Legacy compatibility during backfill; obligation becomes canonical for cancellation quote amount |
-| `customerRefundAmount` | integer nullable | Legacy compatibility during backfill; transaction `amount` is the money movement |
-| retry/error fields | existing fields | `retryCount`, `nextRetryAt`, key age, last error code/time |
-| timestamps | timestamp | Existing creation/update timestamps |
+| Field                            | Type                | Rules                                                                                            |
+| -------------------------------- | ------------------- | ------------------------------------------------------------------------------------------------ |
+| `id`                             | UUID                | Primary key; internal transaction identity                                                       |
+| `paymentId`                      | UUID                | Required FK to Payment                                                                           |
+| `cancellationRefundObligationId` | UUID nullable       | FK to obligation for cancellation-related transactions; null for other refund reasons            |
+| `idempotencyKeyId`               | UUID                | Required unique FK; transaction-scoped, reused by retries                                        |
+| `stripeRefundId`                 | string nullable     | Unique provider reference once known; retain current name during migration                       |
+| `amount`                         | integer minor units | Required and positive                                                                            |
+| `currency`                       | ISO 4217 string     | Must match Payment and optional obligation                                                       |
+| `reason`                         | string nullable     | Allowlisted operational reason                                                                   |
+| `triggerType`                    | enum                | Existing `USER`, `ADMIN`, or `SYSTEM_AUTOMATED`                                                  |
+| `triggeredByUserId`              | UUID nullable       | Actor for user/admin initiation                                                                  |
+| `requiresReview`                 | boolean             | Existing automated-review marker                                                                 |
+| `status`                         | RefundStatus        | Operational transaction lifecycle                                                                |
+| `airlineRefundAmount`            | integer nullable    | Legacy compatibility during backfill; obligation becomes canonical for cancellation quote amount |
+| `customerRefundAmount`           | integer nullable    | Legacy compatibility during backfill; transaction `amount` is the money movement                 |
+| retry/error fields               | existing fields     | `retryCount`, `nextRetryAt`, key age, last error code/time                                       |
+| timestamps                       | timestamp           | Existing creation/update timestamps                                                              |
 
 Target relationships:
 

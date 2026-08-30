@@ -7,13 +7,7 @@ import {
   NotFoundException,
   Optional,
 } from '@nestjs/common';
-import {
-  Booking,
-  BookingFailureReason,
-  BookingStatus,
-  Prisma,
-  RefundStatus,
-} from '@prisma/client';
+import { Booking, BookingFailureReason, BookingStatus, Prisma, RefundStatus } from '@prisma/client';
 import { PrismaService } from '@/prisma/prisma.service';
 import { DuffelService } from '@/duffel/duffel.service';
 import { PaymentRefundService } from '@/payment/payment-refund.service';
@@ -47,10 +41,7 @@ export class CancellationService {
         cancellationRefundObligation: {
           include: {
             refunds: {
-              orderBy: [
-                { updatedAt: 'desc' },
-                { id: 'desc' },
-              ],
+              orderBy: [{ updatedAt: 'desc' }, { id: 'desc' }],
             },
           },
         },
@@ -70,30 +61,35 @@ export class CancellationService {
     const refundedAmount = refunds
       .filter((refund) => refund.status === RefundStatus.SUCCEEDED)
       .reduce((total, refund) => total + refund.amount, 0);
-    const isFulfilled = obligation != null
-      ? !isZeroValueObligation && refundedAmount >= obligation.totalAmount
-      : booking.status === BookingStatus.CANCELLED_AND_REFUNDED;
+    const isFulfilled =
+      obligation != null
+        ? !isZeroValueObligation && refundedAmount >= obligation.totalAmount
+        : booking.status === BookingStatus.CANCELLED_AND_REFUNDED;
 
-    const selectHighestPriority = <T extends {
-      status: RefundStatus;
-      updatedAt: Date;
-      id: string;
-    }>(candidates: T[], priority: Partial<Record<RefundStatus, number>>): T | undefined => {
+    const selectHighestPriority = <
+      T extends {
+        status: RefundStatus;
+        updatedAt: Date;
+        id: string;
+      },
+    >(
+      candidates: T[],
+      priority: Partial<Record<RefundStatus, number>>,
+    ): T | undefined => {
       const matching = candidates.filter((c) => priority[c.status] !== undefined);
       if (matching.length === 0) {
         return undefined;
       }
       return [...matching].sort((left, right) => {
-        const priorityDifference = (priority[left.status] ?? Number.MAX_SAFE_INTEGER)
-          - (priority[right.status] ?? Number.MAX_SAFE_INTEGER);
+        const priorityDifference =
+          (priority[left.status] ?? Number.MAX_SAFE_INTEGER) -
+          (priority[right.status] ?? Number.MAX_SAFE_INTEGER);
         if (priorityDifference !== 0) {
           return priorityDifference;
         }
 
         const updatedAtDifference = right.updatedAt.getTime() - left.updatedAt.getTime();
-        return updatedAtDifference !== 0
-          ? updatedAtDifference
-          : right.id.localeCompare(left.id);
+        return updatedAtDifference !== 0 ? updatedAtDifference : right.id.localeCompare(left.id);
       })[0];
     };
 
@@ -106,21 +102,21 @@ export class CancellationService {
       [RefundStatus.REFUND_FAILED_NEEDS_ATTENTION]: 0,
       [RefundStatus.FAILED]: 1,
     });
-    const projectedRefund = isFulfilled || isZeroValueObligation
-      ? undefined
-      : activeRefund ?? terminalRefund;
+    const projectedRefund =
+      isFulfilled || isZeroValueObligation ? undefined : (activeRefund ?? terminalRefund);
     const refundStatus: RefundStatus | 'NOT_REQUIRED' | null = isZeroValueObligation
       ? 'NOT_REQUIRED'
       : isFulfilled
         ? RefundStatus.SUCCEEDED
-        : projectedRefund?.status ?? (obligation ? RefundStatus.REFUND_PENDING : null);
+        : (projectedRefund?.status ?? (obligation ? RefundStatus.REFUND_PENDING : null));
 
     let escalationMessage: string | null = null;
     if (refundStatus === RefundStatus.REFUND_FAILED_NEEDS_ATTENTION) {
       const updatedAt = projectedRefund?.updatedAt ?? booking.updatedAt;
       const hoursElapsed = (Date.now() - updatedAt.getTime()) / (1000 * 60 * 60);
       if (hoursElapsed < 48) {
-        escalationMessage = 'Refund is taking longer than expected. Our team is reviewing \u2014 no action needed.';
+        escalationMessage =
+          'Refund is taking longer than expected. Our team is reviewing \u2014 no action needed.';
       } else {
         escalationMessage = 'Refund requires attention. Please contact support.';
       }
@@ -132,7 +128,8 @@ export class CancellationService {
       cancellationDeadline: booking.cancellationDeadline?.toISOString() ?? null,
       airlineRefundAmount: booking.airlineRefundAmount?.toString() ?? null,
       customerRefundAmount: booking.customerRefundAmount?.toString() ?? null,
-      duffelCancellationQuoteId: parseDuffelCancellationQuoteId(booking.duffelCancellationQuoteId).quoteId,
+      duffelCancellationQuoteId: parseDuffelCancellationQuoteId(booking.duffelCancellationQuoteId)
+        .quoteId,
       refundStatus,
       retryCount: projectedRefund?.retryCount ?? null,
       nextRetryAt: projectedRefund?.nextRetryAt?.toISOString() ?? null,
@@ -156,7 +153,10 @@ export class CancellationService {
       throw new ForbiddenException('You do not have access to this booking');
     }
 
-    if (booking.status !== BookingStatus.CONFIRMED || (booking.departureAt && booking.departureAt <= new Date())) {
+    if (
+      booking.status !== BookingStatus.CONFIRMED ||
+      (booking.departureAt && booking.departureAt <= new Date())
+    ) {
       throw new BadRequestException('Booking is not eligible for cancellation quote');
     }
 
@@ -177,7 +177,9 @@ export class CancellationService {
         quoteId: parsed.quoteId || '',
         bookingId: booking.id,
         duffelOrderId: booking.duffelOrderId,
-        refundAmount: booking.customerRefundAmount ? booking.customerRefundAmount.toString() : '0.00',
+        refundAmount: booking.customerRefundAmount
+          ? booking.customerRefundAmount.toString()
+          : '0.00',
         currency: booking.currency,
         expiresAt: booking.cancellationDeadline.toISOString(),
         refundable: booking.cancellationRefundable ?? false,
@@ -226,7 +228,9 @@ export class CancellationService {
             quoteId: parsed.quoteId || '',
             bookingId: updatedBooking.id,
             duffelOrderId: updatedBooking.duffelOrderId || booking.duffelOrderId,
-            refundAmount: updatedBooking.customerRefundAmount ? updatedBooking.customerRefundAmount.toString() : '0.00',
+            refundAmount: updatedBooking.customerRefundAmount
+              ? updatedBooking.customerRefundAmount.toString()
+              : '0.00',
             currency: updatedBooking.currency,
             expiresAt: updatedBooking.cancellationDeadline.toISOString(),
             refundable: updatedBooking.cancellationRefundable ?? false,
@@ -247,15 +251,26 @@ export class CancellationService {
       const duffelOrderId = quote.order_id || booking.duffelOrderId;
       const refundAmount = quote.refund_amount ?? quote.total_refund_amount ?? '0.00';
       const currency = quote.refund_currency ?? quote.currency ?? booking.currency ?? 'GBP';
-      const expiresAt = quote.expires_at ?? quote.expiresAt ?? new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
-      const refundable = quote.refundable !== undefined ? Boolean(quote.refundable) : parseFloat(String(refundAmount)) > 0;
+      const expiresAt =
+        quote.expires_at ??
+        quote.expiresAt ??
+        new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+      const refundable =
+        quote.refundable !== undefined
+          ? Boolean(quote.refundable)
+          : parseFloat(String(refundAmount)) > 0;
       const cancellationDeadline = expiresAt;
 
       const refundTo = quote.refund_to || null;
       const nonRefundableAmount = quote.non_refundable_ancillary_amount || null;
       const nonRefundableCurrency = quote.non_refundable_ancillary_currency || null;
 
-      const serializedQuoteId = serializeDuffelCancellationQuoteId(quoteId, refundTo, nonRefundableAmount, nonRefundableCurrency);
+      const serializedQuoteId = serializeDuffelCancellationQuoteId(
+        quoteId,
+        refundTo,
+        nonRefundableAmount,
+        nonRefundableCurrency,
+      );
 
       const finalizeResult = await this.prisma.booking.updateMany({
         where: {
@@ -358,9 +373,10 @@ export class CancellationService {
     }
 
     const amountInMinorUnits = Math.round(Number(refundAmount) * 100);
-    const cancellationStatus = refundable && amountInMinorUnits > 0
-      ? BookingStatus.CANCELLED_PENDING_REFUND
-      : BookingStatus.CANCELLED_NO_REFUND;
+    const cancellationStatus =
+      refundable && amountInMinorUnits > 0
+        ? BookingStatus.CANCELLED_PENDING_REFUND
+        : BookingStatus.CANCELLED_NO_REFUND;
     const persistedCount = await this.prisma.$transaction(async (tx) => {
       const dbBooking = await tx.booking.findUnique({
         where: { id: bookingId },
@@ -376,7 +392,8 @@ export class CancellationService {
         customerRefundAmount: refundAmount,
       };
 
-      const hasActiveDisruption = dbBooking.disruptionStatus === 'DETECTED' || dbBooking.disruptionStatus === 'ACKNOWLEDGED';
+      const hasActiveDisruption =
+        dbBooking.disruptionStatus === 'DETECTED' || dbBooking.disruptionStatus === 'ACKNOWLEDGED';
 
       if (hasActiveDisruption) {
         updateData.disruptionStatus = 'RESOLVED';
@@ -392,7 +409,11 @@ export class CancellationService {
       });
 
       if (result.count > 0) {
-        await this.bookingAgentProjectionService?.updateProjectionStatus(bookingId, cancellationStatus, tx);
+        await this.bookingAgentProjectionService?.updateProjectionStatus(
+          bookingId,
+          cancellationStatus,
+          tx,
+        );
       }
 
       if (result.count > 0 && booking.payment) {
@@ -479,7 +500,10 @@ export class CancellationService {
     });
     return {
       bookingId,
-      bookingStatus: refund.refundStatus === 'SUCCEEDED' ? BookingStatus.CANCELLED_AND_REFUNDED : cancellationStatus,
+      bookingStatus:
+        refund.refundStatus === 'SUCCEEDED'
+          ? BookingStatus.CANCELLED_AND_REFUNDED
+          : cancellationStatus,
       cancellationStatus,
       refundStatus: refund.refundStatus,
       refundAmount: refund.refundAmount,
@@ -514,18 +538,21 @@ export class CancellationService {
   }
 
   toCancellationResponse(booking: Booking): CancellationResponseDto {
-    const refundStatus = booking.status === BookingStatus.CANCELLED_AND_REFUNDED
-      ? 'SUCCEEDED'
-      : booking.status === BookingStatus.FAILED && booking.failureReason === BookingFailureReason.SYSTEM_ERROR
-        ? 'REFUND_FAILED_NEEDS_ATTENTION'
-        : 'PENDING';
+    const refundStatus =
+      booking.status === BookingStatus.CANCELLED_AND_REFUNDED
+        ? 'SUCCEEDED'
+        : booking.status === BookingStatus.FAILED &&
+            booking.failureReason === BookingFailureReason.SYSTEM_ERROR
+          ? 'REFUND_FAILED_NEEDS_ATTENTION'
+          : 'PENDING';
     return {
       bookingId: booking.id,
       bookingStatus: booking.status,
       cancellationStatus: booking.status,
       refundStatus,
       refundAmount: booking.customerRefundAmount?.toString() ?? '0.00',
-      duffelCancellationQuoteId: parseDuffelCancellationQuoteId(booking.duffelCancellationQuoteId).quoteId,
+      duffelCancellationQuoteId: parseDuffelCancellationQuoteId(booking.duffelCancellationQuoteId)
+        .quoteId,
     };
   }
 }

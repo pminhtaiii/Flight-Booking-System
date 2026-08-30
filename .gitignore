@@ -39,8 +39,8 @@ apps/web/playwright-report/
 # Smoke test diagnostics and process logs
 .smoke-diagnostics/
 
-# Graphify cache
-graphify-out/cache/
+# Graphify
+graphify-out/
 
 # Package manager local store
 .pnpm-store/

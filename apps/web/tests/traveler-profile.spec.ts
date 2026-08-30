@@ -1,4 +1,10 @@
-import { expect, test, type Page, type APIRequestContext, type BrowserContext } from '@playwright/test';
+import {
+  expect,
+  test,
+  type Page,
+  type APIRequestContext,
+  type BrowserContext,
+} from '@playwright/test';
 
 const savedDomesticProfile = {
   profileId: 'profile-test-1',
@@ -60,9 +66,11 @@ async function registerAndOpenProfile(
   context: BrowserContext,
   initialReturnTo?: string,
 ): Promise<void> {
-  await request.post('http://127.0.0.1:3001/api/auth/test/reset-lockout', {
-    data: { clearAll: true },
-  }).catch(() => {});
+  await request
+    .post('http://127.0.0.1:3001/api/auth/test/reset-lockout', {
+      data: { clearAll: true },
+    })
+    .catch(() => {});
   await context.clearCookies();
 
   const email = `profile-${Date.now()}-${Math.random().toString(36).slice(2)}@example.com`;
@@ -72,7 +80,9 @@ async function registerAndOpenProfile(
   await page.getByRole('button', { name: 'Create account' }).click();
   await expect(page).toHaveURL(/127.0.0.1:3000\/$/, { timeout: 30000 });
 
-  const targetUrl = initialReturnTo ? `/profile?returnTo=${encodeURIComponent(initialReturnTo)}` : '/profile';
+  const targetUrl = initialReturnTo
+    ? `/profile?returnTo=${encodeURIComponent(initialReturnTo)}`
+    : '/profile';
   await page.goto(targetUrl);
 
   // If initial cold-render redirected to login, log in directly and navigate
@@ -84,7 +94,9 @@ async function registerAndOpenProfile(
     await page.goto(targetUrl);
   }
 
-  await expect(page.getByRole('heading', { name: 'Keep every detail ready for takeoff.' })).toBeVisible({ timeout: 30000 });
+  await expect(
+    page.getByRole('heading', { name: 'Keep every detail ready for takeoff.' }),
+  ).toBeVisible({ timeout: 30000 });
 }
 
 async function fillDomesticProfile(page: Page): Promise<void> {
@@ -111,7 +123,11 @@ async function fillInternationalDocumentAndPreferences(page: Page): Promise<void
 test.describe('Secure traveler profile', () => {
   test.setTimeout(90000);
 
-  test('shows every profile section and saves a domestic profile without a document', async ({ page, request, context }) => {
+  test('shows every profile section and saves a domestic profile without a document', async ({
+    page,
+    request,
+    context,
+  }) => {
     await registerAndOpenProfile(page, request, context);
 
     await expect(page.getByRole('heading', { name: 'Identity' })).toBeVisible();
@@ -123,7 +139,11 @@ test.describe('Secure traveler profile', () => {
 
     await page.route('**/api/profile', async (route) => {
       if (route.request().method() === 'PATCH') {
-        await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(savedDomesticProfile) });
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify(savedDomesticProfile),
+        });
         return;
       }
       await route.continue();
@@ -135,16 +155,26 @@ test.describe('Secure traveler profile', () => {
     await expect(page).toHaveURL(/\/profile$/);
     await expect(page).not.toHaveURL(/jane\.doe|901234567/);
 
-    const browserStorageDump = await page.evaluate(() => JSON.stringify({ ...localStorage, ...sessionStorage }));
+    const browserStorageDump = await page.evaluate(() =>
+      JSON.stringify({ ...localStorage, ...sessionStorage }),
+    );
     expect(browserStorageDump).not.toContain('Jane');
     expect(browserStorageDump).not.toContain('jane.doe');
     expect(browserStorageDump).not.toContain('901234567');
   });
 
-  test('returns to the server-validated handoff target after saving', async ({ page, request, context }) => {
+  test('returns to the server-validated handoff target after saving', async ({
+    page,
+    request,
+    context,
+  }) => {
     await page.route('**/api/profile', async (route) => {
       if (route.request().method() === 'PATCH') {
-        await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(savedDomesticProfile) });
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify(savedDomesticProfile),
+        });
         return;
       }
       await route.continue();
@@ -159,7 +189,11 @@ test.describe('Secure traveler profile', () => {
     await expect(page).not.toHaveURL(/jane\.doe|901234567/);
   });
 
-  test('recovers from a stale revision without overwriting the latest profile', async ({ page, request, context }) => {
+  test('recovers from a stale revision without overwriting the latest profile', async ({
+    page,
+    request,
+    context,
+  }) => {
     await registerAndOpenProfile(page, request, context);
     await fillDomesticProfile(page);
 
@@ -169,13 +203,20 @@ test.describe('Secure traveler profile', () => {
         await route.fulfill({
           status: 409,
           contentType: 'application/json',
-          body: JSON.stringify({ code: 'PROFILE_UPDATE_CONFLICT', message: 'PROFILE_UPDATE_CONFLICT' }),
+          body: JSON.stringify({
+            code: 'PROFILE_UPDATE_CONFLICT',
+            message: 'PROFILE_UPDATE_CONFLICT',
+          }),
         });
         return;
       }
 
       if (route.request().method() === 'GET' && reloadRequested) {
-        await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(savedDomesticProfile) });
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify(savedDomesticProfile),
+        });
         return;
       }
 
@@ -183,7 +224,9 @@ test.describe('Secure traveler profile', () => {
     });
 
     await page.getByRole('button', { name: 'Save profile' }).click();
-    await expect(page.getByRole('alert').first()).toContainText('This profile changed in another tab.');
+    await expect(page.getByRole('alert').first()).toContainText(
+      'This profile changed in another tab.',
+    );
 
     reloadRequested = true;
     await page.getByRole('button', { name: 'Reload latest profile' }).click();
@@ -191,7 +234,11 @@ test.describe('Secure traveler profile', () => {
     await expect(page.getByLabel('Given name')).toHaveValue('Jane');
   });
 
-  test('saves an international traveler profile with passport document and asserts zero PII leakage', async ({ page, request, context }) => {
+  test('saves an international traveler profile with passport document and asserts zero PII leakage', async ({
+    page,
+    request,
+    context,
+  }) => {
     const consoleMessages: string[] = [];
     page.on('console', (msg) => consoleMessages.push(msg.text()));
 
@@ -222,7 +269,9 @@ test.describe('Secure traveler profile', () => {
     await expect(page).toHaveURL(/\/profile$/);
     await expect(page).not.toHaveURL(/N12345678|1995-05-05|jane\.doe|901234567/);
 
-    const browserStorageDump = await page.evaluate(() => JSON.stringify({ ...localStorage, ...sessionStorage }));
+    const browserStorageDump = await page.evaluate(() =>
+      JSON.stringify({ ...localStorage, ...sessionStorage }),
+    );
     expect(browserStorageDump).not.toContain('N12345678');
     expect(browserStorageDump).not.toContain('1995-05-05');
     expect(browserStorageDump).not.toContain('jane.doe');
@@ -237,12 +286,18 @@ test.describe('Secure traveler profile', () => {
     expect(consoleDump).not.toContain('901234567');
   });
 
-  test('validates required fields and atomic document completion before saving', async ({ page, request, context }) => {
+  test('validates required fields and atomic document completion before saving', async ({
+    page,
+    request,
+    context,
+  }) => {
     await registerAndOpenProfile(page, request, context);
 
     // 1. Submit empty form - save blocked with required field errors
     await page.getByRole('button', { name: 'Save profile' }).click();
-    await expect(page.getByRole('alert').first()).toContainText('Complete the highlighted fields before saving.');
+    await expect(page.getByRole('alert').first()).toContainText(
+      'Complete the highlighted fields before saving.',
+    );
     await expect(page.getByText('This field is required.').first()).toBeVisible();
     await expect(page.getByRole('status')).not.toBeVisible();
 
@@ -250,13 +305,19 @@ test.describe('Secure traveler profile', () => {
     await fillDomesticProfile(page);
     await page.getByLabel('Passport number', { exact: true }).fill('N12345678');
     await page.getByRole('button', { name: 'Save profile' }).click();
-    await expect(page.getByRole('alert').first()).toContainText('Complete the highlighted fields before saving.');
-    await expect(page.getByText('Complete the travel document or clear the section.').first()).toBeVisible();
+    await expect(page.getByRole('alert').first()).toContainText(
+      'Complete the highlighted fields before saving.',
+    );
+    await expect(
+      page.getByText('Complete the travel document or clear the section.').first(),
+    ).toBeVisible();
 
     // 3. Discard changes resets form state cleanly
     await page.getByRole('button', { name: 'Discard changes' }).click();
     await expect(page.getByLabel('Given name')).toHaveValue('');
     await expect(page.getByLabel('Passport number', { exact: true })).toHaveValue('');
-    await expect(page.getByText('Complete the highlighted fields before saving.')).not.toBeVisible();
+    await expect(
+      page.getByText('Complete the highlighted fields before saving.'),
+    ).not.toBeVisible();
   });
 });

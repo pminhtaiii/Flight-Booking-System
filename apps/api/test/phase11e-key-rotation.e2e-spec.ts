@@ -4,7 +4,9 @@ import { JwtService } from '@nestjs/jwt';
 const encryptionKey = crypto.randomBytes(32).toString('hex');
 const chatEncryptionKey = crypto.randomBytes(32).toString('hex');
 
-process.env.DATABASE_URL = process.env.DATABASE_URL || 'postgresql://postgres:postgres@127.0.0.1:5432/flight_booking?schema=public';
+process.env.DATABASE_URL =
+  process.env.DATABASE_URL ||
+  'postgresql://postgres:postgres@127.0.0.1:5432/flight_booking?schema=public';
 process.env.REDIS_URL = process.env.REDIS_URL || 'redis://127.0.0.1:6379';
 process.env.ENCRYPTION_KEY = encryptionKey;
 process.env.CHAT_ENCRYPTION_KEY = chatEncryptionKey;
@@ -91,7 +93,9 @@ describe('Phase 11E: Zero-Downtime Key Rotation Ring Verification (e2e)', () => 
 
     prisma = moduleFixture.get<PrismaService>(PrismaService);
     jwtService = moduleFixture.get<JwtService>(JwtService);
-    attestationService = moduleFixture.get<SelectionAttestationService>(SelectionAttestationService);
+    attestationService = moduleFixture.get<SelectionAttestationService>(
+      SelectionAttestationService,
+    );
     handoffTokenService = moduleFixture.get<ChatHandoffTokenService>(ChatHandoffTokenService);
     claimTokenService = moduleFixture.get<ClaimTokenService>(ClaimTokenService);
 
@@ -199,9 +203,7 @@ describe('Phase 11E: Zero-Downtime Key Rotation Ring Verification (e2e)', () => 
   });
 
   describe('3. Selection Attestation Secret Key Rotation Ring', () => {
-    const sampleOffers = [
-      { flightOfferId: 'fo_123', duffelOfferId: 'off_456' },
-    ];
+    const sampleOffers = [{ flightOfferId: 'fo_123', duffelOfferId: 'off_456' }];
     const sessionId = crypto.randomUUID();
 
     it('verifies attestation signed with V1 secret when V2 is active', async () => {

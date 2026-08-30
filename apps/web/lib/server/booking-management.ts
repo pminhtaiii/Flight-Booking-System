@@ -35,9 +35,7 @@ const REQUEST_TIMEOUT_MS = 10_000;
 const MAX_READ_ATTEMPTS = 3;
 const RETRY_BASE_DELAY_MS = 100;
 
-type FetchResult =
-  | { ok: true; response: Response }
-  | { ok: false };
+type FetchResult = { ok: true; response: Response } | { ok: false };
 
 /**
  * Lists user bookings filtered by tab and paginated.
@@ -48,7 +46,11 @@ export async function listBookings(
   limit: number,
 ): Promise<BookingManagementOutcome<BookingListView>> {
   if (tab !== 'upcoming' && tab !== 'past') {
-    return outcomeFailure('INVALID_COMMAND', 'Invalid booking tab. Must be "upcoming" or "past".', false);
+    return outcomeFailure(
+      'INVALID_COMMAND',
+      'Invalid booking tab. Must be "upcoming" or "past".',
+      false,
+    );
   }
 
   const validPage = Number.isInteger(page) && page >= 1 ? page : 1;
@@ -78,15 +80,22 @@ export async function listBookings(
       return unavailableOutcomeFailure();
     }
 
-    const raw = payload as { bookings?: unknown[]; pagination?: { page?: number; limit?: number; total?: number; totalPages?: number } };
+    const raw = payload as {
+      bookings?: unknown[];
+      pagination?: { page?: number; limit?: number; total?: number; totalPages?: number };
+    };
     const rawBookings = Array.isArray(raw.bookings) ? raw.bookings : [];
     const mappedBookings = rawBookings.map(mapListItem);
 
     const pagination = {
       page: typeof raw.pagination?.page === 'number' ? raw.pagination.page : validPage,
       limit: typeof raw.pagination?.limit === 'number' ? raw.pagination.limit : validLimit,
-      total: typeof raw.pagination?.total === 'number' ? raw.pagination.total : mappedBookings.length,
-      totalPages: typeof raw.pagination?.totalPages === 'number' ? raw.pagination.totalPages : Math.ceil(mappedBookings.length / validLimit),
+      total:
+        typeof raw.pagination?.total === 'number' ? raw.pagination.total : mappedBookings.length,
+      totalPages:
+        typeof raw.pagination?.totalPages === 'number'
+          ? raw.pagination.totalPages
+          : Math.ceil(mappedBookings.length / validLimit),
     };
 
     const validated = BookingListViewSchema.safeParse({
@@ -96,7 +105,11 @@ export async function listBookings(
     });
 
     if (!validated.success) {
-      return outcomeFailure('UPSTREAM_UNAVAILABLE', 'Booking list returned an invalid response. Please try again.', true);
+      return outcomeFailure(
+        'UPSTREAM_UNAVAILABLE',
+        'Booking list returned an invalid response. Please try again.',
+        true,
+      );
     }
 
     return { ok: true, data: validated.data };
@@ -140,7 +153,11 @@ export async function getBookingDetail(
     const validated = BookingDetailViewSchema.safeParse(mapped);
 
     if (!validated.success) {
-      return outcomeFailure('UPSTREAM_UNAVAILABLE', 'Booking details returned an invalid response. Please try again.', true);
+      return outcomeFailure(
+        'UPSTREAM_UNAVAILABLE',
+        'Booking details returned an invalid response. Please try again.',
+        true,
+      );
     }
 
     return { ok: true, data: validated.data };
@@ -164,11 +181,14 @@ export async function getCancellationStatus(
     return outcomeFailure('UNAUTHENTICATED', 'Please sign in to view cancellation status.', false);
   }
 
-  const upstream = await fetchWithRetry(`/api/bookings/${encodeURIComponent(bookingId.trim())}/cancellation`, {
-    method: 'GET',
-    headers: { Authorization: `Bearer ${token}` },
-    cache: 'no-store',
-  });
+  const upstream = await fetchWithRetry(
+    `/api/bookings/${encodeURIComponent(bookingId.trim())}/cancellation`,
+    {
+      method: 'GET',
+      headers: { Authorization: `Bearer ${token}` },
+      cache: 'no-store',
+    },
+  );
 
   if (!upstream.ok) return unavailableOutcomeFailure();
   const statusOutcome = await handleUpstreamStatus(upstream.response);
@@ -184,9 +204,11 @@ export async function getCancellationStatus(
     const mapped = {
       bookingId: String(raw.bookingId ?? bookingId),
       bookingStatus: String(raw.bookingStatus ?? ''),
-      cancellationDeadline: typeof raw.cancellationDeadline === 'string' ? raw.cancellationDeadline : null,
+      cancellationDeadline:
+        typeof raw.cancellationDeadline === 'string' ? raw.cancellationDeadline : null,
       airlineRefundAmount: raw.airlineRefundAmount != null ? String(raw.airlineRefundAmount) : null,
-      customerRefundAmount: raw.customerRefundAmount != null ? String(raw.customerRefundAmount) : null,
+      customerRefundAmount:
+        raw.customerRefundAmount != null ? String(raw.customerRefundAmount) : null,
       refundStatus: raw.refundStatus != null ? String(raw.refundStatus) : null,
       nextRetryAt: typeof raw.nextRetryAt === 'string' ? raw.nextRetryAt : null,
       escalationMessage: typeof raw.escalationMessage === 'string' ? raw.escalationMessage : null,
@@ -194,7 +216,11 @@ export async function getCancellationStatus(
 
     const validated = CancellationStatusViewSchema.safeParse(mapped);
     if (!validated.success) {
-      return outcomeFailure('UPSTREAM_UNAVAILABLE', 'Cancellation status returned an invalid response. Please try again.', true);
+      return outcomeFailure(
+        'UPSTREAM_UNAVAILABLE',
+        'Cancellation status returned an invalid response. Please try again.',
+        true,
+      );
     }
 
     return { ok: true, data: validated.data };
@@ -215,17 +241,24 @@ export async function getCancellationQuote(
 
   const token = await getAccessToken();
   if (!token) {
-    return outcomeFailure('UNAUTHENTICATED', 'Please sign in to request a cancellation quote.', false);
+    return outcomeFailure(
+      'UNAUTHENTICATED',
+      'Please sign in to request a cancellation quote.',
+      false,
+    );
   }
 
-  const upstream = await fetchWithRetry(`/api/bookings/${encodeURIComponent(bookingId.trim())}/cancellation-quote`, {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${token}`,
-      'Content-Type': 'application/json',
+  const upstream = await fetchWithRetry(
+    `/api/bookings/${encodeURIComponent(bookingId.trim())}/cancellation-quote`,
+    {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      cache: 'no-store',
     },
-    cache: 'no-store',
-  });
+  );
 
   if (!upstream.ok) return unavailableOutcomeFailure();
   const statusOutcome = await handleUpstreamStatus(upstream.response);
@@ -245,15 +278,25 @@ export async function getCancellationQuote(
       currency: String(raw.currency ?? ''),
       expiresAt: typeof raw.expiresAt === 'string' ? raw.expiresAt : '',
       refundable: Boolean(raw.refundable),
-      ...(raw.cancellationDeadline ? { cancellationDeadline: String(raw.cancellationDeadline) } : {}),
+      ...(raw.cancellationDeadline
+        ? { cancellationDeadline: String(raw.cancellationDeadline) }
+        : {}),
       ...(raw.refundTo ? { refundTo: String(raw.refundTo) } : {}),
-      ...(raw.nonRefundableAncillaryAmount ? { nonRefundableAncillaryAmount: String(raw.nonRefundableAncillaryAmount) } : {}),
-      ...(raw.nonRefundableAncillaryCurrency ? { nonRefundableAncillaryCurrency: String(raw.nonRefundableAncillaryCurrency) } : {}),
+      ...(raw.nonRefundableAncillaryAmount
+        ? { nonRefundableAncillaryAmount: String(raw.nonRefundableAncillaryAmount) }
+        : {}),
+      ...(raw.nonRefundableAncillaryCurrency
+        ? { nonRefundableAncillaryCurrency: String(raw.nonRefundableAncillaryCurrency) }
+        : {}),
     };
 
     const validated = CancellationQuoteViewSchema.safeParse(mapped);
     if (!validated.success) {
-      return outcomeFailure('UPSTREAM_UNAVAILABLE', 'Cancellation quote returned an invalid response. Please try again.', true);
+      return outcomeFailure(
+        'UPSTREAM_UNAVAILABLE',
+        'Cancellation quote returned an invalid response. Please try again.',
+        true,
+      );
     }
 
     return { ok: true, data: validated.data };
@@ -285,15 +328,18 @@ export async function cancelBooking(
     return outcomeFailure('UNAUTHENTICATED', 'Please sign in to cancel your booking.', false);
   }
 
-  const upstream = await fetchWithRetry(`/api/bookings/${encodeURIComponent(bookingId.trim())}/cancel`, {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${token}`,
-      'Content-Type': 'application/json',
+  const upstream = await fetchWithRetry(
+    `/api/bookings/${encodeURIComponent(bookingId.trim())}/cancel`,
+    {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ quoteId: quoteId.trim() }),
+      cache: 'no-store',
     },
-    body: JSON.stringify({ quoteId: quoteId.trim() }),
-    cache: 'no-store',
-  });
+  );
 
   if (!upstream.ok) return unavailableOutcomeFailure();
   const statusOutcome = await handleUpstreamStatus(upstream.response);
@@ -317,7 +363,11 @@ export async function cancelBooking(
 
     const validated = CancellationResultViewSchema.safeParse(mapped);
     if (!validated.success) {
-      return outcomeFailure('UPSTREAM_UNAVAILABLE', 'Cancellation result returned an invalid response. Please try again.', true);
+      return outcomeFailure(
+        'UPSTREAM_UNAVAILABLE',
+        'Cancellation result returned an invalid response. Please try again.',
+        true,
+      );
     }
 
     return { ok: true, data: validated.data };
@@ -454,8 +504,19 @@ export async function getItineraryRevisions(
       return unavailableOutcomeFailure();
     }
 
-    const raw = payload as { items?: unknown[]; revisions?: unknown[]; page?: number; limit?: number; total?: number; totalPages?: number };
-    const rawItems = Array.isArray(raw.items) ? raw.items : (Array.isArray(raw.revisions) ? raw.revisions : []);
+    const raw = payload as {
+      items?: unknown[];
+      revisions?: unknown[];
+      page?: number;
+      limit?: number;
+      total?: number;
+      totalPages?: number;
+    };
+    const rawItems = Array.isArray(raw.items)
+      ? raw.items
+      : Array.isArray(raw.revisions)
+        ? raw.revisions
+        : [];
 
     const mappedRevisions = rawItems.map((item) => {
       const it = item as Record<string, unknown>;
@@ -463,7 +524,10 @@ export async function getItineraryRevisions(
       return {
         revisionId: String(it.revisionId ?? it.id ?? ''),
         version: Math.max(1, typeof it.version === 'number' ? it.version : 1),
-        observedAt: typeof it.observedAt === 'string' ? it.observedAt : new Date(Number(it.observedAt) || Date.now()).toISOString(),
+        observedAt:
+          typeof it.observedAt === 'string'
+            ? it.observedAt
+            : new Date(Number(it.observedAt) || Date.now()).toISOString(),
         isMaterial: Boolean(it.isMaterial),
         materialReasons: Array.isArray(it.materialReasons) ? it.materialReasons.map(String) : [],
         segments: rawSegs.map(mapSegment),
@@ -472,13 +536,18 @@ export async function getItineraryRevisions(
 
     const validatedRevisions = z.array(ItineraryRevisionViewSchema).safeParse(mappedRevisions);
     if (!validatedRevisions.success) {
-      return outcomeFailure('UPSTREAM_UNAVAILABLE', 'Itinerary revisions returned an invalid response. Please try again.', true);
+      return outcomeFailure(
+        'UPSTREAM_UNAVAILABLE',
+        'Itinerary revisions returned an invalid response. Please try again.',
+        true,
+      );
     }
 
     const total = typeof raw.total === 'number' ? raw.total : validatedRevisions.data.length;
     const paginationPage = typeof raw.page === 'number' ? raw.page : validPage;
     const paginationLimit = typeof raw.limit === 'number' ? raw.limit : validLimit;
-    const totalPages = typeof raw.totalPages === 'number' ? raw.totalPages : Math.ceil(total / paginationLimit);
+    const totalPages =
+      typeof raw.totalPages === 'number' ? raw.totalPages : Math.ceil(total / paginationLimit);
 
     return {
       ok: true,
@@ -504,7 +573,11 @@ async function getAccessToken(): Promise<string | null> {
     const sessionFn =
       typeof NextAuth.getServerSession === 'function'
         ? NextAuth.getServerSession
-        : (NextAuth as unknown as { default?: { getServerSession: typeof NextAuth.getServerSession } }).default?.getServerSession;
+        : (
+            NextAuth as unknown as {
+              default?: { getServerSession: typeof NextAuth.getServerSession };
+            }
+          ).default?.getServerSession;
     if (!sessionFn) return null;
     const session: unknown = await sessionFn(authOptions);
     if (!session || typeof session !== 'object' || !('accessToken' in session)) return null;
@@ -543,7 +616,8 @@ async function fetchWithRetry(pathname: string, init: RequestInit): Promise<Fetc
 }
 
 function apiUrl(): string {
-  const configuredUrl = process.env.API_URL || process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+  const configuredUrl =
+    process.env.API_URL || process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
   return configuredUrl.replace(/\/+$/, '');
 }
 
@@ -560,10 +634,16 @@ function outcomeFailure<T = never>(
 }
 
 function unavailableOutcomeFailure<T = never>(): BookingManagementOutcome<T> {
-  return outcomeFailure('UPSTREAM_UNAVAILABLE', 'Booking service is temporarily unavailable. Please try again.', true);
+  return outcomeFailure(
+    'UPSTREAM_UNAVAILABLE',
+    'Booking service is temporarily unavailable. Please try again.',
+    true,
+  );
 }
 
-async function handleUpstreamStatus(response: Response): Promise<BookingManagementOutcome<never> | null> {
+async function handleUpstreamStatus(
+  response: Response,
+): Promise<BookingManagementOutcome<never> | null> {
   if (response.ok) return null;
   if (response.status === 401) {
     return outcomeFailure('UNAUTHENTICATED', 'Please sign in to continue.', false);
@@ -579,7 +659,10 @@ async function handleUpstreamStatus(response: Response): Promise<BookingManageme
   }
   if (response.status === 400 || response.status === 422) {
     const data = (await response.json().catch(() => ({}))) as Record<string, unknown>;
-    const msg = typeof data?.message === 'string' ? data.message : 'Invalid request. Please check your details and try again.';
+    const msg =
+      typeof data?.message === 'string'
+        ? data.message
+        : 'Invalid request. Please check your details and try again.';
     return outcomeFailure('INVALID_COMMAND', msg, false);
   }
   return unavailableOutcomeFailure();
@@ -631,10 +714,20 @@ function mapAirport(raw: unknown): BookingAirportView | undefined {
   const city = typeof airport.city === 'string' ? airport.city : '';
   if (!iataCode || !name || !city) return undefined;
 
-  const terminal = typeof airport.terminal === 'string' && airport.terminal.length > 0 ? airport.terminal : undefined;
-  const gate = typeof airport.gate === 'string' && airport.gate.length > 0 ? airport.gate : undefined;
+  const terminal =
+    typeof airport.terminal === 'string' && airport.terminal.length > 0
+      ? airport.terminal
+      : undefined;
+  const gate =
+    typeof airport.gate === 'string' && airport.gate.length > 0 ? airport.gate : undefined;
 
-  const result = { iataCode, name, city, ...(terminal ? { terminal } : {}), ...(gate ? { gate } : {}) };
+  const result = {
+    iataCode,
+    name,
+    city,
+    ...(terminal ? { terminal } : {}),
+    ...(gate ? { gate } : {}),
+  };
   return BookingAirportViewSchema.safeParse(result).success ? result : undefined;
 }
 
@@ -644,48 +737,47 @@ function mapSegment(raw: unknown): BookingSegmentView {
   }
   const seg = raw as Record<string, unknown>;
 
-  const airline =
-    mapAirline(seg.airline) ||
+  const airline = mapAirline(seg.airline) ||
     mapAirline({
       name: seg.airlineName,
       iataCode: seg.marketingCarrierIata || seg.carrierCode || seg.operatingCarrier,
       logoUrl: seg.airlineLogoUrl,
-    }) ||
-    { name: 'Unknown Airline', iataCode: 'XX' };
+    }) || { name: 'Unknown Airline', iataCode: 'XX' };
 
-  const depAirport =
-    mapAirport(seg.departureAirport) ||
+  const depAirport = mapAirport(seg.departureAirport) ||
     mapAirport({
       iataCode: seg.departureAirportIata || seg.departureAirport,
-      name: seg.departureAirportName || seg.departureAirportIata || seg.departureAirport || 'Departure Airport',
+      name:
+        seg.departureAirportName ||
+        seg.departureAirportIata ||
+        seg.departureAirport ||
+        'Departure Airport',
       city: seg.departureCity || 'City',
       terminal: seg.departureTerminal,
-    }) ||
-    { iataCode: 'DEP', name: 'Departure Airport', city: 'City' };
+    }) || { iataCode: 'DEP', name: 'Departure Airport', city: 'City' };
 
-  const arrAirport =
-    mapAirport(seg.arrivalAirport) ||
+  const arrAirport = mapAirport(seg.arrivalAirport) ||
     mapAirport({
       iataCode: seg.arrivalAirportIata || seg.arrivalAirport,
-      name: seg.arrivalAirportName || seg.arrivalAirportIata || seg.arrivalAirport || 'Arrival Airport',
+      name:
+        seg.arrivalAirportName || seg.arrivalAirportIata || seg.arrivalAirport || 'Arrival Airport',
       city: seg.arrivalCity || 'City',
       terminal: seg.arrivalTerminal,
-    }) ||
-    { iataCode: 'ARR', name: 'Arrival Airport', city: 'City' };
+    }) || { iataCode: 'ARR', name: 'Arrival Airport', city: 'City' };
 
   const departureAt =
     typeof seg.departureAt === 'string'
       ? seg.departureAt
       : typeof seg.departureTime === 'string'
-      ? seg.departureTime
-      : new Date().toISOString();
+        ? seg.departureTime
+        : new Date().toISOString();
 
   const arrivalAt =
     typeof seg.arrivalAt === 'string'
       ? seg.arrivalAt
       : typeof seg.arrivalTime === 'string'
-      ? seg.arrivalTime
-      : new Date().toISOString();
+        ? seg.arrivalTime
+        : new Date().toISOString();
 
   let durationStr = 'PT0M';
   if (typeof seg.duration === 'string') {
@@ -708,7 +800,9 @@ function mapSegment(raw: unknown): BookingSegmentView {
     departureAt,
     arrivalAt,
     duration: durationStr,
-    ...(typeof seg.aircraftType === 'string' && seg.aircraftType.length > 0 ? { aircraftType: seg.aircraftType } : {}),
+    ...(typeof seg.aircraftType === 'string' && seg.aircraftType.length > 0
+      ? { aircraftType: seg.aircraftType }
+      : {}),
     ...(typeof seg.sliceOrder === 'number' ? { sliceOrder: seg.sliceOrder } : {}),
     ...(typeof seg.segmentOrder === 'number' ? { segmentOrder: seg.segmentOrder } : {}),
     ...(typeof seg.globalOrder === 'number' ? { globalOrder: seg.globalOrder } : {}),
@@ -728,23 +822,27 @@ function mapDisruptionAlert(raw: unknown): DisruptionAlertView | undefined {
     ...(typeof d.activeRevisionId === 'string' && d.activeRevisionId.length > 0
       ? { activeRevisionId: d.activeRevisionId }
       : d.activeRevisionId === null
-      ? { activeRevisionId: null }
-      : {}),
+        ? { activeRevisionId: null }
+        : {}),
     isMaterial: Boolean(d.isMaterial),
     materialReasons: Array.isArray(d.materialReasons) ? d.materialReasons.map(String) : [],
     ...(d.incrementalSummary && typeof d.incrementalSummary === 'object'
       ? { incrementalSummary: d.incrementalSummary as Record<string, unknown> }
       : d.incrementalSummary === null
-      ? { incrementalSummary: null }
-      : {}),
+        ? { incrementalSummary: null }
+        : {}),
     ...(d.cumulativeSummary && typeof d.cumulativeSummary === 'object'
       ? { cumulativeSummary: d.cumulativeSummary as Record<string, unknown> }
       : d.cumulativeSummary === null
-      ? { cumulativeSummary: null }
-      : {}),
+        ? { cumulativeSummary: null }
+        : {}),
     stabilizationWarning: Boolean(d.stabilizationWarning),
-    ...(d.resolvedReason !== undefined ? { resolvedReason: d.resolvedReason != null ? String(d.resolvedReason) : null } : {}),
-    ...(d.resolvedAt !== undefined ? { resolvedAt: typeof d.resolvedAt === 'string' ? d.resolvedAt : null } : {}),
+    ...(d.resolvedReason !== undefined
+      ? { resolvedReason: d.resolvedReason != null ? String(d.resolvedReason) : null }
+      : {}),
+    ...(d.resolvedAt !== undefined
+      ? { resolvedAt: typeof d.resolvedAt === 'string' ? d.resolvedAt : null }
+      : {}),
   };
 
   return DisruptionAlertViewSchema.safeParse(result).success ? result : undefined;
@@ -754,14 +852,22 @@ function mapListItem(raw: unknown): BookingListItemView {
   const item = (raw ?? {}) as Record<string, unknown>;
   const currentItin = (item.currentItinerary ?? {}) as Record<string, unknown>;
   const flightSnap = (item.flightSnapshot ?? {}) as Record<string, unknown>;
-  const rawSegments = (Array.isArray(currentItin.segments) ? currentItin.segments : (Array.isArray(flightSnap.segments) ? flightSnap.segments : [])) as unknown[];
-  const segments = rawSegments.map((s) => {
-    try {
-      return mapSegment(s);
-    } catch {
-      return null;
-    }
-  }).filter((s): s is BookingSegmentView => s !== null);
+  const rawSegments = (
+    Array.isArray(currentItin.segments)
+      ? currentItin.segments
+      : Array.isArray(flightSnap.segments)
+        ? flightSnap.segments
+        : []
+  ) as unknown[];
+  const segments = rawSegments
+    .map((s) => {
+      try {
+        return mapSegment(s);
+      } catch {
+        return null;
+      }
+    })
+    .filter((s): s is BookingSegmentView => s !== null);
 
   const firstSeg = segments[0];
   const lastSeg = segments[segments.length - 1];
@@ -801,15 +907,15 @@ function mapListItem(raw: unknown): BookingListItemView {
     typeof item.departureAt === 'string'
       ? item.departureAt
       : typeof currentItin.nextUnflownDepartureAt === 'string'
-      ? currentItin.nextUnflownDepartureAt
-      : firstSeg?.departureAt ?? null;
+        ? currentItin.nextUnflownDepartureAt
+        : (firstSeg?.departureAt ?? null);
 
   const arrivalAt =
     typeof item.arrivalAt === 'string'
       ? item.arrivalAt
       : typeof currentItin.finalArrivalAt === 'string'
-      ? currentItin.finalArrivalAt
-      : lastSeg?.arrivalAt ?? null;
+        ? currentItin.finalArrivalAt
+        : (lastSeg?.arrivalAt ?? null);
 
   const disruption = mapDisruptionAlert(item.disruption);
 
@@ -817,8 +923,8 @@ function mapListItem(raw: unknown): BookingListItemView {
     typeof (item.payment as { status?: unknown } | undefined)?.status === 'string'
       ? (item.payment as { status: string }).status
       : typeof item.paymentStatus === 'string'
-      ? item.paymentStatus
-      : undefined;
+        ? item.paymentStatus
+        : undefined;
   const paymentStatus =
     rawPaymentStatus !== undefined
       ? rawPaymentStatus.trim().length > 0
@@ -869,19 +975,21 @@ function mapDetail(item: Record<string, unknown>): BookingDetailView {
     Array.isArray(rawItin.segments)
       ? rawItin.segments
       : Array.isArray(currentItin.segments)
-      ? currentItin.segments
-      : Array.isArray(flightSnap.segments)
-      ? flightSnap.segments
-      : []
+        ? currentItin.segments
+        : Array.isArray(flightSnap.segments)
+          ? flightSnap.segments
+          : []
   ) as unknown[];
 
-  const segments = rawSegments.map((s) => {
-    try {
-      return mapSegment(s);
-    } catch {
-      return null;
-    }
-  }).filter((s): s is BookingSegmentView => s !== null);
+  const segments = rawSegments
+    .map((s) => {
+      try {
+        return mapSegment(s);
+      } catch {
+        return null;
+      }
+    })
+    .filter((s): s is BookingSegmentView => s !== null);
 
   const firstSeg = segments[0];
   const lastSeg = segments[segments.length - 1];
@@ -921,26 +1029,30 @@ function mapDetail(item: Record<string, unknown>): BookingDetailView {
     typeof item.departureAt === 'string'
       ? item.departureAt
       : typeof currentItin.nextUnflownDepartureAt === 'string'
-      ? currentItin.nextUnflownDepartureAt
-      : firstSeg?.departureAt ?? null;
+        ? currentItin.nextUnflownDepartureAt
+        : (firstSeg?.departureAt ?? null);
 
   const arrivalAt =
     typeof item.arrivalAt === 'string'
       ? item.arrivalAt
       : typeof currentItin.finalArrivalAt === 'string'
-      ? currentItin.finalArrivalAt
-      : lastSeg?.arrivalAt ?? null;
+        ? currentItin.finalArrivalAt
+        : (lastSeg?.arrivalAt ?? null);
 
   const rawPassengers = (
     Array.isArray(item.passengers)
       ? item.passengers
       : Array.isArray(item.passengerSnapshot)
-      ? item.passengerSnapshot
-      : Array.isArray((item.passengerSnapshot as { passengers?: unknown[] } | undefined)?.passengers)
-      ? (item.passengerSnapshot as { passengers: unknown[] }).passengers
-      : Array.isArray((item.bookingIntent as { passengers?: unknown[] } | undefined)?.passengers)
-      ? (item.bookingIntent as { passengers: unknown[] }).passengers
-      : []
+        ? item.passengerSnapshot
+        : Array.isArray(
+              (item.passengerSnapshot as { passengers?: unknown[] } | undefined)?.passengers,
+            )
+          ? (item.passengerSnapshot as { passengers: unknown[] }).passengers
+          : Array.isArray(
+                (item.bookingIntent as { passengers?: unknown[] } | undefined)?.passengers,
+              )
+            ? (item.bookingIntent as { passengers: unknown[] }).passengers
+            : []
   ) as unknown[];
 
   const passengers = rawPassengers.map((p) => {
@@ -955,31 +1067,77 @@ function mapDetail(item: Record<string, unknown>): BookingDetailView {
   });
 
   const itinerary: BookingItineraryView = {
-    source: (rawItin.source === 'REVISION' || currentItin.source === 'REVISION') ? 'REVISION' : 'ORIGINAL',
-    revisionId: (
+    source:
+      rawItin.source === 'REVISION' || currentItin.source === 'REVISION' ? 'REVISION' : 'ORIGINAL',
+    revisionId:
       typeof rawItin.revisionId === 'string'
         ? rawItin.revisionId
         : typeof currentItin.revisionId === 'string'
-        ? currentItin.revisionId
-        : typeof (item.disruption as Record<string, unknown> | undefined)?.activeRevisionId === 'string'
-        ? ((item.disruption as Record<string, unknown>).activeRevisionId as string)
-        : null
+          ? currentItin.revisionId
+          : typeof (item.disruption as Record<string, unknown> | undefined)?.activeRevisionId ===
+              'string'
+            ? ((item.disruption as Record<string, unknown>).activeRevisionId as string)
+            : null,
+    version: Math.max(
+      1,
+      typeof rawItin.version === 'number'
+        ? rawItin.version
+        : typeof currentItin.version === 'number'
+          ? currentItin.version
+          : 1,
     ),
-    version: Math.max(1, typeof rawItin.version === 'number' ? rawItin.version : typeof currentItin.version === 'number' ? currentItin.version : 1),
     segments,
-    nextUnflownDepartureAt: (typeof rawItin.nextUnflownDepartureAt === 'string' ? rawItin.nextUnflownDepartureAt : typeof currentItin.nextUnflownDepartureAt === 'string' ? currentItin.nextUnflownDepartureAt : (firstSeg?.departureAt || null)),
-    finalArrivalAt: (typeof rawItin.finalArrivalAt === 'string' ? rawItin.finalArrivalAt : typeof currentItin.finalArrivalAt === 'string' ? currentItin.finalArrivalAt : (lastSeg?.arrivalAt || null)),
-    ...(typeof rawItin.totalDuration === 'string' ? { totalDuration: rawItin.totalDuration } : typeof flightSnap.totalDuration === 'string' ? { totalDuration: flightSnap.totalDuration } : {}),
-    ...(typeof rawItin.stops === 'number' ? { stops: rawItin.stops } : typeof flightSnap.stops === 'number' ? { stops: flightSnap.stops } : {}),
-    ...(typeof rawItin.cabinClass === 'string' ? { cabinClass: rawItin.cabinClass } : typeof flightSnap.cabinClass === 'string' ? { cabinClass: flightSnap.cabinClass } : {}),
-    ...(rawItin.fareClass !== undefined ? { fareClass: rawItin.fareClass != null ? String(rawItin.fareClass) : null } : flightSnap.fareClass !== undefined ? { fareClass: flightSnap.fareClass != null ? String(flightSnap.fareClass) : null } : {}),
-    ...(rawItin.baggageAllowance !== undefined ? { baggageAllowance: rawItin.baggageAllowance != null ? String(rawItin.baggageAllowance) : null } : flightSnap.baggageAllowance !== undefined ? { baggageAllowance: flightSnap.baggageAllowance != null ? String(flightSnap.baggageAllowance) : null } : {}),
+    nextUnflownDepartureAt:
+      typeof rawItin.nextUnflownDepartureAt === 'string'
+        ? rawItin.nextUnflownDepartureAt
+        : typeof currentItin.nextUnflownDepartureAt === 'string'
+          ? currentItin.nextUnflownDepartureAt
+          : firstSeg?.departureAt || null,
+    finalArrivalAt:
+      typeof rawItin.finalArrivalAt === 'string'
+        ? rawItin.finalArrivalAt
+        : typeof currentItin.finalArrivalAt === 'string'
+          ? currentItin.finalArrivalAt
+          : lastSeg?.arrivalAt || null,
+    ...(typeof rawItin.totalDuration === 'string'
+      ? { totalDuration: rawItin.totalDuration }
+      : typeof flightSnap.totalDuration === 'string'
+        ? { totalDuration: flightSnap.totalDuration }
+        : {}),
+    ...(typeof rawItin.stops === 'number'
+      ? { stops: rawItin.stops }
+      : typeof flightSnap.stops === 'number'
+        ? { stops: flightSnap.stops }
+        : {}),
+    ...(typeof rawItin.cabinClass === 'string'
+      ? { cabinClass: rawItin.cabinClass }
+      : typeof flightSnap.cabinClass === 'string'
+        ? { cabinClass: flightSnap.cabinClass }
+        : {}),
+    ...(rawItin.fareClass !== undefined
+      ? { fareClass: rawItin.fareClass != null ? String(rawItin.fareClass) : null }
+      : flightSnap.fareClass !== undefined
+        ? { fareClass: flightSnap.fareClass != null ? String(flightSnap.fareClass) : null }
+        : {}),
+    ...(rawItin.baggageAllowance !== undefined
+      ? {
+          baggageAllowance:
+            rawItin.baggageAllowance != null ? String(rawItin.baggageAllowance) : null,
+        }
+      : flightSnap.baggageAllowance !== undefined
+        ? {
+            baggageAllowance:
+              flightSnap.baggageAllowance != null ? String(flightSnap.baggageAllowance) : null,
+          }
+        : {}),
   };
 
   const disruption = mapDisruptionAlert(item.disruption);
 
   let ancillarySummary: BookingDetailView['ancillarySummary'];
-  const rawAncillary = item.ancillarySummary as { seats?: unknown[]; baggage?: unknown[] } | undefined;
+  const rawAncillary = item.ancillarySummary as
+    | { seats?: unknown[]; baggage?: unknown[] }
+    | undefined;
   if (rawAncillary && typeof rawAncillary === 'object') {
     const rawSeats = Array.isArray(rawAncillary.seats) ? rawAncillary.seats : [];
     const rawBaggage = Array.isArray(rawAncillary.baggage) ? rawAncillary.baggage : [];
@@ -1026,8 +1184,10 @@ function mapDetail(item: Record<string, unknown>): BookingDetailView {
     cancellation = {
       deadline: typeof item.cancellationDeadline === 'string' ? item.cancellationDeadline : null,
       refundable: item.cancellationRefundable != null ? Boolean(item.cancellationRefundable) : null,
-      airlineRefundAmount: item.airlineRefundAmount != null ? String(item.airlineRefundAmount) : null,
-      customerRefundAmount: item.customerRefundAmount != null ? String(item.customerRefundAmount) : null,
+      airlineRefundAmount:
+        item.airlineRefundAmount != null ? String(item.airlineRefundAmount) : null,
+      customerRefundAmount:
+        item.customerRefundAmount != null ? String(item.customerRefundAmount) : null,
     };
   }
 
@@ -1035,8 +1195,8 @@ function mapDetail(item: Record<string, unknown>): BookingDetailView {
     typeof (item.payment as { status?: unknown } | undefined)?.status === 'string'
       ? (item.payment as { status: string }).status
       : typeof item.paymentStatus === 'string'
-      ? item.paymentStatus
-      : undefined;
+        ? item.paymentStatus
+        : undefined;
   const paymentStatus =
     rawPaymentStatus !== undefined
       ? rawPaymentStatus.trim().length > 0
@@ -1048,8 +1208,8 @@ function mapDetail(item: Record<string, unknown>): BookingDetailView {
     typeof (item.bookingIntent as { offerId?: unknown } | undefined)?.offerId === 'string'
       ? (item.bookingIntent as { offerId: string }).offerId
       : typeof item.offerId === 'string'
-      ? item.offerId
-      : undefined;
+        ? item.offerId
+        : undefined;
   const offerId =
     rawOfferId !== undefined
       ? rawOfferId.trim().length > 0

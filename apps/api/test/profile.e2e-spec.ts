@@ -79,7 +79,6 @@ describe('Traveler Profile (E2E)', () => {
     await prisma.auditLog.deleteMany({});
     await prisma.user.deleteMany({});
 
-
     // Create a default test user
     user = await prisma.user.create({
       data: {
@@ -262,6 +261,3 @@ describe('Traveler Profile (E2E)', () => {
     }
   });
 });
-
-
-

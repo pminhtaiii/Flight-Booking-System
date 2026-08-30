@@ -122,7 +122,7 @@
 - [x] T044 [P] [US3] Add failing lifecycle, stale-writer, expiry, selection, legacy-normalization, and privacy tests in apps/agent/tests/test_trusted_snapshot.py and apps/agent/tests/test_search_snapshot.py
 - [x] T045 [US3] Create canonical SnapshotOwner, TrustedSearchSnapshot, TrustedSearchOffer, and ResolvedOfferSelection models in apps/agent/src/agent/trusted_search_snapshot/models.py
 - [x] T046 [US3] Implement owner-scoped Redis persistence and atomic version-aware replacement in apps/agent/src/agent/trusted_search_snapshot/repository.py
-- [x] T047 [US3] Implement next_version, create_or_replace, load_active, select, safe projection, and delete operations in apps/agent/src/agent/trusted_search_snapshot/lifecycle.py and apps/agent/src/agent/trusted_search_snapshot/__init__.py
+- [x] T047 [US3] Implement next_version, create_or_replace, load_active, select, safe projection, and delete operations in apps/agent/src/agent/trusted_search_snapshot/lifecycle.py and apps/agent/src/agent/trusted_search_snapshot/**init**.py
 - [x] T048 [US3] Add one fail-closed legacy graph-state normalization boundary for snapshot aliases in apps/agent/src/agent/trusted_search_snapshot/lifecycle.py
 - [x] T049 [P] [US3] Route search snapshot creation and identifier-free LLM projection through the lifecycle in apps/agent/src/agent/tools/search_flights.py
 - [x] T050 [P] [US3] Route selection validation through ResolvedOfferSelection in apps/agent/src/agent/tools/signal_checkout_intent.py
@@ -145,7 +145,7 @@
 - [x] T056 [P] [US4] Add failing golden contracts for all eight strict event variants and unchanged names, keys, and order in apps/agent/tests/test_event_contracts.py
 - [x] T057 [US4] Implement the authoritative strict ChatTurnEvent union and SSE encoding helpers in apps/agent/src/agent/chat_turn/events.py
 - [x] T058 [P] [US4] Add failing runner success, failure, disconnect, fence-loss, cancellation, and shutdown tests in apps/agent/tests/test_chat_turn_runner.py
-- [x] T059 [US4] Define ChatTurnCommand and the transport-independent runner interface in apps/agent/src/agent/chat_turn/models.py, apps/agent/src/agent/chat_turn/runner.py, and apps/agent/src/agent/chat_turn/__init__.py
+- [x] T059 [US4] Define ChatTurnCommand and the transport-independent runner interface in apps/agent/src/agent/chat_turn/models.py, apps/agent/src/agent/chat_turn/runner.py, and apps/agent/src/agent/chat_turn/**init**.py
 - [x] T060 [US4] Move session, memory, snapshot, lease, guardrail, persistence, recovery, and summarization ownership into apps/agent/src/agent/chat_turn/runner.py
 - [x] T061 [US4] Isolate LangGraph astream_events v2 parsing and typed event ordering in apps/agent/src/agent/chat_turn/runner.py
 - [x] T062 [US4] Implement one awaited cancellation-safe finalizer that blocks stale fencing owners and completes durable cleanup before terminal errors in apps/agent/src/agent/chat_turn/runner.py

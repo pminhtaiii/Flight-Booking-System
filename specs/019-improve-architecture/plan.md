@@ -46,17 +46,17 @@ Delivery is incremental. Each slice begins with behavior characterization, intro
 
 ## Constitution Check
 
-*GATE: Passed before Phase 0 research and re-checked after Phase 1 design.*
+_GATE: Passed before Phase 0 research and re-checked after Phase 1 design._
 
-| Constitutional requirement | Design response | Gate |
-|---|---|---|
-| Flight-First Architecture | Work is confined to flight search, booking, payment/refund, and the existing advisory chat path. No hotel/dining scope or new external provider is introduced. | PASS |
-| Deterministic Transaction Boundary | Refund Settlement, Booking Lifecycle, Cancellation, and server seams remain deterministic. Trusted Snapshot and handoff preserve zero LLM writes and NestJS cryptographic authority. | PASS |
-| API Budget Discipline | No extra Duffel calls are introduced. Snapshot replacement removes races; web reads retain bounded retry and mutations fail fast. | PASS |
+| Constitutional requirement             | Design response                                                                                                                                                                                                                   | Gate |
+| -------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---- |
+| Flight-First Architecture              | Work is confined to flight search, booking, payment/refund, and the existing advisory chat path. No hotel/dining scope or new external provider is introduced.                                                                    | PASS |
+| Deterministic Transaction Boundary     | Refund Settlement, Booking Lifecycle, Cancellation, and server seams remain deterministic. Trusted Snapshot and handoff preserve zero LLM writes and NestJS cryptographic authority.                                              | PASS |
+| API Budget Discipline                  | No extra Duffel calls are introduced. Snapshot replacement removes races; web reads retain bounded retry and mutations fail fast.                                                                                                 | PASS |
 | Observability & Operational Visibility | Every slice includes PII-safe structured metrics/audit for settlement replay, reservation conflicts, snapshot rejection, runner cleanup, server-seam errors, and agent-tool outcomes. Trace/correlation propagation is preserved. | PASS |
-| Incremental Delivery | Six independently shippable slices use characterize→add→cut over→remove, with focused gates and rollback before the next slice. | PASS |
-| PCI/Data Protection | Stripe remains the card-data boundary; ledger/refund writes are audited; browser credentials are reduced; tool/event projections remain allowlisted. | PASS |
-| Complexity justification | New modules replace proven catch-all/duplicated responsibilities. No speculative provider abstraction or new framework is added. | PASS |
+| Incremental Delivery                   | Six independently shippable slices use characterize→add→cut over→remove, with focused gates and rollback before the next slice.                                                                                                   | PASS |
+| PCI/Data Protection                    | Stripe remains the card-data boundary; ledger/refund writes are audited; browser credentials are reduced; tool/event projections remain allowlisted.                                                                              | PASS |
+| Complexity justification               | New modules replace proven catch-all/duplicated responsibilities. No speculative provider abstraction or new framework is added.                                                                                                  | PASS |
 
 Post-design re-check: the data model uses expand/backfill/validate/contract; no destructive first deployment exists. All public/wire behaviors have characterization gates. No constitutional exception is required.
 
@@ -436,72 +436,72 @@ Rollback: endpoint paths do not change; revert one controller/service cluster at
 
 ### API — Refund and booking
 
-| Current/target file | Planned change |
-|---|---|
-| `apps/api/prisma/schema.prisma` | Add obligation and ledger relations; transition Refund→RefundTransaction model; remove legacy relation only after validation |
-| `apps/api/prisma/migrations/*` | Expand, backfill/validate, and contract migrations with rollback notes |
-| `apps/api/src/payment/payment-refund.service.ts` | Retain provider/retry orchestration during migration; remove all terminal persistence bodies |
-| `payment-webhook.service.ts`, `payment-cron.service.ts`, `admin-refund.controller.ts` | Normalize verified outcomes and invoke Settlement |
-| `apps/api/src/refund/*` | Transaction reservation/idempotency/provider orchestration boundary |
-| `apps/api/src/refund-settlement/*` | Provider-blind terminal persistence and aggregate projections |
-| `apps/api/src/booking/booking.service.ts` | Source for extraction; delete after all clusters migrate |
-| `apps/api/src/booking-lifecycle/*` | Lifecycle core and recovery adapter |
-| `apps/api/src/booking-management/*` | Read projections |
-| `apps/api/src/cancellation/*` | Supplier-first cancellation and refund trigger |
-| `apps/api/src/payment/payment.service.ts` | Depend on normalized Booking Lifecycle contract |
-| `apps/api/src/payment/payment.module.ts`, `apps/api/src/booking/booking.module.ts` | Remove mutual forward refs; compose target modules |
-| `apps/api/src/disruption/sync/reconciliation.service.ts` | Depend on Booking Lifecycle only |
+| Current/target file                                                                   | Planned change                                                                                                               |
+| ------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| `apps/api/prisma/schema.prisma`                                                       | Add obligation and ledger relations; transition Refund→RefundTransaction model; remove legacy relation only after validation |
+| `apps/api/prisma/migrations/*`                                                        | Expand, backfill/validate, and contract migrations with rollback notes                                                       |
+| `apps/api/src/payment/payment-refund.service.ts`                                      | Retain provider/retry orchestration during migration; remove all terminal persistence bodies                                 |
+| `payment-webhook.service.ts`, `payment-cron.service.ts`, `admin-refund.controller.ts` | Normalize verified outcomes and invoke Settlement                                                                            |
+| `apps/api/src/refund/*`                                                               | Transaction reservation/idempotency/provider orchestration boundary                                                          |
+| `apps/api/src/refund-settlement/*`                                                    | Provider-blind terminal persistence and aggregate projections                                                                |
+| `apps/api/src/booking/booking.service.ts`                                             | Source for extraction; delete after all clusters migrate                                                                     |
+| `apps/api/src/booking-lifecycle/*`                                                    | Lifecycle core and recovery adapter                                                                                          |
+| `apps/api/src/booking-management/*`                                                   | Read projections                                                                                                             |
+| `apps/api/src/cancellation/*`                                                         | Supplier-first cancellation and refund trigger                                                                               |
+| `apps/api/src/payment/payment.service.ts`                                             | Depend on normalized Booking Lifecycle contract                                                                              |
+| `apps/api/src/payment/payment.module.ts`, `apps/api/src/booking/booking.module.ts`    | Remove mutual forward refs; compose target modules                                                                           |
+| `apps/api/src/disruption/sync/reconciliation.service.ts`                              | Depend on Booking Lifecycle only                                                                                             |
 
 ### Agent
 
-| Current/target file | Planned change |
-|---|---|
-| `models/snapshot.py`, `repositories/trusted_snapshot_repository.py` | Compatibility re-exports, then delete after lifecycle migration |
-| `trusted_search_snapshot/*` | Canonical model/repository/lifecycle and atomic replacement |
-| `tools/search_flights.py`, `signal_checkout_intent.py` | Delegate creation/projection/selection to lifecycle |
-| `graph/checkout_gate.py`, `graph/nodes.py` | Consume active snapshot/resolved selection rather than raw dict aliases |
-| `models/events.py` | Replace test-only mismatch with compatibility import or delete after authoritative event migration |
-| `chat_turn/*` | Typed event union and durable runner |
-| `streaming/sse.py` | Thin admission/transport adapter |
-| `main.py` | Shutdown active runner handles rather than raw queue mutation |
+| Current/target file                                                 | Planned change                                                                                     |
+| ------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------- |
+| `models/snapshot.py`, `repositories/trusted_snapshot_repository.py` | Compatibility re-exports, then delete after lifecycle migration                                    |
+| `trusted_search_snapshot/*`                                         | Canonical model/repository/lifecycle and atomic replacement                                        |
+| `tools/search_flights.py`, `signal_checkout_intent.py`              | Delegate creation/projection/selection to lifecycle                                                |
+| `graph/checkout_gate.py`, `graph/nodes.py`                          | Consume active snapshot/resolved selection rather than raw dict aliases                            |
+| `models/events.py`                                                  | Replace test-only mismatch with compatibility import or delete after authoritative event migration |
+| `chat_turn/*`                                                       | Typed event union and durable runner                                                               |
+| `streaming/sse.py`                                                  | Thin admission/transport adapter                                                                   |
+| `main.py`                                                           | Shutdown active runner handles rather than raw queue mutation                                      |
 
 ### Web/shared
 
-| Current/target file | Planned change |
-|---|---|
-| `packages/shared/src/types/flight-search.types.ts` | Zod runtime schemas and inferred server-action outcomes |
-| `packages/shared/src/types/booking-management.types.ts` | Prepared owner view and typed command/read outcomes |
-| `packages/shared/src/types/index.ts` | Stable explicit exports for only these vertical contracts |
-| `apps/web/lib/server/flight-search.ts` | Server-only authenticated search/selection transport |
-| `apps/web/app/search/actions.ts` | Next 14 serializable Server Actions |
-| `SearchFormClient.tsx`, search page | Remove token/browser transport/local contract |
-| `apps/web/lib/server/booking-management.ts` | Server-only authenticated booking operations |
-| `app/api/booking-management/**/route.ts` | Thin same-origin polling/command handlers |
+| Current/target file                                                | Planned change                                                    |
+| ------------------------------------------------------------------ | ----------------------------------------------------------------- |
+| `packages/shared/src/types/flight-search.types.ts`                 | Zod runtime schemas and inferred server-action outcomes           |
+| `packages/shared/src/types/booking-management.types.ts`            | Prepared owner view and typed command/read outcomes               |
+| `packages/shared/src/types/index.ts`                               | Stable explicit exports for only these vertical contracts         |
+| `apps/web/lib/server/flight-search.ts`                             | Server-only authenticated search/selection transport              |
+| `apps/web/app/search/actions.ts`                                   | Next 14 serializable Server Actions                               |
+| `SearchFormClient.tsx`, search page                                | Remove token/browser transport/local contract                     |
+| `apps/web/lib/server/booking-management.ts`                        | Server-only authenticated booking operations                      |
+| `app/api/booking-management/**/route.ts`                           | Thin same-origin polling/command handlers                         |
 | Booking pages, `BookingDetail.tsx`, `ItineraryRevisionHistory.tsx` | Prepared views and typed same-origin operations; no token/API URL |
-| `apps/web/.env.example`, Playwright configs | Private `API_URL` and test seam migration |
+| `apps/web/.env.example`, Playwright configs                        | Private `API_URL` and test seam migration                         |
 
 ### Agent Gateway
 
-| Current/target file | Planned change |
-|---|---|
-| `agent-gateway.service.ts` | Shrink per extraction, then delete |
-| `agent-gateway.controller.ts` | Split route ownership while preserving paths |
-| `agent-gateway.module.ts` | Compose capability modules; export only proven providers |
-| `agent-gateway/auth/agent-auth.module.ts` | Narrow reusable guard/claim boundary |
-| `agent-gateway/audit/*` | Allowlisted tool audit |
-| four capability directories | Tool-local validation, projection, audit, and dependencies |
-| `chat/agent-chat.controller.ts`, access service | Own current agent chat persistence routes |
+| Current/target file                             | Planned change                                             |
+| ----------------------------------------------- | ---------------------------------------------------------- |
+| `agent-gateway.service.ts`                      | Shrink per extraction, then delete                         |
+| `agent-gateway.controller.ts`                   | Split route ownership while preserving paths               |
+| `agent-gateway.module.ts`                       | Compose capability modules; export only proven providers   |
+| `agent-gateway/auth/agent-auth.module.ts`       | Narrow reusable guard/claim boundary                       |
+| `agent-gateway/audit/*`                         | Allowlisted tool audit                                     |
+| four capability directories                     | Tool-local validation, projection, audit, and dependencies |
+| `chat/agent-chat.controller.ts`, access service | Own current agent chat persistence routes                  |
 
 ## Cross-Slice Test Matrix
 
-| Invariant | Primary tests | Final gate |
-|---|---|---|
-| Refund exactly-once and partial aggregates | settlement unit, reservation concurrency integration, refund/cancellation E2E | Full API E2E |
-| Payment/Booking cycle removed with behavior preserved | lifecycle/management/cancellation units, payment/booking/disruption E2E, static import check | API build + full tests |
-| Snapshot authority/privacy | lifecycle, search, signal, gate, handoff, privacy tests | Agent full suite + T093 |
-| Runner causal cleanup and wire compatibility | event golden, runner cancellation/fence/shutdown, SSE integration | Agent suite + web direct stream + T093 |
-| Browser has no backend credentials/transport | shared/server/handler tests, scoped static grep, Playwright | Next typecheck/build + Playwright |
-| Gateway capability locality/privacy | cluster units, unchanged gateway/chat E2E, privacy corpus | API and Python tool integration |
+| Invariant                                             | Primary tests                                                                                | Final gate                             |
+| ----------------------------------------------------- | -------------------------------------------------------------------------------------------- | -------------------------------------- |
+| Refund exactly-once and partial aggregates            | settlement unit, reservation concurrency integration, refund/cancellation E2E                | Full API E2E                           |
+| Payment/Booking cycle removed with behavior preserved | lifecycle/management/cancellation units, payment/booking/disruption E2E, static import check | API build + full tests                 |
+| Snapshot authority/privacy                            | lifecycle, search, signal, gate, handoff, privacy tests                                      | Agent full suite + T093                |
+| Runner causal cleanup and wire compatibility          | event golden, runner cancellation/fence/shutdown, SSE integration                            | Agent suite + web direct stream + T093 |
+| Browser has no backend credentials/transport          | shared/server/handler tests, scoped static grep, Playwright                                  | Next typecheck/build + Playwright      |
+| Gateway capability locality/privacy                   | cluster units, unchanged gateway/chat E2E, privacy corpus                                    | API and Python tool integration        |
 
 See [quickstart.md](quickstart.md) for runnable commands and expected outcomes.
 
@@ -520,30 +520,30 @@ Operational runbooks must include migration preflight, mismatch abort conditions
 
 ## Risks and Mitigations
 
-| Risk | Mitigation |
-|---|---|
-| Partial-refund state names drift | Preserve glossary: pre-supplier `CANCELLATION_PENDING`; post-supplier incomplete `CANCELLED_PENDING_REFUND` |
-| Money unit mismatch | Store obligation/transaction amounts in integer minor units; validate Decimal conversion in backfill |
-| Duplicate ledger reversal | Refund Transaction FK plus database uniqueness and idempotent settlement transaction |
-| Payment dispute/refund interaction | Preserve dispute overlay and add explicit combined-state tests before cutover |
-| Schema rollback after contract | Observation window and validated reverse mapping; contract migration last |
-| Booking cycle reappears through projection ownership | Move projection writes to booking-owned boundary; static module graph test |
-| Snapshot stale overwrite/projection race | Atomic version-aware replace and project the snapshot returned by the completed search, not an unrelated latest reload |
-| Python gains duplicate HMAC authority | Keep cryptographic verification exclusively in NestJS |
-| Client disconnect skips cleanup | Runner-owned awaited cancellation-safe finalizer; adapter never owns cleanup |
-| Next.js version drift | Follow installed 14.2.3 serialization/synchronous API conventions; do not use v15 Promise props |
-| Server-side calls break browser interception tests | Use server seam/mock-scenario fixtures; no production client hooks |
-| Prepared Booking view removes user-required data | Fixture parity tests preserve owner-facing PNR/passenger fields while excluding internal IDs/raw payloads |
-| Legacy broad gateway endpoint conflicts with docs | Preserve compatibility during refactor and create a separately authorized deprecation decision |
-| Raw tool audit leaks identifiers | Replace raw params with explicit allowlisted audit projections before module extraction completes |
+| Risk                                                 | Mitigation                                                                                                             |
+| ---------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| Partial-refund state names drift                     | Preserve glossary: pre-supplier `CANCELLATION_PENDING`; post-supplier incomplete `CANCELLED_PENDING_REFUND`            |
+| Money unit mismatch                                  | Store obligation/transaction amounts in integer minor units; validate Decimal conversion in backfill                   |
+| Duplicate ledger reversal                            | Refund Transaction FK plus database uniqueness and idempotent settlement transaction                                   |
+| Payment dispute/refund interaction                   | Preserve dispute overlay and add explicit combined-state tests before cutover                                          |
+| Schema rollback after contract                       | Observation window and validated reverse mapping; contract migration last                                              |
+| Booking cycle reappears through projection ownership | Move projection writes to booking-owned boundary; static module graph test                                             |
+| Snapshot stale overwrite/projection race             | Atomic version-aware replace and project the snapshot returned by the completed search, not an unrelated latest reload |
+| Python gains duplicate HMAC authority                | Keep cryptographic verification exclusively in NestJS                                                                  |
+| Client disconnect skips cleanup                      | Runner-owned awaited cancellation-safe finalizer; adapter never owns cleanup                                           |
+| Next.js version drift                                | Follow installed 14.2.3 serialization/synchronous API conventions; do not use v15 Promise props                        |
+| Server-side calls break browser interception tests   | Use server seam/mock-scenario fixtures; no production client hooks                                                     |
+| Prepared Booking view removes user-required data     | Fixture parity tests preserve owner-facing PNR/passenger fields while excluding internal IDs/raw payloads              |
+| Legacy broad gateway endpoint conflicts with docs    | Preserve compatibility during refactor and create a separately authorized deprecation decision                         |
+| Raw tool audit leaks identifiers                     | Replace raw params with explicit allowlisted audit projections before module extraction completes                      |
 
 ## Complexity Tracking
 
 No constitutional violation is requested. The additional module and migration structure is justified by existing, measured complexity:
 
-| Complexity | Why needed | Simpler alternative rejected because |
-|---|---|---|
-| Refund obligation plus transaction entities | One owed amount can be fulfilled by multiple independent money movements | Booking→many Refund conflates obligation and provider operations |
-| Separate lifecycle/recovery services inside one Booking Lifecycle module | Keeps state transitions provider-blind while retaining cohesive recovery ownership | One service either leaks providers into transitions or scatters recovery again |
-| Thin web Route Handlers for polling/commands | Client polling needs an explicit same-origin HTTP boundary while JWT/backend transport stays server-side | Direct browser→NestJS violates the accepted seam; Server Actions are opaque and unsuitable for stable polling URLs |
-| Temporary compatibility re-exports/facade during cutover only | Enables independently deployable migration | Immediate deletion creates a big-bang caller migration; permanent facade would preserve the shallow interface |
+| Complexity                                                               | Why needed                                                                                               | Simpler alternative rejected because                                                                               |
+| ------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| Refund obligation plus transaction entities                              | One owed amount can be fulfilled by multiple independent money movements                                 | Booking→many Refund conflates obligation and provider operations                                                   |
+| Separate lifecycle/recovery services inside one Booking Lifecycle module | Keeps state transitions provider-blind while retaining cohesive recovery ownership                       | One service either leaks providers into transitions or scatters recovery again                                     |
+| Thin web Route Handlers for polling/commands                             | Client polling needs an explicit same-origin HTTP boundary while JWT/backend transport stays server-side | Direct browser→NestJS violates the accepted seam; Server Actions are opaque and unsuitable for stable polling URLs |
+| Temporary compatibility re-exports/facade during cutover only            | Enables independently deployable migration                                                               | Immediate deletion creates a big-bang caller migration; permanent facade would preserve the shallow interface      |

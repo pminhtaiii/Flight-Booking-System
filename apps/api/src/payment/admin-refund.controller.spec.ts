@@ -54,9 +54,7 @@ describe('AdminRefundController', () => {
   });
 
   it('delegates getEscalatedRefunds to paymentRefundService', async () => {
-    const mockList = [
-      { id: 'ref_1', status: 'REFUND_FAILED_NEEDS_ATTENTION' },
-    ];
+    const mockList = [{ id: 'ref_1', status: 'REFUND_FAILED_NEEDS_ATTENTION' }];
     (paymentRefundService.listEscalatedRefunds as jest.Mock).mockResolvedValue(mockList as any);
 
     const result = await controller.getEscalatedRefunds();

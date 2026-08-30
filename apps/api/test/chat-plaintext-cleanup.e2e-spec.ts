@@ -114,7 +114,10 @@ describe('Chat Plaintext Cleanup (e2e)', () => {
     const fetchedSession = await chatService.getSession(testUser.id, testSessionId);
     expect(fetchedSession.title).toBe('Secret Honeymoon to Tokyo');
 
-    const fetchedMessages = await chatService.listMessages(testUser.id, testSessionId, { limit: 10, direction: 'before' });
+    const fetchedMessages = await chatService.listMessages(testUser.id, testSessionId, {
+      limit: 10,
+      direction: 'before',
+    });
     expect(fetchedMessages.messages.length).toBeGreaterThanOrEqual(1);
     const found = fetchedMessages.messages.find((m) => m.id === testMessageId);
     expect(found).toBeDefined();
@@ -133,8 +136,6 @@ describe('Chat Plaintext Cleanup (e2e)', () => {
       contentKeyVersion: 1,
     };
 
-    await expect(
-      cryptoService.decryptMessageContent(corruptedMessage as any),
-    ).rejects.toThrow();
+    await expect(cryptoService.decryptMessageContent(corruptedMessage as any)).rejects.toThrow();
   });
 });

@@ -65,7 +65,8 @@ function HasValidPassengerMatrix(validationOptions?: ValidationOptions): Propert
           if (args.value.length > 9) return 'Total passengers cannot exceed 9';
           const counts = countPassengerTypes(args.value);
           if (counts.adults < 1) return 'At least one adult passenger is required';
-          if (counts.infants > counts.adults) return 'Number of infants cannot exceed number of adults';
+          if (counts.infants > counts.adults)
+            return 'Number of infants cannot exceed number of adults';
           return 'Invalid passenger breakdown';
         },
       },
@@ -176,12 +177,10 @@ const LEGACY_REQUIRED_PASSENGER_FIELDS = [
 ] as const;
 
 function missingLegacyPassengerFields(passenger: Record<string, unknown>): string[] {
-  return LEGACY_REQUIRED_PASSENGER_FIELDS.filter(
-    (field) => {
-      if (passenger.useProfile === true && field === 'nationality') return false;
-      return passenger[field] === undefined || passenger[field] === null;
-    }
-  );
+  return LEGACY_REQUIRED_PASSENGER_FIELDS.filter((field) => {
+    if (passenger.useProfile === true && field === 'nationality') return false;
+    return passenger[field] === undefined || passenger[field] === null;
+  });
 }
 
 @ValidatorConstraint({ name: 'passengerSource', async: false })
@@ -212,7 +211,8 @@ class CanonicalPassengerShapeConstraint implements ValidatorConstraintInterface 
   validate(value: unknown, args: ValidationArguments): boolean {
     const passenger = args.object as Record<string, unknown>;
     const legacyFields = LEGACY_PASSENGER_FIELDS.filter((field) => passenger[field] !== undefined);
-    if (value === undefined || value === null) return missingLegacyPassengerFields(passenger).length === 0;
+    if (value === undefined || value === null)
+      return missingLegacyPassengerFields(passenger).length === 0;
     return legacyFields.length === 0;
   }
 
@@ -234,7 +234,11 @@ class CanonicalPassengerMetadataConstraint implements ValidatorConstraintInterfa
   validate(value: unknown, args: ValidationArguments): boolean {
     if (value === undefined || value === null) return true;
     const passenger = args.object as { offerPassengerId?: unknown };
-    return typeof passenger.offerPassengerId === 'string' && passenger.offerPassengerId.length <= 100 && /\S/.test(passenger.offerPassengerId);
+    return (
+      typeof passenger.offerPassengerId === 'string' &&
+      passenger.offerPassengerId.length <= 100 &&
+      /\S/.test(passenger.offerPassengerId)
+    );
   }
 
   defaultMessage(): string {

@@ -1,4 +1,16 @@
-import { envSchema } from './app.module';
+import 'reflect-metadata';
+import { MODULE_METADATA } from '@nestjs/common/constants';
+import { Test } from '@nestjs/testing';
+import { AppModule, envSchema } from './app.module';
+import { DashboardModule } from './dashboard/dashboard.module';
+import { DashboardController } from './dashboard/dashboard.controller';
+import { DashboardService } from './dashboard/dashboard.service';
+import { PrismaModule } from './prisma/prisma.module';
+import { PrismaService } from './prisma/prisma.service';
+import { BookingManagementModule } from './booking-management/booking-management.module';
+import { ProfileModule } from './profile/profile.module';
+import { PaymentModule } from './payment/payment.module';
+import { CacheModule } from './cache/cache.module';
 
 describe('AppModule Config Validation', () => {
   const baseConfig = {
@@ -110,5 +122,53 @@ describe('AppModule Config Validation', () => {
       expect(parsed.CHAT_HANDOFF_SECRET_V2).toBe('secret-v2');
       expect(parsed.CHAT_HANDOFF_SECRET_V3).toBe('secret-v3');
     });
+  });
+});
+
+describe('AppModule Dependency Graph & DashboardModule Registration (T017 / T018)', () => {
+  it('registers DashboardModule in AppModule imports array', () => {
+    const imports = Reflect.getMetadata(MODULE_METADATA.IMPORTS, AppModule) as unknown[];
+    expect(imports).toBeDefined();
+    expect(imports).toContain(DashboardModule);
+  });
+
+  it('verifies DashboardModule imports only PrismaModule and strictly excludes heavy dependencies', () => {
+    const dashboardImports = (Reflect.getMetadata(MODULE_METADATA.IMPORTS, DashboardModule) ??
+      []) as unknown[];
+    expect(dashboardImports).toContain(PrismaModule);
+    expect(dashboardImports).not.toContain(BookingManagementModule);
+    expect(dashboardImports).not.toContain(ProfileModule);
+    expect(dashboardImports).not.toContain(PaymentModule);
+    expect(dashboardImports).not.toContain(CacheModule);
+  });
+
+  it('verifies DashboardModule registers DashboardController and provides/exports DashboardService', () => {
+    const controllers = (Reflect.getMetadata(MODULE_METADATA.CONTROLLERS, DashboardModule) ??
+      []) as unknown[];
+    const providers = (Reflect.getMetadata(MODULE_METADATA.PROVIDERS, DashboardModule) ??
+      []) as unknown[];
+    const exports = (Reflect.getMetadata(MODULE_METADATA.EXPORTS, DashboardModule) ??
+      []) as unknown[];
+
+    expect(controllers).toContain(DashboardController);
+    expect(providers).toContain(DashboardService);
+    expect(exports).toContain(DashboardService);
+  });
+
+  it('compiles DashboardModule cleanly with NestJS Test.createTestingModule without errors', async () => {
+    const moduleRef = await Test.createTestingModule({
+      imports: [DashboardModule],
+    })
+      .overrideProvider(PrismaService)
+      .useValue({})
+      .compile();
+
+    expect(moduleRef).toBeDefined();
+    const controller = moduleRef.get<DashboardController>(DashboardController);
+    const service = moduleRef.get<DashboardService>(DashboardService);
+    expect(controller).toBeDefined();
+    expect(controller).toBeInstanceOf(DashboardController);
+    expect(service).toBeDefined();
+    expect(service).toBeInstanceOf(DashboardService);
   });
 });

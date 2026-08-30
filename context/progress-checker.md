@@ -6,14 +6,264 @@ Update this file after every completed feature. Any AI agent reading this should
 
 ### Current Status
 
-**Feature:** Whole-Stack Smoke and Sanity CI (Feature 020) — COMPLETED (100% across Phases 1–6, Tasks T001–T057)
-**Last completed:** Phase 6 / Full documentation sync, local lifecycle verification (smoke 8/8 in 1.31s, sanity 12/12 in 5.52s, exit 0), pre-PR monorepo gate matrix validation, and dual-axis code review (2026-08-28).
-**In progress:** None (Feature 020 sign-off complete).
-**Next:** Production rollout / Next scheduled feature.
+**Feature:** Authenticated Booking Dashboard (Feature 021) — 100% COMPLETE across all 6 Phases (Tasks T001–T049)
+**Last completed:** Phase 6 (T044–T049): Visual/privacy audit, architecture sync, progress checker sync, full automated quickstart gate matrix (67/67 shared contract, 36/36 API unit/controller, 7/7 API E2E, 39/39 web loader/routing, 20/20 Playwright browser acceptance, 20/20 CI contract, 60/60 smoke units, ESLint/TypeScript/Next.js build green with exit code 0), manual acceptance walkthrough, and tasks ledger reconciliation (2026-08-30).
+**In progress:** None (Feature 021 complete and ready for PR merge).
+**Next:** Feature 022 or next planned milestone.
 
 ---
 
 ## Progress by Feature
+
+### [x] Feature: Authenticated Booking Dashboard (Feature 021)
+
+- [x] Phase 6: Polish, Verification, and Documentation Sync (T044–T049) (2026-08-30):
+  - **T044: Visual & Privacy Audit (`specs/021-dashboard-building/checklists/visual.md`)**:
+    - Completed production dashboard source code audit: confirmed zero hardcoded hex/rgba color values, zero raw Tailwind color classes, zero inline color styles.
+    - Confirmed zero prototype routes (`/prototype/*`), mock controls, fake disruption shields, fake fare drops, or mock disclaimer banners.
+    - Confirmed strict zero PII, secret, raw snapshot, supplier ID, or payment credential leakage across client props, DOM attributes, and error boundaries.
+  - **T045: Architecture Documentation Sync (`context/architecture.md`)**:
+    - Documented `Subsystem 9: Authenticated Booking Dashboard` covering the direct Prisma read model (4 counts + 1 findMany executed concurrently via `Promise.all`), server loader boundary (`getDashboardSummary()`), root `/` auth-aware server session branching, private no-store cache policy (`Cache-Control: no-store, private`), and zero Redis cache rationale.
+  - **T046: Project Overview & Progress Checker Sync (`context/project-overview.md`, `context/progress-checker.md`)**:
+    - Updated `context/project-overview.md` with dashboard-scoped sidebar layout, removed mock banners/insights, and live quick actions.
+    - Updated `context/progress-checker.md` marking Feature 021 100% complete across all 6 phases (T001–T049).
+  - **T047: Full Automated Gate Matrix (`specs/021-dashboard-building/implementation-notes.md`)**:
+    - Executed and recorded 100% green exit code 0 across the entire monorepo test and build matrix:
+      - Shared contract unit tests: 67/67 PASS (`pnpm --filter @shared/types test`).
+      - API unit & controller tests: 36/36 PASS (`pnpm --filter @api/backend test`).
+      - API E2E integration tests: 7/7 PASS (`pnpm --filter @api/backend test:e2e`).
+      - Web loader & routing unit tests: 39/39 PASS (`tsx --test`).
+      - Playwright browser acceptance tests: 20/20 PASS (`playwright test`).
+      - CI workflow contract tests: 20/20 PASS (`node --test tests/ci/ci-workflow.contract.test.mjs`).
+      - Smoke harness unit tests: 60/60 PASS (`pnpm test:smoke:units`).
+      - Static gates: ESLint 0 errors / 0 warnings, strict TypeScript 0 errors, Next.js production build exit code 0.
+  - **T048: Manual Acceptance Walkthrough (`specs/021-dashboard-building/quickstart.md`)**:
+    - Performed manual verification walkthrough across populated overview, empty state, unauthenticated/expired session recovery, API 500 error boundary recovery, responsive viewports (360px mobile, 768px tablet, 1280px desktop), dark/light theme switching, keyboard Tab navigation, and reduced-motion animation bounds.
+  - **T049: Task Ledger Finalization (`specs/021-dashboard-building/tasks.md`)**:
+    - Reconciled all tasks T001–T049 as completed `[x]`, verified zero deferred tasks, and confirmed all implementation evidence and test links.
+
+- [x] Phase 5: User Story 3 - Root Entry & Recovery Implementation (T038–T043) (2026-08-30):
+  - **T038: Playwright Acceptance Scenarios for Entry, Viewports & Recovery (`apps/web/tests/dashboard.spec.ts`)**:
+    - Authored E2E acceptance tests for US3 covering:
+      - Authenticated root entry redirecting from `/` to `/dashboard`.
+      - Anonymous root entry preserving marketing landing page on `/`.
+      - Direct `/dashboard` unauthenticated access redirecting to `/login?callbackUrl=/dashboard`.
+      - Expired backend session redirecting to `/login?callbackUrl=/dashboard`.
+      - Upstream API 500 server failure rendering safe recovery error card with `Try Again` CTA and zero leaked tokens/hostnames/internal details.
+      - Upstream malformed response rendering error boundary with zero raw data leakage.
+      - Zero horizontal overflow across mobile (360x800), tablet (768x1024), and desktop (1280x800) viewports (`scrollWidth <= clientWidth`).
+      - Landmark `<main>` visibility and keyboard `Tab` traversal to interactive elements with active focus rings.
+      - `prefers-reduced-motion: reduce` emulation verifying animation and transition durations bounded (`<= 0.01s`).
+  - **T039: Unit Test Suite for Root Session Branching & Dashboard Routing (`apps/web/tests/dashboard-routing.unit.ts`)**:
+    - Implemented unit tests using `node:test`, `node:assert/strict`, and module caching mock seams for `next-auth` (`getServerSession`), `next/navigation` (`redirect`), `server-only`, and `apps/web/lib/server/dashboard.ts` (`getDashboardSummary`).
+    - Validated root page branching: authenticated session triggers `redirect('/dashboard')`, anonymous session returns `<LandingPage />` without redirect.
+    - Validated dashboard page outcome branching: `UNAUTHENTICATED` triggers `redirect('/login?callbackUrl=/dashboard')`, `UPSTREAM_UNAVAILABLE` and `INVALID_RESPONSE` throw unmasked `Error('Unable to load dashboard.')` activating error boundary, `ok: true` renders `DashboardShell`.
+    - Executed `cmd /c "node_modules\.bin\tsx.cmd --test apps/web/tests/dashboard-routing.unit.ts"`: 6/6 PASS after implementation.
+  - **T040: Root Page Server-Side Session Branching (`apps/web/app/page.tsx`)**:
+    - Implemented server-side session check with `getServerSession(authOptions)`. Redirects authenticated users directly to `/dashboard` while preserving `<LandingPage />` rendering for anonymous visitors.
+  - **T041: Login-Return & Failure Routing Alignment (`apps/web/app/dashboard/page.tsx`)**:
+    - Aligned dashboard unauthenticated session and expired token handling with `/login?callbackUrl=/dashboard` redirection. Propagated upstream network and response parsing failures to error boundary without masking or swallowing `NEXT_REDIRECT`.
+  - **T042: Responsive Layout, Contrast & Accessibility Polish (`apps/web/app/dashboard/dashboard.module.css`)**:
+    - Finalized compact mobile navigation, verified zero horizontal overflow (`overflow-x: hidden`, `max-width: 100%`) across 360px, 768px, and desktop breakpoints. Enforced WCAG 2.1 AA contrast, `:focus-visible` focus rings, and `@media (prefers-reduced-motion: reduce)` override bounds.
+  - **T043: US3 Verification & Acceptance Checkpoint**:
+    - Routing unit test suite: 6/6 PASS (`apps/web/tests/dashboard-routing.unit.ts`).
+    - Web unit tests: 39/39 PASS across all dashboard unit suites (`dashboard-search.spec.ts`, `dashboard-actions.spec.ts`, `dashboard.spec.ts`, `dashboard-routing.unit.ts`).
+    - Playwright browser acceptance: 20/20 PASS (`apps/web/tests/dashboard.spec.ts`).
+    - Next.js lint (`next lint`), TypeScript (`tsc --noEmit`), and Next.js build (`next build`): all PASS with exit code 0.
+
+- [x] Phase 4: User Story 2 - Hub Actions & Quick Search Implementation (T032–T037) (2026-08-30):
+  - **T032: Quick Search Normalization & URL Builder (`apps/web/components/dashboard/dashboard-search.ts`)**:
+    - Implemented IATA uppercase/trim normalization, non-empty distinct three-letter airport validation, future/today local calendar date validation, and ordered query URL builder (`/search?origin=...&destination=...&departureDate=...&adults=...&cabinClass=...`).
+  - **T033: Accessible Quick Search Component & `/search` Integration (`DashboardQuickSearch.tsx`, `SearchFormClient.tsx`, `app/search/page.tsx`)**:
+    - Added accessible quick search form with keyboard Enter submission, explicit labels, inline alert error reporting, and Lucide `Search` submit icon.
+    - Updated `/search` Server Component to safely sanitize and consume incoming dashboard query parameters and forward initial values to `SearchFormClient`.
+  - **T034: Feature-Flagged Action Builder & Component (`dashboard-actions.ts`, `DashboardQuickActions.tsx`)**:
+    - Implemented `buildDashboardActions()` providing core actions (`/search`, `/bookings?tab=upcoming`, `/bookings?tab=past`) and conditionally including `/profile` when booking readiness is active.
+    - Rendered accessible quick action card grid with semantic SVG icons and `:focus-visible` styling.
+  - **T035 & T036: Shell Composition & Responsive Semantic CSS (`app/dashboard/page.tsx`, `DashboardShell.tsx`, `dashboard.module.css`)**:
+    - Integrated quick search and actions within the glassmorphic dashboard shell.
+    - Added responsive layout stacking (<640px) and `@media (prefers-reduced-motion: reduce)` overrides with `!important` bounds.
+  - **T037: Verification & Acceptance**:
+    - Full unit test gate: exit 0, 39/39 passed (`dashboard-search.spec.ts`, `dashboard-actions.spec.ts`, `dashboard.spec.ts`, `dashboard-routing.unit.ts`).
+    - Web lint (`next lint`) and TypeScript typecheck (`tsc --noEmit`): exit 0.
+    - Production build (`next build`): exit 0.
+    - Playwright acceptance suite (`dashboard.spec.ts`): exit 0, 20/20 scenarios passed across populated/empty/error states, quick search, actions, and flag toggling.
+    - CI workflow contract (`ci-workflow.contract.test.mjs`): exit 0, 20/20 passed.
+    - Parallel Standards and Spec reviews completed with zero open findings.
+
+- [x] Phase 4 / Slice 1: User Story 2 Hub Actions & Quick Search Characterization (T030–T031) (2026-08-30):
+  - **T030: Playwright Hub Navigation Characterization (`apps/web/tests/dashboard.spec.ts`)**:
+    - Added quick-search submission coverage for accessible airport/date controls and exact `/search` query preservation (`origin`, `destination`, `departureDate`, `adults=1`, `cabinClass=economy`).
+    - Added independently isolated Quick Actions navigation coverage for `/search`, `/bookings?tab=upcoming`, and `/bookings?tab=past`, scoped to the named Quick Actions region so global navigation cannot satisfy the assertions.
+    - Added `mock-scenario` readiness variants proving Traveler Profile omission when disabled and requiring `/profile` when enabled.
+    - Strengthened the anti-prototype guard to reject root and nested `/prototype/*` dashboard links.
+    - Full Playwright execution completed with final exit code `1` after 7.3 minutes (13 passed, 5 failed): four expected Phase 4 RED gaps plus the separately owned Phase 5 authenticated-root redirect RED case. After final review fixes, a focused nine-scenario run completed normally in 8.6 minutes with final exit code `1` (1 passed, 8 expected Phase 4 failures), covering keyboard operation, invalid searches, disabled-flag base-action preservation, and enabled Profile behavior.
+  - **T031: Pure Utility Characterization (`dashboard-search.spec.ts`, `dashboard-actions.spec.ts`)**:
+    - Characterized IATA trim/uppercase normalization, empty/short/same-airport rejection, past-date rejection with same-day acceptance, sanitized valid payloads, and default search URL generation.
+    - Characterized the exact three base dashboard actions and conditional Traveler Profile inclusion, including required render-field shape.
+    - Executed the combined Node/tsx suite: final exit code `1`, with exactly two expected missing-module failures for `./dashboard-search` and `./dashboard-actions`; no syntax or test-runner failures.
+  - **Review & Scope**:
+    - Unit task review: spec PASS and quality PASS after strengthening default URL coverage and splitting short-code cases.
+    - Playwright task review: spec APPROVED and quality APPROVED after scoping action locators to the Quick Actions region; final parallel Standards and Spec re-review completed with zero open findings.
+    - Repo-wide `pnpm format --check` is blocked by `EPERM` while scanning `.pytest_cache`; repo-wide `pnpm lint` is blocked by three unrelated concurrent-work errors and eight warnings. Scoped Prettier and ESLint checks for the Phase 4 artifacts pass cleanly.
+    - Production implementation remains intentionally pending in T032–T035; this slice is the TDD RED baseline only.
+
+- [x] Phase 3: User Story 1 - Web Data Boundary & UI Implementation (T020–T029) (2026-08-29):
+  - **T020: Server-Only Summary Loader (`apps/web/lib/server/dashboard.ts`)**:
+    - Guarded with `import 'server-only'`.
+    - Implemented `getDashboardSummary()` extracting `getServerSession(authOptions)` access token, resolving `API_URL` / `NEXT_PUBLIC_API_URL` dynamically, applying 10,000ms `AbortController` timeout, dispatching `cache: 'no-store'` fetch, validating payload with `DashboardSummarySchema.safeParse`, and mapping status codes to typed `DashboardOutcome`.
+    - Verified with `apps/web/lib/server/dashboard.spec.ts`: 20/20 tests pass (100%).
+  - **T021: Semantic Design Tokens in Global Styles (`apps/web/app/globals.css`)**:
+    - Defined complete `--dashboard-*` token palette for surfaces, borders, glassmorphic elevations, typography, metrics, and status badges under `:root` and `:root.dark`.
+    - Included `@supports not (backdrop-filter: blur(1px))` and `@media (forced-colors: active)` fallbacks.
+  - **T022: Four-Card Booking Metrics Component (`apps/web/components/dashboard/DashboardStats.tsx`)**:
+    - Implemented accessible metric display rendering Total (`Plane`), Upcoming (`Calendar`), Completed (`CheckCircle2`), and Cancelled (`XCircle`) bookings.
+  - **T023: Recent Bookings Timeline & Empty State (`apps/web/components/dashboard/DashboardRecentBookings.tsx`)**:
+    - Implemented 5-item recent timeline with route codes (`originCode → destinationCode`), flight numbers, canonical status chips, links to `/bookings/[id]`, top header link to `/bookings`, and empty state with primary `/search` CTA.
+  - **T024 & T025: Dashboard Shell & CSS Module (`apps/web/components/dashboard/DashboardShell.tsx`, `apps/web/app/dashboard/dashboard.module.css`)**:
+    - Implemented Wayfinder desktop sidebar, sticky top bar, user badge/avatar, and compact mobile navigation with zero prototype mock elements.
+    - Implemented responsive glassmorphic styles with responsive breakpoints (desktop, 1100px, 800px, 560px), reduced motion, and focus-visible rings.
+  - **T026, T027, T028: App Router Route Lifecycle (`page.tsx`, `loading.tsx`, `error.tsx`)**:
+    - `page.tsx`: Server Component with `force-dynamic`, session redirection to `/login?callbackUrl=/dashboard` on unauthenticated state, and clean component composition.
+    - `loading.tsx`: Server-rendered geometry-matching skeleton placeholders.
+    - `error.tsx`: `'use client'` error boundary with user-friendly copy, `reset()` retry button, and zero credential or transport leakage.
+  - **T029: Green Checkpoint & Verification Execution**:
+    - Server loader unit tests: 20/20 PASS (`apps/web/lib/server/dashboard.spec.ts`).
+    - Playwright acceptance suite: 4/4 scenarios verified.
+    - Next.js Lint (`next lint`): 0 errors.
+    - Strict Typecheck (`tsc --noEmit`): 0 errors.
+    - Next.js Production Build (`next build`): Exit code 0 (`ƒ /dashboard` Server Component generated).
+    - CI workflow contract: 20/20 PASS (`tests/ci/ci-workflow.contract.test.mjs`).
+
+- [x] Phase 3: User Story 1 - API and Contract Implementation (T014–T019) (2026-08-29):
+  - **T014: Direct Prisma Summary Queries & Safe Snapshot Mapper (`apps/api/src/dashboard/dashboard.service.ts`)**:
+    - Injected exclusively `PrismaService` (zero cache, profile, or external provider dependencies).
+    - Captured single clock instant (`now = new Date()`) shared across query filters and `generatedAt: now.toISOString()`.
+    - Executed 5 queries concurrently in a single `Promise.all` batch (total bookings, upcoming `CONFIRMED` with `departureAt >= now`, completed `COMPLETED` + past `CONFIRMED` with `departureAt < now`, cancelled across all 5 cancellation statuses, and top 5 recent bookings ordered by `createdAt: 'desc'`, `id: 'desc'`).
+    - Implemented pure allowlisted `mapRecentBooking` / `extractFlightDetails` safely extracting `originCode`, `destinationCode`, `airlineCode`, and `flightNumber` across flat, segment-based, and slice-based (Duffel) structures, safely falling back to `null` on corrupt/missing data without throwing.
+    - Guaranteed zero PII, payment token, raw snapshot, or provider ID leakage.
+    - Verified with `apps/api/src/dashboard/dashboard.service.spec.ts`: 14/14 tests pass (100%).
+  - **T015: Authenticated Dashboard Controller (`apps/api/src/dashboard/dashboard.controller.ts`)**:
+    - Decorated with `@Controller(['dashboard', 'api/dashboard'])` and `@UseGuards(JwtAuthGuard)`.
+    - Implemented `@Get('summary')` handler extracting `req.user.id || req.user.sub`, throwing `UnauthorizedException` when unauthenticated.
+    - Set `Cache-Control: no-store, private` and removed `ETag` on response.
+    - Returned strictly validated `DashboardSummary`.
+    - Verified with `apps/api/src/dashboard/dashboard.controller.spec.ts`: 7/7 tests pass (100%).
+  - **T016: DashboardModule Declaration (`apps/api/src/dashboard/dashboard.module.ts`)**:
+    - Encapsulated `DashboardModule` importing only `PrismaModule`, providing `DashboardService`, and exporting `DashboardService`.
+  - **T017: AppModule Registration (`apps/api/src/app.module.ts`)**:
+    - Registered `DashboardModule` cleanly in `AppModule.imports`.
+  - **T018: AppModule Expectations Verification (`apps/api/src/app.module.spec.ts`)**:
+    - Added test suite verifying `DashboardModule` registration in `AppModule` imports array.
+    - Verified `DashboardModule` imports only `PrismaModule` and excludes heavy modules (`BookingManagementModule`, `ProfileModule`, `PaymentModule`, `CacheModule`).
+    - Verified `DashboardController` and `DashboardService` registration and clean NestJS module compilation with `Test.createTestingModule`.
+    - Verified with `apps/api/src/app.module.spec.ts`: 15/15 tests pass (100%).
+  - **T019: Test Execution & Verification Green Checkpoint**:
+    - Unit & Controller: `36/36 PASS` across 3 test suites (`dashboard.service.spec.ts`, `dashboard.controller.spec.ts`, `app.module.spec.ts`).
+    - API E2E Integration: `7/7 PASS` (`test/dashboard.e2e-spec.ts`) covering 401 unauthenticated requests, strict User A vs User B tenant isolation, zero-data empty state, top 5 descending ordering, negative privacy guarantees, and private no-store cache headers.
+    - Static typecheck (`tsc -p tsconfig.json --noEmit`): 0 errors.
+    - Linting (`eslint`): 0 warnings.
+    - CI workflow contract (`ci-workflow.contract.test.mjs`): 20/20 PASS.
+    - Dual-axis Standards Review and Spec Review completed with 0 P0/P1 issues.
+
+- [x] Phase 3: User Story 1 - Characterization & Unit/E2E Tests (T009–T013) (2026-08-29):
+  - **T009: Failing `DashboardService` Unit Tests (`apps/api/src/dashboard/dashboard.service.spec.ts`)**:
+    - Implemented exhaustive Jest test suite asserting single clock instant (`now = new Date()`) shared across `upcomingBookings` (`departureAt: { gte: now }`), `completedBookings` (`departureAt: { lt: now }`), and `generatedAt: now.toISOString()`.
+    - Validated all 4 computed metrics (`totalBookings`, `upcomingBookings`, `completedBookings` with canonical `COMPLETED` + past `CONFIRMED`, `cancelledBookings` across all 5 canonical cancellation statuses: `CANCELLATION_PENDING`, `CANCELLED_PENDING_REFUND`, `CANCELLED_AND_REFUNDED`, `CANCELLED_NO_REFUND`, `REFUND_FAILED_NEEDS_ATTENTION`).
+    - Validated null departure exclusion from upcoming/completed while included in total.
+    - Validated boundary comparison equality (`departureAt === now` counts as upcoming, not completed).
+    - Validated concurrent query execution (4 counts + 1 `findMany` in a single `Promise.all` batch with max concurrency = 5).
+    - Validated `take: 5` ceiling and `createdAt DESC` ordering.
+    - Validated defensive snapshot display mapper (segments, slices, flat shapes, and 11 corrupt/empty snapshot variants safely resolving to `null` without throwing).
+    - Validated strict tenant isolation (`userId` filter applied on all 5 queries and 0 sensitive fields returned).
+    - Verified clean RED compilation failure (`Cannot find module './dashboard.service'`).
+  - **T010: Failing `DashboardController` Unit Tests (`apps/api/src/dashboard/dashboard.controller.spec.ts`)**:
+    - Implemented Jest test suite asserting `@UseGuards(JwtAuthGuard)` metadata presence on controller.
+    - Validated `req.user.id` and `req.user.sub` extraction and delegation to `dashboardService.getSummary(userId)`.
+    - Validated `Cache-Control: no-store, private` header setting on response.
+    - Validated exact `DashboardSummary` shape matching `@shared/types`.
+    - Validated rejection with `UnauthorizedException` when `req.user` is missing or empty.
+    - Verified clean RED compilation failure (`Cannot find module './dashboard.controller'`).
+  - **T011: Failing API Integration E2E Tests (`apps/api/test/dashboard.e2e-spec.ts`)**:
+    - Implemented Supertest E2E integration test suite against NestJS test application.
+    - Validated HTTP 401 Unauthorized for missing or invalid Bearer tokens on `GET /api/dashboard/summary`.
+    - Validated strict User A vs User B tenant isolation across multi-status bookings (0 leaked counts, 0 leaked booking IDs).
+    - Validated empty state parity for newly registered users (0s across all metrics, `recentBookings: []`, valid `generatedAt` ISO timestamp).
+    - Validated recent 5 limit and descending `createdAt` ordering when user has 8 bookings.
+    - Validated strict Negative Privacy Invariants (0 passport numbers, 0 credit card numbers, 0 payment IDs, 0 Stripe intent IDs, 0 Duffel order/offer IDs, 0 `userId`, 0 raw snapshots, with allowlisted keys only).
+    - Validated `Cache-Control: no-store, private` headers on HTTP response.
+  - **T012: Failing Web Server Loader Unit Tests (`apps/web/lib/server/dashboard.spec.ts`)**:
+    - Implemented `node:test` and `node:assert/strict` unit test suite for `getDashboardSummary()`.
+    - Validated unauthenticated session handling (`{ ok: false, reason: 'UNAUTHENTICATED', retryable: false }`) with 0 network calls when session is null or missing/empty token.
+    - Validated Bearer token forwarding, `cache: 'no-store'`, private URL resolution (`API_URL` -> `NEXT_PUBLIC_API_URL` -> localhost), and trailing slash normalization.
+    - Validated 10,000ms `AbortController` timeout mapping to `{ ok: false, reason: 'UPSTREAM_UNAVAILABLE', retryable: true }`.
+    - Validated HTTP status code mapping (401 -> `UNAUTHENTICATED`, 403 -> `FORBIDDEN`, 500/502/503/504 -> `UPSTREAM_UNAVAILABLE`).
+    - Validated Zod schema safe-parsing rejecting malformed JSON, negative counts, invalid status enums, invalid ISO dates, >5 items, and extra keys violating `.strict()`.
+    - Validated Zero Credential / Stack Trace Leakage across all failure branches.
+    - Verified clean RED failure (`Cannot find module './dashboard.ts'`).
+  - **T013: Failing Playwright E2E Scenarios (`apps/web/tests/dashboard.spec.ts`)**:
+    - Implemented Playwright browser acceptance tests with an in-process scenario-keyed HTTP fixture on port 3101.
+    - Implemented populated overview scenarios verifying 4 metric cards (12, 3, 8, 1), 5 recent booking items with route codes and flight numbers, item link to `/bookings/[bookingId]`, and header link to `/bookings`.
+    - Implemented empty dashboard scenario verifying 0 metrics, empty state message, and primary Search Flights CTA linking to `/search`.
+    - Implemented Zero-Mock Anti-Prototype Guardrail verifying strict absence of Disruption Shield %, fake fare-drop alerts, static seat recommendations, prototype disclaimer banners, prototype variant switchers, and `/prototype/*` links.
+    - Implemented unauthenticated redirect scenario verifying anonymous user redirect to `/login`.
+  - **Phase 3 Slice 1 Verification & Review Sign-Off**:
+    - Shared Contracts: 67/67 PASS (`pnpm --filter @shared/types test`).
+    - Static CI Workflow Contract: 20/20 PASS (`node --test tests/ci/ci-workflow.contract.test.mjs`).
+    - API ESLint Gate: 0 errors / 0 warnings (`pnpm exec eslint "apps/api/**/*.ts" "packages/shared/**/*.ts" --max-warnings 0`).
+    - Web Next Lint Gate: 0 errors / 0 warnings (`pnpm --filter @web/frontend lint`).
+    - Prettier formatting check: clean across all workspaces (`pnpm format --check`).
+    - Dual-axis Standards Review and Spec Review completed with 0 P0/P1 issues.
+
+- [x] Phase 2: Foundational Shared Contract (T005–T008) (2026-08-29):
+  - **T005: Contract Unit Test Suite (`packages/shared/src/types/dashboard.types.spec.ts`)**:
+    - Implemented exhaustive `node:test` and `node:assert/strict` unit suite verifying valid payloads, strict key enforcement (`.strict()`), non-negative integer bounds on all 4 metric counters, canonical 9-status lifecycle enum, nullable projections (`departureAt`, `originCode`, `destinationCode`, `airlineCode`, `flightNumber`), `max(5)` recent booking array cap, ISO 8601 UTC and offset datetime parsing (`{ offset: true }`), UUID v4 format validation, and `DashboardOutcome` discriminated union across all 4 canonical failure reasons (`UNAUTHENTICATED`, `FORBIDDEN`, `UPSTREAM_UNAVAILABLE`, `INVALID_RESPONSE`).
+    - Verified compile-time static type inference parity assertions (`Assert<Equal<...>>`) against hand-written type contracts.
+    - Verified strict RED state failure before implementation (`Cannot find module './dashboard.types'`).
+  - **T006: Shared Zod Schema & Outcome Type Implementation (`packages/shared/src/types/dashboard.types.ts`)**:
+    - Defined and exported `DashboardBookingStatusEnum` and `DashboardBookingStatus` covering the exact 9-value lifecycle enum.
+    - Defined and exported `DashboardStatsSchema` and `DashboardStats` validating non-negative integers with `.strict()`.
+    - Defined and exported `DashboardRecentBookingSchema` and `DashboardRecentBooking` with UUID v4, canonical status, ISO 8601 timestamps, nullable string/datetime display projections, and `.strict()`.
+    - Defined and exported `DashboardSummarySchema` and `DashboardSummary` validating aggregate `stats`, `recentBookings.max(5)`, and `generatedAt` with `.strict()`.
+    - Defined and exported `DashboardFailureReasonEnum`, `DashboardOutcomeSchema`, and `DashboardOutcome` discriminated union with `retryable: boolean` and zero stack trace/credential leakage.
+  - **T007: Shared Barrel Export (`packages/shared/src/types/index.ts`)**:
+    - Exported all dashboard schemas and inferred types via `export * from './dashboard.types';`.
+    - Registered subpath export `"./dashboard.types"` in `packages/shared/package.json`.
+  - **T008: Test Script Registration & Verification Execution (`packages/shared/package.json`)**:
+    - Updated `"test"` script in `packages/shared/package.json` to include compiled `dist/types/dashboard.types.spec.js` and added `"test:shared"` to root `package.json`.
+    - Integrated `pnpm --filter @shared/types test` into GitHub Actions `api-gate` and static contract verification test suite.
+    - Executed `pnpm --filter @shared/types test`: 67/67 unit tests passed across 12 suites with exit code 0.
+    - Verified downstream typechecks: `@api/backend` `tsc -p tsconfig.json --noEmit` PASS (exit code 0), `@web/frontend` `typecheck` PASS (exit code 0).
+    - Verified static CI workflow contract: `node --test tests/ci/ci-workflow.contract.test.mjs` (20/20 PASS).
+    - Dual-axis Standards Review and Spec Review completed with 0 P0/P1 issues.
+
+- [x] Phase 1: Setup and Decision Guardrails (T001–T004) (2026-08-28):
+  - **T001: Execution Baseline & Affected-File Checklist (`specs/021-dashboard-building/implementation-notes.md`)**:
+    - Recorded feature baseline (branch `021-dashboard-building`, SHA `2af59d3`, Node 20+, pnpm 11.9.0, Next.js 14.2.3, NestJS 10.4.22, Prisma 5.22.0, TypeScript 5.4.5, Zod 3.23.8).
+    - Established exhaustive 41-file tracking inventory across `packages/shared`, `apps/api`, `apps/web`, and `specs/context`.
+    - Documented core architecture: direct Prisma read model (4 counts + 1 findMany concurrently via `Promise.all`), zero Redis dashboard cache (`cache: 'no-store'`), server-only data loader boundary, root `/` auth-aware server redirect, and canonical 4 metric definitions (handling past confirmed travel + 5 cancellation statuses).
+  - **T002: OpenAPI Contract Conformance Checklist (`specs/021-dashboard-building/checklists/contract.md`)**:
+    - Authored comprehensive contract checklist derived from `contracts/dashboard-summary.openapi.yaml`.
+    - Formulated schema validation rules for `DashboardStats` (non-negative integer metrics, single clock instant `now`), `DashboardRecentBooking` (UUID v4, 9 canonical lifecycle statuses, ISO timestamps, nullable route/airline projections, allowlisted snapshot parsing, `take: 5`, `createdAt DESC` sort), and `DashboardSummary` aggregate.
+    - Encoded strict Zero-Leakage Privacy Invariants: 0 PII, 0 payment tokens/secrets, 0 raw supplier snapshots, 0 leaked JWTs/backend hostnames, 0 raw database/stack trace errors.
+    - Defined web boundary result contract `DashboardOutcome` tagged failure union (`UNAUTHENTICATED`, `FORBIDDEN`, `UPSTREAM_UNAVAILABLE`, `INVALID_RESPONSE`).
+  - **T003: Visual Translation Guardrail Checklist (`specs/021-dashboard-building/checklists/visual.md`)**:
+    - Established Tokenization-First Strategy in `apps/web/app/globals.css` with dark/light CSS custom properties and `@supports not (backdrop-filter: blur(1px))` fallbacks. Zero hardcoded colors, inline styles, or raw Tailwind colors in production components.
+    - Documented removed prototype mock elements: replaced fake Disruption Shield % with canonical Cancelled Bookings count; stripped fake fare-drop and seat recommendation cards; stripped prototype disclaimer banner and variant switcher controls; eliminated mock `/prototype/*` links.
+    - Documented supported production destinations: Quick Search `/search` parameter handoff, Quick Actions (`/search`, `/bookings?tab=upcoming`, `/bookings?tab=past`, and `/profile` conditionally rendered when `isBookingReadinessEnabled()` is true), and global `ChatWidget` integration.
+    - Defined responsive layouts (Desktop >=1024px sidebar + sticky topbar; Mobile 360px & Tablet 768px stacked layouts with `overflow-x: hidden` zero horizontal scroll) and WCAG 2.1 AA accessibility (landmarks, contrast >=4.5:1, `:focus-visible` rings, reduced motion).
+  - **T004: Next.js 14.2.3 Route & Session Constraint Verification (`specs/021-dashboard-building/implementation-notes.md`)**:
+    - Verified `getServerSession(authOptions)` interop in Server Components and server-only modules.
+    - Verified `redirect()` from `next/navigation` throwing `NEXT_REDIRECT` and documented catch-block safety.
+    - Verified dynamic fetch `{ cache: 'no-store', headers: { Authorization: \`Bearer \${token}\` } }` and Zero Client Credential Invariant (0 tokens/URLs in browser props/state).
+    - Verified `loading.tsx` server skeleton and `error.tsx` client error boundary contracts.
+    - Verified Windows local port 3101 HTTP mock fixture pattern for Playwright browser tests.
+  - **Phase 1 Verification & Quality Sign-Off**:
+    - Static CI Workflow Contract: 20/20 PASS (`node --test tests/ci/ci-workflow.contract.test.mjs`).
+    - Smoke Harness Unit Suite: 60/60 PASS (`pnpm test:smoke:units`).
+    - API ESLint Gate: 0 errors / 0 warnings (`pnpm exec eslint "apps/api/**/*.ts" "packages/shared/**/*.ts" --max-warnings 0`).
+    - Web Next Lint Gate: 0 errors / 0 warnings (`pnpm --filter @web/frontend lint`).
+    - Standards & Spec dual-axis subagent code reviews completed with 0 P0/P1/P2/P3 issues.
 
 ### [x] Feature: Whole-Stack Smoke and Sanity CI (Feature 020) — Phase 6: Polish and Cross-Cutting Verification (T051–T057)
 

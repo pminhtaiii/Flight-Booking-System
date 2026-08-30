@@ -22,33 +22,39 @@ test.describe('Traveller Disruption Experience', () => {
   });
 
   test('renders original vs revised segments and disruption details', async ({ page, context }) => {
-    await context.addCookies([{
-      name: 'mock-scenario',
-      value: 'disruption-detected',
-      domain: '127.0.0.1',
-      path: '/',
-    }]);
+    await context.addCookies([
+      {
+        name: 'mock-scenario',
+        value: 'disruption-detected',
+        domain: '127.0.0.1',
+        path: '/',
+      },
+    ]);
 
     await page.route(`**/api/bookings/${bookingId}/disruptions?page=1&limit=5`, async (route) => {
       await route.fulfill({
         contentType: 'application/json',
         body: JSON.stringify({
-          items: [{
-            revisionId,
-            version: 1,
-            observedAt: '2026-07-25T10:00:00.000Z',
-            isMaterial: true,
-            materialReasons: ['DEPARTURE_MOVED_LATER'],
-            segments: [{
-              airline: { name: 'Revised Air', iataCode: 'RA' },
-              flightNumber: 'RA202',
-              departureAirport: { iataCode: 'LHR', name: 'Heathrow', city: 'London' },
-              arrivalAirport: { iataCode: 'JFK', name: 'John F. Kennedy', city: 'New York' },
-              departureAt: '2026-08-01T13:00:00.000Z',
-              arrivalAt: '2026-08-01T21:00:00.000Z',
-              duration: 'PT8H',
-            }],
-          }],
+          items: [
+            {
+              revisionId,
+              version: 1,
+              observedAt: '2026-07-25T10:00:00.000Z',
+              isMaterial: true,
+              materialReasons: ['DEPARTURE_MOVED_LATER'],
+              segments: [
+                {
+                  airline: { name: 'Revised Air', iataCode: 'RA' },
+                  flightNumber: 'RA202',
+                  departureAirport: { iataCode: 'LHR', name: 'Heathrow', city: 'London' },
+                  arrivalAirport: { iataCode: 'JFK', name: 'John F. Kennedy', city: 'New York' },
+                  departureAt: '2026-08-01T13:00:00.000Z',
+                  arrivalAt: '2026-08-01T21:00:00.000Z',
+                  duration: 'PT8H',
+                },
+              ],
+            },
+          ],
           page: 1,
           limit: 5,
           total: 1,
@@ -62,7 +68,9 @@ test.describe('Traveller Disruption Experience', () => {
     // Disruption Alert & Accessibility checks
     await expect(page.locator('[role="alert"]').first()).toBeVisible();
     await expect(page.getByText('Flight Disruption Detected')).toBeVisible();
-    await expect(page.getByText('Departure time moved later by more than 2 hours').first()).toBeVisible();
+    await expect(
+      page.getByText('Departure time moved later by more than 2 hours').first(),
+    ).toBeVisible();
     await expect(page.getByText('Schedule Instability Alert')).toBeVisible();
 
     // Itinerary change summary checks
@@ -82,27 +90,32 @@ test.describe('Traveller Disruption Experience', () => {
   test('supports Acknowledge action and refreshes state', async ({ page, context }) => {
     let ackCalled = false;
 
-    await context.addCookies([{
-      name: 'mock-scenario',
-      value: 'disruption-detected',
-      domain: '127.0.0.1',
-      path: '/',
-    }]);
+    await context.addCookies([
+      {
+        name: 'mock-scenario',
+        value: 'disruption-detected',
+        domain: '127.0.0.1',
+        path: '/',
+      },
+    ]);
 
-    await page.route(`**/api/bookings/${bookingId}/disruptions/${revisionId}/acknowledge`, async (route) => {
-      ackCalled = true;
-      await route.fulfill({
-        contentType: 'application/json',
-        body: JSON.stringify({
-          bookingId,
-          activeRevisionId: revisionId,
-          disruptionStatus: 'ACKNOWLEDGED',
-        }),
-      });
-    });
+    await page.route(
+      `**/api/bookings/${bookingId}/disruptions/${revisionId}/acknowledge`,
+      async (route) => {
+        ackCalled = true;
+        await route.fulfill({
+          contentType: 'application/json',
+          body: JSON.stringify({
+            bookingId,
+            activeRevisionId: revisionId,
+            disruptionStatus: 'ACKNOWLEDGED',
+          }),
+        });
+      },
+    );
 
     await page.goto(`/bookings/${bookingId}`);
-    
+
     const ackButton = page.getByRole('button', { name: 'I understand' });
     await expect(ackButton).toBeVisible();
     await ackButton.click();
@@ -113,25 +126,30 @@ test.describe('Traveller Disruption Experience', () => {
   test('supports Accept action and refreshes state', async ({ page, context }) => {
     let acceptCalled = false;
 
-    await context.addCookies([{
-      name: 'mock-scenario',
-      value: 'disruption-acknowledged',
-      domain: '127.0.0.1',
-      path: '/',
-    }]);
+    await context.addCookies([
+      {
+        name: 'mock-scenario',
+        value: 'disruption-acknowledged',
+        domain: '127.0.0.1',
+        path: '/',
+      },
+    ]);
 
-    await page.route(`**/api/bookings/${bookingId}/disruptions/${revisionId}/accept`, async (route) => {
-      acceptCalled = true;
-      await route.fulfill({
-        contentType: 'application/json',
-        body: JSON.stringify({
-          bookingId,
-          activeRevisionId: revisionId,
-          disruptionStatus: 'RESOLVED',
-          resolvedReason: 'TRAVELLER_ACCEPTED',
-        }),
-      });
-    });
+    await page.route(
+      `**/api/bookings/${bookingId}/disruptions/${revisionId}/accept`,
+      async (route) => {
+        acceptCalled = true;
+        await route.fulfill({
+          contentType: 'application/json',
+          body: JSON.stringify({
+            bookingId,
+            activeRevisionId: revisionId,
+            disruptionStatus: 'RESOLVED',
+            resolvedReason: 'TRAVELLER_ACCEPTED',
+          }),
+        });
+      },
+    );
 
     await page.goto(`/bookings/${bookingId}`);
 
@@ -143,24 +161,29 @@ test.describe('Traveller Disruption Experience', () => {
   });
 
   test('handles 409 Conflict during action gracefully', async ({ page, context }) => {
-    await context.addCookies([{
-      name: 'mock-scenario',
-      value: 'disruption-detected',
-      domain: '127.0.0.1',
-      path: '/',
-    }]);
+    await context.addCookies([
+      {
+        name: 'mock-scenario',
+        value: 'disruption-detected',
+        domain: '127.0.0.1',
+        path: '/',
+      },
+    ]);
 
-    await page.route(`**/api/bookings/${bookingId}/disruptions/${revisionId}/acknowledge`, async (route) => {
-      await route.fulfill({
-        status: 409,
-        contentType: 'application/json',
-        body: JSON.stringify({
-          code: 'STALE_DISRUPTION_REVISION',
-          activeRevisionId: 'new-revision-id',
-          disruptionStatus: 'DETECTED',
-        }),
-      });
-    });
+    await page.route(
+      `**/api/bookings/${bookingId}/disruptions/${revisionId}/acknowledge`,
+      async (route) => {
+        await route.fulfill({
+          status: 409,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            code: 'STALE_DISRUPTION_REVISION',
+            activeRevisionId: 'new-revision-id',
+            disruptionStatus: 'DETECTED',
+          }),
+        });
+      },
+    );
 
     await page.goto(`/bookings/${bookingId}`);
     await page.getByRole('button', { name: 'I understand' }).click();
@@ -169,12 +192,14 @@ test.describe('Traveller Disruption Experience', () => {
   });
 
   test('coexists with cancellation option', async ({ page, context }) => {
-    await context.addCookies([{
-      name: 'mock-scenario',
-      value: 'disruption-detected',
-      domain: '127.0.0.1',
-      path: '/',
-    }]);
+    await context.addCookies([
+      {
+        name: 'mock-scenario',
+        value: 'disruption-detected',
+        domain: '127.0.0.1',
+        path: '/',
+      },
+    ]);
 
     await page.goto(`/bookings/${bookingId}`);
 

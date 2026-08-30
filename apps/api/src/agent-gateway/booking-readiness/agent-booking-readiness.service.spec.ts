@@ -61,7 +61,9 @@ describe('AgentBookingReadinessService', () => {
 
     const dto = new AgentBookingReadinessRequestDto();
     dto.flightOfferId = 'offer-not-found';
-    dto.passengers = [{ passengerType: PassengerType.ADULT, passengerOrdinal: 1, sourceType: 'inline' }];
+    dto.passengers = [
+      { passengerType: PassengerType.ADULT, passengerOrdinal: 1, sourceType: 'inline' },
+    ];
 
     await expect(service.checkBookingReadiness('user-1', dto)).rejects.toThrow(NotFoundException);
 
@@ -83,7 +85,9 @@ describe('AgentBookingReadinessService', () => {
 
     const dto = new AgentBookingReadinessRequestDto();
     dto.flightOfferId = 'offer-1';
-    dto.passengers = [{ passengerType: PassengerType.ADULT, passengerOrdinal: 1, sourceType: 'inline' }];
+    dto.passengers = [
+      { passengerType: PassengerType.ADULT, passengerOrdinal: 1, sourceType: 'inline' },
+    ];
 
     await expect(service.checkBookingReadiness('user-1', dto)).rejects.toThrow(HttpException);
 
@@ -107,7 +111,9 @@ describe('AgentBookingReadinessService', () => {
 
     const dto = new AgentBookingReadinessRequestDto();
     dto.flightOfferId = 'offer-1';
-    dto.passengers = [{ passengerType: PassengerType.ADULT, passengerOrdinal: 2, sourceType: 'inline' }];
+    dto.passengers = [
+      { passengerType: PassengerType.ADULT, passengerOrdinal: 2, sourceType: 'inline' },
+    ];
 
     await expect(service.checkBookingReadiness('user-1', dto)).rejects.toThrow(HttpException);
 
@@ -128,7 +134,9 @@ describe('AgentBookingReadinessService', () => {
 
     const dto = new AgentBookingReadinessRequestDto();
     dto.flightOfferId = 'offer-1';
-    dto.passengers = [{ passengerType: PassengerType.ADULT, passengerOrdinal: 1, sourceType: 'traveler_profile' }];
+    dto.passengers = [
+      { passengerType: PassengerType.ADULT, passengerOrdinal: 1, sourceType: 'traveler_profile' },
+    ];
 
     await expect(service.checkBookingReadiness('user-1', dto)).rejects.toThrow(NotFoundException);
 
@@ -168,7 +176,9 @@ describe('AgentBookingReadinessService', () => {
 
     const dto = new AgentBookingReadinessRequestDto();
     dto.flightOfferId = 'offer-1';
-    dto.passengers = [{ passengerType: PassengerType.ADULT, passengerOrdinal: 1, sourceType: 'inline' }];
+    dto.passengers = [
+      { passengerType: PassengerType.ADULT, passengerOrdinal: 1, sourceType: 'inline' },
+    ];
 
     const result = await service.checkBookingReadiness('user-1', dto, 'trace-1', 'corr-1');
 
@@ -249,7 +259,9 @@ describe('AgentBookingReadinessService', () => {
 
     const dto = new AgentBookingReadinessRequestDto();
     dto.flightOfferId = 'offer-1';
-    dto.passengers = [{ passengerType: PassengerType.ADULT, passengerOrdinal: 1, sourceType: 'traveler_profile' }];
+    dto.passengers = [
+      { passengerType: PassengerType.ADULT, passengerOrdinal: 1, sourceType: 'traveler_profile' },
+    ];
 
     const result = await service.checkBookingReadiness('user-1', dto);
 
@@ -286,7 +298,9 @@ describe('AgentBookingReadinessService', () => {
 
     const dto = new AgentBookingReadinessRequestDto();
     dto.flightOfferId = 'offer-1';
-    dto.passengers = [{ passengerType: PassengerType.ADULT, passengerOrdinal: 1, sourceType: 'traveler_profile' }];
+    dto.passengers = [
+      { passengerType: PassengerType.ADULT, passengerOrdinal: 1, sourceType: 'traveler_profile' },
+    ];
 
     const result = await service.checkBookingReadiness('user-1', dto);
 
@@ -306,7 +320,9 @@ describe('AgentBookingReadinessService', () => {
 
     const dto = new AgentBookingReadinessRequestDto();
     dto.flightOfferId = 'offer-1';
-    dto.passengers = [{ passengerType: PassengerType.ADULT, passengerOrdinal: 1, sourceType: 'inline' }];
+    dto.passengers = [
+      { passengerType: PassengerType.ADULT, passengerOrdinal: 1, sourceType: 'inline' },
+    ];
 
     const result = await service.checkBookingReadiness('user-1', dto);
 
@@ -319,12 +335,17 @@ describe('AgentBookingReadinessService', () => {
       rawOffer: { passengers: [{ id: 'offer-passenger-1' }] },
     });
     bookingReadinessService.getAdvisoryReadiness.mockRejectedValueOnce(
-      new HttpException({ code: 'DEPENDENCY_ERROR', message: 'Ada Lovelace passport 123456789' }, 503),
+      new HttpException(
+        { code: 'DEPENDENCY_ERROR', message: 'Ada Lovelace passport 123456789' },
+        503,
+      ),
     );
 
     const dto = new AgentBookingReadinessRequestDto();
     dto.flightOfferId = 'offer-id';
-    dto.passengers = [{ passengerType: PassengerType.ADULT, passengerOrdinal: 1, sourceType: 'inline' }];
+    dto.passengers = [
+      { passengerType: PassengerType.ADULT, passengerOrdinal: 1, sourceType: 'inline' },
+    ];
 
     await expect(service.checkBookingReadiness('user-1', dto)).rejects.toThrow(HttpException);
 
@@ -354,7 +375,9 @@ describe('AgentBookingReadinessService', () => {
 
     const dto = new AgentBookingReadinessRequestDto();
     dto.flightOfferId = 'offer-id';
-    dto.passengers = [{ passengerType: PassengerType.ADULT, passengerOrdinal: 1, sourceType: 'inline' }];
+    dto.passengers = [
+      { passengerType: PassengerType.ADULT, passengerOrdinal: 1, sourceType: 'inline' },
+    ];
 
     await expect(service.checkBookingReadiness('user-1', dto)).rejects.toThrow(HttpException);
 

@@ -6,7 +6,10 @@ import { AirportsModule } from '@/airports/airports.module';
 import { ProfileModule } from '@/profile/profile.module';
 import { ChatHandoffModule } from '@/chat-handoff/chat-handoff.module';
 import { EncryptionService } from '@/common/encryption.service';
-import { BookingIntentController, BookingIntentLegacyController } from './booking-intent.controller';
+import {
+  BookingIntentController,
+  BookingIntentLegacyController,
+} from './booking-intent.controller';
 import { BookingIntentService } from './booking-intent.service';
 import { BookingIntentCron } from './booking-intent.cron';
 import { BookingReadinessEvaluator } from './booking-readiness.evaluator';
@@ -18,7 +21,14 @@ import { BookingPassengerFinalValidatorService } from './booking-passenger-final
 import { HandoffFastFailGuard } from './guards/handoff-fast-fail.guard';
 
 @Module({
-  imports: [PrismaModule, DuffelModule, AuditModule, AirportsModule, ProfileModule, forwardRef(() => ChatHandoffModule)],
+  imports: [
+    PrismaModule,
+    DuffelModule,
+    AuditModule,
+    AirportsModule,
+    ProfileModule,
+    forwardRef(() => ChatHandoffModule),
+  ],
   controllers: [BookingIntentController, BookingIntentLegacyController],
   providers: [
     BookingIntentService,

@@ -1,4 +1,5 @@
 # Quickstart: Booking Intent Foundation
+
 **Feature**: 009-booking-intent-foundation
 **Date**: 2026-07-10
 
@@ -71,6 +72,7 @@ curl -s -X POST http://localhost:3001/bookings/intent \
 ```
 
 **Expected outcome**:
+
 - Status 201 with `intentId`, `status: "PENDING"`, confirmed pricing, and 2 passenger records
 - Database: 1 `BookingIntent` row + 2 `BookingIntentPassenger` rows (with `position` 0 and 1)
 - Passport fields encrypted in database (not plaintext)
@@ -89,6 +91,7 @@ curl -s -X GET http://localhost:3001/bookings/intent/$INTENT_ID \
 ```
 
 **Expected outcome**:
+
 - Status 200 with full passenger details including decrypted passport data
 - Flight reference data (origin, destination, dates, cabin class)
 - Pricing snapshot (original, confirmed, priceChanged, pricedAt, intentExpiresAt, offerExpiresAt)
@@ -155,6 +158,7 @@ curl -s -X GET http://localhost:3001/bookings/intent/prefill \
 ```
 
 **Expected outcome**:
+
 - If profile exists: `hasProfile: true` with passenger data and `missingFields` array
 - If no profile: `hasProfile: false`
 
@@ -165,6 +169,7 @@ curl -s -X GET http://localhost:3001/bookings/intent/prefill \
 **Purpose**: Verify two-phase cleanup lifecycle. This is validated via E2E tests, not manual commands.
 
 **Expected behavior**:
+
 1. Create a booking intent
 2. Artificially set `createdAt` to 31 minutes ago
 3. Trigger Phase 1 cleanup → status changes to `EXPIRED`

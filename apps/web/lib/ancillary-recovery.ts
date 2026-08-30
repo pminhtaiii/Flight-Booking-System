@@ -34,7 +34,10 @@ export function ancillaryRecoveryKey(intentId: string): string {
   return `checkout:ancillary-recovery:${intentId}`;
 }
 
-export function writeAncillaryRecovery(storage: StorageWriter, input: AncillaryRecoveryInput): void {
+export function writeAncillaryRecovery(
+  storage: StorageWriter,
+  input: AncillaryRecoveryInput,
+): void {
   const record: AncillaryRecoveryRecord = {
     schemaVersion: 1,
     intentId: input.intentId,
@@ -48,4 +51,3 @@ export function writeAncillaryRecovery(storage: StorageWriter, input: AncillaryR
 
   storage.setItem(ancillaryRecoveryKey(input.intentId), JSON.stringify(record));
 }
-

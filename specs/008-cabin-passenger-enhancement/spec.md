@@ -8,7 +8,7 @@
 
 **Input**: Grilling session decisions from `research/cabin-passenger-enhancement-decisions.md`
 
-## User Scenarios & Testing *(mandatory)*
+## User Scenarios & Testing _(mandatory)_
 
 ### User Story 1 - Select Cabin Class for Flight Search (Priority: P1)
 
@@ -78,7 +78,7 @@ When a chatbot user mentions non-economy cabins or child/infant passengers in th
 - How does the system handle an infant passenger on a very long flight (>8 hours)?
 - What happens if the user changes cabin class and re-searches — does the cache correctly separate the results?
 
-## Requirements *(mandatory)*
+## Requirements _(mandatory)_
 
 ### Functional Requirements
 
@@ -103,7 +103,7 @@ When a chatbot user mentions non-economy cabins or child/infant passengers in th
 - **Flight Offer**: Extended with per-segment `cabinClass`, offer-level `cabinClassMatch`, `cabinMismatchDetails`.
 - **Search History Record**: Extended with `adults`, `children`, `infants`, `cabinClass` for analytics.
 
-## Success Criteria *(mandatory)*
+## Success Criteria _(mandatory)_
 
 ### Measurable Outcomes
 

@@ -24,7 +24,7 @@ describe('SegmentMatcher', () => {
     arrivalAt: '2026-10-01T13:30:00-04:00',
     arrivalLocalDate: '2026-10-01',
     durationMinutes: 510,
-    aircraftType: 'Boeing 777'
+    aircraftType: 'Boeing 777',
   };
 
   it('should match identical segments using exact ID (Tier 1)', () => {
@@ -53,12 +53,14 @@ describe('SegmentMatcher', () => {
   it('should match using Route and Nearest Time (Tier 3) within 6 hours', () => {
     // Flight number or carrier changes, but route/date/time matches closely
     const prev = [{ ...baseSegment, duffelSegmentId: null, flightNumber: '177' }];
-    const curr = [{
-      ...baseSegment,
-      duffelSegmentId: 'seg_new',
-      flightNumber: '999', // flight number changed
-      departureAt: '2026-10-01T12:00:00+01:00' // moved by 2 hours
-    }];
+    const curr = [
+      {
+        ...baseSegment,
+        duffelSegmentId: 'seg_new',
+        flightNumber: '999', // flight number changed
+        departureAt: '2026-10-01T12:00:00+01:00', // moved by 2 hours
+      },
+    ];
     const result = matchSegments(prev, curr);
 
     expect(result.matches).toHaveLength(1);
@@ -68,13 +70,15 @@ describe('SegmentMatcher', () => {
 
   it('should leave unmatched if time shift is outside the 6-hour tolerance', () => {
     const prev = [{ ...baseSegment, duffelSegmentId: null, globalOrder: 0 }];
-    const curr = [{
-      ...baseSegment,
-      duffelSegmentId: 'seg_new',
-      flightNumber: '999',
-      globalOrder: 1, // different globalOrder to prevent position match
-      departureAt: '2026-10-01T17:00:00+01:00' // moved by 7 hours
-    }];
+    const curr = [
+      {
+        ...baseSegment,
+        duffelSegmentId: 'seg_new',
+        flightNumber: '999',
+        globalOrder: 1, // different globalOrder to prevent position match
+        departureAt: '2026-10-01T17:00:00+01:00', // moved by 7 hours
+      },
+    ];
     const result = matchSegments(prev, curr);
 
     expect(result.matches).toHaveLength(0);
@@ -83,15 +87,25 @@ describe('SegmentMatcher', () => {
   });
 
   it('should match using Position (Tier 4) as a final deterministic tie-breaker', () => {
-    const prev = [{ ...baseSegment, duffelSegmentId: null, flightNumber: '177', departureAirportIata: 'LHR', arrivalAirportIata: 'JFK' }];
-    const curr = [{
-      ...baseSegment,
-      duffelSegmentId: 'seg_new',
-      flightNumber: '999',
-      departureAirportIata: 'LGW', // airport changed
-      arrivalAirportIata: 'EWR', // airport changed
-      departureAt: '2026-10-01T15:00:00+01:00' // outside 6 hours
-    }];
+    const prev = [
+      {
+        ...baseSegment,
+        duffelSegmentId: null,
+        flightNumber: '177',
+        departureAirportIata: 'LHR',
+        arrivalAirportIata: 'JFK',
+      },
+    ];
+    const curr = [
+      {
+        ...baseSegment,
+        duffelSegmentId: 'seg_new',
+        flightNumber: '999',
+        departureAirportIata: 'LGW', // airport changed
+        arrivalAirportIata: 'EWR', // airport changed
+        departureAt: '2026-10-01T15:00:00+01:00', // outside 6 hours
+      },
+    ];
     const result = matchSegments(prev, curr);
 
     expect(result.matches).toHaveLength(1);
@@ -108,7 +122,7 @@ describe('SegmentMatcher', () => {
       duffelSegmentId: 'seg_2',
       flightNumber: '200',
       departureAirportIata: 'JFK',
-      arrivalAirportIata: 'MIA'
+      arrivalAirportIata: 'MIA',
     };
     const curr = [{ ...baseSegment }, newSegment];
     const result = matchSegments(prev, curr);
@@ -126,7 +140,7 @@ describe('SegmentMatcher', () => {
       duffelSegmentId: 'seg_2',
       flightNumber: '200',
       departureAirportIata: 'JFK',
-      arrivalAirportIata: 'MIA'
+      arrivalAirportIata: 'MIA',
     };
     const prev = [baseSegment, segment2];
     const curr = [{ ...baseSegment }];
@@ -139,12 +153,14 @@ describe('SegmentMatcher', () => {
 
   it('should correctly handle rerouted segments', () => {
     const prev = [{ ...baseSegment, duffelSegmentId: null }];
-    const curr = [{
-      ...baseSegment,
-      duffelSegmentId: 'seg_2',
-      departureAirportIata: 'LGW', // completely new origin
-      arrivalAirportIata: 'MCO' // completely new destination
-    }];
+    const curr = [
+      {
+        ...baseSegment,
+        duffelSegmentId: 'seg_2',
+        departureAirportIata: 'LGW', // completely new origin
+        arrivalAirportIata: 'MCO', // completely new destination
+      },
+    ];
     const result = matchSegments(prev, curr);
 
     // Positions match (globalOrder 0) -> POSITION_MATCH
@@ -162,13 +178,13 @@ describe('SegmentMatcher', () => {
       duffelSegmentId: null,
       globalOrder: 1,
       segmentOrder: 1,
-      departureAt: '2026-10-01T11:00:00+01:00'
+      departureAt: '2026-10-01T11:00:00+01:00',
     };
     const curr = {
       ...baseSegment,
       duffelSegmentId: 'seg_curr_unique',
       departureAt: '2026-10-01T11:15:00+01:00',
-      flightNumber: '999' // forces Tier 3
+      flightNumber: '999', // forces Tier 3
     };
 
     const result = matchSegments([p1, p2], [curr]);
@@ -180,18 +196,25 @@ describe('SegmentMatcher', () => {
 
   it('should handle same-day same-route ambiguity by leaving them unmatched under Tier 3', () => {
     // One prev segment, but two same-day same-route curr segments at equal distance (e.g. +2h and -2h)
-    const prev = [{ ...baseSegment, duffelSegmentId: null, departureAt: '2026-10-01T12:00:00+01:00', flightNumber: '111' }];
+    const prev = [
+      {
+        ...baseSegment,
+        duffelSegmentId: null,
+        departureAt: '2026-10-01T12:00:00+01:00',
+        flightNumber: '111',
+      },
+    ];
     const c1 = {
       ...baseSegment,
       duffelSegmentId: 'seg_new_1',
       flightNumber: '999',
-      departureAt: '2026-10-01T10:00:00+01:00' // -2h
+      departureAt: '2026-10-01T10:00:00+01:00', // -2h
     };
     const c2 = {
       ...baseSegment,
       duffelSegmentId: 'seg_new_2',
       flightNumber: '999',
-      departureAt: '2026-10-01T14:00:00+01:00' // +2h
+      departureAt: '2026-10-01T14:00:00+01:00', // +2h
     };
 
     matchSegments(prev, [c1, c2]);
@@ -201,7 +224,15 @@ describe('SegmentMatcher', () => {
     // Let's check: if c1 has globalOrder 0, then prev (globalOrder 0) will match c1 via POSITION_MATCH.
     // If we want to test true ambiguity under Tier 3 without Tier 4 taking over, we can assign different globalOrders so Tier 4 doesn't match either.
     // E.g., prev has globalOrder 99. c1 has globalOrder 0, c2 has globalOrder 1.
-    const prevAmbiguous = [{ ...baseSegment, duffelSegmentId: null, globalOrder: 99, departureAt: '2026-10-01T12:00:00+01:00', flightNumber: '111' }];
+    const prevAmbiguous = [
+      {
+        ...baseSegment,
+        duffelSegmentId: null,
+        globalOrder: 99,
+        departureAt: '2026-10-01T12:00:00+01:00',
+        flightNumber: '111',
+      },
+    ];
     const resultAmbiguous = matchSegments(prevAmbiguous, [c1, c2]);
 
     expect(resultAmbiguous.matches).toHaveLength(0);
@@ -211,12 +242,36 @@ describe('SegmentMatcher', () => {
 
   it('should match using Position (Tier 4) when same-route segments are ambiguous', () => {
     const prev = [
-      { ...baseSegment, duffelSegmentId: null, flightNumber: '111', globalOrder: 0, departureAt: '2026-10-01T10:00:00+01:00' },
-      { ...baseSegment, duffelSegmentId: null, flightNumber: '222', globalOrder: 1, departureAt: '2026-10-01T14:00:00+01:00' }
+      {
+        ...baseSegment,
+        duffelSegmentId: null,
+        flightNumber: '111',
+        globalOrder: 0,
+        departureAt: '2026-10-01T10:00:00+01:00',
+      },
+      {
+        ...baseSegment,
+        duffelSegmentId: null,
+        flightNumber: '222',
+        globalOrder: 1,
+        departureAt: '2026-10-01T14:00:00+01:00',
+      },
     ];
     const curr = [
-      { ...baseSegment, duffelSegmentId: null, flightNumber: '333', globalOrder: 0, departureAt: '2026-10-01T12:00:00+01:00' },
-      { ...baseSegment, duffelSegmentId: null, flightNumber: '443', globalOrder: 1, departureAt: '2026-10-01T12:00:00+01:00' }
+      {
+        ...baseSegment,
+        duffelSegmentId: null,
+        flightNumber: '333',
+        globalOrder: 0,
+        departureAt: '2026-10-01T12:00:00+01:00',
+      },
+      {
+        ...baseSegment,
+        duffelSegmentId: null,
+        flightNumber: '443',
+        globalOrder: 1,
+        departureAt: '2026-10-01T12:00:00+01:00',
+      },
     ];
 
     const result = matchSegments(prev, curr);
@@ -227,11 +282,41 @@ describe('SegmentMatcher', () => {
 
   it('should not match using Position (Tier 4) if segments are in different slices or have unrelated routes', () => {
     const prev = [
-      { ...baseSegment, duffelSegmentId: null, flightNumber: '111', globalOrder: 0, sliceOrder: 0, departureAirportIata: 'JFK', arrivalAirportIata: 'BOS', departureCity: 'New York', arrivalCity: 'Boston' },
-      { ...baseSegment, duffelSegmentId: null, flightNumber: '222', globalOrder: 1, sliceOrder: 1, departureAirportIata: 'BOS', arrivalAirportIata: 'JFK', departureCity: 'Boston', arrivalCity: 'New York' }
+      {
+        ...baseSegment,
+        duffelSegmentId: null,
+        flightNumber: '111',
+        globalOrder: 0,
+        sliceOrder: 0,
+        departureAirportIata: 'JFK',
+        arrivalAirportIata: 'BOS',
+        departureCity: 'New York',
+        arrivalCity: 'Boston',
+      },
+      {
+        ...baseSegment,
+        duffelSegmentId: null,
+        flightNumber: '222',
+        globalOrder: 1,
+        sliceOrder: 1,
+        departureAirportIata: 'BOS',
+        arrivalAirportIata: 'JFK',
+        departureCity: 'Boston',
+        arrivalCity: 'New York',
+      },
     ];
     const curr = [
-      { ...baseSegment, duffelSegmentId: null, flightNumber: '333', globalOrder: 0, sliceOrder: 1, departureAirportIata: 'CDG', arrivalAirportIata: 'BOM', departureCity: 'Paris', arrivalCity: 'Mumbai' }
+      {
+        ...baseSegment,
+        duffelSegmentId: null,
+        flightNumber: '333',
+        globalOrder: 0,
+        sliceOrder: 1,
+        departureAirportIata: 'CDG',
+        arrivalAirportIata: 'BOM',
+        departureCity: 'Paris',
+        arrivalCity: 'Mumbai',
+      },
     ];
 
     const result = matchSegments(prev, curr);

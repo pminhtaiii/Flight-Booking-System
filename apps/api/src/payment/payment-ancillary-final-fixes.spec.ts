@@ -152,12 +152,14 @@ describe('PaymentService - Final Fixes Spec', () => {
       prisma.bookingIntent.findUnique.mockResolvedValue({
         id: 'intent-1',
         duffelOfferId: 'offer-1',
-        passengers: [{ 
-          duffelPassengerId: 'p-1', 
-          givenName: 'John', 
-          familyName: 'Doe', 
-          dateOfBirth: new Date('1990-01-01') 
-        }],
+        passengers: [
+          {
+            duffelPassengerId: 'p-1',
+            givenName: 'John',
+            familyName: 'Doe',
+            dateOfBirth: new Date('1990-01-01'),
+          },
+        ],
         user: { email: 'john@example.com' },
         paymentAttemptCount: 1,
       });
@@ -244,7 +246,12 @@ describe('PaymentService - Final Fixes Spec', () => {
       stripe.retrievePaymentIntent.mockRejectedValue(new Error('Stripe network error'));
 
       await expect(
-        service['handleBackgroundError']('pay-123', 'ikey-123', 'user-1', new Error('some background error')),
+        service['handleBackgroundError'](
+          'pay-123',
+          'ikey-123',
+          'user-1',
+          new Error('some background error'),
+        ),
       ).resolves.toBeUndefined();
 
       expect(prisma.payment.update).not.toHaveBeenCalled();
@@ -260,7 +267,12 @@ describe('PaymentService - Final Fixes Spec', () => {
       stripe.retrievePaymentIntent.mockResolvedValue({ status: 'requires_payment_method' });
 
       await expect(
-        service['handleBackgroundError']('pay-123', 'ikey-123', 'user-1', new Error('some background error')),
+        service['handleBackgroundError'](
+          'pay-123',
+          'ikey-123',
+          'user-1',
+          new Error('some background error'),
+        ),
       ).resolves.toBeUndefined();
 
       expect(prisma.payment.update).not.toHaveBeenCalled();
@@ -277,7 +289,12 @@ describe('PaymentService - Final Fixes Spec', () => {
       idempotency.getResumePoint.mockResolvedValue('started');
 
       await expect(
-        service['handleBackgroundError']('pay-123', 'ikey-123', 'user-1', new Error('some background error')),
+        service['handleBackgroundError'](
+          'pay-123',
+          'ikey-123',
+          'user-1',
+          new Error('some background error'),
+        ),
       ).resolves.toBeUndefined();
 
       expect(idempotency.updateRecoveryPoint).toHaveBeenCalledWith('ikey-123', 'captured');
@@ -302,7 +319,12 @@ describe('PaymentService - Final Fixes Spec', () => {
       prisma.bookingIntent.findUnique.mockResolvedValue({ paymentAttemptCount: 1 });
       prisma.booking.findFirst.mockResolvedValue({ id: 'book-123' });
 
-      await service['handleBackgroundError']('pay-123', 'ikey-123', 'user-1', new Error('some background error'));
+      await service['handleBackgroundError'](
+        'pay-123',
+        'ikey-123',
+        'user-1',
+        new Error('some background error'),
+      );
 
       expect(duffel.cancelOrder).toHaveBeenCalledWith('ord-123');
       expect(stripe.cancelPaymentIntent).toHaveBeenCalledWith('pi-123');
@@ -353,7 +375,10 @@ describe('PaymentService - Final Fixes Spec', () => {
         services: [{ serviceId: 'seat-1', quantity: 1 }],
       });
 
-      prisma.user.findUnique.mockResolvedValue({ email: 'john@example.com', stripeCustomerId: 'cus-1' });
+      prisma.user.findUnique.mockResolvedValue({
+        email: 'john@example.com',
+        stripeCustomerId: 'cus-1',
+      });
       stripe.createPaymentIntent.mockResolvedValue({ id: 'pi-1', client_secret: 'secret-1' });
 
       prisma.$queryRaw
@@ -444,9 +469,9 @@ describe('PaymentService - Final Fixes Spec', () => {
         ancillarySelectionVersion: 1,
       };
 
-      await expect(
-        service.createPayment(dto, 'ikey-123', 'user-1', '127.0.0.1')
-      ).rejects.toThrow(ConflictException);
+      await expect(service.createPayment(dto, 'ikey-123', 'user-1', '127.0.0.1')).rejects.toThrow(
+        ConflictException,
+      );
     });
 
     it('should NOT cancel the Stripe PaymentIntent if the database transaction commits but updateRecoveryPoint throws', async () => {
@@ -496,9 +521,9 @@ describe('PaymentService - Final Fixes Spec', () => {
 
       const dto = { bookingIntentId: 'intent-1' };
 
-      await expect(
-        service.createPayment(dto, 'ikey-123', 'user-1', '127.0.0.1'),
-      ).rejects.toThrow('Recovery point update failed');
+      await expect(service.createPayment(dto, 'ikey-123', 'user-1', '127.0.0.1')).rejects.toThrow(
+        'Recovery point update failed',
+      );
 
       expect(stripe.cancelPaymentIntent).not.toHaveBeenCalled();
     });
@@ -515,7 +540,10 @@ describe('PaymentService - Final Fixes Spec', () => {
         services: [{ serviceId: 'seat-1', quantity: 1 }],
       });
 
-      prisma.user.findUnique.mockResolvedValue({ email: 'john@example.com', stripeCustomerId: 'cus-1' });
+      prisma.user.findUnique.mockResolvedValue({
+        email: 'john@example.com',
+        stripeCustomerId: 'cus-1',
+      });
       stripe.createPaymentIntent.mockResolvedValue({ id: 'pi-1', client_secret: 'secret-1' });
 
       prisma.$queryRaw
@@ -575,7 +603,10 @@ describe('PaymentService - Final Fixes Spec', () => {
         services: [{ serviceId: 'seat-1', quantity: 1 }],
       });
 
-      prisma.user.findUnique.mockResolvedValue({ email: 'john@example.com', stripeCustomerId: 'cus-1' });
+      prisma.user.findUnique.mockResolvedValue({
+        email: 'john@example.com',
+        stripeCustomerId: 'cus-1',
+      });
       stripe.createPaymentIntent.mockResolvedValue({ id: 'pi-1', client_secret: 'secret-1' });
 
       prisma.$queryRaw
@@ -608,12 +639,14 @@ describe('PaymentService - Final Fixes Spec', () => {
           {
             currentAncillarySelectionId: 'sel-1',
             ancillaryVersion: 1,
-          }
+          },
         ]);
 
       prisma.$executeRaw.mockResolvedValue(1);
 
-      prisma.ancillarySelection.updateMany.mockRejectedValue(new Error('Database transaction failed'));
+      prisma.ancillarySelection.updateMany.mockRejectedValue(
+        new Error('Database transaction failed'),
+      );
 
       const dto = {
         bookingIntentId: 'intent-1',
@@ -621,9 +654,9 @@ describe('PaymentService - Final Fixes Spec', () => {
         ancillarySelectionVersion: 1,
       };
 
-      await expect(
-        service.createPayment(dto, 'ikey-123', 'user-1', '127.0.0.1'),
-      ).rejects.toThrow('Database transaction failed');
+      await expect(service.createPayment(dto, 'ikey-123', 'user-1', '127.0.0.1')).rejects.toThrow(
+        'Database transaction failed',
+      );
 
       expect(stripe.cancelPaymentIntent).toHaveBeenCalledWith('pi-1');
     });
@@ -652,9 +685,9 @@ describe('PaymentService - Final Fixes Spec', () => {
       ]);
 
       const dto = { bookingIntentId: 'intent-1' };
-      await expect(
-        service.createPayment(dto, 'ikey-123', 'user-1', '127.0.0.1'),
-      ).rejects.toThrow(GoneException);
+      await expect(service.createPayment(dto, 'ikey-123', 'user-1', '127.0.0.1')).rejects.toThrow(
+        GoneException,
+      );
     });
 
     it('should throw GoneException if offerExpiresAt is expired', async () => {
@@ -679,9 +712,9 @@ describe('PaymentService - Final Fixes Spec', () => {
       ]);
 
       const dto = { bookingIntentId: 'intent-1' };
-      await expect(
-        service.createPayment(dto, 'ikey-123', 'user-1', '127.0.0.1'),
-      ).rejects.toThrow(GoneException);
+      await expect(service.createPayment(dto, 'ikey-123', 'user-1', '127.0.0.1')).rejects.toThrow(
+        GoneException,
+      );
     });
 
     it('should throw BadRequestException if dto.ancillarySelectionId is omitted but currentAncillarySelectionId has seat/baggage selections', async () => {
@@ -710,9 +743,9 @@ describe('PaymentService - Final Fixes Spec', () => {
       prisma.baggageSelection.count.mockResolvedValue(0);
 
       const dto = { bookingIntentId: 'intent-1' };
-      await expect(
-        service.createPayment(dto, 'ikey-123', 'user-1', '127.0.0.1'),
-      ).rejects.toThrow(BadRequestException);
+      await expect(service.createPayment(dto, 'ikey-123', 'user-1', '127.0.0.1')).rejects.toThrow(
+        BadRequestException,
+      );
     });
   });
 });

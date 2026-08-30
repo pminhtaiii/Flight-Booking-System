@@ -13,11 +13,7 @@ const boundSelection = {
   bookingIntentId: 'intent-1',
   version: 3,
   status: 'PAYMENT_BOUND',
-  seatSelections: [
-    { serviceId: 'seat-b' },
-    { serviceId: 'seat-a' },
-    { serviceId: 'seat-a' },
-  ],
+  seatSelections: [{ serviceId: 'seat-b' }, { serviceId: 'seat-a' }, { serviceId: 'seat-a' }],
   baggageSelections: [
     { serviceId: 'bag-1', quantity: 2 },
     { serviceId: 'bag-1', quantity: 2 },
@@ -106,9 +102,7 @@ function buildHarness(options: HarnessOptions = {}) {
   const idempotency = {
     computeHash: jest.fn().mockReturnValue('confirm-hash'),
     acquireOrReplay: jest.fn().mockResolvedValue({ status: 'acquired' }),
-    getResumePoint: jest
-      .fn()
-      .mockResolvedValue(options.recoveryPoint ?? 'stripe_authorized'),
+    getResumePoint: jest.fn().mockResolvedValue(options.recoveryPoint ?? 'stripe_authorized'),
     updateRecoveryPoint: jest.fn().mockResolvedValue(undefined),
     completeKey: jest.fn().mockResolvedValue(undefined),
   };
@@ -275,9 +269,7 @@ describe('PaymentService ancillary order recovery', () => {
       recoveryPoint: 'duffel_order_created',
       captureError: new Error('capture request timed out'),
     });
-    harness.stripe.retrievePaymentIntent.mockRejectedValue(
-      new Error('Stripe retrieval outage'),
-    );
+    harness.stripe.retrievePaymentIntent.mockRejectedValue(new Error('Stripe retrieval outage'));
 
     await expect(
       harness.service.executeConfirmPayment(

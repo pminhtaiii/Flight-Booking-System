@@ -45,7 +45,9 @@ export class ChatMessageCryptoService {
     }
     const keyBuffer = Buffer.from(keyHex, 'hex');
     if (keyBuffer.length !== 32) {
-      throw new CryptoKeyUnavailableError('CHAT_ENCRYPTION_KEY must be a 64-character hex string (32 bytes for AES-256)');
+      throw new CryptoKeyUnavailableError(
+        'CHAT_ENCRYPTION_KEY must be a 64-character hex string (32 bytes for AES-256)',
+      );
     }
     return keyBuffer;
   }
@@ -74,10 +76,7 @@ export class ChatMessageCryptoService {
 
     cipher.setAAD(Buffer.from(aad, 'utf8'));
 
-    const encrypted = Buffer.concat([
-      cipher.update(plaintext, 'utf8'),
-      cipher.final(),
-    ]);
+    const encrypted = Buffer.concat([cipher.update(plaintext, 'utf8'), cipher.final()]);
 
     const authTag = cipher.getAuthTag();
 
@@ -112,12 +111,9 @@ export class ChatMessageCryptoService {
 
     const key = this.getKey();
 
-    const decipher = crypto.createDecipheriv(
-      ALGORITHM,
-      key,
-      Buffer.from(nonce, 'hex'),
-      { authTagLength: AUTH_TAG_LENGTH },
-    );
+    const decipher = crypto.createDecipheriv(ALGORITHM, key, Buffer.from(nonce, 'hex'), {
+      authTagLength: AUTH_TAG_LENGTH,
+    });
 
     // Must set auth tag before decryption to enforce verification
     decipher.setAuthTag(Buffer.from(authTag, 'hex'));
@@ -167,7 +163,11 @@ export class ChatMessageCryptoService {
     if (!this.isConfigured()) {
       throw new CryptoKeyUnavailableError('CHAT_ENCRYPTION_KEY is not configured');
     }
-    if (message.contentKeyVersion !== undefined && message.contentKeyVersion !== null && message.contentKeyVersion !== KEY_VERSION) {
+    if (
+      message.contentKeyVersion !== undefined &&
+      message.contentKeyVersion !== null &&
+      message.contentKeyVersion !== KEY_VERSION
+    ) {
       throw new UnsupportedKeyVersionError(message.contentKeyVersion);
     }
     if (
@@ -186,7 +186,10 @@ export class ChatMessageCryptoService {
           message.contentKeyVersion,
         );
       } catch (error) {
-        if (error instanceof CryptoKeyUnavailableError || error instanceof UnsupportedKeyVersionError) {
+        if (
+          error instanceof CryptoKeyUnavailableError ||
+          error instanceof UnsupportedKeyVersionError
+        ) {
           throw error;
         }
         this.logger.warn('Failed to decrypt ChatMessage content');
@@ -229,7 +232,11 @@ export class ChatMessageCryptoService {
     if (!this.isConfigured()) {
       throw new CryptoKeyUnavailableError('CHAT_ENCRYPTION_KEY is not configured');
     }
-    if (session.titleKeyVersion !== undefined && session.titleKeyVersion !== null && session.titleKeyVersion !== KEY_VERSION) {
+    if (
+      session.titleKeyVersion !== undefined &&
+      session.titleKeyVersion !== null &&
+      session.titleKeyVersion !== KEY_VERSION
+    ) {
       throw new UnsupportedKeyVersionError(session.titleKeyVersion);
     }
     if (
@@ -248,7 +255,10 @@ export class ChatMessageCryptoService {
           session.titleKeyVersion,
         );
       } catch (error) {
-        if (error instanceof CryptoKeyUnavailableError || error instanceof UnsupportedKeyVersionError) {
+        if (
+          error instanceof CryptoKeyUnavailableError ||
+          error instanceof UnsupportedKeyVersionError
+        ) {
           throw error;
         }
         this.logger.warn('Failed to decrypt ChatSession title');
@@ -258,5 +268,3 @@ export class ChatMessageCryptoService {
     throw new Error('ChatSession title is missing ciphertext envelope or is corrupted');
   }
 }
-
-

@@ -110,21 +110,22 @@ function missingImplementationError(): Error {
 }
 
 function createLooseMock(): LooseMock {
-  return new Proxy(
-    {} as Record<string, any>,
-    {
-      get(target: Record<string, any>, property: string) {
-        if (!(property in target)) {
-          target[property] = jest.fn();
-        }
-        return target[property];
-      },
+  return new Proxy({} as Record<string, any>, {
+    get(target: Record<string, any>, property: string) {
+      if (!(property in target)) {
+        target[property] = jest.fn();
+      }
+      return target[property];
     },
-  ) as LooseMock;
+  }) as LooseMock;
 }
 
-function instantiateWithNamedMocks<T>(ClassRef: new (...args: unknown[]) => T, namedMocks: Record<string, unknown>): T {
-  const constructorParamTypes = (Reflect.getMetadata('design:paramtypes', ClassRef) as Array<{ name?: string }>) ?? [];
+function instantiateWithNamedMocks<T>(
+  ClassRef: new (...args: unknown[]) => T,
+  namedMocks: Record<string, unknown>,
+): T {
+  const constructorParamTypes =
+    (Reflect.getMetadata('design:paramtypes', ClassRef) as Array<{ name?: string }>) ?? [];
 
   if (constructorParamTypes.length === 0) {
     throw new Error(`${ClassRef.name} constructor metadata is unavailable for test instantiation`);
@@ -146,8 +147,17 @@ function requireAdvisoryServiceClass(): new (...args: unknown[]) => ServiceHarne
     throw missingImplementationError();
   }
 
-  const serviceModulePath = join(projectRoot(), 'apps', 'api', 'src', 'booking-intent', 'booking-readiness.service');
-  const serviceModule = require(serviceModulePath) as { BookingReadinessService?: new (...args: unknown[]) => ServiceHarness['service'] };
+  const serviceModulePath = join(
+    projectRoot(),
+    'apps',
+    'api',
+    'src',
+    'booking-intent',
+    'booking-readiness.service',
+  );
+  const serviceModule = require(serviceModulePath) as {
+    BookingReadinessService?: new (...args: unknown[]) => ServiceHarness['service'];
+  };
   if (!serviceModule.BookingReadinessService) {
     throw new Error('BookingReadinessService export is missing from booking-readiness.service.ts');
   }
@@ -159,7 +169,15 @@ function requireReadinessRequestDtoClass(): new () => object {
     throw missingImplementationError();
   }
 
-  const dtoModulePath = join(projectRoot(), 'apps', 'api', 'src', 'booking-intent', 'dto', 'booking-readiness.dto');
+  const dtoModulePath = join(
+    projectRoot(),
+    'apps',
+    'api',
+    'src',
+    'booking-intent',
+    'dto',
+    'booking-readiness.dto',
+  );
   const dtoModule = require(dtoModulePath) as { BookingReadinessRequestDto?: new () => object };
   if (!dtoModule.BookingReadinessRequestDto) {
     throw new Error('BookingReadinessRequestDto export is missing from booking-readiness.dto.ts');
@@ -167,7 +185,9 @@ function requireReadinessRequestDtoClass(): new () => object {
   return dtoModule.BookingReadinessRequestDto;
 }
 
-function buildOwnedProfile(overrides: Partial<ProfileResponseFixture> = {}): ProfileResponseFixture {
+function buildOwnedProfile(
+  overrides: Partial<ProfileResponseFixture> = {},
+): ProfileResponseFixture {
   return {
     profileId: 'profile-owned',
     revision: 3,
@@ -350,22 +370,25 @@ function getHttpCode(error: unknown): string | null {
 }
 
 function collectMockCallPayloads(mockObject: LooseMock): string {
-  return JSON.stringify(
-    Object.values(mockObject).flatMap((mockFn) => mockFn.mock.calls),
-  );
+  return JSON.stringify(Object.values(mockObject).flatMap((mockFn) => mockFn.mock.calls));
 }
 
-function flattenValidationErrors(errors: ValidationError[], parentPath = ''): Array<{ path: string; constraints: string[] }> {
+function flattenValidationErrors(
+  errors: ValidationError[],
+  parentPath = '',
+): Array<{ path: string; constraints: string[] }> {
   return errors.flatMap((error) => {
     const currentPath = parentPath ? `${parentPath}.${error.property}` : error.property;
     const ownConstraints = Object.keys(error.constraints ?? {}).map((constraint) => ({
       path: currentPath,
       constraint,
     }));
-    const childConstraints = flattenValidationErrors(error.children ?? [], currentPath).map((entry) => ({
-      path: entry.path,
-      constraint: entry.constraints[0],
-    }));
+    const childConstraints = flattenValidationErrors(error.children ?? [], currentPath).map(
+      (entry) => ({
+        path: entry.path,
+        constraint: entry.constraints[0],
+      }),
+    );
 
     return [...ownConstraints, ...childConstraints].map((entry) => ({
       path: entry.path,
@@ -375,18 +398,29 @@ function flattenValidationErrors(errors: ValidationError[], parentPath = ''): Ar
 }
 
 function requireCanonicalReadinessControllerClass(): new (...args: unknown[]) => object {
-  if (!existsSync(join(__dirname, 'booking-readiness.controller.ts')) && !existsSync(join(__dirname, 'booking-intent.controller.ts'))) {
+  if (
+    !existsSync(join(__dirname, 'booking-readiness.controller.ts')) &&
+    !existsSync(join(__dirname, 'booking-intent.controller.ts'))
+  ) {
     throw missingImplementationError();
   }
 
-  const controllerModulePath = join(projectRoot(), 'apps', 'api', 'src', 'booking-intent', 'booking-intent.controller');
+  const controllerModulePath = join(
+    projectRoot(),
+    'apps',
+    'api',
+    'src',
+    'booking-intent',
+    'booking-intent.controller',
+  );
   const controllerModule = require(controllerModulePath) as {
     BookingIntentsReadinessController?: new (...args: unknown[]) => object;
     BookingReadinessController?: new (...args: unknown[]) => object;
   };
 
   const canonicalController =
-    controllerModule.BookingIntentsReadinessController ?? controllerModule.BookingReadinessController;
+    controllerModule.BookingIntentsReadinessController ??
+    controllerModule.BookingReadinessController;
 
   if (!canonicalController) {
     throw new Error(
@@ -411,7 +445,9 @@ describe('BookingReadinessService RED slice', () => {
         expectedConstraint: 'bookingReadinessPassengerSource',
         payload: {
           flightOfferId: '11111111-1111-4111-8111-111111111111',
-          passengers: [{ offerPassengerId: 'pas_001', passengerType: PassengerType.ADULT, source: {} }],
+          passengers: [
+            { offerPassengerId: 'pas_001', passengerType: PassengerType.ADULT, source: {} },
+          ],
         },
       },
       {
@@ -469,7 +505,9 @@ describe('BookingReadinessService RED slice', () => {
     const request = buildReadinessRequest();
     const storedOffer = buildStoredOffer();
 
-    mocks.prisma.flightOffer = { findUnique: jest.fn().mockResolvedValue(storedOffer) } as unknown as jest.Mock;
+    mocks.prisma.flightOffer = {
+      findUnique: jest.fn().mockResolvedValue(storedOffer),
+    } as unknown as jest.Mock;
     mocks.profileService.getProfile.mockResolvedValue(buildOwnedProfile());
     mocks.airportsService.findCountriesByIataCodes.mockResolvedValue(
       new Map([
@@ -523,8 +561,12 @@ describe('BookingReadinessService RED slice', () => {
       ],
     });
 
-    mocks.prisma.flightOffer = { findUnique: jest.fn().mockResolvedValue(buildStoredOffer()) } as unknown as jest.Mock;
-    mocks.profileService.getProfile.mockResolvedValue(buildOwnedProfile({ profileId: 'profile-owned' }));
+    mocks.prisma.flightOffer = {
+      findUnique: jest.fn().mockResolvedValue(buildStoredOffer()),
+    } as unknown as jest.Mock;
+    mocks.profileService.getProfile.mockResolvedValue(
+      buildOwnedProfile({ profileId: 'profile-owned' }),
+    );
 
     await expect(service.getAdvisoryReadiness('user-1', request)).rejects.toMatchObject({
       response: expect.objectContaining({
@@ -550,7 +592,9 @@ describe('BookingReadinessService RED slice', () => {
       ],
     });
 
-    mocks.prisma.flightOffer = { findUnique: jest.fn().mockResolvedValue(buildStoredOffer()) } as unknown as jest.Mock;
+    mocks.prisma.flightOffer = {
+      findUnique: jest.fn().mockResolvedValue(buildStoredOffer()),
+    } as unknown as jest.Mock;
     mocks.profileService.getProfile.mockResolvedValue(buildOwnedProfile());
 
     await expect(service.getAdvisoryReadiness('user-1', request)).rejects.toMatchObject({
@@ -601,7 +645,9 @@ describe('BookingReadinessService RED slice', () => {
       ],
     });
 
-    mocks.prisma.flightOffer = { findUnique: jest.fn().mockResolvedValue(buildStoredOffer()) } as unknown as jest.Mock;
+    mocks.prisma.flightOffer = {
+      findUnique: jest.fn().mockResolvedValue(buildStoredOffer()),
+    } as unknown as jest.Mock;
     mocks.airportsService.findCountriesByIataCodes.mockResolvedValue(
       new Map([
         ['SGN', 'VN'],
@@ -636,7 +682,9 @@ describe('BookingReadinessService RED slice', () => {
   it('returns a safe incomplete readiness result for an owned profile with missing fields', async () => {
     const { service, mocks } = createServiceHarness();
 
-    mocks.prisma.flightOffer = { findUnique: jest.fn().mockResolvedValue(buildStoredOffer()) } as unknown as jest.Mock;
+    mocks.prisma.flightOffer = {
+      findUnique: jest.fn().mockResolvedValue(buildStoredOffer()),
+    } as unknown as jest.Mock;
     mocks.profileService.getProfile.mockResolvedValue(
       buildOwnedProfile({
         identity: {
@@ -670,7 +718,9 @@ describe('BookingReadinessService RED slice', () => {
           sections: [
             {
               name: 'identity',
-              fields: [{ name: 'givenName', status: 'missing', reason: 'REQUIRED', blocking: true }],
+              fields: [
+                { name: 'givenName', status: 'missing', reason: 'REQUIRED', blocking: true },
+              ],
             },
           ],
         },
@@ -689,7 +739,9 @@ describe('BookingReadinessService RED slice', () => {
 
   it('rejects duplicate, missing, mismatched, and invalid passenger mappings with 422 PASSENGER_MAPPING_INVALID', async () => {
     const { service, mocks } = createServiceHarness();
-    mocks.prisma.flightOffer = { findUnique: jest.fn().mockResolvedValue(buildStoredOffer()) } as unknown as jest.Mock;
+    mocks.prisma.flightOffer = {
+      findUnique: jest.fn().mockResolvedValue(buildStoredOffer()),
+    } as unknown as jest.Mock;
     mocks.profileService.getProfile.mockResolvedValue(buildOwnedProfile());
 
     const invalidRequests: ReadinessRequest[] = [
@@ -746,7 +798,9 @@ describe('BookingReadinessService RED slice', () => {
 
   it('normalizes every slice segment, derives trip completion from the latest arrival date, and batches airport-country lookup once', async () => {
     const { service, mocks } = createServiceHarness();
-    mocks.prisma.flightOffer = { findUnique: jest.fn().mockResolvedValue(buildStoredOffer()) } as unknown as jest.Mock;
+    mocks.prisma.flightOffer = {
+      findUnique: jest.fn().mockResolvedValue(buildStoredOffer()),
+    } as unknown as jest.Mock;
     mocks.profileService.getProfile.mockResolvedValue(buildOwnedProfile());
     mocks.airportsService.findCountriesByIataCodes.mockResolvedValue(
       new Map([
@@ -760,14 +814,30 @@ describe('BookingReadinessService RED slice', () => {
     await service.getAdvisoryReadiness('user-1', buildReadinessRequest());
 
     expect(mocks.airportsService.findCountriesByIataCodes).toHaveBeenCalledTimes(1);
-    expect(mocks.airportsService.findCountriesByIataCodes).toHaveBeenCalledWith(['SGN', 'HNL', 'LAX']);
+    expect(mocks.airportsService.findCountriesByIataCodes).toHaveBeenCalledWith([
+      'SGN',
+      'HNL',
+      'LAX',
+    ]);
     expect(mocks.evaluator.evaluate).toHaveBeenCalledWith(
       expect.objectContaining({
         tripCompletionDate: '2030-08-20',
         segments: [
-          expect.objectContaining({ originCountryCode: 'VN', destinationCountryCode: 'US', arrivalDate: '2030-08-15' }),
-          expect.objectContaining({ originCountryCode: 'US', destinationCountryCode: 'US', arrivalDate: '2030-08-15' }),
-          expect.objectContaining({ originCountryCode: 'US', destinationCountryCode: 'VN', arrivalDate: '2030-08-20' }),
+          expect.objectContaining({
+            originCountryCode: 'VN',
+            destinationCountryCode: 'US',
+            arrivalDate: '2030-08-15',
+          }),
+          expect.objectContaining({
+            originCountryCode: 'US',
+            destinationCountryCode: 'US',
+            arrivalDate: '2030-08-15',
+          }),
+          expect.objectContaining({
+            originCountryCode: 'US',
+            destinationCountryCode: 'VN',
+            arrivalDate: '2030-08-20',
+          }),
         ],
       }),
     );
@@ -775,7 +845,9 @@ describe('BookingReadinessService RED slice', () => {
 
   it('maps missing airport-country data to a normal UNKNOWN readiness result instead of a dependency failure', async () => {
     const { service, mocks } = createServiceHarness();
-    mocks.prisma.flightOffer = { findUnique: jest.fn().mockResolvedValue(buildStoredOffer()) } as unknown as jest.Mock;
+    mocks.prisma.flightOffer = {
+      findUnique: jest.fn().mockResolvedValue(buildStoredOffer()),
+    } as unknown as jest.Mock;
     mocks.profileService.getProfile.mockResolvedValue(buildOwnedProfile());
     mocks.airportsService.findCountriesByIataCodes.mockResolvedValue(
       new Map([
@@ -796,7 +868,14 @@ describe('BookingReadinessService RED slice', () => {
           sections: [
             {
               name: 'itinerary',
-              fields: [{ name: 'scope', status: 'unknown', reason: 'AIRPORT_COUNTRY_UNAVAILABLE', blocking: true }],
+              fields: [
+                {
+                  name: 'scope',
+                  status: 'unknown',
+                  reason: 'AIRPORT_COUNTRY_UNAVAILABLE',
+                  blocking: true,
+                },
+              ],
             },
           ],
         },
@@ -841,10 +920,12 @@ describe('BookingReadinessService RED slice', () => {
       ),
     } as unknown as jest.Mock;
 
-    await service.getAdvisoryReadiness('user-1', buildReadinessRequest()).catch((error: unknown) => {
-      expect(getHttpStatus(error)).toBe(409);
-      expect(getHttpCode(error)).toBe('OFFER_EXPIRED');
-    });
+    await service
+      .getAdvisoryReadiness('user-1', buildReadinessRequest())
+      .catch((error: unknown) => {
+        expect(getHttpStatus(error)).toBe(409);
+        expect(getHttpCode(error)).toBe('OFFER_EXPIRED');
+      });
 
     expect(collectMockCallPayloads(mocks.duffelService)).toBe('[]');
     expect(collectMockCallPayloads(mocks.auditService)).toBe('[]');
@@ -852,7 +933,9 @@ describe('BookingReadinessService RED slice', () => {
 
   it('does not write profiles, intents, or passenger snapshots during advisory readiness', async () => {
     const { service, mocks } = createServiceHarness();
-    mocks.prisma.flightOffer = { findUnique: jest.fn().mockResolvedValue(buildStoredOffer()) } as unknown as jest.Mock;
+    mocks.prisma.flightOffer = {
+      findUnique: jest.fn().mockResolvedValue(buildStoredOffer()),
+    } as unknown as jest.Mock;
     mocks.prisma.bookingIntent = { create: jest.fn() } as unknown as jest.Mock;
     mocks.prisma.bookingIntentPassenger = { create: jest.fn() } as unknown as jest.Mock;
     mocks.profileService.getProfile.mockResolvedValue(buildOwnedProfile());
@@ -883,10 +966,12 @@ describe('BookingReadinessService RED slice', () => {
       return undefined;
     });
 
-    await service.getAdvisoryReadiness('user-1', buildReadinessRequest()).catch((error: unknown) => {
-      expect(error).toBeInstanceOf(NotFoundException);
-      expect(getHttpStatus(error)).toBe(404);
-    });
+    await service
+      .getAdvisoryReadiness('user-1', buildReadinessRequest())
+      .catch((error: unknown) => {
+        expect(error).toBeInstanceOf(NotFoundException);
+        expect(getHttpStatus(error)).toBe(404);
+      });
 
     expect(collectMockCallPayloads(mocks.prisma)).toBe('[]');
     expect(collectMockCallPayloads(mocks.profileService)).toBe('[]');
@@ -895,7 +980,9 @@ describe('BookingReadinessService RED slice', () => {
 
   it('propagates trace and correlation ids to observability with pii-free metadata', async () => {
     const { service, mocks } = createServiceHarness();
-    mocks.prisma.flightOffer = { findUnique: jest.fn().mockResolvedValue(buildStoredOffer()) } as unknown as jest.Mock;
+    mocks.prisma.flightOffer = {
+      findUnique: jest.fn().mockResolvedValue(buildStoredOffer()),
+    } as unknown as jest.Mock;
     mocks.profileService.getProfile.mockResolvedValue(buildOwnedProfile());
     mocks.airportsService.findCountriesByIataCodes.mockResolvedValue(
       new Map([
@@ -938,7 +1025,9 @@ describe('BookingIntentController advisory readiness RED slice', () => {
       createIntent: jest.fn(),
       getPrefill: jest.fn(),
       getIntent: jest.fn(),
-      getAdvisoryReadiness: jest.fn().mockResolvedValue({ scope: 'DOMESTIC', ready: true, passengers: [] }),
+      getAdvisoryReadiness: jest
+        .fn()
+        .mockResolvedValue({ scope: 'DOMESTIC', ready: true, passengers: [] }),
     };
 
     const singularController = new BookingIntentController(bookingIntentService as never);
@@ -947,7 +1036,10 @@ describe('BookingIntentController advisory readiness RED slice', () => {
     expect(typeof singularController.getIntent).toBe('function');
 
     const CanonicalReadinessController = requireCanonicalReadinessControllerClass();
-    const canonicalControllerPath = Reflect.getMetadata(PATH_METADATA, CanonicalReadinessController);
+    const canonicalControllerPath = Reflect.getMetadata(
+      PATH_METADATA,
+      CanonicalReadinessController,
+    );
     expect(canonicalControllerPath).toBe('bookings/intents');
 
     const controller = instantiateWithNamedMocks(CanonicalReadinessController, {
@@ -962,7 +1054,9 @@ describe('BookingIntentController advisory readiness RED slice', () => {
     };
     expect(typeof controller.createReadiness).toBe('function');
 
-    expect(Reflect.getMetadata(PATH_METADATA, controller.createReadiness as Function)).toBe('readiness');
+    expect(Reflect.getMetadata(PATH_METADATA, controller.createReadiness as Function)).toBe(
+      'readiness',
+    );
     expect(Reflect.getMetadata(METHOD_METADATA, controller.createReadiness as Function)).toBe(1);
 
     const response = {

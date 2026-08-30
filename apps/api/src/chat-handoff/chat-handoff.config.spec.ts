@@ -20,7 +20,7 @@ describe('Chat Handoff Config Validation', () => {
       FEATURE_FLAG_CHAT_HANDOFF_ISSUE: 'true',
       FEATURE_FLAG_CHAT_HANDOFF_ACCEPT: 'false',
     };
-    
+
     const result = envSchema.safeParse(invalidConfig);
     expect(result.success).toBe(false);
     if (!result.success) {
@@ -35,7 +35,7 @@ describe('Chat Handoff Config Validation', () => {
       FEATURE_FLAG_CHAT_HANDOFF_ISSUE: 'true',
       FEATURE_FLAG_CHAT_HANDOFF_ACCEPT: 'true',
     };
-    
+
     const result = envSchema.safeParse(validConfig);
     expect(result.success).toBe(true);
   });
@@ -75,11 +75,10 @@ describe('Chat Handoff Config Validation', () => {
     await expect(
       controller.resolve({ token: 'chk_handoff_v1_test' }, { user: { id: 'user-1' } }),
     ).resolves.toEqual({ status: 'ACTIVE' });
-    expect(handoffService.resolveSafe).toHaveBeenCalledWith(
-      'chk_handoff_v1_test',
-      'user-1',
-      { traceId: undefined, correlationId: undefined },
-    );
+    expect(handoffService.resolveSafe).toHaveBeenCalledWith('chk_handoff_v1_test', 'user-1', {
+      traceId: undefined,
+      correlationId: undefined,
+    });
   });
 
   it('returns a stable disabled error when ACCEPT=false', async () => {

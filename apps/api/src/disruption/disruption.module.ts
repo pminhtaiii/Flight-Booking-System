@@ -15,7 +15,12 @@ import { DuffelProcessorHealthService } from './webhook/duffel-processor-health.
 import { DuffelEventProcessor } from './webhook/duffel-event.processor';
 
 @Module({
-  imports: [PrismaModule, DuffelModule, BookingLifecycleModule, forwardRef(() => AgentGatewayModule)],
+  imports: [
+    PrismaModule,
+    DuffelModule,
+    BookingLifecycleModule,
+    forwardRef(() => AgentGatewayModule),
+  ],
 
   controllers: [DisruptionController, TravellerDisruptionController, DuffelWebhookController],
   providers: [

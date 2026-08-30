@@ -29,7 +29,9 @@ export type AirportSearchResponse = {
 export async function searchAirports(q: string, limit?: number): Promise<Airport[]> {
   try {
     const limitQuery = limit ? `&limit=${limit}` : '';
-    const res = await fetchWithTimeout(`${API_URL}/api/airports/search?q=${encodeURIComponent(q)}${limitQuery}`);
+    const res = await fetchWithTimeout(
+      `${API_URL}/api/airports/search?q=${encodeURIComponent(q)}${limitQuery}`,
+    );
     if (!res.ok) {
       throw new Error(`Failed to search airports: ${res.statusText}`);
     }
@@ -44,7 +46,9 @@ export async function searchAirports(q: string, limit?: number): Promise<Airport
 
 export async function getAirportByIataCode(iataCode: string): Promise<Airport | null> {
   try {
-    const res = await fetchWithTimeout(`${API_URL}/api/airports/${encodeURIComponent(iataCode.toUpperCase())}`);
+    const res = await fetchWithTimeout(
+      `${API_URL}/api/airports/${encodeURIComponent(iataCode.toUpperCase())}`,
+    );
     if (!res.ok) {
       if (res.status === 404) return null;
       throw new Error(`Failed to fetch airport ${iataCode}: ${res.statusText}`);
@@ -62,7 +66,7 @@ export async function getNearbyAirports(
   lat: number,
   lng: number,
   radius?: number,
-  limit?: number
+  limit?: number,
 ): Promise<NearbyAirportResponse | null> {
   try {
     const params = new URLSearchParams({

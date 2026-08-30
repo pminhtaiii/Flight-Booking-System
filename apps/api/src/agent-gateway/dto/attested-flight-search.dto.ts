@@ -23,7 +23,8 @@ export function AtLeastOneVersionField(validationOptions?: ValidationOptions) {
       validator: {
         validate(value: unknown, args: ValidationArguments) {
           const obj = args.object as { proposedSnapshotVersion?: number; proposedVersion?: number };
-          const hasV1 = obj.proposedSnapshotVersion !== undefined && obj.proposedSnapshotVersion !== null;
+          const hasV1 =
+            obj.proposedSnapshotVersion !== undefined && obj.proposedSnapshotVersion !== null;
           const hasV2 = obj.proposedVersion !== undefined && obj.proposedVersion !== null;
           return hasV1 || hasV2;
         },
@@ -82,5 +83,3 @@ export interface AttestedFlightSearchResponseDto {
   snapshotExpiresAt: string;
   results: AttestedFlightSearchResultDto[];
 }
-
-

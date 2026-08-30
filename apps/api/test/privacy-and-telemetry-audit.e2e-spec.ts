@@ -50,7 +50,11 @@ const FORBIDDEN_PRIVACY_CORPUS = [
   'duffel-secret-offer-xyz',
 ] as const;
 
-function mintClaimToken(userId: string, iat: number, secret = 'test-claim-token-secret-must-be-long-enough'): string {
+function mintClaimToken(
+  userId: string,
+  iat: number,
+  secret = 'test-claim-token-secret-must-be-long-enough',
+): string {
   const payload = { userId, iat };
   const payloadStr = JSON.stringify(payload);
   const signature = crypto.createHmac('sha256', secret).update(payloadStr).digest();
@@ -96,7 +100,9 @@ describe('Privacy Corpus & Structured Telemetry Audit (e2e)', () => {
       .compile();
 
     app = moduleFixture.createNestApplication();
-    app.useGlobalPipes(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, transform: true }));
+    app.useGlobalPipes(
+      new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, transform: true }),
+    );
     app.useGlobalFilters(new HttpExceptionFilter());
     app.setGlobalPrefix('api', { exclude: ['health'] });
     await app.init();
@@ -171,7 +177,8 @@ describe('Privacy Corpus & Structured Telemetry Audit (e2e)', () => {
     });
 
     it('stores ChatMessages strictly with record-bound contentCiphertext and zero raw plaintext in DB rows', async () => {
-      const SECRET_MESSAGE = 'Plaintext sensitive customer conversation between Alice and Bob with passport PASS-123456';
+      const SECRET_MESSAGE =
+        'Plaintext sensitive customer conversation between Alice and Bob with passport PASS-123456';
       const SECRET_TITLE = 'Trip to Danang PNR-XYZ123';
 
       const session = await chatService.createSession(testUserId, SECRET_TITLE);
@@ -247,7 +254,9 @@ describe('Privacy Corpus & Structured Telemetry Audit (e2e)', () => {
       const traceId = `chat_${crypto.randomBytes(16).toString('hex')}`;
       const correlationId = `chat_${crypto.randomBytes(16).toString('hex')}`;
 
-      const logSpy = jest.spyOn(readinessObservability['logger'], 'error').mockImplementation(() => {});
+      const logSpy = jest
+        .spyOn(readinessObservability['logger'], 'error')
+        .mockImplementation(() => {});
 
       readinessObservability.recordOutcome({
         status: 'advisory_error',

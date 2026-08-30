@@ -47,8 +47,8 @@ A backup sync trigger that runs every 30 minutes, scanning CONFIRMED bookings wi
 _Avoid_: Primary sync, Full-table scan
 
 **Duffel Webhook Inbox**:
-A lightweight durable event table (`duffel_webhook_events`) that receives verified Duffel webhook payloads. The webhook endpoint verifies the signature, inserts one small row (event ID, order ID, event type, status, attempts, raw payload), and returns 200 immediately. A DuffelEvent processor polls pending events in small batches and runs the supplier synchronization pipeline for each. On Duffel fetch failure: increment attempts, set RETRY_SCHEDULED with exponential backoff (1m, 5m, 15m); after 5 failures escalate to FAILED_NEEDS_ATTENTION. Cron-triggered syncs need no explicit retry — `lastDuffelSyncedAt` staleness keeps failed bookings at the top of the priority queue. This is the transactional inbox pattern — the receiving-side mirror of the Notification Outbox.
-_Avoid_: Fire-and-forget, Heavy queue infrastructure
+A lightweight durable event table (`duffel_webhook_events`) that receives verified Duffel webhook payloads. The webhook endpoint verifies the signature, inserts one small row (event ID, order ID, event type, status, attempts, raw payload), and returns 200 immediately. A DuffelEvent processor polls pending events in small batches and runs the supplier synchronization pipeline for each. On Duffel fetch failure: increment attempts, set RETRY*SCHEDULED with exponential backoff (1m, 5m, 15m); after 5 failures escalate to FAILED_NEEDS_ATTENTION. Cron-triggered syncs need no explicit retry — `lastDuffelSyncedAt` staleness keeps failed bookings at the top of the priority queue. This is the transactional inbox pattern — the receiving-side mirror of the Notification Outbox.
+\_Avoid*: Fire-and-forget, Heavy queue infrastructure
 
 **Itinerary Revision**:
 An immutable, supplier-authoritative version of a confirmed booking's flight itinerary captured after an airline-initiated change.
@@ -71,12 +71,12 @@ A durable record written in the same transaction as an itinerary revision and di
 _Avoid_: Notification queue, Alert log
 
 **Disruption Status**:
-An orthogonal field on Booking (separate from BookingStatus) that tracks the lifecycle of a detected disruption: NONE → DETECTED → ACKNOWLEDGED → RESOLVED. Carries only the state — the cause and details live on the associated Itinerary Revision. Scoped to a specific revision via `activeDisruptionRevisionId`; when a new material revision arrives, the status resets to DETECTED with the new revision ID. Transitions: DETECTED via material revision; ACKNOWLEDGED via explicit traveller click; RESOLVED via traveller acceptance, departure passing, admin action, or booking cancellation. DETECTED also auto-resolves on departure to prevent stale unacknowledged records. The cycle can repeat — a RESOLVED booking returns to DETECTED if a new material revision arrives. Resolution is auditable: `resolvedReason` (TRAVELLER_ACCEPTED, DEPARTURE_PASSED, ADMIN_RESOLVED, BOOKING_CANCELLED), `resolvedAt`, and `resolvedBy` (traveller/system/admin) are captured on every RESOLVED transition. Cancellation and disruption are independent — travellers may cancel during a disruption, and cancellation auto-resolves the disruption. Disruptions do not affect cancellation deadlines.
-_Avoid_: Disruption reason, Disrupted booking status
+An orthogonal field on Booking (separate from BookingStatus) that tracks the lifecycle of a detected disruption: NONE → DETECTED → ACKNOWLEDGED → RESOLVED. Carries only the state — the cause and details live on the associated Itinerary Revision. Scoped to a specific revision via `activeDisruptionRevisionId`; when a new material revision arrives, the status resets to DETECTED with the new revision ID. Transitions: DETECTED via material revision; ACKNOWLEDGED via explicit traveller click; RESOLVED via traveller acceptance, departure passing, admin action, or booking cancellation. DETECTED also auto-resolves on departure to prevent stale unacknowledged records. The cycle can repeat — a RESOLVED booking returns to DETECTED if a new material revision arrives. Resolution is auditable: `resolvedReason` (TRAVELLER*ACCEPTED, DEPARTURE_PASSED, ADMIN_RESOLVED, BOOKING_CANCELLED), `resolvedAt`, and `resolvedBy` (traveller/system/admin) are captured on every RESOLVED transition. Cancellation and disruption are independent — travellers may cancel during a disruption, and cancellation auto-resolves the disruption. Disruptions do not affect cancellation deadlines.
+\_Avoid*: Disruption reason, Disrupted booking status
 
 **Sync Claim**:
-A two-layer concurrency guard for the supplier synchronization pipeline. Primary: a CAS (compare-and-swap) update on a `syncLockedAt` timestamp field on Booking — first caller wins, stale locks self-expire. Fallback: a UNIQUE constraint on (booking_id, version) on Itinerary Revision — if two pipelines race past the CAS, the database rejects the second insert. The loser catches the unique violation and exits cleanly.
-_Avoid_: Distributed lock, Queue-based serialization
+A two-layer concurrency guard for the supplier synchronization pipeline. Primary: a CAS (compare-and-swap) update on a `syncLockedAt` timestamp field on Booking — first caller wins, stale locks self-expire. Fallback: a UNIQUE constraint on (booking*id, version) on Itinerary Revision — if two pipelines race past the CAS, the database rejects the second insert. The loser catches the unique violation and exits cleanly.
+\_Avoid*: Distributed lock, Queue-based serialization
 
 **Notification Throttle**:
 A per-booking daily cap (3 material notifications/day) on outbox writes. The 3rd notification carries a stabilization warning informing the traveller that frequent changes are being monitored. Beyond the cap, no further outbox records are created and the booking is flagged for manual admin review. Revisions and materiality classification continue unconditionally regardless of the throttle.
@@ -141,8 +141,8 @@ A structured SSE event (`type: ACTION_HANDOFF`) emitted alongside the LLM's text
 _Avoid_: Chat link, Inline URL, Markdown deep link
 
 **Checkout Intent Signal**:
-A read-only LangGraph tool (`signal_checkout_intent`) that the LLM calls when it recognizes the user's explicit intent to book a specific flight. The tool validates the offer index against the most recent search results and sets a graph state flag. It has no side effects — downstream deterministic nodes (validate_handoff, create_handoff_token) handle offer validation and token creation. Replaces the former stub `book_flight` tool.
-_Avoid_: Book action, Write tool, Booking trigger
+A read-only LangGraph tool (`signal_checkout_intent`) that the LLM calls when it recognizes the user's explicit intent to book a specific flight. The tool validates the offer index against the most recent search results and sets a graph state flag. It has no side effects — downstream deterministic nodes (validate*handoff, create_handoff_token) handle offer validation and token creation. Replaces the former stub `book_flight` tool.
+\_Avoid*: Book action, Write tool, Booking trigger
 
 **Trusted Search Snapshot**:
 A compact, code-only record of the most recent `search_flights` tool results stored in the LangGraph state by the `custom_tool_node` — not by the LLM. Contains only the fields needed for downstream validation and handoff token creation (Duffel offer ID, airline, route, departure time, price, currency). The LLM never sees this snapshot; it sees only a formatted text summary without provider identifiers. When `signal_checkout_intent(offer_index=N)` is called, the deterministic `validate_handoff` node resolves the index against this snapshot to obtain the authoritative offer ID. Overwritten on each new search — "Flight 3" always refers to the latest search.
@@ -175,4 +175,3 @@ _Avoid_: Confidence-only routing, Silent fallback to checkout
 **Routing Disambiguation**:
 The pattern for handling ambiguous checkout-like messages (e.g., "Flight 3 looks good" — curiosity or commitment?). When the Router detects possible checkout intent but the Checkout Gate is not fully satisfied, the message is routed to the Travel Assistant with a `disambiguation: possible_checkout` metadata flag. The Travel Assistant — which has the search context — asks an informed clarification question ("Would you like more details about Flight 3, or are you ready to check out?"). The user's clarified response goes through the Router again. The Router never generates conversational responses; it stays single-purpose.
 _Avoid_: Silent downgrade, Generic clarification
-

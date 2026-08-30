@@ -291,23 +291,23 @@ DISPUTED → CHARGEBACK_LOST (dispute lost)
 
 ## Recovery Point → Payment Status Mapping
 
-| Recovery Point | Payment Status | Description |
-|---------------|---------------|-------------|
-| `started` | `CREATED` | PaymentIntent created, pipeline starting |
-| `stripe_authorized` | `AUTHORIZED` | Card authorized, funds held |
-| `duffel_order_created` | `AUTHORIZED` | Duffel PNR confirmed, capture not yet done |
-| `captured` | `SUCCEEDED` | Stripe capture confirmed |
-| `completed` | `SUCCEEDED` | All post-capture steps done (ledger, audit) |
+| Recovery Point         | Payment Status | Description                                 |
+| ---------------------- | -------------- | ------------------------------------------- |
+| `started`              | `CREATED`      | PaymentIntent created, pipeline starting    |
+| `stripe_authorized`    | `AUTHORIZED`   | Card authorized, funds held                 |
+| `duffel_order_created` | `AUTHORIZED`   | Duffel PNR confirmed, capture not yet done  |
+| `captured`             | `SUCCEEDED`    | Stripe capture confirmed                    |
+| `completed`            | `SUCCEEDED`    | All post-capture steps done (ledger, audit) |
 
 ---
 
 ## V1 Chart of Accounts (ledger_entries.account_id)
 
-| Account ID | Purpose |
-|------------|---------|
-| `CUSTOMER_RECEIVABLE` | Money owed by/to the customer |
-| `PLATFORM_REVENUE` | Platform's revenue from bookings |
-| `DUFFEL_COST` | What the platform owes Duffel for the ticket |
+| Account ID            | Purpose                                      |
+| --------------------- | -------------------------------------------- |
+| `CUSTOMER_RECEIVABLE` | Money owed by/to the customer                |
+| `PLATFORM_REVENUE`    | Platform's revenue from bookings             |
+| `DUFFEL_COST`         | What the platform owes Duffel for the ticket |
 
 ---
 

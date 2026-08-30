@@ -6,17 +6,21 @@
 **Skill output:** `./.agent/skills/sketch-findings-booking-systems/`
 
 ## Included Sketches
-| # | Name | Winner | Design Area |
-|---|------|--------|-------------|
+
+| #   | Name                          | Winner    | Design Area                                                            |
+| --- | ----------------------------- | --------- | ---------------------------------------------------------------------- |
 | 001 | 001-chatbot-search-transition | Variant C | Chat layout, transitions, bubble style, input styles, route alignments |
 
 ## Excluded Sketches
-*None.*
+
+_None._
 
 ## Design Direction
+
 Chatbot-first entry layout that starts centered (max-width `680px`, `margin: 0 auto;`). When the user triggers a flight search, the chat panel slides smoothly to the left (taking up ~35-38% of the width) while the flight results panel expands on the right (~62-65% width) to display clean, separate flight cards. Uses purple primary accents (`#7C5CFC`) with white surfaces and light borders.
 
 ## Key Decisions
+
 1.  **Centered Chat Entry:** Keeps the initial chat interaction focused and clean, without any sidebars or empty results columns.
 2.  **Spring-like Sliding Transitions:** Layout adjusts utilizing GPU-accelerated cubic-bezier curves (`all 0.75s cubic-bezier(0.19, 1, 0.22, 1)`) and opacity changes.
 3.  **Modern Chat Bubbles:** Rounded user bubbles (`18px`) featuring a gradient (`linear-gradient(135deg, #7C5CFC, #633BF7)`) and neutral agent bubbles.

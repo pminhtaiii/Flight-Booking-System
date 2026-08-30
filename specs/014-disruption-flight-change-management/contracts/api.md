@@ -28,6 +28,7 @@ Success `200`:
 ```json
 { "received": true }
 ```
+
 Errors:
 
 - `400 WEBHOOK_SIGNATURE_MISSING` — missing header; no row.

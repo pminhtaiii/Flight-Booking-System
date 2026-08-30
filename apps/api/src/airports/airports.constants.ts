@@ -7,8 +7,8 @@ export function sha256(data: string): string {
 export const CACHE_TTLS = {
   SEARCH: 86400, // 24 hours
   DETAIL: 86400, // 24 hours
-  NEARBY: 3600,  // 1 hour
-  ALL: 86400,    // 24 hours
+  NEARBY: 3600, // 1 hour
+  ALL: 86400, // 24 hours
 };
 
 export const CACHE_KEYS = {

@@ -44,10 +44,7 @@ export class EncryptionService {
       try {
         const decipher = crypto.createDecipheriv('aes-256-gcm', key, iv);
         decipher.setAuthTag(authTag);
-        const decrypted = Buffer.concat([
-          decipher.update(encrypted),
-          decipher.final(),
-        ]);
+        const decrypted = Buffer.concat([decipher.update(encrypted), decipher.final()]);
         return decrypted.toString('utf8');
       } catch (err) {
         lastError = err instanceof Error ? err : new Error(String(err));
@@ -108,10 +105,7 @@ export class EncryptionService {
         const decipher = crypto.createDecipheriv('aes-256-gcm', key, iv);
         decipher.setAAD(aad);
         decipher.setAuthTag(authTag);
-        const decrypted = Buffer.concat([
-          decipher.update(encrypted),
-          decipher.final(),
-        ]);
+        const decrypted = Buffer.concat([decipher.update(encrypted), decipher.final()]);
         return decrypted.toString('utf8');
       } catch (err) {
         lastError = err instanceof Error ? err : new Error(String(err));

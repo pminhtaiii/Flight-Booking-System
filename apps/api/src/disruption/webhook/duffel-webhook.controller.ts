@@ -1,4 +1,13 @@
-import { Controller, Post, Req, Headers, HttpCode, HttpStatus, Logger, BadRequestException } from '@nestjs/common';
+import {
+  Controller,
+  Post,
+  Req,
+  Headers,
+  HttpCode,
+  HttpStatus,
+  Logger,
+  BadRequestException,
+} from '@nestjs/common';
 import { Request } from 'express';
 import { DuffelSignatureService } from './duffel-signature.service';
 import { DuffelInboxService } from './duffel-inbox.service';

@@ -15,4 +15,3 @@ import { SelectionAttestationService } from '@/agent-gateway/selection-attestati
   exports: [ChatHandoffService, ChatHandoffTokenService],
 })
 export class ChatHandoffModule {}
-

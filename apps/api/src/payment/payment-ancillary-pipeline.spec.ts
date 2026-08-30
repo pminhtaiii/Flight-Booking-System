@@ -174,7 +174,7 @@ describe('PaymentService - Ancillary Pipeline', () => {
             ancillaryVersion: 1,
           },
         ]);
-        
+
       mockPrisma.$executeRaw.mockResolvedValueOnce(1);
 
       mockPrisma.payment.findFirst.mockResolvedValueOnce(null);
@@ -211,7 +211,7 @@ describe('PaymentService - Ancillary Pipeline', () => {
         25000,
         'USD',
         'cus_123',
-        { 
+        {
           bookingIntentId: 'intent-123',
           ancillarySelectionId: 'anc-sel-123',
           ancillarySelectionVersion: '1',
@@ -292,7 +292,7 @@ describe('PaymentService - Ancillary Pipeline', () => {
             ancillaryVersion: 1,
           },
         ]);
-        
+
       mockPrisma.$executeRaw.mockResolvedValueOnce(1);
 
       mockPrisma.payment.findFirst.mockResolvedValueOnce(null);
@@ -302,9 +302,9 @@ describe('PaymentService - Ancillary Pipeline', () => {
       });
       mockStripe.createPaymentIntent.mockRejectedValueOnce(new Error('Stripe API error'));
 
-      await expect(
-        service.createPayment(dto, idempotencyKey, userId, ipAddress),
-      ).rejects.toThrow('Stripe API error');
+      await expect(service.createPayment(dto, idempotencyKey, userId, ipAddress)).rejects.toThrow(
+        'Stripe API error',
+      );
 
       expect(mockPrisma.ancillarySelection.updateMany).not.toHaveBeenCalled();
     });
@@ -344,9 +344,7 @@ describe('PaymentService - Ancillary Pipeline', () => {
         },
       ]);
 
-      await expect(
-        service.createPayment(dto, idempotencyKey, userId, ipAddress),
-      ).rejects.toThrow(
+      await expect(service.createPayment(dto, idempotencyKey, userId, ipAddress)).rejects.toThrow(
         expect.objectContaining({
           response: expect.objectContaining({
             code: 'ANCILLARY_VERSION_CONFLICT',
@@ -405,7 +403,7 @@ describe('PaymentService - Ancillary Pipeline', () => {
             validatedGrandTotal: '250.00',
           },
         ]);
-        
+
       mockPrisma.$executeRaw.mockResolvedValueOnce(1);
 
       mockPrisma.payment.findFirst.mockResolvedValueOnce(null);
@@ -428,9 +426,7 @@ describe('PaymentService - Ancillary Pipeline', () => {
         },
       ]);
 
-      await expect(
-        service.createPayment(dto, idempotencyKey, userId, ipAddress),
-      ).rejects.toThrow(
+      await expect(service.createPayment(dto, idempotencyKey, userId, ipAddress)).rejects.toThrow(
         expect.objectContaining({
           response: expect.objectContaining({
             code: 'ANCILLARY_VERSION_CONFLICT',
@@ -517,9 +513,9 @@ describe('PaymentService - Ancillary Pipeline', () => {
       // Simulating selection becoming STALE before Step 5 (updateMany returns { count: 0 })
       mockPrisma.$executeRaw.mockResolvedValueOnce(0);
 
-      await expect(
-        service.createPayment(dto, idempotencyKey, userId, ipAddress),
-      ).rejects.toThrow('Payment reservation ownership was lost');
+      await expect(service.createPayment(dto, idempotencyKey, userId, ipAddress)).rejects.toThrow(
+        'Payment reservation ownership was lost',
+      );
 
       // Verify Payment record was NOT created
       expect(mockPrisma.payment.create).not.toHaveBeenCalled();
@@ -601,9 +597,9 @@ describe('PaymentService - Ancillary Pipeline', () => {
       // Mock post-commit step idempotencyService.updateRecoveryPoint throwing error
       mockIdempotency.updateRecoveryPoint.mockRejectedValueOnce(new Error('Redis failure'));
 
-      await expect(
-        service.createPayment(dto, idempotencyKey, userId, ipAddress),
-      ).rejects.toThrow('Redis failure');
+      await expect(service.createPayment(dto, idempotencyKey, userId, ipAddress)).rejects.toThrow(
+        'Redis failure',
+      );
 
       // Verify Payment record was created and ancillary selection updated
       expect(mockPrisma.payment.create).toHaveBeenCalled();
@@ -628,20 +624,19 @@ describe('PaymentService - Ancillary Pipeline', () => {
         status: 'CREATED',
         amount: 25000,
         currency: 'usd',
-        bookingIntent: { userId: 'user-123', duffelOfferId: 'off_123', passengers: [{ id: 'pas_1', type: 'adult' }] },
+        bookingIntent: {
+          userId: 'user-123',
+          duffelOfferId: 'off_123',
+          passengers: [{ id: 'pas_1', type: 'adult' }],
+        },
         ancillarySelectionId: 'anc-sel-123',
         ancillarySelectionVersion: 1,
         ancillarySelection: {
           id: 'anc-sel-123',
           version: 1,
           status: 'PAYMENT_BOUND',
-          seatSelections: [
-            { serviceId: 'srv-seat-1' },
-            { serviceId: 'srv-seat-2' },
-          ],
-          baggageSelections: [
-            { serviceId: 'srv-bag-1', quantity: 2 },
-          ],
+          seatSelections: [{ serviceId: 'srv-seat-1' }, { serviceId: 'srv-seat-2' }],
+          baggageSelections: [{ serviceId: 'srv-bag-1', quantity: 2 }],
         },
       });
 
@@ -787,7 +782,11 @@ describe('PaymentService - Ancillary Pipeline', () => {
         currency: 'usd',
         ancillarySelectionId: null,
         ancillarySelectionVersion: null,
-        bookingIntent: { userId: 'user-123', duffelOfferId: 'off_123', passengers: [{ id: 'pas_1', type: 'adult' }] },
+        bookingIntent: {
+          userId: 'user-123',
+          duffelOfferId: 'off_123',
+          passengers: [{ id: 'pas_1', type: 'adult' }],
+        },
         ancillarySelection: null,
       });
 

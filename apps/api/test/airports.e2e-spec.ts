@@ -154,7 +154,9 @@ describe('Airports (E2E)', () => {
         .query({ q: 'h' })
         .expect(400);
 
-      expect(res.body.message).toContainEqual(expect.stringContaining('q must be at least 2 characters'));
+      expect(res.body.message).toContainEqual(
+        expect.stringContaining('q must be at least 2 characters'),
+      );
     });
 
     it('should limit results to the specified limit parameter', async () => {
@@ -204,9 +206,7 @@ describe('Airports (E2E)', () => {
 
     it('should validate query parameters for nearby check', async () => {
       // Missing lat/lng
-      await request(app.getHttpServer())
-        .get('/airports/nearby')
-        .expect(400);
+      await request(app.getHttpServer()).get('/airports/nearby').expect(400);
 
       // Lat out of range
       await request(app.getHttpServer())
@@ -227,9 +227,7 @@ describe('Airports (E2E)', () => {
       const getSpy = jest.spyOn(cacheService, 'get');
       const setSpy = jest.spyOn(cacheService, 'set');
 
-      const res1 = await request(app.getHttpServer())
-        .get('/airports/all')
-        .expect(200);
+      const res1 = await request(app.getHttpServer()).get('/airports/all').expect(200);
 
       expect(res1.body.count).toBe(3);
       expect(res1.body.data[0]).not.toHaveProperty('icaoCode');
@@ -238,9 +236,7 @@ describe('Airports (E2E)', () => {
       expect(setSpy).toHaveBeenCalled();
 
       setSpy.mockClear();
-      const res2 = await request(app.getHttpServer())
-        .get('/airports/all')
-        .expect(200);
+      const res2 = await request(app.getHttpServer()).get('/airports/all').expect(200);
 
       expect(res2.body).toEqual(res1.body);
       expect(setSpy).not.toHaveBeenCalled();
@@ -256,9 +252,7 @@ describe('Airports (E2E)', () => {
       const setSpy = jest.spyOn(cacheService, 'set');
 
       // First call (cache miss)
-      const res1 = await request(app.getHttpServer())
-        .get('/airports/HAN')
-        .expect(200);
+      const res1 = await request(app.getHttpServer()).get('/airports/HAN').expect(200);
 
       expect(res1.body.iataCode).toBe('HAN');
       expect(res1.body).toHaveProperty('icaoCode', 'VVNB'); // Full details present
@@ -268,9 +262,7 @@ describe('Airports (E2E)', () => {
 
       // Second call (cache hit)
       setSpy.mockClear();
-      const res2 = await request(app.getHttpServer())
-        .get('/airports/HAN')
-        .expect(200);
+      const res2 = await request(app.getHttpServer()).get('/airports/HAN').expect(200);
 
       expect(res2.body).toEqual(res1.body);
       expect(setSpy).not.toHaveBeenCalled();
@@ -280,21 +272,15 @@ describe('Airports (E2E)', () => {
     });
 
     it('should support case-insensitive iataCode lookup', async () => {
-      const res = await request(app.getHttpServer())
-        .get('/airports/han')
-        .expect(200);
+      const res = await request(app.getHttpServer()).get('/airports/han').expect(200);
 
       expect(res.body.iataCode).toBe('HAN');
     });
 
     it('should throw 404 if airport not found', async () => {
-      const res = await request(app.getHttpServer())
-        .get('/airports/XYZ')
-        .expect(404);
+      const res = await request(app.getHttpServer()).get('/airports/XYZ').expect(404);
 
       expect(res.body.message).toBe("Airport with IATA code 'XYZ' not found");
     });
   });
 });
-
-

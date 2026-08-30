@@ -54,11 +54,14 @@ export interface ItineraryDiffResult {
   };
 }
 
-export function computeItineraryDiff(prevSegments: NormalizedSegment[], currSegments: NormalizedSegment[]): ItineraryDiffResult {
+export function computeItineraryDiff(
+  prevSegments: NormalizedSegment[],
+  currSegments: NormalizedSegment[],
+): ItineraryDiffResult {
   const { matches, added, removed } = matchSegments(prevSegments, currSegments);
 
   // 1. Segment Diffs
-  const segmentDiffs: SegmentDiff[] = matches.map(m => {
+  const segmentDiffs: SegmentDiff[] = matches.map((m) => {
     const prev = m.prevSegment;
     const curr = m.currSegment;
     return {
@@ -68,25 +71,34 @@ export function computeItineraryDiff(prevSegments: NormalizedSegment[], currSegm
       arrivalAirportChanged: prev.arrivalAirportIata !== curr.arrivalAirportIata,
       departureLocalDateChanged: prev.departureLocalDate !== curr.departureLocalDate,
       arrivalLocalDateChanged: prev.arrivalLocalDate !== curr.arrivalLocalDate,
-      departureTimeShiftMinutes: Math.round((Date.parse(curr.departureAt) - Date.parse(prev.departureAt)) / (1000 * 60)),
-      arrivalTimeShiftMinutes: Math.round((Date.parse(curr.arrivalAt) - Date.parse(prev.arrivalAt)) / (1000 * 60)),
-      departureTerminalChanged: (prev.departureTerminal || null) !== (curr.departureTerminal || null),
+      departureTimeShiftMinutes: Math.round(
+        (Date.parse(curr.departureAt) - Date.parse(prev.departureAt)) / (1000 * 60),
+      ),
+      arrivalTimeShiftMinutes: Math.round(
+        (Date.parse(curr.arrivalAt) - Date.parse(prev.arrivalAt)) / (1000 * 60),
+      ),
+      departureTerminalChanged:
+        (prev.departureTerminal || null) !== (curr.departureTerminal || null),
       arrivalTerminalChanged: (prev.arrivalTerminal || null) !== (curr.arrivalTerminal || null),
-      aircraftTypeChanged: (prev.aircraftType || null) !== (curr.aircraftType || null)
+      aircraftTypeChanged: (prev.aircraftType || null) !== (curr.aircraftType || null),
     };
   });
 
   // 2. Slice Diffs
   const allSlices = Array.from(
-    new Set([...prevSegments.map(s => s.sliceOrder), ...currSegments.map(s => s.sliceOrder)])
+    new Set([...prevSegments.map((s) => s.sliceOrder), ...currSegments.map((s) => s.sliceOrder)]),
   ).sort((a, b) => a - b);
 
   const sliceDiffs: SliceDiff[] = [];
   let isItineraryRoutingChanged = false;
 
   for (const sliceOrder of allSlices) {
-    const prevInSlice = prevSegments.filter(s => s.sliceOrder === sliceOrder).sort((a, b) => a.segmentOrder - b.segmentOrder);
-    const currInSlice = currSegments.filter(s => s.sliceOrder === sliceOrder).sort((a, b) => a.segmentOrder - b.segmentOrder);
+    const prevInSlice = prevSegments
+      .filter((s) => s.sliceOrder === sliceOrder)
+      .sort((a, b) => a.segmentOrder - b.segmentOrder);
+    const currInSlice = currSegments
+      .filter((s) => s.sliceOrder === sliceOrder)
+      .sort((a, b) => a.segmentOrder - b.segmentOrder);
 
     const prevFirst = prevInSlice[0];
     const prevLast = prevInSlice[prevInSlice.length - 1];
@@ -112,7 +124,9 @@ export function computeItineraryDiff(prevSegments: NormalizedSegment[], currSegm
 
     let finalArrivalShiftMinutes: number | null = null;
     if (prevLast && currLast) {
-      finalArrivalShiftMinutes = Math.round((Date.parse(currLast.arrivalAt) - Date.parse(prevLast.arrivalAt)) / (1000 * 60));
+      finalArrivalShiftMinutes = Math.round(
+        (Date.parse(currLast.arrivalAt) - Date.parse(prevLast.arrivalAt)) / (1000 * 60),
+      );
     }
 
     sliceDiffs.push({
@@ -121,7 +135,7 @@ export function computeItineraryDiff(prevSegments: NormalizedSegment[], currSegm
       segmentCountDelta: currInSlice.length - prevInSlice.length,
       isRoutingChanged: isSliceRoutingChanged,
       departureAirportChanged,
-      arrivalAirportChanged
+      arrivalAirportChanged,
     });
   }
 
@@ -136,13 +150,15 @@ export function computeItineraryDiff(prevSegments: NormalizedSegment[], currSegm
   }
 
   for (const sliceOrder of allSlices) {
-    const currInSlice = currSegments.filter(s => s.sliceOrder === sliceOrder).sort((a, b) => a.segmentOrder - b.segmentOrder);
+    const currInSlice = currSegments
+      .filter((s) => s.sliceOrder === sliceOrder)
+      .sort((a, b) => a.segmentOrder - b.segmentOrder);
     for (let i = 0; i < currInSlice.length - 1; i++) {
       const currSeg1 = currInSlice[i];
       const currSeg2 = currInSlice[i + 1];
 
       const currConnectionMinutes = Math.round(
-        (Date.parse(currSeg2.departureAt) - Date.parse(currSeg1.arrivalAt)) / (1000 * 60)
+        (Date.parse(currSeg2.departureAt) - Date.parse(currSeg1.arrivalAt)) / (1000 * 60),
       );
       const isBelowMct = currConnectionMinutes < 60 && currConnectionMinutes >= 0;
       const isOverlapping = currConnectionMinutes < 0;
@@ -155,9 +171,14 @@ export function computeItineraryDiff(prevSegments: NormalizedSegment[], currSegm
       let prevConnectionMinutes: number | null = null;
       let isOvernightIntroduced = isCurrOvernight;
 
-      if (prevSeg1 && prevSeg2 && prevSeg1.sliceOrder === prevSeg2.sliceOrder && prevSeg1.segmentOrder + 1 === prevSeg2.segmentOrder) {
+      if (
+        prevSeg1 &&
+        prevSeg2 &&
+        prevSeg1.sliceOrder === prevSeg2.sliceOrder &&
+        prevSeg1.segmentOrder + 1 === prevSeg2.segmentOrder
+      ) {
         prevConnectionMinutes = Math.round(
-          (Date.parse(prevSeg2.departureAt) - Date.parse(prevSeg1.arrivalAt)) / (1000 * 60)
+          (Date.parse(prevSeg2.departureAt) - Date.parse(prevSeg1.arrivalAt)) / (1000 * 60),
         );
         const isPrevOvernight = prevSeg1.arrivalLocalDate !== prevSeg2.departureLocalDate;
         isOvernightIntroduced = isCurrOvernight && !isPrevOvernight;
@@ -169,30 +190,34 @@ export function computeItineraryDiff(prevSegments: NormalizedSegment[], currSegm
         currConnectionMinutes,
         isBelowMct,
         isOverlapping,
-        isOvernightIntroduced
+        isOvernightIntroduced,
       });
     }
   }
 
   // 4. Presentation Summary (PII-free)
-  const sliceSummaries = allSlices.map(sliceOrder => {
-    const prevInSlice = prevSegments.filter(s => s.sliceOrder === sliceOrder).sort((a, b) => a.segmentOrder - b.segmentOrder);
-    const currInSlice = currSegments.filter(s => s.sliceOrder === sliceOrder).sort((a, b) => a.segmentOrder - b.segmentOrder);
+  const sliceSummaries = allSlices.map((sliceOrder) => {
+    const prevInSlice = prevSegments
+      .filter((s) => s.sliceOrder === sliceOrder)
+      .sort((a, b) => a.segmentOrder - b.segmentOrder);
+    const currInSlice = currSegments
+      .filter((s) => s.sliceOrder === sliceOrder)
+      .sort((a, b) => a.segmentOrder - b.segmentOrder);
 
     const first = currInSlice[0] || prevInSlice[0];
     const last = currInSlice[currInSlice.length - 1] || prevInSlice[prevInSlice.length - 1];
 
-    const sliceDiff = sliceDiffs.find(d => d.sliceOrder === sliceOrder);
+    const sliceDiff = sliceDiffs.find((d) => d.sliceOrder === sliceOrder);
 
     return {
       sliceOrder,
       originIata: first ? first.departureAirportIata : '',
       destinationIata: last ? last.arrivalAirportIata : '',
-      finalArrivalShiftMinutes: sliceDiff ? sliceDiff.finalArrivalShiftMinutes : null
+      finalArrivalShiftMinutes: sliceDiff ? sliceDiff.finalArrivalShiftMinutes : null,
     };
   });
 
-  const hasStopsChanged = sliceDiffs.some(d => d.segmentCountDelta !== 0);
+  const hasStopsChanged = sliceDiffs.some((d) => d.segmentCountDelta !== 0);
 
   return {
     segmentDiffs,
@@ -206,7 +231,7 @@ export function computeItineraryDiff(prevSegments: NormalizedSegment[], currSegm
       hasStopsChanged,
       addedSegmentsCount: added.length,
       removedSegmentsCount: removed.length,
-      sliceSummaries
-    }
+      sliceSummaries,
+    },
   };
 }

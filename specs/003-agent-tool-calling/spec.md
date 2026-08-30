@@ -16,7 +16,7 @@
 - Q: Where should PII sanitization occur for user-typed inputs (e.g., "passport 12345")? → A: Sanitize before storage only. Raw input is allowed into the LLM context for intent parsing, but persisted messages, audit logs, and trace logs must have PII scrubbed.
 - Q: How should the top 5 flight results be ranked/sorted? → A: Use the API's default ranking. Interactive sorting and filtering will be handled by a separate frontend dashboard feature, not by the agent.
 
-## User Scenarios & Testing *(mandatory)*
+## User Scenarios & Testing _(mandatory)_
 
 ### User Story 1 - Conversational Flight Search (Priority: P1)
 
@@ -141,7 +141,7 @@ A system operator can review a complete audit log of every tool call the agent m
 - How does the system handle a user whose account has been deactivated between JWT validation and tool call execution? The gateway must independently verify user active status and reject the request.
 - What happens when a user types PII into their chat message (e.g., passport numbers, credit card numbers)? The raw input is processed by the LLM for intent parsing, but a sanitization layer must scrub PII from the message before it is persisted to conversation history, audit logs, or trace storage.
 
-## Requirements *(mandatory)*
+## Requirements _(mandatory)_
 
 ### Functional Requirements
 
@@ -174,7 +174,7 @@ A system operator can review a complete audit log of every tool call the agent m
 - **Tool Call Audit Entry**: A log record capturing who triggered a tool, which tool was called, when, and the response characteristics — used for compliance and operational monitoring.
 - **Confirmation Gate**: A suspension mechanism that pauses agent execution when a tool requires user approval, sends a confirmation request to the user, and resumes or aborts based on the user's response.
 
-## Success Criteria *(mandatory)*
+## Success Criteria _(mandatory)_
 
 ### Measurable Outcomes
 

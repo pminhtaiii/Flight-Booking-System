@@ -21,6 +21,7 @@
 **Choice**: Build a dedicated agent gateway module in NestJS (`src/agent-gateway/`) that exposes a curated, PII-stripped API surface for agent consumption.
 
 **Rationale**: The PII boundary must be **structural, not behavioral**. If the agent calls the same endpoints as the frontend, passport numbers, payment details, and personal data enter the LLM context window. From there, they propagate to:
+
 - LangSmith traces (full prompt/response logging)
 - Summarization calls (the summarizer model sees everything)
 - LLM provider logs (depending on retention terms)
@@ -28,11 +29,12 @@
 A system prompt telling the LLM not to surface PII is a behavioral defense — the weakest layer. A gateway that **never includes the field in the response** is a hard boundary. The data simply isn't there to leak.
 
 The gateway also:
+
 - Gives a single audit chokepoint for what data the agent sees
 - Decouples the agent's data contract from the frontend's
 - Reduces token waste by stripping irrelevant metadata
 
-**Invariant enforced**: Architecture doc already states *"All agent data access goes through the agent-gateway, which strips PII and enforces scoped access."* This decision implements that invariant.
+**Invariant enforced**: Architecture doc already states _"All agent data access goes through the agent-gateway, which strips PII and enforces scoped access."_ This decision implements that invariant.
 
 ---
 
@@ -40,11 +42,11 @@ The gateway also:
 
 **Choice**: Three tools at launch:
 
-| Tool | Purpose | Data Returned |
-|---|---|---|
-| `search_flights` | Search flights by origin, destination, dates, passengers | Airline, flight number, departure/arrival times, duration, stops, price, fare class, baggage allowance |
-| `get_user_preferences` | Fetch PII-stripped traveler profile | Seat pref, airline pref, class pref — no passport, no payment data |
-| `list_user_bookings` | Fetch user's bookings with full detail | Destination, dates, airline, status, flight info — no PNR, no e-ticket numbers |
+| Tool                   | Purpose                                                  | Data Returned                                                                                          |
+| ---------------------- | -------------------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
+| `search_flights`       | Search flights by origin, destination, dates, passengers | Airline, flight number, departure/arrival times, duration, stops, price, fare class, baggage allowance |
+| `get_user_preferences` | Fetch PII-stripped traveler profile                      | Seat pref, airline pref, class pref — no passport, no payment data                                     |
+| `list_user_bookings`   | Fetch user's bookings with full detail                   | Destination, dates, airline, status, flight info — no PNR, no e-ticket numbers                         |
 
 **Rationale**: These three cover the primary use cases (search, personalization, booking status) without requiring follow-up detail tools. `list_user_bookings` returns full detail because users typically have 1–5 active bookings. `search_flights` returns medium-fat payloads so common follow-up questions can be answered from context.
 
@@ -80,6 +82,7 @@ The gateway also:
 **Choice**: Service-to-service authentication with cryptographically signed user claim tokens.
 
 **Flow**:
+
 1. User sends message to FastAPI agent service with their JWT.
 2. FastAPI middleware validates JWT once, extracts `userId`.
 3. Agent mints a **signed claim token** (HMAC-SHA256 with a shared secret between agent and gateway).
@@ -88,15 +91,18 @@ The gateway also:
 6. Gateway validates HMAC signature, checks timestamp is within configured TTL window, processes request.
 
 **Configuration**:
+
 - `CLAIM_TOKEN_TTL_SECONDS` — configurable via environment variable, not hardcoded. Can be tuned per deployment.
 - User active status is **not** in the claim token — the gateway checks that independently if needed.
 
 **Rationale**: Forwarding user JWTs (Option A) breaks during long conversations when tokens expire, causing 401 errors mid-tool-call. Simple user-exists DB checks (Option 1) lack cryptographic assurance. The signed claim token provides:
+
 - Cryptographic proof that the userId was extracted from a validated JWT at the FastAPI edge
 - Configurable TTL that accommodates long conversations
 - No privilege escalation risk from forged userIds — the HMAC signature prevents tampering
 
 **Rejected**:
+
 - **Forward user JWT**: Expires during long conversations, causing mid-stream failures.
 - **Trust-the-edge + DB check**: Lacks cryptographic guarantee; an attacker who reaches the gateway could forge userIds.
 - **Relaxed JWT expiry**: Ugly hack that weakens the JWT contract.
@@ -118,6 +124,7 @@ The gateway also:
 **Choice**: LangGraph state machine with explicit nodes and conditional routing.
 
 **Graph Structure**:
+
 ```
 START → agent_node → router
   ├── read tool  → tool_node → observation_node → agent_node
@@ -126,6 +133,7 @@ START → agent_node → router
 ```
 
 **Key Design Elements**:
+
 - **Router**: Classifies tool calls by `requires_confirmation` metadata flag on each tool. Read-only tools route directly to execution. Write tools route to confirmation gate.
 - **Confirm node**: Sends SSE event `type: "confirmation_required"` with proposed action details. Graph **suspends** using LangGraph's `interrupt_before` mechanism.
 - **Resumption**: User's next chat message serves as confirmation response. Graph resumes from checkpoint with user's decision.
@@ -156,6 +164,7 @@ User (JWT) → FastAPI Edge (validate JWT, mint claim token)
 ```
 
 **Invariants**:
+
 - Agent never sees PII — structural boundary at gateway
 - Agent never executes transactions — constitutional prohibition
 - All tool calls traced in LangSmith — full observability

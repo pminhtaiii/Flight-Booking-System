@@ -114,11 +114,7 @@ describe('Refund obligation contract migration (E2E)', () => {
         'close',
         (exitCode: number | null, signal: NodeJS.Signals | null): void => {
           if (processError) {
-            reject(
-              new Error(
-                `Prisma db execute could not start: ${processError.message}`,
-              ),
-            );
+            reject(new Error(`Prisma db execute could not start: ${processError.message}`));
             return;
           }
 
@@ -213,12 +209,7 @@ describe('Refund obligation contract migration (E2E)', () => {
         hasLegacyUniqueIndex(),
         hasContractDiscriminator(),
       ]);
-    if (
-      hasBookingId ||
-      legacyForeignKeyExists ||
-      legacyUniqueIndexExists ||
-      !hasDiscriminator
-    ) {
+    if (hasBookingId || legacyForeignKeyExists || legacyUniqueIndexExists || !hasDiscriminator) {
       throw new Error(
         'The database schema does not match the recorded refund-obligation contract migration head. Restore the disposable test database before running this verifier.',
       );
@@ -285,9 +276,7 @@ describe('Refund obligation contract migration (E2E)', () => {
     await prisma.user.deleteMany({ where: { id: fixture.userId } });
   }
 
-  async function createFixture(
-    options: { createObligation?: boolean } = {},
-  ): Promise<Fixture> {
+  async function createFixture(options: { createObligation?: boolean } = {}): Promise<Fixture> {
     const marker = randomUUID();
     const user = await prisma.user.create({
       data: {
@@ -636,9 +625,9 @@ describe('Refund obligation contract migration (E2E)', () => {
     expect(await hasBookingIdColumn()).toBe(true);
     expect(await hasLegacyForeignKey()).toBe(true);
     expect(await hasLegacyUniqueIndex()).toBe(true);
-    const reverseMappedRows = await prisma.$queryRawUnsafe<
-      Array<{ bookingId: string | null }>
-    >(`SELECT "bookingId" FROM "refunds" WHERE "id" = '${fixture.refundIds[0]}'`);
+    const reverseMappedRows = await prisma.$queryRawUnsafe<Array<{ bookingId: string | null }>>(
+      `SELECT "bookingId" FROM "refunds" WHERE "id" = '${fixture.refundIds[0]}'`,
+    );
     expect(reverseMappedRows[0]?.bookingId).toBe(fixture.bookingId);
   });
 });

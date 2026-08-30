@@ -29,6 +29,7 @@ Monthly quota is deferred. The daily quota is sufficient for booking flows (a ty
 When the chatbot prepares checkout, the backend creates a short-lived, server-issued, single-use handoff token that references the Duffel offer ID internally. The browser URL uses the token (`/checkout/passengers?handoff=chk_handoff_abc123`), never the raw offer ID.
 
 **Consequences:**
+
 - The selected offer cannot be replaced by editing a URL parameter.
 - Checkout rejects tokens belonging to another user or session.
 - Internal provider identifiers never become part of the browser contract.
@@ -70,14 +71,14 @@ Overwritten on each new search — "Flight 3" always refers to the latest search
 
 ## Decision 7: Tool Inventory — Six Read-Only Tools
 
-| Tool | Agent | Purpose |
-|---|---|---|
-| `search_flights` | Travel Assistant | Search flights via Duffel through agent gateway |
-| `get_user_preferences` | Travel Assistant | Read PII-stripped traveler profile preferences |
-| `list_user_booking_summaries` | Travel Assistant | Compact booking summaries (no financial data, no PII) |
-| `get_booking_detail` | Travel Assistant | Narrow detail for a selected booking, on explicit request |
-| `check_booking_readiness` | Travel Assistant | Check profile completeness for a specific offer |
-| `signal_checkout_intent` | Checkout Orchestrator | Express user's explicit booking intent for a specific offer |
+| Tool                          | Agent                 | Purpose                                                     |
+| ----------------------------- | --------------------- | ----------------------------------------------------------- |
+| `search_flights`              | Travel Assistant      | Search flights via Duffel through agent gateway             |
+| `get_user_preferences`        | Travel Assistant      | Read PII-stripped traveler profile preferences              |
+| `list_user_booking_summaries` | Travel Assistant      | Compact booking summaries (no financial data, no PII)       |
+| `get_booking_detail`          | Travel Assistant      | Narrow detail for a selected booking, on explicit request   |
+| `check_booking_readiness`     | Travel Assistant      | Check profile completeness for a specific offer             |
+| `signal_checkout_intent`      | Checkout Orchestrator | Express user's explicit booking intent for a specific offer |
 
 All read-only. Zero write tools. The former stub `book_flight` is removed. The `confirm` node is retired.
 
@@ -97,13 +98,13 @@ All read-only. Zero write tools. The former stub `book_flight` is removed. The `
 
 ## Decision 9: Multi-Agent Decomposition
 
-| Agent | Type | Tools | Responsibility |
-|---|---|---|---|
-| **Intent Router** | LLM (lightweight, structured output) | None | Classifies user intent, routes to specialist |
-| **General-Purpose Agent** | LLM | None | Greetings, FAQ, general conversation |
-| **Travel Assistant** | LLM | 5 read-only tools | Flight search, preferences, booking inquiries, disambiguation |
-| **Checkout Orchestrator** | LLM | 1 read-only tool | Checkout intent signaling only |
-| **Handoff Pipeline** | Deterministic code | None (no LLM) | `validate_handoff` → `create_handoff_token` |
+| Agent                     | Type                                 | Tools             | Responsibility                                                |
+| ------------------------- | ------------------------------------ | ----------------- | ------------------------------------------------------------- |
+| **Intent Router**         | LLM (lightweight, structured output) | None              | Classifies user intent, routes to specialist                  |
+| **General-Purpose Agent** | LLM                                  | None              | Greetings, FAQ, general conversation                          |
+| **Travel Assistant**      | LLM                                  | 5 read-only tools | Flight search, preferences, booking inquiries, disambiguation |
+| **Checkout Orchestrator** | LLM                                  | 1 read-only tool  | Checkout intent signaling only                                |
+| **Handoff Pipeline**      | Deterministic code                   | None (no LLM)     | `validate_handoff` → `create_handoff_token`                   |
 
 Each agent has a narrow system prompt and minimal tool set. The user perceives a single assistant.
 
@@ -114,6 +115,7 @@ Each agent has a narrow system prompt and minimal tool set. The user perceives a
 All agents run inside a single LangGraph as different node clusters sharing one `AgentState`. The Router is the entry node and routes to the appropriate cluster. The Trusted Search Snapshot, conversation history, and handoff state live in the shared state object.
 
 **Graph topology:**
+
 ```
 START → router_node → [route_intent]
     ├── general_agent_node → END
@@ -129,6 +131,7 @@ START → router_node → [route_intent]
 ## Decision 11: Asymmetric Checkout Gate
 
 Routing to the Checkout Orchestrator requires ALL of the following:
+
 1. `intent == CHECKOUT`
 2. Confidence ≥ checkout threshold (higher than other routes, e.g., 0.85 vs. 0.6)
 3. Active Trusted Search Snapshot exists in graph state

@@ -15,6 +15,7 @@ The existing CI pipeline covers change detection, lint/typecheck gates, unit tes
 A Continuous Delivery pipeline is **deferred**. Prerequisites are missing: no Dockerfiles, no staging/production environment, no IaC. Building smoke/sanity tests against a Docker Compose full-stack in CI provides immediate value without solving the entire deployment problem first.
 
 **Progression:**
+
 1. **Now** → Smoke/sanity tests against Docker Compose in CI
 2. **Next** → Dockerfiles + SAST/DAST scanning
 3. **Then** → Staging environment + IaC + CD pipeline
@@ -23,14 +24,14 @@ A Continuous Delivery pipeline is **deferred**. Prerequisites are missing: no Do
 
 ## 2. Smoke vs. Sanity — Definitions
 
-| Aspect | 🔥 Smoke Tests | 🎯 Sanity Tests |
-|--------|----------------|-----------------|
-| Question | "Is the system alive?" | "Do key business flows work?" |
-| Scope | Broad, shallow — every service | Narrow, deep — specific flows |
-| Data created | Minimal (1 test user) | Yes — users, profiles, intents, bookings |
-| Failure meaning | Deployment is fundamentally broken | A specific business flow is broken |
-| Run order | First — gate for sanity tests | After smoke passes |
-| Expected speed | < 15 seconds | < 60 seconds |
+| Aspect          | 🔥 Smoke Tests                     | 🎯 Sanity Tests                          |
+| --------------- | ---------------------------------- | ---------------------------------------- |
+| Question        | "Is the system alive?"             | "Do key business flows work?"            |
+| Scope           | Broad, shallow — every service     | Narrow, deep — specific flows            |
+| Data created    | Minimal (1 test user)              | Yes — users, profiles, intents, bookings |
+| Failure meaning | Deployment is fundamentally broken | A specific business flow is broken       |
+| Run order       | First — gate for sanity tests      | After smoke passes                       |
+| Expected speed  | < 15 seconds                       | < 60 seconds                             |
 
 ---
 
@@ -72,11 +73,11 @@ Full lifecycle from profile creation to confirmed booking: profile setup → rea
 
 Runner split across the project:
 
-| Runner | Domain |
-|--------|--------|
-| Jest | NestJS unit/integration tests |
-| pytest | FastAPI agent tests |
-| Playwright | Browser E2E tests |
+| Runner                | Domain                         |
+| --------------------- | ------------------------------ |
+| Jest                  | NestJS unit/integration tests  |
+| pytest                | FastAPI agent tests            |
+| Playwright            | Browser E2E tests              |
 | `node:test` + `fetch` | Whole-stack smoke/sanity tests |
 
 ---
@@ -104,6 +105,7 @@ tests/
 Docker Compose for infrastructure (Postgres + Redis) + background processes for application services (NestJS, Next.js, Agent). **No Dockerfiles needed yet.**
 
 CI job sequence:
+
 1. `docker compose up -d` (Postgres + Redis)
 2. `prisma migrate deploy` (schema ready)
 3. Start NestJS, Next.js, Agent as background processes
@@ -122,6 +124,7 @@ When Dockerfiles are built (future), swap steps 1–4 for `docker compose up -d`
 **Single job** (`smoke-and-sanity`) — smoke runs first, sanity after. One boot cycle. Both suites need the same stack, so splitting into two jobs would double boot time (~2–3 min) for no functional benefit.
 
 Dependency graph:
+
 ```
 detect-changes
   ├──→ api-gate ──→ api-unit-tests ──→ ┐
@@ -149,6 +152,7 @@ Parallel polling with diagnostic output:
 **Standalone mock HTTP server** under `tests/smoke/mocks/`. No production code changes.
 
 Requirements:
+
 - **Validate** key incoming request fields (not just return canned responses)
 - **Fail on unknown/unexpected routes** (404 + logged warning)
 - **Log all incoming requests** with timestamp, method, path, status for CI diagnostics

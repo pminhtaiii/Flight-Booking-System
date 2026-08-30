@@ -23,6 +23,7 @@ Candidates #1 and #4 are independent refactors solving different problems. They 
 **Decision**: Extract one Refund Settlement deep module. Triggers normalize their outputs before calling Settlement.
 
 **Input shape — composition, not discriminated union:**
+
 - **Common core** (what Settlement consumes): amount, currency, succeeded/failed outcome
 - **Provenance** (carried through for audit, does NOT affect settlement logic): Stripe metadata OR admin resolution metadata
 
@@ -30,12 +31,12 @@ Candidates #1 and #4 are independent refactors solving different problems. They 
 
 **Ownership boundaries:**
 
-| Module | Owns | Must not own |
-|--------|------|-------------|
-| Inline trigger | Stripe request, retry result, normalization to outcome | Final database transitions |
-| Webhook trigger | Signature and event verification, normalization to outcome | Alternative settlement rules |
-| Cron trigger | Due claim, Stripe recovery, normalization to outcome | Scheduled-only finalization |
-| Admin trigger | Authorization, evidence collection, normalization to outcome | Direct record mutation |
+| Module            | Owns                                                                               | Must not own                                     |
+| ----------------- | ---------------------------------------------------------------------------------- | ------------------------------------------------ |
+| Inline trigger    | Stripe request, retry result, normalization to outcome                             | Final database transitions                       |
+| Webhook trigger   | Signature and event verification, normalization to outcome                         | Alternative settlement rules                     |
+| Cron trigger      | Due claim, Stripe recovery, normalization to outcome                               | Scheduled-only finalization                      |
+| Admin trigger     | Authorization, evidence collection, normalization to outcome                       | Direct record mutation                           |
 | Refund Settlement | Idempotent atomic persistence (ledger, refund state, payment state, booking state) | Stripe calls, trigger policy, provider awareness |
 
 ---
@@ -44,17 +45,19 @@ Candidates #1 and #4 are independent refactors solving different problems. They 
 
 **Problem**: `PaymentService` injects `BookingService` via `forwardRef` (confirmed mutual `PaymentModule ↔ BookingModule` cycle). The reason is `executeConfirmPayment()` (787 lines) calling into BookingService for `PROCESSING → CONFIRMED/FAILED` convergence.
 
-**Decision**: Extract **Booking Lifecycle** module that owns the full booking state machine. Payment pipeline calls *into* Booking Lifecycle instead of into a broad BookingService.
+**Decision**: Extract **Booking Lifecycle** module that owns the full booking state machine. Payment pipeline calls _into_ Booking Lifecycle instead of into a broad BookingService.
 
 **Naming**: "Booking Lifecycle" — NOT "Booking Completion". The module owns creation, confirmation, failure, reconciliation, and crons — not just the final step.
 
 **Input from Payment pipeline — normalized outcome:**
+
 - **Success**: confirmed Duffel order reference, captured Stripe payment reference, final amounts
 - **Failure**: reason category (`payment_declined`, `order_creation_failed`, `capture_timeout`, `supplier_rejected`, etc.), partial state
 
 **Key principle**: Booking Lifecycle is provider-blind. It receives a normalized payment pipeline outcome and atomically writes the final booking state + agent projection + audit. It does not know how the pipeline ran.
 
 **Methods owned by Booking Lifecycle:**
+
 - `createBooking()` (L189–255)
 - `updateToConfirmed()` (L257–289)
 - `updateToFailed()` (L291–316)
@@ -73,11 +76,11 @@ Candidates #1 and #4 are independent refactors solving different problems. They 
 
 **Decision**: Split into three deep modules sharing booking persistence, no broad facade.
 
-| Module | Owns | Callers |
-|--------|------|---------|
-| **Booking Lifecycle** | Full state machine: creation, PROCESSING → CONFIRMED/FAILED, reconciliation, crons | Payment pipeline, supplier reconciliation, booking recovery cron |
-| **Booking Management** | Read projection, listing, detail, disruption mapping, sorting | Booking query controller |
-| **Cancellation** | Quote, cancel, supplier-first flow, refund trigger | Cancellation controller |
+| Module                 | Owns                                                                               | Callers                                                          |
+| ---------------------- | ---------------------------------------------------------------------------------- | ---------------------------------------------------------------- |
+| **Booking Lifecycle**  | Full state machine: creation, PROCESSING → CONFIRMED/FAILED, reconciliation, crons | Payment pipeline, supplier reconciliation, booking recovery cron |
+| **Booking Management** | Read projection, listing, detail, disruption mapping, sorting                      | Booking query controller                                         |
+| **Cancellation**       | Quote, cancel, supplier-first flow, refund trigger                                 | Cancellation controller                                          |
 
 **Key principle**: The three modules share persistence, not a broad facade. Each caller sees only the interface it uses.
 
@@ -92,6 +95,7 @@ Candidates #1 and #4 are independent refactors solving different problems. They 
 **Responsibility boundary**: The snapshot module owns resolution from user-selected index to attested offer identity (pure lookup against its own data). It does NOT own handoff token creation or the NestJS call. It returns a resolved offer selection; the handoff pipeline consumes it.
 
 **Lifecycle operations owned:**
+
 - Create (from search tool results)
 - Validate (attestation verification)
 - Replace (new search supersedes old snapshot)
@@ -112,6 +116,7 @@ Candidates #1 and #4 are independent refactors solving different problems. They 
 **Ownership invariant**: The adapter owns connection lifecycle. The runner owns turn lifecycle. These are independent.
 
 **Runner responsibilities:**
+
 - Turn ordering and fencing
 - LangGraph orchestration
 - Output guardrail pipeline
@@ -121,12 +126,14 @@ Candidates #1 and #4 are independent refactors solving different problems. They 
 - Yields typed events through an async iterator (including terminal error events)
 
 **Adapter responsibilities:**
+
 - SSE encoding of typed events from the runner's async iterator
 - Transport disconnect detection
 - Cancelling/closing the runner on client disconnect
 - Never implements domain cleanup
 
 **Critical ordering on failure:**
+
 1. Runner detects failure
 2. Runner performs durable cleanup FIRST (persist partial turn, release lease, finalize guardrails) — in a cancellation-safe `finally`-equivalent block
 3. Runner emits terminal error event AFTER cleanup is complete
@@ -147,12 +154,14 @@ Candidates #1 and #4 are independent refactors solving different problems. They 
 **Application to each candidate:**
 
 ### Candidate #3 — Flight Search Server Seam
+
 - Search rendering consumes typed outcomes (success with flight results, or failure with reason)
 - Server action owns JWT, fetch, retry policy, normalization, and offer selection
 - Shared flight contract lives in one place, not duplicated locally
 - Restores the frontend integration ADR that the current code contradicts
 
 ### Candidate #7 — Agent Gateway Tool-Local Modules
+
 - Break the 11-dependency catch-all into tool-local deep modules:
   - **Attested Flight Search** — search + attestation
   - **Booking Readiness** — readiness evaluation
@@ -163,6 +172,7 @@ Candidates #1 and #4 are independent refactors solving different problems. They 
 - Keep the fixed six read-only tools, two-tier booking exposure, and structural PII seam unchanged
 
 ### Candidate #8 — Web Booking Management Server Seam
+
 - Booking detail rendering consumes a prepared booking view and typed commands
 - Server module owns cancellation, disruption, refresh, status polling, authentication, and error semantics
 - Rendering never receives JWT or NestJS URL
@@ -180,18 +190,19 @@ Marked as "Worth exploring" in the review. Not grilled in this session. The prin
 
 All 8 strong candidates from the architecture review have been resolved:
 
-| # | Candidate | Decision Pattern | Key Principle |
-|---|-----------|-----------------|---------------|
-| 1 | Refund Settlement | Deep module, normalized input | Provider-blind settlement; composition over union |
-| 2 | Chat Turn Runner | Adapter/runner split | Adapter owns connection; runner owns turn lifecycle |
-| 3 | Flight Search Seam | Unified seam rule | Rendering never sees JWT/transport |
-| 4 | Payment ↔ Booking Cycle | Merged into Booking Lifecycle | Normalized payment outcome as input |
-| 5 | Trusted Search Snapshot | Deep lifecycle module | Owns index→offer resolution, not handoff |
-| 6 | Split Booking by 3 Clusters | Three modules sharing persistence | No broad facade |
-| 7 | Agent Gateway | Tool-local deep modules | Each tool owns its privacy projection |
-| 8 | Web Booking Management | Unified seam rule | Typed commands and prepared views |
+| #   | Candidate                   | Decision Pattern                  | Key Principle                                       |
+| --- | --------------------------- | --------------------------------- | --------------------------------------------------- |
+| 1   | Refund Settlement           | Deep module, normalized input     | Provider-blind settlement; composition over union   |
+| 2   | Chat Turn Runner            | Adapter/runner split              | Adapter owns connection; runner owns turn lifecycle |
+| 3   | Flight Search Seam          | Unified seam rule                 | Rendering never sees JWT/transport                  |
+| 4   | Payment ↔ Booking Cycle     | Merged into Booking Lifecycle     | Normalized payment outcome as input                 |
+| 5   | Trusted Search Snapshot     | Deep lifecycle module             | Owns index→offer resolution, not handoff            |
+| 6   | Split Booking by 3 Clusters | Three modules sharing persistence | No broad facade                                     |
+| 7   | Agent Gateway               | Tool-local deep modules           | Each tool owns its privacy projection               |
+| 8   | Web Booking Management      | Unified seam rule                 | Typed commands and prepared views                   |
 
 **Recommended execution order:**
+
 1. Refund Settlement (clean, no forwardRef, existing test suites)
 2. Booking Lifecycle + Management + Cancellation split (breaks forwardRef cycle)
 3. Trusted Search Snapshot lifecycle (consolidates agent integrity chain)

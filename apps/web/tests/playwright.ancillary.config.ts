@@ -10,10 +10,12 @@ export default defineConfig({
     baseURL: 'http://127.0.0.1:3000',
     trace: 'on-first-retry',
   },
-  projects: [{
-    name: 'chromium',
-    use: { ...devices['Desktop Chrome'], channel: 'chrome' },
-  }],
+  projects: [
+    {
+      name: 'chromium',
+      use: { ...devices['Desktop Chrome'], channel: 'chrome' },
+    },
+  ],
   webServer: {
     command: 'node node_modules/next/dist/bin/next dev -p 3000',
     url: 'http://127.0.0.1:3000',

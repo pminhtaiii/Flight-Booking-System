@@ -118,7 +118,9 @@ export class CacheService implements OnModuleInit, OnModuleDestroy {
         return val;
       } catch (err: unknown) {
         const errMsg = err instanceof Error ? err.message : String(err);
-        this.logger.warn(`Redis INCRBY failed for key ${key}: ${errMsg}. Using in-memory fallback.`);
+        this.logger.warn(
+          `Redis INCRBY failed for key ${key}: ${errMsg}. Using in-memory fallback.`,
+        );
       }
     }
 
@@ -219,7 +221,9 @@ export class CacheService implements OnModuleInit, OnModuleDestroy {
         return await this.redisClient.lrange(key, start, stop);
       } catch (err: unknown) {
         const errMsg = err instanceof Error ? err.message : String(err);
-        this.logger.warn(`Redis LRANGE failed for key ${key}: ${errMsg}. Using in-memory fallback.`);
+        this.logger.warn(
+          `Redis LRANGE failed for key ${key}: ${errMsg}. Using in-memory fallback.`,
+        );
       }
     }
 
@@ -349,7 +353,9 @@ export class CacheService implements OnModuleInit, OnModuleDestroy {
         return await this.redisClient.hget(key, field);
       } catch (err: unknown) {
         const errMsg = err instanceof Error ? err.message : String(err);
-        this.logger.warn(`Redis HGET failed for key ${key} field ${field}: ${errMsg}. Using in-memory fallback.`);
+        this.logger.warn(
+          `Redis HGET failed for key ${key} field ${field}: ${errMsg}. Using in-memory fallback.`,
+        );
       }
     }
 
@@ -372,7 +378,9 @@ export class CacheService implements OnModuleInit, OnModuleDestroy {
         return;
       } catch (err: unknown) {
         const errMsg = err instanceof Error ? err.message : String(err);
-        this.logger.warn(`Redis HSET failed for key ${key} field ${field}: ${errMsg}. Using in-memory fallback.`);
+        this.logger.warn(
+          `Redis HSET failed for key ${key} field ${field}: ${errMsg}. Using in-memory fallback.`,
+        );
       }
     }
 

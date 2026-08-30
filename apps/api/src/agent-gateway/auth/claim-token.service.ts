@@ -97,12 +97,12 @@ export class ClaimTokenService {
 
     let isSignatureValid = false;
     for (const secret of candidateSecrets) {
-      const computedSignature = crypto
-        .createHmac('sha256', secret)
-        .update(payloadStr)
-        .digest();
+      const computedSignature = crypto.createHmac('sha256', secret).update(payloadStr).digest();
 
-      if (signatureBuffer.length === computedSignature.length && crypto.timingSafeEqual(signatureBuffer, computedSignature)) {
+      if (
+        signatureBuffer.length === computedSignature.length &&
+        crypto.timingSafeEqual(signatureBuffer, computedSignature)
+      ) {
         isSignatureValid = true;
         break;
       }
@@ -123,7 +123,9 @@ export class ClaimTokenService {
       : 300;
     const nowSeconds = Math.floor(Date.now() / 1000);
     if (nowSeconds - payload.iat > ttlSeconds) {
-      this.logger.warn(`Claim token expired (iat: ${payload.iat}, now: ${nowSeconds}, ttl: ${ttlSeconds})`);
+      this.logger.warn(
+        `Claim token expired (iat: ${payload.iat}, now: ${nowSeconds}, ttl: ${ttlSeconds})`,
+      );
       throw new UnauthorizedException({
         statusCode: 401,
         message: 'Claim token has expired',
