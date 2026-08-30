@@ -39,7 +39,8 @@ test('every enabled dashboard action has the fields required for rendering', () 
     for (const action of actions) {
       assert.ok(action.label);
       assert.ok(action.description);
-      assert.ok(action.icon);
+      // Corrected with user approval: GOAL.md defines the public field as iconName.
+      assert.ok(action.iconName);
       assert.ok(action.href);
     }
   }
