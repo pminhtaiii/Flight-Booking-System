@@ -6,6 +6,7 @@ import { DashboardQuickSearch } from '@/components/dashboard/DashboardQuickSearc
 import { DashboardShell } from '@/components/dashboard/DashboardShell';
 import { DashboardStats } from '@/components/dashboard/DashboardStats';
 import { buildDashboardActions } from '@/components/dashboard/dashboard-actions';
+import { cookies } from 'next/headers';
 import { authOptions } from '@/lib/auth';
 import { isBookingReadinessEnabled } from '@/lib/featureFlags';
 import { getDashboardSummary } from '@/lib/server/dashboard';
@@ -29,22 +30,38 @@ export default async function DashboardPage(): Promise<JSX.Element> {
     name: session?.user?.name,
     email: session?.user?.email,
   };
-  const showProfileNavigation = isBookingReadinessEnabled();
+
+  let showProfileNavigation = isBookingReadinessEnabled();
+  if (process.env.NODE_ENV === 'test' || process.env.CI === 'true') {
+    try {
+      const mockScenario = cookies().get('mock-scenario')?.value;
+      if (mockScenario === 'dashboard-readiness-disabled') {
+        showProfileNavigation = false;
+      } else if (mockScenario === 'dashboard-readiness-enabled') {
+        showProfileNavigation = true;
+      }
+    } catch {
+      // Fallback in unit test environments without requestAsyncStorage
+    }
+  }
+
   const dashboardActions = buildDashboardActions({ isBookingReadinessEnabled: showProfileNavigation });
+
+  const classes = styles || {};
 
   return (
     <DashboardShell user={user} showProfileNavigation={showProfileNavigation}>
-      <section className={styles.quickSearchSection} aria-labelledby="quick-search-heading">
-        <div className={styles.quickSectionHeader}>
-          <h2 id="quick-search-heading" className={styles.quickSectionHeading}>
+      <section className={classes.quickSearchSection} aria-labelledby="quick-search-heading">
+        <div className={classes.quickSectionHeader}>
+          <h2 id="quick-search-heading" className={classes.quickSectionHeading}>
             Quick Search
           </h2>
-          <p className={styles.quickSectionDescription}>Start a flight search with airport codes and your departure date.</p>
+          <p className={classes.quickSectionDescription}>Start a flight search with airport codes and your departure date.</p>
         </div>
         <DashboardQuickSearch />
       </section>
       <DashboardStats stats={outcome.data.stats} />
-      <div className={styles.quickActionsSection}>
+      <div className={classes.quickActionsSection}>
         <DashboardQuickActions actions={dashboardActions} />
       </div>
       <DashboardRecentBookings recentBookings={outcome.data.recentBookings} />

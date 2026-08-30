@@ -183,6 +183,7 @@
   padding: clamp(1rem, 3vw, 2.5rem);
 }
 
+.quickSearchContainer,
 .quickSearchSection,
 .quickActionsSection {
   min-width: 0;
@@ -194,6 +195,7 @@
   -webkit-backdrop-filter: blur(18px);
 }
 
+.quickSearchContainer,
 .quickSearchSection {
   padding: clamp(1rem, 2.5vw, 1.5rem);
 }
@@ -227,6 +229,7 @@
   gap: 1rem;
 }
 
+.quickSearchGrid,
 .quickSearchSection form > div:first-child {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -245,6 +248,7 @@
   font-weight: 650;
 }
 
+.quickSearchInput,
 .quickSearchSection input {
   width: 100%;
   min-height: 2.75rem;
@@ -255,6 +259,9 @@
   padding: 0.65rem 0.75rem;
 }
 
+.quickSearchInput:focus-visible,
+.quickSearchButton:focus-visible,
+.actionCard:focus-visible,
 .quickSearchSection input:focus-visible,
 .quickSearchSection button:focus-visible,
 .quickActionsSection a:focus-visible {
@@ -270,6 +277,7 @@
   font-weight: 650;
 }
 
+.quickSearchButton,
 .quickSearchSection button {
   align-self: flex-start;
   min-height: 2.75rem;
@@ -284,6 +292,7 @@
   transition: background-color 160ms ease, transform 160ms ease;
 }
 
+.quickSearchButton:hover,
 .quickSearchSection button:hover {
   background: var(--dashboard-accent-hover);
   transform: translateY(-1px);
@@ -294,6 +303,7 @@
   overflow: hidden;
 }
 
+.quickActionsGrid,
 .quickActionsSection > section {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -301,6 +311,7 @@
   padding: 1rem;
 }
 
+.actionCard,
 .quickActionsSection a {
   display: flex;
   min-width: 0;
@@ -316,6 +327,7 @@
   transition: background-color 160ms ease, border-color 160ms ease, box-shadow 160ms ease, transform 160ms ease;
 }
 
+.actionCard:hover,
 .quickActionsSection a:hover {
   border-color: var(--dashboard-glass-border-hover);
   background: var(--dashboard-card-hover);
@@ -323,6 +335,7 @@
   transform: translateY(-2px);
 }
 
+.actionCardIcon,
 .quickActionsSection a > svg {
   width: 1.5rem;
   height: 1.5rem;
@@ -330,6 +343,7 @@
   color: var(--dashboard-accent);
 }
 
+.actionCardContent,
 .quickActionsSection a > span {
   min-width: 0;
 }
@@ -951,13 +965,14 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .dashboardRoot,
   .dashboardRoot *,
   .dashboardRoot *::before,
   .dashboardRoot *::after {
-    scroll-behavior: auto;
-    animation-duration: 0.01ms;
-    animation-iteration-count: 1;
-    transition-duration: 0.01ms;
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
   }
 
   .metricCard:hover,
@@ -965,6 +980,6 @@
   .errorAction:hover,
   .quickSearchSection button:hover,
   .quickActionsSection a:hover {
-    transform: none;
+    transform: none !important;
   }
 }

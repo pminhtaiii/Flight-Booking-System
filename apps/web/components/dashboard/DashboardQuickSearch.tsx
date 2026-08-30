@@ -2,6 +2,7 @@
 
 import { type FormEvent, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { Search } from 'lucide-react';
 import { buildSearchUrl, validateQuickSearch } from './dashboard-search';
 
 export function DashboardQuickSearch(): JSX.Element {
@@ -24,6 +25,16 @@ export function DashboardQuickSearch(): JSX.Element {
     router.push(buildSearchUrl(result.value));
   };
 
+  const handleKeyDown = (event: React.KeyboardEvent<HTMLInputElement>): void => {
+    if (event.key === 'Enter') {
+      event.preventDefault();
+      const form = event.currentTarget.form;
+      if (form) {
+        form.requestSubmit();
+      }
+    }
+  };
+
   return (
     <form onSubmit={handleSubmit} className="card space-y-4" noValidate>
       <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
@@ -35,6 +46,7 @@ export function DashboardQuickSearch(): JSX.Element {
             id="dashboard-origin"
             value={origin}
             onChange={(event) => setOrigin(event.target.value)}
+            onKeyDown={handleKeyDown}
             maxLength={3}
             autoComplete="off"
             className="form-input w-full uppercase"
@@ -48,6 +60,7 @@ export function DashboardQuickSearch(): JSX.Element {
             id="dashboard-destination"
             value={destination}
             onChange={(event) => setDestination(event.target.value)}
+            onKeyDown={handleKeyDown}
             maxLength={3}
             autoComplete="off"
             className="form-input w-full uppercase"
@@ -62,13 +75,15 @@ export function DashboardQuickSearch(): JSX.Element {
             type="date"
             value={departureDate}
             onChange={(event) => setDepartureDate(event.target.value)}
+            onKeyDown={handleKeyDown}
             className="form-input w-full"
           />
         </div>
       </div>
       {error ? <p role="alert">{error}</p> : null}
-      <button type="submit" className="btn-primary">
-        Search flights
+      <button type="submit" className="btn-primary inline-flex items-center gap-2">
+        <Search className="h-4 w-4" aria-hidden="true" />
+        <span>Search flights</span>
       </button>
     </form>
   );

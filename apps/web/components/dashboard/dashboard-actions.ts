@@ -8,33 +8,33 @@ export type DashboardAction = {
 
 const baseActions: DashboardAction[] = [
   {
-    id: 'search-flights',
+    id: 'search',
     label: 'Search Flights',
     href: '/search',
-    description: 'Find your next flight',
+    description: 'Find and compare real-time flight offers',
     iconName: 'plane',
   },
   {
-    id: 'upcoming-trips',
+    id: 'upcoming',
     label: 'Upcoming Trips',
     href: '/bookings?tab=upcoming',
-    description: 'View your upcoming bookings',
+    description: 'Manage and review confirmed itineraries',
     iconName: 'calendar',
   },
   {
-    id: 'past-bookings',
+    id: 'past',
     label: 'Past Bookings',
     href: '/bookings?tab=past',
-    description: 'Review your past bookings',
+    description: 'View flight history and past receipts',
     iconName: 'history',
   },
 ];
 
 const profileAction: DashboardAction = {
-  id: 'traveler-profile',
+  id: 'profile',
   label: 'Traveler Profile',
   href: '/profile',
-  description: 'Manage your traveler details',
+  description: 'Manage travel documents and booking readiness',
   iconName: 'user',
 };
 

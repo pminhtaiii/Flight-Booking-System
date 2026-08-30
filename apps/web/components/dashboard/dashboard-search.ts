@@ -58,7 +58,10 @@ export const validateQuickSearch = (params: QuickSearchParams, today: Date = new
 
 export const buildSearchUrl = (params: QuickSearchParams): string => {
   const query = new URLSearchParams();
-  const adults = Number.isInteger(params.adults) && params.adults >= 1 && params.adults <= 9 ? params.adults : 1;
+  const adults =
+    typeof params.adults === 'number' && Number.isInteger(params.adults) && params.adults >= 1 && params.adults <= 9
+      ? params.adults
+      : 1;
 
   query.set('origin', normalizeAirportCode(params.origin));
   query.set('destination', normalizeAirportCode(params.destination));

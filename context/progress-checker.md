@@ -34,6 +34,26 @@ Update this file after every completed feature. Any AI agent reading this should
     - Repo-wide `pnpm format --check` is blocked by `EPERM` while scanning `.pytest_cache`; repo-wide `pnpm lint` is blocked by three unrelated concurrent-work errors and eight warnings. Scoped Prettier and ESLint checks for the Phase 4 artifacts pass cleanly.
     - Production implementation remains intentionally pending in T032–T035; this slice is the TDD RED baseline only.
 
+- [x] Phase 4: User Story 2 - Hub Actions & Quick Search Implementation (T032–T037) (2026-08-30):
+  - **T032: Quick Search Normalization & URL Builder (`apps/web/components/dashboard/dashboard-search.ts`)**:
+    - Implemented IATA uppercase/trim normalization, non-empty distinct three-letter airport validation, future/today local calendar date validation, and ordered query URL builder (`/search?origin=...&destination=...&departureDate=...&adults=...&cabinClass=...`).
+  - **T033: Accessible Quick Search Component & `/search` Integration (`DashboardQuickSearch.tsx`, `SearchFormClient.tsx`, `app/search/page.tsx`)**:
+    - Added accessible quick search form with keyboard Enter submission, explicit labels, inline alert error reporting, and Lucide `Search` submit icon.
+    - Updated `/search` Server Component to safely sanitize and consume incoming dashboard query parameters and forward initial values to `SearchFormClient`.
+  - **T034: Feature-Flagged Action Builder & Component (`dashboard-actions.ts`, `DashboardQuickActions.tsx`)**:
+    - Implemented `buildDashboardActions()` providing core actions (`/search`, `/bookings?tab=upcoming`, `/bookings?tab=past`) and conditionally including `/profile` when booking readiness is active.
+    - Rendered accessible quick action card grid with semantic SVG icons and `:focus-visible` styling.
+  - **T035 & T036: Shell Composition & Responsive Semantic CSS (`app/dashboard/page.tsx`, `DashboardShell.tsx`, `dashboard.module.css`)**:
+    - Integrated quick search and actions within the glassmorphic dashboard shell.
+    - Added responsive layout stacking (<640px) and `@media (prefers-reduced-motion: reduce)` overrides with `!important` bounds.
+  - **T037: Verification & Acceptance**:
+    - Full unit test gate: exit 0, 39/39 passed (`dashboard-search.spec.ts`, `dashboard-actions.spec.ts`, `dashboard.spec.ts`, `dashboard-routing.unit.ts`).
+    - Web lint (`next lint`) and TypeScript typecheck (`tsc --noEmit`): exit 0.
+    - Production build (`next build`): exit 0.
+    - Playwright acceptance suite (`dashboard.spec.ts`): exit 0, 20/20 scenarios passed across populated/empty/error states, quick search, actions, and flag toggling.
+    - CI workflow contract (`ci-workflow.contract.test.mjs`): exit 0, 20/20 passed.
+    - Parallel Standards and Spec reviews completed with zero open findings.
+
 - [ ] Phase 5: User Story 3 - Root Entry & Recovery Characterization (T038–T039) (2026-08-29):
   - **T038: Playwright Acceptance Scenarios for Entry, Viewports & Recovery (`apps/web/tests/dashboard.spec.ts`)**:
     - Authored E2E acceptance tests for US3 covering:

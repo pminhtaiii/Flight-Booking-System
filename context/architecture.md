@@ -111,6 +111,16 @@ The root TypeScript configuration is type-check-only and sets `noEmit: true`. Pa
 
 ---
 
+## Dashboard Hub Action and Search Flow (Feature 021, Phase 4 Completed)
+
+The authenticated `/dashboard` Server Component evaluates `isBookingReadinessEnabled()` once per render. It passes that value to `buildDashboardActions()`, which always exposes Search Flights (`/search`), Upcoming Trips (`/bookings?tab=upcoming`), and Past Bookings (`/bookings?tab=past`), and adds Traveler Profile (`/profile`) only when booking readiness is enabled. `DashboardQuickActions` renders only this derived list with semantic SVG icons and `:focus-visible` styling.
+
+`DashboardQuickSearch` is client-side interaction only: it normalizes airport entries by trimming and uppercasing them, requires distinct three-letter IATA codes and a valid current-or-future local calendar date, then navigates to `/search` with `origin`, `destination`, `departureDate`, `adults=1`, and `cabinClass=economy`. The `/search` Server Component accepts only single, valid query values, bounds adults to 1–9, validates the cabin class, and forwards the sanitized initial values to `SearchFormClient`. The search form still owns the subsequent server action and flight-offer retrieval.
+
+Phase 4 verification is complete and 100% green across unit tests (39/39 passed), Next.js lint, TypeScript typecheck, production build, Playwright acceptance suite (20/20 passed), and CI workflow contract tests (20/20 passed).
+
+---
+
 ## System Architecture & Module Ownership (Feature 019 Final State)
 
 ### High-Level System Overview Diagram

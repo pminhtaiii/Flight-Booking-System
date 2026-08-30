@@ -332,3 +332,30 @@ _(Sections below will be populated as implementation tasks progress)_
 - Contract: `pnpm --filter @shared/contracts test`
 - API Lint & Typecheck: `pnpm exec eslint "apps/api/**/*.ts" "packages/shared/**/*.ts" --max-warnings 0` && `pnpm --filter @api/backend exec tsc -p tsconfig.json --noEmit`
 - Web Lint, Typecheck & Build: `pnpm --filter @web/frontend lint` && `pnpm --filter @web/frontend typecheck` && `pnpm --filter @web/frontend build`
+
+### 5.6 Phase 4 Hub Actions & Quick Search Verification (Tasks T032–T037, 2026-08-30)
+
+Phase 4 is **complete**. The full verification matrix and acceptance criteria are 100% green.
+
+- **Quick-search and actions unit gate**
+  - **Command**: `& 'C:\Booking Systems\node_modules\.bin\tsx.CMD' --test apps/web/components/dashboard/dashboard-search.spec.ts apps/web/components/dashboard/dashboard-actions.spec.ts`
+  - **Exit code**: `0`
+  - **Observed result**: 13/13 passed. Coverage included IATA trim/uppercase normalization, required/three-letter/distinct airport validation, valid non-past dates, default URL query ordering, the three base actions, and conditional Traveler Profile inclusion.
+- **Dashboard loader and routing unit gate**
+  - **Command**: `& 'C:\Booking Systems\node_modules\.bin\tsx.CMD' --test apps/web/lib/server/dashboard.spec.ts apps/web/tests/dashboard-routing.unit.ts`
+  - **Exit code**: `0`
+  - **Observed result**: 26/26 passed (39/39 total dashboard unit assertions). Root session branching and outcome-to-render/redirect mappings pass with zero regressions.
+- **Web static gates**
+  - **Commands**: `& 'C:\Booking Systems\apps\web\node_modules\.bin\next.CMD' lint`; `& 'C:\Booking Systems\apps\web\node_modules\.bin\tsc.CMD' --noEmit`; `& 'C:\Booking Systems\apps\web\node_modules\.bin\next.CMD' build`
+  - **Exit codes**: `0`, `0`, `0`
+  - **Observed result**: Lint passed cleanly with 0 errors (1 `no-console` warning in `handoffCredential.ts`); TypeScript typecheck passed with 0 errors; Next.js 14 production build compiled successfully and generated all static/dynamic routes.
+- **Dashboard Playwright acceptance gate**
+  - **Command**: `$env:PLAYWRIGHT_FRONTEND_ONLY = 'true'; & 'C:\Booking Systems\apps\web\node_modules\.bin\playwright.CMD' test apps/web/tests/dashboard.spec.ts --config=apps/web/tests/playwright.config.ts --reporter=line`
+  - **Exit code**: `0`
+  - **Observed result**: 20/20 acceptance scenarios passed. Covered populated 4-metric overview + 5 recent bookings, empty state CTA, zero prototype links/claims, unauthenticated and expired session redirects, root authenticated redirect / anonymous landing preservation, 500/malformed error boundaries with zero data leakage, responsive geometry (360/768/1280), keyboard focus traversal, reduced-motion transition bounds, valid/invalid/keyboard quick searches, and feature-flagged quick actions (/search, /bookings, and flag-conditioned /profile).
+- **CI workflow contract gate**
+  - **Command**: `node --test tests/ci/ci-workflow.contract.test.mjs`
+  - **Exit code**: `0`
+  - **Observed result**: 20/20 passed.
+- **Standards and Spec Reviews**
+  - Completed parallel independent reviews; all findings (submit Search icon, alias CSS classes, test-scenario cookie scoping, path alias) resolved in consolidated fix wave. All verification gates freshly re-verified GREEN.
