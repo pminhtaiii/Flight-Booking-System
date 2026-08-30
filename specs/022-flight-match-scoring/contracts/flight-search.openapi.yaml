@@ -1,0 +1,280 @@
+openapi: 3.1.0
+info:
+  title: Flight Search Match Scoring Contract
+  version: 1.0.0
+paths:
+  /api/flights/search:
+    post:
+      summary: Search and deterministically rank flight offers
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FlightSearchRequest'
+      responses:
+        '200':
+          description: Mode-tagged ranked result set
+          headers:
+            Cache-Control:
+              schema:
+                type: string
+                const: private, no-store
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FlightSearchResponse'
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  schemas:
+    FlightSearchRequest:
+      type: object
+      additionalProperties: false
+      required: [origin, destination, departureDate, adults]
+      properties:
+        origin: { type: string, pattern: '^[A-Z]{3}$' }
+        destination: { type: string, pattern: '^[A-Z]{3}$' }
+        departureDate: { type: string, format: date }
+        returnDate: { type: [string, 'null'], format: date }
+        adults: { type: integer, minimum: 1, maximum: 9 }
+        children: { type: integer, minimum: 0, maximum: 8, default: 0 }
+        infants: { type: integer, minimum: 0, maximum: 8, default: 0 }
+        cabinClass:
+          type: string
+          enum: [economy, premium_economy, business, first]
+          default: economy
+    FlightSearchResponse:
+      oneOf:
+        - $ref: '#/components/schemas/MatchedFlightSearchResponse'
+        - $ref: '#/components/schemas/RankedFlightSearchResponse'
+      discriminator:
+        propertyName: mode
+        mapping:
+          MATCHED: '#/components/schemas/MatchedFlightSearchResponse'
+          RANKED: '#/components/schemas/RankedFlightSearchResponse'
+    MatchedFlightSearchResponse:
+      type: object
+      additionalProperties: false
+      required: [mode, results, meta]
+      properties:
+        mode: { type: string, const: MATCHED }
+        results:
+          type: array
+          maxItems: 20
+          items: { $ref: '#/components/schemas/MatchedFlightOffer' }
+        meta: { $ref: '#/components/schemas/SearchMeta' }
+    RankedFlightSearchResponse:
+      type: object
+      additionalProperties: false
+      required: [mode, results, meta]
+      properties:
+        mode: { type: string, const: RANKED }
+        results:
+          type: array
+          maxItems: 20
+          items: { $ref: '#/components/schemas/RankedFlightOffer' }
+        meta: { $ref: '#/components/schemas/SearchMeta' }
+    FlightOfferBase:
+      type: object
+      description: Trusted NestJS-to-web-server offer. duffelOfferId is internal-only and MUST be removed by the server seam before the strict browser-safe shared contract.
+      required: [id, duffelOfferId, airline, flightNumber, departureAirport, arrivalAirport, departureTime, arrivalTime, duration, stops, price, currency, fareClass, baggageAllowance, requestedCabinClass, cabinClassMatch, cabinMismatchDetails, segments, returnSegments]
+      properties:
+        id: { type: string, description: Opaque local offer identifier }
+        duffelOfferId: { type: string, minLength: 1, description: Trusted server-only provider identifier; forbidden from browser and LLM projections }
+        airline: { type: string }
+        flightNumber: { type: string }
+        departureAirport: { type: string, pattern: '^[A-Z]{3}$' }
+        arrivalAirport: { type: string, pattern: '^[A-Z]{3}$' }
+        departureTime: { type: string, format: date-time }
+        arrivalTime: { type: string, format: date-time }
+        duration: { type: integer, minimum: 0 }
+        stops: { type: integer, minimum: 0 }
+        price: { type: number, minimum: 0 }
+        currency: { type: string, pattern: '^[A-Z]{3}$' }
+        fareClass: { type: [string, 'null'] }
+        baggageAllowance: { type: [string, 'null'] }
+        requestedCabinClass: { $ref: '#/components/schemas/CabinClass' }
+        cabinClassMatch: { type: string, enum: [full, mixed, downgraded] }
+        cabinMismatchDetails:
+          oneOf:
+            - type: array
+              items: { $ref: '#/components/schemas/CabinMismatchDetail' }
+            - type: 'null'
+        segments:
+          type: array
+          minItems: 1
+          items: { $ref: '#/components/schemas/FlightSegment' }
+        returnSegments:
+          oneOf:
+            - type: array
+              minItems: 1
+              items: { $ref: '#/components/schemas/FlightSegment' }
+            - type: 'null'
+    MatchedFlightOffer:
+      allOf:
+        - $ref: '#/components/schemas/FlightOfferBase'
+        - type: object
+          required: [matchResult]
+          properties:
+            matchResult: { $ref: '#/components/schemas/FlightMatchResult' }
+      unevaluatedProperties: false
+    RankedFlightOffer:
+      allOf:
+        - $ref: '#/components/schemas/FlightOfferBase'
+        - type: object
+          required: [matchResult]
+          properties:
+            matchResult: { type: 'null' }
+      unevaluatedProperties: false
+    CabinClass:
+      type: string
+      enum: [economy, premium_economy, business, first]
+    CabinMismatchDetail:
+      type: object
+      additionalProperties: false
+      required: [segmentIndex, leg, expected, actual, route]
+      properties:
+        segmentIndex: { type: integer, minimum: 0 }
+        leg: { type: string, enum: [outbound, return] }
+        expected: { $ref: '#/components/schemas/CabinClass' }
+        actual: { $ref: '#/components/schemas/CabinClass' }
+        route: { type: string }
+    FlightSegment:
+      type: object
+      additionalProperties: false
+      required: [carrierCode, flightNumber, operatingCarrier, departureAirport, departureTerminal, departureTime, arrivalAirport, arrivalTerminal, arrivalTime, duration, aircraft, cabinClass]
+      properties:
+        carrierCode: { type: string }
+        flightNumber: { type: string }
+        operatingCarrier: { type: string }
+        departureAirport: { type: string, pattern: '^[A-Z]{3}$' }
+        departureTerminal: { type: [string, 'null'] }
+        departureTime: { type: string, format: date-time }
+        arrivalAirport: { type: string, pattern: '^[A-Z]{3}$' }
+        arrivalTerminal: { type: [string, 'null'] }
+        arrivalTime: { type: string, format: date-time }
+        duration: { type: integer, minimum: 0 }
+        aircraft: { type: [string, 'null'] }
+        cabinClass: { $ref: '#/components/schemas/CabinClass' }
+    FlightMatchResult:
+      oneOf:
+        - $ref: '#/components/schemas/EligibleFlightMatchResult'
+        - $ref: '#/components/schemas/IneligibleFlightMatchResult'
+    FlightMatchResultBase:
+      type: object
+      required: [breakdown, metadata]
+      properties:
+        breakdown:
+          type: array
+          items: { $ref: '#/components/schemas/DimensionScore' }
+        metadata:
+          type: object
+          additionalProperties: false
+          required: [scoringVersion, activeWeights]
+          properties:
+            scoringVersion: { type: string, const: flight-match-v1 }
+            activeWeights:
+              type: object
+              additionalProperties: false
+              properties:
+                PRICE: { type: number, minimum: 0, maximum: 1 }
+                AIRLINE: { type: number, minimum: 0, maximum: 1 }
+                ARRIVAL_SCHEDULE: { type: number, minimum: 0, maximum: 1 }
+                STOPS: { type: number, minimum: 0, maximum: 1 }
+                CABIN: { type: number, minimum: 0, maximum: 1 }
+                DEPARTURE_SCHEDULE: { type: number, minimum: 0, maximum: 1 }
+                BAGGAGE: { type: number, minimum: 0, maximum: 1 }
+                DURATION: { type: number, minimum: 0, maximum: 1 }
+    EligibleFlightMatchResult:
+      allOf:
+        - $ref: '#/components/schemas/FlightMatchResultBase'
+        - type: object
+          required: [eligibility, score, matchLevel]
+          properties:
+            eligibility:
+              type: object
+              additionalProperties: false
+              required: [eligible, violations]
+              properties:
+                eligible: { type: boolean, const: true }
+                violations: { type: array, maxItems: 0 }
+            score: { type: integer, minimum: 0, maximum: 100 }
+            matchLevel: { type: string, enum: [STRONG, GOOD, FAIR, WEAK] }
+      unevaluatedProperties: false
+    IneligibleFlightMatchResult:
+      allOf:
+        - $ref: '#/components/schemas/FlightMatchResultBase'
+        - type: object
+          required: [eligibility, score, matchLevel]
+          properties:
+            eligibility:
+              type: object
+              additionalProperties: false
+              required: [eligible, violations]
+              properties:
+                eligible: { type: boolean, const: false }
+                violations:
+                  type: array
+                  minItems: 1
+                  items: { $ref: '#/components/schemas/ConstraintViolation' }
+            score: { type: 'null' }
+            matchLevel: { type: 'null' }
+            breakdown: { type: array, maxItems: 0 }
+      unevaluatedProperties: false
+    DimensionScore:
+      type: object
+      additionalProperties: false
+      required: [dimension, score, weight, contribution, signal, explanation]
+      properties:
+        dimension:
+          type: string
+          enum: [PRICE, AIRLINE, ARRIVAL_SCHEDULE, STOPS, CABIN, DEPARTURE_SCHEDULE, BAGGAGE, DURATION]
+        score: { type: number, minimum: 0, maximum: 1 }
+        weight: { type: number, minimum: 0, maximum: 1 }
+        contribution: { type: number, minimum: 0, maximum: 1 }
+        signal: { type: string, enum: [POSITIVE, NEUTRAL, NEGATIVE] }
+        explanation: { $ref: '#/components/schemas/Explanation' }
+    ConstraintViolation:
+      type: object
+      additionalProperties: false
+      required: [constraint, explanation]
+      properties:
+        constraint: { type: string, enum: [BLACKLISTED_AIRLINE] }
+        explanation: { $ref: '#/components/schemas/Explanation' }
+    Explanation:
+      type: object
+      additionalProperties: false
+      required: [key, params]
+      properties:
+        key: { type: string }
+        params:
+          type: object
+          additionalProperties:
+            type: [string, number, boolean]
+    SearchMeta:
+      type: object
+      additionalProperties: false
+      description: Existing search metadata plus optional safe scoring aggregates.
+      required: [totalResults, searchHash, cached, requestedCabinClass]
+      properties:
+        totalResults: { type: integer, minimum: 0 }
+        searchHash: { type: string }
+        cached: { type: boolean }
+        requestedCabinClass: { type: string }
+        scoringVersion: { type: [string, 'null'] }
+        eligibleCount: { type: integer, minimum: 0 }
+        matchLevelCounts:
+          type: object
+          additionalProperties: false
+          required: [STRONG, GOOD, FAIR, WEAK]
+          properties:
+            STRONG: { type: integer, minimum: 0 }
+            GOOD: { type: integer, minimum: 0 }
+            FAIR: { type: integer, minimum: 0 }
+            WEAK: { type: integer, minimum: 0 }
