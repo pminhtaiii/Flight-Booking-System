@@ -110,9 +110,9 @@ describe('ChatHandoffTokenService', () => {
       expect(() => service.deriveIdempotencyHash(attestation, null as unknown as number)).toThrow(
         'Invalid attestation or offer index for idempotency derivation',
       );
-      expect(() => service.deriveIdempotencyHash(attestation, undefined as unknown as number)).toThrow(
-        'Invalid attestation or offer index for idempotency derivation',
-      );
+      expect(() =>
+        service.deriveIdempotencyHash(attestation, undefined as unknown as number),
+      ).toThrow('Invalid attestation or offer index for idempotency derivation');
     });
 
     it('should throw error for empty or invalid attestation strings', () => {
@@ -176,9 +176,9 @@ describe('ChatHandoffTokenService', () => {
       await expect(service.generateToken(null as unknown as string, 'idemp-123')).rejects.toThrow(
         'Invalid rowId or idempotencyHash for token generation',
       );
-      await expect(service.generateToken(undefined as unknown as string, 'idemp-123')).rejects.toThrow(
-        'Invalid rowId or idempotencyHash for token generation',
-      );
+      await expect(
+        service.generateToken(undefined as unknown as string, 'idemp-123'),
+      ).rejects.toThrow('Invalid rowId or idempotencyHash for token generation');
     });
 
     it('should reject invalid or missing idempotencyHash', async () => {
@@ -188,9 +188,9 @@ describe('ChatHandoffTokenService', () => {
       await expect(service.generateToken('row-123', null as unknown as string)).rejects.toThrow(
         'Invalid rowId or idempotencyHash for token generation',
       );
-      await expect(service.generateToken('row-123', undefined as unknown as string)).rejects.toThrow(
-        'Invalid rowId or idempotencyHash for token generation',
-      );
+      await expect(
+        service.generateToken('row-123', undefined as unknown as string),
+      ).rejects.toThrow('Invalid rowId or idempotencyHash for token generation');
     });
 
     it('should throw error when secret is not configured for requested key version', async () => {
@@ -220,7 +220,8 @@ describe('ChatHandoffTokenService', () => {
       const idempotencyHash = 'idemp-hash-abc';
 
       const generated = await service.generateToken(rowId, idempotencyHash);
-      const tamperedToken = generated.token.slice(0, -1) + (generated.token.endsWith('a') ? 'b' : 'a');
+      const tamperedToken =
+        generated.token.slice(0, -1) + (generated.token.endsWith('a') ? 'b' : 'a');
 
       const isTamperedValid = await service.verifyToken(
         tamperedToken,
@@ -272,7 +273,9 @@ describe('ChatHandoffTokenService', () => {
       expect(await service.verifyToken(validToken, validHash, 1.5)).toBe(false);
       expect(await service.verifyToken(validToken, validHash, NaN)).toBe(false);
       expect(await service.verifyToken(validToken, validHash, 999)).toBe(false);
-      expect(await service.verifyToken(validToken, validHash, null as unknown as number)).toBe(false);
+      expect(await service.verifyToken(validToken, validHash, null as unknown as number)).toBe(
+        false,
+      );
     });
 
     it('should return false when secret is missing for the given keyVersion without throwing', async () => {
@@ -306,19 +309,13 @@ describe('ChatHandoffTokenService', () => {
       expect(v2Result.keyVersion).toBe(2);
 
       // Verify v1 token with v1 keyVersion
-      expect(
-        await rotatedService.verifyToken(v1Result.token, v1Result.tokenHash, 1),
-      ).toBe(true);
+      expect(await rotatedService.verifyToken(v1Result.token, v1Result.tokenHash, 1)).toBe(true);
 
       // Verify v2 token with v2 keyVersion
-      expect(
-        await rotatedService.verifyToken(v2Result.token, v2Result.tokenHash, 2),
-      ).toBe(true);
+      expect(await rotatedService.verifyToken(v2Result.token, v2Result.tokenHash, 2)).toBe(true);
 
       // Verify cross-version token rejection
-      expect(
-        await rotatedService.verifyToken(v1Result.token, v1Result.tokenHash, 2),
-      ).toBe(false);
+      expect(await rotatedService.verifyToken(v1Result.token, v1Result.tokenHash, 2)).toBe(false);
     });
 
     it('should fallback to CHAT_HANDOFF_SECRET for version 1 if CHAT_HANDOFF_SECRET_V1 is not set', async () => {

@@ -169,7 +169,10 @@ function evaluateSupportedStringField(
     : fieldResult(fieldName, 'invalid', invalidReason, true);
 }
 
-function evaluateDateOfBirth(value: string | null | undefined, currentDate: ParsedDate): BookingReadinessEvaluationFieldResult {
+function evaluateDateOfBirth(
+  value: string | null | undefined,
+  currentDate: ParsedDate,
+): BookingReadinessEvaluationFieldResult {
   const normalizedValue = toTrimmedString(value);
 
   if (normalizedValue === null) {
@@ -196,7 +199,9 @@ function evaluateEmail(value: string | null | undefined): BookingReadinessEvalua
     : fieldResult('email', 'invalid', 'INVALID_EMAIL', true);
 }
 
-function evaluatePhoneCountryCode(value: string | null | undefined): BookingReadinessEvaluationFieldResult {
+function evaluatePhoneCountryCode(
+  value: string | null | undefined,
+): BookingReadinessEvaluationFieldResult {
   const normalizedValue = toTrimmedString(value);
 
   if (normalizedValue === null) {
@@ -208,7 +213,9 @@ function evaluatePhoneCountryCode(value: string | null | undefined): BookingRead
     : fieldResult('phoneCountryCode', 'invalid', 'INVALID_PHONE', true);
 }
 
-function evaluatePhoneNumber(value: string | null | undefined): BookingReadinessEvaluationFieldResult {
+function evaluatePhoneNumber(
+  value: string | null | undefined,
+): BookingReadinessEvaluationFieldResult {
   const normalizedValue = toTrimmedString(value);
 
   if (normalizedValue === null) {
@@ -235,7 +242,9 @@ function evaluateDocumentType(
     : fieldResult('documentType', 'invalid', 'UNSUPPORTED_DOCUMENT_TYPE', true);
 }
 
-function evaluatePassportNumber(value: string | null | undefined): BookingReadinessEvaluationFieldResult {
+function evaluatePassportNumber(
+  value: string | null | undefined,
+): BookingReadinessEvaluationFieldResult {
   const normalizedValue = toTrimmedString(value);
 
   if (normalizedValue === null) {
@@ -247,7 +256,10 @@ function evaluatePassportNumber(value: string | null | undefined): BookingReadin
     : fieldResult('passportNumber', 'invalid', 'INVALID_DOCUMENT_NUMBER', true);
 }
 
-function evaluateCountryField(fieldName: 'issuingCountry' | 'nationality', value: string | null | undefined): BookingReadinessEvaluationFieldResult {
+function evaluateCountryField(
+  fieldName: 'issuingCountry' | 'nationality',
+  value: string | null | undefined,
+): BookingReadinessEvaluationFieldResult {
   const normalizedValue = toTrimmedString(value);
 
   if (normalizedValue === null) {
@@ -286,7 +298,12 @@ function evaluatePassportExpiry(
   const advisoryBoundary = addDaysToParsedDate(tripCompletionDate, advisoryBufferDays);
 
   if (compareParsedDates(parsedExpiry, advisoryBoundary) <= 0) {
-    return fieldResult('passportExpiry', 'warning', 'PASSPORT_VALIDITY_REQUIRES_VERIFICATION', false);
+    return fieldResult(
+      'passportExpiry',
+      'warning',
+      'PASSPORT_VALIDITY_REQUIRES_VERIFICATION',
+      false,
+    );
   }
 
   return fieldResult('passportExpiry', 'filled', null, false);
@@ -298,7 +315,12 @@ function evaluateIdentitySection(
 ): BookingReadinessEvaluationSectionResult {
   return sectionResult('identity', [
     evaluateRequiredStringField('givenName', passenger.givenName),
-    fieldResult('middleName', toTrimmedString(passenger.middleName) === null ? 'missing' : 'filled', null, false),
+    fieldResult(
+      'middleName',
+      toTrimmedString(passenger.middleName) === null ? 'missing' : 'filled',
+      null,
+      false,
+    ),
     evaluateRequiredStringField('familyName', passenger.familyName),
     evaluateDateOfBirth(passenger.dateOfBirth, currentDate),
     evaluateSupportedStringField('gender', passenger.gender, SUPPORTED_GENDERS, 'INVALID_GENDER'),
@@ -306,7 +328,9 @@ function evaluateIdentitySection(
   ]);
 }
 
-function evaluateContactSection(passenger: BookingReadinessPassengerInput): BookingReadinessEvaluationSectionResult {
+function evaluateContactSection(
+  passenger: BookingReadinessPassengerInput,
+): BookingReadinessEvaluationSectionResult {
   return sectionResult('contact', [
     evaluateEmail(passenger.email),
     evaluatePhoneCountryCode(passenger.phoneCountryCode),
@@ -347,7 +371,9 @@ function evaluateEntryEligibilitySection(
   ]);
 }
 
-function determineScope(segments: readonly BookingReadinessEvaluationInput['segments'][number][]): BookingReadinessScopeResult {
+function determineScope(
+  segments: readonly BookingReadinessEvaluationInput['segments'][number][],
+): BookingReadinessScopeResult {
   if (segments.length === 0) {
     return {
       scope: 'UNKNOWN',
@@ -439,7 +465,10 @@ export class BookingReadinessEvaluator {
 
     const passengers = input.passengers.map((passenger) => {
       if (scopeResult.scope === 'UNKNOWN') {
-        return buildPassengerResult(passenger, unknownScopeSections(scopeResult.reason, input.entryEligibility));
+        return buildPassengerResult(
+          passenger,
+          unknownScopeSections(scopeResult.reason, input.entryEligibility),
+        );
       }
 
       const sections: BookingReadinessEvaluationSectionResult[] = [
@@ -468,7 +497,10 @@ export class BookingReadinessEvaluator {
 
     return {
       scope: scopeResult.scope,
-      ready: scopeResult.scope !== 'UNKNOWN' && passengers.length > 0 && passengers.every((passenger) => passenger.ready),
+      ready:
+        scopeResult.scope !== 'UNKNOWN' &&
+        passengers.length > 0 &&
+        passengers.every((passenger) => passenger.ready),
       passengers,
     };
   }

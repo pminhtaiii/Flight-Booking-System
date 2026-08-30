@@ -46,7 +46,9 @@ describe('AgentChatController', () => {
   describe('POST access/check', () => {
     it('calls agentChatAccessService.checkUserAccess with dto', async () => {
       const dto = { sub: 'user_123', jti: 'jti_abc', exp: 1700000000 };
-      (agentChatAccessService.checkUserAccess as jest.Mock).mockResolvedValueOnce({ allowed: true });
+      (agentChatAccessService.checkUserAccess as jest.Mock).mockResolvedValueOnce({
+        allowed: true,
+      });
 
       const result = await controller.checkAccess(dto);
 
@@ -124,7 +126,12 @@ describe('AgentChatController', () => {
       const sessionId = 'session_1';
       const headers = { 'x-fencing-token': 'fence_123' };
       const dto = { sender: 'AGENT', content: 'Hello user', type: 'STANDARD' };
-      const createdMessage = { id: 'msg_1', sessionId, sender: MessageSender.AGENT, content: 'Hello user' } as any;
+      const createdMessage = {
+        id: 'msg_1',
+        sessionId,
+        sender: MessageSender.AGENT,
+        content: 'Hello user',
+      } as any;
       (chatService.createMessage as jest.Mock).mockResolvedValueOnce(createdMessage);
 
       const result = await controller.createMessage(sessionId, mockReq, headers, dto);
@@ -149,7 +156,12 @@ describe('AgentChatController', () => {
       const sessionId = 'session_1';
       const headers = { 'X-Fencing-Token': 'fence_456' };
       const dto = { sender: '', content: 'Hi' };
-      const createdMessage = { id: 'msg_2', sessionId, sender: MessageSender.USER, content: 'Hi' } as any;
+      const createdMessage = {
+        id: 'msg_2',
+        sessionId,
+        sender: MessageSender.USER,
+        content: 'Hi',
+      } as any;
       (chatService.createMessage as jest.Mock).mockResolvedValueOnce(createdMessage);
 
       const result = await controller.createMessage(sessionId, mockReq, headers, dto as any);
@@ -193,14 +205,18 @@ describe('AgentChatController', () => {
       const sessionId = 'session_nonexistent';
       const headers = {};
       const dto = { sender: 'USER', content: 'Hello' };
-      (chatService.createMessage as jest.Mock).mockRejectedValueOnce(new NotFoundException('Session not found'));
+      (chatService.createMessage as jest.Mock).mockRejectedValueOnce(
+        new NotFoundException('Session not found'),
+      );
 
       await expect(
         controller.createMessage(sessionId, mockReq, headers, dto as any),
       ).rejects.toThrow(NotFoundException);
 
       try {
-        (chatService.createMessage as jest.Mock).mockRejectedValueOnce(new NotFoundException('Session not found'));
+        (chatService.createMessage as jest.Mock).mockRejectedValueOnce(
+          new NotFoundException('Session not found'),
+        );
         await controller.createMessage(sessionId, mockReq, headers, dto as any);
       } catch (err: any) {
         expect(err).toBeInstanceOf(NotFoundException);
@@ -250,8 +266,16 @@ describe('AgentChatController', () => {
         sessionId,
         {
           messages: [
-            { sender: MessageSender.USER, content: 'Need a flight to SFO', type: MessageType.STANDARD },
-            { sender: MessageSender.AGENT, content: 'Here are flights...', type: MessageType.STANDARD },
+            {
+              sender: MessageSender.USER,
+              content: 'Need a flight to SFO',
+              type: MessageType.STANDARD,
+            },
+            {
+              sender: MessageSender.AGENT,
+              content: 'Here are flights...',
+              type: MessageType.STANDARD,
+            },
           ],
         },
         undefined,
@@ -311,14 +335,18 @@ describe('AgentChatController', () => {
       const sessionId = 'session_nonexistent';
       const headers = {};
       const dto = { messages: [] };
-      (chatService.createMessageBatch as jest.Mock).mockRejectedValueOnce(new NotFoundException('Session not found'));
+      (chatService.createMessageBatch as jest.Mock).mockRejectedValueOnce(
+        new NotFoundException('Session not found'),
+      );
 
-      await expect(
-        controller.createTurn(sessionId, mockReq, headers, dto),
-      ).rejects.toThrow(NotFoundException);
+      await expect(controller.createTurn(sessionId, mockReq, headers, dto)).rejects.toThrow(
+        NotFoundException,
+      );
 
       try {
-        (chatService.createMessageBatch as jest.Mock).mockRejectedValueOnce(new NotFoundException('Session not found'));
+        (chatService.createMessageBatch as jest.Mock).mockRejectedValueOnce(
+          new NotFoundException('Session not found'),
+        );
         await controller.createTurn(sessionId, mockReq, headers, dto);
       } catch (err: any) {
         expect(err).toBeInstanceOf(NotFoundException);
@@ -334,11 +362,13 @@ describe('AgentChatController', () => {
       const sessionId = 'session_1';
       const headers = {};
       const dto = { messages: [] };
-      (chatService.createMessageBatch as jest.Mock).mockRejectedValueOnce(new Error('Turn batch error'));
+      (chatService.createMessageBatch as jest.Mock).mockRejectedValueOnce(
+        new Error('Turn batch error'),
+      );
 
-      await expect(
-        controller.createTurn(sessionId, mockReq, headers, dto),
-      ).rejects.toThrow('Turn batch error');
+      await expect(controller.createTurn(sessionId, mockReq, headers, dto)).rejects.toThrow(
+        'Turn batch error',
+      );
     });
   });
 
@@ -378,14 +408,18 @@ describe('AgentChatController', () => {
       const sessionId = 'session_nonexistent';
       const headers = {};
       const dto = { content: 'Summary' };
-      (chatService.createMessage as jest.Mock).mockRejectedValueOnce(new NotFoundException('Session not found'));
+      (chatService.createMessage as jest.Mock).mockRejectedValueOnce(
+        new NotFoundException('Session not found'),
+      );
 
-      await expect(
-        controller.createSummary(sessionId, mockReq, headers, dto),
-      ).rejects.toThrow(NotFoundException);
+      await expect(controller.createSummary(sessionId, mockReq, headers, dto)).rejects.toThrow(
+        NotFoundException,
+      );
 
       try {
-        (chatService.createMessage as jest.Mock).mockRejectedValueOnce(new NotFoundException('Session not found'));
+        (chatService.createMessage as jest.Mock).mockRejectedValueOnce(
+          new NotFoundException('Session not found'),
+        );
         await controller.createSummary(sessionId, mockReq, headers, dto);
       } catch (err: any) {
         expect(err).toBeInstanceOf(NotFoundException);
@@ -403,9 +437,9 @@ describe('AgentChatController', () => {
       const dto = { content: 'Summary' };
       (chatService.createMessage as jest.Mock).mockRejectedValueOnce(new Error('Summary error'));
 
-      await expect(
-        controller.createSummary(sessionId, mockReq, headers, dto),
-      ).rejects.toThrow('Summary error');
+      await expect(controller.createSummary(sessionId, mockReq, headers, dto)).rejects.toThrow(
+        'Summary error',
+      );
     });
   });
 

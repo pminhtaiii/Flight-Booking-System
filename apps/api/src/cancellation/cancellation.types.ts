@@ -72,11 +72,6 @@ export function serializeDuffelCancellationQuoteId(
   nonRefundableAmount: string | null,
   nonRefundableCurrency: string | null,
 ): string {
-  const parts = [
-    quoteId,
-    refundTo || '',
-    nonRefundableAmount || '',
-    nonRefundableCurrency || '',
-  ];
+  const parts = [quoteId, refundTo || '', nonRefundableAmount || '', nonRefundableCurrency || ''];
   return parts.join('|');
 }

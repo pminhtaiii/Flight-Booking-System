@@ -47,7 +47,8 @@ describe('Refund Settlement & Transaction Lifecycle (E2E)', () => {
     await app.init();
 
     prisma = moduleFixture.get<PrismaService>(PrismaService);
-    refundTransactionService = moduleFixture.get<RefundTransactionService>(RefundTransactionService);
+    refundTransactionService =
+      moduleFixture.get<RefundTransactionService>(RefundTransactionService);
     refundSettlementService = moduleFixture.get<RefundSettlementService>(RefundSettlementService);
   });
 

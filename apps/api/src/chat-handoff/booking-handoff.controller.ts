@@ -52,7 +52,9 @@ export class BookingHandoffController {
         correlationId,
       });
     } catch (error) {
-      this.logger.warn(`[resolve] chat_handoff_resolve_failed: ${error instanceof Error ? error.message : 'unknown'}`);
+      this.logger.warn(
+        `[resolve] chat_handoff_resolve_failed: ${error instanceof Error ? error.message : 'unknown'}`,
+      );
       throw error;
     }
   }

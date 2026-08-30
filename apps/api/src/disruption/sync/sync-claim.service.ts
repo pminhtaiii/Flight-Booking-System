@@ -26,10 +26,7 @@ export class SyncClaimService {
           id: bookingId,
           status: 'CONFIRMED',
           duffelOrderId: { not: null },
-          OR: [
-            { syncLockedAt: null },
-            { syncLockedAt: { lt: staleTime } },
-          ],
+          OR: [{ syncLockedAt: null }, { syncLockedAt: { lt: staleTime } }],
         },
         data: {
           syncLockedAt: now,
@@ -44,7 +41,10 @@ export class SyncClaimService {
       return null;
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      this.logger.error(`Error acquiring sync claim for booking ${bookingId}: ${message}`, error instanceof Error ? error.stack : undefined);
+      this.logger.error(
+        `Error acquiring sync claim for booking ${bookingId}: ${message}`,
+        error instanceof Error ? error.stack : undefined,
+      );
       return null;
     }
   }
@@ -72,7 +72,10 @@ export class SyncClaimService {
       return false;
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      this.logger.error(`Error releasing sync claim for booking ${bookingId}: ${message}`, error instanceof Error ? error.stack : undefined);
+      this.logger.error(
+        `Error releasing sync claim for booking ${bookingId}: ${message}`,
+        error instanceof Error ? error.stack : undefined,
+      );
       return false;
     }
   }

@@ -26,7 +26,7 @@ export class AirportsController {
 
       const data = await this.airportsService.search(dto.q, dto.limit);
       const result = { data, count: data.length };
-      
+
       await this.cache.set(cacheKey, JSON.stringify(result), CACHE_TTLS.SEARCH);
       return result;
     } catch (error) {

@@ -7,12 +7,7 @@ import { DuffelModule } from '../duffel/duffel.module';
 import { AuditModule } from '../audit/audit.module';
 
 @Module({
-  imports: [
-    PrismaModule,
-    CacheModule,
-    DuffelModule,
-    AuditModule,
-  ],
+  imports: [PrismaModule, CacheModule, DuffelModule, AuditModule],
   controllers: [FlightsController],
   providers: [FlightsService],
   exports: [FlightsService],

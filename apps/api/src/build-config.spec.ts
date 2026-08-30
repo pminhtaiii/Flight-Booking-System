@@ -26,15 +26,7 @@ describe('TypeScript build configurations', () => {
   });
 
   it('emits the shared package consumed by the API', () => {
-    const configPath = resolve(
-      __dirname,
-      '..',
-      '..',
-      '..',
-      'packages',
-      'shared',
-      'tsconfig.json',
-    );
+    const configPath = resolve(__dirname, '..', '..', '..', 'packages', 'shared', 'tsconfig.json');
 
     expect(hasExplicitNoEmitFalse(readJson(configPath))).toBe(true);
   });

@@ -7,23 +7,23 @@
 
 ### FlightOffer (existing — `flight_offers`)
 
-| Change | Field | Type | Constraints | Description |
-|--------|-------|------|-------------|-------------|
-| DROP | ~~passengers~~ | ~~Int~~ | — | Replaced by flat breakdown |
-| ADD | adults | Int | Not null, min 1 | Number of adult passengers |
-| ADD | children | Int | Not null, default 0 | Number of child passengers (2–11) |
-| ADD | infants | Int | Not null, default 0 | Number of infant passengers (under 2, on lap) |
-| ADD | cabinClass | String | Not null, default "economy" | Requested cabin class |
+| Change | Field          | Type    | Constraints                 | Description                                   |
+| ------ | -------------- | ------- | --------------------------- | --------------------------------------------- |
+| DROP   | ~~passengers~~ | ~~Int~~ | —                           | Replaced by flat breakdown                    |
+| ADD    | adults         | Int     | Not null, min 1             | Number of adult passengers                    |
+| ADD    | children       | Int     | Not null, default 0         | Number of child passengers (2–11)             |
+| ADD    | infants        | Int     | Not null, default 0         | Number of infant passengers (under 2, on lap) |
+| ADD    | cabinClass     | String  | Not null, default "economy" | Requested cabin class                         |
 
 ### SearchHistory (existing — `search_history`)
 
-| Change | Field | Type | Constraints | Description |
-|--------|-------|------|-------------|-------------|
-| DROP | ~~passengers~~ | ~~Int~~ | — | Replaced by flat breakdown |
-| ADD | adults | Int | Not null, min 1 | Number of adult passengers |
-| ADD | children | Int | Not null, default 0 | Number of child passengers (2–11) |
-| ADD | infants | Int | Not null, default 0 | Number of infant passengers (under 2, on lap) |
-| ADD | cabinClass | String | Not null, default "economy" | Requested cabin class |
+| Change | Field          | Type    | Constraints                 | Description                                   |
+| ------ | -------------- | ------- | --------------------------- | --------------------------------------------- |
+| DROP   | ~~passengers~~ | ~~Int~~ | —                           | Replaced by flat breakdown                    |
+| ADD    | adults         | Int     | Not null, min 1             | Number of adult passengers                    |
+| ADD    | children       | Int     | Not null, default 0         | Number of child passengers (2–11)             |
+| ADD    | infants        | Int     | Not null, default 0         | Number of infant passengers (under 2, on lap) |
+| ADD    | cabinClass     | String  | Not null, default "economy" | Requested cabin class                         |
 
 ---
 
@@ -90,20 +90,21 @@ model SearchHistory {
 
 ```typescript
 class FlightSearchRequestDto {
-  origin: string;          // existing
-  destination: string;     // existing
-  departureDate: string;   // existing
-  returnDate?: string;     // existing
+  origin: string; // existing
+  destination: string; // existing
+  departureDate: string; // existing
+  returnDate?: string; // existing
   // CHANGED: flat passenger breakdown
-  adults: number;          // required, min 1, max 9
-  children?: number;       // optional, default 0, min 0
-  infants?: number;        // optional, default 0, min 0
+  adults: number; // required, min 1, max 9
+  children?: number; // optional, default 0, min 0
+  infants?: number; // optional, default 0, min 0
   // NEW
-  cabinClass?: 'economy' | 'premium_economy' | 'business' | 'first';  // optional, default 'economy'
+  cabinClass?: 'economy' | 'premium_economy' | 'business' | 'first'; // optional, default 'economy'
 }
 ```
 
 **Validation rules**:
+
 - `adults >= 1`
 - `infants <= adults`
 - `cabinClass` defaults to `'economy'` if omitted, and is normalized to `'economy'` at the ingestion layer (in FlightsController/FlightsService) so that cache hashing and database persistence treat legacy callers omitting the field identically to explicit `'economy'` values.
@@ -114,7 +115,7 @@ class FlightSearchRequestDto {
 ```typescript
 class FlightSegmentDto {
   // ... existing fields ...
-  cabinClass: 'economy' | 'premium_economy' | 'business' | 'first';  // NEW
+  cabinClass: 'economy' | 'premium_economy' | 'business' | 'first'; // NEW
 }
 ```
 
@@ -123,9 +124,9 @@ class FlightSegmentDto {
 ```typescript
 class FlightOfferDto {
   // ... existing fields ...
-  requestedCabinClass: 'economy' | 'premium_economy' | 'business' | 'first';  // NEW
-  cabinClassMatch: 'full' | 'mixed' | 'downgraded';                           // NEW
-  cabinMismatchDetails: CabinMismatchDetail[] | null;                          // NEW
+  requestedCabinClass: 'economy' | 'premium_economy' | 'business' | 'first'; // NEW
+  cabinClassMatch: 'full' | 'mixed' | 'downgraded'; // NEW
+  cabinMismatchDetails: CabinMismatchDetail[] | null; // NEW
 }
 
 interface CabinMismatchDetail {
@@ -133,7 +134,7 @@ interface CabinMismatchDetail {
   leg: 'outbound' | 'return';
   expected: string;
   actual: string;
-  route: string;  // e.g., "SGN → HAN"
+  route: string; // e.g., "SGN → HAN"
 }
 ```
 
@@ -149,10 +150,10 @@ recovery: {
   destination: string;
   departureDate: string;
   returnDate: string | null;
-  adults: number;       // NEW (replaces passengers)
-  children: number;     // NEW
-  infants: number;      // NEW
-  cabinClass: string;   // NEW
+  adults: number; // NEW (replaces passengers)
+  children: number; // NEW
+  infants: number; // NEW
+  cabinClass: string; // NEW
 }
 ```
 
@@ -161,16 +162,19 @@ recovery: {
 ## Cache Key Shape
 
 ```typescript
-SHA-256(JSON.stringify({
-  origin,
-  destination,
-  departureDate,
-  returnDate,
-  adults,
-  children: children ?? 0,
-  infants: infants ?? 0,
-  cabinClass
-}))
+SHA -
+  256(
+    JSON.stringify({
+      origin,
+      destination,
+      departureDate,
+      returnDate,
+      adults,
+      children: children ?? 0,
+      infants: infants ?? 0,
+      cabinClass,
+    }),
+  );
 ```
 
 Redis key format: `flights:raw:${sha256}` (unchanged pattern, expanded input)
@@ -184,6 +188,7 @@ No new state machines. The cabin match classification (`full`/`mixed`/`downgrade
 ## Migration Strategy
 
 Single Prisma migration:
+
 1. Add `adults`, `children`, `infants`, `cabinClass` columns with defaults
 2. Backfill: `UPDATE flight_offers SET adults = passengers, children = 0, infants = 0, cabin_class = 'economy'`
 3. Backfill: `UPDATE search_history SET adults = passengers, children = 0, infants = 0, cabin_class = 'economy'`

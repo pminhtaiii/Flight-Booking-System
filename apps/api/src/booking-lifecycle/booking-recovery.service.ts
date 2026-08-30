@@ -218,7 +218,10 @@ export class BookingRecoveryService {
             `Successfully cancelled Stripe PaymentIntent ${booking.payment.stripePaymentIntentId} during stale booking sweep.`,
           );
         } catch (stripeCancelError: unknown) {
-          const err = stripeCancelError instanceof Error ? stripeCancelError : new Error(String(stripeCancelError));
+          const err =
+            stripeCancelError instanceof Error
+              ? stripeCancelError
+              : new Error(String(stripeCancelError));
           this.logger.error(
             `Stripe cancelPaymentIntent failed during stale booking sweep: ${err.message}`,
             err.stack,
@@ -258,7 +261,11 @@ export class BookingRecoveryService {
         });
         const order =
           bookingIntent && bookingIntent.user
-            ? enrichRedactedDuffelOrder(rawOrder, bookingIntent.passengers, bookingIntent.user.email)
+            ? enrichRedactedDuffelOrder(
+                rawOrder,
+                bookingIntent.passengers,
+                bookingIntent.user.email,
+              )
             : rawOrder;
 
         const { flightSnapshot, passengerSnapshot } =

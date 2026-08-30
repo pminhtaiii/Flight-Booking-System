@@ -59,7 +59,6 @@ describe('Audit Log (E2E)', () => {
     await prisma.airport.deleteMany({});
     await prisma.auditLog.deleteMany({});
     await prisma.user.deleteMany({});
-
   });
 
   it('should create audit logs for registration, login, failed login, and logout', async () => {
@@ -197,6 +196,3 @@ describe('Audit Log (E2E)', () => {
     expect(finalLogCount).toBe(initialLogCount);
   });
 });
-
-
-

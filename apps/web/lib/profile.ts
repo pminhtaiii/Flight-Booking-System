@@ -21,10 +21,7 @@ function getApiUrl(): string {
   return apiUrl.trim().replace(/\/+$/, '');
 }
 
-async function requestProfile<T>(
-  accessToken: string,
-  init: RequestInit,
-): Promise<T> {
+async function requestProfile<T>(accessToken: string, init: RequestInit): Promise<T> {
   const response = await fetch(`${getApiUrl()}/api/profile`, {
     ...init,
     cache: 'no-store',

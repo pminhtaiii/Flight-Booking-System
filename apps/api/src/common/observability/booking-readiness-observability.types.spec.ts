@@ -18,19 +18,43 @@ describe('Booking Readiness Observability Contract', () => {
   });
 
   it('defines all required metric names', () => {
-    expect(Object.values(BookingReadinessMetric)).toContain('booking_readiness_profile_request_duration_ms');
-    expect(Object.values(BookingReadinessMetric)).toContain('booking_readiness_readiness_request_duration_ms');
-    expect(Object.values(BookingReadinessMetric)).toContain('booking_readiness_gateway_request_duration_ms');
-    expect(Object.values(BookingReadinessMetric)).toContain('booking_readiness_final_validation_duration_ms');
+    expect(Object.values(BookingReadinessMetric)).toContain(
+      'booking_readiness_profile_request_duration_ms',
+    );
+    expect(Object.values(BookingReadinessMetric)).toContain(
+      'booking_readiness_readiness_request_duration_ms',
+    );
+    expect(Object.values(BookingReadinessMetric)).toContain(
+      'booking_readiness_gateway_request_duration_ms',
+    );
+    expect(Object.values(BookingReadinessMetric)).toContain(
+      'booking_readiness_final_validation_duration_ms',
+    );
     expect(Object.values(BookingReadinessMetric)).toContain('booking_readiness_outcomes_total');
-    expect(Object.values(BookingReadinessMetric)).toContain('booking_readiness_profile_update_conflict_total');
-    expect(Object.values(BookingReadinessMetric)).toContain('booking_readiness_profile_changed_total');
-    expect(Object.values(BookingReadinessMetric)).toContain('booking_readiness_snapshot_integrity_failure_total');
-    expect(Object.values(BookingReadinessMetric)).toContain('booking_readiness_backfill_processed_total');
-    expect(Object.values(BookingReadinessMetric)).toContain('booking_readiness_backfill_skipped_total');
-    expect(Object.values(BookingReadinessMetric)).toContain('booking_readiness_backfill_quarantined_total');
-    expect(Object.values(BookingReadinessMetric)).toContain('booking_readiness_final_validation_blocks_total');
-    expect(Object.values(BookingReadinessMetric)).toContain('booking_readiness_supplier_call_attempts_total');
+    expect(Object.values(BookingReadinessMetric)).toContain(
+      'booking_readiness_profile_update_conflict_total',
+    );
+    expect(Object.values(BookingReadinessMetric)).toContain(
+      'booking_readiness_profile_changed_total',
+    );
+    expect(Object.values(BookingReadinessMetric)).toContain(
+      'booking_readiness_snapshot_integrity_failure_total',
+    );
+    expect(Object.values(BookingReadinessMetric)).toContain(
+      'booking_readiness_backfill_processed_total',
+    );
+    expect(Object.values(BookingReadinessMetric)).toContain(
+      'booking_readiness_backfill_skipped_total',
+    );
+    expect(Object.values(BookingReadinessMetric)).toContain(
+      'booking_readiness_backfill_quarantined_total',
+    );
+    expect(Object.values(BookingReadinessMetric)).toContain(
+      'booking_readiness_final_validation_blocks_total',
+    );
+    expect(Object.values(BookingReadinessMetric)).toContain(
+      'booking_readiness_supplier_call_attempts_total',
+    );
   });
 
   it('ensures allowed metadata keys contain zero PII-risk substrings', () => {

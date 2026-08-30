@@ -77,7 +77,9 @@ test.describe('getSafeReturnTarget', () => {
     expect(getSafeReturnTarget('/checkout')).toBe('/checkout');
     expect(getSafeReturnTarget('/checkout/passengers')).toBe('/checkout/passengers');
     expect(getSafeReturnTarget('/checkout/intent-123/review')).toBe('/checkout/intent-123/review');
-    expect(getSafeReturnTarget('/checkout/intent-123/ancillaries')).toBe('/checkout/intent-123/ancillaries');
+    expect(getSafeReturnTarget('/checkout/intent-123/ancillaries')).toBe(
+      '/checkout/intent-123/ancillaries',
+    );
     expect(getSafeReturnTarget('/prototype/chat')).toBe('/prototype/chat');
   });
 
@@ -86,7 +88,9 @@ test.describe('getSafeReturnTarget', () => {
       '/checkout/passengers?offerId=off_test_123',
     );
     expect(
-      getSafeReturnTarget('/prototype/chat?sessionId=sess_123&scenario=mock-scenario-1&autoResume=true'),
+      getSafeReturnTarget(
+        '/prototype/chat?sessionId=sess_123&scenario=mock-scenario-1&autoResume=true',
+      ),
     ).toBe('/prototype/chat?sessionId=sess_123&autoResume=true&scenario=mock-scenario-1');
     expect(getSafeReturnTarget('/checkout?offerId=off_valid_456&sessionId=sess_789')).toBe(
       '/checkout?offerId=off_valid_456&sessionId=sess_789',

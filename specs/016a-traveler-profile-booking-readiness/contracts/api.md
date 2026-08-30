@@ -11,9 +11,22 @@ Returns the caller's single profile and section completion. Full editable values
 ```json
 {
   "profileId": "uuid",
-  "identity": { "givenName": "...", "middleName": null, "familyName": "...", "dateOfBirth": "YYYY-MM-DD", "gender": "...", "title": "..." },
+  "identity": {
+    "givenName": "...",
+    "middleName": null,
+    "familyName": "...",
+    "dateOfBirth": "YYYY-MM-DD",
+    "gender": "...",
+    "title": "..."
+  },
   "contact": { "email": "...", "phoneCountryCode": "...", "phoneNumber": "..." },
-  "travelDocument": { "documentType": "passport", "passportNumber": "...", "passportExpiry": "YYYY-MM-DD", "issuingCountry": "XX", "nationality": "XX" },
+  "travelDocument": {
+    "documentType": "passport",
+    "passportNumber": "...",
+    "passportExpiry": "YYYY-MM-DD",
+    "issuingCountry": "XX",
+    "nationality": "XX"
+  },
   "preferences": { "seatPreference": null, "classPreference": null },
   "revision": 3,
   "updatedAt": "ISO-8601"
@@ -63,8 +76,18 @@ Inline sources use the same field groups as the profile inside `source`. The end
         {
           "name": "travel_document",
           "fields": [
-            { "name": "passportExpiry", "status": "warning", "reason": "PASSPORT_VALIDITY_REQUIRES_VERIFICATION", "blocking": false },
-            { "name": "issuingCountry", "status": "missing", "reason": "REQUIRED", "blocking": true }
+            {
+              "name": "passportExpiry",
+              "status": "warning",
+              "reason": "PASSPORT_VALIDITY_REQUIRES_VERIFICATION",
+              "blocking": false
+            },
+            {
+              "name": "issuingCountry",
+              "status": "missing",
+              "reason": "REQUIRED",
+              "blocking": true
+            }
           ]
         }
       ]
@@ -105,14 +128,14 @@ Returns owned intent data with document/contact summaries only. It MUST NOT retu
 
 ### Route/response migration matrix
 
-| Concern | Canonical | Compatibility behavior |
-|---|---|---|
-| Advisory readiness | `POST /bookings/intents/readiness` | New-only; feature-flagged |
-| Create intent | `POST /bookings/intents` | Singular POST alias calls the same service during the observation window |
-| Read intent | `GET /bookings/intents/:id` | Web migrates to masked summary first; singular GET then returns the identical safe shape and may retain legacy passport keys as `null` |
-| Prefill | Secure `GET /profile` + readiness | Singular `/bookings/intent/prefill` remains temporarily for disabled legacy checkout, with deprecation telemetry |
-| Ancillaries/payment | Existing intent-scoped routes | Paths unchanged; only their internal passenger DTO use is regression-tested |
-| Agent | `/agent-gateway/bookings/readiness` | No legacy alias |
+| Concern             | Canonical                           | Compatibility behavior                                                                                                                 |
+| ------------------- | ----------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| Advisory readiness  | `POST /bookings/intents/readiness`  | New-only; feature-flagged                                                                                                              |
+| Create intent       | `POST /bookings/intents`            | Singular POST alias calls the same service during the observation window                                                               |
+| Read intent         | `GET /bookings/intents/:id`         | Web migrates to masked summary first; singular GET then returns the identical safe shape and may retain legacy passport keys as `null` |
+| Prefill             | Secure `GET /profile` + readiness   | Singular `/bookings/intent/prefill` remains temporarily for disabled legacy checkout, with deprecation telemetry                       |
+| Ancillaries/payment | Existing intent-scoped routes       | Paths unchanged; only their internal passenger DTO use is regression-tested                                                            |
+| Agent               | `/agent-gateway/bookings/readiness` | No legacy alias                                                                                                                        |
 
 ## Agent-gateway projection
 
@@ -131,7 +154,10 @@ Response allowlist:
       "passengerType": "ADULT",
       "passengerOrdinal": 1,
       "sections": [
-        { "name": "travel_document", "fields": [{ "name": "passportExpiry", "status": "missing", "reason": "REQUIRED" }] }
+        {
+          "name": "travel_document",
+          "fields": [{ "name": "passportExpiry", "status": "missing", "reason": "REQUIRED" }]
+        }
       ]
     }
   ],

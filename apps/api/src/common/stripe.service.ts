@@ -112,7 +112,10 @@ export class StripeService {
       return await this.stripe.paymentIntents.capture(paymentIntentId, params, options);
     } catch (error) {
       const err = error as Error;
-      this.logger.error(`Failed to capture PaymentIntent ${paymentIntentId}: ${err.message}`, err.stack);
+      this.logger.error(
+        `Failed to capture PaymentIntent ${paymentIntentId}: ${err.message}`,
+        err.stack,
+      );
       throw error;
     }
   }
@@ -130,7 +133,10 @@ export class StripeService {
       return await this.stripe.paymentIntents.cancel(paymentIntentId, options);
     } catch (error) {
       const err = error as Error;
-      this.logger.error(`Failed to cancel PaymentIntent ${paymentIntentId}: ${err.message}`, err.stack);
+      this.logger.error(
+        `Failed to cancel PaymentIntent ${paymentIntentId}: ${err.message}`,
+        err.stack,
+      );
       throw error;
     }
   }
@@ -168,7 +174,10 @@ export class StripeService {
       });
     } catch (error) {
       const err = error as Error;
-      this.logger.error(`Failed to retrieve PaymentIntent ${paymentIntentId}: ${err.message}`, err.stack);
+      this.logger.error(
+        `Failed to retrieve PaymentIntent ${paymentIntentId}: ${err.message}`,
+        err.stack,
+      );
       throw error;
     }
   }
@@ -198,7 +207,10 @@ export class StripeService {
       return await this.stripe.refunds.create(params, options);
     } catch (error) {
       const err = error as Error;
-      this.logger.error(`Failed to create refund for PaymentIntent ${paymentIntentId}: ${err.message}`, err.stack);
+      this.logger.error(
+        `Failed to create refund for PaymentIntent ${paymentIntentId}: ${err.message}`,
+        err.stack,
+      );
       throw error;
     }
   }
@@ -208,16 +220,15 @@ export class StripeService {
       return await this.stripe.paymentMethods.detach(paymentMethodId);
     } catch (error) {
       const err = error as Error;
-      this.logger.error(`Failed to detach PaymentMethod ${paymentMethodId}: ${err.message}`, err.stack);
+      this.logger.error(
+        `Failed to detach PaymentMethod ${paymentMethodId}: ${err.message}`,
+        err.stack,
+      );
       throw error;
     }
   }
 
-  constructWebhookEvent(
-    payload: string | Buffer,
-    header: string,
-    secret: string,
-  ): Stripe.Event {
+  constructWebhookEvent(payload: string | Buffer, header: string, secret: string): Stripe.Event {
     try {
       return this.stripe.webhooks.constructEvent(payload, header, secret);
     } catch (error) {

@@ -14,7 +14,11 @@ type LockoutError = {
 function parseLockoutError(error: string): LockoutError | null {
   try {
     const parsed: unknown = JSON.parse(error);
-    if (typeof parsed === 'object' && parsed !== null && (parsed as LockoutError).code === 'auth_locked') {
+    if (
+      typeof parsed === 'object' &&
+      parsed !== null &&
+      (parsed as LockoutError).code === 'auth_locked'
+    ) {
       return parsed as LockoutError;
     }
   } catch {
@@ -74,14 +78,40 @@ export function LoginForm(): JSX.Element {
 
   return (
     <form className={styles.form} onSubmit={handleSubmit} noValidate>
-      {error ? <p className={styles.message} role="alert">{error}</p> : null}
+      {error ? (
+        <p className={styles.message} role="alert">
+          {error}
+        </p>
+      ) : null}
       <div className={styles.field}>
-        <label className={styles.label} htmlFor="login-email">Email address</label>
-        <input className={styles.input} disabled={isLocked} id="login-email" name="email" onChange={(event) => setEmail(event.target.value)} required type="email" value={email} />
+        <label className={styles.label} htmlFor="login-email">
+          Email address
+        </label>
+        <input
+          className={styles.input}
+          disabled={isLocked}
+          id="login-email"
+          name="email"
+          onChange={(event) => setEmail(event.target.value)}
+          required
+          type="email"
+          value={email}
+        />
       </div>
       <div className={styles.field}>
-        <label className={styles.label} htmlFor="login-password">Password</label>
-        <input className={styles.input} disabled={isLocked} id="login-password" name="password" onChange={(event) => setPassword(event.target.value)} required type="password" value={password} />
+        <label className={styles.label} htmlFor="login-password">
+          Password
+        </label>
+        <input
+          className={styles.input}
+          disabled={isLocked}
+          id="login-password"
+          name="password"
+          onChange={(event) => setPassword(event.target.value)}
+          required
+          type="password"
+          value={password}
+        />
       </div>
       <button className={styles.submit} disabled={isSubmitting || isLocked} type="submit">
         {isLocked ? `Try again in ${lockoutSeconds}s` : isSubmitting ? 'Signing in…' : 'Sign in'}

@@ -1,11 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { ConfigService } from '@nestjs/config';
-import {
-  PaymentStatus,
-  BookingIntentStatus,
-  PaymentEventSource,
-} from '@prisma/client';
+import { PaymentStatus, BookingIntentStatus, PaymentEventSource } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { StripeService } from '../common/stripe.service';
 import { enforceTransition } from './payment-state-machine';
@@ -50,11 +46,17 @@ export class PaymentCronService {
             await this.paymentRefundService.recoverScheduledCancellationRefund(refund.id);
           }
         } catch (error: unknown) {
-          this.logger.error(`Cancellation refund recovery failed for ${refund.id}: ${error instanceof Error ? error.message : String(error)}`, error instanceof Error ? error.stack : undefined);
+          this.logger.error(
+            `Cancellation refund recovery failed for ${refund.id}: ${error instanceof Error ? error.message : String(error)}`,
+            error instanceof Error ? error.stack : undefined,
+          );
         }
       }
     } catch (error: unknown) {
-      this.logger.error(`Cancellation refund recovery sweep failed: ${error instanceof Error ? error.message : String(error)}`, error instanceof Error ? error.stack : undefined);
+      this.logger.error(
+        `Cancellation refund recovery sweep failed: ${error instanceof Error ? error.message : String(error)}`,
+        error instanceof Error ? error.stack : undefined,
+      );
     }
   }
 
@@ -63,10 +65,7 @@ export class PaymentCronService {
     const start = Date.now();
     this.logger.log('Starting authorization expiry sweep...');
 
-    const expireMinutes = this.configService.get<number>(
-      'PAYMENT_AUTH_EXPIRE_MINUTES',
-      60,
-    );
+    const expireMinutes = this.configService.get<number>('PAYMENT_AUTH_EXPIRE_MINUTES', 60);
     const cutoff = new Date(Date.now() - expireMinutes * 60 * 1000);
 
     let expiredCount = 0;
@@ -83,10 +82,9 @@ export class PaymentCronService {
 
       for (const payment of payments) {
         try {
-          const stripePaymentIntent =
-            await this.stripeService.retrievePaymentIntent(
-              payment.stripePaymentIntentId,
-            );
+          const stripePaymentIntent = await this.stripeService.retrievePaymentIntent(
+            payment.stripePaymentIntentId,
+          );
 
           if (stripePaymentIntent.status === 'succeeded') {
             await this.reconcileSucceededAuthorization({
@@ -103,16 +101,12 @@ export class PaymentCronService {
           enforceTransition(PaymentStatus.AUTHORIZED, PaymentStatus.EXPIRED);
 
           if (stripePaymentIntent.status !== 'canceled') {
-            await this.stripeService.cancelPaymentIntent(
-              payment.stripePaymentIntentId,
-            );
+            await this.stripeService.cancelPaymentIntent(payment.stripePaymentIntentId);
           }
 
           await this.expireAuthorization(payment);
 
-          this.logger.log(
-            `Expired payment ${payment.id} (PI: ${payment.stripePaymentIntentId})`,
-          );
+          this.logger.log(`Expired payment ${payment.id} (PI: ${payment.stripePaymentIntentId})`);
           expiredCount++;
         } catch (error) {
           failureCount++;
@@ -164,9 +158,14 @@ export class PaymentCronService {
     const start = Date.now();
     this.logger.log('Starting stale lock detection...');
 
-    const rawTimeout = this.configService.get<string | number>('IDEMPOTENCY_LOCK_TIMEOUT_MINUTES', 5);
-    const parsedMinutes = typeof rawTimeout === 'number' ? rawTimeout : parseInt(String(rawTimeout), 10);
-    const lockTimeoutMinutes = Number.isFinite(parsedMinutes) && parsedMinutes > 0 ? parsedMinutes : 5;
+    const rawTimeout = this.configService.get<string | number>(
+      'IDEMPOTENCY_LOCK_TIMEOUT_MINUTES',
+      5,
+    );
+    const parsedMinutes =
+      typeof rawTimeout === 'number' ? rawTimeout : parseInt(String(rawTimeout), 10);
+    const lockTimeoutMinutes =
+      Number.isFinite(parsedMinutes) && parsedMinutes > 0 ? parsedMinutes : 5;
     const lockCutoff = new Date(Date.now() - lockTimeoutMinutes * 60 * 1000);
 
     try {
@@ -180,9 +179,7 @@ export class PaymentCronService {
       });
 
       const duration = Date.now() - start;
-      this.logger.log(
-        `Stale lock detection completed in ${duration}ms. Cleared: ${result.count}`,
-      );
+      this.logger.log(`Stale lock detection completed in ${duration}ms. Cleared: ${result.count}`);
     } catch (error) {
       this.logger.error(
         `Stale lock detection failed: ${(error as Error).message}`,
@@ -197,10 +194,7 @@ export class PaymentCronService {
     version: number;
     amount: number;
   }): Promise<void> {
-    const maxAttempts = this.configService.get<number>(
-      'PAYMENT_MAX_ATTEMPTS',
-      2,
-    );
+    const maxAttempts = this.configService.get<number>('PAYMENT_MAX_ATTEMPTS', 2);
 
     const newStatus = await this.prisma.$transaction(async (tx) => {
       const bookingIntent = await tx.bookingIntent.findUnique({
@@ -245,9 +239,7 @@ export class PaymentCronService {
       return newStatus;
     });
 
-    this.logger.log(
-      `Updated booking intent ${payment.bookingIntentId} to ${newStatus}`,
-    );
+    this.logger.log(`Updated booking intent ${payment.bookingIntentId} to ${newStatus}`);
   }
 
   private async reconcileSucceededAuthorization(payment: {

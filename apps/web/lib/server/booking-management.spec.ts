@@ -27,7 +27,9 @@ const resolvePath = (specifier: string): string => {
 
 const nextAuthPath = resolvePath('next-auth');
 const originalNextAuthModule = testRequire.cache[nextAuthPath];
-testRequire.cache[nextAuthPath] = { exports: { getServerSession, default: { getServerSession } } } as NodeModule;
+testRequire.cache[nextAuthPath] = {
+  exports: { getServerSession, default: { getServerSession } },
+} as NodeModule;
 const serverOnlyPath = resolvePath('server-only');
 const originalServerOnlyModule = testRequire.cache[serverOnlyPath];
 testRequire.cache[serverOnlyPath] = { exports: {} } as NodeModule;
@@ -214,7 +216,10 @@ describe('booking-management server domain module', () => {
     it('maps an authenticated upstream booking list to a shared view stripping provider IDs', async () => {
       let requestedUrl = '';
       let requestedInit: RequestInit | undefined;
-      globalThis.fetch = async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
+      globalThis.fetch = async (
+        input: RequestInfo | URL,
+        init?: RequestInit,
+      ): Promise<Response> => {
         requestedUrl = String(input);
         requestedInit = init;
         return new Response(
@@ -237,15 +242,30 @@ describe('booking-management server domain module', () => {
         assert.strictEqual(outcome.data.bookings[0].pnrReference, 'PNR123');
         assert.strictEqual(outcome.data.bookings[0].totalAmount, '499.00');
         assert.strictEqual(outcome.data.bookings[0].currency, 'USD');
-        assert.deepEqual(outcome.data.bookings[0].airline, { name: 'Mock Horizon Air', iataCode: 'HZ' });
-        assert.deepEqual(outcome.data.bookings[0].origin, { iataCode: 'SFO', city: 'San Francisco' });
-        assert.deepEqual(outcome.data.bookings[0].destination, { iataCode: 'JFK', city: 'New York' });
+        assert.deepEqual(outcome.data.bookings[0].airline, {
+          name: 'Mock Horizon Air',
+          iataCode: 'HZ',
+        });
+        assert.deepEqual(outcome.data.bookings[0].origin, {
+          iataCode: 'SFO',
+          city: 'San Francisco',
+        });
+        assert.deepEqual(outcome.data.bookings[0].destination, {
+          iataCode: 'JFK',
+          city: 'New York',
+        });
         assert.strictEqual(outcome.data.bookings[0].departureAt, timestamp);
         assert.strictEqual(outcome.data.bookings[0].arrivalAt, arrivalTimestamp);
       }
-      assert.match(requestedUrl, /^http:\/\/private-api\.example\/api\/bookings\?tab=upcoming&page=1&limit=10$/);
+      assert.match(
+        requestedUrl,
+        /^http:\/\/private-api\.example\/api\/bookings\?tab=upcoming&page=1&limit=10$/,
+      );
       assert.strictEqual(requestedInit?.method, 'GET');
-      assert.strictEqual((requestedInit?.headers as HeadersInit & { Authorization?: string }).Authorization, 'Bearer session-token-abc');
+      assert.strictEqual(
+        (requestedInit?.headers as HeadersInit & { Authorization?: string }).Authorization,
+        'Bearer session-token-abc',
+      );
 
       // Verify no provider secrets leaked
       const serialized = JSON.stringify(outcome);
@@ -307,7 +327,10 @@ describe('booking-management server domain module', () => {
     });
 
     it('handles 401 and 403 upstream errors properly', async () => {
-      for (const [status, expectedReason] of [[401, 'UNAUTHENTICATED'], [403, 'FORBIDDEN']] as const) {
+      for (const [status, expectedReason] of [
+        [401, 'UNAUTHENTICATED'],
+        [403, 'FORBIDDEN'],
+      ] as const) {
         globalThis.fetch = async (): Promise<Response> => {
           return new Response(JSON.stringify({ message: 'Forbidden' }), { status });
         };
@@ -408,8 +431,14 @@ describe('booking-management server domain module', () => {
         assert.strictEqual(outcome.data.disruption?.activeRevisionId, 'rev-uuid-789');
         assert.strictEqual(outcome.data.disruption?.isMaterial, true);
         assert.strictEqual(outcome.data.disruption?.stabilizationWarning, true);
-        assert.deepEqual(outcome.data.disruption?.incrementalSummary, { isRoutingChanged: false, sliceSummaries: [] });
-        assert.deepEqual(outcome.data.disruption?.cumulativeSummary, { isRoutingChanged: false, sliceSummaries: [] });
+        assert.deepEqual(outcome.data.disruption?.incrementalSummary, {
+          isRoutingChanged: false,
+          sliceSummaries: [],
+        });
+        assert.deepEqual(outcome.data.disruption?.cumulativeSummary, {
+          isRoutingChanged: false,
+          sliceSummaries: [],
+        });
       }
     });
 
@@ -579,7 +608,10 @@ describe('booking-management server domain module', () => {
     it('executes cancellation mutation fast-fail and maps result', async () => {
       let attempts = 0;
       let requestedBody = '';
-      globalThis.fetch = async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
+      globalThis.fetch = async (
+        input: RequestInfo | URL,
+        init?: RequestInit,
+      ): Promise<Response> => {
         attempts += 1;
         requestedBody = String(init?.body);
         return new Response(
@@ -643,13 +675,19 @@ describe('booking-management server domain module', () => {
         assert.strictEqual(outcome.data.ok, true);
       }
       assert.strictEqual(attempts, 1);
-      assert.match(requestedUrl, /\/api\/bookings\/booking-uuid-001\/disruptions\/rev-uuid-001\/acknowledge$/);
+      assert.match(
+        requestedUrl,
+        /\/api\/bookings\/booking-uuid-001\/disruptions\/rev-uuid-001\/acknowledge$/,
+      );
     });
 
     it('maps 409 conflict upstream to STALE_REVISION reason', async () => {
       globalThis.fetch = async (): Promise<Response> => {
         return new Response(
-          JSON.stringify({ code: 'STALE_DISRUPTION_REVISION', message: 'A newer change exists and must be reviewed.' }),
+          JSON.stringify({
+            code: 'STALE_DISRUPTION_REVISION',
+            message: 'A newer change exists and must be reviewed.',
+          }),
           { status: 409 },
         );
       };
@@ -688,13 +726,19 @@ describe('booking-management server domain module', () => {
         assert.strictEqual(outcome.data.ok, true);
       }
       assert.strictEqual(attempts, 1);
-      assert.match(requestedUrl, /\/api\/bookings\/booking-uuid-001\/disruptions\/rev-uuid-001\/accept$/);
+      assert.match(
+        requestedUrl,
+        /\/api\/bookings\/booking-uuid-001\/disruptions\/rev-uuid-001\/accept$/,
+      );
     });
 
     it('maps 409 conflict upstream to STALE_REVISION reason on accept', async () => {
       globalThis.fetch = async (): Promise<Response> => {
         return new Response(
-          JSON.stringify({ code: 'STALE_DISRUPTION_REVISION', message: 'A newer change exists and must be reviewed.' }),
+          JSON.stringify({
+            code: 'STALE_DISRUPTION_REVISION',
+            message: 'A newer change exists and must be reviewed.',
+          }),
           { status: 409 },
         );
       };

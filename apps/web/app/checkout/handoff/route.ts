@@ -18,9 +18,11 @@ function getAuthenticatedSession(session: unknown): AuthenticatedSession | null 
     return null;
   }
 
-  if ('accessToken' in session
-    && typeof session.accessToken === 'string'
-    && session.accessToken.length > 0) {
+  if (
+    'accessToken' in session &&
+    typeof session.accessToken === 'string' &&
+    session.accessToken.length > 0
+  ) {
     return { accessToken: session.accessToken };
   }
 
@@ -28,8 +30,9 @@ function getAuthenticatedSession(session: unknown): AuthenticatedSession | null 
 }
 
 function hasValidSameOriginHeaders(request: Request): boolean {
-  const boundaryValues = [request.headers.get('origin'), request.headers.get('referer')]
-    .filter((value): value is string => value !== null && value !== 'null');
+  const boundaryValues = [request.headers.get('origin'), request.headers.get('referer')].filter(
+    (value): value is string => value !== null && value !== 'null',
+  );
   const configuredOrigin = process.env.NEXTAUTH_URL;
   let expectedOrigin = request.url;
   if (configuredOrigin) {
@@ -105,9 +108,10 @@ export async function POST(request: Request): Promise<NextResponse> {
   }
 
   const originHeader = request.headers.get('origin') || request.headers.get('referer');
-  const redirectTarget = originHeader && !originHeader.includes('null')
-    ? new URL('/checkout/passengers', originHeader).toString()
-    : request.url;
+  const redirectTarget =
+    originHeader && !originHeader.includes('null')
+      ? new URL('/checkout/passengers', originHeader).toString()
+      : request.url;
 
   return createHandoffRedirectResponse(redirectTarget, handoffToken);
 }

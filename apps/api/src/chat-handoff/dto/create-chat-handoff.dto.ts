@@ -16,8 +16,7 @@ export class IsAttestationValidAndConsistentConstraint implements ValidatorConst
     const hasHash =
       typeof dto.selectionAttestationHash === 'string' &&
       dto.selectionAttestationHash.trim().length > 0;
-    const hasAttestation =
-      typeof dto.attestation === 'string' && dto.attestation.trim().length > 0;
+    const hasAttestation = typeof dto.attestation === 'string' && dto.attestation.trim().length > 0;
 
     // At least one must be provided
     if (!hasHash && !hasAttestation) {
@@ -46,14 +45,18 @@ export class CreateChatHandoffDto {
   /**
    * Attestation hash or signed token of the offer selection, produced by the agent.
    */
-  @ValidateIf((o: CreateChatHandoffDto) => !o.attestation || o.selectionAttestationHash !== undefined)
+  @ValidateIf(
+    (o: CreateChatHandoffDto) => !o.attestation || o.selectionAttestationHash !== undefined,
+  )
   @IsString()
   selectionAttestationHash?: string;
 
   /**
    * Alias for selectionAttestationHash.
    */
-  @ValidateIf((o: CreateChatHandoffDto) => !o.selectionAttestationHash || o.attestation !== undefined)
+  @ValidateIf(
+    (o: CreateChatHandoffDto) => !o.selectionAttestationHash || o.attestation !== undefined,
+  )
   @IsString()
   attestation?: string;
 
@@ -65,5 +68,3 @@ export class CreateChatHandoffDto {
   @Validate(IsAttestationValidAndConsistentConstraint)
   selectedOfferIndex!: number;
 }
-
-

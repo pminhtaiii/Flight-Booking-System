@@ -75,7 +75,9 @@ export function AtLeastOneDateField(validationOptions?: ValidationOptions) {
           const obj = args.object as { date?: string; departureDate?: string };
           const hasDate = obj.date !== undefined && obj.date !== null && obj.date !== '';
           const hasDepartureDate =
-            obj.departureDate !== undefined && obj.departureDate !== null && obj.departureDate !== '';
+            obj.departureDate !== undefined &&
+            obj.departureDate !== null &&
+            obj.departureDate !== '';
           return hasDate || hasDepartureDate;
         },
         defaultMessage() {
@@ -95,7 +97,9 @@ export class FlightSearchQueryDto {
   origin!: string;
 
   @IsString()
-  @Matches(/^[A-Z]{3}$/, { message: 'destination must be a 3-character uppercase IATA airport code' })
+  @Matches(/^[A-Z]{3}$/, {
+    message: 'destination must be a 3-character uppercase IATA airport code',
+  })
   @Transform(({ value }) => (typeof value === 'string' ? value.trim().toUpperCase() : value))
   destination!: string;
 
@@ -127,5 +131,3 @@ export class FlightSearchQueryDto {
   @IsString()
   cabinClass?: string;
 }
-
-

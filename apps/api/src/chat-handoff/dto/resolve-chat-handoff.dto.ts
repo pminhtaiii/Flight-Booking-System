@@ -12,4 +12,3 @@ export class ResolveChatHandoffDto {
   @Matches(HANDOFF_CREDENTIAL_PATTERN)
   handoffToken?: string;
 }
-

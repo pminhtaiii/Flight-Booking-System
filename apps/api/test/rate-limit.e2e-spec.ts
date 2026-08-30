@@ -60,7 +60,6 @@ describe('Rate Limit and Lockout (E2E)', () => {
     await prisma.auditLog.deleteMany({});
     await prisma.user.deleteMany({});
 
-
     // Clear lockouts for all IPs by calling the test reset endpoint
     await request(app.getHttpServer())
       .post('/auth/test/reset-lockout')
@@ -246,6 +245,3 @@ describe('Rate Limit and Lockout (E2E)', () => {
       .expect(401);
   });
 });
-
-
-

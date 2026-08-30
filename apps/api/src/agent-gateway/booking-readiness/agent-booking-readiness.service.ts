@@ -1,10 +1,4 @@
-import {
-  Injectable,
-  NotFoundException,
-  Logger,
-  HttpException,
-  HttpStatus,
-} from '@nestjs/common';
+import { Injectable, NotFoundException, Logger, HttpException, HttpStatus } from '@nestjs/common';
 import { PrismaService } from '@/prisma/prisma.service';
 import { ProfileService } from '@/profile/profile.service';
 import { BookingReadinessService } from '@/booking-intent/booking-readiness.service';
@@ -215,11 +209,10 @@ export class AgentBookingReadinessService {
       });
 
       // 3. Call internal readiness service
-      const result = await this.bookingReadinessService.getAdvisoryReadiness(
-        userId,
-        internalDto,
-        { traceId: traceId || undefined, correlationId: correlationId || undefined },
-      );
+      const result = await this.bookingReadinessService.getAdvisoryReadiness(userId, internalDto, {
+        traceId: traceId || undefined,
+        correlationId: correlationId || undefined,
+      });
 
       // 4. Extract safe fields for projection
       const hasInlinePassengers = dto.passengers.some((p) => p.sourceType === 'inline');

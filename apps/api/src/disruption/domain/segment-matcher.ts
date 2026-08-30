@@ -13,7 +13,10 @@ export interface MatcherOutput {
   removed: NormalizedSegment[];
 }
 
-export function matchSegments(prevSegments: NormalizedSegment[], currSegments: NormalizedSegment[]): MatcherOutput {
+export function matchSegments(
+  prevSegments: NormalizedSegment[],
+  currSegments: NormalizedSegment[],
+): MatcherOutput {
   const matchedPrev = new Set<NormalizedSegment>();
   const matchedCurr = new Set<NormalizedSegment>();
   const matches: MatchResult[] = [];
@@ -28,7 +31,7 @@ export function matchSegments(prevSegments: NormalizedSegment[], currSegments: N
           prevSegment: prev,
           currSegment: curr,
           method: 'ID_MATCH',
-          confidence: 'HIGH'
+          confidence: 'HIGH',
         });
         matchedPrev.add(prev);
         matchedCurr.add(curr);
@@ -42,8 +45,8 @@ export function matchSegments(prevSegments: NormalizedSegment[], currSegments: N
     return `${seg.marketingCarrierIata}_${seg.flightNumber}_${seg.departureLocalDate}_${seg.departureAirportIata}`;
   };
 
-  const prevRemainingAfterT1 = prevSegments.filter(s => !matchedPrev.has(s));
-  const currRemainingAfterT1 = currSegments.filter(s => !matchedCurr.has(s));
+  const prevRemainingAfterT1 = prevSegments.filter((s) => !matchedPrev.has(s));
+  const currRemainingAfterT1 = currSegments.filter((s) => !matchedCurr.has(s));
 
   const prevByKey = new Map<string, NormalizedSegment[]>();
   for (const prev of prevRemainingAfterT1) {
@@ -68,7 +71,7 @@ export function matchSegments(prevSegments: NormalizedSegment[], currSegments: N
         prevSegment: prev,
         currSegment: curr,
         method: 'FLIGHT_KEY_MATCH',
-        confidence: 'HIGH'
+        confidence: 'HIGH',
       });
       matchedPrev.add(prev);
       matchedCurr.add(curr);
@@ -76,8 +79,8 @@ export function matchSegments(prevSegments: NormalizedSegment[], currSegments: N
   }
 
   // Pass 3: Tier 3 - Route + local departure date + nearest departure instant within six hours
-  const prevRemainingAfterT2 = prevSegments.filter(s => !matchedPrev.has(s));
-  const currRemainingAfterT2 = currSegments.filter(s => !matchedCurr.has(s));
+  const prevRemainingAfterT2 = prevSegments.filter((s) => !matchedPrev.has(s));
+  const currRemainingAfterT2 = currSegments.filter((s) => !matchedCurr.has(s));
 
   const potentialPairs: { prev: NormalizedSegment; curr: NormalizedSegment; diffMs: number }[] = [];
 
@@ -102,13 +105,13 @@ export function matchSegments(prevSegments: NormalizedSegment[], currSegments: N
     if (candidates.length > 0) {
       candidates.sort((a, b) => a.diffMs - b.diffMs);
       const minDiff = candidates[0].diffMs;
-      const closestCandidates = candidates.filter(c => c.diffMs === minDiff);
+      const closestCandidates = candidates.filter((c) => c.diffMs === minDiff);
 
       if (closestCandidates.length === 1) {
         potentialPairs.push({
           prev,
           curr: closestCandidates[0].curr,
-          diffMs: minDiff
+          diffMs: minDiff,
         });
       }
     }
@@ -120,7 +123,7 @@ export function matchSegments(prevSegments: NormalizedSegment[], currSegments: N
     if (matchedPrev.has(pair.prev) || matchedCurr.has(pair.curr)) {
       continue;
     }
-    const ties = potentialPairs.filter(p => p.curr === pair.curr && p.diffMs === pair.diffMs);
+    const ties = potentialPairs.filter((p) => p.curr === pair.curr && p.diffMs === pair.diffMs);
     if (ties.length > 1) {
       continue;
     }
@@ -129,25 +132,27 @@ export function matchSegments(prevSegments: NormalizedSegment[], currSegments: N
       prevSegment: pair.prev,
       currSegment: pair.curr,
       method: 'ROUTE_TIME_MATCH',
-      confidence: 'MEDIUM'
+      confidence: 'MEDIUM',
     });
     matchedPrev.add(pair.prev);
     matchedCurr.add(pair.curr);
   }
 
   // Pass 4: Tier 4 - Position Match (globalOrder)
-  const prevRemainingAfterT3 = prevSegments.filter(s => !matchedPrev.has(s));
-  const currRemainingAfterT3 = currSegments.filter(s => !matchedCurr.has(s));
+  const prevRemainingAfterT3 = prevSegments.filter((s) => !matchedPrev.has(s));
+  const currRemainingAfterT3 = currSegments.filter((s) => !matchedCurr.has(s));
 
   for (const prev of prevRemainingAfterT3) {
     for (const curr of currRemainingAfterT3) {
       if (matchedCurr.has(curr)) continue;
       if (prev.globalOrder === curr.globalOrder) {
         const sameSlice = prev.sliceOrder === curr.sliceOrder;
-        const shareDeparture = prev.departureAirportIata === curr.departureAirportIata ||
-                               prev.departureCity === curr.departureCity;
-        const shareArrival = prev.arrivalAirportIata === curr.arrivalAirportIata ||
-                             prev.arrivalCity === curr.arrivalCity;
+        const shareDeparture =
+          prev.departureAirportIata === curr.departureAirportIata ||
+          prev.departureCity === curr.departureCity;
+        const shareArrival =
+          prev.arrivalAirportIata === curr.arrivalAirportIata ||
+          prev.arrivalCity === curr.arrivalCity;
         const relatedRoute = shareDeparture || shareArrival;
 
         if (!sameSlice || !relatedRoute) {
@@ -158,7 +163,7 @@ export function matchSegments(prevSegments: NormalizedSegment[], currSegments: N
           prevSegment: prev,
           currSegment: curr,
           method: 'POSITION_MATCH',
-          confidence: 'LOW'
+          confidence: 'LOW',
         });
         matchedPrev.add(prev);
         matchedCurr.add(curr);
@@ -169,12 +174,12 @@ export function matchSegments(prevSegments: NormalizedSegment[], currSegments: N
 
   matches.sort((a, b) => a.prevSegment.globalOrder - b.prevSegment.globalOrder);
 
-  const added = currSegments.filter(s => !matchedCurr.has(s));
-  const removed = prevSegments.filter(s => !matchedPrev.has(s));
+  const added = currSegments.filter((s) => !matchedCurr.has(s));
+  const removed = prevSegments.filter((s) => !matchedPrev.has(s));
 
   return {
     matches,
     added,
-    removed
+    removed,
   };
 }

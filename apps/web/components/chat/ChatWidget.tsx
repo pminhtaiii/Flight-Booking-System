@@ -3,7 +3,11 @@
 import React, { Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useSession } from 'next-auth/react';
-import { BookingActionCard, parseActionRequiredEvent, type SafeActionRequiredEvent } from './BookingActionCard';
+import {
+  BookingActionCard,
+  parseActionRequiredEvent,
+  type SafeActionRequiredEvent,
+} from './BookingActionCard';
 import { CheckoutHandoffCard } from './CheckoutHandoffCard';
 import { createChatStreamRequest } from '@/lib/chatStream';
 import { actionHandoffSchema, type HandoffEvent } from '@shared/types/chat.types';
@@ -26,8 +30,14 @@ function consumeSseBlock(
   onHandoff?: (payload: unknown) => void,
 ): void {
   const lines = block.split(/\r?\n/);
-  const eventName = lines.find((line) => line.startsWith('event:'))?.slice('event:'.length).trim();
-  const data = lines.find((line) => line.startsWith('data:'))?.slice('data:'.length).trim();
+  const eventName = lines
+    .find((line) => line.startsWith('event:'))
+    ?.slice('event:'.length)
+    .trim();
+  const data = lines
+    .find((line) => line.startsWith('data:'))
+    ?.slice('data:'.length)
+    .trim();
 
   if (eventName === 'ACTION_REQUIRED' && data) {
     try {
@@ -68,16 +78,8 @@ type ConsumeChatStreamOptions = {
 };
 
 async function consumeChatStream(options: ConsumeChatStreamOptions): Promise<void> {
-  const {
-    message,
-    sessionId,
-    token,
-    signal,
-    onActionRequired,
-    onDone,
-    onHandoff,
-    onError,
-  } = options;
+  const { message, sessionId, token, signal, onActionRequired, onDone, onHandoff, onError } =
+    options;
   try {
     const response = await createChatStreamRequest({
       message,
@@ -185,7 +187,14 @@ function ChatWidgetInner(): JSX.Element {
         autoResumedRef.current = false;
       };
     }
-  }, [autoResume, activeSessionId, token, acceptActionRequiredEvent, handleDone, acceptHandoffEvent]);
+  }, [
+    autoResume,
+    activeSessionId,
+    token,
+    acceptActionRequiredEvent,
+    handleDone,
+    acceptHandoffEvent,
+  ]);
 
   const handleNavigate = (target: SafeActionRequiredEvent['target']): void => {
     const params = new URLSearchParams();

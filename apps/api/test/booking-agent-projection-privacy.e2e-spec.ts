@@ -18,7 +18,7 @@ describe('BookingAgentProjection Privacy Invariants (E2E)', () => {
       WHERE table_name = 'booking_agent_projections'
     `;
 
-    const columnNames = columns.map(c => c.column_name);
+    const columnNames = columns.map((c) => c.column_name);
 
     // Allowed columns
     expect(columnNames).toContain('bookingId');

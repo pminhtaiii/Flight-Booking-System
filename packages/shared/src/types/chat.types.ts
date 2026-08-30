@@ -89,4 +89,3 @@ export type BookingDetail = BookingSummary & {
   changeable?: boolean | null;
   refundable?: boolean | null;
 };
-

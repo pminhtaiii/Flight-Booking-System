@@ -117,13 +117,22 @@ describe('DuffelService cancellation recovery adapter', () => {
                 duration: 'PT2H30M',
                 aircraft: { name: 'Boeing 737' },
                 passengers: [{ cabin_class: 'economy' }],
-              }
-            ]
-          }
+              },
+            ],
+          },
         ],
         passengers: [
-          { id: 'pas_123', type: 'adult', title: 'Mr', given_name: 'John', family_name: 'Doe', born_on: '1990-01-01', email: 'john@example.com', phone_number: '+12345678' }
-        ]
+          {
+            id: 'pas_123',
+            type: 'adult',
+            title: 'Mr',
+            given_name: 'John',
+            family_name: 'Doe',
+            born_on: '1990-01-01',
+            email: 'john@example.com',
+            phone_number: '+12345678',
+          },
+        ],
       };
 
       const result = service.mapDuffelOrderToSnapshots(mockDuffelOrder);
@@ -150,10 +159,10 @@ describe('DuffelService cancellation recovery adapter', () => {
                 departing_at: '2026-08-20T10:00:00Z',
                 arriving_at: '2026-08-20T12:30:00Z',
                 duration: 'PT2H30M',
-              }
-            ]
-          }
-        ]
+              },
+            ],
+          },
+        ],
       };
 
       const result = service.mapDuffelOrderToSnapshots(mockLegacyDuffelOrder);
@@ -281,4 +290,3 @@ describe('DuffelService cancellation recovery adapter', () => {
     });
   });
 });
-

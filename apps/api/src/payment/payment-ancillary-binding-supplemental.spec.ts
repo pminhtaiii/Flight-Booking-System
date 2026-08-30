@@ -64,7 +64,7 @@ function createAncillaryFixture(options?: {
         {
           currentAncillarySelectionId: options?.currentSelectionId ?? 'selection-3',
           ancillaryVersion: options?.currentVersion ?? 3,
-        }
+        },
       ]),
     $executeRaw: jest.fn().mockResolvedValue(1),
     ancillarySelection: {
@@ -80,7 +80,18 @@ function createAncillaryFixture(options?: {
   };
   const prisma = {
     bookingIntent: {
-      findUnique: jest.fn().mockResolvedValue({ id: 'intent-1', status: 'PENDING', paymentAttemptCount: options?.paymentAttemptCount ?? 0, confirmedPrice: '100.00', currency: 'USD', userId: 'user-1', currentAncillarySelectionId: options?.currentSelectionId ?? 'selection-3', ancillaryVersion: options?.currentVersion ?? 3 }),
+      findUnique: jest
+        .fn()
+        .mockResolvedValue({
+          id: 'intent-1',
+          status: 'PENDING',
+          paymentAttemptCount: options?.paymentAttemptCount ?? 0,
+          confirmedPrice: '100.00',
+          currency: 'USD',
+          userId: 'user-1',
+          currentAncillarySelectionId: options?.currentSelectionId ?? 'selection-3',
+          ancillaryVersion: options?.currentVersion ?? 3,
+        }),
     },
     $transaction: jest.fn().mockImplementation(async (callback) => callback(transaction)),
     payment: { findFirst: jest.fn().mockResolvedValue(null) },
@@ -158,7 +169,18 @@ describe('PaymentService ancillary snapshot binding supplemental coverage', () =
     const payment = { id: 'payment-1', status: 'CREATED' };
     const prisma = {
       bookingIntent: {
-        findUnique: jest.fn().mockResolvedValue({ id: 'intent-1', status: 'PENDING', paymentAttemptCount: 0, confirmedPrice: '123.45', currency: 'USD', userId: 'user-1', currentAncillarySelectionId: null, ancillaryVersion: 0 }),
+        findUnique: jest
+          .fn()
+          .mockResolvedValue({
+            id: 'intent-1',
+            status: 'PENDING',
+            paymentAttemptCount: 0,
+            confirmedPrice: '123.45',
+            currency: 'USD',
+            userId: 'user-1',
+            currentAncillarySelectionId: null,
+            ancillaryVersion: 0,
+          }),
       },
       $transaction: jest.fn().mockImplementation(async (callback) => callback(prisma)),
       $queryRaw: jest.fn().mockResolvedValue([
@@ -246,12 +268,7 @@ describe('PaymentService ancillary snapshot binding supplemental coverage', () =
   it('records exact safe ancillary metadata without supplier or passenger payloads', async () => {
     const fixture = createAncillaryFixture();
 
-    await fixture.service.createPayment(
-      ancillaryDto,
-      'payment-key-1',
-      'user-1',
-      '127.0.0.1',
-    );
+    await fixture.service.createPayment(ancillaryDto, 'payment-key-1', 'user-1', '127.0.0.1');
 
     const expectedMetadata = {
       bookingIntentId: 'intent-1',

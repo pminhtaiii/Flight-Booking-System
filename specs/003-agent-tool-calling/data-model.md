@@ -107,39 +107,39 @@ Stores a traveler's persistent preferences and identity documents. One-to-one wi
 
 ### 1.1 Fields
 
-| Field | Type | Constraints | PII | Notes |
-|-------|------|-------------|-----|-------|
-| `id` | `String` | `@id @default(uuid())` | No | Primary key |
-| `userId` | `String` | `@unique`, FK → `User.id` | No | Enforces one-to-one |
-| `seatPreference` | `String?` | Optional | No | Enum-like: see allowed values below |
-| `classPreference` | `String?` | Optional | No | Enum-like: see allowed values below |
-| `preferredAirlines` | `String[]` | Default `[]` | No | Array of IATA 2-letter airline codes (e.g., `["VN", "SQ"]`) |
-| `blacklistedAirlines` | `String[]` | Default `[]` | No | Array of IATA 2-letter airline codes |
-| `dietaryNeeds` | `String?` | Optional | No | Free-text (e.g., `"vegetarian"`, `"halal"`) |
-| `nationality` | `String?` | Optional | No | ISO 3166-1 alpha-2 country code |
-| `passportNumber` | `String?` | Optional | **Yes** | **NEVER exposed through agent gateway** |
-| `passportExpiry` | `DateTime?` | Optional | **Yes** | **NEVER exposed through agent gateway** |
-| `createdAt` | `DateTime` | `@default(now())` | No | Immutable after creation |
-| `updatedAt` | `DateTime` | `@updatedAt` | No | Auto-managed by Prisma |
+| Field                 | Type        | Constraints               | PII     | Notes                                                       |
+| --------------------- | ----------- | ------------------------- | ------- | ----------------------------------------------------------- |
+| `id`                  | `String`    | `@id @default(uuid())`    | No      | Primary key                                                 |
+| `userId`              | `String`    | `@unique`, FK → `User.id` | No      | Enforces one-to-one                                         |
+| `seatPreference`      | `String?`   | Optional                  | No      | Enum-like: see allowed values below                         |
+| `classPreference`     | `String?`   | Optional                  | No      | Enum-like: see allowed values below                         |
+| `preferredAirlines`   | `String[]`  | Default `[]`              | No      | Array of IATA 2-letter airline codes (e.g., `["VN", "SQ"]`) |
+| `blacklistedAirlines` | `String[]`  | Default `[]`              | No      | Array of IATA 2-letter airline codes                        |
+| `dietaryNeeds`        | `String?`   | Optional                  | No      | Free-text (e.g., `"vegetarian"`, `"halal"`)                 |
+| `nationality`         | `String?`   | Optional                  | No      | ISO 3166-1 alpha-2 country code                             |
+| `passportNumber`      | `String?`   | Optional                  | **Yes** | **NEVER exposed through agent gateway**                     |
+| `passportExpiry`      | `DateTime?` | Optional                  | **Yes** | **NEVER exposed through agent gateway**                     |
+| `createdAt`           | `DateTime`  | `@default(now())`         | No      | Immutable after creation                                    |
+| `updatedAt`           | `DateTime`  | `@updatedAt`              | No      | Auto-managed by Prisma                                      |
 
 ### 1.2 Relationships
 
-| Relation | Target | Cardinality | FK | On Delete |
-|----------|--------|-------------|----|-----------|
-| `user` | `User` | One-to-one | `userId` → `User.id` | `Cascade` |
+| Relation | Target | Cardinality | FK                   | On Delete |
+| -------- | ------ | ----------- | -------------------- | --------- |
+| `user`   | `User` | One-to-one  | `userId` → `User.id` | `Cascade` |
 
 Inverse: `User.travelerProfile` (optional back-relation).
 
 ### 1.3 Validation Rules
 
-| Rule | Constraint | Enforcement Layer |
-|------|-----------|-------------------|
-| `seatPreference` must be one of: `window`, `aisle`, `no_preference` | Application-level enum check | `class-validator` DTO + service layer |
-| `classPreference` must be one of: `economy`, `premium_economy`, `business`, `first` | Application-level enum check | `class-validator` DTO + service layer |
-| `preferredAirlines` entries must be 2-character IATA codes | Regex `/^[A-Z0-9]{2}$/` per element | `class-validator` DTO |
-| `blacklistedAirlines` entries must be 2-character IATA codes | Regex `/^[A-Z0-9]{2}$/` per element | `class-validator` DTO |
-| `nationality` must be 2-character ISO country code | Regex `/^[A-Z]{2}$/` | `class-validator` DTO |
-| `passportNumber` and `passportExpiry` are write-only from agent perspective | Gateway `select` clause excludes these fields | `AgentGatewayService` Prisma query |
+| Rule                                                                                | Constraint                                    | Enforcement Layer                     |
+| ----------------------------------------------------------------------------------- | --------------------------------------------- | ------------------------------------- |
+| `seatPreference` must be one of: `window`, `aisle`, `no_preference`                 | Application-level enum check                  | `class-validator` DTO + service layer |
+| `classPreference` must be one of: `economy`, `premium_economy`, `business`, `first` | Application-level enum check                  | `class-validator` DTO + service layer |
+| `preferredAirlines` entries must be 2-character IATA codes                          | Regex `/^[A-Z0-9]{2}$/` per element           | `class-validator` DTO                 |
+| `blacklistedAirlines` entries must be 2-character IATA codes                        | Regex `/^[A-Z0-9]{2}$/` per element           | `class-validator` DTO                 |
+| `nationality` must be 2-character ISO country code                                  | Regex `/^[A-Z]{2}$/`                          | `class-validator` DTO                 |
+| `passportNumber` and `passportExpiry` are write-only from agent perspective         | Gateway `select` clause excludes these fields | `AgentGatewayService` Prisma query    |
 
 ### 1.4 PII Handling
 
@@ -178,51 +178,51 @@ Represents a flight reservation for a user. Many-to-one with `User`. Contains bo
 
 ### 2.1 Fields
 
-| Field | Type | Constraints | PII | Notes |
-|-------|------|-------------|-----|-------|
-| `id` | `String` | `@id @default(uuid())` | No | Primary key |
-| `userId` | `String` | FK → `User.id` | No | Many-to-one |
-| `pnrCode` | `String?` | Optional | **Yes** | Passenger Name Record — **NEVER exposed through gateway** |
-| `eTicketNumber` | `String?` | Optional | **Yes** | Electronic ticket number — **NEVER exposed through gateway** |
-| `status` | `BookingStatus` | Required, default `PENDING` | No | See enum + state transitions below |
-| `airline` | `String` | Required | No | IATA 2-letter airline code |
-| `flightNumber` | `String` | Required | No | e.g., `"VN302"` |
-| `origin` | `String` | Required | No | IATA 3-letter airport code |
-| `destination` | `String` | Required | No | IATA 3-letter airport code |
-| `departureTime` | `DateTime` | Required | No | UTC |
-| `arrivalTime` | `DateTime` | Required | No | UTC |
-| `duration` | `Int` | Required | No | Flight duration in minutes |
-| `stops` | `Int` | Required, default `0` | No | Number of layovers |
-| `fareClass` | `String?` | Optional | No | e.g., `"economy"`, `"business"` |
-| `price` | `Decimal` | Required | No | Fare amount |
-| `currency` | `String` | Required, default `"USD"` | No | ISO 4217 currency code |
-| `passengers` | `Int` | Required, default `1` | No | Number of passengers |
-| `baggageAllowance` | `String?` | Optional | No | e.g., `"23kg checked, 7kg carry-on"` |
-| `paymentReference` | `String?` | Optional | **Yes** | Payment gateway reference — **NEVER exposed through gateway** |
-| `createdAt` | `DateTime` | `@default(now())` | No | Immutable after creation |
-| `updatedAt` | `DateTime` | `@updatedAt` | No | Auto-managed by Prisma |
+| Field              | Type            | Constraints                 | PII     | Notes                                                         |
+| ------------------ | --------------- | --------------------------- | ------- | ------------------------------------------------------------- |
+| `id`               | `String`        | `@id @default(uuid())`      | No      | Primary key                                                   |
+| `userId`           | `String`        | FK → `User.id`              | No      | Many-to-one                                                   |
+| `pnrCode`          | `String?`       | Optional                    | **Yes** | Passenger Name Record — **NEVER exposed through gateway**     |
+| `eTicketNumber`    | `String?`       | Optional                    | **Yes** | Electronic ticket number — **NEVER exposed through gateway**  |
+| `status`           | `BookingStatus` | Required, default `PENDING` | No      | See enum + state transitions below                            |
+| `airline`          | `String`        | Required                    | No      | IATA 2-letter airline code                                    |
+| `flightNumber`     | `String`        | Required                    | No      | e.g., `"VN302"`                                               |
+| `origin`           | `String`        | Required                    | No      | IATA 3-letter airport code                                    |
+| `destination`      | `String`        | Required                    | No      | IATA 3-letter airport code                                    |
+| `departureTime`    | `DateTime`      | Required                    | No      | UTC                                                           |
+| `arrivalTime`      | `DateTime`      | Required                    | No      | UTC                                                           |
+| `duration`         | `Int`           | Required                    | No      | Flight duration in minutes                                    |
+| `stops`            | `Int`           | Required, default `0`       | No      | Number of layovers                                            |
+| `fareClass`        | `String?`       | Optional                    | No      | e.g., `"economy"`, `"business"`                               |
+| `price`            | `Decimal`       | Required                    | No      | Fare amount                                                   |
+| `currency`         | `String`        | Required, default `"USD"`   | No      | ISO 4217 currency code                                        |
+| `passengers`       | `Int`           | Required, default `1`       | No      | Number of passengers                                          |
+| `baggageAllowance` | `String?`       | Optional                    | No      | e.g., `"23kg checked, 7kg carry-on"`                          |
+| `paymentReference` | `String?`       | Optional                    | **Yes** | Payment gateway reference — **NEVER exposed through gateway** |
+| `createdAt`        | `DateTime`      | `@default(now())`           | No      | Immutable after creation                                      |
+| `updatedAt`        | `DateTime`      | `@updatedAt`                | No      | Auto-managed by Prisma                                        |
 
 ### 2.2 Relationships
 
-| Relation | Target | Cardinality | FK | On Delete |
-|----------|--------|-------------|----|-----------|
-| `user` | `User` | Many-to-one | `userId` → `User.id` | `Cascade` |
+| Relation | Target | Cardinality | FK                   | On Delete |
+| -------- | ------ | ----------- | -------------------- | --------- |
+| `user`   | `User` | Many-to-one | `userId` → `User.id` | `Cascade` |
 
 Inverse: `User.bookings` (array back-relation).
 
 ### 2.3 Validation Rules
 
-| Rule | Constraint | Enforcement Layer |
-|------|-----------|-------------------|
-| `origin` must be exactly 3 uppercase characters | Regex `/^[A-Z]{3}$/` | `class-validator` DTO + service layer |
-| `destination` must be exactly 3 uppercase characters | Regex `/^[A-Z]{3}$/` | `class-validator` DTO + service layer |
-| `origin` ≠ `destination` | Custom validator | Service layer |
-| `passengers` ≥ 1 | `@Min(1)` | `class-validator` DTO |
-| `price` ≥ 0 | `@Min(0)` | `class-validator` DTO |
-| `duration` ≥ 0 | `@Min(0)` | Service layer |
-| `stops` ≥ 0 | `@Min(0)` | Service layer |
-| `departureTime` < `arrivalTime` | Custom validator | Service layer |
-| `airline` must be 2-character IATA code | Regex `/^[A-Z0-9]{2}$/` | `class-validator` DTO |
+| Rule                                                 | Constraint              | Enforcement Layer                     |
+| ---------------------------------------------------- | ----------------------- | ------------------------------------- |
+| `origin` must be exactly 3 uppercase characters      | Regex `/^[A-Z]{3}$/`    | `class-validator` DTO + service layer |
+| `destination` must be exactly 3 uppercase characters | Regex `/^[A-Z]{3}$/`    | `class-validator` DTO + service layer |
+| `origin` ≠ `destination`                             | Custom validator        | Service layer                         |
+| `passengers` ≥ 1                                     | `@Min(1)`               | `class-validator` DTO                 |
+| `price` ≥ 0                                          | `@Min(0)`               | `class-validator` DTO                 |
+| `duration` ≥ 0                                       | `@Min(0)`               | Service layer                         |
+| `stops` ≥ 0                                          | `@Min(0)`               | Service layer                         |
+| `departureTime` < `arrivalTime`                      | Custom validator        | Service layer                         |
+| `airline` must be 2-character IATA code              | Regex `/^[A-Z0-9]{2}$/` | `class-validator` DTO                 |
 
 ### 2.4 PII Handling
 
@@ -269,12 +269,12 @@ Lifecycle states for a booking record.
 
 ### 3.1 Values
 
-| Value | Description |
-|-------|-------------|
-| `PENDING` | Booking created but not yet confirmed by airline/payment system |
-| `CONFIRMED` | Booking confirmed — seats reserved, payment processed |
-| `CANCELLED` | Booking cancelled by traveler or system |
-| `REFUNDED` | Booking cancelled and refund has been processed |
+| Value       | Description                                                     |
+| ----------- | --------------------------------------------------------------- |
+| `PENDING`   | Booking created but not yet confirmed by airline/payment system |
+| `CONFIRMED` | Booking confirmed — seats reserved, payment processed           |
+| `CANCELLED` | Booking cancelled by traveler or system                         |
+| `REFUNDED`  | Booking cancelled and refund has been processed                 |
 
 ### 3.2 State Transitions
 
@@ -288,6 +288,7 @@ stateDiagram-v2
 ```
 
 **Transition rules**:
+
 - `PENDING → CONFIRMED`: Only via payment confirmation (future write tool).
 - `PENDING → CANCELLED`: User-initiated or system timeout.
 - `CONFIRMED → CANCELLED`: User-initiated cancellation (future write tool).
@@ -317,10 +318,10 @@ A short-lived, cryptographically signed payload that proves the agent is acting 
 
 ### 4.1 Fields
 
-| Field | Type | Constraints | PII | Notes |
-|-------|------|-------------|-----|-------|
-| `userId` | `string` | Required, UUID format | No | The authenticated user's `User.id` |
-| `iat` | `number` | Required, Unix timestamp (seconds) | No | Issuance time — used for TTL validation |
+| Field    | Type     | Constraints                        | PII | Notes                                   |
+| -------- | -------- | ---------------------------------- | --- | --------------------------------------- |
+| `userId` | `string` | Required, UUID format              | No  | The authenticated user's `User.id`      |
+| `iat`    | `number` | Required, Unix timestamp (seconds) | No  | Issuance time — used for TTL validation |
 
 ### 4.2 Lifecycle
 
@@ -346,20 +347,20 @@ sequenceDiagram
 
 ### 4.3 Validation Rules
 
-| Rule | Constraint | Failure Response | Enforcement Layer |
-|------|-----------|------------------|-------------------|
-| HMAC signature must be valid | `crypto.timingSafeEqual` comparison | `401 Unauthorized` | `ClaimTokenService` (NestJS) |
-| `iat` must be within TTL window | `now() - iat <= CLAIM_TOKEN_TTL_SECONDS` (default: 300s) | `401 Unauthorized` | `ClaimTokenService` (NestJS) |
-| `userId` must reference an `ACTIVE` user | DB lookup: `User.status === ACTIVE` | `403 USER_INACTIVE` | `ClaimTokenService` (NestJS) |
-| TTL must be configurable without code changes | `CLAIM_TOKEN_TTL_SECONDS` env var | N/A | `ConfigService` |
+| Rule                                          | Constraint                                               | Failure Response    | Enforcement Layer            |
+| --------------------------------------------- | -------------------------------------------------------- | ------------------- | ---------------------------- |
+| HMAC signature must be valid                  | `crypto.timingSafeEqual` comparison                      | `401 Unauthorized`  | `ClaimTokenService` (NestJS) |
+| `iat` must be within TTL window               | `now() - iat <= CLAIM_TOKEN_TTL_SECONDS` (default: 300s) | `401 Unauthorized`  | `ClaimTokenService` (NestJS) |
+| `userId` must reference an `ACTIVE` user      | DB lookup: `User.status === ACTIVE`                      | `403 USER_INACTIVE` | `ClaimTokenService` (NestJS) |
+| TTL must be configurable without code changes | `CLAIM_TOKEN_TTL_SECONDS` env var                        | N/A                 | `ConfigService`              |
 
 ### 4.4 TypeScript Interface
 
 ```typescript
 // apps/api/src/agent-gateway/auth/claim-token.types.ts
 export interface ClaimTokenPayload {
-  userId: string;  // UUID
-  iat: number;     // Unix timestamp (seconds)
+  userId: string; // UUID
+  iat: number; // Unix timestamp (seconds)
 }
 ```
 
@@ -381,19 +382,19 @@ The in-memory state object managed by the LangGraph `StateGraph`. Tracks convers
 
 ### 5.1 Fields
 
-| Field | Type | Constraints | PII | Notes |
-|-------|------|-------------|-----|-------|
-| `messages` | `list[BaseMessage]` | Required, default `[]` | No* | LangChain message history (HumanMessage, AIMessage, ToolMessage). *User-typed PII is scrubbed before persistence but may exist transiently.* |
-| `iteration_count` | `int` | Required, default `0` | No | Tracks tool call iterations in the current turn. Reset per turn. |
-| `pending_confirmation` | `Optional[dict]` | Optional | No | Populated when graph suspends at confirmation gate. Contains proposed action details. |
+| Field                  | Type                | Constraints            | PII  | Notes                                                                                                                                        |
+| ---------------------- | ------------------- | ---------------------- | ---- | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| `messages`             | `list[BaseMessage]` | Required, default `[]` | No\* | LangChain message history (HumanMessage, AIMessage, ToolMessage). _User-typed PII is scrubbed before persistence but may exist transiently._ |
+| `iteration_count`      | `int`               | Required, default `0`  | No   | Tracks tool call iterations in the current turn. Reset per turn.                                                                             |
+| `pending_confirmation` | `Optional[dict]`    | Optional               | No   | Populated when graph suspends at confirmation gate. Contains proposed action details.                                                        |
 
 ### 5.2 Constraints
 
-| Rule | Constraint | Enforcement Layer |
-|------|-----------|-------------------|
-| `iteration_count` ≤ `MAX_TOOL_ITERATIONS` (default 5) | Router node checks before routing to tool node | `router.py` |
-| When `iteration_count` exceeds cap, route to response node | Graph edge condition | `router.py` |
-| `pending_confirmation` set only for `requires_confirmation=True` tools | Tool registry flag check | `router.py` |
+| Rule                                                                   | Constraint                                     | Enforcement Layer |
+| ---------------------------------------------------------------------- | ---------------------------------------------- | ----------------- |
+| `iteration_count` ≤ `MAX_TOOL_ITERATIONS` (default 5)                  | Router node checks before routing to tool node | `router.py`       |
+| When `iteration_count` exceeds cap, route to response node             | Graph edge condition                           | `router.py`       |
+| `pending_confirmation` set only for `requires_confirmation=True` tools | Tool registry flag check                       | `router.py`       |
 
 ### 5.3 Python TypedDict
 
@@ -457,15 +458,15 @@ model AuditLog {
 
 ### 6.2 Convention for Tool Call Entries
 
-| AuditLog Field | Value for Tool Call Entries | Notes |
-|----------------|----------------------------|-------|
-| `userId` | Claim token's `userId` | The user on whose behalf the tool was called |
-| `action` | `"TOOL_CALL"` | Fixed string for all agent tool calls |
-| `resourceType` | `"agent-gateway"` | Identifies the gateway module as the resource |
-| `resourceId` | Tool-specific (e.g., `"search_flights"`, `"get_user_preferences"`) | The tool name |
-| `metadata` | See JSON shape below | Structured telemetry |
-| `traceId` | Request-scoped trace ID | From gateway request context |
-| `correlationId` | Chat session ID or request correlation ID | Links to the originating conversation |
+| AuditLog Field  | Value for Tool Call Entries                                        | Notes                                         |
+| --------------- | ------------------------------------------------------------------ | --------------------------------------------- |
+| `userId`        | Claim token's `userId`                                             | The user on whose behalf the tool was called  |
+| `action`        | `"TOOL_CALL"`                                                      | Fixed string for all agent tool calls         |
+| `resourceType`  | `"agent-gateway"`                                                  | Identifies the gateway module as the resource |
+| `resourceId`    | Tool-specific (e.g., `"search_flights"`, `"get_user_preferences"`) | The tool name                                 |
+| `metadata`      | See JSON shape below                                               | Structured telemetry                          |
+| `traceId`       | Request-scoped trace ID                                            | From gateway request context                  |
+| `correlationId` | Chat session ID or request correlation ID                          | Links to the originating conversation         |
 
 ### 6.3 `metadata` JSON Shape
 
@@ -485,15 +486,15 @@ model AuditLog {
 }
 ```
 
-| Metadata Field | Type | Description |
-|---------------|------|-------------|
-| `toolName` | `string` | The tool invoked (e.g., `search_flights`, `get_user_preferences`, `list_user_bookings`) |
-| `responseSize` | `number` | Response payload size in bytes |
-| `durationMs` | `number` | End-to-end gateway processing time in milliseconds |
-| `claimTokenUserId` | `string` | The userId extracted from the claim token (redundant with `AuditLog.userId` for cross-verification) |
-| `parameters` | `object` | Sanitized tool input parameters (PII scrubbed) |
-| `success` | `boolean` | Whether the tool call succeeded |
-| `errorMessage` | `string?` | Error details if `success` is `false` |
+| Metadata Field     | Type      | Description                                                                                         |
+| ------------------ | --------- | --------------------------------------------------------------------------------------------------- |
+| `toolName`         | `string`  | The tool invoked (e.g., `search_flights`, `get_user_preferences`, `list_user_bookings`)             |
+| `responseSize`     | `number`  | Response payload size in bytes                                                                      |
+| `durationMs`       | `number`  | End-to-end gateway processing time in milliseconds                                                  |
+| `claimTokenUserId` | `string`  | The userId extracted from the claim token (redundant with `AuditLog.userId` for cross-verification) |
+| `parameters`       | `object`  | Sanitized tool input parameters (PII scrubbed)                                                      |
+| `success`          | `boolean` | Whether the tool call succeeded                                                                     |
+| `errorMessage`     | `string?` | Error details if `success` is `false`                                                               |
 
 ### 6.4 Query Patterns
 
@@ -523,20 +524,20 @@ Represents a single flight offer returned from the Amadeus Flight Offers Search 
 
 ### 7.1 Fields (PII-Safe — Exposed Through Gateway)
 
-| Field | Type | Constraints | PII | Notes |
-|-------|------|-------------|-----|-------|
-| `airline` | `string` | Required | No | IATA 2-letter airline code (e.g., `"VN"`) |
-| `flightNumber` | `string` | Required | No | Full flight number (e.g., `"VN302"`) |
-| `departureAirport` | `string` | Required | No | IATA 3-letter airport code (e.g., `"HAN"`) |
-| `arrivalAirport` | `string` | Required | No | IATA 3-letter airport code (e.g., `"NRT"`) |
-| `departureTime` | `string` (ISO 8601) | Required | No | UTC datetime |
-| `arrivalTime` | `string` (ISO 8601) | Required | No | UTC datetime |
-| `duration` | `number` | Required | No | Flight duration in minutes |
-| `stops` | `number` | Required | No | Number of layovers (0 = direct) |
-| `price` | `number` | Required | No | Fare amount |
-| `currency` | `string` | Required | No | ISO 4217 currency code |
-| `fareClass` | `string?` | Optional | No | Cabin class (e.g., `"ECONOMY"`, `"BUSINESS"`) |
-| `baggageAllowance` | `string?` | Optional | No | Baggage info (e.g., `"23kg checked"`) |
+| Field              | Type                | Constraints | PII | Notes                                         |
+| ------------------ | ------------------- | ----------- | --- | --------------------------------------------- |
+| `airline`          | `string`            | Required    | No  | IATA 2-letter airline code (e.g., `"VN"`)     |
+| `flightNumber`     | `string`            | Required    | No  | Full flight number (e.g., `"VN302"`)          |
+| `departureAirport` | `string`            | Required    | No  | IATA 3-letter airport code (e.g., `"HAN"`)    |
+| `arrivalAirport`   | `string`            | Required    | No  | IATA 3-letter airport code (e.g., `"NRT"`)    |
+| `departureTime`    | `string` (ISO 8601) | Required    | No  | UTC datetime                                  |
+| `arrivalTime`      | `string` (ISO 8601) | Required    | No  | UTC datetime                                  |
+| `duration`         | `number`            | Required    | No  | Flight duration in minutes                    |
+| `stops`            | `number`            | Required    | No  | Number of layovers (0 = direct)               |
+| `price`            | `number`            | Required    | No  | Fare amount                                   |
+| `currency`         | `string`            | Required    | No  | ISO 4217 currency code                        |
+| `fareClass`        | `string?`           | Optional    | No  | Cabin class (e.g., `"ECONOMY"`, `"BUSINESS"`) |
+| `baggageAllowance` | `string?`           | Optional    | No  | Baggage info (e.g., `"23kg checked"`)         |
 
 ### 7.2 Gateway Response Shape
 
@@ -549,9 +550,9 @@ export class FlightResultDto {
   flightNumber: string;
   departureAirport: string;
   arrivalAirport: string;
-  departureTime: string;     // ISO 8601
-  arrivalTime: string;       // ISO 8601
-  duration: number;          // minutes
+  departureTime: string; // ISO 8601
+  arrivalTime: string; // ISO 8601
+  duration: number; // minutes
   stops: number;
   price: number;
   currency: string;
@@ -562,20 +563,20 @@ export class FlightResultDto {
 
 ### 7.3 Source Mapping (Amadeus → FlightResultDto)
 
-| FlightResultDto Field | Amadeus API Path | Transformation |
-|-----------------------|------------------|----------------|
-| `airline` | `flightOffers[].itineraries[0].segments[0].carrierCode` | Direct |
-| `flightNumber` | `carrierCode + segments[0].number` | Concatenation |
-| `departureAirport` | `segments[0].departure.iataCode` | Direct |
-| `arrivalAirport` | `segments[-1].arrival.iataCode` | Last segment |
-| `departureTime` | `segments[0].departure.at` | ISO 8601 passthrough |
-| `arrivalTime` | `segments[-1].arrival.at` | Last segment, ISO 8601 |
-| `duration` | `itineraries[0].duration` | Parse ISO 8601 duration to minutes |
-| `stops` | `itineraries[0].segments.length - 1` | Computed |
-| `price` | `flightOffers[].price.total` | Parse to number |
-| `currency` | `flightOffers[].price.currency` | Direct |
-| `fareClass` | `travelerPricings[0].fareDetailsBySegment[0].cabin` | First traveler, first segment |
-| `baggageAllowance` | `travelerPricings[0].fareDetailsBySegment[0].includedCheckedBags` | Format to human-readable string |
+| FlightResultDto Field | Amadeus API Path                                                  | Transformation                     |
+| --------------------- | ----------------------------------------------------------------- | ---------------------------------- |
+| `airline`             | `flightOffers[].itineraries[0].segments[0].carrierCode`           | Direct                             |
+| `flightNumber`        | `carrierCode + segments[0].number`                                | Concatenation                      |
+| `departureAirport`    | `segments[0].departure.iataCode`                                  | Direct                             |
+| `arrivalAirport`      | `segments[-1].arrival.iataCode`                                   | Last segment                       |
+| `departureTime`       | `segments[0].departure.at`                                        | ISO 8601 passthrough               |
+| `arrivalTime`         | `segments[-1].arrival.at`                                         | Last segment, ISO 8601             |
+| `duration`            | `itineraries[0].duration`                                         | Parse ISO 8601 duration to minutes |
+| `stops`               | `itineraries[0].segments.length - 1`                              | Computed                           |
+| `price`               | `flightOffers[].price.total`                                      | Parse to number                    |
+| `currency`            | `flightOffers[].price.currency`                                   | Direct                             |
+| `fareClass`           | `travelerPricings[0].fareDetailsBySegment[0].cabin`               | First traveler, first segment      |
+| `baggageAllowance`    | `travelerPricings[0].fareDetailsBySegment[0].includedCheckedBags` | Format to human-readable string    |
 
 ---
 
@@ -583,16 +584,16 @@ export class FlightResultDto {
 
 ### New Prisma Additions
 
-| Addition | Type | Migration Impact |
-|----------|------|-----------------|
-| `BookingStatus` | Enum | `CREATE TYPE "BookingStatus"` |
+| Addition          | Type  | Migration Impact                   |
+| ----------------- | ----- | ---------------------------------- |
+| `BookingStatus`   | Enum  | `CREATE TYPE "BookingStatus"`      |
 | `TravelerProfile` | Model | `CREATE TABLE "traveler_profiles"` |
-| `Booking` | Model | `CREATE TABLE "bookings"` |
+| `Booking`         | Model | `CREATE TABLE "bookings"`          |
 
 ### Modified Models
 
-| Model | Change | Details |
-|-------|--------|---------|
+| Model  | Change        | Details                                                                    |
+| ------ | ------------- | -------------------------------------------------------------------------- |
 | `User` | Add relations | `travelerProfile TravelerProfile?` and `bookings Booking[]` back-relations |
 
 ### User Model Back-Relations
@@ -619,14 +620,14 @@ The existing `Booking` type in [packages/shared/src/types/index.ts](file:///c:/B
 
 All PII exclusion is **structural** — enforced by Prisma `select` clauses in the gateway service, not by post-query filtering or prompt instructions.
 
-| Entity | PII Fields | Exclusion Mechanism |
-|--------|-----------|---------------------|
-| `TravelerProfile` | `passportNumber`, `passportExpiry` | Prisma `select` omits fields in gateway query |
-| `Booking` | `pnrCode`, `eTicketNumber`, `paymentReference` | Prisma `select` omits fields in gateway query |
-| `FlightSearchResult` | None | Transient; no PII in Amadeus response |
-| `ClaimTokenPayload` | None | Contains only `userId` + `iat` |
-| `AgentState.messages` | Potentially in user input | PII scrubbed before persistence by `pii_scrubber.py` |
-| `AuditLog.metadata` | None allowed | `parameters` field is sanitized before logging |
+| Entity                | PII Fields                                     | Exclusion Mechanism                                  |
+| --------------------- | ---------------------------------------------- | ---------------------------------------------------- |
+| `TravelerProfile`     | `passportNumber`, `passportExpiry`             | Prisma `select` omits fields in gateway query        |
+| `Booking`             | `pnrCode`, `eTicketNumber`, `paymentReference` | Prisma `select` omits fields in gateway query        |
+| `FlightSearchResult`  | None                                           | Transient; no PII in Amadeus response                |
+| `ClaimTokenPayload`   | None                                           | Contains only `userId` + `iat`                       |
+| `AgentState.messages` | Potentially in user input                      | PII scrubbed before persistence by `pii_scrubber.py` |
+| `AuditLog.metadata`   | None allowed                                   | `parameters` field is sanitized before logging       |
 
 > [!IMPORTANT]
 > PII fields are excluded at the **query level**, not the serialization level. The data never leaves the database for gateway responses. This is the structural guarantee required by FR-005.

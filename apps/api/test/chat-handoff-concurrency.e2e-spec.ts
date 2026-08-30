@@ -76,7 +76,6 @@ describe('Chat Handoff Concurrency (E2E)', () => {
     await prisma.auditLog.deleteMany({});
     await prisma.user.deleteMany({});
 
-
     // Create test user
     const uA = await prisma.user.create({
       data: {
@@ -101,7 +100,7 @@ describe('Chat Handoff Concurrency (E2E)', () => {
         adults: 1,
         children: 0,
         infants: 0,
-        price: new Prisma.Decimal(100.00),
+        price: new Prisma.Decimal(100.0),
         currency: 'USD',
         ...data,
       },
@@ -154,10 +153,12 @@ describe('Chat Handoff Concurrency (E2E)', () => {
     });
 
     let duffelCallCount = 0;
-    const duffelSpy = jest.spyOn(duffelService['duffel'].offers, 'get').mockImplementation(async () => {
-      duffelCallCount++;
-      return liveOfferResponse();
-    });
+    const duffelSpy = jest
+      .spyOn(duffelService['duffel'].offers, 'get')
+      .mockImplementation(async () => {
+        duffelCallCount++;
+        return liveOfferResponse();
+      });
 
     const numRequests = 100;
     const reqBody = {
@@ -174,11 +175,11 @@ describe('Chat Handoff Concurrency (E2E)', () => {
       ],
     };
 
-    const requests = Array.from({ length: numRequests }, () => 
+    const requests = Array.from({ length: numRequests }, () =>
       request(app.getHttpServer())
         .post('/api/bookings/intent')
         .set('Authorization', `Bearer ${tokenA}`)
-        .send(reqBody)
+        .send(reqBody),
     );
 
     const responses = await Promise.all(requests);
@@ -197,5 +198,3 @@ describe('Chat Handoff Concurrency (E2E)', () => {
     expect(updatedHandoff?.consumedByBookingIntentId).toBe(successResponses[0].body.intentId);
   });
 });
-
-

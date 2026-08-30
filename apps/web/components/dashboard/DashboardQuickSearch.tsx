@@ -39,7 +39,10 @@ export function DashboardQuickSearch(): JSX.Element {
     <form onSubmit={handleSubmit} className="card space-y-4" noValidate>
       <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
         <div>
-          <label htmlFor="dashboard-origin" className="block text-sm font-medium text-text-secondary mb-1">
+          <label
+            htmlFor="dashboard-origin"
+            className="block text-sm font-medium text-text-secondary mb-1"
+          >
             Departure airport code
           </label>
           <input
@@ -53,7 +56,10 @@ export function DashboardQuickSearch(): JSX.Element {
           />
         </div>
         <div>
-          <label htmlFor="dashboard-destination" className="block text-sm font-medium text-text-secondary mb-1">
+          <label
+            htmlFor="dashboard-destination"
+            className="block text-sm font-medium text-text-secondary mb-1"
+          >
             Arrival airport code
           </label>
           <input
@@ -67,7 +73,10 @@ export function DashboardQuickSearch(): JSX.Element {
           />
         </div>
         <div>
-          <label htmlFor="dashboard-departure-date" className="block text-sm font-medium text-text-secondary mb-1">
+          <label
+            htmlFor="dashboard-departure-date"
+            className="block text-sm font-medium text-text-secondary mb-1"
+          >
             Departure date
           </label>
           <input

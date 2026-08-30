@@ -38,9 +38,7 @@ export class ReconciliationService {
     this.logger.log('Starting reconciliation cron job...');
     try {
       const result = await this.reconcile();
-      this.logger.log(
-        `Reconciliation cron complete. Result: ${JSON.stringify(result)}`
-      );
+      this.logger.log(`Reconciliation cron complete. Result: ${JSON.stringify(result)}`);
     } catch (error) {
       this.logger.error('Error occurred during reconciliation cron execution:', error);
     }
@@ -59,10 +57,7 @@ export class ReconciliationService {
         OR: [
           { currentFinalArrivalAt: { lte: now } },
           {
-            AND: [
-              { currentFinalArrivalAt: null },
-              { departureAt: { lte: now } },
-            ],
+            AND: [{ currentFinalArrivalAt: null }, { departureAt: { lte: now } }],
           },
         ],
       },
@@ -75,7 +70,9 @@ export class ReconciliationService {
     let stale = 0;
     for (const booking of staleBookings) {
       try {
-        const completedBooking = await this.bookingLifecycleService.checkAndCompleteBooking(booking as BookingWithRelations);
+        const completedBooking = await this.bookingLifecycleService.checkAndCompleteBooking(
+          booking as BookingWithRelations,
+        );
         if (completedBooking.status === 'COMPLETED') {
           stale++;
         }
@@ -96,16 +93,10 @@ export class ReconciliationService {
         },
         AND: [
           {
-            OR: [
-              { nextDuffelSyncAt: null },
-              { nextDuffelSyncAt: { lte: now } },
-            ],
+            OR: [{ nextDuffelSyncAt: null }, { nextDuffelSyncAt: { lte: now } }],
           },
           {
-            OR: [
-              { syncLockedAt: null },
-              { syncLockedAt: { lt: fiveMinutesAgo } },
-            ],
+            OR: [{ syncLockedAt: null }, { syncLockedAt: { lt: fiveMinutesAgo } }],
           },
         ],
       },
@@ -148,7 +139,7 @@ export class ReconciliationService {
             currentBudget,
             limit: totalLimit,
             metric: 'budget_blocked',
-          })
+          }),
         );
         budgetBlocked++;
         continue;
@@ -164,7 +155,7 @@ export class ReconciliationService {
             newBudget,
             limit: totalLimit,
             metric: 'budget_blocked',
-          })
+          }),
         );
         await this.cacheService.decr(budgetKey);
         budgetBlocked++;
@@ -196,7 +187,7 @@ export class ReconciliationService {
             bookingId: booking.id,
             status: result.status,
             metric: 'reconciliation_success',
-          })
+          }),
         );
       } catch (error: unknown) {
         failed++;
@@ -230,12 +221,21 @@ export class ReconciliationService {
             nextDuffelSyncAt: nextSyncAt.toISOString(),
             metric: 'reconciliation_failure',
           }),
-          err.stack
+          err.stack,
         );
       }
     }
 
-    const summary = { selected, processed, unchanged, changed, failed, deferred, stale, budgetBlocked };
+    const summary = {
+      selected,
+      processed,
+      unchanged,
+      changed,
+      failed,
+      deferred,
+      stale,
+      budgetBlocked,
+    };
     this.logger.log(`Reconciliation run summary: ${JSON.stringify(summary)}`);
     return summary;
   }

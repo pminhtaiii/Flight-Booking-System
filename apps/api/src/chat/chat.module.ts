@@ -16,4 +16,3 @@ import { ChatMessageCryptoService } from './chat-message-crypto.service';
   exports: [ChatService, ChatMessageCryptoService, AgentChatAccessService],
 })
 export class ChatModule {}
-

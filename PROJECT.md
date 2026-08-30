@@ -21,20 +21,18 @@ Data flow is described in `context/architecture.md`.
 
 ## Milestones
 
-| #   | Name                                        | Scope                                                                                                 | Dependencies | Status      |
-| --- | ------------------------------------------- | ----------------------------------------------------------------------------------------------------- | ------------ | ----------- |
-| M1  | Scaffold Monorepo & Shared Infrastructure   | Initialize root config, folders, tsconfigs, and linters. Set up layouts.                              | None         | DONE        |
-| M2  | Database Schema & Health Endpoint           | Set up Prisma PostgreSQL User and AuditLog models. Expose health check endpoint.                      | M1           | DONE        |
-| M3  | User Registration & PII-Safe Logging        | Implement registration API and UI, Zod schema validation, password hashing, and audit log.            | M2           | DONE        |
-| M4  | User Login & Redis Rate-Limited Lockout     | Implement login API and UI, Redis rate-limiting (5 failures), and escalating lockout (1, 2, 4, 8m).   | M3           | DONE        |
-| M5  | JWT Session Handshake & Protected Dashboard | Configure NextAuth.js, JWT session strategy, JwtAuthGuard, middleware redirects, and dashboard fetch. | M4           | DONE        |
-| M6  | Polish, E2E Verification & Stress Testing   | Unified E2E flow pass, concurrency testing, and linting/type-checking.                                | M5           | DONE        |
-| M7  | Chatbot Agent Service                       | Python/FastAPI service with JWT auth, safety guardrails, SSE streaming, memory, and persistence.      | M6           | DONE        |
-| M8  | Agent Tool-Calling & Data Access           | PII-stripped Agent Gateway module, HMAC claim authentication, LangGraph tool state machine.           | M7           | DONE        |
-| M9  | Map Integration                             | Interactive map visualization with airport markers, great-circle flight route arcs, and auto-complete. | M8           | DONE        |
-| M10 | Duffel Flight Search Service                | Implement deterministic Duffel-based flight search, caching, budget limits, history analytics, detail view with live re-pricing, and expired offer recovery UX. | M9 | DONE |
-
-
+| #   | Name                                        | Scope                                                                                                                                                           | Dependencies | Status |
+| --- | ------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------ | ------ |
+| M1  | Scaffold Monorepo & Shared Infrastructure   | Initialize root config, folders, tsconfigs, and linters. Set up layouts.                                                                                        | None         | DONE   |
+| M2  | Database Schema & Health Endpoint           | Set up Prisma PostgreSQL User and AuditLog models. Expose health check endpoint.                                                                                | M1           | DONE   |
+| M3  | User Registration & PII-Safe Logging        | Implement registration API and UI, Zod schema validation, password hashing, and audit log.                                                                      | M2           | DONE   |
+| M4  | User Login & Redis Rate-Limited Lockout     | Implement login API and UI, Redis rate-limiting (5 failures), and escalating lockout (1, 2, 4, 8m).                                                             | M3           | DONE   |
+| M5  | JWT Session Handshake & Protected Dashboard | Configure NextAuth.js, JWT session strategy, JwtAuthGuard, middleware redirects, and dashboard fetch.                                                           | M4           | DONE   |
+| M6  | Polish, E2E Verification & Stress Testing   | Unified E2E flow pass, concurrency testing, and linting/type-checking.                                                                                          | M5           | DONE   |
+| M7  | Chatbot Agent Service                       | Python/FastAPI service with JWT auth, safety guardrails, SSE streaming, memory, and persistence.                                                                | M6           | DONE   |
+| M8  | Agent Tool-Calling & Data Access            | PII-stripped Agent Gateway module, HMAC claim authentication, LangGraph tool state machine.                                                                     | M7           | DONE   |
+| M9  | Map Integration                             | Interactive map visualization with airport markers, great-circle flight route arcs, and auto-complete.                                                          | M8           | DONE   |
+| M10 | Duffel Flight Search Service                | Implement deterministic Duffel-based flight search, caching, budget limits, history analytics, detail view with live re-pricing, and expired offer recovery UX. | M9           | DONE   |
 
 ## Interface Contracts
 

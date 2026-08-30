@@ -251,9 +251,7 @@ const BookingManagementFailureSchema = z
   .strict();
 
 /** Creates a strict, discriminated outcome schema for a prepared view. */
-export const BookingManagementOutcomeSchema = <TSchema extends z.ZodTypeAny>(
-  dataSchema: TSchema,
-) =>
+export const BookingManagementOutcomeSchema = <TSchema extends z.ZodTypeAny>(dataSchema: TSchema) =>
   z.discriminatedUnion('ok', [
     z.object({ ok: z.literal(true), data: dataSchema }).strict(),
     BookingManagementFailureSchema,

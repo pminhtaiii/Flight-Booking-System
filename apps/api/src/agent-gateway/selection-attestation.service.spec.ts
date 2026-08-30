@@ -65,9 +65,7 @@ describe('SelectionAttestationService', () => {
       const version = 3;
       const issuedAt = new Date(Date.now() - 5000).toISOString();
       const expiresAt = new Date(Date.now() + 15 * 60000).toISOString();
-      const offers = [
-        { flightOfferId: 'offer-1', duffelOfferId: 'duff-1' },
-      ];
+      const offers = [{ flightOfferId: 'offer-1', duffelOfferId: 'duff-1' }];
 
       const attestation = await service.signSelectionAttestation(
         userId,
@@ -316,13 +314,7 @@ describe('SelectionAttestationService', () => {
       ).rejects.toThrow(new UnauthorizedException('Invalid attestation format'));
 
       await expect(
-        service.verifySelectionAttestation(
-          '',
-          userId,
-          sessionId,
-          version,
-          offers,
-        ),
+        service.verifySelectionAttestation('', userId, sessionId, version, offers),
       ).rejects.toThrow(new UnauthorizedException('Invalid attestation format'));
 
       await expect(
@@ -366,13 +358,7 @@ describe('SelectionAttestationService', () => {
       const attestation = `sel_v1_${nonObjectJsonBase64}.validsignature`;
 
       await expect(
-        service.verifySelectionAttestation(
-          attestation,
-          userId,
-          sessionId,
-          version,
-          offers,
-        ),
+        service.verifySelectionAttestation(attestation, userId, sessionId, version, offers),
       ).rejects.toThrow(new UnauthorizedException('Invalid attestation payload'));
     });
   });
@@ -485,13 +471,9 @@ describe('SelectionAttestationService', () => {
       jest.spyOn(configService, 'get').mockReturnValue(null);
 
       await expect(
-        service.verifySelectionAttestation(
-          attestation,
-          'user-1',
-          'session-1',
-          1,
-          [{ flightOfferId: 'f1', duffelOfferId: 'd1' }],
-        ),
+        service.verifySelectionAttestation(attestation, 'user-1', 'session-1', 1, [
+          { flightOfferId: 'f1', duffelOfferId: 'd1' },
+        ]),
       ).rejects.toThrow('ATTESTATION_SECRET is not configured');
     });
   });
@@ -615,13 +597,7 @@ describe('SelectionAttestationService', () => {
       });
 
       await expect(
-        service.verifySelectionAttestation(
-          attestationV1,
-          userId,
-          sessionId,
-          version,
-          offers,
-        ),
+        service.verifySelectionAttestation(attestationV1, userId, sessionId, version, offers),
       ).rejects.toThrow(new UnauthorizedException('Invalid signature'));
     });
   });

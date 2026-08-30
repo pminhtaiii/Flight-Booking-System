@@ -94,7 +94,13 @@ describe('ChatMessageCryptoService', () => {
     const content = 'Flight to Hanoi confirmed for $450';
 
     // Calling convenience methods that are expected in T034
-    const encrypted = await (service as any).encryptMessageContent(messageId, sessionId, sender, type, content);
+    const encrypted = await (service as any).encryptMessageContent(
+      messageId,
+      sessionId,
+      sender,
+      type,
+      content,
+    );
     expect(encrypted.ciphertext).toBeDefined();
     expect(encrypted.keyVersion).toBe(1);
 
@@ -143,9 +149,7 @@ describe('ChatMessageCryptoService', () => {
       content: 'legacy fallback that should NOT be returned',
     };
 
-    await expect(
-      (service as any).decryptMessageContent(corruptMsg),
-    ).rejects.toThrow();
+    await expect((service as any).decryptMessageContent(corruptMsg)).rejects.toThrow();
   });
 
   it('should throw CryptoKeyUnavailableError when CHAT_ENCRYPTION_KEY is not configured', async () => {
@@ -161,7 +165,8 @@ describe('ChatMessageCryptoService', () => {
       ],
     }).compile();
 
-    const unconfiguredService = unconfiguredModule.get<ChatMessageCryptoService>(ChatMessageCryptoService);
+    const unconfiguredService =
+      unconfiguredModule.get<ChatMessageCryptoService>(ChatMessageCryptoService);
     expect(unconfiguredService.isConfigured()).toBe(false);
 
     await expect(
@@ -178,4 +183,3 @@ describe('ChatMessageCryptoService', () => {
     ).rejects.toThrow(/CHAT_ENCRYPTION_KEY is not configured/);
   });
 });
-

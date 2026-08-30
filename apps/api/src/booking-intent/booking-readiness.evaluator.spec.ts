@@ -1,12 +1,19 @@
 import { BookingReadinessEvaluator } from './booking-readiness.evaluator';
-import { DEFAULT_PASSPORT_ADVISORY_BUFFER_DAYS, MAX_PASSPORT_ADVISORY_BUFFER_DAYS, MIN_PASSPORT_ADVISORY_BUFFER_DAYS, parseBookingReadinessConfig } from './booking-readiness.config';
+import {
+  DEFAULT_PASSPORT_ADVISORY_BUFFER_DAYS,
+  MAX_PASSPORT_ADVISORY_BUFFER_DAYS,
+  MIN_PASSPORT_ADVISORY_BUFFER_DAYS,
+  parseBookingReadinessConfig,
+} from './booking-readiness.config';
 import type {
   BookingReadinessEvaluationInput,
   BookingReadinessPassengerInput,
   BookingReadinessResultReasonCode,
 } from './booking-readiness.types';
 
-function createPassenger(overrides: Partial<BookingReadinessPassengerInput> = {}): BookingReadinessPassengerInput {
+function createPassenger(
+  overrides: Partial<BookingReadinessPassengerInput> = {},
+): BookingReadinessPassengerInput {
   return {
     passengerType: 'ADULT',
     passengerOrdinal: 1,
@@ -29,7 +36,9 @@ function createPassenger(overrides: Partial<BookingReadinessPassengerInput> = {}
   };
 }
 
-function createInput(overrides: Partial<BookingReadinessEvaluationInput> = {}): BookingReadinessEvaluationInput {
+function createInput(
+  overrides: Partial<BookingReadinessEvaluationInput> = {},
+): BookingReadinessEvaluationInput {
   return {
     passengers: [createPassenger()],
     segments: [{ originCountryCode: 'US', destinationCountryCode: 'US' }],
@@ -48,7 +57,9 @@ function findField(
   sectionName: string,
   fieldName: string,
 ) {
-  const passenger = result.passengers.find((candidate) => candidate.passengerOrdinal === passengerOrdinal);
+  const passenger = result.passengers.find(
+    (candidate) => candidate.passengerOrdinal === passengerOrdinal,
+  );
   const section = passenger?.sections.find((candidate) => candidate.name === sectionName);
   return section?.fields.find((candidate) => candidate.name === fieldName);
 }
@@ -58,7 +69,22 @@ describe('BookingReadinessEvaluator', () => {
 
   describe('T027 table-driven evaluator matrix', () => {
     it.each<
-      readonly [string, BookingReadinessEvaluationInput, { scope: string; ready: boolean; passengerReady: boolean; field?: { section: string; name: string; status: string; reason: BookingReadinessResultReasonCode | null; blocking: boolean } }]
+      readonly [
+        string,
+        BookingReadinessEvaluationInput,
+        {
+          scope: string;
+          ready: boolean;
+          passengerReady: boolean;
+          field?: {
+            section: string;
+            name: string;
+            status: string;
+            reason: BookingReadinessResultReasonCode | null;
+            blocking: boolean;
+          };
+        },
+      ]
     >([
       [
         'returns ready for a complete domestic passenger',
@@ -72,7 +98,13 @@ describe('BookingReadinessEvaluator', () => {
           scope: 'DOMESTIC',
           ready: false,
           passengerReady: false,
-          field: { section: 'identity', name: 'givenName', status: 'missing', reason: 'REQUIRED', blocking: true },
+          field: {
+            section: 'identity',
+            name: 'givenName',
+            status: 'missing',
+            reason: 'REQUIRED',
+            blocking: true,
+          },
         },
       ],
       [
@@ -82,7 +114,13 @@ describe('BookingReadinessEvaluator', () => {
           scope: 'DOMESTIC',
           ready: false,
           passengerReady: false,
-          field: { section: 'identity', name: 'familyName', status: 'missing', reason: 'REQUIRED', blocking: true },
+          field: {
+            section: 'identity',
+            name: 'familyName',
+            status: 'missing',
+            reason: 'REQUIRED',
+            blocking: true,
+          },
         },
       ],
       [
@@ -92,7 +130,13 @@ describe('BookingReadinessEvaluator', () => {
           scope: 'DOMESTIC',
           ready: false,
           passengerReady: false,
-          field: { section: 'identity', name: 'dateOfBirth', status: 'missing', reason: 'REQUIRED', blocking: true },
+          field: {
+            section: 'identity',
+            name: 'dateOfBirth',
+            status: 'missing',
+            reason: 'REQUIRED',
+            blocking: true,
+          },
         },
       ],
       [
@@ -102,7 +146,13 @@ describe('BookingReadinessEvaluator', () => {
           scope: 'DOMESTIC',
           ready: false,
           passengerReady: false,
-          field: { section: 'identity', name: 'dateOfBirth', status: 'invalid', reason: 'INVALID_DATE', blocking: true },
+          field: {
+            section: 'identity',
+            name: 'dateOfBirth',
+            status: 'invalid',
+            reason: 'INVALID_DATE',
+            blocking: true,
+          },
         },
       ],
       [
@@ -112,7 +162,13 @@ describe('BookingReadinessEvaluator', () => {
           scope: 'DOMESTIC',
           ready: false,
           passengerReady: false,
-          field: { section: 'identity', name: 'gender', status: 'missing', reason: 'REQUIRED', blocking: true },
+          field: {
+            section: 'identity',
+            name: 'gender',
+            status: 'missing',
+            reason: 'REQUIRED',
+            blocking: true,
+          },
         },
       ],
       [
@@ -122,7 +178,13 @@ describe('BookingReadinessEvaluator', () => {
           scope: 'DOMESTIC',
           ready: false,
           passengerReady: false,
-          field: { section: 'identity', name: 'title', status: 'missing', reason: 'REQUIRED', blocking: true },
+          field: {
+            section: 'identity',
+            name: 'title',
+            status: 'missing',
+            reason: 'REQUIRED',
+            blocking: true,
+          },
         },
       ],
       [
@@ -132,7 +194,13 @@ describe('BookingReadinessEvaluator', () => {
           scope: 'DOMESTIC',
           ready: false,
           passengerReady: false,
-          field: { section: 'contact', name: 'email', status: 'missing', reason: 'REQUIRED', blocking: true },
+          field: {
+            section: 'contact',
+            name: 'email',
+            status: 'missing',
+            reason: 'REQUIRED',
+            blocking: true,
+          },
         },
       ],
       [
@@ -142,7 +210,13 @@ describe('BookingReadinessEvaluator', () => {
           scope: 'DOMESTIC',
           ready: false,
           passengerReady: false,
-          field: { section: 'contact', name: 'phoneCountryCode', status: 'missing', reason: 'REQUIRED', blocking: true },
+          field: {
+            section: 'contact',
+            name: 'phoneCountryCode',
+            status: 'missing',
+            reason: 'REQUIRED',
+            blocking: true,
+          },
         },
       ],
       [
@@ -152,7 +226,13 @@ describe('BookingReadinessEvaluator', () => {
           scope: 'DOMESTIC',
           ready: false,
           passengerReady: false,
-          field: { section: 'contact', name: 'phoneNumber', status: 'missing', reason: 'REQUIRED', blocking: true },
+          field: {
+            section: 'contact',
+            name: 'phoneNumber',
+            status: 'missing',
+            reason: 'REQUIRED',
+            blocking: true,
+          },
         },
       ],
       [
@@ -167,7 +247,17 @@ describe('BookingReadinessEvaluator', () => {
       ],
       [
         'ignores incomplete passport data for domestic readiness',
-        createInput({ passengers: [createPassenger({ documentType: null, passportNumber: null, passportExpiry: null, issuingCountry: null, nationality: null })] }),
+        createInput({
+          passengers: [
+            createPassenger({
+              documentType: null,
+              passportNumber: null,
+              passportExpiry: null,
+              issuingCountry: null,
+              nationality: null,
+            }),
+          ],
+        }),
         { scope: 'DOMESTIC', ready: true, passengerReady: true },
       ],
       [
@@ -177,112 +267,211 @@ describe('BookingReadinessEvaluator', () => {
       ],
       [
         'blocks when international documentType is missing',
-        createInput({ segments: [{ originCountryCode: 'US', destinationCountryCode: 'CA' }], passengers: [createPassenger({ documentType: '' })] }),
+        createInput({
+          segments: [{ originCountryCode: 'US', destinationCountryCode: 'CA' }],
+          passengers: [createPassenger({ documentType: '' })],
+        }),
         {
           scope: 'INTERNATIONAL',
           ready: false,
           passengerReady: false,
-          field: { section: 'travel_document', name: 'documentType', status: 'missing', reason: 'REQUIRED', blocking: true },
+          field: {
+            section: 'travel_document',
+            name: 'documentType',
+            status: 'missing',
+            reason: 'REQUIRED',
+            blocking: true,
+          },
         },
       ],
       [
         'blocks when international passportNumber is missing',
-        createInput({ segments: [{ originCountryCode: 'US', destinationCountryCode: 'CA' }], passengers: [createPassenger({ passportNumber: ' ' })] }),
+        createInput({
+          segments: [{ originCountryCode: 'US', destinationCountryCode: 'CA' }],
+          passengers: [createPassenger({ passportNumber: ' ' })],
+        }),
         {
           scope: 'INTERNATIONAL',
           ready: false,
           passengerReady: false,
-          field: { section: 'travel_document', name: 'passportNumber', status: 'missing', reason: 'REQUIRED', blocking: true },
+          field: {
+            section: 'travel_document',
+            name: 'passportNumber',
+            status: 'missing',
+            reason: 'REQUIRED',
+            blocking: true,
+          },
         },
       ],
       [
         'blocks when international passportExpiry is missing',
-        createInput({ segments: [{ originCountryCode: 'US', destinationCountryCode: 'CA' }], passengers: [createPassenger({ passportExpiry: null })] }),
+        createInput({
+          segments: [{ originCountryCode: 'US', destinationCountryCode: 'CA' }],
+          passengers: [createPassenger({ passportExpiry: null })],
+        }),
         {
           scope: 'INTERNATIONAL',
           ready: false,
           passengerReady: false,
-          field: { section: 'travel_document', name: 'passportExpiry', status: 'missing', reason: 'REQUIRED', blocking: true },
+          field: {
+            section: 'travel_document',
+            name: 'passportExpiry',
+            status: 'missing',
+            reason: 'REQUIRED',
+            blocking: true,
+          },
         },
       ],
       [
         'blocks when international issuingCountry is missing',
-        createInput({ segments: [{ originCountryCode: 'US', destinationCountryCode: 'CA' }], passengers: [createPassenger({ issuingCountry: '' })] }),
+        createInput({
+          segments: [{ originCountryCode: 'US', destinationCountryCode: 'CA' }],
+          passengers: [createPassenger({ issuingCountry: '' })],
+        }),
         {
           scope: 'INTERNATIONAL',
           ready: false,
           passengerReady: false,
-          field: { section: 'travel_document', name: 'issuingCountry', status: 'missing', reason: 'REQUIRED', blocking: true },
+          field: {
+            section: 'travel_document',
+            name: 'issuingCountry',
+            status: 'missing',
+            reason: 'REQUIRED',
+            blocking: true,
+          },
         },
       ],
       [
         'blocks when international nationality is missing',
-        createInput({ segments: [{ originCountryCode: 'US', destinationCountryCode: 'CA' }], passengers: [createPassenger({ nationality: '  ' })] }),
+        createInput({
+          segments: [{ originCountryCode: 'US', destinationCountryCode: 'CA' }],
+          passengers: [createPassenger({ nationality: '  ' })],
+        }),
         {
           scope: 'INTERNATIONAL',
           ready: false,
           passengerReady: false,
-          field: { section: 'travel_document', name: 'nationality', status: 'missing', reason: 'REQUIRED', blocking: true },
+          field: {
+            section: 'travel_document',
+            name: 'nationality',
+            status: 'missing',
+            reason: 'REQUIRED',
+            blocking: true,
+          },
         },
       ],
       [
         'blocks unsupported international document types',
-        createInput({ segments: [{ originCountryCode: 'US', destinationCountryCode: 'CA' }], passengers: [createPassenger({ documentType: 'visa' })] }),
+        createInput({
+          segments: [{ originCountryCode: 'US', destinationCountryCode: 'CA' }],
+          passengers: [createPassenger({ documentType: 'visa' })],
+        }),
         {
           scope: 'INTERNATIONAL',
           ready: false,
           passengerReady: false,
-          field: { section: 'travel_document', name: 'documentType', status: 'invalid', reason: 'UNSUPPORTED_DOCUMENT_TYPE', blocking: true },
+          field: {
+            section: 'travel_document',
+            name: 'documentType',
+            status: 'invalid',
+            reason: 'UNSUPPORTED_DOCUMENT_TYPE',
+            blocking: true,
+          },
         },
       ],
       [
         'blocks invalid document countries',
-        createInput({ segments: [{ originCountryCode: 'US', destinationCountryCode: 'CA' }], passengers: [createPassenger({ issuingCountry: 'USA' })] }),
+        createInput({
+          segments: [{ originCountryCode: 'US', destinationCountryCode: 'CA' }],
+          passengers: [createPassenger({ issuingCountry: 'USA' })],
+        }),
         {
           scope: 'INTERNATIONAL',
           ready: false,
           passengerReady: false,
-          field: { section: 'travel_document', name: 'issuingCountry', status: 'invalid', reason: 'INVALID_COUNTRY', blocking: true },
+          field: {
+            section: 'travel_document',
+            name: 'issuingCountry',
+            status: 'invalid',
+            reason: 'INVALID_COUNTRY',
+            blocking: true,
+          },
         },
       ],
       [
         'blocks invalid passport number format',
-        createInput({ segments: [{ originCountryCode: 'US', destinationCountryCode: 'CA' }], passengers: [createPassenger({ passportNumber: '!@#' })] }),
+        createInput({
+          segments: [{ originCountryCode: 'US', destinationCountryCode: 'CA' }],
+          passengers: [createPassenger({ passportNumber: '!@#' })],
+        }),
         {
           scope: 'INTERNATIONAL',
           ready: false,
           passengerReady: false,
-          field: { section: 'travel_document', name: 'passportNumber', status: 'invalid', reason: 'INVALID_DOCUMENT_NUMBER', blocking: true },
+          field: {
+            section: 'travel_document',
+            name: 'passportNumber',
+            status: 'invalid',
+            reason: 'INVALID_DOCUMENT_NUMBER',
+            blocking: true,
+          },
         },
       ],
       [
         'blocks expired passports',
-        createInput({ segments: [{ originCountryCode: 'US', destinationCountryCode: 'CA' }], passengers: [createPassenger({ passportExpiry: '2026-12-19' })] }),
+        createInput({
+          segments: [{ originCountryCode: 'US', destinationCountryCode: 'CA' }],
+          passengers: [createPassenger({ passportExpiry: '2026-12-19' })],
+        }),
         {
           scope: 'INTERNATIONAL',
           ready: false,
           passengerReady: false,
-          field: { section: 'travel_document', name: 'passportExpiry', status: 'invalid', reason: 'EXPIRED', blocking: true },
+          field: {
+            section: 'travel_document',
+            name: 'passportExpiry',
+            status: 'invalid',
+            reason: 'EXPIRED',
+            blocking: true,
+          },
         },
       ],
       [
         'returns a warning when the passport falls within the advisory buffer',
-        createInput({ segments: [{ originCountryCode: 'US', destinationCountryCode: 'CA' }], passengers: [createPassenger({ passportExpiry: '2027-06-18' })] }),
+        createInput({
+          segments: [{ originCountryCode: 'US', destinationCountryCode: 'CA' }],
+          passengers: [createPassenger({ passportExpiry: '2027-06-18' })],
+        }),
         {
           scope: 'INTERNATIONAL',
           ready: true,
           passengerReady: true,
-          field: { section: 'travel_document', name: 'passportExpiry', status: 'warning', reason: 'PASSPORT_VALIDITY_REQUIRES_VERIFICATION', blocking: false },
+          field: {
+            section: 'travel_document',
+            name: 'passportExpiry',
+            status: 'warning',
+            reason: 'PASSPORT_VALIDITY_REQUIRES_VERIFICATION',
+            blocking: false,
+          },
         },
       ],
       [
         'keeps an international passenger ready when the passport is outside the advisory buffer',
-        createInput({ segments: [{ originCountryCode: 'US', destinationCountryCode: 'CA' }], passengers: [createPassenger({ passportExpiry: '2027-06-19' })] }),
+        createInput({
+          segments: [{ originCountryCode: 'US', destinationCountryCode: 'CA' }],
+          passengers: [createPassenger({ passportExpiry: '2027-06-19' })],
+        }),
         {
           scope: 'INTERNATIONAL',
           ready: true,
           passengerReady: true,
-          field: { section: 'travel_document', name: 'passportExpiry', status: 'filled', reason: null, blocking: false },
+          field: {
+            section: 'travel_document',
+            name: 'passportExpiry',
+            status: 'filled',
+            reason: null,
+            blocking: false,
+          },
         },
       ],
       [
@@ -292,7 +481,13 @@ describe('BookingReadinessEvaluator', () => {
           scope: 'UNKNOWN',
           ready: false,
           passengerReady: false,
-          field: { section: 'itinerary', name: 'scope', status: 'unknown', reason: 'AIRPORT_COUNTRY_UNAVAILABLE', blocking: true },
+          field: {
+            section: 'itinerary',
+            name: 'scope',
+            status: 'unknown',
+            reason: 'AIRPORT_COUNTRY_UNAVAILABLE',
+            blocking: true,
+          },
         },
       ],
       [
@@ -302,12 +497,22 @@ describe('BookingReadinessEvaluator', () => {
       ],
       [
         'marks the full itinerary international when any segment crosses a border',
-        createInput({ segments: [{ originCountryCode: 'US', destinationCountryCode: 'US' }, { originCountryCode: 'US', destinationCountryCode: 'CA' }] }),
+        createInput({
+          segments: [
+            { originCountryCode: 'US', destinationCountryCode: 'US' },
+            { originCountryCode: 'US', destinationCountryCode: 'CA' },
+          ],
+        }),
         { scope: 'INTERNATIONAL', ready: true, passengerReady: true },
       ],
       [
         'keeps all-domestic segments domestic',
-        createInput({ segments: [{ originCountryCode: 'US', destinationCountryCode: 'US' }, { originCountryCode: 'US', destinationCountryCode: 'US' }] }),
+        createInput({
+          segments: [
+            { originCountryCode: 'US', destinationCountryCode: 'US' },
+            { originCountryCode: 'US', destinationCountryCode: 'US' },
+          ],
+        }),
         { scope: 'DOMESTIC', ready: true, passengerReady: true },
       ],
       [
@@ -317,7 +522,13 @@ describe('BookingReadinessEvaluator', () => {
           scope: 'UNKNOWN',
           ready: false,
           passengerReady: false,
-          field: { section: 'itinerary', name: 'scope', status: 'unknown', reason: 'ITINERARY_UNAVAILABLE', blocking: true },
+          field: {
+            section: 'itinerary',
+            name: 'scope',
+            status: 'unknown',
+            reason: 'ITINERARY_UNAVAILABLE',
+            blocking: true,
+          },
         },
       ],
     ])('%s', (_name, input, expected) => {
@@ -329,7 +540,9 @@ describe('BookingReadinessEvaluator', () => {
 
       if (expected.field) {
         const { section, ...expectedFieldWithoutSection } = expected.field;
-        expect(findField(result, 1, section, expected.field.name)).toMatchObject(expectedFieldWithoutSection);
+        expect(findField(result, 1, section, expected.field.name)).toMatchObject(
+          expectedFieldWithoutSection,
+        );
       }
     });
 
@@ -584,9 +797,7 @@ describe('BookingReadinessEvaluator', () => {
           },
         },
       ) as BookingReadinessEvaluationInput;
-      const result = evaluator.evaluate(
-        guardedInput,
-      );
+      const result = evaluator.evaluate(guardedInput);
 
       expect(result.scope).toBe('UNKNOWN');
       expect(result.ready).toBe(false);
@@ -595,7 +806,9 @@ describe('BookingReadinessEvaluator', () => {
         reason: 'AIRPORT_COUNTRY_UNAVAILABLE',
         blocking: true,
       });
-      expect(findField(result, 1, 'entry_eligibility', 'destinationEntryEligibility')).toMatchObject({
+      expect(
+        findField(result, 1, 'entry_eligibility', 'destinationEntryEligibility'),
+      ).toMatchObject({
         status: 'unknown',
         reason: 'ENTRY_ELIGIBILITY_UNKNOWN',
         blocking: false,
@@ -619,7 +832,9 @@ describe('BookingReadinessEvaluator', () => {
 
       expect(domesticResult.scope).toBe('DOMESTIC');
       expect(domesticResult.ready).toBe(true);
-      expect(findField(domesticResult, 1, 'entry_eligibility', 'destinationEntryEligibility')).toMatchObject({
+      expect(
+        findField(domesticResult, 1, 'entry_eligibility', 'destinationEntryEligibility'),
+      ).toMatchObject({
         status: 'unknown',
         reason: 'ENTRY_ELIGIBILITY_UNKNOWN',
         blocking: false,
@@ -627,7 +842,9 @@ describe('BookingReadinessEvaluator', () => {
 
       expect(internationalResult.scope).toBe('INTERNATIONAL');
       expect(internationalResult.ready).toBe(true);
-      expect(findField(internationalResult, 1, 'entry_eligibility', 'destinationEntryEligibility')).toMatchObject({
+      expect(
+        findField(internationalResult, 1, 'entry_eligibility', 'destinationEntryEligibility'),
+      ).toMatchObject({
         status: 'unknown',
         reason: 'ENTRY_ELIGIBILITY_UNKNOWN',
         blocking: false,
@@ -651,7 +868,9 @@ describe('BookingReadinessEvaluator', () => {
 
       expect(result.scope).toBe('INTERNATIONAL');
       expect(result.ready).toBe(true);
-      expect(findField(result, 1, 'entry_eligibility', 'destinationEntryEligibility')).toMatchObject({
+      expect(
+        findField(result, 1, 'entry_eligibility', 'destinationEntryEligibility'),
+      ).toMatchObject({
         status: 'filled',
         reason: null,
         blocking: false,

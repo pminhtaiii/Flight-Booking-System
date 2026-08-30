@@ -1,15 +1,16 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { isSafeHandoffCheckoutPayload } from '../lib/handoffCheckoutPayload';
-import {
-  safeHandoffCheckoutOrigin,
-  safeHandoffTraceHeaders,
-} from '../lib/handoffCheckoutRequest';
+import { safeHandoffCheckoutOrigin, safeHandoffTraceHeaders } from '../lib/handoffCheckoutRequest';
 
 test('accepts only canonical readiness client fields', () => {
   assert.equal(
     isSafeHandoffCheckoutPayload(
-      { passengers: [{ offerPassengerId: 'pas_001', passengerType: 'ADULT', source: { type: 'inline' } }] },
+      {
+        passengers: [
+          { offerPassengerId: 'pas_001', passengerType: 'ADULT', source: { type: 'inline' } },
+        ],
+      },
       '/api/bookings/intents/readiness',
     ),
     true,

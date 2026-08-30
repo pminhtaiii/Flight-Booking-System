@@ -162,7 +162,9 @@ export class BookingPassengerFinalValidatorService {
     options?: FinalPassengerValidationOptions,
   ): FinalPassengerValidationResult {
     const startedAt = Date.now();
-    this.metricsService?.increment(BOOKING_READINESS_METRIC_COUNTERS.BOOKING_PASSENGER_FINAL_VALIDATION);
+    this.metricsService?.increment(
+      BOOKING_READINESS_METRIC_COUNTERS.BOOKING_PASSENGER_FINAL_VALIDATION,
+    );
     const now = options?.now ?? new Date();
     const passengers = intent.passengers ?? [];
     const passengerCount = passengers.length;
@@ -237,7 +239,9 @@ export class BookingPassengerFinalValidatorService {
         },
       };
     } catch (error) {
-      this.metricsService?.increment(BOOKING_READINESS_METRIC_COUNTERS.BOOKING_PASSENGER_FINAL_VALIDATION_FAILURES);
+      this.metricsService?.increment(
+        BOOKING_READINESS_METRIC_COUNTERS.BOOKING_PASSENGER_FINAL_VALIDATION_FAILURES,
+      );
       const latencyMs = Date.now() - startedAt;
       const reasonCode =
         (error instanceof HttpException &&
@@ -270,8 +274,7 @@ export class BookingPassengerFinalValidatorService {
     for (let index = 0; index < passengers.length; index++) {
       const passenger = passengers[index];
       const position = passenger.position ?? index;
-      const snapshotVersion =
-        passenger.snapshotVersion ?? intent.snapshotVersion ?? 1;
+      const snapshotVersion = passenger.snapshotVersion ?? intent.snapshotVersion ?? 1;
       const intentId = intent.id;
 
       let decryptedPassportNumber: string | null = null;
@@ -279,27 +282,21 @@ export class BookingPassengerFinalValidatorService {
 
       try {
         if (passenger.passportNumber) {
-          decryptedPassportNumber = this.encryptionService.decryptBound(
-            passenger.passportNumber,
-            {
-              snapshotVersion,
-              intentId,
-              position,
-              fieldName: 'passportNumber',
-            },
-          );
+          decryptedPassportNumber = this.encryptionService.decryptBound(passenger.passportNumber, {
+            snapshotVersion,
+            intentId,
+            position,
+            fieldName: 'passportNumber',
+          });
         }
 
         if (passenger.passportExpiry) {
-          decryptedPassportExpiry = this.encryptionService.decryptBound(
-            passenger.passportExpiry,
-            {
-              snapshotVersion,
-              intentId,
-              position,
-              fieldName: 'passportExpiry',
-            },
-          );
+          decryptedPassportExpiry = this.encryptionService.decryptBound(passenger.passportExpiry, {
+            snapshotVersion,
+            intentId,
+            position,
+            fieldName: 'passportExpiry',
+          });
         }
       } catch {
         throw new UnprocessableEntityException({
@@ -318,10 +315,7 @@ export class BookingPassengerFinalValidatorService {
     return decryptedList;
   }
 
-  private assertOfferNotExpired(
-    intent: BookingIntentForValidation,
-    now: Date,
-  ): void {
+  private assertOfferNotExpired(intent: BookingIntentForValidation, now: Date): void {
     if (intent.offerExpiresAt) {
       const expiresAt = new Date(intent.offerExpiresAt);
       if (!Number.isNaN(expiresAt.getTime()) && expiresAt.getTime() <= now.getTime()) {
@@ -391,8 +385,7 @@ export class BookingPassengerFinalValidatorService {
           isInternational = true;
         }
 
-        const arrivalRaw =
-          segment.arriving_at ?? segment.arrivalDate ?? segment.arrivingAt;
+        const arrivalRaw = segment.arriving_at ?? segment.arrivalDate ?? segment.arrivingAt;
         if (typeof arrivalRaw === 'string') {
           const dateOnly = arrivalRaw.slice(0, 10);
           if (isValidDateOnly(dateOnly)) {
@@ -419,7 +412,11 @@ export class BookingPassengerFinalValidatorService {
     const todayDateOnly = now.toISOString().slice(0, 10);
     const duffelPassengers: DuffelPassengerDto[] = [];
 
-    for (const { record, decryptedPassportNumber, decryptedPassportExpiry } of decryptedPassengers) {
+    for (const {
+      record,
+      decryptedPassportNumber,
+      decryptedPassportExpiry,
+    } of decryptedPassengers) {
       // 1. Validate identity fields
       const givenName = this.requiredString(record.givenName);
       const familyName = this.requiredString(record.familyName);
@@ -455,9 +452,9 @@ export class BookingPassengerFinalValidatorService {
       const identityDocuments: DuffelIdentityDocument[] = [];
       const hasDocumentGroup = Boolean(
         record.documentType ||
-          decryptedPassportNumber ||
-          decryptedPassportExpiry ||
-          record.issuingCountry,
+        decryptedPassportNumber ||
+        decryptedPassportExpiry ||
+        record.issuingCountry,
       );
 
       if (scope === 'INTERNATIONAL' || hasDocumentGroup) {

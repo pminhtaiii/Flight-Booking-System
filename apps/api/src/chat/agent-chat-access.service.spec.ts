@@ -53,9 +53,7 @@ describe('AgentChatAccessService', () => {
     it('throws 401 UNAUTHORIZED if user is missing', async () => {
       (prismaService.user.findUnique as jest.Mock).mockResolvedValueOnce(null);
 
-      await expect(service.checkUserAccess({ sub: 'usr_missing' })).rejects.toThrow(
-        HttpException,
-      );
+      await expect(service.checkUserAccess({ sub: 'usr_missing' })).rejects.toThrow(HttpException);
 
       try {
         (prismaService.user.findUnique as jest.Mock).mockResolvedValueOnce(null);
@@ -77,9 +75,7 @@ describe('AgentChatAccessService', () => {
         status: 'INACTIVE',
       });
 
-      await expect(service.checkUserAccess({ sub: 'usr_inactive' })).rejects.toThrow(
-        HttpException,
-      );
+      await expect(service.checkUserAccess({ sub: 'usr_inactive' })).rejects.toThrow(HttpException);
 
       try {
         (prismaService.user.findUnique as jest.Mock).mockResolvedValueOnce({
@@ -106,9 +102,9 @@ describe('AgentChatAccessService', () => {
 
       const pastExp = Math.floor(Date.now() / 1000) - 60; // 60 seconds in the past
 
-      await expect(
-        service.checkUserAccess({ sub: 'usr_1', exp: pastExp }),
-      ).rejects.toThrow(HttpException);
+      await expect(service.checkUserAccess({ sub: 'usr_1', exp: pastExp })).rejects.toThrow(
+        HttpException,
+      );
 
       try {
         (prismaService.user.findUnique as jest.Mock).mockResolvedValueOnce({

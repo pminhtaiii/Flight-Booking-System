@@ -10,47 +10,52 @@ export class DashboardService {
   async getSummary(userId: string): Promise<DashboardSummary> {
     const now = new Date();
 
-    const [totalBookings, upcomingBookings, completedBookings, cancelledBookings, recentDbBookings] =
-      await Promise.all([
-        this.prisma.booking.count({
-          where: { userId },
-        }),
-        this.prisma.booking.count({
-          where: {
-            userId,
-            status: BookingStatus.CONFIRMED,
-            departureAt: { gte: now },
-          },
-        }),
-        this.prisma.booking.count({
-          where: {
-            userId,
-            OR: [
-              { status: BookingStatus.COMPLETED },
-              { status: BookingStatus.CONFIRMED, departureAt: { lt: now } },
+    const [
+      totalBookings,
+      upcomingBookings,
+      completedBookings,
+      cancelledBookings,
+      recentDbBookings,
+    ] = await Promise.all([
+      this.prisma.booking.count({
+        where: { userId },
+      }),
+      this.prisma.booking.count({
+        where: {
+          userId,
+          status: BookingStatus.CONFIRMED,
+          departureAt: { gte: now },
+        },
+      }),
+      this.prisma.booking.count({
+        where: {
+          userId,
+          OR: [
+            { status: BookingStatus.COMPLETED },
+            { status: BookingStatus.CONFIRMED, departureAt: { lt: now } },
+          ],
+        },
+      }),
+      this.prisma.booking.count({
+        where: {
+          userId,
+          status: {
+            in: [
+              BookingStatus.CANCELLATION_PENDING,
+              BookingStatus.CANCELLED_PENDING_REFUND,
+              BookingStatus.CANCELLED_AND_REFUNDED,
+              BookingStatus.CANCELLED_NO_REFUND,
+              BookingStatus.REFUND_FAILED_NEEDS_ATTENTION,
             ],
           },
-        }),
-        this.prisma.booking.count({
-          where: {
-            userId,
-            status: {
-              in: [
-                BookingStatus.CANCELLATION_PENDING,
-                BookingStatus.CANCELLED_PENDING_REFUND,
-                BookingStatus.CANCELLED_AND_REFUNDED,
-                BookingStatus.CANCELLED_NO_REFUND,
-                BookingStatus.REFUND_FAILED_NEEDS_ATTENTION,
-              ],
-            },
-          },
-        }),
-        this.prisma.booking.findMany({
-          where: { userId },
-          take: 5,
-          orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
-        }),
-      ]);
+        },
+      }),
+      this.prisma.booking.findMany({
+        where: { userId },
+        take: 5,
+        orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+      }),
+    ]);
 
     const stats: DashboardStats = {
       totalBookings,

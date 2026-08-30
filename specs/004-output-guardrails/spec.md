@@ -17,7 +17,7 @@ The agent service streams LLM tokens directly to the user's browser via SSE. Inp
 
 This feature adds a guardrail pipeline between the LLM output and the SSE stream to the user.
 
-## User Scenarios & Testing *(mandatory)*
+## User Scenarios & Testing _(mandatory)_
 
 ### User Story 1 - Safe Output Streaming (Priority: P1)
 
@@ -119,7 +119,7 @@ A system operator can monitor output guardrail activity through structured loggi
 - What happens when the first chunk fails the guardrail? → Hard stop with no partial response persisted (partialMessageId = null). User sees the error message only.
 - How does the output guardrail interact with tool_call/tool_result events? → Tool events are NOT subject to output guardrails — they contain structured data from the gateway (already PII-stripped). Only `on_chat_model_stream` tokens pass through the guardrail pipeline.
 
-## Requirements *(mandatory)*
+## Requirements _(mandatory)_
 
 ### Functional Requirements
 
@@ -147,7 +147,7 @@ A system operator can monitor output guardrail activity through structured loggi
 - **Regex PII Scanner (Output)**: Reuses the existing PII regex patterns from `pii_scrubber.py` for detection (not scrubbing) — passport, credit card (Luhn), email, phone.
 - **NeMo Output Rail**: Extension of the existing NeMo guardrail service for output-side classification using an output-specific system prompt.
 
-## Success Criteria *(mandatory)*
+## Success Criteria _(mandatory)_
 
 ### Measurable Outcomes
 

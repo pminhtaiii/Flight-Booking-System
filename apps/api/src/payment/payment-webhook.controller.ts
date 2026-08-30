@@ -23,10 +23,7 @@ export class PaymentWebhookController {
 
   @Post('webhook')
   @HttpCode(HttpStatus.OK)
-  async handleWebhook(
-    @Req() req: Request,
-    @Headers('stripe-signature') signature: string,
-  ) {
+  async handleWebhook(@Req() req: Request, @Headers('stripe-signature') signature: string) {
     const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
     if (!webhookSecret) {
       this.logger.error('STRIPE_WEBHOOK_SECRET is not configured');

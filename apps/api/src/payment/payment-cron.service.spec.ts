@@ -118,9 +118,7 @@ describe('PaymentCronService', () => {
 
     await service.handleAuthorizationExpiry();
 
-    expect(stripeService.cancelPaymentIntent).toHaveBeenCalledWith(
-      payment.stripePaymentIntentId,
-    );
+    expect(stripeService.cancelPaymentIntent).toHaveBeenCalledWith(payment.stripePaymentIntentId);
     expect(prisma.$transaction).toHaveBeenCalledTimes(1);
     expect(transaction.payment.update).toHaveBeenCalledWith({
       where: { id: payment.id, version: payment.version },
@@ -217,7 +215,9 @@ describe('PaymentCronService', () => {
       },
       data: { status: 'REFUND_PROCESSING', nextRetryAt: expect.any(Date) },
     });
-    expect(paymentRefundService.recoverScheduledCancellationRefund).toHaveBeenCalledWith(dueRefund.id);
+    expect(paymentRefundService.recoverScheduledCancellationRefund).toHaveBeenCalledWith(
+      dueRefund.id,
+    );
   });
 
   it('reclaims a cancellation refund whose processing lease has expired', async () => {
@@ -251,6 +251,8 @@ describe('PaymentCronService', () => {
       },
       data: { status: 'REFUND_PROCESSING', nextRetryAt: expect.any(Date) },
     });
-    expect(paymentRefundService.recoverScheduledCancellationRefund).toHaveBeenCalledWith(processingRefund.id);
+    expect(paymentRefundService.recoverScheduledCancellationRefund).toHaveBeenCalledWith(
+      processingRefund.id,
+    );
   });
 });

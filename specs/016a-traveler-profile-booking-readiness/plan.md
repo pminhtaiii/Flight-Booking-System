@@ -30,16 +30,16 @@ Add an owned traveler-profile domain, one pure booking-readiness evaluator, expl
 
 ## Constitution Check
 
-*GATE: Passed before research and re-checked after design.*
+_GATE: Passed before research and re-checked after design._
 
-| Principle | Design response | Result |
-|---|---|---|
-| Flight-First Architecture | Only flight passenger readiness and intent creation are changed; hotels, dining, companion profiles, and travel-rules providers remain out of scope. | PASS |
-| Deterministic Transaction Boundary | The pure evaluator and NestJS services are authoritative. Chat can request a check or initiate a confirmed command, but cannot provide PII or decide validity/order state. | PASS |
-| API Budget Discipline | Readiness uses stored offer segments and airport countries. Live offer retrieval remains the existing intent/order responsibility and occurs once per existing flow. | PASS |
-| Observability | New endpoints propagate trace/correlation IDs and emit status/count/reason metrics only; logs and audits exclude field values. | PASS |
-| Incremental Delivery | Each user story has an independent test and deployable outcome; the compatibility route keeps checkout operable between slices. | PASS |
-| Security Requirements | JWT/profile ownership, gateway claim guards, field-level passport encryption, TLS/database encryption, safe response DTOs, and PII boundary tests are mandatory. | PASS |
+| Principle                          | Design response                                                                                                                                                            | Result |
+| ---------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------ |
+| Flight-First Architecture          | Only flight passenger readiness and intent creation are changed; hotels, dining, companion profiles, and travel-rules providers remain out of scope.                       | PASS   |
+| Deterministic Transaction Boundary | The pure evaluator and NestJS services are authoritative. Chat can request a check or initiate a confirmed command, but cannot provide PII or decide validity/order state. | PASS   |
+| API Budget Discipline              | Readiness uses stored offer segments and airport countries. Live offer retrieval remains the existing intent/order responsibility and occurs once per existing flow.       | PASS   |
+| Observability                      | New endpoints propagate trace/correlation IDs and emit status/count/reason metrics only; logs and audits exclude field values.                                             | PASS   |
+| Incremental Delivery               | Each user story has an independent test and deployable outcome; the compatibility route keeps checkout operable between slices.                                            | PASS   |
+| Security Requirements              | JWT/profile ownership, gateway claim guards, field-level passport encryption, TLS/database encryption, safe response DTOs, and PII boundary tests are mandatory.           | PASS   |
 
 ### Post-design re-check
 
@@ -77,30 +77,30 @@ Reuse the current payment/order idempotency claim and frozen intent/ancillary ve
 
 ## Bite-Sized Delivery Phases
 
-| Phase | Scope and owned files | Entry → exit criteria | Focused verification |
-|---|---|---|---|
-| 1. Shared contracts + observability | `packages/shared/src/types/*`, `apps/api/src/app.module.ts`, feature metric/trace helpers, environment examples | Existing builds green → shared schemas, flags, metric names, trace propagation, dashboard/alert contract compile | shared build; observability contract tests |
-| 2. Additive schema + dual-write migration | `apps/api/prisma/schema.prisma`, new migration/backfill command and tests | Phase 1 → nullable fields/revision/shadow/snapshot fields applied; rollback-safe dual-write and bounded backfill proven | migration test; decrypt/compare/quarantine tests |
-| 3. Profile API (US1) | new `apps/api/src/profile/*`, `apps/api/src/app.module.ts` | Phase 2 → owned GET/PATCH, revision CAS, atomic document section, no-store/redaction/audit behavior | profile unit/controller/API E2E |
-| 4. Secure profile UI (US1) | `apps/web/app/profile/page.tsx`, `components/profile/*`, web API helper/tests | Phase 3 → traveler can review/correct all fields; no PII in URL/storage/cache | Playwright profile flow and privacy assertions |
-| 5. Pure evaluator (US2) | new evaluator/types/specs under `apps/api/src/booking-intent/` | Phase 1 → complete domestic/international/unknown/document matrix with zero I/O | evaluator Jest matrix/clock tests |
-| 6. Advisory endpoint (US2) | booking-intent DTO/controller/service/module, Airports imports | Phases 3+5 → server-derived scope and revision-bearing readiness response; no writes/supplier call | controller/API parity and latency E2E |
-| 7. Snapshot/source foundation (US3) | source DTOs, snapshot persistence, bound encryption helpers | Phases 2+5 → source union and AAD-bound complete snapshots; cross-owner/cipher-swap rejected | source/encryption/transaction unit tests |
-| 8. Atomic intent + response/route migration (US3) | intent orchestration, plural controller, `apps/web/lib/checkout.ts`, checkout/review UI/tests | Phases 6+7 → expected revision CAS, zero-write rejection, plural client, masked responses; singular aliases remain safe | intent E2E, route-shape matrix, existing checkout regression |
-| 9. Gateway/SSE handoff (US4) | Nest gateway DTO/service/controller; Python client/tool/registry/SSE; web handoff surface | Phases 6+8 → allowlisted metadata-only readiness and secure profile/checkout navigation | gateway E2E, pytest payload injection, Playwright handoff |
-| 10. Final order safety (US5) | payment/order validation seam, Duffel assembly, focused recovery tests | Phases 7+8 → only existing claim owner validates/decrypts/calls supplier; concurrency and expiry boundaries converge | concurrent-submit, lease-loss, expiry, AAD swap, supplier-not-called tests |
+| Phase                                             | Scope and owned files                                                                                           | Entry → exit criteria                                                                                                   | Focused verification                                                       |
+| ------------------------------------------------- | --------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- |
+| 1. Shared contracts + observability               | `packages/shared/src/types/*`, `apps/api/src/app.module.ts`, feature metric/trace helpers, environment examples | Existing builds green → shared schemas, flags, metric names, trace propagation, dashboard/alert contract compile        | shared build; observability contract tests                                 |
+| 2. Additive schema + dual-write migration         | `apps/api/prisma/schema.prisma`, new migration/backfill command and tests                                       | Phase 1 → nullable fields/revision/shadow/snapshot fields applied; rollback-safe dual-write and bounded backfill proven | migration test; decrypt/compare/quarantine tests                           |
+| 3. Profile API (US1)                              | new `apps/api/src/profile/*`, `apps/api/src/app.module.ts`                                                      | Phase 2 → owned GET/PATCH, revision CAS, atomic document section, no-store/redaction/audit behavior                     | profile unit/controller/API E2E                                            |
+| 4. Secure profile UI (US1)                        | `apps/web/app/profile/page.tsx`, `components/profile/*`, web API helper/tests                                   | Phase 3 → traveler can review/correct all fields; no PII in URL/storage/cache                                           | Playwright profile flow and privacy assertions                             |
+| 5. Pure evaluator (US2)                           | new evaluator/types/specs under `apps/api/src/booking-intent/`                                                  | Phase 1 → complete domestic/international/unknown/document matrix with zero I/O                                         | evaluator Jest matrix/clock tests                                          |
+| 6. Advisory endpoint (US2)                        | booking-intent DTO/controller/service/module, Airports imports                                                  | Phases 3+5 → server-derived scope and revision-bearing readiness response; no writes/supplier call                      | controller/API parity and latency E2E                                      |
+| 7. Snapshot/source foundation (US3)               | source DTOs, snapshot persistence, bound encryption helpers                                                     | Phases 2+5 → source union and AAD-bound complete snapshots; cross-owner/cipher-swap rejected                            | source/encryption/transaction unit tests                                   |
+| 8. Atomic intent + response/route migration (US3) | intent orchestration, plural controller, `apps/web/lib/checkout.ts`, checkout/review UI/tests                   | Phases 6+7 → expected revision CAS, zero-write rejection, plural client, masked responses; singular aliases remain safe | intent E2E, route-shape matrix, existing checkout regression               |
+| 9. Gateway/SSE handoff (US4)                      | Nest gateway DTO/service/controller; Python client/tool/registry/SSE; web handoff surface                       | Phases 6+8 → allowlisted metadata-only readiness and secure profile/checkout navigation                                 | gateway E2E, pytest payload injection, Playwright handoff                  |
+| 10. Final order safety (US5)                      | payment/order validation seam, Duffel assembly, focused recovery tests                                          | Phases 7+8 → only existing claim owner validates/decrypts/calls supplier; concurrency and expiry boundaries converge    | concurrent-submit, lease-loss, expiry, AAD swap, supplier-not-called tests |
 
 Phases 3 and 5 may run in parallel after Phase 2/Phase 1 respectively. Phase 4 may run alongside Phase 6 once the profile contract is stable. Agent work in Phase 9 does not touch final-order files. Exact checklist tasks and file-level parallel markers are generated in `tasks.md`.
 
 ## Requirement Traceability
 
-| Requirements / outcomes | Owning phases | Required proof |
-|---|---|---|
-| FR-001–003, FR-022; SC-001, SC-005 | 2–4 | owner/CAS/document-atomic API tests; secure UI; cache/log/audit privacy assertions |
-| FR-004–011; SC-002 | 5–6 | pure matrix plus advisory/authoritative parity and unknown-scope mapping |
-| FR-012–017; SC-003–004 | 7–8 | union conflict, ownership, expected revision, zero-write, immutability, cipher binding, masked response tests |
-| FR-019–021; SC-005, SC-007 | 9 | gateway/SSE allowlist and chat-to-secure-form E2E |
-| FR-018, FR-022; SC-006 | 10 | claim-owner concurrency, final clock/expiry/integrity checks, no-supplier-call assertions |
+| Requirements / outcomes            | Owning phases | Required proof                                                                                                |
+| ---------------------------------- | ------------- | ------------------------------------------------------------------------------------------------------------- |
+| FR-001–003, FR-022; SC-001, SC-005 | 2–4           | owner/CAS/document-atomic API tests; secure UI; cache/log/audit privacy assertions                            |
+| FR-004–011; SC-002                 | 5–6           | pure matrix plus advisory/authoritative parity and unknown-scope mapping                                      |
+| FR-012–017; SC-003–004             | 7–8           | union conflict, ownership, expected revision, zero-write, immutability, cipher binding, masked response tests |
+| FR-019–021; SC-005, SC-007         | 9             | gateway/SSE allowlist and chat-to-secure-form E2E                                                             |
+| FR-018, FR-022; SC-006             | 10            | claim-owner concurrency, final clock/expiry/integrity checks, no-supplier-call assertions                     |
 
 ## Project Structure
 
@@ -195,7 +195,7 @@ docs/runbooks/
 
 ## Complexity Tracking
 
-| Transitional complexity | Why needed | Simpler alternative rejected because |
-|---|---|---|
+| Transitional complexity                                  | Why needed                                                                                                       | Simpler alternative rejected because                                          |
+| -------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------- |
 | Ciphertext shadow + backfill for profile passport expiry | Preserves the production `DateTime` column while moving the value behind AES-GCM without destructive conversion. | In-place type conversion cannot encrypt data and risks loss/rollback failure. |
-| Temporary singular/plural route compatibility | Lets the ADR contract ship without breaking checkout, ancillary, payment, and existing tests. | Immediate route replacement creates a coordinated big-bang deployment. |
+| Temporary singular/plural route compatibility            | Lets the ADR contract ship without breaking checkout, ancillary, payment, and existing tests.                    | Immediate route replacement creates a coordinated big-bang deployment.        |

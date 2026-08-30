@@ -2,9 +2,8 @@ import { expect, test, type APIRequestContext, type Page } from '@playwright/tes
 import { PrismaClient } from '@prisma/client';
 import { HANDOFF_CREDENTIAL_PATTERN } from '@shared/types';
 
-const WEB_ORIGIN = process.env.T093_REAL_FLOW === 'true'
-  ? 'http://localhost:3000'
-  : 'http://127.0.0.1:3000';
+const WEB_ORIGIN =
+  process.env.T093_REAL_FLOW === 'true' ? 'http://localhost:3000' : 'http://127.0.0.1:3000';
 const API_ORIGIN = 'http://127.0.0.1:3001';
 const AGENT_ORIGIN = 'http://127.0.0.1:3002';
 const timeoutFromEnv = (name: string, fallback: number): number => {
@@ -355,8 +354,7 @@ test.describe('T093 real direct-stream checkout flow', () => {
 
     const bootstrapRequest = page.waitForRequest(
       (request) =>
-        request.method() === 'POST' &&
-        request.url() === `${WEB_ORIGIN}/checkout/handoff`,
+        request.method() === 'POST' && request.url() === `${WEB_ORIGIN}/checkout/handoff`,
       { timeout: T093_BROWSER_TIMEOUT_MS },
     );
     await page.getByRole('button', { name: 'Continue to Checkout' }).click({ noWaitAfter: true });
@@ -514,7 +512,9 @@ test.describe('T093 real direct-stream checkout flow', () => {
       sessionStorage: JSON.stringify(window.sessionStorage),
       cookies: document.cookie,
     }));
-    expect(privacySnapshot.href).toMatch(new RegExp(`${WEB_ORIGIN}/checkout/passengers(?:\\?.*)?$`));
+    expect(privacySnapshot.href).toMatch(
+      new RegExp(`${WEB_ORIGIN}/checkout/passengers(?:\\?.*)?$`),
+    );
     expect(JSON.stringify(privacySnapshot)).not.toContain(handoffToken);
     expect(observedRequestUrls.every((url) => !url.includes(handoffToken))).toBe(true);
     expect(

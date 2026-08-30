@@ -68,16 +68,16 @@ data: {"code": "GUARDRAIL_BLOCKED", "message": "Your message could not be proces
 
 ### Error Codes
 
-| Code                    | HTTP Status | Description                                             |
-| ----------------------- | ----------- | ------------------------------------------------------- |
-| `UNAUTHORIZED`          | 401         | Missing or invalid JWT                                  |
-| `GUARDRAIL_BLOCKED`     | 200 (SSE)   | Input blocked by safety guardrails                      |
-| `GUARDRAIL_UNAVAILABLE` | 503         | Guardrail service down, fail-closed                     |
-| `MESSAGE_TOO_LONG`      | 400         | Input exceeds maximum length                            |
-| `QUEUE_FULL`            | 429         | Concurrent message limit exceeded for this conversation |
-| `LLM_ERROR`             | 200 (SSE)   | LLM provider error, user-friendly message returned      |
+| Code                    | HTTP Status | Description                                              |
+| ----------------------- | ----------- | -------------------------------------------------------- |
+| `UNAUTHORIZED`          | 401         | Missing or invalid JWT                                   |
+| `GUARDRAIL_BLOCKED`     | 200 (SSE)   | Input blocked by safety guardrails                       |
+| `GUARDRAIL_UNAVAILABLE` | 503         | Guardrail service down, fail-closed                      |
+| `MESSAGE_TOO_LONG`      | 400         | Input exceeds maximum length                             |
+| `QUEUE_FULL`            | 429         | Concurrent message limit exceeded for this conversation  |
+| `LLM_ERROR`             | 200 (SSE)   | LLM provider error, user-friendly message returned       |
 | `PERSISTENCE_ERROR`     | 200 (SSE)   | Response completed, but saving the final messages failed |
-| `INTERNAL_ERROR`        | 500         | Unexpected server error                                 |
+| `INTERNAL_ERROR`        | 500         | Unexpected server error                                  |
 
 **Notes**:
 

@@ -14,35 +14,35 @@
 
 ## Decision Summary
 
-| # | Decision | Choice |
-|---|----------|--------|
-| D1 | Module structure | Extract flight provider into its own shared module (`DuffelModule`); both `FlightsModule` and `AgentGatewayModule` import from it |
-| D2 | Round-trip support | Supported from day one via multi-slice `offer_request` (Duffel native concept) |
-| D3 | Persistence strategy | Hybrid — Redis for hot lookup, PostgreSQL write-behind for durability |
-| D4 | Write-behind latency | Non-blocking — response returns immediately after Redis write; PostgreSQL write is async post-response |
-| D5 | Re-price trigger | On flight detail / booking page load, NOT at final confirm click |
-| D6 | Table design | Two tables: `flight_offers` (raw blob, hard-purge) + `search_history` (lightweight metadata, kept forever) |
-| D7 | Table write timing | Both tables written simultaneously during the async write-behind step |
-| D8 | Budget management | Single shared Redis counter with configurable priority thresholds (env vars, not hardcoded); user-facing search gets higher cap, agent throttled earlier |
-| D9 | Cache layer | Cache raw Duffel offer response inside the shared `DuffelService`; consumers transform independently into their own DTOs |
-| D10 | Flight detail URL | Internal UUID from `flight_offers` table as `flightId` — never expose Duffel offer IDs |
-| D11 | Expired offer recovery | 410 Gone with search params from `search_history`; frontend shows guided recovery with pre-filled search form; no auto-re-execute |
-| D12 | API provider switch | Duffel API replaces Amadeus — simpler auth (Bearer token), richer data model (slices/segments), pay-as-you-go with 1500:1 search-to-book ratio |
+| #   | Decision               | Choice                                                                                                                                                   |
+| --- | ---------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| D1  | Module structure       | Extract flight provider into its own shared module (`DuffelModule`); both `FlightsModule` and `AgentGatewayModule` import from it                        |
+| D2  | Round-trip support     | Supported from day one via multi-slice `offer_request` (Duffel native concept)                                                                           |
+| D3  | Persistence strategy   | Hybrid — Redis for hot lookup, PostgreSQL write-behind for durability                                                                                    |
+| D4  | Write-behind latency   | Non-blocking — response returns immediately after Redis write; PostgreSQL write is async post-response                                                   |
+| D5  | Re-price trigger       | On flight detail / booking page load, NOT at final confirm click                                                                                         |
+| D6  | Table design           | Two tables: `flight_offers` (raw blob, hard-purge) + `search_history` (lightweight metadata, kept forever)                                               |
+| D7  | Table write timing     | Both tables written simultaneously during the async write-behind step                                                                                    |
+| D8  | Budget management      | Single shared Redis counter with configurable priority thresholds (env vars, not hardcoded); user-facing search gets higher cap, agent throttled earlier |
+| D9  | Cache layer            | Cache raw Duffel offer response inside the shared `DuffelService`; consumers transform independently into their own DTOs                                 |
+| D10 | Flight detail URL      | Internal UUID from `flight_offers` table as `flightId` — never expose Duffel offer IDs                                                                   |
+| D11 | Expired offer recovery | 410 Gone with search params from `search_history`; frontend shows guided recovery with pre-filled search form; no auto-re-execute                        |
+| D12 | API provider switch    | Duffel API replaces Amadeus — simpler auth (Bearer token), richer data model (slices/segments), pay-as-you-go with 1500:1 search-to-book ratio           |
 
 ---
 
 ## Duffel API Key Differences from Amadeus
 
-| Aspect | Amadeus (old) | Duffel (new) |
-|--------|--------------|--------------|
-| **Auth** | OAuth2 client_credentials (token refresh) | Static Bearer token (no refresh needed) |
-| **Search endpoint** | `GET /v2/shopping/flight-offers` | `POST /air/offer_requests` |
-| **Round-trip** | `returnDate` query param | Multi-slice array (outbound + return slices) |
-| **Data model** | Itineraries → Segments | Slices → Segments (richer, includes operating/marketing carrier) |
-| **Re-price** | `POST /v1/shopping/flight-offers/pricing` | `GET /air/offers/{id}` (offers have built-in expiry and live pricing) |
-| **Rate limits** | 2,000 calls/month free tier (hard cap) | 120 requests/60s rate limit; 1500:1 search-to-book ratio |
-| **SDK** | Raw HTTP (no official TS SDK) | `@duffel/api` official TypeScript SDK |
-| **Sandbox** | Test environment with limited routes | "Duffel Airways" test airline with consistent test data |
+| Aspect              | Amadeus (old)                             | Duffel (new)                                                          |
+| ------------------- | ----------------------------------------- | --------------------------------------------------------------------- |
+| **Auth**            | OAuth2 client_credentials (token refresh) | Static Bearer token (no refresh needed)                               |
+| **Search endpoint** | `GET /v2/shopping/flight-offers`          | `POST /air/offer_requests`                                            |
+| **Round-trip**      | `returnDate` query param                  | Multi-slice array (outbound + return slices)                          |
+| **Data model**      | Itineraries → Segments                    | Slices → Segments (richer, includes operating/marketing carrier)      |
+| **Re-price**        | `POST /v1/shopping/flight-offers/pricing` | `GET /air/offers/{id}` (offers have built-in expiry and live pricing) |
+| **Rate limits**     | 2,000 calls/month free tier (hard cap)    | 120 requests/60s rate limit; 1500:1 search-to-book ratio              |
+| **SDK**             | Raw HTTP (no official TS SDK)             | `@duffel/api` official TypeScript SDK                                 |
+| **Sandbox**         | Test environment with limited routes      | "Duffel Airways" test airline with consistent test data               |
 
 ---
 
@@ -200,13 +200,13 @@
 
 ## Environment Variables (Updated)
 
-| Variable | Default | Purpose |
-|----------|---------|---------|
-| `DUFFEL_ACCESS_TOKEN` | — | Duffel API access token (replaces `AMADEUS_API_KEY` + `AMADEUS_API_SECRET`) |
-| `DUFFEL_BUDGET_LIMIT_USER` | 1800 | User-facing search throttle threshold |
-| `DUFFEL_BUDGET_LIMIT_AGENT` | 1200 | Agent/chatbot throttle threshold |
-| `DUFFEL_BUDGET_LIMIT_TOTAL` | 2000 | Absolute monthly cap (hard stop for all callers) |
-| `FLIGHT_OFFERS_RETENTION_DAYS` | 7 | Days before cron purges `flight_offers` rows |
+| Variable                       | Default | Purpose                                                                     |
+| ------------------------------ | ------- | --------------------------------------------------------------------------- |
+| `DUFFEL_ACCESS_TOKEN`          | —       | Duffel API access token (replaces `AMADEUS_API_KEY` + `AMADEUS_API_SECRET`) |
+| `DUFFEL_BUDGET_LIMIT_USER`     | 1800    | User-facing search throttle threshold                                       |
+| `DUFFEL_BUDGET_LIMIT_AGENT`    | 1200    | Agent/chatbot throttle threshold                                            |
+| `DUFFEL_BUDGET_LIMIT_TOTAL`    | 2000    | Absolute monthly cap (hard stop for all callers)                            |
+| `FLIGHT_OFFERS_RETENTION_DAYS` | 7       | Days before cron purges `flight_offers` rows                                |
 
 ---
 

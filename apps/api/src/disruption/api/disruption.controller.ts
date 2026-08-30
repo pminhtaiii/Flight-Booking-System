@@ -1,4 +1,18 @@
-import { Controller, Post, Get, Param, HttpCode, HttpStatus, UseGuards, Req, NotFoundException, ForbiddenException, ParseUUIDPipe, Query, BadRequestException } from '@nestjs/common';
+import {
+  Controller,
+  Post,
+  Get,
+  Param,
+  HttpCode,
+  HttpStatus,
+  UseGuards,
+  Req,
+  NotFoundException,
+  ForbiddenException,
+  ParseUUIDPipe,
+  Query,
+  BadRequestException,
+} from '@nestjs/common';
 import { Request } from 'express';
 import { JwtAuthGuard } from '@/auth/guards/jwt-auth.guard';
 import { PrismaService } from '@/prisma/prisma.service';
@@ -77,7 +91,12 @@ export class TravellerDisruptionController {
 
     if (limitQuery !== undefined) {
       const parsedLimit = parseInt(limitQuery, 10);
-      if (isNaN(parsedLimit) || parsedLimit < 1 || parsedLimit > 50 || String(parsedLimit) !== limitQuery.trim()) {
+      if (
+        isNaN(parsedLimit) ||
+        parsedLimit < 1 ||
+        parsedLimit > 50 ||
+        String(parsedLimit) !== limitQuery.trim()
+      ) {
         throw new BadRequestException('Invalid limit parameter');
       }
       limit = parsedLimit;
@@ -106,4 +125,3 @@ export class TravellerDisruptionController {
     return this.disruptionService.acceptDisruption(bookingId, revisionId, req.user.id);
   }
 }
-

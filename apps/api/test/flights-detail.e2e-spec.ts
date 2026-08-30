@@ -19,9 +19,11 @@ describe('Flights Detail & Re-price (E2E)', () => {
   let userId: string;
 
   beforeAll(async () => {
-    jest.useFakeTimers({
-      doNotFake: ['nextTick', 'setImmediate', 'clearImmediate', 'setInterval', 'setTimeout'],
-    }).setSystemTime(new Date('2026-07-08T12:00:00.000Z'));
+    jest
+      .useFakeTimers({
+        doNotFake: ['nextTick', 'setImmediate', 'clearImmediate', 'setInterval', 'setTimeout'],
+      })
+      .setSystemTime(new Date('2026-07-08T12:00:00.000Z'));
 
     const moduleFixture: TestingModule = await Test.createTestingModule({
       imports: [AppModule],
@@ -73,7 +75,6 @@ describe('Flights Detail & Re-price (E2E)', () => {
     await prisma.airport.deleteMany({});
     await prisma.auditLog.deleteMany({});
     await prisma.user.deleteMany({});
-
 
     const keys = await cacheService.keys('*');
     for (const key of keys) {
@@ -128,9 +129,7 @@ describe('Flights Detail & Re-price (E2E)', () => {
     const mockSearchHash = 'mock_search_hash_123';
 
     it('should return 401 Unauthorized when requesting without Bearer token', async () => {
-      await request(app.getHttpServer())
-        .get(`/api/flights/${validOfferUuid}`)
-        .expect(401);
+      await request(app.getHttpServer()).get(`/api/flights/${validOfferUuid}`).expect(401);
     });
 
     it('should return 400 Bad Request when id is not a valid UUID', async () => {
@@ -162,16 +161,36 @@ describe('Flights Detail & Re-price (E2E)', () => {
           {
             id: 'sli_mock_1',
             duration: 'PT2H10M',
-            origin: { id: 'HAN', name: 'Noi Bai International Airport', iata_code: 'HAN', type: 'airport' },
-            destination: { id: 'SGN', name: 'Tan Son Nhat International Airport', iata_code: 'SGN', type: 'airport' },
+            origin: {
+              id: 'HAN',
+              name: 'Noi Bai International Airport',
+              iata_code: 'HAN',
+              type: 'airport',
+            },
+            destination: {
+              id: 'SGN',
+              name: 'Tan Son Nhat International Airport',
+              iata_code: 'SGN',
+              type: 'airport',
+            },
             segments: [
               {
                 id: 'seg_mock_1',
                 duration: 'PT2H10M',
                 departing_at: '2026-07-15T08:00:00',
                 arriving_at: '2026-07-15T10:10:00',
-                origin: { id: 'HAN', name: 'Noi Bai International Airport', iata_code: 'HAN', type: 'airport' },
-                destination: { id: 'SGN', name: 'Tan Son Nhat International Airport', iata_code: 'SGN', type: 'airport' },
+                origin: {
+                  id: 'HAN',
+                  name: 'Noi Bai International Airport',
+                  iata_code: 'HAN',
+                  type: 'airport',
+                },
+                destination: {
+                  id: 'SGN',
+                  name: 'Tan Son Nhat International Airport',
+                  iata_code: 'SGN',
+                  type: 'airport',
+                },
                 operating_carrier: { id: 'VN', name: 'Vietnam Airlines', iata_code: 'VN' },
                 marketing_carrier: { id: 'VN', name: 'Vietnam Airlines', iata_code: 'VN' },
                 marketing_carrier_flight_number: '123',
@@ -180,40 +199,35 @@ describe('Flights Detail & Re-price (E2E)', () => {
                   {
                     passenger_id: 'pas_mock_1',
                     cabin_class: 'economy',
-                    baggages: [
-                      { type: 'checked', quantity: 1 }
-                    ]
-                  }
-                ]
-              }
-            ]
-          }
+                    baggages: [{ type: 'checked', quantity: 1 }],
+                  },
+                ],
+              },
+            ],
+          },
         ],
-        passengers: [
-          { id: 'pas_mock_1', type: 'adult' }
-        ],
+        passengers: [{ id: 'pas_mock_1', type: 'adult' }],
         passenger_identity_documents_required: false,
         conditions: {
           refund_before_departure: {
             allowed: false,
             penalty_amount: null,
-            penalty_currency: null
+            penalty_currency: null,
           },
           change_before_departure: {
             allowed: true,
             penalty_amount: '50.00',
-            penalty_currency: 'USD'
-          }
-        }
+            penalty_currency: 'USD',
+          },
+        },
       };
 
       beforeEach(async () => {
         duffelService = app.get<DuffelService>(DuffelService);
-        sdkSpy = jest.spyOn(duffelService['duffel'].offers, 'get')
-          .mockResolvedValue({
-            data: mockDuffelOffer,
-            status: 200,
-          } as any);
+        sdkSpy = jest.spyOn(duffelService['duffel'].offers, 'get').mockResolvedValue({
+          data: mockDuffelOffer,
+          status: 200,
+        } as any);
 
         // Seed flight offer and recovery
         await prisma.flightOffer.create({
@@ -229,16 +243,16 @@ describe('Flights Detail & Re-price (E2E)', () => {
             children: 0,
             infants: 0,
             cabinClass: 'economy',
-            price: new Prisma.Decimal(125.50), // original price
+            price: new Prisma.Decimal(125.5), // original price
             currency: 'USD',
-          }
+          },
         });
 
         await prisma.offerRecovery.create({
           data: {
             id: validOfferUuid,
             searchHash: mockSearchHash,
-          }
+          },
         });
 
         // Seed search history
@@ -253,11 +267,11 @@ describe('Flights Detail & Re-price (E2E)', () => {
             infants: 0,
             cabinClass: 'economy',
             resultCount: 1,
-            minPrice: new Prisma.Decimal(125.50),
-            maxPrice: new Prisma.Decimal(125.50),
+            minPrice: new Prisma.Decimal(125.5),
+            maxPrice: new Prisma.Decimal(125.5),
             currency: 'USD',
             searchHash: mockSearchHash,
-          }
+          },
         });
       });
 
@@ -273,8 +287,8 @@ describe('Flights Detail & Re-price (E2E)', () => {
 
         expect(sdkSpy).toHaveBeenCalledWith('off_mock_123');
         expect(res.body.id).toBe(validOfferUuid);
-        expect(res.body.originalPrice).toBe(125.50);
-        expect(res.body.confirmedPrice).toBe(127.00); // live price
+        expect(res.body.originalPrice).toBe(125.5);
+        expect(res.body.confirmedPrice).toBe(127.0); // live price
         expect(res.body.priceChanged).toBe(true);
         expect(res.body.currency).toBe('USD');
         expect(res.body.expiresAt).toBe('2026-07-15T06:00:00Z');
@@ -327,7 +341,7 @@ describe('Flights Detail & Re-price (E2E)', () => {
           data: {
             id: validOfferUuid,
             searchHash: mockSearchHash,
-          }
+          },
         });
 
         await prisma.searchHistory.create({
@@ -342,11 +356,11 @@ describe('Flights Detail & Re-price (E2E)', () => {
             infants: 0,
             cabinClass: 'economy',
             resultCount: 5,
-            minPrice: new Prisma.Decimal(125.50),
-            maxPrice: new Prisma.Decimal(250.00),
+            minPrice: new Prisma.Decimal(125.5),
+            maxPrice: new Prisma.Decimal(250.0),
             currency: 'USD',
             searchHash: mockSearchHash,
-          }
+          },
         });
       });
 
@@ -371,6 +385,3 @@ describe('Flights Detail & Re-price (E2E)', () => {
     });
   });
 });
-
-
-

@@ -46,14 +46,17 @@ type Props = {
 export default async function PassengersPage({ searchParams }: Props) {
   const { accessToken } = await protectCheckoutRoute();
   const offerId = searchParams.offerId;
-  const safeReturnTarget = searchParams.returnTo ? getSafeReturnTarget(searchParams.returnTo) : null;
+  const safeReturnTarget = searchParams.returnTo
+    ? getSafeReturnTarget(searchParams.returnTo)
+    : null;
   const cookieStore = cookies();
   const handoffCookie = cookieStore.get('chat_handoff_token');
-  
+
   const mockScenario = cookieStore.get('mock-scenario')?.value || null;
 
   if (handoffCookie?.value) {
-    const apiUrl = process.env.API_URL || process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+    const apiUrl =
+      process.env.API_URL || process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
     const resolved = await resolveHandoffForBootstrap(
       apiUrl,
       handoffCookie.value,
@@ -72,7 +75,8 @@ export default async function PassengersPage({ searchParams }: Props) {
             <div role="alert" className="card text-text-cancelled bg-bg-cancelled p-6">
               <h1 className="text-xl font-bold">Checkout Session Expired</h1>
               <p className="mt-2 text-sm text-text-secondary">
-                Your checkout session has expired or is invalid. Please restart checkout from the chat assistant.
+                Your checkout session has expired or is invalid. Please restart checkout from the
+                chat assistant.
               </p>
             </div>
           </main>
@@ -95,7 +99,9 @@ export default async function PassengersPage({ searchParams }: Props) {
             </div>
           ) : null}
           <h1 className="text-3xl font-bold text-text-primary">Passenger Details</h1>
-          <p className="text-text-secondary">Please enter the details for all passengers. Fields marked with * are required.</p>
+          <p className="text-text-secondary">
+            Please enter the details for all passengers. Fields marked with * are required.
+          </p>
           <div className="card p-6 space-y-4">
             <h2 className="text-lg font-semibold text-text-primary">Flight Selected</h2>
             <div className="flex flex-wrap gap-6 text-sm text-text-secondary">
@@ -103,21 +109,29 @@ export default async function PassengersPage({ searchParams }: Props) {
                 <span className="font-semibold text-text-primary">Carrier:</span> {offer.airline}
               </div>
               <div>
-                <span className="font-semibold text-text-primary">Route:</span> {offer.origin} to {offer.destination}
+                <span className="font-semibold text-text-primary">Route:</span> {offer.origin} to{' '}
+                {offer.destination}
               </div>
               <div>
-                <span className="font-semibold text-text-primary">Departure:</span> {offer.departureAt}
+                <span className="font-semibold text-text-primary">Departure:</span>{' '}
+                {offer.departureAt}
               </div>
               <div>
                 <span className="font-semibold text-text-primary">Arrival:</span> {offer.arrivalAt}
               </div>
               <div>
-                <span className="font-semibold text-text-primary">Price:</span> {offer.price} {offer.currency}
+                <span className="font-semibold text-text-primary">Price:</span> {offer.price}{' '}
+                {offer.currency}
               </div>
             </div>
           </div>
           <PassengerFormClient
-            flight={{ id: 'handoff', adults: offer.adults, children: offer.children, infants: offer.infants }}
+            flight={{
+              id: 'handoff',
+              adults: offer.adults,
+              children: offer.children,
+              infants: offer.infants,
+            }}
             profile={null}
             offerPassengers={passengers}
             accessToken={accessToken}
@@ -129,8 +143,10 @@ export default async function PassengersPage({ searchParams }: Props) {
   }
 
   // Reject any passenger data passed via query string to prevent PII exposure
-  const hasPiiInQuery = Object.keys(searchParams).some(key =>
-    ['name', 'email', 'phone', 'passport', 'dob', 'gender'].some(pii => key.toLowerCase().includes(pii))
+  const hasPiiInQuery = Object.keys(searchParams).some((key) =>
+    ['name', 'email', 'phone', 'passport', 'dob', 'gender'].some((pii) =>
+      key.toLowerCase().includes(pii),
+    ),
   );
 
   if (hasPiiInQuery) {
@@ -153,9 +169,22 @@ export default async function PassengersPage({ searchParams }: Props) {
     profile = {
       profileId: 'mock-profile-id',
       revision: 1,
-      identity: { givenName: 'Jane', middleName: null, familyName: 'Doe', dateOfBirth: '1995-05-05', gender: 'female', title: 'Ms' },
+      identity: {
+        givenName: 'Jane',
+        middleName: null,
+        familyName: 'Doe',
+        dateOfBirth: '1995-05-05',
+        gender: 'female',
+        title: 'Ms',
+      },
       contact: { email: 'jane@example.test', phoneCountryCode: '+1', phoneNumber: '5550000000' },
-      travelDocument: { documentType: 'passport', passportNumber: 'P12345', passportExpiry: '2030-05-05', issuingCountry: 'US', nationality: 'US' },
+      travelDocument: {
+        documentType: 'passport',
+        passportNumber: 'P12345',
+        passportExpiry: '2030-05-05',
+        issuingCountry: 'US',
+        nationality: 'US',
+      },
       preferences: { seatPreference: 'window', classPreference: 'economy' },
     };
 
@@ -206,7 +235,10 @@ export default async function PassengersPage({ searchParams }: Props) {
         adults: 1,
         children: 1,
         infants: 0,
-        passengers: [{ id: 'pas_001', type: 'ADULT' }, { id: 'pas_002', type: 'CHILD' }],
+        passengers: [
+          { id: 'pas_001', type: 'ADULT' },
+          { id: 'pas_002', type: 'CHILD' },
+        ],
         segments: [{ departureAirport: 'LAX', arrivalAirport: 'SFO' }],
       };
     }
@@ -228,7 +260,9 @@ export default async function PassengersPage({ searchParams }: Props) {
             <main className="mx-auto w-full max-w-3xl py-12 px-4">
               <div role="alert" className="card text-text-cancelled bg-bg-cancelled p-6">
                 <h1 className="text-xl font-bold">Flight Offer Not Found</h1>
-                <p className="mt-2 text-sm text-text-secondary">We could not load the flight offer details. It may have expired.</p>
+                <p className="mt-2 text-sm text-text-secondary">
+                  We could not load the flight offer details. It may have expired.
+                </p>
               </div>
             </main>
           </div>
@@ -243,7 +277,9 @@ export default async function PassengersPage({ searchParams }: Props) {
           <main className="mx-auto w-full max-w-3xl py-12 px-4">
             <div role="alert" className="card text-text-cancelled bg-bg-cancelled p-6">
               <h1 className="text-xl font-bold">Service Error</h1>
-              <p className="mt-2 text-sm text-text-secondary">Failed to retrieve flight offer details. Please try again later.</p>
+              <p className="mt-2 text-sm text-text-secondary">
+                Failed to retrieve flight offer details. Please try again later.
+              </p>
             </div>
           </main>
         </div>
@@ -265,7 +301,6 @@ export default async function PassengersPage({ searchParams }: Props) {
     } catch {
       // Inline passenger sources remain available when profile loading fails.
     }
-
   }
 
   if (!flight) {
@@ -275,7 +310,9 @@ export default async function PassengersPage({ searchParams }: Props) {
         <main className="mx-auto w-full max-w-3xl py-12 px-4">
           <div role="alert" className="card text-text-cancelled bg-bg-cancelled p-6">
             <h1 className="text-xl font-bold">Service Error</h1>
-            <p className="mt-2 text-sm text-text-secondary">Failed to retrieve flight offer details.</p>
+            <p className="mt-2 text-sm text-text-secondary">
+              Failed to retrieve flight offer details.
+            </p>
           </div>
         </main>
       </div>
@@ -297,25 +334,32 @@ export default async function PassengersPage({ searchParams }: Props) {
           </div>
         ) : null}
         <h1 className="text-3xl font-bold text-text-primary">Passenger Details</h1>
-        <p className="text-text-secondary">Please enter the details for all passengers. Fields marked with * are required.</p>
-        
+        <p className="text-text-secondary">
+          Please enter the details for all passengers. Fields marked with * are required.
+        </p>
+
         <div className="card p-6 space-y-4">
           <h2 className="text-lg font-semibold text-text-primary">Flight Selected</h2>
           <div className="flex flex-wrap gap-6 text-sm text-text-secondary">
             <div>
-              <span className="font-semibold text-text-primary">Carrier:</span> {flight.airline} (Flight {flight.flightNumber})
+              <span className="font-semibold text-text-primary">Carrier:</span> {flight.airline}{' '}
+              (Flight {flight.flightNumber})
             </div>
             <div>
-              <span className="font-semibold text-text-primary">Route:</span> {flight.departureAirport} to {flight.arrivalAirport}
+              <span className="font-semibold text-text-primary">Route:</span>{' '}
+              {flight.departureAirport} to {flight.arrivalAirport}
             </div>
             <div>
-              <span className="font-semibold text-text-primary">Date:</span> {new Date(flight.departureTime).toLocaleDateString()}
+              <span className="font-semibold text-text-primary">Date:</span>{' '}
+              {new Date(flight.departureTime).toLocaleDateString()}
             </div>
             <div>
-              <span className="font-semibold text-text-primary">Class:</span> {flight.fareClass || flight.requestedCabinClass}
+              <span className="font-semibold text-text-primary">Class:</span>{' '}
+              {flight.fareClass || flight.requestedCabinClass}
             </div>
             <div>
-              <span className="font-semibold text-text-primary">Price:</span> {flight.confirmedPrice} {flight.currency}
+              <span className="font-semibold text-text-primary">Price:</span>{' '}
+              {flight.confirmedPrice} {flight.currency}
             </div>
           </div>
         </div>

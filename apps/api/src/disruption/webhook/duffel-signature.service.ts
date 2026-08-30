@@ -58,10 +58,7 @@ export class DuffelSignatureService {
       rawBody,
     ]);
 
-    const expectedSignature = crypto
-      .createHmac('sha256', secret)
-      .update(message)
-      .digest('hex');
+    const expectedSignature = crypto.createHmac('sha256', secret).update(message).digest('hex');
 
     // Constant-time comparison
     const sigBuffer = Buffer.from(signatureStr, 'utf8');

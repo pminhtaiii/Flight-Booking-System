@@ -138,7 +138,9 @@ describe('BookingRecoveryService', () => {
         },
       } as unknown as BookingWithRelations;
 
-      mockStripeService.retrievePaymentIntent.mockResolvedValue({ status: 'requires_payment_method' });
+      mockStripeService.retrievePaymentIntent.mockResolvedValue({
+        status: 'requires_payment_method',
+      });
       mockPrisma.paymentEvent.findFirst.mockResolvedValue({
         metadata: { id: 'ord_123' },
       });
@@ -327,7 +329,9 @@ describe('BookingRecoveryService', () => {
       ];
 
       mockPrisma.booking.findMany.mockResolvedValue(staleBookings);
-      const reconcileSpy = jest.spyOn(service, 'reconcileBookingIfStale').mockResolvedValue({} as any);
+      const reconcileSpy = jest
+        .spyOn(service, 'reconcileBookingIfStale')
+        .mockResolvedValue({} as any);
 
       await service.sweepStaleBookings();
 
@@ -346,8 +350,16 @@ describe('BookingRecoveryService', () => {
   describe('sweepUncompletedBookings', () => {
     it('queries past CONFIRMED bookings and calls checkAndCompleteBooking', async () => {
       const pastBookings = [
-        { id: 'b-1', status: BookingStatus.CONFIRMED, departureAt: new Date(Date.now() - 3600_000) },
-        { id: 'b-2', status: BookingStatus.CONFIRMED, departureAt: new Date(Date.now() - 7200_000) },
+        {
+          id: 'b-1',
+          status: BookingStatus.CONFIRMED,
+          departureAt: new Date(Date.now() - 3600_000),
+        },
+        {
+          id: 'b-2',
+          status: BookingStatus.CONFIRMED,
+          departureAt: new Date(Date.now() - 7200_000),
+        },
       ];
 
       mockPrisma.booking.findMany.mockResolvedValue(pastBookings);

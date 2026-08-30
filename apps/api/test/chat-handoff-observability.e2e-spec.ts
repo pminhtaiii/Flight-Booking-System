@@ -71,7 +71,9 @@ describe('chat handoff observability dashboard and alert contract', () => {
         })
         .compile();
       app = moduleFixture.createNestApplication();
-      app.useGlobalPipes(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, transform: true }));
+      app.useGlobalPipes(
+        new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, transform: true }),
+      );
       app.useGlobalFilters(new HttpExceptionFilter());
       app.setGlobalPrefix('api', { exclude: ['health'] });
       await app.init();
@@ -80,12 +82,18 @@ describe('chat handoff observability dashboard and alert contract', () => {
       const jwtService = moduleFixture.get(JwtService);
       const attestationService = moduleFixture.get(SelectionAttestationService);
       const duffelService = moduleFixture.get(DuffelService);
-      const handoffService = moduleFixture.get(ChatHandoffService) as unknown as { logger: { log: jest.Mock; warn: jest.Mock } };
-      const intentService = moduleFixture.get(BookingIntentService) as unknown as { logger: { log: jest.Mock; warn: jest.Mock } };
+      const handoffService = moduleFixture.get(ChatHandoffService) as unknown as {
+        logger: { log: jest.Mock; warn: jest.Mock };
+      };
+      const intentService = moduleFixture.get(BookingIntentService) as unknown as {
+        logger: { log: jest.Mock; warn: jest.Mock };
+      };
       handoffService.logger = { log, warn: jest.fn() };
       intentService.logger = { log, warn: jest.fn() };
 
-      const user = await prisma!.user.create({ data: { email: `${runMarker}@example.test`, password: 'Password123!', status: 'ACTIVE' } });
+      const user = await prisma!.user.create({
+        data: { email: `${runMarker}@example.test`, password: 'Password123!', status: 'ACTIVE' },
+      });
       userId = user.id;
       const userToken = jwtService.sign(
         { sub: user.id, id: user.id, jti: crypto.randomUUID(), email: user.email },
@@ -94,44 +102,117 @@ describe('chat handoff observability dashboard and alert contract', () => {
       const session = await prisma!.chatSession.create({ data: { userId } });
       const offer = await prisma!.flightOffer.create({
         data: {
-          searchHash: runMarker, duffelOfferId: `${runMarker}-offer`, origin: 'SGN', destination: 'HAN',
-          departureDate: new Date(Date.now() + 86_400_000), adults: 1, children: 0, infants: 0,
-          price: new Prisma.Decimal(100), currency: 'USD',
+          searchHash: runMarker,
+          duffelOfferId: `${runMarker}-offer`,
+          origin: 'SGN',
+          destination: 'HAN',
+          departureDate: new Date(Date.now() + 86_400_000),
+          adults: 1,
+          children: 0,
+          infants: 0,
+          price: new Prisma.Decimal(100),
+          currency: 'USD',
           rawOffer: {
-            expires_at: new Date(Date.now() + 900_000).toISOString(), passengers: [{ id: 'pas_observability', type: 'adult' }],
-            slices: [{ segments: [{ origin: { iata_code: 'SGN' }, destination: { iata_code: 'HAN' }, departing_at: new Date(Date.now() + 86_400_000).toISOString(), arriving_at: new Date(Date.now() + 90_000_000).toISOString(), operating_carrier: { name: 'Test Carrier' } }] }],
+            expires_at: new Date(Date.now() + 900_000).toISOString(),
+            passengers: [{ id: 'pas_observability', type: 'adult' }],
+            slices: [
+              {
+                segments: [
+                  {
+                    origin: { iata_code: 'SGN' },
+                    destination: { iata_code: 'HAN' },
+                    departing_at: new Date(Date.now() + 86_400_000).toISOString(),
+                    arriving_at: new Date(Date.now() + 90_000_000).toISOString(),
+                    operating_carrier: { name: 'Test Carrier' },
+                  },
+                ],
+              },
+            ],
           },
         },
       });
       for (const airport of [
-        { iataCode: 'SGN', name: 'Test Origin', city: 'Test City', latitude: 10.8, longitude: 106.6 },
-        { iataCode: 'HAN', name: 'Test Destination', city: 'Test City', latitude: 21.2, longitude: 105.8 },
+        {
+          iataCode: 'SGN',
+          name: 'Test Origin',
+          city: 'Test City',
+          latitude: 10.8,
+          longitude: 106.6,
+        },
+        {
+          iataCode: 'HAN',
+          name: 'Test Destination',
+          city: 'Test City',
+          latitude: 21.2,
+          longitude: 105.8,
+        },
       ]) {
-        await prisma!.airport.upsert({ where: { iataCode: airport.iataCode }, update: {}, create: { ...airport, country: 'VN', type: AirportType.MEDIUM_AIRPORT } });
+        await prisma!.airport.upsert({
+          where: { iataCode: airport.iataCode },
+          update: {},
+          create: { ...airport, country: 'VN', type: AirportType.MEDIUM_AIRPORT },
+        });
       }
       const attestation = await attestationService.signSelectionAttestation(
-        userId, session.id, 1, new Date(Date.now() + 900_000).toISOString(),
+        userId,
+        session.id,
+        1,
+        new Date(Date.now() + 900_000).toISOString(),
         [{ flightOfferId: offer.id, duffelOfferId: `${runMarker}-offer` }],
       );
       const claimToken = mintClaimToken(userId, Math.floor(Date.now() / 1000));
       const create = await request(app.getHttpServer())
-        .post('/api/chat-handoff').set('X-Agent-API-Key', process.env.AGENT_SERVICE_API_KEY!)
+        .post('/api/chat-handoff')
+        .set('X-Agent-API-Key', process.env.AGENT_SERVICE_API_KEY!)
         .set('X-User-Claim', claimToken)
-        .set('X-Trace-Id', traceId).set('X-Correlation-Id', correlationId)
-        .send({ selectionAttestationHash: attestation, selectedOfferIndex: 1 }).expect(201);
+        .set('X-Trace-Id', traceId)
+        .set('X-Correlation-Id', correlationId)
+        .send({ selectionAttestationHash: attestation, selectedOfferIndex: 1 })
+        .expect(201);
       const handoffToken = create.body.token as string;
 
       await request(app.getHttpServer())
-        .get('/api/chat-handoff/resolve').query({ token: handoffToken })
-        .set('Authorization', `Bearer ${userToken}`).set('X-Trace-Id', traceId).set('X-Correlation-Id', correlationId)
+        .get('/api/chat-handoff/resolve')
+        .query({ token: handoffToken })
+        .set('Authorization', `Bearer ${userToken}`)
+        .set('X-Trace-Id', traceId)
+        .set('X-Correlation-Id', correlationId)
         .expect(200);
       const duffelGet = jest.spyOn(duffelService['duffel'].offers, 'get').mockResolvedValue({
-        data: { id: `${runMarker}-offer`, total_amount: '100.00', total_currency: 'USD', expires_at: new Date(Date.now() + 900_000).toISOString(), passengers: [{ id: 'pas_observability', type: 'adult' }] },
+        data: {
+          id: `${runMarker}-offer`,
+          total_amount: '100.00',
+          total_currency: 'USD',
+          expires_at: new Date(Date.now() + 900_000).toISOString(),
+          passengers: [{ id: 'pas_observability', type: 'adult' }],
+        },
       } as never);
       await request(app.getHttpServer())
-        .post('/api/bookings/intents').set('Authorization', `Bearer ${userToken}`)
-        .set('X-Trace-Id', traceId).set('X-Correlation-Id', correlationId)
-        .send({ handoffToken, passengers: [{ offerPassengerId: 'pas_observability', type: PassengerType.ADULT, source: { type: 'inline', givenName: 'Test', familyName: 'Passenger', dateOfBirth: '1990-01-01', gender: 'male', nationality: 'VN', email: 'traveller@example.test', phoneCountryCode: '+84', phoneNumber: '912345678', title: 'Mr' } }] })
+        .post('/api/bookings/intents')
+        .set('Authorization', `Bearer ${userToken}`)
+        .set('X-Trace-Id', traceId)
+        .set('X-Correlation-Id', correlationId)
+        .send({
+          handoffToken,
+          passengers: [
+            {
+              offerPassengerId: 'pas_observability',
+              type: PassengerType.ADULT,
+              source: {
+                type: 'inline',
+                givenName: 'Test',
+                familyName: 'Passenger',
+                dateOfBirth: '1990-01-01',
+                gender: 'male',
+                nationality: 'VN',
+                email: 'traveller@example.test',
+                phoneCountryCode: '+84',
+                phoneNumber: '912345678',
+                title: 'Mr',
+              },
+            },
+          ],
+        })
         .expect(201);
       expect(duffelGet).toHaveBeenCalledTimes(1);
       duffelGet.mockRestore();
@@ -139,23 +220,80 @@ describe('chat handoff observability dashboard and alert contract', () => {
       const expectedOperations = ['handoff_create', 'handoff_resolve', 'handoff_consume'];
       await new Promise((resolve) => setTimeout(resolve, 0));
       const events = log.mock.calls
-        .map(([entry]) => typeof entry === 'string' ? JSON.parse(entry) : null)
-        .filter((entry): entry is Record<string, unknown> => entry !== null && expectedOperations.includes(String(entry.operation)));
-      expect(events).toEqual(expect.arrayContaining([
-        expect.objectContaining({ operation: 'handoff_create', metric: 'handoff_tokens_issued_total', status: 'created', metadata: { outcome: 'created' }, trace_id: traceId, correlation_id: correlationId }),
-        expect.objectContaining({ operation: 'handoff_resolve', metric: 'handoff_tokens_resolved_total', status: 'resolved', metadata: { outcome: 'resolved' }, trace_id: traceId, correlation_id: correlationId }),
-        expect.objectContaining({ operation: 'handoff_consume', metric: 'handoff_tokens_consumed_total', status: 'created', metadata: { outcome: 'consumed', price_changed: false }, trace_id: traceId, correlation_id: correlationId }),
-      ]));
-      const auditLogs = await prisma!.auditLog.findMany({ where: { userId, action: { in: ['chat_handoff_created', 'chat_handoff_resolved', 'chat_handoff_consumed'] } } });
+        .map(([entry]) => (typeof entry === 'string' ? JSON.parse(entry) : null))
+        .filter(
+          (entry): entry is Record<string, unknown> =>
+            entry !== null && expectedOperations.includes(String(entry.operation)),
+        );
+      expect(events).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            operation: 'handoff_create',
+            metric: 'handoff_tokens_issued_total',
+            status: 'created',
+            metadata: { outcome: 'created' },
+            trace_id: traceId,
+            correlation_id: correlationId,
+          }),
+          expect.objectContaining({
+            operation: 'handoff_resolve',
+            metric: 'handoff_tokens_resolved_total',
+            status: 'resolved',
+            metadata: { outcome: 'resolved' },
+            trace_id: traceId,
+            correlation_id: correlationId,
+          }),
+          expect.objectContaining({
+            operation: 'handoff_consume',
+            metric: 'handoff_tokens_consumed_total',
+            status: 'created',
+            metadata: { outcome: 'consumed', price_changed: false },
+            trace_id: traceId,
+            correlation_id: correlationId,
+          }),
+        ]),
+      );
+      const auditLogs = await prisma!.auditLog.findMany({
+        where: {
+          userId,
+          action: {
+            in: ['chat_handoff_created', 'chat_handoff_resolved', 'chat_handoff_consumed'],
+          },
+        },
+      });
 
       // Canonical intent creation resolves the handoff again before it claims it,
       // so the public resolve plus the canonical consume produce two resolves.
       expect(auditLogs).toHaveLength(4);
-      expect(auditLogs.map((entry) => entry.metadata)).toEqual(expect.arrayContaining([
-        expect.objectContaining({ operation: 'handoff_create', metric: 'handoff_tokens_issued_total', status: 'created', outcome: 'created', traceId, correlationId }),
-        expect.objectContaining({ operation: 'handoff_resolve', metric: 'handoff_tokens_resolved_total', status: 'resolved', outcome: 'resolved', traceId, correlationId }),
-        expect.objectContaining({ operation: 'handoff_consume', metric: 'handoff_tokens_consumed_total', status: 'created', outcome: 'consumed', price_changed: false, traceId, correlationId }),
-      ]));
+      expect(auditLogs.map((entry) => entry.metadata)).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            operation: 'handoff_create',
+            metric: 'handoff_tokens_issued_total',
+            status: 'created',
+            outcome: 'created',
+            traceId,
+            correlationId,
+          }),
+          expect.objectContaining({
+            operation: 'handoff_resolve',
+            metric: 'handoff_tokens_resolved_total',
+            status: 'resolved',
+            outcome: 'resolved',
+            traceId,
+            correlationId,
+          }),
+          expect.objectContaining({
+            operation: 'handoff_consume',
+            metric: 'handoff_tokens_consumed_total',
+            status: 'created',
+            outcome: 'consumed',
+            price_changed: false,
+            traceId,
+            correlationId,
+          }),
+        ]),
+      );
 
       const serializedTelemetry = JSON.stringify({ events, auditLogs });
       for (const value of FORBIDDEN_TELEMETRY_VALUES) {
@@ -177,13 +315,15 @@ describe('chat handoff observability dashboard and alert contract', () => {
 
   it('rejects the protected privacy corpus before it can enter an emitted event', () => {
     for (const protectedValue of FORBIDDEN_TELEMETRY_VALUES) {
-      expect(() => createChatTelemetryEvent(
-        'handoff_resolve',
-        'resolved',
-        42,
-        {},
-        { outcome: protectedValue },
-      )).toThrow('not safe to emit');
+      expect(() =>
+        createChatTelemetryEvent(
+          'handoff_resolve',
+          'resolved',
+          42,
+          {},
+          { outcome: protectedValue },
+        ),
+      ).toThrow('not safe to emit');
     }
   });
 

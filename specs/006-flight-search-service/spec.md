@@ -8,7 +8,7 @@
 
 **Input**: User description: "Build the deterministic Duffel Flight Search Service — the core user-facing flight search pipeline with caching, budget management, persistence, and flight detail re-pricing."
 
-## User Scenarios & Testing *(mandatory)*
+## User Scenarios & Testing _(mandatory)_
 
 ### User Story 1 - Search for Flights (Priority: P1)
 
@@ -78,7 +78,7 @@ Every flight search performed by a user is recorded as lightweight metadata (rou
 - How does the system handle extremely long layovers or multi-stop flights with >2 stops?
 - What happens if the user navigates to a flight detail URL that has never existed (invalid UUID)?
 
-## Requirements *(mandatory)*
+## Requirements _(mandatory)_
 
 ### Functional Requirements
 
@@ -102,7 +102,7 @@ Every flight search performed by a user is recorded as lightweight metadata (rou
 - **Flight Offer**: A specific flight option returned by the search — includes airline, routing, timing, pricing, fare class, and baggage details. Has a limited lifespan tied to the retention window.
 - **Search History Record**: Lightweight metadata about a completed search — the route, dates, price range observed, and result count. Preserved indefinitely for analytics.
 
-## Success Criteria *(mandatory)*
+## Success Criteria _(mandatory)_
 
 ### Measurable Outcomes
 

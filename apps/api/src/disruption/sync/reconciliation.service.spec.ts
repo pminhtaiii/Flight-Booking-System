@@ -63,9 +63,7 @@ describe('ReconciliationService & Booking Completion', () => {
     it('should query bookings using correct boundaries and stable ordering', async () => {
       mockPrisma.booking.findMany
         .mockResolvedValueOnce([]) // stale sweep
-        .mockResolvedValueOnce([
-          { id: 'b-1', status: 'CONFIRMED', duffelOrderId: 'ord-1' },
-        ]); // eligible query
+        .mockResolvedValueOnce([{ id: 'b-1', status: 'CONFIRMED', duffelOrderId: 'ord-1' }]); // eligible query
 
       const result = await reconciliationService.reconcile();
 
@@ -84,7 +82,7 @@ describe('ReconciliationService & Booking Completion', () => {
             { nextUnflownDepartureAt: 'asc' },
             { id: 'asc' },
           ],
-        })
+        }),
       );
 
       expect(mockSupplierSyncService.syncBooking).toHaveBeenCalledWith('b-1', 'RECONCILIATION');
@@ -103,7 +101,11 @@ describe('ReconciliationService & Booking Completion', () => {
     it('should complete stale bookings that passed final arrival', async () => {
       mockPrisma.booking.findMany
         .mockResolvedValueOnce([
-          { id: 'b-stale', status: 'CONFIRMED', currentFinalArrivalAt: new Date(Date.now() - 3600000) },
+          {
+            id: 'b-stale',
+            status: 'CONFIRMED',
+            currentFinalArrivalAt: new Date(Date.now() - 3600000),
+          },
         ]) // stale sweep
         .mockResolvedValueOnce([]); // eligible query
 
@@ -114,25 +116,20 @@ describe('ReconciliationService & Booking Completion', () => {
         expect.objectContaining({
           where: expect.objectContaining({
             status: 'CONFIRMED',
-            OR: [
-              { currentFinalArrivalAt: expect.any(Object) },
-              { AND: expect.any(Array), },
-            ],
+            OR: [{ currentFinalArrivalAt: expect.any(Object) }, { AND: expect.any(Array) }],
           }),
-        })
+        }),
       );
 
       expect(mockBookingLifecycleService.checkAndCompleteBooking).toHaveBeenCalledWith(
-        expect.objectContaining({ id: 'b-stale' })
+        expect.objectContaining({ id: 'b-stale' }),
       );
       expect(result.stale).toBe(1);
     });
 
     it('should respect env var batch size limit', async () => {
       process.env.DUFFEL_RECONCILIATION_BATCH_SIZE = '10';
-      mockPrisma.booking.findMany
-        .mockResolvedValueOnce([])
-        .mockResolvedValueOnce([]);
+      mockPrisma.booking.findMany.mockResolvedValueOnce([]).mockResolvedValueOnce([]);
 
       await reconciliationService.reconcile();
 
@@ -140,7 +137,7 @@ describe('ReconciliationService & Booking Completion', () => {
         2,
         expect.objectContaining({
           take: 10,
-        })
+        }),
       );
 
       delete process.env.DUFFEL_RECONCILIATION_BATCH_SIZE;
@@ -149,9 +146,7 @@ describe('ReconciliationService & Booking Completion', () => {
     it('should defer processing and log metrics if budget is exhausted before start', async () => {
       mockPrisma.booking.findMany
         .mockResolvedValueOnce([])
-        .mockResolvedValueOnce([
-          { id: 'b-1', status: 'CONFIRMED', duffelOrderId: 'ord-1' },
-        ]);
+        .mockResolvedValueOnce([{ id: 'b-1', status: 'CONFIRMED', duffelOrderId: 'ord-1' }]);
       // Budget limit is 2000, mock CacheService to return 2000 (fully exhausted)
       mockCacheService.get.mockResolvedValue('2000');
 
@@ -166,9 +161,7 @@ describe('ReconciliationService & Booking Completion', () => {
     it('should defer processing if budget is exhausted during increment', async () => {
       mockPrisma.booking.findMany
         .mockResolvedValueOnce([])
-        .mockResolvedValueOnce([
-          { id: 'b-1', status: 'CONFIRMED', duffelOrderId: 'ord-1' },
-        ]);
+        .mockResolvedValueOnce([{ id: 'b-1', status: 'CONFIRMED', duffelOrderId: 'ord-1' }]);
       mockCacheService.get.mockResolvedValue('1999');
       // Incremented value exceeds the limit (e.g. 2001)
       mockCacheService.incr.mockResolvedValue(2001);
@@ -184,9 +177,7 @@ describe('ReconciliationService & Booking Completion', () => {
     it('should increment unchanged count for NO_CHANGE or duplicate status', async () => {
       mockPrisma.booking.findMany
         .mockResolvedValueOnce([])
-        .mockResolvedValueOnce([
-          { id: 'b-1', status: 'CONFIRMED', duffelOrderId: 'ord-1' },
-        ]);
+        .mockResolvedValueOnce([{ id: 'b-1', status: 'CONFIRMED', duffelOrderId: 'ord-1' }]);
       mockSupplierSyncService.syncBooking.mockResolvedValue({ status: 'CONVERGED_DUPLICATE' });
 
       const result = await reconciliationService.reconcile();
@@ -199,9 +190,7 @@ describe('ReconciliationService & Booking Completion', () => {
     it('should increment changed count if revision was created', async () => {
       mockPrisma.booking.findMany
         .mockResolvedValueOnce([])
-        .mockResolvedValueOnce([
-          { id: 'b-1', status: 'CONFIRMED', duffelOrderId: 'ord-1' },
-        ]);
+        .mockResolvedValueOnce([{ id: 'b-1', status: 'CONFIRMED', duffelOrderId: 'ord-1' }]);
       mockSupplierSyncService.syncBooking.mockResolvedValue({
         status: 'REVISION_CREATED',
         revisionId: 'rev-1',
@@ -217,9 +206,7 @@ describe('ReconciliationService & Booking Completion', () => {
     it('should decrement budget back if sync result is SKIPPED_LOCKED or SKIPPED_INELIGIBLE', async () => {
       mockPrisma.booking.findMany
         .mockResolvedValueOnce([])
-        .mockResolvedValueOnce([
-          { id: 'b-1', status: 'CONFIRMED', duffelOrderId: 'ord-1' },
-        ]);
+        .mockResolvedValueOnce([{ id: 'b-1', status: 'CONFIRMED', duffelOrderId: 'ord-1' }]);
       mockSupplierSyncService.syncBooking.mockResolvedValue({ status: 'SKIPPED_LOCKED' });
 
       const result = await reconciliationService.reconcile();
@@ -232,9 +219,7 @@ describe('ReconciliationService & Booking Completion', () => {
     it('should handle failures gracefully, update retry metadata with exponential backoff and release claim', async () => {
       mockPrisma.booking.findMany
         .mockResolvedValueOnce([])
-        .mockResolvedValueOnce([
-          { id: 'b-1', status: 'CONFIRMED', duffelOrderId: 'ord-1' },
-        ]);
+        .mockResolvedValueOnce([{ id: 'b-1', status: 'CONFIRMED', duffelOrderId: 'ord-1' }]);
       mockSupplierSyncService.syncBooking.mockRejectedValue(new Error('Upstream error'));
 
       // First failure
@@ -243,11 +228,7 @@ describe('ReconciliationService & Booking Completion', () => {
       const result = await reconciliationService.reconcile();
 
       expect(result.failed).toBe(1);
-      expect(mockCacheService.set).toHaveBeenCalledWith(
-        'reconciliation:failures:b-1',
-        '1',
-        172800
-      );
+      expect(mockCacheService.set).toHaveBeenCalledWith('reconciliation:failures:b-1', '1', 172800);
 
       // Verify that nextDuffelSyncAt is updated (15 mins backoff)
       expect(mockPrisma.booking.updateMany).toHaveBeenCalledWith(
@@ -258,16 +239,14 @@ describe('ReconciliationService & Booking Completion', () => {
             syncLockedAt: null,
             syncLockToken: null,
           }),
-        })
+        }),
       );
     });
 
     it('should compute longer backoff for subsequent failures', async () => {
       mockPrisma.booking.findMany
         .mockResolvedValueOnce([])
-        .mockResolvedValueOnce([
-          { id: 'b-1', status: 'CONFIRMED', duffelOrderId: 'ord-1' },
-        ]);
+        .mockResolvedValueOnce([{ id: 'b-1', status: 'CONFIRMED', duffelOrderId: 'ord-1' }]);
       mockSupplierSyncService.syncBooking.mockRejectedValue(new Error('Upstream error'));
 
       // Mocking 2 previous failures
@@ -276,11 +255,7 @@ describe('ReconciliationService & Booking Completion', () => {
       await reconciliationService.reconcile();
 
       // Third failure -> new failures count = 3 -> backoff = 15 * 2^(3-1) = 60 minutes
-      expect(mockCacheService.set).toHaveBeenCalledWith(
-        'reconciliation:failures:b-1',
-        '3',
-        172800
-      );
+      expect(mockCacheService.set).toHaveBeenCalledWith('reconciliation:failures:b-1', '3', 172800);
     });
   });
 
@@ -311,9 +286,7 @@ describe('ReconciliationService & Booking Completion', () => {
         $transaction: jest.fn((callback) => callback(mockPrisma)),
       };
 
-      bookingLifecycleService = new BookingLifecycleService(
-        mockPrisma as unknown as PrismaService,
-      );
+      bookingLifecycleService = new BookingLifecycleService(mockPrisma as unknown as PrismaService);
     });
 
     it('should complete booking and resolve detected disruption if departure/arrival has passed', async () => {

@@ -31,7 +31,9 @@ describe('BookingAgentProjection Backfill (E2E)', () => {
 
   it('is idempotent when re-run (does not duplicate or overwrite existing references)', async () => {
     const beforeProjections = await prisma.bookingAgentProjection.findMany();
-    const referenceMapBefore = new Map(beforeProjections.map(p => [p.bookingId, p.agentReference]));
+    const referenceMapBefore = new Map(
+      beforeProjections.map((p) => [p.bookingId, p.agentReference]),
+    );
 
     // Run backfill second time
     await backfillBookingAgentProjections();

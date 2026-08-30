@@ -1,9 +1,4 @@
-import {
-  Injectable,
-  BadRequestException,
-  Logger,
-  NotFoundException,
-} from '@nestjs/common';
+import { Injectable, BadRequestException, Logger, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '@/prisma/prisma.service';
 import { AuditService } from '@/audit/audit.service';
 import {
@@ -63,7 +58,9 @@ export class RefundSettlementService {
         return 'cancellation_refund_manually_resolved';
       case 'INLINE':
       default:
-        return reason?.startsWith('cancellation:') ? 'cancellation_refund_succeeded' : 'refund_settled';
+        return reason?.startsWith('cancellation:')
+          ? 'cancellation_refund_succeeded'
+          : 'refund_settled';
     }
   }
 
@@ -144,11 +141,7 @@ export class RefundSettlementService {
         refund.amount !== input.money.amount ||
         refund.currency.toUpperCase() !== input.money.currency.toUpperCase()
       ) {
-        this.logSettlementTelemetry(
-          'CONFLICT',
-          input.provenance.source,
-          refund.status,
-        );
+        this.logSettlementTelemetry('CONFLICT', input.provenance.source, refund.status);
         throw new BadRequestException(
           `Refund transaction facts mismatch for ${input.transactionId}: expected ${refund.amount} ${refund.currency}, got ${input.money.amount} ${input.money.currency}`,
         );
@@ -157,11 +150,7 @@ export class RefundSettlementService {
       const booking = refund.cancellationRefundObligation?.booking;
 
       if (refund.status === RefundStatus.SUCCEEDED) {
-        this.logSettlementTelemetry(
-          'NO_OP',
-          input.provenance.source,
-          RefundStatus.SUCCEEDED,
-        );
+        this.logSettlementTelemetry('NO_OP', input.provenance.source, RefundStatus.SUCCEEDED);
         return {
           applied: false,
           transactionStatus: 'SUCCEEDED',
@@ -175,11 +164,7 @@ export class RefundSettlementService {
         (refund.status === RefundStatus.REFUND_FAILED_NEEDS_ATTENTION &&
           input.outcome.status !== 'SUCCEEDED')
       ) {
-        this.logSettlementTelemetry(
-          'NO_OP',
-          input.provenance.source,
-          refund.status,
-        );
+        this.logSettlementTelemetry('NO_OP', input.provenance.source, refund.status);
         return {
           applied: false,
           transactionStatus: refund.status,
@@ -268,7 +253,11 @@ export class RefundSettlementService {
         await tx.paymentEvent.create({
           data: {
             paymentId: refund.paymentId,
-            eventType: this.deriveEventType(input.provenance.source, refund.reason, input.provenance.metadata),
+            eventType: this.deriveEventType(
+              input.provenance.source,
+              refund.reason,
+              input.provenance.metadata,
+            ),
             previousStatus: refund.payment.status,
             newStatus: finalPaymentStatus,
             amount: refund.amount,
@@ -326,11 +315,7 @@ export class RefundSettlementService {
           },
         });
 
-        this.logSettlementTelemetry(
-          'APPLIED',
-          input.provenance.source,
-          RefundStatus.SUCCEEDED,
-        );
+        this.logSettlementTelemetry('APPLIED', input.provenance.source, RefundStatus.SUCCEEDED);
 
         return {
           applied: true,
@@ -393,9 +378,7 @@ export class RefundSettlementService {
       let finalPaymentStatus: PaymentStatus = refund.payment.status;
       if (activeOtherRefunds.length === 0) {
         const restoredStatus =
-          succeededRefunds.length > 0
-            ? PaymentStatus.PARTIALLY_REFUNDED
-            : PaymentStatus.SUCCEEDED;
+          succeededRefunds.length > 0 ? PaymentStatus.PARTIALLY_REFUNDED : PaymentStatus.SUCCEEDED;
 
         if (
           refund.payment.status === PaymentStatus.DISPUTED ||
@@ -449,11 +432,7 @@ export class RefundSettlementService {
         },
       });
 
-      this.logSettlementTelemetry(
-        'APPLIED',
-        input.provenance.source,
-        targetStatus,
-      );
+      this.logSettlementTelemetry('APPLIED', input.provenance.source, targetStatus);
 
       return {
         applied: true,

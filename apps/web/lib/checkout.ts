@@ -43,7 +43,8 @@ export async function protectCheckoutRoute() {
 
   if (!session) {
     const cookieHeader = headers().get('cookie') ?? '';
-    const hasSessionCookie = cookieHeader.includes('next-auth') || cookieHeader.includes('__Secure-next-auth');
+    const hasSessionCookie =
+      cookieHeader.includes('next-auth') || cookieHeader.includes('__Secure-next-auth');
 
     redirect(hasSessionCookie ? `/login?message=session_expired` : `/login`);
   }
@@ -59,12 +60,15 @@ export async function protectCheckoutRoute() {
   };
 }
 
-export async function resolveHandoffToken(handoffToken: string, accessToken: string): Promise<{
+export async function resolveHandoffToken(
+  handoffToken: string,
+  accessToken: string,
+): Promise<{
   flightOfferId: string | null;
   errorStatus: number | null;
 }> {
   'use server';
-  
+
   const apiUrl = process.env.NEXT_PUBLIC_API_URL;
   if (!apiUrl) {
     throw new Error('NEXT_PUBLIC_API_URL is required but not configured.');
@@ -74,18 +78,24 @@ export async function resolveHandoffToken(handoffToken: string, accessToken: str
   const cookieStore = cookies();
   const mockScenario = cookieStore.get('mock-scenario')?.value || null;
 
-  if (handoffToken === 'dummy_token' || ((process.env.NODE_ENV === 'test' || process.env.CI === 'true') && mockScenario)) {
+  if (
+    handoffToken === 'dummy_token' ||
+    ((process.env.NODE_ENV === 'test' || process.env.CI === 'true') && mockScenario)
+  ) {
     return { flightOfferId: 'off_test123', errorStatus: null };
   }
 
   try {
-    const response = await fetch(`${apiUrl}/api/chat-handoff/resolve?token=${encodeURIComponent(handoffToken)}`, {
-      method: 'GET',
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
+    const response = await fetch(
+      `${apiUrl}/api/chat-handoff/resolve?token=${encodeURIComponent(handoffToken)}`,
+      {
+        method: 'GET',
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+        },
+        cache: 'no-store',
       },
-      cache: 'no-store',
-    });
+    );
 
     if (!response.ok) {
       return { flightOfferId: null, errorStatus: response.status };
@@ -146,9 +156,12 @@ export type BookingIntentDto = {
     children: number;
     infants: number;
   };
-}
+};
 
-export async function fetchBookingIntent(intentId: string, accessToken: string): Promise<{
+export async function fetchBookingIntent(
+  intentId: string,
+  accessToken: string,
+): Promise<{
   intent: BookingIntentDto | null;
   errorStatus: number | null;
 }> {
@@ -174,7 +187,7 @@ export async function fetchBookingIntent(intentId: string, accessToken: string):
     if (mockScenario === 'intent-unavailable') {
       return { intent: null, errorStatus: 500 };
     }
-    
+
     if (mockScenario === 'valid-intent' || mockScenario.startsWith('mock-')) {
       return {
         intent: {
@@ -210,7 +223,7 @@ export async function fetchBookingIntent(intentId: string, accessToken: string):
               preFilledFromProfile: false,
               passportNumber: null,
               passportExpiry: null,
-            }
+            },
           ],
           flight: {
             origin: 'JFK',
@@ -221,7 +234,7 @@ export async function fetchBookingIntent(intentId: string, accessToken: string):
             adults: 1,
             children: 0,
             infants: 0,
-          }
+          },
         },
         errorStatus: null,
       };
@@ -258,7 +271,10 @@ export async function fetchBookingIntent(intentId: string, accessToken: string):
   }
 }
 
-export async function fetchAncillaryCatalog(intentId: string, accessToken: string): Promise<{
+export async function fetchAncillaryCatalog(
+  intentId: string,
+  accessToken: string,
+): Promise<{
   data: AncillaryCatalogPayload | null;
   errorStatus: number | null;
 }> {
@@ -270,8 +286,14 @@ export async function fetchAncillaryCatalog(intentId: string, accessToken: strin
   const cookieHeader = headers().get('cookie') ?? '';
   const mockScenarioMatch = cookieHeader.match(/mock-scenario=([^;]+)/);
   const mockScenario = mockScenarioMatch ? mockScenarioMatch[1].trim() : null;
-  if ((process.env.NODE_ENV === 'test' || process.env.CI === 'true') && mockScenario === 'mock-ancillary-phase4') {
-    const seatServices = (designator: string, amount: string): Array<{
+  if (
+    (process.env.NODE_ENV === 'test' || process.env.CI === 'true') &&
+    mockScenario === 'mock-ancillary-phase4'
+  ) {
+    const seatServices = (
+      designator: string,
+      amount: string,
+    ): Array<{
       serviceId: string;
       passengerId: string;
       amount: string;
@@ -299,13 +321,41 @@ export async function fetchAncillaryCatalog(intentId: string, accessToken: strin
               destination: 'SIN',
               seatMapAvailable: true,
               seatMap: {
-                cabins: [{
-                  cabinClass: 'economy',
-                  rows: [
-                    { rowNumber: 1, elements: [{ type: 'seat', designator: '1A', availableServices: seatServices('segment-1-seat-1a', '10.10') }, { type: 'aisle' }, { type: 'seat', designator: '1B', restricted: true }] },
-                    { rowNumber: 2, elements: [{ type: 'seat', designator: '2A', availableServices: seatServices('segment-1-seat-2a', '11.00') }, { type: 'aisle' }, { type: 'seat', designator: '2B', availableServices: seatServices('segment-1-seat-2b', '11.50') }] },
-                  ],
-                }],
+                cabins: [
+                  {
+                    cabinClass: 'economy',
+                    rows: [
+                      {
+                        rowNumber: 1,
+                        elements: [
+                          {
+                            type: 'seat',
+                            designator: '1A',
+                            availableServices: seatServices('segment-1-seat-1a', '10.10'),
+                          },
+                          { type: 'aisle' },
+                          { type: 'seat', designator: '1B', restricted: true },
+                        ],
+                      },
+                      {
+                        rowNumber: 2,
+                        elements: [
+                          {
+                            type: 'seat',
+                            designator: '2A',
+                            availableServices: seatServices('segment-1-seat-2a', '11.00'),
+                          },
+                          { type: 'aisle' },
+                          {
+                            type: 'seat',
+                            designator: '2B',
+                            availableServices: seatServices('segment-1-seat-2b', '11.50'),
+                          },
+                        ],
+                      },
+                    ],
+                  },
+                ],
               },
             },
             {
@@ -314,29 +364,112 @@ export async function fetchAncillaryCatalog(intentId: string, accessToken: strin
               destination: 'NRT',
               seatMapAvailable: true,
               seatMap: {
-                cabins: [{
-                  cabinClass: 'economy',
-                  rows: [{ rowNumber: 2, elements: [{ type: 'seat', designator: '2A', availableServices: seatServices('segment-2-seat-2a', '12.20') }, { type: 'aisle' }, { type: 'seat', designator: '2B', availableServices: seatServices('segment-2-seat-2b', '12.70') }] }],
-                }],
+                cabins: [
+                  {
+                    cabinClass: 'economy',
+                    rows: [
+                      {
+                        rowNumber: 2,
+                        elements: [
+                          {
+                            type: 'seat',
+                            designator: '2A',
+                            availableServices: seatServices('segment-2-seat-2a', '12.20'),
+                          },
+                          { type: 'aisle' },
+                          {
+                            type: 'seat',
+                            designator: '2B',
+                            availableServices: seatServices('segment-2-seat-2b', '12.70'),
+                          },
+                        ],
+                      },
+                    ],
+                  },
+                ],
               },
             },
           ],
           baggageServices: [
-            { serviceId: 'journey-bag-alex', passengerId: 'duffel-alex', segmentIds: ['segment-1', 'segment-2'], type: 'checked', weightValue: 20, weightUnit: 'kg', maxQuantity: 1, amount: '30.00', currency: 'USD' },
-            { serviceId: 'segment-1-bag-alex', passengerId: 'duffel-alex', segmentIds: ['segment-1'], type: 'checked', weightValue: 20, weightUnit: 'kg', maxQuantity: 1, amount: '18.00', currency: 'USD' },
-            { serviceId: 'segment-2-bag-alex', passengerId: 'duffel-alex', segmentIds: ['segment-2'], type: 'checked', weightValue: 20, weightUnit: 'kg', maxQuantity: 1, amount: '18.00', currency: 'USD' },
-            { serviceId: 'journey-bag-blair', passengerId: 'duffel-blair', segmentIds: ['segment-1', 'segment-2'], type: 'checked', weightValue: 20, weightUnit: 'kg', maxQuantity: 1, amount: '30.00', currency: 'USD' },
+            {
+              serviceId: 'journey-bag-alex',
+              passengerId: 'duffel-alex',
+              segmentIds: ['segment-1', 'segment-2'],
+              type: 'checked',
+              weightValue: 20,
+              weightUnit: 'kg',
+              maxQuantity: 1,
+              amount: '30.00',
+              currency: 'USD',
+            },
+            {
+              serviceId: 'segment-1-bag-alex',
+              passengerId: 'duffel-alex',
+              segmentIds: ['segment-1'],
+              type: 'checked',
+              weightValue: 20,
+              weightUnit: 'kg',
+              maxQuantity: 1,
+              amount: '18.00',
+              currency: 'USD',
+            },
+            {
+              serviceId: 'segment-2-bag-alex',
+              passengerId: 'duffel-alex',
+              segmentIds: ['segment-2'],
+              type: 'checked',
+              weightValue: 20,
+              weightUnit: 'kg',
+              maxQuantity: 1,
+              amount: '18.00',
+              currency: 'USD',
+            },
+            {
+              serviceId: 'journey-bag-blair',
+              passengerId: 'duffel-blair',
+              segmentIds: ['segment-1', 'segment-2'],
+              type: 'checked',
+              weightValue: 20,
+              weightUnit: 'kg',
+              maxQuantity: 1,
+              amount: '30.00',
+              currency: 'USD',
+            },
           ],
         },
         passengers: [
-          { intentPassengerId: 'passenger-alex', duffelPassengerId: 'duffel-alex', displayName: 'Alex', type: 'ADULT', seatEligible: true },
-          { intentPassengerId: 'passenger-blair', duffelPassengerId: 'duffel-blair', displayName: 'Blair', type: 'ADULT', seatEligible: true },
-          { intentPassengerId: 'passenger-infant', duffelPassengerId: 'duffel-infant', displayName: 'Lap Infant', type: 'INFANT', seatEligible: false },
+          {
+            intentPassengerId: 'passenger-alex',
+            duffelPassengerId: 'duffel-alex',
+            displayName: 'Alex',
+            type: 'ADULT',
+            seatEligible: true,
+          },
+          {
+            intentPassengerId: 'passenger-blair',
+            duffelPassengerId: 'duffel-blair',
+            displayName: 'Blair',
+            type: 'ADULT',
+            seatEligible: true,
+          },
+          {
+            intentPassengerId: 'passenger-infant',
+            duffelPassengerId: 'duffel-infant',
+            displayName: 'Lap Infant',
+            type: 'INFANT',
+            seatEligible: false,
+          },
         ],
         selection: {
           seats: [],
           baggage: [],
-          totals: { seats: '0.00', baggage: '0.00', ancillaries: '0.00', estimatedGrandTotal: '100.05', currency: 'USD' },
+          totals: {
+            seats: '0.00',
+            baggage: '0.00',
+            ancillaries: '0.00',
+            estimatedGrandTotal: '100.05',
+            currency: 'USD',
+          },
         },
       },
       errorStatus: null,

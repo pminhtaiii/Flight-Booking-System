@@ -28,7 +28,9 @@ export function ItineraryRevisionHistory({ bookingId }: ItineraryRevisionHistory
     if (!bookingId) return;
     setLoading(true);
     try {
-      const response = await fetch(`/api/booking-management/bookings/${bookingId}/revisions?page=${page}&limit=5`);
+      const response = await fetch(
+        `/api/booking-management/bookings/${bookingId}/revisions?page=${page}&limit=5`,
+      );
       if (response.ok) {
         const json: RevisionsResponse = await response.json();
         setData(json);
@@ -45,7 +47,7 @@ export function ItineraryRevisionHistory({ bookingId }: ItineraryRevisionHistory
   }, [fetchHistory]);
 
   const toggleExpand = (revisionId: string) => {
-    setExpandedRevisionId(prev => (prev === revisionId ? null : revisionId));
+    setExpandedRevisionId((prev) => (prev === revisionId ? null : revisionId));
   };
 
   const revisionsList = data?.revisions ?? data?.items ?? [];
@@ -85,11 +87,13 @@ export function ItineraryRevisionHistory({ bookingId }: ItineraryRevisionHistory
                     <span className="font-semibold text-sm text-text-primary">
                       Version {item.version}
                     </span>
-                    <span className={`px-2 py-0.5 text-xs font-semibold rounded-full ${
-                      item.isMaterial 
-                        ? 'bg-bg-cancelled text-text-cancelled border border-danger-border/30' 
-                        : 'bg-bg-match-fair text-text-match-fair border border-color-text-match-fair/30'
-                    }`}>
+                    <span
+                      className={`px-2 py-0.5 text-xs font-semibold rounded-full ${
+                        item.isMaterial
+                          ? 'bg-bg-cancelled text-text-cancelled border border-danger-border/30'
+                          : 'bg-bg-match-fair text-text-match-fair border border-color-text-match-fair/30'
+                      }`}
+                    >
                       {item.isMaterial ? 'Material Change' : 'Minor Change'}
                     </span>
                   </div>
@@ -98,10 +102,14 @@ export function ItineraryRevisionHistory({ bookingId }: ItineraryRevisionHistory
 
                 {item.materialReasons && item.materialReasons.length > 0 && (
                   <div className="mt-3">
-                    <p className="text-xs font-semibold text-text-secondary mb-1">Classification Reasons:</p>
+                    <p className="text-xs font-semibold text-text-secondary mb-1">
+                      Classification Reasons:
+                    </p>
                     <ul className="text-xs list-disc pl-4 space-y-1 text-text-secondary">
                       {item.materialReasons.map((reason) => (
-                        <li key={reason}>{(REASON_LABELS as Record<string, string>)[reason] || reason}</li>
+                        <li key={reason}>
+                          {(REASON_LABELS as Record<string, string>)[reason] || reason}
+                        </li>
                       ))}
                     </ul>
                   </div>
@@ -125,11 +133,18 @@ export function ItineraryRevisionHistory({ bookingId }: ItineraryRevisionHistory
 
                 {isExpanded && item.segments && item.segments.length > 0 && (
                   <div className="mt-4 pt-3 border-t border-card-border space-y-3">
-                    <p className="text-xs font-semibold text-text-muted uppercase tracking-wider mb-2">Itinerary segments in this version:</p>
+                    <p className="text-xs font-semibold text-text-muted uppercase tracking-wider mb-2">
+                      Itinerary segments in this version:
+                    </p>
                     {item.segments.map((segment, index) => (
-                      <div key={index} className="bg-card p-3 rounded-lg border border-card-border text-xs space-y-1.5">
+                      <div
+                        key={index}
+                        className="bg-card p-3 rounded-lg border border-card-border text-xs space-y-1.5"
+                      >
                         <div className="flex justify-between items-center font-semibold text-text-primary">
-                          <span>{segment.airline?.name} {segment.flightNumber}</span>
+                          <span>
+                            {segment.airline?.name} {segment.flightNumber}
+                          </span>
                           {segment.sliceOrder !== undefined && (
                             <span className="text-text-muted font-normal text-[10px] bg-bg-secondary px-1.5 py-0.5 rounded">
                               Slice {segment.sliceOrder + 1}
@@ -137,7 +152,8 @@ export function ItineraryRevisionHistory({ bookingId }: ItineraryRevisionHistory
                           )}
                         </div>
                         <div className="text-text-secondary">
-                          {segment.departureAirport?.city} ({segment.departureAirport?.iataCode}) to {segment.arrivalAirport?.city} ({segment.arrivalAirport?.iataCode})
+                          {segment.departureAirport?.city} ({segment.departureAirport?.iataCode}) to{' '}
+                          {segment.arrivalAirport?.city} ({segment.arrivalAirport?.iataCode})
                         </div>
                         <div className="text-text-muted">
                           Departure: {new Date(segment.departureAt).toLocaleString('en-GB')}
@@ -159,7 +175,7 @@ export function ItineraryRevisionHistory({ bookingId }: ItineraryRevisionHistory
       {data.totalPages > 1 && (
         <div className="flex items-center justify-between pt-3 border-t border-card-border">
           <button
-            onClick={() => setPage(p => Math.max(1, p - 1))}
+            onClick={() => setPage((p) => Math.max(1, p - 1))}
             disabled={page === 1 || loading}
             className="flex items-center gap-1 text-xs font-semibold text-text-secondary disabled:opacity-50"
           >
@@ -169,7 +185,7 @@ export function ItineraryRevisionHistory({ bookingId }: ItineraryRevisionHistory
             Page {page} of {data.totalPages}
           </span>
           <button
-            onClick={() => setPage(p => Math.min(data.totalPages, p + 1))}
+            onClick={() => setPage((p) => Math.min(data.totalPages, p + 1))}
             disabled={page === data.totalPages || loading}
             className="flex items-center gap-1 text-xs font-semibold text-text-secondary disabled:opacity-50"
           >

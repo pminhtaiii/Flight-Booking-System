@@ -130,9 +130,9 @@ describe('ProfileService', () => {
       jest.spyOn(configService, 'get').mockReturnValue('false');
 
       await expect(service.getProfile('user-123')).rejects.toThrow(NotFoundException);
-      await expect(
-        service.updateProfile('user-123', { expectedRevision: 1 }),
-      ).rejects.toThrow(NotFoundException);
+      await expect(service.updateProfile('user-123', { expectedRevision: 1 })).rejects.toThrow(
+        NotFoundException,
+      );
     });
   });
 
@@ -199,9 +199,9 @@ describe('ProfileService', () => {
     it('throws ConflictException (409) if the profile does not exist but client expected non-zero revision', async () => {
       dbProfile = null;
 
-      await expect(
-        service.updateProfile('user-123', { expectedRevision: 1 }),
-      ).rejects.toThrow(ConflictException);
+      await expect(service.updateProfile('user-123', { expectedRevision: 1 })).rejects.toThrow(
+        ConflictException,
+      );
 
       expect(prisma.travelerProfile.create).not.toHaveBeenCalled();
     });
@@ -287,7 +287,8 @@ describe('ProfileService', () => {
   describe('Dual-Write and Shadow Read', () => {
     it('writes both plain passportExpiry and encrypted passportExpiryCiphertext shadow', async () => {
       dbProfile = { id: 'profile-123', userId: 'user-123', revision: 1 };
-      jest.spyOn(encryptionService, 'encryptBound')
+      jest
+        .spyOn(encryptionService, 'encryptBound')
         .mockReturnValueOnce('v1:encrypted-passport-number')
         .mockReturnValueOnce('v1:encrypted-passport-expiry');
 
@@ -329,10 +330,13 @@ describe('ProfileService', () => {
 
       const result = await service.getProfile('user-123');
 
-      expect(encryptionService.decryptBound).toHaveBeenCalledWith('v1:encrypted-passport-expiry-2028', {
-        userId: 'user-123',
-        fieldName: 'passportExpiry',
-      });
+      expect(encryptionService.decryptBound).toHaveBeenCalledWith(
+        'v1:encrypted-passport-expiry-2028',
+        {
+          userId: 'user-123',
+          fieldName: 'passportExpiry',
+        },
+      );
       expect(result.travelDocument?.passportExpiry).toBe('2028-12-31');
     });
 
@@ -423,9 +427,9 @@ describe('ProfileService', () => {
       p2002Err.code = 'P2002';
       jest.spyOn(prisma.travelerProfile, 'create').mockRejectedValueOnce(p2002Err);
 
-      await expect(
-        service.updateProfile('user-123', { expectedRevision: 0 }),
-      ).rejects.toThrow(ConflictException);
+      await expect(service.updateProfile('user-123', { expectedRevision: 0 })).rejects.toThrow(
+        ConflictException,
+      );
     });
 
     it('rethrows generic database errors on create without converting to ConflictException', async () => {
@@ -433,9 +437,9 @@ describe('ProfileService', () => {
       const genericErr = new Error('Database connection lost');
       jest.spyOn(prisma.travelerProfile, 'create').mockRejectedValueOnce(genericErr);
 
-      await expect(
-        service.updateProfile('user-123', { expectedRevision: 0 }),
-      ).rejects.toThrow('Database connection lost');
+      await expect(service.updateProfile('user-123', { expectedRevision: 0 })).rejects.toThrow(
+        'Database connection lost',
+      );
     });
 
     it('rethrows generic database errors on update without converting to ConflictException', async () => {
@@ -443,9 +447,9 @@ describe('ProfileService', () => {
       const genericErr = new Error('Database timeout');
       jest.spyOn(prisma.travelerProfile, 'update').mockRejectedValueOnce(genericErr);
 
-      await expect(
-        service.updateProfile('user-123', { expectedRevision: 1 }),
-      ).rejects.toThrow('Database timeout');
+      await expect(service.updateProfile('user-123', { expectedRevision: 1 })).rejects.toThrow(
+        'Database timeout',
+      );
     });
 
     it('returns null for passportNumber when decryption fails', async () => {

@@ -13,10 +13,12 @@ async function loginAsNewUser(page: Page): Promise<void> {
   await page.click('button[type="submit"]');
   await expect(page).toHaveURL(/.*127\.0\.0\.1:3000\/$/, { timeout: 15000 });
   await page.waitForLoadState('networkidle');
-  await expect.poll(async () => {
-    const cookies = await page.context().cookies();
-    return cookies.some((c) => c.name.includes('next-auth'));
-  }).toBe(true);
+  await expect
+    .poll(async () => {
+      const cookies = await page.context().cookies();
+      return cookies.some((c) => c.name.includes('next-auth'));
+    })
+    .toBe(true);
 }
 
 test.describe('Chat Checkout Handoff', () => {
@@ -34,7 +36,7 @@ test.describe('Chat Checkout Handoff', () => {
       arrivalAt: new Date(Date.now() + 86400000 * 2).toISOString(),
       price: '150.00',
       currency: 'USD',
-    }
+    },
   };
 
   const setupMockStream = async (page: Page): Promise<void> => {
@@ -45,7 +47,8 @@ test.describe('Chat Checkout Handoff', () => {
           headers: {
             'Access-Control-Allow-Origin': WEB_ORIGIN,
             'Access-Control-Allow-Methods': 'POST, OPTIONS',
-            'Access-Control-Allow-Headers': 'Authorization, Content-Type, X-Trace-Id, X-Correlation-Id',
+            'Access-Control-Allow-Headers':
+              'Authorization, Content-Type, X-Trace-Id, X-Correlation-Id',
           },
         });
         return;
@@ -113,11 +116,11 @@ test.describe('Chat Checkout Handoff', () => {
   test('should render strict checkout card from ACTION_HANDOFF event', async ({ page }) => {
     await setupMockStream(page);
     await page.goto('http://127.0.0.1:3000/search');
-    
+
     // Type in chat to trigger the mocked stream
     await page.fill('input[placeholder="Type a message..."]', 'I want to checkout');
     await page.keyboard.press('Enter');
-    
+
     await expect(page.locator('text=Continue to Checkout')).toBeVisible();
     await expect(page.locator('text=Test Airlines')).toBeVisible();
   });
@@ -130,7 +133,8 @@ test.describe('Chat Checkout Handoff', () => {
           headers: {
             'Access-Control-Allow-Origin': WEB_ORIGIN,
             'Access-Control-Allow-Methods': 'POST, OPTIONS',
-            'Access-Control-Allow-Headers': 'Authorization, Content-Type, X-Trace-Id, X-Correlation-Id',
+            'Access-Control-Allow-Headers':
+              'Authorization, Content-Type, X-Trace-Id, X-Correlation-Id',
           },
         });
         return;
@@ -139,23 +143,29 @@ test.describe('Chat Checkout Handoff', () => {
         status: 200,
         contentType: 'text/event-stream',
         headers: { 'Access-Control-Allow-Origin': WEB_ORIGIN },
-        body: [
-          'event: ACTION_REQUIRED',
-          'data: ' + JSON.stringify({
-            action: 'COMPLETE_PROFILE',
-            scope: 'DOMESTIC',
-            passengers: [{
-              passengerType: 'ADULT',
-              passengerOrdinal: 1,
-              sections: [{
-                name: 'identity',
-                fields: [{ name: 'givenName', status: 'missing', reason: 'REQUIRED' }],
-              }],
-            }],
-            target: '/profile',
-          }),
-          '',
-        ].join('\n') + '\n',
+        body:
+          [
+            'event: ACTION_REQUIRED',
+            'data: ' +
+              JSON.stringify({
+                action: 'COMPLETE_PROFILE',
+                scope: 'DOMESTIC',
+                passengers: [
+                  {
+                    passengerType: 'ADULT',
+                    passengerOrdinal: 1,
+                    sections: [
+                      {
+                        name: 'identity',
+                        fields: [{ name: 'givenName', status: 'missing', reason: 'REQUIRED' }],
+                      },
+                    ],
+                  },
+                ],
+                target: '/profile',
+              }),
+            '',
+          ].join('\n') + '\n',
       });
     });
 
@@ -167,17 +177,19 @@ test.describe('Chat Checkout Handoff', () => {
     await expect(page.getByRole('button', { name: 'Complete profile' })).toBeVisible();
   });
 
-  test('should submit CSRF/origin-protected POST bootstrap and redirect cleanly', async ({ page }) => {
+  test('should submit CSRF/origin-protected POST bootstrap and redirect cleanly', async ({
+    page,
+  }) => {
     await loginAsNewUser(page);
     await setupMockStream(page);
     await page.route(`${WEB_ORIGIN}/checkout/passengers`, async (route) => {
       await route.fulfill({ status: 200, contentType: 'text/html', body: '<main>Checkout</main>' });
     });
     await page.goto('http://127.0.0.1:3000/search');
-    
+
     await page.fill('input[placeholder="Type a message..."]', 'checkout');
     await page.keyboard.press('Enter');
-    
+
     const submitButton = page.locator('text=Continue to Checkout');
     await submitButton.waitFor();
 
@@ -200,34 +212,35 @@ test.describe('Chat Checkout Handoff', () => {
 
     expect(response.status()).toBe(303);
     expect(response.headers().location).toBe(`${WEB_ORIGIN}/checkout/passengers`);
-    
+
     const cookies = await context.cookies();
     const handoffCookie = cookies.find((cookie) => cookie.name === 'chat_handoff_token');
-    
+
     expect(handoffCookie).toBeDefined();
     expect(handoffCookie?.httpOnly).toBe(true);
     expect(handoffCookie?.secure).toBe(true);
     expect(handoffCookie?.sameSite).toBe('Strict');
   });
 
-
   test('should enforce browser-storage privacy', async ({ page }) => {
     await setupMockStream(page);
     await page.goto('http://127.0.0.1:3000/search');
-    
+
     await page.fill('input[placeholder="Type a message..."]', 'checkout');
     await page.keyboard.press('Enter');
     await page.locator('text=Continue to Checkout').waitFor();
-    
+
     const localStorage = await page.evaluate(() => window.localStorage.getItem('handoffToken'));
     const sessionStorage = await page.evaluate(() => window.sessionStorage.getItem('handoffToken'));
-    
+
     expect(localStorage).toBeNull();
     expect(sessionStorage).toBeNull();
     await expect(page.locator('input[name="handoffToken"]')).toHaveCount(0);
   });
 
-  test('keeps the handoff credential out of browser URLs, logs, storage, and redirect targets', async ({ page }) => {
+  test('keeps the handoff credential out of browser URLs, logs, storage, and redirect targets', async ({
+    page,
+  }) => {
     const credential = mockHandoffEvent.handoffToken;
     const observedUrls: string[] = [];
     const browserLogs: string[] = [];

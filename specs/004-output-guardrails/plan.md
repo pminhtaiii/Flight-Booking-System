@@ -28,16 +28,16 @@ Add a guardrail pipeline between the LLM token stream and the SSE output to the 
 
 ## Constitution Check
 
-*GATE: Must pass before Phase 0 research. Re-check after Phase 1 design.*
+_GATE: Must pass before Phase 0 research. Re-check after Phase 1 design._
 
-| Principle | Status | Justification |
-|-----------|--------|---------------|
-| I. Flight-First Architecture | ✅ PASS | Output guardrails protect the flight search conversation flow without blocking or complicating the booking pipeline. |
-| II. Deterministic Transaction Boundary | ✅ PASS | Output guardrails operate entirely within the advisory AI agent layer. No booking/payment path changes. |
-| III. API Budget Discipline | ⚠️ WATCH | NeMo output rail calls the Mimo classification endpoint once per chunk. A 10-sentence response = 10 API calls. Monitor API budget impact. Regex fast-fail reduces unnecessary NeMo calls. |
-| IV. Observability & Operational Visibility | ✅ PASS | Structured logging for every guardrail check (layer, verdict, latency). Security event logging on blocks. |
-| V. Incremental Delivery | ✅ PASS | Output guardrails are a self-contained, independently deployable feature. No dependency on frontend changes. |
-| Security Requirements | ✅ PASS | Enforces PII protection in LLM output (constitution mandate). No PII in logs. Fail-closed behavior. |
+| Principle                                  | Status   | Justification                                                                                                                                                                             |
+| ------------------------------------------ | -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| I. Flight-First Architecture               | ✅ PASS  | Output guardrails protect the flight search conversation flow without blocking or complicating the booking pipeline.                                                                      |
+| II. Deterministic Transaction Boundary     | ✅ PASS  | Output guardrails operate entirely within the advisory AI agent layer. No booking/payment path changes.                                                                                   |
+| III. API Budget Discipline                 | ⚠️ WATCH | NeMo output rail calls the Mimo classification endpoint once per chunk. A 10-sentence response = 10 API calls. Monitor API budget impact. Regex fast-fail reduces unnecessary NeMo calls. |
+| IV. Observability & Operational Visibility | ✅ PASS  | Structured logging for every guardrail check (layer, verdict, latency). Security event logging on blocks.                                                                                 |
+| V. Incremental Delivery                    | ✅ PASS  | Output guardrails are a self-contained, independently deployable feature. No dependency on frontend changes.                                                                              |
+| Security Requirements                      | ✅ PASS  | Enforces PII protection in LLM output (constitution mandate). No PII in logs. Fail-closed behavior.                                                                                       |
 
 **Post-Phase-1 Re-check**: API Budget concern mitigated by (1) regex fast-fail skipping NeMo for obvious PII violations, (2) sentence-boundary chunking producing ~5-15 chunks per response (acceptable NeMo call volume), (3) existing NeMo health probe pattern for monitoring.
 
@@ -146,13 +146,13 @@ See [data-model.md](data-model.md), [contracts/](contracts/), [quickstart.md](qu
 
 **Depends on**: Phase 1  
 **FRs covered**: FR-011, FR-013  
-**Delivers**: Config model + reusable PII detection function  
+**Delivers**: Config model + reusable PII detection function
 
 ### Files
 
-| File | Action | What |
-|------|--------|------|
-| `config.py` | MODIFY | Add 4 env vars: `OUTPUT_GUARDRAIL_ENABLED`, `OUTPUT_GUARDRAIL_OVERLAP_TOKENS`, `OUTPUT_GUARDRAIL_MAX_CHUNK_TOKENS`, `OUTPUT_GUARDRAIL_NEMO_TIMEOUT` |
+| File                           | Action | What                                                                                                                                                           |
+| ------------------------------ | ------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `config.py`                    | MODIFY | Add 4 env vars: `OUTPUT_GUARDRAIL_ENABLED`, `OUTPUT_GUARDRAIL_OVERLAP_TOKENS`, `OUTPUT_GUARDRAIL_MAX_CHUNK_TOKENS`, `OUTPUT_GUARDRAIL_NEMO_TIMEOUT`            |
 | `sanitization/pii_scrubber.py` | MODIFY | Extract regex patterns into a reusable `detect_pii(text) -> bool` function (returns True if PII found, does not scrub). Keep existing `scrub_pii()` unchanged. |
 
 ### Acceptance
@@ -174,13 +174,13 @@ See [data-model.md](data-model.md), [contracts/](contracts/), [quickstart.md](qu
 
 **Depends on**: Phase 2 (uses `max_chunk_tokens` from config)  
 **FRs covered**: FR-002, FR-010, FR-011  
-**Delivers**: `ChunkBuffer` class  
+**Delivers**: `ChunkBuffer` class
 
 ### Files
 
-| File | Action | What |
-|------|--------|------|
-| `streaming/chunk_buffer.py` | NEW | `ChunkBuffer` class with `add_token(token) -> Optional[str]` and `flush() -> Optional[str]` |
+| File                        | Action | What                                                                                        |
+| --------------------------- | ------ | ------------------------------------------------------------------------------------------- |
+| `streaming/chunk_buffer.py` | NEW    | `ChunkBuffer` class with `add_token(token) -> Optional[str]` and `flush() -> Optional[str]` |
 
 ### Acceptance
 
@@ -203,13 +203,13 @@ See [data-model.md](data-model.md), [contracts/](contracts/), [quickstart.md](qu
 
 **Depends on**: Phase 2 (uses `nemo_timeout` from config)  
 **FRs covered**: FR-005 (layer 2), FR-012, FR-014  
-**Delivers**: `validate_output_chunk()` method on `NemoGuardrailService`  
+**Delivers**: `validate_output_chunk()` method on `NemoGuardrailService`
 
 ### Files
 
-| File | Action | What |
-|------|--------|------|
-| `guardrails/base.py` | MODIFY | Add `validate_output_chunk(chunk: str) -> Tuple[bool, str]` to `GuardrailService` protocol |
+| File                 | Action | What                                                                                                         |
+| -------------------- | ------ | ------------------------------------------------------------------------------------------------------------ |
+| `guardrails/base.py` | MODIFY | Add `validate_output_chunk(chunk: str) -> Tuple[bool, str]` to `GuardrailService` protocol                   |
 | `guardrails/nemo.py` | MODIFY | Implement `validate_output_chunk()` with output-specific system prompt, same httpx call pattern, fail-closed |
 
 ### Acceptance
@@ -231,13 +231,13 @@ See [data-model.md](data-model.md), [contracts/](contracts/), [quickstart.md](qu
 
 **Depends on**: Phase 3 (ChunkBuffer), Phase 4 (NeMo output rail), Phase 2 (PII detection)  
 **FRs covered**: FR-001, FR-004, FR-005  
-**Delivers**: `OutputGuardrailPipeline` class with layered validation + sliding window  
+**Delivers**: `OutputGuardrailPipeline` class with layered validation + sliding window
 
 ### Files
 
-| File | Action | What |
-|------|--------|------|
-| `guardrails/output_pipeline.py` | NEW | `OutputGuardrailPipeline` with `process_token()`, `flush()`, `_validate_chunk()`, `get_partial_response()` |
+| File                            | Action | What                                                                                                       |
+| ------------------------------- | ------ | ---------------------------------------------------------------------------------------------------------- |
+| `guardrails/output_pipeline.py` | NEW    | `OutputGuardrailPipeline` with `process_token()`, `flush()`, `_validate_chunk()`, `get_partial_response()` |
 
 ### Acceptance
 
@@ -260,12 +260,12 @@ See [data-model.md](data-model.md), [contracts/](contracts/), [quickstart.md](qu
 
 **Depends on**: Phase 5 (OutputGuardrailPipeline)  
 **FRs covered**: FR-001, FR-009  
-**Delivers**: Output guardrail pipeline active in the SSE streaming producer  
+**Delivers**: Output guardrail pipeline active in the SSE streaming producer
 
 ### Files
 
-| File | Action | What |
-|------|--------|------|
+| File               | Action | What                                                                                                                                                                                            |
+| ------------------ | ------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `streaming/sse.py` | MODIFY | Create `OutputGuardrailPipeline` in producer. Feed `on_chat_model_stream` tokens through it. Yield safe chunks as `token` events. Tool events (`on_tool_start`, `on_tool_end`) bypass pipeline. |
 
 ### Acceptance
@@ -286,12 +286,12 @@ See [data-model.md](data-model.md), [contracts/](contracts/), [quickstart.md](qu
 
 **Depends on**: Phase 6 (SSE integration)  
 **FRs covered**: FR-006, FR-007, FR-008  
-**Delivers**: Complete hard stop behavior with partial response persistence  
+**Delivers**: Complete hard stop behavior with partial response persistence
 
 ### Files
 
-| File | Action | What |
-|------|--------|------|
+| File               | Action | What                                                                                                                                                                                      |
+| ------------------ | ------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `streaming/sse.py` | MODIFY | Add `OutputGuardrailBlockedError` handler in producer: stop consuming tokens, emit `OUTPUT_GUARDRAIL_BLOCKED` error event, persist partial response via NestJS client, log security event |
 
 ### Acceptance
@@ -313,12 +313,12 @@ See [data-model.md](data-model.md), [contracts/](contracts/), [quickstart.md](qu
 
 **Depends on**: Phase 7 (hard stop must work before parallelism)  
 **FRs covered**: FR-003  
-**Delivers**: Concurrent chunk validation hiding guardrail latency  
+**Delivers**: Concurrent chunk validation hiding guardrail latency
 
 ### Files
 
-| File | Action | What |
-|------|--------|------|
+| File                            | Action | What                                                                                          |
+| ------------------------------- | ------ | --------------------------------------------------------------------------------------------- |
 | `guardrails/output_pipeline.py` | MODIFY | Add `asyncio.Task` one-chunk lookahead: while chunk N streams to user, pre-validate chunk N+1 |
 
 ### Acceptance
@@ -339,14 +339,14 @@ See [data-model.md](data-model.md), [contracts/](contracts/), [quickstart.md](qu
 
 **Depends on**: Phase 7 (hard stop logging)  
 **FRs covered**: FR-008, FR-015  
-**Delivers**: Structured log entries for every guardrail check  
+**Delivers**: Structured log entries for every guardrail check
 
 ### Files
 
-| File | Action | What |
-|------|--------|------|
+| File                            | Action | What                                                                                                   |
+| ------------------------------- | ------ | ------------------------------------------------------------------------------------------------------ |
 | `guardrails/output_pipeline.py` | MODIFY | Emit structured JSON log per chunk: `{timestamp, session_id, chunk_index, layer, verdict, latency_ms}` |
-| `streaming/sse.py` | MODIFY | Pass `session_id` to pipeline for log context |
+| `streaming/sse.py`              | MODIFY | Pass `session_id` to pipeline for log context                                                          |
 
 ### Acceptance
 
@@ -366,14 +366,14 @@ See [data-model.md](data-model.md), [contracts/](contracts/), [quickstart.md](qu
 
 **Depends on**: All previous phases  
 **FRs covered**: All (cross-cutting verification)  
-**Delivers**: Complete test suite + benchmark results  
+**Delivers**: Complete test suite + benchmark results
 
 ### Files
 
-| File | Action | What |
-|------|--------|------|
-| `tests/test_e2e_output_guardrails.py` | NEW | Integration tests against running agent service |
-| `tests/test_benchmark_output_pipeline.py` | NEW | Latency benchmarks per guardrail layer |
+| File                                      | Action | What                                            |
+| ----------------------------------------- | ------ | ----------------------------------------------- |
+| `tests/test_e2e_output_guardrails.py`     | NEW    | Integration tests against running agent service |
+| `tests/test_benchmark_output_pipeline.py` | NEW    | Latency benchmarks per guardrail layer          |
 
 ### Acceptance — Success Criteria Verification
 

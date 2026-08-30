@@ -98,7 +98,9 @@ async function startFlightSearchFixture(): Promise<void> {
 async function stopFlightSearchFixture(): Promise<void> {
   const server = fixtureServer;
   if (!server) return;
-  await new Promise<void>((resolve, reject) => server.close((error) => (error ? reject(error) : resolve())));
+  await new Promise<void>((resolve, reject) =>
+    server.close((error) => (error ? reject(error) : resolve())),
+  );
   fixtureServer = undefined;
 }
 
@@ -106,15 +108,28 @@ async function authenticateSearchSession(context: BrowserContext): Promise<void>
   const sessionToken = await encode({
     secret: process.env.NEXTAUTH_SECRET || 'test_secret',
     token: {
-      sub: 'user-search-char-123', id: 'user-search-char-123', accessToken: 'char-test-access-token',
-      name: 'Search Characterization Traveler', email: 'search-char@example.com',
+      sub: 'user-search-char-123',
+      id: 'user-search-char-123',
+      accessToken: 'char-test-access-token',
+      name: 'Search Characterization Traveler',
+      email: 'search-char@example.com',
     },
   });
-  await context.addCookies([{ name: 'next-auth.session-token', value: sessionToken, url: 'http://127.0.0.1:3000', httpOnly: true, sameSite: 'Lax' }]);
+  await context.addCookies([
+    {
+      name: 'next-auth.session-token',
+      value: sessionToken,
+      url: 'http://127.0.0.1:3000',
+      httpOnly: true,
+      sameSite: 'Lax',
+    },
+  ]);
 }
 
 async function hideAgentChat(page: Page): Promise<void> {
-  await page.addStyleTag({ content: 'aside[aria-label="Agent chat"] { display: none !important; }' }).catch(() => {});
+  await page
+    .addStyleTag({ content: 'aside[aria-label="Agent chat"] { display: none !important; }' })
+    .catch(() => {});
 }
 
 test.describe('Search Seam Characterization - User Flows', () => {
@@ -135,19 +150,27 @@ test.describe('Search Seam Characterization - User Flows', () => {
     });
   });
 
-  test('unauthenticated users navigating to /search are redirected to /login', async ({ page, context }) => {
+  test('unauthenticated users navigating to /search are redirected to /login', async ({
+    page,
+    context,
+  }) => {
     await context.clearCookies();
     await page.goto('/search');
     await expect(page).toHaveURL(/.*\/login/);
   });
 
-  test('renders search form elements with required inputs and default values', async ({ page, context }) => {
+  test('renders search form elements with required inputs and default values', async ({
+    page,
+    context,
+  }) => {
     await authenticateSearchSession(context);
     await page.goto('/search');
     await hideAgentChat(page);
 
     await expect(page.getByRole('heading', { name: 'Search Flights' })).toBeVisible();
-    await expect(page.getByText('Find and compare flight offers for your next destination.')).toBeVisible();
+    await expect(
+      page.getByText('Find and compare flight offers for your next destination.'),
+    ).toBeVisible();
     await expect(page.getByLabel('Origin (IATA)')).toHaveAttribute('required', '');
     await expect(page.getByLabel('Origin (IATA)')).toHaveAttribute('maxLength', '3');
     await expect(page.getByLabel('Origin (IATA)')).toHaveAttribute('placeholder', 'e.g. JFK');
@@ -160,14 +183,20 @@ test.describe('Search Seam Characterization - User Flows', () => {
     await expect(page.getByLabel('Children')).toHaveValue('0');
     await expect(page.getByLabel('Infants')).toHaveValue('0');
     await expect(page.getByRole('button', { name: 'Search Flights' })).toBeVisible();
-    await expect(page.getByText('No flight offers search results yet. Enter search criteria and search.')).toBeVisible();
+    await expect(
+      page.getByText('No flight offers search results yet. Enter search criteria and search.'),
+    ).toBeVisible();
   });
 
-  test('submits invalid criteria through a same-origin Server Action', async ({ page, context }) => {
+  test('submits invalid criteria through a same-origin Server Action', async ({
+    page,
+    context,
+  }) => {
     await authenticateSearchSession(context);
     const actionRequests: string[] = [];
     page.on('request', (request) => {
-      if (request.method() === 'POST' && request.headers()['next-action']) actionRequests.push(request.url());
+      if (request.method() === 'POST' && request.headers()['next-action'])
+        actionRequests.push(request.url());
     });
 
     await page.goto('/search');
@@ -183,7 +212,10 @@ test.describe('Search Seam Characterization - User Flows', () => {
     expect(actionRequests).toEqual(['http://127.0.0.1:3000/search']);
   });
 
-  test('searches and selects an offer through the API_URL server fixture', async ({ page, context }) => {
+  test('searches and selects an offer through the API_URL server fixture', async ({
+    page,
+    context,
+  }) => {
     await authenticateSearchSession(context);
     fixtureRequests.length = 0;
 
@@ -245,7 +277,9 @@ test.describe('Search Seam Characterization - Static Privacy Boundary', () => {
       for (const marker of forbiddenClientMarkers) expect(content).not.toContain(marker);
     }
 
-    expect(appFiles.find((file) => file.filePath.endsWith('page.tsx'))?.content).toContain('protectCheckoutRoute');
+    expect(appFiles.find((file) => file.filePath.endsWith('page.tsx'))?.content).toContain(
+      'protectCheckoutRoute',
+    );
     const actions = appFiles.find((file) => file.filePath.endsWith('actions.ts'))?.content;
     expect(actions).toContain("'use server'");
     expect(actions).toContain('searchFlightsAction');

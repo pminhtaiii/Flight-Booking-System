@@ -68,12 +68,16 @@ describe('Feature Flag Governance & Rollout Matrix (E2E)', () => {
       .compile();
 
     app = moduleFixture.createNestApplication();
-    app.useGlobalPipes(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, transform: true }));
+    app.useGlobalPipes(
+      new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, transform: true }),
+    );
     app.useGlobalFilters(new HttpExceptionFilter());
     await app.init();
 
     prisma = moduleFixture.get<PrismaService>(PrismaService);
-    attestationService = moduleFixture.get<SelectionAttestationService>(SelectionAttestationService);
+    attestationService = moduleFixture.get<SelectionAttestationService>(
+      SelectionAttestationService,
+    );
     tokenService = moduleFixture.get<ChatHandoffTokenService>(ChatHandoffTokenService);
     jwtService = moduleFixture.get<JwtService>(JwtService);
   });
@@ -160,7 +164,13 @@ describe('Feature Flag Governance & Rollout Matrix (E2E)', () => {
     });
 
     for (const airport of [
-      { iataCode: 'SGN', name: 'Tan Son Nhat', city: 'Ho Chi Minh City', latitude: 10.8231, longitude: 106.6297 },
+      {
+        iataCode: 'SGN',
+        name: 'Tan Son Nhat',
+        city: 'Ho Chi Minh City',
+        latitude: 10.8231,
+        longitude: 106.6297,
+      },
       { iataCode: 'HAN', name: 'Noi Bai', city: 'Hanoi', latitude: 21.2212, longitude: 105.8072 },
     ]) {
       await prisma.airport.upsert({

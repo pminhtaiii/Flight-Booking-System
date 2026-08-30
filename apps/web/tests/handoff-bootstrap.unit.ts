@@ -48,9 +48,10 @@ test('bounds a stalled upstream resolve request', async () => {
     'access-token',
     undefined,
     undefined,
-    async (_url, init) => new Promise<Response>((_resolve, reject) => {
-      init?.signal?.addEventListener('abort', () => reject(new Error('aborted')));
-    }),
+    async (_url, init) =>
+      new Promise<Response>((_resolve, reject) => {
+        init?.signal?.addEventListener('abort', () => reject(new Error('aborted')));
+      }),
     10,
   );
 
@@ -93,7 +94,9 @@ test('supports test mock fallback for HANDOFF_TOKEN when upstream returns 503 or
       'access-token',
       undefined,
       undefined,
-      async () => { throw new Error('network down'); },
+      async () => {
+        throw new Error('network down');
+      },
     );
 
     assert.equal(result.ok, true);

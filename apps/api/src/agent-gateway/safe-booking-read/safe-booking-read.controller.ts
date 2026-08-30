@@ -1,12 +1,4 @@
-import {
-  Controller,
-  Get,
-  Headers,
-  Logger,
-  Param,
-  Req,
-  UseGuards,
-} from '@nestjs/common';
+import { Controller, Get, Headers, Logger, Param, Req, UseGuards } from '@nestjs/common';
 import { Request } from 'express';
 import { AgentApiKeyGuard } from '../auth/agent-api-key.guard';
 import { ClaimTokenGuard } from '../auth/claim-token.guard';
@@ -39,11 +31,7 @@ export class SafeBookingReadController {
       const correlationId = headers['x-correlation-id'] || null;
       const userId = req.user.id;
 
-      return await this.safeBookingReadService.getUserBookings(
-        userId,
-        traceId,
-        correlationId,
-      );
+      return await this.safeBookingReadService.getUserBookings(userId, traceId, correlationId);
     } catch (err: unknown) {
       this.logger.error('Failed to get user bookings');
       throw err;
@@ -60,11 +48,7 @@ export class SafeBookingReadController {
       const correlationId = headers['x-correlation-id'] || null;
       const userId = req.user.id;
 
-      return await this.safeBookingReadService.getBookingSummaries(
-        userId,
-        traceId,
-        correlationId,
-      );
+      return await this.safeBookingReadService.getBookingSummaries(userId, traceId, correlationId);
     } catch (err: unknown) {
       this.logger.error('Failed to get booking summaries');
       throw err;

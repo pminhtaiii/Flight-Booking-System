@@ -1,4 +1,10 @@
-import { expect, test, type Page, type APIRequestContext, type BrowserContext } from '@playwright/test';
+import {
+  expect,
+  test,
+  type Page,
+  type APIRequestContext,
+  type BrowserContext,
+} from '@playwright/test';
 
 async function registerAndLoginUser(
   page: Page,
@@ -8,9 +14,11 @@ async function registerAndLoginUser(
   page.on('console', (msg) => console.log('[Browser Console]', msg.text()));
   page.on('pageerror', (err) => console.log('[Browser PageError]', err.message));
 
-  await request.post('http://127.0.0.1:3001/api/auth/test/reset-lockout', {
-    data: { clearAll: true },
-  }).catch(() => {});
+  await request
+    .post('http://127.0.0.1:3001/api/auth/test/reset-lockout', {
+      data: { clearAll: true },
+    })
+    .catch(() => {});
   await context.clearCookies();
 
   const email = `checkout-${Date.now()}-${Math.random().toString(36).slice(2, 7)}@example.com`;
@@ -77,8 +85,12 @@ test.describe('Checkout Foundation Flow', () => {
 
     let readinessQueried = false;
     let intentCreated = false;
-    let capturedReadinessPayload: { passengers?: Array<{ source?: { type?: string } }> } | null = null;
-    let capturedIntentPayload: { flightOfferId?: string; passengers?: Array<{ source?: { type?: string } }> } | null = null;
+    let capturedReadinessPayload: { passengers?: Array<{ source?: { type?: string } }> } | null =
+      null;
+    let capturedIntentPayload: {
+      flightOfferId?: string;
+      passengers?: Array<{ source?: { type?: string } }>;
+    } | null = null;
 
     // Intercept readiness API
     await page.route('**/api/bookings/intents/readiness', async (route) => {
@@ -91,8 +103,20 @@ test.describe('Checkout Foundation Flow', () => {
           scope: 'DOMESTIC',
           ready: true,
           passengers: [
-            { passengerType: 'ADULT', passengerOrdinal: 1, ready: true, profileRevision: 1, sections: [] },
-            { passengerType: 'CHILD', passengerOrdinal: 2, ready: true, profileRevision: null, sections: [] },
+            {
+              passengerType: 'ADULT',
+              passengerOrdinal: 1,
+              ready: true,
+              profileRevision: 1,
+              sections: [],
+            },
+            {
+              passengerType: 'CHILD',
+              passengerOrdinal: 2,
+              ready: true,
+              profileRevision: null,
+              sections: [],
+            },
           ],
         }),
       });
@@ -268,7 +292,10 @@ test.describe('Checkout Foundation Flow', () => {
     await expect(page.getByText('Traveler profile')).toBeVisible();
     const secureEditLink = page.getByRole('link', { name: 'Edit traveler profile securely' });
     await expect(secureEditLink).toBeVisible();
-    await expect(secureEditLink).toHaveAttribute('href', '/profile?returnTo=/checkout/mock-intent-id/review');
+    await expect(secureEditLink).toHaveAttribute(
+      'href',
+      '/profile?returnTo=/checkout/mock-intent-id/review',
+    );
 
     // Passenger 2 (Inline companion) assertions
     await expect(page.getByText('2. T••• D•••')).toBeVisible();
@@ -322,7 +349,13 @@ test.describe('Checkout Foundation Flow', () => {
           scope: 'DOMESTIC',
           ready: true,
           passengers: [
-            { passengerType: 'ADULT', passengerOrdinal: 1, ready: true, profileRevision: 1, sections: [] },
+            {
+              passengerType: 'ADULT',
+              passengerOrdinal: 1,
+              ready: true,
+              profileRevision: 1,
+              sections: [],
+            },
           ],
         }),
       });
@@ -374,7 +407,9 @@ test.describe('Checkout Foundation Flow', () => {
     const errorBanner = page.locator('[role="alert"]');
     await expect(errorBanner).toBeVisible();
     await expect(
-      page.getByText('Your traveler profile changed. Review the passenger details before trying again.'),
+      page.getByText(
+        'Your traveler profile changed. Review the passenger details before trying again.',
+      ),
     ).toBeVisible();
 
     // Verify "Use my traveler profile details" button is no longer available due to stale revision

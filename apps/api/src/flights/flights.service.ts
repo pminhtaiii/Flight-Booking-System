@@ -3,7 +3,13 @@ import { PrismaService } from '@/prisma/prisma.service';
 import { CacheService } from '@/cache/cache.service';
 import { DuffelService } from '@/duffel/duffel.service';
 import { AuditService } from '@/audit/audit.service';
-import { FlightSearchRequestDto, FlightSearchResponseDto, FlightOfferDto, FlightSegmentDto, CabinMismatchDetail } from './dto/search-flight.dto';
+import {
+  FlightSearchRequestDto,
+  FlightSearchResponseDto,
+  FlightOfferDto,
+  FlightSegmentDto,
+  CabinMismatchDetail,
+} from './dto/search-flight.dto';
 import { FlightDetailResponseDto } from './dto/detail-flight.dto';
 import { DuffelOffer, DuffelSegment } from '@/duffel/duffel.types';
 import { Prisma } from '@prisma/client';
@@ -29,7 +35,7 @@ function generateDeterministicUUID(input: string): string {
     hash.substring(8, 12),
     '4' + hash.substring(13, 16),
     '8' + hash.substring(17, 20),
-    hash.substring(20, 32)
+    hash.substring(20, 32),
   ].join('-');
 }
 
@@ -65,14 +71,17 @@ const CABIN_RANK: Record<CabinClass, number> = {
   economy: 0,
   premium_economy: 1,
   business: 2,
-  first: 3
+  first: 3,
 };
 
 function computeCabinMatch(
   requestedCabinClass: CabinClass,
   segments: FlightSegmentDto[],
-  returnSegments: FlightSegmentDto[] | null
-): { cabinClassMatch: 'full' | 'mixed' | 'downgraded'; cabinMismatchDetails: CabinMismatchDetail[] | null } {
+  returnSegments: FlightSegmentDto[] | null,
+): {
+  cabinClassMatch: 'full' | 'mixed' | 'downgraded';
+  cabinMismatchDetails: CabinMismatchDetail[] | null;
+} {
   const allSegments = [...segments, ...(returnSegments || [])];
   if (allSegments.length === 0) {
     return { cabinClassMatch: 'full', cabinMismatchDetails: null };
@@ -91,7 +100,7 @@ function computeCabinMatch(
   let cabinClassMatch: 'full' | 'mixed' | 'downgraded' = 'full';
   if (longestRank < requestedRank) {
     cabinClassMatch = 'downgraded';
-  } else if (allSegments.some(seg => seg.cabinClass !== requestedCabinClass)) {
+  } else if (allSegments.some((seg) => seg.cabinClass !== requestedCabinClass)) {
     cabinClassMatch = 'mixed';
   }
 
@@ -103,7 +112,7 @@ function computeCabinMatch(
         leg: 'outbound',
         expected: requestedCabinClass,
         actual: seg.cabinClass,
-        route: `${seg.departureAirport} → ${seg.arrivalAirport}`
+        route: `${seg.departureAirport} → ${seg.arrivalAirport}`,
       });
     }
   });
@@ -116,7 +125,7 @@ function computeCabinMatch(
           leg: 'return',
           expected: requestedCabinClass,
           actual: seg.cabinClass,
-          route: `${seg.departureAirport} → ${seg.arrivalAirport}`
+          route: `${seg.departureAirport} → ${seg.arrivalAirport}`,
         });
       }
     });
@@ -124,7 +133,7 @@ function computeCabinMatch(
 
   return {
     cabinClassMatch,
-    cabinMismatchDetails: cabinClassMatch === 'full' ? null : mismatchDetailsList
+    cabinMismatchDetails: cabinClassMatch === 'full' ? null : mismatchDetailsList,
   };
 }
 
@@ -133,8 +142,13 @@ function mapOffer(offer: DuffelOffer, id: string, requestedCabinClass: CabinClas
   const firstSegment = outboundSlice?.segments[0];
   const lastSegment = outboundSlice?.segments[outboundSlice.segments.length - 1];
 
-  const airline = firstSegment?.operating_carrier?.name || firstSegment?.marketing_carrier?.name || 'Unknown Airline';
-  const flightNumber = (firstSegment?.marketing_carrier?.iata_code || '') + (firstSegment?.marketing_carrier_flight_number || '');
+  const airline =
+    firstSegment?.operating_carrier?.name ||
+    firstSegment?.marketing_carrier?.name ||
+    'Unknown Airline';
+  const flightNumber =
+    (firstSegment?.marketing_carrier?.iata_code || '') +
+    (firstSegment?.marketing_carrier_flight_number || '');
 
   const segmentBaggage = firstSegment?.passengers?.[0]?.baggages;
   let baggageAllowance: string | null = null;
@@ -153,7 +167,7 @@ function mapOffer(offer: DuffelOffer, id: string, requestedCabinClass: CabinClas
   const { cabinClassMatch, cabinMismatchDetails } = computeCabinMatch(
     requestedCabinClass,
     segments,
-    returnSegments
+    returnSegments,
   );
 
   return {
@@ -199,7 +213,7 @@ export class FlightsService {
     const startTime = Date.now();
     const origin = query.origin.trim().toUpperCase();
     const destination = query.destination.trim().toUpperCase();
-    
+
     if (origin === destination) {
       throw new BadRequestException('Origin and destination must be different');
     }
@@ -246,17 +260,15 @@ export class FlightsService {
     const sha256 = searchResult.searchHash;
 
     // Map raw offers to FlightOfferDto capping at 20 results using deterministic UUIDs
-    const results: FlightOfferDto[] = (rawResult.offers || [])
-      .slice(0, 20)
-      .map((offer) => {
-        const id = generateDeterministicUUID(`${sha256}:${offer.id}`);
-        return mapOffer(offer, id, passengersInfo.cabinClass);
-      });
+    const results: FlightOfferDto[] = (rawResult.offers || []).slice(0, 20).map((offer) => {
+      const id = generateDeterministicUUID(`${sha256}:${offer.id}`);
+      return mapOffer(offer, id, passengersInfo.cabinClass);
+    });
 
     // Write async write-behind persistence
     setImmediate(async () => {
       try {
-        const prices = results.map(r => r.price);
+        const prices = results.map((r) => r.price);
         const minPrice = prices.length > 0 ? Math.min(...prices) : null;
         const maxPrice = prices.length > 0 ? Math.max(...prices) : null;
         const currency = results.length > 0 ? results[0].currency : 'USD';
@@ -280,7 +292,7 @@ export class FlightsService {
 
           if (!cached) {
             const flightOffersData = results.map((offerDto) => {
-              const rawOffer = rawResult.offers.find(o => o.id === offerDto.duffelOfferId);
+              const rawOffer = rawResult.offers.find((o) => o.id === offerDto.duffelOfferId);
               return {
                 id: offerDto.id,
                 searchHash: sha256,
@@ -372,13 +384,16 @@ export class FlightsService {
         if (searchHistory) {
           throw new HttpException(
             {
-              message: 'This flight offer has expired. Use the search parameters below to find current availability.',
+              message:
+                'This flight offer has expired. Use the search parameters below to find current availability.',
               code: 'OFFER_EXPIRED',
               recovery: {
                 origin: searchHistory.origin,
                 destination: searchHistory.destination,
                 departureDate: searchHistory.departureDate.toISOString().slice(0, 10),
-                returnDate: searchHistory.returnDate ? searchHistory.returnDate.toISOString().slice(0, 10) : null,
+                returnDate: searchHistory.returnDate
+                  ? searchHistory.returnDate.toISOString().slice(0, 10)
+                  : null,
                 adults: searchHistory.adults,
                 children: searchHistory.children,
                 infants: searchHistory.infants,
@@ -391,7 +406,8 @@ export class FlightsService {
       }
 
       // If not in recovery either, check if it's a valid UUID
-      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+      const uuidRegex =
+        /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
       if (!uuidRegex.test(id)) {
         throw new BadRequestException('Invalid UUID format');
       }
@@ -413,34 +429,48 @@ export class FlightsService {
       const isJest = process.env.JEST_WORKER_ID !== undefined;
       const isTestEnv = process.env.NODE_ENV === 'test' || isJest;
       const token = process.env.DUFFEL_ACCESS_TOKEN;
-      const hasDuffelApiUrl = Boolean(process.env.DUFFEL_API_URL && process.env.DUFFEL_API_URL.trim() !== '');
+      const hasDuffelApiUrl = Boolean(
+        process.env.DUFFEL_API_URL && process.env.DUFFEL_API_URL.trim() !== '',
+      );
 
       if (!isJest && !hasDuffelApiUrl && (isTestEnv || token === 'mock')) {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         liveOffer = flightOffer.rawOffer as Record<string, any>;
       } else {
-        const duffelResponse = await this.duffelService['duffel'].offers.get(flightOffer.duffelOfferId);
+        const duffelResponse = await this.duffelService['duffel'].offers.get(
+          flightOffer.duffelOfferId,
+        );
         liveOffer = duffelResponse.data;
       }
     } catch (err: unknown) {
-      const errorObj = err as { status?: number; statusCode?: number; message?: string; stack?: string };
+      const errorObj = err as {
+        status?: number;
+        statusCode?: number;
+        message?: string;
+        stack?: string;
+      };
       // If Duffel API indicates that the offer is gone/expired (e.g. 404/410 status)
       const errStatus = errorObj?.status || errorObj?.statusCode || 500;
       if (errStatus === 404 || errStatus === 410) {
-        this.logger.warn(`Flight offer ${flightOffer.duffelOfferId} expired on Duffel side. Purging from DB.`);
-        
+        this.logger.warn(
+          `Flight offer ${flightOffer.duffelOfferId} expired on Duffel side. Purging from DB.`,
+        );
+
         // Delete the flight offer row
         await this.prisma.flightOffer.delete({ where: { id } }).catch(() => {});
 
         throw new HttpException(
           {
-            message: 'This flight offer has expired. Use the search parameters below to find current availability.',
+            message:
+              'This flight offer has expired. Use the search parameters below to find current availability.',
             code: 'OFFER_EXPIRED',
             recovery: {
               origin: flightOffer.origin,
               destination: flightOffer.destination,
               departureDate: flightOffer.departureDate.toISOString().slice(0, 10),
-              returnDate: flightOffer.returnDate ? flightOffer.returnDate.toISOString().slice(0, 10) : null,
+              returnDate: flightOffer.returnDate
+                ? flightOffer.returnDate.toISOString().slice(0, 10)
+                : null,
               adults: flightOffer.adults,
               children: flightOffer.children,
               infants: flightOffer.infants,
@@ -451,7 +481,10 @@ export class FlightsService {
         );
       }
 
-      this.logger.error(`Failed to retrieve offer from Duffel: ${errorObj?.message || 'Unknown error'}`, errorObj?.stack);
+      this.logger.error(
+        `Failed to retrieve offer from Duffel: ${errorObj?.message || 'Unknown error'}`,
+        errorObj?.stack,
+      );
       throw new HttpException(
         {
           message: 'Upstream flight search service is temporarily unavailable',
@@ -471,8 +504,13 @@ export class FlightsService {
     const firstSegment = outboundSlice?.segments[0];
     const lastSegment = outboundSlice?.segments[outboundSlice.segments.length - 1];
 
-    const airline = firstSegment?.operating_carrier?.name || firstSegment?.marketing_carrier?.name || 'Unknown Airline';
-    const flightNumber = (firstSegment?.marketing_carrier?.iata_code || '') + (firstSegment?.marketing_carrier_flight_number || '');
+    const airline =
+      firstSegment?.operating_carrier?.name ||
+      firstSegment?.marketing_carrier?.name ||
+      'Unknown Airline';
+    const flightNumber =
+      (firstSegment?.marketing_carrier?.iata_code || '') +
+      (firstSegment?.marketing_carrier_flight_number || '');
 
     const segmentBaggage = firstSegment?.passengers?.[0]?.baggages;
     let baggageAllowance: string | null = null;
@@ -493,11 +531,12 @@ export class FlightsService {
           })
           .map((passenger) => ({
             id: passenger.id,
-            type: passenger.type.toLowerCase() === 'child'
-              ? 'CHILD' as const
-              : passenger.type.toLowerCase().startsWith('infant')
-                ? 'INFANT' as const
-                : 'ADULT' as const,
+            type:
+              passenger.type.toLowerCase() === 'child'
+                ? ('CHILD' as const)
+                : passenger.type.toLowerCase().startsWith('infant')
+                  ? ('INFANT' as const)
+                  : ('ADULT' as const),
           }))
       : [];
 
@@ -507,18 +546,20 @@ export class FlightsService {
     const { cabinClassMatch, cabinMismatchDetails } = computeCabinMatch(
       flightOffer.cabinClass as CabinClass,
       segments,
-      returnSegments
+      returnSegments,
     );
 
     // Map conditions
     const rawConditions = liveOffer.conditions;
     const refundable = rawConditions?.refund_before_departure?.allowed ?? false;
     const changeable = rawConditions?.change_before_departure?.allowed ?? false;
-    const changeBeforeDeparture = rawConditions?.change_before_departure ? {
-      allowed: rawConditions.change_before_departure.allowed,
-      penaltyAmount: rawConditions.change_before_departure.penalty_amount || null,
-      penaltyCurrency: rawConditions.change_before_departure.penalty_currency || null,
-    } : null;
+    const changeBeforeDeparture = rawConditions?.change_before_departure
+      ? {
+          allowed: rawConditions.change_before_departure.allowed,
+          penaltyAmount: rawConditions.change_before_departure.penalty_amount || null,
+          penaltyCurrency: rawConditions.change_before_departure.penalty_currency || null,
+        }
+      : null;
 
     const conditions = {
       refundable,

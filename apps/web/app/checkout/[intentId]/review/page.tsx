@@ -21,7 +21,9 @@ export default async function ReviewPage({ params }: Props) {
         <main className="mx-auto w-full max-w-3xl py-12 px-4">
           <div role="alert" className="card text-text-cancelled bg-bg-cancelled p-6">
             <h1 className="text-xl font-bold">Booking Intent Not Found</h1>
-            <p className="mt-2 text-sm text-text-secondary">We could not find the requested booking intent.</p>
+            <p className="mt-2 text-sm text-text-secondary">
+              We could not find the requested booking intent.
+            </p>
           </div>
         </main>
       </div>
@@ -35,7 +37,9 @@ export default async function ReviewPage({ params }: Props) {
         <main className="mx-auto w-full max-w-3xl py-12 px-4">
           <div role="alert" className="card text-text-cancelled bg-bg-cancelled p-6">
             <h1 className="text-xl font-bold">Forbidden</h1>
-            <p className="mt-2 text-sm text-text-secondary">You do not have access to this booking intent.</p>
+            <p className="mt-2 text-sm text-text-secondary">
+              You do not have access to this booking intent.
+            </p>
           </div>
         </main>
       </div>
@@ -49,7 +53,9 @@ export default async function ReviewPage({ params }: Props) {
         <main className="mx-auto w-full max-w-3xl py-12 px-4">
           <div role="alert" className="card text-text-pending bg-bg-pending p-6 space-y-4">
             <h1 className="text-xl font-bold">Booking Intent Expired</h1>
-            <p className="text-sm text-text-secondary">This booking session has expired. Please search and select a new flight.</p>
+            <p className="text-sm text-text-secondary">
+              This booking session has expired. Please search and select a new flight.
+            </p>
             <div>
               <Link href="/search" className="btn-primary">
                 Return to Search
@@ -68,7 +74,9 @@ export default async function ReviewPage({ params }: Props) {
         <main className="mx-auto w-full max-w-3xl py-12 px-4">
           <div role="alert" className="card text-text-cancelled bg-bg-cancelled p-6">
             <h1 className="text-xl font-bold">Service Unavailable</h1>
-            <p className="mt-2 text-sm text-text-secondary">A server error occurred. Please try again later.</p>
+            <p className="mt-2 text-sm text-text-secondary">
+              A server error occurred. Please try again later.
+            </p>
           </div>
         </main>
       </div>
@@ -81,9 +89,13 @@ export default async function ReviewPage({ params }: Props) {
       <main className="mx-auto w-full max-w-3xl space-y-6 py-12 px-4">
         {/* Step Indicator / Title */}
         <div className="space-y-1">
-          <span className="text-xs font-semibold uppercase tracking-wider text-text-muted">Step 3 of 4</span>
+          <span className="text-xs font-semibold uppercase tracking-wider text-text-muted">
+            Step 3 of 4
+          </span>
           <h1 className="text-3xl font-bold text-text-primary">Review Booking</h1>
-          <p className="text-text-secondary">Verify flight information and traveler details before making payment.</p>
+          <p className="text-text-secondary">
+            Verify flight information and traveler details before making payment.
+          </p>
         </div>
 
         {/* Flight Details Card */}
@@ -92,7 +104,9 @@ export default async function ReviewPage({ params }: Props) {
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm text-text-secondary">
             <div>
               <p className="font-semibold text-text-primary">Route</p>
-              <p>{intent.flight.origin} to {intent.flight.destination}</p>
+              <p>
+                {intent.flight.origin} to {intent.flight.destination}
+              </p>
             </div>
             <div>
               <p className="font-semibold text-text-primary">Departure Date</p>
@@ -104,7 +118,11 @@ export default async function ReviewPage({ params }: Props) {
             </div>
             <div>
               <p className="font-semibold text-text-primary">Passengers</p>
-              <p>{intent.flight.adults} Adult(s){intent.flight.children ? ` | ${intent.flight.children} Child(ren)` : ''}{intent.flight.infants ? ` | ${intent.flight.infants} Infant(s)` : ''}</p>
+              <p>
+                {intent.flight.adults} Adult(s)
+                {intent.flight.children ? ` | ${intent.flight.children} Child(ren)` : ''}
+                {intent.flight.infants ? ` | ${intent.flight.infants} Infant(s)` : ''}
+              </p>
             </div>
           </div>
         </div>
@@ -128,19 +146,27 @@ export default async function ReviewPage({ params }: Props) {
                     <span className="font-semibold text-text-primary">Document:</span>
                     <p>
                       {p.documentSummary.documentType || 'Not provided'}
-                      {p.documentSummary.issuingCountry ? ` · ${p.documentSummary.issuingCountry}` : ''}
-                      {p.documentSummary.hasPassport ? ` · ${p.documentSummary.maskedPassportSummary || '•••• ••••'}` : ''}
+                      {p.documentSummary.issuingCountry
+                        ? ` · ${p.documentSummary.issuingCountry}`
+                        : ''}
+                      {p.documentSummary.hasPassport
+                        ? ` · ${p.documentSummary.maskedPassportSummary || '•••• ••••'}`
+                        : ''}
                     </p>
                   </div>
                   <div>
                     <span className="font-semibold text-text-primary">Contact:</span>
                     <p>
-                      {p.contactSummary.maskedContactSummary || p.contactSummary.email || 'Not provided'}
+                      {p.contactSummary.maskedContactSummary ||
+                        p.contactSummary.email ||
+                        'Not provided'}
                     </p>
                   </div>
                   <div>
                     <span className="font-semibold text-text-primary">Source:</span>
-                    <p>{p.preFilledFromProfile ? 'Traveler profile' : 'Entered for this booking'}</p>
+                    <p>
+                      {p.preFilledFromProfile ? 'Traveler profile' : 'Entered for this booking'}
+                    </p>
                   </div>
                 </div>
                 {p.preFilledFromProfile && (
@@ -160,7 +186,9 @@ export default async function ReviewPage({ params }: Props) {
         <div className="card space-y-4">
           <h2 className="text-lg font-semibold text-text-primary">Fare Summary</h2>
           <div className="flex justify-between items-center text-sm border-t border-card-border pt-4">
-            <span className="font-semibold text-text-primary">Total Price (incl. taxes & fees)</span>
+            <span className="font-semibold text-text-primary">
+              Total Price (incl. taxes & fees)
+            </span>
             <span className="text-2xl font-bold text-text-primary">
               {intent.confirmedPrice} {intent.currency}
             </span>

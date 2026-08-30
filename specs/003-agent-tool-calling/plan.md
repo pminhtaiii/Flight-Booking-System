@@ -19,6 +19,7 @@ Three read-only tools at launch: `search_flights`, `get_user_preferences`, `list
 **Language/Version**: TypeScript 5.x (NestJS backend) & Python 3.11+ (FastAPI agent)
 
 **Primary Dependencies**:
+
 - NestJS: `@nestjs/common`, `@nestjs/passport`, `Prisma Client`, `class-validator`, Node.js `crypto`
 - Python: `langchain-core`, `langgraph`, `langchain-openai`, `httpx`, `hmac`/`hashlib` (stdlib), `pydantic`
 
@@ -38,15 +39,15 @@ Three read-only tools at launch: `search_flights`, `get_user_preferences`, `list
 
 ## Constitution Check
 
-*GATE: Must pass before Phase 0 research. Re-check after Phase 1 design.*
+_GATE: Must pass before Phase 0 research. Re-check after Phase 1 design._
 
-| Gate | Principle | Status | Notes |
-|------|-----------|--------|-------|
-| G1 | I. Flight-First Architecture | ✅ PASS | All 3 tools are read-only. No impact on booking pipeline. |
-| G2 | II. Deterministic Transaction Boundary | ✅ PASS | Tools are advisory only. No write operations. Confirmation gate dormant. |
-| G3 | III. API Budget Discipline | ⚠️ CONDITIONAL | Agent-initiated searches consume Amadeus quota. Mitigated: see below. |
-| G4 | IV. Observability & Operational Visibility | ✅ PASS | Audit logging for every tool call (FR-014). LangSmith tracing. Structured logs. |
-| G5 | V. Incremental Delivery | ✅ PASS | Shippable increment. Each tool independently testable and deployable. |
+| Gate | Principle                                  | Status         | Notes                                                                           |
+| ---- | ------------------------------------------ | -------------- | ------------------------------------------------------------------------------- |
+| G1   | I. Flight-First Architecture               | ✅ PASS        | All 3 tools are read-only. No impact on booking pipeline.                       |
+| G2   | II. Deterministic Transaction Boundary     | ✅ PASS        | Tools are advisory only. No write operations. Confirmation gate dormant.        |
+| G3   | III. API Budget Discipline                 | ⚠️ CONDITIONAL | Agent-initiated searches consume Amadeus quota. Mitigated: see below.           |
+| G4   | IV. Observability & Operational Visibility | ✅ PASS        | Audit logging for every tool call (FR-014). LangSmith tracing. Structured logs. |
+| G5   | V. Incremental Delivery                    | ✅ PASS        | Shippable increment. Each tool independently testable and deployable.           |
 
 **G3 Conditional Pass Justification**: Agent-initiated flight searches go through the same `CacheService` (Redis) and rate limiting infrastructure as direct frontend searches. The gateway's `/flights/search` endpoint checks Redis cache first, respects rate limits, and increments the API budget counter — identical treatment to the deterministic search path. This enforces Principle III rather than violating it.
 
@@ -135,12 +136,12 @@ apps/agent/
 
 ## Complexity Tracking
 
-| Aspect | Why Needed | Simpler Alternative Rejected Because |
-|--------|-----------|-------------------------------------|
-| HMAC claim tokens instead of forwarding JWT | Principle II — user JWT must not cross the FastAPI boundary. Claim token contains only `userId` + `issuedAt`. | Forwarding user JWT leaks the full session to the gateway and couples agent auth to user auth lifecycle. |
-| LangGraph state machine instead of simple tool loop | Confirmation gate for future write ops requires graph suspension (`interrupt_before`). LangGraph provides this natively. | A manual while-loop cannot suspend and resume mid-execution for human-in-the-loop confirmation. |
-| Prisma schema additions (TravelerProfile, Booking) | Gateway needs real data to serve. These models are foundational for the entire system. | Mock/hardcoded data makes tools useless for real validation and defers essential schema work. |
-| Integrated gateway services (not proxy-to-standalone) | No standalone flight/booking/profile NestJS services exist yet. Building them is out of scope for this feature. | Building 3 full standalone NestJS modules doubles scope without agent-specific value. |
+| Aspect                                                | Why Needed                                                                                                               | Simpler Alternative Rejected Because                                                                     |
+| ----------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------- |
+| HMAC claim tokens instead of forwarding JWT           | Principle II — user JWT must not cross the FastAPI boundary. Claim token contains only `userId` + `issuedAt`.            | Forwarding user JWT leaks the full session to the gateway and couples agent auth to user auth lifecycle. |
+| LangGraph state machine instead of simple tool loop   | Confirmation gate for future write ops requires graph suspension (`interrupt_before`). LangGraph provides this natively. | A manual while-loop cannot suspend and resume mid-execution for human-in-the-loop confirmation.          |
+| Prisma schema additions (TravelerProfile, Booking)    | Gateway needs real data to serve. These models are foundational for the entire system.                                   | Mock/hardcoded data makes tools useless for real validation and defers essential schema work.            |
+| Integrated gateway services (not proxy-to-standalone) | No standalone flight/booking/profile NestJS services exist yet. Building them is out of scope for this feature.          | Building 3 full standalone NestJS modules doubles scope without agent-specific value.                    |
 
 ---
 
@@ -153,6 +154,7 @@ This feature is organized into **6 progressive phases**, each independently test
 **Covers**: FR-015, FR-003, FR-004, SC-002, SC-009
 
 **Scope**:
+
 - Modify `apps/api/prisma/schema.prisma` to add:
   - `TravelerProfile` model (with name, nationality, passport details, preferences, saved payment cards)
   - `Booking` model and `BookingStatus` enum
@@ -169,6 +171,7 @@ This feature is organized into **6 progressive phases**, each independently test
 **Covers**: FR-006, FR-007, FR-008, FR-015, SC-005
 
 **Scope**:
+
 - Create NestJS `AgentGatewayModule` under `apps/api/src/agent-gateway/`.
 - Implement `agent-api-key.guard.ts` (validate `X-Agent-API-Key` header) and `claim-token.guard.ts`/`claim-token.service.ts` (validate HMAC-SHA256 signature in `X-User-Claim` header).
 - Build the 3 gateway controller endpoints:
@@ -187,6 +190,7 @@ This feature is organized into **6 progressive phases**, each independently test
 **Covers**: FR-005, FR-014, SC-002, SC-006, SC-009
 
 **Scope**:
+
 - Implement PII stripping in `AgentGatewayService` (guarantee no passport numbers, raw payment card details, PNR codes, or e-ticket numbers are returned in gateway responses).
 - Integrate the flight search endpoint with the Amadeus client wrapper, Redis `CacheService`, and rate limiting.
 - Implement structured auditing in `AgentGatewayService` using the existing NestJS `AuditService` to log user, tool name, timestamp, and response size.
@@ -201,6 +205,7 @@ This feature is organized into **6 progressive phases**, each independently test
 **Covers**: FR-019, FR-020, SC-010
 
 **Scope**:
+
 - Implement HMAC-SHA256 claim token generation in Python under `apps/agent/src/agent/auth/claim_token.py`.
 - Extend `nestjs_client.py` in `apps/agent/src/agent/tools/` to dynamically attach API keys and signed user claim tokens to outgoing requests.
 - Implement `pii_scrubber.py` under `apps/agent/src/agent/sanitization/` to scrub regex-matched PII (passports, credit cards, PNRs) from chat messages before they are persisted or logged.
@@ -215,6 +220,7 @@ This feature is organized into **6 progressive phases**, each independently test
 **Covers**: FR-001, FR-002, FR-003, FR-004, FR-009, FR-010, FR-012, FR-018, SC-001, SC-003, SC-004, SC-007
 
 **Scope**:
+
 - Implement LangGraph orchestration under `apps/agent/src/agent/graph/`:
   - `state.py` (TypedDict state object)
   - `nodes.py` (node executors for LLM, tools, and confirmation)
@@ -235,6 +241,7 @@ This feature is organized into **6 progressive phases**, each independently test
 **Covers**: FR-011, FR-013, FR-016, SC-008
 
 **Scope**:
+
 - Implement graph suspension using LangGraph interrupts (`interrupt_before`) for tools requiring confirmation (ready/dormant for future write operations).
 - Extend the SSE streaming generator in `apps/agent/src/agent/streaming/sse.py` to yield `tool_call` status events (e.g. "Searching flights...") and tool results.
 - Write integration tests verifying SSE streams, graph suspension/resume/abort on mock write tools, and correct error-handling on gateway timeouts.

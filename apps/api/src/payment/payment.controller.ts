@@ -72,7 +72,12 @@ export class PaymentController {
     }
 
     const result = await this.paymentService.confirmPayment(dto, idempotencyKey, req.user.id);
-    if (result && typeof result === 'object' && 'status' in result && (result as { status: string }).status === 'PENDING') {
+    if (
+      result &&
+      typeof result === 'object' &&
+      'status' in result &&
+      (result as { status: string }).status === 'PENDING'
+    ) {
       res.status(HttpStatus.ACCEPTED);
     }
     return result;
@@ -99,7 +104,13 @@ export class PaymentController {
     if (!idempotencyKey) {
       throw new BadRequestException('Idempotency-Key header is required');
     }
-    return this.paymentRefundService.initiateRefund(paymentId, dto, idempotencyKey, req.user.id, req.user.role);
+    return this.paymentRefundService.initiateRefund(
+      paymentId,
+      dto,
+      idempotencyKey,
+      req.user.id,
+      req.user.role,
+    );
   }
 
   @Get('methods')
@@ -109,10 +120,7 @@ export class PaymentController {
 
   @Delete('methods/:methodId')
   @HttpCode(HttpStatus.NO_CONTENT)
-  async deletePaymentMethod(
-    @Req() req: AuthenticatedRequest,
-    @Param('methodId') methodId: string,
-  ) {
+  async deletePaymentMethod(@Req() req: AuthenticatedRequest, @Param('methodId') methodId: string) {
     await this.paymentMethodService.deleteMethod(methodId, req.user.id);
   }
 }

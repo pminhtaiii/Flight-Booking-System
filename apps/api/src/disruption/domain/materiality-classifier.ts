@@ -18,49 +18,57 @@ function evaluateDiffForReasons(diff: ItineraryDiffResult): MaterialDisruptionRe
   if (diff.addedSegments.length > 0) {
     reasons.push(MaterialDisruptionReason.SEGMENT_ADDED);
   }
-  if (diff.segmentDiffs.some(d => d.departureAirportChanged)) {
+  if (diff.segmentDiffs.some((d) => d.departureAirportChanged)) {
     reasons.push(MaterialDisruptionReason.DEPARTURE_AIRPORT_CHANGED);
   }
-  if (diff.segmentDiffs.some(d => d.arrivalAirportChanged)) {
+  if (diff.segmentDiffs.some((d) => d.arrivalAirportChanged)) {
     reasons.push(MaterialDisruptionReason.ARRIVAL_AIRPORT_CHANGED);
   }
-  if (diff.sliceDiffs.some(d => d.departureAirportChanged)) {
+  if (diff.sliceDiffs.some((d) => d.departureAirportChanged)) {
     if (!reasons.includes(MaterialDisruptionReason.DEPARTURE_AIRPORT_CHANGED)) {
       reasons.push(MaterialDisruptionReason.DEPARTURE_AIRPORT_CHANGED);
     }
   }
-  if (diff.sliceDiffs.some(d => d.arrivalAirportChanged)) {
+  if (diff.sliceDiffs.some((d) => d.arrivalAirportChanged)) {
     if (!reasons.includes(MaterialDisruptionReason.ARRIVAL_AIRPORT_CHANGED)) {
       reasons.push(MaterialDisruptionReason.ARRIVAL_AIRPORT_CHANGED);
     }
   }
-  if (diff.segmentDiffs.some(d => d.departureLocalDateChanged)) {
+  if (diff.segmentDiffs.some((d) => d.departureLocalDateChanged)) {
     reasons.push(MaterialDisruptionReason.DEPARTURE_LOCAL_DATE_CHANGED);
   }
-  if (diff.segmentDiffs.some(d => d.arrivalLocalDateChanged)) {
+  if (diff.segmentDiffs.some((d) => d.arrivalLocalDateChanged)) {
     reasons.push(MaterialDisruptionReason.ARRIVAL_LOCAL_DATE_CHANGED);
   }
-  if (diff.connectionDiffs.some(d => d.isOvernightIntroduced)) {
+  if (diff.connectionDiffs.some((d) => d.isOvernightIntroduced)) {
     reasons.push(MaterialDisruptionReason.OVERNIGHT_CONNECTION_INTRODUCED);
   }
-  if (diff.connectionDiffs.some(d => d.isBelowMct)) {
+  if (diff.connectionDiffs.some((d) => d.isBelowMct)) {
     reasons.push(MaterialDisruptionReason.CONNECTION_BELOW_MCT);
   }
-  if (diff.connectionDiffs.some(d => d.isOverlapping)) {
+  if (diff.connectionDiffs.some((d) => d.isOverlapping)) {
     reasons.push(MaterialDisruptionReason.INVALID_CONNECTION_OVERLAP);
   }
 
   // Threshold rules
-  if (diff.segmentDiffs.some(d => d.departureTimeShiftMinutes < -60)) {
+  if (diff.segmentDiffs.some((d) => d.departureTimeShiftMinutes < -60)) {
     reasons.push(MaterialDisruptionReason.DEPARTURE_MOVED_EARLIER);
   }
-  if (diff.segmentDiffs.some(d => d.departureTimeShiftMinutes > 120)) {
+  if (diff.segmentDiffs.some((d) => d.departureTimeShiftMinutes > 120)) {
     reasons.push(MaterialDisruptionReason.DEPARTURE_MOVED_LATER);
   }
-  if (diff.sliceDiffs.some(d => d.finalArrivalShiftMinutes !== null && d.finalArrivalShiftMinutes < -60)) {
+  if (
+    diff.sliceDiffs.some(
+      (d) => d.finalArrivalShiftMinutes !== null && d.finalArrivalShiftMinutes < -60,
+    )
+  ) {
     reasons.push(MaterialDisruptionReason.FINAL_ARRIVAL_MOVED_EARLIER);
   }
-  if (diff.sliceDiffs.some(d => d.finalArrivalShiftMinutes !== null && d.finalArrivalShiftMinutes > 120)) {
+  if (
+    diff.sliceDiffs.some(
+      (d) => d.finalArrivalShiftMinutes !== null && d.finalArrivalShiftMinutes > 120,
+    )
+  ) {
     reasons.push(MaterialDisruptionReason.FINAL_ARRIVAL_MOVED_LATER);
   }
 
@@ -69,7 +77,7 @@ function evaluateDiffForReasons(diff: ItineraryDiffResult): MaterialDisruptionRe
 
 export function classifyMateriality(
   incrementalDiff: ItineraryDiffResult,
-  cumulativeDiff: ItineraryDiffResult
+  cumulativeDiff: ItineraryDiffResult,
 ): MaterialityResult {
   const incReasons = evaluateDiffForReasons(incrementalDiff);
   const cumReasons = evaluateDiffForReasons(cumulativeDiff);
@@ -89,6 +97,6 @@ export function classifyMateriality(
     isMaterial: reasons.length > 0,
     reasons,
     baselines,
-    rulesetVersion: 'disruption-v1'
+    rulesetVersion: 'disruption-v1',
   };
 }

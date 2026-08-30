@@ -27,7 +27,18 @@ const validated = {
 function createDependencies(transaction: Record<string, unknown>) {
   const prisma = {
     bookingIntent: {
-      findUnique: jest.fn().mockResolvedValue({ id: 'intent-1', status: 'PENDING', paymentAttemptCount: 0, confirmedPrice: '100.00', currency: 'USD', userId: 'user-1', currentAncillarySelectionId: 'selection-3', ancillaryVersion: 3 }),
+      findUnique: jest
+        .fn()
+        .mockResolvedValue({
+          id: 'intent-1',
+          status: 'PENDING',
+          paymentAttemptCount: 0,
+          confirmedPrice: '100.00',
+          currency: 'USD',
+          userId: 'user-1',
+          currentAncillarySelectionId: 'selection-3',
+          ancillaryVersion: 3,
+        }),
     },
     $transaction: jest.fn().mockImplementation(async (callback) => callback(transaction)),
     payment: { findFirst: jest.fn().mockResolvedValue(null) },
@@ -101,7 +112,7 @@ describe('PaymentService ancillary binding review fixes', () => {
           {
             currentAncillarySelectionId: 'selection-3',
             ancillaryVersion: 3,
-          }
+          },
         ]),
       $executeRaw: jest.fn().mockResolvedValue(1),
       ancillarySelection: { updateMany: jest.fn().mockResolvedValue({ count: 1 }) },
@@ -183,20 +194,18 @@ describe('PaymentService ancillary binding review fixes', () => {
           },
         ];
       }),
-      $executeRaw: jest.fn().mockImplementation(
-        (strings: TemplateStringsArray, ...values: unknown[]) => {
+      $executeRaw: jest
+        .fn()
+        .mockImplementation((strings: TemplateStringsArray, ...values: unknown[]) => {
           const sql = strings.join(' ');
           if (sql.includes('idempotency_keys')) {
             reservation = values.find(
               (value): value is typeof reservation =>
-                typeof value === 'object' &&
-                value !== null &&
-                'validatedAncillary' in value,
+                typeof value === 'object' && value !== null && 'validatedAncillary' in value,
             );
           }
           return 1;
-        },
-      ),
+        }),
       ancillarySelection: { updateMany: jest.fn().mockResolvedValue({ count: 1 }) },
       idempotencyKey: {
         findUnique: jest.fn().mockImplementation(() => idempotencyRecord()),

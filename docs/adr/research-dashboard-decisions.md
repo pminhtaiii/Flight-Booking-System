@@ -15,6 +15,7 @@ The navigation header in the web application links to `/dashboard` across all au
 **Decision:** Implement a dedicated, purpose-built backend endpoint `GET /api/dashboard/summary` in NestJS.
 
 **Rationale:**
+
 - **Avoid Over-Fetching & Multi-Hop Latency:** Fetching upcoming bookings, past bookings, and profile readiness separately from Server Components incurs multiple server-to-server round-trips with excess payload overhead.
 - **Contract Boundary:** The dashboard has distinct aggregate requirements. A purpose-built endpoint protects the dashboard contract from breaking when individual feature endpoints (like paginated booking management lists) evolve.
 
@@ -26,12 +27,12 @@ The navigation header in the web application links to `/dashboard` across all au
 
 ### Stat Metrics (4 Cards)
 
-| Metric Card | Query Definition | Rationale |
-| :--- | :--- | :--- |
-| **`totalBookings`** | `prisma.booking.count({ where: { userId } })` | Lifetime booking count across all states |
-| **`upcomingBookings`** | `prisma.booking.count({ where: { userId, status: 'CONFIRMED', departureAt: { gte: now } } })` | Confirmed upcoming flights |
-| **`completedBookings`** | `prisma.booking.count({ where: { userId, status: 'CONFIRMED', departureAt: { lt: now } } })` | Past confirmed travel history |
-| **`cancelledBookings`** | `prisma.booking.count({ where: { userId, status: 'CANCELLED' } })` | Explicit cancellation count |
+| Metric Card             | Query Definition                                                                              | Rationale                                |
+| :---------------------- | :-------------------------------------------------------------------------------------------- | :--------------------------------------- |
+| **`totalBookings`**     | `prisma.booking.count({ where: { userId } })`                                                 | Lifetime booking count across all states |
+| **`upcomingBookings`**  | `prisma.booking.count({ where: { userId, status: 'CONFIRMED', departureAt: { gte: now } } })` | Confirmed upcoming flights               |
+| **`completedBookings`** | `prisma.booking.count({ where: { userId, status: 'CONFIRMED', departureAt: { lt: now } } })`  | Past confirmed travel history            |
+| **`cancelledBookings`** | `prisma.booking.count({ where: { userId, status: 'CANCELLED' } })`                            | Explicit cancellation count              |
 
 ### Excluded / Deferred Stats
 
@@ -47,6 +48,7 @@ The navigation header in the web application links to `/dashboard` across all au
 **Decision:** Query PostgreSQL directly via Prisma in `DashboardService`. Do **not** introduce a Redis caching layer for the dashboard.
 
 **Rationale:**
+
 - **Indexed Single-Digit Latency:** All queries filter on `userId` and `status`, which are indexed in PostgreSQL. For realistic user booking volumes (1–100 rows), direct counts take < 2ms.
 - **Invalidation Complexity:** Caching dashboard metrics in Redis would require invalidation hooks across 4+ mutation pathways (booking creation, payment confirmation, cancellation, schedule disruption) for virtually zero performance benefit.
 - **Freshness Invariant:** Next.js Server Components fetch with `cache: 'no-store'`, guaranteeing accurate, real-time user stats on every navigation.
@@ -72,6 +74,7 @@ The navigation header in the web application links to `/dashboard` across all au
 **Decision:** Return the 5 most recent bookings (`take: 5`, ordered by `createdAt: 'desc'`) rather than introducing a generic user activity event stream.
 
 **Rationale:**
+
 - The system currently does not persist search or transient browsing history in an event audit log.
 - A concise list of 5 recent bookings provides immediate value with a link to `/bookings` for full management.
 
@@ -82,6 +85,7 @@ The navigation header in the web application links to `/dashboard` across all au
 **Decision:** Do not compute or display a profile completeness banner on the dashboard in this iteration.
 
 **Rationale:**
+
 - Profile completeness is already strictly enforced downstream:
   1. The AI chatbot agent prompts users for missing profile fields interactively.
   2. The booking readiness check (`POST /api/bookings/intents/readiness`) gates intent creation before payment.
@@ -94,6 +98,7 @@ The navigation header in the web application links to `/dashboard` across all au
 **Decision:** The root route (`/`) will automatically redirect authenticated users to `/dashboard`. Unauthenticated visitors continue to see the marketing landing page.
 
 **Rationale:**
+
 - For logged-in users, the landing page CTAs ("Login", "Register") are redundant.
 - Establishes `/dashboard` as the central authenticated hub of the application.
 
@@ -109,12 +114,12 @@ The navigation header in the web application links to `/dashboard` across all au
 
 To ensure seamless alignment between architecture, API specifications, and visual implementation, this feature links directly to the interactive Next.js prototype and the authoritative Stitch design artifacts:
 
-* **Interactive Prototype Route:** [`apps/web/app/prototype/dashboard/page.tsx`](file:///c:/Booking%20Systems/apps/web/app/prototype/dashboard/page.tsx) (`http://localhost:3000/prototype/dashboard`)
-* **Prototype Design Notes:** [`apps/web/app/prototype/dashboard/NOTES.md`](file:///c:/Booking%20Systems/apps/web/app/prototype/dashboard/NOTES.md)
-* **Stitch Project ID:** `projects/13084924633373309967`
-* **Stitch Screen ID:** `projects/13084924633373309967/screens/69ae01acbacf4a6da08c37370416e52c` (Title: *"Wayfinder Dashboard"*)
-* **Design System Token Asset:** `assets/f3a3a4a8638448bcaf25c6d4c42ed87c`
-* **Design Preview:** [Stitch Screen Preview](https://lh3.googleusercontent.com/aida/AEtjO1UdF6EPyNJ0dELL14EyZt5vLcYwcqhV0hE5rJcsTOdFPtGPq2i8n8CgNz1mdzjmgB_yV970UFJuIqredDaqQsC6xhgh8lQpSQYz7TtmlQTuT4j45khJzY0Ra1eZhNGIGJrJ_QN-EhkPqFGOHojRC82u4qwt5bfy8PoN17pdV4-2sDqfwe4Ij5rP8siBJijnebWPCwEWzzFtRnbawMvSEtXFe6CYmYgJKlpwbV-YGmoRsCi5TawNRBzhYAHe)
+- **Interactive Prototype Route:** [`apps/web/app/prototype/dashboard/page.tsx`](file:///c:/Booking%20Systems/apps/web/app/prototype/dashboard/page.tsx) (`http://localhost:3000/prototype/dashboard`)
+- **Prototype Design Notes:** [`apps/web/app/prototype/dashboard/NOTES.md`](file:///c:/Booking%20Systems/apps/web/app/prototype/dashboard/NOTES.md)
+- **Stitch Project ID:** `projects/13084924633373309967`
+- **Stitch Screen ID:** `projects/13084924633373309967/screens/69ae01acbacf4a6da08c37370416e52c` (Title: _"Wayfinder Dashboard"_)
+- **Design System Token Asset:** `assets/f3a3a4a8638448bcaf25c6d4c42ed87c`
+- **Design Preview:** [Stitch Screen Preview](https://lh3.googleusercontent.com/aida/AEtjO1UdF6EPyNJ0dELL14EyZt5vLcYwcqhV0hE5rJcsTOdFPtGPq2i8n8CgNz1mdzjmgB_yV970UFJuIqredDaqQsC6xhgh8lQpSQYz7TtmlQTuT4j45khJzY0Ra1eZhNGIGJrJ_QN-EhkPqFGOHojRC82u4qwt5bfy8PoN17pdV4-2sDqfwe4Ij5rP8siBJijnebWPCwEWzzFtRnbawMvSEtXFe6CYmYgJKlpwbV-YGmoRsCi5TawNRBzhYAHe)
 
 ### Visual Layout Breakdown
 

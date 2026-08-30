@@ -335,7 +335,8 @@ describe('ChatHandoffService', () => {
       jest.spyOn(tokenService, 'deriveIdempotencyHash').mockReturnValue('hash');
 
       // First findUnique returns null (simulate race condition)
-      jest.spyOn(prisma.chatHandoff, 'findUnique')
+      jest
+        .spyOn(prisma.chatHandoff, 'findUnique')
         .mockResolvedValueOnce(null)
         .mockResolvedValueOnce({
           id: '1',
@@ -460,7 +461,6 @@ describe('ChatHandoffService', () => {
     });
   });
 
-
   describe('resolve and resolveHandoffToken', () => {
     it('throws ServiceUnavailableException when ACCEPT flag is off', async () => {
       jest.spyOn(configService, 'get').mockReturnValue('false');
@@ -555,7 +555,6 @@ describe('ChatHandoffService', () => {
       });
     });
 
-
     it('records consumed-token resolve as a replay without sensitive metadata', async () => {
       jest
         .spyOn(configService, 'get')
@@ -588,9 +587,11 @@ describe('ChatHandoffService', () => {
     });
 
     it('does not block token resolution on a stalled audit write', async () => {
-      jest.spyOn(configService, 'get').mockImplementation((key) =>
-        key === 'FEATURE_FLAG_CHAT_HANDOFF_ACCEPT' ? 'true' : 'false',
-      );
+      jest
+        .spyOn(configService, 'get')
+        .mockImplementation((key) =>
+          key === 'FEATURE_FLAG_CHAT_HANDOFF_ACCEPT' ? 'true' : 'false',
+        );
       jest.spyOn(tokenService, 'verifyToken').mockResolvedValue(true);
       jest.spyOn(prisma.chatHandoff, 'findUnique').mockResolvedValue({
         id: 'handoff-1',
@@ -623,16 +624,18 @@ describe('ChatHandoffService', () => {
         expiresAt: new Date(Date.now() + 60_000),
         consumedAt: null,
       } as any);
-      (prisma.$queryRaw as jest.Mock) = jest.fn().mockResolvedValue([{
-        id: 'handoff-1',
-        userId: 'u1',
-        chatSessionId: 'session-1',
-        flightOfferId: 'offer-1',
-        tokenHash: 'token-hash',
-        tokenKeyVersion: 1,
-        expiresAt: new Date(Date.now() + 60_000),
-        consumedAt: null,
-      }]);
+      (prisma.$queryRaw as jest.Mock) = jest.fn().mockResolvedValue([
+        {
+          id: 'handoff-1',
+          userId: 'u1',
+          chatSessionId: 'session-1',
+          flightOfferId: 'offer-1',
+          tokenHash: 'token-hash',
+          tokenKeyVersion: 1,
+          expiresAt: new Date(Date.now() + 60_000),
+          consumedAt: null,
+        },
+      ]);
 
       const result = await service.resolveAndAcquireClaim('chk_handoff_v1_test', 'u1', 30_000);
 
@@ -668,7 +671,18 @@ describe('ChatHandoffService', () => {
         response: { code: 'HANDOFF_IN_PROGRESS' },
       });
       expect(prisma.$queryRaw).toHaveBeenCalledTimes(1);
-      releaseClaim([{ id: 'handoff-1', userId: 'u1', chatSessionId: 'session-1', flightOfferId: 'offer-1', tokenHash: 'hash', tokenKeyVersion: 1, expiresAt: new Date(Date.now() + 60_000), consumedAt: null }]);
+      releaseClaim([
+        {
+          id: 'handoff-1',
+          userId: 'u1',
+          chatSessionId: 'session-1',
+          flightOfferId: 'offer-1',
+          tokenHash: 'hash',
+          tokenKeyVersion: 1,
+          expiresAt: new Date(Date.now() + 60_000),
+          consumedAt: null,
+        },
+      ]);
       await expect(first).resolves.toMatchObject({ handoff: { id: 'handoff-1' } });
     });
 
@@ -936,7 +950,9 @@ describe('ChatHandoffService', () => {
         claimedTokens: Map<string, number>;
         activeClaimAttempts: Map<string, Promise<unknown>>;
       };
-      const inFlightPromise = new Promise<{ handoff: ResolvedChatHandoff; claimToken: string }>(() => {});
+      const inFlightPromise = new Promise<{ handoff: ResolvedChatHandoff; claimToken: string }>(
+        () => {},
+      );
       internalService.activeClaimAttempts.set('user-1:token-hash-1', inFlightPromise);
       internalService.claimedTokens.set('user-1:token-hash-1', Date.now() + 30000);
 

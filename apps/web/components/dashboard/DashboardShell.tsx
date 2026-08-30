@@ -16,7 +16,11 @@ const navigationItems = [
   { href: '/bookings', label: 'My bookings', shortLabel: 'Bookings' },
 ] as const;
 
-export function DashboardShell({ user, showProfileNavigation = false, children }: DashboardShellProps): JSX.Element {
+export function DashboardShell({
+  user,
+  showProfileNavigation = false,
+  children,
+}: DashboardShellProps): JSX.Element {
   const displayName = user.name?.trim() || user.email?.trim() || 'Traveler';
   const avatarLabel = displayName.charAt(0).toLocaleUpperCase();
   const visibleNavigationItems = showProfileNavigation

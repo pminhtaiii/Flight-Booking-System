@@ -146,8 +146,12 @@ export class BookingLifecycleService {
       data: {
         status: BookingStatus.FAILED,
         failureReason,
-        ...(flightSnapshot ? { flightSnapshot: flightSnapshot as unknown as Prisma.InputJsonValue } : {}),
-        ...(passengerSnapshot ? { passengerSnapshot: passengerSnapshot as unknown as Prisma.InputJsonValue } : {}),
+        ...(flightSnapshot
+          ? { flightSnapshot: flightSnapshot as unknown as Prisma.InputJsonValue }
+          : {}),
+        ...(passengerSnapshot
+          ? { passengerSnapshot: passengerSnapshot as unknown as Prisma.InputJsonValue }
+          : {}),
         ...(departureAt ? { departureAt } : {}),
       },
     });

@@ -210,5 +210,3 @@ describe('Health Check (E2E)', () => {
     expect(netDuration).toBeLessThan(750);
   });
 });
-
-

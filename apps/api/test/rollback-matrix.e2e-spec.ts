@@ -57,7 +57,7 @@ async function cleanDatabase(prisma: PrismaService): Promise<void> {
   await prisma.paymentEvent.deleteMany({});
   await prisma.ledgerEntry.deleteMany({});
   await prisma.refund.deleteMany({});
-    await prisma.cancellationRefundObligation.deleteMany({});
+  await prisma.cancellationRefundObligation.deleteMany({});
   await prisma.payment.deleteMany({});
   await prisma.idempotencyKey.deleteMany({});
   await prisma.paymentMethod.deleteMany({});
@@ -120,13 +120,17 @@ describe('Rollback Matrix & Database Row Integrity (E2E)', () => {
       .compile();
 
     app = moduleFixture.createNestApplication();
-    app.useGlobalPipes(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, transform: true }));
+    app.useGlobalPipes(
+      new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, transform: true }),
+    );
     app.useGlobalFilters(new HttpExceptionFilter());
     app.setGlobalPrefix('api', { exclude: ['health'] });
     await app.init();
 
     prisma = moduleFixture.get<PrismaService>(PrismaService);
-    attestationService = moduleFixture.get<SelectionAttestationService>(SelectionAttestationService);
+    attestationService = moduleFixture.get<SelectionAttestationService>(
+      SelectionAttestationService,
+    );
     tokenService = moduleFixture.get<ChatHandoffTokenService>(ChatHandoffTokenService);
     cryptoService = moduleFixture.get<ChatMessageCryptoService>(ChatMessageCryptoService);
     duffelService = moduleFixture.get<DuffelService>(DuffelService);
@@ -204,7 +208,13 @@ describe('Rollback Matrix & Database Row Integrity (E2E)', () => {
     });
 
     for (const airport of [
-      { iataCode: 'SGN', name: 'Tan Son Nhat', city: 'Ho Chi Minh City', latitude: 10.8231, longitude: 106.6297 },
+      {
+        iataCode: 'SGN',
+        name: 'Tan Son Nhat',
+        city: 'Ho Chi Minh City',
+        latitude: 10.8231,
+        longitude: 106.6297,
+      },
       { iataCode: 'HAN', name: 'Noi Bai', city: 'Hanoi', latitude: 21.2212, longitude: 105.8072 },
     ]) {
       await prisma.airport.upsert({
@@ -345,20 +355,20 @@ describe('Rollback Matrix & Database Row Integrity (E2E)', () => {
 
     it('Pre-issued token can be claimed and consumed via POST /api/bookings/intents, creating canonical BookingIntent and setting consumedAt', async () => {
       const rawOfferRecord = (validFlightOffer.rawOffer as Record<string, unknown>) || {};
-      const rawPassengers = Array.isArray(rawOfferRecord.passengers) ? (rawOfferRecord.passengers as Array<{ id: string }>) : [];
+      const rawPassengers = Array.isArray(rawOfferRecord.passengers)
+        ? (rawOfferRecord.passengers as Array<{ id: string }>)
+        : [];
       const passengerId = rawPassengers[0]?.id || 'pas_matrix_1';
       // Mock live Duffel offer re-pricing to succeed
-      const duffelGetSpy = jest
-        .spyOn(duffelService['duffel'].offers, 'get')
-        .mockResolvedValue({
-          data: {
-            id: validFlightOffer.duffelOfferId,
-            total_amount: '150.00',
-            total_currency: 'USD',
-            expires_at: new Date(Date.now() + 900_000).toISOString(),
-            passengers: [{ id: passengerId, type: 'adult' }],
-          },
-        } as never);
+      const duffelGetSpy = jest.spyOn(duffelService['duffel'].offers, 'get').mockResolvedValue({
+        data: {
+          id: validFlightOffer.duffelOfferId,
+          total_amount: '150.00',
+          total_currency: 'USD',
+          expires_at: new Date(Date.now() + 900_000).toISOString(),
+          passengers: [{ id: passengerId, type: 'adult' }],
+        },
+      } as never);
 
       const intentRes = await request(app.getHttpServer())
         .post('/api/bookings/intents')
@@ -426,7 +436,8 @@ describe('Rollback Matrix & Database Row Integrity (E2E)', () => {
       const messageId1 = crypto.randomUUID();
       const messageId2 = crypto.randomUUID();
       const userPlainContent = 'Find me flights from Hanoi to Tokyo';
-      const agentPlainContent = 'I found Vietnam Airlines flight VN310 departing at 08:30 for $452 USD.';
+      const agentPlainContent =
+        'I found Vietnam Airlines flight VN310 departing at 08:30 for $452 USD.';
 
       const userMsgEnc = await cryptoService.encryptMessageContent(
         messageId1,
@@ -626,7 +637,9 @@ describe('Rollback Matrix & Database Row Integrity (E2E)', () => {
       // Total count checks confirm zero row drops
       const handoffCount = await prisma.chatHandoff.count({ where: { userId: validUser.id } });
       const projectionCount = await prisma.bookingAgentProjection.count({ where: { bookingId } });
-      const messageCount = await prisma.chatMessage.count({ where: { sessionId: validSession.id } });
+      const messageCount = await prisma.chatMessage.count({
+        where: { sessionId: validSession.id },
+      });
 
       expect(handoffCount).toBe(1);
       expect(projectionCount).toBe(1);

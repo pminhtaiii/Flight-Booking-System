@@ -51,12 +51,16 @@ export class BookingAgentProjectionService {
         destination = segments[segments.length - 1].arrivalAirportIata || '';
         departureAt = new Date(segments[0].departureAt);
         arrivalAt = new Date(segments[segments.length - 1].arrivalAt);
-        durationMinutes = Math.max(0, Math.round((arrivalAt.getTime() - departureAt.getTime()) / 60000));
+        durationMinutes = Math.max(
+          0,
+          Math.round((arrivalAt.getTime() - departureAt.getTime()) / 60000),
+        );
         stopCount = Math.max(0, segments.length - 1);
         airline = segments[0].airlineName || '';
-        flightNumber = segments[0].marketingCarrierIata && segments[0].flightNumber
-          ? `${segments[0].marketingCarrierIata} ${segments[0].flightNumber}`
-          : (segments[0].flightNumber || null);
+        flightNumber =
+          segments[0].marketingCarrierIata && segments[0].flightNumber
+            ? `${segments[0].marketingCarrierIata} ${segments[0].flightNumber}`
+            : segments[0].flightNumber || null;
         hasFlightData = true;
       }
     }
@@ -64,7 +68,12 @@ export class BookingAgentProjectionService {
     // 2. Fallback: flightSnapshot JSON
     if (!hasFlightData) {
       const flightSnapshot = booking.flightSnapshot as FlightSnapshot | null;
-      if (flightSnapshot && flightSnapshot.segments && Array.isArray(flightSnapshot.segments) && flightSnapshot.segments.length > 0) {
+      if (
+        flightSnapshot &&
+        flightSnapshot.segments &&
+        Array.isArray(flightSnapshot.segments) &&
+        flightSnapshot.segments.length > 0
+      ) {
         const segments = flightSnapshot.segments;
         const depStr = segments[0].departureAt;
         const arrStr = segments[segments.length - 1].arrivalAt;
@@ -78,12 +87,16 @@ export class BookingAgentProjectionService {
             destination = segments[segments.length - 1].arrivalAirport?.iataCode || '';
             departureAt = parsedDep;
             arrivalAt = parsedArr;
-            durationMinutes = Math.max(0, Math.round((arrivalAt.getTime() - departureAt.getTime()) / 60000));
+            durationMinutes = Math.max(
+              0,
+              Math.round((arrivalAt.getTime() - departureAt.getTime()) / 60000),
+            );
             stopCount = flightSnapshot.stops ?? Math.max(0, segments.length - 1);
             airline = segments[0].airline?.name || '';
-            flightNumber = segments[0].airline?.iataCode && segments[0].flightNumber
-              ? `${segments[0].airline.iataCode} ${segments[0].flightNumber}`
-              : (segments[0].flightNumber || null);
+            flightNumber =
+              segments[0].airline?.iataCode && segments[0].flightNumber
+                ? `${segments[0].airline.iataCode} ${segments[0].flightNumber}`
+                : segments[0].flightNumber || null;
             baggageSummary = flightSnapshot.baggageAllowance || null;
             hasFlightData = true;
           }
@@ -134,7 +147,9 @@ export class BookingAgentProjectionService {
 
     const data = this.extractProjectionData(booking);
     if (!data) {
-      this.logger.warn(`Cannot create/update projection: no flight data found for booking ${bookingId}`);
+      this.logger.warn(
+        `Cannot create/update projection: no flight data found for booking ${bookingId}`,
+      );
       return null;
     }
 

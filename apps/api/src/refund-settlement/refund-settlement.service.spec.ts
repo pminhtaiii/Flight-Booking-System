@@ -143,9 +143,7 @@ describe('RefundSettlementService', () => {
       mockTx.$queryRaw.mockResolvedValue([]);
       mockTx.refund.findUnique.mockResolvedValue(null);
 
-      await expect(service.settleVerifiedOutcome(baseInput)).rejects.toThrow(
-        NotFoundException,
-      );
+      await expect(service.settleVerifiedOutcome(baseInput)).rejects.toThrow(NotFoundException);
     });
 
     it('should throw BadRequestException if amount or currency does not match persisted facts', async () => {
@@ -156,9 +154,9 @@ describe('RefundSettlementService', () => {
         money: { amount: 15000, currency: 'USD' },
       };
 
-      await expect(
-        service.settleVerifiedOutcome(mismatchedAmountInput),
-      ).rejects.toThrow(BadRequestException);
+      await expect(service.settleVerifiedOutcome(mismatchedAmountInput)).rejects.toThrow(
+        BadRequestException,
+      );
 
       expect(warnSpy).toHaveBeenCalledWith({
         message: 'refund_settlement',
@@ -172,9 +170,9 @@ describe('RefundSettlementService', () => {
         money: { amount: 20000, currency: 'EUR' },
       };
 
-      await expect(
-        service.settleVerifiedOutcome(mismatchedCurrencyInput),
-      ).rejects.toThrow(BadRequestException);
+      await expect(service.settleVerifiedOutcome(mismatchedCurrencyInput)).rejects.toThrow(
+        BadRequestException,
+      );
     });
 
     it('should handle single full refund settlement transitioning Payment to REFUNDED and Booking to CANCELLED_AND_REFUNDED', async () => {
@@ -384,8 +382,7 @@ describe('RefundSettlementService', () => {
       mockTx.booking.update.mockClear();
       mockTx.refund.findUnique.mockResolvedValue(multiRefundRow('ref_3', 10000));
       mockTx.refund.findMany.mockImplementation((args) => {
-        if (args.where.paymentId)
-          return [{ amount: 10000 }, { amount: 10000 }, { amount: 10000 }];
+        if (args.where.paymentId) return [{ amount: 10000 }, { amount: 10000 }, { amount: 10000 }];
         if (args.where.cancellationRefundObligationId)
           return [{ amount: 10000 }, { amount: 10000 }, { amount: 10000 }];
         return [];
@@ -458,9 +455,7 @@ describe('RefundSettlementService', () => {
       mockTx.refund.findUnique.mockResolvedValue(baseRefundRow);
       mockTx.ledgerEntry.create.mockRejectedValueOnce(new Error('constraint failure'));
 
-      await expect(service.settleVerifiedOutcome(baseInput)).rejects.toThrow(
-        'constraint failure',
-      );
+      await expect(service.settleVerifiedOutcome(baseInput)).rejects.toThrow('constraint failure');
 
       expect(errorSpy).toHaveBeenCalledWith({
         message: 'refund_ledger_invariant_failure',

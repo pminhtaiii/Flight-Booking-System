@@ -46,10 +46,19 @@ describe('DuffelEventProcessor', () => {
 
   describe('claimEvents', () => {
     it('should query and claim pending and retry-scheduled events', async () => {
-      const pendingEvent = { id: 'evt_1', status: 'PENDING', attempts: 0, processingToken: null } as unknown as DuffelWebhookEvent;
+      const pendingEvent = {
+        id: 'evt_1',
+        status: 'PENDING',
+        attempts: 0,
+        processingToken: null,
+      } as unknown as DuffelWebhookEvent;
       mockPrismaService.duffelWebhookEvent.findMany.mockResolvedValue([pendingEvent]);
       mockPrismaService.duffelWebhookEvent.updateMany.mockResolvedValue({ count: 1 });
-      mockPrismaService.duffelWebhookEvent.findUnique.mockResolvedValue({ ...pendingEvent, status: 'PROCESSING', attempts: 1 });
+      mockPrismaService.duffelWebhookEvent.findUnique.mockResolvedValue({
+        ...pendingEvent,
+        status: 'PROCESSING',
+        attempts: 1,
+      });
 
       const claimed = await processor.claimEvents(5);
       expect(claimed.length).toBe(1);
@@ -65,10 +74,19 @@ describe('DuffelEventProcessor', () => {
     });
 
     it('should claim stale processing events (> 5 minutes old)', async () => {
-      const staleEvent = { id: 'evt_2', status: 'PROCESSING', processingStartedAt: new Date(Date.now() - 6 * 60 * 1000), processingToken: 'old_token', attempts: 1 } as unknown as DuffelWebhookEvent;
+      const staleEvent = {
+        id: 'evt_2',
+        status: 'PROCESSING',
+        processingStartedAt: new Date(Date.now() - 6 * 60 * 1000),
+        processingToken: 'old_token',
+        attempts: 1,
+      } as unknown as DuffelWebhookEvent;
       mockPrismaService.duffelWebhookEvent.findMany.mockResolvedValue([staleEvent]);
       mockPrismaService.duffelWebhookEvent.updateMany.mockResolvedValue({ count: 1 });
-      mockPrismaService.duffelWebhookEvent.findUnique.mockResolvedValue({ ...staleEvent, attempts: 2 });
+      mockPrismaService.duffelWebhookEvent.findUnique.mockResolvedValue({
+        ...staleEvent,
+        attempts: 2,
+      });
 
       const claimed = await processor.claimEvents(5);
       expect(claimed.length).toBe(1);
@@ -78,8 +96,20 @@ describe('DuffelEventProcessor', () => {
 
   describe('processInboxBatch', () => {
     it('should process events independently in a batch', async () => {
-      const event1 = { id: 'evt_1', supplierEventId: 'wev_1', duffelOrderId: 'ord_1', status: 'PROCESSING', attempts: 1 } as unknown as DuffelWebhookEvent;
-      const event2 = { id: 'evt_2', supplierEventId: 'wev_2', duffelOrderId: 'ord_2', status: 'PROCESSING', attempts: 1 } as unknown as DuffelWebhookEvent;
+      const event1 = {
+        id: 'evt_1',
+        supplierEventId: 'wev_1',
+        duffelOrderId: 'ord_1',
+        status: 'PROCESSING',
+        attempts: 1,
+      } as unknown as DuffelWebhookEvent;
+      const event2 = {
+        id: 'evt_2',
+        supplierEventId: 'wev_2',
+        duffelOrderId: 'ord_2',
+        status: 'PROCESSING',
+        attempts: 1,
+      } as unknown as DuffelWebhookEvent;
 
       jest.spyOn(processor, 'claimEvents').mockResolvedValue([
         { event: event1, token: 'token_1' },

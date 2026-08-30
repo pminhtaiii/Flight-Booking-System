@@ -7,4 +7,3 @@ export default defineConfig({
   reporter: 'line',
   projects: [{ name: 'state' }],
 });
-

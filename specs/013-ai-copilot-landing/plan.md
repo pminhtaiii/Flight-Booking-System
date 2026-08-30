@@ -28,7 +28,7 @@ Replace the blank root page with the approved AI Flight Copilot landing experien
 
 ## Constitution Check
 
-*GATE: Passed.*
+_GATE: Passed._
 
 - **Flight-First Architecture**: The page promotes flight travel only and does not add hotels, restaurants, or other trip steps.
 - **Deterministic Transaction Boundary**: AI is described as advisory; no AI participates in a transaction.

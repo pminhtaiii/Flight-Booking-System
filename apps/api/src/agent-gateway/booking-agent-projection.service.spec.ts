@@ -257,7 +257,9 @@ describe('BookingAgentProjectionService', () => {
         },
         bookingAgentProjection: {
           findUnique: jest.fn().mockResolvedValue(null),
-          upsert: jest.fn().mockResolvedValue({ bookingId: 'booking-tx', agentReference: 'bkref_tx' }),
+          upsert: jest
+            .fn()
+            .mockResolvedValue({ bookingId: 'booking-tx', agentReference: 'bkref_tx' }),
         },
       };
 

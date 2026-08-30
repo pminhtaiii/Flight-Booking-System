@@ -24,7 +24,7 @@ describe('ItineraryFingerprint', () => {
     arrivalAt: '2026-10-01T13:30:00-04:00',
     arrivalLocalDate: '2026-10-01',
     durationMinutes: 510,
-    aircraftType: 'Boeing 777'
+    aircraftType: 'Boeing 777',
   };
 
   it('should generate same fingerprint for identical itineraries', () => {
@@ -43,7 +43,7 @@ describe('ItineraryFingerprint', () => {
       departureAirportName: 'Heathrow Airport Terminal 5',
       arrivalAirportName: 'JFK Intl',
       departureCity: 'London City',
-      arrivalCity: 'NYC'
+      arrivalCity: 'NYC',
     };
     const fp2 = generateItineraryFingerprint([alteredSegment]);
     expect(fp1).toBe(fp2);
@@ -52,28 +52,36 @@ describe('ItineraryFingerprint', () => {
   it('should change fingerprint if a canonical field changes', () => {
     const fpBase = generateItineraryFingerprint([baseSegment]);
 
-    const fpTimeChange = generateItineraryFingerprint([{
-      ...baseSegment,
-      departureAt: '2026-10-01T10:05:00+01:00'
-    }]);
+    const fpTimeChange = generateItineraryFingerprint([
+      {
+        ...baseSegment,
+        departureAt: '2026-10-01T10:05:00+01:00',
+      },
+    ]);
     expect(fpBase).not.toBe(fpTimeChange);
 
-    const fpFlightChange = generateItineraryFingerprint([{
-      ...baseSegment,
-      flightNumber: '178'
-    }]);
+    const fpFlightChange = generateItineraryFingerprint([
+      {
+        ...baseSegment,
+        flightNumber: '178',
+      },
+    ]);
     expect(fpBase).not.toBe(fpFlightChange);
 
-    const fpAirportChange = generateItineraryFingerprint([{
-      ...baseSegment,
-      departureAirportIata: 'LGW'
-    }]);
+    const fpAirportChange = generateItineraryFingerprint([
+      {
+        ...baseSegment,
+        departureAirportIata: 'LGW',
+      },
+    ]);
     expect(fpBase).not.toBe(fpAirportChange);
 
-    const fpTerminalChange = generateItineraryFingerprint([{
-      ...baseSegment,
-      departureTerminal: '3'
-    }]);
+    const fpTerminalChange = generateItineraryFingerprint([
+      {
+        ...baseSegment,
+        departureTerminal: '3',
+      },
+    ]);
     expect(fpBase).not.toBe(fpTerminalChange);
   });
 
@@ -101,7 +109,7 @@ describe('ItineraryFingerprint', () => {
       arrivalCity: 'New York',
       arrivalTerminal: '4',
       arrivalAt: '2026-10-01T13:30:00-04:00',
-      aircraftType: 'Boeing 777'
+      aircraftType: 'Boeing 777',
     } as NormalizedSegment;
 
     const fp1 = generateItineraryFingerprint([baseSegment]);
@@ -115,7 +123,7 @@ describe('ItineraryFingerprint', () => {
       globalOrder: 1,
       segmentOrder: 1,
       departureAirportIata: 'JFK',
-      arrivalAirportIata: 'MIA'
+      arrivalAirportIata: 'MIA',
     };
 
     const fpA = generateItineraryFingerprint([baseSegment, segment2]);

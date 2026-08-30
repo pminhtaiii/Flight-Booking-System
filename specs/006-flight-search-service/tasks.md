@@ -18,9 +18,9 @@
 
 **Purpose**: Project initialization and basic structure
 
-- [X] T001 Install `@duffel/api` SDK in `apps/api/package.json`
-- [X] T002 Create types and interfaces in `apps/api/src/duffel/duffel.types.ts`
-- [X] T003 Create Duffel module definition in `apps/api/src/duffel/duffel.module.ts`
+- [x] T001 Install `@duffel/api` SDK in `apps/api/package.json`
+- [x] T002 Create types and interfaces in `apps/api/src/duffel/duffel.types.ts`
+- [x] T003 Create Duffel module definition in `apps/api/src/duffel/duffel.module.ts`
 
 ---
 
@@ -30,12 +30,12 @@
 
 **⚠️ CRITICAL**: No user story work can begin until this phase is complete
 
-- [X] T004 Add `FlightOffer`, `SearchHistory`, and `OfferRecovery` models to `apps/api/prisma/schema.prisma`
-- [X] T005 Run database migration using `npx prisma migrate dev`
-- [X] T006 [P] Implement base client initialization and configuration in `apps/api/src/duffel/duffel.service.ts`
-- [X] T007 [P] Implement Redis-based response caching in `apps/api/src/duffel/duffel.service.ts`
-- [X] T008 [P] Implement API budget tracker with priority thresholds in `apps/api/src/duffel/duffel.service.ts`
-- [X] T009 [P] Implement daily scheduled cleanup cron job in `apps/api/src/duffel/duffel-cleanup.service.ts`
+- [x] T004 Add `FlightOffer`, `SearchHistory`, and `OfferRecovery` models to `apps/api/prisma/schema.prisma`
+- [x] T005 Run database migration using `npx prisma migrate dev`
+- [x] T006 [P] Implement base client initialization and configuration in `apps/api/src/duffel/duffel.service.ts`
+- [x] T007 [P] Implement Redis-based response caching in `apps/api/src/duffel/duffel.service.ts`
+- [x] T008 [P] Implement API budget tracker with priority thresholds in `apps/api/src/duffel/duffel.service.ts`
+- [x] T009 [P] Implement daily scheduled cleanup cron job in `apps/api/src/duffel/duffel-cleanup.service.ts`
 
 **Checkpoint**: Foundation ready - user story implementation can now begin in parallel
 
@@ -102,8 +102,8 @@
 
 ### Implementation for User Story 3
 
-- [X] T028 [US3] Ensure search metadata writing in write-behind logic in `apps/api/src/flights/flights.service.ts`
-- [X] T029 [US3] Integrate search history repository in cron task in `apps/api/src/duffel/duffel-cleanup.service.ts`
+- [x] T028 [US3] Ensure search metadata writing in write-behind logic in `apps/api/src/flights/flights.service.ts`
+- [x] T029 [US3] Integrate search history repository in cron task in `apps/api/src/duffel/duffel-cleanup.service.ts`
 
 **Checkpoint**: All user stories are independently functional and history analytics are captured.
 
@@ -113,10 +113,10 @@
 
 **Purpose**: Security, logging, documentation, and final E2E verification
 
-- [X] T030 [P] Ensure audit logs use opaque ID and omit PII in `apps/api/src/flights/flights.service.ts`
-- [X] T031 Update user guide documentation in `PROJECT.md`
-- [X] T032 Verify all automated unit and E2E tests pass across workspaces
-- [X] T033 Run verification scenarios in `specs/006-flight-search-service/quickstart.md`
+- [x] T030 [P] Ensure audit logs use opaque ID and omit PII in `apps/api/src/flights/flights.service.ts`
+- [x] T031 Update user guide documentation in `PROJECT.md`
+- [x] T032 Verify all automated unit and E2E tests pass across workspaces
+- [x] T033 Run verification scenarios in `specs/006-flight-search-service/quickstart.md`
 
 ---
 

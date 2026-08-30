@@ -38,16 +38,16 @@ X-Agent-API-Key: <secret_value>
 
 ### Configuration
 
-| Env Var                | Set On          | Description                            |
-|------------------------|-----------------|----------------------------------------|
-| `AGENT_SERVICE_API_KEY`| Agent + Gateway | Shared secret (same value on both sides)|
+| Env Var                 | Set On          | Description                              |
+| ----------------------- | --------------- | ---------------------------------------- |
+| `AGENT_SERVICE_API_KEY` | Agent + Gateway | Shared secret (same value on both sides) |
 
 ### Validation Rules
 
-| Check                         | Failure Response                |
-|-------------------------------|--------------------------------|
-| Header missing                | `401 INVALID_API_KEY`          |
-| Value does not match           | `401 INVALID_API_KEY`          |
+| Check                | Failure Response      |
+| -------------------- | --------------------- |
+| Header missing       | `401 INVALID_API_KEY` |
+| Value does not match | `401 INVALID_API_KEY` |
 
 ### Guard Implementation
 
@@ -81,10 +81,10 @@ X-User-Claim: <base64url(payload)>.<base64url(signature)>
 {base64url(payload)}.{base64url(signature)}
 ```
 
-| Segment                    | Content                                           |
-|----------------------------|---------------------------------------------------|
-| `base64url(payload)`       | Base64url-encoded JSON: `{"userId": "uuid", "iat": unix_timestamp}` |
-| `base64url(signature)`     | Base64url-encoded HMAC-SHA256 of the **raw JSON payload string**  |
+| Segment                | Content                                                             |
+| ---------------------- | ------------------------------------------------------------------- |
+| `base64url(payload)`   | Base64url-encoded JSON: `{"userId": "uuid", "iat": unix_timestamp}` |
+| `base64url(signature)` | Base64url-encoded HMAC-SHA256 of the **raw JSON payload string**    |
 
 ### Payload Schema
 
@@ -108,17 +108,17 @@ signature = HMAC-SHA256(payload_json_string, CLAIM_TOKEN_SECRET)
 
 ### Configuration
 
-| Env Var                    | Set On          | Description                                     |
-|----------------------------|-----------------|--------------------------------------------------|
-| `CLAIM_TOKEN_SECRET`       | Agent + Gateway | Shared HMAC signing key (same value on both sides)|
-| `CLAIM_TOKEN_TTL_SECONDS`  | Gateway         | Maximum token age in seconds (default: `300`)     |
+| Env Var                   | Set On          | Description                                        |
+| ------------------------- | --------------- | -------------------------------------------------- |
+| `CLAIM_TOKEN_SECRET`      | Agent + Gateway | Shared HMAC signing key (same value on both sides) |
+| `CLAIM_TOKEN_TTL_SECONDS` | Gateway         | Maximum token age in seconds (default: `300`)      |
 
 ### Example Token Construction
 
 **Step 1 — Build payload**:
 
 ```json
-{"userId":"550e8400-e29b-41d4-a716-446655440000","iat":1751356800}
+{ "userId": "550e8400-e29b-41d4-a716-446655440000", "iat": 1751356800 }
 ```
 
 **Step 2 — Sign payload** (Python):
@@ -152,7 +152,7 @@ eyJ1c2VySWQiOiI1NTBlODQwMC1lMjliLTQxZDQtYTcxNi00NDY2NTU0NDAwMDAiLCJpYXQiOjE3NTEz
 ### Validation Rules
 
 | Check                                    | Failure Response                      |
-|------------------------------------------|---------------------------------------|
+| ---------------------------------------- | ------------------------------------- |
 | Header missing                           | `401 INVALID_CLAIM_TOKEN`             |
 | Cannot split into exactly 2 parts by `.` | `401 INVALID_CLAIM_TOKEN`             |
 | Base64url decode fails                   | `401 INVALID_CLAIM_TOKEN`             |
@@ -201,9 +201,9 @@ ClaimTokenService.validateAndGetUser(userId)
 
 ### Failure Response
 
-| Status | Code             | When                                    |
-|--------|------------------|-----------------------------------------|
-| 403    | `USER_INACTIVE`  | User not found, deleted, or deactivated |
+| Status | Code            | When                                    |
+| ------ | --------------- | --------------------------------------- |
+| 403    | `USER_INACTIVE` | User not found, deleted, or deactivated |
 
 ---
 
@@ -268,23 +268,23 @@ sequenceDiagram
 
 ## Environment Variables Summary
 
-| Variable                   | Required | Default | Set On          | Description                                          |
-|----------------------------|----------|---------|-----------------|------------------------------------------------------|
-| `AGENT_SERVICE_API_KEY`    | ✅       | —       | Agent + Gateway | Shared API key for service-to-service authentication |
-| `CLAIM_TOKEN_SECRET`       | ✅       | —       | Agent + Gateway | Shared HMAC-SHA256 signing key for claim tokens      |
-| `CLAIM_TOKEN_TTL_SECONDS`  | ❌       | `300`   | Gateway         | Maximum claim token age (seconds) before rejection   |
-| `AGENT_MAX_ITERATIONS`     | ❌       | `5`     | Agent           | Max tool-calling iterations per turn (loop cap)      |
+| Variable                  | Required | Default | Set On          | Description                                          |
+| ------------------------- | -------- | ------- | --------------- | ---------------------------------------------------- |
+| `AGENT_SERVICE_API_KEY`   | ✅       | —       | Agent + Gateway | Shared API key for service-to-service authentication |
+| `CLAIM_TOKEN_SECRET`      | ✅       | —       | Agent + Gateway | Shared HMAC-SHA256 signing key for claim tokens      |
+| `CLAIM_TOKEN_TTL_SECONDS` | ❌       | `300`   | Gateway         | Maximum claim token age (seconds) before rejection   |
+| `AGENT_MAX_ITERATIONS`    | ❌       | `5`     | Agent           | Max tool-calling iterations per turn (loop cap)      |
 
 ---
 
 ## Security Properties
 
-| Property                    | How Enforced                                                     |
-|-----------------------------|------------------------------------------------------------------|
-| No JWT forwarding           | Agent mints claim token from JWT payload; JWT stops at FastAPI   |
-| Tamper resistance           | HMAC-SHA256 signature verified on every request                  |
-| Replay window               | TTL-bounded (`CLAIM_TOKEN_TTL_SECONDS`, default 5 minutes)       |
-| No privilege escalation     | Claim token contains only `userId` + `iat` — no roles/permissions|
-| User status freshness       | Database check on every request — not cached in token            |
-| Constant-time comparison    | Both API key and HMAC signature use constant-time comparison     |
-| Scoped data access          | All queries filtered by `userId` from validated claim token      |
+| Property                 | How Enforced                                                      |
+| ------------------------ | ----------------------------------------------------------------- |
+| No JWT forwarding        | Agent mints claim token from JWT payload; JWT stops at FastAPI    |
+| Tamper resistance        | HMAC-SHA256 signature verified on every request                   |
+| Replay window            | TTL-bounded (`CLAIM_TOKEN_TTL_SECONDS`, default 5 minutes)        |
+| No privilege escalation  | Claim token contains only `userId` + `iat` — no roles/permissions |
+| User status freshness    | Database check on every request — not cached in token             |
+| Constant-time comparison | Both API key and HMAC signature use constant-time comparison      |
+| Scoped data access       | All queries filtered by `userId` from validated claim token       |

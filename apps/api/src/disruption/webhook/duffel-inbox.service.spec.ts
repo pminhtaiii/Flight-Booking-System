@@ -32,10 +32,23 @@ describe('DuffelInboxService', () => {
 
   it('should insert a supported event as PENDING', async () => {
     mockPrismaService.duffelWebhookEvent.findUnique.mockResolvedValue(null);
-    mockPrismaService.duffelWebhookEvent.create.mockImplementation(({ data }: { data: Prisma.DuffelWebhookEventCreateInput }) => Promise.resolve({ id: 'uuid-123', ...data }));
+    mockPrismaService.duffelWebhookEvent.create.mockImplementation(
+      ({ data }: { data: Prisma.DuffelWebhookEventCreateInput }) =>
+        Promise.resolve({ id: 'uuid-123', ...data }),
+    );
 
-    const payload = { id: 'wev_1', type: 'order.airline_initiated_change_detected', data: { object: { order_id: 'ord_1' } } };
-    const event = await service.createEvent('wev_1', 'idem_key', 'ord_1', 'order.airline_initiated_change_detected', payload);
+    const payload = {
+      id: 'wev_1',
+      type: 'order.airline_initiated_change_detected',
+      data: { object: { order_id: 'ord_1' } },
+    };
+    const event = await service.createEvent(
+      'wev_1',
+      'idem_key',
+      'ord_1',
+      'order.airline_initiated_change_detected',
+      payload,
+    );
 
     expect(event.supplierEventId).toBe('wev_1');
     expect(event.status).toBe('PENDING');
@@ -52,7 +65,10 @@ describe('DuffelInboxService', () => {
 
   it('should insert an unsupported event as SKIPPED', async () => {
     mockPrismaService.duffelWebhookEvent.findUnique.mockResolvedValue(null);
-    mockPrismaService.duffelWebhookEvent.create.mockImplementation(({ data }: { data: Prisma.DuffelWebhookEventCreateInput }) => Promise.resolve({ id: 'uuid-123', ...data }));
+    mockPrismaService.duffelWebhookEvent.create.mockImplementation(
+      ({ data }: { data: Prisma.DuffelWebhookEventCreateInput }) =>
+        Promise.resolve({ id: 'uuid-123', ...data }),
+    );
 
     const payload = { id: 'wev_2', type: 'unsupported.event' };
     const event = await service.createEvent('wev_2', null, null, 'unsupported.event', payload);
@@ -74,7 +90,13 @@ describe('DuffelInboxService', () => {
     const existing = { id: 'uuid-123', supplierEventId: 'wev_1', status: 'PENDING' };
     mockPrismaService.duffelWebhookEvent.findUnique.mockResolvedValue(existing);
 
-    const event = await service.createEvent('wev_1', 'idem_key', 'ord_1', 'order.airline_initiated_change_detected', {});
+    const event = await service.createEvent(
+      'wev_1',
+      'idem_key',
+      'ord_1',
+      'order.airline_initiated_change_detected',
+      {},
+    );
 
     expect(event).toEqual(existing);
     expect(mockPrismaService.duffelWebhookEvent.create).not.toHaveBeenCalled();
@@ -85,12 +107,21 @@ describe('DuffelInboxService', () => {
       .mockResolvedValueOnce(null)
       .mockResolvedValueOnce({ id: 'uuid-123', supplierEventId: 'wev_1', status: 'PENDING' });
 
-    const error = new Error('Unique constraint violation') as { code?: string; meta?: { target?: string[] } };
+    const error = new Error('Unique constraint violation') as {
+      code?: string;
+      meta?: { target?: string[] };
+    };
     error.code = 'P2002';
     error.meta = { target: ['supplierEventId'] };
     mockPrismaService.duffelWebhookEvent.create.mockRejectedValue(error);
 
-    const event = await service.createEvent('wev_1', 'idem_key', 'ord_1', 'order.airline_initiated_change_detected', {});
+    const event = await service.createEvent(
+      'wev_1',
+      'idem_key',
+      'ord_1',
+      'order.airline_initiated_change_detected',
+      {},
+    );
     expect(event.id).toBe('uuid-123');
     expect(mockPrismaService.duffelWebhookEvent.findUnique).toHaveBeenCalledTimes(2);
   });
@@ -99,7 +130,15 @@ describe('DuffelInboxService', () => {
     mockPrismaService.duffelWebhookEvent.findUnique.mockResolvedValue(null);
     mockPrismaService.duffelWebhookEvent.create.mockRejectedValue(new Error('DB connection lost'));
 
-    await expect(service.createEvent('wev_1', 'idem_key', 'ord_1', 'order.airline_initiated_change_detected', {})).rejects.toThrow(
+    await expect(
+      service.createEvent(
+        'wev_1',
+        'idem_key',
+        'ord_1',
+        'order.airline_initiated_change_detected',
+        {},
+      ),
+    ).rejects.toThrow(
       expect.objectContaining({
         status: HttpStatus.SERVICE_UNAVAILABLE,
         response: expect.objectContaining({ error: 'WEBHOOK_INBOX_UNAVAILABLE' }),

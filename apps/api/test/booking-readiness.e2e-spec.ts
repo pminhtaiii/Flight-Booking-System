@@ -108,33 +108,36 @@ async function bootstrapReadinessApp(featureFlag: 'true' | 'false'): Promise<Boo
 }
 
 async function clearApiState(prisma: PrismaService): Promise<void> {
-    await prisma.chatHandoff.deleteMany({});
-    await prisma.chatSession.deleteMany({});
-    await prisma.paymentEvent.deleteMany({});
-    await prisma.ledgerEntry.deleteMany({});
-    await prisma.refund.deleteMany({});
-    await prisma.cancellationRefundObligation.deleteMany({});
-    await prisma.payment.deleteMany({});
-    await prisma.idempotencyKey.deleteMany({});
-    await prisma.paymentMethod.deleteMany({});
-    await prisma.bookingIntentPassenger.deleteMany({});
-    await prisma.bookingIntent.deleteMany({});
-    await prisma.itineraryRevisionSegment.deleteMany({});
-    await prisma.itineraryRevision.deleteMany({});
-    await prisma.disruptionAuditEvent.deleteMany({});
-    await prisma.notificationOutbox.deleteMany({});
-    await prisma.booking.deleteMany({});
-    await prisma.travelerProfile.deleteMany({});
-    await prisma.offerRecovery.deleteMany({});
-    await prisma.flightOffer.deleteMany({});
-    await prisma.searchHistory.deleteMany({});
-    await prisma.airport.deleteMany({});
-    await prisma.auditLog.deleteMany({});
-    await prisma.user.deleteMany({});
-
+  await prisma.chatHandoff.deleteMany({});
+  await prisma.chatSession.deleteMany({});
+  await prisma.paymentEvent.deleteMany({});
+  await prisma.ledgerEntry.deleteMany({});
+  await prisma.refund.deleteMany({});
+  await prisma.cancellationRefundObligation.deleteMany({});
+  await prisma.payment.deleteMany({});
+  await prisma.idempotencyKey.deleteMany({});
+  await prisma.paymentMethod.deleteMany({});
+  await prisma.bookingIntentPassenger.deleteMany({});
+  await prisma.bookingIntent.deleteMany({});
+  await prisma.itineraryRevisionSegment.deleteMany({});
+  await prisma.itineraryRevision.deleteMany({});
+  await prisma.disruptionAuditEvent.deleteMany({});
+  await prisma.notificationOutbox.deleteMany({});
+  await prisma.booking.deleteMany({});
+  await prisma.travelerProfile.deleteMany({});
+  await prisma.offerRecovery.deleteMany({});
+  await prisma.flightOffer.deleteMany({});
+  await prisma.searchHistory.deleteMany({});
+  await prisma.airport.deleteMany({});
+  await prisma.auditLog.deleteMany({});
+  await prisma.user.deleteMany({});
 }
 
-async function createUser(prisma: PrismaService, jwtService: JwtService, email: string): Promise<AuthUser> {
+async function createUser(
+  prisma: PrismaService,
+  jwtService: JwtService,
+  email: string,
+): Promise<AuthUser> {
   const user = await prisma.user.create({
     data: {
       email,
@@ -150,7 +153,11 @@ async function createUser(prisma: PrismaService, jwtService: JwtService, email: 
   };
 }
 
-async function seedAirport(prisma: PrismaService, iataCode: string, country: string): Promise<void> {
+async function seedAirport(
+  prisma: PrismaService,
+  iataCode: string,
+  country: string,
+): Promise<void> {
   await prisma.airport.create({
     data: {
       iataCode,
@@ -396,11 +403,7 @@ describe('Booking Readiness (E2E RED)', () => {
         .set('Authorization', `Bearer ${user.token}`)
         .set('x-trace-id', 'trace-disabled-red')
         .set('x-correlation-id', 'corr-disabled-red')
-        .send(
-          readinessPayload('11111111-1111-4111-8111-111111111111', [
-            inlinePassenger(),
-          ]),
-        );
+        .send(readinessPayload('11111111-1111-4111-8111-111111111111', [inlinePassenger()]));
 
       expect(response.status).toBe(404);
       expect(response.body).toEqual(
@@ -454,7 +457,9 @@ describe('Booking Readiness (E2E RED)', () => {
       const profile = await seedTravelerProfile(prisma, encryptionService, primaryUser.id);
       const duffelSpy = jest.spyOn((duffelService as any).duffel.offers, 'get');
       const auditCreateLogSpy = jest.spyOn(auditService, 'createLog');
-      const loggerWarnSpy = jest.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
+      const loggerWarnSpy = jest
+        .spyOn(Logger.prototype, 'warn')
+        .mockImplementation(() => undefined);
       const traceId = 'trace-domestic-red';
       const correlationId = 'corr-domestic-red';
 
@@ -732,8 +737,12 @@ describe('Booking Readiness (E2E RED)', () => {
     });
 
     it('maps missing offers, expired offers, and malformed stored offers to safe HTTP outcomes', async () => {
-      const loggerWarnSpy = jest.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
-      const loggerErrorSpy = jest.spyOn(Logger.prototype, 'error').mockImplementation(() => undefined);
+      const loggerWarnSpy = jest
+        .spyOn(Logger.prototype, 'warn')
+        .mockImplementation(() => undefined);
+      const loggerErrorSpy = jest
+        .spyOn(Logger.prototype, 'error')
+        .mockImplementation(() => undefined);
       const traceId = 'trace-error-red';
       const correlationId = 'corr-error-red';
       const missingOfferResponse = await request(app.getHttpServer())
@@ -889,12 +898,15 @@ describe('Booking Readiness (E2E RED)', () => {
       await seedAirport(prisma, 'HAN', 'VN');
       const offer = await seedReadinessOffer(prisma);
       const profile = await seedTravelerProfile(prisma, encryptionService, primaryUser.id);
-      
+
       const session = await prisma.chatSession.create({
         data: { userId: primaryUser.id },
       });
       const validHandoffToken = 'chk_handoff_v1_valid-token-123';
-      const tokenHash = require('crypto').createHash('sha256').update(validHandoffToken).digest('hex');
+      const tokenHash = require('crypto')
+        .createHash('sha256')
+        .update(validHandoffToken)
+        .digest('hex');
       const handoff = await prisma.chatHandoff.create({
         data: {
           userId: primaryUser.id,
@@ -941,7 +953,9 @@ describe('Booking Readiness (E2E RED)', () => {
 
       expect(response.status).toBe(400); // Bad Request from class-validator
       expect(response.body.message).toEqual(
-        expect.arrayContaining([expect.stringContaining('Exactly one of flightOfferId or handoffToken must be provided')])
+        expect.arrayContaining([
+          expect.stringContaining('Exactly one of flightOfferId or handoffToken must be provided'),
+        ]),
       );
     });
 
@@ -998,5 +1012,3 @@ describe('Booking Readiness (E2E RED)', () => {
     });
   });
 });
-
-

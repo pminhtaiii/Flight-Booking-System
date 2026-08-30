@@ -3,10 +3,7 @@ import { cookies } from 'next/headers';
 import { authOptions } from '@/lib/auth';
 import { isSafeHandoffCheckoutPayload } from '@/lib/handoffCheckoutPayload';
 import { expiredHandoffCookieHeader, HANDOFF_COOKIE_NAME } from '@/lib/handoffCookie';
-import {
-  safeHandoffCheckoutOrigin,
-  safeHandoffTraceHeaders,
-} from '@/lib/handoffCheckoutRequest';
+import { safeHandoffCheckoutOrigin, safeHandoffTraceHeaders } from '@/lib/handoffCheckoutRequest';
 
 const TIMEOUT_MS = 10_000;
 
@@ -15,19 +12,32 @@ export async function proxyHandoffCheckout(
   pathname: '/api/bookings/intents/readiness' | '/api/bookings/intents',
 ): Promise<Response> {
   if (!safeHandoffCheckoutOrigin(request)) {
-    return new Response(JSON.stringify({ error: 'Checkout unavailable' }), { status: 403, headers: noStoreJson() });
+    return new Response(JSON.stringify({ error: 'Checkout unavailable' }), {
+      status: 403,
+      headers: noStoreJson(),
+    });
   }
-  const session = await getServerSession(authOptions) as { accessToken?: unknown } | null;
+  const session = (await getServerSession(authOptions)) as { accessToken?: unknown } | null;
   const handoffToken = cookies().get(HANDOFF_COOKIE_NAME)?.value;
   if (!session || typeof session.accessToken !== 'string' || !handoffToken) {
-    return new Response(JSON.stringify({ error: 'Checkout unavailable' }), { status: 401, headers: noStoreJson() });
+    return new Response(JSON.stringify({ error: 'Checkout unavailable' }), {
+      status: 401,
+      headers: noStoreJson(),
+    });
   }
   const body: unknown = await request.json().catch(() => null);
   if (!isSafeHandoffCheckoutPayload(body, pathname)) {
-    return new Response(JSON.stringify({ error: 'Invalid checkout request' }), { status: 400, headers: noStoreJson() });
+    return new Response(JSON.stringify({ error: 'Invalid checkout request' }), {
+      status: 400,
+      headers: noStoreJson(),
+    });
   }
   const apiUrl = process.env.NEXT_PUBLIC_API_URL;
-  if (!apiUrl) return new Response(JSON.stringify({ error: 'Checkout unavailable' }), { status: 503, headers: noStoreJson() });
+  if (!apiUrl)
+    return new Response(JSON.stringify({ error: 'Checkout unavailable' }), {
+      status: 503,
+      headers: noStoreJson(),
+    });
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), TIMEOUT_MS);
   try {
@@ -42,13 +52,19 @@ export async function proxyHandoffCheckout(
       cache: 'no-store',
       signal: controller.signal,
     });
-    const response = new Response(await upstream.text(), { status: upstream.status, headers: noStoreJson() });
+    const response = new Response(await upstream.text(), {
+      status: upstream.status,
+      headers: noStoreJson(),
+    });
     if (pathname === '/api/bookings/intents' && upstream.status === 201) {
       response.headers.append('Set-Cookie', expiredHandoffCookieHeader());
     }
     return response;
   } catch {
-    return new Response(JSON.stringify({ error: 'Checkout unavailable' }), { status: 503, headers: noStoreJson() });
+    return new Response(JSON.stringify({ error: 'Checkout unavailable' }), {
+      status: 503,
+      headers: noStoreJson(),
+    });
   } finally {
     clearTimeout(timeout);
   }

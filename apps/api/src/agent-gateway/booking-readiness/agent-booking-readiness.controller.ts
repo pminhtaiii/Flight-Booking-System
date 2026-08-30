@@ -1,13 +1,4 @@
-import {
-  Body,
-  Controller,
-  Headers,
-  HttpCode,
-  Logger,
-  Post,
-  Req,
-  UseGuards,
-} from '@nestjs/common';
+import { Body, Controller, Headers, HttpCode, Logger, Post, Req, UseGuards } from '@nestjs/common';
 import { Request } from 'express';
 import { AgentApiKeyGuard } from '../auth/agent-api-key.guard';
 import { ClaimTokenGuard } from '../auth/claim-token.guard';
@@ -43,12 +34,7 @@ export class AgentBookingReadinessController {
       const correlationId = headers['x-correlation-id'] || null;
       const userId = req.user.id;
 
-      return await this.readinessService.checkBookingReadiness(
-        userId,
-        dto,
-        traceId,
-        correlationId,
-      );
+      return await this.readinessService.checkBookingReadiness(userId, dto, traceId, correlationId);
     } catch (err: unknown) {
       this.logger.error('Failed to check booking readiness');
       throw err;

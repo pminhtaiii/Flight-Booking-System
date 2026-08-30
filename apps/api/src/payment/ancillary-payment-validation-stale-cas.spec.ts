@@ -13,11 +13,13 @@ describe('AncillaryPaymentValidationService stale CAS', () => {
       total: '53.00',
       validationLeaseToken: null,
       validationLeaseExpiresAt: null,
-      seatSelections: [{
-        serviceId: 'seat-1',
-        intentPassengerId: 'passenger-1',
-        segmentId: 'segment-1',
-      }],
+      seatSelections: [
+        {
+          serviceId: 'seat-1',
+          intentPassengerId: 'passenger-1',
+          segmentId: 'segment-1',
+        },
+      ],
       baggageSelections: [],
     };
     const intent = {
@@ -34,7 +36,8 @@ describe('AncillaryPaymentValidationService stale CAS', () => {
       currentAncillarySelection: selection,
     };
     const bookingIntentUpdate = jest.fn().mockResolvedValue({ count: 1 });
-    const selectionUpdate = jest.fn()
+    const selectionUpdate = jest
+      .fn()
       .mockResolvedValueOnce({ count: 1 })
       .mockResolvedValueOnce({ count: 0 });
     type Transaction = {
@@ -52,7 +55,8 @@ describe('AncillaryPaymentValidationService stale CAS', () => {
     };
     const prisma = {
       $transaction: jest.fn(
-        async (callback: (value: Transaction) => Promise<unknown>): Promise<unknown> => callback(transaction),
+        async (callback: (value: Transaction) => Promise<unknown>): Promise<unknown> =>
+          callback(transaction),
       ),
       ancillarySelection: { updateMany: jest.fn() },
     };
@@ -70,12 +74,14 @@ describe('AncillaryPaymentValidationService stale CAS', () => {
       duffel as unknown as DuffelService,
     );
 
-    await expect(service.validateForPayment({
-      userId: 'user-1',
-      bookingIntentId: 'intent-1',
-      ancillarySelectionId: 'selection-3',
-      ancillarySelectionVersion: 3,
-    })).rejects.toMatchObject({
+    await expect(
+      service.validateForPayment({
+        userId: 'user-1',
+        bookingIntentId: 'intent-1',
+        ancillarySelectionId: 'selection-3',
+        ancillarySelectionVersion: 3,
+      }),
+    ).rejects.toMatchObject({
       response: {
         code: 'ANCILLARY_VERSION_CONFLICT',
         intentId: 'intent-1',

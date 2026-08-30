@@ -77,7 +77,10 @@ test('safeReturnTarget - accepts all allowlisted paths', () => {
   assert.equal(getSafeReturnTarget('/checkout'), '/checkout');
   assert.equal(getSafeReturnTarget('/checkout/passengers'), '/checkout/passengers');
   assert.equal(getSafeReturnTarget('/checkout/intent-123/review'), '/checkout/intent-123/review');
-  assert.equal(getSafeReturnTarget('/checkout/intent-123/ancillaries'), '/checkout/intent-123/ancillaries');
+  assert.equal(
+    getSafeReturnTarget('/checkout/intent-123/ancillaries'),
+    '/checkout/intent-123/ancillaries',
+  );
   assert.equal(getSafeReturnTarget('/prototype/chat'), '/prototype/chat');
 });
 
@@ -87,7 +90,9 @@ test('safeReturnTarget - preserves allowlisted query parameters and strips hash 
     '/checkout/passengers?offerId=off_test_123',
   );
   assert.equal(
-    getSafeReturnTarget('/prototype/chat?sessionId=sess_123&scenario=mock-scenario-1&autoResume=true'),
+    getSafeReturnTarget(
+      '/prototype/chat?sessionId=sess_123&scenario=mock-scenario-1&autoResume=true',
+    ),
     '/prototype/chat?sessionId=sess_123&autoResume=true&scenario=mock-scenario-1',
   );
   assert.equal(

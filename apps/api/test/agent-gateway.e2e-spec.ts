@@ -14,10 +14,7 @@ function mintClaimToken(userId: string, iat: number, secret = 'test-claim-token-
   const payload = { userId, iat };
   const payloadStr = JSON.stringify(payload);
 
-  const signature = crypto
-    .createHmac('sha256', secret)
-    .update(payloadStr)
-    .digest();
+  const signature = crypto.createHmac('sha256', secret).update(payloadStr).digest();
 
   const base64UrlPayload = Buffer.from(payloadStr).toString('base64url');
   const base64UrlSignature = signature.toString('base64url');
@@ -67,7 +64,7 @@ describe('Agent Gateway (E2E)', () => {
         offers: [
           {
             id: 'off_1',
-            total_amount: String(452.00 * (Number(query.adults) || 2)),
+            total_amount: String(452.0 * (Number(query.adults) || 2)),
             total_currency: 'USD',
             slices: [
               {
@@ -90,23 +87,19 @@ describe('Agent Gateway (E2E)', () => {
                       {
                         passenger_id: 'pas_1',
                         cabin_class: 'economy',
-                        baggages: [
-                          { type: 'checked', weight: 23, weight_unit: 'KG' }
-                        ]
-                      }
-                    ]
-                  }
-                ]
-              }
+                        baggages: [{ type: 'checked', weight: 23, weight_unit: 'KG' }],
+                      },
+                    ],
+                  },
+                ],
+              },
             ],
-            passengers: [
-              { id: 'pas_1', type: 'adult' }
-            ],
+            passengers: [{ id: 'pas_1', type: 'adult' }],
             passenger_identity_documents_required: false,
           },
           {
             id: 'off_2',
-            total_amount: String(389.00 * (Number(query.adults) || 2)),
+            total_amount: String(389.0 * (Number(query.adults) || 2)),
             total_currency: 'USD',
             slices: [
               {
@@ -129,23 +122,19 @@ describe('Agent Gateway (E2E)', () => {
                       {
                         passenger_id: 'pas_1',
                         cabin_class: 'economy',
-                        baggages: [
-                          { type: 'checked', weight: 23, weight_unit: 'KG' }
-                        ]
-                      }
-                    ]
-                  }
-                ]
-              }
+                        baggages: [{ type: 'checked', weight: 23, weight_unit: 'KG' }],
+                      },
+                    ],
+                  },
+                ],
+              },
             ],
-            passengers: [
-              { id: 'pas_1', type: 'adult' }
-            ],
+            passengers: [{ id: 'pas_1', type: 'adult' }],
             passenger_identity_documents_required: false,
           },
           {
             id: 'off_3',
-            total_amount: String(520.00 * (Number(query.adults) || 2)),
+            total_amount: String(520.0 * (Number(query.adults) || 2)),
             total_currency: 'USD',
             slices: [
               {
@@ -168,23 +157,19 @@ describe('Agent Gateway (E2E)', () => {
                       {
                         passenger_id: 'pas_1',
                         cabin_class: 'business',
-                        baggages: [
-                          { type: 'checked', weight: 32, weight_unit: 'KG' }
-                        ]
-                      }
-                    ]
-                  }
-                ]
-              }
+                        baggages: [{ type: 'checked', weight: 32, weight_unit: 'KG' }],
+                      },
+                    ],
+                  },
+                ],
+              },
             ],
-            passengers: [
-              { id: 'pas_1', type: 'adult' }
-            ],
+            passengers: [{ id: 'pas_1', type: 'adult' }],
             passenger_identity_documents_required: false,
           },
           {
             id: 'off_4',
-            total_amount: String(199.00 * (Number(query.adults) || 2)),
+            total_amount: String(199.0 * (Number(query.adults) || 2)),
             total_currency: 'USD',
             slices: [
               {
@@ -207,23 +192,19 @@ describe('Agent Gateway (E2E)', () => {
                       {
                         passenger_id: 'pas_1',
                         cabin_class: 'economy',
-                        baggages: [
-                          { type: 'checked', quantity: 0 }
-                        ]
-                      }
-                    ]
-                  }
-                ]
-              }
+                        baggages: [{ type: 'checked', quantity: 0 }],
+                      },
+                    ],
+                  },
+                ],
+              },
             ],
-            passengers: [
-              { id: 'pas_1', type: 'adult' }
-            ],
+            passengers: [{ id: 'pas_1', type: 'adult' }],
             passenger_identity_documents_required: false,
           },
           {
             id: 'off_5',
-            total_amount: String(610.00 * (Number(query.adults) || 2)),
+            total_amount: String(610.0 * (Number(query.adults) || 2)),
             total_currency: 'USD',
             slices: [
               {
@@ -246,23 +227,19 @@ describe('Agent Gateway (E2E)', () => {
                       {
                         passenger_id: 'pas_1',
                         cabin_class: 'premium_economy',
-                        baggages: [
-                          { type: 'checked', weight: 30, weight_unit: 'KG' }
-                        ]
-                      }
-                    ]
-                  }
-                ]
-              }
+                        baggages: [{ type: 'checked', weight: 30, weight_unit: 'KG' }],
+                      },
+                    ],
+                  },
+                ],
+              },
             ],
-            passengers: [
-              { id: 'pas_1', type: 'adult' }
-            ],
+            passengers: [{ id: 'pas_1', type: 'adult' }],
             passenger_identity_documents_required: false,
-          }
+          },
         ],
         slices: [],
-        passengers: []
+        passengers: [],
       } as unknown as DuffelOfferRequest;
 
       return {
@@ -302,7 +279,6 @@ describe('Agent Gateway (E2E)', () => {
     await prisma.airport.deleteMany({});
     await prisma.auditLog.deleteMany({});
     await prisma.user.deleteMany({});
-
   });
 
   describe('Authentication and Security (Layer 1 & 2)', () => {
@@ -520,9 +496,9 @@ describe('Agent Gateway (E2E)', () => {
           departureDate: new Date('2027-07-15T00:00:00Z'),
           adults: 1,
           cabinClass: 'economy',
-          price: 1250.00,
+          price: 1250.0,
           currency: 'USD',
-        }
+        },
       });
       const intent = await prisma.bookingIntent.create({
         data: {
@@ -530,16 +506,16 @@ describe('Agent Gateway (E2E)', () => {
           flightOfferId: flightOffer.id,
           duffelOfferId: 'off_123',
           status: 'CONFIRMED',
-          originalPrice: 1250.00,
-          confirmedPrice: 1250.00,
+          originalPrice: 1250.0,
+          confirmedPrice: 1250.0,
           pricedAt: new Date(),
           origin: 'HAN',
           destination: 'NRT',
           departureDate: new Date('2027-07-15T00:00:00Z'),
           adults: 1,
           rawOfferSnapshot: {},
-          intentExpiresAt: new Date(Date.now() + 100000)
-        }
+          intentExpiresAt: new Date(Date.now() + 100000),
+        },
       });
 
       await prisma.booking.create({
@@ -548,22 +524,24 @@ describe('Agent Gateway (E2E)', () => {
           bookingIntentId: intent.id,
           pnrReference: 'PNR_SECRET_123', // PII
           status: 'CONFIRMED',
-          totalAmount: 1250.00,
+          totalAmount: 1250.0,
           currency: 'USD',
           departureAt: new Date('2027-07-15T08:30:00Z'),
           flightSnapshot: {
-            segments: [{
-              airline: { iataCode: 'VN' },
-              flightNumber: 'VN310',
-              departureAirport: { iataCode: 'HAN' },
-              arrivalAirport: { iataCode: 'NRT' },
-              departureAt: '2027-07-15T08:30:00.000Z',
-              arrivalAt: '2027-07-15T15:00:00.000Z'
-            }],
+            segments: [
+              {
+                airline: { iataCode: 'VN' },
+                flightNumber: 'VN310',
+                departureAirport: { iataCode: 'HAN' },
+                arrivalAirport: { iataCode: 'NRT' },
+                departureAt: '2027-07-15T08:30:00.000Z',
+                arrivalAt: '2027-07-15T15:00:00.000Z',
+              },
+            ],
             totalDuration: 'PT5H30M',
             stops: 0,
             fareClass: 'Business',
-            baggageAllowance: '32kg checked'
+            baggageAllowance: '32kg checked',
           },
           passengerSnapshot: {
             passengers: [
@@ -571,10 +549,10 @@ describe('Agent Gateway (E2E)', () => {
                 id: 'passenger-1',
                 type: 'ADULT',
                 position: 1,
-                baggage: [{ type: 'CHECKED', quantity: 1, unit: 'KG', weight: 32 }]
-              }
-            ]
-          }
+                baggage: [{ type: 'CHECKED', quantity: 1, unit: 'KG', weight: 32 }],
+              },
+            ],
+          },
         },
       });
 
@@ -599,7 +577,7 @@ describe('Agent Gateway (E2E)', () => {
       expect(booking.duration).toBe(330);
       expect(booking.stops).toBe(0);
       expect(booking.fareClass).toBe('Business');
-      expect(booking.price).toBe(1250.00);
+      expect(booking.price).toBe(1250.0);
       expect(booking.currency).toBe('USD');
       expect(booking.passengers).toBe(1);
       expect(booking.baggageAllowance).toBe('32kg checked');
@@ -672,7 +650,7 @@ describe('Agent Gateway (E2E)', () => {
       expect(firstResult.arrivalTime).toBe('2027-07-15T15:00:00');
       expect(firstResult.duration).toBe(330);
       expect(firstResult.stops).toBe(0);
-      expect(firstResult.price).toBe(452.00 * 2);
+      expect(firstResult.price).toBe(452.0 * 2);
       expect(firstResult.currency).toBe('USD');
       expect(firstResult.fareClass).toBe('Economy');
       expect(firstResult.baggageAllowance).toBe('23kg checked');
@@ -788,7 +766,9 @@ describe('Agent Gateway (E2E)', () => {
         .set('X-User-Claim', token)
         .expect(400);
 
-      expect(res.body.message).toContain('I can currently only search economy class for adult passengers');
+      expect(res.body.message).toContain(
+        'I can currently only search economy class for adult passengers',
+      );
 
       // Verify audit log has AGENT_KEYWORD_TRIGGER
       const logs = await prisma.auditLog.findMany({
@@ -838,7 +818,9 @@ describe('Agent Gateway (E2E)', () => {
         .set('X-User-Claim', token)
         .expect(400);
 
-      expect(res.body.message).toContain('I can currently only search economy class for adult passengers');
+      expect(res.body.message).toContain(
+        'I can currently only search economy class for adult passengers',
+      );
 
       // Verify audit log has AGENT_KEYWORD_TRIGGER
       const logs = await prisma.auditLog.findMany({
@@ -862,13 +844,15 @@ describe('Agent Gateway (E2E)', () => {
 
     it('should successfully search using passengers query param instead of adults (backward compatibility)', async () => {
       const res = await request(app.getHttpServer())
-        .get('/agent-gateway/flights/search?origin=HAN&destination=NRT&date=2027-07-15&passengers=3')
+        .get(
+          '/agent-gateway/flights/search?origin=HAN&destination=NRT&date=2027-07-15&passengers=3',
+        )
         .set('X-Agent-API-Key', apiKey)
         .set('X-User-Claim', token)
         .expect(200);
 
       expect(res.body.results.length).toBe(5);
-      expect(res.body.results[0].price).toBe(452.00 * 3);
+      expect(res.body.results[0].price).toBe(452.0 * 3);
     });
   });
 
@@ -896,7 +880,7 @@ describe('Agent Gateway (E2E)', () => {
         .set('X-Agent-API-Key', apiKey)
         .set('X-User-Claim', token)
         .send({
-          passengers: [{ passengerType: 'ADULT', passengerOrdinal: 1, sourceType: 'inline' }]
+          passengers: [{ passengerType: 'ADULT', passengerOrdinal: 1, sourceType: 'inline' }],
         })
         .expect(400);
       expect(res.body.message).toContain('flightOfferId must be a UUID');
@@ -909,7 +893,7 @@ describe('Agent Gateway (E2E)', () => {
         .set('X-User-Claim', token)
         .send({
           flightOfferId: crypto.randomUUID(),
-          passengers: [{ passengerOrdinal: 1, sourceType: 'inline' }]
+          passengers: [{ passengerOrdinal: 1, sourceType: 'inline' }],
         })
         .expect(400);
     });
@@ -930,16 +914,20 @@ describe('Agent Gateway (E2E)', () => {
         .set('X-User-Claim', token)
         .send({
           flightOfferId: crypto.randomUUID(),
-          passengers: [{
-            passengerType: 'ADULT',
-            passengerOrdinal: 1,
-            sourceType: 'inline',
-            ...piiValues,
-          }]
+          passengers: [
+            {
+              passengerType: 'ADULT',
+              passengerOrdinal: 1,
+              sourceType: 'inline',
+              ...piiValues,
+            },
+          ],
         })
         .expect(400);
 
-      expect(res.body.message).toEqual(expect.arrayContaining([expect.stringContaining('should not exist')]));
+      expect(res.body.message).toEqual(
+        expect.arrayContaining([expect.stringContaining('should not exist')]),
+      );
       const serialized = JSON.stringify(res.body);
       for (const value of Object.values(piiValues)) {
         expect(serialized).not.toContain(value);
@@ -963,7 +951,9 @@ describe('Agent Gateway (E2E)', () => {
         .set('X-User-Claim', newToken)
         .send({
           flightOfferId: offerId,
-          passengers: [{ passengerType: 'ADULT', passengerOrdinal: 1, sourceType: 'traveler_profile' }]
+          passengers: [
+            { passengerType: 'ADULT', passengerOrdinal: 1, sourceType: 'traveler_profile' },
+          ],
         })
         .expect(404);
 
@@ -1202,7 +1192,7 @@ describe('Agent Gateway (E2E)', () => {
       expect(firstResult.arrivalTime).toBe('2027-07-15T15:00:00');
       expect(firstResult.duration).toBe(330);
       expect(firstResult.stops).toBe(0);
-      expect(firstResult.price).toBe(452.00);
+      expect(firstResult.price).toBe(452.0);
       expect(firstResult.currency).toBe('USD');
       expect(firstResult.fareClass).toBe('Economy');
       expect(firstResult.baggageAllowance).toBe('23kg checked');
@@ -1244,7 +1234,7 @@ describe('Agent Gateway (E2E)', () => {
       expect(res.body.results.length).toBeGreaterThan(0);
       expect(res.body.results[0].flightOfferId).toBeDefined();
       expect(res.body.results[0].duffelOfferId).toBeDefined();
-      expect(res.body.results[0].price).toBe(452.00 * 2);
+      expect(res.body.results[0].price).toBe(452.0 * 2);
     });
 
     it('legacy GET /flights/search should remain completely unenriched', async () => {
@@ -1268,7 +1258,7 @@ describe('Agent Gateway (E2E)', () => {
       expect(results[0].flightNumber).toBe('VN310');
       expect(results[0].departureAirport).toBe('HAN');
       expect(results[0].arrivalAirport).toBe('NRT');
-      expect(results[0].price).toBe(452.00);
+      expect(results[0].price).toBe(452.0);
     });
   });
 
@@ -1609,6 +1599,3 @@ describe('Agent Gateway (E2E)', () => {
     });
   });
 });
-
-
-

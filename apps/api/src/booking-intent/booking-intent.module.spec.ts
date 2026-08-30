@@ -7,7 +7,10 @@ import { BookingPassengerFinalValidatorService } from './booking-passenger-final
 
 describe('BookingIntentModule Phase 7 and Phase 11 providers', () => {
   it('registers and exports source resolver, snapshot builder, and final validator without replacing intent orchestration', () => {
-    const providers = Reflect.getMetadata(MODULE_METADATA.PROVIDERS, BookingIntentModule) as unknown[];
+    const providers = Reflect.getMetadata(
+      MODULE_METADATA.PROVIDERS,
+      BookingIntentModule,
+    ) as unknown[];
     const exports = Reflect.getMetadata(MODULE_METADATA.EXPORTS, BookingIntentModule) as unknown[];
 
     expect(providers).toEqual(

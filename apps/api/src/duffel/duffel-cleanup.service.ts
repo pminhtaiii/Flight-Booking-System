@@ -18,7 +18,10 @@ export class DuffelCleanupService {
       };
 
       const flightRetentionDays = parseRetentionDays(process.env.FLIGHT_OFFERS_RETENTION_DAYS, 7);
-      const recoveryRetentionDays = parseRetentionDays(process.env.OFFER_RECOVERY_RETENTION_DAYS, 30);
+      const recoveryRetentionDays = parseRetentionDays(
+        process.env.OFFER_RECOVERY_RETENTION_DAYS,
+        30,
+      );
 
       const now = new Date();
 
@@ -48,7 +51,7 @@ export class DuffelCleanupService {
       const searchHistoryCount = await this.prisma.searchHistory.count();
 
       this.logger.log(
-        `Cleanup complete. Purged ${deletedOffers.count} expired flight offers (older than ${flightRetentionDays} days) and ${deletedRecoveries.count} expired offer recoveries (older than ${recoveryRetentionDays} days). Preserved ${searchHistoryCount} search history entries indefinitely.`
+        `Cleanup complete. Purged ${deletedOffers.count} expired flight offers (older than ${flightRetentionDays} days) and ${deletedRecoveries.count} expired offer recoveries (older than ${recoveryRetentionDays} days). Preserved ${searchHistoryCount} search history entries indefinitely.`,
       );
     } catch (error) {
       this.logger.error('Error occurred during daily cleanup execution:', error);

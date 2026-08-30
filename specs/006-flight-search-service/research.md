@@ -11,6 +11,7 @@
 **Rationale**: Amadeus Self-Service is no longer available for non-enterprise developers. Duffel offers: self-serve signup with sandbox access, an official TypeScript SDK (`@duffel/api`), simpler Bearer token auth (no OAuth2 refresh), a richer data model (slices → segments), and pay-as-you-go pricing (1500:1 search-to-book ratio instead of a hard monthly cap).
 
 **Alternatives considered**:
+
 - Stay on Amadeus → not viable, API access restricted to enterprise contracts.
 - Kiwi.com Tequila API → less mature SDK, weaker data model, complex pricing.
 - Skyscanner API → deprecated self-serve program.
@@ -56,6 +57,7 @@
 **Rationale**: Duffel natively supports multi-slice journeys in a single API call. No need for separate one-way searches or special query parameters.
 
 **Implementation detail**: The `searchFlights()` method builds a `slices` array:
+
 - One-way: `[{ origin, destination, departure_date }]`
 - Round-trip: `[{ origin, destination, departure_date }, { origin: destination, destination: origin, departure_date: returnDate }]`
 
@@ -91,7 +93,8 @@ Each offer in the response contains matching slices with segments.
 
 **Rationale**: The SDK provides full TypeScript types, handles request/response serialization, and simplifies pagination. Unlike Amadeus (which had no official SDK), Duffel's SDK is maintained and well-typed.
 
-**Implementation detail**: 
+**Implementation detail**:
+
 ```typescript
 import { Duffel } from '@duffel/api';
 

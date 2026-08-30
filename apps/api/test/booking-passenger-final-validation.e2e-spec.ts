@@ -135,14 +135,16 @@ describe('Booking Passenger Final Validation (E2E) - Task T068', () => {
     jest.restoreAllMocks();
   });
 
-  async function createFlightOffer(options: {
-    origin?: string;
-    destination?: string;
-    originCountry?: string;
-    destCountry?: string;
-    departingAt?: string;
-    arrivingAt?: string;
-  } = {}) {
+  async function createFlightOffer(
+    options: {
+      origin?: string;
+      destination?: string;
+      originCountry?: string;
+      destCountry?: string;
+      departingAt?: string;
+      arrivingAt?: string;
+    } = {},
+  ) {
     const origin = options.origin ?? 'SGN';
     const destination = options.destination ?? 'HAN';
     const originCountry = options.originCountry ?? 'VN';
@@ -162,8 +164,16 @@ describe('Booking Passenger Final Validation (E2E) - Task T068', () => {
             {
               segments: [
                 {
-                  origin: { iata_code: origin, iata_country_code: originCountry, countryCode: originCountry },
-                  destination: { iata_code: destination, iata_country_code: destCountry, countryCode: destCountry },
+                  origin: {
+                    iata_code: origin,
+                    iata_country_code: originCountry,
+                    countryCode: originCountry,
+                  },
+                  destination: {
+                    iata_code: destination,
+                    iata_country_code: destCountry,
+                    countryCode: destCountry,
+                  },
                   departing_at: departingAt,
                   arriving_at: arrivingAt,
                   operating_carrier: { iata_code: 'VN' },
@@ -318,9 +328,7 @@ describe('Booking Passenger Final Validation (E2E) - Task T068', () => {
         id: `ord_${crypto.randomUUID()}`,
         booking_reference: 'DOM123',
         slices: (flightOffer.rawOffer as any).slices,
-        passengers: [
-          { id: 'pas_duffel_1', given_name: 'Grace', family_name: 'Hopper' },
-        ],
+        passengers: [{ id: 'pas_duffel_1', given_name: 'Grace', family_name: 'Hopper' }],
       } as any);
 
       // Step 1: Create Payment
@@ -443,17 +451,17 @@ describe('Booking Passenger Final Validation (E2E) - Task T068', () => {
       mockStripeServices(stripePiId);
 
       let passedDuffelPassengers: any = null;
-      const duffelCreateOrderSpy = jest.spyOn(duffelService, 'createOrder').mockImplementation(async (...args: any[]) => {
-        passedDuffelPassengers = args[1];
-        return {
-          id: `ord_${crypto.randomUUID()}`,
-          booking_reference: 'INTL123',
-          slices: (flightOffer.rawOffer as any).slices,
-          passengers: [
-            { id: 'pas_duffel_1', given_name: 'Ada', family_name: 'Lovelace' },
-          ],
-        } as any;
-      });
+      const duffelCreateOrderSpy = jest
+        .spyOn(duffelService, 'createOrder')
+        .mockImplementation(async (...args: any[]) => {
+          passedDuffelPassengers = args[1];
+          return {
+            id: `ord_${crypto.randomUUID()}`,
+            booking_reference: 'INTL123',
+            slices: (flightOffer.rawOffer as any).slices,
+            passengers: [{ id: 'pas_duffel_1', given_name: 'Ada', family_name: 'Lovelace' }],
+          } as any;
+        });
 
       // Step 1: Create Payment
       const createRes = await request(app.getHttpServer())
@@ -652,7 +660,8 @@ describe('Booking Passenger Final Validation (E2E) - Task T068', () => {
 
       const intentId = crypto.randomUUID();
       // Corrupted / malformed ciphertext
-      const tamperedCiphertext = 'v1:0123456789abcdef01234567:0123456789abcdef0123456789abcdef:baddeadbeefcafebabe';
+      const tamperedCiphertext =
+        'v1:0123456789abcdef01234567:0123456789abcdef0123456789abcdef:baddeadbeefcafebabe';
 
       const intent = await createBookingIntentWithPassengers(
         flightOffer,

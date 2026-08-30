@@ -39,8 +39,7 @@ function assertDisposableDatabase(): void {
   const databaseUrl = process.env.DATABASE_URL;
   if (
     !databaseUrl ||
-    (!/(test|e2e|flight_booking)/i.test(databaseUrl) &&
-      process.env.NODE_ENV !== 'test')
+    (!/(test|e2e|flight_booking)/i.test(databaseUrl) && process.env.NODE_ENV !== 'test')
   ) {
     throw new Error(
       'This migration E2E temporarily changes schema and may only run against an explicitly named disposable test/e2e database.',
@@ -495,12 +494,16 @@ describe('CancellationRefundObligation Migration & Backfill (E2E)', () => {
       `);
       expect(postTableCheck[0].exists).toBe(true);
 
-      const legacyRefundRow = await prisma.$queryRawUnsafe<Array<{ id: string; cancellationRefundObligationId: string | null }>>(`
+      const legacyRefundRow = await prisma.$queryRawUnsafe<
+        Array<{ id: string; cancellationRefundObligationId: string | null }>
+      >(`
         SELECT id, "cancellationRefundObligationId" FROM "refunds" WHERE id = '${legacyRefundId}';
       `);
       expect(legacyRefundRow[0].cancellationRefundObligationId).toBeNull();
 
-      const legacyLedgerRows = await prisma.$queryRawUnsafe<Array<{ id: string; refundTransactionId: string | null }>>(`
+      const legacyLedgerRows = await prisma.$queryRawUnsafe<
+        Array<{ id: string; refundTransactionId: string | null }>
+      >(`
         SELECT id, "refundTransactionId" FROM "ledger_entries" WHERE "paymentId" = '${legacyPaymentId}';
       `);
       expect(legacyLedgerRows.length).toBe(4);
@@ -554,9 +557,7 @@ describe('CancellationRefundObligation Migration & Backfill (E2E)', () => {
       ).rejects.toThrow();
 
       // Foreign key RESTRICT: cannot delete Payment when referenced by CancellationRefundObligation
-      await expect(
-        prisma.payment.delete({ where: { id: legacyPaymentId } }),
-      ).rejects.toThrow();
+      await expect(prisma.payment.delete({ where: { id: legacyPaymentId } })).rejects.toThrow();
 
       // Foreign key CASCADE: deleting Booking cascades to CancellationRefundObligation
       await prisma.booking.delete({ where: { id: legacyBookingId } });
@@ -634,7 +635,9 @@ describe('CancellationRefundObligation Migration & Backfill (E2E)', () => {
         include: { refunds: true },
       });
       expect(fetchedObligation?.refunds.length).toBe(2);
-      expect(fetchedObligation?.refunds.map((r) => r.id).sort()).toEqual([refund1.id, refund2.id].sort());
+      expect(fetchedObligation?.refunds.map((r) => r.id).sort()).toEqual(
+        [refund1.id, refund2.id].sort(),
+      );
 
       // 3. Link LedgerEntry records to Refund via refundTransactionId
       const txId1 = `tx_${crypto.randomUUID()}`;

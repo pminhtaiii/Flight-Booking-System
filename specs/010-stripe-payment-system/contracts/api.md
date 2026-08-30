@@ -21,6 +21,7 @@ Create a new payment (Stripe PaymentIntent) for a BookingIntent. This is the ent
 ```
 
 **Headers**:
+
 - `Authorization: Bearer <JWT>`
 - `Idempotency-Key: <client-generated-uuid>` (required)
 
@@ -40,14 +41,14 @@ Create a new payment (Stripe PaymentIntent) for a BookingIntent. This is the ent
 
 ### Error Responses
 
-| Status | Condition |
-|--------|-----------|
-| 400 | Invalid bookingIntentId or missing idempotency key |
-| 403 | BookingIntent belongs to another user |
-| 409 | BookingIntent already has an active payment in progress (pessimistic lock conflict) |
-| 410 | BookingIntent expired |
-| 422 | Idempotency key reused with different request hash |
-| 429 | Payment attempts exhausted (max 2) — BookingIntent transitions to PAYMENT_EXHAUSTED |
+| Status | Condition                                                                           |
+| ------ | ----------------------------------------------------------------------------------- |
+| 400    | Invalid bookingIntentId or missing idempotency key                                  |
+| 403    | BookingIntent belongs to another user                                               |
+| 409    | BookingIntent already has an active payment in progress (pessimistic lock conflict) |
+| 410    | BookingIntent expired                                                               |
+| 422    | Idempotency key reused with different request hash                                  |
+| 429    | Payment attempts exhausted (max 2) — BookingIntent transitions to PAYMENT_EXHAUSTED |
 
 ---
 
@@ -64,6 +65,7 @@ Confirm the payment after Stripe client-side authentication (3DS). Triggers the 
 ```
 
 **Headers**:
+
 - `Authorization: Bearer <JWT>`
 - `Idempotency-Key: <distinct-confirm-key>` (required — distinct from create operation's key)
 
@@ -91,13 +93,13 @@ Confirm the payment after Stripe client-side authentication (3DS). Triggers the 
 
 ### Error Responses
 
-| Status | Condition |
-|--------|-----------|
-| 400 | Invalid paymentId |
-| 402 | Card declined / authorization failed → Payment transitions to FAILED |
-| 403 | Payment belongs to another user |
-| 409 | Version conflict (concurrent modification detected) |
-| 502 | Confirmed Duffel failure — authorization voided, Payment transitions to CANCELLED. (Ambiguous Duffel timeouts preserve authorization for later reconciliation.) |
+| Status | Condition                                                                                                                                                       |
+| ------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 400    | Invalid paymentId                                                                                                                                               |
+| 402    | Card declined / authorization failed → Payment transitions to FAILED                                                                                            |
+| 403    | Payment belongs to another user                                                                                                                                 |
+| 409    | Version conflict (concurrent modification detected)                                                                                                             |
+| 502    | Confirmed Duffel failure — authorization voided, Payment transitions to CANCELLED. (Ambiguous Duffel timeouts preserve authorization for later reconciliation.) |
 
 ---
 
@@ -131,15 +133,15 @@ Raw body with `Stripe-Signature` header. Not JWT-guarded — verified via Stripe
 
 ### Handled Events
 
-| Event | Action |
-|-------|--------|
-| `payment_intent.created` | Update Payment → CREATED (if not already) |
-| `payment_intent.succeeded` | Route through idempotent finalization/reconciliation path (coordinate Duffel, ledger, BookingIntent) before committing SUCCEEDED status |
-| `payment_intent.payment_failed` | Update Payment → FAILED |
-| `payment_intent.canceled` | Update Payment → CANCELLED |
-| `charge.refunded` | Update Payment → REFUNDED or PARTIALLY_REFUNDED |
-| `charge.dispute.created` | Update Payment → DISPUTED, store pre_dispute_status |
-| `charge.dispute.closed` | Update Payment → pre_dispute_status (won) or CHARGEBACK_LOST (lost) |
+| Event                           | Action                                                                                                                                  |
+| ------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| `payment_intent.created`        | Update Payment → CREATED (if not already)                                                                                               |
+| `payment_intent.succeeded`      | Route through idempotent finalization/reconciliation path (coordinate Duffel, ledger, BookingIntent) before committing SUCCEEDED status |
+| `payment_intent.payment_failed` | Update Payment → FAILED                                                                                                                 |
+| `payment_intent.canceled`       | Update Payment → CANCELLED                                                                                                              |
+| `charge.refunded`               | Update Payment → REFUNDED or PARTIALLY_REFUNDED                                                                                         |
+| `charge.dispute.created`        | Update Payment → DISPUTED, store pre_dispute_status                                                                                     |
+| `charge.dispute.closed`         | Update Payment → pre_dispute_status (won) or CHARGEBACK_LOST (lost)                                                                     |
 
 ### Response
 
@@ -161,6 +163,7 @@ Initiate a refund (admin-triggered).
 ```
 
 **Headers**:
+
 - `Authorization: Bearer <JWT>` (admin role required)
 - `Idempotency-Key: <uuid>` (required)
 
@@ -179,12 +182,12 @@ Initiate a refund (admin-triggered).
 
 ### Error Responses
 
-| Status | Condition |
-|--------|-----------|
-| 400 | Invalid amount (exceeds remaining refundable amount) |
-| 403 | Not admin / not authorized |
-| 409 | Refund already in progress for this payment |
-| 422 | Payment not in a refundable state (must be SUCCEEDED or PARTIALLY_REFUNDED) |
+| Status | Condition                                                                   |
+| ------ | --------------------------------------------------------------------------- |
+| 400    | Invalid amount (exceeds remaining refundable amount)                        |
+| 403    | Not admin / not authorized                                                  |
+| 409    | Refund already in progress for this payment                                 |
+| 422    | Payment not in a refundable state (must be SUCCEEDED or PARTIALLY_REFUNDED) |
 
 ---
 
@@ -219,7 +222,7 @@ Remove a saved payment method.
 
 ### Error Responses
 
-| Status | Condition |
-|--------|-----------|
-| 403 | Payment method belongs to another user |
-| 404 | Payment method not found |
+| Status | Condition                              |
+| ------ | -------------------------------------- |
+| 403    | Payment method belongs to another user |
+| 404    | Payment method not found               |

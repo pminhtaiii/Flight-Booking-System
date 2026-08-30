@@ -60,7 +60,7 @@ describe('PaymentService ancillary snapshot binding', () => {
           {
             currentAncillarySelectionId: 'selection-3',
             ancillaryVersion: 3,
-          }
+          },
         ]),
       $executeRaw: jest.fn().mockResolvedValue(1),
       ancillarySelection: {
@@ -82,7 +82,18 @@ describe('PaymentService ancillary snapshot binding', () => {
     };
     const prisma = {
       bookingIntent: {
-        findUnique: jest.fn().mockResolvedValue({ id: 'intent-1', status: 'PENDING', paymentAttemptCount: 0, confirmedPrice: '100.00', currency: 'USD', userId: 'user-1', currentAncillarySelectionId: 'selection-3', ancillaryVersion: 3 }),
+        findUnique: jest
+          .fn()
+          .mockResolvedValue({
+            id: 'intent-1',
+            status: 'PENDING',
+            paymentAttemptCount: 0,
+            confirmedPrice: '100.00',
+            currency: 'USD',
+            userId: 'user-1',
+            currentAncillarySelectionId: 'selection-3',
+            ancillaryVersion: 3,
+          }),
       },
       $transaction: jest.fn().mockImplementation(async (callback) => callback(transaction)),
       user: {
@@ -210,7 +221,18 @@ describe('PaymentService ancillary snapshot binding', () => {
     };
     const prisma = {
       bookingIntent: {
-        findUnique: jest.fn().mockResolvedValue({ id: 'intent-1', status: 'PENDING', paymentAttemptCount: 0, confirmedPrice: '100.00', currency: 'USD', userId: 'user-1', currentAncillarySelectionId: 'selection-3', ancillaryVersion: 3 }),
+        findUnique: jest
+          .fn()
+          .mockResolvedValue({
+            id: 'intent-1',
+            status: 'PENDING',
+            paymentAttemptCount: 0,
+            confirmedPrice: '100.00',
+            currency: 'USD',
+            userId: 'user-1',
+            currentAncillarySelectionId: 'selection-3',
+            ancillaryVersion: 3,
+          }),
       },
       $transaction: jest.fn().mockImplementation(async (callback) => callback(transaction)),
     };
@@ -264,7 +286,18 @@ describe('PaymentService ancillary snapshot binding', () => {
   it('replays a completed bound payment without revalidating the immutable snapshot', async () => {
     const prisma = {
       bookingIntent: {
-        findUnique: jest.fn().mockResolvedValue({ id: 'intent-1', status: 'PENDING', paymentAttemptCount: 0, confirmedPrice: '100.00', currency: 'USD', userId: 'user-1', currentAncillarySelectionId: 'selection-3', ancillaryVersion: 3 }),
+        findUnique: jest
+          .fn()
+          .mockResolvedValue({
+            id: 'intent-1',
+            status: 'PENDING',
+            paymentAttemptCount: 0,
+            confirmedPrice: '100.00',
+            currency: 'USD',
+            userId: 'user-1',
+            currentAncillarySelectionId: 'selection-3',
+            ancillaryVersion: 3,
+          }),
       },
       payment: {
         findFirst: jest.fn().mockResolvedValue({
@@ -354,7 +387,18 @@ describe('PaymentService ancillary snapshot binding', () => {
     };
     const prisma = {
       bookingIntent: {
-        findUnique: jest.fn().mockResolvedValue({ id: 'intent-1', status: 'PENDING', paymentAttemptCount: 0, confirmedPrice: '100.00', currency: 'USD', userId: 'user-1', currentAncillarySelectionId: 'selection-3', ancillaryVersion: 3 }),
+        findUnique: jest
+          .fn()
+          .mockResolvedValue({
+            id: 'intent-1',
+            status: 'PENDING',
+            paymentAttemptCount: 0,
+            confirmedPrice: '100.00',
+            currency: 'USD',
+            userId: 'user-1',
+            currentAncillarySelectionId: 'selection-3',
+            ancillaryVersion: 3,
+          }),
       },
       $transaction: jest.fn().mockImplementation(async (callback) => callback(transaction)),
     };
@@ -436,7 +480,18 @@ describe('PaymentService ancillary snapshot binding', () => {
     const paymentEvent = { create: jest.fn() };
     const prisma = {
       bookingIntent: {
-        findUnique: jest.fn().mockResolvedValue({ id: 'intent-1', status: 'AWAITING_PAYMENT', paymentAttemptCount: 2, confirmedPrice: '100.00', currency: 'USD', userId: 'user-1', currentAncillarySelectionId: 'selection-3', ancillaryVersion: 3 }),
+        findUnique: jest
+          .fn()
+          .mockResolvedValue({
+            id: 'intent-1',
+            status: 'AWAITING_PAYMENT',
+            paymentAttemptCount: 2,
+            confirmedPrice: '100.00',
+            currency: 'USD',
+            userId: 'user-1',
+            currentAncillarySelectionId: 'selection-3',
+            ancillaryVersion: 3,
+          }),
       },
       $transaction: jest.fn().mockImplementation(async (callback) => callback(transaction)),
       payment: { findFirst: jest.fn().mockResolvedValue(existingPayment) },
@@ -470,9 +525,9 @@ describe('PaymentService ancillary snapshot binding', () => {
                 grandTotal: '123.45',
                 currency: 'USD',
                 services: [{ serviceId: 'seat-1', quantity: 1 }],
-              }
-            }
-          }
+              },
+            },
+          },
         }),
       },
       paymentEvent,

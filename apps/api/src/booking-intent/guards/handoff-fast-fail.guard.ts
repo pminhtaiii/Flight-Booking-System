@@ -1,4 +1,10 @@
-import { CanActivate, ConflictException, ExecutionContext, Injectable, Optional } from '@nestjs/common';
+import {
+  CanActivate,
+  ConflictException,
+  ExecutionContext,
+  Injectable,
+  Optional,
+} from '@nestjs/common';
 import { ChatHandoffService } from '@/chat-handoff/chat-handoff.service';
 
 type HandoffRequest = {
@@ -17,7 +23,12 @@ export class HandoffFastFailGuard implements CanActivate {
   canActivate(context: ExecutionContext): boolean {
     if (!this.chatHandoffService) return true;
     const req = context.switchToHttp().getRequest<HandoffRequest>();
-    const pathname = (req.path || req.originalUrl?.split('?')[0] || req.url?.split('?')[0] || '').toLowerCase();
+    const pathname = (
+      req.path ||
+      req.originalUrl?.split('?')[0] ||
+      req.url?.split('?')[0] ||
+      ''
+    ).toLowerCase();
     if (pathname.endsWith('/readiness')) {
       return true;
     }
@@ -28,12 +39,18 @@ export class HandoffFastFailGuard implements CanActivate {
       if (typeof this.chatHandoffService.tryAcquireInFlight === 'function') {
         const reservationId = this.chatHandoffService.tryAcquireInFlight(token, userId);
         if (!reservationId) {
-          throw new ConflictException({ code: 'HANDOFF_IN_PROGRESS', message: 'Handoff in progress' });
+          throw new ConflictException({
+            code: 'HANDOFF_IN_PROGRESS',
+            message: 'Handoff in progress',
+          });
         }
         req.handoffFastFailReservation = { token, reservationId };
       } else if (typeof this.chatHandoffService.isClaimed === 'function') {
         if (this.chatHandoffService.isClaimed(token, userId)) {
-          throw new ConflictException({ code: 'HANDOFF_IN_PROGRESS', message: 'Handoff in progress' });
+          throw new ConflictException({
+            code: 'HANDOFF_IN_PROGRESS',
+            message: 'Handoff in progress',
+          });
         }
       }
     }

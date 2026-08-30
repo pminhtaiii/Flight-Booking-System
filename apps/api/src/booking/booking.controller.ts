@@ -1,4 +1,14 @@
-import { Body, Controller, Get, Post, Param, ParseUUIDPipe, Query, Req, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Post,
+  Param,
+  ParseUUIDPipe,
+  Query,
+  Req,
+  UseGuards,
+} from '@nestjs/common';
 import { Request } from 'express';
 import { JwtAuthGuard } from '@/auth/guards/jwt-auth.guard';
 import { BookingManagementService } from '@/booking-management/booking-management.service';
@@ -24,8 +34,16 @@ export class BookingController {
   ) {}
 
   @Get()
-  async listBookings(@Req() req: AuthenticatedRequest, @Query() query: BookingListQueryDto): Promise<BookingListResponseDto> {
-    return this.bookingManagementService.listBookings(req.user.id, query.tab, query.page, query.limit);
+  async listBookings(
+    @Req() req: AuthenticatedRequest,
+    @Query() query: BookingListQueryDto,
+  ): Promise<BookingListResponseDto> {
+    return this.bookingManagementService.listBookings(
+      req.user.id,
+      query.tab,
+      query.page,
+      query.limit,
+    );
   }
 
   @Get(':bookingId')
@@ -61,4 +79,3 @@ export class BookingController {
     return this.cancellationService.cancelBooking(bookingId, req.user.id, dto.quoteId);
   }
 }
-

@@ -60,7 +60,6 @@ describe('Concurrency and Stress (E2E)', () => {
     await prisma.auditLog.deleteMany({});
     await prisma.user.deleteMany({});
 
-
     await request(app.getHttpServer())
       .post('/auth/test/reset-lockout')
       .send({ clearAll: true })
@@ -119,6 +118,3 @@ describe('Concurrency and Stress (E2E)', () => {
     expect(lockoutRes.body.code).toBe('auth_locked');
   });
 });
-
-
-

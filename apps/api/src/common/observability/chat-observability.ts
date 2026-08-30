@@ -35,11 +35,41 @@ const ALLOWED_METADATA_KEYS = new Set([
   'retry',
   'price_changed',
 ]);
-const FORBIDDEN_VALUE_PATTERN = /(?:https?:\/\/|bearer\s|@|message|token|offer|user|session|passenger|payment|passport|secret|authorization)/i;
+const FORBIDDEN_VALUE_PATTERN =
+  /(?:https?:\/\/|bearer\s|@|message|token|offer|user|session|passenger|payment|passport|secret|authorization)/i;
 const ALLOWED_STRING_VALUES: Record<string, Set<string>> = {
-  status: new Set(['created', 'resolved', 'consumed', 'replayed', 'failed', 'ok', 'conflict', 'accepted', 'rejected', 'denied']),
-  outcome: new Set(['created', 'resolved', 'consumed', 'already_consumed', 'idempotent_retry', 'failed', 'conflict', 'admitted', 'rejected', 'unavailable']),
-  error_class: new Set(['dependency_unavailable', 'timeout', 'unknown', 'daily_quota', 'burst_limit', 'control_plane_unavailable']),
+  status: new Set([
+    'created',
+    'resolved',
+    'consumed',
+    'replayed',
+    'failed',
+    'ok',
+    'conflict',
+    'accepted',
+    'rejected',
+    'denied',
+  ]),
+  outcome: new Set([
+    'created',
+    'resolved',
+    'consumed',
+    'already_consumed',
+    'idempotent_retry',
+    'failed',
+    'conflict',
+    'admitted',
+    'rejected',
+    'unavailable',
+  ]),
+  error_class: new Set([
+    'dependency_unavailable',
+    'timeout',
+    'unknown',
+    'daily_quota',
+    'burst_limit',
+    'control_plane_unavailable',
+  ]),
   dependency: new Set(['redis', 'nestjs', 'llm', 'control_plane']),
 };
 const BOOLEAN_METADATA_KEYS = new Set(['retry', 'price_changed']);
@@ -85,17 +115,14 @@ function opaqueId(candidate?: string | null): string {
   return `chat_${crypto.randomBytes(16).toString('hex')}`;
 }
 
-function safeScalar(
-  key: string,
-  value: unknown,
-): string | number | boolean | null {
+function safeScalar(key: string, value: unknown): string | number | boolean | null {
   const allowlistedValues = ALLOWED_STRING_VALUES[key];
   if (
-    allowlistedValues
-    && typeof value === 'string'
-    && SAFE_VALUE_PATTERN.test(value)
-    && !FORBIDDEN_VALUE_PATTERN.test(value)
-    && allowlistedValues.has(value)
+    allowlistedValues &&
+    typeof value === 'string' &&
+    SAFE_VALUE_PATTERN.test(value) &&
+    !FORBIDDEN_VALUE_PATTERN.test(value) &&
+    allowlistedValues.has(value)
   ) {
     return value;
   }
@@ -129,31 +156,63 @@ export function createChatTelemetryEvent(
 
   let metric = METRIC_BY_OPERATION[operation];
   if (operation === 'chat_message_turn') {
-    metric = safeStatus === 'failed' || safeStatus === 'denied' || safeStatus === 'rejected' || safeMetadata.outcome === 'rejected' || safeMetadata.outcome === 'unavailable' || safeMetadata.outcome === 'failed'
-      ? STANDARDIZED_METRIC_COUNTERS.CHAT_MESSAGES_DENIED
-      : STANDARDIZED_METRIC_COUNTERS.CHAT_MESSAGES_ACCEPTED;
+    metric =
+      safeStatus === 'failed' ||
+      safeStatus === 'denied' ||
+      safeStatus === 'rejected' ||
+      safeMetadata.outcome === 'rejected' ||
+      safeMetadata.outcome === 'unavailable' ||
+      safeMetadata.outcome === 'failed'
+        ? STANDARDIZED_METRIC_COUNTERS.CHAT_MESSAGES_DENIED
+        : STANDARDIZED_METRIC_COUNTERS.CHAT_MESSAGES_ACCEPTED;
   } else if (operation === 'quota_admission') {
-    if (safeStatus === 'failed' || safeStatus === 'rejected' || safeStatus === 'denied' || safeMetadata.outcome === 'rejected' || safeMetadata.outcome === 'unavailable' || safeMetadata.outcome === 'failed') {
+    if (
+      safeStatus === 'failed' ||
+      safeStatus === 'rejected' ||
+      safeStatus === 'denied' ||
+      safeMetadata.outcome === 'rejected' ||
+      safeMetadata.outcome === 'unavailable' ||
+      safeMetadata.outcome === 'failed'
+    ) {
       metric = STANDARDIZED_METRIC_COUNTERS.CHAT_MESSAGES_DENIED;
-    } else if (safeMetadata.outcome === 'admitted' || safeStatus === 'accepted' || safeStatus === 'ok') {
+    } else if (
+      safeMetadata.outcome === 'admitted' ||
+      safeStatus === 'accepted' ||
+      safeStatus === 'ok'
+    ) {
       metric = STANDARDIZED_METRIC_COUNTERS.CHAT_MESSAGES_ACCEPTED;
     } else {
       metric = STANDARDIZED_METRIC_COUNTERS.QUOTA_DAILY_UTILIZATION;
     }
   } else if (operation === 'handoff_create') {
-    if (safeStatus === 'failed' || safeStatus === 'rejected' || safeMetadata.outcome === 'failed' || safeMetadata.outcome === 'rejected') {
+    if (
+      safeStatus === 'failed' ||
+      safeStatus === 'rejected' ||
+      safeMetadata.outcome === 'failed' ||
+      safeMetadata.outcome === 'rejected'
+    ) {
       metric = 'chat_handoff_create_total';
     } else {
       metric = STANDARDIZED_METRIC_COUNTERS.HANDOFF_TOKENS_ISSUED;
     }
   } else if (operation === 'handoff_resolve') {
-    if (safeStatus === 'failed' || safeStatus === 'rejected' || safeMetadata.outcome === 'failed' || safeMetadata.outcome === 'rejected') {
+    if (
+      safeStatus === 'failed' ||
+      safeStatus === 'rejected' ||
+      safeMetadata.outcome === 'failed' ||
+      safeMetadata.outcome === 'rejected'
+    ) {
       metric = 'chat_handoff_resolve_total';
     } else {
       metric = STANDARDIZED_METRIC_COUNTERS.HANDOFF_TOKENS_RESOLVED;
     }
   } else if (operation === 'handoff_consume') {
-    if (safeStatus === 'failed' || safeStatus === 'rejected' || safeMetadata.outcome === 'failed' || safeMetadata.outcome === 'rejected') {
+    if (
+      safeStatus === 'failed' ||
+      safeStatus === 'rejected' ||
+      safeMetadata.outcome === 'failed' ||
+      safeMetadata.outcome === 'rejected'
+    ) {
       metric = 'chat_handoff_consume_total';
     } else {
       metric = STANDARDIZED_METRIC_COUNTERS.HANDOFF_TOKENS_CONSUMED;
@@ -171,10 +230,7 @@ export function createChatTelemetryEvent(
   };
 }
 
-export function emitChatTelemetry(
-  logger: Logger,
-  event: ChatTelemetryEvent,
-): void {
+export function emitChatTelemetry(logger: Logger, event: ChatTelemetryEvent): void {
   logger.log(JSON.stringify(event));
 }
 
@@ -220,4 +276,3 @@ export const CHAT_HANDOFF_OBSERVABILITY_CONTRACT = {
     { panel: 'time_to_first_safe_token', condition: 'operator_configured' },
   ],
 };
-

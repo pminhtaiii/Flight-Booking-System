@@ -1,12 +1,5 @@
 import { Type } from 'class-transformer';
-import {
-  IsArray,
-  IsISO8601,
-  IsInt,
-  IsString,
-  Min,
-  ValidateNested,
-} from 'class-validator';
+import { IsArray, IsISO8601, IsInt, IsString, Min, ValidateNested } from 'class-validator';
 
 export class BookingSummaryDto {
   @IsString()

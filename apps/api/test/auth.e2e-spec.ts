@@ -62,7 +62,6 @@ describe('Authentication (E2E)', () => {
     await prisma.airport.deleteMany({});
     await prisma.auditLog.deleteMany({});
     await prisma.user.deleteMany({});
-
   });
 
   describe('POST /auth/register', () => {
@@ -308,6 +307,3 @@ describe('Authentication (E2E)', () => {
     });
   });
 });
-
-
-

@@ -401,11 +401,13 @@ describe('SupplierSyncService unit/integration tests', () => {
       });
 
       const originalTransaction = prisma.$transaction;
-      prisma.$transaction = jest.fn().mockRejectedValue(new Error('Atomic database rollback test error'));
+      prisma.$transaction = jest
+        .fn()
+        .mockRejectedValue(new Error('Atomic database rollback test error'));
 
-      await expect(
-        supplierSyncService.syncBooking(bookingId, 'WEBHOOK'),
-      ).rejects.toThrow('Atomic database rollback test error');
+      await expect(supplierSyncService.syncBooking(bookingId, 'WEBHOOK')).rejects.toThrow(
+        'Atomic database rollback test error',
+      );
 
       prisma.$transaction = originalTransaction;
 
@@ -452,37 +454,39 @@ describe('SupplierSyncService unit/integration tests', () => {
         meta?: Record<string, unknown>;
       }
 
-      const transactionSpy = jest.spyOn(prisma, '$transaction').mockImplementation(async (callback) => {
-        return originalTransaction.call(prisma, async (tx) => {
-          const originalTxCreate = tx.itineraryRevision.create;
-          tx.itineraryRevision.create = jest.fn().mockImplementation(async (args) => {
-            if (count === 0) {
-              count++;
-              // Simulate that in parallel, another thread inserted version 1 with the SAME fingerprint
-              await originalCreate.call(prisma.itineraryRevision, {
-                data: {
-                  bookingId: args.data.bookingId,
-                  version: args.data.version,
-                  source: args.data.source,
-                  fingerprint: args.data.fingerprint,
-                  isMaterial: args.data.isMaterial,
-                  materialReasons: args.data.materialReasons,
-                  materialBaselines: args.data.materialBaselines,
-                  incrementalDiff: args.data.incrementalDiff,
-                  cumulativeDiff: args.data.cumulativeDiff,
-                },
-              });
-              // Throw unique constraint violation error
-              const error = new Error('Unique constraint failed on version') as PrismaError;
-              error.code = 'P2002';
-              error.meta = { target: ['bookingId', 'version'] };
-              throw error;
-            }
-            return originalTxCreate.call(tx.itineraryRevision, args);
+      const transactionSpy = jest
+        .spyOn(prisma, '$transaction')
+        .mockImplementation(async (callback) => {
+          return originalTransaction.call(prisma, async (tx) => {
+            const originalTxCreate = tx.itineraryRevision.create;
+            tx.itineraryRevision.create = jest.fn().mockImplementation(async (args) => {
+              if (count === 0) {
+                count++;
+                // Simulate that in parallel, another thread inserted version 1 with the SAME fingerprint
+                await originalCreate.call(prisma.itineraryRevision, {
+                  data: {
+                    bookingId: args.data.bookingId,
+                    version: args.data.version,
+                    source: args.data.source,
+                    fingerprint: args.data.fingerprint,
+                    isMaterial: args.data.isMaterial,
+                    materialReasons: args.data.materialReasons,
+                    materialBaselines: args.data.materialBaselines,
+                    incrementalDiff: args.data.incrementalDiff,
+                    cumulativeDiff: args.data.cumulativeDiff,
+                  },
+                });
+                // Throw unique constraint violation error
+                const error = new Error('Unique constraint failed on version') as PrismaError;
+                error.code = 'P2002';
+                error.meta = { target: ['bookingId', 'version'] };
+                throw error;
+              }
+              return originalTxCreate.call(tx.itineraryRevision, args);
+            });
+            return callback(tx);
           });
-          return callback(tx);
         });
-      });
 
       const result = await supplierSyncService.syncBooking(bookingId, 'WEBHOOK');
       expect(result.status).toBe('CONVERGED_DUPLICATE');
@@ -521,37 +525,39 @@ describe('SupplierSyncService unit/integration tests', () => {
         meta?: Record<string, unknown>;
       }
 
-      const transactionSpy = jest.spyOn(prisma, '$transaction').mockImplementation(async (callback) => {
-        return originalTransaction.call(prisma, async (tx) => {
-          const originalTxCreate = tx.itineraryRevision.create;
-          tx.itineraryRevision.create = jest.fn().mockImplementation(async (args) => {
-            if (count === 0) {
-              count++;
-              // Simulate that in parallel, another thread inserted version 1 with a DIFFERENT fingerprint
-              await originalCreate.call(prisma.itineraryRevision, {
-                data: {
-                  bookingId: args.data.bookingId,
-                  version: args.data.version,
-                  source: args.data.source,
-                  fingerprint: 'different-fingerprint',
-                  isMaterial: args.data.isMaterial,
-                  materialReasons: args.data.materialReasons,
-                  materialBaselines: args.data.materialBaselines,
-                  incrementalDiff: args.data.incrementalDiff,
-                  cumulativeDiff: args.data.cumulativeDiff,
-                },
-              });
-              // Throw unique constraint violation error
-              const error = new Error('Unique constraint failed on version') as PrismaError;
-              error.code = 'P2002';
-              error.meta = { target: ['bookingId', 'version'] };
-              throw error;
-            }
-            return originalTxCreate.call(tx.itineraryRevision, args);
+      const transactionSpy = jest
+        .spyOn(prisma, '$transaction')
+        .mockImplementation(async (callback) => {
+          return originalTransaction.call(prisma, async (tx) => {
+            const originalTxCreate = tx.itineraryRevision.create;
+            tx.itineraryRevision.create = jest.fn().mockImplementation(async (args) => {
+              if (count === 0) {
+                count++;
+                // Simulate that in parallel, another thread inserted version 1 with a DIFFERENT fingerprint
+                await originalCreate.call(prisma.itineraryRevision, {
+                  data: {
+                    bookingId: args.data.bookingId,
+                    version: args.data.version,
+                    source: args.data.source,
+                    fingerprint: 'different-fingerprint',
+                    isMaterial: args.data.isMaterial,
+                    materialReasons: args.data.materialReasons,
+                    materialBaselines: args.data.materialBaselines,
+                    incrementalDiff: args.data.incrementalDiff,
+                    cumulativeDiff: args.data.cumulativeDiff,
+                  },
+                });
+                // Throw unique constraint violation error
+                const error = new Error('Unique constraint failed on version') as PrismaError;
+                error.code = 'P2002';
+                error.meta = { target: ['bookingId', 'version'] };
+                throw error;
+              }
+              return originalTxCreate.call(tx.itineraryRevision, args);
+            });
+            return callback(tx);
           });
-          return callback(tx);
         });
-      });
 
       const result = await supplierSyncService.syncBooking(bookingId, 'WEBHOOK');
       expect(result.status).toBe('REVISION_CREATED');
@@ -663,7 +669,10 @@ describe('SupplierSyncService unit/integration tests', () => {
       mockDuffelWithDeparture('2026-08-01T17:00:00Z');
       result = await supplierSyncService.syncBooking(bookingId, 'WEBHOOK');
       expect(result.status).toBe('REVISION_CREATED');
-      outbox = await prisma.notificationOutbox.findMany({ where: { bookingId }, orderBy: { createdAt: 'asc' } });
+      outbox = await prisma.notificationOutbox.findMany({
+        where: { bookingId },
+        orderBy: { createdAt: 'asc' },
+      });
       expect(outbox.length).toBe(2);
       expect(outbox[1].stabilizationWarning).toBe(false);
 
@@ -676,7 +685,10 @@ describe('SupplierSyncService unit/integration tests', () => {
       mockDuffelWithDeparture('2026-08-01T19:30:00Z');
       result = await supplierSyncService.syncBooking(bookingId, 'WEBHOOK');
       expect(result.status).toBe('REVISION_CREATED');
-      outbox = await prisma.notificationOutbox.findMany({ where: { bookingId }, orderBy: { createdAt: 'asc' } });
+      outbox = await prisma.notificationOutbox.findMany({
+        where: { bookingId },
+        orderBy: { createdAt: 'asc' },
+      });
       expect(outbox.length).toBe(3);
       expect(outbox[2].stabilizationWarning).toBe(true); // Warning enabled
 
@@ -713,7 +725,12 @@ describe('SupplierSyncService unit/integration tests', () => {
               {
                 airline: { name: 'Japan Airlines', iataCode: 'JL' },
                 flightNumber: '752',
-                departureAirport: { name: 'Noi Bai', iataCode: 'HAN', city: 'Hanoi', terminal: 'T2' },
+                departureAirport: {
+                  name: 'Noi Bai',
+                  iataCode: 'HAN',
+                  city: 'Hanoi',
+                  terminal: 'T2',
+                },
                 departureAt: '2026-08-01T12:00:00Z',
                 arrivalAirport: { name: 'Narita', iataCode: 'NRT', city: 'Tokyo', terminal: 'T2' },
                 arrivalAt: '2026-08-01T19:00:00Z',

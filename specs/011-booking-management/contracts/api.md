@@ -9,6 +9,7 @@
 Modification to existing endpoint: accepts `bookingId` from client and creates Booking record as first pipeline step.
 
 **Request Body** (additions to existing):
+
 ```json
 {
   "bookingIntentId": "uuid",
@@ -18,11 +19,13 @@ Modification to existing endpoint: accepts `bookingId` from client and creates B
 ```
 
 **Validation**:
+
 - `bookingId` must be valid UUID v4 format → 400 if invalid
 - `bookingId` must not exist for a different user → 403 if cross-user
 - `bookingId` same user + same intent → idempotency replay
 
 **Response** (unchanged — same as current):
+
 ```json
 {
   "success": true,
@@ -34,6 +37,7 @@ Modification to existing endpoint: accepts `bookingId` from client and creates B
 ```
 
 **Error Response** (failure):
+
 ```json
 {
   "success": false,
@@ -46,7 +50,9 @@ Modification to existing endpoint: accepts `bookingId` from client and creates B
 
 **Idempotency / Collision Replay Response**:
 If a request is received and a `Booking` for the `bookingIntentId` already exists, the server returns the cached response state immediately without re-executing the payment or booking pipeline:
+
 1. **If status is `PROCESSING`**: The server returns a 200 OK with the existing canonical `bookingId` to allow the client to redirect or poll safely. The frontend client MUST capture the returned `bookingId` to update its local state, ensuring any escape-hatch navigation (Phase 3) or auto-redirects (Phase 4) target the canonical ID rather than the client-generated UUID, while allowing the loading escalation stepper to continue running:
+
 ```json
 {
   "success": true,
@@ -56,7 +62,9 @@ If a request is received and a `Booking` for the `bookingIntentId` already exist
   "status": "PROCESSING"
 }
 ```
+
 2. **If status is `CONFIRMED`**: The server returns the standard successful response payload:
+
 ```json
 {
   "success": true,
@@ -66,7 +74,9 @@ If a request is received and a `Booking` for the `bookingIntentId` already exist
   "status": "CONFIRMED"
 }
 ```
+
 3. **If status is `FAILED`**: The server returns the standard failure response payload:
+
 ```json
 {
   "success": false,
@@ -91,6 +101,7 @@ List all bookings for the authenticated user.
 | limit | number | 20 | Items per page (max 50) |
 
 **Response**:
+
 ```json
 {
   "bookings": [
@@ -142,6 +153,7 @@ List all bookings for the authenticated user.
 ```
 
 **Booking State Field Rules (Important for UI Handlers)**:
+
 - **`PROCESSING` State Bookings**: Fields `flightSnapshot`, `pnrReference`, and `departureAt` are returned as `null` since the booking pipeline is running and flight details have not been finalized. The frontend `BookingCard` component MUST conditionally handle these null fields (e.g., display a "Processing details..." loading state instead of airline logos or dates, and hide/suppress the PNR field) to prevent page-render crashes.
 - **`FAILED` State Bookings**: Depending on when the failure occurred, `flightSnapshot` and `departureAt` may be `null` (e.g., if it failed during Stripe authorization before Duffel reservation) or populated (e.g. if it failed during capture `CAPTURE_FAILED`). The frontend MUST handle both scenarios.
 - **`CONFIRMED`/`COMPLETED` State Bookings**: All flight, departure, and PNR details will be fully populated.
@@ -156,9 +168,11 @@ List all bookings for the authenticated user.
 Get full booking detail for a specific booking.
 
 **Path Parameters**:
+
 - `bookingId` — UUID of the booking
 
 **Response**:
+
 ```json
 {
   "id": "uuid",
@@ -204,6 +218,7 @@ My Bookings list page with two tabs: Upcoming and Past.
 ### /bookings/[bookingId]
 
 Booking detail page. Renders differently based on:
+
 - `status` field → PROCESSING / CONFIRMED / FAILED / COMPLETED
 - `?confirmed=true` query param → celebration banner on first visit after payment
 - `failureReason` field → context-aware retry button

@@ -45,7 +45,9 @@ describe('Disruption & Flight-Change Management (Webhook & Processor E2E)', () =
       .compile();
 
     app = moduleFixture.createNestApplication({ rawBody: true });
-    app.useGlobalPipes(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, transform: true }));
+    app.useGlobalPipes(
+      new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, transform: true }),
+    );
     app.useGlobalFilters(new HttpExceptionFilter());
     app.setGlobalPrefix('api', { exclude: ['health'] });
     await app.init();
@@ -156,7 +158,6 @@ describe('Disruption & Flight-Change Management (Webhook & Processor E2E)', () =
     await prisma.airport.deleteMany({});
     await prisma.auditLog.deleteMany({});
     await prisma.user.deleteMany({});
-
   });
 
   const generateSignatureHeader = (timestamp: number, rawBody: string, secret: string) => {
@@ -168,16 +169,17 @@ describe('Disruption & Flight-Change Management (Webhook & Processor E2E)', () =
   describe('POST /api/duffel/webhook (Ingestion)', () => {
     it('should fail if signature header is missing', async () => {
       const body = { id: `wev_fake_${suffix}`, type: 'order.airline_initiated_change_detected' };
-      const response = await request(app.getHttpServer())
-        .post('/api/duffel/webhook')
-        .send(body);
+      const response = await request(app.getHttpServer()).post('/api/duffel/webhook').send(body);
 
       expect(response.status).toBe(HttpStatus.BAD_REQUEST);
       expect(response.body.error).toBe('WEBHOOK_SIGNATURE_MISSING');
     });
 
     it('should fail if signature timestamp is stale', async () => {
-      const body = JSON.stringify({ id: `wev_fake_${suffix}`, type: 'order.airline_initiated_change_detected' });
+      const body = JSON.stringify({
+        id: `wev_fake_${suffix}`,
+        type: 'order.airline_initiated_change_detected',
+      });
       const staleTime = Math.floor(Date.now() / 1000) - 301;
       const signature = generateSignatureHeader(staleTime, body, webhookSecret);
 
@@ -392,34 +394,36 @@ describe('Disruption & Flight-Change Management (Webhook & Processor E2E)', () =
           status: 'ACTIVE',
         },
       });
-      otherUserToken = jwtService.sign({ id: otherUser.id, email: otherUser.email }, { expiresIn: '1h' });
+      otherUserToken = jwtService.sign(
+        { id: otherUser.id, email: otherUser.email },
+        { expiresIn: '1h' },
+      );
     });
 
     afterEach(async () => {
-    await prisma.chatHandoff.deleteMany({});
-    await prisma.chatSession.deleteMany({});
-    await prisma.paymentEvent.deleteMany({});
-    await prisma.ledgerEntry.deleteMany({});
-    await prisma.refund.deleteMany({});
-    await prisma.cancellationRefundObligation.deleteMany({});
-    await prisma.payment.deleteMany({});
-    await prisma.idempotencyKey.deleteMany({});
-    await prisma.paymentMethod.deleteMany({});
-    await prisma.bookingIntentPassenger.deleteMany({});
-    await prisma.bookingIntent.deleteMany({});
-    await prisma.itineraryRevisionSegment.deleteMany({});
-    await prisma.itineraryRevision.deleteMany({});
-    await prisma.disruptionAuditEvent.deleteMany({});
-    await prisma.notificationOutbox.deleteMany({});
-    await prisma.booking.deleteMany({});
-    await prisma.travelerProfile.deleteMany({});
-    await prisma.offerRecovery.deleteMany({});
-    await prisma.flightOffer.deleteMany({});
-    await prisma.searchHistory.deleteMany({});
-    await prisma.airport.deleteMany({});
-    await prisma.auditLog.deleteMany({});
-    await prisma.user.deleteMany({});
-
+      await prisma.chatHandoff.deleteMany({});
+      await prisma.chatSession.deleteMany({});
+      await prisma.paymentEvent.deleteMany({});
+      await prisma.ledgerEntry.deleteMany({});
+      await prisma.refund.deleteMany({});
+      await prisma.cancellationRefundObligation.deleteMany({});
+      await prisma.payment.deleteMany({});
+      await prisma.idempotencyKey.deleteMany({});
+      await prisma.paymentMethod.deleteMany({});
+      await prisma.bookingIntentPassenger.deleteMany({});
+      await prisma.bookingIntent.deleteMany({});
+      await prisma.itineraryRevisionSegment.deleteMany({});
+      await prisma.itineraryRevision.deleteMany({});
+      await prisma.disruptionAuditEvent.deleteMany({});
+      await prisma.notificationOutbox.deleteMany({});
+      await prisma.booking.deleteMany({});
+      await prisma.travelerProfile.deleteMany({});
+      await prisma.offerRecovery.deleteMany({});
+      await prisma.flightOffer.deleteMany({});
+      await prisma.searchHistory.deleteMany({});
+      await prisma.airport.deleteMany({});
+      await prisma.auditLog.deleteMany({});
+      await prisma.user.deleteMany({});
     });
 
     it('populates extended fields (currentItinerary and disruption) in list and details endpoints', async () => {
@@ -455,17 +459,17 @@ describe('Disruption & Flight-Change Management (Webhook & Processor E2E)', () =
                 sliceOrder: 0,
                 segmentOrder: 0,
                 globalOrder: 0,
-              }
-            ]
-          }
-        }
+              },
+            ],
+          },
+        },
       });
       await prisma.booking.update({
         where: { id: bookingId },
-        data: { 
+        data: {
           disruptionStatus: 'DETECTED',
-          activeDisruptionRevisionId: rev.id
-        }
+          activeDisruptionRevisionId: rev.id,
+        },
       });
 
       process.env.FEATURE_FLAG_DISRUPTION_SURFACING = 'true';
@@ -480,7 +484,7 @@ describe('Disruption & Flight-Change Management (Webhook & Processor E2E)', () =
       expect(detailsRes.body.disruption.isMaterial).toBe(true);
       expect(detailsRes.body.disruption.incrementalSummary).toEqual({ details: 'incremental' });
       expect(detailsRes.body.disruption.cumulativeSummary).toEqual({ details: 'cumulative' });
-      
+
       expect(detailsRes.body.currentItinerary).toBeDefined();
       expect(detailsRes.body.currentItinerary.source).toBe('REVISION');
       expect(detailsRes.body.currentItinerary.revisionId).toBe(rev.id);
@@ -502,14 +506,14 @@ describe('Disruption & Flight-Change Management (Webhook & Processor E2E)', () =
       expect(listedBooking.disruption.status).toBe('DETECTED');
       expect(listedBooking.currentItinerary).toBeDefined();
       expect(listedBooking.currentItinerary.source).toBe('REVISION');
-      
+
       // Check customer-surfacing flag disabled fallback
       process.env.FEATURE_FLAG_DISRUPTION_SURFACING = 'false';
       const detailsResDisabled = await request(app.getHttpServer())
         .get(`/api/bookings/${bookingId}`)
         .set('Authorization', `Bearer ${userToken}`)
         .expect(200);
-      
+
       expect(detailsResDisabled.body.disruption.status).toBe('NONE');
       expect(detailsResDisabled.body.disruption.activeRevisionId).toBeNull();
       expect(detailsResDisabled.body.currentItinerary.source).toBe('ORIGINAL');
@@ -531,7 +535,7 @@ describe('Disruption & Flight-Change Management (Webhook & Processor E2E)', () =
           cumulativeDiff: { presentationSummary: { details: 'cum-1' } } as any,
           isMaterial: true,
           createdAt: new Date('2026-01-01T12:00:00Z'),
-        }
+        },
       });
 
       await prisma.itineraryRevision.create({
@@ -544,7 +548,7 @@ describe('Disruption & Flight-Change Management (Webhook & Processor E2E)', () =
           cumulativeDiff: { presentationSummary: { details: 'cum-2' } } as any,
           isMaterial: true,
           createdAt: new Date('2026-01-02T12:00:00Z'),
-        }
+        },
       });
 
       // Page 1, limit 1
@@ -605,7 +609,7 @@ describe('Disruption & Flight-Change Management (Webhook & Processor E2E)', () =
           incrementalDiff: {},
           cumulativeDiff: {},
           isMaterial: true,
-        }
+        },
       });
 
       // 403 Other owner
@@ -647,11 +651,11 @@ describe('Disruption & Flight-Change Management (Webhook & Processor E2E)', () =
           isMaterial: true,
           incrementalDiff: {},
           cumulativeDiff: {},
-        }
+        },
       });
       await prisma.booking.update({
         where: { id: bookingId },
-        data: { disruptionStatus: 'DETECTED', activeDisruptionRevisionId: mockRevision.id }
+        data: { disruptionStatus: 'DETECTED', activeDisruptionRevisionId: mockRevision.id },
       });
 
       // 1. Acknowledge
@@ -695,11 +699,11 @@ describe('Disruption & Flight-Change Management (Webhook & Processor E2E)', () =
           isMaterial: true,
           incrementalDiff: {},
           cumulativeDiff: {},
-        }
+        },
       });
       await prisma.booking.update({
         where: { id: bookingId },
-        data: { disruptionStatus: 'DETECTED', activeDisruptionRevisionId: newerRevision.id }
+        data: { disruptionStatus: 'DETECTED', activeDisruptionRevisionId: newerRevision.id },
       });
 
       // Call acknowledge on stale revision (version 1)
@@ -714,13 +718,13 @@ describe('Disruption & Flight-Change Management (Webhook & Processor E2E)', () =
       // Check transition audit events exist
       const audits = await prisma.disruptionAuditEvent.findMany({
         where: { bookingId },
-        orderBy: { createdAt: 'asc' }
+        orderBy: { createdAt: 'asc' },
       });
-      const actions = audits.map(a => a.action);
+      const actions = audits.map((a) => a.action);
       expect(actions).toContain('ACKNOWLEDGED');
       expect(actions).toContain('TRAVELLER_ACCEPTED');
-      
-      const travellerAudit = audits.find(a => a.action === 'TRAVELLER_ACCEPTED');
+
+      const travellerAudit = audits.find((a) => a.action === 'TRAVELLER_ACCEPTED');
       expect(travellerAudit?.actorType).toBe('TRAVELLER');
       expect(travellerAudit?.actorId).toBe(userId);
     });
@@ -735,11 +739,11 @@ describe('Disruption & Flight-Change Management (Webhook & Processor E2E)', () =
           isMaterial: true,
           incrementalDiff: {},
           cumulativeDiff: {},
-        }
+        },
       });
       await prisma.booking.update({
         where: { id: bookingId },
-        data: { disruptionStatus: 'DETECTED', activeDisruptionRevisionId: mockRevision.id }
+        data: { disruptionStatus: 'DETECTED', activeDisruptionRevisionId: mockRevision.id },
       });
 
       // Send both concurrently
@@ -749,7 +753,7 @@ describe('Disruption & Flight-Change Management (Webhook & Processor E2E)', () =
           .set('Authorization', `Bearer ${userToken}`),
         request(app.getHttpServer())
           .post(`/api/bookings/${bookingId}/disruptions/${mockRevision.id}/accept`)
-          .set('Authorization', `Bearer ${userToken}`)
+          .set('Authorization', `Bearer ${userToken}`),
       ]);
 
       // Both should succeed
@@ -762,6 +766,3 @@ describe('Disruption & Flight-Change Management (Webhook & Processor E2E)', () =
     });
   });
 });
-
-
-

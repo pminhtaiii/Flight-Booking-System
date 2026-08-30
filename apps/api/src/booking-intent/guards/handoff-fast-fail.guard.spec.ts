@@ -34,10 +34,14 @@ describe('HandoffFastFailGuard', () => {
       tryAcquireInFlight: jest.fn().mockReturnValue(null),
     } as never);
 
-    expect(() => guard.canActivate(executionContext({
-      body: { handoffToken: 'chk_handoff_v1_token' },
-      user: { id: 'user-1' },
-    }))).toThrow(ConflictException);
+    expect(() =>
+      guard.canActivate(
+        executionContext({
+          body: { handoffToken: 'chk_handoff_v1_token' },
+          user: { id: 'user-1' },
+        }),
+      ),
+    ).toThrow(ConflictException);
   });
 
   it('keeps the reservation identifier so the service can release only its own reservation', () => {
