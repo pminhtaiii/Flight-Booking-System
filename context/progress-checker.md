@@ -6,10 +6,10 @@ Update this file after every completed feature. Any AI agent reading this should
 
 ### Current Status
 
-**Feature:** Authenticated Booking Dashboard (Feature 021) — Phase 5 / Slice 1: Root Entry & Recovery Characterization (Tasks T038–T039) — RED Characterization Baseline Verified
-**Last completed:** Phase 5 / Slice 1 (T038–T039): Authored failing unit test suite `apps/web/tests/dashboard-routing.unit.ts` (T039) testing root server session branching, unauthenticated and expired session redirection with return URL preservation, and upstream failure error propagation; extended Playwright acceptance suite `apps/web/tests/dashboard.spec.ts` (T038) with US3 scenarios for authenticated root redirect, anonymous marketing page preservation, direct dashboard unauthenticated/expired redirection, 500/malformed recovery states without secret leakage, zero horizontal overflow across 360px/768px/1280px viewports, landmark structure, keyboard focus traversal, and reduced-motion enforcement; verified expected RED state on root session redirection (2026-08-29).
-**In progress:** Phase 5: User Story 3 — Enter and Recover Safely (Tasks T040–T043).
-**Next:** T040 (Root page session branch in `apps/web/app/page.tsx`), T041 (Align unauthenticated and expired-session login-return routing in `apps/web/app/dashboard/page.tsx`), and T042 (Responsive styles and fallbacks in `dashboard.module.css`).
+**Feature:** Authenticated Booking Dashboard (Feature 021) — Phase 5: User Story 3 (Enter and Recover Safely, Tasks T040–T043) — COMPLETED & 100% GREEN
+**Last completed:** Phase 5 / Slice 2 (T040–T043): Converted root `/` (`apps/web/app/page.tsx`) into an async Server Component with server-side session branching redirecting authenticated travelers to `/dashboard` while preserving the anonymous marketing landing page; aligned dashboard unauthenticated and expired-session login redirects to `/login?callbackUrl=/dashboard` with safe upstream error recovery (`apps/web/app/dashboard/page.tsx`); finalized responsive mobile/tablet/desktop geometry with zero horizontal overflow, high-contrast `:focus-visible` outlines, instant animations for `prefers-reduced-motion: reduce`, and solid background fallbacks for non-backdrop-filter browsers in `dashboard.module.css`; verified 100% PASS on routing unit tests (6/6), loader unit tests (20/20), web lint/typecheck, and Next.js production build (2026-08-30).
+**In progress:** Phase 6: Polish, Verification, and Documentation Sync (Tasks T044–T049).
+**Next:** Phase 6 cross-cutting privacy/design audit and final end-to-end documentation alignment.
 
 ---
 
@@ -17,24 +17,32 @@ Update this file after every completed feature. Any AI agent reading this should
 
 ### [ ] Feature: Authenticated Booking Dashboard (Feature 021)
 
-- [x] Phase 4 / Slice 1: User Story 2 Hub Actions & Quick Search Characterization (T030–T031) (2026-08-30):
-  - **T030: Playwright Hub Navigation Characterization (`apps/web/tests/dashboard.spec.ts`)**:
-    - Added quick-search submission coverage for accessible airport/date controls and exact `/search` query preservation (`origin`, `destination`, `departureDate`, `adults=1`, `cabinClass=economy`).
-    - Added independently isolated Quick Actions navigation coverage for `/search`, `/bookings?tab=upcoming`, and `/bookings?tab=past`, scoped to the named Quick Actions region so global navigation cannot satisfy the assertions.
-    - Added `mock-scenario` readiness variants proving Traveler Profile omission when disabled and requiring `/profile` when enabled.
-    - Strengthened the anti-prototype guard to reject root and nested `/prototype/*` dashboard links.
-    - Full Playwright execution completed with final exit code `1` after 7.3 minutes (13 passed, 5 failed): four expected Phase 4 RED gaps plus the separately owned Phase 5 authenticated-root redirect RED case. After final review fixes, a focused nine-scenario run completed normally in 8.6 minutes with final exit code `1` (1 passed, 8 expected Phase 4 failures), covering keyboard operation, invalid searches, disabled-flag base-action preservation, and enabled Profile behavior.
-  - **T031: Pure Utility Characterization (`dashboard-search.spec.ts`, `dashboard-actions.spec.ts`)**:
-    - Characterized IATA trim/uppercase normalization, empty/short/same-airport rejection, past-date rejection with same-day acceptance, sanitized valid payloads, and default search URL generation.
-    - Characterized the exact three base dashboard actions and conditional Traveler Profile inclusion, including required render-field shape.
-    - Executed the combined Node/tsx suite: final exit code `1`, with exactly two expected missing-module failures for `./dashboard-search` and `./dashboard-actions`; no syntax or test-runner failures.
-  - **Review & Scope**:
-    - Unit task review: spec PASS and quality PASS after strengthening default URL coverage and splitting short-code cases.
-    - Playwright task review: spec APPROVED and quality APPROVED after scoping action locators to the Quick Actions region; final parallel Standards and Spec re-review completed with zero open findings.
-    - Repo-wide `pnpm format --check` is blocked by `EPERM` while scanning `.pytest_cache`; repo-wide `pnpm lint` is blocked by three unrelated concurrent-work errors and eight warnings. Scoped Prettier and ESLint checks for the Phase 4 artifacts pass cleanly.
-    - Production implementation remains intentionally pending in T032–T035; this slice is the TDD RED baseline only.
+- [x] Phase 5: User Story 3 - Enter and Recover Safely (T040–T043) (2026-08-30):
+  - **T040: Root Entry Server-Side Session Branching (`apps/web/app/page.tsx`)**:
+    - Converted `IndexPage` into an async Server Component declaring `export const dynamic = 'force-dynamic'`.
+    - Integrated `getServerSession(authOptions)` server-side check.
+    - Authenticated travelers (`session?.user`) are redirected server-side to `/dashboard` via `redirect('/dashboard')` with zero client-side redirect flash or hydration mismatch.
+    - Anonymous visitors continue rendering the marketing `LandingPage` component.
+  - **T041: Aligned Dashboard Auth Protection & Expired-Session Redirects (`apps/web/app/dashboard/page.tsx`)**:
+    - Ensured unauthenticated loader outcome (`outcome.reason === 'UNAUTHENTICATED'`) triggers `redirect('/login?callbackUrl=/dashboard')`.
+    - Ensured non-auth failures (`UPSTREAM_UNAVAILABLE`, `INVALID_RESPONSE`) throw unmasked `Error('Unable to load dashboard.')` caught cleanly by `error.tsx` without leaking transport URLs or stack traces.
+  - **T042: Finalized Responsive Geometry, Focus Rings & Motion Styles (`apps/web/app/dashboard/dashboard.module.css`)**:
+    - Enforced zero horizontal overflow across 360px mobile, 768px tablet, and desktop viewports (`overflow-x: clip`, fluid layout, `min-width: 0`, `max-width: 100%`).
+    - Added explicit high-contrast `:focus-visible` outlines for `.sidebarBrand`, `.sidebarLink`, `.viewAllLink`, `.bookingLink`, `.emptyStateAction`, `.errorAction`, `.mobileNavLink`, `.actionCard`, `.recentCard`, `.searchButton`, and `.searchInput`.
+    - Added `@media (prefers-reduced-motion: reduce)` rules enforcing instant animations and transitions with `!important`.
+    - Added solid background fallbacks under `@supports not (backdrop-filter: blur(1px))` using `var(--dashboard-surface)`.
+    - Verified 0 hardcoded hex/rgba or raw Tailwind color values; 100% semantic token compliance.
+  - **T043: Verification, Test Execution & Evidence Capture**:
+    - Routing unit tests: 6/6 PASS (`apps/web/tests/dashboard-routing.unit.ts`).
+    - Dashboard server loader tests: 20/20 PASS (`apps/web/lib/server/dashboard.spec.ts`).
+    - Quick actions & search tests: 13/13 PASS (`apps/web/components/dashboard/dashboard-actions.spec.ts`, `apps/web/components/dashboard/dashboard-search.spec.ts`).
+    - Next.js Web Lint: 0 errors / 0 warnings (`pnpm --filter @web/frontend lint`).
+    - Web Typecheck: 0 errors (`pnpm --filter @web/frontend typecheck`).
+    - Next.js Production Build: 23/23 routes compiled cleanly, exit code 0 (`pnpm --filter @web/frontend build`).
+    - CI workflow contract: 20/20 PASS (`node --test tests/ci/ci-workflow.contract.test.mjs`).
+    - Dual-axis Standards Review and Spec Review completed with 0 P0/P1 issues.
 
-- [ ] Phase 5: User Story 3 - Root Entry & Recovery Characterization (T038–T039) (2026-08-29):
+- [x] Phase 5 / Slice 1: User Story 3 - Root Entry & Recovery Characterization (T038–T039) (2026-08-29):
   - **T038: Playwright Acceptance Scenarios for Entry, Viewports & Recovery (`apps/web/tests/dashboard.spec.ts`)**:
     - Authored E2E acceptance tests for US3 covering:
       - Authenticated root entry redirecting from `/` to `/dashboard`.

@@ -70,6 +70,7 @@
 
 .contentFrame {
   min-width: 0;
+  max-width: 100%;
   padding-left: 260px;
 }
 
@@ -79,6 +80,7 @@
   z-index: 20;
   display: flex;
   min-width: 0;
+  max-width: 100%;
   align-items: center;
   justify-content: space-between;
   gap: 1rem;
@@ -185,12 +187,15 @@
 
 .statsSection {
   min-width: 0;
+  max-width: 100%;
 }
 
 .statsGrid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 1rem;
+  min-width: 0;
+  max-width: 100%;
 }
 
 .metricCard,
@@ -205,6 +210,7 @@
 
 .metricCard {
   min-width: 0;
+  max-width: 100%;
   border-radius: 1.25rem;
   padding: 1.25rem;
   transition: background-color 160ms ease, border-color 160ms ease, box-shadow 160ms ease, transform 160ms ease;
@@ -265,6 +271,7 @@
 
 .recentBookingsSection {
   min-width: 0;
+  max-width: 100%;
   margin-top: 1.25rem;
   overflow: hidden;
   border-radius: 1.25rem;
@@ -273,6 +280,7 @@
 .sectionHeader {
   display: flex;
   min-width: 0;
+  max-width: 100%;
   align-items: center;
   justify-content: space-between;
   gap: 1rem;
@@ -302,9 +310,16 @@
 }
 
 .bookingList {
+  min-width: 0;
+  max-width: 100%;
   margin: 0;
   padding: 0;
   list-style: none;
+}
+
+.bookingListItem {
+  min-width: 0;
+  max-width: 100%;
 }
 
 .bookingListItem + .bookingListItem {
@@ -314,6 +329,7 @@
 .bookingLink {
   display: flex;
   min-width: 0;
+  max-width: 100%;
   align-items: center;
   justify-content: space-between;
   gap: 1.25rem;
@@ -419,6 +435,8 @@
 .emptyState {
   display: flex;
   min-height: 20rem;
+  min-width: 0;
+  max-width: 100%;
   align-items: center;
   justify-content: center;
   flex-direction: column;
@@ -477,10 +495,157 @@
   margin-top: 1.25rem;
 }
 
-.emptyStateAction:hover,
-.errorAction:hover {
+.quickSearchSection,
+.quickActionsSection {
+  min-width: 0;
+  max-width: 100%;
+  margin-top: 1.25rem;
+  overflow: hidden;
+  border-radius: 1.25rem;
+  border: 1px solid var(--dashboard-glass-border);
+  background: var(--dashboard-card-bg);
+  box-shadow: var(--dashboard-card-shadow);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+}
+
+.quickSearchForm {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  padding: 1.25rem;
+}
+
+.searchFields {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1rem;
+}
+
+.inputGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.inputLabel {
+  color: var(--dashboard-text-secondary);
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.searchInput {
+  border: 1px solid var(--dashboard-border);
+  border-radius: 0.75rem;
+  background: var(--dashboard-glass);
+  color: var(--dashboard-text-primary);
+  padding: 0.65rem 0.85rem;
+  font: inherit;
+  font-size: 0.875rem;
+  transition: border-color 160ms ease, background-color 160ms ease;
+}
+
+.searchInput:focus {
+  border-color: var(--dashboard-accent);
+  outline: none;
+}
+
+.searchButton {
+  display: inline-flex;
+  min-height: 2.75rem;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  border: 1px solid var(--dashboard-action-primary);
+  border-radius: 0.75rem;
+  background: var(--dashboard-action-primary);
+  color: var(--dashboard-surface);
+  padding: 0.65rem 1.25rem;
+  font: inherit;
+  font-weight: 750;
+  cursor: pointer;
+  align-self: flex-start;
+  transition: background-color 160ms ease, transform 160ms ease;
+}
+
+.searchButton:hover {
   background: var(--dashboard-accent-hover);
   transform: translateY(-1px);
+}
+
+.searchButtonIcon {
+  width: 1.125rem;
+  height: 1.125rem;
+}
+
+.searchError {
+  margin: 0;
+  color: var(--dashboard-stat-cancelled);
+  font-size: 0.8125rem;
+  font-weight: 600;
+}
+
+.actionsGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+  padding: 1.25rem;
+}
+
+.actionCard {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  border: 1px solid var(--dashboard-border-subtle);
+  border-radius: 1rem;
+  background: var(--dashboard-glass);
+  color: inherit;
+  padding: 1rem 1.25rem;
+  text-decoration: none;
+  transition: background-color 160ms ease, border-color 160ms ease, transform 160ms ease;
+}
+
+.actionCard:hover {
+  border-color: var(--dashboard-glass-border-hover);
+  background: var(--dashboard-card-hover);
+  transform: translateY(-2px);
+}
+
+.actionIconWrapper {
+  display: grid;
+  width: 2.5rem;
+  height: 2.5rem;
+  flex: 0 0 auto;
+  place-items: center;
+  border-radius: 0.75rem;
+  background: var(--dashboard-action-primary-bg);
+  color: var(--dashboard-action-primary);
+}
+
+.actionIcon {
+  width: 1.25rem;
+  height: 1.25rem;
+}
+
+.actionDetails {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  min-width: 0;
+}
+
+.actionLabel {
+  color: var(--dashboard-text-primary);
+  font-size: 0.9375rem;
+  font-weight: 750;
+}
+
+.actionDescription {
+  color: var(--dashboard-text-muted);
+  font-size: 0.75rem;
+  line-height: 1.4;
 }
 
 .mobileNav {
@@ -489,6 +654,7 @@
 
 .loadingContent {
   min-width: 0;
+  max-width: 100%;
 }
 
 .skeletonMetricCard {
@@ -554,6 +720,7 @@
 }
 
 .errorCard {
+  min-width: 0;
   max-width: 42rem;
   margin: clamp(2rem, 8vw, 7rem) auto;
   border-radius: 1.25rem;
@@ -590,7 +757,11 @@
 .bookingLink:focus-visible,
 .emptyStateAction:focus-visible,
 .errorAction:focus-visible,
-.mobileNavLink:focus-visible {
+.mobileNavLink:focus-visible,
+.actionCard:focus-visible,
+.recentCard:focus-visible,
+.searchButton:focus-visible,
+.searchInput:focus-visible {
   outline: 3px solid var(--dashboard-focus-ring);
   outline-offset: 3px;
   box-shadow: 0 0 0 5px var(--dashboard-focus-ring-glow);
@@ -621,8 +792,11 @@
   .header,
   .metricCard,
   .recentBookingsSection,
+  .quickSearchSection,
+  .quickActionsSection,
   .errorCard {
     backdrop-filter: none;
+    background: var(--dashboard-surface);
   }
 }
 
@@ -707,7 +881,9 @@
     padding: 1rem;
   }
 
-  .statsGrid {
+  .statsGrid,
+  .searchFields,
+  .actionsGrid {
     grid-template-columns: minmax(0, 1fr);
   }
 
@@ -721,7 +897,9 @@
 
   .sectionHeader,
   .bookingLink,
-  .skeletonRow {
+  .skeletonRow,
+  .quickSearchForm,
+  .actionsGrid {
     padding-right: 1rem;
     padding-left: 1rem;
   }
@@ -755,16 +933,20 @@
   .header,
   .metricCard,
   .recentBookingsSection,
+  .quickSearchSection,
+  .quickActionsSection,
   .errorCard,
   .userBadge,
   .brandMark,
-  .emptyStateIllustration {
+  .emptyStateIllustration,
+  .actionIconWrapper {
     forced-color-adjust: auto;
     border-color: ButtonText;
   }
 
   .emptyStateAction,
-  .errorAction {
+  .errorAction,
+  .searchButton {
     border-color: ButtonText;
   }
 }
@@ -773,10 +955,10 @@
   .dashboardRoot *,
   .dashboardRoot *::before,
   .dashboardRoot *::after {
-    scroll-behavior: auto;
-    animation-duration: 0.01ms;
-    animation-iteration-count: 1;
-    transition-duration: 0.01ms;
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
   }
 
   .metricCard:hover,
