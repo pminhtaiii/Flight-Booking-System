@@ -88,7 +88,7 @@ The filtered dashboard Playwright check is owned by Task 3 and cannot exercise t
 
 ## Commit
 
-`5382c3a` (`feat(web): add dashboard quick search handoff`)
+Implementation: `51c7fc10ace2faade2bf41dcceb61df0593e3580` (`feat(web): add dashboard quick search handoff`).
 
 ## Concerns
 
