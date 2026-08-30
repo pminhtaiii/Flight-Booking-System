@@ -21,14 +21,18 @@ const formatDuration = (duration: string): string => {
   return `${Math.floor(totalMinutes / 60)}h ${totalMinutes % 60}m`;
 };
 
-export function SearchFormClient() {
-  const [origin, setOrigin] = useState('');
-  const [destination, setDestination] = useState('');
-  const [departureDate, setDepartureDate] = useState('');
-  const [adults, setAdults] = useState(1);
-  const [children, setChildren] = useState(0);
-  const [infants, setInfants] = useState(0);
-  const [cabinClass, setCabinClass] = useState<FlightSearchQuery['cabinClass']>('economy');
+type SearchFormClientProps = {
+  initialValues?: Partial<FlightSearchQuery>;
+};
+
+export function SearchFormClient({ initialValues }: SearchFormClientProps): JSX.Element {
+  const [origin, setOrigin] = useState(initialValues?.origin ?? '');
+  const [destination, setDestination] = useState(initialValues?.destination ?? '');
+  const [departureDate, setDepartureDate] = useState(initialValues?.departureDate ?? '');
+  const [adults, setAdults] = useState(initialValues?.adults ?? 1);
+  const [children, setChildren] = useState(initialValues?.children ?? 0);
+  const [infants, setInfants] = useState(initialValues?.infants ?? 0);
+  const [cabinClass, setCabinClass] = useState<FlightSearchQuery['cabinClass']>(initialValues?.cabinClass ?? 'economy');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [offers, setOffers] = useState<FlightSearchOfferView[]>([]);
