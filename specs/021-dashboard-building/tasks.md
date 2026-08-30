@@ -87,8 +87,8 @@
 
 ### Tests for User Story 2
 
-- [ ] T030 [P] [US2] Extend the in-process dashboard fixture and Playwright coverage for quick-search validation, preserved search values, keyboard submission, exact production action destinations, Profile action presence when booking readiness is enabled, Profile action absence when disabled, and absence of `/prototype/*` links in `apps/web/tests/dashboard.spec.ts`
-- [ ] T031 [P] [US2] Add unit tests for search normalization/URL creation in `apps/web/components/dashboard/dashboard-search.spec.ts` and for Profile action omission/inclusion when booking readiness is false/true in `apps/web/components/dashboard/dashboard-actions.spec.ts`
+- [x] T030 [P] [US2] Extend the in-process dashboard fixture and Playwright coverage for quick-search validation, preserved search values, keyboard submission, exact production action destinations, Profile action presence when booking readiness is enabled, Profile action absence when disabled, and absence of `/prototype/*` links in `apps/web/tests/dashboard.spec.ts`
+- [x] T031 [P] [US2] Add unit tests for search normalization/URL creation in `apps/web/components/dashboard/dashboard-search.spec.ts` and for Profile action omission/inclusion when booking readiness is false/true in `apps/web/components/dashboard/dashboard-actions.spec.ts`
 
 ### Implementation for User Story 2
 
