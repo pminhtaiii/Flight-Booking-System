@@ -12,12 +12,12 @@ Accepted — 2026-07-28
 
 Additive migration, all `String?` / `DateTime?`, no breaking changes.
 
-| Section | New Fields | Existing (no change) |
-|---|---|---|
-| **Identity** | `givenName`, `middleName`, `familyName`, `dateOfBirth`, `gender`, `title` | — |
-| **Contact** | `email`, `phoneCountryCode`, `phoneNumber` | — |
-| **Travel Document** | `documentType`, `issuingCountry` | `passportNumber` ✅, `passportExpiry` ✅, `nationality` ✅ |
-| **Preferences** | — | `seatPreference`, `classPreference`, `preferredAirlines`, `blacklistedAirlines`, `dietaryNeeds` ✅ |
+| Section             | New Fields                                                                | Existing (no change)                                                                               |
+| ------------------- | ------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------- |
+| **Identity**        | `givenName`, `middleName`, `familyName`, `dateOfBirth`, `gender`, `title` | —                                                                                                  |
+| **Contact**         | `email`, `phoneCountryCode`, `phoneNumber`                                | —                                                                                                  |
+| **Travel Document** | `documentType`, `issuingCountry`                                          | `passportNumber` ✅, `passportExpiry` ✅, `nationality` ✅                                         |
+| **Preferences**     | —                                                                         | `seatPreference`, `classPreference`, `preferredAirlines`, `blacklistedAirlines`, `dietaryNeeds` ✅ |
 
 - `middleName` remains optional, never required by validation.
 - `email` on the profile is the traveler contact email (can differ from login email).
@@ -62,11 +62,11 @@ All Duffel-bound fields (identity, contact, AND passport document group) are sna
 
 ### 4. Three-layer validation with shared evaluator
 
-| Layer | Endpoint | Behavior |
-|---|---|---|
-| **Readiness (advisory)** | `POST /api/bookings/intents/readiness` | Proactive check. Returns field statuses. Not a guarantee. |
-| **Intent creation (authoritative)** | `POST /api/bookings/intents` | Same evaluator, hard rejection. Creates snapshot only on success. |
-| **Order creation (final)** | Internal `BookingIntentService` | Offer expiry, snapshot integrity, document checks before Duffel. |
+| Layer                               | Endpoint                               | Behavior                                                          |
+| ----------------------------------- | -------------------------------------- | ----------------------------------------------------------------- |
+| **Readiness (advisory)**            | `POST /api/bookings/intents/readiness` | Proactive check. Returns field statuses. Not a guarantee.         |
+| **Intent creation (authoritative)** | `POST /api/bookings/intents`           | Same evaluator, hard rejection. Creates snapshot only on success. |
+| **Order creation (final)**          | Internal `BookingIntentService`        | Offer expiry, snapshot integrity, document checks before Duffel.  |
 
 Both readiness and intent creation use the same `BookingReadinessEvaluator` — a shared, pure validation unit. The evaluator takes `{ profile, offerSegments, airportCountries }` and returns `{ scope, ready, sections[] }`.
 
@@ -78,10 +78,10 @@ Both readiness and intent creation use the same `BookingReadinessEvaluator` — 
 
 Determined by the offer's segments — if any segment crosses a country border (origin/destination airport country codes differ), the scope is `INTERNATIONAL`.
 
-| Scope | Required | Not Required |
-|---|---|---|
-| **DOMESTIC** | Identity (6 fields) + Contact (3 fields) = 8 fields | Travel document section not evaluated |
-| **INTERNATIONAL** | Identity + Contact + Travel Document (5 fields) = 13 fields | `middleName` always optional |
+| Scope             | Required                                                    | Not Required                          |
+| ----------------- | ----------------------------------------------------------- | ------------------------------------- |
+| **DOMESTIC**      | Identity (6 fields) + Contact (3 fields) = 8 fields         | Travel document section not evaluated |
+| **INTERNATIONAL** | Identity + Contact + Travel Document (5 fields) = 13 fields | `middleName` always optional          |
 
 **Key distinction:** Route scope determines field requirements. Duffel offer requirements determine whether documents must be submitted. Immigration-entry eligibility requires destination-specific travel rules — not inferred from scope alone.
 
@@ -89,11 +89,11 @@ Determined by the offer's segments — if any segment crosses a country border (
 
 ### 6. Document Validation Model: hard / advisory / deferred
 
-| Tier | Behavior | Blocks booking? |
-|---|---|---|
-| **Hard** | Passport expired before trip ends, missing required fields, unsupported document type | Yes — `status: "invalid"` |
-| **Advisory** | Passport expires within `PASSPORT_ADVISORY_BUFFER_DAYS` (default 180) after trip | Warning only — `status: "warning"`, reason: `PASSPORT_VALIDITY_REQUIRES_VERIFICATION` |
-| **Deferred** | Destination-specific validity rules (Timatic integration) | Not built — `status: "unknown"` |
+| Tier         | Behavior                                                                              | Blocks booking?                                                                       |
+| ------------ | ------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------- |
+| **Hard**     | Passport expired before trip ends, missing required fields, unsupported document type | Yes — `status: "invalid"`                                                             |
+| **Advisory** | Passport expires within `PASSPORT_ADVISORY_BUFFER_DAYS` (default 180) after trip      | Warning only — `status: "warning"`, reason: `PASSPORT_VALIDITY_REQUIRES_VERIFICATION` |
+| **Deferred** | Destination-specific validity rules (Timatic integration)                             | Not built — `status: "unknown"`                                                       |
 
 **Rejected:** Universal 180-day hard blocker — passport validity rules vary by destination, nationality, transit route. Only clearly expired/unusable documents are blocked.
 
@@ -115,12 +115,12 @@ PII never flows through SSE or the chatbot agent:
 
 ### 8. Module boundaries
 
-| Module | Owns |
-|---|---|
-| **`profile/`** (NEW) | `TravelerProfile` CRUD, PII encryption/masking, `GET/PATCH /api/profile` endpoints. Does not know about offers or bookings. |
+| Module                           | Owns                                                                                                                                                                                   |
+| -------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **`profile/`** (NEW)             | `TravelerProfile` CRUD, PII encryption/masking, `GET/PATCH /api/profile` endpoints. Does not know about offers or bookings.                                                            |
 | **`booking-intent/`** (EXISTING) | `BookingReadinessEvaluator`, `POST /api/bookings/intents/readiness`, the `source` union resolution logic, passenger snapshot creation. Imports `ProfileService` and `AirportsService`. |
-| **`agent-gateway/`** (EXISTING) | New `check_booking_readiness` tool that proxies to `BookingReadinessEvaluator` with PII stripping. `getUserPreferences` unchanged. |
-| **`common/`** (EXISTING) | `EncryptionService` — shared by both `profile/` and `booking-intent/`. |
+| **`agent-gateway/`** (EXISTING)  | New `check_booking_readiness` tool that proxies to `BookingReadinessEvaluator` with PII stripping. `getUserPreferences` unchanged.                                                     |
+| **`common/`** (EXISTING)         | `EncryptionService` — shared by both `profile/` and `booking-intent/`.                                                                                                                 |
 
 **Rejected:** Putting the evaluator in `profile/` — the evaluator's primary concerns (offer segments, passenger mapping, airport country lookup) belong to the booking context, not the profile context.
 

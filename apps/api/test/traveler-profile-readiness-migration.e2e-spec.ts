@@ -48,7 +48,6 @@ describe('Traveler Profile & Booking Readiness Migration E2E', () => {
     await prisma.airport.deleteMany({});
     await prisma.auditLog.deleteMany({});
     await prisma.user.deleteMany({});
-
   });
 
   it('checks that new TravelerProfile columns are accessible and nullable/defaulted', async () => {
@@ -60,14 +59,14 @@ describe('Traveler Profile & Booking Readiness Migration E2E', () => {
     });
 
     // Create a traveler profile without specifying the new optional fields
-    const profile = await prisma.travelerProfile.create({
+    const profile = (await prisma.travelerProfile.create({
       data: {
         userId: user.id,
         nationality: 'US',
         passportNumber: '123456789',
         passportExpiry: new Date(),
       },
-    }) as any;
+    })) as any;
 
     // Verify defaults and nulls for new fields
     expect(profile.revision).toBe(1);
@@ -85,13 +84,13 @@ describe('Traveler Profile & Booking Readiness Migration E2E', () => {
     expect(profile.passportExpiryCiphertext).toBeNull();
 
     // Verify we can update them
-    const updatedProfile = await prisma.travelerProfile.update({
+    const updatedProfile = (await prisma.travelerProfile.update({
       where: { id: profile.id },
       data: {
         givenName: 'John',
         revision: { increment: 1 },
       } as any,
-    }) as any;
+    })) as any;
 
     expect(updatedProfile.givenName).toBe('John');
     expect(updatedProfile.revision).toBe(2);
@@ -129,7 +128,7 @@ describe('Traveler Profile & Booking Readiness Migration E2E', () => {
       },
     });
 
-    const passenger = await prisma.bookingIntentPassenger.create({
+    const passenger = (await prisma.bookingIntentPassenger.create({
       data: {
         intentId: intent.id,
         position: 1,
@@ -140,7 +139,7 @@ describe('Traveler Profile & Booking Readiness Migration E2E', () => {
         dateOfBirth: new Date(),
         travelerProfileId: profile.id,
       },
-    }) as any;
+    })) as any;
 
     // Verify defaults and nulls for new fields
     expect(passenger.snapshotVersion).toBe(1);
@@ -153,13 +152,13 @@ describe('Traveler Profile & Booking Readiness Migration E2E', () => {
     expect(passenger.issuingCountry).toBeNull();
 
     // Verify we can update them
-    const updatedPassenger = await prisma.bookingIntentPassenger.update({
+    const updatedPassenger = (await prisma.bookingIntentPassenger.update({
       where: { id: passenger.id },
       data: {
         middleName: 'Marie',
         snapshotVersion: 2,
       } as any,
-    }) as any;
+    })) as any;
 
     expect(updatedPassenger.middleName).toBe('Marie');
     expect(updatedPassenger.snapshotVersion).toBe(2);
@@ -227,6 +226,3 @@ describe('Traveler Profile & Booking Readiness Migration E2E', () => {
     expect(foundPassenger!.travelerProfileId).toBeNull();
   });
 });
-
-
-

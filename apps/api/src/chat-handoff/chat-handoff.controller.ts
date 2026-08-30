@@ -53,7 +53,9 @@ export class ChatHandoffController {
       const userId = this.userId(req);
       return await this.chatHandoffService.create(dto, { traceId, correlationId }, userId);
     } catch (error) {
-      this.logger.warn(`[create] Failed to create chat handoff: ${error instanceof Error ? error.message : 'unknown'}`);
+      this.logger.warn(
+        `[create] Failed to create chat handoff: ${error instanceof Error ? error.message : 'unknown'}`,
+      );
       throw error;
     }
   }
@@ -69,7 +71,9 @@ export class ChatHandoffController {
     try {
       return await this.create(dto, req, traceId, correlationId);
     } catch (error) {
-      this.logger.warn(`[createTokens] Failed to create chat handoff tokens: ${error instanceof Error ? error.message : 'unknown'}`);
+      this.logger.warn(
+        `[createTokens] Failed to create chat handoff tokens: ${error instanceof Error ? error.message : 'unknown'}`,
+      );
       throw error;
     }
   }
@@ -90,13 +94,14 @@ export class ChatHandoffController {
       if (!token) {
         throw new UnauthorizedException('Invalid handoff token');
       }
-      return await this.chatHandoffService.resolveSafe(
-        token,
-        this.userId(req),
-        { traceId, correlationId },
-      );
+      return await this.chatHandoffService.resolveSafe(token, this.userId(req), {
+        traceId,
+        correlationId,
+      });
     } catch (error) {
-      this.logger.warn(`[resolve] Failed to resolve chat handoff: ${error instanceof Error ? error.message : 'unknown'}`);
+      this.logger.warn(
+        `[resolve] Failed to resolve chat handoff: ${error instanceof Error ? error.message : 'unknown'}`,
+      );
       throw error;
     }
   }
@@ -118,13 +123,14 @@ export class ChatHandoffController {
       if (!token) {
         throw new UnauthorizedException('Invalid handoff token');
       }
-      return await this.chatHandoffService.resolveSafe(
-        token,
-        this.userId(req),
-        { traceId, correlationId },
-      );
+      return await this.chatHandoffService.resolveSafe(token, this.userId(req), {
+        traceId,
+        correlationId,
+      });
     } catch (error) {
-      this.logger.warn(`[resolvePost] Failed to resolve chat handoff: ${error instanceof Error ? error.message : 'unknown'}`);
+      this.logger.warn(
+        `[resolvePost] Failed to resolve chat handoff: ${error instanceof Error ? error.message : 'unknown'}`,
+      );
       throw error;
     }
   }

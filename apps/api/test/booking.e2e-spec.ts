@@ -21,9 +21,13 @@ describe('Bookings (E2E)', () => {
   let tokenB: string;
 
   beforeAll(async (): Promise<void> => {
-    const moduleFixture: TestingModule = await Test.createTestingModule({ imports: [AppModule] }).compile();
+    const moduleFixture: TestingModule = await Test.createTestingModule({
+      imports: [AppModule],
+    }).compile();
     app = moduleFixture.createNestApplication();
-    app.useGlobalPipes(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, transform: true }));
+    app.useGlobalPipes(
+      new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, transform: true }),
+    );
     app.useGlobalFilters(new HttpExceptionFilter());
     app.setGlobalPrefix('api', { exclude: ['health'] });
     await app.init();
@@ -38,8 +42,20 @@ describe('Bookings (E2E)', () => {
   beforeEach(async (): Promise<void> => {
     const suffix = crypto.randomUUID();
     const [createdA, createdB] = await Promise.all([
-      prisma.user.create({ data: { email: `booking-a-${suffix}@example.com`, password: 'Password123!', status: 'ACTIVE' } }),
-      prisma.user.create({ data: { email: `booking-b-${suffix}@example.com`, password: 'Password123!', status: 'ACTIVE' } }),
+      prisma.user.create({
+        data: {
+          email: `booking-a-${suffix}@example.com`,
+          password: 'Password123!',
+          status: 'ACTIVE',
+        },
+      }),
+      prisma.user.create({
+        data: {
+          email: `booking-b-${suffix}@example.com`,
+          password: 'Password123!',
+          status: 'ACTIVE',
+        },
+      }),
     ]);
     userA = { id: createdA.id, email: createdA.email };
     userB = { id: createdB.id, email: createdB.email };
@@ -72,15 +88,17 @@ describe('Bookings (E2E)', () => {
     await prisma.airport.deleteMany({});
     await prisma.auditLog.deleteMany({});
     await prisma.user.deleteMany({});
-
   });
 
-  async function createBooking(userId: string, overrides: Partial<{
-    status: BookingStatus;
-    departureAt: Date | null;
-    pnrReference: string | null;
-    flightSnapshot: Prisma.InputJsonValue | null;
-  }> = {}): Promise<{ id: string }> {
+  async function createBooking(
+    userId: string,
+    overrides: Partial<{
+      status: BookingStatus;
+      departureAt: Date | null;
+      pnrReference: string | null;
+      flightSnapshot: Prisma.InputJsonValue | null;
+    }> = {},
+  ): Promise<{ id: string }> {
     const now = new Date();
     const intent = await prisma.bookingIntent.create({
       data: {
@@ -111,7 +129,8 @@ describe('Bookings (E2E)', () => {
         status: overrides.status ?? 'PROCESSING',
         departureAt: overrides.departureAt ?? null,
         pnrReference: overrides.pnrReference ?? null,
-        flightSnapshot: overrides.flightSnapshot === null ? Prisma.DbNull : overrides.flightSnapshot,
+        flightSnapshot:
+          overrides.flightSnapshot === null ? Prisma.DbNull : overrides.flightSnapshot,
       },
     });
     return { id: booking.id };
@@ -130,7 +149,8 @@ describe('Bookings (E2E)', () => {
     });
     const payment = await prisma.payment.create({
       data: {
-        bookingIntentId: (await prisma.booking.findUniqueOrThrow({ where: { id: booking.id } })).bookingIntentId,
+        bookingIntentId: (await prisma.booking.findUniqueOrThrow({ where: { id: booking.id } }))
+          .bookingIntentId,
         attemptNumber: 1,
         idempotencyKeyId: key.id,
         stripePaymentIntentId: `pi-${crypto.randomUUID()}`,
@@ -144,32 +164,71 @@ describe('Bookings (E2E)', () => {
 
   it('returns upcoming bookings in processing-first order with null processing fields', async (): Promise<void> => {
     const future = new Date(Date.now() + 48 * 60 * 60 * 1000);
-    const confirmed = await createBooking(userA.id, { status: 'CONFIRMED', departureAt: future, pnrReference: 'PNR123' });
+    const confirmed = await createBooking(userA.id, {
+      status: 'CONFIRMED',
+      departureAt: future,
+      pnrReference: 'PNR123',
+    });
     const processing = await createBooking(userA.id);
-    await createBooking(userA.id, { status: 'COMPLETED', departureAt: new Date(Date.now() - 48 * 60 * 60 * 1000) });
+    await createBooking(userA.id, {
+      status: 'COMPLETED',
+      departureAt: new Date(Date.now() - 48 * 60 * 60 * 1000),
+    });
 
-    const response = await request(app.getHttpServer()).get('/api/bookings').set('Authorization', `Bearer ${tokenA}`).expect(200);
+    const response = await request(app.getHttpServer())
+      .get('/api/bookings')
+      .set('Authorization', `Bearer ${tokenA}`)
+      .expect(200);
 
-    expect(response.body.bookings.map((booking: { id: string }) => booking.id)).toEqual([processing.id, confirmed.id]);
-    expect(response.body.bookings[0]).toMatchObject({ status: 'PROCESSING', departureAt: null, pnrReference: null, flightSnapshot: null });
+    expect(response.body.bookings.map((booking: { id: string }) => booking.id)).toEqual([
+      processing.id,
+      confirmed.id,
+    ]);
+    expect(response.body.bookings[0]).toMatchObject({
+      status: 'PROCESSING',
+      departureAt: null,
+      pnrReference: null,
+      flightSnapshot: null,
+    });
     expect(response.body.pagination).toMatchObject({ page: 1, limit: 20, total: 2, totalPages: 1 });
   });
 
   it('returns only completed and departed bookings on the past tab', async (): Promise<void> => {
-    const past = await createBooking(userA.id, { status: 'COMPLETED', departureAt: new Date(Date.now() - 24 * 60 * 60 * 1000) });
-    await createBooking(userA.id, { status: 'CONFIRMED', departureAt: new Date(Date.now() + 24 * 60 * 60 * 1000) });
+    const past = await createBooking(userA.id, {
+      status: 'COMPLETED',
+      departureAt: new Date(Date.now() - 24 * 60 * 60 * 1000),
+    });
+    await createBooking(userA.id, {
+      status: 'CONFIRMED',
+      departureAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
+    });
 
-    const response = await request(app.getHttpServer()).get('/api/bookings?tab=past').set('Authorization', `Bearer ${tokenA}`).expect(200);
+    const response = await request(app.getHttpServer())
+      .get('/api/bookings?tab=past')
+      .set('Authorization', `Bearer ${tokenA}`)
+      .expect(200);
 
     expect(response.body.bookings).toHaveLength(1);
     expect(response.body.bookings[0].id).toBe(past.id);
   });
 
   it('enforces UUID and pagination query validation at the HTTP boundary', async (): Promise<void> => {
-    await request(app.getHttpServer()).get('/api/bookings/not-a-uuid').set('Authorization', `Bearer ${tokenA}`).expect(400);
-    await request(app.getHttpServer()).get('/api/bookings?tab=invalid').set('Authorization', `Bearer ${tokenA}`).expect(400);
-    await request(app.getHttpServer()).get('/api/bookings?page=0').set('Authorization', `Bearer ${tokenA}`).expect(400);
-    await request(app.getHttpServer()).get('/api/bookings?limit=51').set('Authorization', `Bearer ${tokenA}`).expect(400);
+    await request(app.getHttpServer())
+      .get('/api/bookings/not-a-uuid')
+      .set('Authorization', `Bearer ${tokenA}`)
+      .expect(400);
+    await request(app.getHttpServer())
+      .get('/api/bookings?tab=invalid')
+      .set('Authorization', `Bearer ${tokenA}`)
+      .expect(400);
+    await request(app.getHttpServer())
+      .get('/api/bookings?page=0')
+      .set('Authorization', `Bearer ${tokenA}`)
+      .expect(400);
+    await request(app.getHttpServer())
+      .get('/api/bookings?limit=51')
+      .set('Authorization', `Bearer ${tokenA}`)
+      .expect(400);
   });
 
   it('rejects an invalid client-generated booking UUID before starting confirmation work', async (): Promise<void> => {
@@ -192,7 +251,9 @@ describe('Bookings (E2E)', () => {
       .send({ bookingId: otherUsersBooking.id, paymentId: payment.id })
       .expect(403);
 
-    const persisted = await prisma.booking.findUniqueOrThrow({ where: { id: otherUsersBooking.id } });
+    const persisted = await prisma.booking.findUniqueOrThrow({
+      where: { id: otherUsersBooking.id },
+    });
     expect(persisted.userId).toBe(userB.id);
     expect(persisted.status).toBe('PROCESSING');
   });
@@ -200,19 +261,29 @@ describe('Bookings (E2E)', () => {
   it('returns detail with a null payment and blocks cross-user access without revealing data', async (): Promise<void> => {
     const booking = await createBooking(userA.id, { status: 'FAILED' });
 
-    const ownResponse = await request(app.getHttpServer()).get(`/api/bookings/${booking.id}`).set('Authorization', `Bearer ${tokenA}`).expect(200);
+    const ownResponse = await request(app.getHttpServer())
+      .get(`/api/bookings/${booking.id}`)
+      .set('Authorization', `Bearer ${tokenA}`)
+      .expect(200);
     expect(ownResponse.body).toMatchObject({ id: booking.id, status: 'FAILED', payment: null });
 
-    await request(app.getHttpServer()).get(`/api/bookings/${booking.id}`).set('Authorization', `Bearer ${tokenB}`).expect(403);
-    await request(app.getHttpServer()).get(`/api/bookings/${crypto.randomUUID()}`).set('Authorization', `Bearer ${tokenA}`).expect(404);
+    await request(app.getHttpServer())
+      .get(`/api/bookings/${booking.id}`)
+      .set('Authorization', `Bearer ${tokenB}`)
+      .expect(403);
+    await request(app.getHttpServer())
+      .get(`/api/bookings/${crypto.randomUUID()}`)
+      .set('Authorization', `Bearer ${tokenA}`)
+      .expect(404);
   });
 
   it('allows only one concurrent conditional terminal transition', async (): Promise<void> => {
     const booking = await createBooking(userA.id);
-    const update = (): Promise<{ count: number }> => prisma.booking.updateMany({
-      where: { id: booking.id, status: 'PROCESSING' },
-      data: { status: 'FAILED', failureReason: 'BOOKING_TIMEOUT' },
-    });
+    const update = (): Promise<{ count: number }> =>
+      prisma.booking.updateMany({
+        where: { id: booking.id, status: 'PROCESSING' },
+        data: { status: 'FAILED', failureReason: 'BOOKING_TIMEOUT' },
+      });
 
     const results = await Promise.all([update(), update()]);
     const stored = await prisma.booking.findUniqueOrThrow({ where: { id: booking.id } });
@@ -222,5 +293,3 @@ describe('Bookings (E2E)', () => {
     expect(stored.failureReason).toBe('BOOKING_TIMEOUT');
   });
 });
-
-

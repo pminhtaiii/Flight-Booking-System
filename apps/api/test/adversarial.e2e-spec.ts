@@ -99,7 +99,6 @@ describe('Adversarial and Edge Case Tests (E2E)', () => {
     await prisma.auditLog.deleteMany({});
     await prisma.user.deleteMany({});
 
-
     // Clear lockouts
     await request(app.getHttpServer()).post('/auth/test/reset-lockout').send({ clearAll: true });
   });
@@ -231,8 +230,6 @@ describe('Adversarial and Edge Case Tests (E2E)', () => {
         })
         .expect(400);
     });
-
-
   });
 
   describe('CacheService Fallback Mechanism (Redis Offline simulation)', () => {
@@ -478,6 +475,3 @@ describe('Adversarial and Edge Case Tests (E2E)', () => {
     });
   });
 });
-
-
-

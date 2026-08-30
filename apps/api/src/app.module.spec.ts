@@ -133,7 +133,8 @@ describe('AppModule Dependency Graph & DashboardModule Registration (T017 / T018
   });
 
   it('verifies DashboardModule imports only PrismaModule and strictly excludes heavy dependencies', () => {
-    const dashboardImports = (Reflect.getMetadata(MODULE_METADATA.IMPORTS, DashboardModule) ?? []) as unknown[];
+    const dashboardImports = (Reflect.getMetadata(MODULE_METADATA.IMPORTS, DashboardModule) ??
+      []) as unknown[];
     expect(dashboardImports).toContain(PrismaModule);
     expect(dashboardImports).not.toContain(BookingManagementModule);
     expect(dashboardImports).not.toContain(ProfileModule);
@@ -142,9 +143,12 @@ describe('AppModule Dependency Graph & DashboardModule Registration (T017 / T018
   });
 
   it('verifies DashboardModule registers DashboardController and provides/exports DashboardService', () => {
-    const controllers = (Reflect.getMetadata(MODULE_METADATA.CONTROLLERS, DashboardModule) ?? []) as unknown[];
-    const providers = (Reflect.getMetadata(MODULE_METADATA.PROVIDERS, DashboardModule) ?? []) as unknown[];
-    const exports = (Reflect.getMetadata(MODULE_METADATA.EXPORTS, DashboardModule) ?? []) as unknown[];
+    const controllers = (Reflect.getMetadata(MODULE_METADATA.CONTROLLERS, DashboardModule) ??
+      []) as unknown[];
+    const providers = (Reflect.getMetadata(MODULE_METADATA.PROVIDERS, DashboardModule) ??
+      []) as unknown[];
+    const exports = (Reflect.getMetadata(MODULE_METADATA.EXPORTS, DashboardModule) ??
+      []) as unknown[];
 
     expect(controllers).toContain(DashboardController);
     expect(providers).toContain(DashboardService);
@@ -168,5 +172,3 @@ describe('AppModule Dependency Graph & DashboardModule Registration (T017 / T018
     expect(service).toBeInstanceOf(DashboardService);
   });
 });
-
-

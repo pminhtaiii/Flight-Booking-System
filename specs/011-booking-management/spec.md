@@ -8,7 +8,7 @@
 
 **Input**: Grilling session decisions from [research/booking-management-decisions.md](../../research/booking-management-decisions.md)
 
-## User Scenarios & Testing *(mandatory)*
+## User Scenarios & Testing _(mandatory)_
 
 ### User Story 1 - Post-Payment Confirmation (Priority: P1)
 
@@ -119,7 +119,7 @@ When a booking is confirmed, the complete flight details are stored as a snapsho
 - What happens when a user has a `PROCESSING` booking and revisits the detail page? → Shows processing state. When the pipeline completes, refreshing the page shows final state.
 - How does the Upcoming/Past boundary work? → Based on the flight departure date compared to current time.
 
-## Requirements *(mandatory)*
+## Requirements _(mandatory)_
 
 ### Functional Requirements
 
@@ -145,7 +145,7 @@ When a booking is confirmed, the complete flight details are stored as a snapsho
 - **BookingStatus enum**: `PROCESSING`, `CONFIRMED`, `FAILED`, `COMPLETED`.
 - **BookingFailureReason enum**: `OFFER_EXPIRED`, `PRICE_CHANGED`, `BOOKING_TIMEOUT`, `CAPTURE_FAILED`, `SYSTEM_ERROR`.
 
-## Success Criteria *(mandatory)*
+## Success Criteria _(mandatory)_
 
 ### Measurable Outcomes
 

@@ -11,25 +11,13 @@ export type PaymentStatus =
   | 'DISPUTED'
   | 'CHARGEBACK_LOST';
 
-export type RefundStatus =
-  | 'REFUND_PENDING'
-  | 'SUCCEEDED'
-  | 'FAILED';
+export type RefundStatus = 'REFUND_PENDING' | 'SUCCEEDED' | 'FAILED';
 
-export type RefundTriggerType =
-  | 'USER'
-  | 'ADMIN'
-  | 'SYSTEM_AUTOMATED';
+export type RefundTriggerType = 'USER' | 'ADMIN' | 'SYSTEM_AUTOMATED';
 
-export type LedgerEntryType =
-  | 'DEBIT'
-  | 'CREDIT';
+export type LedgerEntryType = 'DEBIT' | 'CREDIT';
 
-export type PaymentEventSource =
-  | 'WEBHOOK'
-  | 'API'
-  | 'CRON'
-  | 'SYSTEM';
+export type PaymentEventSource = 'WEBHOOK' | 'API' | 'CRON' | 'SYSTEM';
 
 export type Payment = {
   id: string;

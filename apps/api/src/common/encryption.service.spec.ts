@@ -79,7 +79,12 @@ describe('EncryptionService', () => {
 
     it('round-trips plaintext with context binding and version prefixing', () => {
       const service = new EncryptionService();
-      const context = { snapshotVersion: 1, intentId: 'intent-123', position: 1, fieldName: 'passportExpiry' };
+      const context = {
+        snapshotVersion: 1,
+        intentId: 'intent-123',
+        position: 1,
+        fieldName: 'passportExpiry',
+      };
       const plaintext = '2026-08-01';
 
       const ciphertext = (service as any).encryptBound(plaintext, context);
@@ -94,8 +99,18 @@ describe('EncryptionService', () => {
 
     it('fails to decrypt if the wrong context is provided (wrong context swap)', () => {
       const service = new EncryptionService();
-      const contextA = { snapshotVersion: 1, intentId: 'intent-A', position: 1, fieldName: 'passportExpiry' };
-      const contextB = { snapshotVersion: 1, intentId: 'intent-B', position: 1, fieldName: 'passportExpiry' };
+      const contextA = {
+        snapshotVersion: 1,
+        intentId: 'intent-A',
+        position: 1,
+        fieldName: 'passportExpiry',
+      };
+      const contextB = {
+        snapshotVersion: 1,
+        intentId: 'intent-B',
+        position: 1,
+        fieldName: 'passportExpiry',
+      };
       const plaintext = '2026-08-01';
 
       const ciphertext = (service as any).encryptBound(plaintext, contextA);
@@ -106,8 +121,18 @@ describe('EncryptionService', () => {
 
     it('fails to decrypt if ciphertext from another record is swapped (cross-record swap)', () => {
       const service = new EncryptionService();
-      const contextA = { snapshotVersion: 1, intentId: 'intent-123', position: 1, fieldName: 'passportNumber' };
-      const contextB = { snapshotVersion: 1, intentId: 'intent-123', position: 2, fieldName: 'passportNumber' };
+      const contextA = {
+        snapshotVersion: 1,
+        intentId: 'intent-123',
+        position: 1,
+        fieldName: 'passportNumber',
+      };
+      const contextB = {
+        snapshotVersion: 1,
+        intentId: 'intent-123',
+        position: 2,
+        fieldName: 'passportNumber',
+      };
 
       const ciphertextA = (service as any).encryptBound('passport-A', contextA);
       const ciphertextB = (service as any).encryptBound('passport-B', contextB);
@@ -133,7 +158,12 @@ describe('EncryptionService', () => {
 
     it('fails closed safely on tampering', () => {
       const service = new EncryptionService();
-      const context = { snapshotVersion: 1, intentId: 'intent-123', position: 1, fieldName: 'passportExpiry' };
+      const context = {
+        snapshotVersion: 1,
+        intentId: 'intent-123',
+        position: 1,
+        fieldName: 'passportExpiry',
+      };
       const ciphertext = (service as any).encryptBound('data', context);
 
       const parts = ciphertext.split(':');
@@ -148,7 +178,12 @@ describe('EncryptionService', () => {
   describe('key rotation ring', () => {
     const oldKey = '1'.repeat(64);
     const newKey = '2'.repeat(64);
-    const context = { snapshotVersion: 1, intentId: 'intent-rot-1', position: 0, fieldName: 'passportNumber' };
+    const context = {
+      snapshotVersion: 1,
+      intentId: 'intent-rot-1',
+      position: 0,
+      fieldName: 'passportNumber',
+    };
 
     it('decrypts unbound ciphertext encrypted with previous key across rotation', () => {
       // 1. Encrypt with old key
@@ -270,4 +305,4 @@ describe('EncryptionService', () => {
       );
     });
   });
-});
+});

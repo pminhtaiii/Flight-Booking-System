@@ -1,4 +1,13 @@
-export type BookingStatus = 'PROCESSING' | 'CONFIRMED' | 'FAILED' | 'COMPLETED' | 'CANCELLATION_PENDING' | 'CANCELLED_PENDING_REFUND' | 'CANCELLED_AND_REFUNDED' | 'CANCELLED_NO_REFUND' | 'REFUND_FAILED_NEEDS_ATTENTION';
+export type BookingStatus =
+  | 'PROCESSING'
+  | 'CONFIRMED'
+  | 'FAILED'
+  | 'COMPLETED'
+  | 'CANCELLATION_PENDING'
+  | 'CANCELLED_PENDING_REFUND'
+  | 'CANCELLED_AND_REFUNDED'
+  | 'CANCELLED_NO_REFUND'
+  | 'REFUND_FAILED_NEEDS_ATTENTION';
 
 type BookingStatusBadgeProps = {
   status: BookingStatus;
@@ -30,7 +39,9 @@ const statusLabels: Record<BookingStatus, string> = {
 
 export function BookingStatusBadge({ status }: BookingStatusBadgeProps) {
   return (
-    <span className={`rounded-full px-3 py-1 text-xs font-semibold ${statusStyles[status] || 'bg-background text-text-secondary'}`}>
+    <span
+      className={`rounded-full px-3 py-1 text-xs font-semibold ${statusStyles[status] || 'bg-background text-text-secondary'}`}
+    >
       {statusLabels[status] || status}
     </span>
   );

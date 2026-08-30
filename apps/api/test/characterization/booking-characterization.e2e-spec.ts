@@ -4,7 +4,13 @@ process.env.STRIPE_WEBHOOK_SECRET = 'whsec_test_fake';
 process.env.CLAIM_TOKEN_SECRET = 'test-claim-token-secret';
 
 import { Test, TestingModule } from '@nestjs/testing';
-import { INestApplication, ValidationPipe, ForbiddenException, NotFoundException, BadRequestException } from '@nestjs/common';
+import {
+  INestApplication,
+  ValidationPipe,
+  ForbiddenException,
+  NotFoundException,
+  BadRequestException,
+} from '@nestjs/common';
 import request from 'supertest';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -62,8 +68,11 @@ describe('Booking Characterization (E2E)', () => {
     duffelService = moduleFixture.get<DuffelService>(DuffelService);
     bookingLifecycleService = moduleFixture.get<BookingLifecycleService>(BookingLifecycleService);
     bookingRecoveryService = moduleFixture.get<BookingRecoveryService>(BookingRecoveryService);
-    bookingManagementService = moduleFixture.get<BookingManagementService>(BookingManagementService);
-    projectionService = moduleFixture.get<BookingAgentProjectionService>(BookingAgentProjectionService);
+    bookingManagementService =
+      moduleFixture.get<BookingManagementService>(BookingManagementService);
+    projectionService = moduleFixture.get<BookingAgentProjectionService>(
+      BookingAgentProjectionService,
+    );
   });
 
   afterAll(async () => {
@@ -105,7 +114,10 @@ describe('Booking Characterization (E2E)', () => {
       },
     });
     userA = { id: createdA.id, email: createdA.email };
-    tokenA = jwtService.sign({ id: userA.id, email: userA.email, role: 'USER' }, { expiresIn: '24h' });
+    tokenA = jwtService.sign(
+      { id: userA.id, email: userA.email, role: 'USER' },
+      { expiresIn: '24h' },
+    );
 
     const createdB = await prisma.user.create({
       data: {
@@ -116,7 +128,10 @@ describe('Booking Characterization (E2E)', () => {
       },
     });
     userB = { id: createdB.id, email: createdB.email };
-    tokenB = jwtService.sign({ id: userB.id, email: userB.email, role: 'USER' }, { expiresIn: '24h' });
+    tokenB = jwtService.sign(
+      { id: userB.id, email: userB.email, role: 'USER' },
+      { expiresIn: '24h' },
+    );
   });
 
   async function createBookingIntent(userId: string, price = '150.00', currency = 'USD') {
@@ -230,7 +245,11 @@ describe('Booking Characterization (E2E)', () => {
 
       // Replay with same intentId but different requested bookingId -> returns existing booking by intent
       const diffBookingId = crypto.randomUUID();
-      const byIntent = await bookingLifecycleService.createBooking(userA.id, diffBookingId, intent.id);
+      const byIntent = await bookingLifecycleService.createBooking(
+        userA.id,
+        diffBookingId,
+        intent.id,
+      );
       expect(byIntent.id).toBe(bookingId);
 
       const totalCount = await prisma.booking.count({ where: { bookingIntentId: intent.id } });
@@ -455,7 +474,10 @@ describe('Booking Characterization (E2E)', () => {
 
       const retrieveSpy = jest
         .spyOn(stripeService, 'retrievePaymentIntent')
-        .mockResolvedValue({ id: payment.stripePaymentIntentId, status: 'requires_payment_method' } as any);
+        .mockResolvedValue({
+          id: payment.stripePaymentIntentId,
+          status: 'requires_payment_method',
+        } as any);
       const cancelSpy = jest
         .spyOn(stripeService, 'cancelPaymentIntent')
         .mockResolvedValue({ id: payment.stripePaymentIntentId, status: 'canceled' } as any);
@@ -636,9 +658,9 @@ describe('Booking Characterization (E2E)', () => {
       expect(detail.payment).toBeDefined();
 
       // User B (non-owner) is rejected with ForbiddenException
-      await expect(
-        bookingManagementService.getBookingDetail(booking.id, userB.id),
-      ).rejects.toThrow(ForbiddenException);
+      await expect(bookingManagementService.getBookingDetail(booking.id, userB.id)).rejects.toThrow(
+        ForbiddenException,
+      );
     });
   });
 
@@ -663,7 +685,9 @@ describe('Booking Characterization (E2E)', () => {
       expect(hasForwardRefInBooking).toBe(false);
 
       // Assert NO forwardRef in PaymentModule for BookingModule
-      const hasBookingModuleForwardRefInPayment = paymentModuleContent.includes('forwardRef(() => BookingModule)');
+      const hasBookingModuleForwardRefInPayment = paymentModuleContent.includes(
+        'forwardRef(() => BookingModule)',
+      );
       expect(hasBookingModuleForwardRefInPayment).toBe(false);
     });
   });

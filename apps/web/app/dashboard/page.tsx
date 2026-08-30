@@ -45,7 +45,9 @@ export default async function DashboardPage(): Promise<JSX.Element> {
     }
   }
 
-  const dashboardActions = buildDashboardActions({ isBookingReadinessEnabled: showProfileNavigation });
+  const dashboardActions = buildDashboardActions({
+    isBookingReadinessEnabled: showProfileNavigation,
+  });
 
   const classes = styles || {};
 
@@ -56,7 +58,9 @@ export default async function DashboardPage(): Promise<JSX.Element> {
           <h2 id="quick-search-heading" className={classes.quickSectionHeading}>
             Quick Search
           </h2>
-          <p className={classes.quickSectionDescription}>Start a flight search with airport codes and your departure date.</p>
+          <p className={classes.quickSectionDescription}>
+            Start a flight search with airport codes and your departure date.
+          </p>
         </div>
         <DashboardQuickSearch />
       </section>

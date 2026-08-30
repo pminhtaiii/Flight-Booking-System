@@ -26,13 +26,13 @@ Required. Bearer JWT token in `Authorization` header.
 }
 ```
 
-| Field | Type | Required | Validation |
-|-------|------|----------|------------|
-| origin | string | Yes | 3-character uppercase IATA code, must exist in airports database |
-| destination | string | Yes | 3-character uppercase IATA code, must exist in airports database, must differ from origin |
-| departureDate | string | Yes | YYYY-MM-DD format, must be a future date |
-| returnDate | string | No | YYYY-MM-DD format, must be a future date, must be ≥ departureDate |
-| passengers | integer | Yes | 1–9 inclusive |
+| Field         | Type    | Required | Validation                                                                                |
+| ------------- | ------- | -------- | ----------------------------------------------------------------------------------------- |
+| origin        | string  | Yes      | 3-character uppercase IATA code, must exist in airports database                          |
+| destination   | string  | Yes      | 3-character uppercase IATA code, must exist in airports database, must differ from origin |
+| departureDate | string  | Yes      | YYYY-MM-DD format, must be a future date                                                  |
+| returnDate    | string  | No       | YYYY-MM-DD format, must be a future date, must be ≥ departureDate                         |
+| passengers    | integer | Yes      | 1–9 inclusive                                                                             |
 
 ### Success Response (200 OK)
 
@@ -49,7 +49,7 @@ Required. Bearer JWT token in `Authorization` header.
       "arrivalTime": "2026-07-15T10:10:00",
       "duration": 130,
       "stops": 0,
-      "price": 125.50,
+      "price": 125.5,
       "currency": "USD",
       "fareClass": "Economy",
       "baggageAllowance": "1 checked bag(s)",
@@ -79,38 +79,39 @@ Required. Bearer JWT token in `Authorization` header.
 }
 ```
 
-| Field | Description |
-|-------|-------------|
-| results[].id | Internal UUID (from `flight_offers` table). Used in `GET /api/flights/:id` |
-| results[].airline | Human-readable airline name (title case) |
-| results[].flightNumber | Combined carrier code + number (e.g., "VN123") |
-| results[].departureTime | ISO 8601 date-time string at departure airport (e.g. YYYY-MM-DDTHH:MM:SS) without offset. |
-| results[].arrivalTime | ISO 8601 date-time string at arrival airport (e.g. YYYY-MM-DDTHH:MM:SS) without offset. |
-| results[].segments | Array of outbound flight segments with full detail |
-| results[].returnSegments | Array of return segments (null for one-way) |
-| results[].segments[].operatingCarrier | Operating airline name (Duffel provides this natively) |
-| results[].segments[].departureTime | ISO 8601 local date-time string at departure airport without offset. |
-| results[].segments[].arrivalTime | ISO 8601 local date-time string at arrival airport without offset. |
-| results[].duration | Total duration in minutes |
-| results[].stops | Number of stops for the outbound leg (segments.length - 1). For round-trips, separate counts are provided in outbound/return segments. |
-| results[].price | Total price as decimal |
-| results[].currency | ISO 4217 currency code |
-| results[].fareClass | Cabin class (economy, business, etc.) or null |
-| results[].baggageAllowance | Human-readable baggage description or null |
-| meta.totalResults | Count of results returned |
-| meta.searchHash | SHA-256 of the search query (for debugging/tracing) |
-| meta.cached | Whether the result came from cache |
+| Field                                 | Description                                                                                                                            |
+| ------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| results[].id                          | Internal UUID (from `flight_offers` table). Used in `GET /api/flights/:id`                                                             |
+| results[].airline                     | Human-readable airline name (title case)                                                                                               |
+| results[].flightNumber                | Combined carrier code + number (e.g., "VN123")                                                                                         |
+| results[].departureTime               | ISO 8601 date-time string at departure airport (e.g. YYYY-MM-DDTHH:MM:SS) without offset.                                              |
+| results[].arrivalTime                 | ISO 8601 date-time string at arrival airport (e.g. YYYY-MM-DDTHH:MM:SS) without offset.                                                |
+| results[].segments                    | Array of outbound flight segments with full detail                                                                                     |
+| results[].returnSegments              | Array of return segments (null for one-way)                                                                                            |
+| results[].segments[].operatingCarrier | Operating airline name (Duffel provides this natively)                                                                                 |
+| results[].segments[].departureTime    | ISO 8601 local date-time string at departure airport without offset.                                                                   |
+| results[].segments[].arrivalTime      | ISO 8601 local date-time string at arrival airport without offset.                                                                     |
+| results[].duration                    | Total duration in minutes                                                                                                              |
+| results[].stops                       | Number of stops for the outbound leg (segments.length - 1). For round-trips, separate counts are provided in outbound/return segments. |
+| results[].price                       | Total price as decimal                                                                                                                 |
+| results[].currency                    | ISO 4217 currency code                                                                                                                 |
+| results[].fareClass                   | Cabin class (economy, business, etc.) or null                                                                                          |
+| results[].baggageAllowance            | Human-readable baggage description or null                                                                                             |
+| meta.totalResults                     | Count of results returned                                                                                                              |
+| meta.searchHash                       | SHA-256 of the search query (for debugging/tracing)                                                                                    |
+| meta.cached                           | Whether the result came from cache                                                                                                     |
 
 ### Error Responses
 
-| Status | Code | Description |
-|--------|------|-------------|
-| 400 | VALIDATION_ERROR | Invalid input (missing fields, invalid IATA code, past date, etc.) |
-| 401 | UNAUTHORIZED | Missing or invalid JWT token |
-| 429 | RATE_LIMIT_EXCEEDED | Monthly API budget exhausted |
-| 502 | UPSTREAM_UNAVAILABLE | Duffel API is down or timed out |
+| Status | Code                 | Description                                                        |
+| ------ | -------------------- | ------------------------------------------------------------------ |
+| 400    | VALIDATION_ERROR     | Invalid input (missing fields, invalid IATA code, past date, etc.) |
+| 401    | UNAUTHORIZED         | Missing or invalid JWT token                                       |
+| 429    | RATE_LIMIT_EXCEEDED  | Monthly API budget exhausted                                       |
+| 502    | UPSTREAM_UNAVAILABLE | Duffel API is down or timed out                                    |
 
 Error body format:
+
 ```json
 {
   "statusCode": 429,
@@ -131,9 +132,9 @@ Required. Bearer JWT token in `Authorization` header.
 
 ### Path Parameters
 
-| Param | Type | Description |
-|-------|------|-------------|
-| id | UUID | Internal flight offer ID (from search results `results[].id`) |
+| Param | Type | Description                                                   |
+| ----- | ---- | ------------------------------------------------------------- |
+| id    | UUID | Internal flight offer ID (from search results `results[].id`) |
 
 ### Success Response (200 OK)
 
@@ -148,8 +149,8 @@ Required. Bearer JWT token in `Authorization` header.
   "arrivalTime": "2026-07-15T10:10:00",
   "duration": 130,
   "stops": 0,
-  "originalPrice": 125.50,
-  "confirmedPrice": 127.00,
+  "originalPrice": 125.5,
+  "confirmedPrice": 127.0,
   "priceChanged": true,
   "currency": "USD",
   "fareClass": "Economy",
@@ -183,25 +184,25 @@ Required. Bearer JWT token in `Authorization` header.
 }
 ```
 
-| Field | Description |
-|-------|-------------|
-| originalPrice | Price from the original search result |
-| confirmedPrice | Live re-confirmed price from Duffel `GET /air/offers/{id}` |
-| priceChanged | Boolean flag indicating if the price differs from the original |
-| expiresAt | ISO 8601 UTC timestamp when the offer expires on Duffel's side (e.g., YYYY-MM-DDTHH:MM:SSZ). |
-| departureTime | ISO 8601 local date-time string at departure airport without offset. |
-| arrivalTime | ISO 8601 local date-time string at arrival airport without offset. |
-| conditions | Fare conditions (refundable, changeable) — Duffel provides this natively |
+| Field          | Description                                                                                  |
+| -------------- | -------------------------------------------------------------------------------------------- |
+| originalPrice  | Price from the original search result                                                        |
+| confirmedPrice | Live re-confirmed price from Duffel `GET /air/offers/{id}`                                   |
+| priceChanged   | Boolean flag indicating if the price differs from the original                               |
+| expiresAt      | ISO 8601 UTC timestamp when the offer expires on Duffel's side (e.g., YYYY-MM-DDTHH:MM:SSZ). |
+| departureTime  | ISO 8601 local date-time string at departure airport without offset.                         |
+| arrivalTime    | ISO 8601 local date-time string at arrival airport without offset.                           |
+| conditions     | Fare conditions (refundable, changeable) — Duffel provides this natively                     |
 
 ### Error Responses
 
-| Status | Code | Description |
-|--------|------|-------------|
-| 400 | VALIDATION_ERROR | Invalid UUID format |
-| 401 | UNAUTHORIZED | Missing or invalid JWT token |
-| 404 | NOT_FOUND | UUID has never existed |
-| 410 | OFFER_EXPIRED | Offer existed but has been purged from both cache and database |
-| 502 | UPSTREAM_UNAVAILABLE | Duffel API is down or timed out |
+| Status | Code                 | Description                                                    |
+| ------ | -------------------- | -------------------------------------------------------------- |
+| 400    | VALIDATION_ERROR     | Invalid UUID format                                            |
+| 401    | UNAUTHORIZED         | Missing or invalid JWT token                                   |
+| 404    | NOT_FOUND            | UUID has never existed                                         |
+| 410    | OFFER_EXPIRED        | Offer existed but has been purged from both cache and database |
+| 502    | UPSTREAM_UNAVAILABLE | Duffel API is down or timed out                                |
 
 #### 410 Gone Response (Expired Offer)
 

@@ -16,10 +16,7 @@ function mintClaimToken(userId: string, iat: number, secret = claimSecret): stri
   const payload = { userId, iat };
   const payloadStr = JSON.stringify(payload);
 
-  const signature = crypto
-    .createHmac('sha256', secret)
-    .update(payloadStr)
-    .digest();
+  const signature = crypto.createHmac('sha256', secret).update(payloadStr).digest();
 
   const base64UrlPayload = Buffer.from(payloadStr).toString('base64url');
   const base64UrlSignature = signature.toString('base64url');
@@ -301,7 +298,9 @@ describe('Agent Chat Gateway (E2E)', () => {
 
       expect(turnRes.body.messages[0].content).toBe('Find me flights to Tokyo');
 
-      const messageDb = await prisma.chatMessage.findUnique({ where: { id: turnRes.body.messages[0].id } });
+      const messageDb = await prisma.chatMessage.findUnique({
+        where: { id: turnRes.body.messages[0].id },
+      });
       expect(messageDb!.contentCiphertext).not.toBeNull();
       expect(messageDb!.contentNonce).not.toBeNull();
       expect(messageDb!.contentAuthTag).not.toBeNull();
@@ -379,4 +378,3 @@ describe('Agent Chat Gateway (E2E)', () => {
     });
   });
 });
-

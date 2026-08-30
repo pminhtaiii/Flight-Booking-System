@@ -1,6 +1,8 @@
 import { z } from 'zod';
 
-const IataCodeSchema = z.string().regex(/^[A-Z]{3}$/, 'Expected a three-letter uppercase IATA code');
+const IataCodeSchema = z
+  .string()
+  .regex(/^[A-Z]{3}$/, 'Expected a three-letter uppercase IATA code');
 const IsoDateSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Expected an ISO date (YYYY-MM-DD)');
 
 const isCurrentOrFutureCalendarDate = (value: string): boolean => {

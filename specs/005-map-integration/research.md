@@ -12,14 +12,15 @@
 
 **Alternatives Considered**:
 
-| Library | Pricing | Bundle Size | Arc Support | Dark Mode | TypeScript | Verdict |
-|---------|---------|-------------|-------------|-----------|------------|---------|
-| **MapLibre GL JS** | Free & open-source | ~200KB gzipped | Via deck.gl ArcLayer | Full style control | Excellent | **Selected** |
-| Mapbox GL JS | 50K loads free/mo, then $5/1K | ~220KB gzipped | Native arc support | Full style control | Excellent | Rejected: Proprietary license since v2, API key required |
-| Leaflet | Free & open-source | ~40KB gzipped | Via plugins (Leaflet.curve) | CSS themes only | @types/leaflet | Rejected: Raster-based, no WebGL, poor zoom performance |
-| Google Maps | $200/mo credit (~28K loads) | ~200KB gzipped | Via polylines only | Limited | @types/google.maps | Rejected: Usage-based pricing, no free dark mode tiles |
+| Library            | Pricing                       | Bundle Size    | Arc Support                 | Dark Mode          | TypeScript         | Verdict                                                  |
+| ------------------ | ----------------------------- | -------------- | --------------------------- | ------------------ | ------------------ | -------------------------------------------------------- |
+| **MapLibre GL JS** | Free & open-source            | ~200KB gzipped | Via deck.gl ArcLayer        | Full style control | Excellent          | **Selected**                                             |
+| Mapbox GL JS       | 50K loads free/mo, then $5/1K | ~220KB gzipped | Native arc support          | Full style control | Excellent          | Rejected: Proprietary license since v2, API key required |
+| Leaflet            | Free & open-source            | ~40KB gzipped  | Via plugins (Leaflet.curve) | CSS themes only    | @types/leaflet     | Rejected: Raster-based, no WebGL, poor zoom performance  |
+| Google Maps        | $200/mo credit (~28K loads)   | ~200KB gzipped | Via polylines only          | Limited            | @types/google.maps | Rejected: Usage-based pricing, no free dark mode tiles   |
 
 ### Why MapLibre + react-map-gl:
+
 1. **Cost**: Zero API fees. Free vector tile sources (OpenFreeMap, Protomaps, MapTiler free tier)
 2. **Performance**: WebGL rendering handles thousands of airport markers smoothly
 3. **React Integration**: `react-map-gl` (by Uber/Vis.gl) provides declarative React components — same API works for both Mapbox and MapLibre
@@ -29,6 +30,7 @@
 7. **TypeScript**: First-class TypeScript support in both MapLibre and react-map-gl
 
 ### Free Tile Sources:
+
 - **OpenFreeMap**: Fully free, no API key, both light and dark styles
 - **Protomaps**: Self-hosted PMTiles, one-time download, zero ongoing cost
 - **MapTiler**: Free tier with 100K tile requests/month, beautiful styles
@@ -42,18 +44,20 @@
 **Rationale**: Use the `@turf/great-circle` library to compute great-circle arcs between origin and destination airports, rendered as GeoJSON LineString layers on the map.
 
 **Alternatives Considered**:
+
 - **deck.gl ArcLayer**: 3D raised arcs, visually stunning, but adds ~150KB to bundle and requires deck.gl integration layer
 - **Custom bezier curves**: Manual SVG overlay, full control, but complex math and poor projection handling
 - **Turf.js great-circle**: Lightweight (~5KB for the module), geographically accurate, native GeoJSON output, renders as a standard map layer
 
 **Implementation Approach**:
+
 ```typescript
 import greatCircle from '@turf/great-circle';
 
 const arc = greatCircle(
   [originAirport.lng, originAirport.lat],
   [destAirport.lng, destAirport.lat],
-  { npoints: 100 }
+  { npoints: 100 },
 );
 // Render as a GeoJSON Source + Layer on the map
 ```
@@ -69,6 +73,7 @@ const arc = greatCircle(
 **Rationale**: Import the OurAirports dataset into a PostgreSQL `airports` table via a Prisma seed script. The dataset contains ~7,700 airports with scheduled commercial service worldwide.
 
 **Alternatives Considered**:
+
 - **Static JSON bundle**: Ship airports.json with the frontend (~800KB). Rejected: bloats initial page load, hard to query server-side
 - **Amadeus Airport API**: Real-time lookups. Rejected: Consumes API budget (2,000 calls/month), unnecessary for static data
 - **PostGIS spatial queries**: Full GIS extension. Rejected: Overkill for point-radius queries on <10K records. Haversine formula on plain lat/lng columns is sufficient
@@ -118,6 +123,7 @@ const arc = greatCircle(
 **Rationale**: Maps require WebGL and browser APIs — they must be client components. Use Next.js `dynamic()` with `ssr: false` to prevent hydration errors.
 
 **Component Hierarchy**:
+
 ```
 MapContainer ("use client", dynamic import)
 ├── ReactMapGL (MapLibre provider)
@@ -129,6 +135,7 @@ MapContainer ("use client", dynamic import)
 ```
 
 **Integration Points**:
+
 - **Search Page** (`/search`): Map shows origin and destination airports with route arc after search
 - **Flight Details Page** (`/search/[flightId]`): Map shows the specific flight route with all stops
 - **Homepage** (`/`): Optional decorative world map with popular route animations
@@ -139,14 +146,15 @@ MapContainer ("use client", dynamic import)
 
 ### How Others Do It:
 
-| Platform | Map Usage | Tech |
-|----------|-----------|------|
+| Platform           | Map Usage                                                                       | Tech                      |
+| ------------------ | ------------------------------------------------------------------------------- | ------------------------- |
 | **Google Flights** | Interactive destination explorer, route arcs on selection, price bubbles on map | Google Maps (proprietary) |
-| **Skyscanner** | "Explore Everywhere" map with price pins, clicking a country shows deals | Mapbox GL JS |
-| **Kiwi.com** | Full-screen route map with animated flight paths, multi-city visualization | Mapbox GL JS |
-| **Kayak** | Explore map with price bubbles, heatmap overlay for deals | Google Maps |
+| **Skyscanner**     | "Explore Everywhere" map with price pins, clicking a country shows deals        | Mapbox GL JS              |
+| **Kiwi.com**       | Full-screen route map with animated flight paths, multi-city visualization      | Mapbox GL JS              |
+| **Kayak**          | Explore map with price bubbles, heatmap overlay for deals                       | Google Maps               |
 
 **Key Takeaways**:
+
 1. Map is primarily used for **destination exploration** and **route visualization**, not as the main search interface
 2. Flight route arcs are universally curved (great-circle) lines
 3. Airport markers use clustering at low zoom levels
@@ -157,10 +165,10 @@ MapContainer ("use client", dynamic import)
 
 ## 7. Risk Assessment
 
-| Risk | Mitigation |
-|------|------------|
-| MapLibre tile source reliability | Configure fallback tile URLs; Protomaps self-hosted as backup |
-| Large airport dataset slowing seed | Batch insert with `createMany`, only run once |
-| WebGL not supported on old browsers | Graceful fallback: show text-based airport selector |
-| Map bundle size impacting LCP | `dynamic()` with `ssr: false` + code splitting |
-| Free tile source rate limits | Monitor usage; switch providers if needed |
+| Risk                                | Mitigation                                                    |
+| ----------------------------------- | ------------------------------------------------------------- |
+| MapLibre tile source reliability    | Configure fallback tile URLs; Protomaps self-hosted as backup |
+| Large airport dataset slowing seed  | Batch insert with `createMany`, only run once                 |
+| WebGL not supported on old browsers | Graceful fallback: show text-based airport selector           |
+| Map bundle size impacting LCP       | `dynamic()` with `ssr: false` + code splitting                |
+| Free tile source rate limits        | Monitor usage; switch providers if needed                     |

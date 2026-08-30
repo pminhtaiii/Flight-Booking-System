@@ -35,7 +35,11 @@ async function run() {
       missingSnapshot.push(booking.id);
     } else {
       const snapshot = booking.flightSnapshot as unknown as Snapshot;
-      if (!snapshot.segments || !Array.isArray(snapshot.segments) || snapshot.segments.length === 0) {
+      if (
+        !snapshot.segments ||
+        !Array.isArray(snapshot.segments) ||
+        snapshot.segments.length === 0
+      ) {
         lackingTimes.push(booking.id);
       }
     }

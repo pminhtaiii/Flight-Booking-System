@@ -87,7 +87,10 @@ function isRecord(value: unknown): value is ReadinessPassengerSourceRecord {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
-function hasOnlyKeys(value: ReadinessPassengerSourceRecord, allowedKeys: ReadonlySet<string>): boolean {
+function hasOnlyKeys(
+  value: ReadinessPassengerSourceRecord,
+  allowedKeys: ReadonlySet<string>,
+): boolean {
   return Object.keys(value).every((key) => allowedKeys.has(key));
 }
 
@@ -120,7 +123,9 @@ function countPassengerTypes(passengers: readonly unknown[]): {
   );
 }
 
-function HasValidReadinessPassengerMatrix(validationOptions?: ValidationOptions): PropertyDecorator {
+function HasValidReadinessPassengerMatrix(
+  validationOptions?: ValidationOptions,
+): PropertyDecorator {
   return (target: object, propertyKey: string | symbol): void => {
     registerDecorator({
       name: 'hasValidPassengerMatrix',
@@ -191,7 +196,9 @@ class BookingReadinessPassengerSourceConstraint implements ValidatorConstraintIn
   }
 }
 
-function HasValidReadinessPassengerSource(validationOptions?: ValidationOptions): PropertyDecorator {
+function HasValidReadinessPassengerSource(
+  validationOptions?: ValidationOptions,
+): PropertyDecorator {
   return (target: object, propertyKey: string | symbol): void => {
     registerDecorator({
       name: 'bookingReadinessPassengerSource',
@@ -223,7 +230,9 @@ class UniqueReadinessOfferPassengerIdsConstraint implements ValidatorConstraintI
   }
 }
 
-function HasUniqueReadinessOfferPassengerIds(validationOptions?: ValidationOptions): PropertyDecorator {
+function HasUniqueReadinessOfferPassengerIds(
+  validationOptions?: ValidationOptions,
+): PropertyDecorator {
   return (target: object, propertyKey: string | symbol): void => {
     registerDecorator({
       name: 'uniqueReadinessOfferPassengerIds',

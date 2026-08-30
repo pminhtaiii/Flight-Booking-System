@@ -1,9 +1,4 @@
-import {
-  Injectable,
-  NotFoundException,
-  Logger,
-  HttpException,
-} from '@nestjs/common';
+import { Injectable, NotFoundException, Logger, HttpException } from '@nestjs/common';
 import { PrismaService } from '@/prisma/prisma.service';
 import { AgentToolAuditService } from '../audit/agent-tool-audit.service';
 import { BookingSummaryDto, BookingSummariesResponseDto } from '../dto/booking-summary.dto';

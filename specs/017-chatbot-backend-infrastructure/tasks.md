@@ -326,25 +326,25 @@
 
 ### Mapping to the Seventeen Plan Slices
 
-| Plan slice | Task phase |
-|---|---|
-| 1. Contract/JWT/flag freeze | Work Packages 1A–1D |
-| 2. Redis lifecycle/health | Work Package 2A |
-| 3. Atomic quota admission | Work Package 2B |
-| 4. Fenced session lease | Work Package 2C plus US1 fence integration |
-| 5. Trusted snapshot repository | Work Package 2D |
-| 6. Encrypted additive persistence | Work Packages 2E–2F |
-| 7. Secure stream/persistence migration | Work Packages 3A–3F |
-| 8. Router/specialist graph | Work Packages 4A–4C and 4E–4F |
-| 9. Read tools/attested search/projection | Work Package 4D and Work Packages 5A–5D |
-| 10. State-only checkout signal | Work Package 6A |
-| 11. Credential primitive | Work Package 6B |
-| 12. Dark create/resolve API | Work Packages 6C–6D |
-| 13. Deterministic action/clean bootstrap | Work Packages 6E–6G |
-| 14. Claimed canonical consume | Work Packages 6H–6I |
-| 15. Direct cutover/observation with proxy retained | Work Packages 7A–7D and 8A–8C |
-| 16. Approved direct-only cleanup | Work Package 8D / T101 |
-| 17. Approved plaintext cleanup | Work Package 8E / T102 |
+| Plan slice                                         | Task phase                                 |
+| -------------------------------------------------- | ------------------------------------------ |
+| 1. Contract/JWT/flag freeze                        | Work Packages 1A–1D                        |
+| 2. Redis lifecycle/health                          | Work Package 2A                            |
+| 3. Atomic quota admission                          | Work Package 2B                            |
+| 4. Fenced session lease                            | Work Package 2C plus US1 fence integration |
+| 5. Trusted snapshot repository                     | Work Package 2D                            |
+| 6. Encrypted additive persistence                  | Work Packages 2E–2F                        |
+| 7. Secure stream/persistence migration             | Work Packages 3A–3F                        |
+| 8. Router/specialist graph                         | Work Packages 4A–4C and 4E–4F              |
+| 9. Read tools/attested search/projection           | Work Package 4D and Work Packages 5A–5D    |
+| 10. State-only checkout signal                     | Work Package 6A                            |
+| 11. Credential primitive                           | Work Package 6B                            |
+| 12. Dark create/resolve API                        | Work Packages 6C–6D                        |
+| 13. Deterministic action/clean bootstrap           | Work Packages 6E–6G                        |
+| 14. Claimed canonical consume                      | Work Packages 6H–6I                        |
+| 15. Direct cutover/observation with proxy retained | Work Packages 7A–7D and 8A–8C              |
+| 16. Approved direct-only cleanup                   | Work Package 8D / T101                     |
+| 17. Approved plaintext cleanup                     | Work Package 8E / T102                     |
 
 ### User Story Dependencies
 

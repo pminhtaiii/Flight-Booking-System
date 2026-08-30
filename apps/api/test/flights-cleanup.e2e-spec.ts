@@ -53,7 +53,7 @@ describe('Duffel Cleanup Service (E2E)', () => {
           children: 0,
           infants: 0,
           cabinClass: 'economy',
-          price: 150.00,
+          price: 150.0,
           createdAt: activeOfferDate,
         },
         {
@@ -68,7 +68,7 @@ describe('Duffel Cleanup Service (E2E)', () => {
           children: 0,
           infants: 0,
           cabinClass: 'economy',
-          price: 120.00,
+          price: 120.0,
           createdAt: expiredOfferDate,
         },
       ],
@@ -127,7 +127,7 @@ describe('Duffel Cleanup Service (E2E)', () => {
           children: 0,
           infants: 0,
           cabinClass: 'economy',
-          price: 200.00,
+          price: 200.0,
           createdAt: offerDate,
         },
       });
@@ -156,5 +156,3 @@ describe('Duffel Cleanup Service (E2E)', () => {
     }
   });
 });
-
-

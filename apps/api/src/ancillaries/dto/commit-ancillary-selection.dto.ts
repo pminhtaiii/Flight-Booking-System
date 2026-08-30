@@ -1,5 +1,15 @@
 import { Type } from 'class-transformer';
-import { ArrayMaxSize, IsArray, IsInt, IsNotEmpty, IsString, IsUUID, Max, Min, ValidateNested } from 'class-validator';
+import {
+  ArrayMaxSize,
+  IsArray,
+  IsInt,
+  IsNotEmpty,
+  IsString,
+  IsUUID,
+  Max,
+  Min,
+  ValidateNested,
+} from 'class-validator';
 
 export class CommitSeatDto {
   @IsUUID('4') intentPassengerId!: string;
@@ -16,6 +26,14 @@ export class CommitBaggageDto {
 export class CommitAncillarySelectionDto {
   @IsInt() @Min(0) expectedVersion!: number;
   @IsString() @IsNotEmpty() catalogFingerprint!: string;
-  @IsArray() @ArrayMaxSize(100) @ValidateNested({ each: true }) @Type(() => CommitSeatDto) seats!: CommitSeatDto[];
-  @IsArray() @ArrayMaxSize(100) @ValidateNested({ each: true }) @Type(() => CommitBaggageDto) baggage!: CommitBaggageDto[];
+  @IsArray()
+  @ArrayMaxSize(100)
+  @ValidateNested({ each: true })
+  @Type(() => CommitSeatDto)
+  seats!: CommitSeatDto[];
+  @IsArray()
+  @ArrayMaxSize(100)
+  @ValidateNested({ each: true })
+  @Type(() => CommitBaggageDto)
+  baggage!: CommitBaggageDto[];
 }

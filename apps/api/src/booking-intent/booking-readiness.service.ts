@@ -1,10 +1,4 @@
-import {
-  HttpException,
-  HttpStatus,
-  Injectable,
-  NotFoundException,
-  Optional,
-} from '@nestjs/common';
+import { HttpException, HttpStatus, Injectable, NotFoundException, Optional } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PassengerType } from '@prisma/client';
 import { AirportsService } from '@/airports/airports.service';
@@ -89,11 +83,7 @@ function iataFromRaw(value: unknown): string | null {
   return /^[A-Z]{3}$/.test(normalized) ? normalized : null;
 }
 
-function httpError(
-  code: string,
-  message: string,
-  status: HttpStatus,
-): HttpException {
+function httpError(code: string, message: string, status: HttpStatus): HttpException {
   return new HttpException({ code, message }, status);
 }
 
@@ -129,9 +119,10 @@ function profilePassenger(
   const identity = isRecord(profile.identity) ? profile.identity : null;
   const contact = isRecord(profile.contact) ? profile.contact : null;
   const travelDocument = isRecord(profile.travelDocument) ? profile.travelDocument : null;
-  const revision = typeof profile.revision === 'number' && Number.isInteger(profile.revision)
-    ? profile.revision
-    : null;
+  const revision =
+    typeof profile.revision === 'number' && Number.isInteger(profile.revision)
+      ? profile.revision
+      : null;
 
   return {
     passengerType: passenger.passengerType,
@@ -144,13 +135,19 @@ function profilePassenger(
     gender: typeof identity?.gender === 'string' ? identity.gender : null,
     title: typeof identity?.title === 'string' ? identity.title : null,
     email: typeof contact?.email === 'string' ? contact.email : null,
-    phoneCountryCode: typeof contact?.phoneCountryCode === 'string' ? contact.phoneCountryCode : null,
+    phoneCountryCode:
+      typeof contact?.phoneCountryCode === 'string' ? contact.phoneCountryCode : null,
     phoneNumber: typeof contact?.phoneNumber === 'string' ? contact.phoneNumber : null,
-    documentType: typeof travelDocument?.documentType === 'string' ? travelDocument.documentType : null,
-    passportNumber: typeof travelDocument?.passportNumber === 'string' ? travelDocument.passportNumber : null,
-    passportExpiry: typeof travelDocument?.passportExpiry === 'string' ? travelDocument.passportExpiry : null,
-    issuingCountry: typeof travelDocument?.issuingCountry === 'string' ? travelDocument.issuingCountry : null,
-    nationality: typeof travelDocument?.nationality === 'string' ? travelDocument.nationality : null,
+    documentType:
+      typeof travelDocument?.documentType === 'string' ? travelDocument.documentType : null,
+    passportNumber:
+      typeof travelDocument?.passportNumber === 'string' ? travelDocument.passportNumber : null,
+    passportExpiry:
+      typeof travelDocument?.passportExpiry === 'string' ? travelDocument.passportExpiry : null,
+    issuingCountry:
+      typeof travelDocument?.issuingCountry === 'string' ? travelDocument.issuingCountry : null,
+    nationality:
+      typeof travelDocument?.nationality === 'string' ? travelDocument.nationality : null,
   };
 }
 
@@ -223,23 +220,31 @@ export class BookingReadinessService {
       const normalizedOffer = this.normalizeStoredOffer(flightOffer.rawOffer);
       this.validatePassengerMappings(dto.passengers, normalizedOffer.passengers);
 
-      const passengers = await this.resolvePassengers(dto.passengers, normalizedOffer.passengers, userId);
-      const countries = await this.airportsService.findCountriesByIataCodes(normalizedOffer.airportCodes);
+      const passengers = await this.resolvePassengers(
+        dto.passengers,
+        normalizedOffer.passengers,
+        userId,
+      );
+      const countries = await this.airportsService.findCountriesByIataCodes(
+        normalizedOffer.airportCodes,
+      );
       if (!(countries instanceof Map)) {
         throw new Error('Airport country lookup returned an invalid result');
       }
 
       const configValue = this.configService.get<string>('PASSPORT_ADVISORY_BUFFER_DAYS');
-      const readinessConfig = parseBookingReadinessConfig({ PASSPORT_ADVISORY_BUFFER_DAYS: configValue });
+      const readinessConfig = parseBookingReadinessConfig({
+        PASSPORT_ADVISORY_BUFFER_DAYS: configValue,
+      });
       const evaluationInput: BookingReadinessEvaluationInput = {
         passengers,
         segments: normalizedOffer.segments.map((segment) => ({
           ...segment,
           originCountryCode: segment.originCountryCode
-            ? countries.get(segment.originCountryCode) ?? null
+            ? (countries.get(segment.originCountryCode) ?? null)
             : null,
           destinationCountryCode: segment.destinationCountryCode
-            ? countries.get(segment.destinationCountryCode) ?? null
+            ? (countries.get(segment.destinationCountryCode) ?? null)
             : null,
         })),
         tripCompletionDate: normalizedOffer.tripCompletionDate,
@@ -303,17 +308,25 @@ export class BookingReadinessService {
     try {
       this.assertFeatureEnabled();
       const normalizedOffer = this.normalizeStoredOffer(rawOffer);
-      const storedById = new Map(normalizedOffer.passengers.map((passenger) => [passenger.id, passenger]));
+      const storedById = new Map(
+        normalizedOffer.passengers.map((passenger) => [passenger.id, passenger]),
+      );
 
       const evaluationPassengers: BookingReadinessPassengerInput[] = passengers.map((passenger) => {
         const storedPassenger = storedById.get(passenger.offerPassengerId);
         if (!storedPassenger || storedPassenger.type !== passenger.type) {
-          throw httpError('PASSENGER_MAPPING_INVALID', 'Passenger mapping is invalid', HttpStatus.UNPROCESSABLE_ENTITY);
+          throw httpError(
+            'PASSENGER_MAPPING_INVALID',
+            'Passenger mapping is invalid',
+            HttpStatus.UNPROCESSABLE_ENTITY,
+          );
         }
 
         return {
           passengerType: passenger.type,
-          passengerOrdinal: normalizedOffer.passengers.findIndex((item) => item.id === passenger.offerPassengerId) + 1,
+          passengerOrdinal:
+            normalizedOffer.passengers.findIndex((item) => item.id === passenger.offerPassengerId) +
+            1,
           profileRevision: passenger.profileRevision,
           givenName: passenger.givenName,
           middleName: passenger.middleName,
@@ -332,22 +345,26 @@ export class BookingReadinessService {
         };
       });
 
-      const countries = await this.airportsService.findCountriesByIataCodes(normalizedOffer.airportCodes);
+      const countries = await this.airportsService.findCountriesByIataCodes(
+        normalizedOffer.airportCodes,
+      );
       if (!(countries instanceof Map)) {
         throw new Error('Airport country lookup returned an invalid result');
       }
 
       const configValue = this.configService.get<string>('PASSPORT_ADVISORY_BUFFER_DAYS');
-      const readinessConfig = parseBookingReadinessConfig({ PASSPORT_ADVISORY_BUFFER_DAYS: configValue });
+      const readinessConfig = parseBookingReadinessConfig({
+        PASSPORT_ADVISORY_BUFFER_DAYS: configValue,
+      });
       const result = this.bookingReadinessEvaluator.evaluate({
         passengers: evaluationPassengers,
         segments: normalizedOffer.segments.map((segment) => ({
           ...segment,
           originCountryCode: segment.originCountryCode
-            ? countries.get(segment.originCountryCode) ?? null
+            ? (countries.get(segment.originCountryCode) ?? null)
             : null,
           destinationCountryCode: segment.destinationCountryCode
-            ? countries.get(segment.destinationCountryCode) ?? null
+            ? (countries.get(segment.destinationCountryCode) ?? null)
             : null,
         })),
         tripCompletionDate: normalizedOffer.tripCompletionDate,
@@ -404,7 +421,11 @@ export class BookingReadinessService {
   }
 
   private normalizeStoredOffer(rawOffer: unknown): NormalizedOffer {
-    if (!isRecord(rawOffer) || !Array.isArray(rawOffer.passengers) || !Array.isArray(rawOffer.slices)) {
+    if (
+      !isRecord(rawOffer) ||
+      !Array.isArray(rawOffer.passengers) ||
+      !Array.isArray(rawOffer.slices)
+    ) {
       throw new Error('Stored offer data is malformed');
     }
 
@@ -457,19 +478,19 @@ export class BookingReadinessService {
       throw new Error('Stored offer contains no segments');
     }
 
-    const airportCodes = [...new Set(
-      segments.flatMap((segment) => [segment.originCountryCode, segment.destinationCountryCode])
-        .filter((code): code is string => typeof code === 'string'),
-    )];
-    const tripCompletionDate = segments.reduce<string | null>(
-      (latest, segment) => {
-        if (!segment.arrivalDate) {
-          return latest;
-        }
-        return latest === null || segment.arrivalDate > latest ? segment.arrivalDate : latest;
-      },
-      null,
-    );
+    const airportCodes = [
+      ...new Set(
+        segments
+          .flatMap((segment) => [segment.originCountryCode, segment.destinationCountryCode])
+          .filter((code): code is string => typeof code === 'string'),
+      ),
+    ];
+    const tripCompletionDate = segments.reduce<string | null>((latest, segment) => {
+      if (!segment.arrivalDate) {
+        return latest;
+      }
+      return latest === null || segment.arrivalDate > latest ? segment.arrivalDate : latest;
+    }, null);
 
     if (!tripCompletionDate) {
       throw new Error('Stored offer trip completion is unavailable');
@@ -505,8 +526,12 @@ export class BookingReadinessService {
     requestedPassengers: readonly BookingReadinessPassengerDto[],
     storedPassengers: readonly StoredOfferPassenger[],
   ): void {
-    const adultCount = requestedPassengers.filter((passenger) => passenger.passengerType === PassengerType.ADULT).length;
-    const infantCount = requestedPassengers.filter((passenger) => passenger.passengerType === PassengerType.INFANT).length;
+    const adultCount = requestedPassengers.filter(
+      (passenger) => passenger.passengerType === PassengerType.ADULT,
+    ).length;
+    const infantCount = requestedPassengers.filter(
+      (passenger) => passenger.passengerType === PassengerType.INFANT,
+    ).length;
     const requestedIds = requestedPassengers.map((passenger) => passenger.offerPassengerId);
     const storedById = new Map(storedPassengers.map((passenger) => [passenger.id, passenger]));
 
@@ -518,13 +543,21 @@ export class BookingReadinessService {
       infantCount > adultCount ||
       new Set(requestedIds).size !== requestedIds.length
     ) {
-      throw httpError('PASSENGER_MAPPING_INVALID', 'Passenger mapping is invalid', HttpStatus.UNPROCESSABLE_ENTITY);
+      throw httpError(
+        'PASSENGER_MAPPING_INVALID',
+        'Passenger mapping is invalid',
+        HttpStatus.UNPROCESSABLE_ENTITY,
+      );
     }
 
     for (const requestedPassenger of requestedPassengers) {
       const storedPassenger = storedById.get(requestedPassenger.offerPassengerId);
       if (!storedPassenger || storedPassenger.type !== requestedPassenger.passengerType) {
-        throw httpError('PASSENGER_MAPPING_INVALID', 'Passenger mapping is invalid', HttpStatus.UNPROCESSABLE_ENTITY);
+        throw httpError(
+          'PASSENGER_MAPPING_INVALID',
+          'Passenger mapping is invalid',
+          HttpStatus.UNPROCESSABLE_ENTITY,
+        );
       }
     }
   }
@@ -538,7 +571,8 @@ export class BookingReadinessService {
     const passengers: BookingReadinessPassengerInput[] = [];
 
     for (const passenger of requestedPassengers) {
-      const passengerOrdinal = storedPassengers.findIndex((p) => p.id === passenger.offerPassengerId) + 1;
+      const passengerOrdinal =
+        storedPassengers.findIndex((p) => p.id === passenger.offerPassengerId) + 1;
       const source = passenger.source;
       if (source.type === 'inline') {
         passengers.push(inlinePassenger(source, passenger, passengerOrdinal));
@@ -550,14 +584,22 @@ export class BookingReadinessService {
           profile = (await this.profileService.getProfile(userId)) as unknown as RawRecord;
         } catch (error) {
           if (error instanceof HttpException && error.getStatus() === HttpStatus.NOT_FOUND) {
-            throw httpError('PASSENGER_MAPPING_INVALID', 'Passenger mapping is invalid', HttpStatus.UNPROCESSABLE_ENTITY);
+            throw httpError(
+              'PASSENGER_MAPPING_INVALID',
+              'Passenger mapping is invalid',
+              HttpStatus.UNPROCESSABLE_ENTITY,
+            );
           }
           throw error;
         }
       }
 
       if (!isRecord(profile) || profile.profileId !== source.travelerProfileId) {
-        throw httpError('PASSENGER_MAPPING_INVALID', 'Passenger mapping is invalid', HttpStatus.UNPROCESSABLE_ENTITY);
+        throw httpError(
+          'PASSENGER_MAPPING_INVALID',
+          'Passenger mapping is invalid',
+          HttpStatus.UNPROCESSABLE_ENTITY,
+        );
       }
 
       passengers.push(profilePassenger(source, profile, passenger, passengerOrdinal));

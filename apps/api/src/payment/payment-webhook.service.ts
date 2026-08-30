@@ -142,9 +142,14 @@ export class PaymentWebhookService {
       // T007: Check if transition is plausible (e.g. out-of-order) even if strictly invalid in FSM
       if (!canTransition(currentStatus, targetStatus)) {
         if (
-          (targetStatus === PaymentStatus.SUCCEEDED && (currentStatus === PaymentStatus.CREATED || currentStatus === PaymentStatus.AUTHORIZED)) ||
-          (targetStatus === PaymentStatus.FAILED && (currentStatus === PaymentStatus.CREATED || currentStatus === PaymentStatus.AUTHORIZED)) ||
-          (targetStatus === PaymentStatus.CANCELLED && (currentStatus === PaymentStatus.CREATED || currentStatus === PaymentStatus.AUTHORIZED))
+          (targetStatus === PaymentStatus.SUCCEEDED &&
+            (currentStatus === PaymentStatus.CREATED ||
+              currentStatus === PaymentStatus.AUTHORIZED)) ||
+          (targetStatus === PaymentStatus.FAILED &&
+            (currentStatus === PaymentStatus.CREATED ||
+              currentStatus === PaymentStatus.AUTHORIZED)) ||
+          (targetStatus === PaymentStatus.CANCELLED &&
+            (currentStatus === PaymentStatus.CREATED || currentStatus === PaymentStatus.AUTHORIZED))
         ) {
           isPlausible = true;
         }
@@ -161,7 +166,8 @@ export class PaymentWebhookService {
           });
 
           try {
-            const canonicalIntent = await this.stripeService.retrievePaymentIntent(stripePaymentIntentId);
+            const canonicalIntent =
+              await this.stripeService.retrievePaymentIntent(stripePaymentIntentId);
             const canonicalStatus = canonicalIntent.status;
 
             // Verify canonical state matches target status
@@ -170,7 +176,10 @@ export class PaymentWebhookService {
               isCanonicalVerified = true;
             } else if (targetStatus === PaymentStatus.CANCELLED && canonicalStatus === 'canceled') {
               isCanonicalVerified = true;
-            } else if (targetStatus === PaymentStatus.FAILED && canonicalStatus === 'requires_payment_method') {
+            } else if (
+              targetStatus === PaymentStatus.FAILED &&
+              canonicalStatus === 'requires_payment_method'
+            ) {
               isCanonicalVerified = true;
             }
 
@@ -242,10 +251,8 @@ export class PaymentWebhookService {
       if (
         error instanceof Prisma.PrismaClientKnownRequestError &&
         error.code === 'P2002' &&
-        (
-          (Array.isArray(error.meta?.target) && error.meta.target.includes('stripeEventId')) ||
-          (typeof error.meta?.target === 'string' && error.meta.target.includes('stripeEventId'))
-        )
+        ((Array.isArray(error.meta?.target) && error.meta.target.includes('stripeEventId')) ||
+          (typeof error.meta?.target === 'string' && error.meta.target.includes('stripeEventId')))
       ) {
         this.logger.log({
           message: `Concurrent duplicate webhook event detected: event ${stripeEventId} already processed. Skipping.`,
@@ -325,14 +332,18 @@ export class PaymentWebhookService {
             ],
           });
         }
-      } else if (targetStatus === PaymentStatus.FAILED || targetStatus === PaymentStatus.CANCELLED) {
+      } else if (
+        targetStatus === PaymentStatus.FAILED ||
+        targetStatus === PaymentStatus.CANCELLED
+      ) {
         // If payment fails/cancels, we update booking intent status
         const bookingIntent = await tx.bookingIntent.findUnique({
           where: { id: payment.bookingIntentId },
         });
 
         if (bookingIntent) {
-          const nextBookingStatus = bookingIntent.paymentAttemptCount < 2 ? 'AWAITING_PAYMENT' : 'CANCELLED';
+          const nextBookingStatus =
+            bookingIntent.paymentAttemptCount < 2 ? 'AWAITING_PAYMENT' : 'CANCELLED';
           await tx.bookingIntent.update({
             where: { id: payment.bookingIntentId },
             data: { status: nextBookingStatus },
@@ -477,7 +488,11 @@ export class PaymentWebhookService {
     const rawDisputeStatus = dispute.status as string;
 
     // warning_closed: inquiry closed without a chargeback — merchant retains funds, treat as won
-    if (rawDisputeStatus !== 'won' && rawDisputeStatus !== 'lost' && rawDisputeStatus !== 'warning_closed') {
+    if (
+      rawDisputeStatus !== 'won' &&
+      rawDisputeStatus !== 'lost' &&
+      rawDisputeStatus !== 'warning_closed'
+    ) {
       this.logger.error({
         message: `ALERT: Unrecognised dispute status '${rawDisputeStatus}' for payment ${payment.id}. Dropping event.`,
         level: 'ALERT',

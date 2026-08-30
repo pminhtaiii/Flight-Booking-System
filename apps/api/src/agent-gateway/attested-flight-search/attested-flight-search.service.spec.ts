@@ -31,7 +31,9 @@ describe('AttestedFlightSearchService', () => {
     cacheService = { get: jest.fn(), set: jest.fn().mockResolvedValue(undefined) };
     duffelService = { searchFlights: jest.fn() };
     selectionAttestationService = {
-      signSelectionAttestation: jest.fn().mockResolvedValue('sel_v1_mock_attestation.mock_signature'),
+      signSelectionAttestation: jest
+        .fn()
+        .mockResolvedValue('sel_v1_mock_attestation.mock_signature'),
     };
     chatMessageCryptoService = {
       decryptMessageContent: jest.fn().mockResolvedValue('I want to fly to Hanoi'),
@@ -179,7 +181,11 @@ describe('AttestedFlightSearchService', () => {
 
     it('rejects missing adults count', async () => {
       await expect(
-        service.searchFlights('user-1', { origin: 'SGN', destination: 'HAN', date: '2026-09-01' } as any),
+        service.searchFlights('user-1', {
+          origin: 'SGN',
+          destination: 'HAN',
+          date: '2026-09-01',
+        } as any),
       ).rejects.toThrow(HttpException);
 
       expect(agentToolAuditService.recordToolExecution).toHaveBeenCalledWith(
@@ -214,7 +220,9 @@ describe('AttestedFlightSearchService', () => {
         sender: 'USER',
         contentCiphertext: 'enc',
       });
-      chatMessageCryptoService.decryptMessageContent.mockResolvedValueOnce('I want first class tickets');
+      chatMessageCryptoService.decryptMessageContent.mockResolvedValueOnce(
+        'I want first class tickets',
+      );
 
       await expect(
         service.searchFlights('user-1', validQuery, 'trace-1', 'session-1'),
@@ -241,11 +249,15 @@ describe('AttestedFlightSearchService', () => {
         sender: 'USER',
         contentCiphertext: 'corrupt',
       });
-      chatMessageCryptoService.decryptMessageContent.mockRejectedValueOnce(new Error('Corrupt envelope'));
+      chatMessageCryptoService.decryptMessageContent.mockRejectedValueOnce(
+        new Error('Corrupt envelope'),
+      );
 
       await expect(
         service.searchFlights('user-1', validQuery, 'trace-1', 'session-1'),
-      ).rejects.toThrow(new HttpException('Unable to decrypt chat message envelope', HttpStatus.BAD_REQUEST));
+      ).rejects.toThrow(
+        new HttpException('Unable to decrypt chat message envelope', HttpStatus.BAD_REQUEST),
+      );
     });
 
     it('throws 503 when chat encryption is not configured', async () => {
@@ -256,7 +268,9 @@ describe('AttestedFlightSearchService', () => {
         contentCiphertext: 'enc',
       });
       chatMessageCryptoService.isConfigured.mockReturnValueOnce(false);
-      chatMessageCryptoService.decryptMessageContent.mockRejectedValueOnce(new Error('CHAT_ENCRYPTION_KEY is missing'));
+      chatMessageCryptoService.decryptMessageContent.mockRejectedValueOnce(
+        new Error('CHAT_ENCRYPTION_KEY is missing'),
+      );
 
       await expect(
         service.searchFlights('user-1', validQuery, 'trace-1', 'session-1'),
@@ -394,9 +408,9 @@ describe('AttestedFlightSearchService', () => {
     it('rejects when chatSession does not exist or belong to user', async () => {
       prismaService.chatSession.findFirst.mockResolvedValueOnce(null);
 
-      await expect(
-        service.searchFlightsV2('user-1', validV2Dto),
-      ).rejects.toThrow(new HttpException('Chat session not found', HttpStatus.NOT_FOUND));
+      await expect(service.searchFlightsV2('user-1', validV2Dto)).rejects.toThrow(
+        new HttpException('Chat session not found', HttpStatus.NOT_FOUND),
+      );
 
       expect(agentToolAuditService.recordToolExecution).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -424,9 +438,12 @@ describe('AttestedFlightSearchService', () => {
         },
       };
 
-      await expect(
-        service.searchFlightsV2('user-1', invalidDto),
-      ).rejects.toThrow(new HttpException('At least one of adults or passengers must be provided', HttpStatus.BAD_REQUEST));
+      await expect(service.searchFlightsV2('user-1', invalidDto)).rejects.toThrow(
+        new HttpException(
+          'At least one of adults or passengers must be provided',
+          HttpStatus.BAD_REQUEST,
+        ),
+      );
     });
 
     it('rejects missing search date / departureDate', async () => {
@@ -445,9 +462,12 @@ describe('AttestedFlightSearchService', () => {
         },
       };
 
-      await expect(
-        service.searchFlightsV2('user-1', invalidDto),
-      ).rejects.toThrow(new HttpException('At least one of date or departureDate must be provided', HttpStatus.BAD_REQUEST));
+      await expect(service.searchFlightsV2('user-1', invalidDto)).rejects.toThrow(
+        new HttpException(
+          'At least one of date or departureDate must be provided',
+          HttpStatus.BAD_REQUEST,
+        ),
+      );
     });
   });
 });

@@ -58,7 +58,10 @@ describe('PassengerSourceResolverService', () => {
   beforeEach(() => {
     prisma = { travelerProfile: { findFirst: jest.fn() } };
     encryption = { decryptBound: jest.fn(), decrypt: jest.fn() };
-    service = new PassengerSourceResolverService(prisma as never, encryption as unknown as EncryptionService);
+    service = new PassengerSourceResolverService(
+      prisma as never,
+      encryption as unknown as EncryptionService,
+    );
   });
 
   it('resolves an owned profile source and retains provenance/revision', async () => {
@@ -68,36 +71,56 @@ describe('PassengerSourceResolverService', () => {
       {
         offerPassengerId: 'pas_001',
         type: PassengerType.ADULT,
-        source: { type: 'traveler_profile', travelerProfileId: PROFILE_ID, expectedProfileRevision: 3 },
+        source: {
+          type: 'traveler_profile',
+          travelerProfileId: PROFILE_ID,
+          expectedProfileRevision: 3,
+        },
       },
     ]);
 
-    expect(prisma.travelerProfile.findFirst).toHaveBeenCalledWith({ where: { id: PROFILE_ID, userId: USER_ID } });
-    expect(resolved).toEqual(expect.objectContaining({
-      givenName: 'Ada',
-      familyName: 'Lovelace',
-      dateOfBirth: '1815-12-10',
-      travelerProfileId: PROFILE_ID,
-      profileRevision: 3,
-      sourceType: 'traveler_profile',
-    }));
+    expect(prisma.travelerProfile.findFirst).toHaveBeenCalledWith({
+      where: { id: PROFILE_ID, userId: USER_ID },
+    });
+    expect(resolved).toEqual(
+      expect.objectContaining({
+        givenName: 'Ada',
+        familyName: 'Lovelace',
+        dateOfBirth: '1815-12-10',
+        travelerProfileId: PROFILE_ID,
+        profileRevision: 3,
+        sourceType: 'traveler_profile',
+      }),
+    );
     expect(resolved).not.toHaveProperty('source');
   });
 
   it('fails missing or foreign profiles without revealing whether they exist', async () => {
     prisma.travelerProfile.findFirst.mockResolvedValue(null);
 
-    const error = await service.resolve(USER_ID, [
-      {
-        offerPassengerId: 'pas_001',
-        type: PassengerType.ADULT,
-        source: { type: 'traveler_profile', travelerProfileId: 'foreign-profile', expectedProfileRevision: 1 },
-      },
-    ]).catch((value: unknown) => value);
+    const error = await service
+      .resolve(USER_ID, [
+        {
+          offerPassengerId: 'pas_001',
+          type: PassengerType.ADULT,
+          source: {
+            type: 'traveler_profile',
+            travelerProfileId: 'foreign-profile',
+            expectedProfileRevision: 1,
+          },
+        },
+      ])
+      .catch((value: unknown) => value);
 
-    expect(error).toEqual(expect.objectContaining({ response: expect.objectContaining({ code: 'PASSENGER_SOURCE_INVALID' }) }));
+    expect(error).toEqual(
+      expect.objectContaining({
+        response: expect.objectContaining({ code: 'PASSENGER_SOURCE_INVALID' }),
+      }),
+    );
     expect(JSON.stringify(error)).not.toContain('foreign-profile');
-    expect(prisma.travelerProfile.findFirst).toHaveBeenCalledWith({ where: { id: 'foreign-profile', userId: USER_ID } });
+    expect(prisma.travelerProfile.findFirst).toHaveBeenCalledWith({
+      where: { id: 'foreign-profile', userId: USER_ID },
+    });
   });
 
   it('rejects stale revisions with PROFILE_CHANGED', async () => {
@@ -108,12 +131,18 @@ describe('PassengerSourceResolverService', () => {
         {
           offerPassengerId: 'pas_001',
           type: PassengerType.ADULT,
-          source: { type: 'traveler_profile', travelerProfileId: PROFILE_ID, expectedProfileRevision: 3 },
+          source: {
+            type: 'traveler_profile',
+            travelerProfileId: PROFILE_ID,
+            expectedProfileRevision: 3,
+          },
         },
       ]),
-    ).rejects.toEqual(expect.objectContaining({
-      response: expect.objectContaining({ code: 'PROFILE_CHANGED' }),
-    }));
+    ).rejects.toEqual(
+      expect.objectContaining({
+        response: expect.objectContaining({ code: 'PROFILE_CHANGED' }),
+      }),
+    );
   });
 
   it('resolves mixed profile and inline passengers independently without merging values', async () => {
@@ -123,14 +152,26 @@ describe('PassengerSourceResolverService', () => {
       {
         offerPassengerId: 'pas_001',
         type: PassengerType.ADULT,
-        source: { type: 'traveler_profile', travelerProfileId: PROFILE_ID, expectedProfileRevision: 3 },
+        source: {
+          type: 'traveler_profile',
+          travelerProfileId: PROFILE_ID,
+          expectedProfileRevision: 3,
+        },
       },
       inlinePassenger(),
     ]);
 
     expect(resolved).toHaveLength(2);
-    expect(resolved[0]).toEqual(expect.objectContaining({ givenName: 'Ada', travelerProfileId: PROFILE_ID }));
-    expect(resolved[1]).toEqual(expect.objectContaining({ givenName: 'Grace', travelerProfileId: null, sourceType: 'inline' }));
+    expect(resolved[0]).toEqual(
+      expect.objectContaining({ givenName: 'Ada', travelerProfileId: PROFILE_ID }),
+    );
+    expect(resolved[1]).toEqual(
+      expect.objectContaining({
+        givenName: 'Grace',
+        travelerProfileId: null,
+        sourceType: 'inline',
+      }),
+    );
     expect(resolved[1]).not.toHaveProperty('passportNumber', expect.anything());
   });
 
@@ -142,7 +183,11 @@ describe('PassengerSourceResolverService', () => {
         {
           offerPassengerId: 'pas_001',
           type: PassengerType.ADULT,
-          source: { type: 'traveler_profile', travelerProfileId: PROFILE_ID, expectedProfileRevision: 3 },
+          source: {
+            type: 'traveler_profile',
+            travelerProfileId: PROFILE_ID,
+            expectedProfileRevision: 3,
+          },
         },
       ]),
     ).rejects.toBeInstanceOf(UnprocessableEntityException);
@@ -154,7 +199,11 @@ describe('PassengerSourceResolverService', () => {
       {
         offerPassengerId: 'pas_001',
         type: PassengerType.ADULT,
-        source: { type: 'traveler_profile', travelerProfileId: PROFILE_ID, expectedProfileRevision: 3 },
+        source: {
+          type: 'traveler_profile',
+          travelerProfileId: PROFILE_ID,
+          expectedProfileRevision: 3,
+        },
       },
       inlinePassenger(),
     ]);
@@ -173,7 +222,11 @@ describe('PassengerSourceResolverService', () => {
       {
         offerPassengerId: 'pas_001',
         type: PassengerType.ADULT,
-        source: { type: 'traveler_profile', travelerProfileId: PROFILE_ID, expectedProfileRevision: 3 },
+        source: {
+          type: 'traveler_profile',
+          travelerProfileId: PROFILE_ID,
+          expectedProfileRevision: 3,
+        },
       },
     ]);
     source.givenName = 'Changed';
@@ -185,35 +238,51 @@ describe('PassengerSourceResolverService', () => {
 
   it('maps crypto failures to the same safe source error without exposing plaintext', async () => {
     prisma.travelerProfile.findFirst.mockResolvedValue(profile({ passportNumber: 'v1:bad' }));
-    encryption.decryptBound.mockImplementation(() => { throw new Error('secret plaintext failure'); });
+    encryption.decryptBound.mockImplementation(() => {
+      throw new Error('secret plaintext failure');
+    });
 
     await expect(
       service.resolve(USER_ID, [
         {
           offerPassengerId: 'pas_001',
           type: PassengerType.ADULT,
-          source: { type: 'traveler_profile', travelerProfileId: PROFILE_ID, expectedProfileRevision: 3 },
+          source: {
+            type: 'traveler_profile',
+            travelerProfileId: PROFILE_ID,
+            expectedProfileRevision: 3,
+          },
         },
       ]),
-    ).rejects.toEqual(expect.objectContaining({ response: expect.objectContaining({ code: 'PASSENGER_SOURCE_INVALID' }) }));
+    ).rejects.toEqual(
+      expect.objectContaining({
+        response: expect.objectContaining({ code: 'PASSENGER_SOURCE_INVALID' }),
+      }),
+    );
   });
 
   it('supports passport expiry ciphertext created by the profile backfill context', async () => {
     prisma.travelerProfile.findFirst.mockResolvedValue(
       profile({ passportExpiryCiphertext: 'v1:backfilled-expiry' }),
     );
-    encryption.decryptBound.mockImplementation((_value: string, context: Record<string, string>) => {
-      if (context.userId) {
-        throw new Error('user context does not match backfill ciphertext');
-      }
-      return '2030-01-01T00:00:00.000Z';
-    });
+    encryption.decryptBound.mockImplementation(
+      (_value: string, context: Record<string, string>) => {
+        if (context.userId) {
+          throw new Error('user context does not match backfill ciphertext');
+        }
+        return '2030-01-01T00:00:00.000Z';
+      },
+    );
 
     const [resolved] = await service.resolve(USER_ID, [
       {
         offerPassengerId: 'pas_001',
         type: PassengerType.ADULT,
-        source: { type: 'traveler_profile', travelerProfileId: PROFILE_ID, expectedProfileRevision: 3 },
+        source: {
+          type: 'traveler_profile',
+          travelerProfileId: PROFILE_ID,
+          expectedProfileRevision: 3,
+        },
       },
     ]);
 

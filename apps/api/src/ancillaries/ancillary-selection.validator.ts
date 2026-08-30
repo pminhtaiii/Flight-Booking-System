@@ -28,7 +28,11 @@ export class AncillarySelectionValidationError extends Error {
     code: 'ANCILLARY_SCOPE_INVALID' | 'ANCILLARY_CURRENCY_MISMATCH',
     invalidSelections: AncillaryInvalidSelection[],
   ) {
-    super(code === 'ANCILLARY_CURRENCY_MISMATCH' ? 'Ancillary currencies must match.' : 'One or more ancillary selections are invalid.');
+    super(
+      code === 'ANCILLARY_CURRENCY_MISMATCH'
+        ? 'Ancillary currencies must match.'
+        : 'One or more ancillary selections are invalid.',
+    );
     this.name = AncillarySelectionValidationError.name;
     this.code = code;
     this.invalidSelections = invalidSelections;
@@ -46,9 +50,14 @@ const invalid = (
 const normalizedType = (type: string): string => type.toUpperCase();
 
 const baggageTier = (selection: NormalizedBaggageSelection): string =>
-  [normalizedType(selection.type), selection.weightValue ?? '', selection.weightUnit?.toUpperCase() ?? ''].join(':');
+  [
+    normalizedType(selection.type),
+    selection.weightValue ?? '',
+    selection.weightUnit?.toUpperCase() ?? '',
+  ].join(':');
 
-const overlaps = (left: string[], right: string[]): boolean => left.some((segmentId: string) => right.includes(segmentId));
+const overlaps = (left: string[], right: string[]): boolean =>
+  left.some((segmentId: string) => right.includes(segmentId));
 
 const findSeatService = (
   catalog: AncillaryCatalog,
@@ -63,7 +72,9 @@ const findSeatService = (
   for (const cabin of segment.seatMap.cabins) {
     for (const row of cabin.rows) {
       for (const element of row.elements) {
-        const service = element.availableServices?.find((candidate) => candidate.serviceId === serviceId);
+        const service = element.availableServices?.find(
+          (candidate) => candidate.serviceId === serviceId,
+        );
         if (service && element.designator) {
           return { service, designator: element.designator };
         }
@@ -74,7 +85,9 @@ const findSeatService = (
 };
 
 export const validateAncillarySelection = (input: ValidationInput): ValidatedAncillarySelection => {
-  const passengers = new Map(input.passengers.map((passenger) => [passenger.intentPassengerId, passenger]));
+  const passengers = new Map(
+    input.passengers.map((passenger) => [passenger.intentPassengerId, passenger]),
+  );
   const invalidSelections: AncillaryInvalidSelection[] = [];
   const seats: NormalizedSeatSelection[] = [];
   const baggage: NormalizedBaggageSelection[] = [];
@@ -88,13 +101,45 @@ export const validateAncillarySelection = (input: ValidationInput): ValidatedAnc
     const physicalSeatKey = `${selection.segmentId}:${seat?.designator}`;
 
     if (!passenger || passenger.type === 'INFANT' || !passenger.seatEligible) {
-      invalidSelections.push(invalid('SEAT', selection.serviceId, selection.intentPassengerId, [selection.segmentId], 'PASSENGER_INELIGIBLE'));
+      invalidSelections.push(
+        invalid(
+          'SEAT',
+          selection.serviceId,
+          selection.intentPassengerId,
+          [selection.segmentId],
+          'PASSENGER_INELIGIBLE',
+        ),
+      );
     } else if (!seat || seat.service.passengerId !== passenger.duffelPassengerId) {
-      invalidSelections.push(invalid('SEAT', selection.serviceId, selection.intentPassengerId, [selection.segmentId], 'SERVICE_SCOPE_INVALID'));
+      invalidSelections.push(
+        invalid(
+          'SEAT',
+          selection.serviceId,
+          selection.intentPassengerId,
+          [selection.segmentId],
+          'SERVICE_SCOPE_INVALID',
+        ),
+      );
     } else if (occupiedPassengerSeats.has(passengerSeatKey)) {
-      invalidSelections.push(invalid('SEAT', selection.serviceId, selection.intentPassengerId, [selection.segmentId], 'DUPLICATE_PASSENGER_SEAT'));
+      invalidSelections.push(
+        invalid(
+          'SEAT',
+          selection.serviceId,
+          selection.intentPassengerId,
+          [selection.segmentId],
+          'DUPLICATE_PASSENGER_SEAT',
+        ),
+      );
     } else if (occupiedPhysicalSeats.has(physicalSeatKey)) {
-      invalidSelections.push(invalid('SEAT', selection.serviceId, selection.intentPassengerId, [selection.segmentId], 'DUPLICATE_GROUP_SEAT'));
+      invalidSelections.push(
+        invalid(
+          'SEAT',
+          selection.serviceId,
+          selection.intentPassengerId,
+          [selection.segmentId],
+          'DUPLICATE_GROUP_SEAT',
+        ),
+      );
     } else {
       occupiedPassengerSeats.add(passengerSeatKey);
       occupiedPhysicalSeats.add(physicalSeatKey);
@@ -111,14 +156,44 @@ export const validateAncillarySelection = (input: ValidationInput): ValidatedAnc
 
   for (const selection of input.baggage) {
     const passenger = passengers.get(selection.intentPassengerId);
-    const service = input.catalog.baggageServices.find((candidate) => candidate.serviceId === selection.serviceId);
+    const service = input.catalog.baggageServices.find(
+      (candidate) => candidate.serviceId === selection.serviceId,
+    );
 
     if (!passenger || passenger.type === 'INFANT') {
-      invalidSelections.push(invalid('BAGGAGE', selection.serviceId, selection.intentPassengerId, [], 'PASSENGER_INELIGIBLE'));
+      invalidSelections.push(
+        invalid(
+          'BAGGAGE',
+          selection.serviceId,
+          selection.intentPassengerId,
+          [],
+          'PASSENGER_INELIGIBLE',
+        ),
+      );
     } else if (!service || service.passengerId !== passenger.duffelPassengerId) {
-      invalidSelections.push(invalid('BAGGAGE', selection.serviceId, selection.intentPassengerId, [], 'SERVICE_SCOPE_INVALID'));
-    } else if (!Number.isInteger(selection.quantity) || selection.quantity < 1 || selection.quantity > service.maxQuantity) {
-      invalidSelections.push(invalid('BAGGAGE', selection.serviceId, selection.intentPassengerId, service.segmentIds, 'QUANTITY_INVALID'));
+      invalidSelections.push(
+        invalid(
+          'BAGGAGE',
+          selection.serviceId,
+          selection.intentPassengerId,
+          [],
+          'SERVICE_SCOPE_INVALID',
+        ),
+      );
+    } else if (
+      !Number.isInteger(selection.quantity) ||
+      selection.quantity < 1 ||
+      selection.quantity > service.maxQuantity
+    ) {
+      invalidSelections.push(
+        invalid(
+          'BAGGAGE',
+          selection.serviceId,
+          selection.intentPassengerId,
+          service.segmentIds,
+          'QUANTITY_INVALID',
+        ),
+      );
     } else {
       baggage.push({
         intentPassengerId: selection.intentPassengerId,
@@ -136,13 +211,24 @@ export const validateAncillarySelection = (input: ValidationInput): ValidatedAnc
 
   for (let index = 0; index < baggage.length; index += 1) {
     const current = baggage[index];
-    const conflicting = baggage.slice(0, index).find((candidate) =>
-      candidate.intentPassengerId === current.intentPassengerId &&
-      baggageTier(candidate) === baggageTier(current) &&
-      overlaps(candidate.segmentIds, current.segmentIds),
-    );
+    const conflicting = baggage
+      .slice(0, index)
+      .find(
+        (candidate) =>
+          candidate.intentPassengerId === current.intentPassengerId &&
+          baggageTier(candidate) === baggageTier(current) &&
+          overlaps(candidate.segmentIds, current.segmentIds),
+      );
     if (conflicting) {
-      invalidSelections.push(invalid('BAGGAGE', current.serviceId, current.intentPassengerId, current.segmentIds, 'OVERLAPPING_BAGGAGE_COVERAGE'));
+      invalidSelections.push(
+        invalid(
+          'BAGGAGE',
+          current.serviceId,
+          current.intentPassengerId,
+          current.segmentIds,
+          'OVERLAPPING_BAGGAGE_COVERAGE',
+        ),
+      );
     }
   }
 
@@ -150,13 +236,34 @@ export const validateAncillarySelection = (input: ValidationInput): ValidatedAnc
     throw new AncillarySelectionValidationError('ANCILLARY_SCOPE_INVALID', invalidSelections);
   }
 
-  const currencies = new Set([input.expectedCurrency, ...seats.map((selection) => selection.currency), ...baggage.map((selection) => selection.currency)].filter((currency): currency is string => Boolean(currency)));
+  const currencies = new Set(
+    [
+      input.expectedCurrency,
+      ...seats.map((selection) => selection.currency),
+      ...baggage.map((selection) => selection.currency),
+    ].filter((currency): currency is string => Boolean(currency)),
+  );
   if (currencies.size > 1) {
-    throw new AncillarySelectionValidationError(
-      'ANCILLARY_CURRENCY_MISMATCH',
-      [...seats.map((selection) => invalid('SEAT', selection.serviceId, selection.intentPassengerId, [selection.segmentId], 'CURRENCY_MISMATCH')),
-      ...baggage.map((selection) => invalid('BAGGAGE', selection.serviceId, selection.intentPassengerId, selection.segmentIds, 'CURRENCY_MISMATCH'))],
-    );
+    throw new AncillarySelectionValidationError('ANCILLARY_CURRENCY_MISMATCH', [
+      ...seats.map((selection) =>
+        invalid(
+          'SEAT',
+          selection.serviceId,
+          selection.intentPassengerId,
+          [selection.segmentId],
+          'CURRENCY_MISMATCH',
+        ),
+      ),
+      ...baggage.map((selection) =>
+        invalid(
+          'BAGGAGE',
+          selection.serviceId,
+          selection.intentPassengerId,
+          selection.segmentIds,
+          'CURRENCY_MISMATCH',
+        ),
+      ),
+    ]);
   }
 
   return { seats, baggage, currency: currencies.values().next().value ?? null };

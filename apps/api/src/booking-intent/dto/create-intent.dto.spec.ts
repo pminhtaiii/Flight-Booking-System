@@ -90,7 +90,11 @@ describe('CreateIntentDto Phase 7 passenger sources', () => {
           {
             offerPassengerId: 'pas_001',
             type: PassengerType.ADULT,
-            source: { type: 'traveler_profile', travelerProfileId: profileId, expectedProfileRevision: 0 },
+            source: {
+              type: 'traveler_profile',
+              travelerProfileId: profileId,
+              expectedProfileRevision: 0,
+            },
           },
         ],
       }),
@@ -102,7 +106,9 @@ describe('CreateIntentDto Phase 7 passenger sources', () => {
 
   it('requires the source discriminator and rejects unknown source types', async () => {
     const missing = await validationErrors(
-      validPayload({ passengers: [{ offerPassengerId: 'pas_001', type: PassengerType.ADULT, source: {} }] }),
+      validPayload({
+        passengers: [{ offerPassengerId: 'pas_001', type: PassengerType.ADULT, source: {} }],
+      }),
     );
     const unknown = await validationErrors(
       validPayload({
@@ -119,7 +125,9 @@ describe('CreateIntentDto Phase 7 passenger sources', () => {
   it('enforces adult, infant, and maximum passenger matrix rules', async () => {
     const noAdult = await validationErrors(
       validPayload({
-        passengers: [{ offerPassengerId: 'pas_001', type: PassengerType.CHILD, source: inlineSource() }],
+        passengers: [
+          { offerPassengerId: 'pas_001', type: PassengerType.CHILD, source: inlineSource() },
+        ],
       }),
     );
     const tooManyInfants = await validationErrors(
@@ -228,7 +236,11 @@ describe('CreateIntentDto Phase 7 passenger sources', () => {
           {
             offerPassengerId: 'pas_001',
             type: PassengerType.ADULT,
-            source: inlineSource({ passportNumber: secret, email: 'private@example.test', phoneNumber: '0909090909' }),
+            source: inlineSource({
+              passportNumber: secret,
+              email: 'private@example.test',
+              phoneNumber: '0909090909',
+            }),
           },
         ],
       }),
@@ -240,17 +252,31 @@ describe('CreateIntentDto Phase 7 passenger sources', () => {
   });
 
   it('exposes the conflict through the same safe ValidationPipe boundary', async () => {
-    const pipe = new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, transform: true });
+    const pipe = new ValidationPipe({
+      whitelist: true,
+      forbidNonWhitelisted: true,
+      transform: true,
+    });
 
     await expect(
       pipe.transform(
         validPayload({
           passengers: [
-            { offerPassengerId: 'pas_001', type: PassengerType.ADULT, useProfile: true, source: inlineSource() },
+            {
+              offerPassengerId: 'pas_001',
+              type: PassengerType.ADULT,
+              useProfile: true,
+              source: inlineSource(),
+            },
           ],
         }),
         { type: 'body', metatype: CreateIntentDto },
       ),
-    ).rejects.toMatchObject({ response: { statusCode: 400, message: expect.arrayContaining([expect.stringContaining('PASSENGER_SOURCE_CONFLICT')]) } });
+    ).rejects.toMatchObject({
+      response: {
+        statusCode: 400,
+        message: expect.arrayContaining([expect.stringContaining('PASSENGER_SOURCE_CONFLICT')]),
+      },
+    });
   });
 });

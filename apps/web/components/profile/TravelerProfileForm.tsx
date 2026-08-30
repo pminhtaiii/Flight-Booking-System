@@ -160,12 +160,12 @@ function draftToPayload(draft: ProfileDraft, revision: number): UpdateProfilePay
     },
     travelDocument: hasTravelDocument
       ? {
-        documentType: draft.travelDocument.documentType,
-        passportNumber: draft.travelDocument.passportNumber.trim(),
-        passportExpiry: draft.travelDocument.passportExpiry,
-        issuingCountry: draft.travelDocument.issuingCountry,
-        nationality: draft.travelDocument.nationality,
-      }
+          documentType: draft.travelDocument.documentType,
+          passportNumber: draft.travelDocument.passportNumber.trim(),
+          passportExpiry: draft.travelDocument.passportExpiry,
+          issuingCountry: draft.travelDocument.issuingCountry,
+          nationality: draft.travelDocument.nationality,
+        }
       : null,
     preferences: {
       seatPreference: draft.preferences.seatPreference || null,
@@ -222,7 +222,10 @@ export function TravelerProfileForm({
         draft.identity.title,
       ]),
       contact: getSectionStatus(Object.values(draft.contact)),
-      travelDocument: getSectionStatus(Object.values(draft.travelDocument), Object.values(draft.travelDocument).every((value) => value.trim().length === 0)),
+      travelDocument: getSectionStatus(
+        Object.values(draft.travelDocument),
+        Object.values(draft.travelDocument).every((value) => value.trim().length === 0),
+      ),
       preferences: getSectionStatus(Object.values(draft.preferences), true),
     }),
     [draft],
@@ -350,12 +353,18 @@ export function TravelerProfileForm({
 
       if (error instanceof ProfileRequestError && error.status === 409) {
         setSaveState('conflict');
-        setErrorMessage('This profile changed in another tab. Reload the latest version before saving again.');
+        setErrorMessage(
+          'This profile changed in another tab. Reload the latest version before saving again.',
+        );
         return;
       }
 
       setSaveState('error');
-      setErrorMessage(error instanceof ProfileRequestError ? error.message : 'We could not save your profile. Please try again.');
+      setErrorMessage(
+        error instanceof ProfileRequestError
+          ? error.message
+          : 'We could not save your profile. Please try again.',
+      );
     }
   }
 
@@ -381,7 +390,9 @@ export function TravelerProfileForm({
       <label className={styles.field} htmlFor={`${section}-${field}`}>
         <span className={styles.fieldLabel}>{label}</span>
         <input
-          aria-describedby={error ? `${section}-${field}-error` : hint ? `${section}-${field}-hint` : undefined}
+          aria-describedby={
+            error ? `${section}-${field}-error` : hint ? `${section}-${field}-hint` : undefined
+          }
           aria-invalid={error ? true : undefined}
           className={styles.input}
           id={`${section}-${field}`}
@@ -389,8 +400,16 @@ export function TravelerProfileForm({
           type={type}
           value={value}
         />
-        {error ? <span className={styles.fieldError} id={`${section}-${field}-error`}>{error}</span> : null}
-        {!error && hint ? <span className={styles.fieldHint} id={`${section}-${field}-hint`}>{hint}</span> : null}
+        {error ? (
+          <span className={styles.fieldError} id={`${section}-${field}-error`}>
+            {error}
+          </span>
+        ) : null}
+        {!error && hint ? (
+          <span className={styles.fieldHint} id={`${section}-${field}-hint`}>
+            {hint}
+          </span>
+        ) : null}
       </label>
     );
   }
@@ -415,9 +434,17 @@ export function TravelerProfileForm({
           onChange={(event) => updateField(section, field, event.target.value)}
           value={value}
         >
-          {options.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+          {options.map((option) => (
+            <option key={option.value} value={option.value}>
+              {option.label}
+            </option>
+          ))}
         </select>
-        {error ? <span className={styles.fieldError} id={`${section}-${field}-error`}>{error}</span> : null}
+        {error ? (
+          <span className={styles.fieldError} id={`${section}-${field}-error`}>
+            {error}
+          </span>
+        ) : null}
       </label>
     );
   }
@@ -445,18 +472,28 @@ export function TravelerProfileForm({
     );
   }
 
-  const saveLabel = saveState === 'saving' ? 'Saving…' : saveState === 'saved' ? 'Saved' : 'Save profile';
+  const saveLabel =
+    saveState === 'saving' ? 'Saving…' : saveState === 'saved' ? 'Saved' : 'Save profile';
 
   return (
     <main className={styles.page}>
       <div className={styles.shell}>
         <div className={styles.workspaceBar}>
           <nav className={styles.breadcrumb} aria-label="Workspace breadcrumb">
-            <span>Workspace</span><span className={styles.breadcrumbSlash} aria-hidden="true">/</span><strong>Traveler profile</strong>
+            <span>Workspace</span>
+            <span className={styles.breadcrumbSlash} aria-hidden="true">
+              /
+            </span>
+            <strong>Traveler profile</strong>
           </nav>
           <div className={styles.contextActions} aria-label="Profile context">
-            {returnTarget !== '/' ? <a className={styles.backLink} href={returnTarget}>Back to previous workspace</a> : null}
-            <span>Readiness workspace</span><span>Owner-scoped</span>
+            {returnTarget !== '/' ? (
+              <a className={styles.backLink} href={returnTarget}>
+                Back to previous workspace
+              </a>
+            ) : null}
+            <span>Readiness workspace</span>
+            <span>Owner-scoped</span>
           </div>
         </div>
 
@@ -465,25 +502,59 @@ export function TravelerProfileForm({
             <p className={styles.eyebrow}>Traveler profile</p>
             <h1>Keep every detail ready for takeoff.</h1>
             <p className={styles.heroDescription}>
-              Review your identity, contact, document, and travel preferences in one calm, secure place.
+              Review your identity, contact, document, and travel preferences in one calm, secure
+              place.
             </p>
           </div>
           <div className={styles.completionCard} aria-label={`${completion}% profile completion`}>
-            <div className={styles.completionHeader}><span>Profile completion</span><strong>{completion}%</strong></div>
-            <div className={styles.progressTrack}><div className={styles.progressFill} style={{ width: `${completion}%` }} /></div>
-            <p>{completion === 100 ? 'Everything is ready.' : 'Complete the required details before an international booking.'}</p>
+            <div className={styles.completionHeader}>
+              <span>Profile completion</span>
+              <strong>{completion}%</strong>
+            </div>
+            <div className={styles.progressTrack}>
+              <div className={styles.progressFill} style={{ width: `${completion}%` }} />
+            </div>
+            <p>
+              {completion === 100
+                ? 'Everything is ready.'
+                : 'Complete the required details before an international booking.'}
+            </p>
           </div>
         </section>
 
         <section className={styles.signalStrip} aria-label="Profile health summary">
-          <div className={styles.signalItem}><span className={styles.signalLabel}>Profile health</span><strong className={styles.signalValue}>{completion}% ready</strong><span className={styles.signalGood}>{completion === 100 ? 'Ready' : 'On track'}</span></div>
-          <div className={styles.signalItem}><span className={styles.signalLabel}>Revision</span><strong className={styles.signalValue}>{String(profile.revision).padStart(2, '0')}</strong><span className={styles.signalNeutral}>{saveState === 'saved' ? 'Synced' : 'Owner-scoped'}</span></div>
-          <div className={styles.signalItem}><span className={styles.signalLabel}>Privacy posture</span><strong className={styles.signalValue}>Private</strong><span className={styles.signalGood}>Protected</span></div>
+          <div className={styles.signalItem}>
+            <span className={styles.signalLabel}>Profile health</span>
+            <strong className={styles.signalValue}>{completion}% ready</strong>
+            <span className={styles.signalGood}>{completion === 100 ? 'Ready' : 'On track'}</span>
+          </div>
+          <div className={styles.signalItem}>
+            <span className={styles.signalLabel}>Revision</span>
+            <strong className={styles.signalValue}>
+              {String(profile.revision).padStart(2, '0')}
+            </strong>
+            <span className={styles.signalNeutral}>
+              {saveState === 'saved' ? 'Synced' : 'Owner-scoped'}
+            </span>
+          </div>
+          <div className={styles.signalItem}>
+            <span className={styles.signalLabel}>Privacy posture</span>
+            <strong className={styles.signalValue}>Private</strong>
+            <span className={styles.signalGood}>Protected</span>
+          </div>
         </section>
 
         <div className={styles.privacyNotice} role="note">
-          <span className={styles.privacyIcon} aria-hidden="true">✓</span>
-          <div><strong>Your information stays private.</strong><span>Only your authenticated account can read or update this profile. Sensitive travel document fields are protected by the API.</span></div>
+          <span className={styles.privacyIcon} aria-hidden="true">
+            ✓
+          </span>
+          <div>
+            <strong>Your information stays private.</strong>
+            <span>
+              Only your authenticated account can read or update this profile. Sensitive travel
+              document fields are protected by the API.
+            </span>
+          </div>
         </div>
 
         {saveState === 'saved' ? (
@@ -500,7 +571,22 @@ export function TravelerProfileForm({
             )}
           </div>
         ) : null}
-        {errorMessage ? <div className={saveState === 'conflict' ? styles.conflictAlert : styles.errorAlert} role="alert"><strong>{saveState === 'conflict' ? 'Profile revision conflict' : 'Profile needs attention'}</strong><span>{errorMessage}</span>{saveState === 'conflict' ? <button className="btn-secondary" onClick={reloadProfile} type="button">Reload latest profile</button> : null}</div> : null}
+        {errorMessage ? (
+          <div
+            className={saveState === 'conflict' ? styles.conflictAlert : styles.errorAlert}
+            role="alert"
+          >
+            <strong>
+              {saveState === 'conflict' ? 'Profile revision conflict' : 'Profile needs attention'}
+            </strong>
+            <span>{errorMessage}</span>
+            {saveState === 'conflict' ? (
+              <button className="btn-secondary" onClick={reloadProfile} type="button">
+                Reload latest profile
+              </button>
+            ) : null}
+          </div>
+        ) : null}
 
         <form className={styles.form} onSubmit={handleSave}>
           <section className={styles.sectionCard}>
@@ -508,10 +594,29 @@ export function TravelerProfileForm({
             <div className={styles.fieldGrid}>
               {renderSelectField('identity', 'title', 'Title', draft.identity.title, titleOptions)}
               {renderTextField('identity', 'givenName', 'Given name', draft.identity.givenName)}
-              {renderTextField('identity', 'middleName', 'Middle name', draft.identity.middleName, 'text', 'Optional')}
+              {renderTextField(
+                'identity',
+                'middleName',
+                'Middle name',
+                draft.identity.middleName,
+                'text',
+                'Optional',
+              )}
               {renderTextField('identity', 'familyName', 'Family name', draft.identity.familyName)}
-              {renderTextField('identity', 'dateOfBirth', 'Date of birth', draft.identity.dateOfBirth, 'date')}
-              {renderSelectField('identity', 'gender', 'Gender', draft.identity.gender, genderOptions)}
+              {renderTextField(
+                'identity',
+                'dateOfBirth',
+                'Date of birth',
+                draft.identity.dateOfBirth,
+                'date',
+              )}
+              {renderSelectField(
+                'identity',
+                'gender',
+                'Gender',
+                draft.identity.gender,
+                genderOptions,
+              )}
             </div>
           </section>
 
@@ -525,85 +630,217 @@ export function TravelerProfileForm({
                   <label className={styles.phoneCountry} htmlFor="contact-phoneCountryCode">
                     <span className={styles.srOnly}>Phone country code</span>
                     <select
-                      aria-describedby={validationErrors['contact.phoneCountryCode'] ? 'contact-phoneCountryCode-error' : undefined}
+                      aria-describedby={
+                        validationErrors['contact.phoneCountryCode']
+                          ? 'contact-phoneCountryCode-error'
+                          : undefined
+                      }
                       aria-invalid={validationErrors['contact.phoneCountryCode'] ? true : undefined}
                       aria-label="Phone country code"
                       className={styles.input}
                       id="contact-phoneCountryCode"
-                      onChange={(event) => updateField('contact', 'phoneCountryCode', event.target.value)}
+                      onChange={(event) =>
+                        updateField('contact', 'phoneCountryCode', event.target.value)
+                      }
                       value={draft.contact.phoneCountryCode}
                     >
-                      {phoneCountryOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+                      {phoneCountryOptions.map((option) => (
+                        <option key={option.value} value={option.value}>
+                          {option.label}
+                        </option>
+                      ))}
                     </select>
                   </label>
                   <label className={styles.phoneNumber} htmlFor="contact-phoneNumber">
                     <span className={styles.srOnly}>Phone number</span>
                     <input
-                      aria-describedby={validationErrors['contact.phoneNumber'] ? 'contact-phoneNumber-error' : 'contact-phoneNumber-hint'}
+                      aria-describedby={
+                        validationErrors['contact.phoneNumber']
+                          ? 'contact-phoneNumber-error'
+                          : 'contact-phoneNumber-hint'
+                      }
                       aria-invalid={validationErrors['contact.phoneNumber'] ? true : undefined}
                       aria-label="Phone number"
                       className={styles.input}
                       id="contact-phoneNumber"
-                      onChange={(event) => updateField('contact', 'phoneNumber', event.target.value)}
+                      onChange={(event) =>
+                        updateField('contact', 'phoneNumber', event.target.value)
+                      }
                       type="tel"
                       value={draft.contact.phoneNumber}
                     />
                   </label>
                 </div>
-                {validationErrors['contact.phoneCountryCode'] ? <span className={styles.fieldError} id="contact-phoneCountryCode-error">{validationErrors['contact.phoneCountryCode']}</span> : null}
-                {validationErrors['contact.phoneNumber'] ? <span className={styles.fieldError} id="contact-phoneNumber-error">{validationErrors['contact.phoneNumber']}</span> : <span className={styles.fieldHint} id="contact-phoneNumber-hint">Required for booking updates</span>}
+                {validationErrors['contact.phoneCountryCode'] ? (
+                  <span className={styles.fieldError} id="contact-phoneCountryCode-error">
+                    {validationErrors['contact.phoneCountryCode']}
+                  </span>
+                ) : null}
+                {validationErrors['contact.phoneNumber'] ? (
+                  <span className={styles.fieldError} id="contact-phoneNumber-error">
+                    {validationErrors['contact.phoneNumber']}
+                  </span>
+                ) : (
+                  <span className={styles.fieldHint} id="contact-phoneNumber-hint">
+                    Required for booking updates
+                  </span>
+                )}
               </div>
             </div>
           </section>
 
           <section className={`${styles.sectionCard} ${styles.documentSection}`}>
-            {renderSectionHeader('travelDocument', Object.values(draft.travelDocument).every((value) => value.trim().length === 0))}
+            {renderSectionHeader(
+              'travelDocument',
+              Object.values(draft.travelDocument).every((value) => value.trim().length === 0),
+            )}
             <div className={styles.documentSummary}>
-              <div><span>Saved document</span><strong>{draft.travelDocument.documentType === 'passport' ? 'Passport' : 'Travel document'}</strong></div>
-              <div><span>Number</span><strong>{getMaskedPassport(draft.travelDocument.passportNumber)}</strong></div>
-              <div><span>Issuing country</span><strong>{draft.travelDocument.issuingCountry || 'Not added'}</strong></div>
+              <div>
+                <span>Saved document</span>
+                <strong>
+                  {draft.travelDocument.documentType === 'passport'
+                    ? 'Passport'
+                    : 'Travel document'}
+                </strong>
+              </div>
+              <div>
+                <span>Number</span>
+                <strong>{getMaskedPassport(draft.travelDocument.passportNumber)}</strong>
+              </div>
+              <div>
+                <span>Issuing country</span>
+                <strong>{draft.travelDocument.issuingCountry || 'Not added'}</strong>
+              </div>
               <span className={styles.secureLabel}>Protected field</span>
             </div>
             <div className={styles.fieldGrid}>
-              {renderSelectField('travelDocument', 'documentType', 'Document type', draft.travelDocument.documentType, documentOptions)}
+              {renderSelectField(
+                'travelDocument',
+                'documentType',
+                'Document type',
+                draft.travelDocument.documentType,
+                documentOptions,
+              )}
               <div className={styles.field}>
-                <label className={styles.fieldLabel} htmlFor="travelDocument-passportNumber">Passport number</label>
+                <label className={styles.fieldLabel} htmlFor="travelDocument-passportNumber">
+                  Passport number
+                </label>
                 <div className={styles.passwordControl}>
                   <input
-                    aria-describedby={validationErrors['travelDocument.passportNumber'] ? 'travelDocument-passportNumber-error' : 'travelDocument-passportNumber-hint'}
-                    aria-invalid={validationErrors['travelDocument.passportNumber'] ? true : undefined}
+                    aria-describedby={
+                      validationErrors['travelDocument.passportNumber']
+                        ? 'travelDocument-passportNumber-error'
+                        : 'travelDocument-passportNumber-hint'
+                    }
+                    aria-invalid={
+                      validationErrors['travelDocument.passportNumber'] ? true : undefined
+                    }
                     className={styles.input}
                     id="travelDocument-passportNumber"
-                    onChange={(event) => updateField('travelDocument', 'passportNumber', event.target.value)}
+                    onChange={(event) =>
+                      updateField('travelDocument', 'passportNumber', event.target.value)
+                    }
                     type={showPassport ? 'text' : 'password'}
                     value={draft.travelDocument.passportNumber}
                   />
-                  <button aria-label={showPassport ? 'Hide passport number' : 'Show passport number'} className={styles.showButton} onClick={() => setShowPassport((current) => !current)} type="button">{showPassport ? 'Hide' : 'Show'}</button>
+                  <button
+                    aria-label={showPassport ? 'Hide passport number' : 'Show passport number'}
+                    className={styles.showButton}
+                    onClick={() => setShowPassport((current) => !current)}
+                    type="button"
+                  >
+                    {showPassport ? 'Hide' : 'Show'}
+                  </button>
                 </div>
-                {validationErrors['travelDocument.passportNumber'] ? <span className={styles.fieldError} id="travelDocument-passportNumber-error">{validationErrors['travelDocument.passportNumber']}</span> : <span className={styles.fieldHint} id="travelDocument-passportNumber-hint">Visible only while you are editing this secure field.</span>}
+                {validationErrors['travelDocument.passportNumber'] ? (
+                  <span className={styles.fieldError} id="travelDocument-passportNumber-error">
+                    {validationErrors['travelDocument.passportNumber']}
+                  </span>
+                ) : (
+                  <span className={styles.fieldHint} id="travelDocument-passportNumber-hint">
+                    Visible only while you are editing this secure field.
+                  </span>
+                )}
               </div>
-              {renderTextField('travelDocument', 'passportExpiry', 'Passport expiry', draft.travelDocument.passportExpiry, 'date')}
-              {renderSelectField('travelDocument', 'issuingCountry', 'Issuing country', draft.travelDocument.issuingCountry, countryOptions)}
-              {renderSelectField('travelDocument', 'nationality', 'Nationality', draft.travelDocument.nationality, countryOptions)}
+              {renderTextField(
+                'travelDocument',
+                'passportExpiry',
+                'Passport expiry',
+                draft.travelDocument.passportExpiry,
+                'date',
+              )}
+              {renderSelectField(
+                'travelDocument',
+                'issuingCountry',
+                'Issuing country',
+                draft.travelDocument.issuingCountry,
+                countryOptions,
+              )}
+              {renderSelectField(
+                'travelDocument',
+                'nationality',
+                'Nationality',
+                draft.travelDocument.nationality,
+                countryOptions,
+              )}
             </div>
-            <div className={styles.documentCallout} role="note"><strong>International trip?</strong><span>Passport validity is checked again at booking time. Completing this section does not guarantee booking readiness.</span></div>
+            <div className={styles.documentCallout} role="note">
+              <strong>International trip?</strong>
+              <span>
+                Passport validity is checked again at booking time. Completing this section does not
+                guarantee booking readiness.
+              </span>
+            </div>
           </section>
 
           <section className={styles.sectionCard}>
             {renderSectionHeader('preferences', true)}
             <div className={styles.fieldGrid}>
-              {renderSelectField('preferences', 'seatPreference', 'Seat preference', draft.preferences.seatPreference, seatOptions)}
-              {renderSelectField('preferences', 'classPreference', 'Cabin preference', draft.preferences.classPreference, classOptions)}
+              {renderSelectField(
+                'preferences',
+                'seatPreference',
+                'Seat preference',
+                draft.preferences.seatPreference,
+                seatOptions,
+              )}
+              {renderSelectField(
+                'preferences',
+                'classPreference',
+                'Cabin preference',
+                draft.preferences.classPreference,
+                classOptions,
+              )}
             </div>
           </section>
 
           <div className={styles.actions}>
-            <div><strong>Revision {profile.revision}</strong><span>{profile.updatedAt ? `Last updated ${new Date(profile.updatedAt).toLocaleString()}` : 'Not saved yet'}</span></div>
-            <div className={styles.actionButtons}><button className="btn-secondary" disabled={saveState === 'saving'} onClick={handleReset} type="button">Discard changes</button><button className="btn-primary" disabled={saveState === 'saving'} type="submit">{saveLabel}</button></div>
+            <div>
+              <strong>Revision {profile.revision}</strong>
+              <span>
+                {profile.updatedAt
+                  ? `Last updated ${new Date(profile.updatedAt).toLocaleString()}`
+                  : 'Not saved yet'}
+              </span>
+            </div>
+            <div className={styles.actionButtons}>
+              <button
+                className="btn-secondary"
+                disabled={saveState === 'saving'}
+                onClick={handleReset}
+                type="button"
+              >
+                Discard changes
+              </button>
+              <button className="btn-primary" disabled={saveState === 'saving'} type="submit">
+                {saveLabel}
+              </button>
+            </div>
           </div>
         </form>
 
-        <p className={styles.footerNote}>Changes are saved to your private traveler profile and can be reused during booking.</p>
+        <p className={styles.footerNote}>
+          Changes are saved to your private traveler profile and can be reused during booking.
+        </p>
       </div>
     </main>
   );

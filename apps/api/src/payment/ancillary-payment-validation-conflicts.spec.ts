@@ -33,16 +33,20 @@ const createHarness = (pricing: Pricing) => {
       total: '53.00',
       validationLeaseToken: null,
       validationLeaseExpiresAt: null,
-      seatSelections: [{
-        serviceId: 'seat-1',
-        intentPassengerId: 'passenger-1',
-        segmentId: 'segment-1',
-      }],
-      baggageSelections: [{
-        serviceId: 'bag-1',
-        intentPassengerId: 'passenger-1',
-        quantity: 1,
-      }],
+      seatSelections: [
+        {
+          serviceId: 'seat-1',
+          intentPassengerId: 'passenger-1',
+          segmentId: 'segment-1',
+        },
+      ],
+      baggageSelections: [
+        {
+          serviceId: 'bag-1',
+          intentPassengerId: 'passenger-1',
+          quantity: 1,
+        },
+      ],
     },
   };
   const transaction = {
@@ -55,7 +59,8 @@ const createHarness = (pricing: Pricing) => {
   };
   const prisma = {
     $transaction: jest.fn(
-      async (callback: (value: typeof transaction) => Promise<unknown>): Promise<unknown> => callback(transaction),
+      async (callback: (value: typeof transaction) => Promise<unknown>): Promise<unknown> =>
+        callback(transaction),
     ),
     ancillarySelection: { updateMany: jest.fn() },
   };

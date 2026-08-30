@@ -14,10 +14,7 @@ function mintClaimToken(userId: string, iat: number, secret = 'test-claim-token-
   const payload = { userId, iat };
   const payloadStr = JSON.stringify(payload);
 
-  const signature = crypto
-    .createHmac('sha256', secret)
-    .update(payloadStr)
-    .digest();
+  const signature = crypto.createHmac('sha256', secret).update(payloadStr).digest();
 
   const base64UrlPayload = Buffer.from(payloadStr).toString('base64url');
   const base64UrlSignature = signature.toString('base64url');
@@ -91,7 +88,6 @@ describe('Agent Gateway Polish (E2E)', () => {
     await prisma.airport.deleteMany({});
     await prisma.auditLog.deleteMany({});
     await prisma.user.deleteMany({});
-
 
     // Reset Redis cache keys
     const keys = await cacheService.keys('*');
@@ -225,7 +221,12 @@ describe('Agent Gateway Polish (E2E)', () => {
                 id: 'sli_1',
                 duration: 'PT5H30M',
                 origin: { id: 'HAN', name: 'Hanoi Airport', iata_code: 'HAN', type: 'airport' },
-                destination: { id: 'NRT', name: 'Narita Airport', iata_code: 'NRT', type: 'airport' },
+                destination: {
+                  id: 'NRT',
+                  name: 'Narita Airport',
+                  iata_code: 'NRT',
+                  type: 'airport',
+                },
                 segments: [
                   {
                     id: 'seg_1',
@@ -233,7 +234,12 @@ describe('Agent Gateway Polish (E2E)', () => {
                     departing_at: '2026-07-20T08:30:00',
                     arriving_at: '2026-07-20T15:00:00',
                     origin: { id: 'HAN', name: 'Hanoi Airport', iata_code: 'HAN', type: 'airport' },
-                    destination: { id: 'NRT', name: 'Narita Airport', iata_code: 'NRT', type: 'airport' },
+                    destination: {
+                      id: 'NRT',
+                      name: 'Narita Airport',
+                      iata_code: 'NRT',
+                      type: 'airport',
+                    },
                     operating_carrier: { id: 'VN', name: 'Vietnam Airlines', iata_code: 'VN' },
                     marketing_carrier: { id: 'VN', name: 'Vietnam Airlines', iata_code: 'VN' },
                     marketing_carrier_flight_number: '310',
@@ -241,30 +247,24 @@ describe('Agent Gateway Polish (E2E)', () => {
                       {
                         passenger_id: 'pas_1',
                         cabin_class: 'economy',
-                        baggages: [
-                          { type: 'checked', quantity: 1 }
-                        ]
-                      }
-                    ]
-                  }
-                ]
-              }
+                        baggages: [{ type: 'checked', quantity: 1 }],
+                      },
+                    ],
+                  },
+                ],
+              },
             ],
-            passengers: [
-              { id: 'pas_1', type: 'adult' }
-            ],
+            passengers: [{ id: 'pas_1', type: 'adult' }],
             passenger_identity_documents_required: false,
-          }
-        ]
+          },
+        ],
       };
 
-      const searchSpy = jest
-        .spyOn(duffelService, 'searchFlights')
-        .mockResolvedValue({
-          offerRequest: rawDuffelResponse as unknown as DuffelOfferRequest,
-          cached: false,
-          searchHash: 'mock-hash',
-        });
+      const searchSpy = jest.spyOn(duffelService, 'searchFlights').mockResolvedValue({
+        offerRequest: rawDuffelResponse as unknown as DuffelOfferRequest,
+        cached: false,
+        searchHash: 'mock-hash',
+      });
 
       const res = await request(app.getHttpServer())
         .get('/agent-gateway/flights/search')
@@ -285,7 +285,7 @@ describe('Agent Gateway Polish (E2E)', () => {
       expect(mapped.arrivalTime).toBe('2026-07-20T15:00:00');
       expect(mapped.duration).toBe(330);
       expect(mapped.stops).toBe(0);
-      expect(mapped.price).toBe(452.00);
+      expect(mapped.price).toBe(452.0);
       expect(mapped.currency).toBe('USD');
       expect(mapped.fareClass).toBe('Economy');
       expect(mapped.baggageAllowance).toBe('1 checked bag(s)');
@@ -299,15 +299,13 @@ describe('Agent Gateway Polish (E2E)', () => {
     });
 
     it('should create an AuditLog with ACTION = AGENT_TOOL_CALL when flight search succeeds', async () => {
-      const searchSpy = jest
-        .spyOn(duffelService, 'searchFlights')
-        .mockResolvedValue({
-          offerRequest: {
-            offers: [],
-          } as unknown as DuffelOfferRequest,
-          cached: false,
-          searchHash: 'mock-hash',
-        });
+      const searchSpy = jest.spyOn(duffelService, 'searchFlights').mockResolvedValue({
+        offerRequest: {
+          offers: [],
+        } as unknown as DuffelOfferRequest,
+        cached: false,
+        searchHash: 'mock-hash',
+      });
 
       await request(app.getHttpServer())
         .get('/agent-gateway/flights/search')

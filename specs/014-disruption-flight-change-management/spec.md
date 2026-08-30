@@ -8,7 +8,7 @@
 
 **Input**: Prior session context in `CONTEXT.md` and `docs/adr/research-disruption-flight-change-grilling-session.md`, expanded into an implementation-ready PRD.
 
-## User Scenarios & Testing *(mandatory)*
+## User Scenarios & Testing _(mandatory)_
 
 ### User Story 1 - Reliably synchronize supplier changes (Priority: P1)
 
@@ -125,7 +125,7 @@ As a product owner, I can introduce ingestion and customer surfacing in controll
 - First, second, third, and fourth material outbox decisions across a UTC-day boundary.
 - More than 20 eligible reconciliation candidates, repeated failures at the front of the priority order, API budget exhaustion, and multiple scheduler instances.
 
-## Requirements *(mandatory)*
+## Requirements _(mandatory)_
 
 ### Functional Requirements
 
@@ -173,7 +173,7 @@ As a product owner, I can introduce ingestion and customer surfacing in controll
 - **Notification Outbox**: One future delivery request per material revision with safe reference payload and stabilization marker; no recipient PII.
 - **Disruption Audit Event**: Actor-attributed lifecycle and operations actions, including acknowledge, accept, automatic resolution, retry, and admin resolution.
 
-## Success Criteria *(mandatory)*
+## Success Criteria _(mandatory)_
 
 ### Measurable Outcomes
 

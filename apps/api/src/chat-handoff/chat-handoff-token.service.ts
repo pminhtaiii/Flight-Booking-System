@@ -65,10 +65,7 @@ export class ChatHandoffTokenService {
 
     const attestationDigest = this.hashToken(attestation);
     const payload = `${attestationDigest}:${index}`;
-    return crypto
-      .createHmac('sha256', this.getSecretKey(keyVersion))
-      .update(payload)
-      .digest('hex');
+    return crypto.createHmac('sha256', this.getSecretKey(keyVersion)).update(payload).digest('hex');
   }
 
   computeIdempotencyHash(
@@ -78,7 +75,6 @@ export class ChatHandoffTokenService {
   ): string {
     return this.deriveIdempotencyHash(attestation, index, keyVersion);
   }
-
 
   async generateToken(
     rowId: string,
@@ -96,10 +92,7 @@ export class ChatHandoffTokenService {
 
     const secret = this.getSecretKey(keyVersion);
     const tokenPayload = `${rowId}:${idempotencyHash}`;
-    const credential = crypto
-      .createHmac('sha256', secret)
-      .update(tokenPayload)
-      .digest('base64url');
+    const credential = crypto.createHmac('sha256', secret).update(tokenPayload).digest('base64url');
     const token = `chk_handoff_v${keyVersion}_${credential}`;
     const tokenHash = this.hashToken(token);
 
@@ -110,11 +103,7 @@ export class ChatHandoffTokenService {
     };
   }
 
-  async verifyToken(
-    token: string,
-    storedTokenHash: string,
-    keyVersion: number,
-  ): Promise<boolean> {
+  async verifyToken(token: string, storedTokenHash: string, keyVersion: number): Promise<boolean> {
     if (
       !token ||
       typeof token !== 'string' ||
@@ -134,7 +123,9 @@ export class ChatHandoffTokenService {
     try {
       this.getSecretKey(keyVersion);
     } catch (err: unknown) {
-      this.logger.warn(`[verifyToken] Secret key resolution failed: ${err instanceof Error ? err.message : String(err)}`);
+      this.logger.warn(
+        `[verifyToken] Secret key resolution failed: ${err instanceof Error ? err.message : String(err)}`,
+      );
       return false;
     }
 
@@ -148,7 +139,9 @@ export class ChatHandoffTokenService {
       }
       return crypto.timingSafeEqual(candidateBuffer, storedBuffer);
     } catch (err: unknown) {
-      this.logger.warn(`[verifyToken] Constant-time comparison failed: ${err instanceof Error ? err.message : String(err)}`);
+      this.logger.warn(
+        `[verifyToken] Constant-time comparison failed: ${err instanceof Error ? err.message : String(err)}`,
+      );
       return false;
     }
   }

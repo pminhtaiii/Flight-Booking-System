@@ -37,18 +37,13 @@ export class AgentChatController {
 
   @Post('access/check')
   @HttpCode(200)
-  async checkAccess(
-    @Body() dto: CheckUserAccessDto,
-  ) {
+  async checkAccess(@Body() dto: CheckUserAccessDto) {
     return await this.agentChatAccessService.checkUserAccess(dto);
   }
 
   @Post('sessions')
   @HttpCode(201)
-  async createSession(
-    @Req() req: AuthenticatedRequest,
-    @Body() dto: { title?: string },
-  ) {
+  async createSession(@Req() req: AuthenticatedRequest, @Body() dto: { title?: string }) {
     return await this.chatService.createSession(req.user.id, dto.title);
   }
 
@@ -73,8 +68,7 @@ export class AgentChatController {
     @Headers() headers: Record<string, string>,
     @Body() dto: { sender: string; content: string; type?: string },
   ) {
-    const fencingToken =
-      headers?.['x-fencing-token'] || headers?.['X-Fencing-Token'] || undefined;
+    const fencingToken = headers?.['x-fencing-token'] || headers?.['X-Fencing-Token'] || undefined;
 
     try {
       return await this.chatService.createMessage(
@@ -110,8 +104,7 @@ export class AgentChatController {
     @Headers() headers: Record<string, string>,
     @Body() dto: { messages: Array<{ sender?: string; content?: string; type?: string }> },
   ) {
-    const fencingToken =
-      headers?.['x-fencing-token'] || headers?.['X-Fencing-Token'] || undefined;
+    const fencingToken = headers?.['x-fencing-token'] || headers?.['X-Fencing-Token'] || undefined;
 
     try {
       return await this.chatService.createMessageBatch(
@@ -149,8 +142,7 @@ export class AgentChatController {
     @Headers() headers: Record<string, string>,
     @Body() dto: { content: string },
   ) {
-    const fencingToken =
-      headers?.['x-fencing-token'] || headers?.['X-Fencing-Token'] || undefined;
+    const fencingToken = headers?.['x-fencing-token'] || headers?.['X-Fencing-Token'] || undefined;
 
     try {
       return await this.chatService.createMessage(
@@ -180,10 +172,7 @@ export class AgentChatController {
 
   @Delete('sessions/:sessionId')
   @HttpCode(204)
-  async deleteSession(
-    @Param('sessionId') sessionId: string,
-    @Req() req: AuthenticatedRequest,
-  ) {
+  async deleteSession(@Param('sessionId') sessionId: string, @Req() req: AuthenticatedRequest) {
     return await this.chatService.deleteSession(req.user.id, sessionId);
   }
 }

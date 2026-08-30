@@ -5,8 +5,9 @@ export function safeHandoffCheckoutOrigin(
   request: Request,
   configuredOrigin = process.env.NEXTAUTH_URL,
 ): boolean {
-  const boundaryValues = [request.headers.get('origin'), request.headers.get('referer')]
-    .filter((value): value is string => value !== null && value !== 'null');
+  const boundaryValues = [request.headers.get('origin'), request.headers.get('referer')].filter(
+    (value): value is string => value !== null && value !== 'null',
+  );
   const expectedOrigin = configuredOrigin || request.url;
 
   if (boundaryValues.length > 0) {

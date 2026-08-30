@@ -70,7 +70,6 @@ describe('Payment Webhook (E2E)', () => {
     await prisma.airport.deleteMany({});
     await prisma.auditLog.deleteMany({});
     await prisma.user.deleteMany({});
-
   });
 
   async function createTestUser(overrides: { role?: string; status?: string } = {}) {
@@ -168,11 +167,9 @@ describe('Payment Webhook (E2E)', () => {
 
   describe('POST /api/payments/webhook', () => {
     it('rejects webhook with invalid signature (400)', async () => {
-      const spy = jest
-        .spyOn(stripeService, 'constructWebhookEvent')
-        .mockImplementation(() => {
-          throw new Error('Webhook signature verification failed');
-        });
+      const spy = jest.spyOn(stripeService, 'constructWebhookEvent').mockImplementation(() => {
+        throw new Error('Webhook signature verification failed');
+      });
 
       const res = await request(app.getHttpServer())
         .post('/api/payments/webhook')
@@ -348,6 +345,3 @@ describe('Payment Webhook (E2E)', () => {
     });
   });
 });
-
-
-

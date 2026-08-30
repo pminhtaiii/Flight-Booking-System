@@ -301,7 +301,7 @@ describe('PaymentWebhookService', () => {
       mockPrisma.payment.findUnique.mockResolvedValueOnce(null);
 
       const event = createMockEvent('payment_intent.succeeded', 'succeeded');
-      
+
       const result = await service.handleWebhookEvent(event);
       expect(result).toBe(true);
     });
@@ -316,11 +316,12 @@ describe('PaymentWebhookService', () => {
         currency: mockCurrency,
         status: PaymentStatus.AUTHORIZED,
       });
-      
-      const prismaError = new Prisma.PrismaClientKnownRequestError(
-        'Unique constraint failed',
-        { code: 'P2002', clientVersion: '5.14.0', meta: { target: ['stripeEventId'] } }
-      );
+
+      const prismaError = new Prisma.PrismaClientKnownRequestError('Unique constraint failed', {
+        code: 'P2002',
+        clientVersion: '5.14.0',
+        meta: { target: ['stripeEventId'] },
+      });
       mockPrisma.payment.update.mockRejectedValueOnce(prismaError);
 
       const event = createMockEvent('payment_intent.succeeded', 'succeeded');

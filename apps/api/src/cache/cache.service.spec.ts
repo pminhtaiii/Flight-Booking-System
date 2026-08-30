@@ -44,7 +44,11 @@ describe('CacheService', () => {
 
     it('should return down when redis ping times out', async () => {
       (service as unknown as { redisClient: unknown }).redisClient = {
-        ping: jest.fn().mockImplementation(() => new Promise((resolve) => setTimeout(() => resolve('PONG'), 1500))),
+        ping: jest
+          .fn()
+          .mockImplementation(
+            () => new Promise((resolve) => setTimeout(() => resolve('PONG'), 1500)),
+          ),
         quit: jest.fn().mockResolvedValue('OK'),
       };
 
@@ -142,5 +146,3 @@ describe('CacheService', () => {
     });
   });
 });
-
-

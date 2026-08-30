@@ -57,9 +57,9 @@ describe('ProfileController', () => {
       const res = { setHeader: jest.fn(), removeHeader: jest.fn() } as any;
 
       await expect(controller.getProfile(req, res)).rejects.toThrow(NotFoundException);
-      await expect(
-        controller.updateProfile(req, {}, { expectedRevision: 1 }, res),
-      ).rejects.toThrow(NotFoundException);
+      await expect(controller.updateProfile(req, {}, { expectedRevision: 1 }, res)).rejects.toThrow(
+        NotFoundException,
+      );
     });
   });
 

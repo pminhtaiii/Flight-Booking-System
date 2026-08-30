@@ -1,6 +1,9 @@
 import { ForbiddenException, NotFoundException } from '@nestjs/common';
 import { BookingStatus, DisruptionStatus } from '@prisma/client';
-import { BookingManagementService, parseDuffelCancellationQuoteId } from './booking-management.service';
+import {
+  BookingManagementService,
+  parseDuffelCancellationQuoteId,
+} from './booking-management.service';
 
 describe('BookingManagementService', () => {
   let service: BookingManagementService;
@@ -220,9 +223,21 @@ describe('BookingManagementService', () => {
       const bookings = [
         mockBaseBooking({ id: 'b-1', status: BookingStatus.PROCESSING }),
         mockBaseBooking({ id: 'b-2', status: BookingStatus.FAILED }),
-        mockBaseBooking({ id: 'b-3', status: BookingStatus.CONFIRMED, departureAt: new Date('2026-09-01T10:00:00Z') }),
-        mockBaseBooking({ id: 'b-4', status: BookingStatus.CONFIRMED, departureAt: new Date('2026-09-02T10:00:00Z') }),
-        mockBaseBooking({ id: 'b-5', status: BookingStatus.CONFIRMED, departureAt: new Date('2026-09-03T10:00:00Z') }),
+        mockBaseBooking({
+          id: 'b-3',
+          status: BookingStatus.CONFIRMED,
+          departureAt: new Date('2026-09-01T10:00:00Z'),
+        }),
+        mockBaseBooking({
+          id: 'b-4',
+          status: BookingStatus.CONFIRMED,
+          departureAt: new Date('2026-09-02T10:00:00Z'),
+        }),
+        mockBaseBooking({
+          id: 'b-5',
+          status: BookingStatus.CONFIRMED,
+          departureAt: new Date('2026-09-03T10:00:00Z'),
+        }),
       ];
 
       prisma.booking.findMany.mockResolvedValue(bookings);
@@ -260,7 +275,11 @@ describe('BookingManagementService', () => {
         createdAt: staleDate,
       });
 
-      prisma.booking.findMany.mockResolvedValue([staleProcessing, recentProcessing, staleConfirmed]);
+      prisma.booking.findMany.mockResolvedValue([
+        staleProcessing,
+        recentProcessing,
+        staleConfirmed,
+      ]);
 
       await service.listBookings('user-1', 'upcoming', 1, 20);
 
@@ -290,7 +309,9 @@ describe('BookingManagementService', () => {
       });
 
       prisma.booking.findMany.mockResolvedValue([staleProcessing]);
-      bookingRecoveryService.reconcileBookingIfStale.mockRejectedValueOnce(new Error('Stripe timeout'));
+      bookingRecoveryService.reconcileBookingIfStale.mockRejectedValueOnce(
+        new Error('Stripe timeout'),
+      );
 
       const result = await service.listBookings('user-1', 'upcoming', 1, 20);
 
@@ -329,9 +350,7 @@ describe('BookingManagementService', () => {
       bookingIntent: {
         id: 'intent-1',
         duffelOfferId: 'off_test_123',
-        passengers: [
-          { id: 'pass-1', givenName: 'Jane', familyName: 'Doe' },
-        ],
+        passengers: [{ id: 'pass-1', givenName: 'Jane', familyName: 'Doe' }],
       },
       cancellationDeadline: new Date('2026-09-10T00:00:00Z'),
       cancellationRefundable: true,
@@ -355,9 +374,7 @@ describe('BookingManagementService', () => {
     });
 
     it('throws ForbiddenException if userId does not match', async () => {
-      prisma.booking.findUnique.mockResolvedValue(
-        mockDetailBooking({ userId: 'another-user' }),
-      );
+      prisma.booking.findUnique.mockResolvedValue(mockDetailBooking({ userId: 'another-user' }));
 
       await expect(service.getBookingDetail('booking-1', 'user-1')).rejects.toBeInstanceOf(
         ForbiddenException,

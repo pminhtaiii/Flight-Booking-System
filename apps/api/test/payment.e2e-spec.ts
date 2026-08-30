@@ -79,7 +79,6 @@ describe('Payment (E2E)', () => {
     await prisma.auditLog.deleteMany({});
     await prisma.user.deleteMany({});
 
-
     // Create test users
     const uA = await prisma.user.create({
       data: {
@@ -328,11 +327,13 @@ describe('Payment (E2E)', () => {
         email: 'usera@example.com',
       } as any);
 
-      const createPaymentIntentSpy = jest.spyOn(stripeService, 'createPaymentIntent').mockResolvedValue({
-        id: 'pi_existing_cust',
-        client_secret: 'pi_existing_cust_secret',
-        status: 'requires_payment_method',
-      } as any);
+      const createPaymentIntentSpy = jest
+        .spyOn(stripeService, 'createPaymentIntent')
+        .mockResolvedValue({
+          id: 'pi_existing_cust',
+          client_secret: 'pi_existing_cust_secret',
+          status: 'requires_payment_method',
+        } as any);
 
       await request(app.getHttpServer())
         .post('/api/bookings/payment/create')
@@ -390,7 +391,7 @@ describe('Payment (E2E)', () => {
         .expect(404);
     });
 
-    it('returns 403 when querying another user\'s payment', async () => {
+    it("returns 403 when querying another user's payment", async () => {
       const offer = await createMockFlightOffer();
       const intent = await createBookingIntent(userA.id, offer.id);
       mockStripeCreate();
@@ -444,7 +445,7 @@ describe('Payment (E2E)', () => {
         .expect(404);
     });
 
-    it('returns 403 when trying to delete another user\'s payment method', async () => {
+    it("returns 403 when trying to delete another user's payment method", async () => {
       // Create a payment method for userB
       const method = await prisma.paymentMethod.create({
         data: {
@@ -476,7 +477,9 @@ describe('Payment (E2E)', () => {
         },
       });
 
-      const detachSpy = jest.spyOn(stripeService, 'detachPaymentMethod').mockResolvedValue({} as any);
+      const detachSpy = jest
+        .spyOn(stripeService, 'detachPaymentMethod')
+        .mockResolvedValue({} as any);
 
       await request(app.getHttpServer())
         .delete(`/api/bookings/payment/methods/${method.id}`)
@@ -521,5 +524,3 @@ describe('Payment (E2E)', () => {
     });
   });
 });
-
-

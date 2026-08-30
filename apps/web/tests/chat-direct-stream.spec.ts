@@ -45,7 +45,9 @@ test.describe('Chat direct stream browser boundary (mocked FastAPI)', () => {
     expect(response.status()).toBe(404);
   });
 
-  test('sends direct bearer auth to the agent URL and reuses the done session', async ({ page }) => {
+  test('sends direct bearer auth to the agent URL and reuses the done session', async ({
+    page,
+  }) => {
     test.setTimeout(120000);
     const requests: Array<{
       authorization: string | undefined;
@@ -135,7 +137,9 @@ test.describe('Chat direct stream browser boundary (mocked FastAPI)', () => {
     expect(requests[1].correlationId).not.toBe('continued-session');
   });
 
-  test('rejects identifier-bearing handoff, then preserves selection and reconnect continuity', async ({ page }) => {
+  test('rejects identifier-bearing handoff, then preserves selection and reconnect continuity', async ({
+    page,
+  }) => {
     const handoffToken = `chk_handoff_v1_${'a'.repeat(43)}`;
     const requests: Array<{ body: Record<string, unknown>; url: string }> = [];
     let streamRequestNumber = 0;
@@ -159,25 +163,33 @@ test.describe('Chat direct stream browser boundary (mocked FastAPI)', () => {
           headers: {
             'Access-Control-Allow-Origin': 'http://127.0.0.1:3000',
             'Access-Control-Allow-Methods': 'POST, OPTIONS',
-            'Access-Control-Allow-Headers': 'Authorization, Content-Type, X-Trace-Id, X-Correlation-Id',
+            'Access-Control-Allow-Headers':
+              'Authorization, Content-Type, X-Trace-Id, X-Correlation-Id',
           },
         });
         return;
       }
 
       streamRequestNumber += 1;
-      requests.push({ body: route.request().postDataJSON() as Record<string, unknown>, url: route.request().url() });
+      requests.push({
+        body: route.request().postDataJSON() as Record<string, unknown>,
+        url: route.request().url(),
+      });
       const firstTurn = streamRequestNumber === 1;
       const streamBody = firstTurn
         ? [
             'event: flight_results',
-            'data: ' + JSON.stringify({
-              version: 1,
-              results: [{ index: 1, airline: 'Test Airlines', origin: 'JFK', destination: 'LHR' }],
-            }),
+            'data: ' +
+              JSON.stringify({
+                version: 1,
+                results: [
+                  { index: 1, airline: 'Test Airlines', origin: 'JFK', destination: 'LHR' },
+                ],
+              }),
             '',
             'event: ACTION_HANDOFF',
-            'data: ' + JSON.stringify(buildActionHandoffFixture(handoffToken, 'forbidden-offer-id')),
+            'data: ' +
+              JSON.stringify(buildActionHandoffFixture(handoffToken, 'forbidden-offer-id')),
             '',
             'event: done',
             'data: {"sessionId":"continued-session"}',
@@ -211,10 +223,16 @@ test.describe('Chat direct stream browser boundary (mocked FastAPI)', () => {
 
     expect(requests[0].body).toMatchObject({ message: 'search flights' });
     expect(requests[0].body.sessionId).toBeUndefined();
-    expect(requests[1].body).toMatchObject({ message: 'select option 1', sessionId: 'continued-session' });
+    expect(requests[1].body).toMatchObject({
+      message: 'select option 1',
+      sessionId: 'continued-session',
+    });
     expect(requests.every((request) => !request.url.includes(handoffToken))).toBe(true);
     expect(page.url()).not.toContain(handoffToken);
-    const browserStorage = await page.evaluate(() => `${window.location.href}\n${JSON.stringify(window.localStorage)}\n${JSON.stringify(window.sessionStorage)}`);
+    const browserStorage = await page.evaluate(
+      () =>
+        `${window.location.href}\n${JSON.stringify(window.localStorage)}\n${JSON.stringify(window.sessionStorage)}`,
+    );
     expect(browserStorage).not.toContain(handoffToken);
   });
 });

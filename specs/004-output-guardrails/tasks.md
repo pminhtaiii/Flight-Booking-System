@@ -128,33 +128,33 @@
 ### Tests for User Story 5
 
 - [x] T022 [P] [US5] Create concurrency/latency unit tests in apps/agent/tests/test_pipeline_parallelism.py
- 
+
 ### Implementation for User Story 5
- 
+
 - [x] T023 [US5] Implement asyncio Task lookahead in apps/agent/src/agent/guardrails/output_pipeline.py
- 
+
 ---
- 
+
 ## Phase 8: User Story 6 - Operator Observability (Priority: P2)
- 
+
 **Goal**: Monitor output guardrail activity through structured logging and metrics.
- 
+
 **Independent Test**: Verify structured log entries contain required fields and NO content from the blocked chunk.
- 
+
 ### Tests for User Story 6
- 
+
 - [x] T024 [P] [US6] Create logging unit tests in apps/agent/tests/test_guardrail_logging.py
- 
+
 ### Implementation for User Story 6
- 
+
 - [x] T025 [US6] Implement structured JSON logging in apps/agent/src/agent/guardrails/output_pipeline.py
- 
+
 ---
- 
+
 ## Phase 9: Polish & Cross-Cutting Concerns
- 
+
 **Purpose**: Improvements and final validation of the whole pipeline
- 
+
 - [x] T026 [P] Update documentation in specs/004-output-guardrails/
 - [x] T027 [P] Create final E2E validation tests in apps/agent/tests/test_e2e_output_guardrails.py
 - [x] T028 [P] Create benchmark script in apps/agent/tests/test_benchmark_output_pipeline.py

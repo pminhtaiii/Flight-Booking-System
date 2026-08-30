@@ -46,7 +46,11 @@ const FORBIDDEN_PRIVACY_CORPUS = [
   'duffel-private-offer-id-alert-drill',
 ] as const;
 
-function mintClaimToken(userId: string, iat: number, secret = 'test-claim-token-secret-must-be-long-enough'): string {
+function mintClaimToken(
+  userId: string,
+  iat: number,
+  secret = 'test-claim-token-secret-must-be-long-enough',
+): string {
   const payload = { userId, iat };
   const payloadStr = JSON.stringify(payload);
   const signature = crypto.createHmac('sha256', secret).update(payloadStr).digest();
@@ -93,9 +97,13 @@ describe('Automated Alert Rules & End-to-End Trace Correlation (e2e)', () => {
       .compile();
 
     app = moduleFixture.createNestApplication();
-    app.useGlobalPipes(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, transform: true }));
+    app.useGlobalPipes(
+      new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, transform: true }),
+    );
     app.useGlobalFilters(new HttpExceptionFilter());
-    app.setGlobalPrefix('api', { exclude: ['health', 'health/(.*)', 'api/health', 'api/health/(.*)'] });
+    app.setGlobalPrefix('api', {
+      exclude: ['health', 'health/(.*)', 'api/health', 'api/health/(.*)'],
+    });
     await app.init();
 
     prisma = moduleFixture.get(PrismaService);
@@ -145,7 +153,13 @@ describe('Automated Alert Rules & End-to-End Trace Correlation (e2e)', () => {
 
     // Setup destination/origin airports
     for (const airport of [
-      { iataCode: 'SGN', name: 'Tan Son Nhat', city: 'Ho Chi Minh', latitude: 10.8, longitude: 106.6 },
+      {
+        iataCode: 'SGN',
+        name: 'Tan Son Nhat',
+        city: 'Ho Chi Minh',
+        latitude: 10.8,
+        longitude: 106.6,
+      },
       { iataCode: 'HAN', name: 'Noi Bai', city: 'Hanoi', latitude: 21.2, longitude: 105.8 },
     ]) {
       await prisma.airport.upsert({
@@ -161,7 +175,9 @@ describe('Automated Alert Rules & End-to-End Trace Correlation (e2e)', () => {
       const userIds = [userAId, userBId].filter(Boolean);
       await prisma.auditLog.deleteMany({ where: { userId: { in: userIds } } });
       await prisma.chatHandoff.deleteMany({ where: { userId: { in: userIds } } });
-      await prisma.bookingIntentPassenger.deleteMany({ where: { intent: { userId: { in: userIds } } } });
+      await prisma.bookingIntentPassenger.deleteMany({
+        where: { intent: { userId: { in: userIds } } },
+      });
       await prisma.bookingIntent.deleteMany({ where: { userId: { in: userIds } } });
       await prisma.chatMessage.deleteMany({ where: { session: { userId: { in: userIds } } } });
       await prisma.chatSession.deleteMany({ where: { userId: { in: userIds } } });
@@ -296,7 +312,9 @@ describe('Automated Alert Rules & End-to-End Trace Correlation (e2e)', () => {
         fallbackThresholdPercent: number = 10.0,
       ) => {
         const fallbackCount = decisions.filter(
-          (d) => d.status === 'fallback' && (d.outcome === 'malformed_output' || d.outcome === 'low_confidence'),
+          (d) =>
+            d.status === 'fallback' &&
+            (d.outcome === 'malformed_output' || d.outcome === 'low_confidence'),
         ).length;
         const fallbackRatePercent = (fallbackCount / decisions.length) * 100;
         const alertTriggered = fallbackRatePercent > fallbackThresholdPercent;

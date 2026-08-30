@@ -21,7 +21,11 @@ export default async function BookingDetailPage({ params, searchParams }: Props)
   const mockScenarioMatch = cookieHeader.match(/mock-scenario=([^;]+)/);
   const mockScenario = mockScenarioMatch ? mockScenarioMatch[1].trim() : null;
 
-  if ((process.env.NODE_ENV === 'test' || process.env.CI === 'true') && mockScenario && MOCK_BOOKINGS[mockScenario]) {
+  if (
+    (process.env.NODE_ENV === 'test' || process.env.CI === 'true') &&
+    mockScenario &&
+    MOCK_BOOKINGS[mockScenario]
+  ) {
     const rawBooking = MOCK_BOOKINGS[mockScenario];
     const booking = mapBookingDetail(rawBooking as unknown as Record<string, unknown>);
     const showConfirmation = searchParams.confirmed === 'true';
@@ -32,9 +36,9 @@ export default async function BookingDetailPage({ params, searchParams }: Props)
           {showConfirmation && booking.status === 'CONFIRMED' && (
             <BookingConfirmationBanner pnrReference={booking.pnrReference ?? undefined} />
           )}
-          <BookingDetailClient 
-            booking={booking} 
-            showConfirmation={showConfirmation} 
+          <BookingDetailClient
+            booking={booking}
+            showConfirmation={showConfirmation}
             bookingId={params.bookingId}
           />
         </main>
@@ -49,15 +53,17 @@ export default async function BookingDetailPage({ params, searchParams }: Props)
 
   if (!outcome.ok) {
     if (outcome.reason === 'UNAUTHENTICATED') {
-      const hasSessionCookie = cookieHeader.includes('next-auth') || cookieHeader.includes('__Secure-next-auth');
+      const hasSessionCookie =
+        cookieHeader.includes('next-auth') || cookieHeader.includes('__Secure-next-auth');
       redirect(hasSessionCookie ? '/login?message=session_expired' : '/login');
     }
 
-    const error = outcome.reason === 'FORBIDDEN'
-      ? 'You do not have access to this booking.'
-      : outcome.reason === 'NOT_FOUND'
-      ? 'We could not find this booking.'
-      : (outcome.message || 'We could not load this booking. Please try again.');
+    const error =
+      outcome.reason === 'FORBIDDEN'
+        ? 'You do not have access to this booking.'
+        : outcome.reason === 'NOT_FOUND'
+          ? 'We could not find this booking.'
+          : outcome.message || 'We could not load this booking. Please try again.';
 
     return (
       <div className="flex min-h-screen flex-col bg-background">
@@ -80,9 +86,9 @@ export default async function BookingDetailPage({ params, searchParams }: Props)
         {showConfirmation && booking.status === 'CONFIRMED' && (
           <BookingConfirmationBanner pnrReference={booking.pnrReference ?? undefined} />
         )}
-        <BookingDetailClient 
-          booking={booking} 
-          showConfirmation={showConfirmation} 
+        <BookingDetailClient
+          booking={booking}
+          showConfirmation={showConfirmation}
           bookingId={bookingId}
         />
       </main>

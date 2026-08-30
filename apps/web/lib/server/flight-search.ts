@@ -20,7 +20,10 @@ const CabinClassSchema = z.enum(['economy', 'premium_economy', 'business', 'firs
 const LocalOfferIdSchema = z
   .string()
   .min(1)
-  .refine((value: string): boolean => !value.toLowerCase().startsWith('off_'), 'Provider offer identifiers are not allowed');
+  .refine(
+    (value: string): boolean => !value.toLowerCase().startsWith('off_'),
+    'Provider offer identifiers are not allowed',
+  );
 
 const UpstreamSegmentSchema = z
   .object({
@@ -92,18 +95,21 @@ const UpstreamSelectionSchema = z.object({ id: LocalOfferIdSchema }).passthrough
 type UpstreamOffer = z.infer<typeof UpstreamOfferSchema>;
 type UpstreamSegment = z.infer<typeof UpstreamSegmentSchema>;
 
-type FetchResult =
-  | { ok: true; response: Response }
-  | { ok: false };
+type FetchResult = { ok: true; response: Response } | { ok: false };
 
 export async function searchFlights(query: FlightSearchQuery): Promise<FlightSearchOutcome> {
   const parsedQuery = FlightSearchQuerySchema.safeParse(query);
   if (!parsedQuery.success) {
-    return searchFailure('INVALID_SEARCH', 'Please check your search details and try again.', false);
+    return searchFailure(
+      'INVALID_SEARCH',
+      'Please check your search details and try again.',
+      false,
+    );
   }
 
   const token = await getAccessToken();
-  if (!token) return searchFailure('UNAUTHENTICATED', 'Please sign in to search for flights.', false);
+  if (!token)
+    return searchFailure('UNAUTHENTICATED', 'Please sign in to search for flights.', false);
 
   const upstream = await fetchWithRetry('/api/flights/search', {
     method: 'POST',
@@ -123,7 +129,11 @@ export async function searchFlights(query: FlightSearchQuery): Promise<FlightSea
     return searchFailure('RATE_LIMITED', 'Flight search is busy. Please try again shortly.', true);
   }
   if (upstream.response.status === 400 || upstream.response.status === 422) {
-    return searchFailure('INVALID_SEARCH', 'Please check your search details and try again.', false);
+    return searchFailure(
+      'INVALID_SEARCH',
+      'Please check your search details and try again.',
+      false,
+    );
   }
   if (!upstream.response.ok) return unavailableSearchFailure();
 
@@ -131,13 +141,21 @@ export async function searchFlights(query: FlightSearchQuery): Promise<FlightSea
     const payload: unknown = await upstream.response.json();
     const parsedPayload = UpstreamSearchSchema.safeParse(payload);
     if (!parsedPayload.success) {
-      return searchFailure('UPSTREAM_UNAVAILABLE', 'Flight search returned an invalid response. Please try again.', true);
+      return searchFailure(
+        'UPSTREAM_UNAVAILABLE',
+        'Flight search returned an invalid response. Please try again.',
+        true,
+      );
     }
 
     const offers = parsedPayload.data.results.map(mapOffer);
     const validatedOffers = z.array(FlightSearchOfferViewSchema).safeParse(offers);
     if (!validatedOffers.success) {
-      return searchFailure('UPSTREAM_UNAVAILABLE', 'Flight search returned an invalid response. Please try again.', true);
+      return searchFailure(
+        'UPSTREAM_UNAVAILABLE',
+        'Flight search returned an invalid response. Please try again.',
+        true,
+      );
     }
 
     return {
@@ -146,14 +164,22 @@ export async function searchFlights(query: FlightSearchQuery): Promise<FlightSea
       meta: createSearchMeta(validatedOffers.data),
     };
   } catch {
-    return searchFailure('UPSTREAM_UNAVAILABLE', 'Flight search returned an invalid response. Please try again.', true);
+    return searchFailure(
+      'UPSTREAM_UNAVAILABLE',
+      'Flight search returned an invalid response. Please try again.',
+      true,
+    );
   }
 }
 
 export async function selectFlightOffer(offerId: string): Promise<FlightSelectionOutcome> {
   const parsedOfferId = LocalOfferIdSchema.safeParse(offerId);
   if (!parsedOfferId.success) {
-    return selectionFailure('OFFER_UNAVAILABLE', 'This flight offer is unavailable. Please search again.', false);
+    return selectionFailure(
+      'OFFER_UNAVAILABLE',
+      'This flight offer is unavailable. Please search again.',
+      false,
+    );
   }
 
   const token = await getAccessToken();
@@ -170,14 +196,19 @@ export async function selectFlightOffer(offerId: string): Promise<FlightSelectio
     return selectionFailure('UNAUTHENTICATED', 'Please sign in to continue.', false);
   }
   if (upstream.response.status === 404 || upstream.response.status === 410) {
-    return selectionFailure('OFFER_EXPIRED', 'This flight offer has expired. Please search again.', false);
+    return selectionFailure(
+      'OFFER_EXPIRED',
+      'This flight offer has expired. Please search again.',
+      false,
+    );
   }
   if (!upstream.response.ok) return unavailableSelectionFailure();
 
   try {
     const payload: unknown = await upstream.response.json();
     const parsedPayload = UpstreamSelectionSchema.safeParse(payload);
-    if (!parsedPayload.success || parsedPayload.data.id !== parsedOfferId.data) return unavailableSelectionFailure();
+    if (!parsedPayload.success || parsedPayload.data.id !== parsedOfferId.data)
+      return unavailableSelectionFailure();
   } catch {
     return unavailableSelectionFailure();
   }
@@ -191,7 +222,11 @@ async function getAccessToken(): Promise<string | null> {
     const sessionFn =
       typeof NextAuth.getServerSession === 'function'
         ? NextAuth.getServerSession
-        : (NextAuth as unknown as { default?: { getServerSession: typeof NextAuth.getServerSession } }).default?.getServerSession;
+        : (
+            NextAuth as unknown as {
+              default?: { getServerSession: typeof NextAuth.getServerSession };
+            }
+          ).default?.getServerSession;
     if (!sessionFn) return null;
     const session: unknown = await sessionFn(authOptions);
     if (!session || typeof session !== 'object' || !('accessToken' in session)) return null;
@@ -210,7 +245,10 @@ async function fetchWithRetry(pathname: string, init: RequestInit): Promise<Fetc
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
     try {
-      const response = await fetch(`${apiUrl()}${pathname}`, { ...init, signal: controller.signal });
+      const response = await fetch(`${apiUrl()}${pathname}`, {
+        ...init,
+        signal: controller.signal,
+      });
       if (response.status < 500 || attempt === maxAttempts - 1) return { ok: true, response };
     } catch {
       if (attempt === maxAttempts - 1) return { ok: false };
@@ -225,7 +263,8 @@ async function fetchWithRetry(pathname: string, init: RequestInit): Promise<Fetc
 }
 
 function apiUrl(): string {
-  const configuredUrl = process.env.API_URL || process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+  const configuredUrl =
+    process.env.API_URL || process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
   return configuredUrl.replace(/\/+$/, '');
 }
 
@@ -249,7 +288,11 @@ function mapOffer(offer: UpstreamOffer) {
   };
 }
 
-function mapSlice(segments: UpstreamSegment[], totalMinutes?: number, stops?: number): FlightSearchSliceView {
+function mapSlice(
+  segments: UpstreamSegment[],
+  totalMinutes?: number,
+  stops?: number,
+): FlightSearchSliceView {
   const firstSegment = segments[0];
   const lastSegment = segments[segments.length - 1];
   return {
@@ -320,7 +363,11 @@ function searchFailure(
 }
 
 function unavailableSearchFailure(): FlightSearchOutcome {
-  return searchFailure('UPSTREAM_UNAVAILABLE', 'Flight search is temporarily unavailable. Please try again.', true);
+  return searchFailure(
+    'UPSTREAM_UNAVAILABLE',
+    'Flight search is temporarily unavailable. Please try again.',
+    true,
+  );
 }
 
 function selectionFailure(
@@ -332,5 +379,9 @@ function selectionFailure(
 }
 
 function unavailableSelectionFailure(): FlightSelectionOutcome {
-  return selectionFailure('OFFER_UNAVAILABLE', 'This flight offer is unavailable. Please search again.', true);
+  return selectionFailure(
+    'OFFER_UNAVAILABLE',
+    'This flight offer is unavailable. Please search again.',
+    true,
+  );
 }

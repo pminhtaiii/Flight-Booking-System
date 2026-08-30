@@ -47,8 +47,7 @@ describe('RefundTransactionService', () => {
     warnSpy = jest.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
 
     mockPrisma.$transaction.mockImplementation(
-      async (callback: (tx: typeof mockPrisma) => Promise<unknown>) =>
-        callback(mockPrisma),
+      async (callback: (tx: typeof mockPrisma) => Promise<unknown>) => callback(mockPrisma),
     );
 
     const module: TestingModule = await Test.createTestingModule({
@@ -81,17 +80,17 @@ describe('RefundTransactionService', () => {
 
   describe('input validation', () => {
     it('throws BadRequestException for negative, zero, or non-integer amount', async () => {
-      await expect(
-        service.reserveTransaction({ ...baseInput, amount: -100 }),
-      ).rejects.toThrow(BadRequestException);
+      await expect(service.reserveTransaction({ ...baseInput, amount: -100 })).rejects.toThrow(
+        BadRequestException,
+      );
 
-      await expect(
-        service.reserveTransaction({ ...baseInput, amount: 0 }),
-      ).rejects.toThrow(BadRequestException);
+      await expect(service.reserveTransaction({ ...baseInput, amount: 0 })).rejects.toThrow(
+        BadRequestException,
+      );
 
-      await expect(
-        service.reserveTransaction({ ...baseInput, amount: 10.5 }),
-      ).rejects.toThrow(BadRequestException);
+      await expect(service.reserveTransaction({ ...baseInput, amount: 10.5 })).rejects.toThrow(
+        BadRequestException,
+      );
     });
 
     it('rejects a direct reservation that uses the cancellation discriminator', async () => {
@@ -139,9 +138,7 @@ describe('RefundTransactionService', () => {
     it('throws NotFoundException when Payment is not found', async () => {
       mockPrisma.$queryRaw.mockResolvedValueOnce([]);
 
-      await expect(service.reserveTransaction(baseInput)).rejects.toThrow(
-        NotFoundException,
-      );
+      await expect(service.reserveTransaction(baseInput)).rejects.toThrow(NotFoundException);
       expect(mockPrisma.$queryRaw).toHaveBeenCalledTimes(1);
     });
 
@@ -156,9 +153,9 @@ describe('RefundTransactionService', () => {
         },
       ]);
 
-      await expect(
-        service.reserveTransaction({ ...baseInput, currency: 'USD' }),
-      ).rejects.toThrow(BadRequestException);
+      await expect(service.reserveTransaction({ ...baseInput, currency: 'USD' })).rejects.toThrow(
+        BadRequestException,
+      );
     });
   });
 
@@ -345,9 +342,9 @@ describe('RefundTransactionService', () => {
       ]);
 
       // payment: 10000, used: 9000 (6000 + 3000), remaining: 1000. Request: 2000 -> reject
-      await expect(
-        service.reserveTransaction({ ...baseInput, amount: 2000 }),
-      ).rejects.toThrow(BadRequestException);
+      await expect(service.reserveTransaction({ ...baseInput, amount: 2000 })).rejects.toThrow(
+        BadRequestException,
+      );
 
       expect(warnSpy).toHaveBeenCalledWith({
         message: 'refund_reservation',
@@ -478,9 +475,7 @@ describe('RefundTransactionService', () => {
             status: RefundStatus.REFUND_RETRY_SCHEDULED,
           },
         ])
-        .mockResolvedValueOnce([
-          { id: 'ref-ob-1', amount: 3000, status: RefundStatus.SUCCEEDED },
-        ]);
+        .mockResolvedValueOnce([{ id: 'ref-ob-1', amount: 3000, status: RefundStatus.SUCCEEDED }]);
 
       mockPrisma.idempotencyKey.create.mockResolvedValueOnce({
         id: 'key-new',

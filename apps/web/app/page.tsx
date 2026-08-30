@@ -11,4 +11,3 @@ export default async function IndexPage(): Promise<JSX.Element> {
 
   return <LandingPage />;
 }
-

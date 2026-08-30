@@ -23,7 +23,9 @@ const isCabinClass = (value: string): value is FlightSearchQuery['cabinClass'] =
 const getSingleValue = (value: string | string[] | undefined): string | undefined =>
   typeof value === 'string' ? value : undefined;
 
-const getInitialValues = (searchParams: SearchPageProps['searchParams']): Partial<FlightSearchQuery> => {
+const getInitialValues = (
+  searchParams: SearchPageProps['searchParams'],
+): Partial<FlightSearchQuery> => {
   const origin = getSingleValue(searchParams.origin);
   const destination = getSingleValue(searchParams.destination);
   const departureDate = getSingleValue(searchParams.departureDate);
@@ -48,7 +50,9 @@ export default async function SearchPage({ searchParams }: SearchPageProps): Pro
       <Header />
       <main className="mx-auto w-full max-w-4xl space-y-6 py-12 px-4">
         <h1 className="text-3xl font-bold text-text-primary">Search Flights</h1>
-        <p className="text-text-secondary">Find and compare flight offers for your next destination.</p>
+        <p className="text-text-secondary">
+          Find and compare flight offers for your next destination.
+        </p>
         <SearchFormClient initialValues={initialValues} />
       </main>
     </div>

@@ -20,7 +20,7 @@ Grilling session — 2026-07-05. Covers how the Next.js frontend connects to the
 - `NEXT_PUBLIC_API_URL` eliminated for NestJS calls → plain server-only `API_URL` env var.
 - JWT never reaches the browser. Browser auth is the NextAuth httpOnly session cookie only.
 - CORS to NestJS becomes a non-issue for the browser.
-- Architecture invariant preserved: *"Frontend components contain no business logic or direct API calls to external services."*
+- Architecture invariant preserved: _"Frontend components contain no business logic or direct API calls to external services."_
 
 ---
 
@@ -38,18 +38,18 @@ Grilling session — 2026-07-05. Covers how the Next.js frontend connects to the
 
 **Decision:** Errors classified by response body shape, not status code range.
 
-| Category | Trigger | Examples | Mechanism |
-|---|---|---|---|
-| **Session expiry** | `401` status | Token expired, token revoked | `apiClient` intercepts → redirect to `/login` before any result reaches the caller |
-| **Expected business error** | Response body has `{ code, message }` structure | `auth_locked`, `email_exists`, `validation_failed`, `booking_conflict` | Typed `ApiResult<T>` with `ok: false` — component pattern-matches on `error.code` |
-| **Exceptional / contract violation** | Body does **not** have `{ code, message }` shape, OR network failure | Malformed 400, network down, unrecognized error shape | Thrown error → Error Boundary |
+| Category                             | Trigger                                                              | Examples                                                               | Mechanism                                                                          |
+| ------------------------------------ | -------------------------------------------------------------------- | ---------------------------------------------------------------------- | ---------------------------------------------------------------------------------- |
+| **Session expiry**                   | `401` status                                                         | Token expired, token revoked                                           | `apiClient` intercepts → redirect to `/login` before any result reaches the caller |
+| **Expected business error**          | Response body has `{ code, message }` structure                      | `auth_locked`, `email_exists`, `validation_failed`, `booking_conflict` | Typed `ApiResult<T>` with `ok: false` — component pattern-matches on `error.code`  |
+| **Exceptional / contract violation** | Body does **not** have `{ code, message }` shape, OR network failure | Malformed 400, network down, unrecognized error shape                  | Thrown error → Error Boundary                                                      |
 
 Key insight: a well-formed 4xx with a recognized `code` is expected. A malformed 4xx with an unrecognized body is a contract bug — same severity as a 5xx.
 
 ```typescript
 type ApiResult<T> =
   | { ok: true; data: T }
-  | { ok: false; error: { code: string; message: string; status: number } }
+  | { ok: false; error: { code: string; message: string; status: number } };
 ```
 
 ---
@@ -58,15 +58,16 @@ type ApiResult<T> =
 
 **Decision:** NextAuth `jwt` callback refreshes the JWT transparently. Hard session cap at 7 days.
 
-| Concern | Value |
-|---|---|
-| JWT TTL | 24 hours per token |
-| Refresh trigger | NextAuth `jwt` callback checks expiry on every request; refreshes when <2h remaining |
-| Refresh mechanism | New `POST /auth/refresh` on NestJS — accepts valid-but-near-expiry JWT, returns fresh 24h token |
-| Hard cap | 7 days from original login. JWT payload carries `sessionStart` (set at login, preserved across refreshes). When `now - sessionStart > 7 days` → skip refresh, set error flag on token → force re-login |
-| apiClient 401 handler | Safety net for revoked/truly-invalid tokens — should rarely fire under normal flow |
+| Concern               | Value                                                                                                                                                                                                  |
+| --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| JWT TTL               | 24 hours per token                                                                                                                                                                                     |
+| Refresh trigger       | NextAuth `jwt` callback checks expiry on every request; refreshes when <2h remaining                                                                                                                   |
+| Refresh mechanism     | New `POST /auth/refresh` on NestJS — accepts valid-but-near-expiry JWT, returns fresh 24h token                                                                                                        |
+| Hard cap              | 7 days from original login. JWT payload carries `sessionStart` (set at login, preserved across refreshes). When `now - sessionStart > 7 days` → skip refresh, set error flag on token → force re-login |
+| apiClient 401 handler | Safety net for revoked/truly-invalid tokens — should rarely fire under normal flow                                                                                                                     |
 
 Implementation notes:
+
 - `sessionStart` lives in the JWT payload itself (set by NestJS at login, carried through every refresh) so the NextAuth callback can check the 7-day cap without a database call.
 - The `/auth/refresh` endpoint preserves `sessionStart` when minting a new token.
 
@@ -76,12 +77,12 @@ Implementation notes:
 
 **Decision:** Retry transient failures on reads only. Mutations never retry.
 
-| Concern | Value |
-|---|---|
-| Retry scope | `GET` requests only |
-| Retry conditions | Network errors (connection refused, timeout), 502/503/504 |
-| Limits | Max 2 retries, exponential backoff (200ms → 400ms), ~2s total cap |
-| Mutations | Fail fast, no retry — avoids duplicate bookings/payments |
+| Concern          | Value                                                             |
+| ---------------- | ----------------------------------------------------------------- |
+| Retry scope      | `GET` requests only                                               |
+| Retry conditions | Network errors (connection refused, timeout), 502/503/504         |
+| Limits           | Max 2 retries, exponential backoff (200ms → 400ms), ~2s total cap |
+| Mutations        | Fail fast, no retry — avoids duplicate bookings/payments          |
 
 ---
 

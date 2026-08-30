@@ -1,18 +1,28 @@
-import { Injectable, NotFoundException, ForbiddenException, ConflictException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  ForbiddenException,
+  ConflictException,
+} from '@nestjs/common';
 import { PrismaService } from '@/prisma/prisma.service';
-import { 
-  DisruptionHistoryResponseDto, 
-  AcknowledgeDisruptionResponseDto, 
+import {
+  DisruptionHistoryResponseDto,
+  AcknowledgeDisruptionResponseDto,
   AcceptDisruptionResponseDto,
   DisruptionStatus,
-  DisruptionResolvedReason
+  DisruptionResolvedReason,
 } from '@shared/disruption-types';
 
 @Injectable()
 export class DisruptionService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async getDisruptionHistory(bookingId: string, userId: string, page: number, limit: number): Promise<DisruptionHistoryResponseDto> {
+  async getDisruptionHistory(
+    bookingId: string,
+    userId: string,
+    page: number,
+    limit: number,
+  ): Promise<DisruptionHistoryResponseDto> {
     const booking = await this.prisma.booking.findUnique({
       where: { id: bookingId },
     });
@@ -51,7 +61,7 @@ export class DisruptionService {
         materialBaselines: rev.materialBaselines as any[],
         incrementalSummary: (rev.incrementalDiff as any)?.presentationSummary || {},
         cumulativeSummary: (rev.cumulativeDiff as any)?.presentationSummary || {},
-        segments: rev.segments.map(seg => ({
+        segments: rev.segments.map((seg) => ({
           airline: {
             name: seg.airlineName,
             iataCode: seg.marketingCarrierIata,
@@ -90,7 +100,11 @@ export class DisruptionService {
     };
   }
 
-  async acknowledgeDisruption(bookingId: string, revisionId: string, userId: string): Promise<AcknowledgeDisruptionResponseDto> {
+  async acknowledgeDisruption(
+    bookingId: string,
+    revisionId: string,
+    userId: string,
+  ): Promise<AcknowledgeDisruptionResponseDto> {
     const now = new Date();
 
     const updatedBooking = await this.prisma.$transaction(async (tx) => {
@@ -178,7 +192,11 @@ export class DisruptionService {
     };
   }
 
-  async acceptDisruption(bookingId: string, revisionId: string, userId: string): Promise<AcceptDisruptionResponseDto> {
+  async acceptDisruption(
+    bookingId: string,
+    revisionId: string,
+    userId: string,
+  ): Promise<AcceptDisruptionResponseDto> {
     const now = new Date();
 
     const updatedBooking = await this.prisma.$transaction(async (tx) => {
@@ -230,7 +248,11 @@ export class DisruptionService {
 
       if (result.count === 0) {
         const reloaded = await tx.booking.findUnique({ where: { id: bookingId } });
-        if (reloaded && reloaded.activeDisruptionRevisionId === revisionId && reloaded.disruptionStatus === 'RESOLVED') {
+        if (
+          reloaded &&
+          reloaded.activeDisruptionRevisionId === revisionId &&
+          reloaded.disruptionStatus === 'RESOLVED'
+        ) {
           return reloaded;
         }
         throw new ConflictException({
@@ -273,4 +295,3 @@ export class DisruptionService {
     };
   }
 }
-

@@ -8,9 +8,10 @@ const activeUser = {
   status: 'ACTIVE',
 };
 
-const requestFor = (token: string) => ({
-  headers: { authorization: `Bearer ${token}` },
-}) as never;
+const requestFor = (token: string) =>
+  ({
+    headers: { authorization: `Bearer ${token}` },
+  }) as never;
 
 const payload = { id: 'user-1', email: 'user@example.test', jti: 'jti-1' };
 
@@ -18,7 +19,9 @@ describe('JwtStrategy', () => {
   it('coalesces concurrent active-user lookups while checking every token revocation', async () => {
     const prisma = { user: { findUnique: jest.fn().mockResolvedValue(activeUser) } };
     let releaseRevocation!: (value: string | null) => void;
-    const revocation = new Promise<string | null>((resolve) => { releaseRevocation = resolve; });
+    const revocation = new Promise<string | null>((resolve) => {
+      releaseRevocation = resolve;
+    });
     const cache = { get: jest.fn().mockReturnValue(revocation) };
     const strategy = new JwtStrategy(prisma as never, cache as never);
     const request = requestFor('shared-token');
@@ -45,7 +48,9 @@ describe('JwtStrategy', () => {
       role: activeUser.role,
       jti: payload.jti,
     });
-    await expect(strategy.validate(requestFor('shared-token'), payload)).rejects.toBeInstanceOf(UnauthorizedException);
+    await expect(strategy.validate(requestFor('shared-token'), payload)).rejects.toBeInstanceOf(
+      UnauthorizedException,
+    );
 
     expect(cache.get).toHaveBeenCalledTimes(2);
     expect(prisma.user.findUnique).toHaveBeenCalledTimes(1);
@@ -54,7 +59,8 @@ describe('JwtStrategy', () => {
   it('observes user deactivation on the next validation', async () => {
     const prisma = {
       user: {
-        findUnique: jest.fn()
+        findUnique: jest
+          .fn()
           .mockResolvedValueOnce(activeUser)
           .mockResolvedValueOnce({ ...activeUser, status: 'INACTIVE' }),
       },
@@ -68,7 +74,9 @@ describe('JwtStrategy', () => {
       role: activeUser.role,
       jti: payload.jti,
     });
-    await expect(strategy.validate(requestFor('shared-token'), payload)).rejects.toBeInstanceOf(UnauthorizedException);
+    await expect(strategy.validate(requestFor('shared-token'), payload)).rejects.toBeInstanceOf(
+      UnauthorizedException,
+    );
 
     expect(prisma.user.findUnique).toHaveBeenCalledTimes(2);
   });
@@ -77,7 +85,9 @@ describe('JwtStrategy', () => {
     const token = 'shared-token';
     const prisma = { user: { findUnique: jest.fn().mockResolvedValue(activeUser) } };
     let releaseRevocation!: (value: string | null) => void;
-    const revocation = new Promise<string | null>((resolve) => { releaseRevocation = resolve; });
+    const revocation = new Promise<string | null>((resolve) => {
+      releaseRevocation = resolve;
+    });
     const cache = { get: jest.fn().mockReturnValueOnce(revocation).mockResolvedValueOnce(null) };
     const strategy = new JwtStrategy(prisma as never, cache as never);
 

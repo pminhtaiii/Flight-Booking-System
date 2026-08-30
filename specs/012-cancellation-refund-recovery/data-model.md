@@ -17,16 +17,16 @@ failed bookings cannot be cancelled through this flow.
 Create a one-to-one `Cancellation` record for the durable supplier-side audit
 and recovery state.
 
-| Field | Purpose |
-| --- | --- |
-| `id`, `bookingId` (unique) | Identity and owner via Booking |
-| `status` | `PENDING`, `SUPPLIER_CANCELLED`, `SUPPLIER_FAILED` |
-| `quoteId`, `quoteExpiresAt` | Duffel cancellation quote, reused on recovery |
-| `duffelOrderId`, `supplierCancellationId` | Upstream correlation and proof |
-| `airlineRefundAmount`, `currency` | Authoritative quoted supplier amount |
-| `claimedAt`, `supplierCancelledAt` | Claim/recovery and audit timestamps |
-| `lastErrorCode`, `lastErrorAt` | PII-safe diagnostic information |
-| `createdAt`, `updatedAt` | Audit timestamps |
+| Field                                     | Purpose                                            |
+| ----------------------------------------- | -------------------------------------------------- |
+| `id`, `bookingId` (unique)                | Identity and owner via Booking                     |
+| `status`                                  | `PENDING`, `SUPPLIER_CANCELLED`, `SUPPLIER_FAILED` |
+| `quoteId`, `quoteExpiresAt`               | Duffel cancellation quote, reused on recovery      |
+| `duffelOrderId`, `supplierCancellationId` | Upstream correlation and proof                     |
+| `airlineRefundAmount`, `currency`         | Authoritative quoted supplier amount               |
+| `claimedAt`, `supplierCancelledAt`        | Claim/recovery and audit timestamps                |
+| `lastErrorCode`, `lastErrorAt`            | PII-safe diagnostic information                    |
+| `createdAt`, `updatedAt`                  | Audit timestamps                                   |
 
 Indexes: unique `bookingId`, plus `status, claimedAt` for reconciliation.
 

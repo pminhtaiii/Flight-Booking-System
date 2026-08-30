@@ -31,15 +31,17 @@ describe('AncillaryPaymentValidationService expiry races', () => {
       currentAncillarySelectionId: 'selection-3',
       currentAncillarySelection: selection,
     };
-    const selectionUpdate = jest.fn().mockImplementation(
-      async (args: { where: { OR?: Array<{ validationLeaseExpiresAt?: { lte: Date } }> } }) => {
-        const expiryThreshold = args.where.OR?.[1]?.validationLeaseExpiresAt?.lte;
-        if (expiryThreshold) {
-          return { count: expiryThreshold >= expiredAtLockTime ? 1 : 0 };
-        }
-        return { count: 1 };
-      },
-    );
+    const selectionUpdate = jest
+      .fn()
+      .mockImplementation(
+        async (args: { where: { OR?: Array<{ validationLeaseExpiresAt?: { lte: Date } }> } }) => {
+          const expiryThreshold = args.where.OR?.[1]?.validationLeaseExpiresAt?.lte;
+          if (expiryThreshold) {
+            return { count: expiryThreshold >= expiredAtLockTime ? 1 : 0 };
+          }
+          return { count: 1 };
+        },
+      );
     const queryRaw = jest.fn().mockImplementation(async () => {
       if (queryRaw.mock.calls.length === 1) {
         jest.setSystemTime(new Date('2026-07-29T10:00:10.000Z'));
@@ -56,7 +58,8 @@ describe('AncillaryPaymentValidationService expiry races', () => {
     };
     const prisma = {
       $transaction: jest.fn(
-        async (callback: (value: typeof transaction) => Promise<unknown>): Promise<unknown> => callback(transaction),
+        async (callback: (value: typeof transaction) => Promise<unknown>): Promise<unknown> =>
+          callback(transaction),
       ),
       ancillarySelection: { updateMany: jest.fn() },
     };
@@ -77,12 +80,14 @@ describe('AncillaryPaymentValidationService expiry races', () => {
       duffel as unknown as DuffelService,
     );
 
-    await expect(service.validateForPayment({
-      userId: 'user-1',
-      bookingIntentId: 'intent-1',
-      ancillarySelectionId: 'selection-3',
-      ancillarySelectionVersion: 3,
-    })).resolves.toMatchObject({
+    await expect(
+      service.validateForPayment({
+        userId: 'user-1',
+        bookingIntentId: 'intent-1',
+        ancillarySelectionId: 'selection-3',
+        ancillarySelectionVersion: 3,
+      }),
+    ).resolves.toMatchObject({
       selectionId: 'selection-3',
       selectionVersion: 3,
     });
@@ -102,17 +107,21 @@ describe('AncillaryPaymentValidationService expiry races', () => {
         total: '53.00',
         validationLeaseToken: null,
         validationLeaseExpiresAt: null,
-        seatSelections: [{
-          serviceId: 'seat-1',
-          intentPassengerId: 'passenger-1',
-          segmentId: 'segment-1',
-        }],
-        baggageSelections: [{
-          serviceId: 'bag-1',
-          intentPassengerId: 'passenger-1',
-          quantity: 1,
-          segments: [],
-        }],
+        seatSelections: [
+          {
+            serviceId: 'seat-1',
+            intentPassengerId: 'passenger-1',
+            segmentId: 'segment-1',
+          },
+        ],
+        baggageSelections: [
+          {
+            serviceId: 'bag-1',
+            intentPassengerId: 'passenger-1',
+            quantity: 1,
+            segments: [],
+          },
+        ],
       };
       const intent = {
         id: 'intent-1',
@@ -127,17 +136,20 @@ describe('AncillaryPaymentValidationService expiry races', () => {
         currentAncillarySelectionId: 'selection-3',
         currentAncillarySelection: selection,
       };
-      const selectionUpdate = jest.fn().mockImplementation(
-        async (args: { where: { OR?: unknown; validationLeaseExpiresAt?: { gt: Date } } }) => {
-          if (args.where.OR) {
-            return { count: 1 };
-          }
-          const completionThreshold = args.where.validationLeaseExpiresAt?.gt;
-          return {
-            count: completionThreshold === undefined || leaseExpiresAt > completionThreshold ? 1 : 0,
-          };
-        },
-      );
+      const selectionUpdate = jest
+        .fn()
+        .mockImplementation(
+          async (args: { where: { OR?: unknown; validationLeaseExpiresAt?: { gt: Date } } }) => {
+            if (args.where.OR) {
+              return { count: 1 };
+            }
+            const completionThreshold = args.where.validationLeaseExpiresAt?.gt;
+            return {
+              count:
+                completionThreshold === undefined || leaseExpiresAt > completionThreshold ? 1 : 0,
+            };
+          },
+        );
       const bookingIntentUpdate = jest.fn().mockResolvedValue({ count: 1 });
       const queryRaw = jest.fn().mockImplementation(async () => {
         if (queryRaw.mock.calls.length === 2) {
@@ -155,7 +167,8 @@ describe('AncillaryPaymentValidationService expiry races', () => {
       };
       const prisma = {
         $transaction: jest.fn(
-          async (callback: (value: typeof transaction) => Promise<unknown>): Promise<unknown> => callback(transaction),
+          async (callback: (value: typeof transaction) => Promise<unknown>): Promise<unknown> =>
+            callback(transaction),
         ),
         ancillarySelection: { updateMany: jest.fn() },
       };
@@ -177,21 +190,23 @@ describe('AncillaryPaymentValidationService expiry races', () => {
         invalidServiceIdentities: ['seat-1'],
       };
       const duffel = {
-        repriceOffer: jest.fn().mockResolvedValue(
-          completion === 'validated' ? validPricing : stalePricing,
-        ),
+        repriceOffer: jest
+          .fn()
+          .mockResolvedValue(completion === 'validated' ? validPricing : stalePricing),
       };
       const service = new AncillaryPaymentValidationService(
         prisma as unknown as PrismaService,
         duffel as unknown as DuffelService,
       );
 
-      await expect(service.validateForPayment({
-        userId: 'user-1',
-        bookingIntentId: 'intent-1',
-        ancillarySelectionId: 'selection-3',
-        ancillarySelectionVersion: 3,
-      })).rejects.toMatchObject({
+      await expect(
+        service.validateForPayment({
+          userId: 'user-1',
+          bookingIntentId: 'intent-1',
+          ancillarySelectionId: 'selection-3',
+          ancillarySelectionVersion: 3,
+        }),
+      ).rejects.toMatchObject({
         response: {
           code: 'ANCILLARY_VERSION_CONFLICT',
           intentId: 'intent-1',

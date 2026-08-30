@@ -9,26 +9,27 @@
 
 Stores raw Duffel flight offer data for retrieval on the flight detail page. Hard-purged by a cron job after a configurable retention window.
 
-| Field | Type | Constraints | Description |
-|-------|------|-------------|-------------|
-| id | UUID | PK, auto-generated | Internal offer identifier (used in URLs) |
-| searchHash | String | Indexed, not null | SHA-256 of the normalized search query (links to cache key) |
-| duffelOfferId | String | Not null | The Duffel-assigned offer ID (e.g., "off_xxx") |
-| rawOffer | JSON | Not null | Full Duffel offer object as returned by the API |
-| origin | String(3) | Not null | Origin IATA airport code |
-| destination | String(3) | Not null | Destination IATA airport code |
-| departureDate | Date | Not null | Departure date |
-| returnDate | Date | Nullable | Return date (null for one-way) |
-| passengers | Int | Not null, min 1 | Number of passengers |
-| price | Decimal(10,2) | Not null | Total price of the offer |
-| currency | String | Not null, default "USD" | ISO 4217 currency code |
-| createdAt | DateTime | Auto, indexed | Timestamp of record creation |
+| Field         | Type          | Constraints             | Description                                                 |
+| ------------- | ------------- | ----------------------- | ----------------------------------------------------------- |
+| id            | UUID          | PK, auto-generated      | Internal offer identifier (used in URLs)                    |
+| searchHash    | String        | Indexed, not null       | SHA-256 of the normalized search query (links to cache key) |
+| duffelOfferId | String        | Not null                | The Duffel-assigned offer ID (e.g., "off_xxx")              |
+| rawOffer      | JSON          | Not null                | Full Duffel offer object as returned by the API             |
+| origin        | String(3)     | Not null                | Origin IATA airport code                                    |
+| destination   | String(3)     | Not null                | Destination IATA airport code                               |
+| departureDate | Date          | Not null                | Departure date                                              |
+| returnDate    | Date          | Nullable                | Return date (null for one-way)                              |
+| passengers    | Int           | Not null, min 1         | Number of passengers                                        |
+| price         | Decimal(10,2) | Not null                | Total price of the offer                                    |
+| currency      | String        | Not null, default "USD" | ISO 4217 currency code                                      |
+| createdAt     | DateTime      | Auto, indexed           | Timestamp of record creation                                |
 
 **Indexes**: `searchHash`, `createdAt` (for cron cleanup queries)
 **Table name**: `flight_offers`
 **Retention**: Configurable via `FLIGHT_OFFERS_RETENTION_DAYS` env var (default: 7 days)
 
 **Relationships**:
+
 - No foreign keys to `User` — offers are shared across users (same search = same offers)
 - Linked to `SearchHistory` conceptually via `searchHash`, but no FK constraint (different lifecycles)
 
@@ -38,27 +39,28 @@ Stores raw Duffel flight offer data for retrieval on the flight detail page. Har
 
 Lightweight metadata about each search performed. Preserved indefinitely for dashboard analytics (Top Destinations, Spending by Month) and future "Recently Searched" features.
 
-| Field | Type | Constraints | Description |
-|-------|------|-------------|-------------|
-| id | UUID | PK, auto-generated | Record identifier |
-| userId | String | FK → User.id, indexed, not null | The user who performed the search |
-| origin | String(3) | Not null | Origin IATA airport code |
-| destination | String(3) | Not null | Destination IATA airport code |
-| departureDate | Date | Not null | Departure date searched |
-| returnDate | Date | Nullable | Return date searched (null for one-way) |
-| passengers | Int | Not null, min 1 | Number of passengers searched |
-| resultCount | Int | Not null | Number of flight offers returned |
-| minPrice | Decimal(10,2) | Nullable | Lowest price in results (null if 0 results) |
-| maxPrice | Decimal(10,2) | Nullable | Highest price in results (null if 0 results) |
-| currency | String | Not null, default "USD" | Currency of prices |
-| searchHash | String | Not null | SHA-256 linking to the cached/stored offers |
-| createdAt | DateTime | Auto | Timestamp of the search |
+| Field         | Type          | Constraints                     | Description                                  |
+| ------------- | ------------- | ------------------------------- | -------------------------------------------- |
+| id            | UUID          | PK, auto-generated              | Record identifier                            |
+| userId        | String        | FK → User.id, indexed, not null | The user who performed the search            |
+| origin        | String(3)     | Not null                        | Origin IATA airport code                     |
+| destination   | String(3)     | Not null                        | Destination IATA airport code                |
+| departureDate | Date          | Not null                        | Departure date searched                      |
+| returnDate    | Date          | Nullable                        | Return date searched (null for one-way)      |
+| passengers    | Int           | Not null, min 1                 | Number of passengers searched                |
+| resultCount   | Int           | Not null                        | Number of flight offers returned             |
+| minPrice      | Decimal(10,2) | Nullable                        | Lowest price in results (null if 0 results)  |
+| maxPrice      | Decimal(10,2) | Nullable                        | Highest price in results (null if 0 results) |
+| currency      | String        | Not null, default "USD"         | Currency of prices                           |
+| searchHash    | String        | Not null                        | SHA-256 linking to the cached/stored offers  |
+| createdAt     | DateTime      | Auto                            | Timestamp of the search                      |
 
 **Indexes**: `userId`, `createdAt`, composite `[userId, createdAt]`
 **Table name**: `search_history`
 **Retention**: Indefinite (never purged)
 
 **Relationships**:
+
 - `userId` → `User.id` (cascade delete — if user is deleted, their search history is removed)
 
 ---
@@ -67,11 +69,11 @@ Lightweight metadata about each search performed. Preserved indefinitely for das
 
 Stores the durable mapping from `offerId` (UUID) to `searchHash` (SHA-256) so that the `410 Gone` recovery path can find the original search parameters for pre-filling a new search, even after the bulky raw `FlightOffer` row is cleaned up.
 
-| Field | Type | Constraints | Description |
-|-------|------|-------------|-------------|
-| id | UUID | PK | The offer UUID that was generated during search |
-| searchHash | String | Not null | SHA-256 linking to the search query |
-| createdAt | DateTime | Auto, indexed | Timestamp of record creation (for cleanup retention) |
+| Field      | Type     | Constraints   | Description                                          |
+| ---------- | -------- | ------------- | ---------------------------------------------------- |
+| id         | UUID     | PK            | The offer UUID that was generated during search      |
+| searchHash | String   | Not null      | SHA-256 linking to the search query                  |
+| createdAt  | DateTime | Auto, indexed | Timestamp of record creation (for cleanup retention) |
 
 **Indexes**: `createdAt`
 **Table name**: `offer_recoveries`
@@ -85,8 +87,8 @@ Stores the durable mapping from `offerId` (UUID) to `searchHash` (SHA-256) so th
 
 Add relation to `SearchHistory`:
 
-| Change | Detail |
-|--------|--------|
+| Change       | Detail                                        |
+| ------------ | --------------------------------------------- |
 | Add relation | `searchHistory SearchHistory[]` — one-to-many |
 
 No schema changes to `User` columns — only a Prisma relation field.

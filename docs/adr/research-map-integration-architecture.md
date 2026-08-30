@@ -114,13 +114,13 @@ Map viewport auto-fits to show both markers
 
 ## Bundle Impact Analysis
 
-| Package | Gzipped Size | Purpose |
-|---------|-------------|---------|
-| `maplibre-gl` | ~200KB | Core WebGL map engine |
-| `react-map-gl` | ~35KB | React wrapper |
-| `@turf/great-circle` | ~5KB | Arc computation |
-| `@turf/helpers` | ~3KB | GeoJSON utilities |
-| **Total** | **~243KB** | Well under 500KB budget |
+| Package              | Gzipped Size | Purpose                 |
+| -------------------- | ------------ | ----------------------- |
+| `maplibre-gl`        | ~200KB       | Core WebGL map engine   |
+| `react-map-gl`       | ~35KB        | React wrapper           |
+| `@turf/great-circle` | ~5KB         | Arc computation         |
+| `@turf/helpers`      | ~3KB         | GeoJSON utilities       |
+| **Total**            | **~243KB**   | Well under 500KB budget |
 
 All map packages are code-split via `dynamic()` — they don't affect the initial page load of non-map pages.
 

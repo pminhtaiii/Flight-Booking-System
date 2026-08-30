@@ -17,6 +17,7 @@ Search airports by name or IATA code (autocomplete).
 | `limit` | number | No | Max results (default: 10, max: 50) |
 
 **Response 200**:
+
 ```json
 {
   "data": [
@@ -35,6 +36,7 @@ Search airports by name or IATA code (autocomplete).
 ```
 
 **Response 400**: Invalid query (less than 2 characters)
+
 ```json
 { "statusCode": 400, "message": ["q must be at least 2 characters"], "error": "Bad Request" }
 ```
@@ -53,6 +55,7 @@ Get a single airport by IATA code.
 | `iataCode` | string(3) | IATA airport code (uppercase) |
 
 **Response 200**:
+
 ```json
 {
   "iataCode": "HAN",
@@ -70,6 +73,7 @@ Get a single airport by IATA code.
 ```
 
 **Response 404**: Airport not found
+
 ```json
 { "statusCode": 404, "message": "Airport with IATA code 'XYZ' not found", "error": "Not Found" }
 ```
@@ -91,6 +95,7 @@ Find airports within a radius of a geographic point.
 | `limit` | number | No | Max results (default: 10, max: 50) |
 
 **Response 200**:
+
 ```json
 {
   "data": [
@@ -122,6 +127,7 @@ Get all airports (lightweight payload for map rendering).
 **Query Parameters**: None
 
 **Response 200**:
+
 ```json
 {
   "data": [
@@ -152,6 +158,7 @@ All airport endpoints are **public** (no JWT required). Airport data is non-sens
 ## Error Format
 
 All errors follow the standard NestJS exception format:
+
 ```json
 {
   "statusCode": 400,

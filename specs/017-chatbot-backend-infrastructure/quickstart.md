@@ -228,14 +228,14 @@ With model, Duffel, Stripe, and email/SMS boundaries stubbed:
 
 ## Rollout Matrix
 
-| Multi-agent | Accept | Issue | Direct | Expected |
-|---|---|---|---|---|
-| off | off | off | off | Existing safe graph/proxy rollback behavior |
-| off | on | off | off | Dark server acceptance; no action event |
-| on | on | off | off | New router/tools; checkout disambiguates, no token issuance |
-| on | on | on | off | Handoff enabled through proxy during initial observation |
-| on | on | on | on | Target direct topology with proxy retained for observation rollback |
-| on | on | off | on | Rollback issuance; direct safe chat remains |
+| Multi-agent | Accept | Issue | Direct | Expected                                                            |
+| ----------- | ------ | ----- | ------ | ------------------------------------------------------------------- |
+| off         | off    | off   | off    | Existing safe graph/proxy rollback behavior                         |
+| off         | on     | off   | off    | Dark server acceptance; no action event                             |
+| on          | on     | off   | off    | New router/tools; checkout disambiguates, no token issuance         |
+| on          | on     | on    | off    | Handoff enabled through proxy during initial observation            |
+| on          | on     | on    | on     | Target direct topology with proxy retained for observation rollback |
+| on          | on     | off   | on     | Rollback issuance; direct safe chat remains                         |
 
 Invalid configuration (`Issue=true` while `Accept=false`) must fail startup or force issuance off with a clear health/config error.
 
@@ -292,6 +292,7 @@ Record in `docs/runbooks/chatbot-handoff.md` and `context/progress-checker.md` o
 - Tests run to GREEN confirming atomic admission and failure boundaries.
 
 ### Phase 2A: Redis Lifecycle Checkpoint (2026-08-05)
+
 - Wrote failing Redis lifecycle and health tests in `apps/agent/tests/test_redis_infrastructure.py`.
 - Implemented pooled asyncio Redis client in `apps/agent/src/agent/infrastructure/redis.py`.
 - Wired Redis lifecycle and dependency health in `apps/agent/src/agent/main.py`.

@@ -9,10 +9,10 @@
 
 **Decision**: Split into **2 features**, not 3.
 
-| Feature | Scope |
-|---------|-------|
+| Feature    | Scope                                                                                     |
+| ---------- | ----------------------------------------------------------------------------------------- |
 | Feature 11 | Bookings Management (list page + detail page with confirmation/failure/processing states) |
-| Feature 12 | E-Ticket PDF Generation & Delivery |
+| Feature 12 | E-Ticket PDF Generation & Delivery                                                        |
 
 **Rationale**: Originally proposed 3 features (Confirmation + PDF + Management), but the confirmation page and booking detail page show identical data. Merging them eliminates redundant engineering. E-Ticket PDF remains separate because PDF rendering/storage is a self-contained technical concern.
 
@@ -25,6 +25,7 @@
 **Decision**: No separate post-payment confirmation page. The booking detail page at `/bookings/[bookingId]?confirmed=true` renders a success state with celebration UI when the `confirmed` query param is present.
 
 **Behavior**:
+
 - `?confirmed=true` → Success banner, PNR prominently highlighted, "save this" callout
 - Subsequent visits (no param) → Normal booking detail view
 
@@ -36,11 +37,11 @@
 
 **Decision**: Failures surface at the point they occur, not in one place.
 
-| Failure Stage | Where It Surfaces | UX |
-|--------------|-------------------|-----|
-| Card declined (Stripe Elements) | Inline on checkout page | "Payment declined — try a different card." Retry without leaving |
-| Pipeline failure (Duffel timeout, offer expired, capture failure) | Booking detail page with failure state | Error explanation + context-aware retry button |
-| Async failures (webhook disputes) | Deferred to notification feature | Booking detail reflects DB status |
+| Failure Stage                                                     | Where It Surfaces                      | UX                                                               |
+| ----------------------------------------------------------------- | -------------------------------------- | ---------------------------------------------------------------- |
+| Card declined (Stripe Elements)                                   | Inline on checkout page                | "Payment declined — try a different card." Retry without leaving |
+| Pipeline failure (Duffel timeout, offer expired, capture failure) | Booking detail page with failure state | Error explanation + context-aware retry button                   |
+| Async failures (webhook disputes)                                 | Deferred to notification feature       | Booking detail reflects DB status                                |
 
 **Key rule**: Card declines NEVER reach the bookings table. They're handled inline on checkout before the Booking record exists.
 
@@ -51,6 +52,7 @@
 **Decision**: Approach A — synchronous pipeline with a polished 4-phase loading escalation on the checkout page. No SSE, no Redis Pub/Sub, no background jobs.
 
 **Alternatives evaluated**:
+
 - **Approach B (Fully async + SSE)**: Rejected — requires BullMQ job queue, background workers, async idempotency handling. Too much infrastructure change to the payment pipeline.
 - **Approach C (Synchronous + parallel SSE via EventEmitter2)**: Rejected — EventEmitter2 is in-memory, so POST and SSE connections must hit the same process. Silently degrades on multi-replica deployments with no error signal. Swapping to Redis Pub/Sub closes the gap but reduces the simplicity advantage over Approach A.
 
@@ -62,14 +64,15 @@
 
 **Decision**: The checkout page handles long-running pipelines with escalating UX:
 
-| Phase | Timing | Behavior |
-|-------|--------|----------|
-| Phase 1 | 0–10s | Confident animated stepper with timed transitions |
-| Phase 2 | 10–20s | Animation slows, reassurance message appears |
-| Phase 3 | 20s+ | "Check My Bookings" escape hatch link appears |
-| Phase 4 | 45s+ | Client-side timeout, auto-redirect to `/bookings/[bookingId]` |
+| Phase   | Timing | Behavior                                                      |
+| ------- | ------ | ------------------------------------------------------------- |
+| Phase 1 | 0–10s  | Confident animated stepper with timed transitions             |
+| Phase 2 | 10–20s | Animation slows, reassurance message appears                  |
+| Phase 3 | 20s+   | "Check My Bookings" escape hatch link appears                 |
+| Phase 4 | 45s+   | Client-side timeout, auto-redirect to `/bookings/[bookingId]` |
 
 **Key guarantees**:
+
 - Confirm button disabled immediately on click (prevents double-submit)
 - `beforeunload` warns user about leaving
 - Server pipeline runs to completion regardless of client state
@@ -95,6 +98,7 @@
 **Why**: In Approach A, the `/payments/confirm` response doesn't arrive until the pipeline finishes. The escape hatch (Phase 3/4 of the loading escalation) needs a concrete `/bookings/[bookingId]` URL before the response arrives. Client-generated UUID gives the client the ID before the HTTP request even fires.
 
 **Server-side validation (mandatory)**:
+
 ```
 Receive bookingId from client
   → Validate format (reject if not valid UUID v4)
@@ -108,6 +112,7 @@ Receive bookingId from client
 
 **Concurrency (TOCTOU) and Idempotency Safety**:
 To prevent race conditions where concurrent double-tapped requests both pass the `NOT EXISTS` check before either inserts, the database-level unique primary key constraint on `Booking.id` MUST be the final authority:
+
 - Wrap the SELECT-then-INSERT in a transaction (or use Prisma's `upsert` / native upsert query).
 - Catch any unique constraint violation error (e.g., Prisma error code `P2002` for primary key collision).
 - If a collision occurs, gracefully fall back to checking the record again for ownership and executing an idempotency replay, rather than returning a 500 error.
@@ -115,6 +120,7 @@ To prevent race conditions where concurrent double-tapped requests both pass the
 **Security concern addressed**: Without validation, a malicious user could inject another user's bookingId and corrupt their booking. The ownership check prevents this.
 
 **Alternatives rejected**:
+
 - Two-phase confirm (init + execute) — two HTTP requests, more complex idempotency
 - Escape hatch uses BookingIntentId — indirect lookup, messy URL
 
@@ -134,13 +140,13 @@ To prevent race conditions where concurrent double-tapped requests both pass the
 
 ### Failure Categories and Retry Routing
 
-| Failure Category | Internal Cause | User-Facing Message | Retry Destination |
-|-----------------|---------------|---------------------|-------------------|
-| `OFFER_EXPIRED` | Duffel offer unavailable | "This flight offer has expired. Prices and availability may have changed." | Search results (same route pre-filled) |
-| `PRICE_CHANGED` | Duffel re-pricing mismatch | "The price for this flight has changed since your search." | Flight detail page (see new price) |
-| `BOOKING_TIMEOUT` | Duffel 30s PNR timeout | "We couldn't confirm your reservation in time." | Flight detail page (re-verify availability) |
-| `CAPTURE_FAILED` | Stripe capture failure after PNR | "Something went wrong finalizing your payment." | Contact support (PNR exists, money state ambiguous) |
-| `SYSTEM_ERROR` | Unexpected exception | "Something went wrong on our end." | Flight detail page (fresh attempt) |
+| Failure Category  | Internal Cause                   | User-Facing Message                                                        | Retry Destination                                   |
+| ----------------- | -------------------------------- | -------------------------------------------------------------------------- | --------------------------------------------------- |
+| `OFFER_EXPIRED`   | Duffel offer unavailable         | "This flight offer has expired. Prices and availability may have changed." | Search results (same route pre-filled)              |
+| `PRICE_CHANGED`   | Duffel re-pricing mismatch       | "The price for this flight has changed since your search."                 | Flight detail page (see new price)                  |
+| `BOOKING_TIMEOUT` | Duffel 30s PNR timeout           | "We couldn't confirm your reservation in time."                            | Flight detail page (re-verify availability)         |
+| `CAPTURE_FAILED`  | Stripe capture failure after PNR | "Something went wrong finalizing your payment."                            | Contact support (PNR exists, money state ambiguous) |
+| `SYSTEM_ERROR`    | Unexpected exception             | "Something went wrong on our end."                                         | Flight detail page (fresh attempt)                  |
 
 ### Critical Design Rules
 
@@ -180,6 +186,7 @@ For Feature 11, the on-screen confirmation with success banner and PNR display i
 **Rationale**: A confirmed booking is a historical record. Flight details at purchase time are contractual facts. Gate changes and real-time tracking are a different concern (AviationStack, future feature).
 
 **Alternatives rejected**:
+
 - Fetch from Duffel on demand — breaks if Duffel is down, counts against rate limits, slower page loads
 - Snapshot + optional refresh — most complex, mixes concerns. Deferred as a future enhancement.
 
@@ -195,11 +202,11 @@ For Feature 11, the on-screen confirmation with success banner and PNR display i
 
 ## Summary of Deferred Items
 
-| Item | Deferred To |
-|------|-------------|
-| Cancellation & refund UI | Dedicated Cancellation feature |
-| Email/SMS notifications | Dedicated Notification feature |
-| Real-time SSE progress | Future SSE upgrade (Approach C with Redis Pub/Sub) |
-| Flight data refresh from Duffel | Future enhancement |
-| Cancelled tab on My Bookings | Ships with Cancellation feature |
-| AviationStack flight status tracking | Dedicated Flight Status feature |
+| Item                                 | Deferred To                                        |
+| ------------------------------------ | -------------------------------------------------- |
+| Cancellation & refund UI             | Dedicated Cancellation feature                     |
+| Email/SMS notifications              | Dedicated Notification feature                     |
+| Real-time SSE progress               | Future SSE upgrade (Approach C with Redis Pub/Sub) |
+| Flight data refresh from Duffel      | Future enhancement                                 |
+| Cancelled tab on My Bookings         | Ships with Cancellation feature                    |
+| AviationStack flight status tracking | Dedicated Flight Status feature                    |

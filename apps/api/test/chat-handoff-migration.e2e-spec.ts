@@ -12,13 +12,13 @@ describe('Chat Handoff Migration Constraints (e2e)', () => {
       data: {
         email: `handoff-test-${Date.now()}@example.com`,
         password: 'password',
-      }
+      },
     });
 
     testSession = await prisma.chatSession.create({
       data: {
         userId: testUser.id,
-      }
+      },
     });
 
     testOffer = await prisma.flightOffer.create({
@@ -31,8 +31,8 @@ describe('Chat Handoff Migration Constraints (e2e)', () => {
         departureDate: new Date(),
         adults: 1,
         price: 100,
-        currency: 'USD'
-      }
+        currency: 'USD',
+      },
     });
   });
 
@@ -58,7 +58,7 @@ describe('Chat Handoff Migration Constraints (e2e)', () => {
         tokenKeyVersion: 1,
         idempotencyKeyHash: `idem-${Date.now()}`,
         expiresAt: new Date(Date.now() + 100000),
-      }
+      },
     });
 
     expect(handoff).toBeDefined();
@@ -81,8 +81,8 @@ describe('Chat Handoff Migration Constraints (e2e)', () => {
           tokenKeyVersion: 1,
           idempotencyKeyHash: `idem-0-${Date.now()}`,
           expiresAt: new Date(Date.now() + 100000),
-        }
-      })
+        },
+      }),
     ).rejects.toThrow();
   });
 
@@ -102,10 +102,8 @@ describe('Chat Handoff Migration Constraints (e2e)', () => {
           tokenKeyVersion: 1,
           idempotencyKeyHash: `idem-snap0-${Date.now()}`,
           expiresAt: new Date(Date.now() + 100000),
-        }
-      })
+        },
+      }),
     ).rejects.toThrow();
   });
 });
-
-

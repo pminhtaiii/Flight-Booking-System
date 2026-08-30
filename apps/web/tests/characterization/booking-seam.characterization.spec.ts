@@ -103,8 +103,12 @@ test.describe('Booking Seam Characterization - User Flows', () => {
 
     await page.goto(`/bookings/${bookingId}`);
 
-    await expect(page.getByRole('heading', { name: 'Your booking is being processed' })).toBeVisible();
-    await expect(page.getByText('Please refresh this page shortly to check its status.')).toBeVisible();
+    await expect(
+      page.getByRole('heading', { name: 'Your booking is being processed' }),
+    ).toBeVisible();
+    await expect(
+      page.getByText('Please refresh this page shortly to check its status.'),
+    ).toBeVisible();
   });
 
   test('renders disruption alert and handles acknowledge action', async ({ page, context }) => {
@@ -139,7 +143,9 @@ test.describe('Booking Seam Characterization - User Flows', () => {
 
     // Disruption Alert & Summary checks
     await expect(page.getByText('Flight Disruption Detected')).toBeVisible();
-    await expect(page.getByText('Departure time moved later by more than 2 hours').first()).toBeVisible();
+    await expect(
+      page.getByText('Departure time moved later by more than 2 hours').first(),
+    ).toBeVisible();
     await expect(page.getByText('Schedule Instability Alert')).toBeVisible();
     await expect(page.getByText('Review Required')).toBeVisible();
 
@@ -246,21 +252,24 @@ test.describe('Booking Seam Characterization - User Flows', () => {
       },
     ]);
 
-    await page.route(`**/api/booking-management/bookings/${bookingId}/cancellation-quote`, async (route) => {
-      quoteRequested = true;
-      await route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify({
-          quoteId: 'quote-char-789',
-          refundAmount: '450.00',
-          currency: 'GBP',
-          refundTo: 'Original Payment Card (•••• 4242)',
-          nonRefundableAncillaryAmount: '49.00',
-          nonRefundableAncillaryCurrency: 'GBP',
-        }),
-      });
-    });
+    await page.route(
+      `**/api/booking-management/bookings/${bookingId}/cancellation-quote`,
+      async (route) => {
+        quoteRequested = true;
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            quoteId: 'quote-char-789',
+            refundAmount: '450.00',
+            currency: 'GBP',
+            refundTo: 'Original Payment Card (•••• 4242)',
+            nonRefundableAncillaryAmount: '49.00',
+            nonRefundableAncillaryCurrency: 'GBP',
+          }),
+        });
+      },
+    );
 
     await page.route(`**/api/booking-management/bookings/${bookingId}/cancel`, async (route) => {
       cancelRequested = true;

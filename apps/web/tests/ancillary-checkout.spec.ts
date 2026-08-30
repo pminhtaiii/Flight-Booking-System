@@ -1,7 +1,9 @@
 import { expect, test } from '@playwright/test';
 import { encode } from 'next-auth/jwt';
 
-async function authenticateAncillaryScenario(context: Parameters<typeof test>[0]['context']): Promise<void> {
+async function authenticateAncillaryScenario(
+  context: Parameters<typeof test>[0]['context'],
+): Promise<void> {
   const sessionToken = await encode({
     secret: 'test_secret',
     token: {
@@ -13,13 +15,27 @@ async function authenticateAncillaryScenario(context: Parameters<typeof test>[0]
     },
   });
   await context.addCookies([
-    { name: 'next-auth.session-token', value: sessionToken, url: 'http://127.0.0.1:3000', httpOnly: true, sameSite: 'Lax' },
-    { name: 'mock-scenario', value: 'mock-ancillary-phase4', url: 'http://127.0.0.1:3000', sameSite: 'Lax' },
+    {
+      name: 'next-auth.session-token',
+      value: sessionToken,
+      url: 'http://127.0.0.1:3000',
+      httpOnly: true,
+      sameSite: 'Lax',
+    },
+    {
+      name: 'mock-scenario',
+      value: 'mock-ancillary-phase4',
+      url: 'http://127.0.0.1:3000',
+      sameSite: 'Lax',
+    },
   ]);
 }
 
 test.describe('Phase 4 ancillary checkout', () => {
-  test('keeps seat choices isolated across eligible travellers and segments with exact instant totals', async ({ page, context }) => {
+  test('keeps seat choices isolated across eligible travellers and segments with exact instant totals', async ({
+    page,
+    context,
+  }) => {
     await authenticateAncillaryScenario(context);
     const repricingRequests: string[] = [];
     page.on('request', (request) => {
@@ -39,7 +55,9 @@ test.describe('Phase 4 ancillary checkout', () => {
     await travellerOne.focus();
     await travellerOne.press('ArrowRight');
     await expect(page.getByRole('tab', { name: 'Blair' })).toHaveAttribute('aria-selected', 'true');
-    await expect(page.getByRole('gridcell', { name: /1A.*selected by traveller 1/ })).toBeDisabled();
+    await expect(
+      page.getByRole('gridcell', { name: /1A.*selected by traveller 1/ }),
+    ).toBeDisabled();
 
     await page.getByRole('tab', { name: 'SGN → NRT' }).click();
     await page.getByRole('gridcell', { name: /2A.*available/ }).click();

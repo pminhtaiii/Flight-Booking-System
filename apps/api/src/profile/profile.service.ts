@@ -252,7 +252,9 @@ export class ProfileService {
       if (!currentProfile) {
         // Upsert: profile doesn't exist
         if (updateDto.expectedRevision !== 0) {
-          this.metricsService?.increment(BOOKING_READINESS_METRIC_COUNTERS.TRAVELER_PROFILE_CONFLICTS);
+          this.metricsService?.increment(
+            BOOKING_READINESS_METRIC_COUNTERS.TRAVELER_PROFILE_CONFLICTS,
+          );
           throw new ConflictException('PROFILE_UPDATE_CONFLICT');
         }
 
@@ -265,11 +267,15 @@ export class ProfileService {
           });
         } catch (err: any) {
           if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
-            this.metricsService?.increment(BOOKING_READINESS_METRIC_COUNTERS.TRAVELER_PROFILE_CONFLICTS);
+            this.metricsService?.increment(
+              BOOKING_READINESS_METRIC_COUNTERS.TRAVELER_PROFILE_CONFLICTS,
+            );
             throw new ConflictException('PROFILE_UPDATE_CONFLICT');
           }
           if (err?.code === 'P2002') {
-            this.metricsService?.increment(BOOKING_READINESS_METRIC_COUNTERS.TRAVELER_PROFILE_CONFLICTS);
+            this.metricsService?.increment(
+              BOOKING_READINESS_METRIC_COUNTERS.TRAVELER_PROFILE_CONFLICTS,
+            );
             throw new ConflictException('PROFILE_UPDATE_CONFLICT');
           }
           throw err;
@@ -290,7 +296,9 @@ export class ProfileService {
       } else {
         // Exists: CAS revision check
         if (currentProfile.revision !== updateDto.expectedRevision) {
-          this.metricsService?.increment(BOOKING_READINESS_METRIC_COUNTERS.TRAVELER_PROFILE_CONFLICTS);
+          this.metricsService?.increment(
+            BOOKING_READINESS_METRIC_COUNTERS.TRAVELER_PROFILE_CONFLICTS,
+          );
           throw new ConflictException('PROFILE_UPDATE_CONFLICT');
         }
 
@@ -303,11 +311,15 @@ export class ProfileService {
           });
         } catch (err: any) {
           if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2025') {
-            this.metricsService?.increment(BOOKING_READINESS_METRIC_COUNTERS.TRAVELER_PROFILE_CONFLICTS);
+            this.metricsService?.increment(
+              BOOKING_READINESS_METRIC_COUNTERS.TRAVELER_PROFILE_CONFLICTS,
+            );
             throw new ConflictException('PROFILE_UPDATE_CONFLICT');
           }
           if (err?.code === 'P2025') {
-            this.metricsService?.increment(BOOKING_READINESS_METRIC_COUNTERS.TRAVELER_PROFILE_CONFLICTS);
+            this.metricsService?.increment(
+              BOOKING_READINESS_METRIC_COUNTERS.TRAVELER_PROFILE_CONFLICTS,
+            );
             throw new ConflictException('PROFILE_UPDATE_CONFLICT');
           }
           throw err;

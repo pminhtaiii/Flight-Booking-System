@@ -3,7 +3,8 @@ import CredentialsProvider from 'next-auth/providers/credentials';
 
 const createCredentialsProvider =
   typeof (CredentialsProvider as unknown as { default?: unknown })?.default === 'function'
-    ? ((CredentialsProvider as unknown as { default: typeof CredentialsProvider }).default as typeof CredentialsProvider)
+    ? ((CredentialsProvider as unknown as { default: typeof CredentialsProvider })
+        .default as typeof CredentialsProvider)
     : CredentialsProvider;
 
 export const authOptions: NextAuthOptions = {

@@ -8,11 +8,11 @@ Grilling session: 2026-07-09. Covers Feature A (Booking Creation & Passenger Col
 
 The full booking workflow is split into **3 features**:
 
-| Feature | Scope | Status |
-| ------- | ----- | ------ |
-| **A — Booking Creation & Passenger Collection** | Flight selection → passenger entry → re-pricing → intent creation | **Current focus** |
-| **B — Payment & Confirmation** | Stripe payment → PNR creation → ticket issuance → confirmation | Deferred |
-| **C — Bookings Management & Post-Booking** | `/bookings` list, detail, cancellation, refund, status tracking | Deferred (depends on A + B) |
+| Feature                                         | Scope                                                             | Status                      |
+| ----------------------------------------------- | ----------------------------------------------------------------- | --------------------------- |
+| **A — Booking Creation & Passenger Collection** | Flight selection → passenger entry → re-pricing → intent creation | **Current focus**           |
+| **B — Payment & Confirmation**                  | Stripe payment → PNR creation → ticket issuance → confirmation    | Deferred                    |
+| **C — Bookings Management & Post-Booking**      | `/bookings` list, detail, cancellation, refund, status tracking   | Deferred (depends on A + B) |
 
 ---
 
@@ -23,6 +23,7 @@ The full booking workflow is split into **3 features**:
 **Rejected alternative**: Stateless approach (hold data in frontend only).
 
 **Rationale**:
+
 - PII (passport numbers, DOBs, full names) must not live on the client — we need encryption, auditability, and access control server-side.
 - Stateless pushes re-validation burden onto Stripe and Duffel APIs unnecessarily.
 - Server-side gives us control over data lifecycle, encryption, and cleanup.
@@ -36,6 +37,7 @@ The full booking workflow is split into **3 features**:
 **Rejected alternative**: Reusing the existing `Booking` table with additional statuses.
 
 **Rationale**:
+
 - The `Booking` table stays clean — every row represents a real, paid booking.
 - No `EXPIRED`/`ABANDONED` noise polluting queries, analytics, or the agent gateway's `list_user_bookings` tool.
 - Follows the same separation pattern as `FlightOffer` (temporary/cached) vs. `Booking` (permanent).
@@ -45,12 +47,14 @@ The full booking workflow is split into **3 features**:
 ## Decision 3: Two-Phase Cleanup (Soft Expire → Hard Delete)
 
 **Decision**: Abandoned intents go through a two-phase lifecycle:
+
 1. **Phase 1 (Soft expire)**: Cron marks `PENDING` intents older than the TTL as `EXPIRED` (status change only).
 2. **Phase 2 (Hard delete)**: A separate/later cron hard-deletes `EXPIRED` rows after a grace period (e.g., 24 hours).
 
 **Rejected alternative**: Direct hard-delete of stale `PENDING` rows.
 
 **Rationale**:
+
 - Eliminates the race condition where a cron deletes an intent at the exact moment a Stripe payment webhook arrives.
 - If a payment webhook arrives for an `EXPIRED` intent, the row still exists — we can detect the conflict and handle it gracefully (refund or re-activate).
 - No money lost, no missing data. The hard delete only happens after enough time that all in-flight payments have resolved.
@@ -64,6 +68,7 @@ The full booking workflow is split into **3 features**:
 **Rejected alternative**: Storing passengers as a JSON blob column.
 
 **Rationale**:
+
 - Per-field encryption — reuse the AES-256-GCM pattern from `TravelerProfile` on individual columns (passportNumber, passportExpiry).
 - Prisma handles relational models natively with type-safe includes.
 - SQL queries on columns are trivial for auditing and debugging.
@@ -77,6 +82,7 @@ The full booking workflow is split into **3 features**:
 **Rejected alternative**: Using `NOT NULL` database constraints.
 
 **Rationale**:
+
 - `NOT NULL` constraints are binary — they cannot express conditional rules like "required only for international flights."
 - The database is the storage layer, not the rules engine. Business logic belongs in the application.
 
@@ -87,6 +93,7 @@ The full booking workflow is split into **3 features**:
 **Decision**: When creating a booking intent, pre-fill the primary passenger's data from the user's `TravelerProfile` using a **snapshot copy** at creation time.
 
 **How it works**:
+
 1. Backend fetches the user's `TravelerProfile` data.
 2. Frontend renders pre-filled fields + empty fields for missing data.
 3. User fills only the gaps.
@@ -94,6 +101,7 @@ The full booking workflow is split into **3 features**:
 5. An optional `travelerProfileId` on the passenger row records the data origin for audit.
 
 **Why snapshot, not live reference**:
+
 - Profile changes after intent creation don't silently alter the booking data.
 - When promoted to a real `Booking` (Feature B), all data is already locked in.
 
@@ -104,6 +112,7 @@ The full booking workflow is split into **3 features**:
 **Decision**: `BookingIntentPassenger` rows have their **own** retention/erasure lifecycle, independent from `TravelerProfile`.
 
 **Key constraint**:
+
 - Snapshotting creates a second copy of PII — this copy is subject to its own GDPR erasure obligations.
 - Whether completed bookings are exempt as transaction records is a **legal/compliance decision**, not an engineering assumption.
 - The system must support cascading PII deletion into intent/booking rows if required by compliance.
@@ -128,6 +137,7 @@ The full booking workflow is split into **3 features**:
 **Decision**: Call Duffel's pricing/confirmation API at the moment the `BookingIntent` is created — not deferred to payment time.
 
 **Rationale**:
+
 - The user should never be surprised by a price change after committing to the flow.
 - If the price changed, show it on the review screen before they enter payment.
 - The extra latency (one Duffel API call) is acceptable.
@@ -141,6 +151,7 @@ The full booking workflow is split into **3 features**:
 **Decision**: Feature B must re-validate pricing before charging, because the pricing snapshot from Feature A can become stale during the TTL window.
 
 **Carried constraint for Feature A**:
+
 - Store a `pricedAt` timestamp in `BookingIntent` so Feature B can calculate staleness.
 - Store the Duffel offer ID so Feature B can re-price if needed.
 

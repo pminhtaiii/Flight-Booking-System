@@ -1,7 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import crypto from 'node:crypto';
-import { HANDOFF_COOKIE_NAME, handoffCookieOptions, expiredHandoffCookieHeader } from '../lib/handoffCookie.ts';
+import {
+  HANDOFF_COOKIE_NAME,
+  handoffCookieOptions,
+  expiredHandoffCookieHeader,
+} from '../lib/handoffCookie.ts';
 import { createHandoffRedirectResponse } from '../lib/handoffBootstrap.ts';
 
 test('handoff cookie configuration enforces privacy requirements', () => {
@@ -28,13 +32,7 @@ test('expired handoff cookie clears credential with identical scope', () => {
 
 test('clean redirect path forbids query parameters with credentials', () => {
   const cleanRedirectPath = '/checkout/passengers';
-  const forbiddenPatterns = [
-    /token=/i,
-    /handoff=/i,
-    /chk_handoff/i,
-    /offerId=/i,
-    /sessionId=/i,
-  ];
+  const forbiddenPatterns = [/token=/i, /handoff=/i, /chk_handoff/i, /offerId=/i, /sessionId=/i];
 
   for (const pattern of forbiddenPatterns) {
     assert.equal(

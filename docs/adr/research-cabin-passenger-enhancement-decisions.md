@@ -12,12 +12,12 @@ The flight search pipeline (Duffel integration, caching, budget tracking, search
 
 ## Feature Priority Order (User Decision)
 
-| Priority | Feature | Status |
-|----------|---------|--------|
-| **Phase 1** | Cabin class selection + Passenger type diversity | Next — this document |
-| **Phase 2** | Filtering & sorting (stops, airlines, price range, departure time, duration) | Queued |
-| **Phase 3** | Booking flow (order creation, payment) | Queued |
-| **Future** | Multi-city, flexible date search, price alerts, saved searches | Backlog |
+| Priority    | Feature                                                                      | Status               |
+| ----------- | ---------------------------------------------------------------------------- | -------------------- |
+| **Phase 1** | Cabin class selection + Passenger type diversity                             | Next — this document |
+| **Phase 2** | Filtering & sorting (stops, airlines, price range, departure time, duration) | Queued               |
+| **Phase 3** | Booking flow (order creation, payment)                                       | Queued               |
+| **Future**  | Multi-city, flexible date search, price alerts, saved searches               | Backlog              |
 
 ---
 
@@ -28,6 +28,7 @@ The flight search pipeline (Duffel integration, caching, budget tracking, search
 **Rationale**: Duffel optimizes search results internally for the requested cabin. Post-filtering (requesting all cabins and filtering client-side) wastes API budget and may miss premium cabin offers that Duffel only returns when explicitly requested.
 
 **Alternatives rejected**:
+
 - Post-filtering on returned results — budget-inefficient, inaccurate for rare cabins.
 
 ---
@@ -39,6 +40,7 @@ The flight search pipeline (Duffel integration, caching, budget tracking, search
 **Rationale**: In real aviation, regional feeder flights often lack premium cabins. Discarding the entire itinerary would yield zero results for complex multi-leg journeys. Industry standard is to keep and warn.
 
 **Alternatives rejected**:
+
 - Strict validation (discard mismatched offers) — too aggressive, kills valid itineraries.
 - Threshold validation (longest segment match only) — incorporated into the status classification below instead.
 
@@ -57,6 +59,7 @@ The flight search pipeline (Duffel integration, caching, budget tracking, search
 ```
 
 **UI treatment**:
+
 - `full` → no warning
 - `mixed` → yellow ⚠️ badge next to price with expandable details
 - `downgraded` → red ⚠️ badge next to price — stronger warning
@@ -70,11 +73,13 @@ The flight search pipeline (Duffel integration, caching, budget tracking, search
 **Decision**: Add per-segment cabin class and offer-level mismatch summary.
 
 ### FlightSegmentDto additions:
+
 ```typescript
 cabinClass: 'economy' | 'premium_economy' | 'business' | 'first';
 ```
 
 ### FlightOfferDto additions:
+
 ```typescript
 requestedCabinClass: 'economy' | 'premium_economy' | 'business' | 'first';
 cabinClassMatch: 'full' | 'mixed' | 'downgraded';
@@ -83,11 +88,12 @@ cabinMismatchDetails: {
   leg: 'outbound' | 'return';
   expected: string;
   actual: string;
-  route: string;           // e.g., "SGN → HAN"
-}[] | null;
+  route: string; // e.g., "SGN → HAN"
+}
+[] | null;
 ```
 
-**UI placement**: "Mixed Cabin" or "Downgraded" badge displayed next to the price. Mismatch details are specific: *"Segment SGN→HAN is Economy (requested: Business)"*.
+**UI placement**: "Mixed Cabin" or "Downgraded" badge displayed next to the price. Mismatch details are specific: _"Segment SGN→HAN is Economy (requested: Business)"_.
 
 **Rationale**: Users must never assume the whole itinerary matches their requested cabin. Specific per-segment details enable informed booking decisions.
 
@@ -107,6 +113,7 @@ infants?: number;     // optional, default 0  (under 2, on lap)
 **Rationale**: Flat fields eliminate cache-key ordering issues (no normalization needed). Covers 99% of booking scenarios. Simple to validate.
 
 **Validation rules**:
+
 - `adults` ≥ 1
 - `infants` ≤ `adults` (each infant needs a lap)
 - `adults + children + infants` ≤ 9
@@ -119,7 +126,11 @@ infants?: number;     // optional, default 0  (under 2, on lap)
 
 ```typescript
 // Single seam — only this function changes if Duffel adds new types
-function mapPassengersToDuffel(adults: number, children: number, infants: number): DuffelPassenger[] {
+function mapPassengersToDuffel(
+  adults: number,
+  children: number,
+  infants: number,
+): DuffelPassenger[] {
   return [
     ...Array(adults).fill({ type: 'adult' }),
     ...Array(children).fill({ type: 'child' }),
@@ -137,10 +148,19 @@ function mapPassengersToDuffel(adults: number, children: number, infants: number
 **Decision**: SHA-256 of flat, deterministic fields:
 
 ```typescript
-SHA-256(JSON.stringify({
-  origin, destination, departureDate, returnDate,
-  adults, children, infants, cabinClass
-}))
+SHA -
+  256(
+    JSON.stringify({
+      origin,
+      destination,
+      departureDate,
+      returnDate,
+      adults,
+      children,
+      infants,
+      cabinClass,
+    }),
+  );
 ```
 
 **Rationale**: Flat fields = deterministic ordering by construction. No normalization or sorting needed. Adding `cabinClass` and passenger breakdown increases the cache key space (more permutations = more API calls on cache miss), but this is correct behavior — different cabins genuinely return different offers.
@@ -154,6 +174,7 @@ SHA-256(JSON.stringify({
 **Decision**: Option A — replace the single `passengers Int` column with flat columns across `FlightOffer`, `SearchHistory`, and the cache key.
 
 ### Schema changes (both FlightOffer and SearchHistory):
+
 ```
 - passengers  Int        ← DROP
 + adults      Int        ← NEW
@@ -171,16 +192,19 @@ SHA-256(JSON.stringify({
 **Decision**: Keep the chatbot defaulting to `economy` / all-adults in Phase 1. Add a lightweight keyword detection layer.
 
 ### Keyword detection behavior:
+
 1. Detect when user message implies unsupported cabin/passenger needs (e.g., "business class", "2 kids", "infant")
-2. Respond with an honest limitation message: *"I can currently only search economy class for adult passengers. For other cabin classes or passenger types, please use the search page."*
+2. Respond with an honest limitation message: _"I can currently only search economy class for adult passengers. For other cabin classes or passenger types, please use the search page."_
 3. Log those triggers to a dedicated analytics channel to prioritize the real NLP upgrade
 
 ### Interface compatibility:
+
 - Agent gateway uses the **same DTO shape** as the frontend (`adults`, `children`, `infants`, `cabinClass`)
 - Defaults: `adults` mapped from the incoming request's passenger count field, `children = 0`, `infants = 0`, `cabinClass = 'economy'`
 - No interface migration needed when full extraction is implemented later
 
 ### Future upgrade plan:
+
 - **Trigger**: When keyword-detection logs show >10% of chatbot flight queries mention non-economy cabins or child/infant passengers
 - **Scope**: Update Python agent tool schema to accept cabin/passenger params, add extraction logic, remove keyword fallback
 - **Not in scope now** — parked for data-driven prioritization

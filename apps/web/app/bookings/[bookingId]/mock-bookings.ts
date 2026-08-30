@@ -1,7 +1,11 @@
 import { BookingStatus } from '@shared/booking-status';
 import { BookingFailureReason } from '@shared/booking-failure-reason';
 import { DisruptionStatus, MaterialDisruptionReason } from '@shared/disruption-types';
-import type { BookingDetailDto, FlightSegmentSnapshot, PassengerSnapshot } from '@shared/booking-types';
+import type {
+  BookingDetailDto,
+  FlightSegmentSnapshot,
+  PassengerSnapshot,
+} from '@shared/booking-types';
 import type { CurrentItineraryDto, BookingDisruptionDto } from '@shared/disruption-types';
 
 type MockBookingDetailResponse = BookingDetailDto & {
@@ -20,22 +24,26 @@ export const MOCK_BOOKINGS: Record<string, MockBookingDetailResponse> = {
     currency: 'GBP',
     paymentStatus: 'SUCCEEDED',
     flightSnapshot: {
-      segments: [{
-        airline: { name: 'Example Air', iataCode: 'EA' },
-        flightNumber: 'EA101',
-        departureAirport: { iataCode: 'LHR', name: 'Heathrow', city: 'London' },
-        arrivalAirport: { iataCode: 'JFK', name: 'John F. Kennedy', city: 'New York' },
-        departureAt: '2026-08-01T09:00:00.000Z',
-        arrivalAt: '2026-08-01T17:00:00.000Z',
-        duration: 'PT8H',
-      } as unknown as FlightSegmentSnapshot],
+      segments: [
+        {
+          airline: { name: 'Example Air', iataCode: 'EA' },
+          flightNumber: 'EA101',
+          departureAirport: { iataCode: 'LHR', name: 'Heathrow', city: 'London' },
+          arrivalAirport: { iataCode: 'JFK', name: 'John F. Kennedy', city: 'New York' },
+          departureAt: '2026-08-01T09:00:00.000Z',
+          arrivalAt: '2026-08-01T17:00:00.000Z',
+          duration: 'PT8H',
+        } as unknown as FlightSegmentSnapshot,
+      ],
       totalDuration: 'PT8H',
       stops: 0,
       cabinClass: 'ECONOMY',
       baggageAllowance: '1 checked bag',
     },
     passengerSnapshot: {
-      passengers: [{ type: 'adult', firstName: 'Ada', lastName: 'Lovelace' } as unknown as PassengerSnapshot],
+      passengers: [
+        { type: 'adult', firstName: 'Ada', lastName: 'Lovelace' } as unknown as PassengerSnapshot,
+      ],
       contactEmail: 'traveler@example.com',
     } as unknown as PassengerSnapshot,
     createdAt: '2026-07-25T10:00:00.000Z',
@@ -56,15 +64,17 @@ export const MOCK_BOOKINGS: Record<string, MockBookingDetailResponse> = {
     totalAmount: '499.00',
     currency: 'GBP',
     flightSnapshot: {
-      segments: [{
-        airline: { name: 'Example Air', iataCode: 'EA' },
-        flightNumber: 'EA101',
-        departureAirport: { iataCode: 'LHR', name: 'Heathrow', city: 'London' },
-        arrivalAirport: { iataCode: 'JFK', name: 'John F. Kennedy', city: 'New York' },
-        departureAt: '2026-08-01T09:00:00.000Z',
-        arrivalAt: '2026-08-01T17:00:00.000Z',
-        duration: 'PT8H',
-      } as unknown as FlightSegmentSnapshot],
+      segments: [
+        {
+          airline: { name: 'Example Air', iataCode: 'EA' },
+          flightNumber: 'EA101',
+          departureAirport: { iataCode: 'LHR', name: 'Heathrow', city: 'London' },
+          arrivalAirport: { iataCode: 'JFK', name: 'John F. Kennedy', city: 'New York' },
+          departureAt: '2026-08-01T09:00:00.000Z',
+          arrivalAt: '2026-08-01T17:00:00.000Z',
+          duration: 'PT8H',
+        } as unknown as FlightSegmentSnapshot,
+      ],
       totalDuration: 'PT8H',
       stops: 0,
       cabinClass: 'ECONOMY',
@@ -92,15 +102,17 @@ export const MOCK_BOOKINGS: Record<string, MockBookingDetailResponse> = {
     cancellationDeadline: '2029-12-31T23:59:59.000Z',
     cancellationRefundable: true,
     flightSnapshot: {
-      segments: [{
-        airline: { name: 'Original Air', iataCode: 'OA' },
-        flightNumber: 'OA101',
-        departureAirport: { iataCode: 'LHR', name: 'Heathrow', city: 'London' },
-        arrivalAirport: { iataCode: 'JFK', name: 'John F. Kennedy', city: 'New York' },
-        departureAt: '2026-08-01T09:00:00.000Z',
-        arrivalAt: '2026-08-01T17:00:00.000Z',
-        duration: 'PT8H',
-      } as unknown as FlightSegmentSnapshot],
+      segments: [
+        {
+          airline: { name: 'Original Air', iataCode: 'OA' },
+          flightNumber: 'OA101',
+          departureAirport: { iataCode: 'LHR', name: 'Heathrow', city: 'London' },
+          arrivalAirport: { iataCode: 'JFK', name: 'John F. Kennedy', city: 'New York' },
+          departureAt: '2026-08-01T09:00:00.000Z',
+          arrivalAt: '2026-08-01T17:00:00.000Z',
+          duration: 'PT8H',
+        } as unknown as FlightSegmentSnapshot,
+      ],
       totalDuration: 'PT8H',
       stops: 0,
       cabinClass: 'ECONOMY',
@@ -109,15 +121,17 @@ export const MOCK_BOOKINGS: Record<string, MockBookingDetailResponse> = {
       source: 'REVISION',
       revisionId: '9b8577bc-89cd-5b56-9f0f-0c4d73370b0b',
       version: 1,
-      segments: [{
-        airline: { name: 'Revised Air', iataCode: 'RA' },
-        flightNumber: 'RA202',
-        departureAirport: { iataCode: 'LHR', name: 'Heathrow', city: 'London' },
-        arrivalAirport: { iataCode: 'JFK', name: 'John F. Kennedy', city: 'New York' },
-        departureAt: '2026-08-01T13:00:00.000Z',
-        arrivalAt: '2026-08-01T21:00:00.000Z',
-        duration: 'PT8H',
-      } as unknown as FlightSegmentSnapshot],
+      segments: [
+        {
+          airline: { name: 'Revised Air', iataCode: 'RA' },
+          flightNumber: 'RA202',
+          departureAirport: { iataCode: 'LHR', name: 'Heathrow', city: 'London' },
+          arrivalAirport: { iataCode: 'JFK', name: 'John F. Kennedy', city: 'New York' },
+          departureAt: '2026-08-01T13:00:00.000Z',
+          arrivalAt: '2026-08-01T21:00:00.000Z',
+          duration: 'PT8H',
+        } as unknown as FlightSegmentSnapshot,
+      ],
       nextUnflownDepartureAt: '2026-08-01T13:00:00.000Z',
       finalArrivalAt: '2026-08-01T21:00:00.000Z',
     },
@@ -129,22 +143,26 @@ export const MOCK_BOOKINGS: Record<string, MockBookingDetailResponse> = {
       incrementalSummary: {
         isRoutingChanged: false,
         hasStopsChanged: false,
-        sliceSummaries: [{
-          sliceOrder: 0,
-          originIata: 'LHR',
-          destinationIata: 'JFK',
-          finalArrivalShiftMinutes: 240,
-        }],
+        sliceSummaries: [
+          {
+            sliceOrder: 0,
+            originIata: 'LHR',
+            destinationIata: 'JFK',
+            finalArrivalShiftMinutes: 240,
+          },
+        ],
       },
       cumulativeSummary: {
         isRoutingChanged: false,
         hasStopsChanged: false,
-        sliceSummaries: [{
-          sliceOrder: 0,
-          originIata: 'LHR',
-          destinationIata: 'JFK',
-          finalArrivalShiftMinutes: 240,
-        }],
+        sliceSummaries: [
+          {
+            sliceOrder: 0,
+            originIata: 'LHR',
+            destinationIata: 'JFK',
+            finalArrivalShiftMinutes: 240,
+          },
+        ],
       },
       stabilizationWarning: true,
       resolvedReason: null,

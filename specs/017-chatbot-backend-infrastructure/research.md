@@ -169,12 +169,12 @@
 
 ## Resolved Former Open Questions
 
-| Former question | Resolution |
-|---|---|
-| Multi-agent topology | Stateless Router → General/Travel/Checkout specialists in one LangGraph, plus deterministic handoff nodes. |
-| LLM provider | Preserve the deployed Mimo OpenAI-compatible endpoint; Router may use a separately configurable model name but not a new provider. |
-| Python framework | FastAPI is confirmed by the implemented service. |
-| Recent message window | Preserve configurable default 20 and token budget 4000; summaries run after completed turns. |
-| Direct vs proxy transport | Direct browser → FastAPI is the target; proxy exists only as a staged rollback path. |
-| Agent-to-NestJS identity | Existing API key plus HMAC user claim supersedes raw JWT forwarding. |
-| Snapshot durability | PII-free Redis TTL repository restored into per-turn AgentState; messages remain NestJS/PostgreSQL-owned. |
+| Former question           | Resolution                                                                                                                         |
+| ------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
+| Multi-agent topology      | Stateless Router → General/Travel/Checkout specialists in one LangGraph, plus deterministic handoff nodes.                         |
+| LLM provider              | Preserve the deployed Mimo OpenAI-compatible endpoint; Router may use a separately configurable model name but not a new provider. |
+| Python framework          | FastAPI is confirmed by the implemented service.                                                                                   |
+| Recent message window     | Preserve configurable default 20 and token budget 4000; summaries run after completed turns.                                       |
+| Direct vs proxy transport | Direct browser → FastAPI is the target; proxy exists only as a staged rollback path.                                               |
+| Agent-to-NestJS identity  | Existing API key plus HMAC user claim supersedes raw JWT forwarding.                                                               |
+| Snapshot durability       | PII-free Redis TTL repository restored into per-turn AgentState; messages remain NestJS/PostgreSQL-owned.                          |

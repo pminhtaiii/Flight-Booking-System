@@ -209,7 +209,9 @@ describe('AgentToolAuditService', () => {
       await expect(service.recordToolExecution(record)).resolves.not.toThrow();
 
       expect(loggerErrorSpy).toHaveBeenCalledWith(
-        expect.stringContaining('Failed to record agent tool execution audit log: DB connection failed'),
+        expect.stringContaining(
+          'Failed to record agent tool execution audit log: DB connection failed',
+        ),
         expect.any(String),
       );
 

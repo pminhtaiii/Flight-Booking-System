@@ -1,9 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import {
-  hasCheckoutHandoffContext,
-  resolveHandoffForBootstrap,
-} from '../lib/handoffBootstrap';
+import { hasCheckoutHandoffContext, resolveHandoffForBootstrap } from '../lib/handoffBootstrap';
 
 test('rejects a successful resolve response that cannot render checkout', () => {
   assert.equal(hasCheckoutHandoffContext({ ok: true, status: 200 }), false);

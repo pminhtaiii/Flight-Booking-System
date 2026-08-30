@@ -182,7 +182,10 @@ export class DuffelService {
           `Unsupported DUFFEL_API_URL protocol: ${parsed.protocol}. Only http: and https: are allowed.`,
         );
       }
-      this.basePath = `${parsed.origin}${parsed.pathname === '/' ? '' : parsed.pathname}`.replace(/\/+$/, '');
+      this.basePath = `${parsed.origin}${parsed.pathname === '/' ? '' : parsed.pathname}`.replace(
+        /\/+$/,
+        '',
+      );
     } else {
       this.basePath = 'https://api.duffel.com';
     }

@@ -4,21 +4,21 @@
 
 One row per authenticated user; all additions are nullable so existing rows remain valid.
 
-| Field | Type | Rules |
-|---|---|---|
-| `givenName` | `String?` | Required for readiness after trimming |
-| `middleName` | `String?` | Always optional |
-| `familyName` | `String?` | Required for readiness after trimming |
-| `dateOfBirth` | `DateTime? @db.Date` | Past date; age/type validation remains intent-specific |
-| `gender` | `String?` | Supplier-supported canonical value |
-| `title` | `String?` | Supplier-supported title compatible with passenger data |
-| `email` | `String?` | Traveler contact email; independent of login email |
-| `phoneCountryCode` | `String?` | E.164 country prefix, stored separately |
-| `phoneNumber` | `String?` | National significant number |
-| `documentType` | `String?` | Passport for the initial release |
-| `issuingCountry` | `String? @db.VarChar(2)` | Uppercase ISO alpha-2 |
-| `passportExpiryCiphertext` | `String?` | Internal migration shadow; AES-GCM envelope for logical `passportExpiry` |
-| `revision` | `Int @default(1)` | Non-PII optimistic-concurrency token incremented on every profile update |
+| Field                      | Type                     | Rules                                                                    |
+| -------------------------- | ------------------------ | ------------------------------------------------------------------------ |
+| `givenName`                | `String?`                | Required for readiness after trimming                                    |
+| `middleName`               | `String?`                | Always optional                                                          |
+| `familyName`               | `String?`                | Required for readiness after trimming                                    |
+| `dateOfBirth`              | `DateTime? @db.Date`     | Past date; age/type validation remains intent-specific                   |
+| `gender`                   | `String?`                | Supplier-supported canonical value                                       |
+| `title`                    | `String?`                | Supplier-supported title compatible with passenger data                  |
+| `email`                    | `String?`                | Traveler contact email; independent of login email                       |
+| `phoneCountryCode`         | `String?`                | E.164 country prefix, stored separately                                  |
+| `phoneNumber`              | `String?`                | National significant number                                              |
+| `documentType`             | `String?`                | Passport for the initial release                                         |
+| `issuingCountry`           | `String? @db.VarChar(2)` | Uppercase ISO alpha-2                                                    |
+| `passportExpiryCiphertext` | `String?`                | Internal migration shadow; AES-GCM envelope for logical `passportExpiry` |
+| `revision`                 | `Int @default(1)`        | Non-PII optimistic-concurrency token incremented on every profile update |
 
 Existing `nationality`, `passportNumber`, `passportExpiry`, and preference fields retain their names. `passportNumber` uses the existing versioned AES-GCM envelope. `passportExpiry` remains as the legacy date column during migration; the service prefers ciphertext and falls back to the date only until backfill is verified.
 
@@ -35,16 +35,16 @@ Existing `nationality`, `passportNumber`, `passportExpiry`, and preference field
 
 Existing immutable rows gain the fields required for a complete supplier-bound snapshot.
 
-| Field | Type | Protection / rule |
-|---|---|---|
-| `middleName` | `String?` | Optional snapshot value |
-| `title` | `String` | Required |
-| `email` | `String` | Contact snapshot; never returned by general intent reads |
-| `phoneCountryCode` | `String` | Required |
-| `phoneNumber` | `String` | Protected response/log boundary |
-| `documentType` | `String?` | Required for international scope |
-| `issuingCountry` | `String? @db.VarChar(2)` | Required for international scope |
-| `snapshotVersion` | `Int @default(1)` | Selects canonicalization and ciphertext-AAD rules |
+| Field              | Type                     | Protection / rule                                        |
+| ------------------ | ------------------------ | -------------------------------------------------------- |
+| `middleName`       | `String?`                | Optional snapshot value                                  |
+| `title`            | `String`                 | Required                                                 |
+| `email`            | `String`                 | Contact snapshot; never returned by general intent reads |
+| `phoneCountryCode` | `String`                 | Required                                                 |
+| `phoneNumber`      | `String`                 | Protected response/log boundary                          |
+| `documentType`     | `String?`                | Required for international scope                         |
+| `issuingCountry`   | `String? @db.VarChar(2)` | Required for international scope                         |
+| `snapshotVersion`  | `Int @default(1)`        | Selects canonicalization and ciphertext-AAD rules        |
 
 Existing identity fields remain. Existing `passportNumber` and `passportExpiry` string columns continue storing AES-GCM ciphertext. New ciphertext is bound with AAD `{snapshotVersion,intentId,position,fieldName}`; valid ciphertext copied across records fails authentication. `travelerProfileId` records provenance but never acts as a live data source after creation. `duffelPassengerId` remains the supplier passenger identity.
 

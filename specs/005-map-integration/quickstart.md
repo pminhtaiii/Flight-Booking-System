@@ -19,6 +19,7 @@
 **Goal**: Verify airport data is seeded correctly into PostgreSQL.
 
 **Steps**:
+
 ```bash
 # 1. Run the Prisma migration
 npm run prisma:migrate --workspace=apps/api
@@ -40,6 +41,7 @@ cd apps/api && npx prisma studio
 **Goal**: Verify all airport REST endpoints return correct data.
 
 **Steps**:
+
 ```bash
 # 1. Search by name
 curl http://localhost:3001/airports/search?q=Tokyo
@@ -71,6 +73,7 @@ curl http://localhost:3001/airports/all | jq '.count'
 **Goal**: Verify the interactive map renders on the search page.
 
 **Steps**:
+
 1. Navigate to `http://localhost:3000/search`
 2. Verify the map container is visible (no blank space, no errors in console)
 3. Verify map tiles load (world geography visible)
@@ -86,6 +89,7 @@ curl http://localhost:3001/airports/all | jq '.count'
 **Goal**: Verify end-to-end flow from search to route visualization.
 
 **Steps**:
+
 1. Navigate to `http://localhost:3000/search`
 2. Enter origin: "HAN" (Hanoi)
 3. Enter destination: "NRT" (Tokyo Narita)
@@ -105,6 +109,7 @@ curl http://localhost:3001/airports/all | jq '.count'
 **Goal**: Verify map theme switching.
 
 **Steps**:
+
 1. Navigate to any page with the map
 2. Toggle the app's dark mode setting
 3. Verify the map tiles switch from light to dark style
@@ -116,10 +121,10 @@ curl http://localhost:3001/airports/all | jq '.count'
 
 ## Troubleshooting
 
-| Issue | Resolution |
-|-------|------------|
-| Map blank / no tiles | Check tile URL in MapContainer config. Try alternate tile source. |
-| "WebGL not supported" | Test in a modern browser (Chrome, Firefox, Edge). Safari may need WebGL enabled. |
-| Airports not loading | Verify seed ran: `SELECT COUNT(*) FROM airports;`. Check API server is running. |
-| CORS errors on tile fetch | Tile sources should be public. Check for proxy configuration issues. |
-| SSR hydration error | Ensure map components use `dynamic()` with `ssr: false`. |
+| Issue                     | Resolution                                                                       |
+| ------------------------- | -------------------------------------------------------------------------------- |
+| Map blank / no tiles      | Check tile URL in MapContainer config. Try alternate tile source.                |
+| "WebGL not supported"     | Test in a modern browser (Chrome, Firefox, Edge). Safari may need WebGL enabled. |
+| Airports not loading      | Verify seed ran: `SELECT COUNT(*) FROM airports;`. Check API server is running.  |
+| CORS errors on tile fetch | Tile sources should be public. Check for proxy configuration issues.             |
+| SSR hydration error       | Ensure map components use `dynamic()` with `ssr: false`.                         |

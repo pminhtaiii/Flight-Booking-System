@@ -107,9 +107,9 @@ describe('AuthService', () => {
       });
 
       await service.register({ email: 'jwt@example.com', password: 'Password123!' }, '1.2.3.4');
-      
+
       expect(mockJwtService.sign).toHaveBeenCalled();
-      
+
       const calls = mockJwtService.sign.mock.calls;
       const lastCall = calls[calls.length - 1] as any[];
       const payload = lastCall[0];
@@ -207,10 +207,9 @@ describe('AuthService', () => {
         return null;
       });
 
-      await expect(service.validateUserAccess('user-123', 'jti-revoked', 'mock_token')).rejects.toThrow(
-        UnauthorizedException,
-      );
+      await expect(
+        service.validateUserAccess('user-123', 'jti-revoked', 'mock_token'),
+      ).rejects.toThrow(UnauthorizedException);
     });
   });
 });
-

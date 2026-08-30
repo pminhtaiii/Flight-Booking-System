@@ -179,6 +179,7 @@ To ensure client bundle and browser runtime isolation:
 ### Operational Route Handler Exception: Upstream Health Probe
 
 `apps/web/app/health/upstream/route.ts` provides an operational health probe for whole-stack orchestrators and CI readiness probes without exposing backend credentials:
+
 - Must declare `export const dynamic = 'force-dynamic'`.
 - Must return `headers: { 'Cache-Control': 'private, no-store' }` (or `no-store`) on all responses (200 OK or 503 degraded).
 - Executes a bounded server-to-server health ping to NestJS backend `GET /api/health/ping` via private `API_URL` with an `AbortController` timeout of 2000ms.

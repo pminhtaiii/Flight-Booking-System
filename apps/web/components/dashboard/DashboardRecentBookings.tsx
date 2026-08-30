@@ -60,7 +60,9 @@ export function DashboardRecentBookings({ recentBookings }: DashboardRecentBooki
                 <Link className={styles.bookingLink} href={`/bookings/${booking.id}`}>
                   <div className={styles.bookingPrimaryContent}>
                     <p className={styles.flightNumber}>{booking.flightNumber || 'Flight'}</p>
-                    {booking.airlineCode ? <p className={styles.airlineCode}>{booking.airlineCode}</p> : null}
+                    {booking.airlineCode ? (
+                      <p className={styles.airlineCode}>{booking.airlineCode}</p>
+                    ) : null}
                     <p className={styles.bookingRoute}>
                       <span className={styles.routeCode}>{booking.originCode || '—'}</span>
                       <span className={styles.routeSeparator} aria-hidden="true">
@@ -84,11 +86,17 @@ export function DashboardRecentBookings({ recentBookings }: DashboardRecentBooki
         </ul>
       ) : (
         <div className={styles.emptyState}>
-          <div className={styles.emptyStateIllustration} role="img" aria-label="Empty booking illustration">
+          <div
+            className={styles.emptyStateIllustration}
+            role="img"
+            aria-label="Empty booking illustration"
+          >
             <Plane aria-hidden="true" />
           </div>
           <h3 className={styles.emptyStateHeading}>No bookings yet</h3>
-          <p className={styles.emptyStateDescription}>Search for a flight to begin planning your next trip.</p>
+          <p className={styles.emptyStateDescription}>
+            Search for a flight to begin planning your next trip.
+          </p>
           <Link className={styles.emptyStateAction} href="/search">
             Search Flights
           </Link>

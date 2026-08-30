@@ -7,4 +7,3 @@ import { StripeService } from './stripe.service';
   exports: [StripeService],
 })
 export class StripeModule {}
-

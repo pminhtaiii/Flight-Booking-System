@@ -8,7 +8,7 @@
 
 **Input**: User description: "Implement the approved AI Flight Copilot landing-page design in the existing system."
 
-## User Scenarios & Testing *(mandatory)*
+## User Scenarios & Testing _(mandatory)_
 
 ### User Story 1 - Understand the product and access an account (Priority: P1)
 
@@ -44,7 +44,7 @@ As a mobile visitor, I can read the core message and reach either authentication
 - If an existing authentication route is unavailable, the landing page still renders its message and presents the existing route path without failing to load.
 - If visitors use keyboard navigation, both authentication actions expose visible focus states and can be activated without a pointing device.
 
-## Requirements *(mandatory)*
+## Requirements _(mandatory)_
 
 ### Functional Requirements
 
@@ -56,7 +56,7 @@ As a mobile visitor, I can read the core message and reach either authentication
 - **FR-006**: The homepage MUST preserve existing backend and authentication integration boundaries; it introduces no API call, booking operation, or authentication behavior.
 - **FR-007**: The page MUST provide keyboard-accessible navigation and visible focus feedback for interactive controls.
 
-## Success Criteria *(mandatory)*
+## Success Criteria _(mandatory)_
 
 ### Measurable Outcomes
 

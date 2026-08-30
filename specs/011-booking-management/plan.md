@@ -21,7 +21,7 @@ Build the complete post-payment booking management experience. The system create
 
 ## Constitution Check
 
-*GATE: Passed.*
+_GATE: Passed._
 
 - **I. Flight-First Architecture**: ✅ Booking management IS the core flight booking lifecycle — the natural completion of the search → book → confirm flow.
 - **II. Deterministic Transaction Boundary**: ✅ Entire feature is deterministic. No AI involvement. Booking CRUD, flight snapshots, and status rendering are all database reads/writes.
@@ -105,6 +105,7 @@ packages/shared/
 **Scope**: Prisma schema changes, migration, shared TypeScript types.
 
 **Deliverables**:
+
 - Add `BookingStatus` and `BookingFailureReason` enums to Prisma schema
 - Add `Booking` model with all fields (id, userId, bookingIntentId, paymentId, status, failureReason, pnrReference, duffelOrderId, flightSnapshot, passengerSnapshot, totalAmount, currency, departureAt, timestamps)
 - Add relations: User.bookings, BookingIntent.booking, Payment.booking
@@ -121,6 +122,7 @@ packages/shared/
 **Scope**: NestJS BookingModule with CRUD endpoints.
 
 **Deliverables**:
+
 - `BookingModule` with controller and service
 - `BookingService.createBooking(userId, bookingId, bookingIntentId, ...)` — creates Booking with PROCESSING status
 - `BookingService.updateToConfirmed(bookingId, pnrReference, duffelOrderId, flightSnapshot, passengerSnapshot)` — updates status + snapshots
@@ -140,6 +142,7 @@ packages/shared/
 **Scope**: Modify the confirm pipeline to create Booking records and validate client-generated UUIDs.
 
 **Deliverables**:
+
 - Modify `ConfirmPaymentDto` to accept `bookingId` (UUID v4 string)
 - Add server-side UUID validation at the top of the confirm handler:
   - Format validation (must be valid UUID v4) → 400
@@ -163,6 +166,7 @@ packages/shared/
 **Scope**: Build the 4-phase loading component on the checkout page.
 
 **Deliverables**:
+
 - `CheckoutLoadingEscalation` component with 4 timed phases:
   - Phase 1 (0–10s): Animated stepper with named steps (Authorizing → Reserving → Finalizing)
   - Phase 2 (10–20s): Animation slows, reassurance message appears
@@ -186,6 +190,7 @@ packages/shared/
 **Scope**: Build the booking detail page with three render states.
 
 **Deliverables**:
+
 - `/bookings/[bookingId]/page.tsx` — Next.js App Router page
 - `BookingDetail` component rendering full flight snapshot, passenger details, PNR, payment summary
 - `BookingConfirmationBanner` — success celebration UI (shown when `?confirmed=true`). The page component MUST strip the `confirmed` query parameter from the URL on mount (e.g. using `window.history.replaceState` or Next.js `router.replace` to update the URL path without triggering a server re-render) to prevent the banner from displaying again on manual page refreshes.
@@ -208,6 +213,7 @@ packages/shared/
 **Scope**: Build the My Bookings list page with Upcoming/Past tabs.
 
 **Deliverables**:
+
 - `/bookings/page.tsx` — Next.js App Router page with tab navigation
 - `BookingsList` component with tab state management (Upcoming / Past)
 - `BookingCard` component for each booking row:
@@ -230,6 +236,7 @@ packages/shared/
 **Scope**: Backend and frontend E2E tests covering all user stories.
 
 **Deliverables**:
+
 - Backend E2E tests (`apps/api/test/booking.e2e-spec.ts`):
   - Booking list endpoint (tab filtering, pagination, ownership)
   - Booking detail endpoint (ownership check, 404, 403)

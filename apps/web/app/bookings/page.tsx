@@ -23,13 +23,15 @@ export default async function BookingsPage({ searchParams }: BookingsPageProps) 
   if (!outcome.ok) {
     if (outcome.reason === 'UNAUTHENTICATED') {
       const cookieHeader = headers().get('cookie') ?? '';
-      const hasSessionCookie = cookieHeader.includes('next-auth') || cookieHeader.includes('__Secure-next-auth');
+      const hasSessionCookie =
+        cookieHeader.includes('next-auth') || cookieHeader.includes('__Secure-next-auth');
       redirect(hasSessionCookie ? '/login?message=session_expired' : '/login');
     }
 
-    const error = outcome.reason === 'FORBIDDEN'
-      ? 'You do not have access to these bookings.'
-      : (outcome.message || 'We could not load your bookings. Please try again.');
+    const error =
+      outcome.reason === 'FORBIDDEN'
+        ? 'You do not have access to these bookings.'
+        : outcome.message || 'We could not load your bookings. Please try again.';
 
     return (
       <div className="flex min-h-screen flex-col bg-background">

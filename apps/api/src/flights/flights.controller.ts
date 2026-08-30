@@ -37,13 +37,8 @@ export class FlightsController {
   ): Promise<FlightSearchResponseDto> {
     const traceId = headers['x-trace-id'] || headers['x-correlation-id'];
     const correlationId = headers['x-correlation-id'];
-    
-    return this.flightsService.search(
-      req.user.id,
-      body,
-      traceId,
-      correlationId,
-    );
+
+    return this.flightsService.search(req.user.id, body, traceId, correlationId);
   }
 
   @Get(':id')

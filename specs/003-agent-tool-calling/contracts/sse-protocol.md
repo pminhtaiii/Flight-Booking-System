@@ -28,10 +28,10 @@ Streaming LLM token. Emitted as the agent generates response text.
 data: {"type": "token", "content": "string"}
 ```
 
-| Field     | Type   | Description                          |
-|-----------|--------|--------------------------------------|
-| `type`    | string | Always `"token"`                     |
-| `content` | string | The text token fragment              |
+| Field     | Type   | Description             |
+| --------- | ------ | ----------------------- |
+| `type`    | string | Always `"token"`        |
+| `content` | string | The text token fragment |
 
 #### `done`
 
@@ -41,9 +41,9 @@ Stream completion signal. Emitted once when the agent's turn is fully complete.
 data: {"type": "done"}
 ```
 
-| Field  | Type   | Description      |
-|--------|--------|------------------|
-| `type` | string | Always `"done"`  |
+| Field  | Type   | Description     |
+| ------ | ------ | --------------- |
+| `type` | string | Always `"done"` |
 
 #### `error`
 
@@ -53,11 +53,11 @@ Error signal. Emitted when a fatal error terminates the stream.
 data: {"type": "error", "code": "string", "message": "string"}
 ```
 
-| Field     | Type   | Description                     |
-|-----------|--------|---------------------------------|
-| `type`    | string | Always `"error"`                |
-| `code`    | string | Machine-readable error code     |
-| `message` | string | Human-readable error description|
+| Field     | Type   | Description                      |
+| --------- | ------ | -------------------------------- |
+| `type`    | string | Always `"error"`                 |
+| `code`    | string | Machine-readable error code      |
+| `message` | string | Human-readable error description |
 
 ---
 
@@ -71,11 +71,11 @@ Emitted when the agent invokes a tool. Enables the frontend to show status feedb
 data: {"type": "tool_call", "tool": "string", "params": {}}
 ```
 
-| Field    | Type   | Description                                       |
-|----------|--------|---------------------------------------------------|
-| `type`   | string | Always `"tool_call"`                               |
+| Field    | Type   | Description                                                                |
+| -------- | ------ | -------------------------------------------------------------------------- |
+| `type`   | string | Always `"tool_call"`                                                       |
 | `tool`   | string | Tool name (`search_flights`, `get_user_preferences`, `list_user_bookings`) |
-| `params` | object | Sanitized parameters passed to the tool (PII-free) |
+| `params` | object | Sanitized parameters passed to the tool (PII-free)                         |
 
 **Example**:
 
@@ -91,11 +91,11 @@ Emitted when a tool returns its result. Provides a brief summary for frontend st
 data: {"type": "tool_result", "tool": "string", "summary": "string"}
 ```
 
-| Field     | Type   | Description                                      |
-|-----------|--------|--------------------------------------------------|
-| `type`    | string | Always `"tool_result"`                            |
-| `tool`    | string | Tool name that produced the result                |
-| `summary` | string | Brief human-readable summary of the result        |
+| Field     | Type   | Description                                |
+| --------- | ------ | ------------------------------------------ |
+| `type`    | string | Always `"tool_result"`                     |
+| `tool`    | string | Tool name that produced the result         |
+| `summary` | string | Brief human-readable summary of the result |
 
 **Example**:
 
@@ -111,8 +111,8 @@ Emitted when a tool marked `requires_confirmation: true` is invoked. Suspends th
 data: {"type": "confirmation_required", "action": "string", "details": {}}
 ```
 
-| Field     | Type   | Description                                        |
-|-----------|--------|----------------------------------------------------|
+| Field     | Type   | Description                                         |
+| --------- | ------ | --------------------------------------------------- |
 | `type`    | string | Always `"confirmation_required"`                    |
 | `action`  | string | Proposed action description (e.g., `"book_flight"`) |
 | `details` | object | Action parameters for user review                   |
@@ -228,7 +228,7 @@ data: {"type": "token", "content": " booked!"}
 data: {"type": "done"}
 ```
 
-**Sequence (confirmed)**: `tool_call` → `confirmation_required` → *(suspend)* → `tool_result` → `token*` → `done`
+**Sequence (confirmed)**: `tool_call` → `confirmation_required` → _(suspend)_ → `tool_result` → `token*` → `done`
 
 **Sequence (declined)**:
 
@@ -245,7 +245,7 @@ data: {"type": "token", "content": " booking."}
 data: {"type": "done"}
 ```
 
-**Sequence (declined)**: `tool_call` → `confirmation_required` → *(suspend)* → `token*` → `done`
+**Sequence (declined)**: `tool_call` → `confirmation_required` → _(suspend)_ → `token*` → `done`
 
 ---
 

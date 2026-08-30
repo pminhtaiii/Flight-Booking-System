@@ -12,10 +12,7 @@ const ALLOWED_TRANSITIONS: Record<PaymentStatus, Set<PaymentStatus>> = {
     PaymentStatus.EXPIRED,
     PaymentStatus.CANCELLED,
   ]),
-  [PaymentStatus.SUCCEEDED]: new Set([
-    PaymentStatus.REFUND_PENDING,
-    PaymentStatus.DISPUTED,
-  ]),
+  [PaymentStatus.SUCCEEDED]: new Set([PaymentStatus.REFUND_PENDING, PaymentStatus.DISPUTED]),
   [PaymentStatus.REFUND_PENDING]: new Set([
     PaymentStatus.PARTIALLY_REFUNDED,
     PaymentStatus.REFUNDED,
@@ -25,9 +22,7 @@ const ALLOWED_TRANSITIONS: Record<PaymentStatus, Set<PaymentStatus>> = {
     PaymentStatus.REFUND_PENDING,
     PaymentStatus.DISPUTED,
   ]),
-  [PaymentStatus.REFUNDED]: new Set([
-    PaymentStatus.DISPUTED,
-  ]),
+  [PaymentStatus.REFUNDED]: new Set([PaymentStatus.DISPUTED]),
   [PaymentStatus.DISPUTED]: new Set([
     PaymentStatus.SUCCEEDED,
     PaymentStatus.PARTIALLY_REFUNDED,

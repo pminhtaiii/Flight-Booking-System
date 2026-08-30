@@ -22,9 +22,9 @@ export async function backfillBookingAgentProjections() {
         itineraryRevisions: {
           orderBy: { version: 'desc' },
           take: 1,
-          include: { segments: { orderBy: { globalOrder: 'asc' } } }
-        }
-      }
+          include: { segments: { orderBy: { globalOrder: 'asc' } } },
+        },
+      },
     });
 
     if (bookings.length === 0) {
@@ -36,9 +36,9 @@ export async function backfillBookingAgentProjections() {
       try {
         let agentReference: string;
         const existing = await prisma.bookingAgentProjection.findUnique({
-          where: { bookingId: booking.id }
+          where: { bookingId: booking.id },
         });
-        
+
         if (existing) {
           agentReference = existing.agentReference;
         } else {
@@ -54,7 +54,7 @@ export async function backfillBookingAgentProjections() {
         let airline = '';
         let flightNumber: string | null = null;
         let hasFlightData = false;
-        
+
         if (booking.itineraryRevisions && booking.itineraryRevisions.length > 0) {
           const activeRevision = booking.itineraryRevisions[0];
           const segments = activeRevision.segments || [];
@@ -73,15 +73,20 @@ export async function backfillBookingAgentProjections() {
 
         if (!hasFlightData) {
           const flightSnapshot: any = booking.flightSnapshot;
-          if (flightSnapshot && flightSnapshot.segments && Array.isArray(flightSnapshot.segments) && flightSnapshot.segments.length > 0) {
+          if (
+            flightSnapshot &&
+            flightSnapshot.segments &&
+            Array.isArray(flightSnapshot.segments) &&
+            flightSnapshot.segments.length > 0
+          ) {
             const segments = flightSnapshot.segments;
             const depStr = segments[0].departureAt;
             const arrStr = segments[segments.length - 1].arrivalAt;
-            
+
             if (depStr && arrStr) {
               const parsedDep = new Date(depStr);
               const parsedArr = new Date(arrStr);
-              
+
               if (!isNaN(parsedDep.getTime()) && !isNaN(parsedArr.getTime())) {
                 origin = segments[0].departureAirport?.iataCode || '';
                 destination = segments[segments.length - 1].arrivalAirport?.iataCode || '';
@@ -90,7 +95,9 @@ export async function backfillBookingAgentProjections() {
                 durationMinutes = (arrivalAt.getTime() - departureAt.getTime()) / 60000;
                 stopCount = flightSnapshot.stops ?? Math.max(0, segments.length - 1);
                 airline = segments[0].airline?.name || '';
-                flightNumber = segments[0].airline?.iataCode ? `${segments[0].airline.iataCode} ${segments[0].flightNumber}` : null;
+                flightNumber = segments[0].airline?.iataCode
+                  ? `${segments[0].airline.iataCode} ${segments[0].flightNumber}`
+                  : null;
                 hasFlightData = true;
               }
             }
@@ -129,7 +136,7 @@ export async function backfillBookingAgentProjections() {
                   durationMinutes,
                   stopCount,
                   flightNumber,
-                }
+                },
               });
               successUpsert = true;
             } catch (error: any) {
@@ -147,10 +154,10 @@ export async function backfillBookingAgentProjections() {
         failed++;
         console.error(`Failed to backfill booking ${booking.id}: ${error.message}`);
       }
-      
+
       lastId = booking.id;
     }
-    
+
     console.log(`Progress: ${processed} processed (${success} successful, ${failed} failed)`);
   }
 
@@ -158,7 +165,7 @@ export async function backfillBookingAgentProjections() {
   console.log(`Total Processed: ${processed}`);
   console.log(`Success: ${success}`);
   console.log(`Failed: ${failed}`);
-  
+
   await prisma.$disconnect();
 }
 

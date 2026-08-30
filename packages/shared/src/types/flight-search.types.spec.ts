@@ -10,10 +10,10 @@ import {
   type FlightSelectionOutcome,
 } from './flight-search.types';
 
-type Equal<Left, Right> = (<Value>() => Value extends Left ? 1 : 2) extends <Value>() =>
-  Value extends Right ? 1 : 2
-  ? true
-  : false;
+type Equal<Left, Right> =
+  (<Value>() => Value extends Left ? 1 : 2) extends <Value>() => Value extends Right ? 1 : 2
+    ? true
+    : false;
 type Assert<Condition extends true> = Condition;
 
 type ExpectedFlightSelectionOutcome =
@@ -85,55 +85,93 @@ const validQuery = {
 
 describe('Flight Search shared contracts', () => {
   it('parses valid query and success outcome', () => {
-    assert.equal(
-      FlightSearchQuerySchema.parse(validQuery).origin,
-      'SGN',
-    );
+    assert.equal(FlightSearchQuerySchema.parse(validQuery).origin, 'SGN');
 
     const parsed: FlightSearchOutcome = FlightSearchOutcomeSchema.parse({
       ok: true,
       offers: [offer],
-      meta: { totalCount: 1, currency: 'USD', minPrice: 250.5, maxPrice: 250.5, airlines: ['Vietnam Airlines'] },
+      meta: {
+        totalCount: 1,
+        currency: 'USD',
+        minPrice: 250.5,
+        maxPrice: 250.5,
+        airlines: ['Vietnam Airlines'],
+      },
     });
     assert.equal(parsed.ok, true);
   });
 
   it('parses valid search and selection failure outcomes', () => {
-    assert.deepEqual(FlightSearchOutcomeSchema.parse({
-      ok: false, reason: 'RATE_LIMITED', message: 'Try again shortly', retryable: true,
-    }), { ok: false, reason: 'RATE_LIMITED', message: 'Try again shortly', retryable: true });
-    assert.deepEqual(FlightSelectionOutcomeSchema.parse({
-      ok: false, reason: 'OFFER_EXPIRED', message: 'Choose another offer', retryable: true,
-    }), { ok: false, reason: 'OFFER_EXPIRED', message: 'Choose another offer', retryable: true });
+    assert.deepEqual(
+      FlightSearchOutcomeSchema.parse({
+        ok: false,
+        reason: 'RATE_LIMITED',
+        message: 'Try again shortly',
+        retryable: true,
+      }),
+      { ok: false, reason: 'RATE_LIMITED', message: 'Try again shortly', retryable: true },
+    );
+    assert.deepEqual(
+      FlightSelectionOutcomeSchema.parse({
+        ok: false,
+        reason: 'OFFER_EXPIRED',
+        message: 'Choose another offer',
+        retryable: true,
+      }),
+      { ok: false, reason: 'OFFER_EXPIRED', message: 'Choose another offer', retryable: true },
+    );
   });
 
   it('parses a valid selection success outcome', () => {
-    assert.deepEqual(FlightSelectionOutcomeSchema.parse({ ok: true, checkoutPath: '/checkout/local-offer-01' }),
-      { ok: true, checkoutPath: '/checkout/local-offer-01' });
+    assert.deepEqual(
+      FlightSelectionOutcomeSchema.parse({ ok: true, checkoutPath: '/checkout/local-offer-01' }),
+      { ok: true, checkoutPath: '/checkout/local-offer-01' },
+    );
   });
 
   it('rejects unexpected provider fields, malformed values, and unsupported reasons', () => {
     assert.throws(() => FlightSearchOfferViewSchema.parse({ ...offer, duffelOfferId: 'off_123' }));
-    assert.throws(() => FlightSearchQuerySchema.parse({
-      origin: 'sgn', destination: 'HAN', departureDate: '2026/09/01', returnDate: null,
-      adults: 0, children: 0, infants: 0, cabinClass: 'economy',
-    }));
-    assert.throws(() => FlightSearchOutcomeSchema.parse({
-      ok: false, reason: 'PROVIDER_ERROR', message: 'No', retryable: false,
-    }));
+    assert.throws(() =>
+      FlightSearchQuerySchema.parse({
+        origin: 'sgn',
+        destination: 'HAN',
+        departureDate: '2026/09/01',
+        returnDate: null,
+        adults: 0,
+        children: 0,
+        infants: 0,
+        cabinClass: 'economy',
+      }),
+    );
+    assert.throws(() =>
+      FlightSearchOutcomeSchema.parse({
+        ok: false,
+        reason: 'PROVIDER_ERROR',
+        message: 'No',
+        retryable: false,
+      }),
+    );
     assert.throws(() => FlightSelectionOutcomeSchema.parse({ ok: true }));
   });
 
   it('rejects semantically invalid search queries', () => {
     assert.throws(() => FlightSearchQuerySchema.parse({ ...validQuery, destination: 'SGN' }));
-    assert.throws(() => FlightSearchQuerySchema.parse({ ...validQuery, adults: 8, children: 1, infants: 1 }));
+    assert.throws(() =>
+      FlightSearchQuerySchema.parse({ ...validQuery, adults: 8, children: 1, infants: 1 }),
+    );
     assert.throws(() => FlightSearchQuerySchema.parse({ ...validQuery, infants: 2 }));
-    assert.throws(() => FlightSearchQuerySchema.parse({
-      ...validQuery,
-      departureDate: futureDate(3),
-      returnDate: futureDate(2),
-    }));
-    assert.throws(() => FlightSearchQuerySchema.parse({ ...validQuery, departureDate: '2026-02-31' }));
-    assert.throws(() => FlightSearchQuerySchema.parse({ ...validQuery, departureDate: '2000-01-01' }));
+    assert.throws(() =>
+      FlightSearchQuerySchema.parse({
+        ...validQuery,
+        departureDate: futureDate(3),
+        returnDate: futureDate(2),
+      }),
+    );
+    assert.throws(() =>
+      FlightSearchQuerySchema.parse({ ...validQuery, departureDate: '2026-02-31' }),
+    );
+    assert.throws(() =>
+      FlightSearchQuerySchema.parse({ ...validQuery, departureDate: '2000-01-01' }),
+    );
   });
 });

@@ -31,9 +31,7 @@ import { BookingIntentService } from '@/booking-intent/booking-intent.service';
 import { BookingReadinessObservability } from '@/booking-intent/booking-readiness.observability';
 import { CacheService } from '@/cache/cache.service';
 import { HttpExceptionFilter } from '@/common/filters/http-exception.filter';
-import {
-  createChatTelemetryEvent,
-} from '@/common/observability/chat-observability';
+import { createChatTelemetryEvent } from '@/common/observability/chat-observability';
 
 const FORBIDDEN_PRIVACY_CORPUS = [
   'chk_handoff_v1_secret_credential_12345',
@@ -59,7 +57,11 @@ const FORBIDDEN_PRIVACY_CORPUS = [
   '+84 912345678',
 ] as const;
 
-function mintClaimToken(userId: string, iat: number, secret = 'test-claim-token-secret-must-be-long-enough'): string {
+function mintClaimToken(
+  userId: string,
+  iat: number,
+  secret = 'test-claim-token-secret-must-be-long-enough',
+): string {
   const payload = { userId, iat };
   const payloadStr = JSON.stringify(payload);
   const signature = crypto.createHmac('sha256', secret).update(payloadStr).digest();
@@ -106,7 +108,9 @@ describe('Automated Negative Privacy & Security Continuous Audit (e2e)', () => {
       .compile();
 
     app = moduleFixture.createNestApplication();
-    app.useGlobalPipes(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, transform: true }));
+    app.useGlobalPipes(
+      new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, transform: true }),
+    );
     app.useGlobalFilters(new HttpExceptionFilter());
     app.setGlobalPrefix('api', { exclude: ['health'] });
     await app.init();
@@ -214,7 +218,8 @@ describe('Automated Negative Privacy & Security Continuous Audit (e2e)', () => {
     });
 
     it('persists chat messages and sessions with zero plaintext across raw PostgreSQL database rows', async () => {
-      const SENSITIVE_CONVERSATION = 'Plaintext sensitive customer conversation between Alice and Bob with passport PASS-123456';
+      const SENSITIVE_CONVERSATION =
+        'Plaintext sensitive customer conversation between Alice and Bob with passport PASS-123456';
       const SENSITIVE_TITLE = 'Trip to Danang PNR-XYZ123';
 
       const session = await chatService.createSession(testUserId, SENSITIVE_TITLE);

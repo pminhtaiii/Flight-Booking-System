@@ -14,9 +14,16 @@ function ProfileDisabledFallback(): JSX.Element {
       <Header />
       <main className="mx-auto flex w-full max-w-3xl flex-1 items-center px-6 py-16">
         <section className="card w-full space-y-4 p-8" aria-labelledby="profile-disabled-title">
-          <p className="text-sm font-semibold uppercase tracking-[0.16em] text-accent">Traveler profile</p>
-          <h1 id="profile-disabled-title" className="text-3xl font-bold text-text-primary">Profile workspace is not available yet</h1>
-          <p className="text-text-secondary">This workspace is being prepared for the next booking-readiness release. Your account is unchanged.</p>
+          <p className="text-sm font-semibold uppercase tracking-[0.16em] text-accent">
+            Traveler profile
+          </p>
+          <h1 id="profile-disabled-title" className="text-3xl font-bold text-text-primary">
+            Profile workspace is not available yet
+          </h1>
+          <p className="text-text-secondary">
+            This workspace is being prepared for the next booking-readiness release. Your account is
+            unchanged.
+          </p>
         </section>
       </main>
     </div>
@@ -29,10 +36,16 @@ function ProfileLoadError({ message }: { message: string }): JSX.Element {
       <Header />
       <main className="mx-auto flex w-full max-w-3xl flex-1 items-center px-6 py-16">
         <section className="card w-full space-y-4 p-8" aria-labelledby="profile-error-title">
-          <p className="text-sm font-semibold uppercase tracking-[0.16em] text-accent">Traveler profile</p>
-          <h1 id="profile-error-title" className="text-3xl font-bold text-text-primary">We could not load your profile</h1>
+          <p className="text-sm font-semibold uppercase tracking-[0.16em] text-accent">
+            Traveler profile
+          </p>
+          <h1 id="profile-error-title" className="text-3xl font-bold text-text-primary">
+            We could not load your profile
+          </h1>
           <p className="text-text-secondary">{message}</p>
-          <a className="btn-primary inline-flex w-fit" href="/profile">Try again</a>
+          <a className="btn-primary inline-flex w-fit" href="/profile">
+            Try again
+          </a>
         </section>
       </main>
     </div>
@@ -50,7 +63,9 @@ export default async function ProfilePage({
 
   // Reject any passenger PII query parameters to prevent PII exposure in browser history/logs
   const hasPiiInQuery = Object.keys(searchParams || {}).some((key) =>
-    ['name', 'email', 'phone', 'passport', 'dob', 'gender'].some((pii) => key.toLowerCase().includes(pii)),
+    ['name', 'email', 'phone', 'passport', 'dob', 'gender'].some((pii) =>
+      key.toLowerCase().includes(pii),
+    ),
   );
 
   if (hasPiiInQuery) {
@@ -63,7 +78,8 @@ export default async function ProfilePage({
 
   if (!session) {
     const cookieHeader = headers().get('cookie') ?? '';
-    const hasSessionCookie = cookieHeader.includes('next-auth') || cookieHeader.includes('__Secure-next-auth');
+    const hasSessionCookie =
+      cookieHeader.includes('next-auth') || cookieHeader.includes('__Secure-next-auth');
     redirect(hasSessionCookie ? '/login?message=session_expired' : '/login');
   }
 
@@ -88,9 +104,10 @@ export default async function ProfilePage({
       redirect('/login?message=session_expired');
     }
 
-    const message = error instanceof ProfileRequestError && error.status === 404
-      ? 'The profile workspace is not enabled on the API yet.'
-      : 'Please try again in a moment.';
+    const message =
+      error instanceof ProfileRequestError && error.status === 404
+        ? 'The profile workspace is not enabled on the API yet.'
+        : 'Please try again in a moment.';
 
     return <ProfileLoadError message={message} />;
   }

@@ -230,9 +230,9 @@ describe('PaymentIdempotencyService', () => {
           lockedAt: null,
         });
 
-        await expect(service.acquireOrReplay(key, hash, requestUserId, requestPath)).rejects.toEqual(
-          new ConflictException('Idempotency key is not valid for this request'),
-        );
+        await expect(
+          service.acquireOrReplay(key, hash, requestUserId, requestPath),
+        ).rejects.toEqual(new ConflictException('Idempotency key is not valid for this request'));
         expect(mockPrisma.idempotencyKey.updateMany).not.toHaveBeenCalled();
       },
     );
@@ -243,21 +243,19 @@ describe('PaymentIdempotencyService', () => {
     ])(
       'rejects a P2002 race for %s before replaying the stored response',
       async (_scenario: string, requestUserId: string, requestPath: string) => {
-        mockPrisma.idempotencyKey.findUnique
-          .mockResolvedValueOnce(null)
-          .mockResolvedValueOnce({
-            ...existingKey,
-            responseBody: { paymentIntentId: 'pi_sensitive' },
-            responseCode: 200,
-            lockedAt: null,
-          });
+        mockPrisma.idempotencyKey.findUnique.mockResolvedValueOnce(null).mockResolvedValueOnce({
+          ...existingKey,
+          responseBody: { paymentIntentId: 'pi_sensitive' },
+          responseCode: 200,
+          lockedAt: null,
+        });
         const prismaError = new Error('Unique constraint violation') as Error & { code?: string };
         prismaError.code = 'P2002';
         mockPrisma.idempotencyKey.create.mockRejectedValueOnce(prismaError);
 
-        await expect(service.acquireOrReplay(key, hash, requestUserId, requestPath)).rejects.toEqual(
-          new ConflictException('Idempotency key is not valid for this request'),
-        );
+        await expect(
+          service.acquireOrReplay(key, hash, requestUserId, requestPath),
+        ).rejects.toEqual(new ConflictException('Idempotency key is not valid for this request'));
         expect(mockPrisma.idempotencyKey.updateMany).not.toHaveBeenCalled();
       },
     );

@@ -17,7 +17,10 @@ import { DuffelService, DuffelTimeoutError } from '@/duffel/duffel.service';
 import { AuditService } from '@/audit/audit.service';
 import { EncryptionService } from '@/common/encryption.service';
 import { CreateIntentDto } from './dto/create-intent.dto';
-import { BookingReadinessRequestDto, BookingReadinessResponseDto } from './dto/booking-readiness.dto';
+import {
+  BookingReadinessRequestDto,
+  BookingReadinessResponseDto,
+} from './dto/booking-readiness.dto';
 import { BookingReadinessService } from './booking-readiness.service';
 import { ChatHandoffService } from '@/chat-handoff/chat-handoff.service';
 import {
@@ -176,412 +179,446 @@ export class BookingIntentService {
 
     let isSuccess = false;
     try {
-
-    if (!targetFlightOfferId) {
-      throw new HttpException(
-        {
-          code: 'OFFER_NOT_FOUND',
-          message: 'Flight offer id or handoff token is required',
-        },
-        HttpStatus.BAD_REQUEST,
-      );
-    }
-
-    let flightOffer = handoff?.flightOffer ?? this.flightOfferCache.get(targetFlightOfferId);
-    if (!flightOffer) {
-      const loadedFlightOffer = await this.prisma.flightOffer.findUnique({
-        where: { id: targetFlightOfferId },
-      });
-      if (loadedFlightOffer) {
-        flightOffer = loadedFlightOffer;
-        if (this.flightOfferCache.size >= 500) {
-          const firstKey = this.flightOfferCache.keys().next().value;
-          if (firstKey) this.flightOfferCache.delete(firstKey);
-        }
-        this.flightOfferCache.set(targetFlightOfferId, loadedFlightOffer);
-      }
-    }
-
-    if (!flightOffer) {
-      throw new HttpException(
-        {
-          code: 'OFFER_NOT_FOUND',
-          message: 'Flight offer not found',
-        },
-        HttpStatus.NOT_FOUND,
-      );
-    }
-
-    const canonicalPassengerCount = dto.passengers.filter((passenger) => passenger.source != null).length;
-    if (canonicalPassengerCount > 0 && canonicalPassengerCount < dto.passengers.length) {
-      throw new HttpException(
-        {
-          code: 'PASSENGER_SOURCE_INVALID',
-          message: 'Passenger source is invalid',
-        },
-        HttpStatus.BAD_REQUEST,
-      );
-    }
-    const hasCanonicalSources = canonicalPassengerCount === dto.passengers.length;
-    const allowLegacy = context?.allowLegacy !== false;
-
-    if (!hasCanonicalSources && !allowLegacy) {
-      throw new HttpException(
-        {
-          code: 'PASSENGER_SOURCE_INVALID',
-          message: 'Canonical passenger sources are required',
-        },
-        HttpStatus.BAD_REQUEST,
-      );
-    }
-
-    if (dto.passengers.some((passenger) => passenger.useProfile !== undefined) && hasCanonicalSources) {
-      throw new HttpException(
-        {
-          code: 'PASSENGER_SOURCE_CONFLICT',
-          message: 'Passenger source conflicts with legacy profile selection',
-        },
-        HttpStatus.BAD_REQUEST,
-      );
-    }
-
-    let canonicalPassengers: ResolvedPassenger[] | null = null;
-    let legacyPassengers: ResolvedIntentPassenger[] | null = null;
-    if (hasCanonicalSources) {
-      if (!this.passengerSourceResolver || !this.passengerSnapshotService || !this.bookingReadinessService) {
+      if (!targetFlightOfferId) {
         throw new HttpException(
           {
-            code: 'READINESS_DEPENDENCY_UNAVAILABLE',
-            message: 'Booking readiness dependencies are unavailable',
-          },
-          HttpStatus.SERVICE_UNAVAILABLE,
-        );
-      }
-
-      canonicalPassengers = await this.passengerSourceResolver.resolve(
-        userId,
-        dto.passengers.map((passenger) => ({
-          offerPassengerId: passenger.offerPassengerId,
-          type: passenger.type,
-          source: passenger.source,
-        })) as PassengerSourceRequest[],
-      );
-    } else {
-      const legacyInputPassengers = dto.passengers as unknown as LegacyIntentPassenger[];
-      if (legacyInputPassengers.some((passenger, index) => passenger.useProfile === true && (index !== 0 || passenger.type !== PassengerType.ADULT))) {
-        throw new HttpException(
-          {
-            code: 'LEGACY_PROFILE_SOURCE_UNSUPPORTED',
-            message: 'Legacy profile selection is supported only for the primary adult',
+            code: 'OFFER_NOT_FOUND',
+            message: 'Flight offer id or handoff token is required',
           },
           HttpStatus.BAD_REQUEST,
         );
       }
-      legacyPassengers = await this.applyPrimaryPassengerPrefill(
-        userId,
-        legacyInputPassengers,
-      );
-    }
 
-    const passengersForValidation = canonicalPassengers ?? legacyPassengers ?? [];
-    this.validatePassengerCountAgainstOffer(passengersForValidation, {
-      adults: flightOffer.adults,
-      children: flightOffer.children,
-      infants: flightOffer.infants,
-    });
-
-    if (claimLost) {
-      throw new ConflictException({ code: 'CLAIM_LOST', message: 'Handoff claim was lost' });
-    }
-
-    const liveOfferPromise = this.fetchLiveOffer(flightOffer.duffelOfferId, 25000);
-    const readinessPromise = canonicalPassengers
-      ? this.bookingReadinessService!.evaluateAuthoritativeReadiness(
-          flightOffer.rawOffer,
-          canonicalPassengers,
-          {
-            traceId: context?.traceId,
-            correlationId: context?.correlationId,
-          },
-        )
-      : Promise.resolve(null);
-
-    const [liveOffer, authoritativeReadiness] = await Promise.all([liveOfferPromise, readinessPromise]);
-
-    if (authoritativeReadiness && !authoritativeReadiness.ready) {
-      this.metricsService?.increment(BOOKING_READINESS_METRIC_COUNTERS.BOOKING_INTENT_AUTHORITATIVE_REJECTIONS);
-      throw new HttpException(
-        {
-          code: 'BOOKING_NOT_READY',
-          message: 'Booking is not ready',
-          ...authoritativeReadiness,
-        },
-        HttpStatus.UNPROCESSABLE_ENTITY,
-      );
-    }
-
-    const confirmedPrice = Number(liveOffer.totalAmount);
-    const originalPrice = Number(flightOffer.price);
-    const now = new Date();
-    const parsedTtl = Number(process.env.BOOKING_INTENT_TTL_MINUTES);
-    const ttlMinutes = isNaN(parsedTtl) || !process.env.BOOKING_INTENT_TTL_MINUTES ? 30 : parsedTtl;
-    const intentExpiresAt = new Date(now.getTime() + ttlMinutes * 60 * 1000);
-
-    const duffelPassengerIds = this.extractDuffelPassengerIds(liveOffer.raw, passengersForValidation);
-
-    const canonicalSnapshotPassengers = canonicalPassengers?.map((passenger, index) => ({
-      ...passenger,
-      duffelPassengerId: duffelPassengerIds[index],
-      position: index,
-    }));
-
-    const readinessScope = authoritativeReadiness
-      ? (authoritativeReadiness.scope === 'INTERNATIONAL' ? 'INTERNATIONAL' : 'DOMESTIC')
-      : 'DOMESTIC';
-
-    let maskedPassengers: MaskedPassengerSummary[] | null = null;
-    const intentId = randomUUID();
-    const snapshotData = canonicalSnapshotPassengers
-      ? this.passengerSnapshotService!.buildSnapshotData({
-          intentId,
-          passengers: canonicalSnapshotPassengers,
-          scope: readinessScope,
-        })
-      : null;
-    maskedPassengers = snapshotData?.maskedPassengers ?? null;
-
-    const created = await this.prisma.$transaction(async (tx) => {
-      if (canonicalPassengers && canonicalPassengers.some((p) => p.travelerProfileId)) {
-        await this.assertCanonicalProfileRevisions(tx, userId, canonicalPassengers);
+      let flightOffer = handoff?.flightOffer ?? this.flightOfferCache.get(targetFlightOfferId);
+      if (!flightOffer) {
+        const loadedFlightOffer = await this.prisma.flightOffer.findUnique({
+          where: { id: targetFlightOfferId },
+        });
+        if (loadedFlightOffer) {
+          flightOffer = loadedFlightOffer;
+          if (this.flightOfferCache.size >= 500) {
+            const firstKey = this.flightOfferCache.keys().next().value;
+            if (firstKey) this.flightOfferCache.delete(firstKey);
+          }
+          this.flightOfferCache.set(targetFlightOfferId, loadedFlightOffer);
+        }
       }
 
-      const intent = await tx.bookingIntent.create({
-        data: {
-          id: intentId,
+      if (!flightOffer) {
+        throw new HttpException(
+          {
+            code: 'OFFER_NOT_FOUND',
+            message: 'Flight offer not found',
+          },
+          HttpStatus.NOT_FOUND,
+        );
+      }
+
+      const canonicalPassengerCount = dto.passengers.filter(
+        (passenger) => passenger.source != null,
+      ).length;
+      if (canonicalPassengerCount > 0 && canonicalPassengerCount < dto.passengers.length) {
+        throw new HttpException(
+          {
+            code: 'PASSENGER_SOURCE_INVALID',
+            message: 'Passenger source is invalid',
+          },
+          HttpStatus.BAD_REQUEST,
+        );
+      }
+      const hasCanonicalSources = canonicalPassengerCount === dto.passengers.length;
+      const allowLegacy = context?.allowLegacy !== false;
+
+      if (!hasCanonicalSources && !allowLegacy) {
+        throw new HttpException(
+          {
+            code: 'PASSENGER_SOURCE_INVALID',
+            message: 'Canonical passenger sources are required',
+          },
+          HttpStatus.BAD_REQUEST,
+        );
+      }
+
+      if (
+        dto.passengers.some((passenger) => passenger.useProfile !== undefined) &&
+        hasCanonicalSources
+      ) {
+        throw new HttpException(
+          {
+            code: 'PASSENGER_SOURCE_CONFLICT',
+            message: 'Passenger source conflicts with legacy profile selection',
+          },
+          HttpStatus.BAD_REQUEST,
+        );
+      }
+
+      let canonicalPassengers: ResolvedPassenger[] | null = null;
+      let legacyPassengers: ResolvedIntentPassenger[] | null = null;
+      if (hasCanonicalSources) {
+        if (
+          !this.passengerSourceResolver ||
+          !this.passengerSnapshotService ||
+          !this.bookingReadinessService
+        ) {
+          throw new HttpException(
+            {
+              code: 'READINESS_DEPENDENCY_UNAVAILABLE',
+              message: 'Booking readiness dependencies are unavailable',
+            },
+            HttpStatus.SERVICE_UNAVAILABLE,
+          );
+        }
+
+        canonicalPassengers = await this.passengerSourceResolver.resolve(
           userId,
-          flightOfferId: flightOffer.id,
-          duffelOfferId: flightOffer.duffelOfferId,
-          originalPrice: flightOffer.price,
-          confirmedPrice: new Prisma.Decimal(confirmedPrice),
-          currency: liveOffer.currency,
-          priceChanged: originalPrice !== confirmedPrice,
-          pricedAt: now,
-          origin: flightOffer.origin,
-          destination: flightOffer.destination,
-          departureDate: flightOffer.departureDate,
-          returnDate: flightOffer.returnDate,
-          cabinClass: flightOffer.cabinClass,
-          adults: flightOffer.adults,
-          children: flightOffer.children,
-          infants: flightOffer.infants,
-          rawOfferSnapshot: this.toInputJsonValue(liveOffer.raw),
-          intentExpiresAt,
-          offerExpiresAt: liveOffer.offerExpiresAt,
-        },
+          dto.passengers.map((passenger) => ({
+            offerPassengerId: passenger.offerPassengerId,
+            type: passenger.type,
+            source: passenger.source,
+          })) as PassengerSourceRequest[],
+        );
+      } else {
+        const legacyInputPassengers = dto.passengers as unknown as LegacyIntentPassenger[];
+        if (
+          legacyInputPassengers.some(
+            (passenger, index) =>
+              passenger.useProfile === true &&
+              (index !== 0 || passenger.type !== PassengerType.ADULT),
+          )
+        ) {
+          throw new HttpException(
+            {
+              code: 'LEGACY_PROFILE_SOURCE_UNSUPPORTED',
+              message: 'Legacy profile selection is supported only for the primary adult',
+            },
+            HttpStatus.BAD_REQUEST,
+          );
+        }
+        legacyPassengers = await this.applyPrimaryPassengerPrefill(userId, legacyInputPassengers);
+      }
+
+      const passengersForValidation = canonicalPassengers ?? legacyPassengers ?? [];
+      this.validatePassengerCountAgainstOffer(passengersForValidation, {
+        adults: flightOffer.adults,
+        children: flightOffer.children,
+        infants: flightOffer.infants,
       });
 
-      const createPassengersPromise = snapshotData
-        ? (async () => {
-            if (tx.bookingIntentPassenger.createMany) {
-              await tx.bookingIntentPassenger.createMany({ data: snapshotData.persistenceInput });
-              return snapshotData.persistenceInput.map((input, index) => ({
-                id: `p_${intent.id}_${index}`,
-                ...input,
-              }));
-            }
-            return Promise.all(snapshotData.persistenceInput.map((data) => tx.bookingIntentPassenger.create({ data })));
-          })()
-        : Promise.all(
-            (legacyPassengers ?? []).map((passenger, index) =>
-              tx.bookingIntentPassenger.create({
-                data: {
-                  intentId: intent.id,
-                  position: index,
-                  type: passenger.type,
-                  givenName: passenger.givenName,
-                  familyName: passenger.familyName,
-                  dateOfBirth: this.asDate(passenger.dateOfBirth),
-                  gender: passenger.gender.toLowerCase(),
-                  nationality: passenger.nationality ? passenger.nationality.toUpperCase() : null,
-                  passportNumber: passenger.passportNumber
-                    ? this.encryptionService.encrypt(passenger.passportNumber)
-                    : null,
-                  passportExpiry: passenger.passportExpiry
-                    ? this.encryptionService.encrypt(passenger.passportExpiry)
-                    : null,
-                  travelerProfileId: passenger.travelerProfileId || null,
-                  duffelPassengerId: duffelPassengerIds[index],
-                },
-              }),
-            ),
-          );
+      if (claimLost) {
+        throw new ConflictException({ code: 'CLAIM_LOST', message: 'Handoff claim was lost' });
+      }
 
-      const updateHandoffPromise = (async () => {
-        if (handoff && claimTokenHash) {
-          if (claimLost) {
-            try {
-              const conflictEvent = createChatTelemetryEvent(
-                'handoff_claim_conflict',
-                'conflict',
-                Date.now() - startedAt,
-                { traceId: context?.traceId, correlationId: context?.correlationId },
-                { outcome: 'conflict' },
-              );
-              emitChatTelemetry(this.logger, conflictEvent);
-            } catch (_) {}
-            throw new ConflictException({ code: 'CLAIM_LOST', message: 'Handoff claim was lost' });
+      const liveOfferPromise = this.fetchLiveOffer(flightOffer.duffelOfferId, 25000);
+      const readinessPromise = canonicalPassengers
+        ? this.bookingReadinessService!.evaluateAuthoritativeReadiness(
+            flightOffer.rawOffer,
+            canonicalPassengers,
+            {
+              traceId: context?.traceId,
+              correlationId: context?.correlationId,
+            },
+          )
+        : Promise.resolve(null);
+
+      const [liveOffer, authoritativeReadiness] = await Promise.all([
+        liveOfferPromise,
+        readinessPromise,
+      ]);
+
+      if (authoritativeReadiness && !authoritativeReadiness.ready) {
+        this.metricsService?.increment(
+          BOOKING_READINESS_METRIC_COUNTERS.BOOKING_INTENT_AUTHORITATIVE_REJECTIONS,
+        );
+        throw new HttpException(
+          {
+            code: 'BOOKING_NOT_READY',
+            message: 'Booking is not ready',
+            ...authoritativeReadiness,
+          },
+          HttpStatus.UNPROCESSABLE_ENTITY,
+        );
+      }
+
+      const confirmedPrice = Number(liveOffer.totalAmount);
+      const originalPrice = Number(flightOffer.price);
+      const now = new Date();
+      const parsedTtl = Number(process.env.BOOKING_INTENT_TTL_MINUTES);
+      const ttlMinutes =
+        isNaN(parsedTtl) || !process.env.BOOKING_INTENT_TTL_MINUTES ? 30 : parsedTtl;
+      const intentExpiresAt = new Date(now.getTime() + ttlMinutes * 60 * 1000);
+
+      const duffelPassengerIds = this.extractDuffelPassengerIds(
+        liveOffer.raw,
+        passengersForValidation,
+      );
+
+      const canonicalSnapshotPassengers = canonicalPassengers?.map((passenger, index) => ({
+        ...passenger,
+        duffelPassengerId: duffelPassengerIds[index],
+        position: index,
+      }));
+
+      const readinessScope = authoritativeReadiness
+        ? authoritativeReadiness.scope === 'INTERNATIONAL'
+          ? 'INTERNATIONAL'
+          : 'DOMESTIC'
+        : 'DOMESTIC';
+
+      let maskedPassengers: MaskedPassengerSummary[] | null = null;
+      const intentId = randomUUID();
+      const snapshotData = canonicalSnapshotPassengers
+        ? this.passengerSnapshotService!.buildSnapshotData({
+            intentId,
+            passengers: canonicalSnapshotPassengers,
+            scope: readinessScope,
+          })
+        : null;
+      maskedPassengers = snapshotData?.maskedPassengers ?? null;
+
+      const created = await this.prisma.$transaction(
+        async (tx) => {
+          if (canonicalPassengers && canonicalPassengers.some((p) => p.travelerProfileId)) {
+            await this.assertCanonicalProfileRevisions(tx, userId, canonicalPassengers);
           }
 
-          const updateResult = await tx.chatHandoff.updateMany({
-            where: {
-              id: handoff.id,
-              userId,
-              chatSessionId: handoff.chatSessionId,
-              claimTokenHash: claimTokenHash,
-              consumedAt: null,
-              claimExpiresAt: { gt: new Date() },
-              expiresAt: { gt: new Date() },
-              chatSession: {
-                userId,
-                deletedAt: null,
-              },
-            },
+          const intent = await tx.bookingIntent.create({
             data: {
-              consumedAt: new Date(),
-              consumedByBookingIntentId: intent.id,
-              updatedAt: new Date(),
+              id: intentId,
+              userId,
+              flightOfferId: flightOffer.id,
+              duffelOfferId: flightOffer.duffelOfferId,
+              originalPrice: flightOffer.price,
+              confirmedPrice: new Prisma.Decimal(confirmedPrice),
+              currency: liveOffer.currency,
+              priceChanged: originalPrice !== confirmedPrice,
+              pricedAt: now,
+              origin: flightOffer.origin,
+              destination: flightOffer.destination,
+              departureDate: flightOffer.departureDate,
+              returnDate: flightOffer.returnDate,
+              cabinClass: flightOffer.cabinClass,
+              adults: flightOffer.adults,
+              children: flightOffer.children,
+              infants: flightOffer.infants,
+              rawOfferSnapshot: this.toInputJsonValue(liveOffer.raw),
+              intentExpiresAt,
+              offerExpiresAt: liveOffer.offerExpiresAt,
             },
           });
 
-          if (updateResult.count === 0) {
-            try {
-              const conflictEvent = createChatTelemetryEvent(
-                'handoff_claim_conflict',
-                'conflict',
-                Date.now() - startedAt,
-                { traceId: context?.traceId, correlationId: context?.correlationId },
-                { outcome: 'conflict' },
+          const createPassengersPromise = snapshotData
+            ? (async () => {
+                if (tx.bookingIntentPassenger.createMany) {
+                  await tx.bookingIntentPassenger.createMany({
+                    data: snapshotData.persistenceInput,
+                  });
+                  return snapshotData.persistenceInput.map((input, index) => ({
+                    id: `p_${intent.id}_${index}`,
+                    ...input,
+                  }));
+                }
+                return Promise.all(
+                  snapshotData.persistenceInput.map((data) =>
+                    tx.bookingIntentPassenger.create({ data }),
+                  ),
+                );
+              })()
+            : Promise.all(
+                (legacyPassengers ?? []).map((passenger, index) =>
+                  tx.bookingIntentPassenger.create({
+                    data: {
+                      intentId: intent.id,
+                      position: index,
+                      type: passenger.type,
+                      givenName: passenger.givenName,
+                      familyName: passenger.familyName,
+                      dateOfBirth: this.asDate(passenger.dateOfBirth),
+                      gender: passenger.gender.toLowerCase(),
+                      nationality: passenger.nationality
+                        ? passenger.nationality.toUpperCase()
+                        : null,
+                      passportNumber: passenger.passportNumber
+                        ? this.encryptionService.encrypt(passenger.passportNumber)
+                        : null,
+                      passportExpiry: passenger.passportExpiry
+                        ? this.encryptionService.encrypt(passenger.passportExpiry)
+                        : null,
+                      travelerProfileId: passenger.travelerProfileId || null,
+                      duffelPassengerId: duffelPassengerIds[index],
+                    },
+                  }),
+                ),
               );
-              emitChatTelemetry(this.logger, conflictEvent);
-            } catch (_) {}
-            throw new ConflictException('Claim lost or expired before completion');
+
+          const updateHandoffPromise = (async () => {
+            if (handoff && claimTokenHash) {
+              if (claimLost) {
+                try {
+                  const conflictEvent = createChatTelemetryEvent(
+                    'handoff_claim_conflict',
+                    'conflict',
+                    Date.now() - startedAt,
+                    { traceId: context?.traceId, correlationId: context?.correlationId },
+                    { outcome: 'conflict' },
+                  );
+                  emitChatTelemetry(this.logger, conflictEvent);
+                } catch (_) {}
+                throw new ConflictException({
+                  code: 'CLAIM_LOST',
+                  message: 'Handoff claim was lost',
+                });
+              }
+
+              const updateResult = await tx.chatHandoff.updateMany({
+                where: {
+                  id: handoff.id,
+                  userId,
+                  chatSessionId: handoff.chatSessionId,
+                  claimTokenHash: claimTokenHash,
+                  consumedAt: null,
+                  claimExpiresAt: { gt: new Date() },
+                  expiresAt: { gt: new Date() },
+                  chatSession: {
+                    userId,
+                    deletedAt: null,
+                  },
+                },
+                data: {
+                  consumedAt: new Date(),
+                  consumedByBookingIntentId: intent.id,
+                  updatedAt: new Date(),
+                },
+              });
+
+              if (updateResult.count === 0) {
+                try {
+                  const conflictEvent = createChatTelemetryEvent(
+                    'handoff_claim_conflict',
+                    'conflict',
+                    Date.now() - startedAt,
+                    { traceId: context?.traceId, correlationId: context?.correlationId },
+                    { outcome: 'conflict' },
+                  );
+                  emitChatTelemetry(this.logger, conflictEvent);
+                } catch (_) {}
+                throw new ConflictException('Claim lost or expired before completion');
+              }
+            }
+          })();
+
+          const [passengers] = await Promise.all([createPassengersPromise, updateHandoffPromise]);
+
+          const telemetryOperation: ChatTelemetryOperation = handoff
+            ? 'handoff_consume'
+            : 'intent_create';
+          const telemetryEvent = createChatTelemetryEvent(
+            telemetryOperation,
+            'created',
+            Date.now() - startedAt,
+            {
+              traceId: context?.traceId,
+              correlationId: context?.correlationId,
+            },
+            {
+              outcome: handoff ? 'consumed' : 'created',
+              price_changed: originalPrice !== confirmedPrice,
+            },
+          );
+          if (this.auditService) {
+            await this.auditService.createLog(tx, {
+              userId,
+              action: handoff ? 'chat_handoff_consumed' : 'booking_intent_created',
+              resourceType: handoff ? 'ChatHandoff' : 'BookingIntent',
+              resourceId: handoff ? null : intent.id,
+              ipAddress: context?.ipAddress,
+              traceId: telemetryEvent.trace_id,
+              correlationId: telemetryEvent.correlation_id,
+              metadata: {
+                operation: telemetryEvent.operation,
+                metric: telemetryEvent.metric,
+                status: telemetryEvent.status,
+                latency_ms: telemetryEvent.latency_ms,
+                ...telemetryEvent.metadata,
+              },
+            });
           }
-        }
-      })();
 
-      const [passengers] = await Promise.all([
-        createPassengersPromise,
-        updateHandoffPromise,
-      ]);
-
-      const telemetryOperation: ChatTelemetryOperation = handoff
-        ? 'handoff_consume'
-        : 'intent_create';
-      const telemetryEvent = createChatTelemetryEvent(
-        telemetryOperation,
-        'created',
-        Date.now() - startedAt,
-        {
-          traceId: context?.traceId,
-          correlationId: context?.correlationId,
+          return { intent, passengers, maskedPassengers, telemetryEvent };
         },
         {
-          outcome: handoff ? 'consumed' : 'created',
-          price_changed: originalPrice !== confirmedPrice,
+          maxWait: 10000,
+          timeout: 15000,
         },
       );
-      if (this.auditService) {
-        await this.auditService.createLog(tx, {
-          userId,
-          action: handoff ? 'chat_handoff_consumed' : 'booking_intent_created',
-          resourceType: handoff ? 'ChatHandoff' : 'BookingIntent',
-          resourceId: handoff ? null : intent.id,
-          ipAddress: context?.ipAddress,
-          traceId: telemetryEvent.trace_id,
-          correlationId: telemetryEvent.correlation_id,
-          metadata: {
-            operation: telemetryEvent.operation,
-            metric: telemetryEvent.metric,
-            status: telemetryEvent.status,
-            latency_ms: telemetryEvent.latency_ms,
-            ...telemetryEvent.metadata,
-          },
-        });
-      }
 
-      return { intent, passengers, maskedPassengers, telemetryEvent };
-    }, {
-      maxWait: 10000,
-      timeout: 15000,
-    });
-
-    try {
-      emitChatTelemetry(this.logger, created.telemetryEvent);
-    } catch {
       try {
-        this.logger.warn('Chat telemetry emission failed');
-      } catch (_) {
-        // Swallow error to prevent crash if logger sink throws
-      }
-    }
-
-    if (this.bookingReadinessObservability) {
-      try {
-        this.bookingReadinessObservability.recordOutcome({
-          operation: BookingReadinessOperation.INTENT_CREATE,
-          status: 'created',
-          latencyMs: Date.now() - startedAt,
-          metadata: {
-            scope: readinessScope,
-            passengerCount: (canonicalPassengers ?? legacyPassengers ?? []).length,
-            status: 'created',
-          },
-          context: {
-            traceId: context?.traceId,
-            correlationId: context?.correlationId,
-          },
-        });
+        emitChatTelemetry(this.logger, created.telemetryEvent);
       } catch {
         try {
-          this.logger.warn('Booking readiness observability emission failed');
+          this.logger.warn('Chat telemetry emission failed');
         } catch (_) {
           // Swallow error to prevent crash if logger sink throws
         }
       }
-    }
 
-    isSuccess = true;
-    this.metricsService?.increment(BOOKING_READINESS_METRIC_COUNTERS.BOOKING_INTENT_CREATIONS);
-    return {
-      intentId: created.intent.id,
-      status: created.intent.status,
-      originalPrice,
-      confirmedPrice,
-      priceChanged: created.intent.priceChanged,
-      currency: created.intent.currency,
-      pricedAt: created.intent.pricedAt.toISOString(),
-      intentExpiresAt: created.intent.intentExpiresAt.toISOString(),
-      offerExpiresAt: created.intent.offerExpiresAt
-        ? created.intent.offerExpiresAt.toISOString()
-        : null,
-      passengers: (created.maskedPassengers ?? created.passengers
-        .sort((a, b) => a.position - b.position)
-        .map((passenger, index) => this.toSafePassengerSummary(passenger, index)))
-        .map((passenger, index) => ({
+      if (this.bookingReadinessObservability) {
+        try {
+          this.bookingReadinessObservability.recordOutcome({
+            operation: BookingReadinessOperation.INTENT_CREATE,
+            status: 'created',
+            latencyMs: Date.now() - startedAt,
+            metadata: {
+              scope: readinessScope,
+              passengerCount: (canonicalPassengers ?? legacyPassengers ?? []).length,
+              status: 'created',
+            },
+            context: {
+              traceId: context?.traceId,
+              correlationId: context?.correlationId,
+            },
+          });
+        } catch {
+          try {
+            this.logger.warn('Booking readiness observability emission failed');
+          } catch (_) {
+            // Swallow error to prevent crash if logger sink throws
+          }
+        }
+      }
+
+      isSuccess = true;
+      this.metricsService?.increment(BOOKING_READINESS_METRIC_COUNTERS.BOOKING_INTENT_CREATIONS);
+      return {
+        intentId: created.intent.id,
+        status: created.intent.status,
+        originalPrice,
+        confirmedPrice,
+        priceChanged: created.intent.priceChanged,
+        currency: created.intent.currency,
+        pricedAt: created.intent.pricedAt.toISOString(),
+        intentExpiresAt: created.intent.intentExpiresAt.toISOString(),
+        offerExpiresAt: created.intent.offerExpiresAt
+          ? created.intent.offerExpiresAt.toISOString()
+          : null,
+        passengers: (
+          created.maskedPassengers ??
+          created.passengers
+            .sort((a, b) => a.position - b.position)
+            .map((passenger, index) => this.toSafePassengerSummary(passenger, index))
+        ).map((passenger, index) => ({
           ...passenger,
           id: created.passengers[index]?.id ?? `${created.intent.id}-${passenger.passengerOrdinal}`,
           passportNumber: null,
           passportExpiry: null,
         })),
-      flight: {
-        origin: created.intent.origin,
-        destination: created.intent.destination,
-        departureDate: this.toDateOnly(created.intent.departureDate),
-        returnDate: created.intent.returnDate ? this.toDateOnly(created.intent.returnDate) : null,
-        cabinClass: created.intent.cabinClass,
-      },
-    };
-
+        flight: {
+          origin: created.intent.origin,
+          destination: created.intent.destination,
+          departureDate: this.toDateOnly(created.intent.departureDate),
+          returnDate: created.intent.returnDate ? this.toDateOnly(created.intent.returnDate) : null,
+          cabinClass: created.intent.cabinClass,
+        },
+      };
     } finally {
       if (claimWatchdog) clearInterval(claimWatchdog);
       if (fastFailReservation && this.chatHandoffService) {
@@ -646,10 +683,13 @@ export class BookingIntentService {
       offerExpiresAt: intent.offerExpiresAt ? intent.offerExpiresAt.toISOString() : null,
       createdAt: intent.createdAt.toISOString(),
       passengers: intent.passengers.map((passenger, index) => ({
-        ...this.toSafePassengerSummary({
-          ...passenger,
-          intentId: passenger.intentId ?? intent.id,
-        }, index),
+        ...this.toSafePassengerSummary(
+          {
+            ...passenger,
+            intentId: passenger.intentId ?? intent.id,
+          },
+          index,
+        ),
         type: passenger.type,
         givenName: passenger.givenName,
         familyName: passenger.familyName,
@@ -729,7 +769,11 @@ export class BookingIntentService {
   ): Promise<ResolvedIntentPassenger[]> {
     const merged: ResolvedIntentPassenger[] = passengers.map((passenger) => ({ ...passenger }));
 
-    if (merged.length === 0 || merged[0].type !== PassengerType.ADULT || merged[0].useProfile !== true) {
+    if (
+      merged.length === 0 ||
+      merged[0].type !== PassengerType.ADULT ||
+      merged[0].useProfile !== true
+    ) {
       return merged;
     }
 
@@ -749,7 +793,9 @@ export class BookingIntentService {
 
     const primary = merged[0];
     const resolvedPassport = this.decryptProfileField(profile.passportNumber);
-    const resolvedPassportExpiry = profile.passportExpiry ? this.toDateOnly(profile.passportExpiry) : null;
+    const resolvedPassportExpiry = profile.passportExpiry
+      ? this.toDateOnly(profile.passportExpiry)
+      : null;
 
     merged[0] = {
       ...primary,
@@ -835,7 +881,12 @@ export class BookingIntentService {
         expires_at?: string | null;
       };
 
-      if (!offer || !offer.total_amount || isNaN(Number(offer.total_amount)) || Number(offer.total_amount) <= 0) {
+      if (
+        !offer ||
+        !offer.total_amount ||
+        isNaN(Number(offer.total_amount)) ||
+        Number(offer.total_amount) <= 0
+      ) {
         throw new HttpException(
           {
             code: 'UPSTREAM_UNAVAILABLE',
@@ -942,7 +993,10 @@ export class BookingIntentService {
       const index = remaining.findIndex((supplier) => supplier.type === passenger.type);
       if (index < 0) {
         throw new HttpException(
-          { code: 'UPSTREAM_UNAVAILABLE', message: 'Offer passenger identities do not match the booking intent' },
+          {
+            code: 'UPSTREAM_UNAVAILABLE',
+            message: 'Offer passenger identities do not match the booking intent',
+          },
           HttpStatus.BAD_GATEWAY,
         );
       }
@@ -1023,23 +1077,26 @@ export class BookingIntentService {
     return { deletedCount: deleteResult.count };
   }
 
-  private toSafePassengerSummary(passenger: {
-    id: string;
-    position?: number;
-    snapshotVersion?: number;
-    intentId?: string;
-    type: PassengerType;
-    givenName: string;
-    familyName: string;
-    documentType?: string | null;
-    issuingCountry?: string | null;
-    passportNumber?: string | null;
-    passportExpiry?: string | null;
-    email?: string | null;
-    phoneCountryCode?: string | null;
-    phoneNumber?: string | null;
-    travelerProfileId?: string | null;
-  }, fallbackPosition = 0): MaskedPassengerSummary & { id: string } {
+  private toSafePassengerSummary(
+    passenger: {
+      id: string;
+      position?: number;
+      snapshotVersion?: number;
+      intentId?: string;
+      type: PassengerType;
+      givenName: string;
+      familyName: string;
+      documentType?: string | null;
+      issuingCountry?: string | null;
+      passportNumber?: string | null;
+      passportExpiry?: string | null;
+      email?: string | null;
+      phoneCountryCode?: string | null;
+      phoneNumber?: string | null;
+      travelerProfileId?: string | null;
+    },
+    fallbackPosition = 0,
+  ): MaskedPassengerSummary & { id: string } {
     const passengerOrdinal = Number.isFinite(passenger.position)
       ? (passenger.position as number) + 1
       : fallbackPosition + 1;
@@ -1047,8 +1104,12 @@ export class BookingIntentService {
     const hasPassport = Boolean(passenger.passportNumber || passenger.passportExpiry);
     const maskedPassportSummary = this.maskPassportSummary(passenger, fallbackPosition);
     const emailMasked = this.maskEmail(passenger.email ?? null);
-    const phoneMasked = this.maskPhone(passenger.phoneCountryCode ?? null, passenger.phoneNumber ?? null);
-    const maskedContactSummary = [emailMasked, phoneMasked].filter(Boolean).join(' ').trim() || null;
+    const phoneMasked = this.maskPhone(
+      passenger.phoneCountryCode ?? null,
+      passenger.phoneNumber ?? null,
+    );
+    const maskedContactSummary =
+      [emailMasked, phoneMasked].filter(Boolean).join(' ').trim() || null;
 
     return {
       id: passenger.id,
@@ -1066,7 +1127,8 @@ export class BookingIntentService {
         phone: phoneMasked,
         maskedContactSummary,
       },
-      preFilledFromProfile: passenger.travelerProfileId !== null && passenger.travelerProfileId !== undefined,
+      preFilledFromProfile:
+        passenger.travelerProfileId !== null && passenger.travelerProfileId !== undefined,
       maskedPassportSummary,
       maskedContactSummary,
     };
@@ -1087,8 +1149,10 @@ export class BookingIntentService {
     }
     if (passenger.passportNumber) {
       try {
-        const position = typeof passenger.position === 'number' ? passenger.position : fallbackPosition;
-        const snapshotVersion = typeof passenger.snapshotVersion === 'number' ? passenger.snapshotVersion : 1;
+        const position =
+          typeof passenger.position === 'number' ? passenger.position : fallbackPosition;
+        const snapshotVersion =
+          typeof passenger.snapshotVersion === 'number' ? passenger.snapshotVersion : 1;
         const intentId = passenger.intentId;
         if (intentId) {
           const decrypted = this.encryptionService.decryptBound(passenger.passportNumber, {

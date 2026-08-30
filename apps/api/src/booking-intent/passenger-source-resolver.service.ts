@@ -183,7 +183,9 @@ export class PassengerSourceResolverService {
     };
   }
 
-  private normalizeInline(passenger: PassengerSourceRequest & { source: InlinePassengerSource }): ResolvedPassenger {
+  private normalizeInline(
+    passenger: PassengerSourceRequest & { source: InlinePassengerSource },
+  ): ResolvedPassenger {
     const source = passenger.source;
     return {
       offerPassengerId: passenger.offerPassengerId,
@@ -210,7 +212,10 @@ export class PassengerSourceResolverService {
     };
   }
 
-  private decryptProfileField(value: string | null, contexts: readonly EncryptionContext[]): string | null {
+  private decryptProfileField(
+    value: string | null,
+    contexts: readonly EncryptionContext[],
+  ): string | null {
     if (!value) return null;
     if (value.startsWith('v1:')) {
       let lastError: unknown;

@@ -55,18 +55,26 @@ export type AncillarySelectionAction =
       type: 'removeFlaggedSelections';
     };
 
-function seatScopeKey(selection: Pick<NormalizedSeatSelection, 'segmentId' | 'intentPassengerId'>): string {
+function seatScopeKey(
+  selection: Pick<NormalizedSeatSelection, 'segmentId' | 'intentPassengerId'>,
+): string {
   return JSON.stringify([selection.segmentId, selection.intentPassengerId]);
 }
 
-function baggageServiceKey(selection: Pick<NormalizedBaggageSelection, 'intentPassengerId' | 'serviceId'>): string {
+function baggageServiceKey(
+  selection: Pick<NormalizedBaggageSelection, 'intentPassengerId' | 'serviceId'>,
+): string {
   return JSON.stringify([selection.intentPassengerId, selection.serviceId]);
 }
 
-export function createAncillarySelectionState(hydration: AncillarySelectionHydration): AncillarySelectionState {
+export function createAncillarySelectionState(
+  hydration: AncillarySelectionHydration,
+): AncillarySelectionState {
   return {
     seatsByScope: Object.fromEntries(hydration.seats.map((seat) => [seatScopeKey(seat), seat])),
-    baggageByService: Object.fromEntries(hydration.baggage.map((bag) => [baggageServiceKey(bag), bag])),
+    baggageByService: Object.fromEntries(
+      hydration.baggage.map((bag) => [baggageServiceKey(bag), bag]),
+    ),
     reconciliationIssues: [],
   };
 }
@@ -82,7 +90,9 @@ export function ancillarySelectionReducer(
         Object.entries(state.seatsByScope).filter(([, seat]) => !flaggedIds.has(seat.serviceId)),
       ),
       baggageByService: Object.fromEntries(
-        Object.entries(state.baggageByService).filter(([, baggage]) => !flaggedIds.has(baggage.serviceId)),
+        Object.entries(state.baggageByService).filter(
+          ([, baggage]) => !flaggedIds.has(baggage.serviceId),
+        ),
       ),
       reconciliationIssues: [],
     };
@@ -93,16 +103,17 @@ export function ancillarySelectionReducer(
     const issuesFor = (
       kind: AncillaryReconciliationIssue['kind'],
       selections: Array<NormalizedSeatSelection | NormalizedBaggageSelection>,
-    ): AncillaryReconciliationIssue[] => selections.flatMap<AncillaryReconciliationIssue>((selection) => {
-      const service = services.get(selection.serviceId);
-      if (!service) {
-        return [{ kind, serviceId: selection.serviceId, reason: 'REMOVED' as const }];
-      }
-      if (service.amount !== selection.amount || service.currency !== selection.currency) {
-        return [{ kind, serviceId: selection.serviceId, reason: 'CHANGED' as const }];
-      }
-      return [];
-    });
+    ): AncillaryReconciliationIssue[] =>
+      selections.flatMap<AncillaryReconciliationIssue>((selection) => {
+        const service = services.get(selection.serviceId);
+        if (!service) {
+          return [{ kind, serviceId: selection.serviceId, reason: 'REMOVED' as const }];
+        }
+        if (service.amount !== selection.amount || service.currency !== selection.currency) {
+          return [{ kind, serviceId: selection.serviceId, reason: 'CHANGED' as const }];
+        }
+        return [];
+      });
 
     return {
       ...state,
@@ -115,13 +126,14 @@ export function ancillarySelectionReducer(
 
   if (action.type === 'setBaggageQuantity') {
     const baggageByService = Object.fromEntries(
-      Object.entries(state.baggageByService).filter(([, baggage]) => !(
-        baggage.intentPassengerId === action.baggage.intentPassengerId
-        && (
-          baggage.serviceId === action.baggage.serviceId
-          || action.conflictingServiceIds.includes(baggage.serviceId)
-        )
-      )),
+      Object.entries(state.baggageByService).filter(
+        ([, baggage]) =>
+          !(
+            baggage.intentPassengerId === action.baggage.intentPassengerId &&
+            (baggage.serviceId === action.baggage.serviceId ||
+              action.conflictingServiceIds.includes(baggage.serviceId))
+          ),
+      ),
     );
 
     if (action.baggage.quantity > 0) {
@@ -141,8 +153,9 @@ export function ancillarySelectionReducer(
   }
 
   const selectedByGroup = Object.values(state.seatsByScope).some(
-    (seat) => seat.intentPassengerId !== action.seat.intentPassengerId
-      && action.relatedServiceIds.includes(seat.serviceId),
+    (seat) =>
+      seat.intentPassengerId !== action.seat.intentPassengerId &&
+      action.relatedServiceIds.includes(seat.serviceId),
   );
 
   if (selectedByGroup) {
@@ -166,7 +179,9 @@ export function getBaggageSelections(state: AncillarySelectionState): Normalized
   return Object.values(state.baggageByService);
 }
 
-export function getReconciliationIssues(state: AncillarySelectionState): AncillaryReconciliationIssue[] {
+export function getReconciliationIssues(
+  state: AncillarySelectionState,
+): AncillaryReconciliationIssue[] {
   return state.reconciliationIssues;
 }
 
@@ -189,12 +204,17 @@ function minorToDecimal(minor: number): string {
   return `${sign}${Math.floor(absolute / 100)}.${String(absolute % 100).padStart(2, '0')}`;
 }
 
-function hasEquivalentBaggageTier(left: AncillaryBaggageService, right: AncillaryBaggageService): boolean {
-  return left.passengerId === right.passengerId
-    && left.type.toLowerCase() === right.type.toLowerCase()
-    && left.weightValue === right.weightValue
-    && left.weightUnit?.toLowerCase() === right.weightUnit?.toLowerCase()
-    && left.currency === right.currency;
+function hasEquivalentBaggageTier(
+  left: AncillaryBaggageService,
+  right: AncillaryBaggageService,
+): boolean {
+  return (
+    left.passengerId === right.passengerId &&
+    left.type.toLowerCase() === right.type.toLowerCase() &&
+    left.weightValue === right.weightValue &&
+    left.weightUnit?.toLowerCase() === right.weightUnit?.toLowerCase() &&
+    left.currency === right.currency
+  );
 }
 
 export function calculateBaggageSavings(
@@ -205,12 +225,18 @@ export function calculateBaggageSavings(
     return null;
   }
 
-  const segmentPrices = journeyService.segmentIds.map((segmentId) => candidateServices
-    .filter((candidate) => candidate.segmentIds.length === 1
-      && candidate.segmentIds[0] === segmentId
-      && hasEquivalentBaggageTier(journeyService, candidate))
-    .map((candidate) => decimalToMinor(candidate.amount))
-    .sort((left, right) => left - right)[0]);
+  const segmentPrices = journeyService.segmentIds.map(
+    (segmentId) =>
+      candidateServices
+        .filter(
+          (candidate) =>
+            candidate.segmentIds.length === 1 &&
+            candidate.segmentIds[0] === segmentId &&
+            hasEquivalentBaggageTier(journeyService, candidate),
+        )
+        .map((candidate) => decimalToMinor(candidate.amount))
+        .sort((left, right) => left - right)[0],
+  );
 
   if (segmentPrices.some((price) => price === undefined)) {
     return null;
@@ -250,4 +276,3 @@ export function calculateAncillaryTotals(
     currency,
   };
 }
-

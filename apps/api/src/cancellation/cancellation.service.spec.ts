@@ -331,8 +331,18 @@ describe('CancellationService', () => {
         cancellationRefundObligation: {
           totalAmount: 5_000,
           refunds: [
-            refund({ id: 'refund-a', status: RefundStatus.REFUND_PENDING, updatedAt: dateA, retryCount: 1 }),
-            refund({ id: 'refund-b', status: RefundStatus.REFUND_PENDING, updatedAt: dateB, retryCount: 2 }),
+            refund({
+              id: 'refund-a',
+              status: RefundStatus.REFUND_PENDING,
+              updatedAt: dateA,
+              retryCount: 1,
+            }),
+            refund({
+              id: 'refund-b',
+              status: RefundStatus.REFUND_PENDING,
+              updatedAt: dateB,
+              retryCount: 2,
+            }),
           ],
         },
       });
@@ -356,9 +366,7 @@ describe('CancellationService', () => {
 
     it('throws NotFoundException if booking is not found', async () => {
       mockPrisma.booking.findUnique.mockResolvedValue(null);
-      await expect(service.getCancellationQuote('b-1', 'u-1')).rejects.toThrow(
-        NotFoundException,
-      );
+      await expect(service.getCancellationQuote('b-1', 'u-1')).rejects.toThrow(NotFoundException);
     });
 
     it('throws ForbiddenException if user is not booking owner', async () => {
@@ -366,9 +374,7 @@ describe('CancellationService', () => {
         id: 'b-1',
         userId: 'other-user',
       });
-      await expect(service.getCancellationQuote('b-1', 'u-1')).rejects.toThrow(
-        ForbiddenException,
-      );
+      await expect(service.getCancellationQuote('b-1', 'u-1')).rejects.toThrow(ForbiddenException);
     });
 
     it('throws BadRequestException if booking status is not CONFIRMED', async () => {
@@ -377,9 +383,7 @@ describe('CancellationService', () => {
         userId: 'u-1',
         status: BookingStatus.CANCELLED_AND_REFUNDED,
       });
-      await expect(service.getCancellationQuote('b-1', 'u-1')).rejects.toThrow(
-        BadRequestException,
-      );
+      await expect(service.getCancellationQuote('b-1', 'u-1')).rejects.toThrow(BadRequestException);
     });
 
     it('throws BadRequestException if departureAt is in the past', async () => {
@@ -389,9 +393,7 @@ describe('CancellationService', () => {
         status: BookingStatus.CONFIRMED,
         departureAt: new Date(Date.now() - 3600000),
       });
-      await expect(service.getCancellationQuote('b-1', 'u-1')).rejects.toThrow(
-        BadRequestException,
-      );
+      await expect(service.getCancellationQuote('b-1', 'u-1')).rejects.toThrow(BadRequestException);
     });
 
     it('throws BadRequestException if duffelOrderId is missing', async () => {
@@ -700,9 +702,7 @@ describe('CancellationService', () => {
     });
 
     it('throws NotFoundException if claim fails and booking no longer exists', async () => {
-      mockPrisma.booking.findUnique
-        .mockResolvedValueOnce(booking)
-        .mockResolvedValueOnce(null);
+      mockPrisma.booking.findUnique.mockResolvedValueOnce(booking).mockResolvedValueOnce(null);
       mockPrisma.booking.updateMany.mockResolvedValue({ count: 0 });
 
       await expect(service.cancelBooking('booking-1', 'user-1', 'quote-1')).rejects.toThrow(
@@ -805,7 +805,9 @@ describe('CancellationService', () => {
       mockPrisma.booking.findUnique.mockResolvedValue(booking);
       mockPrisma.booking.updateMany.mockResolvedValue({ count: 1 });
       mockDuffelService.retrieveOrder.mockResolvedValue({ status: 'CANCELLED' });
-      mockPrisma.$transaction.mockImplementation(async (callback: any) => callback(transactionClient));
+      mockPrisma.$transaction.mockImplementation(async (callback: any) =>
+        callback(transactionClient),
+      );
 
       await expect(service.cancelBooking('booking-1', 'user-1', 'quote-1')).rejects.toThrow(
         'audit write failed',
@@ -949,12 +951,10 @@ describe('CancellationService', () => {
     });
 
     it('returns canonical response when transaction persistedCount is 0', async () => {
-      mockPrisma.booking.findUnique
-        .mockResolvedValueOnce(booking)
-        .mockResolvedValueOnce({
-          ...booking,
-          status: BookingStatus.CANCELLED_AND_REFUNDED,
-        });
+      mockPrisma.booking.findUnique.mockResolvedValueOnce(booking).mockResolvedValueOnce({
+        ...booking,
+        status: BookingStatus.CANCELLED_AND_REFUNDED,
+      });
       mockPrisma.booking.updateMany.mockResolvedValue({ count: 1 });
       mockDuffelService.retrieveOrder.mockResolvedValue({ status: 'CANCELLED' });
       mockPrisma.$transaction.mockResolvedValue(0);

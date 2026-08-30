@@ -104,6 +104,7 @@ The agent authenticates to the gateway using a service-to-service API key and cr
 ### Testing Seam
 
 The primary testing seam is the **agent gateway boundary**. This is where we verify:
+
 - PII stripping: gateway responses never contain passport, payment, PNR, or e-ticket data.
 - Scope enforcement: the gateway only serves read-only data for the authenticated user.
 - Claim token validation: invalid/expired/tampered tokens are rejected.

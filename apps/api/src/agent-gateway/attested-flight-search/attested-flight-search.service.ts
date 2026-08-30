@@ -642,14 +642,13 @@ export class AttestedFlightSearchService {
         });
       }
 
-      const selectionAttestation =
-        await this.selectionAttestationService.signSelectionAttestation(
-          userId,
-          dto.chatSessionId,
-          proposedSnapshotVersion,
-          expiresAt.toISOString(),
-          attestationOffers,
-        );
+      const selectionAttestation = await this.selectionAttestationService.signSelectionAttestation(
+        userId,
+        dto.chatSessionId,
+        proposedSnapshotVersion,
+        expiresAt.toISOString(),
+        attestationOffers,
+      );
 
       const response = {
         selectionAttestation,

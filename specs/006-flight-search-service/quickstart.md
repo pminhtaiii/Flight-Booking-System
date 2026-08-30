@@ -38,6 +38,7 @@ pnpm --filter @web/frontend dev
 ### Scenario 1: One-Way Flight Search (P1 — Core Value)
 
 **Steps**:
+
 1. Log in to the frontend at `http://localhost:3000/login`
 2. Navigate to the Search page
 3. Enter origin: LHR, destination: JFK, departure date: (any future date), passengers: 1
@@ -45,11 +46,13 @@ pnpm --filter @web/frontend dev
 5. Click "Search Flights"
 
 **Expected outcome**:
+
 - Up to 20 flight results appear below the search form
 - Each result shows: airline name, flight number, times, duration, stops, price, fare class, baggage
 - Response time: < 5 seconds for first search, < 1 second for repeated identical search (cache hit)
 
 **Verification commands** (backend-only, without frontend):
+
 ```bash
 # Direct API call
 curl -X POST http://localhost:3001/api/flights/search \
@@ -65,14 +68,17 @@ curl -X POST http://localhost:3001/api/flights/search \
 ### Scenario 2: Round-Trip Flight Search (P1)
 
 **Steps**:
+
 1. Same as Scenario 1, but toggle to "Round-trip" and enter a return date
 2. Click "Search Flights"
 
 **Expected outcome**:
+
 - Results include both outbound and return itinerary segments
 - Each result has `segments` (outbound) and `returnSegments` (return)
 
 **Verification command**:
+
 ```bash
 curl -X POST http://localhost:3001/api/flights/search \
   -H "Authorization: Bearer <jwt-token>" \
@@ -85,16 +91,19 @@ curl -X POST http://localhost:3001/api/flights/search \
 ### Scenario 3: Flight Detail with Live Re-pricing (P2)
 
 **Steps**:
+
 1. Perform a search (Scenario 1 or 2)
 2. Copy the `id` field from any result
 3. Navigate to `/search/<id>` or click "View Details"
 
 **Expected outcome**:
+
 - Detail page shows full flight information with `confirmedPrice` (live from Duffel)
 - If price changed, a `priceChanged: true` flag is present with both `originalPrice` and `confirmedPrice`
 - Duffel-specific data like `expiresAt` and `conditions` (refundable/changeable) are displayed
 
 **Verification command**:
+
 ```bash
 curl http://localhost:3001/api/flights/<uuid> \
   -H "Authorization: Bearer <jwt-token>"
@@ -105,15 +114,18 @@ curl http://localhost:3001/api/flights/<uuid> \
 ### Scenario 4: Expired Offer Recovery (P2)
 
 **Steps**:
+
 1. Wait for a flight offer to be purged (or manually delete it from the database for testing)
 2. Navigate to `/search/<expired-uuid>`
 
 **Expected outcome**:
+
 - HTTP 410 response with `code: "OFFER_EXPIRED"`
 - Response includes `recovery` object with original search parameters
 - Frontend shows "Offer expired" notice with pre-filled search form
 
 **Verification command**:
+
 ```bash
 # Should return 410 with recovery params
 curl -i http://localhost:3001/api/flights/00000000-0000-0000-0000-000000000000 \
@@ -125,10 +137,12 @@ curl -i http://localhost:3001/api/flights/00000000-0000-0000-0000-000000000000 \
 ### Scenario 5: Budget Exhaustion Handling
 
 **Steps**:
+
 1. Temporarily set `DUFFEL_BUDGET_LIMIT_USER=1` in `.env` and restart the backend
 2. Perform two flight searches
 
 **Expected outcome**:
+
 - First search succeeds
 - Second search returns HTTP 429 with a friendly message
 - Agent/chatbot searches should be throttled before user searches
@@ -138,15 +152,18 @@ curl -i http://localhost:3001/api/flights/00000000-0000-0000-0000-000000000000 \
 ### Scenario 6: Cache Hit Verification
 
 **Steps**:
+
 1. Perform a search
 2. Immediately perform the exact same search again
 
 **Expected outcome**:
+
 - Second response includes `meta.cached: true`
 - Response time is significantly faster (< 1 second)
 - Redis budget counter only incremented once (not twice)
 
 **Verification**:
+
 ```bash
 # Check budget counter
 redis-cli GET "budget:duffel:2026-07"
@@ -158,15 +175,18 @@ redis-cli GET "budget:duffel:2026-07"
 ### Scenario 7: Async Persistence Verification
 
 **Steps**:
+
 1. Perform a search
 2. Query the database for newly created records
 
 **Expected outcome**:
+
 - `flight_offers` table has rows with matching `searchHash`
 - `search_history` table has a row with the user's ID and search metadata
 - Both were created after the response was returned (non-blocking)
 
 **Verification**:
+
 ```bash
 # Check tables via Prisma Studio
 npx prisma studio --schema=apps/api/prisma/schema.prisma
@@ -190,10 +210,10 @@ npm run test:e2e --workspace=apps/api -- --testPathPattern=agent-gateway
 
 ## Troubleshooting
 
-| Issue | Solution |
-|-------|----------|
-| "Duffel access token is not configured" | Check `DUFFEL_ACCESS_TOKEN` in `apps/api/.env` |
-| 502 Bad Gateway on search | Duffel API may be down; check https://www.duffelstatus.com |
-| 429 Too Many Requests | Budget exhausted; check Redis key `budget:duffel:YYYY-MM` or reset it |
-| Empty search results | In test mode, use Duffel Airways routes (LHR↔JFK, LHR↔CDG) |
-| "Rate limit exceeded" from Duffel | You're exceeding 120 req/60s; add backoff or check for runaway loops |
+| Issue                                   | Solution                                                              |
+| --------------------------------------- | --------------------------------------------------------------------- |
+| "Duffel access token is not configured" | Check `DUFFEL_ACCESS_TOKEN` in `apps/api/.env`                        |
+| 502 Bad Gateway on search               | Duffel API may be down; check https://www.duffelstatus.com            |
+| 429 Too Many Requests                   | Budget exhausted; check Redis key `budget:duffel:YYYY-MM` or reset it |
+| Empty search results                    | In test mode, use Duffel Airways routes (LHR↔JFK, LHR↔CDG)            |
+| "Rate limit exceeded" from Duffel       | You're exceeding 120 req/60s; add backoff or check for runaway loops  |

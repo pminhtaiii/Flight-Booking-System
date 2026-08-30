@@ -5,15 +5,9 @@ import { BookingLifecycleModule } from '@/booking-lifecycle/booking-lifecycle.mo
 import { CancellationModule } from '@/cancellation/cancellation.module';
 
 @Module({
-  imports: [
-    BookingManagementModule,
-    BookingLifecycleModule,
-    CancellationModule,
-  ],
+  imports: [BookingManagementModule, BookingLifecycleModule, CancellationModule],
   controllers: [BookingController],
   providers: [],
   exports: [],
 })
 export class BookingModule {}
-
-

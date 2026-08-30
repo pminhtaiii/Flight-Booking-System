@@ -80,7 +80,9 @@ describe('Phase 11E: Data-Quality & State Drift Sentinel (E2E)', () => {
     // Cleanup created data
     if (testSession?.id) {
       await prisma.chatMessage.deleteMany({ where: { sessionId: testSession.id } }).catch(() => {});
-      await prisma.chatHandoff.deleteMany({ where: { chatSessionId: testSession.id } }).catch(() => {});
+      await prisma.chatHandoff
+        .deleteMany({ where: { chatSessionId: testSession.id } })
+        .catch(() => {});
       await prisma.chatSession.deleteMany({ where: { id: testSession.id } }).catch(() => {});
     }
     if (testFlightOffer?.id) {
@@ -189,7 +191,9 @@ describe('Phase 11E: Data-Quality & State Drift Sentinel (E2E)', () => {
       expect(healed2?.claimExpiresAt).toBeNull();
       expect(healed2?.claimRecoverAfter).toBeNull();
 
-      const untouched = await prisma.chatHandoff.findUnique({ where: { id: validClaimedHandoff.id } });
+      const untouched = await prisma.chatHandoff.findUnique({
+        where: { id: validClaimedHandoff.id },
+      });
       expect(untouched?.claimTokenHash).toBe('valid-claim-token-hash');
     });
   });

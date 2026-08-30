@@ -26,22 +26,42 @@ export async function getDashboardSummary(): Promise<DashboardOutcome> {
       return failure('UNAUTHENTICATED', 'Your session has expired. Please sign in again.', false);
     }
     if (response.status === 403) {
-      return failure('FORBIDDEN', 'Access denied. You do not have permission to view this resource.', false);
+      return failure(
+        'FORBIDDEN',
+        'Access denied. You do not have permission to view this resource.',
+        false,
+      );
     }
     if (!response.ok) {
-      return failure('UPSTREAM_UNAVAILABLE', 'The dashboard service is temporarily unavailable. Please try again.', true);
+      return failure(
+        'UPSTREAM_UNAVAILABLE',
+        'The dashboard service is temporarily unavailable. Please try again.',
+        true,
+      );
     }
 
     try {
       const parsed = DashboardSummarySchema.safeParse(await response.json());
       return parsed.success
         ? { ok: true, data: parsed.data }
-        : failure('INVALID_RESPONSE', 'Unable to load dashboard data due to an unexpected format.', false);
+        : failure(
+            'INVALID_RESPONSE',
+            'Unable to load dashboard data due to an unexpected format.',
+            false,
+          );
     } catch {
-      return failure('INVALID_RESPONSE', 'Unable to load dashboard data due to an unexpected format.', false);
+      return failure(
+        'INVALID_RESPONSE',
+        'Unable to load dashboard data due to an unexpected format.',
+        false,
+      );
     }
   } catch {
-    return failure('UPSTREAM_UNAVAILABLE', 'Connection timed out. Please check your network and try again.', true);
+    return failure(
+      'UPSTREAM_UNAVAILABLE',
+      'Connection timed out. Please check your network and try again.',
+      true,
+    );
   } finally {
     clearTimeout(timeout);
   }
@@ -52,8 +72,11 @@ async function getAccessToken(): Promise<string | null> {
     const sessionFn =
       typeof NextAuth.getServerSession === 'function'
         ? NextAuth.getServerSession
-        : (NextAuth as unknown as { default?: { getServerSession: typeof NextAuth.getServerSession } }).default
-            ?.getServerSession;
+        : (
+            NextAuth as unknown as {
+              default?: { getServerSession: typeof NextAuth.getServerSession };
+            }
+          ).default?.getServerSession;
     const session: unknown = await sessionFn?.(authOptions);
     if (!session || typeof session !== 'object' || !('accessToken' in session)) return null;
 
@@ -65,7 +88,8 @@ async function getAccessToken(): Promise<string | null> {
 }
 
 function apiUrl(): string {
-  const configuredUrl = process.env.API_URL || process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+  const configuredUrl =
+    process.env.API_URL || process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
   return configuredUrl.replace(/\/+$/, '');
 }
 

@@ -9,6 +9,7 @@ export function isCheckoutEnabled(): boolean {
 export function getFeatureFlags() {
   return {
     FEATURE_FLAG_CHAT_MULTI_AGENT: process.env.NEXT_PUBLIC_FEATURE_FLAG_CHAT_MULTI_AGENT === 'true',
-    FEATURE_FLAG_CHAT_HANDOFF_ACCEPT: process.env.NEXT_PUBLIC_FEATURE_FLAG_CHAT_HANDOFF_ACCEPT === 'true',
+    FEATURE_FLAG_CHAT_HANDOFF_ACCEPT:
+      process.env.NEXT_PUBLIC_FEATURE_FLAG_CHAT_HANDOFF_ACCEPT === 'true',
   };
 }
