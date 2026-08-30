@@ -6,6 +6,7 @@ type DashboardShellProps = {
     name?: string | null;
     email?: string | null;
   };
+  showProfileNavigation?: boolean;
   children: React.ReactNode;
 };
 
@@ -15,9 +16,12 @@ const navigationItems = [
   { href: '/bookings', label: 'My bookings', shortLabel: 'Bookings' },
 ] as const;
 
-export function DashboardShell({ user, children }: DashboardShellProps): JSX.Element {
+export function DashboardShell({ user, showProfileNavigation = false, children }: DashboardShellProps): JSX.Element {
   const displayName = user.name?.trim() || user.email?.trim() || 'Traveler';
   const avatarLabel = displayName.charAt(0).toLocaleUpperCase();
+  const visibleNavigationItems = showProfileNavigation
+    ? [...navigationItems, { href: '/profile', label: 'Traveler profile', shortLabel: 'Profile' }]
+    : navigationItems;
 
   return (
     <div className={styles.dashboardRoot}>
@@ -29,7 +33,7 @@ export function DashboardShell({ user, children }: DashboardShellProps): JSX.Ele
           <span>Wayfinder</span>
         </Link>
         <nav className={styles.sidebarNav}>
-          {navigationItems.map((item) => (
+          {visibleNavigationItems.map((item) => (
             <Link
               key={item.href}
               className={`${styles.sidebarLink} ${item.href === '/dashboard' ? styles.sidebarLinkCurrent : ''}`}
@@ -67,7 +71,7 @@ export function DashboardShell({ user, children }: DashboardShellProps): JSX.Ele
       </div>
 
       <nav className={styles.mobileNav} aria-label="Mobile dashboard navigation">
-        {navigationItems.map((item) => (
+        {visibleNavigationItems.map((item) => (
           <Link
             key={item.href}
             className={`${styles.mobileNavLink} ${item.href === '/dashboard' ? styles.mobileNavLinkCurrent : ''}`}
