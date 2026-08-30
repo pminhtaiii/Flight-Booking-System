@@ -356,37 +356,37 @@ The following checklist tables must be verified by automated tests and visual in
 
 | Check ID     | Verification Item               | Target File(s)                        | Criteria                                                                                                                          | Status |
 | :----------- | :------------------------------ | :------------------------------------ | :-------------------------------------------------------------------------------------------------------------------------------- | :----: |
-| **V-TOK-01** | Semantic CSS Variables Declared | `apps/web/app/globals.css`            | `--dashboard-surface`, `--dashboard-glass`, `--dashboard-border`, `--dashboard-accent`, etc. present in `:root` and `:root.dark`. |  [ ]   |
-| **V-TOK-02** | No Hardcoded Color Literals     | `apps/web/app/dashboard/*.module.css` | Zero occurrences of raw hex (`#...`), `rgb(...)`, or `hsl(...)` color strings in CSS modules.                                     |  [ ]   |
-| **V-TOK-03** | No Inline Color Styles          | `apps/web/components/dashboard/*.tsx` | Zero `style={{ color: ... }}` or inline background definitions in JSX elements.                                                   |  [ ]   |
-| **V-TOK-04** | No Raw Tailwind Color Utilities | `apps/web/components/dashboard/*.tsx` | Zero `bg-blue-500`, `text-slate-900`, `border-emerald-600` classes in JSX.                                                        |  [ ]   |
-| **V-TOK-05** | Backdrop Filter Fallbacks       | `apps/web/app/globals.css`            | Solid color fallbacks provided inside `@supports not (backdrop-filter: blur(1px))`.                                               |  [ ]   |
+| **V-TOK-01** | Semantic CSS Variables Declared | `apps/web/app/globals.css`            | `--dashboard-surface`, `--dashboard-glass`, `--dashboard-border`, `--dashboard-accent`, etc. present in `:root` and `:root.dark`. |  [x]   |
+| **V-TOK-02** | No Hardcoded Color Literals     | `apps/web/app/dashboard/*.module.css` | Zero occurrences of raw hex (`#...`), `rgb(...)`, or `hsl(...)` color strings in CSS modules.                                     |  [x]   |
+| **V-TOK-03** | No Inline Color Styles          | `apps/web/components/dashboard/*.tsx` | Zero `style={{ color: ... }}` or inline background definitions in JSX elements.                                                   |  [x]   |
+| **V-TOK-04** | No Raw Tailwind Color Utilities | `apps/web/components/dashboard/*.tsx` | Zero `bg-blue-500`, `text-slate-900`, `border-emerald-600` classes in JSX.                                                        |  [x]   |
+| **V-TOK-05** | Backdrop Filter Fallbacks       | `apps/web/app/globals.css`            | Solid color fallbacks provided inside `@supports not (backdrop-filter: blur(1px))`.                                               |  [x]   |
 
 ### Phase 2: Mock Element Removal Audit
 
 | Check ID     | Verification Item                       | Target File(s)           | Criteria                                                                                           | Status |
 | :----------- | :-------------------------------------- | :----------------------- | :------------------------------------------------------------------------------------------------- | :----: |
-| **V-MOK-01** | Cancelled Bookings Stat Replaces Shield | `DashboardStats.tsx`     | Card 4 displays `cancelledBookings` count; Disruption Shield percentage and glow card are removed. |  [ ]   |
-| **V-MOK-02** | Static Fare Drop Card Removed           | `DashboardShell.tsx`     | "Tokyo Autumn Fares Dropped 18%" card is removed from production component.                        |  [ ]   |
-| **V-MOK-03** | Static Seat Recommendation Removed      | `DashboardShell.tsx`     | "Window Seat 14A Available" card is removed from production component.                             |  [ ]   |
-| **V-MOK-04** | Prototype Tag Banner Removed            | `DashboardShell.tsx`     | Top prototype disclaimer banner is removed from production view.                                   |  [ ]   |
-| **V-MOK-05** | Variant Switcher Removed                | `DashboardShell.tsx`     | Floating variant navigation switcher (`?variant=...`) is removed.                                  |  [ ]   |
-| **V-MOK-06** | Zero `/prototype/*` Hyperlinks          | All dashboard components | Codebase grep confirms zero links to `/prototype/chat` or `/prototype/dashboard`.                  |  [ ]   |
+| **V-MOK-01** | Cancelled Bookings Stat Replaces Shield | `DashboardStats.tsx`     | Card 4 displays `cancelledBookings` count; Disruption Shield percentage and glow card are removed. |  [x]   |
+| **V-MOK-02** | Static Fare Drop Card Removed           | `DashboardShell.tsx`     | "Tokyo Autumn Fares Dropped 18%" card is removed from production component.                        |  [x]   |
+| **V-MOK-03** | Static Seat Recommendation Removed      | `DashboardShell.tsx`     | "Window Seat 14A Available" card is removed from production component.                             |  [x]   |
+| **V-MOK-04** | Prototype Tag Banner Removed            | `DashboardShell.tsx`     | Top prototype disclaimer banner is removed from production view.                                   |  [x]   |
+| **V-MOK-05** | Variant Switcher Removed                | `DashboardShell.tsx`     | Floating variant navigation switcher (`?variant=...`) is removed.                                  |  [x]   |
+| **V-MOK-06** | Zero `/prototype/*` Hyperlinks          | All dashboard components | Codebase grep confirms zero links to `/prototype/chat` or `/prototype/dashboard`.                  |  [x]   |
 
 ### Phase 3: Route Integration & Handoff Audit
 
 | Check ID     | Verification Item                         | Target File(s)                | Criteria                                                                                             | Status |
 | :----------- | :---------------------------------------- | :---------------------------- | :--------------------------------------------------------------------------------------------------- | :----: |
-| **V-RTE-01** | Quick Search Handoff                      | `DashboardQuickSearch.tsx`    | Submits to `/search?origin=...&destination=...&departureDate=...` with preserved values.             |  [ ]   |
-| **V-RTE-02** | Same-Airport Search Rejection             | `dashboard-search.ts`         | Displays validation error when Origin equals Destination; does not navigate.                         |  [ ]   |
-| **V-RTE-03** | Past Date Search Rejection                | `dashboard-search.ts`         | Displays validation error when Departure Date is before today; does not navigate.                    |  [ ]   |
-| **V-RTE-04** | Quick Action: Search Flights              | `DashboardQuickActions.tsx`   | Navigates to `/search`.                                                                              |  [ ]   |
-| **V-RTE-05** | Quick Action: Manage Itinerary            | `DashboardQuickActions.tsx`   | Navigates to `/bookings?tab=upcoming` (or `/bookings`).                                              |  [ ]   |
-| **V-RTE-06** | Quick Action: Past Trips                  | `DashboardQuickActions.tsx`   | Navigates to `/bookings?tab=past`.                                                                   |  [ ]   |
-| **V-RTE-07** | Quick Action: Profile Gating (Flag ON)    | `DashboardQuickActions.tsx`   | When `isBookingReadinessEnabled()` is `true`, Traveler Profile card renders and links to `/profile`. |  [ ]   |
-| **V-RTE-08** | Quick Action: Profile Omission (Flag OFF) | `DashboardQuickActions.tsx`   | When `isBookingReadinessEnabled()` is `false`, Traveler Profile card is omitted completely.          |  [ ]   |
-| **V-RTE-09** | Recent Booking Detail Links               | `DashboardRecentBookings.tsx` | Recent item click navigates to `/bookings/[bookingId]`.                                              |  [ ]   |
-| **V-RTE-10** | All Bookings Link                         | `DashboardRecentBookings.tsx` | "All bookings →" header link navigates to `/bookings`.                                               |  [ ]   |
+| **V-RTE-01** | Quick Search Handoff                      | `DashboardQuickSearch.tsx`    | Submits to `/search?origin=...&destination=...&departureDate=...` with preserved values.             |  [x]   |
+| **V-RTE-02** | Same-Airport Search Rejection             | `dashboard-search.ts`         | Displays validation error when Origin equals Destination; does not navigate.                         |  [x]   |
+| **V-RTE-03** | Past Date Search Rejection                | `dashboard-search.ts`         | Displays validation error when Departure Date is before today; does not navigate.                    |  [x]   |
+| **V-RTE-04** | Quick Action: Search Flights              | `DashboardQuickActions.tsx`   | Navigates to `/search`.                                                                              |  [x]   |
+| **V-RTE-05** | Quick Action: Manage Itinerary            | `DashboardQuickActions.tsx`   | Navigates to `/bookings?tab=upcoming` (or `/bookings`).                                              |  [x]   |
+| **V-RTE-06** | Quick Action: Past Trips                  | `DashboardQuickActions.tsx`   | Navigates to `/bookings?tab=past`.                                                                   |  [x]   |
+| **V-RTE-07** | Quick Action: Profile Gating (Flag ON)    | `DashboardQuickActions.tsx`   | When `isBookingReadinessEnabled()` is `true`, Traveler Profile card renders and links to `/profile`. |  [x]   |
+| **V-RTE-08** | Quick Action: Profile Omission (Flag OFF) | `DashboardQuickActions.tsx`   | When `isBookingReadinessEnabled()` is `false`, Traveler Profile card is omitted completely.          |  [x]   |
+| **V-RTE-09** | Recent Booking Detail Links               | `DashboardRecentBookings.tsx` | Recent item click navigates to `/bookings/[bookingId]`.                                              |  [x]   |
+| **V-RTE-10** | All Bookings Link                         | `DashboardRecentBookings.tsx` | "All bookings →" header link navigates to `/bookings`.                                               |  [x]   |
 
 ### Phase 4: Responsive & Viewport Layout Audit
 
@@ -408,3 +408,46 @@ The following checklist tables must be verified by automated tests and visual in
 | **V-A11Y-05** | Icon Button Accessible Names | TopNav & Action buttons  | All icon-only buttons have explicit `aria-label` attributes.                                |  [ ]   |
 | **V-A11Y-06** | Form Input Labels            | Quick Search Form        | All search inputs have accessible labels or `aria-label` attributes.                        |  [ ]   |
 | **V-A11Y-07** | Reduced Motion Honored       | Animations & Transitions | `@media (prefers-reduced-motion: reduce)` disables hover lifts, shimmers, and transitions.  |  [ ]   |
+
+---
+
+## 8. Phase 6 T044 Audit Evidence (2026-08-30)
+
+This audit reran only the production dashboard directories required by Task T044:
+
+- `apps/web/app/dashboard/`
+- `apps/web/components/dashboard/`
+- `apps/api/src/dashboard/`
+
+Commands executed:
+
+```powershell
+Get-ChildItem apps/web/app/dashboard,apps/web/components/dashboard,apps/api/src/dashboard -Recurse -File | Select-Object -ExpandProperty FullName | Select-Object -First 200
+
+rg -n -S "#([0-9a-fA-F]{3,8})\b|rgba?\(|hsla?\(|style=\{\{ |bg-(red|orange|amber|yellow|lime|green|emerald|teal|cyan|sky|blue|indigo|violet|purple|fuchsia|pink|rose|slate|gray|zinc|neutral|stone)-|text-(red|orange|amber|yellow|lime|green|emerald|teal|cyan|sky|blue|indigo|violet|purple|fuchsia|pink|rose|slate|gray|zinc|neutral|stone)-|border-(red|orange|amber|yellow|lime|green|emerald|teal|cyan|sky|blue|indigo|violet|purple|fuchsia|pink|rose|slate|gray|zinc|neutral|stone)-" apps/web/app/dashboard apps/web/components/dashboard apps/api/src/dashboard | Select-Object -First 200
+
+rg -n -S "/prototype/|\bprototype\b|variant=|Wayfinder Dashboard Prototype|Disruption Shield|Tokyo Autumn|14A|AI Route Match" apps/web/app/dashboard apps/web/components/dashboard apps/api/src/dashboard | Select-Object -First 200
+
+rg -n -S "accessToken|NEXT_PUBLIC_API_URL|API_URL|DATABASE_URL|passport|paymentId|passengerSnapshot|duffelOrderId|duffelCancellationQuoteId|customerRefundAmount|flightSnapshot|authorization|Bearer|process\.env|useSession" apps/web/app/dashboard apps/web/components/dashboard apps/api/src/dashboard | Select-Object -First 200
+
+rg -n -S "Cancelled Bookings|href: '/search'|href: '/bookings\?tab=upcoming'|href: '/bookings\?tab=past'|href: '/profile'|buildSearchUrl|validateQuickSearch|origin === destination|Departure date must be today or later|View all bookings|/bookings/\$\{booking\.id\}|Dashboard navigation|Mobile dashboard navigation|prefers-reduced-motion" apps/web/app/dashboard apps/web/components/dashboard apps/api/src/dashboard | Select-Object -First 200
+```
+
+Adjudicated results:
+
+- Raw color literal / inline color / raw Tailwind color scan returned no matches in the audited directories. Production dashboard styling is consumed through semantic classes and `dashboard.module.css`, with no confirmed T044 token violation.
+- Prototype-route/mock scan returned one match in `apps/api/src/dashboard/dashboard.controller.spec.ts:63` (`DashboardController.prototype...`). That file is a Jest spec, not a production implementation file, so it is not a T044 violation. No production `.tsx`, `.ts`, or `.css` file in the audited directories references `/prototype/*`, `variant=`, `Disruption Shield`, fake fare-drop copy, or seat-recommendation mock text.
+- Route handoff evidence is present in production source:
+  `DashboardQuickSearch.tsx:18-25` calls `validateQuickSearch()` and `buildSearchUrl()`;
+  `dashboard-search.ts:54-67` rejects same-airport and past-date input, then builds `/search?...`;
+  `dashboard-actions.ts:13,20,27,36` maps only `/search`, `/bookings?tab=upcoming`, `/bookings?tab=past`, and gated `/profile`;
+  `DashboardRecentBookings.tsx:49,60` links to `/bookings` and `/bookings/${booking.id}`;
+  `DashboardStats.tsx:37` renders `Cancelled Bookings`.
+- Privacy and secret-boundary evidence is allowlist-based rather than leak-based:
+  `apps/api/src/dashboard/dashboard.service.ts:68-87` maps `flightSnapshot` down to `originCode`, `destinationCode`, `airlineCode`, and `flightNumber`, then returns only the shared summary shape;
+  `apps/web/app/dashboard/page.tsx:18,48,67,71` passes only validated summary data into the dashboard view;
+  `apps/api/src/dashboard/dashboard.service.spec.ts:484-550` regression-tests that `paymentId`, `duffelOrderId`, `passengerSnapshot`, `flightSnapshot`, `duffelCancellationQuoteId`, and `customerRefundAmount` stay `undefined` in returned recent bookings.
+
+Scope note:
+
+- Follow-up token verification for `apps/web/app/globals.css` confirmed `V-TOK-01` and `V-TOK-05`: dashboard semantic token declarations appear in `:root` (`apps/web/app/globals.css:5-47`) and `:root.dark` (`apps/web/app/globals.css:87-131`), and the solid fallback block is defined under `@supports not (backdrop-filter: blur(1px))` with light and dark overrides (`apps/web/app/globals.css:171-186`).

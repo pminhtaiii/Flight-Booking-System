@@ -1,6 +1,5 @@
 import { expect, test, type APIRequestContext, type Page } from '@playwright/test';
 import { PrismaClient } from '@prisma/client';
-import { HANDOFF_CREDENTIAL_PATTERN } from '@shared/types';
 
 const WEB_ORIGIN =
   process.env.T093_REAL_FLOW === 'true' ? 'http://localhost:3000' : 'http://127.0.0.1:3000';

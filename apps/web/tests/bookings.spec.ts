@@ -8,14 +8,11 @@ test.describe('My Bookings list', () => {
     request,
     context,
   }) => {
-    page.on('console', (msg) => console.log('[Browser Console]', msg.text()));
-    page.on('pageerror', (err) => console.log('[Browser PageError]', err.message));
-
     await request
       .post('http://127.0.0.1:3001/api/auth/test/reset-lockout', {
         data: { clearAll: true },
       })
-      .catch((err) => console.log('[ResetLockout Connection Error]', err));
+      .catch(() => {});
 
     await context.clearCookies();
 
@@ -24,12 +21,6 @@ test.describe('My Bookings list', () => {
     await page.getByRole('textbox', { name: 'Email' }).fill(email);
     await page.getByRole('textbox', { name: 'Password' }).fill('Password123!');
     await page.getByRole('button', { name: 'Create account' }).click();
-
-    // Check for page validation or API errors on failure
-    const errorAlert = page.locator('form [role="alert"]');
-    if ((await errorAlert.count()) > 0) {
-      console.log('[Register Form Alert Text]', await errorAlert.textContent());
-    }
 
     await expect(page).toHaveURL(/.*127.0.0.1:3000\/$/, { timeout: 30000 });
 
