@@ -111,15 +111,15 @@
 
 ### Tests for User Story 3
 
-- [ ] T038 [P] [US3] Extend the bearer-scenario dashboard fixture and Playwright coverage for authenticated root redirect, anonymous landing preservation, direct dashboard login redirect, expired-session messaging, malformed/unavailable upstream recovery, 360/768/desktop overflow, keyboard focus, and reduced-motion behavior in `apps/web/tests/dashboard.spec.ts`
-- [ ] T039 [P] [US3] Add page-level unit coverage for root session branching and dashboard outcome-to-render/redirect behavior in `apps/web/tests/dashboard-routing.unit.ts`
+- [x] T038 [P] [US3] Extend the bearer-scenario dashboard fixture and Playwright coverage for authenticated root redirect, anonymous landing preservation, direct dashboard login redirect, expired-session messaging, malformed/unavailable upstream recovery, 360/768/desktop overflow, keyboard focus, and reduced-motion behavior in `apps/web/tests/dashboard.spec.ts`
+- [x] T039 [P] [US3] Add page-level unit coverage for root session branching and dashboard outcome-to-render/redirect behavior in `apps/web/tests/dashboard-routing.unit.ts`
 
 ### Implementation for User Story 3
 
-- [ ] T040 [US3] Convert the root page to a server-side session branch that redirects authenticated users and preserves anonymous `LandingPage` rendering in `apps/web/app/page.tsx`
-- [ ] T041 [US3] Align dashboard unauthenticated and expired-session routing with existing secure login-return behavior in `apps/web/app/dashboard/page.tsx`
-- [ ] T042 [US3] Finalize compact navigation, no-horizontal-overflow, contrast, focus-visible, reduced-motion, and backdrop-filter fallback styles in `apps/web/app/dashboard/dashboard.module.css`
-- [ ] T043 [US3] Make US3 routing and browser tests pass and record viewport/accessibility evidence in `specs/021-dashboard-building/implementation-notes.md`
+- [x] T040 [US3] Convert the root page to a server-side session branch that redirects authenticated users and preserves anonymous `LandingPage` rendering in `apps/web/app/page.tsx`
+- [x] T041 [US3] Align dashboard unauthenticated and expired-session routing with existing secure login-return behavior in `apps/web/app/dashboard/page.tsx`
+- [x] T042 [US3] Finalize compact navigation, no-horizontal-overflow, contrast, focus-visible, reduced-motion, and backdrop-filter fallback styles in `apps/web/app/dashboard/dashboard.module.css`
+- [x] T043 [US3] Make US3 routing and browser tests pass and record viewport/accessibility evidence in `specs/021-dashboard-building/implementation-notes.md`
 
 **Checkpoint**: All three stories are independently functional and the dashboard is the safe authenticated entry hub.
 
