@@ -1,7 +1,7 @@
 import 'server-only';
 import * as NextAuth from 'next-auth';
 import { DashboardSummarySchema, type DashboardOutcome } from '@shared/types/dashboard.types';
-import { authOptions } from '../auth.ts';
+import { authOptions } from '@/lib/auth';
 
 const REQUEST_TIMEOUT_MS = 10_000;
 

@@ -17,6 +17,43 @@ Update this file after every completed feature. Any AI agent reading this should
 
 ### [ ] Feature: Authenticated Booking Dashboard (Feature 021)
 
+- [x] Phase 4 / Slice 1: User Story 2 Hub Actions & Quick Search Characterization (T030–T031) (2026-08-30):
+  - **T030: Playwright Hub Navigation Characterization (`apps/web/tests/dashboard.spec.ts`)**:
+    - Added quick-search submission coverage for accessible airport/date controls and exact `/search` query preservation (`origin`, `destination`, `departureDate`, `adults=1`, `cabinClass=economy`).
+    - Added independently isolated Quick Actions navigation coverage for `/search`, `/bookings?tab=upcoming`, and `/bookings?tab=past`, scoped to the named Quick Actions region so global navigation cannot satisfy the assertions.
+    - Added `mock-scenario` readiness variants proving Traveler Profile omission when disabled and requiring `/profile` when enabled.
+    - Strengthened the anti-prototype guard to reject root and nested `/prototype/*` dashboard links.
+    - Full Playwright execution completed with final exit code `1` after 7.3 minutes (13 passed, 5 failed): four expected Phase 4 RED gaps plus the separately owned Phase 5 authenticated-root redirect RED case. After final review fixes, a focused nine-scenario run completed normally in 8.6 minutes with final exit code `1` (1 passed, 8 expected Phase 4 failures), covering keyboard operation, invalid searches, disabled-flag base-action preservation, and enabled Profile behavior.
+  - **T031: Pure Utility Characterization (`dashboard-search.spec.ts`, `dashboard-actions.spec.ts`)**:
+    - Characterized IATA trim/uppercase normalization, empty/short/same-airport rejection, past-date rejection with same-day acceptance, sanitized valid payloads, and default search URL generation.
+    - Characterized the exact three base dashboard actions and conditional Traveler Profile inclusion, including required render-field shape.
+    - Executed the combined Node/tsx suite: final exit code `1`, with exactly two expected missing-module failures for `./dashboard-search` and `./dashboard-actions`; no syntax or test-runner failures.
+  - **Review & Scope**:
+    - Unit task review: spec PASS and quality PASS after strengthening default URL coverage and splitting short-code cases.
+    - Playwright task review: spec APPROVED and quality APPROVED after scoping action locators to the Quick Actions region; final parallel Standards and Spec re-review completed with zero open findings.
+    - Repo-wide `pnpm format --check` is blocked by `EPERM` while scanning `.pytest_cache`; repo-wide `pnpm lint` is blocked by three unrelated concurrent-work errors and eight warnings. Scoped Prettier and ESLint checks for the Phase 4 artifacts pass cleanly.
+    - Production implementation remains intentionally pending in T032–T035; this slice is the TDD RED baseline only.
+
+- [x] Phase 4: User Story 2 - Hub Actions & Quick Search Implementation (T032–T037) (2026-08-30):
+  - **T032: Quick Search Normalization & URL Builder (`apps/web/components/dashboard/dashboard-search.ts`)**:
+    - Implemented IATA uppercase/trim normalization, non-empty distinct three-letter airport validation, future/today local calendar date validation, and ordered query URL builder (`/search?origin=...&destination=...&departureDate=...&adults=...&cabinClass=...`).
+  - **T033: Accessible Quick Search Component & `/search` Integration (`DashboardQuickSearch.tsx`, `SearchFormClient.tsx`, `app/search/page.tsx`)**:
+    - Added accessible quick search form with keyboard Enter submission, explicit labels, inline alert error reporting, and Lucide `Search` submit icon.
+    - Updated `/search` Server Component to safely sanitize and consume incoming dashboard query parameters and forward initial values to `SearchFormClient`.
+  - **T034: Feature-Flagged Action Builder & Component (`dashboard-actions.ts`, `DashboardQuickActions.tsx`)**:
+    - Implemented `buildDashboardActions()` providing core actions (`/search`, `/bookings?tab=upcoming`, `/bookings?tab=past`) and conditionally including `/profile` when booking readiness is active.
+    - Rendered accessible quick action card grid with semantic SVG icons and `:focus-visible` styling.
+  - **T035 & T036: Shell Composition & Responsive Semantic CSS (`app/dashboard/page.tsx`, `DashboardShell.tsx`, `dashboard.module.css`)**:
+    - Integrated quick search and actions within the glassmorphic dashboard shell.
+    - Added responsive layout stacking (<640px) and `@media (prefers-reduced-motion: reduce)` overrides with `!important` bounds.
+  - **T037: Verification & Acceptance**:
+    - Full unit test gate: exit 0, 39/39 passed (`dashboard-search.spec.ts`, `dashboard-actions.spec.ts`, `dashboard.spec.ts`, `dashboard-routing.unit.ts`).
+    - Web lint (`next lint`) and TypeScript typecheck (`tsc --noEmit`): exit 0.
+    - Production build (`next build`): exit 0.
+    - Playwright acceptance suite (`dashboard.spec.ts`): exit 0, 20/20 scenarios passed across populated/empty/error states, quick search, actions, and flag toggling.
+    - CI workflow contract (`ci-workflow.contract.test.mjs`): exit 0, 20/20 passed.
+    - Parallel Standards and Spec reviews completed with zero open findings.
+
 - [ ] Phase 5: User Story 3 - Root Entry & Recovery Characterization (T038–T039) (2026-08-29):
   - **T038: Playwright Acceptance Scenarios for Entry, Viewports & Recovery (`apps/web/tests/dashboard.spec.ts`)**:
     - Authored E2E acceptance tests for US3 covering:
@@ -37,7 +74,6 @@ Update this file after every completed feature. Any AI agent reading this should
   - **Dual-Axis Code Review Completed**:
     - Standards Review: 0 blocking issues after type assertion annotations and explicit return typing.
     - Spec Review: 0 scope creep; added expired token, malformed upstream payload, landmark, and strengthened keyboard focus assertions.
-
 
 - [x] Phase 3: User Story 1 - Web Data Boundary & UI Implementation (T020–T029) (2026-08-29):
   - **T020: Server-Only Summary Loader (`apps/web/lib/server/dashboard.ts`)**:

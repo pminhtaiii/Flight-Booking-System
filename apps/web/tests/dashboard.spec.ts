@@ -438,7 +438,7 @@ test.describe('Dashboard Feature Acceptance (E2E)', () => {
     await page.getByLabel('Departure airport code').fill('SGN');
     await page.getByLabel('Arrival airport code').fill('HAN');
     await page.getByLabel('Departure date').fill('2099-09-01');
-    await page.getByRole('button', { name: 'Search Flights' }).click();
+    await page.getByLabel('Departure date').press('Enter');
 
     await expect(page).toHaveURL(/\/search/);
     const searchParams = new URL(page.url()).searchParams;
@@ -450,46 +450,82 @@ test.describe('Dashboard Feature Acceptance (E2E)', () => {
     expect(searchParams.get('cabinClass')).toBe('economy');
   });
 
-  test('14. Quick Action Search Flights: navigates to search', async ({ page }) => {
+  test('14. Quick Search: does not navigate for matching airport inputs', async ({ page }) => {
+    await authenticateSession(page, 'token-populated');
+    await page.goto('/dashboard');
+
+    await page.getByLabel('Departure airport code').fill('SGN');
+    await page.getByLabel('Arrival airport code').fill('sgn');
+    await page.getByLabel('Departure date').fill('2099-09-01');
+    await page.getByLabel('Departure date').press('Enter');
+
+    await expect(page).toHaveURL(/\/dashboard\/?$/);
+  });
+
+  test('15. Quick Search: does not navigate for a past departure date', async ({ page }) => {
+    await authenticateSession(page, 'token-populated');
+    await page.goto('/dashboard');
+
+    await page.getByLabel('Departure airport code').fill('SGN');
+    await page.getByLabel('Arrival airport code').fill('HAN');
+    await page.getByLabel('Departure date').fill('2000-01-01');
+    await page.getByLabel('Departure date').press('Enter');
+
+    await expect(page).toHaveURL(/\/dashboard\/?$/);
+  });
+
+  test('16. Quick Action Search Flights: navigates to search', async ({ page }) => {
     await authenticateSession(page, 'token-populated');
     await page.goto('/dashboard');
 
     const quickActions = page.getByRole('region', { name: 'Quick Actions' });
-    await quickActions.getByRole('link', { name: 'Search Flights' }).click();
+    const action = quickActions.getByRole('link', { name: 'Search Flights' });
+    await action.focus();
+    await expect(action).toBeFocused();
+    await page.keyboard.press('Enter');
 
     await expect(page).toHaveURL(/\/search$/);
   });
 
-  test('15. Quick Action Upcoming Trips: navigates to upcoming bookings', async ({ page }) => {
+  test('17. Quick Action Upcoming Trips: navigates to upcoming bookings', async ({ page }) => {
     await authenticateSession(page, 'token-populated');
     await page.goto('/dashboard');
 
     const quickActions = page.getByRole('region', { name: 'Quick Actions' });
-    await quickActions.getByRole('link', { name: 'Upcoming Trips' }).click();
+    const action = quickActions.getByRole('link', { name: 'Upcoming Trips' });
+    await action.focus();
+    await expect(action).toBeFocused();
+    await page.keyboard.press('Enter');
 
     await expect(page).toHaveURL(/\/bookings\?tab=upcoming$/);
   });
 
-  test('16. Quick Action Past Bookings: navigates to past bookings', async ({ page }) => {
+  test('18. Quick Action Past Bookings: navigates to past bookings', async ({ page }) => {
     await authenticateSession(page, 'token-populated');
     await page.goto('/dashboard');
 
     const quickActions = page.getByRole('region', { name: 'Quick Actions' });
-    await quickActions.getByRole('link', { name: 'Past Bookings' }).click();
+    const action = quickActions.getByRole('link', { name: 'Past Bookings' });
+    await action.focus();
+    await expect(action).toBeFocused();
+    await page.keyboard.press('Enter');
 
     await expect(page).toHaveURL(/\/bookings\?tab=past$/);
   });
 
-  test('17. Traveler Profile disabled: omits the profile action', async ({ page }) => {
+  test('19. Traveler Profile disabled: omits the profile action', async ({ page }) => {
     await authenticateSession(page, 'token-populated');
     await setMockScenario(page, 'dashboard-readiness-disabled');
     await page.goto('/dashboard');
 
     const quickActions = page.getByRole('region', { name: 'Quick Actions' });
+    await expect(quickActions.getByRole('link', { name: 'Search Flights' })).toBeVisible();
+    await expect(quickActions.getByRole('link', { name: 'Upcoming Trips' })).toBeVisible();
+    await expect(quickActions.getByRole('link', { name: 'Past Bookings' })).toBeVisible();
     await expect(quickActions.getByRole('link', { name: 'Traveler Profile' })).toHaveCount(0);
   });
 
-  test('18. Traveler Profile enabled: exposes the profile action', async ({ page }) => {
+  test('20. Traveler Profile enabled: exposes the profile action', async ({ page }) => {
     await authenticateSession(page, 'token-populated');
     await setMockScenario(page, 'dashboard-readiness-enabled');
     await page.goto('/dashboard');

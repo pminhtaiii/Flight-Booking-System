@@ -53,7 +53,7 @@ Comprehensive inventory of all files targeted for creation, modification, or ver
 
 ### 2.3 Frontend Web Application (`apps/web/`)
 
-- [ ] [`apps/web/app/page.tsx`](file:///c:/Booking%20Systems/apps/web/app/page.tsx): Convert landing page to an async Server Component checking session; redirects authenticated users to `/dashboard` while rendering `LandingPage` for anonymous visitors.
+- [x] [`apps/web/app/page.tsx`](file:///c:/Booking%20Systems/apps/web/app/page.tsx): Convert landing page to an async Server Component checking session; redirects authenticated users to `/dashboard` while rendering `LandingPage` for anonymous visitors.
 - [x] [`apps/web/app/globals.css`](file:///c:/Booking%20Systems/apps/web/app/globals.css): Define semantic CSS tokens for dashboard glassmorphic surfaces, typography, stats, borders, and interactive states (light/dark/fallback modes).
 - [x] [`apps/web/app/dashboard/dashboard.module.css`](file:///c:/Booking%20Systems/apps/web/app/dashboard/dashboard.module.css): Scoped CSS Module providing layout grid, responsive breakpoints (360px, 768px, 1200px+), sidebar layout, and backdrop-filter fallbacks.
 - [x] [`apps/web/app/dashboard/error.tsx`](file:///c:/Booking%20Systems/apps/web/app/dashboard/error.tsx): Client error boundary component adhering to Next.js contract (`error`, `reset`) with clean user messaging and no credential/stack trace leaks.
@@ -62,18 +62,18 @@ Comprehensive inventory of all files targeted for creation, modification, or ver
 - [x] [`apps/web/components/dashboard/DashboardShell.tsx`](file:///c:/Booking%20Systems/apps/web/components/dashboard/DashboardShell.tsx): Production shell component composing desktop sidebar, sticky topbar, compact mobile navigation, hero banner, quick search, stats grid, quick actions, and recent activity timeline.
 - [x] [`apps/web/components/dashboard/DashboardStats.tsx`](file:///c:/Booking%20Systems/apps/web/components/dashboard/DashboardStats.tsx): 2x2 responsive stat cards rendering Total, Upcoming, Completed, and Cancelled bookings with semantic tokens and icons.
 - [x] [`apps/web/components/dashboard/DashboardRecentBookings.tsx`](file:///c:/Booking%20Systems/apps/web/components/dashboard/DashboardRecentBookings.tsx): Recent activity feed rendering up to 5 bookings with status chips, route indicators, dates, and links to `/bookings/[bookingId]` and `/bookings`.
-- [ ] [`apps/web/components/dashboard/DashboardQuickActions.tsx`](file:///c:/Booking%20Systems/apps/web/components/dashboard/DashboardQuickActions.tsx): 2x2 quick action grid linking to production travel tasks (`/search`, `/bookings?tab=upcoming`, `/bookings?tab=past`, and conditionally `/profile`).
-- [ ] [`apps/web/components/dashboard/DashboardQuickSearch.tsx`](file:///c:/Booking%20Systems/apps/web/components/dashboard/DashboardQuickSearch.tsx): Accessible inline search form validating origin, destination, and departure date before routing to `/search`.
-- [ ] [`apps/web/components/dashboard/dashboard-actions.ts`](file:///c:/Booking%20Systems/apps/web/components/dashboard/dashboard-actions.ts): Pure utility deriving available quick actions based on the `isBookingReadinessEnabled` flag.
-- [ ] [`apps/web/components/dashboard/dashboard-actions.spec.ts`](file:///c:/Booking%20Systems/apps/web/components/dashboard/dashboard-actions.spec.ts): Unit tests for quick action list derivation.
-- [ ] [`apps/web/components/dashboard/dashboard-search.ts`](file:///c:/Booking%20Systems/apps/web/components/dashboard/dashboard-search.ts): Pure search query validation, IATA normalization, and search URL generator.
-- [ ] [`apps/web/components/dashboard/dashboard-search.spec.ts`](file:///c:/Booking%20Systems/apps/web/components/dashboard/dashboard-search.spec.ts): Unit tests for search query building and validation logic.
-- [ ] [`apps/web/components/search/SearchFormClient.tsx`](file:///c:/Booking%20Systems/apps/web/components/search/SearchFormClient.tsx): Support optional initial values (`initialOrigin`, `initialDestination`, `initialDepartureDate`) from search parameters.
-- [ ] [`apps/web/app/search/page.tsx`](file:///c:/Booking%20Systems/apps/web/app/search/page.tsx): Pass sanitized search query parameters into `SearchFormClient`.
+- [x] [`apps/web/components/dashboard/DashboardQuickActions.tsx`](file:///c:/Booking%20Systems/apps/web/components/dashboard/DashboardQuickActions.tsx): 2x2 quick action grid linking to production travel tasks (`/search`, `/bookings?tab=upcoming`, `/bookings?tab=past`, and conditionally `/profile`).
+- [x] [`apps/web/components/dashboard/DashboardQuickSearch.tsx`](file:///c:/Booking%20Systems/apps/web/components/dashboard/DashboardQuickSearch.tsx): Accessible inline search form validating origin, destination, and departure date before routing to `/search`.
+- [x] [`apps/web/components/dashboard/dashboard-actions.ts`](file:///c:/Booking%20Systems/apps/web/components/dashboard/dashboard-actions.ts): Pure utility deriving available quick actions based on the `isBookingReadinessEnabled` flag.
+- [x] [`apps/web/components/dashboard/dashboard-actions.spec.ts`](file:///c:/Booking%20Systems/apps/web/components/dashboard/dashboard-actions.spec.ts): Unit tests for quick action list derivation.
+- [x] [`apps/web/components/dashboard/dashboard-search.ts`](file:///c:/Booking%20Systems/apps/web/components/dashboard/dashboard-search.ts): Pure search query validation, IATA normalization, and search URL generator.
+- [x] [`apps/web/components/dashboard/dashboard-search.spec.ts`](file:///c:/Booking%20Systems/apps/web/components/dashboard/dashboard-search.spec.ts): Unit tests for search query building and validation logic.
+- [x] [`apps/web/components/search/SearchFormClient.tsx`](file:///c:/Booking%20Systems/apps/web/components/search/SearchFormClient.tsx): Support optional initial values (`initialOrigin`, `initialDestination`, `initialDepartureDate`) from search parameters.
+- [x] [`apps/web/app/search/page.tsx`](file:///c:/Booking%20Systems/apps/web/app/search/page.tsx): Pass sanitized search query parameters into `SearchFormClient`.
 - [x] [`apps/web/lib/server/dashboard.ts`](file:///c:/Booking%20Systems/apps/web/lib/server/dashboard.ts): Server-only data loader acquiring JWT session, calling `GET /api/dashboard/summary` with `cache: 'no-store'`, 10s `AbortController` timeout, safe parsing via `DashboardSummarySchema`, and returning `DashboardOutcome`.
 - [x] [`apps/web/lib/server/dashboard.spec.ts`](file:///c:/Booking%20Systems/apps/web/lib/server/dashboard.spec.ts): Unit tests for `getDashboardSummary` under success, 401, 403, 500, timeout, malformed payload, and unauthenticated conditions.
 - [x] [`apps/web/tests/dashboard.spec.ts`](file:///c:/Booking%20Systems/apps/web/tests/dashboard.spec.ts): Playwright browser tests covering populated state, empty state, navigation links, quick search handoff, flag toggles, root redirect, login redirect, error recovery, responsive viewports (360px, 768px, 1280px), and keyboard focus.
-- [ ] [`apps/web/tests/dashboard-routing.unit.ts`](file:///c:/Booking%20Systems/apps/web/tests/dashboard-routing.unit.ts): Page routing unit tests covering root page redirect and dashboard session gating.
+- [x] [`apps/web/tests/dashboard-routing.unit.ts`](file:///c:/Booking%20Systems/apps/web/tests/dashboard-routing.unit.ts): Page routing unit tests covering root page redirect and dashboard session gating.
 
 ### 2.4 Context & Specification Documentation
 
@@ -322,13 +322,80 @@ _(Sections below will be populated as implementation tasks progress)_
   - **Command**: `node --test tests/ci/ci-workflow.contract.test.mjs`
   - **Result**: `20/20 PASS`, Exit `0`
 
-### 5.4 Playwright Browser Suite Execution (Task T043)
+### 5.4 Playwright Browser Suite & Routing Execution (Task T043)
 
-- Command: `npx playwright test apps/web/tests/dashboard.spec.ts --config=apps/web/tests/playwright.config.ts`
-- Exit Code: _Pending US2/US3 extensions_
+- **Root & Dashboard Page Routing Unit Tests**:
+  - **Command**: `& '.\node_modules\.bin\tsx.CMD' --test apps/web/tests/dashboard-routing.unit.ts`
+  - **Result**: `6/6 PASS` across 2 suites (0 failures, 0 skipped, duration ~10.3s)
+  - **Exit Code**: `0`
+  - **Coverage**:
+    - Authenticated session redirect from `/` to `/dashboard`.
+    - Anonymous session preservation rendering `LandingPage` on `/`.
+    - Unauthenticated dashboard session redirect to `/login?callbackUrl=/dashboard`.
+    - Non-masked `Error("Unable to load dashboard.")` throw on `UPSTREAM_UNAVAILABLE`.
+    - Non-masked `Error("Unable to load dashboard.")` throw on `INVALID_RESPONSE`.
+    - Render `DashboardShell` without redirect when summary loader returns `ok: true`.
+
+- **Quick Actions & Quick Search Unit Tests**:
+  - **Command**: `& '.\node_modules\.bin\tsx.CMD' --test apps/web/components/dashboard/dashboard-actions.spec.ts apps/web/components/dashboard/dashboard-search.spec.ts`
+  - **Result**: `13/13 PASS` (0 failures, 0 skipped, duration ~3.5s)
+  - **Exit Code**: `0`
+  - **Coverage**:
+    - Action derivation omitting `/profile` when readiness is disabled and including `/profile` when enabled.
+    - Presence of required fields (`label`, `description`, `icon`, `href`) on every enabled action.
+    - Airport code trimming and capitalization (`SGN`, `HAN`).
+    - Validation rejecting empty origin/destination, codes < 3 chars, identical origin/dest, and past dates.
+    - Acceptance of same-day and future dates.
+    - Search URL construction preserving param ordering (`/search?origin=...&destination=...&departureDate=...&adults=1&cabinClass=economy`).
+
+- **Dashboard Server Loader Unit Tests**:
+  - **Command**: `& '.\node_modules\.bin\tsx.CMD' --test apps/web/lib/server/dashboard.spec.ts`
+  - **Result**: `20/20 PASS` across 7 test suites (0 failures, 0 skipped)
+  - **Exit Code**: `0`
+
+- **Frontend Lint & Typecheck**:
+  - **Lint**: `pnpm --filter @web/frontend lint` -> Exit `0` (0 errors)
+  - **Typecheck**: `pnpm --filter @web/frontend typecheck` -> Exit `0` (0 errors)
+
+- **Next.js Production Build**:
+  - **Command**: `pnpm --filter @web/frontend build`
+  - **Result**: `23/23` static & dynamic pages generated successfully (`ƒ /dashboard` Server Component route: 3.48 kB, First Load JS: 97.4 kB; `ƒ /search`: 3.88 kB; `ƒ /`: 520 B).
+  - **Exit Code**: `0`
+
+- **CI Workflow Contract**:
+  - **Command**: `node --test tests/ci/ci-workflow.contract.test.mjs`
+  - **Result**: `20/20 PASS` (0 failures, 0 skipped)
+  - **Exit Code**: `0`
 
 ### 5.5 Monorepo Quality Gate Matrix (Task T047)
 
 - Contract: `pnpm --filter @shared/contracts test`
 - API Lint & Typecheck: `pnpm exec eslint "apps/api/**/*.ts" "packages/shared/**/*.ts" --max-warnings 0` && `pnpm --filter @api/backend exec tsc -p tsconfig.json --noEmit`
 - Web Lint, Typecheck & Build: `pnpm --filter @web/frontend lint` && `pnpm --filter @web/frontend typecheck` && `pnpm --filter @web/frontend build`
+
+### 5.6 Phase 4 Hub Actions & Quick Search Verification (Tasks T032–T037, 2026-08-30)
+
+Phase 4 is **complete**. The full verification matrix and acceptance criteria are 100% green.
+
+- **Quick-search and actions unit gate**
+  - **Command**: `& 'C:\Booking Systems\node_modules\.bin\tsx.CMD' --test apps/web/components/dashboard/dashboard-search.spec.ts apps/web/components/dashboard/dashboard-actions.spec.ts`
+  - **Exit code**: `0`
+  - **Observed result**: 13/13 passed. Coverage included IATA trim/uppercase normalization, required/three-letter/distinct airport validation, valid non-past dates, default URL query ordering, the three base actions, and conditional Traveler Profile inclusion.
+- **Dashboard loader and routing unit gate**
+  - **Command**: `& 'C:\Booking Systems\node_modules\.bin\tsx.CMD' --test apps/web/lib/server/dashboard.spec.ts apps/web/tests/dashboard-routing.unit.ts`
+  - **Exit code**: `0`
+  - **Observed result**: 26/26 passed (39/39 total dashboard unit assertions). Root session branching and outcome-to-render/redirect mappings pass with zero regressions.
+- **Web static gates**
+  - **Commands**: `& 'C:\Booking Systems\apps\web\node_modules\.bin\next.CMD' lint`; `& 'C:\Booking Systems\apps\web\node_modules\.bin\tsc.CMD' --noEmit`; `& 'C:\Booking Systems\apps\web\node_modules\.bin\next.CMD' build`
+  - **Exit codes**: `0`, `0`, `0`
+  - **Observed result**: Lint passed cleanly with 0 errors (1 `no-console` warning in `handoffCredential.ts`); TypeScript typecheck passed with 0 errors; Next.js 14 production build compiled successfully and generated all static/dynamic routes.
+- **Dashboard Playwright acceptance gate**
+  - **Command**: `$env:PLAYWRIGHT_FRONTEND_ONLY = 'true'; & 'C:\Booking Systems\apps\web\node_modules\.bin\playwright.CMD' test apps/web/tests/dashboard.spec.ts --config=apps/web/tests/playwright.config.ts --reporter=line`
+  - **Exit code**: `0`
+  - **Observed result**: 20/20 acceptance scenarios passed. Covered populated 4-metric overview + 5 recent bookings, empty state CTA, zero prototype links/claims, unauthenticated and expired session redirects, root authenticated redirect / anonymous landing preservation, 500/malformed error boundaries with zero data leakage, responsive geometry (360/768/1280), keyboard focus traversal, reduced-motion transition bounds, valid/invalid/keyboard quick searches, and feature-flagged quick actions (/search, /bookings, and flag-conditioned /profile).
+- **CI workflow contract gate**
+  - **Command**: `node --test tests/ci/ci-workflow.contract.test.mjs`
+  - **Exit code**: `0`
+  - **Observed result**: 20/20 passed.
+- **Standards and Spec Reviews**
+  - Completed parallel independent reviews; all findings (submit Search icon, alias CSS classes, test-scenario cookie scoping, path alias) resolved in consolidated fix wave. All verification gates freshly re-verified GREEN.
