@@ -25,7 +25,7 @@ Booking flights involves juggling multiple airline sites, comparing prices, and 
 ```
 /                        → Homepage
 /login                   → Auth page (email/password)
-/dashboard               → Trip overview, recent activity, analytics
+/dashboard               → Authenticated booking overview, quick actions, recent bookings
 /search                  → Flight search controls + results list
 /search/[flightId]       → Individual flight details + AI insights
 /trip/[tripId]           → Full trip itinerary (flight + hotel + dining)
@@ -40,13 +40,13 @@ Booking flights involves juggling multiple airline sites, comparing prices, and 
 
 ## Navigation
 
-Top navbar. Clean and minimal:
+Global navigation stays top-nav and minimal:
 
 ```
 Dashboard    Search Flights    My Bookings    Profile
 ```
 
-Full width layout on all pages. No sidebar.
+Most pages keep the full-width layout. Feature 021 adds a dashboard-scoped sidebar and compact mobile nav inside `DashboardShell` only, so the rest of the app does not inherit a new global sidebar.
 
 ---
 
@@ -56,13 +56,12 @@ Full width layout on all pages. No sidebar.
 
 - Hero section with search quick-start (origin, destination, dates, passengers).
 - Logged-in users → redirect to dashboard.
-- Logged-out users → redirect to login.
+- Logged-out users → keep the marketing landing page.
 
 ### 2. Onboarding
 
 - User signs up with email and password (social login deferred to a future milestone).
 - On login → redirect to `/dashboard`.
-- Dashboard shows an incomplete profile banner if traveler preferences are not set.
 
 ### 3. Traveler Profile Setup
 
@@ -186,17 +185,17 @@ After a flight is booked, the system uses the destination airport's coordinates 
 
 ### 10. Dashboard
 
-- **Stats bar** — 4 cards:
-  - Total Flights Booked
-  - Total Trips Planned
-  - Average Match Score
-  - Upcoming Trips
-- **Recent activity** — last 10 user actions (searches, bookings, cancellations, research).
-- **Analytics section**:
-  - Flights booked over time — line chart.
-  - Match score distribution — bar chart.
-  - Top destinations — bar chart.
-  - Spending by month — bar chart.
+- Feature 021 completes the authenticated dashboard as a booking hub instead of an analytics surface.
+- **Stats bar** — 4 live booking cards:
+  - Total Bookings
+  - Upcoming Bookings
+  - Completed Bookings
+  - Cancelled Bookings
+- **Recent bookings** — at most 5 owner-scoped bookings, newest first, with a reduced route and airline summary.
+- **Quick search** preserves origin, destination, and departure date into the production `/search` flow.
+- **Quick actions** always include Search Flights, Upcoming Trips, and Past Bookings. Traveler Profile appears only when booking readiness is enabled.
+- Root `/` redirects authenticated users to `/dashboard`, while direct unauthenticated `/dashboard` access returns the login flow with `callbackUrl=/dashboard`.
+- Prototype-only fake metrics remain omitted in production. The shipped dashboard does not show the mock Disruption Shield percentage or static fare alerts.
 
 ### 11. AI Customer Support Chatbot (Future)
 
@@ -368,5 +367,5 @@ flowchart TD
 - Payment flow meets PCI-DSS compliance requirements.
 - System gracefully handles Amadeus API rate limits within the free tier.
 - Trip assembly surfaces useful hotel and restaurant suggestions based on destination coordinates.
-- Dashboard analytics show meaningful data after several searches and bookings.
+- Authenticated users reach a fresh booking dashboard with live owner-scoped metrics and recent bookings, while signed-out users keep the marketing homepage.
 - UI is visually consistent across all pages.

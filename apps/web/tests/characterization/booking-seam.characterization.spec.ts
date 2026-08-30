@@ -3,7 +3,6 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 
 const bookingId = '8a7466ab-78bd-4a45-8e9e-9b3c62269a9a';
-const revisionId = '9b8577bc-89cd-5b56-9f0f-0c4d73370b0b';
 
 async function authenticateClientSession(page: Page) {
   await page.route('**/api/auth/session', async (route) => {

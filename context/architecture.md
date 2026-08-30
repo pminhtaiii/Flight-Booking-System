@@ -111,13 +111,33 @@ The root TypeScript configuration is type-check-only and sets `noEmit: true`. Pa
 
 ---
 
-## Dashboard Hub Action and Search Flow (Feature 021, Phase 4 Completed)
+## Authenticated Booking Dashboard (Feature 021, Phase 6 Finalization)
 
-The authenticated `/dashboard` Server Component evaluates `isBookingReadinessEnabled()` once per render. It passes that value to `buildDashboardActions()`, which always exposes Search Flights (`/search`), Upcoming Trips (`/bookings?tab=upcoming`), and Past Bookings (`/bookings?tab=past`), and adds Traveler Profile (`/profile`) only when booking readiness is enabled. `DashboardQuickActions` renders only this derived list with semantic SVG icons and `:focus-visible` styling.
+Feature 021 ships `/dashboard` as the authenticated booking hub without introducing a new cache tier, global layout rewrite, or fabricated travel metrics. The production path is split cleanly between a direct Prisma read model in the API and a server-only loader in the web app.
 
-`DashboardQuickSearch` is client-side interaction only: it normalizes airport entries by trimming and uppercasing them, requires distinct three-letter IATA codes and a valid current-or-future local calendar date, then navigates to `/search` with `origin`, `destination`, `departureDate`, `adults=1`, and `cabinClass=economy`. The `/search` Server Component accepts only single, valid query values, bounds adults to 1–9, validates the cabin class, and forwards the sanitized initial values to `SearchFormClient`. The search form still owns the subsequent server action and flight-offer retrieval.
+1. **Backend Read Model (`apps/api/src/dashboard/`)**:
+   - `DashboardModule` is a thin NestJS composition module that imports `PrismaModule` and exposes `DashboardController` plus `DashboardService`.
+   - `DashboardController` serves authenticated `GET /api/dashboard/summary` behind `JwtAuthGuard`, derives the owner from `req.user.id || req.user.sub`, rejects blank identities with `UnauthorizedException`, sets `Cache-Control: no-store, private`, removes `ETag`, and delegates the projection work to `DashboardService`.
+   - `DashboardService` captures a single request clock with `const now = new Date()` and reuses that same instant for every time-sensitive boundary plus the returned `generatedAt` timestamp.
+   - The service executes exactly five concurrent Prisma reads via `Promise.all`: total booking count, upcoming confirmed count (`departureAt >= now`), completed count (`COMPLETED` plus legacy past `CONFIRMED`), cancelled-family count across the five canonical cancellation statuses, and `findMany` for the five newest bookings ordered by `createdAt desc, id desc`.
+   - Recent booking rows are reduced through an allowlisted mapper (`extractFlightDetails`) that reads only `originCode`, `destinationCode`, `airlineCode`, and `flightNumber` from supported snapshot shapes and returns `null` for malformed or unsupported provider payloads instead of leaking raw snapshot data.
 
-Phase 4 verification is complete and 100% green across unit tests (39/39 passed), Next.js lint, TypeScript typecheck, production build, Playwright acceptance suite (20/20 passed), and CI workflow contract tests (20/20 passed).
+2. **Web Server Boundary (`apps/web/lib/server/dashboard.ts`)**:
+   - `dashboard.ts` is guarded by `import 'server-only'` and owns all dashboard transport logic.
+   - It acquires the access token through `getServerSession(authOptions)` (with a compatibility fallback for the current `next-auth` export shape), returns `UNAUTHENTICATED` before any fetch when no token exists, and keeps the bearer token confined to server-to-server calls.
+   - Dashboard fetches use `cache: 'no-store'` and a 10-second `AbortController` timeout against `${API_URL || NEXT_PUBLIC_API_URL || 'http://localhost:3001'}/api/dashboard/summary`.
+   - Responses are parsed with the strict shared Zod boundary in `packages/shared/src/types/dashboard.types.ts`: `DashboardSummarySchema` requires four non-negative integer stats, at most five recent-booking items, ISO datetimes, and no extra keys. Loader failures normalize into the typed `DashboardOutcome` union (`UNAUTHENTICATED`, `FORBIDDEN`, `UPSTREAM_UNAVAILABLE`, `INVALID_RESPONSE`).
+
+3. **Entry Routing and Dashboard Shell**:
+   - `apps/web/app/page.tsx` checks `getServerSession(authOptions)` on the server and issues a redirect to `/dashboard` only for authenticated users; otherwise it leaves the marketing `LandingPage` in place.
+   - `apps/web/app/dashboard/page.tsx` is `force-dynamic`, loads the summary through the server boundary, redirects unauthenticated failures to `/login?callbackUrl=/dashboard`, and throws non-auth failures to the route error boundary instead of rendering stale fallback metrics.
+   - The dashboard page also resolves the signed-in display name, evaluates `isBookingReadinessEnabled()`, and derives quick actions so `/profile` appears only when booking readiness is enabled.
+   - `DashboardShell` owns the desktop sidebar and mobile navigation strictly inside the dashboard route. The rest of the application keeps its existing global layout.
+
+4. **Freshness and Performance Rationale**:
+   - The dashboard deliberately does not use Redis caching, tag revalidation, or background polling. Fresh travel metrics matter more than cache hits for this route, and the read model stays intentionally small enough to rely on indexed PostgreSQL reads.
+   - The documented target remains sub-200 ms p95 for the owner-scoped summary using the five-query concurrent Prisma batch and zero cross-service fan-out.
+   - Prototype-only claims such as a fake Disruption Shield percentage or static fare alerts remain excluded from production until a real data contract exists.
 
 ---
 
@@ -337,6 +357,7 @@ The web layer (`apps/web`) establishes a strict server boundary protecting backe
 1. **Server Domain Modules (`apps/web/lib/server/`)**:
    - Protected with the `import 'server-only'` sentinel.
    - `flight-search.ts`: Acquires NextAuth session, resolves private `API_URL` (`API_URL || NEXT_PUBLIC_API_URL || 'http://localhost:3001'`), bounds requests with 10s timeout and 3-attempt exponential retry policy, validates responses with Zod, and normalizes into shared `FlightSearchOutcome`.
+   - `dashboard.ts`: Acquires the dashboard access token server-side, performs a single `cache: 'no-store'` summary fetch with a 10-second abort boundary, validates the payload with `DashboardSummarySchema`, and normalizes failures into a typed `DashboardOutcome` union without exposing transport details to client components.
    - `booking-management.ts`: Acquires NextAuth session, resolves private `API_URL`, manages bounded retries (3 attempts on GET reads, fast-fail on POST mutations), validates responses with Zod, strips provider identifiers (Duffel IDs, Stripe IDs, raw snapshots), and normalizes into shared `BookingManagementOutcome`.
 
 2. **Thin Same-Origin Route Handlers (`apps/web/app/api/booking-management/`)**:

@@ -1,4 +1,4 @@
-import { expect, test, type Page, type Route } from '@playwright/test';
+import { expect, test, type Route } from '@playwright/test';
 
 const WEB_ORIGIN = 'http://127.0.0.1:3000';
 
@@ -173,24 +173,6 @@ const MOCK_MALICIOUS_TARGET_MISMATCH_PAYLOAD = {
   ],
   target: '/checkout/passengers',
 };
-
-async function loginAsNewUser(page: Page): Promise<string> {
-  const unique = Date.now() + Math.floor(Math.random() * 10000);
-  const email = `traveler${unique}@example.com`;
-  await page.goto(`${WEB_ORIGIN}/register`);
-  await page.fill('input[name="email"]', email);
-  await page.fill('input[name="password"]', 'Password123!');
-  await page.click('button[type="submit"]');
-  await expect(page).toHaveURL(/.*127\.0\.0\.1:3000\/$/, { timeout: 30000 });
-  await page.waitForLoadState('networkidle');
-  await expect
-    .poll(async () => {
-      const cookies = await page.context().cookies();
-      return cookies.some((c) => c.name.includes('next-auth'));
-    })
-    .toBe(true);
-  return email;
-}
 
 test.describe('Booking Readiness Chat Handoff', () => {
   test.setTimeout(90000);

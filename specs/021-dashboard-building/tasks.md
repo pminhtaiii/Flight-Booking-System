@@ -129,12 +129,12 @@
 
 **Purpose**: Enforce cross-cutting privacy/design constraints and leave code, tests, and repository context synchronized.
 
-- [ ] T044 [P] Audit production dashboard source for hardcoded hex/rgba values, raw Tailwind color classes, inline color styles, prototype controls/routes, client tokens, backend URLs, raw snapshots, provider IDs, payment data, and passenger PII; record results in `specs/021-dashboard-building/checklists/visual.md`
-- [ ] T045 [P] Add the dashboard module, endpoint, web server boundary, root redirect, and no-cache rationale to `context/architecture.md`
-- [ ] T046 Update the dashboard-scoped sidebar decision and removed profile-banner/unsupported-insight assumptions in `context/project-overview.md`, then record feature status, exclusions, and verified results in `context/progress-checker.md`
-- [ ] T047 Run every automated command in `specs/021-dashboard-building/quickstart.md` and record exact exit codes in `specs/021-dashboard-building/implementation-notes.md`
-- [ ] T048 Perform the manual populated, empty, expired, unavailable, responsive, keyboard, dark-theme, and reduced-motion walkthrough from `specs/021-dashboard-building/quickstart.md`
-- [ ] T049 Reconcile completed tasks, deferred items, and remaining evidence links in `specs/021-dashboard-building/tasks.md`
+- [x] T044 [P] Audit production dashboard source for hardcoded hex/rgba values, raw Tailwind color classes, inline color styles, prototype controls/routes, client tokens, backend URLs, raw snapshots, provider IDs, payment data, and passenger PII; record results in `specs/021-dashboard-building/checklists/visual.md`
+- [x] T045 [P] Add the dashboard module, endpoint, web server boundary, root redirect, and no-cache rationale to `context/architecture.md`
+- [x] T046 Update the dashboard-scoped sidebar decision and removed profile-banner/unsupported-insight assumptions in `context/project-overview.md`, then record feature status, exclusions, and verified results in `context/progress-checker.md`
+- [x] T047 Run every automated command in `specs/021-dashboard-building/quickstart.md` and record exact exit codes in `specs/021-dashboard-building/implementation-notes.md`
+- [x] T048 Perform the manual populated, empty, expired, unavailable, responsive, keyboard, dark-theme, and reduced-motion walkthrough from `specs/021-dashboard-building/quickstart.md`
+- [x] T049 Reconcile completed tasks, deferred items, and remaining evidence links in `specs/021-dashboard-building/tasks.md`
 
 ---
 
