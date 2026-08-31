@@ -25,6 +25,10 @@ type ProfileAfterMigration = Record<ProfileColumn, unknown> & {
   revision: number;
 };
 
+type ExistingProfileData = {
+  id: string;
+} & Partial<Record<ProfileColumn, unknown>>;
+
 function assertDisposableDatabase(): void {
   const databaseUrl = process.env.DATABASE_URL;
   if (!databaseUrl) {
@@ -38,12 +42,12 @@ function assertDisposableDatabase(): void {
     throw new Error('DATABASE_URL must be a valid PostgreSQL connection URL.');
   }
 
-  if (
-    !/(?:^|[_-])(test|e2e|flight_booking)(?:[_-]|$)/i.test(databaseName) &&
-    process.env.NODE_ENV !== 'test'
-  ) {
+  const isCi = process.env.CI === 'true' || process.env.GITHUB_ACTIONS === 'true';
+  const isExplicitlyDisposable = /(?:^|[_-])(test|e2e)(?:[_-]|$)/i.test(databaseName);
+
+  if (!isCi && !isExplicitlyDisposable) {
     throw new Error(
-      'This migration verifier may only run against a database explicitly named as a disposable test or e2e database.',
+      `This migration verifier may only run against a database explicitly named as a disposable test or e2e database (found '${databaseName}').`,
     );
   }
 }
@@ -103,6 +107,7 @@ describe('Traveler profile flight-match migration (E2E)', (): void => {
   let testingModule: TestingModule | undefined;
   let prisma: PrismaService;
   let originalColumns: ProfileColumn[] = [];
+  let existingProfileData: ExistingProfileData[] = [];
   let fixtureUserId: string | undefined;
 
   async function profileColumns(): Promise<ProfileColumn[]> {
@@ -150,6 +155,29 @@ describe('Traveler profile flight-match migration (E2E)', (): void => {
       if (!originalColumns.includes(column) && currentColumns.has(column)) {
         await prisma.$executeRawUnsafe(
           `ALTER TABLE "traveler_profiles" DROP COLUMN "${column}"`,
+        );
+      }
+    }
+
+    for (const row of existingProfileData) {
+      const setClauses: string[] = [];
+      for (const column of originalColumns) {
+        const val = row[column];
+        if (val === null || val === undefined) {
+          setClauses.push(`"${column}" = NULL`);
+        } else if (column === 'preferredDepartureWindow' || column === 'preferredArrivalWindow') {
+          const jsonStr = JSON.stringify(val).replace(/'/g, "''");
+          setClauses.push(`"${column}" = '${jsonStr}'::JSONB`);
+        } else if (typeof val === 'string') {
+          const escaped = val.replace(/'/g, "''");
+          setClauses.push(`"${column}" = '${escaped}'`);
+        } else {
+          setClauses.push(`"${column}" = ${String(val)}`);
+        }
+      }
+      if (setClauses.length > 0) {
+        await prisma.$executeRawUnsafe(
+          `UPDATE "traveler_profiles" SET ${setClauses.join(', ')} WHERE "id" = '${row.id.replace(/'/g, "''")}'`,
         );
       }
     }
@@ -216,6 +244,12 @@ describe('Traveler profile flight-match migration (E2E)', (): void => {
     prisma = testingModule.get<PrismaService>(PrismaService);
     await testingModule.init();
     originalColumns = await profileColumns();
+    if (originalColumns.length > 0) {
+      const selectColumns = ['"id"', ...originalColumns.map((col) => `"${col}"`)].join(', ');
+      existingProfileData = await prisma.$queryRawUnsafe<ExistingProfileData[]>(
+        `SELECT ${selectColumns} FROM "traveler_profiles"`,
+      );
+    }
   });
 
   afterAll(async (): Promise<void> => {
