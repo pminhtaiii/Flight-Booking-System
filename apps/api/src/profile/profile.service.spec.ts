@@ -125,6 +125,111 @@ describe('ProfileService', () => {
     jest.restoreAllMocks();
   });
 
+  describe('Scoring Preferences Projection', () => {
+    it('returns empty scoring preferences without requiring the booking readiness flag', async () => {
+      jest.spyOn(configService, 'get').mockReturnValue('false');
+
+      await expect(service.getScoringPreferences('user-123')).resolves.toEqual({
+        preferredAirlines: [],
+        blacklistedAirlines: [],
+        classPreference: null,
+        preferredDepartureWindow: null,
+        preferredArrivalWindow: null,
+        maxStops: null,
+        priceSensitivity: null,
+        requiresCheckedBaggage: null,
+      });
+    });
+
+    it('selects only scoring columns and never projects profile PII', async () => {
+      dbProfile = {
+        id: 'profile-123',
+        userId: 'user-123',
+        revision: 4,
+        preferredAirlines: ['SQ'],
+        blacklistedAirlines: ['XX'],
+        classPreference: 'BUSINESS',
+        preferredDepartureWindow: { start: 8, end: 12 },
+        preferredArrivalWindow: { start: 18, end: 22 },
+        maxStops: 1,
+        priceSensitivity: 'MODERATE',
+        requiresCheckedBaggage: true,
+        passportNumber: 'SECRET-PASSPORT',
+        email: 'private@example.com',
+        phoneNumber: '+123456789',
+        address: 'private address',
+      };
+
+      const result = await service.getScoringPreferences('user-123');
+
+      expect(prisma.travelerProfile.findUnique).toHaveBeenCalledWith({
+        where: { userId: 'user-123' },
+        select: {
+          preferredAirlines: true,
+          blacklistedAirlines: true,
+          classPreference: true,
+          preferredDepartureWindow: true,
+          preferredArrivalWindow: true,
+          maxStops: true,
+          priceSensitivity: true,
+          requiresCheckedBaggage: true,
+        },
+      });
+      expect(result).toEqual({
+        preferredAirlines: ['SQ'],
+        blacklistedAirlines: ['XX'],
+        classPreference: 'BUSINESS',
+        preferredDepartureWindow: { start: 8, end: 12 },
+        preferredArrivalWindow: { start: 18, end: 22 },
+        maxStops: 1,
+        priceSensitivity: 'MODERATE',
+        requiresCheckedBaggage: true,
+      });
+      expect(JSON.stringify(result)).not.toContain('SECRET-PASSPORT');
+      expect(JSON.stringify(result)).not.toContain('private@example.com');
+      expect(encryptionService.decryptBound).not.toHaveBeenCalled();
+      expect(encryptionService.decrypt).not.toHaveBeenCalled();
+    });
+
+    it('preserves ordinary and overnight hour windows', async () => {
+      dbProfile = {
+        userId: 'user-123',
+        preferredAirlines: [],
+        blacklistedAirlines: [],
+        classPreference: null,
+        preferredDepartureWindow: { start: 22, end: 6 },
+        preferredArrivalWindow: { start: 9, end: 17 },
+        maxStops: null,
+        priceSensitivity: null,
+        requiresCheckedBaggage: null,
+      };
+
+      await expect(service.getScoringPreferences('user-123')).resolves.toMatchObject({
+        preferredDepartureWindow: { start: 22, end: 6 },
+        preferredArrivalWindow: { start: 9, end: 17 },
+      });
+    });
+
+    it('fails closed to null for malformed stored hour windows', async () => {
+      dbProfile = {
+        userId: 'user-123',
+        preferredAirlines: [],
+        blacklistedAirlines: [],
+        classPreference: null,
+        preferredDepartureWindow: { start: '22', end: 6 },
+        preferredArrivalWindow: { start: 24, end: 17 },
+        maxStops: null,
+        priceSensitivity: null,
+        requiresCheckedBaggage: null,
+      };
+
+      await expect(service.getScoringPreferences('user-123')).resolves.toMatchObject({
+        preferredDepartureWindow: null,
+        preferredArrivalWindow: null,
+      });
+    });
+  });
+
   describe('Feature Flag', () => {
     it('throws NotFoundException when FEATURE_FLAG_BOOKING_READINESS is false', async () => {
       jest.spyOn(configService, 'get').mockReturnValue('false');

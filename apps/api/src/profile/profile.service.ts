@@ -11,6 +11,21 @@ import {
 import { UpdateProfileDto } from './dto/update-profile.dto';
 import { ProfileResponseDto } from './dto/profile-response.dto';
 
+export type ScoringPreferences = {
+  preferredAirlines: string[];
+  blacklistedAirlines: string[];
+  classPreference: string | null;
+  preferredDepartureWindow: { start: number; end: number } | null;
+  preferredArrivalWindow: { start: number; end: number } | null;
+  maxStops: number | null;
+  priceSensitivity: 'BUDGET' | 'MODERATE' | 'FLEXIBLE' | null;
+  requiresCheckedBaggage: boolean | null;
+};
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
 @Injectable()
 export class ProfileService {
   constructor(
@@ -158,6 +173,75 @@ export class ProfileService {
       preferences,
       revision: dbProfile.revision,
       updatedAt: dbProfile.updatedAt ? dbProfile.updatedAt.toISOString() : undefined,
+    };
+  }
+
+  async getScoringPreferences(userId: string): Promise<ScoringPreferences> {
+    const dbProfile = await this.prisma.travelerProfile.findUnique({
+      where: { userId },
+      select: {
+        preferredAirlines: true,
+        blacklistedAirlines: true,
+        classPreference: true,
+        preferredDepartureWindow: true,
+        preferredArrivalWindow: true,
+        maxStops: true,
+        priceSensitivity: true,
+        requiresCheckedBaggage: true,
+      },
+    });
+
+    if (!dbProfile) {
+      return {
+        preferredAirlines: [],
+        blacklistedAirlines: [],
+        classPreference: null,
+        preferredDepartureWindow: null,
+        preferredArrivalWindow: null,
+        maxStops: null,
+        priceSensitivity: null,
+        requiresCheckedBaggage: null,
+      };
+    }
+
+    const parseWindow = (value: Prisma.JsonValue | null): { start: number; end: number } | null => {
+      if (!isRecord(value)) return null;
+      const { start, end } = value;
+      if (
+        typeof start !== 'number' ||
+        typeof end !== 'number' ||
+        !Number.isInteger(start) ||
+        !Number.isInteger(end) ||
+        start < 0 ||
+        start > 23 ||
+        end < 0 ||
+        end > 23
+      ) {
+        return null;
+      }
+      return { start, end };
+    };
+
+    const priceSensitivity =
+      dbProfile.priceSensitivity === 'BUDGET' ||
+      dbProfile.priceSensitivity === 'MODERATE' ||
+      dbProfile.priceSensitivity === 'FLEXIBLE'
+        ? dbProfile.priceSensitivity
+        : null;
+
+    return {
+      preferredAirlines: Array.isArray(dbProfile.preferredAirlines)
+        ? dbProfile.preferredAirlines
+        : [],
+      blacklistedAirlines: Array.isArray(dbProfile.blacklistedAirlines)
+        ? dbProfile.blacklistedAirlines
+        : [],
+      classPreference: dbProfile.classPreference ?? null,
+      preferredDepartureWindow: parseWindow(dbProfile.preferredDepartureWindow),
+      preferredArrivalWindow: parseWindow(dbProfile.preferredArrivalWindow),
+      maxStops: dbProfile.maxStops ?? null,
+      priceSensitivity,
+      requiresCheckedBaggage: dbProfile.requiresCheckedBaggage ?? null,
     };
   }
 
