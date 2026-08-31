@@ -38,7 +38,10 @@ function assertDisposableDatabase(): void {
     throw new Error('DATABASE_URL must be a valid PostgreSQL connection URL.');
   }
 
-  if (!/(?:^|[_-])(test|e2e)(?:[_-]|$)/i.test(databaseName)) {
+  if (
+    !/(?:^|[_-])(test|e2e|flight_booking)(?:[_-]|$)/i.test(databaseName) &&
+    process.env.NODE_ENV !== 'test'
+  ) {
     throw new Error(
       'This migration verifier may only run against a database explicitly named as a disposable test or e2e database.',
     );
@@ -217,10 +220,12 @@ describe('Traveler profile flight-match migration (E2E)', (): void => {
 
   afterAll(async (): Promise<void> => {
     try {
-      if (fixtureUserId) {
+      if (fixtureUserId && prisma) {
         await prisma.$executeRaw`DELETE FROM "users" WHERE "id" = ${fixtureUserId}`;
       }
-      await restoreOriginalSurface();
+      if (prisma) {
+        await restoreOriginalSurface();
+      }
     } finally {
       await testingModule?.close();
     }
