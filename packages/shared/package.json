@@ -32,7 +32,7 @@
   },
   "scripts": {
     "build": "tsc",
-    "test": "pnpm run build && node --test dist/types/flight-search.types.spec.js dist/types/booking-management.types.spec.js dist/types/dashboard.types.spec.js",
+    "test": "pnpm run build && node --test dist/types/flight-search.types.spec.js dist/types/booking-management.types.spec.js dist/types/dashboard.types.spec.js dist/types/traveler-profile.types.spec.js",
     "dev": "tsc -w"
   },
   "dependencies": {

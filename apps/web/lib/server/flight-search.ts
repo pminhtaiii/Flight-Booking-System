@@ -2,6 +2,8 @@ import 'server-only';
 import * as NextAuth from 'next-auth';
 import { z } from 'zod';
 import {
+  FlightMatchResultSchema,
+  FlightSearchMatchLevelCountsSchema,
   FlightSearchOfferViewSchema,
   FlightSearchQuerySchema,
   type FlightSearchOutcome,
@@ -73,11 +75,13 @@ const UpstreamOfferSchema = z
     cabinMismatchDetails: z.array(CabinMismatchDetailSchema).nullable(),
     segments: z.array(UpstreamSegmentSchema).min(1),
     returnSegments: z.array(UpstreamSegmentSchema).min(1).nullable(),
+    matchResult: FlightMatchResultSchema.nullable().optional(),
   })
   .strict();
 
 const UpstreamSearchSchema = z
   .object({
+    mode: z.enum(['MATCHED', 'RANKED']).optional(),
     results: z.array(UpstreamOfferSchema),
     meta: z
       .object({
@@ -85,6 +89,9 @@ const UpstreamSearchSchema = z
         searchHash: z.string().min(1).optional(),
         cached: z.boolean().optional(),
         requestedCabinClass: CabinClassSchema.optional(),
+        scoringVersion: z.string().min(1).nullable().optional(),
+        eligibleCount: z.number().int().min(0).optional(),
+        matchLevelCounts: FlightSearchMatchLevelCountsSchema.optional(),
       })
       .strict()
       .optional(),
@@ -160,8 +167,9 @@ export async function searchFlights(query: FlightSearchQuery): Promise<FlightSea
 
     return {
       ok: true,
+      mode: parsedPayload.data.mode ?? 'RANKED',
       offers: validatedOffers.data,
-      meta: createSearchMeta(validatedOffers.data),
+      meta: createSearchMeta(validatedOffers.data, parsedPayload.data.meta),
     };
   } catch {
     return searchFailure(
@@ -285,6 +293,7 @@ function mapOffer(offer: UpstreamOffer) {
       mapSlice(offer.segments, offer.duration, offer.stops),
       ...(offer.returnSegments ? [mapSlice(offer.returnSegments)] : []),
     ],
+    matchResult: offer.matchResult ?? null,
   };
 }
 
@@ -325,7 +334,10 @@ function mapSegment(segment: UpstreamSegment): FlightSearchSegmentView {
   };
 }
 
-function createSearchMeta(offers: z.infer<typeof FlightSearchOfferViewSchema>[]) {
+function createSearchMeta(
+  offers: z.infer<typeof FlightSearchOfferViewSchema>[],
+  upstreamMeta?: z.infer<typeof UpstreamSearchSchema>['meta'],
+) {
   const prices = offers.map((offer) => offer.price);
   const airlines: string[] = [];
   const seenAirlines = new Set<string>();
@@ -341,6 +353,15 @@ function createSearchMeta(offers: z.infer<typeof FlightSearchOfferViewSchema>[])
     minPrice: prices.length === 0 ? null : Math.min(...prices),
     maxPrice: prices.length === 0 ? null : Math.max(...prices),
     airlines,
+    ...(upstreamMeta?.scoringVersion !== undefined
+      ? { scoringVersion: upstreamMeta.scoringVersion }
+      : {}),
+    ...(upstreamMeta?.eligibleCount !== undefined
+      ? { eligibleCount: upstreamMeta.eligibleCount }
+      : {}),
+    ...(upstreamMeta?.matchLevelCounts !== undefined
+      ? { matchLevelCounts: upstreamMeta.matchLevelCounts }
+      : {}),
   };
 }
 

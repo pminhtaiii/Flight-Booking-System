@@ -78,6 +78,123 @@ export const FlightSearchQuerySchema = z
 
 export type FlightSearchQuery = z.infer<typeof FlightSearchQuerySchema>;
 
+/** Eight fixed dimensions evaluated during deterministic flight matching. */
+export const FlightMatchDimensionSchema = z.enum([
+  'PRICE',
+  'AIRLINE',
+  'ARRIVAL_SCHEDULE',
+  'STOPS',
+  'CABIN',
+  'DEPARTURE_SCHEDULE',
+  'BAGGAGE',
+  'DURATION',
+]);
+
+export type FlightMatchDimension = z.infer<typeof FlightMatchDimensionSchema>;
+
+/** Three-tier signal derived from rounded sub-score thresholds. */
+export const DimensionSignalSchema = z.enum(['POSITIVE', 'NEUTRAL', 'NEGATIVE']);
+
+export type DimensionSignal = z.infer<typeof DimensionSignalSchema>;
+
+/** Four discrete match levels based on final score brackets. */
+export const MatchLevelSchema = z.enum(['STRONG', 'GOOD', 'FAIR', 'WEAK']);
+
+export type MatchLevel = z.infer<typeof MatchLevelSchema>;
+
+/** Safe, key-specific explanation with primitive display parameters. */
+export const ExplanationSchema = z
+  .object({
+    key: z.string().min(1),
+    params: z.record(z.union([z.string(), z.number(), z.boolean()])),
+  })
+  .strict();
+
+export type Explanation = z.infer<typeof ExplanationSchema>;
+
+/** Granular breakdown score and explanation for an individual dimension. */
+export const DimensionScoreSchema = z
+  .object({
+    dimension: FlightMatchDimensionSchema,
+    score: z.number().min(0).max(1),
+    weight: z.number().min(0).max(1),
+    contribution: z.number().min(0).max(1),
+    signal: DimensionSignalSchema,
+    explanation: ExplanationSchema,
+  })
+  .strict();
+
+export type DimensionScore = z.infer<typeof DimensionScoreSchema>;
+
+/** Allowlisted constraint violation types. */
+export const ConstraintTypeSchema = z.enum(['BLACKLISTED_AIRLINE']);
+
+export type ConstraintType = z.infer<typeof ConstraintTypeSchema>;
+
+/** Specific constraint violation blocking match eligibility. */
+export const ConstraintViolationSchema = z
+  .object({
+    constraint: ConstraintTypeSchema,
+    explanation: ExplanationSchema,
+  })
+  .strict();
+
+export type ConstraintViolation = z.infer<typeof ConstraintViolationSchema>;
+
+/** Metadata recording scoring policy version and active effective weights. */
+export const FlightMatchMetadataSchema = z
+  .object({
+    scoringVersion: z.literal('flight-match-v1'),
+    activeWeights: z.record(FlightMatchDimensionSchema, z.number().min(0).max(1)),
+  })
+  .strict();
+
+export type FlightMatchMetadata = z.infer<typeof FlightMatchMetadataSchema>;
+
+/** Result payload for an eligible offer meeting all hard constraints. */
+export const EligibleFlightMatchResultSchema = z
+  .object({
+    eligibility: z
+      .object({
+        eligible: z.literal(true),
+        violations: z.array(ConstraintViolationSchema).max(0),
+      })
+      .strict(),
+    score: z.number().int().min(0).max(100),
+    matchLevel: MatchLevelSchema,
+    breakdown: z.array(DimensionScoreSchema),
+    metadata: FlightMatchMetadataSchema,
+  })
+  .strict();
+
+export type EligibleFlightMatchResult = z.infer<typeof EligibleFlightMatchResultSchema>;
+
+/** Result payload for an offer violating at least one hard constraint. */
+export const IneligibleFlightMatchResultSchema = z
+  .object({
+    eligibility: z
+      .object({
+        eligible: z.literal(false),
+        violations: z.array(ConstraintViolationSchema).min(1),
+      })
+      .strict(),
+    score: z.null(),
+    matchLevel: z.null(),
+    breakdown: z.array(DimensionScoreSchema).max(0),
+    metadata: FlightMatchMetadataSchema,
+  })
+  .strict();
+
+export type IneligibleFlightMatchResult = z.infer<typeof IneligibleFlightMatchResultSchema>;
+
+/** Union of eligible and ineligible match result shapes. */
+export const FlightMatchResultSchema = z.union([
+  EligibleFlightMatchResultSchema,
+  IneligibleFlightMatchResultSchema,
+]);
+
+export type FlightMatchResult = z.infer<typeof FlightMatchResultSchema>;
+
 /** A sanitized segment; deliberately contains no provider identifier. */
 export const FlightSearchSegmentViewSchema = z
   .object({
@@ -124,10 +241,22 @@ export const FlightSearchOfferViewSchema = z
     duration: z.string().min(1),
     stops: z.number().int().min(0),
     slices: z.array(FlightSearchSliceViewSchema).min(1),
+    matchResult: FlightMatchResultSchema.nullable().optional(),
   })
   .strict();
 
 export type FlightSearchOfferView = z.infer<typeof FlightSearchOfferViewSchema>;
+
+export const FlightSearchMatchLevelCountsSchema = z
+  .object({
+    STRONG: z.number().int().min(0),
+    GOOD: z.number().int().min(0),
+    FAIR: z.number().int().min(0),
+    WEAK: z.number().int().min(0),
+  })
+  .strict();
+
+export type FlightSearchMatchLevelCounts = z.infer<typeof FlightSearchMatchLevelCountsSchema>;
 
 export const FlightSearchMetaSchema = z
   .object({
@@ -136,6 +265,9 @@ export const FlightSearchMetaSchema = z
     minPrice: z.number().finite().min(0).nullable(),
     maxPrice: z.number().finite().min(0).nullable(),
     airlines: z.array(z.string().min(1)),
+    scoringVersion: z.string().min(1).nullable().optional(),
+    eligibleCount: z.number().int().min(0).optional(),
+    matchLevelCounts: FlightSearchMatchLevelCountsSchema.optional(),
   })
   .strict();
 
@@ -150,14 +282,19 @@ const FlightSearchFailureSchema = z
   })
   .strict();
 
+export const FlightSearchSuccessOutcomeSchema = z
+  .object({
+    ok: z.literal(true),
+    mode: z.enum(['MATCHED', 'RANKED']).optional(),
+    offers: z.array(FlightSearchOfferViewSchema),
+    meta: FlightSearchMetaSchema,
+  })
+  .strict();
+
+export type FlightSearchSuccessOutcome = z.infer<typeof FlightSearchSuccessOutcomeSchema>;
+
 export const FlightSearchOutcomeSchema = z.discriminatedUnion('ok', [
-  z
-    .object({
-      ok: z.literal(true),
-      offers: z.array(FlightSearchOfferViewSchema),
-      meta: FlightSearchMetaSchema,
-    })
-    .strict(),
+  FlightSearchSuccessOutcomeSchema,
   FlightSearchFailureSchema,
 ]);
 

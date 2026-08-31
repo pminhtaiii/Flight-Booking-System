@@ -22,12 +22,12 @@ description: "Dependency-ordered implementation tasks for deterministic flight m
 
 **Purpose**: Make the cross-service contract explicit before any producer or consumer changes.
 
-- [ ] T001 Drive MATCHED eligibility/score/level/breakdown schemas one behavior at a time through RED → GREEN in `packages/shared/src/types/flight-search.types.spec.ts` and `packages/shared/src/types/flight-search.types.ts`
-- [ ] T002 Drive RANKED nullability, active-weight precision, key-specific explanation parameters, and provider-ID rejection one behavior at a time through RED → GREEN in `packages/shared/src/types/flight-search.types.spec.ts` and `packages/shared/src/types/flight-search.types.ts`
-- [ ] T003 Drive hour-window and price-sensitivity contracts one behavior at a time through RED → GREEN in `packages/shared/src/types/traveler-profile.types.spec.ts` and `packages/shared/src/types/traveler-profile.types.ts`
-- [ ] T004 Drive airline canonicalization, max-stops, and tri-state baggage contracts one behavior at a time through RED → GREEN and export them in `packages/shared/src/types/traveler-profile.types.spec.ts`, `packages/shared/src/types/traveler-profile.types.ts`, `packages/shared/src/types/index.ts`, and `packages/shared/src/index.ts`
-- [ ] T005 Drive legacy-response-as-RANKED and future mode-tagged upstream parsing through RED → GREEN before producer work in `apps/web/lib/server/flight-search.spec.ts` and `apps/web/lib/server/flight-search.ts`
-- [ ] T006 Run the shared/web contract gates and reconcile the trusted Nest boundary in `specs/022-flight-match-scoring/contracts/flight-search.openapi.yaml` with the provider-blind shared boundary
+- [x] T001 Drive MATCHED eligibility/score/level/breakdown schemas one behavior at a time through RED → GREEN in `packages/shared/src/types/flight-search.types.spec.ts` and `packages/shared/src/types/flight-search.types.ts`
+- [x] T002 Drive RANKED nullability, active-weight precision, key-specific explanation parameters, and provider-ID rejection one behavior at a time through RED → GREEN in `packages/shared/src/types/flight-search.types.spec.ts` and `packages/shared/src/types/flight-search.types.ts`
+- [x] T003 Drive hour-window and price-sensitivity contracts one behavior at a time through RED → GREEN in `packages/shared/src/types/traveler-profile.types.spec.ts` and `packages/shared/src/types/traveler-profile.types.ts`
+- [x] T004 Drive airline canonicalization, max-stops, and tri-state baggage contracts one behavior at a time through RED → GREEN and export them in `packages/shared/src/types/traveler-profile.types.spec.ts`, `packages/shared/src/types/traveler-profile.types.ts`, `packages/shared/src/types/index.ts`, and `packages/shared/src/index.ts`
+- [x] T005 Drive legacy-response-as-RANKED and future mode-tagged upstream parsing through RED → GREEN before producer work in `apps/web/lib/server/flight-search.spec.ts` and `apps/web/lib/server/flight-search.ts`
+- [x] T006 Run the shared/web contract gates and reconcile the trusted Nest boundary in `specs/022-flight-match-scoring/contracts/flight-search.openapi.yaml` with the provider-blind shared boundary
 
 **Checkpoint**: Strict shared contracts compile and reject provider/PII expansion before persistence or runtime work begins.
 
