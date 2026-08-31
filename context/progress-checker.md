@@ -6,14 +6,45 @@ Update this file after every completed feature. Any AI agent reading this should
 
 ### Current Status
 
-**Feature:** Authenticated Booking Dashboard (Feature 021) — 100% COMPLETE across all 6 Phases (Tasks T001–T049)
-**Last completed:** Phase 6 (T044–T049): Visual/privacy audit, architecture sync, progress checker sync, full automated quickstart gate matrix (67/67 shared contract, 36/36 API unit/controller, 7/7 API E2E, 39/39 web loader/routing, 20/20 Playwright browser acceptance, 20/20 CI contract, 60/60 smoke units, ESLint/TypeScript/Next.js build green with exit code 0), manual acceptance walkthrough, and tasks ledger reconciliation (2026-08-30).
-**In progress:** None (Feature 021 complete and ready for PR merge).
-**Next:** Feature 022 or next planned milestone.
+**Feature:** Flight Match Scoring (Feature 022) — Phase 1 & Phase 2 / Slice 1 Complete (Tasks T001–T010)
+**Last completed:** Phase 2 / Slice 1 (T007–T010): Additive Prisma migration for 5 nullable flight match preferences on `TravelerProfile`, migration characterization E2E test verifying null defaults, revision preservation, and zero score tables/columns, DTO validation for schedule windows (`HourWindowDto` with start/end 0..23, overnight window support, strict keys), DTO validation for `maxStops` (0..8), `priceSensitivity` (`BUDGET | MODERATE | FLEXIBLE`), `requiresCheckedBaggage`, airline code canonicalization (trim, uppercase, 2-3 char IATA/ICAO format, deduplication), and clean mapping to `ProfileResponseDto` with shared contract types (2026-08-31).
+**In progress:** Phase 2 / Slice 2 (T011+): Profile scoring preferences projection and offer normalizer.
+**Next:** T011–T022 (Foundational Scoring Projection, Normalizer & Policy).
 
 ---
 
 ## Progress by Feature
+
+### [ ] Feature: Flight Match Scoring (Feature 022)
+
+- [x] Phase 2 / Slice 1: Database Migration & Profile DTO Validation (T007–T010) (2026-08-31):
+  - **T007: Additive Prisma Migration (`apps/api/prisma/schema.prisma`, `apps/api/prisma/migrations/20260831000000_add_flight_match_preferences/migration.sql`)**:
+    - Added 5 nullable columns to `TravelerProfile` (`preferredDepartureWindow: Json?`, `preferredArrivalWindow: Json?`, `maxStops: Int?`, `priceSensitivity: String?`, `requiresCheckedBaggage: Boolean?`).
+    - Verified null-default behavior on all new columns for existing rows without rewriting existing profile records.
+  - **T008: Migration Invariants & Revision Safety (`apps/api/test/traveler-profile-flight-match-migration.e2e-spec.ts`)**:
+    - Verified existing profile `revision` numbers are strictly preserved during migration.
+    - Verified exactly 0 new tables are created (no `flight_match_scores` table).
+    - Verified exactly 0 score columns are added to `bookings` or `flights`.
+  - **T009: DTO Validation for Schedule Windows (`apps/api/src/profile/dto/update-profile.dto.ts`, `apps/api/src/profile/profile.controller.spec.ts`)**:
+    - Added nested `HourWindowDto` with `@IsInt()`, `@Min(0)`, `@Max(23)` for `start` and `end`.
+    - Supported overnight windows where `start > end` (e.g. `{ start: 22, end: 6 }`).
+    - Rejected unknown extra properties, non-integer hours, floats, and strings.
+    - Allowed explicit `null` to clear preferences.
+  - **T010: DTO Validation for Sensitivity, Baggage, Stops & Canonical Airlines (`apps/api/src/profile/dto/update-profile.dto.ts`, `apps/api/src/profile/dto/profile-response.dto.ts`, `apps/api/src/profile/profile.controller.spec.ts`)**:
+    - Validated `maxStops`: nullable integer `0..8`.
+    - Validated `priceSensitivity`: `@IsIn(['BUDGET', 'MODERATE', 'FLEXIBLE'])` with case/trim normalization.
+    - Validated `requiresCheckedBaggage`: nullable boolean.
+    - Canonicalized `preferredAirlines` and `blacklistedAirlines`: trimmed, uppercased to 2-3 char IATA/ICAO format (`/^[A-Z0-9]{2,3}$/`), and deduplicated arrays.
+    - Mapped all 5 fields cleanly into `ProfileResponseDto` using `@shared/types`.
+    - Automated tests: 42/42 controller tests PASS (`src/profile/profile.controller.spec.ts`), 1/1 migration E2E test PASS (`test/traveler-profile-flight-match-migration.e2e-spec.ts`), strict TypeScript `tsc` exit code 0.
+
+- [x] Phase 1: Setup — Strict Shared Contracts (T001–T006) (2026-08-31):
+  - **T001–T004: Shared Types and Schemas (`packages/shared/src/types/`)**:
+    - Implemented strict Zod contracts and types for `HourWindow`, `PriceSensitivity`, `CarrierCodeSchema`, `canonicalizeCarrierCodes`, `MaxStopsSchema`, `RequiresCheckedBaggageSchema`, `FlightMatchResult`, `DimensionScore`, `ExplanationSchema`, and `FlightSearchOfferViewSchema`.
+    - Shared contract test suite: 110/110 tests PASS (`pnpm --filter @shared/types test`).
+  - **T005–T006: Server-side Tolerant Parser & Boundary Contracts (`apps/web/lib/server/flight-search.ts`, `specs/022-flight-match-scoring/contracts/flight-search.openapi.yaml`)**:
+    - Handled legacy search response as `RANKED` and future mode-tagged results.
+    - Reconciled trusted Nest boundary with provider-blind shared boundary.
 
 ### [x] Feature: Authenticated Booking Dashboard (Feature 021)
 

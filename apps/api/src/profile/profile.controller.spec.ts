@@ -241,10 +241,10 @@ describe('ProfileController', () => {
       expect(await validate(dto, { whitelist: true, forbidNonWhitelisted: true })).not.toHaveLength(0);
     });
 
-    it('rejects maxStops above three', async (): Promise<void> => {
+    it('rejects maxStops above eight', async (): Promise<void> => {
       const dto = plainToInstance(UpdateProfileDto, {
         expectedRevision: 1,
-        preferences: { maxStops: 4 },
+        preferences: { maxStops: 9 },
       });
 
       expect(await validate(dto, { whitelist: true, forbidNonWhitelisted: true })).not.toHaveLength(0);
@@ -343,10 +343,19 @@ describe('ProfileController', () => {
       expect(await validate(dto, { whitelist: true, forbidNonWhitelisted: true })).not.toHaveLength(0);
     });
 
-    it('rejects a three-character airline code', async (): Promise<void> => {
+    it('accepts two-character and three-character airline codes', async (): Promise<void> => {
       const dto = plainToInstance(UpdateProfileDto, {
         expectedRevision: 1,
-        preferences: { preferredAirlines: ['VNA'] },
+        preferences: { preferredAirlines: ['VN', 'VNA'] },
+      });
+
+      expect(await validate(dto, { whitelist: true, forbidNonWhitelisted: true })).toHaveLength(0);
+    });
+
+    it('rejects a four-character airline code', async (): Promise<void> => {
+      const dto = plainToInstance(UpdateProfileDto, {
+        expectedRevision: 1,
+        preferences: { preferredAirlines: ['VNAR'] },
       });
 
       expect(await validate(dto, { whitelist: true, forbidNonWhitelisted: true })).not.toHaveLength(0);

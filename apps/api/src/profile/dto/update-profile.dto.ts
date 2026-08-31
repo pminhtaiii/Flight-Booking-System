@@ -1,4 +1,5 @@
 import { Transform, TransformFnParams, Type } from 'class-transformer';
+import { PriceSensitivity } from '@shared/types';
 import {
   IsArray,
   IsBoolean,
@@ -140,14 +141,14 @@ export class PreferencesSectionDto {
   @ValidateIf((_object, value) => value !== null)
   @IsInt()
   @Min(0)
-  @Max(3)
+  @Max(8)
   maxStops?: number | null;
 
   @IsOptional()
   @ValidateIf((_object, value) => value !== null)
   @Transform(({ value }: TransformFnParams): unknown => canonicalizePriceSensitivity(value))
   @IsIn(['BUDGET', 'MODERATE', 'FLEXIBLE'])
-  priceSensitivity?: 'BUDGET' | 'MODERATE' | 'FLEXIBLE' | null;
+  priceSensitivity?: PriceSensitivity | null;
 
   @IsOptional()
   @ValidateIf((_object, value) => value !== null)
@@ -158,14 +159,14 @@ export class PreferencesSectionDto {
   @Transform(({ value }: TransformFnParams): unknown => canonicalizeAirlineCodes(value))
   @IsArray()
   @IsString({ each: true })
-  @Matches(/^[A-Z0-9]{2}$/, { each: true })
+  @Matches(/^[A-Z0-9]{2,3}$/, { each: true })
   preferredAirlines?: string[] | null;
 
   @IsOptional()
   @Transform(({ value }: TransformFnParams): unknown => canonicalizeAirlineCodes(value))
   @IsArray()
   @IsString({ each: true })
-  @Matches(/^[A-Z0-9]{2}$/, { each: true })
+  @Matches(/^[A-Z0-9]{2,3}$/, { each: true })
   blacklistedAirlines?: string[] | null;
 }
 
