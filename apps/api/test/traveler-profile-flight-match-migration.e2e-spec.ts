@@ -25,11 +25,7 @@ type ProfileAfterMigration = Record<ProfileColumn, unknown> & {
   revision: number;
 };
 
-type ExistingProfileData = {
-  id: string;
-} & Partial<Record<ProfileColumn, unknown>>;
-
-function assertDisposableDatabase(): void {
+function assertSafeDatabase(): void {
   const databaseUrl = process.env.DATABASE_URL;
   if (!databaseUrl) {
     throw new Error('DATABASE_URL is required for the migration verifier.');
@@ -42,26 +38,29 @@ function assertDisposableDatabase(): void {
     throw new Error('DATABASE_URL must be a valid PostgreSQL connection URL.');
   }
 
-  const isCi = process.env.CI === 'true' || process.env.GITHUB_ACTIONS === 'true';
-  const isExplicitlyDisposable = /(?:^|[_-])(test|e2e)(?:[_-]|$)/i.test(databaseName);
-
-  if (!isCi && !isExplicitlyDisposable) {
+  if (
+    /(?:^|[_-])(prod|production)(?:[_-]|$)/i.test(databaseName) ||
+    process.env.NODE_ENV === 'production'
+  ) {
     throw new Error(
-      `This migration verifier may only run against a database explicitly named as a disposable test or e2e database (found '${databaseName}').`,
+      `This migration verifier may not run against a production database ('${databaseName}').`,
     );
   }
 }
 
-async function executeSqlScript(sql: string): Promise<void> {
+async function executeSqlScriptInSchema(sql: string, schemaName: string): Promise<void> {
   const databaseUrl = process.env.DATABASE_URL;
   if (!databaseUrl) {
     throw new Error('DATABASE_URL is required to execute migration SQL.');
   }
 
+  const schemaDbUrl = new URL(databaseUrl);
+  schemaDbUrl.searchParams.set('schema', schemaName);
+
   const prismaCliPath = require.resolve('prisma/build/index.js');
   const prismaProcess = spawn(
     process.execPath,
-    [prismaCliPath, 'db', 'execute', '--stdin', '--url', databaseUrl],
+    [prismaCliPath, 'db', 'execute', '--stdin', '--url', schemaDbUrl.toString()],
     {
       stdio: ['pipe', 'ignore', 'pipe'],
       env: {
@@ -104,120 +103,45 @@ async function executeSqlScript(sql: string): Promise<void> {
 describe('Traveler profile flight-match migration (E2E)', (): void => {
   jest.setTimeout(60_000);
 
+  const testSchema = `flight_match_migration_${randomUUID().replace(/-/g, '_')}`;
   let testingModule: TestingModule | undefined;
   let prisma: PrismaService;
-  let originalColumns: ProfileColumn[] = [];
-  let existingProfileData: ExistingProfileData[] = [];
-  let fixtureUserId: string | undefined;
-
-  async function profileColumns(): Promise<ProfileColumn[]> {
-    const rows = await prisma.$queryRaw<Array<{ columnName: ProfileColumn }>>`
-      SELECT column_name AS "columnName"
-      FROM information_schema.columns
-      WHERE table_schema = current_schema()
-        AND table_name = 'traveler_profiles'
-        AND column_name IN (
-          'preferredDepartureWindow',
-          'preferredArrivalWindow',
-          'maxStops',
-          'priceSensitivity',
-          'requiresCheckedBaggage'
-        )
-      ORDER BY column_name;
-    `;
-    return rows.map((row) => row.columnName);
-  }
-
-  async function restorePreMigrationSurface(): Promise<void> {
-    for (const column of PROFILE_COLUMNS) {
-      await prisma.$executeRawUnsafe(
-        `ALTER TABLE "traveler_profiles" DROP COLUMN IF EXISTS "${column}"`,
-      );
-    }
-  }
-
-  async function restoreOriginalSurface(): Promise<void> {
-    const definitions: Record<ProfileColumn, string> = {
-      preferredDepartureWindow: 'JSONB',
-      preferredArrivalWindow: 'JSONB',
-      maxStops: 'INTEGER',
-      priceSensitivity: 'TEXT',
-      requiresCheckedBaggage: 'BOOLEAN',
-    };
-    const currentColumns = new Set(await profileColumns());
-
-    for (const column of PROFILE_COLUMNS) {
-      if (originalColumns.includes(column) && !currentColumns.has(column)) {
-        await prisma.$executeRawUnsafe(
-          `ALTER TABLE "traveler_profiles" ADD COLUMN "${column}" ${definitions[column]}`,
-        );
-      }
-      if (!originalColumns.includes(column) && currentColumns.has(column)) {
-        await prisma.$executeRawUnsafe(
-          `ALTER TABLE "traveler_profiles" DROP COLUMN "${column}"`,
-        );
-      }
-    }
-
-    for (const row of existingProfileData) {
-      const setClauses: string[] = [];
-      for (const column of originalColumns) {
-        const val = row[column];
-        if (val === null || val === undefined) {
-          setClauses.push(`"${column}" = NULL`);
-        } else if (column === 'preferredDepartureWindow' || column === 'preferredArrivalWindow') {
-          const jsonStr = JSON.stringify(val).replace(/'/g, "''");
-          setClauses.push(`"${column}" = '${jsonStr}'::JSONB`);
-        } else if (typeof val === 'string') {
-          const escaped = val.replace(/'/g, "''");
-          setClauses.push(`"${column}" = '${escaped}'`);
-        } else {
-          setClauses.push(`"${column}" = ${String(val)}`);
-        }
-      }
-      if (setClauses.length > 0) {
-        await prisma.$executeRawUnsafe(
-          `UPDATE "traveler_profiles" SET ${setClauses.join(', ')} WHERE "id" = '${row.id.replace(/'/g, "''")}'`,
-        );
-      }
-    }
-  }
 
   async function userTables(): Promise<string[]> {
-    const rows = await prisma.$queryRaw<Array<{ tableName: string }>>`
-      SELECT table_name AS "tableName"
-      FROM information_schema.tables
-      WHERE table_schema = current_schema()
-        AND table_type = 'BASE TABLE'
-      ORDER BY table_name;
-    `;
+    const rows = await prisma.$queryRawUnsafe<Array<{ tableName: string }>>(
+      `SELECT table_name AS "tableName"
+       FROM information_schema.tables
+       WHERE table_schema = '${testSchema}'
+         AND table_type = 'BASE TABLE'
+       ORDER BY table_name;`,
+    );
     return rows.map((row) => row.tableName);
   }
 
   async function scoreColumnsFor(tableName: 'bookings' | 'flights'): Promise<string[]> {
-    const rows = await prisma.$queryRaw<Array<{ columnName: string }>>`
-      SELECT column_name AS "columnName"
-      FROM information_schema.columns
-      WHERE table_schema = current_schema()
-        AND table_name = ${tableName}
-        AND column_name ILIKE '%score%'
-      ORDER BY column_name;
-    `;
+    const rows = await prisma.$queryRawUnsafe<Array<{ columnName: string }>>(
+      `SELECT column_name AS "columnName"
+       FROM information_schema.columns
+       WHERE table_schema = '${testSchema}'
+         AND table_name = '${tableName}'
+         AND column_name ILIKE '%score%'
+       ORDER BY column_name;`,
+    );
     return rows.map((row) => row.columnName);
   }
 
   async function profileAfterMigration(profileId: string): Promise<ProfileAfterMigration> {
-    const rows = await prisma.$queryRaw<ProfileAfterMigration[]>`
-      SELECT
-        "revision",
-        "preferredDepartureWindow",
-        "preferredArrivalWindow",
-        "maxStops",
-        "priceSensitivity",
-        "requiresCheckedBaggage"
-      FROM "traveler_profiles"
-      WHERE "id" = ${profileId};
-    `;
+    const rows = await prisma.$queryRawUnsafe<ProfileAfterMigration[]>(
+      `SELECT
+         "revision",
+         "preferredDepartureWindow",
+         "preferredArrivalWindow",
+         "maxStops",
+         "priceSensitivity",
+         "requiresCheckedBaggage"
+       FROM "${testSchema}"."traveler_profiles"
+       WHERE "id" = '${profileId}';`,
+    );
     if (!rows[0]) {
       throw new Error('The pre-migration traveler profile was not found after migration.');
     }
@@ -225,11 +149,11 @@ describe('Traveler profile flight-match migration (E2E)', (): void => {
   }
 
   async function legacyProfileRevision(profileId: string): Promise<number> {
-    const rows = await prisma.$queryRaw<Array<{ revision: number }>>`
-      SELECT "revision"
-      FROM "traveler_profiles"
-      WHERE "id" = ${profileId};
-    `;
+    const rows = await prisma.$queryRawUnsafe<Array<{ revision: number }>>(
+      `SELECT "revision"
+       FROM "${testSchema}"."traveler_profiles"
+       WHERE "id" = '${profileId}';`,
+    );
     if (!rows[0]) {
       throw new Error('The pre-migration traveler profile was not created.');
     }
@@ -237,28 +161,48 @@ describe('Traveler profile flight-match migration (E2E)', (): void => {
   }
 
   beforeAll(async (): Promise<void> => {
-    assertDisposableDatabase();
+    assertSafeDatabase();
     testingModule = await Test.createTestingModule({
       imports: [PrismaModule],
     }).compile();
     prisma = testingModule.get<PrismaService>(PrismaService);
     await testingModule.init();
-    originalColumns = await profileColumns();
-    if (originalColumns.length > 0) {
-      const selectColumns = ['"id"', ...originalColumns.map((col) => `"${col}"`)].join(', ');
-      existingProfileData = await prisma.$queryRawUnsafe<ExistingProfileData[]>(
-        `SELECT ${selectColumns} FROM "traveler_profiles"`,
+
+    await prisma.$executeRawUnsafe(`CREATE SCHEMA "${testSchema}"`);
+    await prisma.$executeRawUnsafe(`
+      CREATE TABLE "${testSchema}"."users" (
+        "id" TEXT PRIMARY KEY,
+        "email" TEXT UNIQUE NOT NULL,
+        "password" TEXT NOT NULL,
+        "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
       );
-    }
+    `);
+    await prisma.$executeRawUnsafe(`
+      CREATE TABLE "${testSchema}"."traveler_profiles" (
+        "id" TEXT PRIMARY KEY,
+        "userId" TEXT NOT NULL,
+        "preferredAirlines" TEXT[] DEFAULT ARRAY[]::TEXT[],
+        "blacklistedAirlines" TEXT[] DEFAULT ARRAY[]::TEXT[],
+        "revision" INTEGER NOT NULL DEFAULT 1,
+        "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+    await prisma.$executeRawUnsafe(`
+      CREATE TABLE "${testSchema}"."bookings" (
+        "id" TEXT PRIMARY KEY
+      );
+    `);
+    await prisma.$executeRawUnsafe(`
+      CREATE TABLE "${testSchema}"."flights" (
+        "id" TEXT PRIMARY KEY
+      );
+    `);
   });
 
   afterAll(async (): Promise<void> => {
     try {
-      if (fixtureUserId && prisma) {
-        await prisma.$executeRaw`DELETE FROM "users" WHERE "id" = ${fixtureUserId}`;
-      }
       if (prisma) {
-        await restoreOriginalSurface();
+        await prisma.$executeRawUnsafe(`DROP SCHEMA IF EXISTS "${testSchema}" CASCADE`);
       }
     } finally {
       await testingModule?.close();
@@ -266,21 +210,18 @@ describe('Traveler profile flight-match migration (E2E)', (): void => {
   });
 
   it('adds nullable profile preferences without changing existing rows or persisting scores', async (): Promise<void> => {
-    await restorePreMigrationSurface();
     const beforeTables = await userTables();
     const marker = randomUUID();
     const userId = randomUUID();
     const profileId = randomUUID();
     const legacyRevision = 7;
-    fixtureUserId = userId;
 
-    // Generated Prisma clients select post-migration columns, so this verifier creates its legacy fixture through parameterized SQL.
-    await prisma.$executeRaw`
-      INSERT INTO "users" ("id", "email", "password", "updatedAt")
-      VALUES (${userId}, ${`flight-match-migration-${marker}@example.test`}, 'migration-test-password', NOW());
-    `;
-    await prisma.$executeRaw`
-      INSERT INTO "traveler_profiles" (
+    await prisma.$executeRawUnsafe(`
+      INSERT INTO "${testSchema}"."users" ("id", "email", "password", "updatedAt")
+      VALUES ('${userId}', 'flight-match-migration-${marker}@example.test', 'migration-test-password', NOW());
+    `);
+    await prisma.$executeRawUnsafe(`
+      INSERT INTO "${testSchema}"."traveler_profiles" (
         "id",
         "userId",
         "preferredAirlines",
@@ -288,12 +229,13 @@ describe('Traveler profile flight-match migration (E2E)', (): void => {
         "revision",
         "updatedAt"
       )
-      VALUES (${profileId}, ${userId}, ARRAY[]::TEXT[], ARRAY[]::TEXT[], ${legacyRevision}, NOW());
-    `;
+      VALUES ('${profileId}', '${userId}', ARRAY[]::TEXT[], ARRAY[]::TEXT[], ${legacyRevision}, NOW());
+    `);
+
     const beforeMigration = { revision: await legacyProfileRevision(profileId) };
     expect(beforeMigration.revision).toBe(legacyRevision);
 
-    await executeSqlScript(fs.readFileSync(MIGRATION_PATH, 'utf8'));
+    await executeSqlScriptInSchema(fs.readFileSync(MIGRATION_PATH, 'utf8'), testSchema);
 
     const afterMigration = await profileAfterMigration(profileId);
     const afterTables = await userTables();
