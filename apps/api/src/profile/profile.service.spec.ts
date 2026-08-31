@@ -1,6 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { ConflictException, NotFoundException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { Prisma } from '@prisma/client';
 import { ProfileService } from './profile.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { EncryptionService } from '../common/encryption.service';
@@ -405,8 +406,8 @@ describe('ProfileService', () => {
           classPreference: null,
           preferredAirlines: [],
           blacklistedAirlines: [],
-          preferredDepartureWindow: null,
-          preferredArrivalWindow: null,
+          preferredDepartureWindow: Prisma.DbNull,
+          preferredArrivalWindow: Prisma.DbNull,
           maxStops: null,
           priceSensitivity: null,
           requiresCheckedBaggage: null,
