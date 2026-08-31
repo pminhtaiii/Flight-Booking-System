@@ -102,13 +102,255 @@ export const MatchLevelSchema = z.enum(['STRONG', 'GOOD', 'FAIR', 'WEAK']);
 
 export type MatchLevel = z.infer<typeof MatchLevelSchema>;
 
-/** Safe, key-specific explanation with primitive display parameters. */
-export const ExplanationSchema = z
+/** Helper correlating a rounded 0..100 score to its canonical match level bracket. */
+export const getExpectedMatchLevel = (score: number): MatchLevel => {
+  if (score >= 75) return 'STRONG';
+  if (score >= 50) return 'GOOD';
+  if (score >= 25) return 'FAIR';
+  return 'WEAK';
+};
+
+/** All 24 allowlisted explanation keys across scoring policy dimensions and constraints. */
+export const ExplanationKeySchema = z.enum([
+  'match.price.below_median',
+  'match.price.at_median',
+  'match.price.above_median',
+  'match.airline.preferred',
+  'match.airline.neutral',
+  'match.arrival.in_window',
+  'match.arrival.near_window',
+  'match.arrival.outside_window',
+  'match.stops.within_preference',
+  'match.stops.exceeds_preference',
+  'match.stops.relative',
+  'match.cabin.exact',
+  'match.cabin.adjacent',
+  'match.cabin.mismatch',
+  'match.departure.in_window',
+  'match.departure.near_window',
+  'match.departure.outside_window',
+  'match.baggage.checked_included',
+  'match.baggage.checked_missing',
+  'match.baggage.not_required',
+  'match.duration.below_median',
+  'match.duration.at_median',
+  'match.duration.above_median',
+  'constraint.airline.blacklisted',
+]);
+
+export type ExplanationKey = z.infer<typeof ExplanationKeySchema>;
+
+const PriceExplanationParamsSchema = z
   .object({
-    key: z.string().min(1),
-    params: z.record(z.union([z.string(), z.number(), z.boolean()])),
+    difference: z.union([z.string(), z.number()]).optional(),
+    percentDiff: z.number().optional(),
+    percentBelow: z.number().optional(),
+    currency: z.string().optional(),
+    isBest: z.boolean().optional(),
   })
   .strict();
+
+const AirlineExplanationParamsSchema = z
+  .object({
+    airline: z.string().optional(),
+  })
+  .strict();
+
+const ScheduleExplanationParamsSchema = z
+  .object({
+    time: z.string().optional(),
+    windowStart: z.union([z.string(), z.number()]).optional(),
+    windowEnd: z.union([z.string(), z.number()]).optional(),
+  })
+  .strict();
+
+const StopsExplanationParamsSchema = z
+  .object({
+    actual: z.number().optional(),
+    preferred: z.number().optional(),
+    stops: z.number().optional(),
+    maxStops: z.number().optional(),
+    minStops: z.number().optional(),
+  })
+  .strict();
+
+const CabinExplanationParamsSchema = z
+  .object({
+    expected: z.string().optional(),
+    actual: z.string().optional(),
+    cabin: z.string().optional(),
+  })
+  .strict();
+
+const BaggageExplanationParamsSchema = z
+  .object({
+    checkedBags: z.number().optional(),
+    required: z.boolean().optional(),
+  })
+  .strict();
+
+const DurationExplanationParamsSchema = z
+  .object({
+    difference: z.union([z.string(), z.number()]).optional(),
+    percentDiff: z.number().optional(),
+    percentBelow: z.number().optional(),
+    minutes: z.number().optional(),
+  })
+  .strict();
+
+const BlacklistedAirlineExplanationParamsSchema = z
+  .object({
+    airline: z.string().optional(),
+  })
+  .strict();
+
+/** Safe, key-specific explanation with primitive display parameters. */
+export const ExplanationSchema = z.discriminatedUnion('key', [
+  z
+    .object({
+      key: z.literal('match.price.below_median'),
+      params: PriceExplanationParamsSchema,
+    })
+    .strict(),
+  z
+    .object({
+      key: z.literal('match.price.at_median'),
+      params: PriceExplanationParamsSchema,
+    })
+    .strict(),
+  z
+    .object({
+      key: z.literal('match.price.above_median'),
+      params: PriceExplanationParamsSchema,
+    })
+    .strict(),
+  z
+    .object({
+      key: z.literal('match.airline.preferred'),
+      params: AirlineExplanationParamsSchema,
+    })
+    .strict(),
+  z
+    .object({
+      key: z.literal('match.airline.neutral'),
+      params: AirlineExplanationParamsSchema,
+    })
+    .strict(),
+  z
+    .object({
+      key: z.literal('match.arrival.in_window'),
+      params: ScheduleExplanationParamsSchema,
+    })
+    .strict(),
+  z
+    .object({
+      key: z.literal('match.arrival.near_window'),
+      params: ScheduleExplanationParamsSchema,
+    })
+    .strict(),
+  z
+    .object({
+      key: z.literal('match.arrival.outside_window'),
+      params: ScheduleExplanationParamsSchema,
+    })
+    .strict(),
+  z
+    .object({
+      key: z.literal('match.stops.within_preference'),
+      params: StopsExplanationParamsSchema,
+    })
+    .strict(),
+  z
+    .object({
+      key: z.literal('match.stops.exceeds_preference'),
+      params: StopsExplanationParamsSchema,
+    })
+    .strict(),
+  z
+    .object({
+      key: z.literal('match.stops.relative'),
+      params: StopsExplanationParamsSchema,
+    })
+    .strict(),
+  z
+    .object({
+      key: z.literal('match.cabin.exact'),
+      params: CabinExplanationParamsSchema,
+    })
+    .strict(),
+  z
+    .object({
+      key: z.literal('match.cabin.adjacent'),
+      params: CabinExplanationParamsSchema,
+    })
+    .strict(),
+  z
+    .object({
+      key: z.literal('match.cabin.mismatch'),
+      params: CabinExplanationParamsSchema,
+    })
+    .strict(),
+  z
+    .object({
+      key: z.literal('match.departure.in_window'),
+      params: ScheduleExplanationParamsSchema,
+    })
+    .strict(),
+  z
+    .object({
+      key: z.literal('match.departure.near_window'),
+      params: ScheduleExplanationParamsSchema,
+    })
+    .strict(),
+  z
+    .object({
+      key: z.literal('match.departure.outside_window'),
+      params: ScheduleExplanationParamsSchema,
+    })
+    .strict(),
+  z
+    .object({
+      key: z.literal('match.baggage.checked_included'),
+      params: BaggageExplanationParamsSchema,
+    })
+    .strict(),
+  z
+    .object({
+      key: z.literal('match.baggage.checked_missing'),
+      params: BaggageExplanationParamsSchema,
+    })
+    .strict(),
+  z
+    .object({
+      key: z.literal('match.baggage.not_required'),
+      params: BaggageExplanationParamsSchema,
+    })
+    .strict(),
+  z
+    .object({
+      key: z.literal('match.duration.below_median'),
+      params: DurationExplanationParamsSchema,
+    })
+    .strict(),
+  z
+    .object({
+      key: z.literal('match.duration.at_median'),
+      params: DurationExplanationParamsSchema,
+    })
+    .strict(),
+  z
+    .object({
+      key: z.literal('match.duration.above_median'),
+      params: DurationExplanationParamsSchema,
+    })
+    .strict(),
+  z
+    .object({
+      key: z.literal('constraint.airline.blacklisted'),
+      params: BlacklistedAirlineExplanationParamsSchema,
+    })
+    .strict(),
+]);
 
 export type Explanation = z.infer<typeof ExplanationSchema>;
 
@@ -141,11 +383,46 @@ export const ConstraintViolationSchema = z
 
 export type ConstraintViolation = z.infer<typeof ConstraintViolationSchema>;
 
+/** Active weights across all 8 match dimensions normalized to sum to 1.000000. */
+export const ActiveWeightsSchema = z
+  .object({
+    PRICE: z.number().min(0).max(1),
+    AIRLINE: z.number().min(0).max(1),
+    ARRIVAL_SCHEDULE: z.number().min(0).max(1),
+    STOPS: z.number().min(0).max(1),
+    CABIN: z.number().min(0).max(1),
+    DEPARTURE_SCHEDULE: z.number().min(0).max(1),
+    BAGGAGE: z.number().min(0).max(1),
+    DURATION: z.number().min(0).max(1),
+  })
+  .strict()
+  .superRefine((weights, context) => {
+    const sum =
+      weights.PRICE +
+      weights.AIRLINE +
+      weights.ARRIVAL_SCHEDULE +
+      weights.STOPS +
+      weights.CABIN +
+      weights.DEPARTURE_SCHEDULE +
+      weights.BAGGAGE +
+      weights.DURATION;
+    const roundedSum = Math.round(sum * 1_000_000) / 1_000_000;
+    if (roundedSum !== 1) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: [],
+        message: `Active weights must sum to 1.000000, received ${roundedSum}`,
+      });
+    }
+  });
+
+export type ActiveWeights = z.infer<typeof ActiveWeightsSchema>;
+
 /** Metadata recording scoring policy version and active effective weights. */
 export const FlightMatchMetadataSchema = z
   .object({
     scoringVersion: z.literal('flight-match-v1'),
-    activeWeights: z.record(FlightMatchDimensionSchema, z.number().min(0).max(1)),
+    activeWeights: ActiveWeightsSchema,
   })
   .strict();
 
@@ -165,7 +442,17 @@ export const EligibleFlightMatchResultSchema = z
     breakdown: z.array(DimensionScoreSchema),
     metadata: FlightMatchMetadataSchema,
   })
-  .strict();
+  .strict()
+  .superRefine((result, context) => {
+    const expected = getExpectedMatchLevel(result.score);
+    if (result.matchLevel !== expected) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['matchLevel'],
+        message: `matchLevel "${result.matchLevel}" does not match expected level "${expected}" for score ${result.score}`,
+      });
+    }
+  });
 
 export type EligibleFlightMatchResult = z.infer<typeof EligibleFlightMatchResultSchema>;
 

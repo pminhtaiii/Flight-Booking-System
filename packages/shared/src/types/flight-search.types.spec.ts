@@ -2,11 +2,13 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
 import {
+  ActiveWeightsSchema,
   ConstraintTypeSchema,
   ConstraintViolationSchema,
   DimensionScoreSchema,
   DimensionSignalSchema,
   EligibleFlightMatchResultSchema,
+  ExplanationKeySchema,
   ExplanationSchema,
   FlightMatchDimensionSchema,
   FlightMatchMetadataSchema,
@@ -19,12 +21,15 @@ import {
   FlightSelectionOutcomeSchema,
   IneligibleFlightMatchResultSchema,
   MatchLevelSchema,
+  getExpectedMatchLevel,
+  type ActiveWeights,
   type ConstraintType,
   type ConstraintViolation,
   type DimensionScore,
   type DimensionSignal,
   type EligibleFlightMatchResult,
   type Explanation,
+  type ExplanationKey,
   type FlightMatchDimension,
   type FlightMatchMetadata,
   type FlightMatchResult,
@@ -74,10 +79,107 @@ type ExpectedMatchLevel = 'STRONG' | 'GOOD' | 'FAIR' | 'WEAK';
 type MatchLevelInferenceParity = Assert<Equal<MatchLevel, ExpectedMatchLevel>>;
 void (0 as unknown as MatchLevelInferenceParity);
 
-type ExpectedExplanation = {
-  key: string;
-  params: Record<string, string | number | boolean>;
+type ExpectedExplanationKey =
+  | 'match.price.below_median'
+  | 'match.price.at_median'
+  | 'match.price.above_median'
+  | 'match.airline.preferred'
+  | 'match.airline.neutral'
+  | 'match.arrival.in_window'
+  | 'match.arrival.near_window'
+  | 'match.arrival.outside_window'
+  | 'match.stops.within_preference'
+  | 'match.stops.exceeds_preference'
+  | 'match.stops.relative'
+  | 'match.cabin.exact'
+  | 'match.cabin.adjacent'
+  | 'match.cabin.mismatch'
+  | 'match.departure.in_window'
+  | 'match.departure.near_window'
+  | 'match.departure.outside_window'
+  | 'match.baggage.checked_included'
+  | 'match.baggage.checked_missing'
+  | 'match.baggage.not_required'
+  | 'match.duration.below_median'
+  | 'match.duration.at_median'
+  | 'match.duration.above_median'
+  | 'constraint.airline.blacklisted';
+type ExplanationKeyInferenceParity = Assert<Equal<ExplanationKey, ExpectedExplanationKey>>;
+void (0 as unknown as ExplanationKeyInferenceParity);
+
+type PriceParams = {
+  difference?: string | number;
+  percentDiff?: number;
+  percentBelow?: number;
+  currency?: string;
+  isBest?: boolean;
 };
+
+type AirlineParams = {
+  airline?: string;
+};
+
+type ScheduleParams = {
+  time?: string;
+  windowStart?: string | number;
+  windowEnd?: string | number;
+};
+
+type StopsParams = {
+  actual?: number;
+  preferred?: number;
+  stops?: number;
+  maxStops?: number;
+  minStops?: number;
+};
+
+type CabinParams = {
+  expected?: string;
+  actual?: string;
+  cabin?: string;
+};
+
+type BaggageParams = {
+  checkedBags?: number;
+  required?: boolean;
+};
+
+type DurationParams = {
+  difference?: string | number;
+  percentDiff?: number;
+  percentBelow?: number;
+  minutes?: number;
+};
+
+type BlacklistedAirlineParams = {
+  airline?: string;
+};
+
+type ExpectedExplanation =
+  | { key: 'match.price.below_median'; params: PriceParams }
+  | { key: 'match.price.at_median'; params: PriceParams }
+  | { key: 'match.price.above_median'; params: PriceParams }
+  | { key: 'match.airline.preferred'; params: AirlineParams }
+  | { key: 'match.airline.neutral'; params: AirlineParams }
+  | { key: 'match.arrival.in_window'; params: ScheduleParams }
+  | { key: 'match.arrival.near_window'; params: ScheduleParams }
+  | { key: 'match.arrival.outside_window'; params: ScheduleParams }
+  | { key: 'match.stops.within_preference'; params: StopsParams }
+  | { key: 'match.stops.exceeds_preference'; params: StopsParams }
+  | { key: 'match.stops.relative'; params: StopsParams }
+  | { key: 'match.cabin.exact'; params: CabinParams }
+  | { key: 'match.cabin.adjacent'; params: CabinParams }
+  | { key: 'match.cabin.mismatch'; params: CabinParams }
+  | { key: 'match.departure.in_window'; params: ScheduleParams }
+  | { key: 'match.departure.near_window'; params: ScheduleParams }
+  | { key: 'match.departure.outside_window'; params: ScheduleParams }
+  | { key: 'match.baggage.checked_included'; params: BaggageParams }
+  | { key: 'match.baggage.checked_missing'; params: BaggageParams }
+  | { key: 'match.baggage.not_required'; params: BaggageParams }
+  | { key: 'match.duration.below_median'; params: DurationParams }
+  | { key: 'match.duration.at_median'; params: DurationParams }
+  | { key: 'match.duration.above_median'; params: DurationParams }
+  | { key: 'constraint.airline.blacklisted'; params: BlacklistedAirlineParams };
 type ExplanationInferenceParity = Assert<Equal<Explanation, ExpectedExplanation>>;
 void (0 as unknown as ExplanationInferenceParity);
 
@@ -105,9 +207,22 @@ type ConstraintViolationInferenceParity = Assert<
 >;
 void (0 as unknown as ConstraintViolationInferenceParity);
 
+type ExpectedActiveWeights = {
+  PRICE: number;
+  AIRLINE: number;
+  ARRIVAL_SCHEDULE: number;
+  STOPS: number;
+  CABIN: number;
+  DEPARTURE_SCHEDULE: number;
+  BAGGAGE: number;
+  DURATION: number;
+};
+type ActiveWeightsInferenceParity = Assert<Equal<ActiveWeights, ExpectedActiveWeights>>;
+void (0 as unknown as ActiveWeightsInferenceParity);
+
 type ExpectedFlightMatchMetadata = {
   scoringVersion: 'flight-match-v1';
-  activeWeights: Partial<Record<ExpectedDimension, number>>;
+  activeWeights: ExpectedActiveWeights;
 };
 type MetadataInferenceParity = Assert<
   Equal<FlightMatchMetadata, ExpectedFlightMatchMetadata>
@@ -383,25 +498,45 @@ describe('T001: MATCHED eligibility, score, matchLevel, and breakdown schemas', 
     assert.equal(parsed.matchLevel, 'STRONG');
     assert.equal(parsed.breakdown.length, 1);
 
-    // Score boundary tests
+    // Score boundary tests (valid score and matching level)
     assert.equal(
-      EligibleFlightMatchResultSchema.parse({ ...validEligibleMatchResult, score: 0 }).score,
+      EligibleFlightMatchResultSchema.parse({
+        ...validEligibleMatchResult,
+        score: 0,
+        matchLevel: 'WEAK',
+      }).score,
       0,
     );
     assert.equal(
-      EligibleFlightMatchResultSchema.parse({ ...validEligibleMatchResult, score: 100 }).score,
+      EligibleFlightMatchResultSchema.parse({
+        ...validEligibleMatchResult,
+        score: 100,
+        matchLevel: 'STRONG',
+      }).score,
       100,
     );
 
     // Rejects out of bound scores or float scores
     assert.throws(() =>
-      EligibleFlightMatchResultSchema.parse({ ...validEligibleMatchResult, score: -1 }),
+      EligibleFlightMatchResultSchema.parse({
+        ...validEligibleMatchResult,
+        score: -1,
+        matchLevel: 'WEAK',
+      }),
     );
     assert.throws(() =>
-      EligibleFlightMatchResultSchema.parse({ ...validEligibleMatchResult, score: 101 }),
+      EligibleFlightMatchResultSchema.parse({
+        ...validEligibleMatchResult,
+        score: 101,
+        matchLevel: 'STRONG',
+      }),
     );
     assert.throws(() =>
-      EligibleFlightMatchResultSchema.parse({ ...validEligibleMatchResult, score: 82.5 }),
+      EligibleFlightMatchResultSchema.parse({
+        ...validEligibleMatchResult,
+        score: 82.5,
+        matchLevel: 'STRONG',
+      }),
     );
 
     // Rejects eligible with non-empty violations
@@ -419,6 +554,64 @@ describe('T001: MATCHED eligibility, score, matchLevel, and breakdown schemas', 
         },
       }),
     );
+  });
+
+  it('correlates scores to expected match levels with getExpectedMatchLevel helper', () => {
+    assert.equal(getExpectedMatchLevel(0), 'WEAK');
+    assert.equal(getExpectedMatchLevel(24), 'WEAK');
+    assert.equal(getExpectedMatchLevel(25), 'FAIR');
+    assert.equal(getExpectedMatchLevel(49), 'FAIR');
+    assert.equal(getExpectedMatchLevel(50), 'GOOD');
+    assert.equal(getExpectedMatchLevel(74), 'GOOD');
+    assert.equal(getExpectedMatchLevel(75), 'STRONG');
+    assert.equal(getExpectedMatchLevel(100), 'STRONG');
+  });
+
+  it('enforces score and matchLevel correlation in EligibleFlightMatchResultSchema', () => {
+    // Valid boundary combinations
+    const validPairs: [number, MatchLevel][] = [
+      [0, 'WEAK'],
+      [24, 'WEAK'],
+      [25, 'FAIR'],
+      [49, 'FAIR'],
+      [50, 'GOOD'],
+      [74, 'GOOD'],
+      [75, 'STRONG'],
+      [100, 'STRONG'],
+    ];
+    for (const [score, matchLevel] of validPairs) {
+      const parsed = EligibleFlightMatchResultSchema.parse({
+        ...validEligibleMatchResult,
+        score,
+        matchLevel,
+      });
+      assert.equal(parsed.score, score);
+      assert.equal(parsed.matchLevel, matchLevel);
+    }
+
+    // Invalid / mismatched score and matchLevel pairs
+    const invalidPairs: [number, MatchLevel][] = [
+      [60, 'STRONG'],
+      [80, 'FAIR'],
+      [20, 'GOOD'],
+      [45, 'WEAK'],
+      [70, 'STRONG'],
+      [10, 'FAIR'],
+      [50, 'STRONG'],
+      [74, 'FAIR'],
+      [75, 'GOOD'],
+      [0, 'STRONG'],
+      [100, 'WEAK'],
+    ];
+    for (const [score, matchLevel] of invalidPairs) {
+      assert.throws(() =>
+        EligibleFlightMatchResultSchema.parse({
+          ...validEligibleMatchResult,
+          score,
+          matchLevel,
+        }),
+      );
+    }
   });
 
   it('parses valid IneligibleFlightMatchResult and enforces null score/level and empty breakdown', () => {
@@ -526,6 +719,98 @@ describe('T002: RANKED nullability, active weights, explanation params, and prov
     );
   });
 
+  it('validates ActiveWeightsSchema requiring all 8 dimensions and exact 1.000000 normalized sum', () => {
+    // Valid base weights
+    const parsedBase = ActiveWeightsSchema.parse(validMetadata.activeWeights);
+    assert.equal(parsedBase.PRICE, 0.2);
+
+    // Valid equal distribution
+    const equalWeights: ActiveWeights = {
+      PRICE: 0.125,
+      AIRLINE: 0.125,
+      ARRIVAL_SCHEDULE: 0.125,
+      STOPS: 0.125,
+      CABIN: 0.125,
+      DEPARTURE_SCHEDULE: 0.125,
+      BAGGAGE: 0.125,
+      DURATION: 0.125,
+    };
+    assert.deepEqual(ActiveWeightsSchema.parse(equalWeights), equalWeights);
+
+    // Valid six-decimal rounded sum
+    const sixDecimalWeights: ActiveWeights = {
+      PRICE: 0.333334,
+      AIRLINE: 0.333333,
+      ARRIVAL_SCHEDULE: 0.333333,
+      STOPS: 0,
+      CABIN: 0,
+      DEPARTURE_SCHEDULE: 0,
+      BAGGAGE: 0,
+      DURATION: 0,
+    };
+    assert.deepEqual(ActiveWeightsSchema.parse(sixDecimalWeights), sixDecimalWeights);
+
+    // Rejects missing dimensions (e.g. missing DURATION)
+    const missingDuration = { ...validMetadata.activeWeights };
+    delete (missingDuration as { DURATION?: number }).DURATION;
+    assert.throws(() => ActiveWeightsSchema.parse(missingDuration));
+
+    // Rejects missing all except some dimensions
+    assert.throws(() =>
+      ActiveWeightsSchema.parse({
+        PRICE: 0.5,
+        AIRLINE: 0.5,
+      }),
+    );
+
+    // Rejects sums less than 1.000000 (e.g. sum = 0.8)
+    assert.throws(() =>
+      ActiveWeightsSchema.parse({
+        ...validMetadata.activeWeights,
+        PRICE: 0.0,
+      }),
+    );
+
+    // Rejects sums greater than 1.000000 (e.g. sum = 1.2)
+    assert.throws(() =>
+      ActiveWeightsSchema.parse({
+        ...validMetadata.activeWeights,
+        PRICE: 0.4,
+      }),
+    );
+
+    // Rejects small precision deviations not rounding to 1.000000
+    assert.throws(() =>
+      ActiveWeightsSchema.parse({
+        ...validMetadata.activeWeights,
+        PRICE: 0.200005,
+      }),
+    );
+
+    // Rejects negative weights or weights > 1
+    assert.throws(() =>
+      ActiveWeightsSchema.parse({
+        ...validMetadata.activeWeights,
+        PRICE: -0.1,
+        AIRLINE: 0.45,
+      }),
+    );
+    assert.throws(() =>
+      ActiveWeightsSchema.parse({
+        ...validMetadata.activeWeights,
+        PRICE: 1.05,
+      }),
+    );
+
+    // Rejects extra/unknown keys (strict)
+    assert.throws(() =>
+      ActiveWeightsSchema.parse({
+        ...validMetadata.activeWeights,
+        UNKNOWN_DIM: 0,
+      }),
+    );
+  });
+
   it('validates FlightMatchMetadata active weights precision and keys', () => {
     const parsed = FlightMatchMetadataSchema.parse(validMetadata);
     assert.equal(parsed.scoringVersion, 'flight-match-v1');
@@ -539,58 +824,205 @@ describe('T002: RANKED nullability, active weights, explanation params, and prov
       }),
     );
 
-    // Rejects negative weights or weights > 1
+    // Rejects metadata with non-normalized weights
     assert.throws(() =>
       FlightMatchMetadataSchema.parse({
         ...validMetadata,
-        activeWeights: { ...validMetadata.activeWeights, PRICE: -0.1 },
-      }),
-    );
-    assert.throws(() =>
-      FlightMatchMetadataSchema.parse({
-        ...validMetadata,
-        activeWeights: { ...validMetadata.activeWeights, PRICE: 1.05 },
-      }),
-    );
-
-    // Rejects unknown dimension keys in activeWeights
-    assert.throws(() =>
-      FlightMatchMetadataSchema.parse({
-        ...validMetadata,
-        activeWeights: { ...validMetadata.activeWeights, INVALID_DIM: 0.5 },
+        activeWeights: { ...validMetadata.activeWeights, PRICE: 0.1 },
       }),
     );
   });
 
-  it('validates Explanation schema with key-specific primitive parameters and rejects non-primitives', () => {
-    const validExplanation: Explanation = {
-      key: 'match.price.below_median',
-      params: {
-        percentDiff: 15.5,
-        currency: 'USD',
-        isBest: true,
+  it('validates ExplanationKeySchema parsing all 24 allowlisted keys and rejecting unknown keys', () => {
+    const all24Keys = [
+      'match.price.below_median',
+      'match.price.at_median',
+      'match.price.above_median',
+      'match.airline.preferred',
+      'match.airline.neutral',
+      'match.arrival.in_window',
+      'match.arrival.near_window',
+      'match.arrival.outside_window',
+      'match.stops.within_preference',
+      'match.stops.exceeds_preference',
+      'match.stops.relative',
+      'match.cabin.exact',
+      'match.cabin.adjacent',
+      'match.cabin.mismatch',
+      'match.departure.in_window',
+      'match.departure.near_window',
+      'match.departure.outside_window',
+      'match.baggage.checked_included',
+      'match.baggage.checked_missing',
+      'match.baggage.not_required',
+      'match.duration.below_median',
+      'match.duration.at_median',
+      'match.duration.above_median',
+      'constraint.airline.blacklisted',
+    ] as const;
+
+    for (const key of all24Keys) {
+      assert.equal(ExplanationKeySchema.parse(key), key);
+    }
+
+    assert.throws(() => ExplanationKeySchema.parse('match.price.unknown'));
+    assert.throws(() => ExplanationKeySchema.parse('match.foo'));
+    assert.throws(() => ExplanationKeySchema.parse(''));
+    assert.throws(() => ExplanationKeySchema.parse('constraint.unknown'));
+  });
+
+  it('validates ExplanationSchema with all 24 allowlisted keys, key-specific params, and empty params', () => {
+    const validExplanations: Explanation[] = [
+      {
+        key: 'match.price.below_median',
+        params: {
+          difference: '15%',
+          percentDiff: 15.5,
+          percentBelow: 15.5,
+          currency: 'USD',
+          isBest: true,
+        },
       },
-    };
-    const parsed = ExplanationSchema.parse(validExplanation);
-    assert.equal(parsed.key, 'match.price.below_median');
-    assert.equal(parsed.params.percentDiff, 15.5);
-    assert.equal(parsed.params.currency, 'USD');
-    assert.equal(parsed.params.isBest, true);
+      { key: 'match.price.at_median', params: { percentDiff: 0, currency: 'USD' } },
+      {
+        key: 'match.price.above_median',
+        params: { difference: 50, percentDiff: -20, currency: 'USD' },
+      },
+      { key: 'match.airline.preferred', params: { airline: 'Vietnam Airlines' } },
+      { key: 'match.airline.neutral', params: { airline: 'VietJet Air' } },
+      { key: 'match.arrival.in_window', params: { time: '14:30', windowStart: 12, windowEnd: 18 } },
+      {
+        key: 'match.arrival.near_window',
+        params: { time: '19:00', windowStart: '12:00', windowEnd: '18:00' },
+      },
+      {
+        key: 'match.arrival.outside_window',
+        params: { time: '22:00', windowStart: 8, windowEnd: 12 },
+      },
+      {
+        key: 'match.stops.within_preference',
+        params: { actual: 0, preferred: 0, stops: 0, maxStops: 1, minStops: 0 },
+      },
+      {
+        key: 'match.stops.exceeds_preference',
+        params: { actual: 2, preferred: 1, stops: 2, maxStops: 1 },
+      },
+      { key: 'match.stops.relative', params: { actual: 1, preferred: 0, stops: 1 } },
+      {
+        key: 'match.cabin.exact',
+        params: { expected: 'economy', actual: 'economy', cabin: 'economy' },
+      },
+      {
+        key: 'match.cabin.adjacent',
+        params: { expected: 'premium_economy', actual: 'economy', cabin: 'economy' },
+      },
+      {
+        key: 'match.cabin.mismatch',
+        params: { expected: 'business', actual: 'economy', cabin: 'economy' },
+      },
+      {
+        key: 'match.departure.in_window',
+        params: { time: '09:00', windowStart: 8, windowEnd: 12 },
+      },
+      {
+        key: 'match.departure.near_window',
+        params: { time: '07:30', windowStart: 8, windowEnd: 12 },
+      },
+      {
+        key: 'match.departure.outside_window',
+        params: { time: '23:00', windowStart: 8, windowEnd: 12 },
+      },
+      { key: 'match.baggage.checked_included', params: { checkedBags: 1, required: true } },
+      { key: 'match.baggage.checked_missing', params: { checkedBags: 0, required: true } },
+      { key: 'match.baggage.not_required', params: { checkedBags: 0, required: false } },
+      {
+        key: 'match.duration.below_median',
+        params: { difference: '30m', percentDiff: 10, percentBelow: 10, minutes: 120 },
+      },
+      { key: 'match.duration.at_median', params: { percentDiff: 0, minutes: 150 } },
+      {
+        key: 'match.duration.above_median',
+        params: { difference: 45, percentDiff: -15, minutes: 195 },
+      },
+      { key: 'constraint.airline.blacklisted', params: { airline: 'XX' } },
+    ];
 
-    // Rejects empty key
+    for (const exp of validExplanations) {
+      const parsed = ExplanationSchema.parse(exp);
+      assert.equal(parsed.key, exp.key);
+      assert.deepEqual(parsed.params, exp.params);
+
+      // Also verify empty params object {} is accepted for all keys
+      const emptyParsed = ExplanationSchema.parse({ key: exp.key, params: {} });
+      assert.equal(emptyParsed.key, exp.key);
+      assert.deepEqual(emptyParsed.params, {});
+    }
+  });
+
+  it('strictly rejects unknown keys, unpermitted params on known keys, and non-primitives in ExplanationSchema', () => {
+    // Unknown keys
+    assert.throws(() => ExplanationSchema.parse({ key: 'match.unknown', params: {} }));
     assert.throws(() => ExplanationSchema.parse({ key: '', params: {} }));
+    assert.throws(() => ExplanationSchema.parse({ key: 'match.price.unknown_key', params: {} }));
 
-    // Rejects non-primitive nested objects or arrays in params
+    // Unpermitted params on price explanation
     assert.throws(() =>
       ExplanationSchema.parse({
         key: 'match.price.below_median',
-        params: { nested: { invalid: true } },
+        params: { airline: 'VN' },
       }),
     );
     assert.throws(() =>
       ExplanationSchema.parse({
         key: 'match.price.below_median',
-        params: { list: [1, 2, 3] },
+        params: { unexpectedParam: 123 },
+      }),
+    );
+
+    // Unpermitted params on airline explanation
+    assert.throws(() =>
+      ExplanationSchema.parse({
+        key: 'match.airline.preferred',
+        params: { percentDiff: 10 },
+      }),
+    );
+
+    // Unpermitted params on stops explanation
+    assert.throws(() =>
+      ExplanationSchema.parse({
+        key: 'match.stops.within_preference',
+        params: { currency: 'USD' },
+      }),
+    );
+
+    // Unpermitted params on baggage explanation
+    assert.throws(() =>
+      ExplanationSchema.parse({
+        key: 'match.baggage.checked_included',
+        params: { minutes: 100 },
+      }),
+    );
+
+    // Non-primitive params (nested objects or arrays)
+    assert.throws(() =>
+      ExplanationSchema.parse({
+        key: 'match.price.below_median',
+        params: { percentDiff: { value: 15 } as unknown as number },
+      }),
+    );
+    assert.throws(() =>
+      ExplanationSchema.parse({
+        key: 'match.airline.preferred',
+        params: { airline: ['VN'] as unknown as string },
+      }),
+    );
+
+    // Extra keys on top-level explanation object
+    assert.throws(() =>
+      ExplanationSchema.parse({
+        key: 'match.price.below_median',
+        params: {},
+        extra: true,
       }),
     );
   });
@@ -608,7 +1040,10 @@ describe('T002: RANKED nullability, active weights, explanation params, and prov
     };
     const parsed = ConstraintViolationSchema.parse(violation);
     assert.equal(parsed.constraint, 'BLACKLISTED_AIRLINE');
-    assert.equal(parsed.explanation.params.airline, 'XX');
+    assert.equal(parsed.explanation.key, 'constraint.airline.blacklisted');
+    if (parsed.explanation.key === 'constraint.airline.blacklisted') {
+      assert.equal(parsed.explanation.params.airline, 'XX');
+    }
 
     assert.throws(() =>
       ConstraintViolationSchema.parse({

@@ -233,7 +233,10 @@ describe('flight-search server seam', () => {
             weight: 0.35,
             contribution: 0.315,
             signal: 'POSITIVE',
-            explanation: { key: 'price_score', params: { score: 0.9 } },
+            explanation: {
+              key: 'match.price.below_median',
+              params: { difference: '10%' },
+            },
           },
         ],
         metadata: {
@@ -262,7 +265,7 @@ describe('flight-search server seam', () => {
             {
               constraint: 'BLACKLISTED_AIRLINE',
               explanation: {
-                key: 'blacklisted_airline',
+                key: 'constraint.airline.blacklisted',
                 params: { airline: 'Mock Horizon Air' },
               },
             },
