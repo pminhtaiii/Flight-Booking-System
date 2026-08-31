@@ -354,6 +354,49 @@ export const ExplanationSchema = z.discriminatedUnion('key', [
 
 export type Explanation = z.infer<typeof ExplanationSchema>;
 
+/** Mappings of each dimension to its allowlisted explanation keys. */
+export const DIMENSION_EXPLANATION_KEYS = {
+  PRICE: [
+    'match.price.below_median',
+    'match.price.at_median',
+    'match.price.above_median',
+  ],
+  AIRLINE: [
+    'match.airline.preferred',
+    'match.airline.neutral',
+  ],
+  ARRIVAL_SCHEDULE: [
+    'match.arrival.in_window',
+    'match.arrival.near_window',
+    'match.arrival.outside_window',
+  ],
+  STOPS: [
+    'match.stops.within_preference',
+    'match.stops.exceeds_preference',
+    'match.stops.relative',
+  ],
+  CABIN: [
+    'match.cabin.exact',
+    'match.cabin.adjacent',
+    'match.cabin.mismatch',
+  ],
+  DEPARTURE_SCHEDULE: [
+    'match.departure.in_window',
+    'match.departure.near_window',
+    'match.departure.outside_window',
+  ],
+  BAGGAGE: [
+    'match.baggage.checked_included',
+    'match.baggage.checked_missing',
+    'match.baggage.not_required',
+  ],
+  DURATION: [
+    'match.duration.below_median',
+    'match.duration.at_median',
+    'match.duration.above_median',
+  ],
+} as const satisfies Record<FlightMatchDimension, readonly ExplanationKey[]>;
+
 /** Granular breakdown score and explanation for an individual dimension. */
 export const DimensionScoreSchema = z
   .object({
@@ -364,7 +407,17 @@ export const DimensionScoreSchema = z
     signal: DimensionSignalSchema,
     explanation: ExplanationSchema,
   })
-  .strict();
+  .strict()
+  .superRefine((score, context) => {
+    const allowedKeys: readonly string[] = DIMENSION_EXPLANATION_KEYS[score.dimension];
+    if (!allowedKeys.includes(score.explanation.key)) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['explanation', 'key'],
+        message: `Explanation key "${score.explanation.key}" is not valid for dimension "${score.dimension}"`,
+      });
+    }
+  });
 
 export type DimensionScore = z.infer<typeof DimensionScoreSchema>;
 
@@ -373,13 +426,28 @@ export const ConstraintTypeSchema = z.enum(['BLACKLISTED_AIRLINE']);
 
 export type ConstraintType = z.infer<typeof ConstraintTypeSchema>;
 
+/** Mappings of each constraint type to its allowlisted explanation keys. */
+export const CONSTRAINT_EXPLANATION_KEYS = {
+  BLACKLISTED_AIRLINE: ['constraint.airline.blacklisted'],
+} as const satisfies Record<ConstraintType, readonly ExplanationKey[]>;
+
 /** Specific constraint violation blocking match eligibility. */
 export const ConstraintViolationSchema = z
   .object({
     constraint: ConstraintTypeSchema,
     explanation: ExplanationSchema,
   })
-  .strict();
+  .strict()
+  .superRefine((violation, context) => {
+    const allowedKeys: readonly string[] = CONSTRAINT_EXPLANATION_KEYS[violation.constraint];
+    if (!allowedKeys.includes(violation.explanation.key)) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['explanation', 'key'],
+        message: `Explanation key "${violation.explanation.key}" is not valid for constraint "${violation.constraint}"`,
+      });
+    }
+  });
 
 export type ConstraintViolation = z.infer<typeof ConstraintViolationSchema>;
 

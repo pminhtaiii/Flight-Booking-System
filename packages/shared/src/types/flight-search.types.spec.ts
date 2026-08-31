@@ -3,8 +3,10 @@ import { describe, it } from 'node:test';
 
 import {
   ActiveWeightsSchema,
+  CONSTRAINT_EXPLANATION_KEYS,
   ConstraintTypeSchema,
   ConstraintViolationSchema,
+  DIMENSION_EXPLANATION_KEYS,
   DimensionScoreSchema,
   DimensionSignalSchema,
   EligibleFlightMatchResultSchema,
@@ -657,6 +659,30 @@ describe('T001: MATCHED eligibility, score, matchLevel, and breakdown schemas', 
     assert.throws(() => FlightMatchResultSchema.parse({ unknown: true }));
   });
 
+  it('validates DIMENSION_EXPLANATION_KEYS and CONSTRAINT_EXPLANATION_KEYS map all expected keys', () => {
+    const dimensions: FlightMatchDimension[] = [
+      'PRICE',
+      'AIRLINE',
+      'ARRIVAL_SCHEDULE',
+      'STOPS',
+      'CABIN',
+      'DEPARTURE_SCHEDULE',
+      'BAGGAGE',
+      'DURATION',
+    ];
+    for (const d of dimensions) {
+      assert.ok(DIMENSION_EXPLANATION_KEYS[d].length > 0);
+      for (const key of DIMENSION_EXPLANATION_KEYS[d]) {
+        assert.equal(ExplanationKeySchema.parse(key), key);
+      }
+    }
+
+    assert.ok(CONSTRAINT_EXPLANATION_KEYS.BLACKLISTED_AIRLINE.length > 0);
+    for (const key of CONSTRAINT_EXPLANATION_KEYS.BLACKLISTED_AIRLINE) {
+      assert.equal(ExplanationKeySchema.parse(key), key);
+    }
+  });
+
   it('validates DimensionScore constraints', () => {
     assert.equal(DimensionScoreSchema.parse(validDimensionScore).dimension, 'PRICE');
 
@@ -667,6 +693,263 @@ describe('T001: MATCHED eligibility, score, matchLevel, and breakdown schemas', 
     assert.throws(() => DimensionScoreSchema.parse({ ...validDimensionScore, weight: 1.01 }));
     assert.throws(() => DimensionScoreSchema.parse({ ...validDimensionScore, contribution: -0.1 }));
     assert.throws(() => DimensionScoreSchema.parse({ ...validDimensionScore, contribution: 1.5 }));
+  });
+
+  it('validates DimensionScoreSchema accepts valid dimension-explanation pairs for all 8 dimensions', () => {
+    const validScores: DimensionScore[] = [
+      // PRICE (3 keys)
+      {
+        dimension: 'PRICE',
+        score: 0.9,
+        weight: 0.2,
+        contribution: 0.18,
+        signal: 'POSITIVE',
+        explanation: { key: 'match.price.below_median', params: { difference: '15%' } },
+      },
+      {
+        dimension: 'PRICE',
+        score: 0.6,
+        weight: 0.2,
+        contribution: 0.12,
+        signal: 'NEUTRAL',
+        explanation: { key: 'match.price.at_median', params: { currency: 'USD' } },
+      },
+      {
+        dimension: 'PRICE',
+        score: 0.2,
+        weight: 0.2,
+        contribution: 0.04,
+        signal: 'NEGATIVE',
+        explanation: { key: 'match.price.above_median', params: { percentDiff: -20 } },
+      },
+      // AIRLINE (2 keys)
+      {
+        dimension: 'AIRLINE',
+        score: 1.0,
+        weight: 0.15,
+        contribution: 0.15,
+        signal: 'POSITIVE',
+        explanation: { key: 'match.airline.preferred', params: { airline: 'Vietnam Airlines' } },
+      },
+      {
+        dimension: 'AIRLINE',
+        score: 0.5,
+        weight: 0.15,
+        contribution: 0.075,
+        signal: 'NEUTRAL',
+        explanation: { key: 'match.airline.neutral', params: { airline: 'VietJet Air' } },
+      },
+      // ARRIVAL_SCHEDULE (3 keys)
+      {
+        dimension: 'ARRIVAL_SCHEDULE',
+        score: 1.0,
+        weight: 0.15,
+        contribution: 0.15,
+        signal: 'POSITIVE',
+        explanation: { key: 'match.arrival.in_window', params: { time: '14:30' } },
+      },
+      {
+        dimension: 'ARRIVAL_SCHEDULE',
+        score: 0.5,
+        weight: 0.15,
+        contribution: 0.075,
+        signal: 'NEUTRAL',
+        explanation: { key: 'match.arrival.near_window', params: { time: '19:00' } },
+      },
+      {
+        dimension: 'ARRIVAL_SCHEDULE',
+        score: 0.1,
+        weight: 0.15,
+        contribution: 0.015,
+        signal: 'NEGATIVE',
+        explanation: { key: 'match.arrival.outside_window', params: { time: '22:00' } },
+      },
+      // STOPS (3 keys)
+      {
+        dimension: 'STOPS',
+        score: 1.0,
+        weight: 0.1,
+        contribution: 0.1,
+        signal: 'POSITIVE',
+        explanation: { key: 'match.stops.within_preference', params: { actual: 0, preferred: 0 } },
+      },
+      {
+        dimension: 'STOPS',
+        score: 0.3,
+        weight: 0.1,
+        contribution: 0.03,
+        signal: 'NEGATIVE',
+        explanation: { key: 'match.stops.exceeds_preference', params: { actual: 2, preferred: 1 } },
+      },
+      {
+        dimension: 'STOPS',
+        score: 0.7,
+        weight: 0.1,
+        contribution: 0.07,
+        signal: 'NEUTRAL',
+        explanation: { key: 'match.stops.relative', params: { actual: 1, preferred: 0 } },
+      },
+      // CABIN (3 keys)
+      {
+        dimension: 'CABIN',
+        score: 1.0,
+        weight: 0.1,
+        contribution: 0.1,
+        signal: 'POSITIVE',
+        explanation: { key: 'match.cabin.exact', params: { expected: 'economy', actual: 'economy' } },
+      },
+      {
+        dimension: 'CABIN',
+        score: 0.6,
+        weight: 0.1,
+        contribution: 0.06,
+        signal: 'NEUTRAL',
+        explanation: { key: 'match.cabin.adjacent', params: { expected: 'premium_economy', actual: 'economy' } },
+      },
+      {
+        dimension: 'CABIN',
+        score: 0.0,
+        weight: 0.1,
+        contribution: 0.0,
+        signal: 'NEGATIVE',
+        explanation: { key: 'match.cabin.mismatch', params: { expected: 'business', actual: 'economy' } },
+      },
+      // DEPARTURE_SCHEDULE (3 keys)
+      {
+        dimension: 'DEPARTURE_SCHEDULE',
+        score: 1.0,
+        weight: 0.1,
+        contribution: 0.1,
+        signal: 'POSITIVE',
+        explanation: { key: 'match.departure.in_window', params: { time: '09:00' } },
+      },
+      {
+        dimension: 'DEPARTURE_SCHEDULE',
+        score: 0.5,
+        weight: 0.1,
+        contribution: 0.05,
+        signal: 'NEUTRAL',
+        explanation: { key: 'match.departure.near_window', params: { time: '07:30' } },
+      },
+      {
+        dimension: 'DEPARTURE_SCHEDULE',
+        score: 0.1,
+        weight: 0.1,
+        contribution: 0.01,
+        signal: 'NEGATIVE',
+        explanation: { key: 'match.departure.outside_window', params: { time: '23:00' } },
+      },
+      // BAGGAGE (3 keys)
+      {
+        dimension: 'BAGGAGE',
+        score: 1.0,
+        weight: 0.1,
+        contribution: 0.1,
+        signal: 'POSITIVE',
+        explanation: { key: 'match.baggage.checked_included', params: { checkedBags: 1, required: true } },
+      },
+      {
+        dimension: 'BAGGAGE',
+        score: 0.2,
+        weight: 0.1,
+        contribution: 0.02,
+        signal: 'NEGATIVE',
+        explanation: { key: 'match.baggage.checked_missing', params: { checkedBags: 0, required: true } },
+      },
+      {
+        dimension: 'BAGGAGE',
+        score: 0.8,
+        weight: 0.1,
+        contribution: 0.08,
+        signal: 'NEUTRAL',
+        explanation: { key: 'match.baggage.not_required', params: { checkedBags: 0, required: false } },
+      },
+      // DURATION (3 keys)
+      {
+        dimension: 'DURATION',
+        score: 0.9,
+        weight: 0.1,
+        contribution: 0.09,
+        signal: 'POSITIVE',
+        explanation: { key: 'match.duration.below_median', params: { difference: '30m', minutes: 120 } },
+      },
+      {
+        dimension: 'DURATION',
+        score: 0.5,
+        weight: 0.1,
+        contribution: 0.05,
+        signal: 'NEUTRAL',
+        explanation: { key: 'match.duration.at_median', params: { percentDiff: 0, minutes: 150 } },
+      },
+      {
+        dimension: 'DURATION',
+        score: 0.2,
+        weight: 0.1,
+        contribution: 0.02,
+        signal: 'NEGATIVE',
+        explanation: { key: 'match.duration.above_median', params: { minutes: 195 } },
+      },
+    ];
+
+    for (const score of validScores) {
+      const parsed = DimensionScoreSchema.parse(score);
+      assert.equal(parsed.dimension, score.dimension);
+      assert.equal(parsed.explanation.key, score.explanation.key);
+    }
+  });
+
+  it('rejects mismatched dimension-explanation pairs in DimensionScoreSchema', () => {
+    const invalidPairs: { dimension: FlightMatchDimension; explanation: Explanation }[] = [
+      {
+        dimension: 'PRICE',
+        explanation: { key: 'match.airline.preferred', params: { airline: 'VN' } },
+      },
+      {
+        dimension: 'CABIN',
+        explanation: { key: 'match.price.below_median', params: { difference: '15%' } },
+      },
+      {
+        dimension: 'DURATION',
+        explanation: { key: 'match.stops.relative', params: { actual: 1 } },
+      },
+      {
+        dimension: 'AIRLINE',
+        explanation: { key: 'match.arrival.in_window', params: { time: '12:00' } },
+      },
+      {
+        dimension: 'ARRIVAL_SCHEDULE',
+        explanation: { key: 'match.departure.in_window', params: { time: '12:00' } },
+      },
+      {
+        dimension: 'STOPS',
+        explanation: { key: 'match.baggage.checked_included', params: { checkedBags: 1 } },
+      },
+      {
+        dimension: 'DEPARTURE_SCHEDULE',
+        explanation: { key: 'match.cabin.exact', params: { expected: 'economy' } },
+      },
+      {
+        dimension: 'BAGGAGE',
+        explanation: { key: 'match.duration.below_median', params: { minutes: 120 } },
+      },
+      {
+        dimension: 'PRICE',
+        explanation: { key: 'constraint.airline.blacklisted', params: { airline: 'XX' } },
+      },
+    ];
+
+    for (const { dimension, explanation } of invalidPairs) {
+      assert.throws(() =>
+        DimensionScoreSchema.parse({
+          dimension,
+          score: 0.8,
+          weight: 0.2,
+          contribution: 0.16,
+          signal: 'POSITIVE',
+          explanation,
+        }),
+      );
+    }
   });
 });
 
@@ -1051,6 +1334,40 @@ describe('T002: RANKED nullability, active weights, explanation params, and prov
         explanation: { key: 'foo', params: {} },
       }),
     );
+  });
+
+  it('validates ConstraintViolationSchema accepts valid BLACKLISTED_AIRLINE with constraint.airline.blacklisted and rejects other explanation keys', () => {
+    const validViolation: ConstraintViolation = {
+      constraint: 'BLACKLISTED_AIRLINE',
+      explanation: {
+        key: 'constraint.airline.blacklisted',
+        params: { airline: 'XX' },
+      },
+    };
+    const parsed = ConstraintViolationSchema.parse(validViolation);
+    assert.equal(parsed.constraint, 'BLACKLISTED_AIRLINE');
+    assert.equal(parsed.explanation.key, 'constraint.airline.blacklisted');
+
+    // Rejects other explanation keys
+    const nonConstraintExplanations: Explanation[] = [
+      { key: 'match.airline.preferred', params: { airline: 'XX' } },
+      { key: 'match.price.below_median', params: { difference: '10%' } },
+      { key: 'match.stops.relative', params: { actual: 1 } },
+      { key: 'match.arrival.in_window', params: { time: '12:00' } },
+      { key: 'match.cabin.exact', params: { expected: 'economy' } },
+      { key: 'match.departure.in_window', params: { time: '12:00' } },
+      { key: 'match.baggage.checked_included', params: { checkedBags: 1 } },
+      { key: 'match.duration.below_median', params: { minutes: 120 } },
+    ];
+
+    for (const explanation of nonConstraintExplanations) {
+      assert.throws(() =>
+        ConstraintViolationSchema.parse({
+          constraint: 'BLACKLISTED_AIRLINE',
+          explanation,
+        }),
+      );
+    }
   });
 
   it('validates FlightSearchMetaSchema with optional scoringVersion, eligibleCount, and matchLevelCounts', () => {
