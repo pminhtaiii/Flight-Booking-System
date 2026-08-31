@@ -43,9 +43,9 @@ description: "Dependency-ordered implementation tasks for deterministic flight m
 - [x] T008 Drive revision preservation and absence of any score table/column through RED → GREEN in `apps/api/test/traveler-profile-flight-match-migration.e2e-spec.ts` and the same additive migration
 - [x] T009 Drive hour-window/overnight/unknown-key DTO validation through RED → GREEN in `apps/api/src/profile/profile.controller.spec.ts` and `apps/api/src/profile/dto/update-profile.dto.ts`
 - [x] T010 Drive max-stops, sensitivity, baggage, airline canonicalization, and response DTO behavior through RED → GREEN in `apps/api/src/profile/profile.controller.spec.ts`, `apps/api/src/profile/dto/update-profile.dto.ts`, and `apps/api/src/profile/dto/profile-response.dto.ts`
-- [ ] T011 Drive missing-profile, owner-scoped, readiness-flag-independent `getScoringPreferences()` through RED → GREEN in `apps/api/src/profile/profile.service.spec.ts` and `apps/api/src/profile/profile.service.ts`
-- [ ] T012 Drive revision-CAS atomic update/clear, mapping, and safe changed-field audit behavior through RED → GREEN in `apps/api/src/profile/profile.service.spec.ts` and `apps/api/src/profile/profile.service.ts`
-- [ ] T013 Extend owned profile API E2E coverage for the scoring fields and airline arrays in `apps/api/test/profile.e2e-spec.ts`
+- [x] T011 Drive missing-profile, owner-scoped, readiness-flag-independent `getScoringPreferences()` through RED → GREEN in `apps/api/src/profile/profile.service.spec.ts` and `apps/api/src/profile/profile.service.ts`
+- [x] T012 Drive revision-CAS atomic update/clear, mapping, and safe changed-field audit behavior through RED → GREEN in `apps/api/src/profile/profile.service.spec.ts` and `apps/api/src/profile/profile.service.ts`
+- [x] T013 Extend owned profile API E2E coverage for the scoring fields and airline arrays in `apps/api/test/profile.e2e-spec.ts`
 - [ ] T014 [P] Define immutable supplier-independent inputs, scoring preferences, eligibility, dimension, result, and internal orchestration types in `apps/api/src/flight-match/flight-match.types.ts`
 - [ ] T015 Drive canonical order, local IDs, full-itinerary aggregates, outbound local-clock facts, carrier codes, longest cabin, and checked bags one behavior at a time through RED → GREEN in `apps/api/src/flights/flight-offer-normalizer.spec.ts` and `apps/api/src/flights/flight-offer-normalizer.ts`
 - [ ] T016 Drive malformed-offer rejection, first-valid-currency selection, mixed-currency dropping, rejection counts, and all-invalid empty output through RED → GREEN in `apps/api/src/flights/flight-offer-normalizer.spec.ts` and `apps/api/src/flights/flight-offer-normalizer.ts`
@@ -279,3 +279,7 @@ Task B: T064 strict score-free Python snapshot invariant tests
 - Generated `.js` duplicates are not implementation targets unless the existing package build explicitly regenerates them.
 - Do not add a scoring feature flag, score table, score Redis key, LLM scorer, ninth dimension, direct agent scorer import, or direct Python ordering logic.
 - Context files are updated after feature verification, not during partial implementation.
+
+## Phase 8: Convergence
+
+- [x] T078 Make stored scoring-window reads reject unknown JSON keys and emit a bounded PII-safe integrity counter per `data-model.md` persistence invariants

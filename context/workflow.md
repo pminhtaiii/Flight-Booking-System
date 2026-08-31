@@ -7,56 +7,38 @@ The mandatory workflow that all AI agents must follow when building features in 
 ## Workflow Pipeline
 
 ```
-speckit-specify → speckit-plan → plan-review-convergence → speckit-tasks → speckit-implement (with TDD) → speckit-converge → code-review
+speckit-plan → plan-review-convergence → speckit-tasks → brainstorming → writing-plans → speckit-implement (with TDD) → speckit-converge → code-review
 ```
 
 ```mermaid
 flowchart LR
-    A["speckit-specify"] --> B["speckit-plan"]
-    B --> C["plan-review-convergence"]
-    C --> D["speckit-tasks"]
-    D --> E["speckit-implement\n(with TDD)"]
-    E --> F["speckit-converge"]
-    F --> G["code-review\n(Standards & Spec)"]
-
-    style C fill:#ff6b6b,color:#fff
-    style E fill:#4a9eff,color:#fff
-    style G fill:#50c878,color:#fff
+    A["speckit-plan"] --> B["plan-review-convergence"]
+    B --> C["speckit-tasks"]
+    C --> D["brainstorming\n(Explore & Approve Design)"]
+    D --> E["writing-plans\n(Bite-Sized TDD Plans)"]
+    E --> F["speckit-implement\n(with TDD)"]
+    F --> G["speckit-converge"]
+    G --> H["code-review\n(Standards & Spec)"]
 ```
 
-> 🔴 **Red** = Plan quality gate · 🔵 **Blue** = TDD-enforced implementation · 🟢 **Green** = Two-axis quality & spec sign-off
+> **Pipeline Stages**: Plan Quality Gate (`plan-review-convergence`) → Design Refinement & Task Planning (`brainstorming`, `writing-plans`) → TDD Implementation (`speckit-implement`) → Post-Implementation Convergence (`speckit-converge`) → Dual-Axis Quality Sign-Off (`code-review`).
 
 ---
 
-## Step 1: Specify (`/speckit-specify`)
-
-**Purpose**: Understand the feature, gather context, and produce a formal specification.
-
-The agent must:
-
-1. Understand the feature's final aim and how it fits into the existing system.
-2. Produce a `spec.md` with functional requirements, acceptance criteria, user stories, and edge cases.
-
-The spec is the agent's written understanding of the feature. The user reviews and may overwrite or correct it before proceeding.
-
-**Gate**: User must approve the spec before moving to Step 2.
-
----
-
-## Step 2: Plan (`/speckit-plan`)
+## Step 1: Plan (`/speckit-plan`)
 
 **Purpose**: Create a detailed implementation plan — architecture, file structure, services, function signatures, data model changes.
 
 The agent must:
 
-1. Read the approved spec.
+1. Understand the feature requirements and architectural boundaries.
 2. Produce a `plan.md` with technical decisions, file-by-file breakdown, and implementation approach, ensuring alignment with project architecture and code standards.
 
 **Gate**: Plan produced, but not yet approved — it goes through convergence review first.
 
 ---
 
-## Step 3: Plan Review Convergence (`/plan-review-convergence`)
+## Step 2: Plan Review Convergence (`/plan-review-convergence`)
 
 **Purpose**: Cross-AI review of the plan to catch high-priority issues before any code is written.
 
@@ -71,7 +53,7 @@ The agent must:
 
 ---
 
-## Step 4: Generate Tasks (`/speckit-tasks`)
+## Step 3: Generate Tasks (`/speckit-tasks`)
 
 **Purpose**: Break the converged plan into an actionable, dependency-ordered task list.
 
@@ -85,7 +67,40 @@ The agent must:
 
 ---
 
-## Step 5: Implement with TDD (`/speckit-implement`)
+## Step 4: Brainstorming (`/brainstorming`)
+
+**Purpose**: Turn slice or feature designs into structured, validated approaches before touching code.
+
+The agent must:
+
+1. **Classify the path**:
+   - **Spike**: Feasibility inquiry with throwaway experiments (2–3 sentence probe plan, user nod).
+   - **Bounded**: Scoped change to existing code/flow (ask clarifying questions, present short in-chat design, wait for approval).
+   - **Architectural**: New subsystems, features, or interface restructuring (full exploration, 2–3 approaches with trade-offs, sectioned design, user approval per section).
+2. **Explore Context & Intent**: Inspect files, docs, and recent commits. Ask focused clarifying questions one at a time.
+3. **Propose Approaches**: Provide 2–3 options with explicit trade-offs and a clear recommendation.
+4. **Hard Gate**: Do NOT invoke implementation skills or write code until the user gives explicit approval on the design.
+
+---
+
+## Step 5: Writing Plans (`/writing-plans`)
+
+**Purpose**: Structure the approved design into a comprehensive, bite-sized, TDD-actionable implementation plan before writing any production code.
+
+The agent must:
+
+1. **Map File Structure & Boundaries**: Define exact file responsibilities, inputs, and outputs to maintain clean, deep module seams.
+2. **Structure Bite-Sized TDD Tasks**:
+   - Each step is a 2–5 minute focused action: Write failing test (RED) → Verify failure → Write minimal code (GREEN) → Verify pass → Commit.
+   - Define exact consumed and produced interfaces for each task.
+3. **Eliminate Placeholders**: Strictly no "TODO", "TBD", or vague instructions; provide exact code snippets, types, and commands.
+4. **Self-Review Checklist**: Skim against plan coverage, placeholder scan, and type consistency across tasks.
+
+**Gate**: Comprehensive plan produced and self-reviewed before task execution.
+
+---
+
+## Step 6: Implement with TDD (`/speckit-implement`)
 
 **Purpose**: Execute all tasks from `tasks.md` using test-driven development.
 
@@ -135,13 +150,13 @@ If any of these conditions are met, the agent MUST write E2E tests before markin
 
 ---
 
-## Step 6: Converge (`/speckit-converge`)
+## Step 7: Converge (`/speckit-converge`)
 
-**Purpose**: Post-implementation gap analysis — verify the codebase satisfies the spec, plan, and tasks.
+**Purpose**: Post-implementation gap analysis — verify the codebase satisfies the plan and tasks.
 
 The agent must:
 
-1. Run `speckit-converge` to assess the implemented code against the spec, plan, and tasks.
+1. Run `speckit-converge` to assess the implemented code against the plan and tasks.
 2. If gaps are found: new tasks are appended to `tasks.md` under a Convergence phase.
 3. Run `/speckit-implement` again to complete the appended convergence tasks (still with TDD).
 4. Run `/speckit-converge` again to verify gaps are closed.
@@ -151,16 +166,16 @@ The agent must:
 
 ---
 
-## Step 7: Dual-Axis Code Review (`/code-review`)
+## Step 8: Dual-Axis Code Review (`/code-review`)
 
-**Purpose**: Independent two-axis code review running parallel sub-agents to verify that the implementation adheres to repository standards and faithfully fulfills the originating spec with zero unrequested scope creep.
+**Purpose**: Independent two-axis code review running parallel sub-agents to verify that the implementation adheres to repository standards and faithfully fulfills the originating spec and plan with zero unrequested scope creep.
 
 The agent must:
 
 1. **Pin the fixed point**: Determine the diff baseline against the feature branch base / merge-base (`git diff <fixed-point>...HEAD`).
 2. **Spawn parallel review sub-agents**:
    - **Standards Sub-Agent**: Checks against `context/code-standards.md`, architecture invariants, and Fowler smell baseline (Mysterious Name, Duplicated Code, Feature Envy, Speculative Generality, etc.). Reports hard violations and judgment calls.
-   - **Spec Sub-Agent**: Cross-checks the diff directly against `spec.md`. Flags missing/partial requirements, behavioral deviations, and unauthorized scope creep.
+   - **Spec Sub-Agent**: Cross-checks the diff directly against the feature specification and plan. Flags missing/partial requirements, behavioral deviations, and unauthorized scope creep.
 3. **Aggregate and Resolve**:
    - Present both reports under `## Standards` and `## Spec` side-by-side without merging or masking findings.
    - Fix all blocking findings (P0/P1/critical issues) before final completion.
@@ -222,10 +237,11 @@ If any test fails, the task remains `[ ]` and the agent continues working on it.
 
 | Step                    | Gate                                | Who Approves                 |
 | ----------------------- | ----------------------------------- | ---------------------------- |
-| speckit-specify         | Spec reviewed and approved          | User                         |
 | speckit-plan            | Plan produced (goes to convergence) | Automatic                    |
 | plan-review-convergence | No unresolved HIGH/CRITICAL issues  | User approves converged plan |
 | speckit-tasks           | Tasks generated                     | User may review              |
+| brainstorming           | Design & approach approved (hard)   | User                         |
+| writing-plans           | Bite-sized TDD plan produced        | User / Plan Review           |
 | speckit-implement (TDD) | All tests pass for every task       | Automatic (tests)            |
 | speckit-converge        | "✅ Converged" reported             | Automatic (convergence)      |
 | code-review             | Zero blocking findings (both axes)  | User / Dual-Axis Sub-agents  |

@@ -6,16 +6,43 @@ Update this file after every completed feature. Any AI agent reading this should
 
 ### Current Status
 
-**Feature:** Flight Match Scoring (Feature 022) — Phase 1 & Phase 2 / Slice 1 Complete (Tasks T001–T010)
-**Last completed:** Phase 2 / Slice 1 (T007–T010): Additive Prisma migration for 5 nullable flight match preferences on `TravelerProfile`, migration characterization E2E test verifying null defaults, revision preservation, and zero score tables/columns, DTO validation for schedule windows (`HourWindowDto` with start/end 0..23, overnight window support, strict keys), DTO validation for `maxStops` (0..8), `priceSensitivity` (`BUDGET | MODERATE | FLEXIBLE`), `requiresCheckedBaggage`, airline code canonicalization (trim, uppercase, 2-3 char IATA/ICAO format, deduplication), and clean mapping to `ProfileResponseDto` with shared contract types (2026-08-31).
-**In progress:** Phase 2 / Slice 2 (T011+): Profile scoring preferences projection and offer normalizer.
-**Next:** T011–T022 (Foundational Scoring Projection, Normalizer & Policy).
+**Feature:** Flight Match Scoring (Feature 022) — Phase 1 & Phase 2 / Slices 1 & 2 Complete (Tasks T001–T013)
+**Last completed:** Phase 2 / Slice 2 (T011–T013): Internal scoring preferences projection (`getScoringPreferences`), flag-independent scoring preferences projection with zero-PII allowlist and missing profile fallback, optimistic concurrency control (CAS revision increments and conflict handling), profile persistence mapping, explicit `null` preference clearing via `Prisma.DbNull`, PII-safe changed-field audit logging, and extended profile E2E integration test suite covering scoring preference persistence, overnight windows (`{ start: 22, end: 6 }`), CAS conflict handling, and negative privacy verification (2026-08-31).
+**In progress:** Phase 2 / Slice 3 (T014+): Offer normalizer, policy helpers, and web profile serialization.
+**Next:** T014–T022 (Normalized Inputs, Policy Versioning & Profile Web Controls).
 
 ---
 
 ## Progress by Feature
 
 ### [ ] Feature: Flight Match Scoring (Feature 022)
+
+- [x] Phase 2 / Slice 2: Profile Service Projection & E2E API Verification (T011–T013) (2026-08-31):
+  - **T011: Internal Scoring Preferences Projection (`apps/api/src/profile/profile.service.ts`, `apps/api/src/profile/profile.service.spec.ts`)**:
+    - Implemented `getScoringPreferences(userId)` returning allowlisted `ScoringPreferences` (`preferredAirlines`, `blacklistedAirlines`, `classPreference`, `preferredDepartureWindow`, `preferredArrivalWindow`, `maxStops`, `priceSensitivity`, `requiresCheckedBaggage`).
+    - Enforced booking readiness feature flag independence (`getScoringPreferences` operates regardless of `FEATURE_FLAG_BOOKING_READINESS`).
+    - Handled missing profiles safely returning default empty arrays and `null` values.
+    - Guaranteed zero PII projection (excludes passport, dates of birth, emails, phones, and addresses).
+    - Added bounded PII-safe `TRAVELER_PROFILE_SCORING_WINDOW_INTEGRITY_FAILURES` metric counter when stored window JSON contains unknown keys or invalid ranges.
+  - **T012: Profile Service Persistence, Mapping & Safe Audit (`apps/api/src/profile/profile.service.ts`, `apps/api/src/profile/profile.service.spec.ts`)**:
+    - Unified scoring preferences extraction across `getProfile()` and `getScoringPreferences()`.
+    - Mapped incoming preference updates into Prisma write payload while preserving omitted fields.
+    - Supported explicit `null` updates to clear preferences using `Prisma.DbNull`.
+    - Maintained optimistic concurrency CAS revision check (`revision === expectedRevision`), throwing `PROFILE_UPDATE_CONFLICT` (409) on mismatch or concurrent database collision.
+    - Recorded changed-field audit telemetry safely (`changedFields: ['preferences']`) with zero raw preference or PII payload logging.
+  - **T013: Extended Profile API E2E Test Suite (`apps/api/test/profile.e2e-spec.ts`)**:
+    - Verified authenticated `GET /api/profile` and `PATCH /api/profile` flows.
+    - Verified persistence of canonical flight match preferences including airline arrays, stops, baggage, sensitivity, and overnight windows (`{ start: 22, end: 6 }`).
+    - Verified explicit `null` clearing of flight match preferences.
+    - Verified optimistic revision CAS conflict rejection (409).
+    - Verified negative privacy guarantees: zero plaintext passport, contact sentinels, or preference sentinels in audit logs or error responses.
+  - **Verification Evidence**:
+    - Profile Unit Tests: 29/29 PASS (`apps/api/src/profile/profile.service.spec.ts`).
+    - Profile E2E Tests: 9/9 PASS (`apps/api/test/profile.e2e-spec.ts`).
+    - Shared Types Tests: 110/110 PASS (`pnpm --filter @shared/types test`).
+    - TypeScript Typecheck: 0 errors (`tsc --noEmit`).
+    - ESLint: 0 errors, 0 warnings.
+    - CI Contract Tests: 20/20 PASS (`tests/ci/ci-workflow.contract.test.mjs`).
 
 - [x] Phase 2 / Slice 1: Database Migration & Profile DTO Validation (T007–T010) (2026-08-31):
   - **T007: Additive Prisma Migration (`apps/api/prisma/schema.prisma`, `apps/api/prisma/migrations/20260831000000_add_flight_match_preferences/migration.sql`)**:

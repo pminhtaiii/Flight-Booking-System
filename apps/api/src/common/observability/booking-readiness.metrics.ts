@@ -15,6 +15,8 @@ export const BOOKING_READINESS_METRIC_COUNTERS = {
   BOOKING_PASSENGER_FINAL_VALIDATION_FAILURES: 'booking_passenger_final_validation_failures_total',
   PASSPORT_EXPIRY_BACKFILL_RUNS: 'passport_expiry_backfill_runs_total',
   PASSPORT_EXPIRY_BACKFILL_QUARANTINED: 'passport_expiry_backfill_quarantined_total',
+  TRAVELER_PROFILE_SCORING_WINDOW_INTEGRITY_FAILURES:
+    'traveler_profile_scoring_window_integrity_failures_total',
 } as const;
 
 export type BookingReadinessMetricCounter =
@@ -32,6 +34,7 @@ export const STANDARDIZED_READINESS_METRICS = [
   'booking_passenger_final_validation_failures_total',
   'passport_expiry_backfill_runs_total',
   'passport_expiry_backfill_quarantined_total',
+  'traveler_profile_scoring_window_integrity_failures_total',
 ] as const;
 
 export interface LatencyPercentiles {
