@@ -155,6 +155,11 @@ model TravelerProfile {
   classPreference          String?
   preferredAirlines        String[]
   blacklistedAirlines      String[]
+  preferredDepartureWindow Json?
+  preferredArrivalWindow   Json?
+  maxStops                 Int?
+  priceSensitivity         String?
+  requiresCheckedBaggage   Boolean?
   dietaryNeeds             String?
   nationality              String?
   /// @encrypted
