@@ -186,6 +186,134 @@ describe('Traveler Profile (E2E)', () => {
     expect(dbProfile?.givenName).toBe('Jane');
   });
 
+  it('persists canonical flight-match preferences through PATCH and subsequent GET', async () => {
+    await prisma.travelerProfile.create({
+      data: {
+        userId: user.id,
+        revision: 1,
+      },
+    });
+
+    const preferences = {
+      preferredAirlines: ['vn', 'SQ', 'vn'],
+      blacklistedAirlines: ['ek'],
+      preferredDepartureWindow: { start: 22, end: 6 },
+      preferredArrivalWindow: { start: 5, end: 9 },
+      maxStops: 1,
+      priceSensitivity: ' flexible ',
+      requiresCheckedBaggage: true,
+    };
+
+    const patchResponse = await request(app.getHttpServer())
+      .patch('/api/profile')
+      .set('Authorization', `Bearer ${authToken}`)
+      .send({ expectedRevision: 1, preferences })
+      .expect(200);
+
+    const expectedPreferences = {
+      preferredAirlines: ['VN', 'SQ'],
+      blacklistedAirlines: ['EK'],
+      preferredDepartureWindow: { start: 22, end: 6 },
+      preferredArrivalWindow: { start: 5, end: 9 },
+      maxStops: 1,
+      priceSensitivity: 'FLEXIBLE',
+      requiresCheckedBaggage: true,
+    };
+
+    expect(patchResponse.body.preferences).toMatchObject(expectedPreferences);
+    expect(patchResponse.body.revision).toBe(2);
+
+    const getResponse = await request(app.getHttpServer())
+      .get('/api/profile')
+      .set('Authorization', `Bearer ${authToken}`)
+      .expect(200);
+
+    expect(getResponse.body.preferences).toMatchObject(expectedPreferences);
+    expect(getResponse.body.revision).toBe(2);
+
+    const storedProfile = await prisma.travelerProfile.findUniqueOrThrow({
+      where: { userId: user.id },
+    });
+    expect(storedProfile).toMatchObject({
+      preferredAirlines: ['VN', 'SQ'],
+      blacklistedAirlines: ['EK'],
+      preferredDepartureWindow: { start: 22, end: 6 },
+      preferredArrivalWindow: { start: 5, end: 9 },
+      maxStops: 1,
+      priceSensitivity: 'FLEXIBLE',
+      requiresCheckedBaggage: true,
+      revision: 2,
+    });
+  });
+
+  it('clears flight-match preferences through PATCH and subsequent GET', async () => {
+    await prisma.travelerProfile.create({
+      data: {
+        userId: user.id,
+        revision: 1,
+      },
+    });
+
+    await request(app.getHttpServer())
+      .patch('/api/profile')
+      .set('Authorization', `Bearer ${authToken}`)
+      .send({
+        expectedRevision: 1,
+        preferences: {
+          preferredAirlines: ['VN'],
+          blacklistedAirlines: ['EK'],
+          preferredDepartureWindow: { start: 22, end: 6 },
+          preferredArrivalWindow: { start: 5, end: 9 },
+          maxStops: 1,
+          priceSensitivity: 'FLEXIBLE',
+          requiresCheckedBaggage: true,
+        },
+      })
+      .expect(200);
+
+    const clearResponse = await request(app.getHttpServer())
+      .patch('/api/profile')
+      .set('Authorization', `Bearer ${authToken}`)
+      .send({
+        expectedRevision: 2,
+        preferences: {
+          preferredAirlines: null,
+          blacklistedAirlines: null,
+          preferredDepartureWindow: null,
+          preferredArrivalWindow: null,
+          maxStops: null,
+          priceSensitivity: null,
+          requiresCheckedBaggage: null,
+        },
+      })
+      .expect(200);
+
+    expect(clearResponse.body.preferences).toBeNull();
+    expect(clearResponse.body.revision).toBe(3);
+
+    const getResponse = await request(app.getHttpServer())
+      .get('/api/profile')
+      .set('Authorization', `Bearer ${authToken}`)
+      .expect(200);
+
+    expect(getResponse.body.preferences).toBeNull();
+    expect(getResponse.body.revision).toBe(3);
+
+    const storedProfile = await prisma.travelerProfile.findUniqueOrThrow({
+      where: { userId: user.id },
+    });
+    expect(storedProfile).toMatchObject({
+      preferredAirlines: [],
+      blacklistedAirlines: [],
+      preferredDepartureWindow: null,
+      preferredArrivalWindow: null,
+      maxStops: null,
+      priceSensitivity: null,
+      requiresCheckedBaggage: null,
+      revision: 3,
+    });
+  });
+
   it('PATCH /api/profile returns 409 conflict on stale revision', async () => {
     await prisma.travelerProfile.create({
       data: {
@@ -210,6 +338,135 @@ describe('Traveler Profile (E2E)', () => {
       .set('Authorization', `Bearer ${authToken}`)
       .send(updatePayload)
       .expect(409);
+  });
+
+  it('returns the revision-conflict token without partially writing stale preferences', async () => {
+    await prisma.travelerProfile.create({
+      data: {
+        userId: user.id,
+        preferredAirlines: ['VN'],
+        preferredDepartureWindow: { start: 22, end: 6 },
+        maxStops: 1,
+        priceSensitivity: 'FLEXIBLE',
+        requiresCheckedBaggage: true,
+        revision: 2,
+      },
+    });
+
+    const staleResponse = await request(app.getHttpServer())
+      .patch('/api/profile')
+      .set('Authorization', `Bearer ${authToken}`)
+      .send({
+        expectedRevision: 1,
+        preferences: {
+          preferredAirlines: ['EK'],
+          preferredDepartureWindow: { start: 8, end: 12 },
+          maxStops: 0,
+          priceSensitivity: 'BUDGET',
+          requiresCheckedBaggage: false,
+        },
+      })
+      .expect(409);
+
+    expect(staleResponse.body.message).toBe('PROFILE_REVISION_CONFLICT');
+
+    const storedProfile = await prisma.travelerProfile.findUniqueOrThrow({
+      where: { userId: user.id },
+    });
+    expect(storedProfile).toMatchObject({
+      preferredAirlines: ['VN'],
+      preferredDepartureWindow: { start: 22, end: 6 },
+      maxStops: 1,
+      priceSensitivity: 'FLEXIBLE',
+      requiresCheckedBaggage: true,
+      revision: 2,
+    });
+  });
+
+  it('never exposes raw PII or preference payload values in audits or API errors', async () => {
+    await prisma.travelerProfile.create({
+      data: {
+        userId: user.id,
+        revision: 1,
+      },
+    });
+
+    const passportSentinel = 'T013-PASSPORT-SENTINEL';
+    const contactSentinel = 't013-contact-sentinel@example.test';
+    const phoneSentinel = 'T013-PHONE-SENTINEL';
+    const preferredAirlineSentinel = 'XA';
+    const blacklistedAirlineSentinel = 'XB';
+
+    await request(app.getHttpServer())
+      .patch('/api/profile')
+      .set('Authorization', `Bearer ${authToken}`)
+      .send({
+        expectedRevision: 1,
+        contact: {
+          email: contactSentinel,
+          phoneCountryCode: '+84',
+          phoneNumber: phoneSentinel,
+        },
+        travelDocument: {
+          documentType: 'passport',
+          passportNumber: passportSentinel,
+          passportExpiry: '2030-08-01',
+          issuingCountry: 'US',
+          nationality: 'US',
+        },
+        preferences: {
+          preferredAirlines: [preferredAirlineSentinel],
+          blacklistedAirlines: [blacklistedAirlineSentinel],
+          preferredDepartureWindow: { start: 22, end: 6 },
+          priceSensitivity: 'FLEXIBLE',
+        },
+      })
+      .expect(200);
+
+    const logs = await prisma.auditLog.findMany({
+      where: { userId: user.id },
+    });
+    expect(logs.length).toBeGreaterThan(0);
+
+    for (const log of logs) {
+      const metadata = JSON.stringify(log.metadata);
+      expect(metadata).not.toContain(passportSentinel);
+      expect(metadata).not.toContain(contactSentinel);
+      expect(metadata).not.toContain(phoneSentinel);
+      expect(metadata).not.toContain(preferredAirlineSentinel);
+      expect(metadata).not.toContain(blacklistedAirlineSentinel);
+      expect(metadata).not.toContain('FLEXIBLE');
+    }
+
+    const invalidPreferenceSentinel = 'T013PREF';
+    const errorResponse = await request(app.getHttpServer())
+      .patch('/api/profile')
+      .set('Authorization', `Bearer ${authToken}`)
+      .send({
+        expectedRevision: 2,
+        contact: {
+          email: 'not-an-email',
+          phoneCountryCode: '+84',
+          phoneNumber: phoneSentinel,
+        },
+        travelDocument: {
+          documentType: 'passport',
+          passportNumber: passportSentinel,
+          passportExpiry: '2030-08-01',
+          issuingCountry: 'INVALID',
+          nationality: 'US',
+        },
+        preferences: {
+          preferredAirlines: [invalidPreferenceSentinel],
+        },
+      })
+      .expect(400);
+
+    const errorBody = JSON.stringify(errorResponse.body);
+    expect(errorBody).not.toContain(passportSentinel);
+    expect(errorBody).not.toContain(contactSentinel);
+    expect(errorBody).not.toContain(phoneSentinel);
+    expect(errorBody).not.toContain(invalidPreferenceSentinel);
   });
 
   it('No plaintext passport/expiry or contact details in database or audits', async () => {
