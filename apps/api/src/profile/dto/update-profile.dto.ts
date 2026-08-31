@@ -6,7 +6,9 @@ import {
   ValidateNested,
   IsEmail,
   IsDateString,
+  Max,
   Matches,
+  Min,
   IsNotEmpty,
   ValidateIf,
 } from 'class-validator';
@@ -77,6 +79,18 @@ export class TravelDocumentSectionDto {
   nationality!: string;
 }
 
+export class HourWindowDto {
+  @IsInt()
+  @Min(0)
+  @Max(23)
+  start!: number;
+
+  @IsInt()
+  @Min(0)
+  @Max(23)
+  end!: number;
+}
+
 export class PreferencesSectionDto {
   @IsOptional()
   @IsString()
@@ -85,6 +99,18 @@ export class PreferencesSectionDto {
   @IsOptional()
   @IsString()
   classPreference?: string | null;
+
+  @IsOptional()
+  @ValidateIf((_object, value) => value !== null)
+  @ValidateNested()
+  @Type(() => HourWindowDto)
+  preferredDepartureWindow?: HourWindowDto | null;
+
+  @IsOptional()
+  @ValidateIf((_object, value) => value !== null)
+  @ValidateNested()
+  @Type(() => HourWindowDto)
+  preferredArrivalWindow?: HourWindowDto | null;
 }
 
 export class UpdateProfileDto {

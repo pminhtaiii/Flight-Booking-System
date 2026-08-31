@@ -41,7 +41,7 @@ description: "Dependency-ordered implementation tasks for deterministic flight m
 
 - [x] T007 Drive additive null-default/existing-row migration through RED → GREEN in `apps/api/test/traveler-profile-flight-match-migration.e2e-spec.ts`, `apps/api/prisma/schema.prisma`, and `apps/api/prisma/migrations/<timestamp>_add_flight_match_preferences/migration.sql`
 - [x] T008 Drive revision preservation and absence of any score table/column through RED → GREEN in `apps/api/test/traveler-profile-flight-match-migration.e2e-spec.ts` and the same additive migration
-- [ ] T009 Drive hour-window/overnight/unknown-key DTO validation through RED → GREEN in `apps/api/src/profile/profile.controller.spec.ts` and `apps/api/src/profile/dto/update-profile.dto.ts`
+- [x] T009 Drive hour-window/overnight/unknown-key DTO validation through RED → GREEN in `apps/api/src/profile/profile.controller.spec.ts` and `apps/api/src/profile/dto/update-profile.dto.ts`
 - [ ] T010 Drive max-stops, sensitivity, baggage, airline canonicalization, and response DTO behavior through RED → GREEN in `apps/api/src/profile/profile.controller.spec.ts`, `apps/api/src/profile/dto/update-profile.dto.ts`, and `apps/api/src/profile/dto/profile-response.dto.ts`
 - [ ] T011 Drive missing-profile, owner-scoped, readiness-flag-independent `getScoringPreferences()` through RED → GREEN in `apps/api/src/profile/profile.service.spec.ts` and `apps/api/src/profile/profile.service.ts`
 - [ ] T012 Drive revision-CAS atomic update/clear, mapping, and safe changed-field audit behavior through RED → GREEN in `apps/api/src/profile/profile.service.spec.ts` and `apps/api/src/profile/profile.service.ts`

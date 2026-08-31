@@ -148,6 +148,86 @@ describe('ProfileController', () => {
       expect(errors.length).toBe(0);
     });
 
+    it('passes validation with valid preferred departure and arrival windows', async () => {
+      const dto = plainToInstance(UpdateProfileDto, {
+        expectedRevision: 1,
+        preferences: {
+          preferredDepartureWindow: { start: 6, end: 10 },
+          preferredArrivalWindow: { start: 22, end: 6 },
+        },
+      });
+
+      const errors = await validate(dto, { whitelist: true, forbidNonWhitelisted: true });
+
+      expect(errors).toHaveLength(0);
+    });
+
+    it('passes validation when preferred departure and arrival windows are explicitly null', async () => {
+      const dto = plainToInstance(UpdateProfileDto, {
+        expectedRevision: 1,
+        preferences: {
+          preferredDepartureWindow: null,
+          preferredArrivalWindow: null,
+        },
+      });
+
+      const errors = await validate(dto, { whitelist: true, forbidNonWhitelisted: true });
+
+      expect(errors).toHaveLength(0);
+    });
+
+    it.each([
+      ['start is below zero', { start: -1, end: 10 }],
+      ['start is above 23', { start: 24, end: 10 }],
+      ['end is below zero', { start: 6, end: -1 }],
+      ['end is above 23', { start: 6, end: 24 }],
+    ])('fails validation when a preferred departure window %s', async (_description, window) => {
+      const dto = plainToInstance(UpdateProfileDto, {
+        expectedRevision: 1,
+        preferences: { preferredDepartureWindow: window },
+      });
+
+      const errors = await validate(dto, { whitelist: true, forbidNonWhitelisted: true });
+
+      expect(errors).toHaveLength(1);
+      expect(errors[0].property).toBe('preferences');
+      expect(errors[0].children?.[0].property).toBe('preferredDepartureWindow');
+    });
+
+    it.each([
+      ['string start', { start: '6', end: 10 }],
+      ['string end', { start: 6, end: '10' }],
+      ['floating-point start', { start: 6.5, end: 10 }],
+      ['floating-point end', { start: 6, end: 10.5 }],
+    ])('fails validation for a preferred departure window with a %s', async (_description, window) => {
+      const dto = plainToInstance(UpdateProfileDto, {
+        expectedRevision: 1,
+        preferences: { preferredDepartureWindow: window },
+      });
+
+      const errors = await validate(dto, { whitelist: true, forbidNonWhitelisted: true });
+
+      expect(errors).toHaveLength(1);
+      expect(errors[0].property).toBe('preferences');
+      expect(errors[0].children?.[0].property).toBe('preferredDepartureWindow');
+    });
+
+    it('fails validation for an unknown nested hour-window property', async () => {
+      const dto = plainToInstance(UpdateProfileDto, {
+        expectedRevision: 1,
+        preferences: {
+          preferredDepartureWindow: { start: 6, end: 10, timezone: 'Asia/Ho_Chi_Minh' },
+        },
+      });
+
+      const errors = await validate(dto, { whitelist: true, forbidNonWhitelisted: true });
+
+      expect(errors).toHaveLength(1);
+      expect(errors[0].property).toBe('preferences');
+      expect(errors[0].children?.[0].property).toBe('preferredDepartureWindow');
+      expect(errors[0].children?.[0].children?.[0].property).toBe('timezone');
+    });
+
     it('fails when expectedRevision is missing', async () => {
       const payload = {
         identity: {
