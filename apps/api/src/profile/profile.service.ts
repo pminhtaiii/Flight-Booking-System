@@ -26,6 +26,32 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
+function parseHourWindow(
+  value: Prisma.JsonValue | null | undefined,
+): { start: number; end: number } | null {
+  if (!isRecord(value)) return null;
+  const { start, end } = value;
+  if (
+    typeof start !== 'number' ||
+    typeof end !== 'number' ||
+    !Number.isInteger(start) ||
+    !Number.isInteger(end) ||
+    start < 0 ||
+    start > 23 ||
+    end < 0 ||
+    end > 23
+  ) {
+    return null;
+  }
+  return { start, end };
+}
+
+function parsePriceSensitivity(
+  value: string | null | undefined,
+): ScoringPreferences['priceSensitivity'] {
+  return value === 'BUDGET' || value === 'MODERATE' || value === 'FLEXIBLE' ? value : null;
+}
+
 @Injectable()
 export class ProfileService {
   constructor(
@@ -157,11 +183,36 @@ export class ProfileService {
         }
       : null;
 
-    const hasPrefs = dbProfile.seatPreference || dbProfile.classPreference;
+    const preferredAirlines = Array.isArray(dbProfile.preferredAirlines)
+      ? dbProfile.preferredAirlines
+      : [];
+    const blacklistedAirlines = Array.isArray(dbProfile.blacklistedAirlines)
+      ? dbProfile.blacklistedAirlines
+      : [];
+    const preferredDepartureWindow = parseHourWindow(dbProfile.preferredDepartureWindow);
+    const preferredArrivalWindow = parseHourWindow(dbProfile.preferredArrivalWindow);
+    const priceSensitivity = parsePriceSensitivity(dbProfile.priceSensitivity);
+    const hasPrefs =
+      dbProfile.seatPreference ||
+      dbProfile.classPreference ||
+      preferredAirlines.length > 0 ||
+      blacklistedAirlines.length > 0 ||
+      preferredDepartureWindow !== null ||
+      preferredArrivalWindow !== null ||
+      (dbProfile.maxStops !== null && dbProfile.maxStops !== undefined) ||
+      priceSensitivity !== null ||
+      (dbProfile.requiresCheckedBaggage !== null && dbProfile.requiresCheckedBaggage !== undefined);
     const preferences = hasPrefs
       ? {
           seatPreference: dbProfile.seatPreference || null,
           classPreference: dbProfile.classPreference || null,
+          preferredAirlines,
+          blacklistedAirlines,
+          preferredDepartureWindow,
+          preferredArrivalWindow,
+          maxStops: dbProfile.maxStops ?? null,
+          priceSensitivity,
+          requiresCheckedBaggage: dbProfile.requiresCheckedBaggage ?? null,
         }
       : null;
 
@@ -204,30 +255,7 @@ export class ProfileService {
       };
     }
 
-    const parseWindow = (value: Prisma.JsonValue | null): { start: number; end: number } | null => {
-      if (!isRecord(value)) return null;
-      const { start, end } = value;
-      if (
-        typeof start !== 'number' ||
-        typeof end !== 'number' ||
-        !Number.isInteger(start) ||
-        !Number.isInteger(end) ||
-        start < 0 ||
-        start > 23 ||
-        end < 0 ||
-        end > 23
-      ) {
-        return null;
-      }
-      return { start, end };
-    };
-
-    const priceSensitivity =
-      dbProfile.priceSensitivity === 'BUDGET' ||
-      dbProfile.priceSensitivity === 'MODERATE' ||
-      dbProfile.priceSensitivity === 'FLEXIBLE'
-        ? dbProfile.priceSensitivity
-        : null;
+    const priceSensitivity = parsePriceSensitivity(dbProfile.priceSensitivity);
 
     return {
       preferredAirlines: Array.isArray(dbProfile.preferredAirlines)
@@ -237,8 +265,8 @@ export class ProfileService {
         ? dbProfile.blacklistedAirlines
         : [],
       classPreference: dbProfile.classPreference ?? null,
-      preferredDepartureWindow: parseWindow(dbProfile.preferredDepartureWindow),
-      preferredArrivalWindow: parseWindow(dbProfile.preferredArrivalWindow),
+      preferredDepartureWindow: parseHourWindow(dbProfile.preferredDepartureWindow),
+      preferredArrivalWindow: parseHourWindow(dbProfile.preferredArrivalWindow),
       maxStops: dbProfile.maxStops ?? null,
       priceSensitivity,
       requiresCheckedBaggage: dbProfile.requiresCheckedBaggage ?? null,
@@ -318,9 +346,44 @@ export class ProfileService {
       if (updateDto.preferences === null) {
         data.seatPreference = null;
         data.classPreference = null;
+        data.preferredAirlines = [];
+        data.blacklistedAirlines = [];
+        data.preferredDepartureWindow = null;
+        data.preferredArrivalWindow = null;
+        data.maxStops = null;
+        data.priceSensitivity = null;
+        data.requiresCheckedBaggage = null;
       } else {
-        data.seatPreference = updateDto.preferences.seatPreference;
-        data.classPreference = updateDto.preferences.classPreference;
+        const hasPreference = (key: string): boolean =>
+          Object.prototype.hasOwnProperty.call(updateDto.preferences, key);
+
+        if (hasPreference('seatPreference')) {
+          data.seatPreference = updateDto.preferences.seatPreference;
+        }
+        if (hasPreference('classPreference')) {
+          data.classPreference = updateDto.preferences.classPreference;
+        }
+        if (hasPreference('preferredAirlines')) {
+          data.preferredAirlines = updateDto.preferences.preferredAirlines ?? [];
+        }
+        if (hasPreference('blacklistedAirlines')) {
+          data.blacklistedAirlines = updateDto.preferences.blacklistedAirlines ?? [];
+        }
+        if (hasPreference('preferredDepartureWindow')) {
+          data.preferredDepartureWindow = updateDto.preferences.preferredDepartureWindow;
+        }
+        if (hasPreference('preferredArrivalWindow')) {
+          data.preferredArrivalWindow = updateDto.preferences.preferredArrivalWindow;
+        }
+        if (hasPreference('maxStops')) {
+          data.maxStops = updateDto.preferences.maxStops;
+        }
+        if (hasPreference('priceSensitivity')) {
+          data.priceSensitivity = updateDto.preferences.priceSensitivity;
+        }
+        if (hasPreference('requiresCheckedBaggage')) {
+          data.requiresCheckedBaggage = updateDto.preferences.requiresCheckedBaggage;
+        }
       }
     }
 
@@ -339,7 +402,7 @@ export class ProfileService {
           this.metricsService?.increment(
             BOOKING_READINESS_METRIC_COUNTERS.TRAVELER_PROFILE_CONFLICTS,
           );
-          throw new ConflictException('PROFILE_UPDATE_CONFLICT');
+          throw new ConflictException('PROFILE_REVISION_CONFLICT');
         }
 
         data.userId = userId;
@@ -354,13 +417,13 @@ export class ProfileService {
             this.metricsService?.increment(
               BOOKING_READINESS_METRIC_COUNTERS.TRAVELER_PROFILE_CONFLICTS,
             );
-            throw new ConflictException('PROFILE_UPDATE_CONFLICT');
+            throw new ConflictException('PROFILE_REVISION_CONFLICT');
           }
           if (err?.code === 'P2002') {
             this.metricsService?.increment(
               BOOKING_READINESS_METRIC_COUNTERS.TRAVELER_PROFILE_CONFLICTS,
             );
-            throw new ConflictException('PROFILE_UPDATE_CONFLICT');
+            throw new ConflictException('PROFILE_REVISION_CONFLICT');
           }
           throw err;
         }
@@ -383,7 +446,7 @@ export class ProfileService {
           this.metricsService?.increment(
             BOOKING_READINESS_METRIC_COUNTERS.TRAVELER_PROFILE_CONFLICTS,
           );
-          throw new ConflictException('PROFILE_UPDATE_CONFLICT');
+          throw new ConflictException('PROFILE_REVISION_CONFLICT');
         }
 
         data.revision = { increment: 1 };
@@ -398,13 +461,13 @@ export class ProfileService {
             this.metricsService?.increment(
               BOOKING_READINESS_METRIC_COUNTERS.TRAVELER_PROFILE_CONFLICTS,
             );
-            throw new ConflictException('PROFILE_UPDATE_CONFLICT');
+            throw new ConflictException('PROFILE_REVISION_CONFLICT');
           }
           if (err?.code === 'P2025') {
             this.metricsService?.increment(
               BOOKING_READINESS_METRIC_COUNTERS.TRAVELER_PROFILE_CONFLICTS,
             );
-            throw new ConflictException('PROFILE_UPDATE_CONFLICT');
+            throw new ConflictException('PROFILE_REVISION_CONFLICT');
           }
           throw err;
         }

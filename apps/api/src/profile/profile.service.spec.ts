@@ -241,6 +241,126 @@ describe('ProfileService', () => {
     });
   });
 
+  describe('Scoring Preference Public Profile Mapping', () => {
+    it('returns stored scoring preferences from the public profile read', async () => {
+      dbProfile = {
+        id: 'profile-123',
+        userId: 'user-123',
+        revision: 3,
+        preferredAirlines: ['VN'],
+        blacklistedAirlines: ['AA'],
+        preferredDepartureWindow: { start: 22, end: 6 },
+        preferredArrivalWindow: { start: 9, end: 17 },
+        maxStops: 1,
+        priceSensitivity: 'FLEXIBLE',
+        requiresCheckedBaggage: false,
+      };
+
+      await expect(service.getProfile('user-123')).resolves.toMatchObject({
+        preferences: {
+          seatPreference: null,
+          classPreference: null,
+          preferredAirlines: ['VN'],
+          blacklistedAirlines: ['AA'],
+          preferredDepartureWindow: { start: 22, end: 6 },
+          preferredArrivalWindow: { start: 9, end: 17 },
+          maxStops: 1,
+          priceSensitivity: 'FLEXIBLE',
+          requiresCheckedBaggage: false,
+        },
+      });
+    });
+
+    it('persists only supplied preference keys and preserves omitted preferences', async () => {
+      dbProfile = {
+        id: 'profile-123',
+        userId: 'user-123',
+        revision: 3,
+        seatPreference: 'AISLE',
+        classPreference: 'BUSINESS',
+        preferredAirlines: ['VN'],
+        blacklistedAirlines: ['AA'],
+        preferredDepartureWindow: { start: 22, end: 6 },
+        preferredArrivalWindow: { start: 9, end: 17 },
+        maxStops: 2,
+        priceSensitivity: 'BUDGET',
+        requiresCheckedBaggage: true,
+      };
+
+      const result = await service.updateProfile('user-123', {
+        expectedRevision: 3,
+        preferences: {
+          preferredAirlines: ['SQ'],
+          maxStops: null,
+          requiresCheckedBaggage: false,
+        },
+      });
+
+      expect(prisma.travelerProfile.update).toHaveBeenCalledWith({
+        where: { userId: 'user-123', revision: 3 },
+        data: expect.objectContaining({
+          preferredAirlines: ['SQ'],
+          maxStops: null,
+          requiresCheckedBaggage: false,
+          revision: { increment: 1 },
+        }),
+      });
+      expect((prisma.travelerProfile.update as jest.Mock).mock.calls[0][0].data).not.toHaveProperty(
+        'seatPreference',
+      );
+      expect(result.preferences).toMatchObject({
+        seatPreference: 'AISLE',
+        classPreference: 'BUSINESS',
+        preferredAirlines: ['SQ'],
+        blacklistedAirlines: ['AA'],
+        preferredDepartureWindow: { start: 22, end: 6 },
+        preferredArrivalWindow: { start: 9, end: 17 },
+        maxStops: null,
+        priceSensitivity: 'BUDGET',
+        requiresCheckedBaggage: false,
+      });
+    });
+
+    it('clears every preference field when preferences is explicitly null', async () => {
+      dbProfile = {
+        id: 'profile-123',
+        userId: 'user-123',
+        revision: 3,
+        seatPreference: 'AISLE',
+        classPreference: 'BUSINESS',
+        preferredAirlines: ['VN'],
+        blacklistedAirlines: ['AA'],
+        preferredDepartureWindow: { start: 22, end: 6 },
+        preferredArrivalWindow: { start: 9, end: 17 },
+        maxStops: 2,
+        priceSensitivity: 'BUDGET',
+        requiresCheckedBaggage: true,
+      };
+
+      const result = await service.updateProfile('user-123', {
+        expectedRevision: 3,
+        preferences: null,
+      });
+
+      expect(prisma.travelerProfile.update).toHaveBeenCalledWith({
+        where: { userId: 'user-123', revision: 3 },
+        data: expect.objectContaining({
+          seatPreference: null,
+          classPreference: null,
+          preferredAirlines: [],
+          blacklistedAirlines: [],
+          preferredDepartureWindow: null,
+          preferredArrivalWindow: null,
+          maxStops: null,
+          priceSensitivity: null,
+          requiresCheckedBaggage: null,
+          revision: { increment: 1 },
+        }),
+      });
+      expect(result.preferences).toBeNull();
+    });
+  });
+
   describe('Owner Scoping', () => {
     it('queries only the profile owned by the authenticated user ID on GET', async () => {
       dbProfile = null;
@@ -299,6 +419,59 @@ describe('ProfileService', () => {
       ).rejects.toThrow(ConflictException);
 
       expect(prisma.travelerProfile.update).not.toHaveBeenCalled();
+    });
+
+    it('returns PROFILE_REVISION_CONFLICT for stale revisions and CAS races', async () => {
+      dbProfile = { id: 'profile-123', userId: 'user-123', revision: 2 };
+
+      let staleRevisionError: unknown;
+      try {
+        await service.updateProfile('user-123', { expectedRevision: 1 });
+      } catch (error) {
+        staleRevisionError = error;
+      }
+
+      expect(staleRevisionError).toBeInstanceOf(ConflictException);
+      if (!(staleRevisionError instanceof ConflictException)) {
+        throw staleRevisionError;
+      }
+      expect(staleRevisionError.getResponse()).toMatchObject({
+        message: 'PROFILE_REVISION_CONFLICT',
+      });
+
+      dbProfile = { id: 'profile-123', userId: 'user-123', revision: 1 };
+      const p2025Error = Object.assign(new Error('Record to update not found'), { code: 'P2025' });
+      jest.spyOn(prisma.travelerProfile, 'update').mockRejectedValueOnce(p2025Error);
+
+      let raceError: unknown;
+      try {
+        await service.updateProfile('user-123', { expectedRevision: 1 });
+      } catch (error) {
+        raceError = error;
+      }
+
+      expect(raceError).toBeInstanceOf(ConflictException);
+      if (!(raceError instanceof ConflictException)) {
+        throw raceError;
+      }
+      expect(raceError.getResponse()).toMatchObject({ message: 'PROFILE_REVISION_CONFLICT' });
+
+      dbProfile = null;
+      const p2002Error = Object.assign(new Error('Unique constraint failed'), { code: 'P2002' });
+      jest.spyOn(prisma.travelerProfile, 'create').mockRejectedValueOnce(p2002Error);
+
+      let createRaceError: unknown;
+      try {
+        await service.updateProfile('user-123', { expectedRevision: 0 });
+      } catch (error) {
+        createRaceError = error;
+      }
+
+      expect(createRaceError).toBeInstanceOf(ConflictException);
+      if (!(createRaceError instanceof ConflictException)) {
+        throw createRaceError;
+      }
+      expect(createRaceError.getResponse()).toMatchObject({ message: 'PROFILE_REVISION_CONFLICT' });
     });
 
     it('throws ConflictException (409) if the profile does not exist but client expected non-zero revision', async () => {
@@ -499,6 +672,34 @@ describe('ProfileService', () => {
       expect(metadataString).not.toContain('1990-01-01');
 
       expect(metadata.changedFields).toContain('identity');
+    });
+
+    it('records only a preference section marker and revision for scoring preference updates', async () => {
+      dbProfile = { id: 'profile-123', userId: 'user-123', revision: 3 };
+
+      await service.updateProfile('user-123', {
+        expectedRevision: 3,
+        preferences: {
+          preferredAirlines: ['VN'],
+          blacklistedAirlines: ['AA'],
+          preferredDepartureWindow: { start: 22, end: 6 },
+          preferredArrivalWindow: { start: 9, end: 17 },
+          maxStops: 1,
+          priceSensitivity: 'FLEXIBLE',
+          requiresCheckedBaggage: true,
+        },
+      });
+
+      const call = (auditService.createLog as jest.Mock).mock.calls[0];
+      const metadata = call[1].metadata;
+
+      expect(metadata).toEqual({ changedFields: ['preferences'], revision: 4 });
+      const metadataString = JSON.stringify(metadata);
+      expect(metadataString).not.toContain('VN');
+      expect(metadataString).not.toContain('AA');
+      expect(metadataString).not.toContain('22');
+      expect(metadataString).not.toContain('FLEXIBLE');
+      expect(metadataString).not.toContain('true');
     });
 
     it('wraps profile mutation and audit log insertion in a single transaction', async () => {
