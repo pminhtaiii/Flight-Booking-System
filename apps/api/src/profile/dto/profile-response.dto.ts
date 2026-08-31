@@ -24,6 +24,13 @@ export class ProfileResponseTravelDocumentDto {
 export class ProfileResponsePreferencesDto {
   seatPreference?: string | null;
   classPreference?: string | null;
+  preferredAirlines?: string[];
+  blacklistedAirlines?: string[];
+  preferredDepartureWindow?: { start: number; end: number } | null;
+  preferredArrivalWindow?: { start: number; end: number } | null;
+  maxStops?: number | null;
+  priceSensitivity?: 'BUDGET' | 'MODERATE' | 'FLEXIBLE' | null;
+  requiresCheckedBaggage?: boolean | null;
 }
 
 export class ProfileResponseDto {

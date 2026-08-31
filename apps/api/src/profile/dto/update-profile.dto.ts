@@ -1,12 +1,18 @@
-import { Type } from 'class-transformer';
+import { Transform, TransformFnParams, Type } from 'class-transformer';
 import {
+  IsArray,
+  IsBoolean,
+  IsIn,
   IsInt,
   IsOptional,
+  IsObject,
   IsString,
   ValidateNested,
   IsEmail,
   IsDateString,
+  Max,
   Matches,
+  Min,
   IsNotEmpty,
   ValidateIf,
 } from 'class-validator';
@@ -77,6 +83,36 @@ export class TravelDocumentSectionDto {
   nationality!: string;
 }
 
+export class HourWindowDto {
+  @IsInt()
+  @Min(0)
+  @Max(23)
+  start!: number;
+
+  @IsInt()
+  @Min(0)
+  @Max(23)
+  end!: number;
+}
+
+function canonicalizeAirlineCodes(value: unknown): unknown {
+  if (!Array.isArray(value)) {
+    return value;
+  }
+
+  return [
+    ...new Set(
+      value.map((entry: unknown): unknown =>
+        typeof entry === 'string' ? entry.trim().toUpperCase() : entry,
+      ),
+    ),
+  ];
+}
+
+function canonicalizePriceSensitivity(value: unknown): unknown {
+  return typeof value === 'string' ? value.trim().toUpperCase() : value;
+}
+
 export class PreferencesSectionDto {
   @IsOptional()
   @IsString()
@@ -85,6 +121,52 @@ export class PreferencesSectionDto {
   @IsOptional()
   @IsString()
   classPreference?: string | null;
+
+  @IsOptional()
+  @ValidateIf((_object, value) => value !== null)
+  @IsObject()
+  @ValidateNested()
+  @Type(() => HourWindowDto)
+  preferredDepartureWindow?: HourWindowDto | null;
+
+  @IsOptional()
+  @ValidateIf((_object, value) => value !== null)
+  @IsObject()
+  @ValidateNested()
+  @Type(() => HourWindowDto)
+  preferredArrivalWindow?: HourWindowDto | null;
+
+  @IsOptional()
+  @ValidateIf((_object, value) => value !== null)
+  @IsInt()
+  @Min(0)
+  @Max(3)
+  maxStops?: number | null;
+
+  @IsOptional()
+  @ValidateIf((_object, value) => value !== null)
+  @Transform(({ value }: TransformFnParams): unknown => canonicalizePriceSensitivity(value))
+  @IsIn(['BUDGET', 'MODERATE', 'FLEXIBLE'])
+  priceSensitivity?: 'BUDGET' | 'MODERATE' | 'FLEXIBLE' | null;
+
+  @IsOptional()
+  @ValidateIf((_object, value) => value !== null)
+  @IsBoolean()
+  requiresCheckedBaggage?: boolean | null;
+
+  @IsOptional()
+  @Transform(({ value }: TransformFnParams): unknown => canonicalizeAirlineCodes(value))
+  @IsArray()
+  @IsString({ each: true })
+  @Matches(/^[A-Z0-9]{2}$/, { each: true })
+  preferredAirlines?: string[] | null;
+
+  @IsOptional()
+  @Transform(({ value }: TransformFnParams): unknown => canonicalizeAirlineCodes(value))
+  @IsArray()
+  @IsString({ each: true })
+  @Matches(/^[A-Z0-9]{2}$/, { each: true })
+  blacklistedAirlines?: string[] | null;
 }
 
 export class UpdateProfileDto {
