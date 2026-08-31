@@ -4,6 +4,8 @@ import {
   normalizeOffer,
   parseISO8601Duration,
   generateDeterministicUUID,
+  isValidIsoDateTime,
+  extractLocalHour,
 } from './flight-offer-normalizer';
 
 describe('FlightOfferNormalizer (T015)', () => {
@@ -387,7 +389,7 @@ describe('FlightOfferNormalizer (T015)', () => {
       expect(normalizeOffer(offer3, 0)?.outboundDepartureHour).toBe(23);
     });
 
-    it('extracts local clock inbound arrival hour from outbound final segment arriving_at', () => {
+    it('extracts local clock outbound arrival hour from outbound final segment arriving_at', () => {
       const offer = createMockOffer({
         slices: [
           {
@@ -423,7 +425,7 @@ describe('FlightOfferNormalizer (T015)', () => {
         ],
       });
 
-      expect(normalizeOffer(offer, 0)?.inboundArrivalHour).toBe(16);
+      expect(normalizeOffer(offer, 0)?.outboundArrivalHour).toBe(16);
     });
   });
 
@@ -787,6 +789,132 @@ describe('FlightOfferNormalizer (T015)', () => {
 
       expect(normalized?.hasCheckedBaggage).toBeNull();
     });
+
+    it('returns null in multi-slice round-trip when one slice has checked bag but the other slice omits baggage data', () => {
+      const offer = createMockOffer({
+        slices: [
+          {
+            id: 'sli_outbound',
+            duration: 'PT5H',
+            origin: { id: 'plc_sfo', name: 'SFO', iata_code: 'SFO', type: 'airport' },
+            destination: { id: 'plc_jfk', name: 'JFK', iata_code: 'JFK', type: 'airport' },
+            segments: [
+              {
+                id: 'seg_1',
+                duration: 'PT5H',
+                departing_at: '2026-09-01T08:00:00',
+                arriving_at: '2026-09-01T13:00:00',
+                origin: { id: 'plc_sfo', name: 'SFO', iata_code: 'SFO', type: 'airport' },
+                destination: { id: 'plc_jfk', name: 'JFK', iata_code: 'JFK', type: 'airport' },
+                marketing_carrier: { id: 'arl_dl', name: 'Delta', iata_code: 'DL' },
+                operating_carrier: { id: 'arl_dl', name: 'Delta', iata_code: 'DL' },
+                marketing_carrier_flight_number: '1',
+                passengers: [
+                  {
+                    passenger_id: 'pas_1',
+                    cabin_class: 'economy',
+                    baggages: [{ type: 'checked', quantity: 1 }],
+                  },
+                ],
+              },
+            ],
+          },
+          {
+            id: 'sli_return',
+            duration: 'PT5H',
+            origin: { id: 'plc_jfk', name: 'JFK', iata_code: 'JFK', type: 'airport' },
+            destination: { id: 'plc_sfo', name: 'SFO', iata_code: 'SFO', type: 'airport' },
+            segments: [
+              {
+                id: 'seg_2',
+                duration: 'PT5H',
+                departing_at: '2026-09-05T08:00:00',
+                arriving_at: '2026-09-05T13:00:00',
+                origin: { id: 'plc_jfk', name: 'JFK', iata_code: 'JFK', type: 'airport' },
+                destination: { id: 'plc_sfo', name: 'SFO', iata_code: 'SFO', type: 'airport' },
+                marketing_carrier: { id: 'arl_dl', name: 'Delta', iata_code: 'DL' },
+                operating_carrier: { id: 'arl_dl', name: 'Delta', iata_code: 'DL' },
+                marketing_carrier_flight_number: '2',
+                passengers: [
+                  {
+                    passenger_id: 'pas_1',
+                    cabin_class: 'economy',
+                    // baggage omitted (undefined)
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+      });
+
+      const normalized = normalizeOffer(offer, 0);
+
+      expect(normalized?.hasCheckedBaggage).toBeNull();
+    });
+
+    it('returns null in multi-slice round-trip when one slice has carry-on only but the other slice omits baggage data', () => {
+      const offer = createMockOffer({
+        slices: [
+          {
+            id: 'sli_outbound',
+            duration: 'PT5H',
+            origin: { id: 'plc_sfo', name: 'SFO', iata_code: 'SFO', type: 'airport' },
+            destination: { id: 'plc_jfk', name: 'JFK', iata_code: 'JFK', type: 'airport' },
+            segments: [
+              {
+                id: 'seg_1',
+                duration: 'PT5H',
+                departing_at: '2026-09-01T08:00:00',
+                arriving_at: '2026-09-01T13:00:00',
+                origin: { id: 'plc_sfo', name: 'SFO', iata_code: 'SFO', type: 'airport' },
+                destination: { id: 'plc_jfk', name: 'JFK', iata_code: 'JFK', type: 'airport' },
+                marketing_carrier: { id: 'arl_dl', name: 'Delta', iata_code: 'DL' },
+                operating_carrier: { id: 'arl_dl', name: 'Delta', iata_code: 'DL' },
+                marketing_carrier_flight_number: '1',
+                passengers: [
+                  {
+                    passenger_id: 'pas_1',
+                    cabin_class: 'economy',
+                    baggages: [{ type: 'carry_on', quantity: 1 }],
+                  },
+                ],
+              },
+            ],
+          },
+          {
+            id: 'sli_return',
+            duration: 'PT5H',
+            origin: { id: 'plc_jfk', name: 'JFK', iata_code: 'JFK', type: 'airport' },
+            destination: { id: 'plc_sfo', name: 'SFO', iata_code: 'SFO', type: 'airport' },
+            segments: [
+              {
+                id: 'seg_2',
+                duration: 'PT5H',
+                departing_at: '2026-09-05T08:00:00',
+                arriving_at: '2026-09-05T13:00:00',
+                origin: { id: 'plc_jfk', name: 'JFK', iata_code: 'JFK', type: 'airport' },
+                destination: { id: 'plc_sfo', name: 'SFO', iata_code: 'SFO', type: 'airport' },
+                marketing_carrier: { id: 'arl_dl', name: 'Delta', iata_code: 'DL' },
+                operating_carrier: { id: 'arl_dl', name: 'Delta', iata_code: 'DL' },
+                marketing_carrier_flight_number: '2',
+                passengers: [
+                  {
+                    passenger_id: 'pas_1',
+                    cabin_class: 'economy',
+                    // baggage omitted (undefined)
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+      });
+
+      const normalized = normalizeOffer(offer, 0);
+
+      expect(normalized?.hasCheckedBaggage).toBeNull();
+    });
   });
 
   describe('Malformed Offer Rejection & Validation (T016)', () => {
@@ -1022,6 +1150,114 @@ describe('FlightOfferNormalizer (T015)', () => {
         expect(result.normalizedOffers).toHaveLength(0);
         expect(result.droppedCount).toBe(1);
         expect(result.rejectionCounts).toEqual({ INVALID_TIMESTAMP: 1 });
+      });
+
+      it.each([
+        ['invalid-date-T14:30:00'],
+        ['2026-02-31T10:00:00'],
+        ['2026-13-01T10:00:00'],
+        ['2026-09-01T25:00:00'],
+        ['2026-09-01T10:65:00'],
+        ['2026-09-01T10:00:99'],
+        ['2026-09-01T10:00:00+99:99'],
+        ['2026-09-01'],
+        ['2023-02-29T10:00:00Z'],
+        ['2026-04-31T10:00:00Z'],
+        ['2026-06-31T10:00:00Z'],
+        ['2026-09-31T10:00:00Z'],
+        ['2026-11-31T10:00:00Z'],
+        ['not-a-timestamp'],
+        ['2026-00-10T10:00:00Z'],
+        ['2026-05-00T10:00:00Z'],
+      ])('rejects offer with malformed departing_at timestamp: %s', (malformedTimestamp) => {
+        const offer = createMockOffer({
+          slices: [
+            {
+              id: 'sli_1',
+              duration: 'PT2H',
+              origin: { id: 'plc_sfo', name: 'SFO', iata_code: 'SFO', type: 'airport' },
+              destination: { id: 'plc_jfk', name: 'JFK', iata_code: 'JFK', type: 'airport' },
+              segments: [
+                {
+                  id: 'seg_1',
+                  duration: 'PT2H',
+                  departing_at: malformedTimestamp,
+                  arriving_at: '2026-09-01T10:00:00',
+                  origin: { id: 'plc_sfo', name: 'SFO', iata_code: 'SFO', type: 'airport' },
+                  destination: { id: 'plc_jfk', name: 'JFK', iata_code: 'JFK', type: 'airport' },
+                  marketing_carrier: { id: 'arl_ba', name: 'BA', iata_code: 'BA' },
+                  operating_carrier: { id: 'arl_ba', name: 'BA', iata_code: 'BA' },
+                  marketing_carrier_flight_number: '1',
+                },
+              ],
+            },
+          ],
+        });
+
+        expect(isValidIsoDateTime(malformedTimestamp)).toBe(false);
+        expect(extractLocalHour(malformedTimestamp)).toBeNull();
+        expect(normalizeOffer(offer, 0)).toBeNull();
+
+        const result = normalizeFlightOffers([offer]);
+        expect(result.normalizedOffers).toHaveLength(0);
+        expect(result.droppedCount).toBe(1);
+        expect(result.rejectionCounts).toEqual({ INVALID_TIMESTAMP: 1 });
+      });
+
+      it.each([
+        ['invalid-date-T14:30:00'],
+        ['2026-02-31T10:00:00'],
+        ['2026-13-01T10:00:00'],
+        ['2026-09-01T25:00:00'],
+        ['2026-09-01T10:65:00'],
+        ['2026-09-01T10:00:99'],
+        ['2026-09-01T10:00:00+99:99'],
+        ['2026-09-01'],
+      ])('rejects offer with malformed arriving_at timestamp: %s', (malformedTimestamp) => {
+        const offer = createMockOffer({
+          slices: [
+            {
+              id: 'sli_1',
+              duration: 'PT2H',
+              origin: { id: 'plc_sfo', name: 'SFO', iata_code: 'SFO', type: 'airport' },
+              destination: { id: 'plc_jfk', name: 'JFK', iata_code: 'JFK', type: 'airport' },
+              segments: [
+                {
+                  id: 'seg_1',
+                  duration: 'PT2H',
+                  departing_at: '2026-09-01T08:00:00',
+                  arriving_at: malformedTimestamp,
+                  origin: { id: 'plc_sfo', name: 'SFO', iata_code: 'SFO', type: 'airport' },
+                  destination: { id: 'plc_jfk', name: 'JFK', iata_code: 'JFK', type: 'airport' },
+                  marketing_carrier: { id: 'arl_ba', name: 'BA', iata_code: 'BA' },
+                  operating_carrier: { id: 'arl_ba', name: 'BA', iata_code: 'BA' },
+                  marketing_carrier_flight_number: '1',
+                },
+              ],
+            },
+          ],
+        });
+
+        expect(isValidIsoDateTime(malformedTimestamp)).toBe(false);
+        expect(extractLocalHour(malformedTimestamp)).toBeNull();
+        expect(normalizeOffer(offer, 0)).toBeNull();
+
+        const result = normalizeFlightOffers([offer]);
+        expect(result.normalizedOffers).toHaveLength(0);
+        expect(result.droppedCount).toBe(1);
+        expect(result.rejectionCounts).toEqual({ INVALID_TIMESTAMP: 1 });
+      });
+
+      it('correctly validates valid ISO8601 datetimes across formats and leap years', () => {
+        expect(isValidIsoDateTime('2024-02-29T10:00:00Z')).toBe(true);
+        expect(isValidIsoDateTime('2000-02-29T10:00:00.123+05:30')).toBe(true);
+        expect(isValidIsoDateTime('2026-09-01T08:30:00')).toBe(true);
+        expect(isValidIsoDateTime('2026-12-31T23:59:59-0800')).toBe(true);
+        expect(isValidIsoDateTime('2026-01-01T00:00:00+09')).toBe(true);
+
+        expect(extractLocalHour('2024-02-29T10:00:00Z')).toBe(10);
+        expect(extractLocalHour('2026-09-01T00:30:00')).toBe(0);
+        expect(extractLocalHour('2026-12-31T23:59:59-0800')).toBe(23);
       });
     });
 

@@ -49,14 +49,14 @@ describe('Chat and Handoff Privacy Corpus E2E & Boundary Safety', () => {
     const moduleFixture: TestingModule = await Test.createTestingModule({ imports: [AppModule] })
       .overrideProvider(ConfigService)
       .useValue({
-        get: (key: string): string | undefined => {
+        get: (key: string, defaultValue?: unknown): unknown => {
           if (key === 'FEATURE_FLAG_CHAT_HANDOFF_ISSUE') return 'true';
           if (key === 'FEATURE_FLAG_CHAT_HANDOFF_ACCEPT') return 'true';
           if (key === 'FEATURE_FLAG_BOOKING_READINESS') return 'true';
           if (key === 'CHAT_HANDOFF_SECRET') return 'test-handoff-secret';
           if (key === 'CHAT_ENCRYPTION_KEY') return chatEncryptionKey;
           if (key === 'CLAIM_TOKEN_SECRET') return 'test-claim-token-secret-must-be-long-enough';
-          return process.env[key];
+          return process.env[key] ?? defaultValue;
         },
       })
       .compile();

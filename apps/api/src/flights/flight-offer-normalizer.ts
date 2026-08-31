@@ -46,12 +46,55 @@ export function generateDeterministicUUID(input: string): string {
   ].join('-');
 }
 
+function isLeapYear(year: number): boolean {
+  return (year % 4 === 0 && year % 100 !== 0) || year % 400 === 0;
+}
+
+function getDaysInMonth(year: number, month: number): number {
+  switch (month) {
+    case 2:
+      return isLeapYear(year) ? 29 : 28;
+    case 4:
+    case 6:
+    case 9:
+    case 11:
+      return 30;
+    default:
+      return 31;
+  }
+}
+
+/**
+ * Strictly validates an ISO8601 datetime string.
+ * Checks valid 4-digit year, 01-12 month, valid day for month/leap year,
+ * 00-23 hour, 00-59 minute, 00-59 second, optional milliseconds,
+ * and optional timezone offset (Z, +/-HH:mm, +/-HHmm, +/-HH).
+ */
+export function isValidIsoDateTime(isoDateTime: string | null | undefined): boolean {
+  if (!isoDateTime || typeof isoDateTime !== 'string') return false;
+  const match = isoDateTime.match(
+    /^(\d{4})-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])T([01]\d|2[0-3]):([0-5]\d):([0-5]\d)(?:\.\d+)?(?:Z|[+-](?:[01]\d|2[0-3])(?::?[0-5]\d)?)?$/i,
+  );
+  if (!match) return false;
+
+  const year = parseInt(match[1], 10);
+  const month = parseInt(match[2], 10);
+  const day = parseInt(match[3], 10);
+
+  const daysInMonth = getDaysInMonth(year, month);
+  if (day < 1 || day > daysInMonth) {
+    return false;
+  }
+
+  return true;
+}
+
 /**
  * Extracts the local clock hour (0..23) directly from an ISO datetime string, or null if invalid.
  */
 export function extractLocalHour(isoDateTime: string | null | undefined): number | null {
-  if (!isoDateTime || typeof isoDateTime !== 'string') return null;
-  const match = isoDateTime.match(/T(\d{2}):/);
+  if (!isValidIsoDateTime(isoDateTime)) return null;
+  const match = (isoDateTime as string).match(/T(\d{2}):/i);
   if (!match) return null;
   const hour = parseInt(match[1], 10);
   return !isNaN(hour) && hour >= 0 && hour <= 23 ? hour : null;
@@ -126,11 +169,11 @@ export function validateAndNormalizeOffer(
   const lastOutboundSegment = outboundSegments[outboundSegments.length - 1];
 
   const outboundDepartureHour = extractLocalHour(firstOutboundSegment?.departing_at);
-  // Note: inboundArrivalHour represents the local arrival hour of the outbound slice's final leg
+  // Note: outboundArrivalHour represents the local arrival hour of the outbound slice's final leg
   // (the flight arriving at the primary destination), used for arrival schedule scoring.
-  const inboundArrivalHour = extractLocalHour(lastOutboundSegment?.arriving_at);
+  const outboundArrivalHour = extractLocalHour(lastOutboundSegment?.arriving_at);
 
-  if (outboundDepartureHour === null || inboundArrivalHour === null) {
+  if (outboundDepartureHour === null || outboundArrivalHour === null) {
     return { success: false, reason: 'INVALID_TIMESTAMP' };
   }
 
@@ -143,7 +186,7 @@ export function validateAndNormalizeOffer(
   const carrierCodes: string[] = [];
   const carrierNamesByCode: Record<string, string> = {};
 
-  let hasAnyBaggageInfo = false;
+  let hasOmittedBaggageSlice = false;
   let allSlicesHaveChecked = true;
 
   for (const slice of offer.slices) {
@@ -182,7 +225,6 @@ export function validateAndNormalizeOffer(
     // Checked baggage per slice's longest segment
     const baggages = longestSliceSeg?.passengers?.[0]?.baggages;
     if (baggages !== undefined && baggages !== null) {
-      hasAnyBaggageInfo = true;
       const hasCheckedInSlice = baggages.some(
         (b) =>
           b.type?.toLowerCase() === 'checked' &&
@@ -192,7 +234,7 @@ export function validateAndNormalizeOffer(
         allSlicesHaveChecked = false;
       }
     } else {
-      allSlicesHaveChecked = false;
+      hasOmittedBaggageSlice = true;
     }
   }
 
@@ -204,9 +246,9 @@ export function validateAndNormalizeOffer(
     return { success: false, reason: 'INVALID_STOPS' };
   }
 
-  const hasCheckedBaggage: boolean | null = hasAnyBaggageInfo
-    ? allSlicesHaveChecked
-    : null;
+  const hasCheckedBaggage: boolean | null = hasOmittedBaggageSlice
+    ? null
+    : allSlicesHaveChecked;
 
   return {
     success: true,
@@ -217,7 +259,7 @@ export function validateAndNormalizeOffer(
       stops,
       duration,
       outboundDepartureHour,
-      inboundArrivalHour,
+      outboundArrivalHour,
       carrierCodes,
       carrierNamesByCode: Object.keys(carrierNamesByCode).length > 0 ? carrierNamesByCode : undefined,
       cabinClass: longestCabinClass,

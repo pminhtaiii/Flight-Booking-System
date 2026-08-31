@@ -24,11 +24,11 @@ describe('Traveler Profile (E2E)', () => {
     })
       .overrideProvider(ConfigService)
       .useValue({
-        get: (key: string) => {
+        get: (key: string, defaultValue?: unknown) => {
           if (key === 'FEATURE_FLAG_BOOKING_READINESS') {
             return 'true';
           }
-          return process.env[key];
+          return process.env[key] ?? defaultValue;
         },
       })
       .compile();

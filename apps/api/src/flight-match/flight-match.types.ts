@@ -27,7 +27,7 @@ export type FlightMatchInput = {
   readonly stops: number;
   readonly duration: number;
   readonly outboundDepartureHour: number;
-  readonly inboundArrivalHour: number;
+  readonly outboundArrivalHour: number;
   readonly carrierCodes: readonly string[];
   readonly carrierNamesByCode?: Readonly<Record<string, string>>;
   readonly cabinClass: string;

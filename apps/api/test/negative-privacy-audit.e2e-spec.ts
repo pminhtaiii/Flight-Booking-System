@@ -94,7 +94,7 @@ describe('Automated Negative Privacy & Security Continuous Audit (e2e)', () => {
     })
       .overrideProvider(ConfigService)
       .useValue({
-        get: (key: string): string | undefined => {
+        get: (key: string, defaultValue?: unknown): unknown => {
           if (key === 'FEATURE_FLAG_CHAT_HANDOFF_ISSUE') return 'true';
           if (key === 'FEATURE_FLAG_CHAT_HANDOFF_ACCEPT') return 'true';
           if (key === 'FEATURE_FLAG_BOOKING_READINESS') return 'true';
@@ -102,7 +102,7 @@ describe('Automated Negative Privacy & Security Continuous Audit (e2e)', () => {
           if (key === 'CHAT_ENCRYPTION_KEY') return chatEncryptionKey;
           if (key === 'ENCRYPTION_KEY') return encryptionKey;
           if (key === 'CLAIM_TOKEN_SECRET') return 'test-claim-token-secret-must-be-long-enough';
-          return process.env[key];
+          return process.env[key] ?? defaultValue;
         },
       })
       .compile();

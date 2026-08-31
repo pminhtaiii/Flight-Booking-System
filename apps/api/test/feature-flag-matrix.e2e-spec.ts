@@ -53,7 +53,7 @@ describe('Feature Flag Governance & Rollout Matrix (E2E)', () => {
     })
       .overrideProvider(ConfigService)
       .useValue({
-        get: (key: string) => {
+        get: (key: string, defaultValue?: unknown) => {
           if (key in configOverrides) return configOverrides[key];
           if (key === 'FEATURE_FLAG_CHAT_HANDOFF_ISSUE') return 'false';
           if (key === 'FEATURE_FLAG_CHAT_HANDOFF_ACCEPT') return 'false';
@@ -62,7 +62,7 @@ describe('Feature Flag Governance & Rollout Matrix (E2E)', () => {
           if (key === 'CLAIM_TOKEN_SECRET') return 'test-claim-token-secret';
           if (key === 'CLAIM_TOKEN_TTL_SECONDS') return '300';
           if (key === 'ATTESTATION_SECRET') return 'test-attestation-secret';
-          return process.env[key];
+          return process.env[key] ?? defaultValue;
         },
       })
       .compile();

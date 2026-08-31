@@ -69,12 +69,12 @@ describe('Booking Readiness Observability (E2E) - Tasks T073 & T074', () => {
     })
       .overrideProvider(ConfigService)
       .useValue({
-        get: (key: string) => {
+        get: (key: string, defaultValue?: unknown) => {
           if (key === 'FEATURE_FLAG_BOOKING_READINESS') return 'true';
           if (key === 'FEATURE_FLAG_CHAT_HANDOFF_ISSUE') return 'true';
           if (key === 'FEATURE_FLAG_CHAT_HANDOFF_ACCEPT') return 'true';
           if (key === 'CHAT_HANDOFF_SECRET') return 'test-handoff-secret';
-          return process.env[key];
+          return process.env[key] ?? defaultValue;
         },
       })
       .compile();
