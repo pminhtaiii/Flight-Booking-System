@@ -2,6 +2,8 @@ import { randomUUID } from 'crypto';
 import { spawn } from 'child_process';
 import * as fs from 'fs';
 import * as path from 'path';
+import { Test, TestingModule } from '@nestjs/testing';
+import { PrismaModule } from '@/prisma/prisma.module';
 import { PrismaService } from '@/prisma/prisma.service';
 
 const MIGRATION_PATH = path.join(
@@ -92,9 +94,10 @@ async function executeSqlScript(sql: string): Promise<void> {
   });
 }
 
-describe('Traveler profile flight-match migration (E2E)', () => {
+describe('Traveler profile flight-match migration (E2E)', (): void => {
   jest.setTimeout(60_000);
 
+  let testingModule: TestingModule | undefined;
   let prisma: PrismaService;
   let originalColumns: ProfileColumn[] = [];
   let fixtureUserId: string | undefined;
@@ -202,30 +205,34 @@ describe('Traveler profile flight-match migration (E2E)', () => {
     return rows[0].revision;
   }
 
-  beforeAll(async () => {
+  beforeAll(async (): Promise<void> => {
     assertDisposableDatabase();
-    prisma = new PrismaService();
-    await prisma.$connect();
+    testingModule = await Test.createTestingModule({
+      imports: [PrismaModule],
+    }).compile();
+    prisma = testingModule.get<PrismaService>(PrismaService);
+    await testingModule.init();
     originalColumns = await profileColumns();
   });
 
-  afterAll(async () => {
+  afterAll(async (): Promise<void> => {
     try {
       if (fixtureUserId) {
         await prisma.$executeRaw`DELETE FROM "users" WHERE "id" = ${fixtureUserId}`;
       }
       await restoreOriginalSurface();
     } finally {
-      await prisma.$disconnect();
+      await testingModule?.close();
     }
   });
 
-  it('adds nullable profile preferences without changing existing rows or persisting scores', async () => {
+  it('adds nullable profile preferences without changing existing rows or persisting scores', async (): Promise<void> => {
     await restorePreMigrationSurface();
     const beforeTables = await userTables();
     const marker = randomUUID();
     const userId = randomUUID();
     const profileId = randomUUID();
+    const legacyRevision = 7;
     fixtureUserId = userId;
 
     // Generated Prisma clients select post-migration columns, so this verifier creates its legacy fixture through parameterized SQL.
@@ -239,11 +246,13 @@ describe('Traveler profile flight-match migration (E2E)', () => {
         "userId",
         "preferredAirlines",
         "blacklistedAirlines",
+        "revision",
         "updatedAt"
       )
-      VALUES (${profileId}, ${userId}, ARRAY[]::TEXT[], ARRAY[]::TEXT[], NOW());
+      VALUES (${profileId}, ${userId}, ARRAY[]::TEXT[], ARRAY[]::TEXT[], ${legacyRevision}, NOW());
     `;
     const beforeMigration = { revision: await legacyProfileRevision(profileId) };
+    expect(beforeMigration.revision).toBe(legacyRevision);
 
     await executeSqlScript(fs.readFileSync(MIGRATION_PATH, 'utf8'));
 
@@ -260,6 +269,7 @@ describe('Traveler profile flight-match migration (E2E)', () => {
       }),
     );
     expect(afterMigration.revision).toBe(beforeMigration.revision);
+    expect(afterMigration.revision).toBe(legacyRevision);
     expect(afterTables).toEqual(beforeTables);
     expect(afterTables).not.toContain('flight_match_scores');
     expect(await scoreColumnsFor('bookings')).toEqual([]);

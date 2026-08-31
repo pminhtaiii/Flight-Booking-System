@@ -1,10 +1,11 @@
-import { Transform, Type } from 'class-transformer';
+import { Transform, TransformFnParams, Type } from 'class-transformer';
 import {
   IsArray,
   IsBoolean,
   IsIn,
   IsInt,
   IsOptional,
+  IsObject,
   IsString,
   ValidateNested,
   IsEmail,
@@ -100,8 +101,16 @@ function canonicalizeAirlineCodes(value: unknown): unknown {
   }
 
   return [
-    ...new Set(value.map((entry) => (typeof entry === 'string' ? entry.trim().toUpperCase() : entry))),
+    ...new Set(
+      value.map((entry: unknown): unknown =>
+        typeof entry === 'string' ? entry.trim().toUpperCase() : entry,
+      ),
+    ),
   ];
+}
+
+function canonicalizePriceSensitivity(value: unknown): unknown {
+  return typeof value === 'string' ? value.trim().toUpperCase() : value;
 }
 
 export class PreferencesSectionDto {
@@ -115,12 +124,14 @@ export class PreferencesSectionDto {
 
   @IsOptional()
   @ValidateIf((_object, value) => value !== null)
+  @IsObject()
   @ValidateNested()
   @Type(() => HourWindowDto)
   preferredDepartureWindow?: HourWindowDto | null;
 
   @IsOptional()
   @ValidateIf((_object, value) => value !== null)
+  @IsObject()
   @ValidateNested()
   @Type(() => HourWindowDto)
   preferredArrivalWindow?: HourWindowDto | null;
@@ -134,6 +145,7 @@ export class PreferencesSectionDto {
 
   @IsOptional()
   @ValidateIf((_object, value) => value !== null)
+  @Transform(({ value }: TransformFnParams): unknown => canonicalizePriceSensitivity(value))
   @IsIn(['BUDGET', 'MODERATE', 'FLEXIBLE'])
   priceSensitivity?: 'BUDGET' | 'MODERATE' | 'FLEXIBLE' | null;
 
@@ -143,14 +155,14 @@ export class PreferencesSectionDto {
   requiresCheckedBaggage?: boolean | null;
 
   @IsOptional()
-  @Transform(({ value }) => canonicalizeAirlineCodes(value))
+  @Transform(({ value }: TransformFnParams): unknown => canonicalizeAirlineCodes(value))
   @IsArray()
   @IsString({ each: true })
   @Matches(/^[A-Z0-9]{2}$/, { each: true })
   preferredAirlines?: string[] | null;
 
   @IsOptional()
-  @Transform(({ value }) => canonicalizeAirlineCodes(value))
+  @Transform(({ value }: TransformFnParams): unknown => canonicalizeAirlineCodes(value))
   @IsArray()
   @IsString({ each: true })
   @Matches(/^[A-Z0-9]{2}$/, { each: true })
