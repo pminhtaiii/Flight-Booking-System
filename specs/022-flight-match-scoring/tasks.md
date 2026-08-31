@@ -279,3 +279,7 @@ Task B: T064 strict score-free Python snapshot invariant tests
 - Generated `.js` duplicates are not implementation targets unless the existing package build explicitly regenerates them.
 - Do not add a scoring feature flag, score table, score Redis key, LLM scorer, ninth dimension, direct agent scorer import, or direct Python ordering logic.
 - Context files are updated after feature verification, not during partial implementation.
+
+## Phase 8: Convergence
+
+- [x] T078 Make stored scoring-window reads reject unknown JSON keys and emit a bounded PII-safe integrity counter per `data-model.md` persistence invariants

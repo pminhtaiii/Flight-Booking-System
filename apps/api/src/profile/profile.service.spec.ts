@@ -6,6 +6,10 @@ import { PrismaService } from '../prisma/prisma.service';
 import { EncryptionService } from '../common/encryption.service';
 import { AuditService } from '../audit/audit.service';
 import { UpdateProfileDto } from './dto/update-profile.dto';
+import {
+  BookingReadinessMetricsService,
+  BOOKING_READINESS_METRIC_COUNTERS,
+} from '../common/observability/booking-readiness.metrics';
 
 describe('ProfileService', () => {
   let service: ProfileService;
@@ -13,6 +17,7 @@ describe('ProfileService', () => {
   let encryptionService: EncryptionService;
   let auditService: AuditService;
   let configService: ConfigService;
+  let metricsService: { increment: jest.Mock };
   let dbProfile: any = null;
 
   beforeAll(async () => {
@@ -56,6 +61,12 @@ describe('ProfileService', () => {
             },
           },
         },
+        {
+          provide: BookingReadinessMetricsService,
+          useValue: {
+            increment: jest.fn(),
+          },
+        },
       ],
     }).compile();
 
@@ -64,6 +75,7 @@ describe('ProfileService', () => {
     encryptionService = module.get<EncryptionService>(EncryptionService);
     auditService = module.get<AuditService>(AuditService);
     configService = module.get<ConfigService>(ConfigService);
+    metricsService = module.get(BookingReadinessMetricsService);
   });
 
   beforeEach(() => {
@@ -227,6 +239,50 @@ describe('ProfileService', () => {
         preferredDepartureWindow: null,
         preferredArrivalWindow: null,
       });
+    });
+
+    it('fails closed when a stored hour window contains an unknown key', async () => {
+      dbProfile = {
+        userId: 'user-123',
+        preferredAirlines: [],
+        blacklistedAirlines: [],
+        classPreference: null,
+        preferredDepartureWindow: { start: 8, end: 12, timezone: 'UTC' },
+        preferredArrivalWindow: null,
+        maxStops: null,
+        priceSensitivity: null,
+        requiresCheckedBaggage: null,
+      };
+
+      await expect(service.getScoringPreferences('user-123')).resolves.toMatchObject({
+        preferredDepartureWindow: null,
+      });
+    });
+
+    it('increments the bounded integrity counter once per malformed stored window', async () => {
+      dbProfile = {
+        userId: 'user-123',
+        preferredAirlines: [],
+        blacklistedAirlines: [],
+        classPreference: null,
+        preferredDepartureWindow: { start: 8, end: 12, timezone: 'UTC' },
+        preferredArrivalWindow: { start: 24, end: 12 },
+        maxStops: null,
+        priceSensitivity: null,
+        requiresCheckedBaggage: null,
+      };
+
+      await service.getScoringPreferences('user-123');
+
+      expect(metricsService.increment).toHaveBeenCalledTimes(2);
+      expect(metricsService.increment).toHaveBeenNthCalledWith(
+        1,
+        BOOKING_READINESS_METRIC_COUNTERS.TRAVELER_PROFILE_SCORING_WINDOW_INTEGRITY_FAILURES,
+      );
+      expect(metricsService.increment).toHaveBeenNthCalledWith(
+        2,
+        BOOKING_READINESS_METRIC_COUNTERS.TRAVELER_PROFILE_SCORING_WINDOW_INTEGRITY_FAILURES,
+      );
     });
   });
 

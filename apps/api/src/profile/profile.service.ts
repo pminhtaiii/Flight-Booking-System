@@ -30,6 +30,12 @@ function parseHourWindow(
   value: Prisma.JsonValue | null | undefined,
 ): { start: number; end: number } | null {
   if (!isRecord(value)) return null;
+
+  const ownKeys = Reflect.ownKeys(value);
+  if (ownKeys.length !== 2 || !ownKeys.includes('start') || !ownKeys.includes('end')) {
+    return null;
+  }
+
   const { start, end } = value;
   if (
     typeof start !== 'number' ||
@@ -256,6 +262,27 @@ export class ProfileService {
     }
 
     const priceSensitivity = parsePriceSensitivity(dbProfile.priceSensitivity);
+    const preferredDepartureWindow = parseHourWindow(dbProfile.preferredDepartureWindow);
+    const preferredArrivalWindow = parseHourWindow(dbProfile.preferredArrivalWindow);
+
+    if (
+      dbProfile.preferredDepartureWindow !== null &&
+      dbProfile.preferredDepartureWindow !== undefined &&
+      preferredDepartureWindow === null
+    ) {
+      this.metricsService?.increment(
+        BOOKING_READINESS_METRIC_COUNTERS.TRAVELER_PROFILE_SCORING_WINDOW_INTEGRITY_FAILURES,
+      );
+    }
+    if (
+      dbProfile.preferredArrivalWindow !== null &&
+      dbProfile.preferredArrivalWindow !== undefined &&
+      preferredArrivalWindow === null
+    ) {
+      this.metricsService?.increment(
+        BOOKING_READINESS_METRIC_COUNTERS.TRAVELER_PROFILE_SCORING_WINDOW_INTEGRITY_FAILURES,
+      );
+    }
 
     return {
       preferredAirlines: Array.isArray(dbProfile.preferredAirlines)
@@ -265,8 +292,8 @@ export class ProfileService {
         ? dbProfile.blacklistedAirlines
         : [],
       classPreference: dbProfile.classPreference ?? null,
-      preferredDepartureWindow: parseHourWindow(dbProfile.preferredDepartureWindow),
-      preferredArrivalWindow: parseHourWindow(dbProfile.preferredArrivalWindow),
+      preferredDepartureWindow,
+      preferredArrivalWindow,
       maxStops: dbProfile.maxStops ?? null,
       priceSensitivity,
       requiresCheckedBaggage: dbProfile.requiresCheckedBaggage ?? null,
