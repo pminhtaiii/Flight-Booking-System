@@ -6,6 +6,7 @@ import { plainToInstance } from 'class-transformer';
 import { ProfileController } from './profile.controller';
 import { ProfileService } from './profile.service';
 import { UpdateProfileDto } from './dto/update-profile.dto';
+import { ProfileResponsePreferencesDto } from './dto/profile-response.dto';
 
 describe('ProfileController', () => {
   let controller: ProfileController;
@@ -174,6 +175,153 @@ describe('ProfileController', () => {
       const errors = await validate(dto, { whitelist: true, forbidNonWhitelisted: true });
 
       expect(errors).toHaveLength(0);
+    });
+
+    it('accepts valid scalar scoring preferences', async () => {
+      const dto = plainToInstance(UpdateProfileDto, {
+        expectedRevision: 1,
+        preferences: {
+          maxStops: 0,
+          priceSensitivity: 'BUDGET',
+          requiresCheckedBaggage: false,
+        },
+      });
+
+      const errors = await validate(dto, { whitelist: true, forbidNonWhitelisted: true });
+
+      expect(errors).toHaveLength(0);
+    });
+
+    it('accepts explicitly null scalar scoring preferences', async () => {
+      const dto = plainToInstance(UpdateProfileDto, {
+        expectedRevision: 1,
+        preferences: {
+          maxStops: null,
+          priceSensitivity: null,
+          requiresCheckedBaggage: null,
+        },
+      });
+
+      const errors = await validate(dto, { whitelist: true, forbidNonWhitelisted: true });
+
+      expect(errors).toHaveLength(0);
+    });
+
+    it('rejects maxStops below zero', async () => {
+      const dto = plainToInstance(UpdateProfileDto, {
+        expectedRevision: 1,
+        preferences: { maxStops: -1 },
+      });
+
+      expect(await validate(dto, { whitelist: true, forbidNonWhitelisted: true })).not.toHaveLength(0);
+    });
+
+    it('rejects maxStops above three', async () => {
+      const dto = plainToInstance(UpdateProfileDto, {
+        expectedRevision: 1,
+        preferences: { maxStops: 4 },
+      });
+
+      expect(await validate(dto, { whitelist: true, forbidNonWhitelisted: true })).not.toHaveLength(0);
+    });
+
+    it('rejects a fractional maxStops value', async () => {
+      const dto = plainToInstance(UpdateProfileDto, {
+        expectedRevision: 1,
+        preferences: { maxStops: 1.5 },
+      });
+
+      expect(await validate(dto, { whitelist: true, forbidNonWhitelisted: true })).not.toHaveLength(0);
+    });
+
+    it('rejects an unsupported price sensitivity', async () => {
+      const dto = plainToInstance(UpdateProfileDto, {
+        expectedRevision: 1,
+        preferences: { priceSensitivity: 'CHEAPEST' },
+      });
+
+      expect(await validate(dto, { whitelist: true, forbidNonWhitelisted: true })).not.toHaveLength(0);
+    });
+
+    it('rejects a non-boolean checked-baggage preference', async () => {
+      const dto = plainToInstance(UpdateProfileDto, {
+        expectedRevision: 1,
+        preferences: { requiresCheckedBaggage: 'yes' },
+      });
+
+      expect(await validate(dto, { whitelist: true, forbidNonWhitelisted: true })).not.toHaveLength(0);
+    });
+
+    it('canonicalizes and deduplicates preferred and blacklisted airline codes', async () => {
+      const dto = plainToInstance(UpdateProfileDto, {
+        expectedRevision: 1,
+        preferences: {
+          preferredAirlines: [' vn ', 'VN', 'qf'],
+          blacklistedAirlines: [' aa ', 'AA'],
+        },
+      });
+
+      expect(dto.preferences?.preferredAirlines).toEqual(['VN', 'QF']);
+      expect(dto.preferences?.blacklistedAirlines).toEqual(['AA']);
+      expect(await validate(dto, { whitelist: true, forbidNonWhitelisted: true })).toHaveLength(0);
+    });
+
+    it('declares all scoring preference fields in the profile response contract', () => {
+      const preferences: ProfileResponsePreferencesDto = {
+        preferredAirlines: ['VN'],
+        blacklistedAirlines: ['AA'],
+        preferredDepartureWindow: { start: 6, end: 10 },
+        preferredArrivalWindow: null,
+        maxStops: 0,
+        priceSensitivity: 'MODERATE',
+        requiresCheckedBaggage: false,
+      };
+
+      expect(preferences).toEqual({
+        preferredAirlines: ['VN'],
+        blacklistedAirlines: ['AA'],
+        preferredDepartureWindow: { start: 6, end: 10 },
+        preferredArrivalWindow: null,
+        maxStops: 0,
+        priceSensitivity: 'MODERATE',
+        requiresCheckedBaggage: false,
+      });
+    });
+
+    it('rejects a one-character airline code', async () => {
+      const dto = plainToInstance(UpdateProfileDto, {
+        expectedRevision: 1,
+        preferences: { preferredAirlines: ['V'] },
+      });
+
+      expect(await validate(dto, { whitelist: true, forbidNonWhitelisted: true })).not.toHaveLength(0);
+    });
+
+    it('rejects a three-character airline code', async () => {
+      const dto = plainToInstance(UpdateProfileDto, {
+        expectedRevision: 1,
+        preferences: { preferredAirlines: ['VNA'] },
+      });
+
+      expect(await validate(dto, { whitelist: true, forbidNonWhitelisted: true })).not.toHaveLength(0);
+    });
+
+    it('rejects an airline code with punctuation', async () => {
+      const dto = plainToInstance(UpdateProfileDto, {
+        expectedRevision: 1,
+        preferences: { blacklistedAirlines: ['V!'] },
+      });
+
+      expect(await validate(dto, { whitelist: true, forbidNonWhitelisted: true })).not.toHaveLength(0);
+    });
+
+    it('rejects a non-string airline code entry', async () => {
+      const dto = plainToInstance(UpdateProfileDto, {
+        expectedRevision: 1,
+        preferences: { blacklistedAirlines: [12] },
+      });
+
+      expect(await validate(dto, { whitelist: true, forbidNonWhitelisted: true })).not.toHaveLength(0);
     });
 
     it.each([
