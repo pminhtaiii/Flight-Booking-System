@@ -7,7 +7,7 @@ The mandatory workflow that all AI agents must follow when building features in 
 ## Workflow Pipeline
 
 ```
-speckit-specify → speckit-plan → plan-review-convergence → speckit-tasks → speckit-implement (with TDD) → speckit-converge
+speckit-specify → speckit-plan → plan-review-convergence → speckit-tasks → speckit-implement (with TDD) → speckit-converge → code-review
 ```
 
 ```mermaid
@@ -17,12 +17,14 @@ flowchart LR
     C --> D["speckit-tasks"]
     D --> E["speckit-implement\n(with TDD)"]
     E --> F["speckit-converge"]
+    F --> G["code-review\n(Standards & Spec)"]
 
     style C fill:#ff6b6b,color:#fff
     style E fill:#4a9eff,color:#fff
+    style G fill:#50c878,color:#fff
 ```
 
-> 🔴 **Red** = Plan quality gate · 🔵 **Blue** = TDD-enforced implementation
+> 🔴 **Red** = Plan quality gate · 🔵 **Blue** = TDD-enforced implementation · 🟢 **Green** = Two-axis quality & spec sign-off
 
 ---
 
@@ -149,6 +151,24 @@ The agent must:
 
 ---
 
+## Step 7: Dual-Axis Code Review (`/code-review`)
+
+**Purpose**: Independent two-axis code review running parallel sub-agents to verify that the implementation adheres to repository standards and faithfully fulfills the originating spec with zero unrequested scope creep.
+
+The agent must:
+
+1. **Pin the fixed point**: Determine the diff baseline against the feature branch base / merge-base (`git diff <fixed-point>...HEAD`).
+2. **Spawn parallel review sub-agents**:
+   - **Standards Sub-Agent**: Checks against `context/code-standards.md`, architecture invariants, and Fowler smell baseline (Mysterious Name, Duplicated Code, Feature Envy, Speculative Generality, etc.). Reports hard violations and judgment calls.
+   - **Spec Sub-Agent**: Cross-checks the diff directly against `spec.md`. Flags missing/partial requirements, behavioral deviations, and unauthorized scope creep.
+3. **Aggregate and Resolve**:
+   - Present both reports under `## Standards` and `## Spec` side-by-side without merging or masking findings.
+   - Fix all blocking findings (P0/P1/critical issues) before final completion.
+
+**Gate**: Zero blocking findings across both Standards and Spec axes before PR creation and feature completion.
+
+---
+
 ## TDD Strict Rules
 
 These rules are **non-negotiable**. Any agent that violates them is producing invalid work.
@@ -208,3 +228,4 @@ If any test fails, the task remains `[ ]` and the agent continues working on it.
 | speckit-tasks           | Tasks generated                     | User may review              |
 | speckit-implement (TDD) | All tests pass for every task       | Automatic (tests)            |
 | speckit-converge        | "✅ Converged" reported             | Automatic (convergence)      |
+| code-review             | Zero blocking findings (both axes)  | User / Dual-Axis Sub-agents  |

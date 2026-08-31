@@ -1,3 +1,37 @@
+import { z } from 'zod';
+
+export const HourWindowSchema = z
+  .object({
+    start: z.number().int().min(0).max(23),
+    end: z.number().int().min(0).max(23),
+  })
+  .strict();
+export type HourWindow = z.infer<typeof HourWindowSchema>;
+
+export const PriceSensitivitySchema = z.enum(['BUDGET', 'MODERATE', 'FLEXIBLE']);
+export type PriceSensitivity = z.infer<typeof PriceSensitivitySchema>;
+
+export const CarrierCodeSchema = z.string().regex(/^[A-Z0-9]{2,3}$/);
+
+export function canonicalizeCarrierCodes(codes: readonly string[]): string[] {
+  const seen = new Set<string>();
+  const result: string[] = [];
+  for (const code of codes) {
+    const trimmedUpper = code.trim().toUpperCase();
+    if (CarrierCodeSchema.safeParse(trimmedUpper).success) {
+      if (!seen.has(trimmedUpper)) {
+        seen.add(trimmedUpper);
+        result.push(trimmedUpper);
+      }
+    }
+  }
+  return result;
+}
+
+export const MaxStopsSchema = z.number().int().min(0).max(8).nullable();
+
+export const RequiresCheckedBaggageSchema = z.boolean().nullable();
+
 export interface TravelerIdentity {
   givenName: string | null;
   middleName?: string | null;
@@ -27,6 +61,11 @@ export interface TravelerPreferences {
   preferredAirlines?: string[] | null;
   blacklistedAirlines?: string[] | null;
   dietaryNeeds?: string | null;
+  preferredDepartureWindow?: HourWindow | null;
+  preferredArrivalWindow?: HourWindow | null;
+  maxStops?: number | null;
+  priceSensitivity?: PriceSensitivity | null;
+  requiresCheckedBaggage?: boolean | null;
 }
 
 export type TravelerIdentityField =

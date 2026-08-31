@@ -37,6 +37,19 @@ components:
       type: object
       additionalProperties: false
       required: [origin, destination, departureDate, adults]
+      description: >-
+        Cross-field passenger invariants enforced at the API boundary:
+        (1) adults + children + infants MUST NOT exceed 9;
+        (2) infants MUST NOT exceed adults.
+        These constraints cannot be expressed as per-property JSON Schema
+        rules and are enforced by the NestJS IsValidPassengerCount validator.
+      x-constraints:
+        - name: maxTotalPassengers
+          rule: adults + children + infants <= 9
+          errorMessage: Maximum 9 passengers per search
+        - name: infantsLimitedByAdults
+          rule: infants <= adults
+          errorMessage: Number of infants cannot exceed number of adults
       properties:
         origin: { type: string, pattern: '^[A-Z]{3}$' }
         destination: { type: string, pattern: '^[A-Z]{3}$' }
@@ -44,7 +57,7 @@ components:
         returnDate: { type: [string, 'null'], format: date }
         adults: { type: integer, minimum: 1, maximum: 9 }
         children: { type: integer, minimum: 0, maximum: 8, default: 0 }
-        infants: { type: integer, minimum: 0, maximum: 8, default: 0 }
+        infants: { type: integer, minimum: 0, maximum: 4, default: 0 }
         cabinClass:
           type: string
           enum: [economy, premium_economy, business, first]
