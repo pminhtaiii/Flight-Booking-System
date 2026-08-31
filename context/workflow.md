@@ -19,15 +19,9 @@ flowchart LR
     E --> F["speckit-implement\n(with TDD)"]
     F --> G["speckit-converge"]
     G --> H["code-review\n(Standards & Spec)"]
-
-    style B fill:#ff6b6b,color:#fff
-    style D fill:#f59e0b,color:#fff
-    style E fill:#f59e0b,color:#fff
-    style F fill:#4a9eff,color:#fff
-    style H fill:#50c878,color:#fff
 ```
 
-> 🔴 **Red** = Plan quality gate · 🟡 **Yellow** = Design refinement & task-level TDD planning · 🔵 **Blue** = TDD-enforced implementation · 🟢 **Green** = Two-axis quality & spec sign-off
+> **Pipeline Stages**: Plan Quality Gate (`plan-review-convergence`) → Design Refinement & Task Planning (`brainstorming`, `writing-plans`) → TDD Implementation (`speckit-implement`) → Post-Implementation Convergence (`speckit-converge`) → Dual-Axis Quality Sign-Off (`code-review`).
 
 ---
 

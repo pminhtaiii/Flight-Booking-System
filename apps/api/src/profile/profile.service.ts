@@ -445,7 +445,7 @@ export class ProfileService {
           this.metricsService?.increment(
             BOOKING_READINESS_METRIC_COUNTERS.TRAVELER_PROFILE_CONFLICTS,
           );
-          throw new ConflictException('PROFILE_REVISION_CONFLICT');
+          throw new ConflictException('PROFILE_UPDATE_CONFLICT');
         }
 
         try {
@@ -461,7 +461,7 @@ export class ProfileService {
             this.metricsService?.increment(
               BOOKING_READINESS_METRIC_COUNTERS.TRAVELER_PROFILE_CONFLICTS,
             );
-            throw new ConflictException('PROFILE_REVISION_CONFLICT');
+            throw new ConflictException('PROFILE_UPDATE_CONFLICT');
           }
           throw err;
         }
@@ -484,7 +484,7 @@ export class ProfileService {
           this.metricsService?.increment(
             BOOKING_READINESS_METRIC_COUNTERS.TRAVELER_PROFILE_CONFLICTS,
           );
-          throw new ConflictException('PROFILE_REVISION_CONFLICT');
+          throw new ConflictException('PROFILE_UPDATE_CONFLICT');
         }
 
         data.revision = { increment: 1 };
@@ -499,7 +499,7 @@ export class ProfileService {
             this.metricsService?.increment(
               BOOKING_READINESS_METRIC_COUNTERS.TRAVELER_PROFILE_CONFLICTS,
             );
-            throw new ConflictException('PROFILE_REVISION_CONFLICT');
+            throw new ConflictException('PROFILE_UPDATE_CONFLICT');
           }
           throw err;
         }

@@ -478,7 +478,7 @@ describe('ProfileService', () => {
       expect(prisma.travelerProfile.update).not.toHaveBeenCalled();
     });
 
-    it('returns PROFILE_REVISION_CONFLICT for stale revisions and CAS races', async () => {
+    it('returns PROFILE_UPDATE_CONFLICT for stale revisions and CAS races', async () => {
       dbProfile = { id: 'profile-123', userId: 'user-123', revision: 2 };
 
       let staleRevisionError: unknown;
@@ -493,7 +493,7 @@ describe('ProfileService', () => {
         throw staleRevisionError;
       }
       expect(staleRevisionError.getResponse()).toMatchObject({
-        message: 'PROFILE_REVISION_CONFLICT',
+        message: 'PROFILE_UPDATE_CONFLICT',
       });
 
       dbProfile = { id: 'profile-123', userId: 'user-123', revision: 1 };
@@ -511,7 +511,7 @@ describe('ProfileService', () => {
       if (!(raceError instanceof ConflictException)) {
         throw raceError;
       }
-      expect(raceError.getResponse()).toMatchObject({ message: 'PROFILE_REVISION_CONFLICT' });
+      expect(raceError.getResponse()).toMatchObject({ message: 'PROFILE_UPDATE_CONFLICT' });
 
       dbProfile = null;
       const p2002Error = Object.assign(new Error('Unique constraint failed'), { code: 'P2002' });
@@ -528,7 +528,7 @@ describe('ProfileService', () => {
       if (!(createRaceError instanceof ConflictException)) {
         throw createRaceError;
       }
-      expect(createRaceError.getResponse()).toMatchObject({ message: 'PROFILE_REVISION_CONFLICT' });
+      expect(createRaceError.getResponse()).toMatchObject({ message: 'PROFILE_UPDATE_CONFLICT' });
     });
 
     it('throws ConflictException (409) if the profile does not exist but client expected non-zero revision', async () => {

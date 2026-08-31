@@ -28,7 +28,7 @@ Update this file after every completed feature. Any AI agent reading this should
     - Unified scoring preferences extraction across `getProfile()` and `getScoringPreferences()`.
     - Mapped incoming preference updates into Prisma write payload while preserving omitted fields.
     - Supported explicit `null` updates to clear preferences using `Prisma.DbNull`.
-    - Maintained optimistic concurrency CAS revision check (`revision === expectedRevision`), throwing `PROFILE_REVISION_CONFLICT` (409) on mismatch or concurrent database collision.
+    - Maintained optimistic concurrency CAS revision check (`revision === expectedRevision`), throwing `PROFILE_UPDATE_CONFLICT` (409) on mismatch or concurrent database collision.
     - Recorded changed-field audit telemetry safely (`changedFields: ['preferences']`) with zero raw preference or PII payload logging.
   - **T013: Extended Profile API E2E Test Suite (`apps/api/test/profile.e2e-spec.ts`)**:
     - Verified authenticated `GET /api/profile` and `PATCH /api/profile` flows.

@@ -368,7 +368,7 @@ describe('Traveler Profile (E2E)', () => {
       })
       .expect(409);
 
-    expect(staleResponse.body.message).toBe('PROFILE_REVISION_CONFLICT');
+    expect(staleResponse.body.message).toBe('PROFILE_UPDATE_CONFLICT');
 
     const storedProfile = await prisma.travelerProfile.findUniqueOrThrow({
       where: { userId: user.id },
