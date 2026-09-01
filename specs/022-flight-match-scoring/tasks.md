@@ -77,10 +77,10 @@ description: "Dependency-ordered implementation tasks for deterministic flight m
 
 ### Weight resolution and final ranking
 
-- [ ] T029 [US1] Drive missing-personalized transfer, zero-variance redistribution, caps, and exact 1.000000 totals through RED → GREEN in `apps/api/src/flight-match/flight-match-scorer.service.spec.ts` and `apps/api/src/flight-match/flight-match-scorer.service.ts`
-- [ ] T030 [US1] Drive full-baseline-collapse against the entire transferred target using the airline-only 0.425/0.255/0.170/0.150 fixture plus single/all-ineligible fallbacks through RED → GREEN in `apps/api/src/flight-match/flight-match-scorer.service.spec.ts` and `apps/api/src/flight-match/flight-match-scorer.service.ts`
-- [ ] T031 [US1] Drive contribution precision, half-away rounding, and exact 24/25/49/50/74/75 match buckets through RED → GREEN in `apps/api/src/flight-match/flight-match-scorer.service.spec.ts` and `apps/api/src/flight-match/flight-match-scorer.service.ts`
-- [ ] T032 [US1] Drive breakdown/metadata order, eligible-first score order, objective tie-breaks, and original-index stability through RED → GREEN in `apps/api/src/flight-match/flight-match-scorer.service.spec.ts` and `apps/api/src/flight-match/flight-match-scorer.service.ts`
+- [x] T029 [US1] Drive missing-personalized transfer, zero-variance redistribution, caps, and exact 1.000000 totals through RED → GREEN in `apps/api/src/flight-match/flight-match-scorer.service.spec.ts` and `apps/api/src/flight-match/flight-match-scorer.service.ts`
+- [x] T030 [US1] Drive full-baseline-collapse against the entire transferred target using the airline-only 0.425/0.255/0.170/0.150 fixture plus single/all-ineligible fallbacks through RED → GREEN in `apps/api/src/flight-match/flight-match-scorer.service.spec.ts` and `apps/api/src/flight-match/flight-match-scorer.service.ts`
+- [x] T031 [US1] Drive contribution precision, half-away rounding, and exact 24/25/49/50/74/75 match buckets through RED → GREEN in `apps/api/src/flight-match/flight-match-scorer.service.spec.ts` and `apps/api/src/flight-match/flight-match-scorer.service.ts`
+- [x] T032 [US1] Drive breakdown/metadata order, eligible-first score order, objective tie-breaks, and original-index stability through RED → GREEN in `apps/api/src/flight-match/flight-match-scorer.service.spec.ts` and `apps/api/src/flight-match/flight-match-scorer.service.ts`
 
 ### Canonical search orchestration
 
