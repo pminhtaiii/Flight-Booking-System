@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { FlightMatchScorerService } from './flight-match-scorer.service';
 
 /**
  * Clean NestJS module scaffold for pure flight match scoring and category ranking.
@@ -6,7 +7,8 @@ import { Module } from '@nestjs/common';
  * Providers (FlightMatchScorerService, CategoryRankerService) are registered in Phase 3 when implementations exist.
  */
 @Module({
-  providers: [],
-  exports: [],
+  imports: [],
+  providers: [FlightMatchScorerService],
+  exports: [FlightMatchScorerService],
 })
 export class FlightMatchModule {}
