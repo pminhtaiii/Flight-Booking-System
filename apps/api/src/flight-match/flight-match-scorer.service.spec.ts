@@ -1,6 +1,18 @@
 import { FlightMatchScorerService } from './flight-match-scorer.service';
 import { BASE_WEIGHTS, SCORING_POLICY_VERSION } from './flight-match.policy';
-import type { FlightMatchInput, ScoringPreferences } from './flight-match.types';
+import type {
+  DimensionScore,
+  FlightMatchInput,
+  ScoringPreferences,
+} from './flight-match.types';
+
+type MedianComparison = 'below' | 'at' | 'above';
+type BaselineDimension = Extract<DimensionScore['dimension'], 'PRICE' | 'DURATION'>;
+type BaselineExplanationKey = Extract<
+  DimensionScore['explanation']['key'],
+  | `match.price.${MedianComparison}_median`
+  | `match.duration.${MedianComparison}_median`
+>;
 
 const baseOffer: FlightMatchInput = {
   id: 'offer-1',
@@ -39,6 +51,28 @@ function preferences(
 
 describe('FlightMatchScorerService eligibility (T023)', () => {
   const scorer = new FlightMatchScorerService();
+
+  it('ignores invalid, empty, non-string, and malformed carrier codes', () => {
+    const invalidCodes: readonly unknown[] = [
+      '',
+      '   ',
+      'A',
+      'ABCD',
+      'A-',
+      'A A',
+      42,
+      null,
+      {},
+      [],
+    ];
+
+    expect(
+      scorer.checkEligibility(
+        offer({ carrierCodes: invalidCodes as readonly string[] }),
+        preferences({ blacklistedAirlines: invalidCodes as readonly string[] }),
+      ),
+    ).toEqual({ eligible: true, violations: [] });
+  });
 
   it.each([
     {
@@ -343,7 +377,7 @@ function deepFreeze<T>(value: T): T {
 function breakdownFor(
   scoredOffers: ReturnType<FlightMatchScorerService['scoreOffers']>,
   offerId: string,
-) {
+): readonly DimensionScore[] {
   const scoredOffer = scoredOffers.find(({ offer: flightOffer }) => flightOffer.id === offerId);
   if (!scoredOffer || scoredOffer.matchResult.score === null) {
     throw new Error(`Expected an eligible scored offer with id ${offerId}`);
@@ -352,18 +386,12 @@ function breakdownFor(
 }
 
 function dimensionScore(
-  dimension: 'PRICE' | 'DURATION',
+  dimension: BaselineDimension,
   score: number,
   weight: number,
-  signal: 'NEGATIVE' | 'NEUTRAL' | 'POSITIVE',
-  key:
-    | 'match.price.below_median'
-    | 'match.price.at_median'
-    | 'match.price.above_median'
-    | 'match.duration.below_median'
-    | 'match.duration.at_median'
-    | 'match.duration.above_median',
-) {
+  signal: DimensionScore['signal'],
+  key: BaselineExplanationKey,
+): DimensionScore {
   return {
     dimension,
     score,

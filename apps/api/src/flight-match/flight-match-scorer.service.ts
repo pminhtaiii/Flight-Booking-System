@@ -19,6 +19,34 @@ import type {
   ScoringPreferences,
 } from './flight-match.types';
 
+const AIRLINE_CODE_PATTERN = /^[A-Z0-9]{2,3}$/;
+
+type MedianComparison = 'below' | 'at' | 'above';
+type PriceMedianExplanationKey =
+  | 'match.price.below_median'
+  | 'match.price.at_median'
+  | 'match.price.above_median';
+type DurationMedianExplanationKey =
+  | 'match.duration.below_median'
+  | 'match.duration.at_median'
+  | 'match.duration.above_median';
+
+const MEDIAN_EXPLANATION_KEYS: Readonly<{
+  PRICE: Readonly<Record<MedianComparison, PriceMedianExplanationKey>>;
+  DURATION: Readonly<Record<MedianComparison, DurationMedianExplanationKey>>;
+}> = {
+  PRICE: {
+    below: 'match.price.below_median',
+    at: 'match.price.at_median',
+    above: 'match.price.above_median',
+  },
+  DURATION: {
+    below: 'match.duration.below_median',
+    at: 'match.duration.at_median',
+    above: 'match.duration.above_median',
+  },
+};
+
 @Injectable()
 export class FlightMatchScorerService {
   checkEligibility(
@@ -167,7 +195,7 @@ function normalizeAirlineCodes(codes: readonly unknown[]): readonly string[] {
     }
 
     const normalizedCode = code.trim().toUpperCase();
-    if (normalizedCode) {
+    if (AIRLINE_CODE_PATTERN.test(normalizedCode)) {
       normalizedCodes.add(normalizedCode);
     }
   }
@@ -180,18 +208,8 @@ function getComparisonExplanationKey(
   value: number,
   median: number,
 ):
-  | 'match.price.below_median'
-  | 'match.price.at_median'
-  | 'match.price.above_median'
-  | 'match.duration.below_median'
-  | 'match.duration.at_median'
-  | 'match.duration.above_median' {
-  const comparison = value < median ? 'below' : value > median ? 'above' : 'at';
-  return `match.${dimension.toLowerCase()}.${comparison}_median` as
-    | 'match.price.below_median'
-    | 'match.price.at_median'
-    | 'match.price.above_median'
-    | 'match.duration.below_median'
-    | 'match.duration.at_median'
-    | 'match.duration.above_median';
+  | PriceMedianExplanationKey
+  | DurationMedianExplanationKey {
+  const comparison: MedianComparison = value < median ? 'below' : value > median ? 'above' : 'at';
+  return MEDIAN_EXPLANATION_KEYS[dimension][comparison];
 }
