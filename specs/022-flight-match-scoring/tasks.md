@@ -52,9 +52,9 @@ description: "Dependency-ordered implementation tasks for deterministic flight m
 - [x] T017 Drive policy version, exact weights, cabin order, sensitivity multipliers, buckets, red-eye hours, and explanation allowlist one behavior at a time through RED → GREEN in `apps/api/src/flight-match/flight-match.policy.spec.ts` and `apps/api/src/flight-match/flight-match.policy.ts`
 - [x] T018 Drive clamp, round6, half-away final rounding, signal thresholds, circular-hour distance, and deterministic median helpers one behavior at a time through RED → GREEN in `apps/api/src/flight-match/flight-match.policy.spec.ts` and `apps/api/src/flight-match/flight-match.policy.ts`
 - [x] T019 Create the zero-import NestJS module scaffold in `apps/api/src/flight-match/flight-match.module.ts`; provider registration is completed only after each pure service exists
-- [ ] T020 Drive legacy-null/window/sensitivity browser profile parsing through RED → GREEN in `apps/web/lib/profile.spec.ts`, `apps/web/lib/profile-contract.ts`, and `apps/web/lib/profile.ts`
-- [ ] T021 Drive airline/max-stops/baggage profile serialization and clearing through RED → GREEN in `apps/web/lib/profile.spec.ts`, `apps/web/lib/profile-contract.ts`, and `apps/web/lib/profile.ts`
-- [ ] T022 Run Prisma validation/generation, shared tests, profile unit/API tests, and normalizer/policy tests from `specs/022-flight-match-scoring/quickstart.md`
+- [x] T020 Drive legacy-null/window/sensitivity browser profile parsing through RED → GREEN in `apps/web/lib/profile.spec.ts`, `apps/web/lib/profile-contract.ts`, and `apps/web/lib/profile.ts`
+- [x] T021 Drive airline/max-stops/baggage profile serialization and clearing through RED → GREEN in `apps/web/lib/profile.spec.ts`, `apps/web/lib/profile-contract.ts`, and `apps/web/lib/profile.ts`
+- [x] T022 Run Prisma validation/generation, shared tests, profile unit/API tests, and normalizer/policy tests from `specs/022-flight-match-scoring/quickstart.md`
 
 **Checkpoint**: Existing profiles remain valid, current profile CAS/security invariants hold, and raw Duffel data can be normalized without the scorer knowing Duffel.
 
@@ -279,3 +279,7 @@ Task B: T064 strict score-free Python snapshot invariant tests
 ## Phase 8: Convergence
 
 - [x] T078 Make stored scoring-window reads reject unknown JSON keys and emit a bounded PII-safe integrity counter per `data-model.md` persistence invariants
+
+## Phase 9: Convergence
+
+- [x] T079 Prevent unallowlisted profile-service error messages from reaching the browser per SC-005 / T021 zero-PII/auth-error invariant (partial)

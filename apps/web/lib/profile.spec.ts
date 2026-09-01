@@ -9,6 +9,23 @@ import {
 } from './profile';
 import type { TravelerProfileResponse, UpdateProfilePayload } from './profile';
 
+function stubJsonResponse(
+  body: unknown,
+  status = 200,
+  capture?: (input: RequestInfo | URL, init?: RequestInit) => void,
+): typeof fetch {
+  return async function jsonResponseStub(
+    input: RequestInfo | URL,
+    init?: RequestInit,
+  ): Promise<Response> {
+    capture?.(input, init);
+    return new Response(JSON.stringify(body), {
+      status,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  };
+}
+
 describe('Profile Client Contract Tests', () => {
   const originalEnv = process.env;
   const originalFetch = globalThis.fetch;
@@ -115,6 +132,77 @@ describe('Profile Client Contract Tests', () => {
       assert.deepStrictEqual(result, mockProfileData);
     });
 
+    it('preserves every modern scoring preference returned by GET', async () => {
+      const modernProfile: TravelerProfileResponse = {
+        ...mockProfileData,
+        preferences: {
+          ...mockProfileData.preferences,
+          preferredAirlines: ['VN', 'SQ'],
+          blacklistedAirlines: ['XX'],
+          preferredDepartureWindow: { start: 9, end: 12 },
+          preferredArrivalWindow: { start: 22, end: 2 },
+          maxStops: 0,
+          priceSensitivity: 'MODERATE',
+          requiresCheckedBaggage: false,
+        },
+        updatedAt: '2026-09-01T10:00:00.000Z',
+      };
+
+      globalThis.fetch = stubJsonResponse(modernProfile);
+
+      assert.deepStrictEqual(await fetchProfile('sample-token'), modernProfile);
+    });
+
+    it('keeps a legacy profile unchanged when scoring preferences are absent', async () => {
+      const legacyProfile: TravelerProfileResponse = {
+        ...mockProfileData,
+        updatedAt: '2026-08-31T23:59:59.000Z',
+      };
+
+      globalThis.fetch = stubJsonResponse(legacyProfile);
+
+      assert.deepStrictEqual(await fetchProfile('sample-token'), legacyProfile);
+    });
+
+    it('keeps legacy profile sections when every scoring preference is explicitly null', async () => {
+      const nullScoringProfile: TravelerProfileResponse = {
+        ...mockProfileData,
+        preferences: {
+          ...mockProfileData.preferences,
+          preferredAirlines: null,
+          blacklistedAirlines: null,
+          preferredDepartureWindow: null,
+          preferredArrivalWindow: null,
+          maxStops: null,
+          priceSensitivity: null,
+          requiresCheckedBaggage: null,
+        },
+        updatedAt: '2026-09-01T00:00:00.000Z',
+      };
+
+      globalThis.fetch = stubJsonResponse(nullScoringProfile);
+
+      assert.deepStrictEqual(await fetchProfile('sample-token'), nullScoringProfile);
+    });
+
+    it('rejects a successful response without a profile object', async () => {
+      globalThis.fetch = stubJsonResponse([]);
+
+      await assert.rejects(
+        () => fetchProfile('sample-token'),
+        /Invalid traveler profile response\./,
+      );
+    });
+
+    it('rejects an object response without a profile identifier', async () => {
+      globalThis.fetch = stubJsonResponse({ revision: 1 });
+
+      await assert.rejects(
+        () => fetchProfile('sample-token'),
+        /Invalid traveler profile response\./,
+      );
+    });
+
     it('getTravelerProfile alias behaves identically to fetchProfile', async () => {
       assert.strictEqual(getTravelerProfile, fetchProfile);
 
@@ -200,6 +288,58 @@ describe('Profile Client Contract Tests', () => {
 
       assert.deepStrictEqual(JSON.parse(String(capturedInit?.body)), updatePayload);
       assert.deepStrictEqual(result, updatedProfileResponse);
+    });
+
+    it('serializes every populated scoring preference without dropping zero or false', async () => {
+      const populatedPayload: UpdateProfilePayload = {
+        expectedRevision: 4,
+        preferences: {
+          seatPreference: 'WINDOW',
+          classPreference: 'ECONOMY',
+          preferredAirlines: ['VN', 'SQ'],
+          blacklistedAirlines: ['XX'],
+          preferredDepartureWindow: { start: 6, end: 9 },
+          preferredArrivalWindow: { start: 23, end: 1 },
+          maxStops: 0,
+          priceSensitivity: 'MODERATE',
+          requiresCheckedBaggage: false,
+        },
+      };
+      let capturedInit: RequestInit | undefined;
+
+      globalThis.fetch = stubJsonResponse(updatedProfileResponse, 200, (_input, init) => {
+        capturedInit = init;
+      });
+
+      await updateProfile('sample-token', populatedPayload);
+
+      assert.deepStrictEqual(JSON.parse(String(capturedInit?.body)), populatedPayload);
+    });
+
+    it('serializes explicit clearing values for every scoring preference', async () => {
+      const clearPayload: UpdateProfilePayload = {
+        expectedRevision: 4,
+        preferences: {
+          seatPreference: 'WINDOW',
+          classPreference: 'ECONOMY',
+          preferredAirlines: null,
+          blacklistedAirlines: null,
+          preferredDepartureWindow: null,
+          preferredArrivalWindow: null,
+          maxStops: null,
+          priceSensitivity: null,
+          requiresCheckedBaggage: null,
+        },
+      };
+      let capturedInit: RequestInit | undefined;
+
+      globalThis.fetch = stubJsonResponse(updatedProfileResponse, 200, (_input, init) => {
+        capturedInit = init;
+      });
+
+      await updateProfile('sample-token', clearPayload);
+
+      assert.deepStrictEqual(JSON.parse(String(capturedInit?.body)), clearPayload);
     });
 
     it('updateTravelerProfile alias behaves identically to updateProfile', async () => {
@@ -324,6 +464,46 @@ describe('Profile Client Contract Tests', () => {
         },
       );
     });
+
+    it('replaces a sensitive server error message with the generic profile failure message', async () => {
+      const sensitiveMessage =
+        'Unable to update jane.doe@example.com with Passport A12345678 using Bearer eyJhbGciOiJIUzI1NiJ9.payload.signature.';
+
+      globalThis.fetch = stubJsonResponse({ message: sensitiveMessage }, 500);
+
+      await assert.rejects(
+        () => fetchProfile('test-token'),
+        (err: unknown) => {
+          assert.ok(err instanceof ProfileRequestError);
+          assert.strictEqual(err.message, 'We could not update your traveler profile.');
+          assert.ok(!err.message.includes('jane.doe@example.com'));
+          assert.ok(!err.message.includes('A12345678'));
+          assert.ok(!err.message.includes('eyJhbGciOiJIUzI1NiJ9'));
+          return true;
+        },
+      );
+    });
+
+    it('replaces an unallowlisted server error message that contains unrecognized sensitive data', async () => {
+      const customerName = 'Maya Chen';
+      const phoneNumber = '+84 912 345 678';
+      const opaqueCredential = 'credential_9f4c2a';
+      const sensitiveMessage = `Unable to update ${customerName}; contact ${phoneNumber}; credential ${opaqueCredential}.`;
+
+      globalThis.fetch = stubJsonResponse({ message: sensitiveMessage }, 500);
+
+      await assert.rejects(
+        () => fetchProfile('test-token'),
+        (err: unknown) => {
+          assert.ok(err instanceof ProfileRequestError);
+          assert.strictEqual(err.message, 'We could not update your traveler profile.');
+          assert.ok(!err.message.includes(customerName));
+          assert.ok(!err.message.includes(phoneNumber));
+          assert.ok(!err.message.includes(opaqueCredential));
+          return true;
+        },
+      );
+    });
   });
 
   describe('Optimistic Concurrency Conflict Handling (409 Conflict)', () => {
@@ -331,6 +511,31 @@ describe('Profile Client Contract Tests', () => {
       code: 'PROFILE_UPDATE_CONFLICT',
       message: 'Profile has been modified by another session. Refresh and retry.',
     };
+
+    it('maps the production legacy message-only conflict to a safe local semantic', async () => {
+      globalThis.fetch = stubJsonResponse(
+        { message: 'PROFILE_UPDATE_CONFLICT', statusCode: 409 },
+        409,
+      );
+
+      await assert.rejects(
+        () =>
+          updateProfile('test-token', {
+            expectedRevision: 1,
+            preferences: { seatPreference: 'AISLE', classPreference: null },
+          }),
+        (err: unknown) => {
+          assert.ok(err instanceof ProfileRequestError);
+          assert.strictEqual(err.status, 409);
+          assert.strictEqual(err.code, 'PROFILE_UPDATE_CONFLICT');
+          assert.strictEqual(
+            err.message,
+            'Profile has been modified by another session. Refresh and retry.',
+          );
+          return true;
+        },
+      );
+    });
 
     it('extracts PROFILE_UPDATE_CONFLICT code and message on updateProfile 409 conflict', async () => {
       globalThis.fetch = (async () => {
@@ -354,6 +559,31 @@ describe('Profile Client Contract Tests', () => {
             err.message,
             'Profile has been modified by another session. Refresh and retry.',
           );
+          return true;
+        },
+      );
+    });
+
+    it('extracts PROFILE_REVISION_CONFLICT code and safe message on updateProfile 409 conflict', async () => {
+      globalThis.fetch = stubJsonResponse(
+        {
+          code: 'PROFILE_REVISION_CONFLICT',
+          message: 'Profile revision conflict.',
+        },
+        409,
+      );
+
+      await assert.rejects(
+        () =>
+          updateProfile('test-token', {
+            expectedRevision: 1,
+            preferences: { seatPreference: 'AISLE', classPreference: null },
+          }),
+        (err: unknown) => {
+          assert.ok(err instanceof ProfileRequestError);
+          assert.strictEqual(err.status, 409);
+          assert.strictEqual(err.code, 'PROFILE_REVISION_CONFLICT');
+          assert.strictEqual(err.message, 'Profile revision conflict.');
           return true;
         },
       );

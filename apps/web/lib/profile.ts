@@ -21,7 +21,30 @@ function getApiUrl(): string {
   return apiUrl.trim().replace(/\/+$/, '');
 }
 
-async function requestProfile<T>(accessToken: string, init: RequestInit): Promise<T> {
+type ResponseRecord = Record<string, unknown>;
+
+function isResponseRecord(value: unknown): value is ResponseRecord {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function isTravelerProfileResponse(value: unknown): value is TravelerProfileResponse {
+  return (
+    isResponseRecord(value) && (typeof value.profileId === 'string' || value.profileId === null)
+  );
+}
+
+function parseTravelerProfileResponse(value: unknown): TravelerProfileResponse {
+  if (!isTravelerProfileResponse(value)) {
+    throw new Error('Invalid traveler profile response.');
+  }
+
+  return value;
+}
+
+async function requestProfile(
+  accessToken: string,
+  init: RequestInit,
+): Promise<TravelerProfileResponse> {
   const response = await fetch(`${getApiUrl()}/api/profile`, {
     ...init,
     cache: 'no-store',
@@ -36,11 +59,11 @@ async function requestProfile<T>(accessToken: string, init: RequestInit): Promis
     throw await getProfileRequestError(response);
   }
 
-  return (await response.json()) as T;
+  return parseTravelerProfileResponse(await response.json());
 }
 
 export function fetchProfile(accessToken: string): Promise<TravelerProfileResponse> {
-  return requestProfile<TravelerProfileResponse>(accessToken, {
+  return requestProfile(accessToken, {
     method: 'GET',
   });
 }
@@ -51,7 +74,7 @@ export function updateProfile(
   accessToken: string,
   payload: UpdateProfilePayload,
 ): Promise<TravelerProfileResponse> {
-  return requestProfile<TravelerProfileResponse>(accessToken, {
+  return requestProfile(accessToken, {
     method: 'PATCH',
     headers: {
       'Content-Type': 'application/json',

@@ -1,4 +1,6 @@
 import type {
+  HourWindow,
+  PriceSensitivity,
   TravelerContact,
   TravelerDocument,
   TravelerIdentity,
@@ -41,6 +43,13 @@ export type ProfileDocumentUpdate = {
 export type ProfilePreferencesUpdate = {
   seatPreference: string | null;
   classPreference: string | null;
+  preferredAirlines?: string[] | null;
+  blacklistedAirlines?: string[] | null;
+  preferredDepartureWindow?: HourWindow | null;
+  preferredArrivalWindow?: HourWindow | null;
+  maxStops?: number | null;
+  priceSensitivity?: PriceSensitivity | null;
+  requiresCheckedBaggage?: boolean | null;
 };
 
 export type UpdateProfilePayload = {
@@ -55,6 +64,21 @@ type ErrorBody = {
   code?: unknown;
   message?: unknown;
 };
+
+const GENERIC_PROFILE_FAILURE_MESSAGE = 'We could not update your traveler profile.';
+const PROFILE_ERROR_MESSAGES_BY_CODE = new Map<string, string>([
+  ['PROFILE_UPDATE_CONFLICT', 'Profile has been modified by another session. Refresh and retry.'],
+  ['PROFILE_REVISION_CONFLICT', 'Profile revision conflict.'],
+]);
+const SAFE_PROFILE_ERROR_MESSAGES = new Set<string>([
+  'Invalid passport expiration date format.',
+  'givenName is required. email must be a valid email.',
+  'Authentication required.',
+  'Access to profile is forbidden.',
+  'Profile not found.',
+  'Internal server error processing profile.',
+  'Upstream profile database unreachable.',
+]);
 
 export class ProfileRequestError extends Error {
   readonly status: number;
@@ -82,12 +106,21 @@ export async function getProfileRequestError(response: Response): Promise<Profil
   }
 
   const errorBody = isErrorBody(body) ? body : {};
-  const message = Array.isArray(errorBody.message)
+  const serverMessage = Array.isArray(errorBody.message)
     ? errorBody.message.filter((item): item is string => typeof item === 'string').join(' ')
     : typeof errorBody.message === 'string'
       ? errorBody.message
-      : 'We could not update your traveler profile.';
-  const code = typeof errorBody.code === 'string' ? errorBody.code : null;
+      : GENERIC_PROFILE_FAILURE_MESSAGE;
+  const serverCode = typeof errorBody.code === 'string' ? errorBody.code : null;
+  const code =
+    response.status === 409 && serverMessage === 'PROFILE_UPDATE_CONFLICT'
+      ? 'PROFILE_UPDATE_CONFLICT'
+      : serverCode;
+  const message =
+    (code === null ? undefined : PROFILE_ERROR_MESSAGES_BY_CODE.get(code)) ??
+    (SAFE_PROFILE_ERROR_MESSAGES.has(serverMessage)
+      ? serverMessage
+      : GENERIC_PROFILE_FAILURE_MESSAGE);
 
   return new ProfileRequestError(response.status, message, code);
 }
