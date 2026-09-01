@@ -19,7 +19,7 @@ Update this file after every completed feature. Any AI agent reading this should
 ### [ ] Feature: Flight Match Scoring (Feature 022)
 
 - [x] Phase 3 / Slice 1: Eligibility, Visible Ineligible Results, and PRICE/DURATION Curves (T023–T025) (2026-09-01):
-  - `& '.\\node_modules\\.bin\\jest.CMD' --runInBand src/flight-match/flight-match-scorer.service.spec.ts` from `apps/api`: 20/20 tests passed, exit 0.
+  - `& '.\\node_modules\\.bin\\jest.CMD' --runInBand src/flight-match/flight-match-scorer.service.spec.ts` from `apps/api`: 21/21 tests passed, exit 0.
   - `pnpm --filter @api/backend exec tsc -p tsconfig.json --noEmit`: exit 1 on Windows because the bare `tsc` executable was not found; the equivalent `& '.\\node_modules\\.bin\\tsc.CMD' -p tsconfig.json --noEmit` from `apps/api` completed with exit 0.
   - PRICE sensitivity and provisional contribution/aggregate scaffolding landed under this slice plan; T026/T031 completion coverage plus remaining dimensions, redistribution, sorting, and service/module registration remain pending.
 
