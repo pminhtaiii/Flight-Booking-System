@@ -46,12 +46,12 @@ description: "Dependency-ordered implementation tasks for deterministic flight m
 - [x] T011 Drive missing-profile, owner-scoped, readiness-flag-independent `getScoringPreferences()` through RED → GREEN in `apps/api/src/profile/profile.service.spec.ts` and `apps/api/src/profile/profile.service.ts`
 - [x] T012 Drive revision-CAS atomic update/clear, mapping, and safe changed-field audit behavior through RED → GREEN in `apps/api/src/profile/profile.service.spec.ts` and `apps/api/src/profile/profile.service.ts`
 - [x] T013 Extend owned profile API E2E coverage for the scoring fields and airline arrays in `apps/api/test/profile.e2e-spec.ts`
-- [ ] T014 [P] Define immutable supplier-independent inputs, scoring preferences, eligibility, dimension, result, and internal orchestration types in `apps/api/src/flight-match/flight-match.types.ts`
-- [ ] T015 Drive canonical order, local IDs, full-itinerary aggregates, outbound local-clock facts, carrier codes, longest cabin, and checked bags one behavior at a time through RED → GREEN in `apps/api/src/flights/flight-offer-normalizer.spec.ts` and `apps/api/src/flights/flight-offer-normalizer.ts`
-- [ ] T016 Drive malformed-offer rejection, first-valid-currency selection, mixed-currency dropping, rejection counts, and all-invalid empty output through RED → GREEN in `apps/api/src/flights/flight-offer-normalizer.spec.ts` and `apps/api/src/flights/flight-offer-normalizer.ts`
-- [ ] T017 Drive policy version, exact weights, cabin order, sensitivity multipliers, buckets, red-eye hours, and explanation allowlist one behavior at a time through RED → GREEN in `apps/api/src/flight-match/flight-match.policy.spec.ts` and `apps/api/src/flight-match/flight-match.policy.ts`
-- [ ] T018 Drive clamp, round6, half-away final rounding, signal thresholds, circular-hour distance, and deterministic median helpers one behavior at a time through RED → GREEN in `apps/api/src/flight-match/flight-match.policy.spec.ts` and `apps/api/src/flight-match/flight-match.policy.ts`
-- [ ] T019 Create the zero-import NestJS module scaffold in `apps/api/src/flight-match/flight-match.module.ts`; provider registration is completed only after each pure service exists
+- [x] T014 [P] Define immutable supplier-independent inputs, scoring preferences, eligibility, dimension, result, and internal orchestration types in `apps/api/src/flight-match/flight-match.types.ts`
+- [x] T015 Drive canonical order, local IDs, full-itinerary aggregates, outbound local-clock facts, carrier codes, longest cabin, and checked bags one behavior at a time through RED → GREEN in `apps/api/src/flights/flight-offer-normalizer.spec.ts` and `apps/api/src/flights/flight-offer-normalizer.ts`
+- [x] T016 Drive malformed-offer rejection, first-valid-currency selection, mixed-currency dropping, rejection counts, and all-invalid empty output through RED → GREEN in `apps/api/src/flights/flight-offer-normalizer.spec.ts` and `apps/api/src/flights/flight-offer-normalizer.ts`
+- [x] T017 Drive policy version, exact weights, cabin order, sensitivity multipliers, buckets, red-eye hours, and explanation allowlist one behavior at a time through RED → GREEN in `apps/api/src/flight-match/flight-match.policy.spec.ts` and `apps/api/src/flight-match/flight-match.policy.ts`
+- [x] T018 Drive clamp, round6, half-away final rounding, signal thresholds, circular-hour distance, and deterministic median helpers one behavior at a time through RED → GREEN in `apps/api/src/flight-match/flight-match.policy.spec.ts` and `apps/api/src/flight-match/flight-match.policy.ts`
+- [x] T019 Create the zero-import NestJS module scaffold in `apps/api/src/flight-match/flight-match.module.ts`; provider registration is completed only after each pure service exists
 - [ ] T020 Drive legacy-null/window/sensitivity browser profile parsing through RED → GREEN in `apps/web/lib/profile.spec.ts`, `apps/web/lib/profile-contract.ts`, and `apps/web/lib/profile.ts`
 - [ ] T021 Drive airline/max-stops/baggage profile serialization and clearing through RED → GREEN in `apps/web/lib/profile.spec.ts`, `apps/web/lib/profile-contract.ts`, and `apps/web/lib/profile.ts`
 - [ ] T022 Run Prisma validation/generation, shared tests, profile unit/API tests, and normalizer/policy tests from `specs/022-flight-match-scoring/quickstart.md`
@@ -108,10 +108,6 @@ description: "Dependency-ordered implementation tasks for deterministic flight m
 - [ ] T043 [US2] Drive scorer non-invocation, RANKED mode, null match results, and ranker registration through RED → GREEN in `apps/api/src/flights/flight-search-orchestrator.service.spec.ts`, `apps/api/src/flights/flight-search-orchestrator.service.ts`, and `apps/api/src/flight-match/flight-match.module.ts`
 - [ ] T044 [US2] Add empty-profile, missing-profile, empty-offer, and stable cold-start API E2E coverage in `apps/api/test/flights-match-scoring.e2e-spec.ts`
 - [ ] T045 [US2] Prove cached/uncached RANKED searches preserve persistence/upserts, agent-warmed-cache browser selection, budget, rate-limit, and error behavior in `apps/api/test/flights-search.e2e-spec.ts`
-
-**Checkpoint**: Existing travelers without preferences receive honest objective ranking and the scorer is not invoked.
-
----
 
 ## Phase 5: User Story 3 — Understand and Configure Matching (Priority: P3)
 
