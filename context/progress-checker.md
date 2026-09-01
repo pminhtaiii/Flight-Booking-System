@@ -6,16 +6,22 @@ Update this file after every completed feature. Any AI agent reading this should
 
 ### Current Status
 
-**Feature:** Flight Match Scoring (Feature 022) — Phase 1 & Phase 2 / Slices 1 & 2 Complete (Tasks T001–T013)
-**Last completed:** Phase 2 / Slice 2 (T011–T013): Internal scoring preferences projection (`getScoringPreferences`), flag-independent scoring preferences projection with zero-PII allowlist and missing profile fallback, optimistic concurrency control (CAS revision increments and conflict handling), profile persistence mapping, explicit `null` preference clearing via `Prisma.DbNull`, PII-safe changed-field audit logging, and extended profile E2E integration test suite covering scoring preference persistence, overnight windows (`{ start: 22, end: 6 }`), CAS conflict handling, and negative privacy verification (2026-08-31).
-**In progress:** Phase 2 / Slice 3 (T014+): Offer normalizer, policy helpers, and web profile serialization.
-**Next:** T014–T022 (Normalized Inputs, Policy Versioning & Profile Web Controls).
+**Feature:** Flight Match Scoring (Feature 022) — Phase 1 & Phase 2 Complete (Tasks T001–T022)
+**Last completed:** Phase 2 / Slice 4 (T020–T022): The browser profile boundary tolerantly preserves legacy missing scoring fields, explicit `null` values, API-validated overnight windows, identity/contact/document sections, revisions, and timestamps, and serializes/clears canonical airlines, `maxStops: 0`, and `requiresCheckedBaggage: false` without loss. Contract boundaries remain provider/PII-safe; migration verification confirms additive nullable preferences without score persistence (2026-09-01).
+**In progress:** None — Phase 3 has not started.
+**Next:** Phase 3 / User Story 1 (T023–T039): Eligibility, deterministic scoring, canonical search orchestration, and MATCHED API verification.
 
 ---
 
 ## Progress by Feature
 
 ### [ ] Feature: Flight Match Scoring (Feature 022)
+
+- [x] Phase 2 / Slice 4: Browser Profile Contract, Quality Gate & Documentation (T020–T022) (2026-09-01):
+  - The browser response guard preserves legacy profiles where scoring fields are absent or explicitly `null`, passing API-validated departure/arrival windows (including overnight windows), price sensitivity, identity/contact/document sections, revisions, and timestamps through unchanged.
+  - Browser serialization preserves canonical airline arrays plus falsy-but-meaningful `maxStops: 0` and `requiresCheckedBaggage: false`, and sends explicit `null` values to clear each scoring preference.
+  - Privacy and persistence boundaries remain intact: browser profile contracts expose no provider identifiers, and migration E2E confirms nullable preference additions without score persistence.
+  - Verified: Prisma schema validation and Prisma Client generation; shared contracts (110 tests); profile service/controller units (71 tests); profile migration E2E (1 test); offer normalizer/policy units (147 tests); web profile contracts (28 tests); API and web TypeScript typechecks (all exit 0). On Windows, the two `pnpm exec` CLI invocations required the equivalent installed `.CMD` shim after the mandated commands could not resolve their bare executables.
 
 - [x] Phase 2 / Slice 2: Profile Service Projection & E2E API Verification (T011–T013) (2026-08-31):
   - **T011: Internal Scoring Preferences Projection (`apps/api/src/profile/profile.service.ts`, `apps/api/src/profile/profile.service.spec.ts`)**:
