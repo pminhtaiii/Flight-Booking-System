@@ -235,10 +235,16 @@ describe('Feature Flag Governance & Rollout Matrix (E2E)', () => {
     });
 
     it('Token resolve returns 503 Service Unavailable ("Chat handoff acceptance is disabled") with zero internal leakage', async () => {
+      const rawToken = await tokenService.generateToken(
+        crypto.randomUUID(),
+        'test-idempotency-hash',
+        1,
+      );
+
       const res = await request(app.getHttpServer())
         .get('/chat-handoff/resolve')
         .set('Authorization', `Bearer ${validUserToken}`)
-        .query({ token: 'chk_handoff_v1_anytoken' })
+        .query({ token: rawToken.token })
         .expect(503);
 
       expect(res.body.message).toBe('Chat handoff acceptance is disabled');
