@@ -1169,6 +1169,10 @@ describe('FlightOfferNormalizer (T015)', () => {
         ['not-a-timestamp'],
         ['2026-00-10T10:00:00Z'],
         ['2026-05-00T10:00:00Z'],
+        ['2026-09-01T10:00:00+23:59'],
+        ['2026-09-01T10:00:00+14:01'],
+        ['2026-09-01T10:00:00-15:00'],
+        ['2026-09-01T10:00:00+18:00'],
       ])('rejects offer with malformed departing_at timestamp: %s', (malformedTimestamp) => {
         const offer = createMockOffer({
           slices: [
@@ -1213,6 +1217,10 @@ describe('FlightOfferNormalizer (T015)', () => {
         ['2026-09-01T10:00:99'],
         ['2026-09-01T10:00:00+99:99'],
         ['2026-09-01'],
+        ['2026-09-01T10:00:00+23:59'],
+        ['2026-09-01T10:00:00+14:01'],
+        ['2026-09-01T10:00:00-15:00'],
+        ['2026-09-01T10:00:00+18:00'],
       ])('rejects offer with malformed arriving_at timestamp: %s', (malformedTimestamp) => {
         const offer = createMockOffer({
           slices: [
@@ -1254,10 +1262,15 @@ describe('FlightOfferNormalizer (T015)', () => {
         expect(isValidIsoDateTime('2026-09-01T08:30:00')).toBe(true);
         expect(isValidIsoDateTime('2026-12-31T23:59:59-0800')).toBe(true);
         expect(isValidIsoDateTime('2026-01-01T00:00:00+09')).toBe(true);
+        expect(isValidIsoDateTime('2026-09-01T10:00:00+14:00')).toBe(true);
+        expect(isValidIsoDateTime('2026-09-01T10:00:00+1400')).toBe(true);
+        expect(isValidIsoDateTime('2026-09-01T10:00:00-12:00')).toBe(true);
+        expect(isValidIsoDateTime('2026-09-01T10:00:00+13:45')).toBe(true);
 
         expect(extractLocalHour('2024-02-29T10:00:00Z')).toBe(10);
         expect(extractLocalHour('2026-09-01T00:30:00')).toBe(0);
         expect(extractLocalHour('2026-12-31T23:59:59-0800')).toBe(23);
+        expect(extractLocalHour('2026-09-01T10:00:00+14:00')).toBe(10);
       });
     });
 
