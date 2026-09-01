@@ -146,8 +146,7 @@ describe('Chaos & Fault-Tolerance Incident Drills (E2E)', () => {
     it('simulates supplier timeout during pricing validation, safely releases claim in finally block, and succeeds upon recovery retry', async () => {
       const offer = await createMockFlightOffer({ adults: 1 });
       const handoffId = crypto.randomUUID();
-      const token = `chk_handoff_v1_chaos_supplier_timeout_${crypto.randomUUID().replace(/-/g, '')}`;
-      const tokenHash = tokenService.hashToken(token);
+      const { token, tokenHash } = await tokenService.generateToken(handoffId, 'idem-chaos-1', 1);
       const duffelOfferIdHash = tokenService.hashToken(offer.duffelOfferId);
 
       const session = await prisma.chatSession.create({
@@ -272,8 +271,7 @@ describe('Chaos & Fault-Tolerance Incident Drills (E2E)', () => {
     it('successfully recovers and consumes handoff when previous claim lease expired (> claimRecoverAfter)', async () => {
       const offer = await createMockFlightOffer({ adults: 1 });
       const handoffId = crypto.randomUUID();
-      const token = `chk_handoff_v1_chaos_expired_recovery_${crypto.randomUUID().replace(/-/g, '')}`;
-      const tokenHash = tokenService.hashToken(token);
+      const { token, tokenHash } = await tokenService.generateToken(handoffId, 'idem-chaos-2', 1);
       const duffelOfferIdHash = tokenService.hashToken(offer.duffelOfferId);
 
       const session = await prisma.chatSession.create({
