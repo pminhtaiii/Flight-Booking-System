@@ -366,7 +366,7 @@ describe('FlightSearchOrchestratorService (T033)', () => {
       );
     });
 
-    it('leaves effective classPreference null when profile classPreference is unsupported even if query.cabinClass is valid', async () => {
+    it("applies valid query.cabinClass override when profile classPreference is non-empty unsupported (e.g. 'unknown_class')", async () => {
       profileService.getScoringPreferences.mockResolvedValueOnce({
         ...defaultPreferences,
         classPreference: 'unknown_class',
@@ -385,7 +385,7 @@ describe('FlightSearchOrchestratorService (T033)', () => {
       expect(scorer.scoreAll).toHaveBeenCalledWith(
         expect.any(Array),
         expect.objectContaining({
-          classPreference: null,
+          classPreference: 'business',
         }),
       );
     });

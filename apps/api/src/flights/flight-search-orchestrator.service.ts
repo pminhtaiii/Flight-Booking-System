@@ -112,10 +112,13 @@ export class FlightSearchOrchestratorService {
     const normalizedStoredCabin = normalizeCabinClass(profilePrefs.classPreference);
     const normalizedQueryCabin = normalizeCabinClass(params.query.cabinClass);
 
-    const effectiveClassPreference =
-      normalizedStoredCabin !== null
-        ? (normalizedQueryCabin ?? normalizedStoredCabin)
-        : null;
+    const hasStoredPreference =
+      profilePrefs.classPreference !== null &&
+      profilePrefs.classPreference.trim() !== '';
+
+    const effectiveClassPreference = hasStoredPreference
+      ? (normalizedQueryCabin ?? normalizedStoredCabin)
+      : null;
 
     const effectivePreferences: ScoringPreferences = {
       ...profilePrefs,
