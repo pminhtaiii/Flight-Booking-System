@@ -71,9 +71,9 @@ description: "Dependency-ordered implementation tasks for deterministic flight m
 - [x] T023 [US1] Drive blacklist precedence across all carriers and stable violation explanations through RED → GREEN in `apps/api/src/flight-match/flight-match-scorer.service.spec.ts` and `apps/api/src/flight-match/flight-match-scorer.service.ts`
 - [x] T024 [US1] Drive ineligible visibility, eligible-only references, duplicate-code handling, and frozen-input non-mutation one behavior at a time through RED → GREEN in `apps/api/src/flight-match/flight-match-scorer.service.spec.ts` and `apps/api/src/flight-match/flight-match-scorer.service.ts`
 - [x] T025 [US1] Drive odd/even median PRICE and DURATION curves plus exact signal thresholds one behavior at a time through RED → GREEN in `apps/api/src/flight-match/flight-match-scorer.service.spec.ts` and `apps/api/src/flight-match/flight-match-scorer.service.ts`
-- [ ] T026 [US1] Drive sensitivity-modified PRICE and preference/relative STOPS behavior through RED → GREEN in `apps/api/src/flight-match/flight-match-scorer.service.spec.ts` and `apps/api/src/flight-match/flight-match-scorer.service.ts`
-- [ ] T027 [US1] Drive AIRLINE neutral/preferred and effective-query CABIN exact/adjacent/mismatch behavior through RED → GREEN in `apps/api/src/flight-match/flight-match-scorer.service.spec.ts` and `apps/api/src/flight-match/flight-match-scorer.service.ts`
-- [ ] T028 [US1] Drive overnight/boundary/shoulder schedules and baggage true/false/null behavior through RED → GREEN in `apps/api/src/flight-match/flight-match-scorer.service.spec.ts` and `apps/api/src/flight-match/flight-match-scorer.service.ts`
+- [x] T026 [US1] Drive sensitivity-modified PRICE and preference/relative STOPS behavior through RED → GREEN in `apps/api/src/flight-match/flight-match-scorer.service.spec.ts` and `apps/api/src/flight-match/flight-match-scorer.service.ts`
+- [x] T027 [US1] Drive AIRLINE neutral/preferred and effective-query CABIN exact/adjacent/mismatch behavior through RED → GREEN in `apps/api/src/flight-match/flight-match-scorer.service.spec.ts` and `apps/api/src/flight-match/flight-match-scorer.service.ts`
+- [x] T028 [US1] Drive overnight/boundary/shoulder schedules and baggage true/false/null behavior through RED → GREEN in `apps/api/src/flight-match/flight-match-scorer.service.spec.ts` and `apps/api/src/flight-match/flight-match-scorer.service.ts`
 
 ### Weight resolution and final ranking
 

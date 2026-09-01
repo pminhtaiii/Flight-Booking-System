@@ -6,17 +6,24 @@ Update this file after every completed feature. Any AI agent reading this should
 
 ### Current Status
 
-**Feature:** Flight Match Scoring (Feature 022) — Phase 1, Phase 2, and Phase 3 / Slice 1 Complete (Tasks T001–T025)
-**Last completed:** Phase 3 / Slice 1 (T023–T025): Added the dependency-free, unregistered FlightMatchScorerService with normalized blacklist eligibility, retained ineligible result shapes, eligible-only PRICE/DURATION medians, fixed base-weight contributions, rounded signal thresholds, and no input mutation (2026-09-01).
-**Previous completed:** Phase 2 / Slice 4 (T020–T022): The browser profile boundary tolerantly preserves legacy missing scoring fields, explicit `null` values, API-validated overnight windows, identity/contact/document sections, revisions, and timestamps, and serializes/clears canonical airlines, `maxStops: 0`, and `requiresCheckedBaggage: false` without loss. Contract boundaries remain provider/PII-safe; migration verification confirms additive nullable preferences without score persistence (2026-09-01).
-**In progress:** None — Phase 3 / Slice 1 is complete. The slice includes price-sensitivity and provisional contribution/aggregate scaffolding; T026/T031 completion coverage, remaining dimensions, redistribution, and sorting are still pending.
-**Next:** Phase 3 / User Story 1 (T026–T039): Complete sensitivity/STOPS and contribution/score coverage, remaining dimensions, weight resolution, ordering, canonical search orchestration, and MATCHED API verification.
+**Feature:** Flight Match Scoring (Feature 022) — Phase 1, Phase 2, and Phase 3 / Slices 1–2 Complete (Tasks T001–T028)
+**Last completed:** Phase 3 / Slice 2 (T026–T028): Implemented all remaining individual dimension sub-score calculators in FlightMatchScorerService (PRICE sensitivity with signed percentDiff, STOPS preference and relative scoring, AIRLINE preferred/neutral matching, CABIN exact/adjacent/mismatch scoring, SCHEDULE departure/arrival standard/overnight/shoulder decay, and BAGGAGE allowance) with strict pure boundary, zero input mutation, and 88/88 passing tests (2026-09-01).
+**Previous completed:** Phase 3 / Slice 1 (T023–T025): Added the dependency-free, unregistered FlightMatchScorerService with normalized blacklist eligibility, retained ineligible result shapes, eligible-only PRICE/DURATION medians, fixed base-weight contributions, rounded signal thresholds, and no input mutation (2026-09-01).
+**In progress:** None — Phase 3 / Slice 2 is complete. Weight resolution, final sorting, and canonical search orchestration (T029–T039) remain pending.
+**Next:** Phase 3 / User Story 1 (T029–T039): Weight resolution and redistribution (T029–T030), final contribution and score/level calculation (T031), stable ordering/tie-breaks (T032), search orchestration (T033–T035), and API/E2E verification (T036–T039).
 
 ---
 
 ## Progress by Feature
 
 ### [ ] Feature: Flight Match Scoring (Feature 022)
+
+- [x] Phase 3 / Slice 2: Discrete & Personalized Dimension Scoring (T026–T028) (2026-09-01):
+  - `& '.\node_modules\.bin\jest.CMD' --runInBand src/flight-match/flight-match-scorer.service.spec.ts` from `apps/api`: 88/88 tests passed, exit 0.
+  - `pnpm --filter @api/backend exec tsc -p tsconfig.json --noEmit`: exit 0.
+  - `pnpm exec eslint "apps/api/src/flight-match/flight-match-scorer.service.ts" "apps/api/src/flight-match/flight-match-scorer.service.spec.ts" --max-warnings 0`: exit 0.
+  - Implemented public dimension calculators in `FlightMatchScorerService`: `scorePrice` (signed percentDiff explanation), `scoreStops` (maxStops within/exceeds preference and relative minStops), `scoreAirline` (preferred and neutral), `scoreCabin` (exact, adjacent, mismatch), `scoreDepartureSchedule` / `scoreArrivalSchedule` (standard, overnight, 6-hour linear shoulder decay, near/outside window), and `scoreBaggage` (checked_included, checked_missing, not_required).
+  - Maintained pure boundary invariants: zero DB/Redis/HTTP/logging calls, zero mutation under `Object.freeze`, round6 sub-score and contribution precision, and canonical signal thresholds.
 
 - [x] Phase 3 / Slice 1: Eligibility, Visible Ineligible Results, and PRICE/DURATION Curves (T023–T025) (2026-09-01):
   - `& '.\\node_modules\\.bin\\jest.CMD' --runInBand src/flight-match/flight-match-scorer.service.spec.ts` from `apps/api`: 21/21 tests passed, exit 0.
