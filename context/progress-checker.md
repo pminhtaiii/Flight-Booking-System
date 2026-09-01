@@ -6,17 +6,65 @@ Update this file after every completed feature. Any AI agent reading this should
 
 ### Current Status
 
-**Feature:** Flight Match Scoring (Feature 022) — Phase 1, Phase 2, and Phase 3 / Slices 1–2 Complete (Tasks T001–T028)
-**Last completed:** Phase 3 / Slice 2 (T026–T028): Implemented all remaining individual dimension sub-score calculators in FlightMatchScorerService (PRICE sensitivity with signed percentDiff, STOPS preference and relative scoring, AIRLINE preferred/neutral matching, CABIN exact/adjacent/mismatch scoring, SCHEDULE departure/arrival standard/overnight/shoulder decay, and BAGGAGE allowance) with strict pure boundary, zero input mutation, and 88/88 passing tests (2026-09-01).
-**Previous completed:** Phase 3 / Slice 1 (T023–T025): Added the dependency-free, unregistered FlightMatchScorerService with normalized blacklist eligibility, retained ineligible result shapes, eligible-only PRICE/DURATION medians, fixed base-weight contributions, rounded signal thresholds, and no input mutation (2026-09-01).
-**In progress:** None — Phase 3 / Slice 2 is complete. Weight resolution, final sorting, and canonical search orchestration (T029–T039) remain pending.
-**Next:** Phase 3 / User Story 1 (T029–T039): Weight resolution and redistribution (T029–T030), final contribution and score/level calculation (T031), stable ordering/tie-breaks (T032), search orchestration (T033–T035), and API/E2E verification (T036–T039).
+**Feature:** Flight Match Scoring (Feature 022) — Phase 1, Phase 2, and Phase 3 / Slices 1–5 Complete (Tasks T001–T032)
+**Last completed:** Phase 3 / Slice 5 (T032): Implemented dimension breakdown ordering strictly adhering to canonical `POLICY_DIMENSION_ORDER`, metadata inclusion (`scoringVersion: 'flight-match-v1'`, `activeWeights`), and multi-attribute 7-tier tie-breaking ranking in `FlightMatchScorerService.scoreAll()`, with isolated tie-breaking layer coverage, ineligible offer handling, degenerate cases, deep freeze immutability, and 157/157 passing tests (2026-09-01).
+**Previous completed:** Phase 3 / Slice 4 (T031): Implemented dimension contribution precision (`computeContribution`), total score computation (`computeFinalScore`), match level tiers (`getMatchLevel`), and composite result derivation (`computeScoreResult`) in `FlightMatchScorerService`, with half-away-from-zero rounding, clamping [0, 100], exact match bucket boundary verification, and 143/143 passing tests (2026-09-01).
+**In progress:** None — Phase 3 / Slice 5 (T032) is complete. Canonical search orchestration and verification (T033–T039) remain pending.
+**Next:** Phase 3 / User Story 1 (T033–T039): Canonical search orchestration (T033–T035) and API/E2E verification (T036–T039).
 
 ---
 
 ## Progress by Feature
 
 ### [ ] Feature: Flight Match Scoring (Feature 022)
+
+- [x] Phase 3 / Slice 5: Breakdown Order, Metadata & Stable Multi-Attribute Tie-Breaking (T032) (2026-09-01):
+  - `& '.\node_modules\.bin\jest.CMD' --runInBand src/flight-match/flight-match-scorer.service.spec.ts` from `apps/api`: 157/157 tests passed, exit 0.
+  - `pnpm --filter @api/backend exec tsc -p tsconfig.json --noEmit`: exit 0.
+  - `pnpm exec eslint "apps/api/src/flight-match/**/*.ts" --max-warnings 0`: exit 0.
+  - Implemented `scoreAll(offers, preferences)` in `FlightMatchScorerService`:
+    - Resolved `activeWeights` via `resolveWeights(offers, preferences)`.
+    - Computed medians and minStops across eligible offers only.
+    - Strictly ordered dimension breakdown per `POLICY_DIMENSION_ORDER` (1. PRICE -> 2. AIRLINE -> 3. ARRIVAL_SCHEDULE -> 4. STOPS -> 5. CABIN -> 6. DEPARTURE_SCHEDULE -> 7. BAGGAGE -> 8. DURATION).
+    - Verified dimension weights match activeWeights and contributions match `round6(score * weight)`.
+    - Attached metadata `{ scoringVersion: 'flight-match-v1', activeWeights }` to both eligible and ineligible offer results.
+    - Ineligible offers: `score: null`, `matchLevel: null`, `breakdown: []`, positioned after all eligible offers.
+    - Implemented 7-tier tie-breaking ladder: 1. eligible before ineligible -> 2. score descending -> 3. stops ascending -> 4. price ascending -> 5. duration ascending -> 6. departure red-eye penalty ascending -> 7. originalIndex ascending.
+    - Verified each layer of the tie-breaking ladder in isolation.
+    - Stably ordered multiple ineligible offers by `originalIndex` at the end.
+    - Handled degenerate sets: empty array returns `[]`, single offer returns sorted 1-element array, all-ineligible returns preserved `originalIndex` order.
+    - Deep freeze immutability verified with zero mutation across input arrays and objects.
+
+- [x] Phase 3 / Slice 4: Dimension Contributions, Final Score & Match Level Buckets (T031) (2026-09-01):
+  - `& '.\node_modules\.bin\jest.CMD' --runInBand src/flight-match/flight-match-scorer.service.spec.ts` from `apps/api`: 143/143 tests passed, exit 0.
+  - `pnpm --filter @api/backend exec tsc -p tsconfig.json --noEmit`: exit 0.
+  - `pnpm exec eslint "apps/api/src/flight-match/**/*.ts" --max-warnings 0`: exit 0.
+  - Implemented `computeContribution(subScore, effectiveWeight)`, `computeFinalScore(breakdown)`, `getMatchLevel(score)`, and `computeScoreResult(breakdown)` in `FlightMatchScorerService`:
+    - Dimension contributions calculated at exact 6-decimal precision: `round6(subScore * effectiveWeight)`.
+    - Total score computation: `clamp(roundHalfAwayFromZero(round6(sum(contribution) * 100)), 0, 100)`.
+    - Half-away-from-zero rounding behavior verified on exact .5 contribution percentages.
+    - Clamping behavior verified for negative sums (< 0 clamped to 0) and overflow sums (> 100 clamped to 100).
+    - Exact match level bucket boundary tests passed:
+      - STRONG: 75–100 (74.49 -> 74 GOOD vs 74.5 -> 75 STRONG, 75 STRONG, 100 STRONG).
+      - GOOD: 50–74 (49.49 -> 49 FAIR vs 49.5 -> 50 GOOD, 50 GOOD, 74 GOOD).
+      - FAIR: 25–49 (24.49 -> 24 WEAK vs 24.5 -> 25 FAIR, 25 FAIR, 49 FAIR).
+      - WEAK: 0–24 (0 WEAK, 24 WEAK).
+    - Ineligible offers verified: score: null, matchLevel: null, breakdown: [].
+    - Zero mutation under `deepFreeze` across all contribution, score, and level calculations.
+
+
+- [x] Phase 3 / Slice 3: Weight Resolution, Baseline Collapse Fallback & Degenerate Sets (T029–T030) (2026-09-01):
+  - `& '.\node_modules\.bin\jest.CMD' --runInBand src/flight-match/flight-match-scorer.service.spec.ts` from `apps/api`: 123/123 tests passed, exit 0.
+  - `pnpm --filter @api/backend exec tsc -p tsconfig.json --noEmit`: exit 0.
+  - Implemented `resolveWeights(offers, preferences)` in `FlightMatchScorerService`:
+    - Transfers unprovided/missing personalized dimensions to the baseline target pool.
+    - Evaluates sub-score variance across eligible offers for multi-offer sets (>= 2 offers).
+    - Caps personalized redistributed weights at their base weights; unallocated amounts flow to baseline target pool.
+    - Cancels collapse when all baseline dimensions (PRICE, STOPS, DURATION) have zero variance, distributing the entire baseline target in 20:12:8 ratio.
+    - Proves the airline-only personalization golden fixture: 0.425000 / 0.255000 / 0.170000 / 0.150000 totaling exact 1.000000.
+    - Assigns any 6-decimal rounding remainder deterministically to highest-priority active baseline dimension (PRICE > STOPS > DURATION).
+    - Handles degenerate sets: single eligible offer (no zero-variance collapse), all ineligible offers (retains offers with null score and empty breakdown, resolveWeights returns BASE_WEIGHTS), empty offers array (returns empty array / BASE_WEIGHTS), and mixed eligible/ineligible offers (ineligible offers excluded from activeWeights and medians/variance).
+    - Preserves immutability and purity under `Object.freeze`.
 
 - [x] Phase 3 / Slice 2: Discrete & Personalized Dimension Scoring (T026–T028) (2026-09-01):
   - `& '.\node_modules\.bin\jest.CMD' --runInBand src/flight-match/flight-match-scorer.service.spec.ts` from `apps/api`: 88/88 tests passed, exit 0.

@@ -8,6 +8,7 @@ import {
   getCabinAdjacency,
   getMatchLevel,
   getPriceSensitivityMultiplier,
+  getRedEyePenalty,
   hourDistanceToWindow,
   isHourInWindow,
   round6,
@@ -16,14 +17,46 @@ import {
   SCORING_POLICY_VERSION,
 } from './flight-match.policy';
 import type {
+  ActiveWeights,
   DimensionScore,
   EligibilityResult,
+  FlightMatchDimension,
   FlightMatchInput,
+  MatchLevel,
   ScoredOffer,
   ScoringPreferences,
 } from './flight-match.types';
 
 const AIRLINE_CODE_PATTERN = /^[A-Z0-9]{2,3}$/;
+
+type PersonalizedDimension =
+  | 'AIRLINE'
+  | 'ARRIVAL_SCHEDULE'
+  | 'CABIN'
+  | 'DEPARTURE_SCHEDULE'
+  | 'BAGGAGE';
+
+type BaselineDimension = 'PRICE' | 'STOPS' | 'DURATION';
+
+const PERSONALIZED_DIMENSION_KEYS: readonly PersonalizedDimension[] = [
+  'AIRLINE',
+  'ARRIVAL_SCHEDULE',
+  'CABIN',
+  'DEPARTURE_SCHEDULE',
+  'BAGGAGE',
+];
+
+const BASELINE_DIMENSION_KEYS: readonly BaselineDimension[] = [
+  'PRICE',
+  'STOPS',
+  'DURATION',
+];
+
+const BASELINE_REMAINDER_KEYS: readonly BaselineDimension[] = [
+  'PRICE',
+  'STOPS',
+  'DURATION',
+];
 
 type MedianComparison = 'below' | 'at' | 'above';
 type PriceMedianExplanationKey =
@@ -96,6 +129,177 @@ export class FlightMatchScorerService {
     return { eligible: false, violations };
   }
 
+  resolveWeights(
+    offers: readonly FlightMatchInput[],
+    preferences: ScoringPreferences,
+    preFilteredEligibleOffers?: readonly FlightMatchInput[],
+  ): ActiveWeights {
+    const eligibleOffers =
+      preFilteredEligibleOffers ??
+      offers.filter((offer) => this.checkEligibility(offer, preferences).eligible);
+
+    if (eligibleOffers.length === 0) {
+      return { ...BASE_WEIGHTS };
+    }
+
+    const isMissingPersonalized: Record<PersonalizedDimension, boolean> = {
+      AIRLINE: normalizeAirlineCodes(preferences.preferredAirlines ?? []).length === 0,
+      ARRIVAL_SCHEDULE: preferences.preferredArrivalWindow == null,
+      CABIN: preferences.classPreference == null || preferences.classPreference.trim() === '',
+      DEPARTURE_SCHEDULE: preferences.preferredDepartureWindow == null,
+      BAGGAGE: preferences.requiresCheckedBaggage == null,
+    };
+
+    const applyZeroVariance = eligibleOffers.length >= 2;
+
+    let isBaselineActive: Record<BaselineDimension, boolean>;
+
+    if (applyZeroVariance) {
+      const medianPrice = calculateMedian(eligibleOffers.map((o) => o.price));
+      const medianDuration = calculateMedian(eligibleOffers.map((o) => o.duration));
+      const minStops = Math.min(...eligibleOffers.map((o) => o.stops));
+
+      const priceScores = eligibleOffers.map(
+        (o) => this.scorePrice(o, medianPrice, preferences).score,
+      );
+      const stopsScores = eligibleOffers.map(
+        (o) => this.scoreStops(o, preferences, minStops).score,
+      );
+      const durationScores = eligibleOffers.map(
+        (o) => this.scoreDuration(o, medianDuration).score,
+      );
+
+      const priceZeroVariance = priceScores.every((s) => s === priceScores[0]);
+      const stopsZeroVariance = stopsScores.every((s) => s === stopsScores[0]);
+      const durationZeroVariance = durationScores.every((s) => s === durationScores[0]);
+
+      const allBaselineZeroVariance =
+        priceZeroVariance && stopsZeroVariance && durationZeroVariance;
+
+      isBaselineActive = {
+        PRICE: allBaselineZeroVariance || !priceZeroVariance,
+        STOPS: allBaselineZeroVariance || !stopsZeroVariance,
+        DURATION: allBaselineZeroVariance || !durationZeroVariance,
+      };
+    } else {
+      isBaselineActive = {
+        PRICE: true,
+        STOPS: true,
+        DURATION: true,
+      };
+    }
+
+    const isPersonalizedActive: Record<PersonalizedDimension, boolean> = {
+      AIRLINE: false,
+      ARRIVAL_SCHEDULE: false,
+      CABIN: false,
+      DEPARTURE_SCHEDULE: false,
+      BAGGAGE: false,
+    };
+
+    for (const dim of PERSONALIZED_DIMENSION_KEYS) {
+      if (isMissingPersonalized[dim]) {
+        isPersonalizedActive[dim] = false;
+        continue;
+      }
+
+      if (!applyZeroVariance) {
+        isPersonalizedActive[dim] = true;
+        continue;
+      }
+
+      let scores: readonly number[] = [];
+      switch (dim) {
+        case 'AIRLINE':
+          scores = eligibleOffers.map((o) => this.scoreAirline(o, preferences).score);
+          break;
+        case 'ARRIVAL_SCHEDULE':
+          scores = eligibleOffers.map((o) => this.scoreArrivalSchedule(o, preferences).score);
+          break;
+        case 'CABIN':
+          scores = eligibleOffers.map((o) => this.scoreCabin(o, preferences).score);
+          break;
+        case 'DEPARTURE_SCHEDULE':
+          scores = eligibleOffers.map((o) => this.scoreDepartureSchedule(o, preferences).score);
+          break;
+        case 'BAGGAGE':
+          scores = eligibleOffers.map((o) => this.scoreBaggage(o, preferences).score);
+          break;
+      }
+
+      const isZeroVariance = scores.every((s) => s === scores[0]);
+      isPersonalizedActive[dim] = !isZeroVariance;
+    }
+
+    const mutableWeights: Record<FlightMatchDimension, number> = {
+      PRICE: 0,
+      AIRLINE: 0,
+      ARRIVAL_SCHEDULE: 0,
+      STOPS: 0,
+      CABIN: 0,
+      DEPARTURE_SCHEDULE: 0,
+      BAGGAGE: 0,
+      DURATION: 0,
+    };
+
+    let sumPersonalizedWeights = 0;
+    for (const dim of PERSONALIZED_DIMENSION_KEYS) {
+      if (isPersonalizedActive[dim]) {
+        mutableWeights[dim] = BASE_WEIGHTS[dim];
+        sumPersonalizedWeights += BASE_WEIGHTS[dim];
+      } else {
+        mutableWeights[dim] = 0;
+      }
+    }
+
+    const baselineTargetPool = round6(1.0 - sumPersonalizedWeights);
+
+    const activeBaselineDimensions = BASELINE_DIMENSION_KEYS.filter(
+      (dim) => isBaselineActive[dim],
+    );
+    const sumActiveBaselineBaseWeights = activeBaselineDimensions.reduce(
+      (sum, dim) => sum + BASE_WEIGHTS[dim],
+      0,
+    );
+
+    for (const dim of BASELINE_DIMENSION_KEYS) {
+      if (isBaselineActive[dim]) {
+        mutableWeights[dim] = round6(
+          (BASE_WEIGHTS[dim] / sumActiveBaselineBaseWeights) * baselineTargetPool,
+        );
+      } else {
+        mutableWeights[dim] = 0;
+      }
+    }
+
+    const currentSum = round6(
+      Object.values(mutableWeights).reduce((sum, w) => sum + w, 0),
+    );
+    const remainder = round6(1.0 - currentSum);
+
+    if (remainder !== 0) {
+      const highestPriorityBaseline = BASELINE_REMAINDER_KEYS.find(
+        (dim) => isBaselineActive[dim],
+      );
+      if (highestPriorityBaseline) {
+        mutableWeights[highestPriorityBaseline] = round6(
+          mutableWeights[highestPriorityBaseline] + remainder,
+        );
+      }
+    }
+
+    return {
+      PRICE: mutableWeights.PRICE,
+      AIRLINE: mutableWeights.AIRLINE,
+      ARRIVAL_SCHEDULE: mutableWeights.ARRIVAL_SCHEDULE,
+      STOPS: mutableWeights.STOPS,
+      CABIN: mutableWeights.CABIN,
+      DEPARTURE_SCHEDULE: mutableWeights.DEPARTURE_SCHEDULE,
+      BAGGAGE: mutableWeights.BAGGAGE,
+      DURATION: mutableWeights.DURATION,
+    };
+  }
+
   scoreOffers(
     offers: readonly FlightMatchInput[],
     preferences: ScoringPreferences,
@@ -131,20 +335,14 @@ export class FlightMatchScorerService {
         this.scorePrice(offer, medianPrice, preferences),
         this.scoreDuration(offer, medianDuration),
       ];
-      const score = clamp(
-        roundHalfAwayFromZero(
-          breakdown.reduce((sum, dimension) => sum + dimension.contribution, 0) * 100,
-        ),
-        0,
-        100,
-      );
+      const { score, matchLevel } = this.computeScoreResult(breakdown);
 
       return {
         offer,
         matchResult: {
           eligibility: { eligible: true, violations: [] },
           score,
-          matchLevel: getMatchLevel(score),
+          matchLevel,
           breakdown,
           metadata: {
             scoringVersion: SCORING_POLICY_VERSION,
@@ -155,10 +353,142 @@ export class FlightMatchScorerService {
     });
   }
 
-  private scorePrice(
+  scoreAll(
+    offers: readonly FlightMatchInput[],
+    preferences: ScoringPreferences,
+  ): readonly ScoredOffer[] {
+    const evaluatedOffers = offers.map((offer) => ({
+      offer,
+      eligibility: this.checkEligibility(offer, preferences),
+    }));
+
+    const eligibleOffers = evaluatedOffers
+      .filter(({ eligibility }) => eligibility.eligible)
+      .map(({ offer }) => offer);
+
+    const activeWeights = this.resolveWeights(offers, preferences, eligibleOffers);
+
+    const medianPrice = calculateMedian(eligibleOffers.map(({ price }) => price));
+    const medianDuration = calculateMedian(eligibleOffers.map(({ duration }) => duration));
+    const minStops =
+      eligibleOffers.length > 0
+        ? Math.min(...eligibleOffers.map(({ stops }) => stops))
+        : 0;
+
+    const scoredOffers: ScoredOffer[] = evaluatedOffers.map(({ offer, eligibility }) => {
+      if (!eligibility.eligible) {
+        return {
+          offer,
+          matchResult: {
+            eligibility: { eligible: false, violations: eligibility.violations },
+            score: null,
+            matchLevel: null,
+            breakdown: [],
+            metadata: {
+              scoringVersion: SCORING_POLICY_VERSION,
+              activeWeights,
+            },
+          },
+        };
+      }
+
+      const breakdown: readonly DimensionScore[] = [
+        this.scorePrice(offer, medianPrice, preferences, activeWeights.PRICE),
+        this.scoreAirline(offer, preferences, activeWeights.AIRLINE),
+        this.scoreArrivalSchedule(offer, preferences, activeWeights.ARRIVAL_SCHEDULE),
+        this.scoreStops(offer, preferences, minStops, activeWeights.STOPS),
+        this.scoreCabin(offer, preferences, activeWeights.CABIN),
+        this.scoreDepartureSchedule(offer, preferences, activeWeights.DEPARTURE_SCHEDULE),
+        this.scoreBaggage(offer, preferences, activeWeights.BAGGAGE),
+        this.scoreDuration(offer, medianDuration, activeWeights.DURATION),
+      ];
+
+      const { score, matchLevel } = this.computeScoreResult(breakdown);
+
+      return {
+        offer,
+        matchResult: {
+          eligibility: { eligible: true, violations: [] },
+          score,
+          matchLevel,
+          breakdown,
+          metadata: {
+            scoringVersion: SCORING_POLICY_VERSION,
+            activeWeights,
+          },
+        },
+      };
+    });
+
+    return [...scoredOffers].sort((a, b) => {
+      const aEligible = a.matchResult.eligibility.eligible;
+      const bEligible = b.matchResult.eligibility.eligible;
+
+      if (aEligible !== bEligible) {
+        return aEligible ? -1 : 1;
+      }
+
+      if (!aEligible && !bEligible) {
+        return a.offer.originalIndex - b.offer.originalIndex;
+      }
+
+      const aScore = a.matchResult.score ?? 0;
+      const bScore = b.matchResult.score ?? 0;
+      if (aScore !== bScore) {
+        return bScore - aScore;
+      }
+
+      if (a.offer.stops !== b.offer.stops) {
+        return a.offer.stops - b.offer.stops;
+      }
+
+      if (a.offer.price !== b.offer.price) {
+        return a.offer.price - b.offer.price;
+      }
+
+      if (a.offer.duration !== b.offer.duration) {
+        return a.offer.duration - b.offer.duration;
+      }
+
+      const aPenalty = getRedEyePenalty(a.offer.outboundDepartureHour);
+      const bPenalty = getRedEyePenalty(b.offer.outboundDepartureHour);
+      if (aPenalty !== bPenalty) {
+        return aPenalty - bPenalty;
+      }
+
+      return a.offer.originalIndex - b.offer.originalIndex;
+    });
+  }
+
+  computeContribution(subScore: number, effectiveWeight: number): number {
+    return round6(subScore * effectiveWeight);
+  }
+
+  computeFinalScore(breakdown: readonly DimensionScore[]): number {
+    const sum = breakdown.reduce((acc, item) => acc + item.contribution, 0);
+    return clamp(roundHalfAwayFromZero(round6(sum * 100)), 0, 100);
+  }
+
+  getMatchLevel(score: number): MatchLevel {
+    return getMatchLevel(score);
+  }
+
+  computeScoreResult(breakdown: readonly DimensionScore[]): {
+    score: number;
+    matchLevel: MatchLevel;
+  } {
+    const score = this.computeFinalScore(breakdown);
+    return {
+      score,
+      matchLevel: this.getMatchLevel(score),
+    };
+  }
+
+  scorePrice(
     offer: FlightMatchInput,
     medianPrice: number,
     preferences: ScoringPreferences,
+    effectiveWeight: number = BASE_WEIGHTS.PRICE,
   ): DimensionScore {
     const score = round6(
       clamp(
@@ -174,8 +504,8 @@ export class FlightMatchScorerService {
     return {
       dimension: 'PRICE',
       score,
-      weight: BASE_WEIGHTS.PRICE,
-      contribution: round6(score * BASE_WEIGHTS.PRICE),
+      weight: effectiveWeight,
+      contribution: this.computeContribution(score, effectiveWeight),
       signal: determineSignal(score),
       explanation: {
         key: getComparisonExplanationKey('PRICE', offer.price, medianPrice),
@@ -191,6 +521,7 @@ export class FlightMatchScorerService {
     offer: FlightMatchInput,
     preferences: ScoringPreferences,
     minStops: number,
+    effectiveWeight: number = BASE_WEIGHTS.STOPS,
   ): DimensionScore {
     if (preferences.maxStops !== null && preferences.maxStops !== undefined) {
       const maxStops = preferences.maxStops;
@@ -213,8 +544,8 @@ export class FlightMatchScorerService {
       return {
         dimension: 'STOPS',
         score,
-        weight: BASE_WEIGHTS.STOPS,
-        contribution: round6(score * BASE_WEIGHTS.STOPS),
+        weight: effectiveWeight,
+        contribution: this.computeContribution(score, effectiveWeight),
         signal: determineSignal(score),
         explanation,
       };
@@ -226,8 +557,8 @@ export class FlightMatchScorerService {
     return {
       dimension: 'STOPS',
       score,
-      weight: BASE_WEIGHTS.STOPS,
-      contribution: round6(score * BASE_WEIGHTS.STOPS),
+      weight: effectiveWeight,
+      contribution: this.computeContribution(score, effectiveWeight),
       signal: determineSignal(score),
       explanation: {
         key: 'match.stops.relative',
@@ -239,6 +570,7 @@ export class FlightMatchScorerService {
   scoreAirline(
     offer: FlightMatchInput,
     preferences: ScoringPreferences,
+    effectiveWeight: number = BASE_WEIGHTS.AIRLINE,
   ): DimensionScore {
     const preferredCodes = normalizeAirlineCodes(preferences.preferredAirlines ?? []);
     if (preferredCodes.length > 0) {
@@ -251,8 +583,8 @@ export class FlightMatchScorerService {
         return {
           dimension: 'AIRLINE',
           score,
-          weight: BASE_WEIGHTS.AIRLINE,
-          contribution: round6(score * BASE_WEIGHTS.AIRLINE),
+          weight: effectiveWeight,
+          contribution: this.computeContribution(score, effectiveWeight),
           signal: determineSignal(score),
           explanation: {
             key: 'match.airline.preferred',
@@ -266,8 +598,8 @@ export class FlightMatchScorerService {
     return {
       dimension: 'AIRLINE',
       score,
-      weight: BASE_WEIGHTS.AIRLINE,
-      contribution: round6(score * BASE_WEIGHTS.AIRLINE),
+      weight: effectiveWeight,
+      contribution: this.computeContribution(score, effectiveWeight),
       signal: determineSignal(score),
       explanation: {
         key: 'match.airline.neutral',
@@ -279,6 +611,7 @@ export class FlightMatchScorerService {
   scoreCabin(
     offer: FlightMatchInput,
     preferences: ScoringPreferences,
+    effectiveWeight: number = BASE_WEIGHTS.CABIN,
   ): DimensionScore {
     const adjacency = getCabinAdjacency(preferences.classPreference ?? '', offer.cabinClass);
     const { subScore, key: explanationKey } = CABIN_ADJACENCY_MAPPINGS[adjacency];
@@ -287,8 +620,8 @@ export class FlightMatchScorerService {
     return {
       dimension: 'CABIN',
       score,
-      weight: BASE_WEIGHTS.CABIN,
-      contribution: round6(score * BASE_WEIGHTS.CABIN),
+      weight: effectiveWeight,
+      contribution: this.computeContribution(score, effectiveWeight),
       signal: determineSignal(score),
       explanation: {
         key: explanationKey,
@@ -303,28 +636,33 @@ export class FlightMatchScorerService {
   scoreDepartureSchedule(
     offer: FlightMatchInput,
     preferences: ScoringPreferences,
+    effectiveWeight: number = BASE_WEIGHTS.DEPARTURE_SCHEDULE,
   ): DimensionScore {
     return this.scoreScheduleWindow(
       'DEPARTURE_SCHEDULE',
       offer.outboundDepartureHour,
       preferences.preferredDepartureWindow,
+      effectiveWeight,
     );
   }
 
   scoreArrivalSchedule(
     offer: FlightMatchInput,
     preferences: ScoringPreferences,
+    effectiveWeight: number = BASE_WEIGHTS.ARRIVAL_SCHEDULE,
   ): DimensionScore {
     return this.scoreScheduleWindow(
       'ARRIVAL_SCHEDULE',
       offer.outboundArrivalHour,
       preferences.preferredArrivalWindow,
+      effectiveWeight,
     );
   }
 
   scoreBaggage(
     offer: FlightMatchInput,
     preferences: ScoringPreferences,
+    effectiveWeight: number = BASE_WEIGHTS.BAGGAGE,
   ): DimensionScore {
     let subScore: number;
     let explanationKey:
@@ -350,8 +688,8 @@ export class FlightMatchScorerService {
     return {
       dimension: 'BAGGAGE',
       score,
-      weight: BASE_WEIGHTS.BAGGAGE,
-      contribution: round6(score * BASE_WEIGHTS.BAGGAGE),
+      weight: effectiveWeight,
+      contribution: this.computeContribution(score, effectiveWeight),
       signal: determineSignal(score),
       explanation: {
         key: explanationKey,
@@ -364,6 +702,7 @@ export class FlightMatchScorerService {
     dimension: 'DEPARTURE_SCHEDULE' | 'ARRIVAL_SCHEDULE',
     hour: number,
     window: Readonly<{ start: number; end: number }> | null | undefined,
+    effectiveWeight: number = SCHEDULE_CONFIG[dimension].weight,
   ): DimensionScore {
     const config = SCHEDULE_CONFIG[dimension];
     const formattedTime = `${String(hour).padStart(2, '0')}:00`;
@@ -373,8 +712,8 @@ export class FlightMatchScorerService {
       return {
         dimension,
         score,
-        weight: config.weight,
-        contribution: round6(score * config.weight),
+        weight: effectiveWeight,
+        contribution: this.computeContribution(score, effectiveWeight),
         signal: determineSignal(score),
         explanation: {
           key: config.nearWindowKey,
@@ -402,8 +741,8 @@ export class FlightMatchScorerService {
     return {
       dimension,
       score,
-      weight: config.weight,
-      contribution: round6(score * config.weight),
+      weight: effectiveWeight,
+      contribution: this.computeContribution(score, effectiveWeight),
       signal: determineSignal(score),
       explanation: {
         key: explanationKey,
@@ -416,9 +755,10 @@ export class FlightMatchScorerService {
     };
   }
 
-  private scoreDuration(
+  scoreDuration(
     offer: FlightMatchInput,
     medianDuration: number,
+    effectiveWeight: number = BASE_WEIGHTS.DURATION,
   ): DimensionScore {
     const score = round6(
       clamp(
@@ -432,8 +772,8 @@ export class FlightMatchScorerService {
     return {
       dimension: 'DURATION',
       score,
-      weight: BASE_WEIGHTS.DURATION,
-      contribution: round6(score * BASE_WEIGHTS.DURATION),
+      weight: effectiveWeight,
+      contribution: this.computeContribution(score, effectiveWeight),
       signal: determineSignal(score),
       explanation: {
         key: getComparisonExplanationKey('DURATION', offer.duration, medianDuration),

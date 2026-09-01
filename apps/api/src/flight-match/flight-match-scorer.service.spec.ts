@@ -1,8 +1,13 @@
 import { FlightMatchScorerService } from './flight-match-scorer.service';
-import { BASE_WEIGHTS, SCORING_POLICY_VERSION } from './flight-match.policy';
+import {
+  BASE_WEIGHTS,
+  POLICY_DIMENSION_ORDER,
+  SCORING_POLICY_VERSION,
+} from './flight-match.policy';
 import type {
   DimensionScore,
   FlightMatchInput,
+  ScoredOffer,
   ScoringPreferences,
 } from './flight-match.types';
 
@@ -1297,6 +1302,1480 @@ describe('FlightMatchScorerService STOPS dimension and price sensitivity (T026)'
         expect(result.weight).toBe(BASE_WEIGHTS.BAGGAGE);
         expect(result.weight).toBe(0.10);
       });
+    });
+  });
+
+  describe('FlightMatchScorerService weight resolution (T029)', () => {
+    const scorer = new FlightMatchScorerService();
+
+    const fullPreferences: ScoringPreferences = {
+      preferredAirlines: ['AA'],
+      blacklistedAirlines: [],
+      classPreference: 'economy',
+      preferredDepartureWindow: { start: 8, end: 12 },
+      preferredArrivalWindow: { start: 14, end: 18 },
+      maxStops: 1,
+      priceSensitivity: 'MODERATE',
+      requiresCheckedBaggage: true,
+    };
+
+    // offerA and offerB have different sub-scores on ALL 8 dimensions
+    const offerA: FlightMatchInput = offer({
+      id: 'offer-a',
+      price: 100,
+      duration: 120,
+      stops: 0,
+      carrierCodes: ['AA'],
+      cabinClass: 'economy',
+      outboundDepartureHour: 9, // inside [8, 12] -> subScore 1.0
+      outboundArrivalHour: 15,   // inside [14, 18] -> subScore 1.0
+      hasCheckedBaggage: true,   // required true, bag true -> 1.0
+      originalIndex: 0,
+    });
+
+    const offerB: FlightMatchInput = offer({
+      id: 'offer-b',
+      price: 200,
+      duration: 180,
+      stops: 2,                  // exceeds maxStops 1 by 1 -> 0.5
+      carrierCodes: ['DL'],      // neutral carrier -> 0.5
+      cabinClass: 'premium_economy', // adjacent -> 0.5
+      outboundDepartureHour: 14, // shoulder distance 2 -> ~0.666667
+      outboundArrivalHour: 20,   // shoulder distance 2 -> ~0.666667
+      hasCheckedBaggage: false,  // required true, bag false -> 0.0
+      originalIndex: 1,
+    });
+
+    function sumWeights(weights: Record<string, number>): number {
+      return (
+        Math.round(
+          Object.values(weights).reduce((sum, w) => sum + (typeof w === 'number' ? w : 0), 0) *
+            1_000_000,
+        ) / 1_000_000
+      );
+    }
+
+    describe('Base weights and dimension pools', () => {
+      it('returns exact BASE_WEIGHTS when all preferences are present and offers have variance on all dimensions', () => {
+        const weights = scorer.resolveWeights([offerA, offerB], fullPreferences);
+
+        expect(weights).toEqual({
+          PRICE: 0.20,
+          AIRLINE: 0.15,
+          ARRIVAL_SCHEDULE: 0.15,
+          STOPS: 0.12,
+          CABIN: 0.10,
+          DEPARTURE_SCHEDULE: 0.10,
+          BAGGAGE: 0.10,
+          DURATION: 0.08,
+        });
+
+        expect(sumWeights(weights)).toBe(1.000000);
+      });
+    });
+
+    describe('Missing personalized transfer', () => {
+      it('releases AIRLINE weight (0.15) to baseline pool when preferredAirlines is empty', () => {
+        const prefs = preferences({
+          ...fullPreferences,
+          preferredAirlines: [],
+        });
+        const weights = scorer.resolveWeights([offerA, offerB], prefs);
+
+        expect(weights.AIRLINE).toBe(0);
+        // Baseline target pool = 0.40 + 0.15 = 0.55
+        // PRICE = (0.20 / 0.40) * 0.55 = 0.275000
+        // STOPS = (0.12 / 0.40) * 0.55 = 0.165000
+        // DURATION = (0.08 / 0.40) * 0.55 = 0.110000
+        expect(weights.PRICE).toBe(0.275);
+        expect(weights.STOPS).toBe(0.165);
+        expect(weights.DURATION).toBe(0.11);
+        expect(weights.ARRIVAL_SCHEDULE).toBe(0.15);
+        expect(weights.CABIN).toBe(0.10);
+        expect(weights.DEPARTURE_SCHEDULE).toBe(0.10);
+        expect(weights.BAGGAGE).toBe(0.10);
+
+        expect(sumWeights(weights)).toBe(1.000000);
+      });
+
+      it('releases AIRLINE weight to baseline pool when preferredAirlines contains only invalid codes', () => {
+        const prefs = preferences({
+          ...fullPreferences,
+          preferredAirlines: ['   ', 'INVALID', '1'],
+        });
+        const weights = scorer.resolveWeights([offerA, offerB], prefs);
+
+        expect(weights.AIRLINE).toBe(0);
+        expect(weights.PRICE).toBe(0.275);
+        expect(weights.STOPS).toBe(0.165);
+        expect(weights.DURATION).toBe(0.11);
+      });
+
+      it('releases ARRIVAL_SCHEDULE weight (0.15) to baseline pool when preferredArrivalWindow is null', () => {
+        const prefs = preferences({
+          ...fullPreferences,
+          preferredArrivalWindow: null,
+        });
+        const weights = scorer.resolveWeights([offerA, offerB], prefs);
+
+        expect(weights.ARRIVAL_SCHEDULE).toBe(0);
+        expect(weights.PRICE).toBe(0.275);
+        expect(weights.STOPS).toBe(0.165);
+        expect(weights.DURATION).toBe(0.11);
+        expect(weights.AIRLINE).toBe(0.15);
+
+        expect(sumWeights(weights)).toBe(1.000000);
+      });
+
+      it('releases CABIN weight (0.10) to baseline pool when classPreference is null', () => {
+        const prefs = preferences({
+          ...fullPreferences,
+          classPreference: null,
+        });
+        const weights = scorer.resolveWeights([offerA, offerB], prefs);
+
+        expect(weights.CABIN).toBe(0);
+        // Baseline target pool = 0.40 + 0.10 = 0.50
+        // PRICE = (0.20 / 0.40) * 0.50 = 0.250000
+        // STOPS = (0.12 / 0.40) * 0.50 = 0.150000
+        // DURATION = (0.08 / 0.40) * 0.50 = 0.100000
+        expect(weights.PRICE).toBe(0.25);
+        expect(weights.STOPS).toBe(0.15);
+        expect(weights.DURATION).toBe(0.10);
+
+        expect(sumWeights(weights)).toBe(1.000000);
+      });
+
+      it('releases CABIN weight (0.10) to baseline pool when classPreference is empty or whitespace', () => {
+        const prefs = preferences({
+          ...fullPreferences,
+          classPreference: '   ',
+        });
+        const weights = scorer.resolveWeights([offerA, offerB], prefs);
+
+        expect(weights.CABIN).toBe(0);
+        expect(weights.PRICE).toBe(0.25);
+        expect(weights.STOPS).toBe(0.15);
+        expect(weights.DURATION).toBe(0.10);
+      });
+
+      it('releases DEPARTURE_SCHEDULE weight (0.10) to baseline pool when preferredDepartureWindow is null', () => {
+        const prefs = preferences({
+          ...fullPreferences,
+          preferredDepartureWindow: null,
+        });
+        const weights = scorer.resolveWeights([offerA, offerB], prefs);
+
+        expect(weights.DEPARTURE_SCHEDULE).toBe(0);
+        expect(weights.PRICE).toBe(0.25);
+        expect(weights.STOPS).toBe(0.15);
+        expect(weights.DURATION).toBe(0.10);
+
+        expect(sumWeights(weights)).toBe(1.000000);
+      });
+
+      it('releases BAGGAGE weight (0.10) to baseline pool when requiresCheckedBaggage is null', () => {
+        const prefs = preferences({
+          ...fullPreferences,
+          requiresCheckedBaggage: null,
+        });
+        const weights = scorer.resolveWeights([offerA, offerB], prefs);
+
+        expect(weights.BAGGAGE).toBe(0);
+        expect(weights.PRICE).toBe(0.25);
+        expect(weights.STOPS).toBe(0.15);
+        expect(weights.DURATION).toBe(0.10);
+
+        expect(sumWeights(weights)).toBe(1.000000);
+      });
+
+      it('releases all 0.60 personalized weight to baseline pool when all personalized preferences are missing', () => {
+        const weights = scorer.resolveWeights([offerA, offerB], basePreferences);
+
+        expect(weights).toEqual({
+          PRICE: 0.50,
+          STOPS: 0.30,
+          DURATION: 0.20,
+          AIRLINE: 0,
+          ARRIVAL_SCHEDULE: 0,
+          CABIN: 0,
+          DEPARTURE_SCHEDULE: 0,
+          BAGGAGE: 0,
+        });
+
+        expect(sumWeights(weights)).toBe(1.000000);
+      });
+    });
+
+    describe('Zero-variance detection and single-offer sets', () => {
+      it('does NOT apply zero-variance collapse for single-offer sets', () => {
+        const singleOffer = [offerA];
+        const weights = scorer.resolveWeights(singleOffer, fullPreferences);
+
+        // With single offer, no collapse occurs even though 1 offer has trivial zero variance
+        expect(weights).toEqual({
+          PRICE: 0.20,
+          AIRLINE: 0.15,
+          ARRIVAL_SCHEDULE: 0.15,
+          STOPS: 0.12,
+          CABIN: 0.10,
+          DEPARTURE_SCHEDULE: 0.10,
+          BAGGAGE: 0.10,
+          DURATION: 0.08,
+        });
+      });
+
+      it('does NOT collapse single-offer sets but transfers missing personalized dimensions', () => {
+        const singleOffer = [offerA];
+        const weights = scorer.resolveWeights(singleOffer, basePreferences);
+
+        expect(weights).toEqual({
+          PRICE: 0.50,
+          STOPS: 0.30,
+          DURATION: 0.20,
+          AIRLINE: 0,
+          ARRIVAL_SCHEDULE: 0,
+          CABIN: 0,
+          DEPARTURE_SCHEDULE: 0,
+          BAGGAGE: 0,
+        });
+      });
+
+      it('collapses STOPS when all eligible offers have identical stops (>= 2 offers)', () => {
+        const offers = [
+          offerA, // stops: 0
+          offer({ ...offerB, stops: 0 }), // now both have stops: 0
+        ];
+        const weights = scorer.resolveWeights(offers, fullPreferences);
+
+        expect(weights.STOPS).toBe(0);
+        // Active baseline base weights: PRICE (0.20), DURATION (0.08) -> sum = 0.28
+        // Baseline target pool = 0.40
+        // PRICE = (0.20 / 0.28) * 0.40 = 0.285714
+        // DURATION = (0.08 / 0.28) * 0.40 = 0.114286
+        expect(weights.PRICE).toBe(0.285714);
+        expect(weights.DURATION).toBe(0.114286);
+        expect(weights.AIRLINE).toBe(0.15);
+        expect(weights.ARRIVAL_SCHEDULE).toBe(0.15);
+        expect(weights.CABIN).toBe(0.10);
+        expect(weights.DEPARTURE_SCHEDULE).toBe(0.10);
+        expect(weights.BAGGAGE).toBe(0.10);
+
+        expect(sumWeights(weights)).toBe(1.000000);
+      });
+
+      it('collapses PRICE when all eligible offers have identical prices (>= 2 offers)', () => {
+        const offers = [
+          offerA, // price: 100
+          offer({ ...offerB, price: 100 }), // both price: 100
+        ];
+        const weights = scorer.resolveWeights(offers, fullPreferences);
+
+        expect(weights.PRICE).toBe(0);
+        // Active baseline: STOPS (0.12), DURATION (0.08) -> sum = 0.20
+        // STOPS = (0.12 / 0.20) * 0.40 = 0.240000
+        // DURATION = (0.08 / 0.20) * 0.40 = 0.160000
+        expect(weights.STOPS).toBe(0.24);
+        expect(weights.DURATION).toBe(0.16);
+
+        expect(sumWeights(weights)).toBe(1.000000);
+      });
+
+      it('collapses DURATION when all eligible offers have identical durations (>= 2 offers)', () => {
+        const offers = [
+          offerA, // duration: 120
+          offer({ ...offerB, duration: 120 }), // both duration: 120
+        ];
+        const weights = scorer.resolveWeights(offers, fullPreferences);
+
+        expect(weights.DURATION).toBe(0);
+        // Active baseline: PRICE (0.20), STOPS (0.12) -> sum = 0.32
+        // PRICE = (0.20 / 0.32) * 0.40 = 0.250000
+        // STOPS = (0.12 / 0.32) * 0.40 = 0.150000
+        expect(weights.PRICE).toBe(0.25);
+        expect(weights.STOPS).toBe(0.15);
+
+        expect(sumWeights(weights)).toBe(1.000000);
+      });
+    });
+
+    describe('Redistribution with personalized caps', () => {
+      it('collapses zero-variance personalized dimension and overflows all weight to baseline target due to caps', () => {
+        const offers = [
+          offerA, // cabinClass: 'economy' (score 1.0)
+          offer({ ...offerB, cabinClass: 'economy' }), // both have cabinClass: 'economy' (score 1.0)
+        ];
+        const weights = scorer.resolveWeights(offers, fullPreferences);
+
+        // CABIN collapses to 0
+        expect(weights.CABIN).toBe(0);
+        // Active personalized dimensions (AIRLINE 0.15, ARRIVAL 0.15, DEPARTURE 0.10, BAGGAGE 0.10) CANNOT exceed base weights
+        expect(weights.AIRLINE).toBe(0.15);
+        expect(weights.ARRIVAL_SCHEDULE).toBe(0.15);
+        expect(weights.DEPARTURE_SCHEDULE).toBe(0.10);
+        expect(weights.BAGGAGE).toBe(0.10);
+
+        // CABIN 0.10 overflows down to baseline target pool: 0.40 + 0.10 = 0.50
+        // PRICE = (0.20 / 0.40) * 0.50 = 0.250000
+        // STOPS = (0.12 / 0.40) * 0.50 = 0.150000
+        // DURATION = (0.08 / 0.40) * 0.50 = 0.100000
+        expect(weights.PRICE).toBe(0.25);
+        expect(weights.STOPS).toBe(0.15);
+        expect(weights.DURATION).toBe(0.10);
+
+        expect(sumWeights(weights)).toBe(1.000000);
+      });
+
+      it('collapses BAGGAGE when requiresCheckedBaggage is false because all offers score 1.0', () => {
+        const prefs = preferences({
+          ...fullPreferences,
+          requiresCheckedBaggage: false,
+        });
+        const weights = scorer.resolveWeights([offerA, offerB], prefs);
+
+        // All offers score 1.0 when requiresCheckedBaggage is false -> zero variance
+        expect(weights.BAGGAGE).toBe(0);
+        // BAGGAGE 0.10 overflows to baseline pool -> baseline target pool = 0.50
+        expect(weights.PRICE).toBe(0.25);
+        expect(weights.STOPS).toBe(0.15);
+        expect(weights.DURATION).toBe(0.10);
+
+        expect(sumWeights(weights)).toBe(1.000000);
+      });
+
+      it('cancels collapse when all baseline dimensions are zero-variance and distributes full target in 20:12:8 ratio', () => {
+        // Both offers have identical price, stops, duration
+        const offers = [
+          offerA,
+          offer({
+            ...offerB,
+            price: offerA.price,
+            stops: offerA.stops,
+            duration: offerA.duration,
+          }),
+        ];
+        // Airline-only preference: preferredAirlines: ['AA'], others missing
+        const prefs = preferences({
+          preferredAirlines: ['AA'],
+        });
+        const weights = scorer.resolveWeights(offers, prefs);
+
+        // Missing personalized: ARRIVAL (0.15), CABIN (0.10), DEPARTURE (0.10), BAGGAGE (0.10) = 0.45
+        // Baseline target pool = 0.40 + 0.45 = 0.85
+        // AIRLINE has variance (offerA carrier AA -> 1.0, offerB carrier DL -> 0.5) -> AIRLINE = 0.15
+        // All baseline dimensions have zero variance -> collapse is cancelled!
+        // PRICE = (0.20 / 0.40) * 0.85 = 0.425
+        // STOPS = (0.12 / 0.40) * 0.85 = 0.255
+        // DURATION = (0.08 / 0.40) * 0.85 = 0.170
+        expect(weights).toEqual({
+          PRICE: 0.425,
+          STOPS: 0.255,
+          DURATION: 0.170,
+          AIRLINE: 0.150,
+          ARRIVAL_SCHEDULE: 0,
+          CABIN: 0,
+          DEPARTURE_SCHEDULE: 0,
+          BAGGAGE: 0,
+        });
+
+        expect(sumWeights(weights)).toBe(1.000000);
+      });
+    });
+
+    describe('Ineligible offers and edge cases', () => {
+      it('excludes blacklisted ineligible offers from zero-variance detection', () => {
+        const blacklistedOffer = offer({
+          id: 'blacklisted',
+          carrierCodes: ['NK'],
+          price: 999,
+          stops: 5,
+          duration: 999,
+        });
+        const offers = [
+          offerA, // stops: 0
+          offer({ ...offerB, stops: 0 }), // stops: 0
+          blacklistedOffer, // stops: 5, but blacklisted!
+        ];
+        const prefs = preferences({
+          ...fullPreferences,
+          blacklistedAirlines: ['NK'],
+        });
+
+        const weights = scorer.resolveWeights(offers, prefs);
+        // Only eligible offers (offerA and offerB) are considered; both have stops: 0 -> STOPS collapses!
+        expect(weights.STOPS).toBe(0);
+      });
+
+      it('returns BASE_WEIGHTS when all offers are ineligible', () => {
+        const blacklisted1 = offer({ id: 'b1', carrierCodes: ['NK'] });
+        const blacklisted2 = offer({ id: 'b2', carrierCodes: ['NK'] });
+        const prefs = preferences({ blacklistedAirlines: ['NK'] });
+
+        const weights = scorer.resolveWeights([blacklisted1, blacklisted2], prefs);
+        expect(weights).toEqual(BASE_WEIGHTS);
+      });
+
+      it('returns BASE_WEIGHTS when offers array is empty', () => {
+        const weights = scorer.resolveWeights([], fullPreferences);
+        expect(weights).toEqual(BASE_WEIGHTS);
+      });
+    });
+
+    describe('Exact 1.000000 invariant and remainder assignment', () => {
+      it('assigns 6-decimal rounding remainder to highest-priority active baseline dimension (PRICE)', () => {
+        // Construct a scenario where floating division creates a remainder
+        // Baseline target pool = 0.85 (airline only), with STOPS collapsed to 0
+        // Active baseline: PRICE (0.20) and DURATION (0.08) -> sum = 0.28
+        // PRICE: round6((0.20 / 0.28) * 0.85) = round6(0.607142857...) = 0.607143
+        // DURATION: round6((0.08 / 0.28) * 0.85) = round6(0.242857142...) = 0.242857
+        // Sum = 0.607143 + 0.242857 + 0.15 = 1.000000
+        const offers = [
+          offerA,
+          offer({ ...offerB, stops: offerA.stops }),
+        ];
+        const prefs = preferences({ preferredAirlines: ['AA'] });
+        const weights = scorer.resolveWeights(offers, prefs);
+
+        expect(sumWeights(weights)).toBe(1.000000);
+      });
+
+      it('assigns rounding remainder to STOPS when PRICE is collapsed', () => {
+        // If PRICE is collapsed (zero variance), highest active baseline is STOPS
+        const offers = [
+          offerA,
+          offer({ ...offerB, price: offerA.price }), // price identical -> PRICE collapses
+        ];
+        const prefs = preferences({ preferredAirlines: ['AA'] });
+        const weights = scorer.resolveWeights(offers, prefs);
+
+        expect(weights.PRICE).toBe(0);
+        expect(weights.STOPS).toBeGreaterThan(0);
+        expect(sumWeights(weights)).toBe(1.000000);
+      });
+
+      it('assigns rounding remainder to DURATION when PRICE and STOPS are collapsed', () => {
+        // If PRICE and STOPS are both collapsed, highest active baseline is DURATION
+        const offers = [
+          offerA,
+          offer({
+            ...offerB,
+            price: offerA.price,
+            stops: offerA.stops,
+          }), // price and stops identical
+        ];
+        const prefs = preferences({ preferredAirlines: ['AA'] });
+        const weights = scorer.resolveWeights(offers, prefs);
+
+        expect(weights.PRICE).toBe(0);
+        expect(weights.STOPS).toBe(0);
+        expect(weights.DURATION).toBe(0.85);
+        expect(weights.AIRLINE).toBe(0.15);
+        expect(sumWeights(weights)).toBe(1.000000);
+      });
+
+      it('guarantees sum of active weights is exactly 1.000000 across multiple random/arbitrary scenarios', () => {
+        // Test with different combination of missing preferences and offers
+        const scenarios: ScoringPreferences[] = [
+          fullPreferences,
+          basePreferences,
+          preferences({ preferredAirlines: ['AA'] }),
+          preferences({ classPreference: 'business', maxStops: 0 }),
+          preferences({ requiresCheckedBaggage: true, preferredArrivalWindow: { start: 10, end: 12 } }),
+        ];
+
+        for (const scenario of scenarios) {
+          const weights = scorer.resolveWeights([offerA, offerB], scenario);
+          expect(sumWeights(weights)).toBe(1.000000);
+        }
+      });
+    });
+
+    describe('Immutability and purity', () => {
+      it('accepts deeply frozen offers and preferences without mutation in resolveWeights', () => {
+        const frozenOffers = deepFreeze([offerA, offerB]);
+        const frozenPrefs = deepFreeze(fullPreferences);
+        const beforeOffers = JSON.stringify(frozenOffers);
+        const beforePrefs = JSON.stringify(frozenPrefs);
+
+        expect(() => scorer.resolveWeights(frozenOffers, frozenPrefs)).not.toThrow();
+        expect(JSON.stringify(frozenOffers)).toBe(beforeOffers);
+        expect(JSON.stringify(frozenPrefs)).toBe(beforePrefs);
+      });
+    });
+  });
+});
+
+describe('FlightMatchScorerService full baseline collapse fallback & degenerate sets (T030)', () => {
+  const scorer = new FlightMatchScorerService();
+
+  function sumWeights(weights: Record<string, number>): number {
+    return (
+      Math.round(
+        Object.values(weights).reduce((sum, w) => sum + (typeof w === 'number' ? w : 0), 0) *
+          1_000_000,
+      ) / 1_000_000
+    );
+  }
+
+  describe('Full baseline collapse fallback', () => {
+    it('cancels collapse when all baseline dimensions (PRICE, STOPS, DURATION) have zero variance and distributes entire baseline target in 20:12:8 ratio', () => {
+      // 3 offers with identical price, stops, duration
+      const offers = [
+        offer({ id: 'o1', price: 150, stops: 1, duration: 180, carrierCodes: ['AA'] }),
+        offer({ id: 'o2', price: 150, stops: 1, duration: 180, carrierCodes: ['DL'] }),
+        offer({ id: 'o3', price: 150, stops: 1, duration: 180, carrierCodes: ['UA'] }),
+      ];
+      // All personalized preferences missing -> baseline target pool is 1.0
+      const prefs = preferences();
+      const weights = scorer.resolveWeights(offers, prefs);
+
+      // Entire baseline target pool (1.0) distributed in 20:12:8 ratio:
+      // PRICE: (0.20 / 0.40) * 1.0 = 0.500000
+      // STOPS: (0.12 / 0.40) * 1.0 = 0.300000
+      // DURATION: (0.08 / 0.40) * 1.0 = 0.200000
+      expect(weights).toEqual({
+        PRICE: 0.500000,
+        STOPS: 0.300000,
+        DURATION: 0.200000,
+        AIRLINE: 0,
+        ARRIVAL_SCHEDULE: 0,
+        CABIN: 0,
+        DEPARTURE_SCHEDULE: 0,
+        BAGGAGE: 0,
+      });
+      expect(weights.PRICE).toBe(0.500000);
+      expect(weights.STOPS).toBe(0.300000);
+      expect(weights.DURATION).toBe(0.200000);
+      expect(sumWeights(weights)).toBe(1.000000);
+    });
+
+    it('cancels baseline collapse and distributes entire target in 20:12:8 ratio when some personalized dimensions are active', () => {
+      const offers = [
+        offer({
+          id: 'o1',
+          price: 250,
+          stops: 0,
+          duration: 300,
+          cabinClass: 'economy',
+          outboundDepartureHour: 9,
+        }),
+        offer({
+          id: 'o2',
+          price: 250,
+          stops: 0,
+          duration: 300,
+          cabinClass: 'business',
+          outboundDepartureHour: 15,
+        }),
+      ];
+      // CABIN (0.10) and DEPARTURE_SCHEDULE (0.10) have variance -> active sum = 0.20
+      // Missing personalized: AIRLINE (0.15), ARRIVAL (0.15), BAGGAGE (0.10) = 0.40
+      // Baseline target pool = 0.40 + 0.40 = 0.80
+      const prefs = preferences({
+        classPreference: 'economy',
+        preferredDepartureWindow: { start: 8, end: 11 },
+      });
+      const weights = scorer.resolveWeights(offers, prefs);
+
+      // Entire baseline target pool (0.80) distributed in 20:12:8 ratio:
+      // PRICE: (0.20 / 0.40) * 0.80 = 0.400000
+      // STOPS: (0.12 / 0.40) * 0.80 = 0.240000
+      // DURATION: (0.08 / 0.40) * 0.80 = 0.160000
+      expect(weights.PRICE).toBe(0.400000);
+      expect(weights.STOPS).toBe(0.240000);
+      expect(weights.DURATION).toBe(0.160000);
+      expect(weights.CABIN).toBe(0.100000);
+      expect(weights.DEPARTURE_SCHEDULE).toBe(0.100000);
+      expect(weights.AIRLINE).toBe(0);
+      expect(weights.ARRIVAL_SCHEDULE).toBe(0);
+      expect(weights.BAGGAGE).toBe(0);
+      expect(sumWeights(weights)).toBe(1.000000);
+    });
+  });
+
+  describe('Airline-only personalization golden fixture', () => {
+    it('yields exact 0.425000 / 0.255000 / 0.170000 / 0.150000 active weights when all baseline dimensions collapse', () => {
+      // User only supplies preferredAirlines, all other personalized dimensions missing/null
+      const prefs = preferences({
+        preferredAirlines: ['AA'],
+      });
+
+      // Eligible offers have identical price, stops, duration (all baseline dimensions collapse),
+      // but have variance in carrierCodes (AA -> score 1.0, DL -> score 0.5)
+      const offers = [
+        offer({
+          id: 'offer-aa',
+          price: 199.99,
+          stops: 0,
+          duration: 150,
+          carrierCodes: ['AA'],
+        }),
+        offer({
+          id: 'offer-dl',
+          price: 199.99,
+          stops: 0,
+          duration: 150,
+          carrierCodes: ['DL'],
+        }),
+      ];
+
+      const weights = scorer.resolveWeights(offers, prefs);
+
+      expect(weights).toEqual({
+        PRICE: 0.425000,
+        STOPS: 0.255000,
+        DURATION: 0.170000,
+        AIRLINE: 0.150000,
+        ARRIVAL_SCHEDULE: 0,
+        CABIN: 0,
+        DEPARTURE_SCHEDULE: 0,
+        BAGGAGE: 0,
+      });
+
+      expect(weights.PRICE).toBe(0.425000);
+      expect(weights.STOPS).toBe(0.255000);
+      expect(weights.DURATION).toBe(0.170000);
+      expect(weights.AIRLINE).toBe(0.150000);
+      expect(sumWeights(weights)).toBe(1.000000);
+    });
+  });
+
+  describe('Degenerate Sets', () => {
+    describe('Single eligible offer', () => {
+      it('does not apply zero-variance collapse and transfers missing personalized weights to baseline in 20:12:8 ratio', () => {
+        const singleOffer = [
+          offer({
+            id: 'single-1',
+            price: 350,
+            stops: 1,
+            duration: 240,
+            carrierCodes: ['AA'],
+          }),
+        ];
+
+        // Case A: All personalized dimensions missing -> 0.60 transferred to baseline pool (total 1.0)
+        const weightsBase = scorer.resolveWeights(singleOffer, preferences());
+        expect(weightsBase).toEqual({
+          PRICE: 0.500000,
+          STOPS: 0.300000,
+          DURATION: 0.200000,
+          AIRLINE: 0,
+          ARRIVAL_SCHEDULE: 0,
+          CABIN: 0,
+          DEPARTURE_SCHEDULE: 0,
+          BAGGAGE: 0,
+        });
+        expect(weightsBase.PRICE).toBe(0.500000);
+        expect(weightsBase.STOPS).toBe(0.300000);
+        expect(weightsBase.DURATION).toBe(0.200000);
+        expect(sumWeights(weightsBase)).toBe(1.000000);
+
+        // Case B: Airline-only preference with single offer: AIRLINE (0.15) active, missing = 0.45 transferred to baseline (total 0.85)
+        const weightsAirlineOnly = scorer.resolveWeights(
+          singleOffer,
+          preferences({ preferredAirlines: ['AA'] }),
+        );
+        expect(weightsAirlineOnly).toEqual({
+          PRICE: 0.425000,
+          STOPS: 0.255000,
+          DURATION: 0.170000,
+          AIRLINE: 0.150000,
+          ARRIVAL_SCHEDULE: 0,
+          CABIN: 0,
+          DEPARTURE_SCHEDULE: 0,
+          BAGGAGE: 0,
+        });
+        expect(weightsAirlineOnly.PRICE).toBe(0.425000);
+        expect(weightsAirlineOnly.STOPS).toBe(0.255000);
+        expect(weightsAirlineOnly.DURATION).toBe(0.170000);
+        expect(weightsAirlineOnly.AIRLINE).toBe(0.150000);
+        expect(sumWeights(weightsAirlineOnly)).toBe(1.000000);
+
+        // Case C: Full preferences with single offer: no zero-variance collapse occurs
+        const fullPrefs: ScoringPreferences = {
+          preferredAirlines: ['AA'],
+          blacklistedAirlines: [],
+          classPreference: 'economy',
+          preferredDepartureWindow: { start: 8, end: 12 },
+          preferredArrivalWindow: { start: 14, end: 18 },
+          maxStops: 1,
+          priceSensitivity: 'MODERATE',
+          requiresCheckedBaggage: true,
+        };
+        const weightsFull = scorer.resolveWeights(singleOffer, fullPrefs);
+        expect(weightsFull).toEqual(BASE_WEIGHTS);
+        expect(sumWeights(weightsFull)).toBe(1.000000);
+      });
+    });
+
+    describe('All offers ineligible', () => {
+      it('returns score: null, matchLevel: null, and breakdown: [] for each offer without throwing', () => {
+        const ineligibleOffers = [
+          offer({ id: 'ineligible-1', carrierCodes: ['NK'] }),
+          offer({ id: 'ineligible-2', carrierCodes: ['F9'] }),
+        ];
+        const prefs = preferences({
+          blacklistedAirlines: ['NK', 'F9'],
+        });
+
+        let scoredOffers: readonly ScoredOffer[] = [];
+        expect(() => {
+          scoredOffers = scorer.scoreOffers(ineligibleOffers, prefs);
+        }).not.toThrow();
+
+        expect(scoredOffers).toHaveLength(2);
+        for (const scored of scoredOffers) {
+          expect(scored.matchResult.eligibility.eligible).toBe(false);
+          expect(scored.matchResult.eligibility.violations.length).toBeGreaterThan(0);
+          expect(scored.matchResult.score).toBeNull();
+          expect(scored.matchResult.matchLevel).toBeNull();
+          expect(scored.matchResult.breakdown).toEqual([]);
+          expect(scored.matchResult.metadata.scoringVersion).toBe(SCORING_POLICY_VERSION);
+        }
+      });
+
+      it('returns BASE_WEIGHTS without throwing in resolveWeights when all offers are ineligible', () => {
+        const ineligibleOffers = [
+          offer({ id: 'ineligible-1', carrierCodes: ['NK'] }),
+          offer({ id: 'ineligible-2', carrierCodes: ['F9'] }),
+        ];
+        const prefs = preferences({
+          blacklistedAirlines: ['NK', 'F9'],
+        });
+
+        let weights: Record<string, number> | undefined;
+        expect(() => {
+          weights = scorer.resolveWeights(ineligibleOffers, prefs);
+        }).not.toThrow();
+        expect(weights).toEqual(BASE_WEIGHTS);
+      });
+    });
+
+    describe('Empty offers array', () => {
+      it('returns [] without throwing in scoreOffers', () => {
+        let result: readonly ScoredOffer[] | undefined;
+        expect(() => {
+          result = scorer.scoreOffers([], preferences());
+        }).not.toThrow();
+        expect(result).toEqual([]);
+      });
+
+      it('returns BASE_WEIGHTS without throwing in resolveWeights', () => {
+        let weights: Record<string, number> | undefined;
+        expect(() => {
+          weights = scorer.resolveWeights([], preferences());
+        }).not.toThrow();
+        expect(weights).toEqual(BASE_WEIGHTS);
+      });
+    });
+
+    describe('Ineligible offers mixed with eligible', () => {
+      it('asserts ineligible offers do not affect activeWeights computation or medians/variance', () => {
+        const eligible1 = offer({
+          id: 'el-1',
+          price: 100,
+          stops: 0,
+          duration: 120,
+          carrierCodes: ['AA'],
+        });
+        const eligible2 = offer({
+          id: 'el-2',
+          price: 100,
+          stops: 0,
+          duration: 120,
+          carrierCodes: ['DL'],
+        });
+        // Ineligible offer has extreme outlier values in price, stops, duration and blacklisted carrier
+        const ineligible = offer({
+          id: 'inel-1',
+          price: 9999,
+          stops: 5,
+          duration: 1500,
+          carrierCodes: ['NK'],
+        });
+
+        const prefs = preferences({
+          preferredAirlines: ['AA'],
+          blacklistedAirlines: ['NK'],
+        });
+
+        // 1. activeWeights computation:
+        const weightsMixed = scorer.resolveWeights([eligible1, eligible2, ineligible], prefs);
+        const weightsEligibleOnly = scorer.resolveWeights([eligible1, eligible2], prefs);
+
+        expect(weightsMixed).toEqual(weightsEligibleOnly);
+        expect(weightsMixed).toEqual({
+          PRICE: 0.425000,
+          STOPS: 0.255000,
+          DURATION: 0.170000,
+          AIRLINE: 0.150000,
+          ARRIVAL_SCHEDULE: 0,
+          CABIN: 0,
+          DEPARTURE_SCHEDULE: 0,
+          BAGGAGE: 0,
+        });
+
+        // 2. Medians and variance in scoreOffers:
+        const scoredMixed = scorer.scoreOffers([eligible1, eligible2, ineligible], prefs);
+        const scoredEligibleOnly = scorer.scoreOffers([eligible1, eligible2], prefs);
+
+        // Ineligible offer is preserved with null score and empty breakdown
+        expect(scoredMixed[2].offer.id).toBe('inel-1');
+        expect(scoredMixed[2].matchResult.eligibility.eligible).toBe(false);
+        expect(scoredMixed[2].matchResult.score).toBeNull();
+        expect(scoredMixed[2].matchResult.matchLevel).toBeNull();
+        expect(scoredMixed[2].matchResult.breakdown).toEqual([]);
+
+        // Eligible offers scores and breakdowns are unaffected by ineligible offer's outlier values
+        expect(scoredMixed[0].matchResult.score).toBe(scoredEligibleOnly[0].matchResult.score);
+        expect(scoredMixed[1].matchResult.score).toBe(scoredEligibleOnly[1].matchResult.score);
+        expect(scoredMixed[0].matchResult.breakdown).toEqual(scoredEligibleOnly[0].matchResult.breakdown);
+        expect(scoredMixed[1].matchResult.breakdown).toEqual(scoredEligibleOnly[1].matchResult.breakdown);
+      });
+    });
+
+    describe('Immutability and purity', () => {
+      it('accepts deeply frozen inputs across degenerate sets and full baseline collapse without mutation', () => {
+        const frozenOffers = deepFreeze([
+          offer({ id: 'f-1', price: 100, stops: 0, duration: 120, carrierCodes: ['AA'] }),
+          offer({ id: 'f-2', price: 100, stops: 0, duration: 120, carrierCodes: ['DL'] }),
+          offer({ id: 'f-3', price: 9999, stops: 4, duration: 999, carrierCodes: ['NK'] }),
+        ]);
+        const frozenPrefs = deepFreeze(
+          preferences({
+            preferredAirlines: ['AA'],
+            blacklistedAirlines: ['NK'],
+          }),
+        );
+
+        const offersJsonBefore = JSON.stringify(frozenOffers);
+        const prefsJsonBefore = JSON.stringify(frozenPrefs);
+
+        expect(() => scorer.resolveWeights(frozenOffers, frozenPrefs)).not.toThrow();
+        expect(() => scorer.scoreOffers(frozenOffers, frozenPrefs)).not.toThrow();
+
+        expect(JSON.stringify(frozenOffers)).toBe(offersJsonBefore);
+        expect(JSON.stringify(frozenPrefs)).toBe(prefsJsonBefore);
+      });
+    });
+  });
+});
+
+describe('FlightMatchScorerService dimension contributions, final score & match level buckets (T031)', () => {
+  const scorer = new FlightMatchScorerService();
+
+  const makeScore = (
+    dimension: DimensionScore['dimension'],
+    score: number,
+    weight: number,
+    contribution: number,
+  ): DimensionScore => ({
+    dimension,
+    score,
+    weight,
+    contribution,
+    signal: score >= 0.67 ? 'POSITIVE' : score >= 0.34 ? 'NEUTRAL' : 'NEGATIVE',
+    explanation: { key: 'match.price.at_median', params: {} },
+  });
+
+  describe('Dimension contributions precision', () => {
+    it('computes contribution as round6(subScore * effectiveWeight) at 6-decimal precision', () => {
+      // Standard cases
+      expect(scorer.computeContribution(1.0, 0.2)).toBe(0.2);
+      expect(scorer.computeContribution(0.5, 0.2)).toBe(0.1);
+      expect(scorer.computeContribution(0.75, 0.15)).toBe(0.1125);
+
+      // Sub-scores requiring exact 6-decimal rounding
+      // 0.1234567 * 0.3 = 0.03703701 -> 0.037037
+      expect(scorer.computeContribution(0.1234567, 0.3)).toBe(0.037037);
+      // 0.1234567 * 0.12 = 0.014814804 -> 0.014815
+      expect(scorer.computeContribution(0.1234567, 0.12)).toBe(0.014815);
+      // 0.333333 * 0.15 = 0.04999995 -> 0.05
+      expect(scorer.computeContribution(0.333333, 0.15)).toBe(0.05);
+
+      // Zero subScore and weights
+      expect(scorer.computeContribution(0, 0.2)).toBe(0);
+      expect(scorer.computeContribution(1.0, 0)).toBe(0);
+
+      // No negative zero (-0)
+      expect(Object.is(scorer.computeContribution(-0, 0.2), 0)).toBe(true);
+    });
+
+    it('verifies dimension contributions in scored offers match round6(score * weight)', () => {
+      const sampleOffers = [
+        offer({ id: 'o-1', price: 80, duration: 100, stops: 0, cabinClass: 'economy', carrierCodes: ['AA'] }),
+        offer({ id: 'o-2', price: 120, duration: 140, stops: 1, cabinClass: 'business', carrierCodes: ['DL'] }),
+      ];
+      const samplePrefs = preferences({
+        preferredAirlines: ['AA'],
+        classPreference: 'economy',
+        maxStops: 0,
+        requiresCheckedBaggage: true,
+      });
+
+      const scored = scorer.scoreOffers(sampleOffers, samplePrefs);
+      for (const { matchResult } of scored) {
+        if (matchResult.score !== null) {
+          for (const dim of matchResult.breakdown) {
+            const expectedContribution = Math.round(dim.score * dim.weight * 1_000_000) / 1_000_000;
+            expect(dim.contribution).toBe(expectedContribution);
+          }
+        }
+      }
+    });
+  });
+
+  describe('Total score computation', () => {
+    it('computes score = clamp(roundHalfAwayFromZero(sum(contribution) * 100), 0, 100)', () => {
+      const breakdown = [
+        makeScore('PRICE', 1.0, 0.2, 0.2),
+        makeScore('AIRLINE', 1.0, 0.15, 0.15),
+        makeScore('ARRIVAL_SCHEDULE', 1.0, 0.15, 0.15),
+        makeScore('STOPS', 1.0, 0.12, 0.12),
+        makeScore('CABIN', 1.0, 0.1, 0.1),
+        makeScore('DEPARTURE_SCHEDULE', 1.0, 0.1, 0.1),
+        makeScore('BAGGAGE', 1.0, 0.1, 0.1),
+        makeScore('DURATION', 1.0, 0.08, 0.08),
+      ];
+
+      expect(scorer.computeFinalScore(breakdown)).toBe(100);
+      expect(scorer.computeScoreResult(breakdown)).toEqual({
+        score: 100,
+        matchLevel: 'STRONG',
+      });
+    });
+
+    it('computes score 0 when all contributions are 0', () => {
+      const breakdown = [
+        makeScore('PRICE', 0, 0.2, 0),
+        makeScore('STOPS', 0, 0.12, 0),
+        makeScore('DURATION', 0, 0.08, 0),
+      ];
+
+      expect(scorer.computeFinalScore(breakdown)).toBe(0);
+      expect(scorer.computeScoreResult(breakdown)).toEqual({
+        score: 0,
+        matchLevel: 'WEAK',
+      });
+    });
+
+    it('rounds exact .5 contribution percentages half-away-from-zero', () => {
+      // 0.5% (sum = 0.005) -> 1
+      expect(scorer.computeFinalScore([makeScore('PRICE', 0.025, 0.2, 0.005)])).toBe(1);
+      // 0.49% (sum = 0.0049) -> 0
+      expect(scorer.computeFinalScore([makeScore('PRICE', 0.0245, 0.2, 0.0049)])).toBe(0);
+
+      // 24.5% (sum = 0.245) -> 25
+      expect(scorer.computeFinalScore([makeScore('PRICE', 1.225, 0.2, 0.245)])).toBe(25);
+      // 24.49% (sum = 0.2449) -> 24
+      expect(scorer.computeFinalScore([makeScore('PRICE', 1.2245, 0.2, 0.2449)])).toBe(24);
+
+      // 49.5% (sum = 0.495) -> 50
+      expect(scorer.computeFinalScore([makeScore('PRICE', 2.475, 0.2, 0.495)])).toBe(50);
+      // 49.49% (sum = 0.4949) -> 49
+      expect(scorer.computeFinalScore([makeScore('PRICE', 2.4745, 0.2, 0.4949)])).toBe(49);
+
+      // 74.5% (sum = 0.745) -> 75
+      expect(scorer.computeFinalScore([makeScore('PRICE', 3.725, 0.2, 0.745)])).toBe(75);
+      // 74.49% (sum = 0.7449) -> 74
+      expect(scorer.computeFinalScore([makeScore('PRICE', 3.7245, 0.2, 0.7449)])).toBe(74);
+
+      // 99.5% (sum = 0.995) -> 100
+      expect(scorer.computeFinalScore([makeScore('PRICE', 4.975, 0.2, 0.995)])).toBe(100);
+      // 99.49% (sum = 0.9949) -> 99
+      expect(scorer.computeFinalScore([makeScore('PRICE', 4.9745, 0.2, 0.9949)])).toBe(99);
+    });
+
+    it('clamps negative contribution sums (< 0) to 0', () => {
+      const negativeBreakdown = [makeScore('PRICE', -0.5, 0.2, -0.1)];
+      expect(scorer.computeFinalScore(negativeBreakdown)).toBe(0);
+      expect(scorer.computeScoreResult(negativeBreakdown)).toEqual({
+        score: 0,
+        matchLevel: 'WEAK',
+      });
+    });
+
+    it('clamps contribution sums exceeding 1.0 (> 100) to 100', () => {
+      const overflownBreakdown = [
+        makeScore('PRICE', 2.0, 0.5, 1.0),
+        makeScore('DURATION', 1.0, 0.5, 0.5),
+      ];
+      expect(scorer.computeFinalScore(overflownBreakdown)).toBe(100);
+      expect(scorer.computeScoreResult(overflownBreakdown)).toEqual({
+        score: 100,
+        matchLevel: 'STRONG',
+      });
+    });
+  });
+
+  describe('Exact match level bucket boundaries', () => {
+    describe('STRONG (75–100)', () => {
+      it('categorizes 74.49 as score 74 -> GOOD and 74.5 as score 75 -> STRONG', () => {
+        const justBelow = scorer.computeScoreResult([makeScore('PRICE', 1, 1, 0.7449)]);
+        expect(justBelow.score).toBe(74);
+        expect(justBelow.matchLevel).toBe('GOOD');
+
+        const atThreshold = scorer.computeScoreResult([makeScore('PRICE', 1, 1, 0.745)]);
+        expect(atThreshold.score).toBe(75);
+        expect(atThreshold.matchLevel).toBe('STRONG');
+      });
+
+      it('categorizes boundary score 75 as STRONG', () => {
+        expect(scorer.getMatchLevel(75)).toBe('STRONG');
+        const res = scorer.computeScoreResult([makeScore('PRICE', 1, 1, 0.75)]);
+        expect(res.score).toBe(75);
+        expect(res.matchLevel).toBe('STRONG');
+      });
+
+      it('categorizes boundary score 100 as STRONG', () => {
+        expect(scorer.getMatchLevel(100)).toBe('STRONG');
+        const res = scorer.computeScoreResult([makeScore('PRICE', 1, 1, 1.0)]);
+        expect(res.score).toBe(100);
+        expect(res.matchLevel).toBe('STRONG');
+      });
+    });
+
+    describe('GOOD (50–74)', () => {
+      it('categorizes 49.49 as score 49 -> FAIR and 49.5 as score 50 -> GOOD', () => {
+        const justBelow = scorer.computeScoreResult([makeScore('PRICE', 1, 1, 0.4949)]);
+        expect(justBelow.score).toBe(49);
+        expect(justBelow.matchLevel).toBe('FAIR');
+
+        const atThreshold = scorer.computeScoreResult([makeScore('PRICE', 1, 1, 0.495)]);
+        expect(atThreshold.score).toBe(50);
+        expect(atThreshold.matchLevel).toBe('GOOD');
+      });
+
+      it('categorizes boundary score 50 as GOOD', () => {
+        expect(scorer.getMatchLevel(50)).toBe('GOOD');
+        const res = scorer.computeScoreResult([makeScore('PRICE', 1, 1, 0.5)]);
+        expect(res.score).toBe(50);
+        expect(res.matchLevel).toBe('GOOD');
+      });
+
+      it('categorizes boundary score 74 as GOOD', () => {
+        expect(scorer.getMatchLevel(74)).toBe('GOOD');
+        const res = scorer.computeScoreResult([makeScore('PRICE', 1, 1, 0.74)]);
+        expect(res.score).toBe(74);
+        expect(res.matchLevel).toBe('GOOD');
+      });
+    });
+
+    describe('FAIR (25–49)', () => {
+      it('categorizes 24.49 as score 24 -> WEAK and 24.5 as score 25 -> FAIR', () => {
+        const justBelow = scorer.computeScoreResult([makeScore('PRICE', 1, 1, 0.2449)]);
+        expect(justBelow.score).toBe(24);
+        expect(justBelow.matchLevel).toBe('WEAK');
+
+        const atThreshold = scorer.computeScoreResult([makeScore('PRICE', 1, 1, 0.245)]);
+        expect(atThreshold.score).toBe(25);
+        expect(atThreshold.matchLevel).toBe('FAIR');
+      });
+
+      it('categorizes boundary score 25 as FAIR', () => {
+        expect(scorer.getMatchLevel(25)).toBe('FAIR');
+        const res = scorer.computeScoreResult([makeScore('PRICE', 1, 1, 0.25)]);
+        expect(res.score).toBe(25);
+        expect(res.matchLevel).toBe('FAIR');
+      });
+
+      it('categorizes boundary score 49 as FAIR', () => {
+        expect(scorer.getMatchLevel(49)).toBe('FAIR');
+        const res = scorer.computeScoreResult([makeScore('PRICE', 1, 1, 0.49)]);
+        expect(res.score).toBe(49);
+        expect(res.matchLevel).toBe('FAIR');
+      });
+    });
+
+    describe('WEAK (0–24)', () => {
+      it('categorizes boundary score 0 as WEAK', () => {
+        expect(scorer.getMatchLevel(0)).toBe('WEAK');
+        const res = scorer.computeScoreResult([makeScore('PRICE', 1, 1, 0.0)]);
+        expect(res.score).toBe(0);
+        expect(res.matchLevel).toBe('WEAK');
+      });
+
+      it('categorizes boundary score 24 as WEAK', () => {
+        expect(scorer.getMatchLevel(24)).toBe('WEAK');
+        const res = scorer.computeScoreResult([makeScore('PRICE', 1, 1, 0.24)]);
+        expect(res.score).toBe(24);
+        expect(res.matchLevel).toBe('WEAK');
+      });
+    });
+  });
+
+  describe('Ineligible offers', () => {
+    it('returns score: null, matchLevel: null, and breakdown: [] for ineligible offers', () => {
+      const blacklistedOffer = offer({ carrierCodes: ['NK'] });
+      const prefs = preferences({ blacklistedAirlines: ['NK'] });
+
+      const [scored] = scorer.scoreOffers([blacklistedOffer], prefs);
+
+      expect(scored.matchResult.eligibility.eligible).toBe(false);
+      expect(scored.matchResult.score).toBeNull();
+      expect(scored.matchResult.matchLevel).toBeNull();
+      expect(scored.matchResult.breakdown).toEqual([]);
+      expect(scored.matchResult.eligibility.violations).toEqual([
+        {
+          constraint: 'BLACKLISTED_AIRLINE',
+          explanation: {
+            key: 'constraint.airline.blacklisted',
+            params: { airline: 'NK' },
+          },
+        },
+      ]);
+    });
+  });
+
+  describe('Immutability and purity', () => {
+    it('accepts deeply frozen inputs without mutation across contribution, score, and level calculations', () => {
+      const frozenBreakdown = deepFreeze([
+        makeScore('PRICE', 0.8, 0.2, 0.16),
+        makeScore('AIRLINE', 1.0, 0.15, 0.15),
+        makeScore('STOPS', 0.5, 0.12, 0.06),
+        makeScore('DURATION', 0.75, 0.08, 0.06),
+      ]);
+      const frozenOffers = deepFreeze([
+        offer({ id: 'f-1', price: 200, carrierCodes: ['AA'] }),
+        offer({ id: 'f-2', price: 300, carrierCodes: ['NK'] }),
+      ]);
+      const frozenPrefs = deepFreeze(
+        preferences({
+          preferredAirlines: ['AA'],
+          blacklistedAirlines: ['NK'],
+        }),
+      );
+
+      const breakdownJsonBefore = JSON.stringify(frozenBreakdown);
+      const offersJsonBefore = JSON.stringify(frozenOffers);
+      const prefsJsonBefore = JSON.stringify(frozenPrefs);
+
+      expect(() => scorer.computeContribution(0.8, 0.2)).not.toThrow();
+      expect(() => scorer.computeFinalScore(frozenBreakdown)).not.toThrow();
+      expect(() => scorer.computeScoreResult(frozenBreakdown)).not.toThrow();
+      expect(() => scorer.getMatchLevel(75)).not.toThrow();
+      expect(() => scorer.scoreOffers(frozenOffers, frozenPrefs)).not.toThrow();
+
+      expect(JSON.stringify(frozenBreakdown)).toBe(breakdownJsonBefore);
+      expect(JSON.stringify(frozenOffers)).toBe(offersJsonBefore);
+      expect(JSON.stringify(frozenPrefs)).toBe(prefsJsonBefore);
+    });
+  });
+});
+
+describe('FlightMatchScorerService breakdown order, metadata & stable tie-breaking ranking (T032)', () => {
+  const scorer = new FlightMatchScorerService();
+
+  describe('Breakdown order and metadata', () => {
+    it('strictly follows canonical POLICY_DIMENSION_ORDER for eligible offers with matching activeWeights and round6 contributions', () => {
+      const prefs = preferences({
+        preferredAirlines: ['AA'],
+        classPreference: 'economy',
+        preferredDepartureWindow: { start: 8, end: 12 },
+        preferredArrivalWindow: { start: 12, end: 16 },
+        maxStops: 1,
+        priceSensitivity: 'MODERATE',
+        requiresCheckedBaggage: true,
+      });
+
+      const offers = [
+        offer({
+          id: 'o-1',
+          price: 150,
+          stops: 0,
+          duration: 180,
+          outboundDepartureHour: 9,
+          outboundArrivalHour: 13,
+          carrierCodes: ['AA'],
+          cabinClass: 'economy',
+          hasCheckedBaggage: true,
+          originalIndex: 0,
+        }),
+        offer({
+          id: 'o-2',
+          price: 250,
+          stops: 1,
+          duration: 240,
+          outboundDepartureHour: 10,
+          outboundArrivalHour: 15,
+          carrierCodes: ['DL'],
+          cabinClass: 'premium_economy',
+          hasCheckedBaggage: false,
+          originalIndex: 1,
+        }),
+      ];
+
+      const activeWeights = scorer.resolveWeights(offers, prefs);
+      const results = scorer.scoreAll(offers, prefs);
+
+      expect(results).toHaveLength(2);
+      for (const result of results) {
+        expect(result.matchResult.eligibility.eligible).toBe(true);
+        expect(result.matchResult.score).not.toBeNull();
+        expect(result.matchResult.matchLevel).not.toBeNull();
+
+        // Canonical POLICY_DIMENSION_ORDER check
+        const dimensionNames = result.matchResult.breakdown.map(
+          (d: DimensionScore) => d.dimension,
+        );
+        expect(dimensionNames).toEqual([...POLICY_DIMENSION_ORDER]);
+
+        // Verify each dimension's weight matches resolved activeWeights and contribution matches round6(score * weight)
+        for (const dimScore of result.matchResult.breakdown) {
+          const expectedWeight = activeWeights[dimScore.dimension as keyof typeof activeWeights];
+          expect(dimScore.weight).toBe(expectedWeight);
+          expect(dimScore.contribution).toBe(
+            Math.round(dimScore.score * dimScore.weight * 1_000_000) / 1_000_000,
+          );
+        }
+
+        // Verify metadata
+        expect(result.matchResult.metadata).toEqual({
+          scoringVersion: SCORING_POLICY_VERSION,
+          activeWeights,
+        });
+      }
+    });
+
+    it('returns score: null, matchLevel: null, breakdown: [], and valid metadata for ineligible offers placed AFTER eligible offers', () => {
+      const prefs = preferences({
+        blacklistedAirlines: ['NK'],
+      });
+
+      const offers = [
+        offer({
+          id: 'ineligible-1',
+          carrierCodes: ['NK'],
+          originalIndex: 0,
+        }),
+        offer({
+          id: 'eligible-1',
+          carrierCodes: ['AA'],
+          originalIndex: 1,
+        }),
+      ];
+
+      const activeWeights = scorer.resolveWeights(offers, prefs);
+      const results = scorer.scoreAll(offers, prefs);
+
+      expect(results).toHaveLength(2);
+
+      // Eligible offer placed first
+      expect(results[0].offer.id).toBe('eligible-1');
+      expect(results[0].matchResult.eligibility.eligible).toBe(true);
+
+      // Ineligible offer placed after
+      expect(results[1].offer.id).toBe('ineligible-1');
+      expect(results[1].matchResult.eligibility.eligible).toBe(false);
+      expect(results[1].matchResult.score).toBeNull();
+      expect(results[1].matchResult.matchLevel).toBeNull();
+      expect(results[1].matchResult.breakdown).toEqual([]);
+      expect(results[1].matchResult.metadata).toEqual({
+        scoringVersion: SCORING_POLICY_VERSION,
+        activeWeights,
+      });
+    });
+  });
+
+  describe('Stable sorting order (MATCHED mode) and tie-breaking ladder', () => {
+    it('sorts eligible offers before ineligible offers regardless of initial position', () => {
+      const prefs = preferences({ blacklistedAirlines: ['NK'] });
+      const offers = [
+        offer({ id: 'ineligible-early', carrierCodes: ['NK'], originalIndex: 0 }),
+        offer({ id: 'eligible-late', carrierCodes: ['AA'], originalIndex: 1 }),
+      ];
+
+      const results = scorer.scoreAll(offers, prefs);
+      expect(results[0].offer.id).toBe('eligible-late');
+      expect(results[1].offer.id).toBe('ineligible-early');
+    });
+
+    it('sorts eligible offers by score descending when scores differ', () => {
+      const prefs = preferences({
+        preferredAirlines: ['AA'],
+      });
+      const offers = [
+        offer({ id: 'lower-score', carrierCodes: ['DL'], originalIndex: 0 }),
+        offer({ id: 'higher-score', carrierCodes: ['AA'], originalIndex: 1 }),
+      ];
+
+      const results = scorer.scoreAll(offers, prefs);
+      expect(results[0].offer.id).toBe('higher-score');
+      expect(results[1].offer.id).toBe('lower-score');
+      expect(results[0].matchResult.score!).toBeGreaterThan(results[1].matchResult.score!);
+    });
+
+    it('breaks tie on score by stops ascending (Layer 1)', () => {
+      // Both within maxStops = 2 -> both receive stops subscore 1.0; other dims identical -> scores equal
+      const prefs = preferences({
+        maxStops: 2,
+      });
+      const offers = [
+        offer({ id: 'more-stops', stops: 1, originalIndex: 0 }),
+        offer({ id: 'fewer-stops', stops: 0, originalIndex: 1 }),
+      ];
+
+      const results = scorer.scoreAll(offers, prefs);
+      expect(results[0].matchResult.score).toBe(results[1].matchResult.score);
+      expect(results[0].offer.id).toBe('fewer-stops');
+      expect(results[1].offer.id).toBe('more-stops');
+    });
+
+    it('breaks tie on score + stops by price ascending (Layer 2)', () => {
+      // Same stops, price delta small enough that final rounded scores remain identical
+      const prefs = preferences({
+        maxStops: 1,
+      });
+      const offers = [
+        offer({ id: 'higher-price', price: 100.01, stops: 0, originalIndex: 0 }),
+        offer({ id: 'lower-price', price: 100.00, stops: 0, originalIndex: 1 }),
+      ];
+
+      const results = scorer.scoreAll(offers, prefs);
+      expect(results[0].matchResult.score).toBe(results[1].matchResult.score);
+      expect(results[0].offer.stops).toBe(results[1].offer.stops);
+      expect(results[0].offer.id).toBe('lower-price');
+      expect(results[1].offer.id).toBe('higher-price');
+    });
+
+    it('breaks tie on score + stops + price by duration ascending (Layer 3)', () => {
+      // Same stops, same price, duration delta small enough that final rounded scores remain identical
+      const prefs = preferences({
+        maxStops: 1,
+      });
+      const offers = [
+        offer({ id: 'longer-duration', price: 100, stops: 0, duration: 120.01, originalIndex: 0 }),
+        offer({ id: 'shorter-duration', price: 100, stops: 0, duration: 120.00, originalIndex: 1 }),
+      ];
+
+      const results = scorer.scoreAll(offers, prefs);
+      expect(results[0].matchResult.score).toBe(results[1].matchResult.score);
+      expect(results[0].offer.stops).toBe(results[1].offer.stops);
+      expect(results[0].offer.price).toBe(results[1].offer.price);
+      expect(results[0].offer.id).toBe('shorter-duration');
+      expect(results[1].offer.id).toBe('longer-duration');
+    });
+
+    it('breaks tie on score + stops + price + duration by departure red-eye penalty ascending (Layer 4)', () => {
+      // 03:00 red-eye (penalty 1) loses to 10:00 non-red-eye (penalty 0)
+      // When preferredDepartureWindow is null, schedule score is neutral 0.5 for both
+      const prefs = preferences({
+        preferredDepartureWindow: null,
+      });
+      const offers = [
+        offer({
+          id: 'red-eye-offer',
+          price: 100,
+          stops: 0,
+          duration: 120,
+          outboundDepartureHour: 3,
+          originalIndex: 0,
+        }),
+        offer({
+          id: 'daytime-offer',
+          price: 100,
+          stops: 0,
+          duration: 120,
+          outboundDepartureHour: 10,
+          originalIndex: 1,
+        }),
+      ];
+
+      const results = scorer.scoreAll(offers, prefs);
+      expect(results[0].matchResult.score).toBe(results[1].matchResult.score);
+      expect(results[0].offer.stops).toBe(results[1].offer.stops);
+      expect(results[0].offer.price).toBe(results[1].offer.price);
+      expect(results[0].offer.duration).toBe(results[1].offer.duration);
+      expect(results[0].offer.id).toBe('daytime-offer');
+      expect(results[1].offer.id).toBe('red-eye-offer');
+    });
+
+    it('breaks tie on all criteria by originalIndex ascending (Layer 5)', () => {
+      const prefs = preferences();
+      const offers = [
+        offer({ id: 'second-offer', price: 100, stops: 0, duration: 120, outboundDepartureHour: 10, originalIndex: 5 }),
+        offer({ id: 'first-offer', price: 100, stops: 0, duration: 120, outboundDepartureHour: 10, originalIndex: 2 }),
+      ];
+
+      // Test passed in reversed order
+      const results = scorer.scoreAll(offers, prefs);
+      expect(results[0].offer.id).toBe('first-offer');
+      expect(results[1].offer.id).toBe('second-offer');
+    });
+
+    it('sorts multiple ineligible offers stably by originalIndex at the end', () => {
+      const prefs = preferences({ blacklistedAirlines: ['NK', 'F9'] });
+      const offers = [
+        offer({ id: 'ineligible-2', carrierCodes: ['NK'], originalIndex: 8 }),
+        offer({ id: 'eligible-1', carrierCodes: ['AA'], originalIndex: 4 }),
+        offer({ id: 'ineligible-1', carrierCodes: ['F9'], originalIndex: 1 }),
+      ];
+
+      const results = scorer.scoreAll(offers, prefs);
+      expect(results.map((r: ScoredOffer) => r.offer.id)).toEqual([
+        'eligible-1',
+        'ineligible-1',
+        'ineligible-2',
+      ]);
+    });
+  });
+
+  describe('Degenerate cases', () => {
+    it('returns empty array when offers array is empty', () => {
+      const results = scorer.scoreAll([], preferences());
+      expect(results).toEqual([]);
+    });
+
+    it('returns sorted 1-element array for single eligible offer', () => {
+      const single = offer({ id: 'solo', originalIndex: 0 });
+      const results = scorer.scoreAll([single], preferences());
+      expect(results).toHaveLength(1);
+      expect(results[0].offer.id).toBe('solo');
+      expect(results[0].matchResult.eligibility.eligible).toBe(true);
+    });
+
+    it('returns all ineligible offers at end with originalIndex order preserved', () => {
+      const prefs = preferences({ blacklistedAirlines: ['NK'] });
+      const offers = [
+        offer({ id: 'inelig-b', carrierCodes: ['NK'], originalIndex: 10 }),
+        offer({ id: 'inelig-a', carrierCodes: ['NK'], originalIndex: 3 }),
+      ];
+
+      const results = scorer.scoreAll(offers, prefs);
+      expect(results).toHaveLength(2);
+      expect(results[0].offer.id).toBe('inelig-a');
+      expect(results[1].offer.id).toBe('inelig-b');
+      expect(results[0].matchResult.eligibility.eligible).toBe(false);
+      expect(results[1].matchResult.eligibility.eligible).toBe(false);
+    });
+  });
+
+  describe('Immutability and purity', () => {
+    it('does not mutate frozen offers array, offer objects, or preferences', () => {
+      const frozenOffers = deepFreeze([
+        offer({ id: 'f-1', price: 200, stops: 1, duration: 150, outboundDepartureHour: 10, carrierCodes: ['AA'], originalIndex: 1 }),
+        offer({ id: 'f-2', price: 100, stops: 0, duration: 120, outboundDepartureHour: 9, carrierCodes: ['AA'], originalIndex: 0 }),
+        offer({ id: 'f-3', carrierCodes: ['NK'], originalIndex: 2 }),
+      ]);
+      const frozenPrefs = deepFreeze(
+        preferences({
+          preferredAirlines: ['AA'],
+          blacklistedAirlines: ['NK'],
+          classPreference: 'economy',
+        }),
+      );
+
+      const offersJsonBefore = JSON.stringify(frozenOffers);
+      const prefsJsonBefore = JSON.stringify(frozenPrefs);
+
+      let results: readonly ScoredOffer[] = [];
+      expect(() => {
+        results = scorer.scoreAll(frozenOffers, frozenPrefs);
+      }).not.toThrow();
+
+      expect(results).toHaveLength(3);
+      expect(JSON.stringify(frozenOffers)).toBe(offersJsonBefore);
+      expect(JSON.stringify(frozenPrefs)).toBe(prefsJsonBefore);
     });
   });
 });
