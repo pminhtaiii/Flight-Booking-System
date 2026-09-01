@@ -1,4 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { CABIN_RANK, CabinClass } from '@/flight-match/flight-match.policy';
 import { DuffelOffer } from '@/duffel/duffel.types';
 import { ScoredOffer, ScoringPreferences } from '@/flight-match/flight-match.types';
 import { ProfileService } from '@/profile/profile.service';
@@ -48,6 +49,12 @@ export interface OrchestratedSearchResponse {
   readonly meta: SearchMeta;
   readonly droppedCount: number;
   readonly rejectionCounts: Readonly<Record<string, number>>;
+}
+
+export function normalizeCabinClass(cabin: string | null | undefined): CabinClass | null {
+  if (!cabin || typeof cabin !== 'string') return null;
+  const key = cabin.trim().toLowerCase();
+  return key in CABIN_RANK ? (key as CabinClass) : null;
 }
 
 @Injectable()
@@ -102,9 +109,12 @@ export class FlightSearchOrchestratorService {
       };
     }
 
+    const normalizedStoredCabin = normalizeCabinClass(profilePrefs.classPreference);
+    const normalizedQueryCabin = normalizeCabinClass(params.query.cabinClass);
+
     const effectiveClassPreference =
-      profilePrefs.classPreference !== null
-        ? (params.query.cabinClass ?? profilePrefs.classPreference)
+      normalizedStoredCabin !== null
+        ? (normalizedQueryCabin ?? normalizedStoredCabin)
         : null;
 
     const effectivePreferences: ScoringPreferences = {

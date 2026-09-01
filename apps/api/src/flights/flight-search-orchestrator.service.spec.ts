@@ -341,6 +341,78 @@ describe('FlightSearchOrchestratorService (T033)', () => {
         }),
       );
     });
+
+    it("ignores unsupported profile classPreference (e.g. 'unknown_class', 'coach') and leaves effective classPreference null when query.cabinClass is omitted", async () => {
+      profileService.getScoringPreferences.mockResolvedValueOnce({
+        ...defaultPreferences,
+        classPreference: 'coach',
+      });
+
+      const params: OrchestratorParams = {
+        rawOffers: [createMockDuffelOffer('off_1')],
+        query: { ...defaultQuery, cabinClass: undefined },
+        userId: 'usr_1',
+        searchHash: 'hash_123',
+        cached: false,
+      };
+
+      await service.orchestrateSearch(params);
+
+      expect(scorer.scoreAll).toHaveBeenCalledWith(
+        expect.any(Array),
+        expect.objectContaining({
+          classPreference: null,
+        }),
+      );
+    });
+
+    it('leaves effective classPreference null when profile classPreference is unsupported even if query.cabinClass is valid', async () => {
+      profileService.getScoringPreferences.mockResolvedValueOnce({
+        ...defaultPreferences,
+        classPreference: 'unknown_class',
+      });
+
+      const params: OrchestratorParams = {
+        rawOffers: [createMockDuffelOffer('off_1')],
+        query: { ...defaultQuery, cabinClass: 'business' },
+        userId: 'usr_1',
+        searchHash: 'hash_123',
+        cached: false,
+      };
+
+      await service.orchestrateSearch(params);
+
+      expect(scorer.scoreAll).toHaveBeenCalledWith(
+        expect.any(Array),
+        expect.objectContaining({
+          classPreference: null,
+        }),
+      );
+    });
+
+    it("handles case-insensitive and trimmed profile classPreference (e.g. ' ECONOMY ')", async () => {
+      profileService.getScoringPreferences.mockResolvedValueOnce({
+        ...defaultPreferences,
+        classPreference: ' ECONOMY ',
+      });
+
+      const params: OrchestratorParams = {
+        rawOffers: [createMockDuffelOffer('off_1')],
+        query: { ...defaultQuery, cabinClass: undefined },
+        userId: 'usr_1',
+        searchHash: 'hash_123',
+        cached: false,
+      };
+
+      await service.orchestrateSearch(params);
+
+      expect(scorer.scoreAll).toHaveBeenCalledWith(
+        expect.any(Array),
+        expect.objectContaining({
+          classPreference: 'economy',
+        }),
+      );
+    });
   });
 
   describe('Raw-Cache Hit Rescoring & Zero Persistence (T034)', () => {
