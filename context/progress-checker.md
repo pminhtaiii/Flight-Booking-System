@@ -6,17 +6,34 @@ Update this file after every completed feature. Any AI agent reading this should
 
 ### Current Status
 
-**Feature:** Flight Match Scoring (Feature 022) — Phase 1, Phase 2, and Phase 3 / Slices 1–5 Complete (Tasks T001–T032)
-**Last completed:** Phase 3 / Slice 5 (T032): Implemented dimension breakdown ordering strictly adhering to canonical `POLICY_DIMENSION_ORDER`, metadata inclusion (`scoringVersion: 'flight-match-v1'`, `activeWeights`), and multi-attribute 7-tier tie-breaking ranking in `FlightMatchScorerService.scoreAll()`, with isolated tie-breaking layer coverage, ineligible offer handling, degenerate cases, deep freeze immutability, and 157/157 passing tests (2026-09-01).
-**Previous completed:** Phase 3 / Slice 4 (T031): Implemented dimension contribution precision (`computeContribution`), total score computation (`computeFinalScore`), match level tiers (`getMatchLevel`), and composite result derivation (`computeScoreResult`) in `FlightMatchScorerService`, with half-away-from-zero rounding, clamping [0, 100], exact match bucket boundary verification, and 143/143 passing tests (2026-09-01).
-**In progress:** None — Phase 3 / Slice 5 (T032) is complete. Canonical search orchestration and verification (T033–T039) remain pending.
-**Next:** Phase 3 / User Story 1 (T033–T039): Canonical search orchestration (T033–T035) and API/E2E verification (T036–T039).
+**Feature:** Flight Match Scoring (Feature 022) — Phase 1, Phase 2, and Phase 3 / Slices 1–6 Complete (Tasks T001–T035)
+**Last completed:** Phase 3 / Slice 6 (T033–T035): Implemented `FlightSearchOrchestratorService` core normalization (canonical first 20), profile scoring fetch, query cabin precedence override, raw-cache hit rescoring, metadata aggregation (`SearchMeta`), invalid offer telemetry, and zero score persistence. Wired NestJS modules (`FlightMatchModule` exporting `FlightMatchScorerService`, `FlightsModule` importing `FlightMatchModule` and `ProfileModule` and exporting `FlightSearchOrchestratorService`), with acyclic dependency graph verification and 255/255 passing tests (2026-09-01).
+**Previous completed:** Phase 3 / Slice 5 (T032): Implemented dimension breakdown ordering strictly adhering to canonical `POLICY_DIMENSION_ORDER`, metadata inclusion (`scoringVersion: 'flight-match-v1'`, `activeWeights`), and multi-attribute 7-tier tie-breaking ranking in `FlightMatchScorerService.scoreAll()`, with isolated tie-breaking layer coverage, ineligible offer handling, degenerate cases, deep freeze immutability, and 157/157 passing tests (2026-09-01).
+**In progress:** None — Phase 3 / Slice 6 (T033–T035) is complete. Consumer delegation & verification (T036–T039) remain pending.
+**Next:** Phase 3 / User Story 1 (T036–T039): FlightsService cache upsert / delegation (T036), DTO / controller / headers (T037), and API/E2E verification & benchmark (T038–T039).
 
 ---
 
 ## Progress by Feature
 
 ### [ ] Feature: Flight Match Scoring (Feature 022)
+
+- [x] Phase 3 / Slice 6: Search Orchestrator Core & Module Wiring (T033–T035) (2026-09-01):
+  - `& '.\node_modules\.bin\jest.CMD' --runInBand src/flights/flight-search-orchestrator.service.spec.ts src/flights/flights-module-wiring.spec.ts src/flight-match/` from `apps/api`: 255/255 tests passed, exit 0.
+  - `& '.\node_modules\.bin\tsc.CMD' -p tsconfig.json --noEmit` from `apps/api`: exit 0.
+  - `pnpm exec eslint "apps/api/src/flight-match/**/*.ts" "apps/api/src/flights/**/*.ts" --max-warnings 0`: exit 0.
+  - Implemented `FlightSearchOrchestratorService`:
+    - Step 1: Normalization: Discards malformed offers via `normalizeFlightOffers()`, caps to first 20 canonical valid offers (`maxItems: 20`), and preserves `originalIndex` to raw offer mapping.
+    - Step 2: Profile Fetch: Calls `profileService.getScoringPreferences(userId)` once if userId non-empty; falls back to default empty preferences with zero DB calls when userId is null/undefined/empty.
+    - Step 3: Query Cabin Precedence: Query `cabinClass` strictly overrides `profile.classPreference` if profile preference exists; if profile preference is null, query cabin remains supplier filter and personalized cabin dimension stays inactive.
+    - Step 4: Scorer Invocation: Delegates canonical offers and effective preferences to `FlightMatchScorerService.scoreAll()`.
+    - Raw-Cache Hit Rescoring: Re-runs `scoreAll()` against requesting user's profile when `cached: true`; enforces zero score persistence to database or cache.
+    - Aggregate Metadata Generation: Assembles `SearchMeta` (`totalResults: canonicalOffers.length`, `searchHash`, `cached`, `requestedCabinClass`, `scoringVersion: 'flight-match-v1'`, `eligibleCount`, `matchLevelCounts: { STRONG, GOOD, FAIR, WEAK }`). Excludes ineligible offers from bucket counts.
+    - Invalid Offer Tracking: Logs warning telemetry on dropped offers (`droppedCount`, `rejectionCounts`, `searchHash`) without failing search.
+  - Wired NestJS Modules:
+    - `FlightMatchModule`: Pure zero-infrastructure module (`imports: []`), registers and exports `FlightMatchScorerService`.
+    - `FlightsModule`: Imports `FlightMatchModule` and `ProfileModule`, registers and exports `FlightSearchOrchestratorService`.
+    - Verified acyclic module graph and clean NestJS dependency injection via `flights-module-wiring.spec.ts`.
 
 - [x] Phase 3 / Slice 5: Breakdown Order, Metadata & Stable Multi-Attribute Tie-Breaking (T032) (2026-09-01):
   - `& '.\node_modules\.bin\jest.CMD' --runInBand src/flight-match/flight-match-scorer.service.spec.ts` from `apps/api`: 157/157 tests passed, exit 0.
