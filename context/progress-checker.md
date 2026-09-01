@@ -6,16 +6,22 @@ Update this file after every completed feature. Any AI agent reading this should
 
 ### Current Status
 
-**Feature:** Flight Match Scoring (Feature 022) — Phase 1 & Phase 2 Complete (Tasks T001–T022)
-**Last completed:** Phase 2 / Slice 4 (T020–T022): The browser profile boundary tolerantly preserves legacy missing scoring fields, explicit `null` values, API-validated overnight windows, identity/contact/document sections, revisions, and timestamps, and serializes/clears canonical airlines, `maxStops: 0`, and `requiresCheckedBaggage: false` without loss. Contract boundaries remain provider/PII-safe; migration verification confirms additive nullable preferences without score persistence (2026-09-01).
-**In progress:** None — Phase 3 has not started.
-**Next:** Phase 3 / User Story 1 (T023–T039): Eligibility, deterministic scoring, canonical search orchestration, and MATCHED API verification.
+**Feature:** Flight Match Scoring (Feature 022) — Phase 1, Phase 2, and Phase 3 / Slice 1 Complete (Tasks T001–T025)
+**Last completed:** Phase 3 / Slice 1 (T023–T025): Added the dependency-free, unregistered FlightMatchScorerService with normalized blacklist eligibility, retained ineligible result shapes, eligible-only PRICE/DURATION medians, fixed base-weight contributions, rounded signal thresholds, and no input mutation (2026-09-01).
+**Previous completed:** Phase 2 / Slice 4 (T020–T022): The browser profile boundary tolerantly preserves legacy missing scoring fields, explicit `null` values, API-validated overnight windows, identity/contact/document sections, revisions, and timestamps, and serializes/clears canonical airlines, `maxStops: 0`, and `requiresCheckedBaggage: false` without loss. Contract boundaries remain provider/PII-safe; migration verification confirms additive nullable preferences without score persistence (2026-09-01).
+**In progress:** None — Phase 3 / Slice 1 is complete; T026–T032 remain intentionally unimplemented.
+**Next:** Phase 3 / User Story 1 (T026–T039): Remaining dimensions, weight resolution, ordering, canonical search orchestration, and MATCHED API verification.
 
 ---
 
 ## Progress by Feature
 
 ### [ ] Feature: Flight Match Scoring (Feature 022)
+
+- [x] Phase 3 / Slice 1: Eligibility, Visible Ineligible Results, and PRICE/DURATION Curves (T023–T025) (2026-09-01):
+  - `& '.\\node_modules\\.bin\\jest.CMD' --runInBand src/flight-match/flight-match-scorer.service.spec.ts` from `apps/api`: 20/20 tests passed, exit 0.
+  - `pnpm --filter @api/backend exec tsc -p tsconfig.json --noEmit`: exit 1 on Windows because the bare `tsc` executable was not found; the equivalent `& '.\\node_modules\\.bin\\tsc.CMD' -p tsconfig.json --noEmit` from `apps/api` completed with exit 0.
+  - T026–T032 and service/module registration remain intentionally out of scope for this slice.
 
 - [x] Phase 2 / Slice 4: Browser Profile Contract, Quality Gate & Documentation (T020–T022) (2026-09-01):
   - The browser response guard preserves legacy profiles where scoring fields are absent or explicitly `null`, passing API-validated departure/arrival windows (including overnight windows), price sensitivity, identity/contact/document sections, revisions, and timestamps through unchanged.
