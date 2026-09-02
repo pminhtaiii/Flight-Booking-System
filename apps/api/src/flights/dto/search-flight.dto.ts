@@ -10,6 +10,7 @@ import {
   ValidationArguments,
 } from 'class-validator';
 import { Transform, Type } from 'class-transformer';
+import type { FlightMatchResult } from '@/flight-match/flight-match.types';
 
 export function IsFutureDateString(validationOptions?: ValidationOptions) {
   return function (object: object, propertyName: string) {
@@ -175,6 +176,7 @@ export class FlightOfferDto {
   cabinMismatchDetails!: CabinMismatchDetail[] | null;
   segments!: FlightSegmentDto[];
   returnSegments!: FlightSegmentDto[] | null;
+  matchResult!: FlightMatchResult | null;
 }
 
 export class FlightSearchResponseMetaDto {
@@ -182,9 +184,18 @@ export class FlightSearchResponseMetaDto {
   searchHash!: string;
   cached!: boolean;
   requestedCabinClass!: string;
+  scoringVersion?: string | null;
+  eligibleCount?: number;
+  matchLevelCounts?: {
+    STRONG: number;
+    GOOD: number;
+    FAIR: number;
+    WEAK: number;
+  };
 }
 
 export class FlightSearchResponseDto {
+  mode: 'MATCHED' | 'RANKED' = 'MATCHED';
   results!: FlightOfferDto[];
   meta!: FlightSearchResponseMetaDto;
 }

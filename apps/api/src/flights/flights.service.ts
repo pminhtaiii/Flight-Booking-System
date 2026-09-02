@@ -3,6 +3,7 @@ import { PrismaService } from '@/prisma/prisma.service';
 import { CacheService } from '@/cache/cache.service';
 import { DuffelService } from '@/duffel/duffel.service';
 import { AuditService } from '@/audit/audit.service';
+import { FlightSearchOrchestratorService } from './flight-search-orchestrator.service';
 import {
   FlightSearchRequestDto,
   FlightSearchResponseDto,
@@ -13,7 +14,6 @@ import {
 import { FlightDetailResponseDto } from './dto/detail-flight.dto';
 import { DuffelOffer, DuffelSegment } from '@/duffel/duffel.types';
 import { Prisma } from '@prisma/client';
-import * as crypto from 'crypto';
 
 export type CabinClass = 'economy' | 'premium_economy' | 'business' | 'first';
 
@@ -26,17 +26,6 @@ function parseISO8601Duration(durationStr: string | null | undefined): number {
   const hours = parseInt(matches[2] || '0', 10);
   const minutes = parseInt(matches[3] || '0', 10);
   return days * 1440 + hours * 60 + minutes;
-}
-
-function generateDeterministicUUID(input: string): string {
-  const hash = crypto.createHash('sha256').update(input).digest('hex');
-  return [
-    hash.substring(0, 8),
-    hash.substring(8, 12),
-    '4' + hash.substring(13, 16),
-    '8' + hash.substring(17, 20),
-    hash.substring(20, 32),
-  ].join('-');
 }
 
 function capitalize(str: string | null | undefined): string | null {
@@ -190,8 +179,10 @@ function mapOffer(offer: DuffelOffer, id: string, requestedCabinClass: CabinClas
     cabinMismatchDetails,
     segments,
     returnSegments,
+    matchResult: null,
   };
 }
+
 
 @Injectable()
 export class FlightsService {
@@ -202,6 +193,7 @@ export class FlightsService {
     private readonly cacheService: CacheService,
     private readonly duffelService: DuffelService,
     private readonly auditService: AuditService,
+    private readonly flightSearchOrchestratorService: FlightSearchOrchestratorService,
   ) {}
 
   async search(
@@ -259,10 +251,30 @@ export class FlightsService {
     const cached = searchResult.cached;
     const sha256 = searchResult.searchHash;
 
-    // Map raw offers to FlightOfferDto capping at 20 results using deterministic UUIDs
-    const results: FlightOfferDto[] = (rawResult.offers || []).slice(0, 20).map((offer) => {
-      const id = generateDeterministicUUID(`${sha256}:${offer.id}`);
-      return mapOffer(offer, id, passengersInfo.cabinClass);
+    const orchestrated = await this.flightSearchOrchestratorService.orchestrateSearch({
+      rawOffers: rawResult.offers || [],
+      query: {
+        origin,
+        destination,
+        departureDate: query.departureDate,
+        returnDate: query.returnDate,
+        adults: passengersInfo.adults,
+        children: passengersInfo.children,
+        infants: passengersInfo.infants,
+        cabinClass: query.cabinClass,
+      },
+      userId,
+      searchHash: sha256,
+      cached,
+    });
+
+    // Map each OrchestratedFlightResult from orchestrated.results to FlightOfferDto
+    const results: FlightOfferDto[] = orchestrated.results.map((res) => {
+      const offerDto = mapOffer(res.rawOffer, res.scoredOffer.offer.id, passengersInfo.cabinClass);
+      return {
+        ...offerDto,
+        matchResult: res.scoredOffer.matchResult,
+      };
     });
 
     // Write async write-behind persistence
@@ -290,39 +302,37 @@ export class FlightsService {
             },
           });
 
-          if (!cached) {
-            const flightOffersData = results.map((offerDto) => {
-              const rawOffer = rawResult.offers.find((o) => o.id === offerDto.duffelOfferId);
-              return {
-                id: offerDto.id,
-                searchHash: sha256,
-                duffelOfferId: offerDto.duffelOfferId,
-                rawOffer: rawOffer ? (rawOffer as unknown as Prisma.InputJsonValue) : {},
-                origin,
-                destination,
-                departureDate: new Date(query.departureDate),
-                returnDate: query.returnDate ? new Date(query.returnDate) : null,
-                ...passengersInfo,
-                price: new Prisma.Decimal(offerDto.price),
-                currency: offerDto.currency,
-              };
-            });
-
-            const offerRecoveriesData = results.map((offerDto) => ({
+          const flightOffersData = results.map((offerDto) => {
+            const rawOffer = (rawResult.offers || []).find((o) => o.id === offerDto.duffelOfferId);
+            return {
               id: offerDto.id,
               searchHash: sha256,
-            }));
+              duffelOfferId: offerDto.duffelOfferId,
+              rawOffer: rawOffer ? (rawOffer as unknown as Prisma.InputJsonValue) : {},
+              origin,
+              destination,
+              departureDate: new Date(query.departureDate),
+              returnDate: query.returnDate ? new Date(query.returnDate) : null,
+              ...passengersInfo,
+              price: new Prisma.Decimal(offerDto.price),
+              currency: offerDto.currency,
+            };
+          });
 
-            if (flightOffersData.length > 0) {
-              await tx.flightOffer.createMany({
-                data: flightOffersData,
-                skipDuplicates: true,
-              });
-              await tx.offerRecovery.createMany({
-                data: offerRecoveriesData,
-                skipDuplicates: true,
-              });
-            }
+          const offerRecoveriesData = results.map((offerDto) => ({
+            id: offerDto.id,
+            searchHash: sha256,
+          }));
+
+          if (flightOffersData.length > 0) {
+            await tx.flightOffer.createMany({
+              data: flightOffersData,
+              skipDuplicates: true,
+            });
+            await tx.offerRecovery.createMany({
+              data: offerRecoveriesData,
+              skipDuplicates: true,
+            });
           }
         });
       } catch (error) {
@@ -351,9 +361,34 @@ export class FlightsService {
       correlationId,
     });
 
+    await this.auditService.createLog(this.prisma, {
+      userId,
+      action: 'search.completed',
+      resourceType: 'Flight',
+      metadata: {
+        origin,
+        destination,
+        departureDate: query.departureDate,
+        returnDate: query.returnDate || null,
+        adults: passengersInfo.adults,
+        children: passengersInfo.children,
+        infants: passengersInfo.infants,
+        cabinClass: passengersInfo.cabinClass,
+        mode: orchestrated.mode,
+        resultCount: results.length,
+        eligibleCount: orchestrated.meta.eligibleCount,
+        duration: responseTime,
+        searchHash: sha256,
+      },
+      traceId,
+      correlationId,
+    });
+
     return {
+      mode: orchestrated.mode,
       results,
       meta: {
+        ...orchestrated.meta,
         totalResults: results.length,
         searchHash: sha256,
         cached,

@@ -87,10 +87,10 @@ description: "Dependency-ordered implementation tasks for deterministic flight m
 - [x] T033 [US1] Drive canonical-first-20 normalization, one profile read, query-cabin precedence, and scorer invocation through RED → GREEN in `apps/api/src/flights/flight-search-orchestrator.service.spec.ts` and `apps/api/src/flights/flight-search-orchestrator.service.ts`
 - [x] T034 [US1] Drive current-profile rescoring on raw-cache hits, invalid-offer counts, aggregate metadata, and no score persistence through RED → GREEN in `apps/api/src/flights/flight-search-orchestrator.service.spec.ts` and `apps/api/src/flights/flight-search-orchestrator.service.ts`
 - [x] T035 [US1] Register/export `FlightMatchScorerService`, register/export the orchestrator, and add acyclic `ProfileModule`/`FlightMatchModule` imports in `apps/api/src/flight-match/flight-match.module.ts` and `apps/api/src/flights/flights.module.ts`
-- [ ] T036 [US1] Drive cache-hit/miss upsert of missing `FlightOffer`/`OfferRecovery`, including agent-warmed raw cache followed by browser selection, through RED → GREEN in `apps/api/src/flights/flights.service.spec.ts` and `apps/api/src/flights/flights.service.ts`
-- [ ] T037 [US1] Drive history/audit preservation, PII-safe mode/meta response, trusted DTO serialization, and private/no-store search headers with ETag removal through RED → GREEN in `apps/api/src/flights/flights.service.spec.ts`, `apps/api/src/flights/flights.controller.spec.ts`, `apps/api/src/flights/flights.service.ts`, `apps/api/src/flights/flights.controller.ts`, and `apps/api/src/flights/dto/search-flight.dto.ts`
-- [ ] T038 [US1] Add MATCHED contract, private/no-store headers, repeated-run parity, blacklist visibility, raw-cache rescoring, no-extra-Duffel-call, and no-score-storage E2E coverage in `apps/api/test/flights-match-scoring.e2e-spec.ts`
-- [ ] T039 [US1] Add and run the deterministic 1,000-repeat and warmed 20-offer p95 benchmark in `apps/api/src/flight-match/flight-match.performance.spec.ts`
+- [x] T036 [US1] Drive cache-hit/miss upsert of missing `FlightOffer`/`OfferRecovery`, including agent-warmed raw cache followed by browser selection, through RED → GREEN in `apps/api/src/flights/flights.service.spec.ts` and `apps/api/src/flights/flights.service.ts`
+- [x] T037 [US1] Drive history/audit preservation, PII-safe mode/meta response, trusted DTO serialization, and private/no-store search headers with ETag removal through RED → GREEN in `apps/api/src/flights/flights.service.spec.ts`, `apps/api/src/flights/flights.controller.spec.ts`, `apps/api/src/flights/flights.service.ts`, `apps/api/src/flights/flights.controller.ts`, and `apps/api/src/flights/dto/search-flight.dto.ts`
+- [x] T038 [US1] Add MATCHED contract, private/no-store headers, repeated-run parity, blacklist visibility, raw-cache rescoring, no-extra-Duffel-call, and no-score-storage E2E coverage in `apps/api/test/flights-match-scoring.e2e-spec.ts`
+- [x] T039 [US1] Add and run the deterministic 1,000-repeat and warmed 20-offer p95 benchmark in `apps/api/src/flight-match/flight-match.performance.spec.ts`
 
 **Checkpoint**: Personalized browser API searches are a deployable MVP with exact deterministic policy evidence and unchanged Duffel budget behavior.
 
@@ -283,3 +283,15 @@ Task B: T064 strict score-free Python snapshot invariant tests
 ## Phase 9: Convergence
 
 - [x] T079 Prevent unallowlisted profile-service error messages from reaching the browser per SC-005 / T021 zero-PII/auth-error invariant (partial)
+
+## Phase 10: Convergence
+
+- [x] T080 Add strict schema-equivalent MATCHED response assertions for dimension bounds, integer scores, exact object keys, and primitive explanation parameters per T038 / `contracts/flight-search.openapi.yaml` (partial)
+- [x] T081 Assert PostgreSQL contains no score- or scoring-specific table anywhere in the public schema per FR-023 / T038 zero-score-persistence invariant (partial)
+- [x] T082 Add an agent-warmed raw-cache followed by browser offer recovery/detail scenario per T036 / plan Phase 3 cache-hit selection requirement (partial)
+- [x] T083 Assert full match-result output parity across every one of the 1,000 benchmark repetitions per SC-001 / T039 deterministic repeatability requirement (partial)
+
+## Phase 11: Convergence
+
+- [x] T084 Complete schema-equivalent MATCHED response validation for remaining OpenAPI scalar types, formats, enums, minima, mismatch-detail shapes, and array cardinalities per T038 / T080 (partial)
+- [x] T085 Eliminate scorer benchmark flakiness while retaining the strict warmed 20-offer p95 `< 5 ms` threshold per T039 / workflow Rule 4 (partial)

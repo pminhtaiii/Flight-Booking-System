@@ -28,6 +28,7 @@ import type {
 } from './flight-match.types';
 
 const AIRLINE_CODE_PATTERN = /^[A-Z0-9]{2,3}$/;
+const NORMALIZED_AIRLINE_CODES = new WeakMap<readonly unknown[], readonly string[]>();
 
 type PersonalizedDimension =
   | 'AIRLINE'
@@ -110,8 +111,10 @@ export class FlightMatchScorerService {
   checkEligibility(
     offer: FlightMatchInput,
     preferences: ScoringPreferences,
+    precomputedBlacklist?: ReadonlySet<string>,
   ): EligibilityResult {
-    const blacklistedAirlines = new Set(normalizeAirlineCodes(preferences.blacklistedAirlines));
+    const blacklistedAirlines =
+      precomputedBlacklist ?? new Set(normalizeAirlineCodes(preferences.blacklistedAirlines));
     const violations = normalizeAirlineCodes(offer.carrierCodes)
       .filter((airline) => blacklistedAirlines.has(airline))
       .map((airline) => ({
@@ -133,6 +136,7 @@ export class FlightMatchScorerService {
     offers: readonly FlightMatchInput[],
     preferences: ScoringPreferences,
     preFilteredEligibleOffers?: readonly FlightMatchInput[],
+    precomputedPreferredSet?: ReadonlySet<string>,
   ): ActiveWeights {
     const eligibleOffers =
       preFilteredEligibleOffers ??
@@ -142,8 +146,12 @@ export class FlightMatchScorerService {
       return { ...BASE_WEIGHTS };
     }
 
+    const preferredSet =
+      precomputedPreferredSet ??
+      new Set(normalizeAirlineCodes(preferences.preferredAirlines ?? []));
+
     const isMissingPersonalized: Record<PersonalizedDimension, boolean> = {
-      AIRLINE: normalizeAirlineCodes(preferences.preferredAirlines ?? []).length === 0,
+      AIRLINE: preferredSet.size === 0,
       ARRIVAL_SCHEDULE: preferences.preferredArrivalWindow == null,
       CABIN: preferences.classPreference == null || preferences.classPreference.trim() === '',
       DEPARTURE_SCHEDULE: preferences.preferredDepartureWindow == null,
@@ -159,19 +167,60 @@ export class FlightMatchScorerService {
       const medianDuration = calculateMedian(eligibleOffers.map((o) => o.duration));
       const minStops = Math.min(...eligibleOffers.map((o) => o.stops));
 
-      const priceScores = eligibleOffers.map(
-        (o) => this.scorePrice(o, medianPrice, preferences).score,
-      );
-      const stopsScores = eligibleOffers.map(
-        (o) => this.scoreStops(o, preferences, minStops).score,
-      );
-      const durationScores = eligibleOffers.map(
-        (o) => this.scoreDuration(o, medianDuration).score,
-      );
+      const priceMultiplier = getPriceSensitivityMultiplier(preferences.priceSensitivity);
+      const getPriceScore = (o: FlightMatchInput) =>
+        round6(
+          clamp(
+            0.5 +
+              0.5 *
+                priceMultiplier *
+                ((medianPrice - o.price) / Math.max(medianPrice, 0.01)),
+            0,
+            1,
+          ),
+        );
 
-      const priceZeroVariance = priceScores.every((s) => s === priceScores[0]);
-      const stopsZeroVariance = stopsScores.every((s) => s === stopsScores[0]);
-      const durationZeroVariance = durationScores.every((s) => s === durationScores[0]);
+      const firstPrice = getPriceScore(eligibleOffers[0]);
+      let priceZeroVariance = true;
+      for (let i = 1; i < eligibleOffers.length; i++) {
+        if (getPriceScore(eligibleOffers[i]) !== firstPrice) {
+          priceZeroVariance = false;
+          break;
+        }
+      }
+
+      const maxStopsPref = preferences.maxStops;
+      const getStopsScore = (o: FlightMatchInput) =>
+        maxStopsPref !== null && maxStopsPref !== undefined
+          ? round6(o.stops <= maxStopsPref ? 1.0 : clamp(1 - 0.5 * (o.stops - maxStopsPref), 0, 1))
+          : round6(clamp(1 - 0.5 * (o.stops - minStops), 0, 1));
+
+      const firstStops = getStopsScore(eligibleOffers[0]);
+      let stopsZeroVariance = true;
+      for (let i = 1; i < eligibleOffers.length; i++) {
+        if (getStopsScore(eligibleOffers[i]) !== firstStops) {
+          stopsZeroVariance = false;
+          break;
+        }
+      }
+
+      const getDurationScore = (o: FlightMatchInput) =>
+        round6(
+          clamp(
+            0.5 + 0.5 * ((medianDuration - o.duration) / Math.max(medianDuration, 1)),
+            0,
+            1,
+          ),
+        );
+
+      const firstDuration = getDurationScore(eligibleOffers[0]);
+      let durationZeroVariance = true;
+      for (let i = 1; i < eligibleOffers.length; i++) {
+        if (getDurationScore(eligibleOffers[i]) !== firstDuration) {
+          durationZeroVariance = false;
+          break;
+        }
+      }
 
       const allBaselineZeroVariance =
         priceZeroVariance && stopsZeroVariance && durationZeroVariance;
@@ -208,26 +257,96 @@ export class FlightMatchScorerService {
         continue;
       }
 
-      let scores: readonly number[] = [];
+      let isZeroVariance = true;
       switch (dim) {
-        case 'AIRLINE':
-          scores = eligibleOffers.map((o) => this.scoreAirline(o, preferences).score);
+        case 'AIRLINE': {
+          const getScore = (o: FlightMatchInput) =>
+            preferredSet.size > 0 &&
+            normalizeAirlineCodes(o.carrierCodes ?? []).some((c) => preferredSet.has(c))
+              ? 1.0
+              : 0.5;
+          const first = getScore(eligibleOffers[0]);
+          for (let i = 1; i < eligibleOffers.length; i++) {
+            if (getScore(eligibleOffers[i]) !== first) {
+              isZeroVariance = false;
+              break;
+            }
+          }
           break;
-        case 'ARRIVAL_SCHEDULE':
-          scores = eligibleOffers.map((o) => this.scoreArrivalSchedule(o, preferences).score);
+        }
+        case 'ARRIVAL_SCHEDULE': {
+          const window = preferences.preferredArrivalWindow;
+          if (!window) {
+            isZeroVariance = true;
+            break;
+          }
+          const getScore = (o: FlightMatchInput) => {
+            const h = o.outboundArrivalHour;
+            if (isHourInWindow(h, window)) return 1.0;
+            const dist = hourDistanceToWindow(h, window);
+            return round6(clamp(1 - dist / SCHEDULE_SHOULDER_HOURS, 0, 1));
+          };
+          const first = getScore(eligibleOffers[0]);
+          for (let i = 1; i < eligibleOffers.length; i++) {
+            if (getScore(eligibleOffers[i]) !== first) {
+              isZeroVariance = false;
+              break;
+            }
+          }
           break;
-        case 'CABIN':
-          scores = eligibleOffers.map((o) => this.scoreCabin(o, preferences).score);
+        }
+        case 'CABIN': {
+          const reqClass = preferences.classPreference ?? '';
+          const getScore = (o: FlightMatchInput) =>
+            CABIN_ADJACENCY_MAPPINGS[getCabinAdjacency(reqClass, o.cabinClass)].subScore;
+          const first = getScore(eligibleOffers[0]);
+          for (let i = 1; i < eligibleOffers.length; i++) {
+            if (getScore(eligibleOffers[i]) !== first) {
+              isZeroVariance = false;
+              break;
+            }
+          }
           break;
-        case 'DEPARTURE_SCHEDULE':
-          scores = eligibleOffers.map((o) => this.scoreDepartureSchedule(o, preferences).score);
+        }
+        case 'DEPARTURE_SCHEDULE': {
+          const window = preferences.preferredDepartureWindow;
+          if (!window) {
+            isZeroVariance = true;
+            break;
+          }
+          const getScore = (o: FlightMatchInput) => {
+            const h = o.outboundDepartureHour;
+            if (isHourInWindow(h, window)) return 1.0;
+            const dist = hourDistanceToWindow(h, window);
+            return round6(clamp(1 - dist / SCHEDULE_SHOULDER_HOURS, 0, 1));
+          };
+          const first = getScore(eligibleOffers[0]);
+          for (let i = 1; i < eligibleOffers.length; i++) {
+            if (getScore(eligibleOffers[i]) !== first) {
+              isZeroVariance = false;
+              break;
+            }
+          }
           break;
-        case 'BAGGAGE':
-          scores = eligibleOffers.map((o) => this.scoreBaggage(o, preferences).score);
+        }
+        case 'BAGGAGE': {
+          const req = preferences.requiresCheckedBaggage;
+          const getScore = (o: FlightMatchInput) => {
+            if (req === true) return o.hasCheckedBaggage === true ? 1.0 : 0.0;
+            if (req === false) return 1.0;
+            return 0.5;
+          };
+          const first = getScore(eligibleOffers[0]);
+          for (let i = 1; i < eligibleOffers.length; i++) {
+            if (getScore(eligibleOffers[i]) !== first) {
+              isZeroVariance = false;
+              break;
+            }
+          }
           break;
+        }
       }
 
-      const isZeroVariance = scores.every((s) => s === scores[0]);
       isPersonalizedActive[dim] = !isZeroVariance;
     }
 
@@ -357,16 +476,18 @@ export class FlightMatchScorerService {
     offers: readonly FlightMatchInput[],
     preferences: ScoringPreferences,
   ): readonly ScoredOffer[] {
+    const blacklistedSet = new Set(normalizeAirlineCodes(preferences.blacklistedAirlines));
     const evaluatedOffers = offers.map((offer) => ({
       offer,
-      eligibility: this.checkEligibility(offer, preferences),
+      eligibility: this.checkEligibility(offer, preferences, blacklistedSet),
     }));
 
     const eligibleOffers = evaluatedOffers
       .filter(({ eligibility }) => eligibility.eligible)
       .map(({ offer }) => offer);
 
-    const activeWeights = this.resolveWeights(offers, preferences, eligibleOffers);
+    const preferredSet = new Set(normalizeAirlineCodes(preferences.preferredAirlines ?? []));
+    const activeWeights = this.resolveWeights(offers, preferences, eligibleOffers, preferredSet);
 
     const medianPrice = calculateMedian(eligibleOffers.map(({ price }) => price));
     const medianDuration = calculateMedian(eligibleOffers.map(({ duration }) => duration));
@@ -394,7 +515,7 @@ export class FlightMatchScorerService {
 
       const breakdown: readonly DimensionScore[] = [
         this.scorePrice(offer, medianPrice, preferences, activeWeights.PRICE),
-        this.scoreAirline(offer, preferences, activeWeights.AIRLINE),
+        this.scoreAirline(offer, preferences, activeWeights.AIRLINE, preferredSet),
         this.scoreArrivalSchedule(offer, preferences, activeWeights.ARRIVAL_SCHEDULE),
         this.scoreStops(offer, preferences, minStops, activeWeights.STOPS),
         this.scoreCabin(offer, preferences, activeWeights.CABIN),
@@ -571,10 +692,12 @@ export class FlightMatchScorerService {
     offer: FlightMatchInput,
     preferences: ScoringPreferences,
     effectiveWeight: number = BASE_WEIGHTS.AIRLINE,
+    precomputedPreferredSet?: ReadonlySet<string>,
   ): DimensionScore {
-    const preferredCodes = normalizeAirlineCodes(preferences.preferredAirlines ?? []);
-    if (preferredCodes.length > 0) {
-      const preferredSet = new Set(preferredCodes);
+    const preferredSet =
+      precomputedPreferredSet ??
+      new Set(normalizeAirlineCodes(preferences.preferredAirlines ?? []));
+    if (preferredSet.size > 0) {
       const offerCarriers = normalizeAirlineCodes(offer.carrierCodes ?? []);
       const matchedCarrier = offerCarriers.find((carrier) => preferredSet.has(carrier));
 
@@ -784,6 +907,22 @@ export class FlightMatchScorerService {
 }
 
 function normalizeAirlineCodes(codes: readonly unknown[]): readonly string[] {
+  if (!codes || codes.length === 0) {
+    return [];
+  }
+
+  const cached = NORMALIZED_AIRLINE_CODES.get(codes);
+  if (cached) {
+    return cached;
+  }
+
+  if (codes.length === 1 && typeof codes[0] === 'string') {
+    const normalizedCode = codes[0].trim().toUpperCase();
+    const normalizedCodes = AIRLINE_CODE_PATTERN.test(normalizedCode) ? [normalizedCode] : [];
+    NORMALIZED_AIRLINE_CODES.set(codes, normalizedCodes);
+    return normalizedCodes;
+  }
+
   const normalizedCodes = new Set<string>();
 
   for (const code of codes) {
@@ -797,7 +936,9 @@ function normalizeAirlineCodes(codes: readonly unknown[]): readonly string[] {
     }
   }
 
-  return [...normalizedCodes];
+  const result = [...normalizedCodes];
+  NORMALIZED_AIRLINE_CODES.set(codes, result);
+  return result;
 }
 
 function getComparisonExplanationKey(
