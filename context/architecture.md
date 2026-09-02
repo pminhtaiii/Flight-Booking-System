@@ -1002,3 +1002,7 @@ Feature 019 restructures high-leverage boundaries without changing public produc
    - `FlightMatchModule`: `imports: []` $\rightarrow$ `exports: [FlightMatchScorerService]`.
    - `FlightsModule`: `imports: [..., FlightMatchModule, ProfileModule]` $\rightarrow$ `exports: [FlightsService, FlightSearchOrchestratorService]`.
    - Zero circular dependencies across `FlightsModule`, `FlightMatchModule`, and `ProfileModule`.
+
+4. **Search HTTP Boundary (`FlightsController`)**:
+   - Both public search aliases return `FlightSearchResponseDto` through Nest's passthrough response path, preserving direct controller invocation and DTO serialization.
+   - The controller sets `Cache-Control: private, no-store`, removes any existing `ETag`, and uses a response-local Express application view that omits only the `etag fn` setting during final JSON serialization. No global Express ETag setting is mutated, so unrelated concurrent responses retain their normal behavior.
